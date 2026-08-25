@@ -124,3 +124,39 @@ if ($manifest.auditSummary.status -cne 'planned') {
     throw "Unexpected dry-run audit status: $($manifest.auditSummary.status)"
 }
 Write-Host 'GODOT_ALS_P2A_METADATA_OK'
+
+$exportOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export "-Output=$outputPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
+$exportOutput | ForEach-Object { Write-Host $_ }
+if ($LASTEXITCODE -ne 0) {
+    throw "P2A full export failed with exit code $LASTEXITCODE."
+}
+$exportMarker = 'GODOT_ALS_P2A_EXPORT_OK assets='
+if (-not (($exportOutput | Out-String).Contains($exportMarker, [StringComparison]::Ordinal))) {
+    throw "P2A full export marker was not found: $exportMarker"
+}
+
+$formalManifestPath = Join-Path $outputPath 'als_manifest.json'
+if (-not (Test-Path -LiteralPath $formalManifestPath -PathType Leaf)) {
+    throw "Formal manifest does not exist: $formalManifestPath"
+}
+$formalManifest = Get-Content -LiteralPath $formalManifestPath -Raw | ConvertFrom-Json
+if ($formalManifest.auditSummary.status -cne 'complete' -or $formalManifest.auditSummary.errorCount -ne 0) {
+    throw "Formal manifest audit is not complete: $($formalManifest.auditSummary.status)"
+}
+foreach ($file in $formalManifest.files) {
+    $filePath = Join-Path $outputPath $file.relativePath
+    if (-not (Test-Path -LiteralPath $filePath -PathType Leaf) -or (Get-Item -LiteralPath $filePath).Length -le 0) {
+        throw "Manifest output file is missing or empty: $($file.relativePath)"
+    }
+    if ($file.sha256 -cnotmatch '^[0-9a-f]{64}$') {
+        throw "Manifest output SHA-256 is invalid: $($file.relativePath)"
+    }
+    $actualHash = (Get-FileHash -LiteralPath $filePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -cne $file.sha256) {
+        throw "Manifest output SHA-256 mismatch: $($file.relativePath)"
+    }
+}
+if (@($formalManifest.files).Count -ne $plan.summary.exportableCount) {
+    throw "Formal manifest file count does not match export plan: $(@($formalManifest.files).Count)"
+}
+Write-Host "GODOT_ALS_P2A_FULL_EXPORT_OK files=$(@($formalManifest.files).Count)"

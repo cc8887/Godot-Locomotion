@@ -2,7 +2,10 @@
 
 #include "AlsAssetDiscovery.h"
 #include "AlsExportPlanner.h"
+#include "AlsFbxExporter.h"
 #include "AlsManifestWriter.h"
+#include "AlsOutputAuditor.h"
+#include "AlsTextureExporter.h"
 #include "Misc/App.h"
 #include "Misc/EngineVersion.h"
 #include "Misc/Parse.h"
@@ -28,7 +31,9 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         return 0;
     }
 
-    if (!FParse::Param(*Params, TEXT("DryRun")))
+    const bool bDryRun = FParse::Param(*Params, TEXT("DryRun"));
+    const bool bExport = FParse::Param(*Params, TEXT("Export"));
+    if (bDryRun == bExport)
     {
         UE_LOG(LogAlsGodotExporter, Error, TEXT("ALS export commandlet requires -ReadyCheck, -DryRun, or -Export."));
         return 2;
@@ -37,7 +42,7 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
     FString OutputDirectory;
     if (!FParse::Value(*Params, TEXT("Output="), OutputDirectory) || OutputDirectory.IsEmpty() || FPaths::IsRelative(OutputDirectory))
     {
-        UE_LOG(LogAlsGodotExporter, Error, TEXT("-DryRun requires an absolute -Output path."));
+        UE_LOG(LogAlsGodotExporter, Error, TEXT("-DryRun or -Export requires an absolute -Output path."));
         return 2;
     }
     OutputDirectory = FPaths::ConvertRelativePathToFull(OutputDirectory);
@@ -66,5 +71,35 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 
     UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_P2A_PLAN_OK assets=%d exportable=%d config=%d excluded=0"),
         Assets.Num(), ExportableCount, ConfigCount);
+    if (bDryRun)
+    {
+        return 0;
+    }
+
+    int32 FbxFileCount = 0;
+    int32 TextureFileCount = 0;
+    TArray<FString> NormalizedFbxKeys;
+    if (!FAlsFbxExporter::Export(OutputDirectory, Assets, FbxFileCount, NormalizedFbxKeys, Error) ||
+        !FAlsTextureExporter::Export(OutputDirectory, Assets, TextureFileCount, Error))
+    {
+        UE_LOG(LogAlsGodotExporter, Error, TEXT("Asset export failed: %s"), *Error);
+        return 4;
+    }
+
+    TArray<FAlsExportFile> Files;
+    if (!FAlsOutputAuditor::Audit(OutputDirectory, Assets, NormalizedFbxKeys, Files, Error))
+    {
+        UE_LOG(LogAlsGodotExporter, Error, TEXT("Output audit failed: %s"), *Error);
+        return 6;
+    }
+    if (!FAlsManifestWriter::WriteComplete(OutputDirectory, Assets, Files, Error))
+    {
+        UE_LOG(LogAlsGodotExporter, Error, TEXT("Formal manifest publication failed: %s"), *Error);
+        return 6;
+    }
+
+    UE_LOG(LogAlsGodotExporter, Display,
+        TEXT("GODOT_ALS_P2A_EXPORT_OK assets=%d files=%d fbx=%d textures=%d warnings=0"),
+        Assets.Num(), Files.Num(), FbxFileCount, TextureFileCount);
     return 0;
 }

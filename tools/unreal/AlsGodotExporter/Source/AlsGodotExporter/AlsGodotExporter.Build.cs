@@ -18,8 +18,13 @@ public class AlsGodotExporter : ModuleRules
             "AssetRegistry",
             "Json",
             "JsonUtilities",
+            "RenderCore",
+            "Renderer",
+            "SSL",
             "UnrealEd",
             "AnimationDataController",
         });
+
+        AddEngineThirdPartyPrivateStaticDependencies(target, "OpenSSL");
     }
 }
