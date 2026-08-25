@@ -1,0 +1,27 @@
+; Engine configuration file.
+; Edit through the editor where practical.
+
+config_version=5
+
+[application]
+
+config/name="Godot ALS"
+run/main_scene="res://scenes/tests/headless_smoke.tscn"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[dotnet]
+
+project/assembly_name="GodotALS"
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
