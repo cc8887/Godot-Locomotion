@@ -82,7 +82,7 @@ Create `.gdignore` markers in `artifacts`, `benchmark-results`, `docs`, `src/Als
 
 ```ini
 [importer_defaults]
-fbx={
+scene={
 "fbx/embedded_image_handling": 0,
 "animation/import": true,
 "animation/fps": 30
