@@ -214,6 +214,12 @@ foreach ($file in $formalManifest.files) {
         throw "Manifest output SHA-256 mismatch: $($file.relativePath)"
     }
 }
+$fbxFiles = Get-ChildItem -LiteralPath $outputPath -Recurse -File -Filter '*.fbx'
+$externalTextureObjects = @($fbxFiles | Select-String -Pattern '^\s*(Texture|Video):\s+\d+,' -CaseSensitive)
+if ($externalTextureObjects.Count -ne 0) {
+    $firstMatch = $externalTextureObjects[0]
+    throw "Normalized FBX still contains an external texture object: $($firstMatch.Path):$($firstMatch.LineNumber)"
+}
 if (@($formalManifest.files).Count -ne $plan.summary.exportableCount) {
     throw "Formal manifest file count does not match export plan: $(@($formalManifest.files).Count)"
 }

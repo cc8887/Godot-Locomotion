@@ -33,10 +33,13 @@ public sealed class RepositoryImportPolicyTests
     [Fact]
     public void FbxImportDoesNotResolveExporterWorkstationTextures()
     {
-        var defaults = File.ReadAllText(Path.Combine(RepositoryRoot.Find(), "import_defaults.cfg"));
+        var root = RepositoryRoot.Find();
+        var project = File.ReadAllText(Path.Combine(root, "project.godot"));
 
-        Assert.Contains("fbx/embedded_image_handling=0", defaults, StringComparison.Ordinal);
-        Assert.Contains("animation/import=true", defaults, StringComparison.Ordinal);
-        Assert.Contains("animation/fps=30", defaults, StringComparison.Ordinal);
+        Assert.Contains("[importer_defaults]", project, StringComparison.Ordinal);
+        Assert.Contains("\"fbx/embedded_image_handling\": 0", project, StringComparison.Ordinal);
+        Assert.Contains("\"animation/import\": true", project, StringComparison.Ordinal);
+        Assert.Contains("\"animation/fps\": 30", project, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(root, "import_defaults.cfg")));
     }
 }

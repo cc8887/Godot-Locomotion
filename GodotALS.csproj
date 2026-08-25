@@ -1,10 +1,12 @@
 <Project Sdk="Godot.NET.Sdk/4.7.2">
   <PropertyGroup>
     <RootNamespace>GodotAls</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="src/Als.Godot/**/*.cs" />
     <ProjectReference Include="src/Als.Core/Als.Core.csproj" />
+    <ProjectReference Include="src/Als.Import/Als.Import.csproj" />
   </ItemGroup>
 </Project>

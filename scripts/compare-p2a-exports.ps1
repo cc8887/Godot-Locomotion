@@ -20,16 +20,27 @@ function Resolve-ExportRoot([string]$Path, [string]$Label) {
     return (Resolve-Path -LiteralPath $Path).Path
 }
 
-function Get-RelativeFiles([string]$Root) {
-    return @(Get-ChildItem -LiteralPath $Root -Recurse -File | ForEach-Object {
-        [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
-    } | Sort-Object)
+function Get-ComparableFiles([string]$Root) {
+    $manifestPath = Join-Path $Root 'als_manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw "Formal manifest is missing: $manifestPath"
+    }
+    $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+    $producerMetadata = @(
+        'als_manifest.json',
+        'export_plan.json',
+        'partial/als_manifest.partial.json',
+        'audit/export_report.json',
+        'audit/export_report.txt'
+    )
+    $files = @($manifest.files | ForEach-Object { $_.relativePath }) + $producerMetadata
+    return @($files | Sort-Object -Unique)
 }
 
 $referencePath = Resolve-ExportRoot $ReferenceRoot 'ReferenceRoot'
 $candidatePath = Resolve-ExportRoot $CandidateRoot 'CandidateRoot'
-$referenceFiles = @(Get-RelativeFiles $referencePath)
-$candidateFiles = @(Get-RelativeFiles $candidatePath)
+$referenceFiles = @(Get-ComparableFiles $referencePath)
+$candidateFiles = @(Get-ComparableFiles $candidatePath)
 
 $setDifference = Compare-Object -ReferenceObject $referenceFiles -DifferenceObject $candidateFiles
 if ($setDifference) {
@@ -50,9 +61,6 @@ foreach ($relativePath in $referenceFiles) {
 }
 
 $manifestRelativePath = 'als_manifest.json'
-if ($referenceFiles -cnotcontains $manifestRelativePath) {
-    throw "Formal manifest is missing: $manifestRelativePath"
-}
 $referenceManifest = [IO.File]::ReadAllBytes((Join-Path $referencePath $manifestRelativePath))
 $candidateManifest = [IO.File]::ReadAllBytes((Join-Path $candidatePath $manifestRelativePath))
 if (-not [System.Linq.Enumerable]::SequenceEqual[byte]($referenceManifest, $candidateManifest)) {
