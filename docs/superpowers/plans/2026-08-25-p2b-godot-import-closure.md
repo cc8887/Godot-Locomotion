@@ -219,27 +219,27 @@ git commit -m "feat: compile ALS skeleton contracts"
 - Create: `tests/Als.Import.Tests/AlsAnimationSetCompilerTests.cs`
 - Create: `tests/Als.Import.Tests/AlsMetadataReferenceTests.cs`
 
-- [ ] **Step 1: Write failing typed-compilation tests**
+- [x] **Step 1: Write failing typed-compilation tests**
 
 The valid fixture must compile into deterministic arrays and integer IDs. Assert play length/sample rate, loop/root-motion/additive settings, curve/event/sync order, montage section/segment references, BlendSpace samples, material parent/parameter overrides, physics constraints, and exact stable-ID-to-index mappings.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run the focused compiler tests. Expected: compile failure because the compiler API is absent.
 
-- [ ] **Step 3: Implement typed metadata readers**
+- [x] **Step 3: Implement typed metadata readers**
 
 Use `JsonElement.Deserialize<T>(AlsManifestSerializer.JsonOptions)` per asset kind. Missing required arrays are errors even when the expected array is empty. Optional object references use `-1` after compilation; unresolved non-empty IDs are validation failures.
 
-- [ ] **Step 4: Implement immutable animation-set definition**
+- [x] **Step 4: Implement immutable animation-set definition**
 
 `AlsAnimationSetDefinition` contains arrays for skeletons, meshes, clips, montages, blend spaces, aim offsets, materials, textures, physics, curves, and config assets plus ordinal stable-ID lookup tables. Integer IDs are assigned from already sorted manifest arrays; runtime lookup never scans object paths.
 
-- [ ] **Step 5: Verify deterministic compilation**
+- [x] **Step 5: Verify deterministic compilation**
 
 Compile the same fixture twice, serialize the definition's canonical digest input, and assert identical SHA-256. Mutating one clip duration or reference must change the digest or produce a field-specific validation issue.
 
-- [ ] **Step 6: Verify GREEN and commit**
+- [x] **Step 6: Verify GREEN and commit**
 
 ```powershell
 dotnet test .\tests\Als.Import.Tests\Als.Import.Tests.csproj -c Debug
