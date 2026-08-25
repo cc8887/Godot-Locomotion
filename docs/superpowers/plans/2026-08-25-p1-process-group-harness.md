@@ -476,7 +476,7 @@ git add docs/architecture/p1-process-group-harness.md docs/superpowers/plans/202
 git commit -m "docs: record P1 process-group harness"
 ```
 
-- [ ] **Step 4：最终审计**
+- [x] **Step 4：最终审计**
 
 Run:
 
