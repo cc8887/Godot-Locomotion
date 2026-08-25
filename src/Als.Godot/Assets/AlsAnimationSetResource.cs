@@ -20,7 +20,7 @@ public partial class AlsAnimationSetResource : Resource
 
     [Export] public string DefinitionPayloadSha256 { get; set; } = string.Empty;
 
-    [Export] public Godot.Collections.Array<AlsAssetResourceEntry> Entries { get; set; } = [];
+    [Export] public int EntryCount { get; set; }
 
     [Export] public int ManifestAssetCount { get; set; }
 
