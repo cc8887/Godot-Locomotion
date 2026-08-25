@@ -82,7 +82,7 @@ public partial class AlsCommitStage : Node
             _context.Replacements == expectedReplacements &&
             (_context.Mode == AlsHarnessMode.Single
                 ? offMainWorkers == 0
-                : offMainWorkers > 0);
+                : offMainWorkers == _context.Entries.Length);
 
         var marker = valid ? "GODOT_ALS_P1_OK" : "GODOT_ALS_P1_FAIL";
         GD.Print(
