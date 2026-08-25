@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using GodotAls.Core.Events;
 
 namespace GodotAls.Core.Contracts;
 
@@ -15,6 +16,7 @@ public struct AlsFrameResult
     public Vector3 RightFootTarget;
     public Vector3 MovementIntent;
     public Quaternion RotationIntent;
+    public AlsEventBuffer TypedEvents;
     public long WorkerElapsedTicks;
     public int ErrorCode;
 
