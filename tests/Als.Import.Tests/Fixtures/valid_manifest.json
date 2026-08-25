@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "exporterVersion": "1.0.0",
+  "sourceEngineVersion": "5.9.0",
+  "sourceProjectId": "fixture-project",
+  "sourceContentRoot": "/Game/Test",
+  "coordinateSystem": {
+    "sourceHandedness": "left",
+    "sourceUpAxis": "Z",
+    "targetHandedness": "right",
+    "targetUpAxis": "Y"
+  },
+  "unitScale": 0.01,
+  "skeletons": [
+    {
+      "id": "09ee83c5ee0df9c7343e9ebc943d4902498af3e5",
+      "objectPath": "/Game/Test/Skeleton.Skeleton",
+      "packagePath": "/Game/Test/Skeleton",
+      "assetName": "Skeleton",
+      "classPath": "/Script/Engine.Skeleton",
+      "outputPath": null,
+      "dependencies": [],
+      "metadata": {
+        "overlay": false,
+        "prop": false,
+        "bones": [
+          {
+            "name": "root",
+            "parentIndex": -1,
+            "translation": [0, 0, 0],
+            "rotation": [0, 0, 0, 1],
+            "scale": [1, 1, 1]
+          }
+        ],
+        "restPoseHash": "0000000000000000000000000000000000000000",
+        "sockets": [],
+        "virtualBones": [],
+        "boneCount": 1
+      }
+    }
+  ],
+  "skeletalMeshes": [],
+  "staticMeshes": [],
+  "animations": [
+    {
+      "id": "67aa33bdcab9e580ed7bec894c9858bb5cf30764",
+      "objectPath": "/Game/Test/Walk.Walk",
+      "packagePath": "/Game/Test/Walk",
+      "assetName": "Walk",
+      "classPath": "/Script/Engine.AnimSequence",
+      "outputPath": "animations/67aa33bdcab9e580ed7bec894c9858bb5cf30764.fbx",
+      "dependencies": ["09ee83c5ee0df9c7343e9ebc943d4902498af3e5"],
+      "metadata": {
+        "overlay": false,
+        "prop": false,
+        "playLength": 1.0,
+        "frameRateNumerator": 30,
+        "frameRateDenominator": 1,
+        "sampledKeyCount": 31,
+        "loop": true,
+        "interpolation": 1,
+        "rootMotionEnabled": false,
+        "rootMotionRootLock": 0,
+        "forceRootLock": false,
+        "useNormalizedRootMotionScale": true,
+        "additiveType": 0,
+        "additiveBasePoseType": 0,
+        "additiveBasePoseFrame": 0,
+        "additiveBasePoseObjectPath": "",
+        "additiveBasePoseId": "",
+        "skeletonId": "09ee83c5ee0df9c7343e9ebc943d4902498af3e5",
+        "skeletonObjectPath": "/Game/Test/Skeleton.Skeleton",
+        "curves": [],
+        "notifies": [],
+        "syncMarkers": []
+      }
+    }
+  ],
+  "montages": [],
+  "blendSpaces": [],
+  "aimOffsets": [],
+  "materials": [],
+  "textures": [],
+  "physicsAssets": [],
+  "curves": [],
+  "configAssets": [],
+  "files": [
+    {
+      "relativePath": "animations/67aa33bdcab9e580ed7bec894c9858bb5cf30764.fbx",
+      "sha256": "39e21c717a0c58458478ffc8cc7598bc6cb92486687b5b2af63a38164a89a3ef",
+      "size": 17
+    }
+  ],
+  "auditSummary": {
+    "status": "complete",
+    "assetCount": 2,
+    "fileCount": 1,
+    "errorCount": 0,
+    "warningCount": 0
+  }
+}

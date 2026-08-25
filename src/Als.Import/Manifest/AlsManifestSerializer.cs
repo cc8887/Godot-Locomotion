@@ -1,0 +1,48 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace GodotAls.Import.Manifest;
+
+public static class AlsManifestSerializer
+{
+    public static JsonSerializerOptions JsonOptions { get; } = CreateOptions();
+
+    public static AlsManifest Load(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return Deserialize(File.ReadAllText(path));
+    }
+
+    public static AlsManifest Deserialize(string json)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
+        var manifest = JsonSerializer.Deserialize<AlsManifest>(json, JsonOptions)
+            ?? throw new JsonException("ALS manifest deserialized to null.");
+        EnsureRequiredMembers(manifest);
+        return manifest;
+    }
+
+    private static JsonSerializerOptions CreateOptions() => new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = false,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    };
+
+    private static void EnsureRequiredMembers(AlsManifest manifest)
+    {
+        if (manifest.ExporterVersion is null || manifest.SourceEngineVersion is null ||
+            manifest.SourceProjectId is null || manifest.SourceContentRoot is null ||
+            manifest.CoordinateSystem is null || manifest.Skeletons is null ||
+            manifest.SkeletalMeshes is null || manifest.StaticMeshes is null ||
+            manifest.Animations is null || manifest.Montages is null ||
+            manifest.BlendSpaces is null || manifest.AimOffsets is null ||
+            manifest.Materials is null || manifest.Textures is null ||
+            manifest.PhysicsAssets is null || manifest.Curves is null ||
+            manifest.ConfigAssets is null || manifest.Files is null ||
+            manifest.AuditSummary is null)
+        {
+            throw new JsonException("ALS manifest is missing a required top-level member.");
+        }
+    }
+}
