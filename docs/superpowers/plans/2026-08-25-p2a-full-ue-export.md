@@ -1,6 +1,6 @@
 # P2A Full UE Asset Export Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use completed checkboxes for tracking.
 
 **Goal:** 使用 UE 5.9 C++ Editor Commandlet 一次发现并导出全部目标 ALS 角色、动画、Overlay、道具及依赖，生成通过 schema、输出审计和双运行确定性门禁的正式 manifest。
 
@@ -55,7 +55,7 @@ docs/architecture/p2a-full-ue-export.md                 实测资产计数、限
 - Create: `tools/schemas/als_manifest.schema.json`
 - Modify: `GodotALS.sln`
 
-- [ ] **Step 1：先写稳定 ID 和 export plan validator 失败测试**
+- [x] **Step 1：先写稳定 ID 和 export plan validator 失败测试**
 
 核心测试 API：
 
@@ -86,7 +86,7 @@ public void ValidatorRejectsUnsortedAssetsAndExcludedAudio()
 }
 ```
 
-- [ ] **Step 2：运行测试确认 RED**
+- [x] **Step 2：运行测试确认 RED**
 
 Run:
 
@@ -96,7 +96,7 @@ dotnet test .\tests\Als.Import.Tests\Als.Import.Tests.csproj
 
 Expected: 项目或 `GodotAls.Import.Manifest` API 不存在。
 
-- [ ] **Step 3：实现合同、稳定 ID 和 validator**
+- [x] **Step 3：实现合同、稳定 ID 和 validator**
 
 `AlsAssetKind` 固定为：
 
@@ -140,7 +140,7 @@ public static string Create(string objectPath)
 }
 ```
 
-- [ ] **Step 4：编写两个 JSON Schema 并确认 GREEN**
+- [x] **Step 4：编写两个 JSON Schema 并确认 GREEN**
 
 两个 schema 使用 draft 2020-12，`additionalProperties=false`。plan 要求 `schemaVersion=1`、`assets`、`summary`；manifest 要求设计规格中的全部顶层数组、`files` 和 `auditSummary`。稳定 ID pattern 为 `^[0-9a-f]{40}$`，生成路径 pattern 为 `^(meshes|animations|textures)/[0-9a-f]{40}\\.(fbx|png|tga)$`。
 
@@ -154,7 +154,7 @@ dotnet test .\GodotALS.sln
 
 Expected: 原有 23 项测试和新增测试全部通过，0 warning/error。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add GodotALS.sln src/Als.Import tests/Als.Import.Tests tools/schemas
@@ -173,7 +173,7 @@ git commit -m "feat: define P2 asset export contracts"
 - Create: `scripts/build-als-exporter.ps1`
 - Create: `scripts/verify-p2a.ps1`
 
-- [ ] **Step 1：先创建失败的 P2A 插件门禁**
+- [x] **Step 1：先创建失败的 P2A 插件门禁**
 
 `verify-p2a.ps1` 接受必填 `-EngineRoot`、`-UnrealProject`，以及默认输出目录。第一版调用不存在的 `build-als-exporter.ps1`，然后要求：
 
@@ -191,7 +191,7 @@ Run:
 
 Expected: RED，构建脚本或插件不存在。
 
-- [ ] **Step 2：实现最小 Editor 插件和 Commandlet**
+- [x] **Step 2：实现最小 Editor 插件和 Commandlet**
 
 `.uplugin` 固定 `EnabledByDefault=true`、`CanContainContent=false`、Editor module、Win64 allow list。Build.cs 依赖：
 
@@ -206,7 +206,7 @@ PrivateDependencyModuleNames.AddRange(new[]
 
 Commandlet 构造函数设置 `IsClient=false`、`IsEditor=true`、`LogToConsole=true`、`ShowErrorCount=true`。`Main()` 支持 `-ReadyCheck`，输出严格 marker 后返回 0；未知或缺少参数返回 2。
 
-- [ ] **Step 3：实现 BuildPlugin 和受控部署**
+- [x] **Step 3：实现 BuildPlugin 和受控部署**
 
 脚本流程固定为：
 
@@ -218,11 +218,11 @@ Commandlet 构造函数设置 `IsClient=false`、`IsEditor=true`、`LogToConsole
 6. 只删除带哨兵的目标目录，复制打包插件并创建哨兵；
 7. 调用 `UnrealEditor-Cmd.exe <uproject> -run=AlsGodotExport -ReadyCheck -unattended -nop4 -nosplash -nullrhi`。
 
-- [ ] **Step 4：运行门禁确认 GREEN**
+- [x] **Step 4：运行门禁确认 GREEN**
 
 Expected: UAT 和 UE 进程均退出 0，输出 `GODOT_ALS_EXPORTER_READY`，源 `.uproject` 内容未改变。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add tools/unreal/AlsGodotExporter scripts/build-als-exporter.ps1 scripts/verify-p2a.ps1
@@ -242,7 +242,7 @@ git commit -m "feat: scaffold UE ALS export commandlet"
 - Modify: `tools/unreal/AlsGodotExporter/Source/AlsGodotExporter/Private/AlsGodotExportCommandlet.cpp`
 - Modify: `scripts/verify-p2a.ps1`
 
-- [ ] **Step 1：扩展门禁并确认 dry-run RED**
+- [x] **Step 1：扩展门禁并确认 dry-run RED**
 
 门禁运行 `-DryRun -Output=<assets/generated/als_v4>`，要求 `export_plan.json` 和 marker：
 
@@ -252,11 +252,11 @@ GODOT_ALS_P2A_PLAN_OK assets=<N> exportable=<N> config=<N> excluded=0
 
 PowerShell 解析 JSON 并断言资产类别包含 Skeleton、SkeletalMesh、StaticMesh、AnimationSequence、AnimMontage、BlendSpace 或 AimOffset、PhysicsAsset、Material/MaterialInstance、Texture、Blueprint；任一 object path 含 `/Audio/`、`/Environment/`、`/Levels/`、`/UI/`、`/AI/` 或 `/GameModes/` 则失败。
 
-- [ ] **Step 2：实现稳定 ID 和类型分类**
+- [x] **Step 2：实现稳定 ID 和类型分类**
 
 C++ 使用 `FTCHARToUTF8`、`FSHA1::HashBuffer()`、`BytesToHex().ToLower()`，结果必须与 Task 1 fixture 一致。类型分类基于 `FAssetData.AssetClassPath`，子类 class path 显式映射到 `EAlsAssetKind`，未知目标资产归为 `OtherConfig`，不静默跳过。
 
-- [ ] **Step 3：实现 AssetRegistry 扫描与依赖闭包**
+- [x] **Step 3：实现 AssetRegistry 扫描与依赖闭包**
 
 使用：
 
@@ -270,13 +270,13 @@ AssetRegistry.GetAssets(Filter, Assets);
 
 先按排除前缀过滤。对 Mesh、Material 和 MaterialInstance 使用 `GetDependencies(PackageName, ..., EDependencyCategory::Package)` 递归纳入 `/Game/AdvancedLocomotionV4` 下的 Material、MaterialInstance 和 Texture；`/Engine` 依赖记录为 external dependency，不复制 Engine 资产。最终按稳定 ID ordinal 排序并拒绝 ID/大小写冲突。
 
-- [ ] **Step 4：写入规范 export_plan.json 并确认 GREEN**
+- [x] **Step 4：写入规范 export_plan.json 并确认 GREEN**
 
 JSON 字段顺序固定，保存 UTF-8 无 BOM。Commandlet 写临时文件后调用 `IFileManager::Move()` 原子替换计划。C# `AlsExportPlanValidator` 通过一个小 CLI 入口或 PowerShell 反序列化检查同一计划。
 
 Run P2A gate，Expected: dry-run marker 成功、`excluded=0`、所有目标类别存在。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add tools/unreal/AlsGodotExporter scripts/verify-p2a.ps1
@@ -298,29 +298,29 @@ git commit -m "feat: discover complete ALS asset export plan"
 - Create: `tools/unreal/AlsGodotExporter/Source/AlsGodotExporter/Private/AlsManifestWriter.cpp`
 - Modify: `tools/unreal/AlsGodotExporter/Source/AlsGodotExporter/Private/AlsGodotExportCommandlet.cpp`
 
-- [ ] **Step 1：先在门禁中要求 partial manifest 元数据并确认 RED**
+- [x] **Step 1：先在门禁中要求 partial manifest 元数据并确认 RED**
 
 dry-run 也必须生成 `partial/als_manifest.partial.json`。PowerShell 检查：Mannequin skeleton 含 root/pelvis/foot_l/foot_r，animation 数量大于 0，至少一个动画含 curve 或 notify，Montage section 非空，BlendSpace sample 非空，PhysicsAsset body 非空，Overlay object path 非空，Props mesh 非空。
 
-- [ ] **Step 2：实现 rig 和 animation metadata reader**
+- [x] **Step 2：实现 rig 和 animation metadata reader**
 
 骨架读取 `FReferenceSkeleton` 的 bone name、parent index 和 ref bone pose；local transform 以 translation/rotation quaternion/scale 数组写入。rest pose hash 对按 bone index 排序的 UTF-8 bone name、parent 和 IEEE754 float bits 做 SHA-1。
 
 Animation Sequence 读取 skeleton、play length、sampling frame rate、sample keys、loop interpolation、additive settings、root motion、`Notifies`、`AuthoredSyncMarkers` 和 DataModel curve names。Notify/marker 按 trigger time、name、原始 index 排序。
 
-- [ ] **Step 3：实现 Montage、BlendSpace/Aim Offset 和 PhysicsAsset reader**
+- [x] **Step 3：实现 Montage、BlendSpace/Aim Offset 和 PhysicsAsset reader**
 
 Montage 记录 CompositeSections、SlotAnimTracks、segment clip references、blend in/out 和 next section。BlendSpace/Aim Offset 记录三个 blend parameter 及每个 sample 的 animation ID、sample value 和 rate scale。PhysicsAsset 记录 `SkeletalBodySetups` bone、primitive count，以及 constraint 两端 bone。
 
-- [ ] **Step 4：实现材质、纹理和 Blueprint/Data 配置元数据**
+- [x] **Step 4：实现材质、纹理和 Blueprint/Data 配置元数据**
 
 Material Instance 记录 parent ID、texture/scalar/vector parameter overrides；基础 Material 记录 referenced textures。Blueprint/Data 只记录 class path、asset references 和可序列化的默认配置摘要，不序列化 bytecode 或图。
 
-- [ ] **Step 5：写 partial manifest 并确认门禁 GREEN**
+- [x] **Step 5：写 partial manifest 并确认门禁 GREEN**
 
 manifest 包含设计规格固定的全部顶层数组。dry-run 中 `files=[]`、`auditSummary.status="planned"`，只写 partial，不写正式 manifest。
 
-- [ ] **Step 6：提交**
+- [x] **Step 6：提交**
 
 ```powershell
 git add tools/unreal/AlsGodotExporter scripts/verify-p2a.ps1
@@ -341,7 +341,7 @@ git commit -m "feat: extract complete ALS asset metadata"
 - Modify: `tools/unreal/AlsGodotExporter/Source/AlsGodotExporter/Private/AlsManifestWriter.cpp`
 - Modify: `tools/unreal/AlsGodotExporter/Source/AlsGodotExporter/Private/AlsGodotExportCommandlet.cpp`
 
-- [ ] **Step 1：扩展门禁要求 full export 并确认 RED**
+- [x] **Step 1：扩展门禁要求 full export 并确认 RED**
 
 Commandlet full 模式成功 marker：
 
@@ -351,25 +351,25 @@ GODOT_ALS_P2A_EXPORT_OK assets=<N> files=<N> fbx=<N> textures=<N> warnings=<N>
 
 门禁要求正式 `als_manifest.json` 存在、partial 仍保留、每个 `files[].relativePath` 存在且非空、SHA-256 为 64 位小写十六进制。
 
-- [ ] **Step 2：实现自动化 FBX 和纹理导出**
+- [x] **Step 2：实现自动化 FBX 和纹理导出**
 
 为 `UAssetExportTask` 设置 `bAutomated=true`、`bPrompt=false`、`bReplaceIdentical=true`、`bUseFileArchive=true`。FBX options 固定 `FBX_2020`、ASCII、front X axis、vertex color、无 LOD、导出 morph target、animation 不带 preview mesh。SkeletalMesh、StaticMesh 和 AnimationSequence 使用对应 UE exporter；Skeleton 由 SkeletalMesh FBX 和 manifest ref pose 承载。
 
 Texture 优先 `UTextureExporterPNG`，不支持 PNG 时使用 TGA exporter；输出扩展名写回 plan/manifest，不能通过改后缀伪装格式。
 
-- [ ] **Step 3：实现 ASCII FBX 非语义字段规范化**
+- [x] **Step 3：实现 ASCII FBX 非语义字段规范化**
 
 只允许替换已登记的 header key：`FileId`、`CreationTime`、`LastSaved` 及其分量。normalizer 输出被修改 key 列表；出现未知 header 时间/随机字段或二进制 FBX 头时返回导出错误 4。规范化后文件必须仍以 `; FBX` 文本头开始。
 
-- [ ] **Step 4：实现 SHA-256 和输出审计**
+- [x] **Step 4：实现 SHA-256 和输出审计**
 
 读取文件到 `TArray64<uint8>`，调用 `FPlatformMisc::GetSHA256Signature()`，使用 `FSHA256Signature.Signature` 生成 64 位小写 hex。审计拒绝缺失/空文件、重复相对路径、路径逃逸、hash 失败、目标资产没有输出，以及 metadata 内部引用缺失。
 
-- [ ] **Step 5：原子发布正式 manifest 并确认 GREEN**
+- [x] **Step 5：原子发布正式 manifest 并确认 GREEN**
 
 先写 `partial/als_manifest.partial.json`，审计通过后复制为同目录临时正式文件并用 `IFileManager::Move()` 替换 `als_manifest.json`。失败时不得改变已有正式 manifest。
 
-- [ ] **Step 6：提交**
+- [x] **Step 6：提交**
 
 ```powershell
 git add tools/unreal/AlsGodotExporter scripts/verify-p2a.ps1
@@ -386,32 +386,31 @@ git commit -m "feat: export and audit complete ALS asset set"
 - Modify: `tools/unreal/AlsGodotExporter/Source/AlsGodotExporter/Private/AlsOutputAuditor.cpp`
 - Create: `scripts/compare-p2a-exports.ps1`
 
-- [ ] **Step 1：实现两个隔离输出目录的比较器**
+- [x] **Step 1：实现两个隔离输出目录的比较器**
 
 第一次输出到 `assets/generated/als_v4`，第二次输出到 `artifacts/p2a-determinism/als_v4`。比较器检查相对文件集合、文件长度和 SHA-256；manifest 逐字节比较。差异输出首个 relative path、两侧长度和 hash，返回非零。
 
-- [ ] **Step 2：运行 dry-run 和第一次完整导出**
+- [x] **Step 2：运行 dry-run 和第一次完整导出**
 
 Run:
 
 ```powershell
 .\scripts\verify-p2a.ps1 `
   -EngineRoot 'D:\UnrealEngine' `
-  -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject' `
-  -GodotProjectRoot 'D:\GodotALS'
+  -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
 ```
 
 Expected: plugin build/deploy、dry-run、full export 完成；输出全部目标类别，音频等排除数量为 0。
 
-- [ ] **Step 3：运行第二次完整导出和确定性比较**
+- [x] **Step 3：运行第二次完整导出和确定性比较**
 
 Expected: 两侧相对文件、manifest 和 SHA-256 全部相同，输出 `P2A_DETERMINISM_OK`。
 
-- [ ] **Step 4：若失败，按 systematic-debugging 修复**
+- [x] **Step 4：若失败，按 systematic-debugging 修复**
 
 保留两个输出目录。先确定差异层：计划、metadata JSON、FBX header/track、texture bytes 或文件集合；只修改已确认根因的 reader/exporter/normalizer，再重跑单资产复现和完整矩阵。
 
-- [ ] **Step 5：提交门禁修正**
+- [x] **Step 5：提交门禁修正**
 
 ```powershell
 git add scripts/verify-p2a.ps1 scripts/compare-p2a-exports.ps1 tools/unreal/AlsGodotExporter
@@ -424,14 +423,14 @@ git commit -m "test: enforce deterministic complete ALS export"
 - Create: `docs/architecture/p2a-full-ue-export.md`
 - Modify: `docs/superpowers/plans/2026-08-25-p2a-full-ue-export.md`
 
-- [ ] **Step 1：记录真实资产计数和已知限制**
+- [x] **Step 1：记录真实资产计数和已知限制**
 
 文档记录 UE/插件版本、每种资产计划/导出数量、输出大小、耗时、warnings、排除数量、代表性资产路径、manifest/hash、FBX normalizer 修改字段和 P2B 前提。明确生成资产不进入 Git。
 
-- [ ] **Step 2：运行最终验证**
+- [x] **Step 2：运行最终验证**
 
 ```powershell
-.\scripts\verify-p2a.ps1 -EngineRoot 'D:\UnrealEngine' -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject' -GodotProjectRoot 'D:\GodotALS'
+.\scripts\verify-p2a.ps1 -EngineRoot 'D:\UnrealEngine' -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
 .\scripts\verify-p1.ps1 -GodotExecutable 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
 .\scripts\verify-p0.ps1 -GodotExecutable 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
 git diff --check
@@ -439,14 +438,14 @@ git diff --check
 
 Expected: `P2A_VERIFICATION_OK`、`P1_VERIFICATION_OK`、`P0_VERIFICATION_OK`，所有 .NET 测试通过，构建 0 warning/error。
 
-- [ ] **Step 3：提交完成记录**
+- [x] **Step 3：提交完成记录**
 
 ```powershell
 git add docs/architecture/p2a-full-ue-export.md docs/superpowers/plans/2026-08-25-p2a-full-ue-export.md
 git commit -m "docs: record P2A full UE asset export"
 ```
 
-- [ ] **Step 4：最终审计**
+- [x] **Step 4：最终审计**
 
 ```powershell
 git status --short --branch
