@@ -47,8 +47,9 @@
     "auditSummary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["assetCount", "fileCount", "errorCount", "warningCount"],
+      "required": ["status", "assetCount", "fileCount", "errorCount", "warningCount"],
       "properties": {
+        "status": { "enum": ["planned", "complete", "failed"] },
         "assetCount": { "type": "integer", "minimum": 0 },
         "fileCount": { "type": "integer", "minimum": 0 },
         "errorCount": { "type": "integer", "minimum": 0 },
@@ -85,9 +86,9 @@
     "file": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256", "size"],
+      "required": ["relativePath", "sha256", "size"],
       "properties": {
-        "path": { "type": "string", "pattern": "^(meshes/(skeletal|static)|animations|textures)/[0-9a-f]{40}\\.(fbx|png|tga)$" },
+        "relativePath": { "type": "string", "pattern": "^(meshes/(skeletal|static)|animations|textures)/[0-9a-f]{40}\\.(fbx|png|tga)$" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "size": { "type": "integer", "minimum": 1 }
       }

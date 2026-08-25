@@ -200,7 +200,10 @@ EAlsAssetKind FAlsAssetDiscovery::Classify(const FAssetData& AssetData)
     if (ClassName == TEXT("AnimSequence")) return EAlsAssetKind::AnimationSequence;
     if (ClassName == TEXT("AnimMontage")) return EAlsAssetKind::AnimMontage;
     if (ClassName.Contains(TEXT("AimOffset"))) return EAlsAssetKind::AimOffset;
-    if (ClassName.Contains(TEXT("BlendSpace"))) return EAlsAssetKind::BlendSpace;
+    if (ClassName.Contains(TEXT("BlendSpace")))
+    {
+        return AssetData.GetObjectPathString().Contains(TEXT("/AimOffsets/")) ? EAlsAssetKind::AimOffset : EAlsAssetKind::BlendSpace;
+    }
     if (ClassName == TEXT("PhysicsAsset")) return EAlsAssetKind::PhysicsAsset;
     if (ClassName == TEXT("Material")) return EAlsAssetKind::Material;
     if (ClassName.Contains(TEXT("MaterialInstance"))) return EAlsAssetKind::MaterialInstance;
