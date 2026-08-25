@@ -31,6 +31,15 @@ if (-not (($outputLines | Out-String).Contains($marker, [StringComparison]::Ordi
 Write-Host 'GODOT_ALS_P2A_READY'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
+$artifactsPath = Join-Path $repositoryRoot 'artifacts'
+[void](New-Item -ItemType Directory -Path $artifactsPath -Force)
+$godotIgnorePath = Join-Path $artifactsPath '.gdignore'
+if (-not (Test-Path -LiteralPath $godotIgnorePath -PathType Leaf)) {
+    [IO.File]::WriteAllText(
+        $godotIgnorePath,
+        "# Generated build and determinism artifacts are not Godot project resources.`n",
+        [Text.UTF8Encoding]::new($false))
+}
 if ([string]::IsNullOrWhiteSpace($Output)) {
     $Output = Join-Path $repositoryRoot 'assets\generated\als_v4'
 }

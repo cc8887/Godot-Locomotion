@@ -37,7 +37,7 @@
 - Create: `tests/Als.Import.Tests/RepositoryRoot.cs`
 - Create: `tests/Als.Import.Tests/RepositoryImportPolicyTests.cs`
 
-- [ ] **Step 1: Write failing repository-policy tests**
+- [x] **Step 1: Write failing repository-policy tests**
 
 Add tests that locate the repository root and assert:
 
@@ -59,7 +59,7 @@ public void FbxImportDoesNotResolveExporterWorkstationTextures()
 }
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -69,7 +69,7 @@ dotnet test .\tests\Als.Import.Tests\Als.Import.Tests.csproj -c Debug --filter R
 
 Expected: FAIL because `artifacts/.gdignore`, `import_defaults.cfg`, and `RepositoryRoot` do not exist.
 
-- [ ] **Step 3: Add the minimal tracked policy files**
+- [x] **Step 3: Add the minimal tracked policy files**
 
 Change `.gitignore` from the blanket `artifacts/` rule to:
 
@@ -90,11 +90,11 @@ animation/fps=30
 
 Add a test-only `RepositoryRoot.Find()` helper that walks parents until both `GodotALS.sln` and `.git` are present. Update `verify-p2a.ps1` to recreate `artifacts/.gdignore` after any artifact cleanup, so local verification cannot remove the scan boundary.
 
-- [ ] **Step 4: Verify GREEN and run P2A script syntax checks**
+- [x] **Step 4: Verify GREEN and run P2A script syntax checks**
 
 Run the focused test and parse all PowerShell verification scripts with `System.Management.Automation.Language.Parser.ParseFile`. Expected: tests pass and parser error count is zero.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add .gitignore artifacts/.gdignore benchmark-results/.gdignore docs/.gdignore src/Als.Core/.gdignore src/Als.Import/.gdignore tests/.gdignore tools/.gdignore import_defaults.cfg scripts/verify-p2a.ps1 tests/Als.Import.Tests

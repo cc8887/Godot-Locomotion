@@ -1,0 +1,1 @@
+# Benchmark output is consumed by reports, not by Godot's resource scanner.
