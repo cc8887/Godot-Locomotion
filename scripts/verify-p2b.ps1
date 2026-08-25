@@ -87,5 +87,30 @@ for ($index = 0; $index -lt $expected.Length; $index++) {
     }
 }
 
+$assetSmokeOutput = & $GodotExecutable --headless --path $projectRootPath `
+    'res://scenes/tests/p2b_asset_smoke.tscn' 2>&1
+$assetSmokeExitCode = $LASTEXITCODE
+$assetSmokeOutput | ForEach-Object { Write-Host $_ }
+$joinedAssetSmokeOutput = $assetSmokeOutput -join [Environment]::NewLine
+$assetSmokeErrorLines = @($assetSmokeOutput | Where-Object { "$_" -match '^(SCRIPT ERROR|ERROR):' })
+if ($assetSmokeExitCode -ne 0 -or $assetSmokeErrorLines.Count -ne 0) {
+    $details = $assetSmokeErrorLines -join [Environment]::NewLine
+    throw "Godot P2B representative asset smoke failed with exit code $assetSmokeExitCode.$([Environment]::NewLine)$details"
+}
+
+$assetSmokePattern = 'P2B_ASSET_SMOKE_OK mannequinBones=(\d+) clips=(\d+) overlay=(\d+) props=(\d+)'
+$assetSmokeMatch = [regex]::Match($joinedAssetSmokeOutput, $assetSmokePattern)
+if (-not $assetSmokeMatch.Success) {
+    throw 'Godot P2B representative asset marker was not emitted.'
+}
+
+$expectedAssetSmoke = @(68, 6, 2, 1)
+for ($index = 0; $index -lt $expectedAssetSmoke.Length; $index++) {
+    if ([int]$assetSmokeMatch.Groups[$index + 1].Value -ne $expectedAssetSmoke[$index]) {
+        throw "Godot P2B representative asset marker reported unexpected counts: $($assetSmokeMatch.Value)"
+    }
+}
+
+Write-Output 'P2B_ASSET_VERIFICATION_OK'
 Write-Output 'P2B_VERIFICATION_OK'
 exit 0
