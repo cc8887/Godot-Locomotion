@@ -50,9 +50,11 @@ P2A 建立 UE 5.9 到 Godot ALS 项目的可重复资产交付边界。本阶段
 | OtherConfig | 30 | manifest 配置摘要 |
 | **合计** | **267** | **141 文件** |
 
-二进制结果共 137 个 FBX 和 4 个 PNG。连同 `export_plan.json`、partial/formal manifest 和审计报告，单个输出目录共 146 个文件、142,702,695 bytes（约 136.1 MiB）。126 个不产生独立二进制文件的复合动画、材质和配置资产仍以稳定 ID、类型、依赖关系和类型化元数据进入 formal manifest。
+二进制结果共 137 个 FBX 和 4 个 PNG。连同 `export_plan.json`、partial/formal manifest 和审计报告，单个输出目录共 146 个文件、142,777,727 bytes（约 136.2 MiB）。126 个不产生独立二进制文件的复合动画、材质和配置资产仍以稳定 ID、类型、依赖关系和类型化元数据进入 formal manifest。
 
 9 个 MaterialInstance 均记录 parent 和三类显式 parameter override 数组。本批源资产实测包含 9 个 scalar、9 个 vector、0 个 texture override；texture 数组即使为空也会写出，避免 P2B 把“无覆盖”与“导出器遗漏字段”混为一谈。
+
+骨架与动画语义元数据也作为 P2B 的强合同输出：5 个 Skeleton 均带 canonical rest-pose SHA-1，共记录 5 个 socket；7 个 SkeletalMesh 均显式引用 Skeleton；126 个 AnimationSequence 记录 loop、插值、Root Motion、additive base pose 等设置，其中 40 个带有效 base-pose 引用；2 个 PhysicsAsset 共记录 38 个约束；18 个 Montage 记录 blend-in、blend-out、trigger 和 auto-blend-out 设置。
 
 代表性资产包括：
 
@@ -74,9 +76,9 @@ P2A 建立 UE 5.9 到 Godot ALS 项目的可重复资产交付边界。本阶段
 - `fileCount=141`
 - `errorCount=0`
 - `warningCount=0`
-- 单次实测 manifest SHA-256：`b5d5602974b95bc45aaa9ed9b4f6bf0a9c1033f19dbf659082b2135a781bd569`
+- 单次实测 manifest SHA-256：`f3f0e3e1d25e9d1bb31dfff9302d79af8572f62917dbb40a34fff5121f813cab`
 
-`files[]` 为每个 FBX/PNG 记录相对路径、长度和 SHA-256。审计拒绝空文件、缺失文件、重复路径、输出根逃逸、无效 hash、目标资产缺少输出以及内部引用缺失。本批对 skeleton、animation、Montage、BlendSpace、material parent 和 texture 的 194 个 metadata 引用检查结果为 0 缺失。SHA-256 通过 UE 所带 OpenSSL 计算；UE 5.9 当前的平台 SHA-256 API 在该 commandlet 路径会发生 native crash，因此没有使用它。
+`files[]` 为每个 FBX/PNG 记录相对路径、长度和 SHA-256。审计拒绝空文件、缺失文件、重复路径、输出根逃逸、无效 hash、目标资产缺少输出以及内部引用缺失。本批对 skeleton、skeletal mesh、animation、additive base pose、Montage、BlendSpace、material parent 和 texture 的 241 个 metadata 引用检查结果为 0 缺失。SHA-256 通过 UE 所带 OpenSSL 计算；UE 5.9 当前的平台 SHA-256 API 在该 commandlet 路径会发生 native crash，因此没有使用它。
 
 ## 确定性处理
 
@@ -95,7 +97,7 @@ normalizer 不修改动画采样值、骨骼变换、网格顶点、材质参数
 P2A_DETERMINISM_OK files=146
 ```
 
-两次 commandlet 实测用时为 38.08 秒和 37.82 秒。计时受 UE 启动、shader 和 DDC 状态影响，只用于记录当前机器基线，不作为正确性门禁。
+两次 commandlet 实测用时为 41.12 秒和 42.59 秒。计时受 UE 启动、shader 和 DDC 状态影响，只用于记录当前机器基线，不作为正确性门禁。
 
 ## 已知提示与限制
 
