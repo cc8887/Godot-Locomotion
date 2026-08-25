@@ -39,7 +39,7 @@ docs/architecture/p1-process-group-harness.md            实际线程、等价�
 - Create: `src/Als.Core/Simulation/AlsSyntheticInputSource.cs`
 - Create: `src/Als.Core/Simulation/AlsSyntheticLocomotionModel.cs`
 
-- [ ] **Step 1：先写模型失败测试**
+- [x] **Step 1：先写模型失败测试**
 
 测试要求：相同输入和初始状态产生相同结果；地面字节决定 Grounded/InAir；每 30 帧产生一个稳定事件；结果 hot path 在热身后为 0 B。
 
@@ -111,13 +111,13 @@ public sealed class AlsSyntheticLocomotionModelTests
 }
 ```
 
-- [ ] **Step 2：运行测试确认 RED**
+- [x] **Step 2：运行测试确认 RED**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsSyntheticLocomotionModelTests`
 
 Expected: 编译失败，`GodotAls.Core.Simulation` 不存在。
 
-- [ ] **Step 3：实现合成输入源**
+- [x] **Step 3：实现合成输入源**
 
 `AlsSyntheticInputSource.Create()` 使用 `FrameId` 和 `CharacterId` 计算相位，不读取时间、随机数或 Node。它设置：
 
@@ -130,7 +130,7 @@ var speed = 1.5f + (identity.CharacterId % 3);
 
 并返回完整 `AlsFrameInput`：单位变换、确定性速度/输入、Y-up 地面、无脚部命中、无 Mantle、`Running/Standing/LookingDirection/MotorDriven/Tier0`。
 
-- [ ] **Step 4：实现模型并确认 GREEN**
+- [x] **Step 4：实现模型并确认 GREEN**
 
 `AlsSyntheticLocomotionModel.Evaluate()`：
 
@@ -169,7 +169,7 @@ Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --fi
 
 Expected: 3 tests passed。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add src/Als.Core/Simulation tests/Als.Core.Tests/AlsSyntheticLocomotionModelTests.cs
@@ -182,7 +182,7 @@ git commit -m "feat: add deterministic synthetic locomotion model"
 - Test: `tests/Als.Core.Tests/AlsResultDigestTests.cs`
 - Create: `src/Als.Core/Diagnostics/AlsResultDigest.cs`
 
-- [ ] **Step 1：先写 digest 失败测试**
+- [x] **Step 1：先写 digest 失败测试**
 
 ```csharp
 using GodotAls.Core.Contracts;
@@ -231,23 +231,23 @@ public sealed class AlsResultDigestTests
 }
 ```
 
-- [ ] **Step 2：运行测试确认 RED**
+- [x] **Step 2：运行测试确认 RED**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsResultDigestTests`
 
 Expected: 编译失败，`AlsResultDigest` 不存在。
 
-- [ ] **Step 3：实现无分配 FNV-1a digest**
+- [x] **Step 3：实现无分配 FNV-1a digest**
 
 `AlsResultDigest` 使用 `OffsetBasis = 14695981039346656037UL` 和 `Prime = 1099511628211UL`。`Append()` 依次加入 identity 三字段、resolved state、drive mode、Root Motion、pelvis/feet/movement/rotation、事件数量与事件字段、worker error；浮点通过 `BitConverter.SingleToInt32Bits()` 转为位模式。`WorkerElapsedTicks` 不进入 digest，因为它不是行为结果。
 
-- [ ] **Step 4：运行 digest 与全部核心测试**
+- [x] **Step 4：运行 digest 与全部核心测试**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore`
 
 Expected: digest 测试通过，原有 16 项测试继续通过。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add src/Als.Core/Diagnostics tests/Als.Core.Tests/AlsResultDigestTests.cs
@@ -259,7 +259,7 @@ git commit -m "feat: add stable ALS result digest"
 **Files:**
 - Create: `scripts/verify-p1.ps1`
 
-- [ ] **Step 1：创建验证驱动**
+- [x] **Step 1：创建验证驱动**
 
 脚本接受 `-GodotExecutable`、`-Frames 90` 和 `-CharacterCounts @(1,10,16,32)`。它先执行 restore/build/test，然后对每个角色数量分别运行：
 
@@ -281,7 +281,7 @@ GODOT_ALS_P1_OK mode=(single|parallel) characters=(\d+) frames=(\d+) digest=([0-
 
 每组必须满足：single 与 parallel digest 相同；`missing=0`；`allocations=0`；90 帧时 `replacements=2`；single 的 `off_main=0`；parallel 的 `off_main>0`。最后输出 `P1_VERIFICATION_OK`。
 
-- [ ] **Step 2：运行脚本确认 RED**
+- [x] **Step 2：运行脚本确认 RED**
 
 Run:
 
@@ -291,7 +291,7 @@ Run:
 
 Expected: build 和核心测试通过，Godot 因 `p1_dispatch_harness.tscn` 不存在而失败。
 
-- [ ] **Step 3：提交 RED 驱动**
+- [x] **Step 3：提交 RED 驱动**
 
 ```powershell
 git add scripts/verify-p1.ps1
@@ -306,9 +306,9 @@ git commit -m "test: define P1 dispatch verification matrix"
 - Create: `src/Als.Godot/Dispatch/AlsHarnessEntry.cs`
 - Create: `src/Als.Godot/Dispatch/AlsVisualWorkerRoot.cs`
 
-- [ ] **Step 1：定义固定 Harness 状态**
+- [x] **Step 1：定义固定 Harness 状态**
 
-`AlsHarnessContext` 构造时创建固定长度 `AlsHarnessEntry[]` 和 `AlsSlotRegistry`，保存 `Mode`、`TargetFrames`、`WarmupFrames=20`、`MainManagedThreadId`、`PublishedFrameId=-1`、digest、missing、replacements、allocations 和 off-main worker 数。数组长度在运行期间不变，生命周期操作只替换单个 entry 引用。
+`AlsHarnessContext` 构造时创建固定长度 `AlsHarnessEntry[]` 和 `AlsSlotRegistry`，保存 `Mode`、`TargetFrames`、`WarmupFrames=30`、`MainManagedThreadId`、`PublishedFrameId=0`、digest、missing、replacements、allocations 和 off-main worker 数。数组长度在运行期间不变，生命周期操作只替换单个 entry 引用。30 帧热身用于覆盖首次类型化事件分支，依据见 P1 实测文档。
 
 `AlsHarnessEntry` 保存：
 
@@ -319,7 +319,7 @@ public required AlsVisualWorkerRoot Worker { get; init; }
 public long StartFrame { get; init; }
 ```
 
-- [ ] **Step 2：实现 worker 配置和合成骨架创建**
+- [x] **Step 2：实现 worker 配置和合成骨架创建**
 
 `AlsVisualWorkerRoot.Configure()` 在节点入树前设置 context、handle、exchange、`ProcessThreadGroup` 和 `ProcessThreadGroupOrder=1`。single 使用 `MainThread`，parallel 使用 `SubThread`。
 
@@ -333,19 +333,19 @@ skeleton.SetBoneParent(pelvis, root);
 skeleton.SetBoneRest(pelvis, new Transform3D(Basis.Identity, new Vector3(0f, 1f, 0f)));
 ```
 
-- [ ] **Step 3：实现 worker physics callback**
+- [x] **Step 3：实现 worker physics callback**
 
 `_PhysicsProcess()` 使用 `Volatile.Read(ref context.PublishedFrameId)` 构造当前 identity，从 exchange 读取输入，调用 `AlsSyntheticLocomotionModel.Evaluate()`，用 `result.PelvisTarget.Y` 设置 pelvis bone pose，然后发布结果。
 
 计时使用 `Stopwatch.GetTimestamp()`，托管分配使用 `GC.GetAllocatedBytesForCurrentThread()`。只有 `frame > context.WarmupFrames` 且 `frame > entry.StartFrame + 2` 时累计分配。parallel 模式下，如果当前 managed thread id 不等于 main thread id，使用 `Interlocked.Exchange(ref entry.ObservedOffMainThread, 1)`。
 
-- [ ] **Step 4：编译 Godot 工程**
+- [x] **Step 4：编译 Godot 工程**
 
 Run: `dotnet build .\GodotALS.csproj --no-restore`
 
 Expected: 0 warnings，0 errors；尚未有可运行 P1 场景。
 
-- [ ] **Step 5：提交 worker 基础**
+- [x] **Step 5：提交 worker 基础**
 
 ```powershell
 git add src/Als.Godot/Dispatch
@@ -360,11 +360,11 @@ git commit -m "feat: add process-group visual worker"
 - Create: `src/Als.Godot/Dispatch/P1DispatchHarness.cs`
 - Create: `scenes/tests/p1_dispatch_harness.tscn`
 
-- [ ] **Step 1：实现 Main Order 0 Gather**
+- [x] **Step 1：实现 Main Order 0 Gather**
 
 `AlsGatherStage` 配置为 `MainThread/Order 0`。每次 `_PhysicsProcess()` 将 `PublishedFrameId + 1` 作为新帧，为固定数组中每个 entry 创建确定性 input 并发布，最后才使用 `Volatile.Write` 更新 `PublishedFrameId`。计时和分配只在 warm-up 后累计。
 
-- [ ] **Step 2：实现 Main Order 2 Commit**
+- [x] **Step 2：实现 Main Order 2 Commit**
 
 `AlsCommitStage` 配置为 `MainThread/Order 2`。它按 entry 数组顺序消费当前帧结果：缺失则递增 `MissingResults`，成功则调用 `AlsResultDigest.Append()`。每 30 帧处理完结果后调用 root 的 `ReplaceCharacter(0, frame)`；90 帧共替换两次，最后一帧不替换。
 
@@ -374,7 +374,7 @@ git commit -m "feat: add process-group visual worker"
 GODOT_ALS_P1_OK mode=parallel characters=10 frames=90 digest=0123456789ABCDEF missing=0 replacements=2 allocations=0 off_main=10
 ```
 
-- [ ] **Step 3：实现 Harness 建树和参数解析**
+- [x] **Step 3：实现 Harness 建树和参数解析**
 
 `P1DispatchHarness._Ready()` 读取 `OS.GetCmdlineUserArgs()`：
 
@@ -384,7 +384,7 @@ GODOT_ALS_P1_OK mode=parallel characters=10 frames=90 digest=0123456789ABCDEF mi
 
 它捕获 `Environment.CurrentManagedThreadId`，创建 context、Gather、Commit 和初始 worker。`ReplaceCharacter()` 只由 Commit main-thread callback 调用：在 barrier 后 `QueueFree()` 旧 worker、释放旧 handle、重新 acquire、创建 exchange 和 worker、替换固定数组槽位并把新 worker 加入场景。
 
-- [ ] **Step 4：创建场景并运行 1 角色 single/parallel**
+- [x] **Step 4：创建场景并运行 1 角色 single/parallel**
 
 场景：
 
@@ -401,7 +401,7 @@ Run two commands with `--als-characters=1 --als-frames=90`。
 
 Expected: 两者都输出 P1 marker，digest 相同，parallel `off_main=1`，single `off_main=0`。
 
-- [ ] **Step 5：提交三阶段 Harness**
+- [x] **Step 5：提交三阶段 Harness**
 
 ```powershell
 git add src/Als.Godot/Dispatch scenes/tests/p1_dispatch_harness.tscn
@@ -414,17 +414,17 @@ git commit -m "feat: add Gather worker Commit harness"
 - Modify when evidence requires: `src/Als.Godot/Dispatch/*.cs`
 - Modify when evidence requires: `scripts/verify-p1.ps1`
 
-- [ ] **Step 1：运行完整验证矩阵**
+- [x] **Step 1：运行完整验证矩阵**
 
 Run: `scripts/verify-p1.ps1` with the local Godot 4.7.2 console executable。
 
 Expected: 1、10、16、32 角色的 single/parallel digest 全部一致；无缺失结果；无 thread-access error；每次运行 replacement=2；steady-state allocations=0。
 
-- [ ] **Step 2：若失败，按 systematic-debugging 修复**
+- [x] **Step 2：若失败，按 systematic-debugging 修复**
 
 任何 build、thread access、missing result、digest、allocation 或 lifecycle 失败都先保留输出并建立最小复现。只修复已确认根因，修复后重跑触发失败的单场景，再重跑完整矩阵。
 
-- [ ] **Step 3：回归 P0 与全部核心测试**
+- [x] **Step 3：回归 P0 与全部核心测试**
 
 Run:
 
@@ -435,7 +435,7 @@ dotnet test .\GodotALS.sln --no-build --no-restore
 
 Expected: `P0_VERIFICATION_OK`，所有核心测试通过。
 
-- [ ] **Step 4：提交矩阵修正**
+- [x] **Step 4：提交矩阵修正**
 
 仅在 Step 2 产生代码修改时提交：
 
@@ -452,11 +452,11 @@ git commit -m "fix: stabilize P1 process-group harness"
 - Create: `docs/architecture/p1-process-group-harness.md`
 - Modify: `docs/superpowers/plans/2026-08-25-p1-process-group-harness.md`
 
-- [ ] **Step 1：记录实际架构和限制**
+- [x] **Step 1：记录实际架构和限制**
 
 文档记录 process group 属性、barrier、跨线程共享对象、Skeleton 所有权、single/parallel digest、1/10/16/32 结果、lifecycle replacement、steady-state allocation 和 P2 前提。明确 P1 的合成骨架不代表真实 ALS AnimationTree 成本。
 
-- [ ] **Step 2：勾选真实完成步骤并运行最终验证**
+- [x] **Step 2：勾选真实完成步骤并运行最终验证**
 
 Run:
 
@@ -469,7 +469,7 @@ git status --short
 
 Expected: P1/P0 标记都成功；只有预期文档和计划清单未提交。
 
-- [ ] **Step 3：提交完成记录**
+- [x] **Step 3：提交完成记录**
 
 ```powershell
 git add docs/architecture/p1-process-group-harness.md docs/superpowers/plans/2026-08-25-p1-process-group-harness.md
