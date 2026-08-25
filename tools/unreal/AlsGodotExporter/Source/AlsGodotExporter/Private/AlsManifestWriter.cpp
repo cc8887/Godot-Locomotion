@@ -95,7 +95,10 @@ namespace
     }
 }
 
-bool FAlsManifestWriter::WritePlanned(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets, FString& OutError)
+namespace
+{
+bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets,
+    const TArray<FAlsExportFile>& Files, const TCHAR* Status, const bool bPublishFormal, FString& OutError)
 {
     TMap<FString, TSharedRef<FJsonObject>> MetadataById;
     for (const FAlsExportAsset& Asset : Assets)
@@ -140,11 +143,19 @@ bool FAlsManifestWriter::WritePlanned(const FString& OutputDirectory, const TArr
         return Kind == EAlsAssetKind::DataTable || Kind == EAlsAssetKind::Blueprint || Kind == EAlsAssetKind::OtherConfig;
     });
     Writer->WriteArrayStart(TEXT("files"));
+    for (const FAlsExportFile& File : Files)
+    {
+        Writer->WriteObjectStart();
+        Writer->WriteValue(TEXT("relativePath"), File.RelativePath);
+        Writer->WriteValue(TEXT("sha256"), File.Sha256);
+        Writer->WriteValue(TEXT("size"), File.Size);
+        Writer->WriteObjectEnd();
+    }
     Writer->WriteArrayEnd();
     Writer->WriteObjectStart(TEXT("auditSummary"));
-    Writer->WriteValue(TEXT("status"), TEXT("planned"));
+    Writer->WriteValue(TEXT("status"), Status);
     Writer->WriteValue(TEXT("assetCount"), Assets.Num());
-    Writer->WriteValue(TEXT("fileCount"), 0);
+    Writer->WriteValue(TEXT("fileCount"), Files.Num());
     Writer->WriteValue(TEXT("errorCount"), 0);
     Writer->WriteValue(TEXT("warningCount"), 0);
     Writer->WriteObjectEnd();
@@ -171,5 +182,28 @@ bool FAlsManifestWriter::WritePlanned(const FString& OutputDirectory, const TArr
         OutError = FString::Printf(TEXT("Unable to publish partial manifest: %s"), *FinalPath);
         return false;
     }
+    if (bPublishFormal)
+    {
+        const FString FormalPath = FPaths::Combine(OutputDirectory, TEXT("als_manifest.json"));
+        const FString FormalTemporaryPath = FormalPath + TEXT(".tmp");
+        if (!FFileHelper::SaveStringToFile(Json, *FormalTemporaryPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM) ||
+            !IFileManager::Get().Move(*FormalPath, *FormalTemporaryPath, true, true, false, true))
+        {
+            OutError = FString::Printf(TEXT("Unable to publish formal manifest: %s"), *FormalPath);
+            return false;
+        }
+    }
     return true;
+}
+}
+
+bool FAlsManifestWriter::WritePlanned(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets, FString& OutError)
+{
+    return WriteManifest(OutputDirectory, Assets, {}, TEXT("planned"), false, OutError);
+}
+
+bool FAlsManifestWriter::WriteComplete(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets,
+    const TArray<FAlsExportFile>& Files, FString& OutError)
+{
+    return WriteManifest(OutputDirectory, Assets, Files, TEXT("complete"), true, OutError);
 }

@@ -31,5 +31,12 @@ struct FAlsExportAsset
     TArray<FString> ExternalDependencies;
 };
 
+struct FAlsExportFile
+{
+    FString RelativePath;
+    FString Sha256;
+    int64 Size = 0;
+};
+
 const TCHAR* AlsAssetKindToString(EAlsAssetKind Kind);
 bool AlsAssetKindIsExportable(EAlsAssetKind Kind);
