@@ -171,7 +171,7 @@ git commit -m "feat: validate audited ALS manifests"
 - Create: `tests/Als.Import.Tests/AlsSkeletonCompilerTests.cs`
 - Create: `tests/Als.Import.Tests/AlsCanonicalPoseHashTests.cs`
 
-- [ ] **Step 1: Write failing coordinate and virtual-bone tests**
+- [x] **Step 1: Write failing coordinate and virtual-bone tests**
 
 Assert the fixed mapping:
 
@@ -182,23 +182,23 @@ Assert.Equal(new Vector3(2f, 3f, -1f),
 
 For the Mannequin-shaped fixture, assert 79 logical bones, 11 virtual bones, 68 physical bones, stable physical parent indices, and required `root`, `pelvis`, `foot_l`, `foot_r` IDs.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run the three focused classes. Expected: compile failure because compilation types are absent.
 
-- [ ] **Step 3: Implement typed rig metadata and coordinate conversion**
+- [x] **Step 3: Implement typed rig metadata and coordinate conversion**
 
 Deserialize bone local translation/rotation/scale, sockets, virtual bones, mesh `skeletonId`, and physics bodies/constraints. Map UE `(X forward, Y right, Z up)` centimeters to Godot `(X right, Y up, -Z forward)` meters as `(Y, Z, -X) * 0.01`. Convert rotations by basis conjugation `C * R * inverse(C)` and normalize quaternion sign so `W >= 0` before hashing.
 
-- [ ] **Step 4: Compile logical and physical skeleton tables**
+- [x] **Step 4: Compile logical and physical skeleton tables**
 
 Assign integer IDs by manifest bone order. Build `LogicalBones`, `PhysicalBones`, `LogicalToPhysical`, `PhysicalToLogical`, sockets, and virtual-bone source/target indices. Reject virtual references that do not resolve and physical children whose surviving parent is missing.
 
-- [ ] **Step 5: Implement canonical target-pose hashing**
+- [x] **Step 5: Implement canonical target-pose hashing**
 
 Hash ordered UTF-8 bone name, parent ID, and coordinate-converted local transform after rounding floats to `1e-5`. Store separate `SourceRestPoseHash` and `TargetPhysicalRestPoseHash`; never compare UE's 79-bone source hash directly with Godot's 68-bone imported skeleton.
 
-- [ ] **Step 6: Verify GREEN and commit**
+- [x] **Step 6: Verify GREEN and commit**
 
 Run all import tests, then commit:
 

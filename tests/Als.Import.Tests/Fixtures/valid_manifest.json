@@ -30,12 +30,46 @@
             "translation": [0, 0, 0],
             "rotation": [0, 0, 0, 1],
             "scale": [1, 1, 1]
+          },
+          {
+            "name": "pelvis",
+            "parentIndex": 0,
+            "translation": [100, 200, 300],
+            "rotation": [0, 0, 0, 1],
+            "scale": [1, 1, 1]
+          },
+          {
+            "name": "foot_l",
+            "parentIndex": 1,
+            "translation": [10, 20, 30],
+            "rotation": [0, 0, 0, 1],
+            "scale": [1, 1, 1]
+          },
+          {
+            "name": "foot_r",
+            "parentIndex": 1,
+            "translation": [10, -20, 30],
+            "rotation": [0, 0, 0, 1],
+            "scale": [1, 1, 1]
+          },
+          {
+            "name": "VB foot_target_l",
+            "parentIndex": 0,
+            "translation": [0, 0, 0],
+            "rotation": [0, 0, 0, 1],
+            "scale": [1, 1, 1]
           }
         ],
         "restPoseHash": "0000000000000000000000000000000000000000",
         "sockets": [],
-        "virtualBones": [],
-        "boneCount": 1
+        "virtualBones": [
+          {
+            "name": "VB foot_target_l",
+            "source": "root",
+            "target": "foot_l"
+          }
+        ],
+        "boneCount": 5
       }
     }
   ],
