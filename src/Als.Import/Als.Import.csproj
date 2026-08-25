@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>GodotAls.Import</RootNamespace>
+  </PropertyGroup>
+</Project>
