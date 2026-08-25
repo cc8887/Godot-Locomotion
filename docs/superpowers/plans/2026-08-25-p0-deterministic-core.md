@@ -1105,7 +1105,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $godotOutput = & $GodotExecutable --headless --path $ProjectRoot 2>&1
 $godotOutput | Write-Output
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-if ($godotOutput -notmatch 'GODOT_ALS_P0_OK') {
+if (-not ($godotOutput -match 'GODOT_ALS_P0_OK')) {
     throw 'Godot smoke marker was not emitted.'
 }
 
