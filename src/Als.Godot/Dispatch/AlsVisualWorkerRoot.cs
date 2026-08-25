@@ -51,18 +51,34 @@ public partial class AlsVisualWorkerRoot : Node
         var started = Stopwatch.GetTimestamp();
 
         AlsSyntheticLocomotionModel.Evaluate(input, ref _runtimeState, ref _result);
+        var allocatedAfterModel = measureAllocations
+            ? GC.GetAllocatedBytesForCurrentThread()
+            : 0;
         _skeleton.SetBonePosePosition(
             _pelvisBone,
             new Vector3(0f, _result.PelvisTarget.Y, 0f));
+        var allocatedAfterSkeleton = measureAllocations
+            ? GC.GetAllocatedBytesForCurrentThread()
+            : 0;
 
         _result.WorkerElapsedTicks = Stopwatch.GetTimestamp() - started;
         _entry.Exchange.PublishResult(_result);
 
         if (measureAllocations)
         {
+            var allocatedAfterExchange = GC.GetAllocatedBytesForCurrentThread();
+            var allocated = allocatedAfterExchange - allocatedBefore;
             Interlocked.Add(
-                ref _context.SteadyStateAllocations,
-                GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
+                ref _context.WorkerModelAllocations,
+                allocatedAfterModel - allocatedBefore);
+            Interlocked.Add(
+                ref _context.WorkerSkeletonAllocations,
+                allocatedAfterSkeleton - allocatedAfterModel);
+            Interlocked.Add(
+                ref _context.WorkerExchangeAllocations,
+                allocatedAfterExchange - allocatedAfterSkeleton);
+            Interlocked.Add(ref _context.WorkerAllocations, allocated);
+            Interlocked.Add(ref _context.SteadyStateAllocations, allocated);
         }
 
         if (_context.Mode == AlsHarnessMode.Parallel &&

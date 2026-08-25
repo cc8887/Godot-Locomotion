@@ -26,7 +26,7 @@ public sealed class AlsHarnessContext
 
     public int TargetFrames { get; }
 
-    public int WarmupFrames { get; } = 20;
+    public int WarmupFrames { get; } = 30;
 
     public int MainManagedThreadId { get; }
 
@@ -39,4 +39,16 @@ public sealed class AlsHarnessContext
     public long Replacements;
 
     public long SteadyStateAllocations;
+
+    public long GatherAllocations;
+
+    public long WorkerAllocations;
+
+    public long WorkerModelAllocations;
+
+    public long WorkerSkeletonAllocations;
+
+    public long WorkerExchangeAllocations;
+
+    public long CommitAllocations;
 }
