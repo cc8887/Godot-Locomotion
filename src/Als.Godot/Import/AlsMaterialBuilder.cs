@@ -35,44 +35,49 @@ public sealed class AlsMaterialBuilder
 
     public int ApplyToScene(PackedScene scene, AlsManifestAsset sourceAsset)
     {
-        var dependencyMaterials = sourceAsset.Dependencies
-            .Select(TryGetMaterialId)
-            .Where(value => value >= 0)
-            .ToArray();
         var root = scene.Instantiate();
         try
         {
-            var applied = 0;
-            foreach (var mesh in FindAll<MeshInstance3D>(root))
-            {
-                if (mesh.Mesh is null)
-                {
-                    continue;
-                }
-
-                for (var surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
-                {
-                    var importedName = mesh.GetActiveMaterial(surface)?.ResourceName ?? string.Empty;
-                    var materialId = FindByName(importedName);
-                    if (materialId < 0 && dependencyMaterials.Length != 0)
-                    {
-                        materialId = dependencyMaterials[Math.Min(surface, dependencyMaterials.Length - 1)];
-                    }
-
-                    if (materialId >= 0)
-                    {
-                        mesh.SetSurfaceOverrideMaterial(surface, GetMaterial(materialId));
-                        applied++;
-                    }
-                }
-            }
-
-            return applied;
+            return ApplyToRoot(root, sourceAsset);
         }
         finally
         {
             root.Free();
         }
+    }
+
+    public int ApplyToRoot(Node root, AlsManifestAsset sourceAsset)
+    {
+        var dependencyMaterials = sourceAsset.Dependencies
+            .Select(TryGetMaterialId)
+            .Where(value => value >= 0)
+            .ToArray();
+        var applied = 0;
+        foreach (var mesh in FindAll<MeshInstance3D>(root))
+        {
+            if (mesh.Mesh is null)
+            {
+                continue;
+            }
+
+            for (var surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
+            {
+                var importedName = mesh.GetActiveMaterial(surface)?.ResourceName ?? string.Empty;
+                var materialId = FindByName(importedName);
+                if (materialId < 0 && dependencyMaterials.Length != 0)
+                {
+                    materialId = dependencyMaterials[Math.Min(surface, dependencyMaterials.Length - 1)];
+                }
+
+                if (materialId >= 0)
+                {
+                    mesh.SetSurfaceOverrideMaterial(surface, GetMaterial(materialId));
+                    applied++;
+                }
+            }
+        }
+
+        return applied;
     }
 
     private void ApplyParameters(StandardMaterial3D material, AlsMaterialDefinition source)
