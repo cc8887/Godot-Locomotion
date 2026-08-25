@@ -1,8 +1,22 @@
 using Godot;
 using GodotAls.Import.Compilation;
-using GodotAls.Import.Manifest;
 
 namespace GodotAls.Import;
+
+public sealed record AlsMaterialDiagnostic(
+    string Severity,
+    string Code,
+    string AssetId,
+    string MeshName,
+    int SurfaceIndex,
+    string ImportedMaterialName,
+    string SelectedMaterialName);
+
+public sealed record AlsMaterialApplyReport(
+    int AppliedCount,
+    int SurfaceCount,
+    int UnresolvedCount,
+    IReadOnlyList<AlsMaterialDiagnostic> Diagnostics);
 
 public sealed class AlsMaterialBuilder
 {
@@ -33,12 +47,15 @@ public sealed class AlsMaterialBuilder
         return material;
     }
 
-    public int ApplyToScene(PackedScene scene, AlsManifestAsset sourceAsset)
+    public AlsMaterialApplyReport ApplyToScene(
+        PackedScene scene,
+        string assetId,
+        IReadOnlyList<int> materialIds)
     {
         var root = scene.Instantiate();
         try
         {
-            return ApplyToRoot(root, sourceAsset);
+            return ApplyToRoot(root, assetId, materialIds);
         }
         finally
         {
@@ -46,13 +63,14 @@ public sealed class AlsMaterialBuilder
         }
     }
 
-    public int ApplyToRoot(Node root, AlsManifestAsset sourceAsset)
+    public AlsMaterialApplyReport ApplyToRoot(
+        Node root,
+        string assetId,
+        IReadOnlyList<int> materialIds)
     {
-        var dependencyMaterials = sourceAsset.Dependencies
-            .Select(TryGetMaterialId)
-            .Where(value => value >= 0)
-            .ToArray();
+        var diagnostics = new List<AlsMaterialDiagnostic>();
         var applied = 0;
+        var surfaceCount = 0;
         foreach (var mesh in FindAll<MeshInstance3D>(root))
         {
             if (mesh.Mesh is null)
@@ -62,11 +80,20 @@ public sealed class AlsMaterialBuilder
 
             for (var surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
             {
+                surfaceCount++;
                 var importedName = mesh.GetActiveMaterial(surface)?.ResourceName ?? string.Empty;
                 var materialId = FindByName(importedName);
-                if (materialId < 0 && dependencyMaterials.Length != 0)
+                if (materialId < 0 && surface < materialIds.Count)
                 {
-                    materialId = dependencyMaterials[Math.Min(surface, dependencyMaterials.Length - 1)];
+                    materialId = materialIds[surface];
+                    diagnostics.Add(new AlsMaterialDiagnostic(
+                        "warning",
+                        "ALSMATERIAL001",
+                        assetId,
+                        mesh.Name,
+                        surface,
+                        importedName,
+                        _definition.Materials[materialId].Name));
                 }
 
                 if (materialId >= 0)
@@ -74,10 +101,25 @@ public sealed class AlsMaterialBuilder
                     mesh.SetSurfaceOverrideMaterial(surface, GetMaterial(materialId));
                     applied++;
                 }
+                else
+                {
+                    diagnostics.Add(new AlsMaterialDiagnostic(
+                        "error",
+                        "ALSMATERIAL002",
+                        assetId,
+                        mesh.Name,
+                        surface,
+                        importedName,
+                        string.Empty));
+                }
             }
         }
 
-        return applied;
+        return new AlsMaterialApplyReport(
+            applied,
+            surfaceCount,
+            diagnostics.Count(value => value.Severity == "error"),
+            diagnostics);
     }
 
     private void ApplyParameters(StandardMaterial3D material, AlsMaterialDefinition source)
@@ -108,18 +150,6 @@ public sealed class AlsMaterialBuilder
         {
             var texturePath = AlsImportedResourceAuditor.ToResourcePath(_definition.Textures[textureId].ResourcePath);
             material.AlbedoTexture = ResourceLoader.Load<Texture2D>(texturePath);
-        }
-    }
-
-    private int TryGetMaterialId(string stableId)
-    {
-        try
-        {
-            return _definition.AssetIndex.GetMaterialId(stableId);
-        }
-        catch (KeyNotFoundException)
-        {
-            return -1;
         }
     }
 

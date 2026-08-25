@@ -70,10 +70,14 @@ public static partial class AlsManifestValidator
         if (!string.Equals(coordinate.SourceHandedness, "left", StringComparison.Ordinal) ||
             !string.Equals(coordinate.SourceUpAxis, "Z", StringComparison.Ordinal) ||
             !string.Equals(coordinate.TargetHandedness, "right", StringComparison.Ordinal) ||
-            !string.Equals(coordinate.TargetUpAxis, "Y", StringComparison.Ordinal) ||
-            manifest.UnitScale <= 0)
+            !string.Equals(coordinate.TargetUpAxis, "Y", StringComparison.Ordinal))
         {
             Add(issues, "ALSMANIFEST006", null, "$.coordinateSystem", "Unsupported coordinate-system contract.");
+        }
+        if (Math.Abs(manifest.UnitScale - 0.01) > 1e-12)
+        {
+            Add(issues, "ALSMANIFEST006", null, "$.unitScale", "Unit scale must be exactly 0.01 meters per centimeter.",
+                "0.01", manifest.UnitScale.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 

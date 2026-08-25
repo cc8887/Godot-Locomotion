@@ -5,7 +5,11 @@ namespace GodotAls.Dispatch;
 
 public readonly record struct AlsRealRigInput(AlsFrameIdentity Identity, double DeltaTime);
 
-public readonly record struct AlsRealRigResult(AlsFrameIdentity Identity, ulong PoseDigest);
+public readonly record struct AlsRealRigResult(
+    AlsFrameIdentity Identity,
+    ulong PoseDigest,
+    ulong EventDigest,
+    int EventsFired);
 
 public sealed class AlsRealRigExchange
 {

@@ -3,6 +3,7 @@ using System.Threading;
 using Godot;
 using GodotAls.Animation;
 using GodotAls.Core.Contracts;
+using GodotAls.Import.Compilation;
 
 namespace GodotAls.Dispatch;
 
@@ -16,6 +17,8 @@ public partial class AlsRealRigWorkerRoot : Node
     private AlsRealRigHarnessContext _context = null!;
     private AlsRealRigHarnessEntry _entry = null!;
     private AlsBoundAnimation _bound = null!;
+    private double _playbackTime;
+    private ulong _eventDigest = AlsAnimationEventDigest.OffsetBasis;
 
     public bool IsWarm { get; private set; }
 
@@ -56,10 +59,17 @@ public partial class AlsRealRigWorkerRoot : Node
             return;
         }
 
+        var previousTime = _playbackTime;
+        _playbackTime += input.DeltaTime;
         _bound.Player.Advance(input.DeltaTime);
+        var eventsFired = AlsAnimationEventDigest.Advance(
+            _context.WalkClip,
+            previousTime,
+            _playbackTime,
+            ref _eventDigest);
         var digestText = AlsPoseDigest.Compute(_bound.Skeleton, checked((int)frameId), PoseBoneNames);
         var digest = ulong.Parse(digestText.AsSpan(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        _entry.Exchange.PublishResult(new AlsRealRigResult(identity, digest));
+        _entry.Exchange.PublishResult(new AlsRealRigResult(identity, digest, _eventDigest, eventsFired));
 
         if (_context.Mode == AlsHarnessMode.Parallel &&
             System.Environment.CurrentManagedThreadId != _context.MainManagedThreadId)

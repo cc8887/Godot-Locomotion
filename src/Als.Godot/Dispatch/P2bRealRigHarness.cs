@@ -1,9 +1,9 @@
 using System.Threading;
 using Godot;
+using GodotAls.Assets;
 using GodotAls.Core.Contracts;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
-using GodotAls.Import.Manifest;
 
 namespace GodotAls.Dispatch;
 
@@ -24,8 +24,9 @@ public partial class P2bRealRigHarness : Node
                 return;
             }
 
-            var manifest = AlsManifestSerializer.Load(ProjectSettings.GlobalizePath(AlsGodotImportCoordinator.ManifestPath));
-            var definition = AlsAnimationSetCompiler.Compile(manifest);
+            var resource = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath)
+                ?? throw new InvalidOperationException("Compiled ALS animation set could not be loaded.");
+            var definition = resource.LoadDefinition();
             var mannequin = definition.SkeletalMeshes[
                 definition.AssetIndex.GetSkeletalMeshId(MannequinAssetId)];
             var walk = definition.Animations[definition.AssetIndex.GetAnimationId(WalkClipId)];
@@ -63,6 +64,11 @@ public partial class P2bRealRigHarness : Node
     public void ReplaceCharacter(int entryIndex)
     {
         var oldEntry = _context.Entries[entryIndex];
+        if (_context.Mode == AlsHarnessMode.Parallel &&
+            Volatile.Read(ref oldEntry.ObservedOffMainThread) != 1)
+        {
+            throw new InvalidOperationException("Cannot replace a real-rig worker before it has run off the main thread.");
+        }
         oldEntry.Worker.QueueFree();
         if (!_context.Registry.Release(oldEntry.Handle))
         {
@@ -195,6 +201,7 @@ public partial class AlsRealRigCommitStage : Node
                 continue;
             }
             AppendResult(ref _context.Digest, result);
+            _context.EventOccurrences += result.EventsFired;
         }
 
         if (frameId == 60)
@@ -221,7 +228,7 @@ public partial class AlsRealRigCommitStage : Node
         GD.Print(
             $"{marker} mode={mode} characters={_context.Entries.Length} frames={_context.TargetFrames} " +
             $"digest={_context.Digest:X16} missing={_context.MissingResults} stale={_context.StaleResults} " +
-            $"off_main={offMainWorkers} replacements={_context.Replacements}");
+            $"off_main={offMainWorkers} replacements={_context.Replacements} events={_context.EventOccurrences}");
         GetTree().Quit(valid ? 0 : 1);
     }
 
@@ -231,6 +238,8 @@ public partial class AlsRealRigCommitStage : Node
         Append(ref digest, result.Identity.CharacterId);
         Append(ref digest, result.Identity.SlotGeneration);
         Append(ref digest, result.PoseDigest);
+        Append(ref digest, result.EventDigest);
+        Append(ref digest, result.EventsFired);
     }
 
     private static void Append(ref ulong digest, long value) => Append(ref digest, unchecked((ulong)value));

@@ -24,15 +24,15 @@ public static class AlsAnimationSetCompiler
         var materialIds = IdMap(manifest.Materials);
         var textureIds = IdMap(manifest.Textures);
 
-        var skeletalMeshes = CompileSkeletalMeshes(manifest.SkeletalMeshes, skeletonIds);
-        var staticMeshes = CompileStaticMeshes(manifest.StaticMeshes);
+        var skeletalMeshes = CompileSkeletalMeshes(manifest.SkeletalMeshes, skeletonIds, materialIds);
+        var staticMeshes = CompileStaticMeshes(manifest.StaticMeshes, materialIds);
         var animations = CompileAnimations(manifest.Animations, skeletonIds, animationIds);
         var montages = CompileMontages(manifest.Montages, animationIds);
         var blendSpaces = CompileBlends(manifest.BlendSpaces, "blendSpaces", animationIds);
         var aimOffsets = CompileBlends(manifest.AimOffsets, "aimOffsets", animationIds);
         var textures = CompileTextures(manifest.Textures);
         var materials = CompileMaterials(manifest.Materials, materialIds, textureIds);
-        var physicsAssets = CompilePhysicsAssets(manifest.PhysicsAssets);
+        var physicsAssets = CompilePhysicsAssets(manifest.PhysicsAssets, skeletalMeshes, skeletons);
         var curves = CompileGenericAssets(manifest.Curves, "curves");
         var configAssets = CompileGenericAssets(manifest.ConfigAssets, "configAssets");
         var assetIndex = new AlsAssetIndex(
@@ -58,7 +58,8 @@ public static class AlsAnimationSetCompiler
 
     private static AlsSkeletalMeshDefinition[] CompileSkeletalMeshes(
         AlsManifestAsset[] assets,
-        Dictionary<string, int> skeletonIds) =>
+        Dictionary<string, int> skeletonIds,
+        Dictionary<string, int> materialIds) =>
         assets.Select((asset, index) =>
         {
             var metadata = Read(asset, $"$.skeletalMeshes[{index}].metadata", AlsSkeletalMeshMetadata.Read);
@@ -71,10 +72,13 @@ public static class AlsAnimationSetCompiler
 
             return new AlsSkeletalMeshDefinition(
                 index, asset.Id, asset.AssetName, asset.ObjectPath, asset.OutputPath!,
-                skeletonIds[metadata.SkeletonId], metadata.MaterialSlotCount, metadata.Overlay, metadata.Prop);
+                skeletonIds[metadata.SkeletonId], metadata.MaterialSlotCount,
+                ResolveDependencies(asset.Dependencies, materialIds), metadata.Overlay, metadata.Prop);
         }).ToArray();
 
-    private static AlsStaticMeshDefinition[] CompileStaticMeshes(AlsManifestAsset[] assets) =>
+    private static AlsStaticMeshDefinition[] CompileStaticMeshes(
+        AlsManifestAsset[] assets,
+        Dictionary<string, int> materialIds) =>
         assets.Select((asset, index) =>
         {
             var metadata = Read(asset, $"$.staticMeshes[{index}].metadata", AlsStaticMeshMetadata.Read);
@@ -87,7 +91,8 @@ public static class AlsAnimationSetCompiler
 
             return new AlsStaticMeshDefinition(
                 index, asset.Id, asset.AssetName, asset.ObjectPath, asset.OutputPath!,
-                metadata.MaterialSlotCount, metadata.Overlay, metadata.Prop);
+                metadata.MaterialSlotCount, ResolveDependencies(asset.Dependencies, materialIds),
+                metadata.Overlay, metadata.Prop);
         }).ToArray();
 
     private static AlsAnimationDefinition[] CompileAnimations(
@@ -216,7 +221,10 @@ public static class AlsAnimationSetCompiler
                 metadata.Overlay, metadata.Prop);
         }).ToArray();
 
-    private static AlsPhysicsAssetDefinition[] CompilePhysicsAssets(AlsManifestAsset[] assets) =>
+    private static AlsPhysicsAssetDefinition[] CompilePhysicsAssets(
+        AlsManifestAsset[] assets,
+        AlsSkeletalMeshDefinition[] skeletalMeshes,
+        AlsSkeletonDefinition[] skeletons) =>
         assets.Select((asset, index) =>
         {
             var path = $"$.physicsAssets[{index}].metadata";
@@ -228,12 +236,42 @@ public static class AlsAnimationSetCompiler
                     "Physics constraint count does not match constraints[].");
             }
 
+            var dependentMeshes = skeletalMeshes
+                .Where(mesh => asset.Dependencies.Contains(mesh.StableId, StringComparer.Ordinal))
+                .ToArray();
+            if (dependentMeshes.Length != 1)
+            {
+                throw ContentError("ALSPHYSICS002", asset.Id, $"$.physicsAssets[{index}].dependencies",
+                    "Physics asset must depend on exactly one exported skeletal mesh.");
+            }
+
+            var skeleton = skeletons[dependentMeshes[0].SkeletonId];
+            for (var bodyIndex = 0; bodyIndex < metadata.Bodies.Length; bodyIndex++)
+            {
+                RequirePhysicalBone(metadata.Bodies[bodyIndex].Bone, $"{path}.bodies[{bodyIndex}].bone");
+            }
+            for (var constraintIndex = 0; constraintIndex < metadata.Constraints.Length; constraintIndex++)
+            {
+                var constraint = metadata.Constraints[constraintIndex];
+                RequirePhysicalBone(constraint.ChildBone, $"{path}.constraints[{constraintIndex}].childBone");
+                RequirePhysicalBone(constraint.ParentBone, $"{path}.constraints[{constraintIndex}].parentBone");
+            }
+
             return new AlsPhysicsAssetDefinition(
                 index, asset.Id, asset.AssetName, asset.ObjectPath,
                 metadata.Bodies.Select(value => new AlsPhysicsBodyDefinition(value.Bone, value.PrimitiveCount)).ToArray(),
                 metadata.Constraints.Select(value => new AlsPhysicsConstraintDefinition(
                     value.ChildBone, value.ParentBone)).ToArray(),
                 metadata.Overlay, metadata.Prop);
+
+            void RequirePhysicalBone(string bone, string fieldPath)
+            {
+                if (skeleton.GetPhysicalBoneId(bone) < 0)
+                {
+                    throw ContentError("ALSPHYSICS003", asset.Id, fieldPath,
+                        $"Physics bone does not resolve against skeleton '{skeleton.AssetId}'.");
+                }
+            }
         }).ToArray();
 
     private static AlsGenericAssetDefinition[] CompileGenericAssets(AlsManifestAsset[] assets, string section) =>
@@ -248,6 +286,9 @@ public static class AlsAnimationSetCompiler
     private static Dictionary<string, int> IdMap(AlsManifestAsset[] assets) =>
         assets.Select((value, index) => (value.Id, index))
             .ToDictionary(value => value.Id, value => value.index, StringComparer.Ordinal);
+
+    private static int[] ResolveDependencies(string[] dependencies, Dictionary<string, int> ids) =>
+        dependencies.Where(ids.ContainsKey).Select(value => ids[value]).ToArray();
 
     private static T Read<T>(AlsManifestAsset asset, string path, Func<JsonElement, T> read)
     {

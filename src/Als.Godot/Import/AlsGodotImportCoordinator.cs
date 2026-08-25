@@ -38,7 +38,7 @@ public static class AlsGodotImportCoordinator
         GD.Print("P2B_IMPORT_STAGE definition_compiled");
         var audit = AlsImportedResourceAuditor.Audit(manifest, definition);
         GD.Print("P2B_IMPORT_STAGE resources_audited");
-        VerifyRepresentativeMaterials(manifest, definition);
+        VerifyRepresentativeMaterials(definition);
         GD.Print("P2B_IMPORT_STAGE materials_verified");
         var resource = CreateResource(manifest, definition);
         SaveAndReload(resource);
@@ -58,6 +58,7 @@ public static class AlsGodotImportCoordinator
         AlsManifest manifest,
         AlsAnimationSetDefinition definition)
     {
+        var definitionJson = AlsAnimationSetPayload.Serialize(definition);
         var resource = new AlsAnimationSetResource
         {
             SchemaVersion = manifest.SchemaVersion,
@@ -65,6 +66,8 @@ public static class AlsGodotImportCoordinator
             SourceEngineVersion = manifest.SourceEngineVersion,
             SourceProjectId = manifest.SourceProjectId,
             DefinitionDigest = definition.DefinitionDigest,
+            DefinitionJson = definitionJson,
+            DefinitionPayloadSha256 = AlsAnimationSetPayload.ComputeSha256(definitionJson),
             ManifestAssetCount = manifest.AuditSummary.AssetCount,
             ManifestFileCount = manifest.Files.Length,
         };
@@ -193,20 +196,43 @@ public static class AlsGodotImportCoordinator
         {
             throw new InvalidOperationException("Generated ALS animation set did not reload with matching data.");
         }
+
+        var restored = reloaded.LoadDefinition();
+        if (restored.Animations.Length == 0 ||
+            restored.Montages.Length == 0 ||
+            restored.BlendSpaces.Length == 0 ||
+            restored.Materials.Length == 0 ||
+            restored.PhysicsAssets.Length == 0)
+        {
+            throw new InvalidOperationException("Generated ALS animation set reloaded without complete runtime tables.");
+        }
     }
 
-    private static void VerifyRepresentativeMaterials(
-        AlsManifest manifest,
-        AlsAnimationSetDefinition definition)
+    private static void VerifyRepresentativeMaterials(AlsAnimationSetDefinition definition)
     {
         var builder = new AlsMaterialBuilder(definition);
         foreach (var stableId in new[] { MannequinAssetId, M4a1AssetId })
         {
-            var asset = manifest.SkeletalMeshes.Single(value => value.Id == stableId);
-            var scene = ResourceLoader.Load<PackedScene>(AlsImportedResourceAuditor.ToResourcePath(asset.OutputPath!));
-            if (scene is null || builder.ApplyToScene(scene, asset) == 0)
+            var mesh = definition.SkeletalMeshes[definition.AssetIndex.GetSkeletalMeshId(stableId)];
+            var scene = ResourceLoader.Load<PackedScene>(AlsImportedResourceAuditor.ToResourcePath(mesh.ResourcePath));
+            if (scene is null)
             {
-                throw new InvalidOperationException($"Representative mesh received no reconstructed material: {asset.AssetName}");
+                throw new InvalidOperationException($"Representative mesh could not be loaded for material audit: {mesh.Name}");
+            }
+
+            var report = builder.ApplyToScene(scene, mesh.StableId, mesh.MaterialIds);
+            foreach (var diagnostic in report.Diagnostics)
+            {
+                GD.Print(
+                    $"P2B_MATERIAL_DIAGNOSTIC severity={diagnostic.Severity} code={diagnostic.Code} " +
+                    $"asset={diagnostic.AssetId} mesh={diagnostic.MeshName} surface={diagnostic.SurfaceIndex} " +
+                    $"imported={diagnostic.ImportedMaterialName} selected={diagnostic.SelectedMaterialName}");
+            }
+            if (report.AppliedCount == 0 || report.UnresolvedCount != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Representative mesh material reconstruction failed: {mesh.Name} " +
+                    $"applied={report.AppliedCount} unresolved={report.UnresolvedCount}");
             }
         }
     }

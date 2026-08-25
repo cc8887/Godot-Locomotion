@@ -164,6 +164,62 @@ public sealed class AlsAnimationSetCompilerTests
         Assert.Equal("root", definition.PhysicsAssets[0].Constraints[0].ParentBone);
         Assert.Equal(0, definition.AssetIndex.GetCurveId(curve.Id));
         Assert.Equal(0, definition.AssetIndex.GetConfigAssetId(config.Id));
+
+        var payload = AlsAnimationSetPayload.Serialize(definition);
+        Assert.Equal(64, AlsAnimationSetPayload.ComputeSha256(payload).Length);
+        var restored = AlsAnimationSetPayload.Deserialize(payload);
+        Assert.Equal(definition.DefinitionDigest, restored.DefinitionDigest);
+        Assert.Equal(definition.Montages[0].Slots[0].Segments[0], restored.Montages[0].Slots[0].Segments[0]);
+        Assert.Equal(definition.BlendSpaces[0].Samples[0].AnimationId, restored.BlendSpaces[0].Samples[0].AnimationId);
+        Assert.Equal(definition.BlendSpaces[0].Samples[0].SampleValue, restored.BlendSpaces[0].Samples[0].SampleValue);
+        Assert.Equal(definition.BlendSpaces[0].Samples[0].RateScale, restored.BlendSpaces[0].Samples[0].RateScale);
+        Assert.Equal(definition.Materials[1].TextureParameterOverrides[0], restored.Materials[1].TextureParameterOverrides[0]);
+        Assert.Equal(definition.PhysicsAssets[0].Constraints[0], restored.PhysicsAssets[0].Constraints[0]);
+        Assert.Equal(0, restored.AssetIndex.GetAnimationId(animation.Id));
+    }
+
+    [Fact]
+    public void RejectsPhysicsBonesThatDoNotResolveAgainstTheDependentMeshSkeleton()
+    {
+        var fixture = AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath());
+        var skeleton = fixture.Skeletons[0];
+        var skeletalMesh = Asset(
+            "/Game/Test/SK_Test.SK_Test",
+            "/Script/Engine.SkeletalMesh",
+            "meshes/skeletal/test.fbx",
+            [skeleton.Id],
+            new
+            {
+                overlay = false,
+                prop = false,
+                skeletonId = skeleton.Id,
+                skeletonObjectPath = skeleton.ObjectPath,
+                materialSlotCount = 0,
+            });
+        var physics = Asset(
+            "/Game/Test/PHYS_Test.PHYS_Test",
+            "/Script/Engine.PhysicsAsset",
+            null,
+            [skeletalMesh.Id],
+            new
+            {
+                overlay = false,
+                prop = false,
+                bodies = new[] { new { bone = "missing", primitiveCount = 1 } },
+                constraints = new[] { new { childBone = "pelvis", parentBone = "missing" } },
+                constraintCount = 1,
+            });
+        var manifest = fixture with
+        {
+            SkeletalMeshes = [skeletalMesh],
+            PhysicsAssets = [physics],
+            AuditSummary = fixture.AuditSummary with { AssetCount = 4 },
+        };
+
+        var exception = Assert.Throws<AlsCompilationException>(() => AlsAnimationSetCompiler.Compile(manifest));
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.Code == "ALSPHYSICS003" && issue.FieldPath == "$.physicsAssets[0].metadata.bodies[0].bone");
     }
 
     private static AlsManifestAsset BlendAsset(string objectPath, string classPath, AlsManifestAsset animation) =>

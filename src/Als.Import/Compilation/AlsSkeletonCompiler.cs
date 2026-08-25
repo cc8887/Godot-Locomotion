@@ -82,6 +82,17 @@ public static partial class AlsSkeletonCompiler
             Find(nameToLogical, "pelvis"),
             Find(nameToLogical, "foot_l"),
             Find(nameToLogical, "foot_r"));
+        if ((required.Pelvis >= 0 || required.FootLeft >= 0 || required.FootRight >= 0) &&
+            (required.Root < 0 || required.Pelvis < 0 || required.FootLeft < 0 || required.FootRight < 0))
+        {
+            throw new AlsCompilationException([
+                new AlsValidationIssue(
+                    "ALSRIG010",
+                    asset.Id,
+                    "$.metadata.bones",
+                    "Humanoid skeleton must contain root, pelvis, foot_l, and foot_r.")
+            ]);
+        }
         return new AlsSkeletonDefinition(
             asset.Id,
             asset.ObjectPath,
