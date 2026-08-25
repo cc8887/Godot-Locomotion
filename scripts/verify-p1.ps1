@@ -77,6 +77,10 @@ foreach ($characterCount in $CharacterCounts) {
     $single = Invoke-P1Harness -Mode single -CharacterCount $characterCount
     $parallel = Invoke-P1Harness -Mode parallel -CharacterCount $characterCount
 
+    if ($single.Mode -ne 'single' -or $parallel.Mode -ne 'parallel') {
+        throw "Harness reported an unexpected mode for characters=$characterCount."
+    }
+
     if ($single.Characters -ne $characterCount -or $parallel.Characters -ne $characterCount) {
         throw "Harness reported an unexpected character count for requested count $characterCount."
     }
@@ -108,8 +112,8 @@ foreach ($characterCount in $CharacterCounts) {
         throw "Single mode observed off-main workers for characters=${characterCount}: $($single.OffMain)."
     }
 
-    if ($parallel.OffMain -le 0) {
-        throw "Parallel mode did not observe an off-main worker for characters=$characterCount."
+    if ($parallel.OffMain -ne $characterCount) {
+        throw "Parallel mode expected $characterCount off-main workers but observed $($parallel.OffMain)."
     }
 }
 
