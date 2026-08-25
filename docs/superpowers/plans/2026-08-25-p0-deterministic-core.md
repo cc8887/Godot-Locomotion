@@ -1164,14 +1164,14 @@ git status --short
 
 Expected: `P0_VERIFICATION_OK`；diff 无空白错误；只有预期的文档修改未提交。
 
-- [ ] **Step 4：提交 P0 完成记录**
+- [x] **Step 4：提交 P0 完成记录**
 
 ```powershell
 git add docs/architecture/p0-deterministic-core.md docs/superpowers/plans/2026-08-25-p0-deterministic-core.md
 git commit -m "docs: record P0 deterministic core"
 ```
 
-- [ ] **Step 5：最终审计**
+- [x] **Step 5：最终审计**
 
 Run:
 
