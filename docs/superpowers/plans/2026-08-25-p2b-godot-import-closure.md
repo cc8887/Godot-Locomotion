@@ -114,7 +114,7 @@ git commit -m "fix: isolate generated ALS import inputs"
 - Create: `tests/Als.Import.Tests/AlsManifestValidatorTests.cs`
 - Create: `tests/Als.Import.Tests/AlsFileAuditorTests.cs`
 
-- [ ] **Step 1: Write failing serializer and semantic-validation tests**
+- [x] **Step 1: Write failing serializer and semantic-validation tests**
 
 Cover exact camel-case property names, unknown-property rejection, schema version, `auditSummary.status=complete`, per-section stable-ID ordering, duplicate IDs, canonical object/output paths, summary counts, dependency/reference closure, and structured field paths:
 
@@ -125,11 +125,11 @@ Assert.Contains(result, issue =>
     issue.FieldPath == "$.animations[0].metadata.skeletonId");
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run the three focused test classes. Expected: compile failure because serializer, validator, options, and auditor are absent.
 
-- [ ] **Step 3: Implement strict loading and graph validation**
+- [x] **Step 3: Implement strict loading and graph validation**
 
 `AlsManifestSerializer.Load(path)` must use:
 
@@ -144,15 +144,15 @@ new JsonSerializerOptions
 
 `AlsManifestValidator` builds one ordinal `Dictionary<string, (string Section, int Index)>`, recursively checks every metadata property named `id` or ending in `Id`, and emits stable issue codes without throwing for content errors.
 
-- [ ] **Step 4: Implement streaming file audit**
+- [x] **Step 4: Implement streaming file audit**
 
 `AlsFileAuditor.Validate(root, manifest)` rejects absolute paths, traversal, missing/empty files, size mismatch, SHA-256 mismatch, duplicate file rows, output files absent from `files[]`, and undeclared files under the four binary output folders. Hash with `SHA256.HashData(FileStream)` and lowercase hex.
 
-- [ ] **Step 5: Verify GREEN and malformed fixture coverage**
+- [x] **Step 5: Verify GREEN and malformed fixture coverage**
 
 Run all `Als.Import.Tests`. Expected: existing export-plan tests plus new manifest tests pass with no warning.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Als.Import tests/Als.Import.Tests
