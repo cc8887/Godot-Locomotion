@@ -160,3 +160,17 @@ if (@($formalManifest.files).Count -ne $plan.summary.exportableCount) {
     throw "Formal manifest file count does not match export plan: $(@($formalManifest.files).Count)"
 }
 Write-Host "GODOT_ALS_P2A_FULL_EXPORT_OK files=$(@($formalManifest.files).Count)"
+
+$determinismPath = Join-Path $repositoryRoot 'artifacts\p2a-determinism\als_v4'
+$determinismOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export "-Output=$determinismPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
+$determinismOutput | ForEach-Object { Write-Host $_ }
+if ($LASTEXITCODE -ne 0) {
+    throw "P2A determinism export failed with exit code $LASTEXITCODE."
+}
+
+$compareScript = Join-Path $PSScriptRoot 'compare-p2a-exports.ps1'
+& $compareScript -ReferenceRoot $outputPath -CandidateRoot $determinismPath
+if ($LASTEXITCODE -ne 0) {
+    throw "P2A determinism comparison failed with exit code $LASTEXITCODE."
+}
+Write-Host 'P2A_VERIFICATION_OK'

@@ -23,6 +23,93 @@ namespace
         }
         return Count;
     }
+
+    bool TryReadDeclaredObjectId(const FString& Line, FString& OutId)
+    {
+        int32 ColonIndex = INDEX_NONE;
+        if (!Line.FindChar(TEXT(':'), ColonIndex))
+        {
+            return false;
+        }
+        int32 Index = ColonIndex + 1;
+        while (Index < Line.Len() && FChar::IsWhitespace(Line[Index]))
+        {
+            ++Index;
+        }
+        const int32 StartIndex = Index;
+        while (Index < Line.Len() && FChar::IsDigit(Line[Index]))
+        {
+            ++Index;
+        }
+        const int32 EndIndex = Index;
+        if (Index == StartIndex || Index >= Line.Len() || Line[Index] != TEXT(','))
+        {
+            return false;
+        }
+        ++Index;
+        while (Index < Line.Len() && FChar::IsWhitespace(Line[Index]))
+        {
+            ++Index;
+        }
+        if (Index >= Line.Len() || Line[Index] != TEXT('"'))
+        {
+            return false;
+        }
+        OutId = Line.Mid(StartIndex, EndIndex - StartIndex);
+        return !OutId.IsEmpty() && OutId != TEXT("0");
+    }
+
+    bool TryReadPoseNodeId(const FString& Line, FString& OutId)
+    {
+        const FString Trimmed = Line.TrimStart();
+        if (!Trimmed.StartsWith(TEXT("Node:")))
+        {
+            return false;
+        }
+        OutId = Trimmed.RightChop(5).TrimStartAndEnd();
+        if (OutId.IsEmpty() || OutId == TEXT("0"))
+        {
+            return false;
+        }
+        for (const TCHAR Character : OutId)
+        {
+            if (!FChar::IsDigit(Character))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    FString RemapNumericTokens(const FString& Line, const TMap<FString, FString>& ObjectIds)
+    {
+        FString Result;
+        Result.Reserve(Line.Len());
+        int32 Index = 0;
+        while (Index < Line.Len())
+        {
+            if (!FChar::IsDigit(Line[Index]))
+            {
+                Result.AppendChar(Line[Index++]);
+                continue;
+            }
+            const int32 StartIndex = Index;
+            while (Index < Line.Len() && FChar::IsDigit(Line[Index]))
+            {
+                ++Index;
+            }
+            const FString Token = Line.Mid(StartIndex, Index - StartIndex);
+            if (const FString* Replacement = ObjectIds.Find(Token))
+            {
+                Result += *Replacement;
+            }
+            else
+            {
+                Result += Token;
+            }
+        }
+        return Result;
+    }
 }
 
 bool FAlsFbxNormalizer::Normalize(const FString& Filename, TArray<FString>& OutModifiedKeys, FString& OutError)
@@ -42,6 +129,23 @@ bool FAlsFbxNormalizer::Normalize(const FString& Filename, TArray<FString>& OutM
     Contents.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
     TArray<FString> Lines;
     Contents.ParseIntoArrayLines(Lines, false);
+    TMap<FString, FString> ObjectIds;
+    for (const FString& Line : Lines)
+    {
+        FString ObjectId;
+        if (TryReadDeclaredObjectId(Line, ObjectId) && !ObjectIds.Contains(ObjectId))
+        {
+            ObjectIds.Add(ObjectId, FString::Printf(TEXT("%lld"), 1000000000000LL + ObjectIds.Num() + 1));
+        }
+    }
+    for (const FString& Line : Lines)
+    {
+        FString ObjectId;
+        if (TryReadPoseNodeId(Line, ObjectId) && !ObjectIds.Contains(ObjectId))
+        {
+            ObjectIds.Add(ObjectId, FString::Printf(TEXT("%lld"), 1000000000000LL + ObjectIds.Num() + 1));
+        }
+    }
     bool bInCreationTimestamp = false;
     int32 TimestampDepth = 0;
     for (FString& Line : Lines)
@@ -92,6 +196,25 @@ bool FAlsFbxNormalizer::Normalize(const FString& Filename, TArray<FString>& OutM
             Line = Indent + TEXT("LastSaved: \"1970-01-01 00:00:00:000\"");
             OutModifiedKeys.AddUnique(TEXT("LastSaved"));
         }
+        else if (Trimmed.StartsWith(TEXT("P: \"DocumentUrl\",")))
+        {
+            Line = Indent + TEXT("P: \"DocumentUrl\", \"KString\", \"Url\", \"\", \"als://normalized.fbx\"");
+            OutModifiedKeys.AddUnique(TEXT("DocumentUrl"));
+        }
+        else if (Trimmed.StartsWith(TEXT("P: \"SrcDocumentUrl\",")))
+        {
+            Line = Indent + TEXT("P: \"SrcDocumentUrl\", \"KString\", \"Url\", \"\", \"als://normalized.fbx\"");
+            OutModifiedKeys.AddUnique(TEXT("SrcDocumentUrl"));
+        }
+    }
+
+    for (FString& Line : Lines)
+    {
+        Line = RemapNumericTokens(Line, ObjectIds);
+    }
+    if (!ObjectIds.IsEmpty())
+    {
+        OutModifiedKeys.AddUnique(TEXT("ObjectId"));
     }
 
     FString Normalized = FString::Join(Lines, TEXT("\n")) + TEXT("\n");
