@@ -68,108 +68,11 @@ public static class AlsGodotImportCoordinator
             DefinitionDigest = definition.DefinitionDigest,
             DefinitionJson = definitionJson,
             DefinitionPayloadSha256 = AlsAnimationSetPayload.ComputeSha256(definitionJson),
+            EntryCount = manifest.AuditSummary.AssetCount,
             ManifestAssetCount = manifest.AuditSummary.AssetCount,
             ManifestFileCount = manifest.Files.Length,
         };
-
-        AddEntries(resource, "skeletons", manifest.Skeletons, (asset, id) => new AlsAssetResourceEntry
-        {
-            SkeletonId = id,
-            SkeletonHash = definition.Skeletons[id].TargetPhysicalRestPoseHash,
-            SemanticCount = definition.Skeletons[id].PhysicalBones.Length,
-        });
-        AddEntries(resource, "skeletalMeshes", manifest.SkeletalMeshes, (asset, id) => new AlsAssetResourceEntry
-        {
-            SkeletonId = definition.SkeletalMeshes[id].SkeletonId,
-            SemanticCount = definition.SkeletalMeshes[id].MaterialSlotCount,
-            Overlay = definition.SkeletalMeshes[id].Overlay,
-            Prop = definition.SkeletalMeshes[id].Prop,
-        });
-        AddEntries(resource, "staticMeshes", manifest.StaticMeshes, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.StaticMeshes[id].MaterialSlotCount,
-            Overlay = definition.StaticMeshes[id].Overlay,
-            Prop = definition.StaticMeshes[id].Prop,
-        });
-        AddEntries(resource, "animations", manifest.Animations, (asset, id) => new AlsAssetResourceEntry
-        {
-            SkeletonId = definition.Animations[id].SkeletonId,
-            SemanticCount = definition.Animations[id].SampledKeyCount,
-            Overlay = definition.Animations[id].Overlay,
-            Prop = definition.Animations[id].Prop,
-        });
-        AddEntries(resource, "montages", manifest.Montages, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.Montages[id].Slots.Sum(slot => slot.Segments.Length),
-            Overlay = definition.Montages[id].Overlay,
-            Prop = definition.Montages[id].Prop,
-        });
-        AddEntries(resource, "blendSpaces", manifest.BlendSpaces, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.BlendSpaces[id].Samples.Length,
-            Overlay = definition.BlendSpaces[id].Overlay,
-            Prop = definition.BlendSpaces[id].Prop,
-        });
-        AddEntries(resource, "aimOffsets", manifest.AimOffsets, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.AimOffsets[id].Samples.Length,
-            Overlay = definition.AimOffsets[id].Overlay,
-            Prop = definition.AimOffsets[id].Prop,
-        });
-        AddEntries(resource, "materials", manifest.Materials, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.Materials[id].ScalarParameterOverrides.Length +
-                definition.Materials[id].VectorParameterOverrides.Length +
-                definition.Materials[id].TextureParameterOverrides.Length,
-            Overlay = definition.Materials[id].Overlay,
-            Prop = definition.Materials[id].Prop,
-        });
-        AddEntries(resource, "textures", manifest.Textures, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.Textures[id].Width * definition.Textures[id].Height,
-            Overlay = definition.Textures[id].Overlay,
-            Prop = definition.Textures[id].Prop,
-        });
-        AddEntries(resource, "physicsAssets", manifest.PhysicsAssets, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.PhysicsAssets[id].Bodies.Length,
-            Overlay = definition.PhysicsAssets[id].Overlay,
-            Prop = definition.PhysicsAssets[id].Prop,
-        });
-        AddEntries(resource, "curves", manifest.Curves, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.Curves[id].AssetRegistryTagCount,
-            Overlay = definition.Curves[id].Overlay,
-            Prop = definition.Curves[id].Prop,
-        });
-        AddEntries(resource, "configAssets", manifest.ConfigAssets, (asset, id) => new AlsAssetResourceEntry
-        {
-            SemanticCount = definition.ConfigAssets[id].AssetRegistryTagCount,
-            Overlay = definition.ConfigAssets[id].Overlay,
-            Prop = definition.ConfigAssets[id].Prop,
-        });
         return resource;
-    }
-
-    private static void AddEntries(
-        AlsAnimationSetResource resource,
-        string section,
-        AlsManifestAsset[] assets,
-        Func<AlsManifestAsset, int, AlsAssetResourceEntry> create)
-    {
-        for (var index = 0; index < assets.Length; index++)
-        {
-            var asset = assets[index];
-            var entry = create(asset, index);
-            entry.Section = section;
-            entry.StableId = asset.Id;
-            entry.IntegerId = index;
-            entry.GodotResourcePath = asset.OutputPath is null
-                ? string.Empty
-                : AlsImportedResourceAuditor.ToResourcePath(asset.OutputPath);
-            entry.SourceObjectPath = asset.ObjectPath;
-            resource.Entries.Add(entry);
-        }
     }
 
     private static void SaveAndReload(AlsAnimationSetResource resource)
@@ -192,7 +95,7 @@ public static class AlsGodotImportCoordinator
             ResourceLoader.CacheMode.Replace);
         if (reloaded is null ||
             reloaded.DefinitionDigest != resource.DefinitionDigest ||
-            reloaded.Entries.Count != resource.Entries.Count)
+            reloaded.EntryCount != resource.EntryCount)
         {
             throw new InvalidOperationException("Generated ALS animation set did not reload with matching data.");
         }
