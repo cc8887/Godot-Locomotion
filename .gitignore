@@ -1,1 +1,13 @@
 .worktrees/
+.godot/
+.mono/
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+assets/generated/
+artifacts/
+benchmark-results/

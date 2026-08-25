@@ -183,7 +183,7 @@ trim_trailing_whitespace = false
 Run:
 
 ```powershell
-dotnet new sln --name GodotALS --format sln
+dotnet new sln --name GodotALS
 dotnet sln .\GodotALS.sln add .\GodotALS.csproj
 dotnet sln .\GodotALS.sln add .\src\Als.Core\Als.Core.csproj
 dotnet sln .\GodotALS.sln add .\tests\Als.Core.Tests\Als.Core.Tests.csproj
