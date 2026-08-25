@@ -17,6 +17,18 @@ window/size/viewport_height=720
 
 project/assembly_name="GodotALS"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/als_importer/plugin.cfg")
+
+[importer_defaults]
+
+scene={
+"animation/fps": 30,
+"animation/import": true,
+"fbx/embedded_image_handling": 0
+}
+
 [physics]
 
 common/physics_ticks_per_second=60

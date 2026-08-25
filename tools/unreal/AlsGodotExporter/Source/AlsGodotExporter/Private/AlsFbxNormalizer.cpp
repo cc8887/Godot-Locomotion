@@ -110,6 +110,78 @@ namespace
         }
         return Result;
     }
+
+    bool ContainsNumericToken(const FString& Line, const TSet<FString>& Tokens)
+    {
+        int32 Index = 0;
+        while (Index < Line.Len())
+        {
+            if (!FChar::IsDigit(Line[Index]))
+            {
+                ++Index;
+                continue;
+            }
+            const int32 StartIndex = Index;
+            while (Index < Line.Len() && FChar::IsDigit(Line[Index]))
+            {
+                ++Index;
+            }
+            if (Tokens.Contains(Line.Mid(StartIndex, Index - StartIndex)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool StripExternalTextureObjects(TArray<FString>& Lines, bool& bOutModified, FString& OutError)
+    {
+        TSet<FString> TextureObjectIds;
+        TArray<FString> FilteredLines;
+        FilteredLines.Reserve(Lines.Num());
+        for (int32 Index = 0; Index < Lines.Num(); ++Index)
+        {
+            const FString Trimmed = Lines[Index].TrimStart();
+            FString ObjectId;
+            const bool bTextureObject = Trimmed.StartsWith(TEXT("Texture:")) || Trimmed.StartsWith(TEXT("Video:"));
+            if (!bTextureObject || !TryReadDeclaredObjectId(Lines[Index], ObjectId))
+            {
+                FilteredLines.Add(Lines[Index]);
+                continue;
+            }
+
+            TextureObjectIds.Add(ObjectId);
+            int32 Depth = CountCharacter(Lines[Index], TEXT('{')) - CountCharacter(Lines[Index], TEXT('}'));
+            while (Depth > 0 && ++Index < Lines.Num())
+            {
+                Depth += CountCharacter(Lines[Index], TEXT('{')) - CountCharacter(Lines[Index], TEXT('}'));
+            }
+            if (Depth != 0)
+            {
+                OutError = TEXT("FBX contains an unterminated Texture or Video object.");
+                return false;
+            }
+        }
+
+        if (TextureObjectIds.IsEmpty())
+        {
+            bOutModified = false;
+            return true;
+        }
+
+        Lines.Reset(FilteredLines.Num());
+        for (const FString& Line : FilteredLines)
+        {
+            const FString Trimmed = Line.TrimStart();
+            if (Trimmed.StartsWith(TEXT("C:")) && ContainsNumericToken(Trimmed, TextureObjectIds))
+            {
+                continue;
+            }
+            Lines.Add(Line);
+        }
+        bOutModified = true;
+        return true;
+    }
 }
 
 bool FAlsFbxNormalizer::Normalize(const FString& Filename, TArray<FString>& OutModifiedKeys, FString& OutError)
@@ -129,6 +201,15 @@ bool FAlsFbxNormalizer::Normalize(const FString& Filename, TArray<FString>& OutM
     Contents.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
     TArray<FString> Lines;
     Contents.ParseIntoArrayLines(Lines, false);
+    bool bStrippedExternalTextures = false;
+    if (!StripExternalTextureObjects(Lines, bStrippedExternalTextures, OutError))
+    {
+        return false;
+    }
+    if (bStrippedExternalTextures)
+    {
+        OutModifiedKeys.AddUnique(TEXT("ExternalTextureObject"));
+    }
     TMap<FString, FString> ObjectIds;
     for (const FString& Line : Lines)
     {
