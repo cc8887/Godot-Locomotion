@@ -15,6 +15,56 @@
 
 namespace
 {
+    bool ValidateMetadataValue(const FString& OwnerId, const FString& FieldPath,
+        const TSharedPtr<FJsonValue>& Value, const TSet<FString>& AssetIds, FString& OutError)
+    {
+        if (!Value.IsValid())
+        {
+            OutError = FString::Printf(TEXT("Null metadata value for asset %s at %s."), *OwnerId, *FieldPath);
+            return false;
+        }
+        if (Value->Type == EJson::Object)
+        {
+            for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : Value->AsObject()->Values)
+            {
+                const FString ChildPath = FieldPath + TEXT(".") + Field.Key;
+                if (Field.Key == TEXT("id") || Field.Key.EndsWith(TEXT("Id"), ESearchCase::CaseSensitive))
+                {
+                    if (!Field.Value.IsValid() || Field.Value->Type != EJson::String)
+                    {
+                        OutError = FString::Printf(TEXT("Metadata reference for asset %s is not a string at %s."),
+                            *OwnerId, *ChildPath);
+                        return false;
+                    }
+                    const FString ReferenceId = Field.Value->AsString();
+                    if (!ReferenceId.IsEmpty() && !AssetIds.Contains(ReferenceId))
+                    {
+                        OutError = FString::Printf(TEXT("Missing metadata reference for asset %s at %s: %s"),
+                            *OwnerId, *ChildPath, *ReferenceId);
+                        return false;
+                    }
+                }
+                if (!ValidateMetadataValue(OwnerId, ChildPath, Field.Value, AssetIds, OutError))
+                {
+                    return false;
+                }
+            }
+        }
+        else if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& Values = Value->AsArray();
+            for (int32 Index = 0; Index < Values.Num(); ++Index)
+            {
+                if (!ValidateMetadataValue(OwnerId, FString::Printf(TEXT("%s[%d]"), *FieldPath, Index),
+                    Values[Index], AssetIds, OutError))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     bool ReadMetadata(const FAlsExportAsset& Asset, TSharedRef<FJsonObject>& Metadata, FString& OutError)
     {
         Metadata->SetBoolField(TEXT("overlay"), Asset.AssetData.GetObjectPathString().Contains(TEXT("/Overlay/")));
@@ -100,6 +150,12 @@ namespace
 bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets,
     const TArray<FAlsExportFile>& Files, const TCHAR* Status, const bool bPublishFormal, FString& OutError)
 {
+    TSet<FString> AssetIds;
+    for (const FAlsExportAsset& Asset : Assets)
+    {
+        AssetIds.Add(Asset.Id);
+    }
+
     TMap<FString, TSharedRef<FJsonObject>> MetadataById;
     for (const FAlsExportAsset& Asset : Assets)
     {
@@ -109,6 +165,15 @@ bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>
             return false;
         }
         MetadataById.Add(Asset.Id, Metadata);
+    }
+    for (const FAlsExportAsset& Asset : Assets)
+    {
+        const TSharedRef<FJsonObject>& Metadata = MetadataById.FindChecked(Asset.Id);
+        if (!ValidateMetadataValue(Asset.Id, TEXT("metadata"), MakeShared<FJsonValueObject>(Metadata),
+            AssetIds, OutError))
+        {
+            return false;
+        }
     }
 
     FString Json;
