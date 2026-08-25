@@ -1,0 +1,20 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "ALS Godot Exporter",
+  "Description": "Deterministic ALS asset export commandlet for Godot.",
+  "Category": "Editor",
+  "CreatedBy": "Godot ALS",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "AlsGodotExporter",
+      "Type": "Editor",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": ["Win64"]
+    }
+  ]
+}
