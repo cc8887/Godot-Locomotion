@@ -1,6 +1,6 @@
 # P2 完整 ALS 资产导出与 Godot 导入设计
 
-**状态：** 已确认设计，待实施计划
+**状态：** 已完成（P2A + P2B 全部门禁通过）
 
 **日期：** 2026-08-25
 
@@ -11,6 +11,9 @@
 **源引擎：** Unreal Engine 5.9.0
 
 **目标引擎：** Godot 4.7.2 .NET
+
+**完成记录：** `docs/architecture/p2a-full-ue-export.md`、
+`docs/architecture/p2b-godot-import-closure.md`
 
 ## 一、阶段目标
 
@@ -267,6 +270,11 @@ P2 只有同时满足以下条件才完成：
 8. 真实 rig single/parallel digest 相同；
 9. P0 和 P1 门禁继续通过；
 10. Git 不跟踪 Marketplace/Fab 二进制资产、`.godot`、UE Binaries/Intermediate 或本机路径。
+
+截至 2026-08-26，上述十项均已通过。P2A 已完成插件干净构建、dry-run、267 资产全量导出、
+141 个二进制文件审计和 146 文件双次确定性比较；P2B 已完成完整 runtime Resource、全量 Godot 导入、
+Mannequin/Overlay/道具 smoke、rest pose hash、pose/事件单并行摘要、P0/P1 回归和 Git 边界审计。
+实测数据、限制与门禁输出见 `docs/architecture/p2b-godot-import-closure.md`。
 
 ## 十一、实施分段
 
