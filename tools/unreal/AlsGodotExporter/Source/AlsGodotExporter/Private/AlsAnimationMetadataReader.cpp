@@ -19,9 +19,19 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
     OutMetadata->SetNumberField(TEXT("frameRateNumerator"), FrameRate.Numerator);
     OutMetadata->SetNumberField(TEXT("frameRateDenominator"), FrameRate.Denominator);
     OutMetadata->SetNumberField(TEXT("sampledKeyCount"), Sequence->GetNumberOfSampledKeys());
+    OutMetadata->SetBoolField(TEXT("loop"), Sequence->bLoop);
+    OutMetadata->SetNumberField(TEXT("interpolation"), static_cast<uint8>(Sequence->Interpolation));
     OutMetadata->SetBoolField(TEXT("rootMotionEnabled"), Sequence->bEnableRootMotion);
     OutMetadata->SetNumberField(TEXT("rootMotionRootLock"), static_cast<uint8>(Sequence->RootMotionRootLock.GetValue()));
+    OutMetadata->SetBoolField(TEXT("forceRootLock"), Sequence->bForceRootLock);
+    OutMetadata->SetBoolField(TEXT("useNormalizedRootMotionScale"), Sequence->bUseNormalizedRootMotionScale);
     OutMetadata->SetNumberField(TEXT("additiveType"), static_cast<uint8>(Sequence->GetAdditiveAnimType()));
+    OutMetadata->SetNumberField(TEXT("additiveBasePoseType"), static_cast<uint8>(Sequence->RefPoseType.GetValue()));
+    OutMetadata->SetNumberField(TEXT("additiveBasePoseFrame"), Sequence->RefFrameIndex);
+    const FString BasePosePath = Sequence->RefPoseSeq ? Sequence->RefPoseSeq->GetPathName() : FString();
+    OutMetadata->SetStringField(TEXT("additiveBasePoseObjectPath"), BasePosePath);
+    OutMetadata->SetStringField(TEXT("additiveBasePoseId"),
+        BasePosePath.StartsWith(TEXT("/Game/AdvancedLocomotionV4/")) ? FAlsStableAssetId::Create(BasePosePath) : FString());
     if (const USkeleton* Skeleton = Sequence->GetSkeleton())
     {
         const FString SkeletonPath = Skeleton->GetPathName();

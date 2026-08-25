@@ -66,6 +66,12 @@ bool FAlsCompositeAssetReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJs
         }
         OutMetadata->SetArrayField(TEXT("slots"), Slots);
         OutMetadata->SetNumberField(TEXT("playLength"), Montage->GetPlayLength());
+        OutMetadata->SetNumberField(TEXT("blendInTime"), Montage->BlendIn.GetBlendTime());
+        OutMetadata->SetNumberField(TEXT("blendInOption"), static_cast<uint8>(Montage->BlendIn.GetBlendOption()));
+        OutMetadata->SetNumberField(TEXT("blendOutTime"), Montage->BlendOut.GetBlendTime());
+        OutMetadata->SetNumberField(TEXT("blendOutOption"), static_cast<uint8>(Montage->BlendOut.GetBlendOption()));
+        OutMetadata->SetNumberField(TEXT("blendOutTriggerTime"), Montage->BlendOutTriggerTime);
+        OutMetadata->SetBoolField(TEXT("enableAutoBlendOut"), Montage->bEnableAutoBlendOut);
         return true;
     }
 
