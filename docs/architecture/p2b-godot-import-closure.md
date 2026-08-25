@@ -92,10 +92,10 @@ P2B 生成 `StandardMaterial3D` 近似材质：
 - 映射首个 color/tint vector 到 albedo color；
 - 映射首个 texture override 或 referenced texture 到 albedo texture；
 - 支持父材质递归复制和子实例 override；
-- 优先按导入 surface material 名称匹配 manifest material 名称。
+- 仅在当前 mesh 的 `materialIds` 集合内按导入 surface material 名称匹配，禁止跨 mesh 全局选材质。
 
-若名称无法匹配，才按该 mesh 已编译的 material ID 槽位回退，并输出结构化
-`ALSMATERIAL001` warning；没有对应槽位时输出 `ALSMATERIAL002` error，代表资产门禁失败。
+名称为空、未命中或在当前 mesh 内存在歧义时，不按 dependency 顺序猜测 surface 槽位，直接输出
+结构化 `ALSMATERIAL002` error 并使代表资产门禁失败。
 本次 Mannequin 和 M4A1 均按名称命中，未产生材质诊断。
 
 P2 不承诺 UE shader 视觉等价，也未映射 normal/ORM、材质函数、复杂透明/布料或自定义 shader graph。
@@ -123,10 +123,10 @@ sync marker，门禁明确校验事件数，避免“空事件摘要”误通过
 
 最终回归包含：
 
-- `verify-p2b.ps1 -CleanImport`：全量导入、完整 Resource、资产 smoke、真实 rig 1/10 矩阵；
+- `verify-p2b.ps1 -CleanImport`：全量导入、完整 Resource、资产 smoke、真实 rig 1/10 矩阵；随后连续三轮缓存复用门禁同样通过，四轮 Godot 进程均正常退出；
 - `verify-p1.ps1`：1/10/16/32 角色 single/parallel 摘要一致，所有阶段分配计数为 0；
 - `verify-p0.ps1`：基础线程交换门禁通过；
-- `dotnet test GodotALS.sln -c Release --no-restore`：58 项测试通过；
+- `dotnet test GodotALS.sln -c Release --no-restore`：67 项测试通过；
 - `git diff --check` 与跟踪文件审计通过。
 
 Git 跟踪 0 个 FBX/PNG/TGA、`.import`、`.godot`、生成 `.tres`、UE Binaries/Intermediate、插件包、

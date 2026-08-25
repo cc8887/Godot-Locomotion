@@ -108,18 +108,18 @@ public static class AlsAnimationBinder
             }
 
             var sourcePath = animation.TrackGetPath(trackIndex);
-            if (sourcePath.GetNameCount() == 0 ||
-                !string.Equals(
-                    sourcePath.GetName(sourcePath.GetNameCount() - 1),
-                    "Skeleton3D",
-                    StringComparison.Ordinal) ||
-                sourcePath.GetSubNameCount() != 1)
+            string boneName;
+            try
+            {
+                boneName = AlsAnimationTrackPathContract.GetBoneName(sourcePath.ToString());
+            }
+            catch (AlsCompilationException exception)
             {
                 throw new InvalidOperationException(
-                    $"Animation track does not target exactly one bone for {clipName}: index={trackIndex} path={sourcePath}");
+                    $"Animation track does not target exactly one bone for {clipName}: index={trackIndex} path={sourcePath}",
+                    exception);
             }
 
-            var boneName = sourcePath.GetSubName(0);
             if (targetSkeleton.FindBone(boneName) < 0)
             {
                 throw new InvalidOperationException(

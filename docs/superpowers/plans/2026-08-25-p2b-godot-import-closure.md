@@ -32,7 +32,7 @@
 - Create: `src/Als.Import/.gdignore`
 - Create: `tests/.gdignore`
 - Create: `tools/.gdignore`
-- Create: `import_defaults.cfg`
+- Modify: `project.godot`
 - Modify: `scripts/verify-p2a.ps1`
 - Create: `tests/Als.Import.Tests/RepositoryRoot.cs`
 - Create: `tests/Als.Import.Tests/RepositoryImportPolicyTests.cs`
@@ -54,8 +54,8 @@ public void DeterminismArtifactsAreHiddenFromGodot()
 [Fact]
 public void FbxImportDoesNotResolveExporterWorkstationTextures()
 {
-    var defaults = File.ReadAllText(Path.Combine(RepositoryRoot.Find(), "import_defaults.cfg"));
-    Assert.Contains("fbx/embedded_image_handling=0", defaults, StringComparison.Ordinal);
+    var project = File.ReadAllText(Path.Combine(RepositoryRoot.Find(), "project.godot"));
+    Assert.Contains("\"fbx/embedded_image_handling\": 0", project, StringComparison.Ordinal);
 }
 ```
 
@@ -67,7 +67,7 @@ Run:
 dotnet test .\tests\Als.Import.Tests\Als.Import.Tests.csproj -c Debug --filter RepositoryImportPolicyTests
 ```
 
-Expected: FAIL because `artifacts/.gdignore`, `import_defaults.cfg`, and `RepositoryRoot` do not exist.
+Expected: FAIL because the `.gdignore` markers and `RepositoryRoot` do not exist yet.
 
 - [x] **Step 3: Add the minimal tracked policy files**
 
@@ -78,14 +78,15 @@ artifacts/*
 !artifacts/.gdignore
 ```
 
-Create `.gdignore` markers in `artifacts`, `benchmark-results`, `docs`, `src/Als.Core`, `src/Als.Import`, `tests`, and `tools`. Do not create one in `assets/generated` or `src/Als.Godot`: generated assets and Godot scripts must remain visible to the editor. Create `import_defaults.cfg`:
+Create `.gdignore` markers in `artifacts`, `benchmark-results`, `docs`, `src/Als.Core`, `src/Als.Import`, `tests`, and `tools`. Do not create one in `assets/generated` or `src/Als.Godot`: generated assets and Godot scripts must remain visible to the editor. Pin the importer defaults in `project.godot`:
 
 ```ini
-[scene]
-
-fbx/embedded_image_handling=0
-animation/import=true
-animation/fps=30
+[importer_defaults]
+fbx={
+"fbx/embedded_image_handling": 0,
+"animation/import": true,
+"animation/fps": 30
+}
 ```
 
 Add a test-only `RepositoryRoot.Find()` helper that walks parents until both `GodotALS.sln` and `.git` are present. Update `verify-p2a.ps1` to recreate `artifacts/.gdignore` after any artifact cleanup, so local verification cannot remove the scan boundary.
@@ -97,7 +98,7 @@ Run the focused test and parse all PowerShell verification scripts with `System.
 - [x] **Step 5: Commit**
 
 ```powershell
-git add .gitignore artifacts/.gdignore benchmark-results/.gdignore docs/.gdignore src/Als.Core/.gdignore src/Als.Import/.gdignore tests/.gdignore tools/.gdignore import_defaults.cfg scripts/verify-p2a.ps1 tests/Als.Import.Tests
+git add .gitignore artifacts/.gdignore benchmark-results/.gdignore docs/.gdignore src/Als.Core/.gdignore src/Als.Import/.gdignore tests/.gdignore tools/.gdignore project.godot scripts/verify-p2a.ps1 tests/Als.Import.Tests
 git commit -m "fix: isolate generated ALS import inputs"
 ```
 
@@ -294,7 +295,7 @@ Expected: no determinism-directory resources, no missing original TGA errors, al
 - [x] **Step 7: Commit**
 
 ```powershell
-git add GodotALS.csproj project.godot import_defaults.cfg addons src/Als.Godot scenes/tests/p2b_import.tscn scripts/verify-p2b.ps1
+git add GodotALS.csproj project.godot addons src/Als.Godot scenes/tests/p2b_import.tscn scripts/verify-p2b.ps1
 git commit -m "feat: import audited ALS assets into Godot"
 ```
 

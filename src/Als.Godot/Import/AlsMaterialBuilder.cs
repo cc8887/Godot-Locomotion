@@ -21,11 +21,13 @@ public sealed record AlsMaterialApplyReport(
 public sealed class AlsMaterialBuilder
 {
     private readonly AlsAnimationSetDefinition _definition;
+    private readonly string[] _materialNames;
     private readonly StandardMaterial3D?[] _materials;
 
     public AlsMaterialBuilder(AlsAnimationSetDefinition definition)
     {
         _definition = definition;
+        _materialNames = definition.Materials.Select(material => material.Name).ToArray();
         _materials = new StandardMaterial3D?[definition.Materials.Length];
     }
 
@@ -82,19 +84,10 @@ public sealed class AlsMaterialBuilder
             {
                 surfaceCount++;
                 var importedName = mesh.GetActiveMaterial(surface)?.ResourceName ?? string.Empty;
-                var materialId = FindByName(importedName);
-                if (materialId < 0 && surface < materialIds.Count)
-                {
-                    materialId = materialIds[surface];
-                    diagnostics.Add(new AlsMaterialDiagnostic(
-                        "warning",
-                        "ALSMATERIAL001",
-                        assetId,
-                        mesh.Name,
-                        surface,
-                        importedName,
-                        _definition.Materials[materialId].Name));
-                }
+                var materialId = AlsMaterialSlotResolver.Resolve(
+                    _materialNames,
+                    materialIds,
+                    importedName);
 
                 if (materialId >= 0)
                 {
@@ -151,24 +144,6 @@ public sealed class AlsMaterialBuilder
             var texturePath = AlsImportedResourceAuditor.ToResourcePath(_definition.Textures[textureId].ResourcePath);
             material.AlbedoTexture = ResourceLoader.Load<Texture2D>(texturePath);
         }
-    }
-
-    private int FindByName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return -1;
-        }
-
-        for (var index = 0; index < _definition.Materials.Length; index++)
-        {
-            if (string.Equals(_definition.Materials[index].Name, name, StringComparison.OrdinalIgnoreCase))
-            {
-                return index;
-            }
-        }
-
-        return -1;
     }
 
     private static IEnumerable<T> FindAll<T>(Node root) where T : Node
