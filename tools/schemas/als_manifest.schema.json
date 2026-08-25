@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://godotals.local/schemas/als_manifest.schema.json",
+  "title": "Godot ALS exported asset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "exporterVersion", "sourceEngineVersion", "sourceProjectId", "sourceContentRoot",
+    "coordinateSystem", "unitScale", "skeletons", "skeletalMeshes", "staticMeshes", "animations",
+    "montages", "blendSpaces", "aimOffsets", "materials", "textures", "physicsAssets", "curves",
+    "configAssets", "files", "auditSummary"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "exporterVersion": { "type": "string", "minLength": 1 },
+    "sourceEngineVersion": { "type": "string", "minLength": 1 },
+    "sourceProjectId": { "type": "string", "minLength": 1 },
+    "sourceContentRoot": { "type": "string", "pattern": "^/Game/" },
+    "coordinateSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceHandedness", "sourceUpAxis", "targetHandedness", "targetUpAxis"],
+      "properties": {
+        "sourceHandedness": { "const": "left" },
+        "sourceUpAxis": { "const": "Z" },
+        "targetHandedness": { "const": "right" },
+        "targetUpAxis": { "const": "Y" }
+      }
+    },
+    "unitScale": { "type": "number", "exclusiveMinimum": 0 },
+    "skeletons": { "$ref": "#/$defs/assets" },
+    "skeletalMeshes": { "$ref": "#/$defs/assets" },
+    "staticMeshes": { "$ref": "#/$defs/assets" },
+    "animations": { "$ref": "#/$defs/assets" },
+    "montages": { "$ref": "#/$defs/assets" },
+    "blendSpaces": { "$ref": "#/$defs/assets" },
+    "aimOffsets": { "$ref": "#/$defs/assets" },
+    "materials": { "$ref": "#/$defs/assets" },
+    "textures": { "$ref": "#/$defs/assets" },
+    "physicsAssets": { "$ref": "#/$defs/assets" },
+    "curves": { "$ref": "#/$defs/assets" },
+    "configAssets": { "$ref": "#/$defs/assets" },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "auditSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetCount", "fileCount", "errorCount", "warningCount"],
+      "properties": {
+        "assetCount": { "type": "integer", "minimum": 0 },
+        "fileCount": { "type": "integer", "minimum": 0 },
+        "errorCount": { "type": "integer", "minimum": 0 },
+        "warningCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "stableId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "assets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/asset" }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "objectPath", "packagePath", "assetName", "classPath", "outputPath", "dependencies", "metadata"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "objectPath": { "type": "string", "pattern": "^/Game/.+\\.[^./]+$" },
+        "packagePath": { "type": "string", "pattern": "^/Game/" },
+        "assetName": { "type": "string", "minLength": 1 },
+        "classPath": { "type": "string", "minLength": 1 },
+        "outputPath": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^(meshes/(skeletal|static)|animations|textures)/[0-9a-f]{40}\\.(fbx|png|tga)$" }
+          ]
+        },
+        "dependencies": { "type": "array", "items": { "$ref": "#/$defs/stableId" }, "uniqueItems": true },
+        "metadata": { "type": "object" }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^(meshes/(skeletal|static)|animations|textures)/[0-9a-f]{40}\\.(fbx|png|tga)$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

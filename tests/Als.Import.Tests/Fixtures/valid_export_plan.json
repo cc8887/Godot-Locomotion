@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "7d3d3f1e0f341eb76b3233c535305c182eb91ed4",
+      "objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Box.Box",
+      "packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Box",
+      "classPath": "/Script/Engine.StaticMesh",
+      "kind": "StaticMesh",
+      "outputPath": "meshes/static/7d3d3f1e0f341eb76b3233c535305c182eb91ed4.fbx",
+      "dependencies": [],
+      "externalDependencies": []
+    }
+  ],
+  "summary": {
+    "assetCount": 1,
+    "exportableCount": 1
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://godotals.local/schemas/als_export_plan.schema.json",
+  "title": "Godot ALS UE export plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "assets", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "assets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/asset" }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetCount", "exportableCount"],
+      "properties": {
+        "assetCount": { "type": "integer", "minimum": 0 },
+        "exportableCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "stableId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "objectPath", "packagePath", "classPath", "kind", "outputPath", "dependencies", "externalDependencies"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "objectPath": { "type": "string", "pattern": "^/Game/.+\\.[^./]+$" },
+        "packagePath": { "type": "string", "pattern": "^/Game/" },
+        "classPath": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": ["Skeleton", "SkeletalMesh", "StaticMesh", "AnimationSequence", "AnimMontage", "BlendSpace", "AimOffset", "PhysicsAsset", "Material", "MaterialInstance", "Texture", "Curve", "DataTable", "Blueprint", "OtherConfig"]
+        },
+        "outputPath": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^(meshes/(skeletal|static)|animations|textures)/[0-9a-f]{40}\\.(fbx|png|tga)$" }
+          ]
+        },
+        "dependencies": { "type": "array", "items": { "$ref": "#/$defs/stableId" }, "uniqueItems": true },
+        "externalDependencies": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    }
+  }
+}
