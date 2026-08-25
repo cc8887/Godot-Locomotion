@@ -147,7 +147,7 @@ public static class AlsGodotImportCoordinator
             throw new InvalidOperationException(
                 $"{stage} failed:" + System.Environment.NewLine +
                 string.Join(System.Environment.NewLine, issues.Take(30).Select(issue =>
-                    $"{issue.Code} {issue.FieldPath}: {issue.Message}")));
+                    AlsValidationIssueFormatter.Format(issue))));
         }
     }
 }
