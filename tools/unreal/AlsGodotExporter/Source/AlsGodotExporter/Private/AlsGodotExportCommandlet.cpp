@@ -2,6 +2,7 @@
 
 #include "AlsAssetDiscovery.h"
 #include "AlsExportPlanner.h"
+#include "AlsManifestWriter.h"
 #include "Misc/App.h"
 #include "Misc/EngineVersion.h"
 #include "Misc/Parse.h"
@@ -55,6 +56,12 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
     {
         UE_LOG(LogAlsGodotExporter, Error, TEXT("Export plan failed: %s"), *Error);
         return 3;
+    }
+
+    if (!FAlsManifestWriter::WritePlanned(OutputDirectory, Assets, Error))
+    {
+        UE_LOG(LogAlsGodotExporter, Error, TEXT("Metadata extraction failed: %s"), *Error);
+        return 5;
     }
 
     UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_P2A_PLAN_OK assets=%d exportable=%d config=%d excluded=0"),

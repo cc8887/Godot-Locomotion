@@ -87,3 +87,40 @@ if (-not (($dryRunOutput | Out-String).Contains($planMarker, [StringComparison]:
 }
 
 Write-Host "GODOT_ALS_P2A_DRY_RUN_OK assets=$($plan.summary.assetCount) exportable=$($plan.summary.exportableCount)"
+
+$partialManifestPath = Join-Path $outputPath 'partial\als_manifest.partial.json'
+if (-not (Test-Path -LiteralPath $partialManifestPath -PathType Leaf)) {
+    throw "Dry-run partial manifest does not exist: $partialManifestPath"
+}
+$manifest = Get-Content -LiteralPath $partialManifestPath -Raw | ConvertFrom-Json
+$allBoneNames = @($manifest.skeletons | ForEach-Object { $_.metadata.bones } | ForEach-Object { $_.name })
+foreach ($boneName in @('root', 'pelvis', 'foot_l', 'foot_r')) {
+    if ($boneName -notin $allBoneNames) {
+        throw "Partial manifest does not contain required bone: $boneName"
+    }
+}
+$animationsWithSemantics = @($manifest.animations | Where-Object {
+    @($_.metadata.curves).Count -gt 0 -or @($_.metadata.notifies).Count -gt 0
+})
+if ($animationsWithSemantics.Count -eq 0) {
+    throw 'Partial manifest contains no animation with curves or notifies.'
+}
+if (@($manifest.montages | Where-Object { @($_.metadata.sections).Count -gt 0 }).Count -eq 0) {
+    throw 'Partial manifest contains no montage sections.'
+}
+if (@($manifest.blendSpaces + $manifest.aimOffsets | Where-Object { @($_.metadata.samples).Count -gt 0 }).Count -eq 0) {
+    throw 'Partial manifest contains no blend space or aim offset samples.'
+}
+if (@($manifest.physicsAssets | Where-Object { @($_.metadata.bodies).Count -gt 0 }).Count -eq 0) {
+    throw 'Partial manifest contains no physics bodies.'
+}
+if (@($manifest.animations | Where-Object { $_.objectPath -match '/Overlay/' }).Count -eq 0) {
+    throw 'Partial manifest contains no overlay animation.'
+}
+if (@($manifest.staticMeshes + $manifest.skeletalMeshes | Where-Object { $_.objectPath -match '/Props/' }).Count -eq 0) {
+    throw 'Partial manifest contains no prop mesh.'
+}
+if ($manifest.auditSummary.status -cne 'planned') {
+    throw "Unexpected dry-run audit status: $($manifest.auditSummary.status)"
+}
+Write-Host 'GODOT_ALS_P2A_METADATA_OK'

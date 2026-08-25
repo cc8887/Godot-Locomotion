@@ -41,6 +41,6 @@ public sealed record AlsManifestAsset(
     string[] Dependencies,
     JsonElement Metadata);
 
-public sealed record AlsManifestFile(string Path, string Sha256, long Size);
+public sealed record AlsManifestFile(string RelativePath, string Sha256, long Size);
 
-public sealed record AlsAuditSummary(int AssetCount, int FileCount, int ErrorCount, int WarningCount);
+public sealed record AlsAuditSummary(string Status, int AssetCount, int FileCount, int ErrorCount, int WarningCount);
