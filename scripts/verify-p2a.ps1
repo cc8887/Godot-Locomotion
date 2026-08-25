@@ -120,6 +120,22 @@ if (@($manifest.animations | Where-Object { $_.objectPath -match '/Overlay/' }).
 if (@($manifest.staticMeshes + $manifest.skeletalMeshes | Where-Object { $_.objectPath -match '/Props/' }).Count -eq 0) {
     throw 'Partial manifest contains no prop mesh.'
 }
+$materialInstances = @($manifest.materials | Where-Object { $_.classPath -match 'MaterialInstance' })
+if ($materialInstances.Count -eq 0) {
+    throw 'Partial manifest contains no material instance.'
+}
+$materialOverrideCount = 0
+foreach ($materialInstance in $materialInstances) {
+    foreach ($field in @('scalarParameterOverrides', 'vectorParameterOverrides', 'textureParameterOverrides')) {
+        if ($null -eq $materialInstance.metadata.PSObject.Properties[$field]) {
+            throw "Material instance metadata is missing '$field': $($materialInstance.objectPath)"
+        }
+        $materialOverrideCount += @($materialInstance.metadata.$field).Count
+    }
+}
+if ($materialOverrideCount -eq 0) {
+    throw 'Partial manifest contains no material parameter overrides.'
+}
 if ($manifest.auditSummary.status -cne 'planned') {
     throw "Unexpected dry-run audit status: $($manifest.auditSummary.status)"
 }
