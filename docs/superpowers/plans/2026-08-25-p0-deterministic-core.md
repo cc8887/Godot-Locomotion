@@ -61,7 +61,7 @@ scripts/verify-p0.ps1                       一键 restore/build/test/headless �
 - Create: `tests/Als.Core.Tests/Als.Core.Tests.csproj`
 - Create: `GodotALS.sln`
 
-- [ ] **Step 1：写入仓库基础配置**
+- [x] **Step 1：写入仓库基础配置**
 
 `.gitignore` 写入以下完整内容：
 
@@ -128,7 +128,7 @@ indent_size = 2
 trim_trailing_whitespace = false
 ```
 
-- [ ] **Step 2：创建三个工程文件**
+- [x] **Step 2：创建三个工程文件**
 
 `GodotALS.csproj`：
 
@@ -178,7 +178,7 @@ trim_trailing_whitespace = false
 </Project>
 ```
 
-- [ ] **Step 3：创建 solution 并加入工程**
+- [x] **Step 3：创建 solution 并加入工程**
 
 Run:
 
@@ -192,7 +192,7 @@ dotnet restore .\GodotALS.sln
 
 Expected: restore 成功，solution 中包含 3 个项目。
 
-- [ ] **Step 4：写入 Godot 项目设置**
+- [x] **Step 4：写入 Godot 项目设置**
 
 `project.godot`：
 
@@ -226,7 +226,7 @@ renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 ```
 
-- [ ] **Step 5：验证空工程构建并提交**
+- [x] **Step 5：验证空工程构建并提交**
 
 Run: `dotnet build .\GodotALS.sln --no-restore`
 
@@ -249,7 +249,7 @@ git commit -m "build: scaffold Godot ALS solution"
 - Create: `src/Als.Core/Contracts/AlsRuntimeState.cs`
 - Create: `src/Als.Core/Contracts/AlsFrameResult.cs`
 
-- [ ] **Step 1：先写失败的合同测试**
+- [x] **Step 1：先写失败的合同测试**
 
 ```csharp
 using System.Reflection;
@@ -286,13 +286,13 @@ public sealed class ContractLayoutTests
 }
 ```
 
-- [ ] **Step 2：运行测试确认失败**
+- [x] **Step 2：运行测试确认失败**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter ContractLayoutTests`
 
 Expected: 编译失败，提示 `AlsFrameInput`、`AlsFrameIdentity`、`AlsRuntimeState` 和 `AlsFrameResult` 不存在。
 
-- [ ] **Step 3：实现最小固定布局合同**
+- [x] **Step 3：实现最小固定布局合同**
 
 `AlsEnums.cs` 中的所有枚举显式使用 `byte`：
 
@@ -492,13 +492,13 @@ public struct AlsFrameResult
 
 字符串和引用字段一律禁止。Task 3 再按明确补丁加入事件值字段。
 
-- [ ] **Step 4：运行合同测试确认通过**
+- [x] **Step 4：运行合同测试确认通过**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter ContractLayoutTests`
 
 Expected: 3 tests passed。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add src/Als.Core/Contracts tests/Als.Core.Tests/ContractLayoutTests.cs
@@ -513,7 +513,7 @@ git commit -m "feat: define unmanaged ALS frame contracts"
 - Create: `src/Als.Core/Events/AlsEventBuffer.cs`
 - Modify: `src/Als.Core/Contracts/AlsFrameResult.cs`
 
-- [ ] **Step 1：先写容量和顺序测试**
+- [x] **Step 1：先写容量和顺序测试**
 
 ```csharp
 using GodotAls.Core.Events;
@@ -550,13 +550,13 @@ public sealed class AlsEventBufferTests
 }
 ```
 
-- [ ] **Step 2：运行测试确认失败**
+- [x] **Step 2：运行测试确认失败**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsEventBufferTests`
 
 Expected: 编译失败，事件类型尚不存在。
 
-- [ ] **Step 3：使用 InlineArray 实现零分配缓冲**
+- [x] **Step 3：使用 InlineArray 实现零分配缓冲**
 
 ```csharp
 using System.Runtime.CompilerServices;
@@ -631,13 +631,13 @@ public struct AlsEventBuffer
  }
 ```
 
-- [ ] **Step 4：运行事件与合同测试**
+- [x] **Step 4：运行事件与合同测试**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter "FullyQualifiedName~AlsEventBufferTests|FullyQualifiedName~ContractLayoutTests"`
 
 Expected: 5 tests passed，`AlsFrameResult` 仍不包含引用。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add src/Als.Core/Events src/Als.Core/Contracts/AlsFrameResult.cs tests/Als.Core.Tests/AlsEventBufferTests.cs
@@ -650,7 +650,7 @@ git commit -m "feat: add bounded animation event buffer"
 - Test: `tests/Als.Core.Tests/AlsFrameExchangeTests.cs`
 - Create: `src/Als.Core/Exchange/AlsFrameExchange.cs`
 
-- [ ] **Step 1：先写发布、消费和错误身份测试**
+- [x] **Step 1：先写发布、消费和错误身份测试**
 
 ```csharp
 using GodotAls.Core.Contracts;
@@ -698,13 +698,13 @@ public sealed class AlsFrameExchangeTests
 }
 ```
 
-- [ ] **Step 2：运行测试确认失败**
+- [x] **Step 2：运行测试确认失败**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsFrameExchangeTests`
 
 Expected: 编译失败，`AlsFrameExchange` 或 default factory 不存在。
 
-- [ ] **Step 3：实现预分配双缓冲和发布标记**
+- [x] **Step 3：实现预分配双缓冲和发布标记**
 
 ```csharp
 using System.Threading;
@@ -778,13 +778,13 @@ public sealed class AlsFrameExchange
 
 为 `AlsFrameInput` 和 `AlsFrameResult` 增加只填充身份、delta 和单位旋转的 `CreateDefault()` 工厂，测试和 Harness 用它构建完整有效的零值帧。
 
-- [ ] **Step 4：运行交换测试确认通过**
+- [x] **Step 4：运行交换测试确认通过**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsFrameExchangeTests`
 
 Expected: 3 tests passed。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add src/Als.Core/Exchange/AlsFrameExchange.cs src/Als.Core/Contracts tests/Als.Core.Tests/AlsFrameExchangeTests.cs
@@ -797,7 +797,7 @@ git commit -m "feat: add per-character frame exchange"
 - Test: `tests/Als.Core.Tests/AlsSlotRegistryTests.cs`
 - Create: `src/Als.Core/Exchange/AlsSlotRegistry.cs`
 
-- [ ] **Step 1：先写复用和错误释放测试**
+- [x] **Step 1：先写复用和错误释放测试**
 
 ```csharp
 using GodotAls.Core.Exchange;
@@ -831,13 +831,13 @@ public sealed class AlsSlotRegistryTests
 }
 ```
 
-- [ ] **Step 2：运行测试确认失败**
+- [x] **Step 2：运行测试确认失败**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsSlotRegistryTests`
 
 Expected: 编译失败，registry 类型不存在。
 
-- [ ] **Step 3：实现固定容量 registry**
+- [x] **Step 3：实现固定容量 registry**
 
 ```csharp
 namespace GodotAls.Core.Exchange;
@@ -885,13 +885,13 @@ public sealed class AlsSlotRegistry
 }
 ```
 
-- [ ] **Step 4：运行测试确认通过**
+- [x] **Step 4：运行测试确认通过**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsSlotRegistryTests`
 
 Expected: 2 tests passed。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```powershell
 git add src/Als.Core/Exchange/AlsSlotRegistry.cs tests/Als.Core.Tests/AlsSlotRegistryTests.cs
@@ -905,7 +905,7 @@ git commit -m "feat: guard character slot reuse with generations"
 - Test: `tests/Als.Core.Tests/HotPathAllocationTests.cs`
 - Create: `src/Als.Core/Math/AlsMath.cs`
 
-- [ ] **Step 1：先写数学行为测试**
+- [x] **Step 1：先写数学行为测试**
 
 ```csharp
 using GodotAls.Core.Math;
@@ -940,13 +940,13 @@ public sealed class AlsMathTests
 }
 ```
 
-- [ ] **Step 2：运行测试确认失败**
+- [x] **Step 2：运行测试确认失败**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore --filter AlsMathTests`
 
 Expected: 编译失败，`AlsMath` 不存在。
 
-- [ ] **Step 3：实现 exact damper 和角度归一化**
+- [x] **Step 3：实现 exact damper 和角度归一化**
 
 ```csharp
 namespace GodotAls.Core.Math;
@@ -969,7 +969,7 @@ public static class AlsMath
 }
 ```
 
-- [ ] **Step 4：增加热路径零分配测试**
+- [x] **Step 4：增加热路径零分配测试**
 
 测试先热身，再测量 10,000 次事件缓冲与 frame exchange 操作：
 
@@ -1015,7 +1015,7 @@ private static void Run(AlsFrameExchange exchange, int iterations)
 }
 ```
 
-- [ ] **Step 5：运行全部核心测试并提交**
+- [x] **Step 5：运行全部核心测试并提交**
 
 Run: `dotnet test .\tests\Als.Core.Tests\Als.Core.Tests.csproj --no-restore`
 
@@ -1033,7 +1033,7 @@ git commit -m "feat: add deterministic ALS math and allocation gate"
 - Create: `scenes/tests/headless_smoke.tscn`
 - Create: `scripts/verify-p0.ps1`
 
-- [ ] **Step 1：创建会主动退出的 headless 场景**
+- [x] **Step 1：创建会主动退出的 headless 场景**
 
 `HeadlessSmoke.cs`：
 
@@ -1065,7 +1065,7 @@ public partial class HeadlessSmoke : Node
 script = ExtResource("1_smoke")
 ```
 
-- [ ] **Step 2：编译并运行 Godot headless**
+- [x] **Step 2：编译并运行 Godot headless**
 
 Run:
 
@@ -1076,7 +1076,7 @@ dotnet build .\GodotALS.csproj --no-restore
 
 Expected: 进程退出码为 0，输出包含 `GODOT_ALS_P0_OK frame=0 generation=1`。
 
-- [ ] **Step 3：创建不提交本机路径的一键验证脚本**
+- [x] **Step 3：创建不提交本机路径的一键验证脚本**
 
 `scripts/verify-p0.ps1` 接受必填 `-GodotExecutable` 参数：
 
@@ -1113,7 +1113,7 @@ Write-Output 'P0_VERIFICATION_OK'
 exit 0
 ```
 
-- [ ] **Step 4：运行完整 P0 门禁**
+- [x] **Step 4：运行完整 P0 门禁**
 
 Run:
 
@@ -1123,7 +1123,7 @@ Run:
 
 Expected: restore、build、全部测试、Godot headless 均通过，脚本最终输出 `P0_VERIFICATION_OK`。
 
-- [ ] **Step 5：提交 P0 集成**
+- [x] **Step 5：提交 P0 集成**
 
 ```powershell
 git add src/Als.Godot/HeadlessSmoke.cs scenes/tests/headless_smoke.tscn scripts/verify-p0.ps1
@@ -1136,7 +1136,7 @@ git commit -m "test: add Godot P0 verification gate"
 - Create: `docs/architecture/p0-deterministic-core.md`
 - Modify: `docs/superpowers/plans/2026-08-25-p0-deterministic-core.md`
 
-- [ ] **Step 1：记录实际工具链与核心合同**
+- [x] **Step 1：记录实际工具链与核心合同**
 
 文档必须记录：
 
@@ -1148,11 +1148,11 @@ git commit -m "test: add Godot P0 verification gate"
 - 当前事件容量 16 及溢出策略；
 - 已知的 P1 接口前提。
 
-- [ ] **Step 2：勾选本计划中已完成步骤**
+- [x] **Step 2：勾选本计划中已完成步骤**
 
 只将已经执行且验证通过的 `[ ]` 改为 `[x]`，未运行的步骤保持未完成。
 
-- [ ] **Step 3：再次运行完整验证**
+- [x] **Step 3：再次运行完整验证**
 
 Run:
 
@@ -1180,4 +1180,4 @@ git status --short --branch
 git log --oneline --decorate -10
 ```
 
-Expected: `main` 工作区干净；P0 由多个小提交组成；没有生成文件进入 Git。
+Expected: `feature/p0-deterministic-core` 工作区干净；P0 由多个小提交组成；没有生成文件进入 Git。
