@@ -14,7 +14,7 @@
 
 - P2A output is `assets/generated/als_v4`; generated FBX, PNG, `.import`, `.tres`, and `.godot` cache remain untracked.
 - `artifacts/p2a-determinism` must contain a `.gdignore`, otherwise Godot imports the second deterministic copy and doubles all imported resources.
-- FBX image references point at original workstation TGA paths. `import_defaults.cfg` must set `fbx/embedded_image_handling=0`; P2B reconstructs materials from manifest texture IDs instead of loading FBX image paths.
+- FBX image references originally pointed at UE workstation TGA paths. The exporter now strips top-level external `Texture`/`Video` FBX objects and connections; `project.godot` additionally fixes `fbx/embedded_image_handling=0`. P2B reconstructs materials from compiled manifest texture IDs.
 - Mannequin asset ID is `86d98d8177feb473c8a5f406c5b42f8c2a2f7b07`; its imported scene contains a 68-bone `Skeleton3D` and mesh.
 - UE Skeleton ID `b5b52715012cad50bf7a625ddf01e4335bb4fcf0` has 79 logical bones: 68 physical FBX bones plus 11 entries listed in `metadata.virtualBones`. The physical import contract is the ordered logical-bone list with those 11 virtual-bone names removed.
 - Walk-forward clip ID `6124eafdcbeaaf04bca366add34c821faa0e4963` imports as a 1.133333-second animation named `Unreal Take` with 128 tracks rooted at `Skeleton3D:<bone>`.
@@ -263,23 +263,23 @@ git commit -m "feat: compile ALS animation set definitions"
 - Create: `scripts/verify-p2b.ps1`
 - Modify: `project.godot`
 
-- [ ] **Step 1: Add a failing headless P2B gate**
+- [x] **Step 1: Add a failing headless P2B gate**
 
 `verify-p2b.ps1` must require a complete formal manifest, build the solution, clear only `.godot/imported` and generated `.import`/compiled outputs when `-CleanImport` is set, run `godot --headless --editor --import`, reject `ERROR:`/`SCRIPT ERROR:`, then run `p2b_import.tscn`. Initial expected result: non-zero because `P2B_IMPORT_OK` is absent.
 
-- [ ] **Step 2: Reference `Als.Import` and implement generated Resources**
+- [x] **Step 2: Reference `Als.Import` and implement generated Resources**
 
 Add explicit `TargetFramework=net8.0` and the `Als.Import` project reference to `GodotALS.csproj` so the editor does not rewrite the project file. `AlsAnimationSetResource` stores schema/exporter/source IDs, definition digest, and parallel arrays of stable IDs, integer IDs, Godot resource paths, source object paths, skeleton hashes, and semantic counts. Generated output is `res://assets/generated/als_v4/compiled/als_animation_set.tres`.
 
-- [ ] **Step 3: Implement imported-resource audit**
+- [x] **Step 3: Implement imported-resource audit**
 
 For all 141 binary rows, convert manifest paths to `res://assets/generated/als_v4/<relativePath>`, require `ResourceLoader.Exists`, and load the expected type: FBX as `PackedScene`, PNG/TGA as `Texture2D`. Inspect 7 skeletal scenes for `Skeleton3D` and `MeshInstance3D`, 4 static scenes for mesh, and 126 animation scenes for `AnimationPlayer`, non-empty animation, duration tolerance `1/30` second, and physical bone-name order.
 
-- [ ] **Step 4: Implement material reconstruction**
+- [x] **Step 4: Implement material reconstruction**
 
 Ignore FBX image paths. Build `StandardMaterial3D` instances from compiled scalar/vector/texture overrides, resolve texture IDs to stable PNG paths, and match imported mesh surface material names to manifest material names. Emit structured unresolved-slot diagnostics; the P2B smoke requires Mannequin and M4A1 to receive a non-null material, but does not require visual parity shaders.
 
-- [ ] **Step 5: Implement coordinator and EditorPlugin**
+- [x] **Step 5: Implement coordinator and EditorPlugin**
 
 `AlsGodotImportCoordinator.Run()` loads, validates, audits, compiles, saves the Resource atomically through a temporary `.tres`, reloads it, and returns a count/error report. `AlsImporterPlugin` exposes one editor tool-menu command that calls the same coordinator; enable it in `project.godot` under `[editor_plugins]`. Headless entry calls the coordinator directly and prints:
 
@@ -287,11 +287,11 @@ Ignore FBX image paths. Build `StandardMaterial3D` instances from compiled scala
 P2B_IMPORT_OK assets=267 files=141 skeletal=7 static=4 animations=126 textures=4
 ```
 
-- [ ] **Step 6: Run headless import to verify GREEN**
+- [x] **Step 6: Run headless import to verify GREEN**
 
 Expected: no determinism-directory resources, no missing original TGA errors, all 141 resources load, compiled Resource reloads, and the success marker appears.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add GodotALS.csproj project.godot import_defaults.cfg addons src/Als.Godot scenes/tests/p2b_import.tscn scripts/verify-p2b.ps1
@@ -309,19 +309,19 @@ Include editor-generated `.uid` files only for tracked C# scripts under `src/Als
 - Create: `scenes/tests/p2b_asset_smoke.tscn`
 - Modify: `scripts/verify-p2b.ps1`
 
-- [ ] **Step 1: Extend the gate and verify RED**
+- [x] **Step 1: Extend the gate and verify RED**
 
 Require Mannequin, M4A1, Walk Forward, Run Forward, Turn L90, Mantle 1m, and M4A1/Pistol Overlay stable IDs. Expected failure: `P2B_ASSET_SMOKE_OK` is absent.
 
-- [ ] **Step 2: Implement animation binding**
+- [x] **Step 2: Implement animation binding**
 
 Instantiate the Mannequin scene, locate its `Skeleton3D` and `AnimationPlayer`, duplicate the source clip's `Unreal Take`, and rewrite each track node portion from `Skeleton3D:<bone>` to the target skeleton path relative to the target player's root. Reject missing physical bones, unknown track types, zero-track clips, and duration mismatches. Set callback mode to manual and call `Advance(delta)` explicitly.
 
-- [ ] **Step 3: Implement normalized pose digest**
+- [x] **Step 3: Implement normalized pose digest**
 
 For `root`, `pelvis`, `spine_03`, `hand_l`, `hand_r`, `foot_l`, and `foot_r`, hash frame number, bone ID, and quantized local pose position/rotation/scale. Exclude timing and object instance IDs.
 
-- [ ] **Step 4: Implement representative asset smoke**
+- [x] **Step 4: Implement representative asset smoke**
 
 Load and advance each representative clip for `min(60, ceil(playLength * 30))` frames, require at least one selected bone pose to change for non-pose clips, instantiate Mannequin and M4A1 meshes, apply approximate materials, and print:
 
@@ -329,7 +329,7 @@ Load and advance each representative clip for `min(60, ceil(playLength * 30))` f
 P2B_ASSET_SMOKE_OK mannequinBones=68 clips=6 overlay=2 props=1
 ```
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run `verify-p2b.ps1`, then commit the binder, digest, smoke scene, and script updates.
 
@@ -342,15 +342,15 @@ Run `verify-p2b.ps1`, then commit the binder, digest, smoke scene, and script up
 - Create: `scenes/tests/p2b_real_rig_harness.tscn`
 - Modify: `scripts/verify-p2b.ps1`
 
-- [ ] **Step 1: Add the failing real-rig matrix**
+- [x] **Step 1: Add the failing real-rig matrix**
 
 Run one and ten Mannequins for 120 fixed 60 Hz frames in `single` and `parallel` modes. Require matching digests, every parallel worker observed off-main-thread, `missing=0`, `stale=0`, and no thread-access errors. Expected failure: harness classes and marker are absent.
 
-- [ ] **Step 2: Implement worker ownership**
+- [x] **Step 2: Implement worker ownership**
 
 Each worker instantiates and exclusively owns one Mannequin, its Skeleton3D, AnimationPlayer, bound Walk clip, runtime state, and exchange. Gather publishes only unmanaged input; worker manually advances animation and publishes pose digest/result; Commit consumes by stable character ID. No worker accesses siblings, scene-global nodes, ResourceLoader, or file IO after `_Ready()`.
 
-- [ ] **Step 3: Implement stable lifecycle and digest output**
+- [x] **Step 3: Implement stable lifecycle and digest output**
 
 Warm all workers before measurement. Preserve the P1 generation rules and replace character zero after frame 60. Print one marker per run:
 
@@ -358,11 +358,11 @@ Warm all workers before measurement. Preserve the P1 generation rules and replac
 GODOT_ALS_P2B_RIG_OK mode=parallel characters=10 frames=120 digest=<HEX> missing=0 stale=0 off_main=10
 ```
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 The script compares each character-count pair and fails if digest or semantic counts differ. This is a correctness gate, not the final 10-minute performance benchmark.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/Als.Godot/Dispatch scenes/tests/p2b_real_rig_harness.tscn scripts/verify-p2b.ps1
@@ -376,7 +376,7 @@ git commit -m "test: verify real ALS rigs across process groups"
 - Modify: `docs/superpowers/plans/2026-08-25-p2b-godot-import-closure.md`
 - Modify: `docs/superpowers/specs/2026-08-25-p2-full-asset-pipeline-design.md`
 
-- [ ] **Step 1: Run the complete fresh verification matrix**
+- [x] **Step 1: Run the complete fresh verification matrix**
 
 ```powershell
 .\scripts\verify-p2b.ps1 -GodotExecutable 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' -CleanImport
@@ -388,21 +388,21 @@ git diff --check
 
 Expected: `P2B_VERIFICATION_OK`, P1/P0 markers, all tests pass, and no build/import/thread error.
 
-- [ ] **Step 2: Record actual import and smoke results**
+- [x] **Step 2: Record actual import and smoke results**
 
 Document Godot importer version/options, imported counts, cache size/time, physical/logical bone counts, representative clip durations/tracks, material limitations, real-rig digests, worker counts, and known warnings. Update the P2 design status to P2 complete only if all ten completion conditions pass.
 
-- [ ] **Step 3: Audit repository boundaries**
+- [x] **Step 3: Audit repository boundaries**
 
 Require no tracked FBX/PNG/TGA, `.import`, `.godot`, generated `.tres`, UE binaries, plugin packages, `bin`, or `obj`. Confirm only `artifacts/.gdignore` is tracked beneath `artifacts`.
 
-- [ ] **Step 4: Mark plan checks and commit**
+- [x] **Step 4: Mark plan checks and commit**
 
 ```powershell
 git add docs
 git commit -m "docs: record P2B Godot import closure"
 ```
 
-- [ ] **Step 5: Review the full branch against the design**
+- [x] **Step 5: Review the full branch against the design**
 
 Check `main...HEAD` for missing P2 completion conditions, placeholder text, silent fallback, path assumptions, and untested production methods. P3 may start only after this review and the complete P2B gate pass.
