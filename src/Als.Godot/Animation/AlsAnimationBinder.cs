@@ -28,6 +28,7 @@ public sealed class AlsBoundAnimation : IDisposable
 public static class AlsAnimationBinder
 {
     private const double AnimationLengthTolerance = 1.0 / 30.0;
+    private const string ImportedAnimationName = "Unreal Take";
     private const string LibraryName = "als";
     private const string AnimationName = "bound";
 
@@ -47,10 +48,16 @@ public static class AlsAnimationBinder
             using var sourceRoot = new OwnedNode(sourceScene.Instantiate());
             var sourcePlayer = AlsImportedResourceAuditor.FindFirst<AnimationPlayer>(sourceRoot.Value)
                 ?? throw new InvalidOperationException($"Animation scene has no AnimationPlayer: {clip.Name}");
-            var sourceAnimation = sourcePlayer.GetAnimationList()
-                .Select(name => sourcePlayer.GetAnimation(name))
-                .FirstOrDefault(animation => animation is not null && animation.GetTrackCount() > 0)
-                ?? throw new InvalidOperationException($"Animation scene has no non-empty clip: {clip.Name}");
+            if (!sourcePlayer.HasAnimation(ImportedAnimationName))
+            {
+                throw new InvalidOperationException(
+                    $"Animation scene does not contain '{ImportedAnimationName}': {clip.Name}");
+            }
+            var sourceAnimation = sourcePlayer.GetAnimation(ImportedAnimationName);
+            if (sourceAnimation is null || sourceAnimation.GetTrackCount() == 0)
+            {
+                throw new InvalidOperationException($"Imported animation is empty: {clip.Name}");
+            }
             if (Math.Abs(sourceAnimation.Length - clip.PlayLength) > AnimationLengthTolerance + 1e-6)
             {
                 throw new InvalidOperationException(
@@ -101,7 +108,12 @@ public static class AlsAnimationBinder
             }
 
             var sourcePath = animation.TrackGetPath(trackIndex);
-            if (sourcePath.GetSubNameCount() != 1)
+            if (sourcePath.GetNameCount() == 0 ||
+                !string.Equals(
+                    sourcePath.GetName(sourcePath.GetNameCount() - 1),
+                    "Skeleton3D",
+                    StringComparison.Ordinal) ||
+                sourcePath.GetSubNameCount() != 1)
             {
                 throw new InvalidOperationException(
                     $"Animation track does not target exactly one bone for {clipName}: index={trackIndex} path={sourcePath}");

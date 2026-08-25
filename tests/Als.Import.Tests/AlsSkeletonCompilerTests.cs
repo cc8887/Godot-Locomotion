@@ -42,4 +42,21 @@ public sealed class AlsSkeletonCompilerTests
         Assert.Contains(exception.Issues, issue =>
             issue.Code == "ALSRIG008" && issue.FieldPath == "$.metadata.virtualBones[0].target");
     }
+
+    [Fact]
+    public void RejectsAnIncompleteHumanoidRequiredBoneSet()
+    {
+        var manifest = AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath());
+        var json = manifest.Skeletons[0].Metadata.GetRawText().Replace(
+            "\"name\": \"foot_r\"",
+            "\"name\": \"toe_r\"",
+            StringComparison.Ordinal);
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var asset = manifest.Skeletons[0] with { Metadata = document.RootElement.Clone() };
+
+        var exception = Assert.Throws<AlsCompilationException>(() => AlsSkeletonCompiler.Compile(asset));
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.Code == "ALSRIG010" && issue.FieldPath == "$.metadata.bones");
+    }
 }

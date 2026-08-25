@@ -18,11 +18,11 @@ public sealed record AlsAnimationSetDefinition(
 
 public sealed record AlsSkeletalMeshDefinition(
     int Id, string StableId, string Name, string ObjectPath, string ResourcePath,
-    int SkeletonId, int MaterialSlotCount, bool Overlay, bool Prop);
+    int SkeletonId, int MaterialSlotCount, int[] MaterialIds, bool Overlay, bool Prop);
 
 public sealed record AlsStaticMeshDefinition(
     int Id, string StableId, string Name, string ObjectPath, string ResourcePath,
-    int MaterialSlotCount, bool Overlay, bool Prop);
+    int MaterialSlotCount, int[] MaterialIds, bool Overlay, bool Prop);
 
 public sealed record AlsAnimationDefinition(
     int Id,

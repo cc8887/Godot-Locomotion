@@ -14,6 +14,16 @@ public sealed record AlsImportedResourceAuditReport(
 public static class AlsImportedResourceAuditor
 {
     private const double AnimationLengthTolerance = 1.0 / 30.0;
+    private const string MannequinAssetId = "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07";
+
+    private static readonly System.Numerics.Matrix4x4 ImportedBoneToTarget = new(
+        0f, 0f, -1f, 0f,
+        -1f, 0f, 0f, 0f,
+        0f, 1f, 0f, 0f,
+        0f, 0f, 0f, 1f);
+
+    private static readonly System.Numerics.Matrix4x4 TargetToImportedBone =
+        CreateImportedBoneInverse();
 
     public static AlsImportedResourceAuditReport Audit(
         AlsManifest manifest,
@@ -70,6 +80,149 @@ public static class AlsImportedResourceAuditor
     public static string ToResourcePath(string relativePath) =>
         $"res://assets/generated/als_v4/{relativePath.Replace('\\', '/')}";
 
+    public static string ComputeTargetRestPoseHash(
+        Skeleton3D skeleton,
+        AlsSkeletonDefinition expected)
+    {
+        ArgumentNullException.ThrowIfNull(skeleton);
+        ArgumentNullException.ThrowIfNull(expected);
+        var actual = ReadTargetRestPose(skeleton);
+        if (actual.Length != expected.PhysicalBones.Length)
+        {
+            return AlsCanonicalPoseHash.Create(actual);
+        }
+
+        var normalized = new AlsBoneDefinition[actual.Length];
+        for (var index = 0; index < actual.Length; index++)
+        {
+            var source = actual[index];
+            var contract = expected.PhysicalBones[index];
+            var rotation = source.Rotation;
+            if (System.Numerics.Quaternion.Dot(rotation, contract.Rotation) < 0f)
+            {
+                rotation = new System.Numerics.Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W);
+            }
+
+            normalized[index] = source with
+            {
+                Name = string.Equals(source.Name, contract.Name, StringComparison.OrdinalIgnoreCase)
+                    ? contract.Name
+                    : source.Name,
+                Translation = NormalizeVector(source.Translation, contract.Translation),
+                Rotation = NormalizeQuaternion(rotation, contract.Rotation),
+                Scale = NormalizeVector(source.Scale, contract.Scale),
+            };
+        }
+
+        return AlsCanonicalPoseHash.Create(normalized);
+
+        static System.Numerics.Vector3 NormalizeVector(
+            System.Numerics.Vector3 actual,
+            System.Numerics.Vector3 expected) => new(
+                NormalizeComponent(actual.X, expected.X),
+                NormalizeComponent(actual.Y, expected.Y),
+                NormalizeComponent(actual.Z, expected.Z));
+
+        static System.Numerics.Quaternion NormalizeQuaternion(
+            System.Numerics.Quaternion actual,
+            System.Numerics.Quaternion expected) => new(
+                NormalizeComponent(actual.X, expected.X),
+                NormalizeComponent(actual.Y, expected.Y),
+                NormalizeComponent(actual.Z, expected.Z),
+                NormalizeComponent(actual.W, expected.W));
+
+        static float NormalizeComponent(float actual, float expected) =>
+            Math.Abs(actual - expected) <= 1.1e-5f ? expected : actual;
+    }
+
+    public static string DescribeRestPoseDifferences(
+        Skeleton3D skeleton,
+        AlsSkeletonDefinition expected)
+    {
+        var actual = ReadTargetRestPose(skeleton);
+        var lines = new List<string>();
+        for (var index = 0; index < Math.Min(actual.Length, expected.PhysicalBones.Length); index++)
+        {
+            var left = expected.PhysicalBones[index];
+            var right = actual[index];
+            if (!string.Equals(left.Name, right.Name, StringComparison.Ordinal) ||
+                left.ParentPhysicalId != right.ParentPhysicalId ||
+                !QuantizedEqual(left.Translation.X, right.Translation.X) ||
+                !QuantizedEqual(left.Translation.Y, right.Translation.Y) ||
+                !QuantizedEqual(left.Translation.Z, right.Translation.Z) ||
+                !QuantizedEqual(left.Rotation.X, right.Rotation.X) ||
+                !QuantizedEqual(left.Rotation.Y, right.Rotation.Y) ||
+                !QuantizedEqual(left.Rotation.Z, right.Rotation.Z) ||
+                !QuantizedEqual(left.Rotation.W, right.Rotation.W) ||
+                !QuantizedEqual(left.Scale.X, right.Scale.X) ||
+                !QuantizedEqual(left.Scale.Y, right.Scale.Y) ||
+                !QuantizedEqual(left.Scale.Z, right.Scale.Z))
+            {
+                lines.Add(
+                    $"bone={left.Name}/{right.Name} parent={left.ParentPhysicalId}/{right.ParentPhysicalId} " +
+                    $"expectedT={left.Translation} actualT={right.Translation} " +
+                    $"expectedR={left.Rotation} actualR={right.Rotation} " +
+                    $"expectedS={left.Scale} actualS={right.Scale}");
+                if (lines.Count == 5)
+                {
+                    break;
+                }
+            }
+        }
+
+        return lines.Count == 0 ? "No transform deltas above tolerance." : string.Join(System.Environment.NewLine, lines);
+
+        static bool QuantizedEqual(float left, float right) =>
+            MathF.Round(left, 5, MidpointRounding.ToEven) == MathF.Round(right, 5, MidpointRounding.ToEven);
+    }
+
+    private static AlsBoneDefinition[] ReadTargetRestPose(Skeleton3D skeleton)
+    {
+        var bones = new AlsBoneDefinition[skeleton.GetBoneCount()];
+        for (var index = 0; index < bones.Length; index++)
+        {
+            var rest = skeleton.GetBoneRest(index);
+            var importedRotation = rest.Basis.Orthonormalized().GetRotationQuaternion().Normalized();
+            var rotationMatrix = System.Numerics.Matrix4x4.CreateFromQuaternion(
+                new System.Numerics.Quaternion(
+                    importedRotation.X,
+                    importedRotation.Y,
+                    importedRotation.Z,
+                    importedRotation.W));
+            var rotation = System.Numerics.Quaternion.Normalize(
+                System.Numerics.Quaternion.CreateFromRotationMatrix(
+                    TargetToImportedBone * rotationMatrix * ImportedBoneToTarget));
+            if (rotation.W < 0f)
+            {
+                rotation = new System.Numerics.Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W);
+            }
+
+            var importedScale = rest.Basis.Scale;
+
+            bones[index] = new AlsBoneDefinition(
+                index,
+                index,
+                skeleton.GetBoneName(index).ToString(),
+                skeleton.GetBoneParent(index),
+                skeleton.GetBoneParent(index),
+                new System.Numerics.Vector3(-rest.Origin.Y, rest.Origin.Z, -rest.Origin.X),
+                rotation,
+                new System.Numerics.Vector3(importedScale.Y, importedScale.Z, importedScale.X));
+        }
+
+        return bones;
+    }
+
+    private static System.Numerics.Matrix4x4 CreateImportedBoneInverse()
+    {
+        if (!System.Numerics.Matrix4x4.Invert(ImportedBoneToTarget, out var inverse))
+        {
+            throw new InvalidOperationException("Godot FBX bone conversion basis is not invertible.");
+        }
+
+        return inverse;
+    }
+
     private static void AuditSkeletalMeshes(AlsAnimationSetDefinition definition, List<string> errors)
     {
         foreach (var mesh in definition.SkeletalMeshes)
@@ -84,7 +237,12 @@ public static class AlsImportedResourceAuditor
                 }
                 else
                 {
-                    CompareSkeleton(resourcePath, skeleton, definition.Skeletons[mesh.SkeletonId], false, errors);
+                    CompareSkeleton(
+                        resourcePath,
+                        skeleton,
+                        definition.Skeletons[mesh.SkeletonId],
+                        string.Equals(mesh.StableId, MannequinAssetId, StringComparison.Ordinal),
+                        errors);
                 }
 
                 if (FindFirst<MeshInstance3D>(root) is null)
@@ -126,7 +284,7 @@ public static class AlsImportedResourceAuditor
                 }
                 else
                 {
-                    CompareSkeleton(resourcePath, skeleton, definition.Skeletons[clip.SkeletonId], true, errors);
+                    CompareSkeleton(resourcePath, skeleton, definition.Skeletons[clip.SkeletonId], false, errors);
                 }
 
                 if (player is null)
@@ -207,6 +365,18 @@ public static class AlsImportedResourceAuditor
             }
 
             expectedIndex++;
+        }
+
+        if (requireCompleteSkeleton)
+        {
+            var actualHash = ComputeTargetRestPoseHash(skeleton, expected);
+            if (!string.Equals(actualHash, expected.TargetPhysicalRestPoseHash, StringComparison.Ordinal))
+            {
+                errors.Add(
+                    $"Skeleton rest-pose hash mismatch: {resourcePath} " +
+                    $"expected={expected.TargetPhysicalRestPoseHash} actual={actualHash} " +
+                    DescribeRestPoseDifferences(skeleton, expected));
+            }
         }
     }
 

@@ -113,7 +113,7 @@ for ($index = 0; $index -lt $expectedAssetSmoke.Length; $index++) {
 
 Write-Output 'P2B_ASSET_VERIFICATION_OK'
 
-$rigMarkerPattern = 'GODOT_ALS_P2B_RIG_OK mode=(single|parallel) characters=(\d+) frames=(\d+) digest=([0-9A-F]{16}) missing=(\d+) stale=(\d+) off_main=(\d+)'
+$rigMarkerPattern = 'GODOT_ALS_P2B_RIG_OK mode=(single|parallel) characters=(\d+) frames=(\d+) digest=([0-9A-F]{16}) missing=(\d+) stale=(\d+) off_main=(\d+) replacements=(\d+) events=(\d+)'
 function Invoke-P2bRigHarness {
     param(
         [Parameter(Mandatory)]
@@ -148,6 +148,8 @@ function Invoke-P2bRigHarness {
         Missing = [long]$match.Groups[5].Value
         Stale = [long]$match.Groups[6].Value
         OffMain = [int]$match.Groups[7].Value
+        Replacements = [int]$match.Groups[8].Value
+        Events = [long]$match.Groups[9].Value
     }
 }
 
@@ -159,7 +161,8 @@ foreach ($characterCount in @(1, 10)) {
     }
     foreach ($result in @($single, $parallel)) {
         if ($result.Characters -ne $characterCount -or $result.Frames -ne 120 -or
-            $result.Missing -ne 0 -or $result.Stale -ne 0) {
+            $result.Missing -ne 0 -or $result.Stale -ne 0 -or
+            $result.Replacements -ne 1 -or $result.Events -ne ($characterCount * 4 + 4)) {
             throw "P2B real-rig harness reported invalid semantics for mode=$($result.Mode) characters=$characterCount."
         }
     }

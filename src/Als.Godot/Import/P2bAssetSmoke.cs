@@ -1,7 +1,7 @@
 using Godot;
 using GodotAls.Animation;
+using GodotAls.Assets;
 using GodotAls.Import.Compilation;
-using GodotAls.Import.Manifest;
 
 namespace GodotAls.Import;
 
@@ -41,11 +41,12 @@ public partial class P2bAssetSmoke : Node
 
     private void RunSmoke()
     {
-        var manifest = AlsManifestSerializer.Load(ProjectSettings.GlobalizePath(AlsGodotImportCoordinator.ManifestPath));
-        var definition = AlsAnimationSetCompiler.Compile(manifest);
-        var mannequinAsset = manifest.SkeletalMeshes.Single(asset => asset.Id == MannequinAssetId);
-        var m4a1Asset = manifest.SkeletalMeshes.Single(asset => asset.Id == M4a1AssetId);
-        var mannequin = LoadScene(mannequinAsset.OutputPath!, mannequinAsset.AssetName);
+        var resource = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath)
+            ?? throw new InvalidOperationException("Compiled ALS animation set could not be loaded.");
+        var definition = resource.LoadDefinition();
+        var mannequinAsset = definition.SkeletalMeshes[definition.AssetIndex.GetSkeletalMeshId(MannequinAssetId)];
+        var m4a1Asset = definition.SkeletalMeshes[definition.AssetIndex.GetSkeletalMeshId(M4a1AssetId)];
+        var mannequin = LoadScene(mannequinAsset.ResourcePath, mannequinAsset.Name);
         var materialBuilder = new AlsMaterialBuilder(definition);
         var finalDigests = new List<string>();
         var overlayCount = 0;
@@ -61,7 +62,11 @@ public partial class P2bAssetSmoke : Node
                 clip,
                 definition.Skeletons[clip.SkeletonId]);
             AddChild(bound.Root);
-            if (materialBuilder.ApplyToRoot(bound.Root, mannequinAsset) == 0)
+            var materialReport = materialBuilder.ApplyToRoot(
+                bound.Root,
+                mannequinAsset.StableId,
+                mannequinAsset.MaterialIds);
+            if (materialReport.AppliedCount == 0 || materialReport.UnresolvedCount != 0)
             {
                 throw new InvalidOperationException($"Mannequin received no reconstructed material for {clip.Name}.");
             }
@@ -87,11 +92,15 @@ public partial class P2bAssetSmoke : Node
             overlayCount += clip.Overlay ? 1 : 0;
         }
 
-        var propRoot = LoadScene(m4a1Asset.OutputPath!, m4a1Asset.AssetName).Instantiate();
+        var propRoot = LoadScene(m4a1Asset.ResourcePath, m4a1Asset.Name).Instantiate();
         AddChild(propRoot);
         try
         {
-            if (materialBuilder.ApplyToRoot(propRoot, m4a1Asset) == 0)
+            var materialReport = materialBuilder.ApplyToRoot(
+                propRoot,
+                m4a1Asset.StableId,
+                m4a1Asset.MaterialIds);
+            if (materialReport.AppliedCount == 0 || materialReport.UnresolvedCount != 0)
             {
                 throw new InvalidOperationException("M4A1 received no reconstructed material.");
             }
@@ -106,6 +115,19 @@ public partial class P2bAssetSmoke : Node
         {
             var skeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(mannequinRoot)
                 ?? throw new InvalidOperationException("Mannequin scene has no Skeleton3D.");
+            var mannequinMeshId = definition.AssetIndex.GetSkeletalMeshId(MannequinAssetId);
+            var skeletonDefinition = definition.Skeletons[definition.SkeletalMeshes[mannequinMeshId].SkeletonId];
+            var importedRestPoseHash = AlsImportedResourceAuditor.ComputeTargetRestPoseHash(skeleton, skeletonDefinition);
+            if (!string.Equals(
+                    importedRestPoseHash,
+                    skeletonDefinition.TargetPhysicalRestPoseHash,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Mannequin rest-pose hash mismatch: expected={skeletonDefinition.TargetPhysicalRestPoseHash} " +
+                    $"actual={importedRestPoseHash}{System.Environment.NewLine}" +
+                    AlsImportedResourceAuditor.DescribeRestPoseDifferences(skeleton, skeletonDefinition));
+            }
             if (finalDigests.Distinct(StringComparer.Ordinal).Count() < 2)
             {
                 throw new InvalidOperationException("Representative animations produced no distinct final pose digests.");
@@ -113,7 +135,7 @@ public partial class P2bAssetSmoke : Node
 
             GD.Print(
                 $"P2B_ASSET_SMOKE_OK mannequinBones={skeleton.GetBoneCount()} clips={ClipIds.Length} " +
-                $"overlay={overlayCount} props={(m4a1Asset.Metadata.GetProperty("prop").GetBoolean() ? 1 : 0)}");
+                $"overlay={overlayCount} props={(m4a1Asset.Prop ? 1 : 0)} restHash={importedRestPoseHash}");
         }
         finally
         {

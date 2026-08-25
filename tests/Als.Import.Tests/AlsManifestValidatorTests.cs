@@ -46,4 +46,18 @@ public sealed class AlsManifestValidatorTests
         Assert.Contains(issues, issue => issue.Code == "ALSMANIFEST004" && issue.FieldPath == "$.auditSummary.fileCount");
         Assert.Contains(issues, issue => issue.Code == "ALSMANIFEST005" && issue.FieldPath == "$.auditSummary.errorCount");
     }
+
+    [Fact]
+    public void RejectsAUnitScaleThatDoesNotMatchTheCoordinateConverter()
+    {
+        var manifest = AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath()) with
+        {
+            UnitScale = 1.0,
+        };
+
+        var issue = Assert.Single(AlsManifestValidator.Validate(manifest));
+
+        Assert.Equal("ALSMANIFEST006", issue.Code);
+        Assert.Equal("$.unitScale", issue.FieldPath);
+    }
 }

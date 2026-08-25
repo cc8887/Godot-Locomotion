@@ -55,6 +55,8 @@ public sealed class AlsRealRigHarnessContext
 
     public long StaleResults;
 
+    public long EventOccurrences;
+
     public long Replacements;
 }
 
