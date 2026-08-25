@@ -9,5 +9,7 @@ obj/
 *.user
 *.suo
 assets/generated/
-artifacts/
-benchmark-results/
+artifacts/*
+!artifacts/.gdignore
+benchmark-results/*
+!benchmark-results/.gdignore
