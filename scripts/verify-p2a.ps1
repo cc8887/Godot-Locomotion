@@ -99,20 +99,53 @@ foreach ($boneName in @('root', 'pelvis', 'foot_l', 'foot_r')) {
         throw "Partial manifest does not contain required bone: $boneName"
     }
 }
+foreach ($skeleton in @($manifest.skeletons)) {
+    if ($skeleton.metadata.restPoseHash -notmatch '^[0-9a-f]{40}$') {
+        throw "Skeleton metadata has no valid rest pose hash: $($skeleton.objectPath)"
+    }
+    if ($null -eq $skeleton.metadata.PSObject.Properties['sockets']) {
+        throw "Skeleton metadata has no sockets array: $($skeleton.objectPath)"
+    }
+    if (@($skeleton.metadata.bones).Count -ne $skeleton.metadata.boneCount) {
+        throw "Skeleton bone count does not match metadata: $($skeleton.objectPath)"
+    }
+}
 $animationsWithSemantics = @($manifest.animations | Where-Object {
     @($_.metadata.curves).Count -gt 0 -or @($_.metadata.notifies).Count -gt 0
 })
 if ($animationsWithSemantics.Count -eq 0) {
     throw 'Partial manifest contains no animation with curves or notifies.'
 }
+foreach ($animation in @($manifest.animations)) {
+    foreach ($field in @('loop', 'interpolation', 'forceRootLock', 'useNormalizedRootMotionScale',
+        'additiveBasePoseType', 'additiveBasePoseFrame', 'additiveBasePoseId', 'additiveBasePoseObjectPath')) {
+        if ($null -eq $animation.metadata.PSObject.Properties[$field]) {
+            throw "Animation metadata is missing '$field': $($animation.objectPath)"
+        }
+    }
+}
 if (@($manifest.montages | Where-Object { @($_.metadata.sections).Count -gt 0 }).Count -eq 0) {
     throw 'Partial manifest contains no montage sections.'
+}
+foreach ($montage in @($manifest.montages)) {
+    foreach ($field in @('blendInTime', 'blendInOption', 'blendOutTime', 'blendOutOption',
+        'blendOutTriggerTime', 'enableAutoBlendOut')) {
+        if ($null -eq $montage.metadata.PSObject.Properties[$field]) {
+            throw "Montage metadata is missing '$field': $($montage.objectPath)"
+        }
+    }
 }
 if (@($manifest.blendSpaces + $manifest.aimOffsets | Where-Object { @($_.metadata.samples).Count -gt 0 }).Count -eq 0) {
     throw 'Partial manifest contains no blend space or aim offset samples.'
 }
 if (@($manifest.physicsAssets | Where-Object { @($_.metadata.bodies).Count -gt 0 }).Count -eq 0) {
     throw 'Partial manifest contains no physics bodies.'
+}
+foreach ($physicsAsset in @($manifest.physicsAssets)) {
+    if ($null -eq $physicsAsset.metadata.PSObject.Properties['constraints'] -or
+        @($physicsAsset.metadata.constraints).Count -ne $physicsAsset.metadata.constraintCount) {
+        throw "Physics asset constraints do not match metadata: $($physicsAsset.objectPath)"
+    }
 }
 if (@($manifest.animations | Where-Object { $_.objectPath -match '/Overlay/' }).Count -eq 0) {
     throw 'Partial manifest contains no overlay animation.'
