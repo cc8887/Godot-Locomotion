@@ -714,15 +714,18 @@ namespace GodotAls.Core.Exchange;
 
 public sealed class AlsFrameExchange
 {
+    private const long UnpublishedFrame = -1;
+
     private readonly AlsFrameInput[] _inputs = new AlsFrameInput[2];
     private readonly AlsFrameResult[] _results = new AlsFrameResult[2];
-    private readonly long[] _publishedInputFrames = [-1, -1];
-    private readonly long[] _publishedResultFrames = [-1, -1];
-    private readonly long[] _consumedResultFrames = [-1, -1];
+    private readonly long[] _publishedInputFrames = [UnpublishedFrame, UnpublishedFrame];
+    private readonly long[] _publishedResultFrames = [UnpublishedFrame, UnpublishedFrame];
+    private readonly long[] _consumedResultFrames = [UnpublishedFrame, UnpublishedFrame];
 
     public void PublishInput(AlsFrameInput input)
     {
         var slot = Slot(input.Identity.FrameId);
+        Volatile.Write(ref _publishedInputFrames[slot], UnpublishedFrame);
         _inputs[slot] = input;
         Volatile.Write(ref _publishedInputFrames[slot], input.Identity.FrameId);
     }
@@ -743,6 +746,7 @@ public sealed class AlsFrameExchange
     public void PublishResult(AlsFrameResult result)
     {
         var slot = Slot(result.Identity.FrameId);
+        Volatile.Write(ref _publishedResultFrames[slot], UnpublishedFrame);
         _results[slot] = result;
         Volatile.Write(ref _publishedResultFrames[slot], result.Identity.FrameId);
     }
