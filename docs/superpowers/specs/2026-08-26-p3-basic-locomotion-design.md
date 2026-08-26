@@ -359,10 +359,14 @@ trace 至少包含五条序列：
 4. Velocity/Looking/Aiming rotation mode；
 5. jump -> ascend -> fall -> land -> grounded。
 
+五条序列的帧数也是锁定契约：`idle_gaits=240`、`directions=240`、
+`crouch_clearance=210`、`rotation_modes=240`、`jump_land=240`。loader、schema 和生成验证器都必须按
+sequence name 拒绝截断或额外帧。
+
 trace 仍由真实 `AAlsCharacter` 和 `UAlsAnimationInstance` tick 驱动，但每帧必须拆成三个严格对象：
 
 - `physicalActual`：tick 后的位置、速度、加速度、yaw、grounded、动态移动上限和实际 stance/rotation mode，作为移植模型的同帧输入证据；
-- `nativeActual`：UE 原生 AnimInstance/ALS 内部 gait、blend、stride、play rate、lean 和 target yaw，仅用于审计。`synthesizedAnimationPhase` 是 commandlet 生成的诊断值，不冒充原生动画字段，也不参与 pass/fail；
+- `nativeActual`：UE 原生 AnimInstance/ALS 内部 gait、blend、stride、play rate、lean 和 target yaw，仅用于审计。`observedAnimationState` 是 commandlet 根据物理 jump/airborne/landing 观测合成的严格枚举，不冒充 AnimInstance 直接字段；其中 `jump_land` 的 native `LandRecovery` 锁定为 frame 81..93 共 13 帧，而 port oracle 为 frame 81..92 共 12 帧。`synthesizedAnimationPhase` 同样是 commandlet 生成的诊断值。两者都不参与 pass/fail；
 - `portExpected`：commandlet 内独立 C++ oracle 仅消费同帧 `physicalActual`、command 和导出的 settings，并维护自己的跨帧状态，输出全部 `AlsFrameResult` 比较字段。oracle 不调用、不依赖 C# production model。
 
 真实物理状态和原生动画观测在同一 UE tick 内可能处于不同更新时间，因此 `nativeActual` 与
@@ -381,8 +385,8 @@ Godot integration replay 将统一命令送入真实 `AlsCharacterMotor`，验�
 ### 10.3 容差
 
 - enum、bool、transition frame、animation ID：完全一致；
-- 米和米/秒字段：绝对误差 `<= 0.001`；
-- 归一化 blend/stride/play-rate/lean：绝对误差 `<= 0.0001`；
+- 米和米/秒字段（包括单位为 m/s 的 `blendCoordinates`）：绝对误差 `<= 0.001`；
+- 归一化 stride/play-rate/lean/phase：绝对误差 `<= 0.0001`；
 - yaw：最短角误差 `<= 0.1` 度；
 - Godot 单线程/多线程摘要：完全一致。
 

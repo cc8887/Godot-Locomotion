@@ -613,7 +613,7 @@ Expected: FAIL because trace loader and fixtures are missing.
 
 - [ ] **Step 3: Implement strict trace DTOs and tolerances**
 
-The schema requires `schemaVersion`, `referenceCommit`, `fixedDeltaTime`, `sequence`, and `frames`, sets `additionalProperties: false` at every object, and requires every frame field from design section 10.1. The comparer must use exact equality for enum/bool/frame/animation ID, `0.001` for metric fields, `0.0001` for normalized parameters, and shortest-angle `0.1` degree for yaw. Configure fixtures to copy to output:
+The schema requires `schemaVersion`, `referenceCommit`, `fixedDeltaTime`, `sequence`, and `frames`, sets `additionalProperties: false` at every object, and requires every frame field from design section 10.1. It locks exact frame counts by sequence name: `idle_gaits=240`, `directions=240`, `crouch_clearance=210`, `rotation_modes=240`, and `jump_land=240`. The comparer must use exact equality for enum/bool/frame/animation ID, `0.001` for metric fields including the m/s `blendCoordinates`, `0.0001` for normalized stride/play-rate/lean/phase, and shortest-angle `0.1` degree for yaw. Configure fixtures to copy to output:
 
 ```xml
 <ItemGroup>
@@ -679,7 +679,8 @@ Expected: FAIL because the trace plugin/commandlet does not exist.
 - drive public desired gait/stance/rotation/aiming APIs and movement input
 - tick the real character and UAlsAnimationInstance
 - serialize post-tick physical evidence as `physicalActual`
-- serialize native AnimInstance observations as non-gating `nativeActual`; label the commandlet phase as `synthesizedAnimationPhase`
+- serialize native AnimInstance observations as non-gating `nativeActual`; label the commandlet phase as `synthesizedAnimationPhase`, and the physical jump/airborne/landing-derived audit enum as `observedAnimationState`
+- lock native `jump_land` LandRecovery to frames 81..93 (13 frames) independently of portExpected frames 81..92 (12 frames)
 - evaluate a stateful, independent C++ port oracle from the same physical evidence and serialize all model outputs as `portExpected`
 - permit native observations and port expectations to differ; only `portExpected` is a golden pass/fail oracle
 - serialize the resolved movement/animation settings as `p3_locomotion_settings.json`

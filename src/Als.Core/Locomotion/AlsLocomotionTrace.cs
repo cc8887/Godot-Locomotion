@@ -10,6 +10,7 @@ public sealed class AlsLocomotionTrace
 {
     private const double FixedDeltaSeconds = 1d / 60d;
     private const double TimeTolerance = 1e-12d;
+    private const float MetricTolerance = 0.001f;
     private const float ParameterTolerance = 0.0001f;
     private const float YawTolerance = MathF.PI / 1800f;
 
@@ -35,8 +36,8 @@ public sealed class AlsLocomotionTrace
     ];
 
     private static readonly string[] NativeActualProperties =
-        ["blendCoordinates", "gait", "lean", "locomotionState", "playRate", "rotationMode", "stance",
-         "stride", "synthesizedAnimationPhase", "targetYaw"];
+        ["blendCoordinates", "gait", "lean", "locomotionState", "observedAnimationState", "playRate",
+         "rotationMode", "stance", "stride", "synthesizedAnimationPhase", "targetYaw"];
 
     private static readonly string[] PortExpectedProperties =
         ["animationPhase", "animationState", "blendCoordinates", "gait", "lean", "locomotionState",
@@ -45,13 +46,14 @@ public sealed class AlsLocomotionTrace
     private static readonly string[] Vector2Properties = ["x", "y"];
     private static readonly string[] Vector3Properties = ["x", "y", "z"];
 
-    private static readonly HashSet<string> SequenceNames = new(StringComparer.Ordinal)
+    private static readonly IReadOnlyDictionary<string, int> SequenceFrameCounts =
+        new Dictionary<string, int>(StringComparer.Ordinal)
     {
-        "idle_gaits",
-        "directions",
-        "crouch_clearance",
-        "rotation_modes",
-        "jump_land",
+        ["idle_gaits"] = 240,
+        ["directions"] = 240,
+        ["crouch_clearance"] = 210,
+        ["rotation_modes"] = 240,
+        ["jump_land"] = 240,
     };
 
     private AlsLocomotionTrace(
@@ -89,7 +91,7 @@ public sealed class AlsLocomotionTrace
             RequireDouble(root, "fixedDeltaSeconds", FixedDeltaSeconds);
             var patchHashes = ReadPatchHashes(root.GetProperty("patchHashes"));
             var name = ReadSequenceName(root.GetProperty("name"), path);
-            var frames = ReadFrames(root.GetProperty("frames"));
+            var frames = ReadFrames(root.GetProperty("frames"), name);
 
             return new AlsLocomotionTrace(
                 name,
@@ -128,8 +130,8 @@ public sealed class AlsLocomotionTrace
             CompareExact(issues, frame.Index, "actualStance", frame.ExpectedActualStance, result.ActualStance);
             CompareExact(issues, frame.Index, "actualRotationMode", frame.ExpectedActualRotationMode, result.ActualRotationMode);
             CompareExact(issues, frame.Index, "animationState", frame.ExpectedAnimationState, result.AnimationState);
-            CompareNumber(issues, frame.Index, "blendCoordinates.x", frame.ExpectedBlendCoordinates.X, result.BlendCoordinates.X, ParameterTolerance);
-            CompareNumber(issues, frame.Index, "blendCoordinates.y", frame.ExpectedBlendCoordinates.Y, result.BlendCoordinates.Y, ParameterTolerance);
+            CompareNumber(issues, frame.Index, "blendCoordinates.x", frame.ExpectedBlendCoordinates.X, result.BlendCoordinates.X, MetricTolerance);
+            CompareNumber(issues, frame.Index, "blendCoordinates.y", frame.ExpectedBlendCoordinates.Y, result.BlendCoordinates.Y, MetricTolerance);
             CompareNumber(issues, frame.Index, "stride", frame.ExpectedStride, result.Stride, ParameterTolerance);
             CompareNumber(issues, frame.Index, "playRate", frame.ExpectedPlayRate, result.PlayRate, ParameterTolerance);
             CompareNumber(issues, frame.Index, "lean.x", frame.ExpectedLean.X, result.Lean.X, ParameterTolerance);
@@ -141,11 +143,19 @@ public sealed class AlsLocomotionTrace
         return [.. issues];
     }
 
-    private static AlsLocomotionTraceFrame[] ReadFrames(JsonElement element)
+    private static AlsLocomotionTraceFrame[] ReadFrames(JsonElement element, string sequenceName)
     {
-        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() == 0)
+        if (element.ValueKind != JsonValueKind.Array)
         {
-            throw new FormatException("frames must be a nonempty array.");
+            throw new FormatException("frames must be an array.");
+        }
+
+        var expectedFrameCount = SequenceFrameCounts[sequenceName];
+        if (element.GetArrayLength() != expectedFrameCount)
+        {
+            throw new FormatException(
+                $"Sequence '{sequenceName}' frame count must be exactly {expectedFrameCount}, " +
+                $"actual {element.GetArrayLength()}.");
         }
 
         var frames = new AlsLocomotionTraceFrame[element.GetArrayLength()];
@@ -306,6 +316,7 @@ public sealed class AlsLocomotionTrace
 
         return new AlsNativeLocomotionObservation(
             locomotionState,
+            ReadEnum<AlsAnimationState>(element, "observedAnimationState"),
             ReadEnum<AlsGait>(element, "gait"),
             ReadEnum<AlsStance>(element, "stance"),
             ReadEnum<AlsRotationMode>(element, "rotationMode"),
@@ -367,7 +378,7 @@ public sealed class AlsLocomotionTrace
     {
         if (element.ValueKind != JsonValueKind.String ||
             element.GetString() is not { } name ||
-            !SequenceNames.Contains(name))
+            !SequenceFrameCounts.ContainsKey(name))
         {
             throw new FormatException("name is not a supported P3 sequence.");
         }
@@ -608,6 +619,7 @@ public readonly record struct AlsLocomotionTraceFrame(
 
 public readonly record struct AlsNativeLocomotionObservation(
     AlsLocomotionState LocomotionState,
+    AlsAnimationState ObservedAnimationState,
     AlsGait Gait,
     AlsStance Stance,
     AlsRotationMode RotationMode,

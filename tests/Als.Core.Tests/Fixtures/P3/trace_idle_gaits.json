@@ -32,6 +32,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -123,6 +124,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -214,6 +216,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -305,6 +308,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -396,6 +400,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -487,6 +492,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -578,6 +584,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -669,6 +676,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -760,6 +768,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -851,6 +860,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -942,6 +952,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1033,6 +1044,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1124,6 +1136,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1215,6 +1228,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1306,6 +1320,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1397,6 +1412,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1488,6 +1504,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1579,6 +1596,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1670,6 +1688,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1761,6 +1780,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1852,6 +1872,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -1943,6 +1964,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2034,6 +2056,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2125,6 +2148,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2216,6 +2240,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2307,6 +2332,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2398,6 +2424,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2489,6 +2516,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2580,6 +2608,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2671,6 +2700,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2762,6 +2792,7 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2853,6 +2884,7 @@
 					"y": 0.056377708911895752
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 0.72315454483032227,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2944,6 +2976,7 @@
 					"y": 0.10957697033882141
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 0.68423932790756226,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3035,6 +3068,7 @@
 					"y": 0.15977698564529419
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 0.737293541431427,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3126,6 +3160,7 @@
 					"y": 0.20714683830738068
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 0.89539754390716553,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3217,6 +3252,7 @@
 					"y": 0.2518460750579834
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1111111640930176,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3308,6 +3344,7 @@
 					"y": 0.25174197554588318
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3399,6 +3436,7 @@
 					"y": 0.23754933476448059
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3490,6 +3528,7 @@
 					"y": 0.22415684163570404
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3581,6 +3620,7 @@
 					"y": 0.21151939034461975
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3672,6 +3712,7 @@
 					"y": 0.1995944082736969
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3763,6 +3804,7 @@
 					"y": 0.18834173679351807
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3854,6 +3896,7 @@
 					"y": 0.1777234673500061
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3945,6 +3988,7 @@
 					"y": 0.16770382225513458
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4036,6 +4080,7 @@
 					"y": 0.15824906527996063
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4127,6 +4172,7 @@
 					"y": 0.14932733774185181
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4218,6 +4264,7 @@
 					"y": 0.14090859889984131
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4309,6 +4356,7 @@
 					"y": 0.13296449184417725
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4400,6 +4448,7 @@
 					"y": 0.12546825408935547
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4491,6 +4540,7 @@
 					"y": 0.1183946430683136
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4582,6 +4632,7 @@
 					"y": 0.11171982437372208
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4673,6 +4724,7 @@
 					"y": 0.10542131960391998
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4764,6 +4816,7 @@
 					"y": 0.099477909505367279
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4855,6 +4908,7 @@
 					"y": 0.093869574368000031
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4946,6 +5000,7 @@
 					"y": 0.088577419519424438
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5037,6 +5092,7 @@
 					"y": 0.083583630621433258
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5128,6 +5184,7 @@
 					"y": 0.078871376812458038
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5219,6 +5276,7 @@
 					"y": 0.074424788355827332
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5310,6 +5368,7 @@
 					"y": 0.070228889584541321
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5401,6 +5460,7 @@
 					"y": 0.066269546747207642
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5492,6 +5552,7 @@
 					"y": 0.0625334233045578
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5583,6 +5644,7 @@
 					"y": 0.059007931500673294
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5674,6 +5736,7 @@
 					"y": 0.055681198835372925
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5765,6 +5828,7 @@
 					"y": 0.052542019635438919
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5856,6 +5920,7 @@
 					"y": 0.049579821527004242
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5947,6 +6012,7 @@
 					"y": 0.046784624457359314
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6038,6 +6104,7 @@
 					"y": 0.044147014617919922
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6129,6 +6196,7 @@
 					"y": 0.041658107191324234
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6220,6 +6288,7 @@
 					"y": 0.039309520274400711
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6311,6 +6380,7 @@
 					"y": 0.03709334135055542
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6402,6 +6472,7 @@
 					"y": 0.035002104938030243
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6493,6 +6564,7 @@
 					"y": 0.033028766512870789
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6584,6 +6656,7 @@
 					"y": 0.031166680157184601
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6675,6 +6748,7 @@
 					"y": 0.029409574344754219
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6766,6 +6840,7 @@
 					"y": 0.027751529589295387
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6857,6 +6932,7 @@
 					"y": 0.026186961680650711
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -6948,6 +7024,7 @@
 					"y": 0.024710601195693016
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7039,6 +7116,7 @@
 					"y": 0.023317474871873856
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7130,6 +7208,7 @@
 					"y": 0.022002888843417168
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7221,6 +7300,7 @@
 					"y": 0.02076241560280323
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7312,6 +7392,7 @@
 					"y": 0.019591879099607468
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7403,6 +7484,7 @@
 					"y": 0.018487334251403809
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7494,6 +7576,7 @@
 					"y": 0.017445061355829239
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7585,6 +7668,7 @@
 					"y": 0.016461549326777458
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7676,6 +7760,7 @@
 					"y": 0.015533484518527985
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7767,6 +7852,7 @@
 					"y": 0.014657742343842983
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7858,6 +7944,7 @@
 					"y": 0.013831372372806072
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -7949,6 +8036,7 @@
 					"y": 0.013051590882241726
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8040,6 +8128,7 @@
 					"y": 0.012315772473812103
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8131,6 +8220,7 @@
 					"y": 0.011621437035501003
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8222,6 +8312,7 @@
 					"y": 0.010966246947646141
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8313,6 +8404,7 @@
 					"y": 0.066725701093673706
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.3888888359069824,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8404,6 +8496,7 @@
 					"y": 0.11934156715869904
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.6111111640930176,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8495,6 +8588,7 @@
 					"y": 0.16899107396602631
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.8333333730697632,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8586,6 +8680,7 @@
 					"y": 0.21584145724773407
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.0555555820465088,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8677,6 +8772,7 @@
 					"y": 0.26005053520202637
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.2777779102325439,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8768,6 +8864,7 @@
 					"y": 0.30176717042922974
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8859,6 +8956,7 @@
 					"y": 0.28475421667098999
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -8950,6 +9048,7 @@
 					"y": 0.26870042085647583
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9041,6 +9140,7 @@
 					"y": 0.25355172157287598
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9132,6 +9232,7 @@
 					"y": 0.23925705254077911
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9223,6 +9324,7 @@
 					"y": 0.22576828300952911
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9314,6 +9416,7 @@
 					"y": 0.21303997933864594
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9405,6 +9508,7 @@
 					"y": 0.20102927088737488
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9496,6 +9600,7 @@
 					"y": 0.18969570100307465
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9587,6 +9692,7 @@
 					"y": 0.1790010929107666
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9678,6 +9784,7 @@
 					"y": 0.16890941560268402
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9769,6 +9876,7 @@
 					"y": 0.15938669443130493
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9860,6 +9968,7 @@
 					"y": 0.15040083229541779
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -9951,6 +10060,7 @@
 					"y": 0.14192157983779907
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10042,6 +10152,7 @@
 					"y": 0.13392037153244019
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10133,6 +10244,7 @@
 					"y": 0.12637025117874146
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10224,6 +10336,7 @@
 					"y": 0.11924578249454498
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10315,6 +10428,7 @@
 					"y": 0.11252297461032867
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10406,6 +10520,7 @@
 					"y": 0.10617918521165848
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10497,6 +10612,7 @@
 					"y": 0.10019304603338242
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10588,6 +10704,7 @@
 					"y": 0.094544388353824615
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10679,6 +10796,7 @@
 					"y": 0.08921419084072113
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10770,6 +10888,7 @@
 					"y": 0.084184497594833374
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10861,6 +10980,7 @@
 					"y": 0.079438365995883942
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -10952,6 +11072,7 @@
 					"y": 0.074959814548492432
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11043,6 +11164,7 @@
 					"y": 0.070733755826950073
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11134,6 +11256,7 @@
 					"y": 0.066745951771736145
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11225,6 +11348,7 @@
 					"y": 0.062982968986034393
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11316,6 +11440,7 @@
 					"y": 0.059432134032249451
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11407,6 +11532,7 @@
 					"y": 0.056081485003232956
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11498,6 +11624,7 @@
 					"y": 0.052919737994670868
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11589,6 +11716,7 @@
 					"y": 0.049936246126890182
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11680,6 +11808,7 @@
 					"y": 0.047120954841375351
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11771,6 +11900,7 @@
 					"y": 0.044464383274316788
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11862,6 +11992,7 @@
 					"y": 0.041957583278417587
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -11953,6 +12084,7 @@
 					"y": 0.039592109620571136
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12044,6 +12176,7 @@
 					"y": 0.037359997630119324
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12135,6 +12268,7 @@
 					"y": 0.035253725945949554
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12226,6 +12360,7 @@
 					"y": 0.033266201615333557
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12317,6 +12452,7 @@
 					"y": 0.031390730291604996
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12408,6 +12544,7 @@
 					"y": 0.02962099201977253
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12499,6 +12636,7 @@
 					"y": 0.027951028198003769
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12590,6 +12728,7 @@
 					"y": 0.026375213637948036
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12681,6 +12820,7 @@
 					"y": 0.024888239800930023
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12772,6 +12912,7 @@
 					"y": 0.023485098034143448
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12863,6 +13004,7 @@
 					"y": 0.022161062806844711
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -12954,6 +13096,7 @@
 					"y": 0.020911673083901405
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13045,6 +13188,7 @@
 					"y": 0.019732721149921417
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13136,6 +13280,7 @@
 					"y": 0.018620235845446587
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13227,6 +13372,7 @@
 					"y": 0.017570469528436661
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13318,6 +13464,7 @@
 					"y": 0.016579886898398399
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13409,6 +13556,7 @@
 					"y": 0.01564515009522438
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13500,6 +13648,7 @@
 					"y": 0.014763112179934978
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13591,6 +13740,7 @@
 					"y": 0.013930801302194595
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -13682,6 +13832,7 @@
 					"y": 0.013145415112376213
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.5,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -13773,6 +13924,7 @@
 					"y": 0.068782016634941101
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.7222223281860352,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -13864,6 +14016,7 @@
 					"y": 0.1212819516658783
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.9444444179534912,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -13955,6 +14108,7 @@
 					"y": 0.17082205414772034
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14046,6 +14200,7 @@
 					"y": 0.21756920218467712
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14137,6 +14292,7 @@
 					"y": 0.26168084144592285
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14228,6 +14384,7 @@
 					"y": 0.30330559611320496
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14319,6 +14476,7 @@
 					"y": 0.34258362650871277
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14410,6 +14568,7 @@
 					"y": 0.37964725494384766
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14501,6 +14660,7 @@
 					"y": 0.41462132334709167
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14592,6 +14752,7 @@
 					"y": 0.44762364029884338
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14683,6 +14844,7 @@
 					"y": 0.47876536846160889
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14774,6 +14936,7 @@
 					"y": 0.50815141201019287
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14865,6 +15028,7 @@
 					"y": 0.5358806848526001
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -14956,6 +15120,7 @@
 					"y": 0.56204664707183838
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15047,6 +15212,7 @@
 					"y": 0.58673745393753052
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15138,6 +15304,7 @@
 					"y": 0.56588703393936157
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15229,6 +15396,7 @@
 					"y": 0.53398358821868896
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15320,6 +15488,7 @@
 					"y": 0.50387883186340332
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15411,6 +15580,7 @@
 					"y": 0.47547128796577454
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15502,6 +15672,7 @@
 					"y": 0.4486653208732605
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15593,6 +15764,7 @@
 					"y": 0.4233705997467041
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15684,6 +15856,7 @@
 					"y": 0.39950191974639893
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15775,6 +15948,7 @@
 					"y": 0.37697890400886536
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15866,6 +16040,7 @@
 					"y": 0.35572570562362671
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -15957,6 +16132,7 @@
 					"y": 0.33567070960998535
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16048,6 +16224,7 @@
 					"y": 0.31674635410308838
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16139,6 +16316,7 @@
 					"y": 0.2988889217376709
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16230,6 +16408,7 @@
 					"y": 0.28203824162483215
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16321,6 +16500,7 @@
 					"y": 0.26613757014274597
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16412,6 +16592,7 @@
 					"y": 0.25113335251808167
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16503,6 +16684,7 @@
 					"y": 0.23697502911090851
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16594,6 +16776,7 @@
 					"y": 0.22361491620540619
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16685,6 +16868,7 @@
 					"y": 0.21100801229476929
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16776,6 +16960,7 @@
 					"y": 0.19911186397075653
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16867,6 +17052,7 @@
 					"y": 0.18788638710975647
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -16958,6 +17144,7 @@
 					"y": 0.17729377746582031
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17049,6 +17236,7 @@
 					"y": 0.16729836165904999
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17140,6 +17328,7 @@
 					"y": 0.1578664630651474
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17231,6 +17420,7 @@
 					"y": 0.14896631240844727
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17322,6 +17512,7 @@
 					"y": 0.14056792855262756
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17413,6 +17604,7 @@
 					"y": 0.13264302909374237
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17504,6 +17696,7 @@
 					"y": 0.12516492605209351
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17595,6 +17788,7 @@
 					"y": 0.11810841411352158
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17686,6 +17880,7 @@
 					"y": 0.11144973337650299
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17777,6 +17972,7 @@
 					"y": 0.10516645014286041
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17868,6 +18064,7 @@
 					"y": 0.099237404763698578
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -17959,6 +18156,7 @@
 					"y": 0.093642629683017731
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18050,6 +18248,7 @@
 					"y": 0.088363274931907654
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18141,6 +18340,7 @@
 					"y": 0.08338155597448349
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18232,6 +18432,7 @@
 					"y": 0.078680694103240967
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18323,6 +18524,7 @@
 					"y": 0.074244856834411621
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18414,6 +18616,7 @@
 					"y": 0.070059105753898621
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18505,6 +18708,7 @@
 					"y": 0.066109336912631989
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18596,6 +18800,7 @@
 					"y": 0.062382243573665619
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18687,6 +18892,7 @@
 					"y": 0.058865275233983994
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18778,6 +18984,7 @@
 					"y": 0.055546585470438004
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18869,6 +19076,7 @@
 					"y": 0.052414994686841965
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -18960,6 +19168,7 @@
 					"y": 0.049459956586360931
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -19051,6 +19260,7 @@
 					"y": 0.046671517193317413
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
@@ -19142,6 +19352,7 @@
 					"y": 0.044040285050868988
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19233,6 +19444,7 @@
 					"y": -0.012369111180305481
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19324,6 +19536,7 @@
 					"y": -0.065598264336585999
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19415,6 +19628,7 @@
 					"y": -0.11582650244235992
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19506,6 +19720,7 @@
 					"y": -0.16322296857833862
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19597,6 +19812,7 @@
 					"y": -0.20794732868671417
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19688,6 +19904,7 @@
 					"y": -0.25015023350715637
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19779,6 +19996,7 @@
 					"y": -0.28997385501861572
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19870,6 +20088,7 @@
 					"y": -0.32755228877067566
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -19961,6 +20180,7 @@
 					"y": -0.3630121648311615
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20052,6 +20272,7 @@
 					"y": -0.39647287130355835
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20143,6 +20364,7 @@
 					"y": -0.42804715037345886
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20234,6 +20456,7 @@
 					"y": -0.45784133672714233
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20325,6 +20548,7 @@
 					"y": -0.48595580458641052
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20416,6 +20640,7 @@
 					"y": -0.51248526573181152
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20507,6 +20732,7 @@
 					"y": -0.53751903772354126
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20598,6 +20824,7 @@
 					"y": -0.56114143133163452
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 3,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20689,6 +20916,7 @@
 					"y": -0.58343207836151123
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.9533727169036865,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20780,6 +21008,7 @@
 					"y": -0.6044660210609436
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.8350915908813477,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20871,6 +21100,7 @@
 					"y": -0.62431412935256958
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.7114341259002686,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -20962,6 +21192,7 @@
 					"y": -0.64304322004318237
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.582155704498291,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21053,6 +21284,7 @@
 					"y": -0.66121906042098999
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.4470014572143555,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21144,6 +21376,7 @@
 					"y": -0.67916816473007202
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.3070082664489746,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21235,6 +21468,7 @@
 					"y": -0.69610536098480225
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.1640987396240234,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21326,6 +21560,7 @@
 					"y": -0.71208769083023071
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 2.018211841583252,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21417,6 +21652,7 @@
 					"y": -0.7271689772605896
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.8692857027053833,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21508,6 +21744,7 @@
 					"y": -0.74140000343322754
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.7172569036483765,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21599,6 +21836,7 @@
 					"y": -0.75482869148254395
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.5620608329772949,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21690,6 +21928,7 @@
 					"y": -0.76750034093856812
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.4036315679550171,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -21781,6 +22020,7 @@
 					"y": -0.77945756912231445
 				},
 				"locomotionState": "Grounded",
+				"observedAnimationState": "Grounded",
 				"playRate": 1.2419016361236572,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
