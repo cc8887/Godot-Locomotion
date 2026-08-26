@@ -616,23 +616,52 @@ Godot 导入完成后生成只读运行时数据 `AlsAnimationSet`，包含：
 - 10 角色全质量性能仍满足阶段预算；
 - 根据 Profiler 数据决定 Modifier 是否需要 GDExtension，不能凭感觉提前下沉。
 
-### P5：事件、动作和 Root Motion
+### P5：事件、Overlay、动作和 Root Motion
+
+P5 按依赖顺序拆为三个可独立验收的纵向切片。
+
+#### P5A：事件与动作基础
 
 任务：
 
 - Curve Runtime；
 - Notify、Notify State 和 Typed Event；
 - Sync Marker 和左右脚相位；
-- Dynamic Transition 和 ActionPlayer；
-- Mantle detection、Motion Correction 和移动平台目标；
-- Roll、动作中断和 Root Motion 碰撞反馈。
+- Dynamic Transition 和 ActionPlayer。
 
 门禁：
 
 - 混合和循环情况下事件无重复、无乱序；
 - worker 不直接调用 gameplay；
+- 动作中断返回稳定、可测试的原因码。
+
+#### P5B：Overlay gameplay
+
+任务：
+
+- Overlay state、配置和动画 profile；
+- Overlay locomotion 与 P4 上下半身分层的组合；
+- Rifle、Pistol 等道具的确定性挂点、显示和生命周期；
+- 基于 ActionPlayer/Typed Event 的装备、收起和切换；
+- Overlay、stance、gait、rotation mode 与 action 的组合规则。
+
+门禁：
+
+- 已导出的全部 Overlay 配置和道具引用可追溯到 stable ID；
+- 无道具、Rifle 和 Pistol 代表路径均通过 UE/Godot golden 回放；
+- 快速切换、动作中断和角色销毁不会遗留道具节点或过期事件；
+- 1/10 角色 single/parallel 结果一致，前 10 个角色保持完整 Overlay 质量。
+
+#### P5C：Mantle、Roll 和 Root Motion
+
+任务：
+
+- Mantle detection、Motion Correction 和移动平台目标；
+- Roll、动作中断和 Root Motion 碰撞反馈。
+
+门禁：
+
 - Mantle/Roll 不能穿透碰撞；
-- 动作中断返回稳定、可测试的原因码；
 - 多角色交错动作压力测试通过。
 
 ### P6：Ragdoll、Get-up 和 Camera

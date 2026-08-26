@@ -456,7 +456,9 @@ P3 只有同时满足以下条件才完成：
 13. 没有修改 Godot Core，没有未经 profiler 证据引入 GDExtension。
 
 P3 完成后，P4 才开始 AimOffset、分层姿态、Turn/Rotate in Place、Foot IK、Foot Lock、pelvis、
-楼梯和移动平台视觉处理。
+楼梯和移动平台视觉处理。P5A 实现事件与动作基础，P5B 基于 P4/P5A 实现完整 Overlay gameplay
+和道具生命周期，P5C 实现 Mantle、Roll 和 Root Motion。P6 实现 Ragdoll、Get-up、Pose Recovery
+和完整 ALS Camera，P7 执行最终十分钟性能门禁。这些能力只排除在 P3 之外，不从项目目标中删除。
 
 ## 十四、参考
 
