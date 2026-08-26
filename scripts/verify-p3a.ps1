@@ -10,6 +10,7 @@ $projectRootPath = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $solutionPath = Join-Path $projectRootPath 'GodotALS.sln'
 $godotProjectPath = Join-Path $projectRootPath 'GodotALS.csproj'
 $scenePath = 'res://scenes/tests/p3a_locomotion_harness.tscn'
+$p3aBaseCommit = 'e69f18bb3410d77ef50df38b073535b5e9f20635'
 . (Join-Path $PSScriptRoot 'p3a-verification-functions.ps1')
 
 # Tier promotion can charge runtime bookkeeping to an otherwise allocation-free measured frame.
@@ -114,7 +115,7 @@ if (-not $SkipRegression) {
     dotnet test $solutionPath -c Release --no-restore
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath
+    Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath -BaseCommit $p3aBaseCommit
 }
 
 $completionMarker = Get-P3aCompletionMarker -RegressionSkipped ([bool]$SkipRegression)
