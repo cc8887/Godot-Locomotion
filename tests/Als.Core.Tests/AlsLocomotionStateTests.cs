@@ -165,6 +165,28 @@ public sealed class AlsLocomotionStateTests
         {
             LocomotionState = (AlsLocomotionState)byte.MaxValue,
         });
+        AssertTransactionalFailure(valid, InitializedGroundedState() with
+        {
+            PreviousLocomotionState = (AlsLocomotionState)byte.MaxValue,
+        });
+        AssertTransactionalFailure(valid, InitializedGroundedState() with
+        {
+            ActualGait = (AlsGait)byte.MaxValue,
+        });
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(-0.001f)]
+    public void InvalidGroundedEntrySpeedPreservesCallerStateAndResult(float groundedEntrySpeed)
+    {
+        var state = InitializedGroundedState() with
+        {
+            GroundedEntrySpeed = groundedEntrySpeed,
+        };
+
+        AssertTransactionalFailure(P3TestInput.Grounded(), state);
     }
 
     private static AlsRuntimeState InitializedGroundedState() => new()
@@ -211,6 +233,7 @@ public sealed class AlsLocomotionStateTests
         Assert.Equal(expectedState.LocomotionState, state.LocomotionState);
         Assert.Equal(expectedState.AnimationPhase, state.AnimationPhase);
         Assert.Equal(expectedState.TargetYaw, state.TargetYaw);
+        Assert.Equal(expectedState.GroundedEntrySpeed, state.GroundedEntrySpeed);
         Assert.Equal(expectedResult.Identity, result.Identity);
         Assert.Equal(expectedResult.ErrorCode, result.ErrorCode);
         Assert.Equal(expectedResult.ActualGait, result.ActualGait);

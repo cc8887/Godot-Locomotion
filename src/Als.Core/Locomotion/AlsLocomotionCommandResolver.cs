@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using GodotAls.Core.Contracts;
 
@@ -27,6 +28,7 @@ public static class AlsLocomotionCommandResolver
     private const float SprintAngleLimit = 50f * MathF.PI / 180f;
     private static readonly float SprintDirectionThreshold = MathF.Cos(SprintAngleLimit);
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static AlsResolvedLocomotionCommand Resolve(
         in AlsLocomotionCommand command,
         AlsStance actualStance)

@@ -72,6 +72,7 @@ public static class AlsLocomotionModel
         return speeds.Backward + ((speeds.Forward - speeds.Backward) * amount);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static void Evaluate(
         in AlsFrameInput input,
         ref AlsRuntimeState state,
@@ -162,11 +163,11 @@ public static class AlsLocomotionModel
         }
         else
         {
-            nextState.SmoothedLocalVelocity = Vector2.Lerp(
+            nextState.SmoothedLocalVelocity = LerpFinite(
                 state.SmoothedLocalVelocity,
                 localVelocity,
                 AlsMath.DamperExactAlpha(input.DeltaTime, settings.VelocitySmoothingHalfLife));
-            nextState.SmoothedLocalAcceleration = Vector2.Lerp(
+            nextState.SmoothedLocalAcceleration = LerpFinite(
                 state.SmoothedLocalAcceleration,
                 localAcceleration,
                 AlsMath.DamperExactAlpha(input.DeltaTime, settings.AccelerationSmoothingHalfLife));
@@ -186,7 +187,7 @@ public static class AlsLocomotionModel
             settings.VelocityAngleInterpolationStart,
             settings.VelocityAngleInterpolationEnd);
         var stride = referenceSpeed > SmallNumber
-            ? System.Math.Clamp(speed / referenceSpeed, 0f, 1f)
+            ? (float)System.Math.Clamp((double)speed / referenceSpeed, 0d, 1d)
             : 0f;
         var animatedSpeed = input.Stance == AlsStance.Crouching
             ? settings.AnimatedCrouchSpeed
@@ -199,12 +200,15 @@ public static class AlsLocomotionModel
             };
         var playRateDenominator = animatedSpeed * MathF.Max(stride, MinimumPlayRate);
         var rawPlayRate = playRateDenominator > SmallNumber
-            ? speed / playRateDenominator
-            : 0f;
+            ? (double)speed / playRateDenominator
+            : 0d;
         var maximumPlayRate = input.Stance == AlsStance.Crouching
             ? 2f
             : MathF.Max(MinimumPlayRate, settings.PlayRateMaximum);
-        var playRate = System.Math.Clamp(rawPlayRate, MinimumPlayRate, maximumPlayRate);
+        var playRate = (float)System.Math.Clamp(
+            rawPlayRate,
+            MinimumPlayRate,
+            maximumPlayRate);
 
         var leanTarget = CalculateLeanTarget(input, localVelocity, localAcceleration);
         nextState.SmoothedLean = Vector2.Lerp(
@@ -297,16 +301,34 @@ public static class AlsLocomotionModel
 
     private static Vector2 WorldHorizontalToLocal(float worldX, float worldZ, float characterYaw)
     {
-        var sin = MathF.Sin(characterYaw);
-        var cos = MathF.Cos(characterYaw);
-        var right = (worldX * cos) - (worldZ * sin);
-        var forward = (-worldX * sin) - (worldZ * cos);
-        if (!float.IsFinite(right) || !float.IsFinite(forward))
+        var sin = (double)MathF.Sin(characterYaw);
+        var cos = (double)MathF.Cos(characterYaw);
+        var right = ((double)worldX * cos) - ((double)worldZ * sin);
+        var forward = (-(double)worldX * sin) - ((double)worldZ * cos);
+
+        return new Vector2(SaturateFinite(right), SaturateFinite(forward));
+    }
+
+    private static Vector2 LerpFinite(in Vector2 current, in Vector2 target, float alpha) => new(
+        LerpFinite(current.X, target.X, alpha),
+        LerpFinite(current.Y, target.Y, alpha));
+
+    private static float LerpFinite(float current, float target, float alpha) =>
+        SaturateFinite((double)current + (((double)target - current) * alpha));
+
+    private static float SaturateFinite(double value)
+    {
+        if (value >= float.MaxValue)
         {
-            throw new ArgumentOutOfRangeException(nameof(worldX), "Local horizontal value must be finite.");
+            return float.MaxValue;
         }
 
-        return new Vector2(right, forward);
+        if (value <= -float.MaxValue)
+        {
+            return -float.MaxValue;
+        }
+
+        return (float)value;
     }
 
     private static float SelectTargetYaw(
@@ -387,17 +409,10 @@ public static class AlsLocomotionModel
 
     private static float Hypot(float first, float second)
     {
-        var absoluteFirst = MathF.Abs(first);
-        var absoluteSecond = MathF.Abs(second);
-        var maximum = MathF.Max(absoluteFirst, absoluteSecond);
-        if (maximum == 0f)
-        {
-            return 0f;
-        }
-
-        var minimum = MathF.Min(absoluteFirst, absoluteSecond);
-        var ratio = minimum / maximum;
-        return maximum * MathF.Sqrt(1f + (ratio * ratio));
+        var magnitude = System.Math.Sqrt(
+            ((double)first * first) +
+            ((double)second * second));
+        return magnitude >= float.MaxValue ? float.MaxValue : (float)magnitude;
     }
 
     private static void ValidateInput(in AlsFrameInput input)
@@ -450,13 +465,16 @@ public static class AlsLocomotionModel
             throw new ArgumentOutOfRangeException(nameof(state), "Initialized must be zero or one.");
         }
 
-        if (!Enum.IsDefined(state.LocomotionState))
+        if (!Enum.IsDefined(state.LocomotionState) ||
+            !Enum.IsDefined(state.PreviousLocomotionState) ||
+            !Enum.IsDefined(state.ActualGait))
         {
-            throw new ArgumentOutOfRangeException(nameof(state), "LocomotionState must be defined.");
+            throw new ArgumentOutOfRangeException(nameof(state), "Locomotion history enums must be defined.");
         }
 
         if (!float.IsFinite(state.AnimationPhase) || state.AnimationPhase < 0f || state.AnimationPhase >= 1f ||
             !float.IsFinite(state.LandingRecoveryTime) || state.LandingRecoveryTime < 0f ||
+            !float.IsFinite(state.GroundedEntrySpeed) || state.GroundedEntrySpeed < 0f ||
             !float.IsFinite(state.TargetYaw) ||
             !IsFinite(state.SmoothedLocalVelocity) ||
             !IsFinite(state.SmoothedLocalAcceleration) ||
