@@ -206,12 +206,10 @@ public static class AlsLocomotionModel
         var playRate = System.Math.Clamp(rawPlayRate, MinimumPlayRate, maximumPlayRate);
 
         var leanTarget = CalculateLeanTarget(input, localVelocity, localAcceleration);
-        nextState.SmoothedLean = firstFrame
-            ? leanTarget
-            : Vector2.Lerp(
-                state.SmoothedLean,
-                leanTarget,
-                AlsMath.DamperExactAlpha(input.DeltaTime, settings.LeanHalfLife));
+        nextState.SmoothedLean = Vector2.Lerp(
+            state.SmoothedLean,
+            leanTarget,
+            AlsMath.DamperExactAlpha(input.DeltaTime, settings.LeanHalfLife));
 
         var animationPhase = state.AnimationPhase;
         if (currentLocomotionState == AlsLocomotionState.Grounded &&
@@ -264,15 +262,17 @@ public static class AlsLocomotionModel
         if (landed)
         {
             nextState.GroundedEntrySpeed = speed;
-            nextState.LandingRecoveryTime = settings.LandingRecoveryDuration;
+            nextState.LandingRecoveryTime = settings.LandingRecoveryDuration <= input.DeltaTime
+                ? 0f
+                : settings.LandingRecoveryDuration - input.DeltaTime;
             return AlsAnimationState.LandRecovery;
         }
 
         if (nextState.LandingRecoveryTime > 0f)
         {
-            nextState.LandingRecoveryTime = MathF.Max(
-                0f,
-                nextState.LandingRecoveryTime - input.DeltaTime);
+            nextState.LandingRecoveryTime = nextState.LandingRecoveryTime <= input.DeltaTime
+                ? 0f
+                : nextState.LandingRecoveryTime - input.DeltaTime;
             return AlsAnimationState.LandRecovery;
         }
 

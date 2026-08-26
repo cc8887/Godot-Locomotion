@@ -8,6 +8,23 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsLocomotionAnimationParameterTests
 {
     [Fact]
+    public void FirstFrameLeanDampsFromZeroInsteadOfSnappingToTarget()
+    {
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+        var input = P3TestInput.Grounded(
+            velocity: new Vector3(0f, 0f, -1f),
+            acceleration: new Vector3(0f, 0f, -2f),
+            deltaTime: 0.2f,
+            maxAcceleration: 4f);
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.Equal(0.25f, result.Lean.Y, 5);
+        Assert.Equal(result.Lean, state.SmoothedLean);
+    }
+
+    [Fact]
     public void LocalVelocityAndAccelerationHistoriesUseExactHalfLifeDamping()
     {
         var state = new AlsRuntimeState

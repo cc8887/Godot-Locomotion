@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text.Json.Nodes;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 
@@ -68,19 +69,39 @@ public sealed class AlsLocomotionStateTests
         AlsLocomotionModel.Evaluate(landing, ref state, ref result, P3TestSettings.Reference);
 
         Assert.Equal(AlsAnimationState.LandRecovery, result.AnimationState);
-        Assert.Equal(0.2f, state.LandingRecoveryTime, 5);
+        Assert.Equal(0.1f, state.LandingRecoveryTime, 5);
         Assert.Equal(2f, state.GroundedEntrySpeed, 5);
         Assert.NotEqual(0f, result.AnimationPhase);
 
         AlsLocomotionModel.Evaluate(landing with { Identity = new AlsFrameIdentity(2, 0, 1) }, ref state, ref result, P3TestSettings.Reference);
         Assert.Equal(AlsAnimationState.LandRecovery, result.AnimationState);
-        Assert.Equal(0.1f, state.LandingRecoveryTime, 5);
+        Assert.Equal(0f, state.LandingRecoveryTime);
 
         AlsLocomotionModel.Evaluate(landing with { Identity = new AlsFrameIdentity(3, 0, 1) }, ref state, ref result, P3TestSettings.Reference);
+        Assert.Equal(AlsAnimationState.Grounded, result.AnimationState);
+    }
+
+    [Fact]
+    public void ZeroDurationLandingStillReportsRecoveryOnTheTransitionFrameOnly()
+    {
+        var state = new AlsRuntimeState
+        {
+            Initialized = 1,
+            LocomotionState = AlsLocomotionState.InAir,
+        };
+        var result = new AlsFrameResult();
+        var landing = P3TestInput.Grounded();
+        var settings = LoadSettingsWithLandingRecoveryDuration(0f);
+
+        AlsLocomotionModel.Evaluate(landing, ref state, ref result, settings);
         Assert.Equal(AlsAnimationState.LandRecovery, result.AnimationState);
         Assert.Equal(0f, state.LandingRecoveryTime);
 
-        AlsLocomotionModel.Evaluate(landing with { Identity = new AlsFrameIdentity(4, 0, 1) }, ref state, ref result, P3TestSettings.Reference);
+        AlsLocomotionModel.Evaluate(
+            landing with { Identity = new AlsFrameIdentity(2, 0, 1) },
+            ref state,
+            ref result,
+            settings);
         Assert.Equal(AlsAnimationState.Grounded, result.AnimationState);
     }
 
@@ -119,6 +140,18 @@ public sealed class AlsLocomotionStateTests
         AnimationPhase = 0.375f,
         TargetYaw = 0.25f,
     };
+
+    private static AlsLocomotionSettings LoadSettingsWithLandingRecoveryDuration(float duration)
+    {
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "P3",
+            "p3_locomotion_settings.json");
+        var root = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        root["values"]!["landingRecoveryDuration"] = duration;
+        return AlsLocomotionSettings.Load(root.ToJsonString());
+    }
 
     private static void AssertTransactionalFailure(
         AlsFrameInput input,
