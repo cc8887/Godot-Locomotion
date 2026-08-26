@@ -41,12 +41,12 @@ void AAlsTraceCharacter::BeginPlay()
     Super::BeginPlay();
 }
 
-UAlsCharacterMovementComponent* AAlsTraceCharacter::GetTraceMovement() const
+const UAlsCharacterMovementComponent* AAlsTraceCharacter::GetTraceMovement() const
 {
     return AlsCharacterMovement;
 }
 
-UAlsAnimationInstance* AAlsTraceCharacter::GetTraceAnimationInstance() const
+const UAlsAnimationInstance* AAlsTraceCharacter::GetTraceAnimationInstance() const
 {
     return AnimationInstance.Get();
 }

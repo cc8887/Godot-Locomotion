@@ -1,1 +1,2 @@
+# Unified patch context preserves the upstream JSON tab after Git's context marker.
 reference/patches/*.patch whitespace=-space-before-tab
