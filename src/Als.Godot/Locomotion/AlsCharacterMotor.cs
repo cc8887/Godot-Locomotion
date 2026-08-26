@@ -104,24 +104,52 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 "JumpPressed must be zero or one.");
         }
 
-        var requestedCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
-
-        var standingRequestBlocked = UpdateStance(requestedCommand.RequestedStance);
-        var resolvedCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
-
-        var characterYaw = GetCharacterYaw();
-        var desiredSpeed = CalculateDesiredSpeed(resolvedCommand, characterYaw);
-        var desiredVelocity = ToGodot(resolvedCommand.WorldDirection) * desiredSpeed;
+        var currentStanceCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
         var currentVelocity = Velocity;
+        RequireFiniteVector(currentVelocity, nameof(Velocity));
+        var characterYaw = GetCharacterYaw();
+        if (!float.IsFinite(characterYaw))
+        {
+            throw new ArgumentOutOfRangeException(nameof(GlobalTransform), "Character yaw must be finite.");
+        }
+
+        var requestedStanceCommand = AlsLocomotionCommandResolver.Resolve(
+            command,
+            currentStanceCommand.RequestedStance);
+        var currentDesiredSpeed = CalculateDesiredSpeed(currentStanceCommand, characterYaw, _actualStance);
+        var requestedDesiredSpeed = CalculateDesiredSpeed(
+            requestedStanceCommand,
+            characterYaw,
+            currentStanceCommand.RequestedStance);
+        var currentDesiredVelocity = ToGodot(currentStanceCommand.WorldDirection) * currentDesiredSpeed;
+        var requestedDesiredVelocity = ToGodot(requestedStanceCommand.WorldDirection) * requestedDesiredSpeed;
+        RequireFiniteVector(currentDesiredVelocity, nameof(currentDesiredVelocity));
+        RequireFiniteVector(requestedDesiredVelocity, nameof(requestedDesiredVelocity));
+
         var currentHorizontal = new Vector3(currentVelocity.X, 0f, currentVelocity.Z);
-        var horizontalVelocity = IntegrateHorizontalVelocity(
+        var currentStanceHorizontalVelocity = IntegrateHorizontalVelocity(
             currentHorizontal,
-            desiredVelocity,
+            currentDesiredVelocity,
+            _settings.MaxAcceleration,
+            _settings.MaxBrakingDeceleration,
+            deltaTime);
+        var requestedStanceHorizontalVelocity = IntegrateHorizontalVelocity(
+            currentHorizontal,
+            requestedDesiredVelocity,
             _settings.MaxAcceleration,
             _settings.MaxBrakingDeceleration,
             deltaTime);
 
-        var verticalVelocity = Velocity.Y;
+        var standingRequestBlocked = UpdateStance(currentStanceCommand.RequestedStance);
+        var usedRequestedStance = _actualStance == currentStanceCommand.RequestedStance;
+        var resolvedCommand = usedRequestedStance ? requestedStanceCommand : currentStanceCommand;
+        var desiredSpeed = usedRequestedStance ? requestedDesiredSpeed : currentDesiredSpeed;
+        var horizontalVelocity = usedRequestedStance
+            ? requestedStanceHorizontalVelocity
+            : currentStanceHorizontalVelocity;
+        RequireFiniteVector(horizontalVelocity, nameof(horizontalVelocity));
+
+        var verticalVelocity = currentVelocity.Y;
         byte jumpAccepted = 0;
         var groundedBeforeMove = IsOnFloor() || (_lastFrameId < 0 && ProbeInitialFloor());
         if (groundedBeforeMove)
@@ -141,7 +169,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
             verticalVelocity -= _settings.Gravity * deltaTime;
         }
 
-        Velocity = new Vector3(horizontalVelocity.X, verticalVelocity, horizontalVelocity.Z);
+        var nextVelocity = new Vector3(horizontalVelocity.X, verticalVelocity, horizontalVelocity.Z);
+        RequireFiniteVector(nextVelocity, nameof(nextVelocity));
+        Velocity = nextVelocity;
         MoveAndSlide();
 
         var actualVelocity = ToNumerics(GetRealVelocity());
@@ -239,7 +269,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     private float CalculateDesiredSpeed(
         in AlsResolvedLocomotionCommand command,
-        float characterYaw)
+        float characterYaw,
+        AlsStance actualStance)
     {
         if (command.InputAmount <= 0f)
         {
@@ -251,7 +282,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var localRight = (command.WorldDirection.X * cos) - (command.WorldDirection.Z * sin);
         var localForward = (-command.WorldDirection.X * sin) - (command.WorldDirection.Z * cos);
         var localYaw = MathF.Atan2(localRight, localForward);
-        var stanceSpeeds = _actualStance == AlsStance.Standing
+        var stanceSpeeds = actualStance == AlsStance.Standing
             ? _settings.StandingSpeeds
             : _settings.CrouchingSpeeds;
         var directionalSpeeds = command.MaxAllowedGait switch
@@ -268,42 +299,140 @@ public partial class AlsCharacterMotor : CharacterBody3D
             _settings.DirectionalSpeedBackwardAngle);
     }
 
-    private static Vector3 IntegrateHorizontalVelocity(
+    internal static Vector3 IntegrateHorizontalVelocity(
         in Vector3 currentVelocity,
         in Vector3 desiredVelocity,
         float acceleration,
         float brakingDeceleration,
         float deltaTime)
     {
-        var difference = desiredVelocity - currentVelocity;
-        var distance = difference.Length();
-        if (distance <= 0f)
+        RequireFiniteVector(currentVelocity, nameof(currentVelocity));
+        RequireFiniteVector(desiredVelocity, nameof(desiredVelocity));
+        RequirePositiveFinite(acceleration, nameof(acceleration));
+        RequirePositiveFinite(brakingDeceleration, nameof(brakingDeceleration));
+        RequirePositiveFinite(deltaTime, nameof(deltaTime));
+
+        var currentX = (double)currentVelocity.X;
+        var currentY = (double)currentVelocity.Y;
+        var currentZ = (double)currentVelocity.Z;
+        var desiredX = (double)desiredVelocity.X;
+        var desiredY = (double)desiredVelocity.Y;
+        var desiredZ = (double)desiredVelocity.Z;
+        var differenceX = desiredX - currentX;
+        var differenceY = desiredY - currentY;
+        var differenceZ = desiredZ - currentZ;
+        var distance = Math.Sqrt(
+            (differenceX * differenceX) +
+            (differenceY * differenceY) +
+            (differenceZ * differenceZ));
+        if (distance == 0d)
         {
             return desiredVelocity;
         }
 
-        if (currentVelocity.Dot(difference) >= 0f)
+        var currentDotDifference =
+            (currentX * differenceX) +
+            (currentY * differenceY) +
+            (currentZ * differenceZ);
+        if (currentDotDifference >= 0d)
         {
-            return currentVelocity.MoveToward(desiredVelocity, acceleration * deltaTime);
+            return MoveToward(
+                currentX,
+                currentY,
+                currentZ,
+                desiredX,
+                desiredY,
+                desiredZ,
+                distance,
+                (double)acceleration * deltaTime);
         }
 
-        var direction = difference / distance;
-        var brakingDistance = MathF.Min(-currentVelocity.Dot(direction), distance);
+        var brakingDistance = Math.Min(-currentDotDifference / distance, distance);
         var brakingTime = brakingDistance / brakingDeceleration;
         if (brakingTime >= deltaTime)
         {
-            return currentVelocity + (direction * (brakingDeceleration * deltaTime));
+            return MoveToward(
+                currentX,
+                currentY,
+                currentZ,
+                desiredX,
+                desiredY,
+                desiredZ,
+                distance,
+                (double)brakingDeceleration * deltaTime);
         }
 
-        var velocityAtMinimum = currentVelocity + (direction * brakingDistance);
         if (brakingDistance >= distance)
         {
             return desiredVelocity;
         }
 
-        return velocityAtMinimum.MoveToward(
-            desiredVelocity,
-            acceleration * (deltaTime - brakingTime));
+        var inverseDistance = 1d / distance;
+        var minimumX = currentX + (differenceX * inverseDistance * brakingDistance);
+        var minimumY = currentY + (differenceY * inverseDistance * brakingDistance);
+        var minimumZ = currentZ + (differenceZ * inverseDistance * brakingDistance);
+        return MoveToward(
+            minimumX,
+            minimumY,
+            minimumZ,
+            desiredX,
+            desiredY,
+            desiredZ,
+            distance - brakingDistance,
+            (double)acceleration * (deltaTime - brakingTime));
+    }
+
+    private static Vector3 MoveToward(
+        double currentX,
+        double currentY,
+        double currentZ,
+        double desiredX,
+        double desiredY,
+        double desiredZ,
+        double distance,
+        double maximumDistance)
+    {
+        if (maximumDistance >= distance)
+        {
+            return CreateFiniteVector(desiredX, desiredY, desiredZ);
+        }
+
+        var amount = maximumDistance / distance;
+        return CreateFiniteVector(
+            currentX + ((desiredX - currentX) * amount),
+            currentY + ((desiredY - currentY) * amount),
+            currentZ + ((desiredZ - currentZ) * amount));
+    }
+
+    private static Vector3 CreateFiniteVector(double x, double y, double z) => new(
+        ToFiniteFloat(x),
+        ToFiniteFloat(y),
+        ToFiniteFloat(z));
+
+    private static float ToFiniteFloat(double value)
+    {
+        if (!double.IsFinite(value) || value < -float.MaxValue || value > float.MaxValue)
+        {
+            throw new InvalidOperationException("Velocity integration produced a non-finite component.");
+        }
+
+        return (float)value;
+    }
+
+    private static void RequireFiniteVector(in Vector3 value, string parameterName)
+    {
+        if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) || !float.IsFinite(value.Z))
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "Velocity components must be finite.");
+        }
+    }
+
+    private static void RequirePositiveFinite(float value, string parameterName)
+    {
+        if (!float.IsFinite(value) || value <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "Value must be positive and finite.");
+        }
     }
 
     private AlsFloorSample CreateFloorSample(bool grounded)

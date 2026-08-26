@@ -20,6 +20,7 @@ public partial class P3aMotorSmoke : Node
     private AlsCharacterMotor _reverseMotor = null!;
     private AlsCharacterMotor _gaitReductionMotor = null!;
     private AlsCharacterMotor _crouchJumpMotor = null!;
+    private AlsCharacterMotor _velocityTransactionMotor = null!;
     private AnimatableBody3D _movingPlatform = null!;
     private StaticBody3D _ceiling = null!;
     private AlsMotorSettings _settings;
@@ -40,12 +41,16 @@ public partial class P3aMotorSmoke : Node
     private bool _reverseResponseChecked;
     private bool _gaitReductionChecked;
     private bool _crouchJumpChecked;
+    private bool _responseMathBoundariesChecked;
+    private bool _velocityTransactionChecked;
     private AlsLocomotionSettings _coreSettings = null!;
     private float _reverseVelocity;
     private float _reverseAcceleration;
     private float _reverseLean;
     private float _gaitVelocity;
     private float _gaitAcceleration;
+    private float _extremeResponse;
+    private float _largeDeltaResponse;
 
     public override void _Ready()
     {
@@ -59,7 +64,6 @@ public partial class P3aMotorSmoke : Node
                     Vector3.Up,
                     MathF.PI / 4f),
                 "floor collider classification ignored FloorMaxAngle");
-
             AddChild(CreateBoxBody("Floor", new Vector3(20f, 1f, 20f), new Vector3(0f, -0.5f, 0f)));
             _ceiling = CreateBoxBody("Ceiling", new Vector3(6f, 0.2f, 6f), new Vector3(0f, 10f, 0f));
             AddChild(_ceiling);
@@ -97,6 +101,7 @@ public partial class P3aMotorSmoke : Node
             ConfigureMovingPlatformProbe();
             ConfigureResponseProbes();
             ConfigureCrouchJumpProbe();
+            ConfigureVelocityTransactionProbe();
             ObserveMinimumCapsuleClearance(standingSpeeds, crouchingSpeeds);
         }
         catch (Exception exception)
@@ -112,6 +117,11 @@ public partial class P3aMotorSmoke : Node
             ObserveInvalidJump();
             ObserveFreshJump();
             ObserveCrouchJump();
+            ObserveVelocityTransaction();
+            if (_frameId == 2)
+            {
+                ObserveResponseMathBoundaries();
+            }
             UpdateMovingPlatform();
             var platformInput = _platformMotor.Step(_frameId, 1, 1, DeltaTime);
             ObserveMovingPlatform(platformInput);
@@ -234,6 +244,8 @@ public partial class P3aMotorSmoke : Node
         Require(_reverseResponseChecked, "reverse response regression did not execute");
         Require(_gaitReductionChecked, "gait reduction regression did not execute");
         Require(_crouchJumpChecked, "crouching jump control did not execute");
+        Require(_responseMathBoundariesChecked, "response math boundary regression did not execute");
+        Require(_velocityTransactionChecked, "velocity transaction regression did not execute");
         Require(_landingTransitions == 1, $"expected one landing transition, observed {_landingTransitions}");
         _passed[3] = true;
         Require(Array.TrueForAll(_passed, static passed => passed), "one or more motor smoke cases did not execute");
@@ -241,6 +253,9 @@ public partial class P3aMotorSmoke : Node
             $"GODOT_ALS_P3A_MOTOR_RESPONSE reverse_velocity={_reverseVelocity:R} " +
             $"reverse_acceleration={_reverseAcceleration:R} reverse_lean={_reverseLean:R} " +
             $"gait_velocity={_gaitVelocity:R} gait_acceleration={_gaitAcceleration:R}");
+        GD.Print(
+            $"GODOT_ALS_P3A_MOTOR_MATH extreme_response={_extremeResponse:R} " +
+            $"large_delta_response={_largeDeltaResponse:R} transaction_retry=1");
         GD.Print("GODOT_ALS_P3A_MOTOR_OK cases=7");
         GetTree().Quit(0);
     }
@@ -333,6 +348,28 @@ public partial class P3aMotorSmoke : Node
             new AlsReplayInputAdapter(0, new[] { crouch, crouch with { JumpPressed = 1 } }));
     }
 
+    private void ConfigureVelocityTransactionProbe()
+    {
+        AddChild(CreateBoxBody(
+            "VelocityTransactionFloor",
+            new Vector3(6f, 1f, 6f),
+            new Vector3(160f, -0.5f, 0f)));
+        var crouch = CreateResponseCommand(NumericsVector2.Zero, AlsGait.Running) with
+        {
+            RequestedStance = AlsStance.Crouching,
+        };
+        var stand = crouch with { RequestedStance = AlsStance.Standing };
+        _velocityTransactionMotor = new AlsCharacterMotor
+        {
+            Name = "VelocityTransactionMotor",
+            Position = new Vector3(160f, _settings.StandingHeight * 0.5f, 0f),
+        };
+        AddChild(_velocityTransactionMotor);
+        _velocityTransactionMotor.Configure(
+            _settings,
+            new AlsReplayInputAdapter(0, new[] { crouch, stand }));
+    }
+
     private void ObserveCrouchJump()
     {
         if (_frameId > 1)
@@ -352,6 +389,115 @@ public partial class P3aMotorSmoke : Node
         Require(input.Floor.IsGrounded == 0, "ordinary crouching jump did not publish InAir");
         _crouchJumpChecked = true;
         _crouchJumpMotor.QueueFree();
+    }
+
+    private void ObserveVelocityTransaction()
+    {
+        if (_frameId == 0)
+        {
+            var crouchInput = _velocityTransactionMotor.Step(0, 8, 1, DeltaTime);
+            Require(crouchInput.Stance == AlsStance.Crouching, "velocity transaction probe did not crouch");
+            return;
+        }
+
+        if (_frameId != 1)
+        {
+            return;
+        }
+
+        var capsule = (CapsuleShape3D)_velocityTransactionMotor
+            .GetNode<CollisionShape3D>("AlsCapsuleCollision")
+            .Shape;
+        var clearance = _velocityTransactionMotor.GetNode<ShapeCast3D>("AlsStandClearance");
+        var transformBefore = _velocityTransactionMotor.GlobalTransform;
+        var heightBefore = capsule.Height;
+        var clearancePositionBefore = clearance.Position;
+        _velocityTransactionMotor.Velocity = new Vector3(float.NaN, 0f, 0f);
+        var rejected = false;
+        try
+        {
+            _velocityTransactionMotor.Step(1, 8, 1, DeltaTime);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            rejected = true;
+        }
+
+        Require(rejected, "non-finite current velocity was not rejected");
+        Require(_velocityTransactionMotor.GlobalTransform == transformBefore, "invalid velocity changed transform");
+        Require(capsule.Height == heightBefore, "invalid velocity changed capsule stance");
+        Require(clearance.Position == clearancePositionBefore, "invalid velocity updated stand clearance");
+        Require(float.IsNaN(_velocityTransactionMotor.Velocity.X), "invalid velocity was partially overwritten");
+
+        _velocityTransactionMotor.Velocity = Vector3.Zero;
+        var retry = _velocityTransactionMotor.Step(1, 8, 1, DeltaTime);
+        Require(retry.Identity.FrameId == 1, "invalid velocity polluted frame history");
+        Require(retry.Stance == AlsStance.Standing, "valid retry did not commit requested stance");
+        _velocityTransactionChecked = true;
+        _velocityTransactionMotor.QueueFree();
+    }
+
+    private void ObserveResponseMathBoundaries()
+    {
+        var equal = new Vector3(1f, 0f, -2f);
+        Require(
+            AlsCharacterMotor.IntegrateHorizontalVelocity(equal, equal, 4f, 2f, 1f) == equal,
+            "equal response vectors did not remain equal");
+        Require(
+            AlsCharacterMotor.IntegrateHorizontalVelocity(Vector3.Zero, Vector3.Zero, 4f, 2f, 1f) == Vector3.Zero,
+            "zero response vectors did not remain zero");
+
+        var maximum = new Vector3(float.MaxValue, 0f, 0f);
+        var minimum = new Vector3(-float.MaxValue, 0f, 0f);
+        var extreme = AlsCharacterMotor.IntegrateHorizontalVelocity(maximum, minimum, 4f, 2f, 1f);
+        Require(IsFinite(extreme), "opposed float extrema produced a non-finite response");
+        Require(extreme.X <= maximum.X && extreme.X >= minimum.X, "opposed float extrema overshot desired velocity");
+        _extremeResponse = extreme.X;
+
+        var crossed = AlsCharacterMotor.IntegrateHorizontalVelocity(
+            new Vector3(-1f, 0f, 0f),
+            new Vector3(2f, 0f, 0f),
+            acceleration: 4f,
+            brakingDeceleration: 1f,
+            deltaTime: 2f);
+        Require(crossed == new Vector3(2f, 0f, 0f), "large delta crossed beyond desired velocity");
+        _largeDeltaResponse = crossed.X;
+
+        RequireThrows<ArgumentOutOfRangeException>(
+            () => AlsCharacterMotor.IntegrateHorizontalVelocity(
+                new Vector3(float.NaN, 0f, 0f),
+                Vector3.Zero,
+                4f,
+                2f,
+                1f),
+            "non-finite current response velocity was not rejected");
+        RequireThrows<ArgumentOutOfRangeException>(
+            () => AlsCharacterMotor.IntegrateHorizontalVelocity(
+                Vector3.Zero,
+                new Vector3(0f, 0f, float.PositiveInfinity),
+                4f,
+                2f,
+                1f),
+            "non-finite desired response velocity was not rejected");
+        _responseMathBoundariesChecked = true;
+    }
+
+    private static bool IsFinite(in Vector3 vector) =>
+        float.IsFinite(vector.X) && float.IsFinite(vector.Y) && float.IsFinite(vector.Z);
+
+    private static void RequireThrows<TException>(Action action, string message)
+        where TException : Exception
+    {
+        try
+        {
+            action();
+        }
+        catch (TException)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(message);
     }
 
     private void ObserveResponseProbes(in AlsFrameInput reverseInput, in AlsFrameInput gaitInput)
