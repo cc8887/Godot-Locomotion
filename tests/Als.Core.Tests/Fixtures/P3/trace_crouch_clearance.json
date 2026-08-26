@@ -6,7 +6,7 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
@@ -15,7 +15,7 @@
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 0.33333335071802139
+					"y": 0.25000001303851604
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -26,10 +26,12 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
 				"playRate": 1,
 				"position":
 				{
-					"x": 0.0055555561350451718,
+					"x": 0.0041666671012838795,
 					"y": 0,
 					"z": 0
 				},
@@ -39,7 +41,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 0.33333335071802139,
+					"x": 0.25000001303851604,
 					"y": 0,
 					"z": 0
 				},
@@ -69,16 +71,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.028719242662191391,
+				"animationPhase": 0.027390981093049049,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 0.66666670210659507
+					"y": 0.50000002657994624
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -86,23 +88,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.056377708911895752
+					"y": 0.042283285409212112
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.72315454483032227,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.6434587836265564,
 				"position":
 				{
-					"x": 0.016666668416311391,
+					"x": 0.012500001312233541,
 					"y": 0,
 					"z": 0
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.30729565024375916,
+				"stride": 0.25901687145233154,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 0.66666670210659507,
+					"x": 0.50000002657994624,
 					"y": 0,
 					"z": 0
 				},
@@ -132,16 +136,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.040123231709003448,
+				"animationPhase": 0.039679024368524551,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.0000000541098415
+					"y": 0.75000004058238101
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -149,23 +153,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.10957697033882141
+					"y": 0.082182735204696655
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.68423932790756226,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.73728263378143311,
 				"position":
 				{
-					"x": 0.033333336854043202,
+					"x": 0.025000002640532398,
 					"y": 0,
 					"z": 0
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.64954537153244019,
+				"stride": 0.45211070775985718,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.0000000541098415,
+					"x": 0.75000004058238101,
 					"y": 0,
 					"z": 0
 				},
@@ -195,16 +201,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.052411459386348724,
+				"animationPhase": 0.051044482737779617,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.3333334066765383
+					"y": 1.0000000565968608
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -212,23 +218,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.15977698564529419
+					"y": 0.11983274668455124
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.737293541431427,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.68192750215530396,
 				"position":
 				{
-					"x": 0.055555561457631443,
+					"x": 0.041666671119714532,
 					"y": 0,
 					"z": 0
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.90420806407928467,
+				"stride": 0.73321586847305298,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.3333334066765383,
+					"x": 1.0000000565968608,
 					"y": 0,
 					"z": 0
 				},
@@ -258,16 +266,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.067334756255149841,
+				"animationPhase": 0.063332706689834595,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.6666667597597309
+					"y": 1.2500000712768005
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -275,23 +283,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.20714683830738068
+					"y": 0.15536013245582581
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.89539754390716553,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.737293541431427,
 				"position":
 				{
-					"x": 0.083333342235684379,
+					"x": 0.06250000672753761,
 					"y": 0,
 					"z": 0
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.99273109436035156,
+				"stride": 0.90420806407928467,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.6666667597597309,
+					"x": 1.2500000712768005,
 					"y": 0,
 					"z": 0
 				},
@@ -321,16 +331,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.085853278636932373,
+				"animationPhase": 0.077479831874370575,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.0000001069585496
+					"y": 1.5000000847334127
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -338,23 +348,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.2518460750579834
+					"y": 0.18888457119464874
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.1111111640930176,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.8488273024559021,
 				"position":
 				{
-					"x": 0.11666667909012909,
+					"x": 0.087500009443612831,
 					"y": 0,
 					"z": 0
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 1,
+				"stride": 0.98174667358398438,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.0000001069585496,
+					"x": 1.5000000847334127,
 					"y": 0,
 					"z": 0
 				},
@@ -384,30 +396,32 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.10807550698518753,
+				"animationPhase": 0.094146504998207092,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.3333334613839547
+					"y": 1.7500001034264685
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": 0.29402527213096619
+					"y": 0.22051897644996643
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333334922790527,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 1.0000001192092896,
 				"position":
 				{
-					"x": 0.15555557214140872,
+					"x": 0.11666667935521426,
 					"y": 0,
 					"z": 0
 				},
@@ -417,7 +431,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.3333334613839547,
+					"x": 1.7500001034264685,
 					"y": 0,
 					"z": 0
 				},
@@ -447,30 +461,32 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.13400143384933472,
+				"animationPhase": 0.11359095573425293,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.6666668100361672
+					"y": 2.0000001205617699
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": 0.33382651209831238
+					"y": 0.25036990642547607
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.5555555820465088,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 1.1666667461395264,
 				"position":
 				{
-					"x": 0.20000002129330338,
+					"x": 0.15000001643637934,
 					"y": 0,
 					"z": 0
 				},
@@ -480,7 +496,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.6666668100361672,
+					"x": 2.0000001205617699,
 					"y": 0,
 					"z": 0
 				},
@@ -510,16 +526,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.16363106667995453,
+				"animationPhase": 0.13581317663192749,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.000000165301989
+					"y": 2.2500001362024089
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -527,13 +543,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.37138384580612183
+					"y": 0.27853789925575256
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.7777779102325439,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.6875,
+				"playRate": 1.3333334922790527,
 				"position":
 				{
-					"x": 0.25000002665603988,
+					"x": 0.18750002066219701,
 					"y": 0,
 					"z": 0
 				},
@@ -543,7 +561,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.000000165301989,
+					"x": 2.2500001362024089,
 					"y": 0,
 					"z": 0
 				},
@@ -573,16 +591,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.19696441292762756,
+				"animationPhase": 0.16081318259239197,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.3333335262191426
+					"y": 2.5000001505381086
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -590,13 +608,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.4068237841129303
+					"y": 0.30511784553527832
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.0000002384185791,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.375,
+				"playRate": 1.5000001192092896,
 				"position":
 				{
-					"x": 0.30555558832380708,
+					"x": 0.2291666920109183,
 					"y": 0,
 					"z": 0
 				},
@@ -606,7 +626,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.3333335262191426,
+					"x": 2.5000001505381086,
 					"y": 0,
 					"z": 0
 				},
@@ -636,16 +656,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.23400145769119263,
+				"animationPhase": 0.18859095871448517,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.6666668705432635
+					"y": 2.7500001637346281
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -653,13 +673,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.4402657151222229
+					"y": 0.33019930124282837
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.2222223281860352,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.0625,
+				"playRate": 1.6666667461395264,
 				"position":
 				{
-					"x": 0.36666670602005447,
+					"x": 0.27500003046355687,
 					"y": 0,
 					"z": 0
 				},
@@ -669,7 +691,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.6666668705432635,
+					"x": 2.7500001637346281,
 					"y": 0,
 					"z": 0
 				},
@@ -699,16 +721,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.27474221587181091,
+				"animationPhase": 0.21914651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125000000000022
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -716,13 +738,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.47182226181030273
+					"y": 0.35386669635772705
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.4444446563720703,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.75,
+				"playRate": 1.8333334922790527,
 				"position":
 				{
-					"x": 0.42916670927968348,
+					"x": 0.32187503290827862,
 					"y": 0,
 					"z": 0
 				},
@@ -732,7 +756,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125000000000022,
 					"y": 0,
 					"z": 0
 				},
@@ -762,16 +786,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.31640887260437012,
+				"animationPhase": 0.25039651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -779,13 +803,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.45931640267372131
+					"y": 0.34448730945587158
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.49166671253931249,
+					"x": 0.36875003535300038,
 					"y": 0,
 					"z": 0
 				},
@@ -795,7 +821,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -825,16 +851,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.35807552933692932,
+				"animationPhase": 0.28164651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -842,13 +868,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.43342119455337524
+					"y": 0.32506591081619263
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.5541667157989415,
+					"x": 0.41562503779772214,
 					"y": 0,
 					"z": 0
 				},
@@ -858,7 +886,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -888,16 +916,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.39974218606948853,
+				"animationPhase": 0.31289651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -905,13 +933,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.40898591279983521
+					"y": 0.3067394495010376
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.61666671905857051,
+					"x": 0.4625000402424439,
 					"y": 0,
 					"z": 0
 				},
@@ -921,7 +951,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -951,16 +981,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.44140884280204773,
+				"animationPhase": 0.34414651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.749999999999996
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -968,13 +998,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.38592821359634399
+					"y": 0.28944617509841919
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.67916672231819941,
+					"x": 0.50937504268716571,
 					"y": 0,
 					"z": 0
 				},
@@ -984,7 +1016,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.749999999999996,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1014,16 +1046,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.48307549953460693,
+				"animationPhase": 0.37539651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1031,13 +1063,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.36417046189308167
+					"y": 0.27312785387039185
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.74166672557782842,
+					"x": 0.55625004513188747,
 					"y": 0,
 					"z": 0
 				},
@@ -1047,7 +1081,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1077,16 +1111,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.52474218606948853,
+				"animationPhase": 0.40664651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1094,13 +1128,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.34363937377929688
+					"y": 0.25772953033447266
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.80416672883745743,
+					"x": 0.60312504757660923,
 					"y": 0,
 					"z": 0
 				},
@@ -1110,7 +1146,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1140,16 +1176,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.56640887260437012,
+				"animationPhase": 0.43789651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1157,13 +1193,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.32426577806472778
+					"y": 0.24319933354854584
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.86666673209708645,
+					"x": 0.65000005002133099,
 					"y": 0,
 					"z": 0
 				},
@@ -1173,7 +1211,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1203,16 +1241,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.60807555913925171,
+				"animationPhase": 0.46914651989936829,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1220,13 +1258,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.30598440766334534
+					"y": 0.2294883131980896
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.92916673535671546,
+					"x": 0.69687505246605275,
 					"y": 0,
 					"z": 0
 				},
@@ -1236,7 +1276,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1266,16 +1306,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.6497422456741333,
+				"animationPhase": 0.5003964900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1283,13 +1323,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.28873372077941895
+					"y": 0.21655029058456421
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 0.99166673861634458,
+					"x": 0.74375005491077451,
 					"y": 0,
 					"z": 0
 				},
@@ -1299,7 +1341,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1329,16 +1371,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.69140893220901489,
+				"animationPhase": 0.5316464900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1346,13 +1388,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.27245557308197021
+					"y": 0.20434167981147766
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.0541667418759735,
+					"x": 0.79062505735549626,
 					"y": 0,
 					"z": 0
 				},
@@ -1362,7 +1406,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1392,16 +1436,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.73307561874389648,
+				"animationPhase": 0.5628964900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1409,13 +1453,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.25709515810012817
+					"y": 0.19282136857509613
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.1166667451356025,
+					"x": 0.83750005980021802,
 					"y": 0,
 					"z": 0
 				},
@@ -1425,7 +1471,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1455,16 +1501,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.77474230527877808,
+				"animationPhase": 0.5941464900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1472,13 +1518,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.24260072410106659
+					"y": 0.18195053935050964
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.1791667483952315,
+					"x": 0.88437506224493978,
 					"y": 0,
 					"z": 0
 				},
@@ -1488,7 +1536,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1518,16 +1566,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.81640899181365967,
+				"animationPhase": 0.6253964900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1535,13 +1583,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.22892345488071442
+					"y": 0.17169257998466492
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.2416667516548605,
+					"x": 0.93125006468966154,
 					"y": 0,
 					"z": 0
 				},
@@ -1551,7 +1601,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1581,16 +1631,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.85807567834854126,
+				"animationPhase": 0.6566464900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1598,13 +1648,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.21601727604866028
+					"y": 0.16201294958591461
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.3041667549144895,
+					"x": 0.9781250671343833,
 					"y": 0,
 					"z": 0
 				},
@@ -1614,7 +1666,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1644,16 +1696,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.89974236488342285,
+				"animationPhase": 0.6878964900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1661,13 +1713,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.20383872091770172
+					"y": 0.1528790295124054
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.3666667581741185,
+					"x": 1.0250000695791051,
 					"y": 0,
 					"z": 0
 				},
@@ -1677,7 +1731,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1707,16 +1761,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.94140905141830444,
+				"animationPhase": 0.7191464900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1724,13 +1778,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.19234676659107208
+					"y": 0.14426006376743317
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.4291667614337475,
+					"x": 1.0718750720238268,
 					"y": 0,
 					"z": 0
 				},
@@ -1740,7 +1796,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1770,16 +1826,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.98307573795318604,
+				"animationPhase": 0.7503964900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1787,13 +1843,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.18150269985198975
+					"y": 0.13612700998783112
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.4916667646933766,
+					"x": 1.1187500744685486,
 					"y": 0,
 					"z": 0
 				},
@@ -1803,7 +1861,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1833,16 +1891,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.024742364883422852,
+				"animationPhase": 0.7816464900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1850,13 +1908,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.17126999795436859
+					"y": 0.12845247983932495
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.5541667679530056,
+					"x": 1.1656250769132703,
 					"y": 0,
 					"z": 0
 				},
@@ -1866,7 +1926,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -1896,16 +1956,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.058075699955224991,
+				"animationPhase": 0.8128964900970459,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.6166665649414065
+					"y": 2.6736380004882814
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1913,13 +1973,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.16161419451236725
+					"y": 0.12121061980724335
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2,
+				"maxAcceleration": 5.1708557128906252,
+				"maxBrakingDeceleration": 8.3317138671874993,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 1.6144445471790934,
+					"x": 1.2101857125787598,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -1929,7 +1991,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.6166665649414065,
+					"x": 2.6736380004882814,
 					"y": 0,
 					"z": 0
 				},
@@ -1959,16 +2021,16 @@
 			{
 				"acceleration":
 				{
-					"x": 5,
+					"x": 3.8781417846679687,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.09140903502702713,
+				"animationPhase": 0.84260356426239014,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.4833331298828125
+					"y": 2.5227767944335939
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -1976,13 +2038,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.096125051379203796
+					"y": 0.062483511865139008
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2,
+				"maxAcceleration": 5.7932458496093755,
+				"maxBrakingDeceleration": 9.0516723632812504,
+				"playRate": 1.7824252843856812,
 				"position":
 				{
-					"x": 1.6725001023716399,
+					"x": 1.2522319946788707,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -1992,7 +2056,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.4833331298828125,
+					"x": 2.5227767944335939,
 					"y": 0,
 					"z": 0
 				},
@@ -2022,16 +2086,16 @@
 			{
 				"acceleration":
 				{
-					"x": 5,
+					"x": 4.3449343872070312,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.12474237382411957,
+				"animationPhase": 0.87063443660736084,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.349999694824219
+					"y": 2.3501583862304689
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -2039,13 +2103,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.03432803601026535
+					"y": 0.0096891149878501892
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2,
+				"maxAcceleration": 7.3363146972656255,
+				"maxBrakingDeceleration": 10.35710693359375,
+				"playRate": 1.6818511486053467,
 				"position":
 				{
-					"x": 1.7283334335306453,
+					"x": 1.2914013031588838,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2055,7 +2121,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.349999694824219,
+					"x": 2.3501583862304689,
 					"y": 0,
 					"z": 0
 				},
@@ -2085,16 +2151,16 @@
 			{
 				"acceleration":
 				{
-					"x": 5,
+					"x": 5.5022360229492184,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.15807570517063141,
+				"animationPhase": 0.89674729108810425,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.216666259765625
+					"y": 2.140145263671875
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -2102,13 +2168,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.023985005915164948
+					"y": -0.037196274846792221
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2,
+				"maxAcceleration": 10.6904833984375,
+				"maxBrakingDeceleration": 12.600791015625001,
+				"playRate": 1.5667722225189209,
 				"position":
 				{
-					"x": 1.7819445406561094,
+					"x": 1.3270703927470362,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2118,7 +2186,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.216666259765625,
+					"x": 2.140145263671875,
 					"y": 0,
 					"z": 0
 				},
@@ -2148,16 +2216,16 @@
 			{
 				"acceleration":
 				{
-					"x": 5,
+					"x": 8.0178625488281252,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.19140903651714325,
+				"animationPhase": 0.92052668333053589,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.0833328247070315
+					"y": 1.8643928527832032
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -2165,13 +2233,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0790104940533638
+					"y": -0.078036509454250336
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2,
+				"maxAcceleration": 17.856218261718752,
+				"maxBrakingDeceleration": 16.545146484375,
+				"playRate": 1.4267635345458984,
 				"position":
 				{
-					"x": 1.8333334237480321,
+					"x": 1.3581436085806839,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2181,7 +2251,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.0833328247070315,
+					"x": 1.8643928527832032,
 					"y": 0,
 					"z": 0
 				},
@@ -2211,16 +2281,16 @@
 			{
 				"acceleration":
 				{
-					"x": 5,
+					"x": 13.392163696289062,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.22474236786365509,
+				"animationPhase": 0.94124215841293335,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.9499993896484376
+					"y": 1.5310595703125001
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -2228,13 +2298,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.13093377649784088
+					"y": -0.12027585506439209
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1.2429286241531372,
 				"position":
 				{
-					"x": 1.8825000828064138,
+					"x": 1.3836612694167421,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2244,7 +2316,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.9499993896484376,
+					"x": 1.5310595703125001,
 					"y": 0,
 					"z": 0
 				},
@@ -2274,30 +2346,32 @@
 			{
 				"acceleration":
 				{
-					"x": 5,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.25752013921737671,
+				"animationPhase": 0.95825392007827759,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.8162908935546875
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.17977163195610046
+					"y": -0.16987267136573792
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.9666662216186523,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1.0207064151763916,
 				"position":
 				{
-					"x": 1.9294382668136754,
+					"x": 1.4086612707205937,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2307,7 +2381,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.8162908935546875,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2337,30 +2411,32 @@
 			{
 				"acceleration":
 				{
-					"x": 5.0057446289062497,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.28881224989891052,
+				"animationPhase": 0.97492057085037231,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.6776571655273438
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.22401124238967896
+					"y": -0.16554884612560272
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.8775272369384766,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 1.9740658885666429,
+					"x": 1.4336612720244453,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2370,7 +2446,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.6776571655273438,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2400,30 +2476,32 @@
 			{
 				"acceleration":
 				{
-					"x": 5.1616333007812498,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.31856399774551392,
+				"animationPhase": 0.99158722162246704,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.5272470092773438
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.26334559917449951
+					"y": -0.15621557831764221
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.7851047515869141,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.0161866742513688,
+					"x": 1.4586612733282969,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2433,7 +2511,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.5272470092773438,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2463,30 +2541,32 @@
 			{
 				"acceleration":
 				{
-					"x": 5.7660461425781255,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.34664452075958252,
+				"animationPhase": 0.008253931999206543,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.3554136657714846
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.29784762859344482
+					"y": -0.14740850031375885
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.6848313808441162,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.0554435707283001,
+					"x": 1.4836612746321485,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2496,7 +2576,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.3554136657714846,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2526,30 +2606,32 @@
 			{
 				"acceleration":
 				{
-					"x": 7.2741369628906254,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.37281578779220581,
+				"animationPhase": 0.024920599535107613,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.14675048828125
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.32748249173164368
+					"y": -0.13909794390201569
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.5702757835388184,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.091222747399017,
+					"x": 1.5086612759360001,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2559,7 +2641,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.14675048828125,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2589,30 +2671,32 @@
 			{
 				"acceleration":
 				{
-					"x": 10.558131103515626,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.39666858315467834,
+				"animationPhase": 0.041587267071008682,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.35206076502799988
+					"y": -0.13125592470169067
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.4311670064926147,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.1245560824708192,
+					"x": 1.5336612772398517,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2622,7 +2706,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2652,30 +2736,32 @@
 			{
 				"acceleration":
 				{
-					"x": 17.569855957031251,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.41889080405235291,
+				"animationPhase": 0.058253936469554901,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.35703274607658386
+					"y": -0.12385601550340652
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.1578894175426213,
+					"x": 1.5586612785437033,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2685,7 +2771,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2715,30 +2801,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.44111302495002747,
+				"animationPhase": 0.074920602142810822,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.33690404891967773
+					"y": -0.11687329411506653
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.1912227526144235,
+					"x": 1.5836612798475549,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2748,7 +2836,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2778,30 +2866,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.46333524584770203,
+				"animationPhase": 0.091587267816066742,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.31791016459465027
+					"y": -0.11028424650430679
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.2245560876862256,
+					"x": 1.6086612811514065,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2811,7 +2901,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2841,30 +2931,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.48555746674537659,
+				"animationPhase": 0.10825393348932266,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.29998710751533508
+					"y": -0.10406666994094849
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.2578894227580277,
+					"x": 1.6336612824552581,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2874,7 +2966,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2904,30 +2996,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.50777971744537354,
+				"animationPhase": 0.12492059916257858,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.28307452797889709
+					"y": -0.098199628293514252
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.2912227578298299,
+					"x": 1.6586612837591097,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -2937,7 +3031,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -2967,30 +3061,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.5300019383430481,
+				"animationPhase": 0.1415872722864151,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.26711544394493103
+					"y": -0.09266335517168045
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.324556092901632,
+					"x": 1.6836612850629613,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3000,7 +3096,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3030,30 +3126,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55222415924072266,
+				"animationPhase": 0.15825393795967102,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.25205609202384949
+					"y": -0.087439209222793579
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.3578894279734341,
+					"x": 1.7086612863668129,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3063,7 +3161,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3093,30 +3191,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.57444638013839722,
+				"animationPhase": 0.17492060363292694,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.23784574866294861
+					"y": -0.082509584724903107
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.3912227630452363,
+					"x": 1.7336612876706645,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3126,7 +3226,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3156,30 +3256,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.59666860103607178,
+				"animationPhase": 0.19158726930618286,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.22443655133247375
+					"y": -0.077857881784439087
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.4245560981170384,
+					"x": 1.7586612889745161,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3189,7 +3291,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3219,30 +3321,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.61889082193374634,
+				"animationPhase": 0.20825393497943878,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.21178333461284637
+					"y": -0.073468431830406189
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.4578894331888406,
+					"x": 1.7836612902783677,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3252,7 +3356,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3282,30 +3386,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.6411130428314209,
+				"animationPhase": 0.2249206006526947,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.19984348118305206
+					"y": -0.069326452910900116
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.4912227682606427,
+					"x": 1.8086612915822193,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3315,7 +3421,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3345,30 +3451,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.66333526372909546,
+				"animationPhase": 0.24158726632595062,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.18857675790786743
+					"y": -0.06541799008846283
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.5245561033324448,
+					"x": 1.8336612928860709,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3378,7 +3486,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3408,30 +3516,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.68555748462677002,
+				"animationPhase": 0.25825393199920654,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.17794522643089294
+					"y": -0.061729874461889267
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.557889438404247,
+					"x": 1.8586612941899225,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3441,7 +3551,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3471,30 +3581,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.70777970552444458,
+				"animationPhase": 0.27492061257362366,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.16791307926177979
+					"y": -0.058249685913324356
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.5912227734760491,
+					"x": 1.8836612954937741,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3504,7 +3616,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3534,30 +3646,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.73000192642211914,
+				"animationPhase": 0.29158729314804077,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.15844652056694031
+					"y": -0.054965700954198837
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.6245561085478513,
+					"x": 1.9086612967976258,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3567,7 +3681,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3597,30 +3711,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.7522241473197937,
+				"animationPhase": 0.30825397372245789,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.14951366186141968
+					"y": -0.051866859197616577
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.6578894436196534,
+					"x": 1.9336612981014774,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3630,7 +3746,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3660,30 +3776,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.77444636821746826,
+				"animationPhase": 0.324920654296875,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.14108441770076752
+					"y": -0.048942726105451584
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.6912227786914555,
+					"x": 1.958661299405329,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3693,7 +3811,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3723,30 +3841,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.79666858911514282,
+				"animationPhase": 0.34158733487129211,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.13313040137290955
+					"y": -0.046183448284864426
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.7245561137632577,
+					"x": 1.9836613007091806,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3756,7 +3876,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3786,30 +3906,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.81889081001281738,
+				"animationPhase": 0.35825401544570923,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.12562482059001923
+					"y": -0.04357973113656044
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.7578894488350598,
+					"x": 2.0086613020130319,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3819,7 +3941,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3849,30 +3971,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.84111303091049194,
+				"animationPhase": 0.37492069602012634,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.11854238063097
+					"y": -0.041122805327177048
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.791222783906862,
+					"x": 2.0336613033168836,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3882,7 +4006,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3912,30 +4036,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.8633352518081665,
+				"animationPhase": 0.39158737659454346,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.11185923218727112
+					"y": -0.038804396986961365
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.8245561189786641,
+					"x": 2.0586613046207352,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -3945,7 +4071,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -3975,30 +4101,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.88555747270584106,
+				"animationPhase": 0.40825405716896057,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.10555286705493927
+					"y": -0.036616694182157516
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.8578894540504662,
+					"x": 2.0836613059245868,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4008,7 +4136,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4038,30 +4166,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.90777969360351562,
+				"animationPhase": 0.42492073774337769,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.09960203617811203
+					"y": -0.034552328288555145
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.8912227891222684,
+					"x": 2.1086613072284384,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4071,7 +4201,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4101,30 +4231,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.93000191450119019,
+				"animationPhase": 0.4415874183177948,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.09398670494556427
+					"y": -0.032604347914457321
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.9245561241940705,
+					"x": 2.13366130853229,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4134,7 +4266,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4164,30 +4296,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.95222413539886475,
+				"animationPhase": 0.45825409889221191,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.088687948882579803
+					"y": -0.030766189098358154
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.9578894592658727,
+					"x": 2.1586613098361416,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4197,7 +4331,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4227,30 +4361,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.97444635629653931,
+				"animationPhase": 0.47492077946662903,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.083687923848628998
+					"y": -0.02903166227042675
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 2.9912227943376748,
+					"x": 2.1836613111399932,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4260,7 +4396,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4290,30 +4426,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.99666857719421387,
+				"animationPhase": 0.49158746004104614,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.078969791531562805
+					"y": -0.027394924312829971
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.0245561294094769,
+					"x": 2.2086613124438448,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4323,7 +4461,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4353,30 +4491,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.018890857696533203,
+				"animationPhase": 0.50825411081314087,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.07451765239238739
+					"y": -0.025850461795926094
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.0578894644812791,
+					"x": 2.2336613137476964,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4386,7 +4526,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4416,30 +4556,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.041113082319498062,
+				"animationPhase": 0.5249207615852356,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.070316515862941742
+					"y": -0.024393072351813316
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.0912227995530812,
+					"x": 2.258661315051548,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4449,7 +4591,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4479,30 +4621,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.063335306942462921,
+				"animationPhase": 0.54158741235733032,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.066352233290672302
+					"y": -0.023017846047878265
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.1245561346248834,
+					"x": 2.2836613163553996,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4512,7 +4656,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4542,30 +4686,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.085557535290718079,
+				"animationPhase": 0.55825406312942505,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.062611445784568787
+					"y": -0.021720152348279953
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.1578894696966855,
+					"x": 2.3086613176592512,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4575,7 +4721,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4605,30 +4751,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.10777975618839264,
+				"animationPhase": 0.57492071390151978,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.059081554412841797
+					"y": -0.020495619624853134
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.1912228047684876,
+					"x": 2.3336613189631028,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4638,7 +4786,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4668,30 +4816,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.1300019770860672,
+				"animationPhase": 0.5915873646736145,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.055750671774148941
+					"y": -0.019340123981237411
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.2245561398402898,
+					"x": 2.3586613202669544,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4701,7 +4851,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4731,30 +4881,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.15222419798374176,
+				"animationPhase": 0.60825401544570923,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.052607577294111252
+					"y": -0.018249772489070892
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.2578894749120919,
+					"x": 2.383661321570806,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4764,7 +4916,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4794,30 +4946,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.17444641888141632,
+				"animationPhase": 0.62492066621780396,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0496416836977005
+					"y": -0.017220892012119293
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.291222809983894,
+					"x": 2.4086613228746576,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4827,7 +4981,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4857,30 +5011,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.19666863977909088,
+				"animationPhase": 0.64158731698989868,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.046842999756336212
+					"y": -0.016250018030405045
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.3245561450556962,
+					"x": 2.4336613241785092,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4890,7 +5046,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4920,30 +5076,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.21889086067676544,
+				"animationPhase": 0.65825396776199341,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.044202100485563278
+					"y": -0.015333878807723522
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.3578894801274983,
+					"x": 2.4586613254823608,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -4953,7 +5111,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -4983,30 +5141,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.24111308157444,
+				"animationPhase": 0.67492061853408813,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.041710086166858673
+					"y": -0.0144693898037076
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.3912228151993005,
+					"x": 2.4836613267862124,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5016,7 +5176,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5046,30 +5206,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.26333531737327576,
+				"animationPhase": 0.69158726930618286,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.039358567446470261
+					"y": -0.013653638772666454
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.4245561502711026,
+					"x": 2.508661328090064,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5079,7 +5241,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5109,30 +5271,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.28555753827095032,
+				"animationPhase": 0.70825392007827759,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.037139620631933212
+					"y": -0.012883878313004971
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.4578894853429047,
+					"x": 2.5336613293939156,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5142,7 +5306,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5172,30 +5336,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.30777975916862488,
+				"animationPhase": 0.72492057085037231,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.035045772790908813
+					"y": -0.012157514691352844
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.4912228204147069,
+					"x": 2.5586613306977672,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5205,7 +5371,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5235,30 +5401,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.33000198006629944,
+				"animationPhase": 0.74158722162246704,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5000000000000171
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.033069971948862076
+					"y": -0.011472102254629135
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.524556155486509,
+					"x": 2.5836613320016193,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5268,7 +5436,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5000000000000171,
 					"y": 0,
 					"z": 0
 				},
@@ -5298,30 +5466,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.352224200963974,
+				"animationPhase": 0.75825387239456177,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.031205562874674797
+					"y": -0.010825331322848797
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.5578894905583112,
+					"x": 2.6086613333054709,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5331,7 +5501,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5361,30 +5531,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.37444642186164856,
+				"animationPhase": 0.77492052316665649,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.02944626472890377
+					"y": -0.010215023532509804
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.5912228256301133,
+					"x": 2.6336613346093225,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5394,7 +5566,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5424,30 +5596,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.39666864275932312,
+				"animationPhase": 0.79158717393875122,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.027786152437329292
+					"y": -0.0096391234546899796
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.6245561607019154,
+					"x": 2.6586613359131741,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5457,7 +5631,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5487,30 +5661,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.41889086365699768,
+				"animationPhase": 0.80825382471084595,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.026219632476568222
+					"y": -0.0090956920757889748
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.6578894957737176,
+					"x": 2.6836613372170257,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5520,7 +5696,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5550,30 +5726,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.44111308455467224,
+				"animationPhase": 0.82492047548294067,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.024741429835557938
+					"y": -0.0085828974843025208
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.6912228308455197,
+					"x": 2.7086613385208773,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5583,7 +5761,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5613,30 +5791,32 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.4633353054523468,
+				"animationPhase": 0.8415871262550354,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2
+					"y": 1.5
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.023346565663814545
+					"y": -0.0080990130081772804
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.7245561659173219,
+					"x": 2.7336613398247289,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5646,7 +5826,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2,
+					"x": 1.5,
 					"y": 0,
 					"z": 0
 				},
@@ -5680,26 +5860,28 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.48555752635002136,
+				"animationPhase": 0.85825377702713013,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.6666666492819835
+					"y": 1.1666666492819833
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.022030340507626534
+					"y": -0.007642409298568964
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.7523339448540787,
+					"x": 2.7531057849935356,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -5709,7 +5891,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.6666666492819835,
+					"x": 1.1666666492819833,
 					"y": 0,
 					"z": 0
 				},
@@ -5743,36 +5925,38 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.50407606363296509,
+				"animationPhase": 0.87169837951660156,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.3333332985639665
+					"y": 0.83333329856396665
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": -0.077166028320789337
+					"y": -0.06358925998210907
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.1111111640930176,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 0.80667686462402344,
 				"position":
 				{
-					"x": 3.7745561676557906,
+					"x": 2.766994674027297,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Crouching",
-				"stride": 1,
+				"stride": 0.96417510509490967,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.3333332985639665,
+					"x": 0.83333329856396665,
 					"y": 0,
 					"z": 0
 				},
@@ -5806,12 +5990,12 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.51899933815002441,
+				"animationPhase": 0.88323342800140381,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 0.99999994784594992
+					"y": 0.49999994784594992
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -5819,23 +6003,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.12919329106807709
+					"y": -0.11638195067644119
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.8953973650932312,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 0.69210338592529297,
 				"position":
 				{
-					"x": 3.7912228343224577,
+					"x": 2.7753280069260131,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Crouching",
-				"stride": 0.99273109436035156,
+				"stride": 0.80270600318908691,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 0.99999994784594992,
+					"x": 0.49999994784594992,
 					"y": 0,
 					"z": 0
 				},
@@ -5869,12 +6055,12 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.5312875509262085,
+				"animationPhase": 0.89552146196365356,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 0.66666659712793319
+					"y": 0.16666659712793322
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -5882,23 +6068,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.17828737199306488
+					"y": -0.16619831323623657
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.73729348182678223,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 0.73728269338607788,
 				"position":
 				{
-					"x": 3.8023339448540794,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Crouching",
-				"stride": 0.90420800447463989,
+				"stride": 0.45211058855056763,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 0.66666659712793319,
+					"x": 0.16666659712793322,
 					"y": 0,
 					"z": 0
 				},
@@ -5932,12 +6120,12 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.54269152879714966,
+				"animationPhase": 0.90372872352600098,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 0.33333324640991652
+					"y": 0
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -5945,23 +6133,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.22461365163326263
+					"y": -0.21320614218711853
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.68423932790756226,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 0.49243611097335815,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Crouching",
-				"stride": 0.64954519271850586,
+				"stride": 0.22563549876213074,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 0.33333324640991652,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -5995,7 +6185,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55474412441253662,
+				"animationPhase": 0.90373039245605469,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6008,19 +6198,21 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.26832816004753113
+					"y": -0.22373713552951813
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.72315442562103271,
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
+				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Crouching",
-				"stride": 0.30729559063911438,
+				"stride": 0.20000000298023224,
 				"targetYaw": 0,
 				"velocity":
 				{
@@ -6058,7 +6250,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55474579334259033,
+				"animationPhase": 0.9037320613861084,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6071,13 +6263,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.29830259084701538
+					"y": -0.21112334728240967
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6121,7 +6315,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55474746227264404,
+				"animationPhase": 0.90373373031616211,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6134,13 +6328,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.28148496150970459
+					"y": -0.19922070205211639
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6184,7 +6380,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55474913120269775,
+				"animationPhase": 0.90373539924621582,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6197,13 +6393,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.26561549305915833
+					"y": -0.18798910081386566
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6247,7 +6445,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55475080013275146,
+				"animationPhase": 0.90373706817626953,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6260,13 +6458,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.25064069032669067
+					"y": -0.17739070951938629
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6310,7 +6510,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55475246906280518,
+				"animationPhase": 0.90373873710632324,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6323,13 +6523,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.23651014268398285
+					"y": -0.16738982498645782
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6373,7 +6575,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55475413799285889,
+				"animationPhase": 0.90374040603637695,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6386,13 +6588,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.22317624092102051
+					"y": -0.15795277059078217
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6436,7 +6640,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.5547558069229126,
+				"animationPhase": 0.90374207496643066,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6449,13 +6653,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.21059407293796539
+					"y": -0.14904776215553284
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6499,7 +6705,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55475747585296631,
+				"animationPhase": 0.90374374389648438,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6512,13 +6718,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.1987212598323822
+					"y": -0.14064478874206543
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6562,7 +6770,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55475914478302002,
+				"animationPhase": 0.90374541282653809,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6575,13 +6783,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.18751780688762665
+					"y": -0.13271555304527283
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6625,7 +6835,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55476081371307373,
+				"animationPhase": 0.9037470817565918,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6638,13 +6848,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.17694598436355591
+					"y": -0.12523335218429565
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6688,7 +6900,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55476248264312744,
+				"animationPhase": 0.90374875068664551,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6701,13 +6913,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.16697017848491669
+					"y": -0.11817298084497452
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6751,7 +6965,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55476415157318115,
+				"animationPhase": 0.90375041961669922,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6764,13 +6978,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.15755678713321686
+					"y": -0.11151065677404404
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6814,7 +7030,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55476582050323486,
+				"animationPhase": 0.90375208854675293,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6827,13 +7043,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.14867410063743591
+					"y": -0.10522393882274628
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6877,7 +7095,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55476748943328857,
+				"animationPhase": 0.90375375747680664,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6890,13 +7108,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.14029219746589661
+					"y": -0.09929165244102478
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -6940,7 +7160,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55476915836334229,
+				"animationPhase": 0.90375542640686035,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -6953,13 +7173,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.1323828399181366
+					"y": -0.093693815171718597
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7003,7 +7225,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.554770827293396,
+				"animationPhase": 0.90375709533691406,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7016,13 +7238,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.12491939961910248
+					"y": -0.088411569595336914
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7066,7 +7290,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55477249622344971,
+				"animationPhase": 0.90375876426696777,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7079,13 +7303,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.11787673085927963
+					"y": -0.083427131175994873
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7129,7 +7355,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55477416515350342,
+				"animationPhase": 0.90376043319702148,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7142,13 +7368,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.11123111099004745
+					"y": -0.078723698854446411
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7192,7 +7420,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55477583408355713,
+				"animationPhase": 0.9037621021270752,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7205,13 +7433,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.10496015846729279
+					"y": -0.074285440146923065
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7255,7 +7485,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55477750301361084,
+				"animationPhase": 0.90376377105712891,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7268,13 +7498,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.099042743444442749
+					"y": -0.070097394287586212
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7318,7 +7550,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55477917194366455,
+				"animationPhase": 0.90376543998718262,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7331,13 +7563,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.093458943068981171
+					"y": -0.066145464777946472
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7381,7 +7615,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55478084087371826,
+				"animationPhase": 0.90376710891723633,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7394,13 +7628,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.088189944624900818
+					"y": -0.062416333705186844
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7444,7 +7680,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55478250980377197,
+				"animationPhase": 0.90376877784729004,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7457,13 +7693,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.083218000829219818
+					"y": -0.058897443115711212
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7507,7 +7745,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55478417873382568,
+				"animationPhase": 0.90377044677734375,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7520,13 +7758,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.078526362776756287
+					"y": -0.055576939135789871
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7570,7 +7810,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55478584766387939,
+				"animationPhase": 0.90377211570739746,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7583,13 +7823,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.074099227786064148
+					"y": -0.052443638443946838
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7633,7 +7875,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55478751659393311,
+				"animationPhase": 0.90377378463745117,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7646,13 +7888,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.069921679794788361
+					"y": -0.049486987292766571
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7696,7 +7940,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55478918552398682,
+				"animationPhase": 0.90377545356750488,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7709,13 +7953,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.065979659557342529
+					"y": -0.046697024255990982
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7759,7 +8005,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55479085445404053,
+				"animationPhase": 0.90377712249755859,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7772,13 +8018,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.06225987896323204
+					"y": -0.04406435415148735
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7822,7 +8070,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55479252338409424,
+				"animationPhase": 0.9037787914276123,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7835,13 +8083,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.058749809861183167
+					"y": -0.041580107063055038
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7885,7 +8135,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55479419231414795,
+				"animationPhase": 0.90378046035766602,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7898,13 +8148,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.055437631905078888
+					"y": -0.039235915988683701
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -7948,7 +8200,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55479586124420166,
+				"animationPhase": 0.90378212928771973,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -7961,13 +8213,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.052312184125185013
+					"y": -0.037023883312940598
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8011,7 +8265,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55479753017425537,
+				"animationPhase": 0.90378379821777344,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8024,13 +8278,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.049362942576408386
+					"y": -0.034936562180519104
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8074,7 +8330,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55479919910430908,
+				"animationPhase": 0.90378546714782715,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8087,13 +8343,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.04657997190952301
+					"y": -0.032966919243335724
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8137,7 +8395,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55480086803436279,
+				"animationPhase": 0.90378713607788086,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8150,13 +8408,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.043953899294137955
+					"y": -0.031108319759368896
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8200,7 +8460,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.5548025369644165,
+				"animationPhase": 0.90378880500793457,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8213,13 +8473,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.041475880891084671
+					"y": -0.029354503378272057
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8263,7 +8525,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55480420589447021,
+				"animationPhase": 0.90379047393798828,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8276,13 +8538,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.039137564599514008
+					"y": -0.027699563652276993
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8326,7 +8590,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55480587482452393,
+				"animationPhase": 0.90379214286804199,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8339,13 +8603,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.036931078881025314
+					"y": -0.026137925684452057
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8389,7 +8655,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55480754375457764,
+				"animationPhase": 0.9037938117980957,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8402,13 +8668,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.034848988056182861
+					"y": -0.024664329364895821
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8452,7 +8720,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55480921268463135,
+				"animationPhase": 0.90379548072814941,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8465,13 +8733,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.032884281128644943
+					"y": -0.023273810744285583
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8515,7 +8785,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55481088161468506,
+				"animationPhase": 0.90379714965820312,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8528,13 +8798,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.031030340120196342
+					"y": -0.021961687132716179
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8578,7 +8850,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55481255054473877,
+				"animationPhase": 0.90379881858825684,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8591,13 +8863,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.029280921444296837
+					"y": -0.020723536610603333
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8641,7 +8915,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55481421947479248,
+				"animationPhase": 0.90380048751831055,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8654,13 +8928,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.02763012982904911
+					"y": -0.019555190578103065
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8704,7 +8980,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55481588840484619,
+				"animationPhase": 0.90380215644836426,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8717,13 +8993,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.026072407141327858
+					"y": -0.018452713266015053
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8767,7 +9045,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.5548175573348999,
+				"animationPhase": 0.90380382537841797,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8780,13 +9058,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.024602504447102547
+					"y": -0.017412392422556877
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8830,7 +9110,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55481922626495361,
+				"animationPhase": 0.90380549430847168,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8843,13 +9123,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.023215470835566521
+					"y": -0.016430720686912537
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8893,7 +9175,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55482089519500732,
+				"animationPhase": 0.90380716323852539,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8906,13 +9188,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.021906636655330658
+					"y": -0.01550439465790987
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -8956,7 +9240,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55482256412506104,
+				"animationPhase": 0.9038088321685791,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -8969,13 +9253,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.02067159116268158
+					"y": -0.014630292542278767
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9019,7 +9305,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55482423305511475,
+				"animationPhase": 0.90381050109863281,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9032,13 +9318,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.019506175071001053
+					"y": -0.013805470429360867
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9082,7 +9370,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55482590198516846,
+				"animationPhase": 0.90381217002868652,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9095,13 +9383,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.018406461924314499
+					"y": -0.013027149252593517
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9145,7 +9435,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55482757091522217,
+				"animationPhase": 0.90381383895874023,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9158,13 +9448,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.017368746921420097
+					"y": -0.012292708270251751
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9208,7 +9500,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55482923984527588,
+				"animationPhase": 0.90381550788879395,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9221,13 +9513,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.01638953760266304
+					"y": -0.011599673889577389
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9271,7 +9565,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55483090877532959,
+				"animationPhase": 0.90381717681884766,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9284,13 +9578,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.01546553336083889
+					"y": -0.01094571128487587
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9334,7 +9630,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.5548325777053833,
+				"animationPhase": 0.90381884574890137,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9347,13 +9643,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.014593621715903282
+					"y": -0.010328616946935654
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9397,7 +9695,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55483424663543701,
+				"animationPhase": 0.90382051467895508,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9410,13 +9708,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.013770867139101028
+					"y": -0.0097463130950927734
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9460,7 +9760,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55483591556549072,
+				"animationPhase": 0.90382218360900879,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9473,13 +9773,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.012994497083127499
+					"y": -0.0091968383640050888
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9523,7 +9825,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55483758449554443,
+				"animationPhase": 0.9038238525390625,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9536,13 +9838,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.012261897325515747
+					"y": -0.0086783412843942642
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9586,7 +9890,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55483925342559814,
+				"animationPhase": 0.90382552146911621,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9599,13 +9903,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.011570599861443043
+					"y": -0.0081890765577554703
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9649,7 +9955,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55484092235565186,
+				"animationPhase": 0.90382719039916992,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9662,13 +9968,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.010918276384472847
+					"y": -0.0077273952774703503
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9712,7 +10020,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55484259128570557,
+				"animationPhase": 0.90382885932922363,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9725,13 +10033,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.010302728973329067
+					"y": -0.0072917426005005836
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9775,7 +10085,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55484426021575928,
+				"animationPhase": 0.90383052825927734,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9788,13 +10098,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0097218845039606094
+					"y": -0.0068806507624685764
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9838,7 +10150,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55484592914581299,
+				"animationPhase": 0.90383219718933105,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9851,13 +10163,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0091737871989607811
+					"y": -0.0064927353523671627
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9901,7 +10215,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.5548475980758667,
+				"animationPhase": 0.90383386611938477,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9914,13 +10228,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0086565902456641197
+					"y": -0.006126689724624157
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -9964,7 +10280,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55484926700592041,
+				"animationPhase": 0.90383553504943848,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -9977,13 +10293,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0081685511395335197
+					"y": -0.0057812808081507683
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -10027,7 +10345,7 @@
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55485093593597412,
+				"animationPhase": 0.90383720397949219,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
@@ -10040,13 +10358,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0077080270275473595
+					"y": -0.005455345381051302
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 25,
+				"maxBrakingDeceleration": 20,
 				"playRate": 9.9999997473787516e-05,
 				"position":
 				{
-					"x": 3.8078894992506562,
+					"x": 2.7781057836896843,
 					"y": 0,
 					"z": -0.34000000000000002
 				},
@@ -10086,16 +10406,16 @@
 			{
 				"acceleration":
 				{
-					"x": 25,
+					"x": 18.75,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.57707315683364868,
+				"animationPhase": 0.92050385475158691,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 0.41666668839752941
+					"y": 0.3125000162981556
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -10103,13 +10423,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": -0.0072734663262963295
+					"y": -0.0051477854140102863
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.3333333730697632,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 1,
 				"position":
 				{
-					"x": 3.8148339444194623,
+					"x": 2.7833141175662894,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10119,7 +10441,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 0.41666668839752941,
+					"x": 0.3125000162981556,
 					"y": 0,
 					"z": 0
 				},
@@ -10149,16 +10471,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.58953976631164551,
+				"animationPhase": 0.93232297897338867,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 0.75000003836429219
+					"y": 0.56250002956793266
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -10166,23 +10488,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.049514304846525192
+					"y": 0.047996543347835541
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.74799507856369019,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.70914608240127563,
 				"position":
 				{
-					"x": 3.8273339457107931,
+					"x": 2.7926891185480325,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.37136313319206238,
+				"stride": 0.29378056526184082,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 0.75000003836429219,
+					"x": 0.56250002956793266,
 					"y": 0,
 					"z": 0
 				},
@@ -10212,16 +10536,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.60090523958206177,
+				"animationPhase": 0.94424694776535034,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.0833333922431212
+					"y": 0.81250004332136772
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -10229,23 +10553,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.10310050845146179
+					"y": 0.087573893368244171
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.68192750215530396,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.71543902158737183,
 				"position":
 				{
-					"x": 3.8453895031898493,
+					"x": 2.806230786642975,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.73321586847305298,
+				"stride": 0.52415370941162109,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.0833333922431212,
+					"x": 0.81250004332136772,
 					"y": 0,
 					"z": 0
 				},
@@ -10275,16 +10601,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.6137276291847229,
+				"animationPhase": 0.95572400093078613,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.4166667401712629
+					"y": 1.0625000591075915
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -10292,23 +10618,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.15366564691066742
+					"y": 0.12491996586322784
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.76934409141540527,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.68862324953079224,
 				"position":
 				{
-					"x": 3.8690006167574524,
+					"x": 2.8239391218849965,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.93875062465667725,
+				"stride": 0.7865937352180481,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.4166667401712629,
+					"x": 1.0625000591075915,
 					"y": 0,
 					"z": 0
 				},
@@ -10338,16 +10666,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.62949371337890625,
+				"animationPhase": 0.96840423345565796,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 1.750000089002465
+					"y": 1.312500073578311
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -10355,23 +10683,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.20138004422187805
+					"y": 0.16016054153442383
 				},
 				"locomotionState": "Grounded",
-				"playRate": 0.94596403837203979,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.76081490516662598,
 				"position":
 				{
-					"x": 3.8981672864286536,
+					"x": 2.845814124252172,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 0.99839365482330322,
+				"stride": 0.93101930618286133,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 1.750000089002465,
+					"x": 1.312500073578311,
 					"y": 0,
 					"z": 0
 				},
@@ -10401,16 +10731,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.64893817901611328,
+				"animationPhase": 0.9831269383430481,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.0833334450192655
+					"y": 1.5625000804852973
 				},
 				"gait": "Walking",
 				"grounded": true,
@@ -10418,23 +10748,25 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.24640440940856934
+					"y": 0.1934143453836441
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.1666667461395264,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 0.88336247205734253,
 				"position":
 				{
-					"x": 3.9328895123232135,
+					"x": 2.871855793618439,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
-				"stride": 1,
+				"stride": 0.99053335189819336,
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.0833334450192655,
+					"x": 1.5625000804852973,
 					"y": 0,
 					"z": 0
 				},
@@ -10464,30 +10796,32 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.67208635807037354,
+				"animationPhase": 0.00048804283142089844,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.4166667949349034
+					"y": 1.8125000995323666
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": 0.28889039158821106
+					"y": 0.22479337453842163
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.388888955116272,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
+				"playRate": 1.0416667461395264,
 				"position":
 				{
-					"x": 3.9731672943394449,
+					"x": 2.9020641301861327,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10497,7 +10831,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.4166667949349034,
+					"x": 1.8125000995323666,
 					"y": 0,
 					"z": 0
 				},
@@ -10527,30 +10861,32 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.69893819093704224,
+				"animationPhase": 0.020626936107873917,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 2.7500001515004362
+					"y": 2.0625001169645483
 				},
-				"gait": "Running",
+				"gait": "Walking",
 				"grounded": true,
 				"jumpTransition": false,
 				"lean":
 				{
 					"x": 0,
-					"y": 0.32898113131523132
+					"y": 0.25440332293510437
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.6111112833023071,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.921875,
+				"playRate": 1.2083334922790527,
 				"position":
 				{
-					"x": 4.0190006325881802,
+					"x": 2.9364391339283378,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10560,7 +10896,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 2.7500001515004362,
+					"x": 2.0625001169645483,
 					"y": 0,
 					"z": 0
 				},
@@ -10590,16 +10926,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.72949373722076416,
+				"animationPhase": 0.043543606996536255,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.0833334908559205
+					"y": 2.3125001328789088
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -10607,13 +10943,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.36681163311004639
+					"y": 0.28234392404556274
 				},
 				"locomotionState": "Grounded",
-				"playRate": 1.8333333730697632,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.609375,
+				"playRate": 1.3750001192092896,
 				"position":
 				{
-					"x": 4.0703895267825851,
+					"x": 2.9749808048197575,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10623,7 +10961,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.0833334908559205,
+					"x": 2.3125001328789088,
 					"y": 0,
 					"z": 0
 				},
@@ -10653,16 +10991,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.76375299692153931,
+				"animationPhase": 0.069238051772117615,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.4166668375441369
+					"y": 2.562500147467464
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -10670,13 +11008,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.40250933170318604
+					"y": 0.30870929360389709
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.0555555820465088,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.296875,
+				"playRate": 1.5416667461395264,
 				"position":
 				{
-					"x": 4.1273339770448718,
+					"x": 3.0176891428382953,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10686,7 +11026,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.4166668375441369,
+					"x": 2.562500147467464,
 					"y": 0,
 					"z": 0
 				},
@@ -10716,16 +11056,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.80171597003936768,
+				"animationPhase": 0.097710274159908295,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -10733,13 +11073,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.43619447946548462
+					"y": 0.33358824253082275
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.2777779102325439,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.984375,
+				"playRate": 1.7083333730697632,
 				"position":
 				{
-					"x": 4.1898339803045008,
+					"x": 3.064564145283017,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10749,7 +11091,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -10779,16 +11121,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.84338265657424927,
+				"animationPhase": 0.12896028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -10796,13 +11138,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.46798050403594971
+					"y": 0.35706454515457153
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.2523339835641298,
+					"x": 3.1114391477277388,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10812,7 +11156,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -10842,16 +11186,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.88504934310913086,
+				"animationPhase": 0.16021028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -10859,13 +11203,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.44159683585166931
+					"y": 0.33693405985832214
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.3148339868237588,
+					"x": 3.1583141501724605,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10875,7 +11221,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -10905,16 +11251,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.92671602964401245,
+				"animationPhase": 0.19146028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -10922,13 +11268,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.41670063138008118
+					"y": 0.31793847680091858
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.3773339900833879,
+					"x": 3.2051891526171823,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -10938,7 +11286,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -10968,16 +11316,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.96838271617889404,
+				"animationPhase": 0.22271028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -10985,13 +11333,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.39320799708366394
+					"y": 0.30001384019851685
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.4398339933430169,
+					"x": 3.252064155061904,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11001,7 +11351,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11031,16 +11381,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.010049343109130859,
+				"animationPhase": 0.25396028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11048,13 +11398,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.37103983759880066
+					"y": 0.28309974074363708
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.5023339966026459,
+					"x": 3.2989391575066258,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11064,7 +11416,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11094,16 +11446,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.051716011017560959,
+				"animationPhase": 0.28521028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11111,13 +11463,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.35012146830558777
+					"y": 0.26713922619819641
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.5648339998622749,
+					"x": 3.3458141599513476,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11127,7 +11481,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11157,16 +11511,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.093382678925991058,
+				"animationPhase": 0.31646028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11174,13 +11528,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.33038240671157837
+					"y": 0.25207853317260742
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.6273340031219039,
+					"x": 3.3926891623960693,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11190,7 +11546,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11220,16 +11576,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.13504934310913086,
+				"animationPhase": 0.34771028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11237,13 +11593,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.3117561936378479
+					"y": 0.23786692321300507
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.6898340063815329,
+					"x": 3.4395641648407911,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11253,7 +11611,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11283,16 +11641,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.17671601474285126,
+				"animationPhase": 0.37896028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11300,13 +11658,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.29418009519577026
+					"y": 0.2244565337896347
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.7523340096411619,
+					"x": 3.4864391672855128,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11316,7 +11676,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11346,16 +11706,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.21838268637657166,
+				"animationPhase": 0.41021028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11363,13 +11723,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.27759489417076111
+					"y": 0.21180218458175659
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.8148340129007909,
+					"x": 3.5333141697302346,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11379,7 +11741,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11409,16 +11771,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.26004934310913086,
+				"animationPhase": 0.44146028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11426,13 +11788,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.26194474101066589
+					"y": 0.19986125826835632
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.8773340161604199,
+					"x": 3.5801891721749564,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11442,7 +11806,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11472,16 +11836,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.30171599984169006,
+				"animationPhase": 0.47271028161048889,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11489,13 +11853,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.24717690050601959
+					"y": 0.1885935366153717
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 4.939834019420049,
+					"x": 3.6270641746196781,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11505,7 +11871,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11535,16 +11901,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.34338265657424927,
+				"animationPhase": 0.5039602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11552,13 +11918,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.23324163258075714
+					"y": 0.177961066365242
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.002334022679678,
+					"x": 3.6739391770643999,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11568,7 +11936,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11598,16 +11966,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.38504931330680847,
+				"animationPhase": 0.5352102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11615,13 +11983,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.22009199857711792
+					"y": 0.16792802512645721
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.064834025939307,
+					"x": 3.7208141795091216,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11631,7 +12001,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11661,16 +12031,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.42671597003936768,
+				"animationPhase": 0.5664602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11678,13 +12048,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.20768371224403381
+					"y": 0.15846063196659088
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.127334029198936,
+					"x": 3.7676891819538434,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11694,7 +12066,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11724,16 +12096,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.46838262677192688,
+				"animationPhase": 0.5977102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11741,13 +12113,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.19597497582435608
+					"y": 0.14952698349952698
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.189834032458565,
+					"x": 3.8145641843985651,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11757,7 +12131,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11787,16 +12161,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.51004928350448608,
+				"animationPhase": 0.6289602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11804,13 +12178,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.1849263608455658
+					"y": 0.14109699428081512
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.252334035718194,
+					"x": 3.8614391868432869,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11820,7 +12196,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11850,16 +12226,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.55171597003936768,
+				"animationPhase": 0.6602102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11867,13 +12243,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.17450064420700073
+					"y": 0.13314226269721985
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.314834038977823,
+					"x": 3.9083141892880087,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11883,7 +12261,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11913,16 +12291,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.59338265657424927,
+				"animationPhase": 0.6914602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11930,13 +12308,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.16466270387172699
+					"y": 0.12563601136207581
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.377334042237452,
+					"x": 3.9551891917327304,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -11946,7 +12326,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -11976,16 +12356,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.63504934310913086,
+				"animationPhase": 0.7227102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -11993,13 +12373,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.15537939965724945
+					"y": 0.11855293810367584
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.439834045497081,
+					"x": 4.0020641941774526,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12009,7 +12391,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12039,16 +12421,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.67671602964401245,
+				"animationPhase": 0.7539602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12056,13 +12438,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.14661946892738342
+					"y": 0.11186919361352921
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.5023340487567101,
+					"x": 4.0489391966221744,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12072,7 +12456,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12102,16 +12486,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.71838271617889404,
+				"animationPhase": 0.7852102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12119,13 +12503,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.13835339248180389
+					"y": 0.10556226223707199
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.5648340520163391,
+					"x": 4.0958141990668961,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12135,7 +12521,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12165,16 +12551,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.76004940271377563,
+				"animationPhase": 0.8164602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12182,13 +12568,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.13055334985256195
+					"y": 0.099610902369022369
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.6273340552759681,
+					"x": 4.1426892015116179,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12198,7 +12586,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12228,16 +12616,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.80171608924865723,
+				"animationPhase": 0.8477102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12245,13 +12633,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.12319304794073105
+					"y": 0.093995064496994019
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.6898340585355971,
+					"x": 4.1895642039563397,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12261,7 +12651,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12291,16 +12681,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.84338277578353882,
+				"animationPhase": 0.8789602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12308,13 +12698,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.11624770611524582
+					"y": 0.088695839047431946
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.7523340617952261,
+					"x": 4.2364392064010614,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12324,7 +12716,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12354,16 +12746,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.88504946231842041,
+				"animationPhase": 0.9102102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12371,13 +12763,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.10969392955303192
+					"y": 0.083695366978645325
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.8148340650548551,
+					"x": 4.2833142088457832,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12387,7 +12781,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12417,16 +12811,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.926716148853302,
+				"animationPhase": 0.9414602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12434,13 +12828,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.10350963473320007
+					"y": 0.078976817429065704
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.8773340683144841,
+					"x": 4.3301892112905049,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12450,7 +12846,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12480,16 +12876,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.96838283538818359,
+				"animationPhase": 0.9727102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12497,13 +12893,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.097673997282981873
+					"y": 0.074524283409118652
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 5.9398340715741131,
+					"x": 4.3770642137352267,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12513,7 +12911,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12543,16 +12941,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.01004946231842041,
+				"animationPhase": 0.0039602518081665039,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12560,13 +12958,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.092167362570762634
+					"y": 0.070322774350643158
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.0023340748337422,
+					"x": 4.4239392161799485,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12576,7 +12976,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12606,16 +13006,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.05171613022685051,
+				"animationPhase": 0.035210251808166504,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12623,13 +13023,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.086971178650856018
+					"y": 0.066358134150505066
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.0648340780933712,
+					"x": 4.4708142186246702,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12639,7 +13041,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12669,16 +13071,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.093382798135280609,
+				"animationPhase": 0.066460251808166504,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12686,13 +13088,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.08206794410943985
+					"y": 0.062617011368274689
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.1273340813530002,
+					"x": 4.517689221069392,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12702,7 +13106,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12732,16 +13136,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.13504946231842041,
+				"animationPhase": 0.097710251808166504,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12749,13 +13153,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.07744114100933075
+					"y": 0.059086807072162628
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.1898340846126292,
+					"x": 4.5645642235141137,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12765,7 +13171,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12795,16 +13201,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.17671613395214081,
+				"animationPhase": 0.1289602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12812,13 +13218,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.073075190186500549
+					"y": 0.055755630135536194
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.2523340878722582,
+					"x": 4.6114392259588355,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12828,7 +13236,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12858,16 +13266,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.21838280558586121,
+				"animationPhase": 0.1602102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12875,13 +13283,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.068955376744270325
+					"y": 0.05261225625872612
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.3148340911318872,
+					"x": 4.6583142284035572,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12891,7 +13301,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12921,16 +13331,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.26004946231842041,
+				"animationPhase": 0.1914602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -12938,13 +13348,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.065067827701568604
+					"y": 0.049646098166704178
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.3773340943915162,
+					"x": 4.705189230848279,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -12954,7 +13366,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -12984,16 +13396,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.30171611905097961,
+				"animationPhase": 0.2227102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -13001,13 +13413,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.061399452388286591
+					"y": 0.046847164630889893
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.4398340976511452,
+					"x": 4.7520642332930008,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -13017,7 +13431,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -13047,16 +13461,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.34338277578353882,
+				"animationPhase": 0.2539602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -13064,13 +13478,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.057937890291213989
+					"y": 0.044206030666828156
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.5023341009107742,
+					"x": 4.7989392357377225,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -13080,7 +13496,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -13110,16 +13526,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.38504943251609802,
+				"animationPhase": 0.2852102518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -13127,13 +13543,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.054671484977006912
+					"y": 0.041713796555995941
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.5648341041704033,
+					"x": 4.8458142381824443,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -13143,7 +13561,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},
@@ -13173,16 +13591,16 @@
 			{
 				"acceleration":
 				{
-					"x": 20,
+					"x": 15,
 					"y": 0,
 					"z": 0
 				},
-				"animationPhase": 0.42671608924865723,
+				"animationPhase": 0.3164602518081665,
 				"animationState": "Grounded",
 				"blendCoordinates":
 				{
 					"x": 0,
-					"y": 3.75
+					"y": 2.8125
 				},
 				"gait": "Running",
 				"grounded": true,
@@ -13190,13 +13608,15 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.051589231938123703
+					"y": 0.039362069219350815
 				},
 				"locomotionState": "Grounded",
-				"playRate": 2.5,
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.671875,
+				"playRate": 1.875,
 				"position":
 				{
-					"x": 6.6273341074300323,
+					"x": 4.892689240627166,
 					"y": 0,
 					"z": 9.9945068359375004e-06
 				},
@@ -13206,7 +13626,7 @@
 				"targetYaw": 0,
 				"velocity":
 				{
-					"x": 3.75,
+					"x": 2.8125,
 					"y": 0,
 					"z": 0
 				},

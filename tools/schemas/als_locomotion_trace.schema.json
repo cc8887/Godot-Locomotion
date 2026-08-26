@@ -70,9 +70,9 @@
               "required": [
                 "accelerationSmoothingHalfLife", "animatedCrouchSpeed", "animatedRunSpeed",
                 "animatedSprintSpeed", "animatedWalkSpeed", "crouchedHalfHeight",
-                "crouchRunForwardSpeed", "crouchWalkForwardSpeed", "gravity", "jumpSpeed",
-                "landingRecoveryDuration", "leanHalfLife", "maxAcceleration",
-                "maxBrakingDeceleration", "movingSpeedThreshold", "playRateMaximum",
+                "crouchRunForwardSpeed", "crouchWalkForwardSpeed", "gravity",
+                "initialMaxAcceleration", "initialMaxBrakingDeceleration", "jumpSpeed",
+                "landingRecoveryDuration", "leanHalfLife", "movingSpeedThreshold", "playRateMaximum",
                 "playRateMinimum", "rotationInterpolationHalfLife", "runBackwardSpeed",
                 "runForwardSpeed", "sprintSpeed", "standingHalfHeight",
                 "targetYawInterpolationSpeed", "velocityAngleInterpolationEnd",
@@ -89,11 +89,11 @@
                 "crouchRunForwardSpeed": { "type": "number" },
                 "crouchWalkForwardSpeed": { "type": "number" },
                 "gravity": { "type": "number" },
+                "initialMaxAcceleration": { "type": "number", "minimum": 0 },
+                "initialMaxBrakingDeceleration": { "type": "number", "minimum": 0 },
                 "jumpSpeed": { "type": "number" },
                 "landingRecoveryDuration": { "type": "number" },
                 "leanHalfLife": { "type": "number" },
-                "maxAcceleration": { "type": "number" },
-                "maxBrakingDeceleration": { "type": "number" },
                 "movingSpeedThreshold": { "type": "number" },
                 "playRateMaximum": { "type": "number" },
                 "playRateMinimum": { "type": "number" },
@@ -134,8 +134,9 @@
       "additionalProperties": false,
       "required": [
         "acceleration", "animationPhase", "animationState", "blendCoordinates", "gait",
-        "grounded", "jumpTransition", "lean", "locomotionState", "playRate", "position",
-        "rotationMode", "stance", "stride", "targetYaw", "velocity", "yaw"
+        "grounded", "jumpTransition", "lean", "locomotionState", "maxAcceleration",
+        "maxBrakingDeceleration", "playRate", "position", "rotationMode", "stance", "stride",
+        "targetYaw", "velocity", "yaw"
       ],
       "properties": {
         "acceleration": { "$ref": "#/$defs/vector3" },
@@ -147,6 +148,8 @@
         "jumpTransition": { "type": "boolean" },
         "lean": { "$ref": "#/$defs/vector2" },
         "locomotionState": { "enum": ["Grounded", "InAir"] },
+        "maxAcceleration": { "type": "number", "minimum": 0 },
+        "maxBrakingDeceleration": { "type": "number", "minimum": 0 },
         "playRate": { "type": "number" },
         "position": { "$ref": "#/$defs/vector3" },
         "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
