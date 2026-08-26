@@ -18,7 +18,10 @@ public sealed class AlsReferenceLockTests
         Assert.Equal("2026-08-26", lockFile.GetProperty("observedDate").GetString());
         Assert.Equal("5.9.0", lockFile.GetProperty("targetEngine").GetString());
         Assert.Equal(JsonValueKind.Array, lockFile.GetProperty("compatibilityPatches").ValueKind);
-        Assert.Empty(lockFile.GetProperty("compatibilityPatches").EnumerateArray());
+        var patch = Assert.Single(lockFile.GetProperty("compatibilityPatches").EnumerateArray());
+        Assert.Equal("reference/patches/als-refactored-ue-5.9-engine-version.patch", patch.GetProperty("path").GetString());
+        Assert.Equal("3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f", patch.GetProperty("sha256").GetString());
+        Assert.Equal(2, patch.EnumerateObject().Count());
         Assert.Equal(6, lockFile.EnumerateObject().Count());
     }
 }

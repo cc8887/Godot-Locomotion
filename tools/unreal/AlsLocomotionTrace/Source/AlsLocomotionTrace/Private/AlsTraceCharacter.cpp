@@ -1,0 +1,62 @@
+#include "AlsTraceCharacter.h"
+
+#include "AlsAnimationInstance.h"
+#include "AlsCharacterMovementComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Settings/AlsAnimationInstanceSettings.h"
+#include "Settings/AlsCharacterSettings.h"
+#include "Settings/AlsMovementSettings.h"
+#include "UObject/ConstructorHelpers.h"
+
+#include UE_INLINE_GENERATED_CPP_BY_NAME(AlsTraceCharacter)
+
+AAlsTraceCharacter::AAlsTraceCharacter(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+{
+    static ConstructorHelpers::FObjectFinder<UAlsCharacterSettings> CharacterSettingsAsset{
+	TEXT("/ALS/ALS/Data/Character/CS_Als_Default.CS_Als_Default")};
+    static ConstructorHelpers::FObjectFinder<UAlsMovementSettings> MovementSettingsAsset{
+	TEXT("/ALS/ALS/Data/Character/Movement/MS_Als_Normal.MS_Als_Normal")};
+    static ConstructorHelpers::FObjectFinder<UAlsAnimationInstanceSettings> AnimationSettingsAsset{
+	TEXT("/ALS/ALS/Data/AnimationInstance/AIS_Als_Default.AIS_Als_Default")};
+    static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkeletalMeshAsset{
+	TEXT("/ALS/ALS/Character/SKM_Als.SKM_Als")};
+    static ConstructorHelpers::FClassFinder<UAnimInstance> AnimationBlueprint{
+	TEXT("/ALS/ALS/Character/AB_Als")};
+
+    Settings = CharacterSettingsAsset.Object;
+    MovementSettings = MovementSettingsAsset.Object;
+    TraceAnimationSettings = AnimationSettingsAsset.Object;
+
+    GetMesh()->SetSkeletalMeshAsset(SkeletalMeshAsset.Object);
+    GetMesh()->SetAnimInstanceClass(AnimationBlueprint.Class);
+    GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+}
+
+void AAlsTraceCharacter::BeginPlay()
+{
+    // The native trace subclass assigns its animation blueprint in its constructor. Re-cache the final instance created
+    // during actor startup so the unmodified ALS tick path observes the same instance as the mesh.
+    AnimationInstance = Cast<UAlsAnimationInstance>(GetMesh()->GetAnimInstance());
+    Super::BeginPlay();
+}
+
+UAlsCharacterMovementComponent* AAlsTraceCharacter::GetTraceMovement() const
+{
+    return AlsCharacterMovement;
+}
+
+UAlsAnimationInstance* AAlsTraceCharacter::GetTraceAnimationInstance() const
+{
+    return AnimationInstance.Get();
+}
+
+const UAlsMovementSettings* AAlsTraceCharacter::GetTraceMovementSettings() const
+{
+    return MovementSettings;
+}
+
+const UAlsAnimationInstanceSettings* AAlsTraceCharacter::GetTraceAnimationSettings() const
+{
+    return TraceAnimationSettings;
+}

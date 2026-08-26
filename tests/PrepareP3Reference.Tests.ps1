@@ -13,7 +13,8 @@ function New-P3ReferenceFixture
     $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-reference-$([guid]::NewGuid().ToString('N'))"
     $referenceRoot = Join-Path $fixtureRoot 'reference-repository'
     $projectRoot = Join-Path $fixtureRoot 'project'
-    New-Item -ItemType Directory -Path $referenceRoot, (Join-Path $projectRoot 'reference') | Out-Null
+    $projectPatchRoot = Join-Path $projectRoot 'reference\patches'
+    New-Item -ItemType Directory -Path $referenceRoot, $projectPatchRoot | Out-Null
 
     & git -C $referenceRoot init --quiet
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the reference fixture repository.' }
@@ -40,15 +41,12 @@ function New-P3ReferenceFixture
         New-Item -ItemType Directory -Path $outsideRoot | Out-Null
         Set-Content -LiteralPath $outsideFile -Value 'external patch' -NoNewline
 
-        $linkPath = Join-Path $referenceRoot 'linked.patch'
+        $linkPath = Join-Path $projectPatchRoot 'linked.patch'
         New-Item -ItemType SymbolicLink -Path $linkPath -Target $outsideFile | Out-Null
-        & git -C $referenceRoot add linked.patch
-        & git -C $referenceRoot commit --quiet -m 'fixture link'
-        if ($LASTEXITCODE -ne 0) { throw 'Could not commit the reference fixture link.' }
 
         $patches = @(
             [ordered]@{
-                path = 'linked.patch'
+                path = 'reference/patches/linked.patch'
                 sha256 = (Get-FileHash -LiteralPath $outsideFile -Algorithm SHA256).Hash.ToLowerInvariant()
             }
         )
@@ -56,18 +54,14 @@ function New-P3ReferenceFixture
     elseif ($InternalPatch)
     {
         Set-Content -LiteralPath $targetPath -Value 'after' -NoNewline
-        $patchPath = Join-Path $referenceRoot 'change.patch'
+        $patchPath = Join-Path $projectPatchRoot 'change.patch'
         & git -C $referenceRoot diff "--output=$patchPath" -- target.txt
         if ($LASTEXITCODE -ne 0) { throw 'Could not generate the reference fixture patch.' }
         Set-Content -LiteralPath $targetPath -Value 'before' -NoNewline
 
-        & git -C $referenceRoot add change.patch
-        & git -C $referenceRoot commit --quiet -m 'fixture patch'
-        if ($LASTEXITCODE -ne 0) { throw 'Could not commit the reference fixture patch.' }
-
         $patches = @(
             [ordered]@{
-                path = 'change.patch'
+                path = 'reference/patches/change.patch'
                 sha256 = (Get-FileHash -LiteralPath $patchPath -Algorithm SHA256).Hash.ToLowerInvariant()
             }
         )
@@ -75,28 +69,28 @@ function New-P3ReferenceFixture
     elseif ($AtomicFailurePatches)
     {
         Set-Content -LiteralPath $targetPath -Value 'after' -NoNewline
-        $firstPatchPath = Join-Path $referenceRoot 'first.patch'
+        $firstPatchPath = Join-Path $projectPatchRoot 'first.patch'
         & git -C $referenceRoot diff "--output=$firstPatchPath" -- target.txt
         if ($LASTEXITCODE -ne 0) { throw 'Could not generate the first atomicity fixture patch.' }
         Set-Content -LiteralPath $targetPath -Value 'before' -NoNewline
 
         Set-Content -LiteralPath $secondTargetPath -Value 'after-two' -NoNewline
-        $secondPatchPath = Join-Path $referenceRoot 'second.patch'
+        $secondPatchPath = Join-Path $projectPatchRoot 'second.patch'
         & git -C $referenceRoot diff "--output=$secondPatchPath" -- target-two.txt
         if ($LASTEXITCODE -ne 0) { throw 'Could not generate the second atomicity fixture patch.' }
         Set-Content -LiteralPath $secondTargetPath -Value 'diverged-two' -NoNewline
 
-        & git -C $referenceRoot add first.patch second.patch target-two.txt
+        & git -C $referenceRoot add target-two.txt
         & git -C $referenceRoot commit --quiet -m 'fixture atomicity patches'
         if ($LASTEXITCODE -ne 0) { throw 'Could not commit the atomicity fixture patches.' }
 
         $patches = @(
             [ordered]@{
-                path = 'first.patch'
+                path = 'reference/patches/first.patch'
                 sha256 = (Get-FileHash -LiteralPath $firstPatchPath -Algorithm SHA256).Hash.ToLowerInvariant()
             },
             [ordered]@{
-                path = 'second.patch'
+                path = 'reference/patches/second.patch'
                 sha256 = (Get-FileHash -LiteralPath $secondPatchPath -Algorithm SHA256).Hash.ToLowerInvariant()
             }
         )
@@ -172,6 +166,30 @@ Describe 'prepare-p3-reference.ps1' {
             $output.Count | Should Be 1
             $output[0].ToString() | Should Be "P3_REFERENCE_OK commit=$($fixture.Commit) patches=1"
             (Get-Content -LiteralPath $fixture.TargetPath -Raw) | Should Be 'after'
+
+            $secondOutput = @(& pwsh -NoProfile -File $script:PrepareScript -ReferenceRoot $fixture.ReferenceRoot -ProjectRoot $fixture.ProjectRoot 2>&1)
+            $LASTEXITCODE | Should Be 0
+            $secondOutput.Count | Should Be 1
+            $secondOutput[0].ToString() | Should Be "P3_REFERENCE_OK commit=$($fixture.Commit) patches=1"
+            (Get-Content -LiteralPath $fixture.TargetPath -Raw) | Should Be 'after'
+        }
+        finally
+        {
+            Remove-Item -LiteralPath $fixture.FixtureRoot -Recurse -Force
+        }
+    }
+
+    It 'rejects unrelated dirt when the locked patch is already applied' {
+        $fixture = New-P3ReferenceFixture -Origin 'https://github.com/Sixze/ALS-Refactored.git' -InternalPatch
+        try
+        {
+            & pwsh -NoProfile -File $script:PrepareScript -ReferenceRoot $fixture.ReferenceRoot -ProjectRoot $fixture.ProjectRoot | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Initial patch preparation failed unexpectedly.' }
+            Set-Content -LiteralPath (Join-Path $fixture.ReferenceRoot 'seed.txt') -Value 'unrelated' -NoNewline
+
+            $output = @(& pwsh -NoProfile -File $script:PrepareScript -ReferenceRoot $fixture.ReferenceRoot -ProjectRoot $fixture.ProjectRoot 2>&1)
+            $LASTEXITCODE | Should Not Be 0
+            ($output -join "`n") | Should Match 'differs from the exact locked compatibility patch result'
         }
         finally
         {

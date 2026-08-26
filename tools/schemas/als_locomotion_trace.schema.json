@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://godot-als.local/schemas/als_locomotion_trace.schema.json",
+  "title": "Godot ALS P3 Unreal locomotion reference",
+  "oneOf": [
+    { "$ref": "#/$defs/settingsDocument" },
+    { "$ref": "#/$defs/traceDocument" }
+  ],
+  "$defs": {
+    "vector2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "vector3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["fixedDeltaSeconds", "kind", "patchHashes", "referenceCommit", "schemaVersion"],
+      "properties": {
+        "fixedDeltaSeconds": { "type": "number", "const": 0.016666666666666666 },
+        "kind": { "enum": ["settings", "trace"] },
+        "patchHashes": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        },
+        "referenceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "schemaVersion": { "type": "integer", "const": 1 }
+      }
+    },
+    "settingsDocument": {
+      "allOf": [
+        { "$ref": "#/$defs/metadata" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fixedDeltaSeconds", "kind", "patchHashes", "referenceCommit", "schemaVersion", "sources", "values"],
+          "properties": {
+            "fixedDeltaSeconds": true,
+            "kind": { "const": "settings" },
+            "patchHashes": true,
+            "referenceCommit": true,
+            "schemaVersion": true,
+            "sources": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["animation", "character", "movement", "portDefaults"],
+              "properties": {
+                "animation": { "type": "string" },
+                "character": { "type": "string" },
+                "movement": { "type": "string" },
+                "portDefaults": { "type": "string" }
+              }
+            },
+            "values": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "accelerationSmoothingHalfLife", "animatedCrouchSpeed", "animatedRunSpeed",
+                "animatedSprintSpeed", "animatedWalkSpeed", "crouchedHalfHeight",
+                "crouchRunForwardSpeed", "crouchWalkForwardSpeed", "gravity", "jumpSpeed",
+                "landingRecoveryDuration", "leanHalfLife", "maxAcceleration",
+                "maxBrakingDeceleration", "movingSpeedThreshold", "playRateMaximum",
+                "playRateMinimum", "rotationInterpolationHalfLife", "runBackwardSpeed",
+                "runForwardSpeed", "sprintSpeed", "standingHalfHeight",
+                "targetYawInterpolationSpeed", "velocityAngleInterpolationEnd",
+                "velocityAngleInterpolationStart", "velocitySmoothingHalfLife",
+                "walkBackwardSpeed", "walkForwardSpeed"
+              ],
+              "properties": {
+                "accelerationSmoothingHalfLife": { "type": "number" },
+                "animatedCrouchSpeed": { "type": "number" },
+                "animatedRunSpeed": { "type": "number" },
+                "animatedSprintSpeed": { "type": "number" },
+                "animatedWalkSpeed": { "type": "number" },
+                "crouchedHalfHeight": { "type": "number" },
+                "crouchRunForwardSpeed": { "type": "number" },
+                "crouchWalkForwardSpeed": { "type": "number" },
+                "gravity": { "type": "number" },
+                "jumpSpeed": { "type": "number" },
+                "landingRecoveryDuration": { "type": "number" },
+                "leanHalfLife": { "type": "number" },
+                "maxAcceleration": { "type": "number" },
+                "maxBrakingDeceleration": { "type": "number" },
+                "movingSpeedThreshold": { "type": "number" },
+                "playRateMaximum": { "type": "number" },
+                "playRateMinimum": { "type": "number" },
+                "rotationInterpolationHalfLife": { "type": "number" },
+                "runBackwardSpeed": { "type": "number" },
+                "runForwardSpeed": { "type": "number" },
+                "sprintSpeed": { "type": "number" },
+                "standingHalfHeight": { "type": "number" },
+                "targetYawInterpolationSpeed": { "type": "number" },
+                "velocityAngleInterpolationEnd": { "type": "number" },
+                "velocityAngleInterpolationStart": { "type": "number" },
+                "velocitySmoothingHalfLife": { "type": "number" },
+                "walkBackwardSpeed": { "type": "number" },
+                "walkForwardSpeed": { "type": "number" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aimYaw", "jumpPressed", "movementAxes", "requestedGait", "requestedRotationMode", "requestedStance", "standBlocked", "viewYaw"],
+      "properties": {
+        "aimYaw": { "type": "number" },
+        "jumpPressed": { "type": "boolean" },
+        "movementAxes": { "$ref": "#/$defs/vector2" },
+        "requestedGait": { "enum": ["Walking", "Running", "Sprinting"] },
+        "requestedRotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
+        "requestedStance": { "enum": ["Standing", "Crouching"] },
+        "standBlocked": { "type": "boolean" },
+        "viewYaw": { "type": "number" }
+      }
+    },
+    "actual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceleration", "animationPhase", "animationState", "blendCoordinates", "gait",
+        "grounded", "jumpTransition", "lean", "locomotionState", "playRate", "position",
+        "rotationMode", "stance", "stride", "targetYaw", "velocity", "yaw"
+      ],
+      "properties": {
+        "acceleration": { "$ref": "#/$defs/vector3" },
+        "animationPhase": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+        "animationState": { "enum": ["Grounded", "JumpStart", "FallLoop", "LandRecovery"] },
+        "blendCoordinates": { "$ref": "#/$defs/vector2" },
+        "gait": { "enum": ["Walking", "Running", "Sprinting"] },
+        "grounded": { "type": "boolean" },
+        "jumpTransition": { "type": "boolean" },
+        "lean": { "$ref": "#/$defs/vector2" },
+        "locomotionState": { "enum": ["Grounded", "InAir"] },
+        "playRate": { "type": "number" },
+        "position": { "$ref": "#/$defs/vector3" },
+        "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
+        "stance": { "enum": ["Standing", "Crouching"] },
+        "stride": { "type": "number" },
+        "targetYaw": { "type": "number" },
+        "velocity": { "$ref": "#/$defs/vector3" },
+        "yaw": { "type": "number" }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actual", "command", "index", "tick", "time"],
+      "properties": {
+        "actual": { "$ref": "#/$defs/actual" },
+        "command": { "$ref": "#/$defs/command" },
+        "index": { "type": "integer", "minimum": 0 },
+        "tick": { "type": "integer", "minimum": 0 },
+        "time": { "type": "number", "minimum": 0 }
+      }
+    },
+    "traceDocument": {
+      "allOf": [
+        { "$ref": "#/$defs/metadata" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fixedDeltaSeconds", "frames", "kind", "name", "patchHashes", "referenceCommit", "schemaVersion"],
+          "properties": {
+            "fixedDeltaSeconds": true,
+            "frames": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/frame" } },
+            "kind": { "const": "trace" },
+            "name": { "enum": ["idle_gaits", "directions", "crouch_clearance", "rotation_modes", "jump_land"] },
+            "patchHashes": true,
+            "referenceCommit": true,
+            "schemaVersion": true
+          }
+        }
+      ]
+    }
+  }
+}

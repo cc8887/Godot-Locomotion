@@ -1,0 +1,47 @@
+{
+	"fixedDeltaSeconds": 0.016666666666666666,
+	"kind": "settings",
+	"patchHashes": [
+		"3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f"
+	],
+	"referenceCommit": "b754d6f0f2bb03741d301f8fb88077ebfe561e17",
+	"schemaVersion": 1,
+	"sources":
+	{
+		"animation": "/ALS/ALS/Data/AnimationInstance/AIS_Als_Default",
+		"character": "/ALS/ALS/Data/Character/CS_Als_Default",
+		"movement": "/ALS/ALS/Data/Character/Movement/MS_Als_Normal",
+		"portDefaults": "accelerationSmoothingHalfLife,landingRecoveryDuration,playRateMaximum,playRateMinimum,rotationInterpolationHalfLife,targetYawInterpolationSpeed,velocitySmoothingHalfLife"
+	},
+	"values":
+	{
+		"accelerationSmoothingHalfLife": 0.10000000000000001,
+		"animatedCrouchSpeed": 1.5,
+		"animatedRunSpeed": 3.5,
+		"animatedSprintSpeed": 6,
+		"animatedWalkSpeed": 1.5,
+		"crouchedHalfHeight": 0.56000000000000005,
+		"crouchRunForwardSpeed": 2,
+		"crouchWalkForwardSpeed": 1.5,
+		"gravity": 9.8000000000000007,
+		"jumpSpeed": 4.2000000000000002,
+		"landingRecoveryDuration": 0.20000000000000001,
+		"leanHalfLife": 0.20000000298023224,
+		"maxAcceleration": 20,
+		"maxBrakingDeceleration": 15,
+		"movingSpeedThreshold": 0.5,
+		"playRateMaximum": 3,
+		"playRateMinimum": 0,
+		"rotationInterpolationHalfLife": 0.10000000000000001,
+		"runBackwardSpeed": 3.75,
+		"runForwardSpeed": 3.75,
+		"sprintSpeed": 6.5,
+		"standingHalfHeight": 0.90000000000000002,
+		"targetYawInterpolationSpeed": 12,
+		"velocityAngleInterpolationEnd": 2.1816616058349609,
+		"velocityAngleInterpolationStart": 1.7453292608261108,
+		"velocitySmoothingHalfLife": 0.10000000000000001,
+		"walkBackwardSpeed": 1.75,
+		"walkForwardSpeed": 1.75
+	}
+}
