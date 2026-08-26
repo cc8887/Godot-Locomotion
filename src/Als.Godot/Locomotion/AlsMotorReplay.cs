@@ -5,6 +5,7 @@ namespace GodotAls.Locomotion;
 
 public static class AlsMotorReplay
 {
+    public const long HarnessLastFrame = 720;
     public const long MovementObservationFrame = 8;
     public const long ReleaseFrame = 9;
     public const long JumpFrame = 10;
@@ -49,6 +50,65 @@ public static class AlsMotorReplay
         commands[BlockedStandFrame] = standingSprint with { JumpPressed = 1 };
 
         return new AlsReplayInputAdapter(0, commands);
+    }
+
+    public static AlsReplayInputAdapter CreateHarnessSequence()
+    {
+        var commands = new AlsLocomotionCommand[HarnessLastFrame + 1];
+        Array.Fill(commands, AlsLocomotionCommand.CreateDefault());
+
+        Fill(commands, 1, 60, CreateCommand(Vector2.UnitY, AlsStance.Standing, AlsGait.Walking, 0));
+        Fill(commands, 61, 120, CreateCommand(Vector2.UnitY, AlsStance.Standing, AlsGait.Running, 0));
+        commands[61] = commands[61] with { JumpPressed = 1 };
+        Fill(commands, 121, 180, CreateCommand(Vector2.UnitY, AlsStance.Standing, AlsGait.Sprinting, 0));
+        Fill(commands, 181, 240, CreateCommand(Vector2.UnitX, AlsStance.Standing, AlsGait.Running, 0));
+        Fill(commands, 241, 300, CreateCommand(-Vector2.UnitY, AlsStance.Standing, AlsGait.Running, 0));
+        Fill(
+            commands,
+            301,
+            360,
+            CreateCommand(new Vector2(-0.6f, 0.8f), AlsStance.Standing, AlsGait.Running, 0) with
+            {
+                ViewYaw = MathF.PI * 0.5f,
+                RequestedRotationMode = AlsRotationMode.VelocityDirection,
+            });
+        Fill(
+            commands,
+            361,
+            420,
+            CreateCommand(new Vector2(0.7f, 0.7f), AlsStance.Standing, AlsGait.Walking, 0) with
+            {
+                AimYaw = -MathF.PI * 0.25f,
+                RequestedRotationMode = AlsRotationMode.Aiming,
+            });
+        Fill(
+            commands,
+            421,
+            480,
+            CreateCommand(new Vector2(0.5f, 0.5f), AlsStance.Crouching, AlsGait.Running, 0));
+        Fill(commands, 481, 520, CreateCommand(Vector2.Zero, AlsStance.Standing, AlsGait.Running, 0));
+        commands[481] = commands[481] with { JumpPressed = 1 };
+        Fill(commands, 521, 600, CreateCommand(-Vector2.UnitX, AlsStance.Standing, AlsGait.Walking, 0));
+        Fill(
+            commands,
+            601,
+            660,
+            CreateCommand(new Vector2(-0.7f, 0.7f), AlsStance.Standing, AlsGait.Sprinting, 0));
+        Fill(commands, 661, HarnessLastFrame, CreateCommand(Vector2.Zero, AlsStance.Standing, AlsGait.Running, 0));
+
+        return new AlsReplayInputAdapter(0, commands);
+    }
+
+    private static void Fill(
+        AlsLocomotionCommand[] commands,
+        int firstFrame,
+        long lastFrame,
+        in AlsLocomotionCommand command)
+    {
+        for (var frame = firstFrame; frame <= lastFrame; frame++)
+        {
+            commands[frame] = command;
+        }
     }
 
     private static AlsLocomotionCommand CreateCommand(
