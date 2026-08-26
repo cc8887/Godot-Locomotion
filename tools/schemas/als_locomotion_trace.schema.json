@@ -163,12 +163,13 @@
     "nativeActual": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["blendCoordinates", "gait", "lean", "locomotionState", "playRate", "rotationMode", "stance", "stride", "synthesizedAnimationPhase", "targetYaw"],
+      "required": ["blendCoordinates", "gait", "lean", "locomotionState", "observedAnimationState", "playRate", "rotationMode", "stance", "stride", "synthesizedAnimationPhase", "targetYaw"],
       "properties": {
         "blendCoordinates": { "$ref": "#/$defs/vector2" },
         "gait": { "enum": ["Walking", "Running", "Sprinting"] },
         "lean": { "$ref": "#/$defs/normalizedVector2" },
         "locomotionState": { "enum": ["Grounded", "InAir"] },
+        "observedAnimationState": { "enum": ["Grounded", "JumpStart", "FallLoop", "LandRecovery"] },
         "playRate": { "type": "number", "minimum": 0, "maximum": 3 },
         "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
         "stance": { "enum": ["Standing", "Crouching"] },
@@ -225,6 +226,41 @@
             "referenceCommit": true,
             "schemaVersion": true
           }
+        },
+        {
+          "if": {
+            "required": ["name"],
+            "properties": { "name": { "const": "idle_gaits" } }
+          },
+          "then": { "properties": { "frames": { "minItems": 240, "maxItems": 240 } } }
+        },
+        {
+          "if": {
+            "required": ["name"],
+            "properties": { "name": { "const": "directions" } }
+          },
+          "then": { "properties": { "frames": { "minItems": 240, "maxItems": 240 } } }
+        },
+        {
+          "if": {
+            "required": ["name"],
+            "properties": { "name": { "const": "crouch_clearance" } }
+          },
+          "then": { "properties": { "frames": { "minItems": 210, "maxItems": 210 } } }
+        },
+        {
+          "if": {
+            "required": ["name"],
+            "properties": { "name": { "const": "rotation_modes" } }
+          },
+          "then": { "properties": { "frames": { "minItems": 240, "maxItems": 240 } } }
+        },
+        {
+          "if": {
+            "required": ["name"],
+            "properties": { "name": { "const": "jump_land" } }
+          },
+          "then": { "properties": { "frames": { "minItems": 240, "maxItems": 240 } } }
         }
       ]
     }

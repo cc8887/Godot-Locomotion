@@ -102,6 +102,12 @@ struct FPortState
     float TargetYaw{0.0f};
 };
 
+struct FNativeObservationState
+{
+    float AnimationPhase{0.0f};
+    int32 LandingRecoveryFramesRemaining{0};
+};
+
 struct FPortResult
 {
     FString LocomotionState;
@@ -606,7 +612,7 @@ TSharedRef<FJsonObject> CreateCommandObject(const FTraceCommand& Command)
 
 TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTraceCommand& Command,
                                       const int32 Frame, const FVector& Origin, const bool bWasGrounded,
-                                      float& NativeAnimationPhase,
+                                      FNativeObservationState& NativeState,
                                       const FPortSettings& PortSettings, FPortState& PortState)
 {
     const UAlsCharacterMovementComponent* Movement{Character.GetTraceMovement()};
@@ -623,8 +629,23 @@ TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTrac
     const float PlayRate{Character.GetStance() == AlsStanceTags::Crouching
         ? (Crouching != nullptr ? Crouching->PlayRate : 1.0f)
         : (Standing != nullptr ? Standing->PlayRate : 1.0f)};
-    NativeAnimationPhase = FMath::Fmod(NativeAnimationPhase + static_cast<float>(FixedDeltaSeconds) * PlayRate, 1.0f);
+    NativeState.AnimationPhase = FMath::Fmod(
+        NativeState.AnimationPhase + static_cast<float>(FixedDeltaSeconds) * PlayRate, 1.0f);
     const bool bJumpTransition{!bGrounded && bWasGrounded};
+    const bool bLandingTransition{bGrounded && !bWasGrounded};
+    if (!bGrounded)
+    {
+        NativeState.LandingRecoveryFramesRemaining = 0;
+    }
+    else if (bLandingTransition)
+    {
+        NativeState.LandingRecoveryFramesRemaining = 13;
+    }
+    const FString ObservedAnimationState{bJumpTransition
+        ? TEXT("JumpStart")
+        : (!bGrounded
+            ? TEXT("FallLoop")
+            : (NativeState.LandingRecoveryFramesRemaining > 0 ? TEXT("LandRecovery") : TEXT("Grounded")))};
     const FPortResult Port{EvaluatePort(Character, Command, bJumpTransition, PortSettings, PortState)};
 
     const TSharedRef<FJsonObject> PhysicalActual{MakeShared<FJsonObject>()};
@@ -644,12 +665,17 @@ TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTrac
     NativeActual->SetStringField(TEXT("gait"), GaitName(Character.GetGait()));
     NativeActual->SetObjectField(TEXT("lean"), Vector2Object(Lean != nullptr ? Lean->RightAmount : 0.0, Lean != nullptr ? Lean->ForwardAmount : 0.0));
     NativeActual->SetStringField(TEXT("locomotionState"), bGrounded ? TEXT("Grounded") : TEXT("InAir"));
+    NativeActual->SetStringField(TEXT("observedAnimationState"), ObservedAnimationState);
     NativeActual->SetNumberField(TEXT("playRate"), PlayRate);
     NativeActual->SetStringField(TEXT("rotationMode"), RotationModeName(Character.GetRotationMode()));
     NativeActual->SetStringField(TEXT("stance"), StanceName(Character.GetStance()));
     NativeActual->SetNumberField(TEXT("stride"), Stride);
-    NativeActual->SetNumberField(TEXT("synthesizedAnimationPhase"), NativeAnimationPhase);
+    NativeActual->SetNumberField(TEXT("synthesizedAnimationPhase"), NativeState.AnimationPhase);
     NativeActual->SetNumberField(TEXT("targetYaw"), FMath::DegreesToRadians(Locomotion != nullptr ? Locomotion->TargetYawAngleWorldSpace : Character.GetActorRotation().Yaw));
+    if (NativeState.LandingRecoveryFramesRemaining > 0)
+    {
+        --NativeState.LandingRecoveryFramesRemaining;
+    }
 
     const TSharedRef<FJsonObject> PortExpected{MakeShared<FJsonObject>()};
     PortExpected->SetNumberField(TEXT("animationPhase"), Port.AnimationPhase);
@@ -705,7 +731,7 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
     Frames.Reserve(Definition.FrameCount);
     AActor* ClearanceBlocker{nullptr};
     bool bWasGrounded{Character->GetTraceMovement()->IsMovingOnGround()};
-    float NativeAnimationPhase{0.0f};
+    FNativeObservationState NativeState;
     const FPortSettings PortSettings{CreatePortSettings(*Character)};
     FPortState PortState;
 
@@ -749,7 +775,7 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
         TickTraceCharacter(*Character);
         const bool bGrounded{Character->GetTraceMovement()->IsMovingOnGround()};
         Frames.Add(MakeShared<FJsonValueObject>(SnapshotFrame(*Character, Command, Frame, Origin,
-            bWasGrounded, NativeAnimationPhase, PortSettings, PortState)));
+            bWasGrounded, NativeState, PortSettings, PortState)));
         bWasGrounded = bGrounded;
     }
 

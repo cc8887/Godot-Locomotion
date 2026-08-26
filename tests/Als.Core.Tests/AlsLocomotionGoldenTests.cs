@@ -70,6 +70,7 @@ public sealed class AlsLocomotionGoldenTests
         {
             NativeActual = trace.Frames[0].NativeActual with
             {
+                ObservedAnimationState = AlsAnimationState.JumpStart,
                 Gait = AlsGait.Sprinting,
                 Stride = 1f,
                 PlayRate = 3f,
@@ -79,6 +80,87 @@ public sealed class AlsLocomotionGoldenTests
         };
 
         Assert.Equal(expected, AlsLocomotionTrace.Compare(trace, P3TestSettings.Reference));
+    }
+
+    [Theory]
+    [MemberData(nameof(ReferenceFixtures))]
+    public void ATraceWithAValidTailFrameRemovedIsRejected(string fixture)
+    {
+        AssertFixtureMutationRejected(fixture, root => root["frames"]!.AsArray().RemoveAt(
+            root["frames"]!.AsArray().Count - 1));
+    }
+
+    [Fact]
+    public void NativeObservedAnimationStateIsRequired()
+    {
+        AssertMutationRejected(root => ObjectAt(root, "nativeActual").Remove("observedAnimationState"));
+    }
+
+    [Fact]
+    public void NativeObservedAnimationStateMustBeAValidEnum()
+    {
+        var exception = MutationException(root =>
+            ObjectAt(root, "nativeActual")["observedAnimationState"] = "Hovering");
+
+        Assert.Contains(nameof(AlsAnimationState), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NativeAndPortLandingRecoveryWindowsRemainIndependent()
+    {
+        var trace = AlsLocomotionTrace.Load(P3Fixture.Path("trace_jump_land.json"));
+
+        var nativeFrames = trace.Frames
+            .Where(frame => frame.NativeActual.ObservedAnimationState == AlsAnimationState.LandRecovery)
+            .Select(frame => frame.Index)
+            .ToArray();
+        var portFrames = trace.Frames
+            .Where(frame => frame.ExpectedAnimationState == AlsAnimationState.LandRecovery)
+            .Select(frame => frame.Index)
+            .ToArray();
+
+        Assert.Equal(Enumerable.Range(81, 13), nativeFrames);
+        Assert.Equal(Enumerable.Range(81, 12), portFrames);
+    }
+
+    [Fact]
+    public void BlendCoordinatesUseMetricToleranceBoundaries()
+    {
+        var inside = AlsLocomotionTrace.Load(P3Fixture.Path("trace_idle_gaits.json"));
+        inside.Frames[0] = inside.Frames[0] with
+        {
+            ExpectedBlendCoordinates = inside.Frames[0].ExpectedBlendCoordinates +
+                                       new System.Numerics.Vector2(0.0009f, 0f),
+        };
+
+        Assert.DoesNotContain(
+            AlsLocomotionTrace.Compare(inside, P3TestSettings.Reference),
+            issue => issue.Frame == 0 && issue.Field == "blendCoordinates.x");
+
+        var outside = AlsLocomotionTrace.Load(P3Fixture.Path("trace_idle_gaits.json"));
+        outside.Frames[0] = outside.Frames[0] with
+        {
+            ExpectedBlendCoordinates = outside.Frames[0].ExpectedBlendCoordinates +
+                                       new System.Numerics.Vector2(0.0011f, 0f),
+        };
+
+        Assert.Contains(
+            AlsLocomotionTrace.Compare(outside, P3TestSettings.Reference),
+            issue => issue.Frame == 0 && issue.Field == "blendCoordinates.x");
+    }
+
+    [Fact]
+    public void NormalizedParametersKeepTheirTighterTolerance()
+    {
+        var trace = AlsLocomotionTrace.Load(P3Fixture.Path("trace_idle_gaits.json"));
+        trace.Frames[0] = trace.Frames[0] with
+        {
+            ExpectedStride = trace.Frames[0].ExpectedStride + 0.0009f,
+        };
+
+        Assert.Contains(
+            AlsLocomotionTrace.Compare(trace, P3TestSettings.Reference),
+            issue => issue.Frame == 0 && issue.Field == "stride");
     }
 
     [Fact]
@@ -268,6 +350,34 @@ public sealed class AlsLocomotionGoldenTests
     }
 
     [Fact]
+    public void SchemaPinsTheExactFrameCountForEverySequence()
+    {
+        var schema = JsonNode.Parse(File.ReadAllText(P3Fixture.RepositoryPath(
+            "tools",
+            "schemas",
+            "als_locomotion_trace.schema.json")))!.AsObject();
+        var rules = schema["$defs"]!["traceDocument"]!["allOf"]!.AsArray();
+        var expectedCounts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["idle_gaits"] = 240,
+            ["directions"] = 240,
+            ["crouch_clearance"] = 210,
+            ["rotation_modes"] = 240,
+            ["jump_land"] = 240,
+        };
+
+        foreach (var (name, expectedCount) in expectedCounts)
+        {
+            var rule = Assert.Single(rules, candidate =>
+                candidate?["if"]?["properties"]?["name"]?["const"]?.GetValue<string>() == name);
+            Assert.Equal(expectedCount,
+                rule!["then"]!["properties"]!["frames"]!["minItems"]!.GetValue<int>());
+            Assert.Equal(expectedCount,
+                rule["then"]!["properties"]!["frames"]!["maxItems"]!.GetValue<int>());
+        }
+    }
+
+    [Fact]
     public void BooleanFieldsAreConvertedToBytes()
     {
         var trace = AlsLocomotionTrace.Load(P3Fixture.Path("trace_jump_land.json"));
@@ -282,19 +392,36 @@ public sealed class AlsLocomotionGoldenTests
 
     private static void AssertMutationRejected(Action<JsonObject> mutation)
     {
+        _ = MutationException(mutation);
+    }
+
+    private static FormatException MutationException(Action<JsonObject> mutation)
+    {
         var root = JsonNode.Parse(File.ReadAllText(P3Fixture.Path("trace_idle_gaits.json")))!.AsObject();
         mutation(root);
-        AssertRawRejected(root.ToJsonString());
+        return LoadException("trace_idle_gaits.json", root.ToJsonString());
+    }
+
+    private static void AssertFixtureMutationRejected(string fixture, Action<JsonObject> mutation)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(P3Fixture.Path(fixture)))!.AsObject();
+        mutation(root);
+        _ = LoadException(fixture, root.ToJsonString());
     }
 
     private static void AssertRawRejected(string json)
     {
+        _ = LoadException("trace_idle_gaits.json", json);
+    }
+
+    private static FormatException LoadException(string fixture, string json)
+    {
         var directory = Directory.CreateTempSubdirectory("godot-als-p3-");
         try
         {
-            var path = System.IO.Path.Combine(directory.FullName, "trace_idle_gaits.json");
+            var path = System.IO.Path.Combine(directory.FullName, fixture);
             File.WriteAllText(path, json);
-            Assert.Throws<FormatException>(() => AlsLocomotionTrace.Load(path));
+            return Assert.Throws<FormatException>(() => AlsLocomotionTrace.Load(path));
         }
         finally
         {

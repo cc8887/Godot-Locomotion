@@ -18,6 +18,37 @@ function New-P3GeneratedFixture
 }
 
 Describe 'generate-p3-golden.ps1 semantic validation' {
+    It 'rejects the wrong frame count for every named trace' {
+        $expectedCounts = [ordered]@{
+            idle_gaits = 240
+            directions = 240
+            crouch_clearance = 210
+            rotation_modes = 240
+            jump_land = 240
+        }
+        foreach ($entry in $expectedCounts.GetEnumerator())
+        {
+            $fixtureRoot = New-P3GeneratedFixture
+            try
+            {
+                $tracePath = Join-Path $fixtureRoot "trace_$($entry.Key).json"
+                $trace = Get-Content -LiteralPath $tracePath -Raw | ConvertFrom-Json
+                $trace.frames = @($trace.frames | Select-Object -First ($entry.Value - 1))
+                [System.IO.File]::WriteAllText($tracePath, ($trace | ConvertTo-Json -Depth 20),
+                    [System.Text.UTF8Encoding]::new($false))
+
+                $validationError = ''
+                try { Validate-GeneratedOutput $fixtureRoot $script:SchemaPath }
+                catch { $validationError = $_.Exception.Message }
+                $validationError | Should Match "$($entry.Key).*frame count.*$($entry.Value)"
+            }
+            finally
+            {
+                Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+            }
+        }
+    }
+
     It 'rejects gait labels without idle-to-moving locomotion evidence' {
         $fixtureRoot = New-P3GeneratedFixture
         try
@@ -93,6 +124,20 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
         ($names -contains 'portExpected') | Should Be $true
         ($names -contains 'actual') | Should Be $false
         $trace.frames[0].nativeActual.stride | Should Not Be $trace.frames[0].portExpected.stride
+    }
+
+    It 'locks native and port landing recovery to their independent windows' {
+        $trace = Get-Content -LiteralPath (Join-Path $script:RepositoryRoot `
+            'tests\Als.Core.Tests\Fixtures\P3\trace_jump_land.json') -Raw | ConvertFrom-Json
+        $nativeFrames = @($trace.frames | Where-Object {
+            $_.nativeActual.observedAnimationState -ceq 'LandRecovery'
+        } | ForEach-Object { $_.index })
+        $portFrames = @($trace.frames | Where-Object {
+            $_.portExpected.animationState -ceq 'LandRecovery'
+        } | ForEach-Object { $_.index })
+
+        ($nativeFrames -join ',') | Should Be ((81..93) -join ',')
+        ($portFrames -join ',') | Should Be ((81..92) -join ',')
     }
 }
 

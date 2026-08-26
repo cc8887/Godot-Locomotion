@@ -16,6 +16,13 @@ $ErrorActionPreference = 'Stop'
 $lockedCommit = 'b754d6f0f2bb03741d301f8fb88077ebfe561e17'
 $lockedPatchHash = '3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f'
 $sequenceNames = @('idle_gaits', 'directions', 'crouch_clearance', 'rotation_modes', 'jump_land')
+$expectedFrameCounts = [ordered]@{
+    idle_gaits = 240
+    directions = 240
+    crouch_clearance = 210
+    rotation_modes = 240
+    jump_land = 240
+}
 $expectedOutputNames = @($sequenceNames | ForEach-Object { "trace_$_.json" }) + 'p3_locomotion_settings.json'
 $outputDestinations = [ordered]@{
     'p3_locomotion_settings.json' = 'assets\config\p3_locomotion_settings.json'
@@ -513,6 +520,17 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
     foreach ($file in $files)
     {
         $raw = Get-Content -LiteralPath $file.FullName -Raw
+        $document = $raw | ConvertFrom-Json
+        if ($document.kind -ceq 'trace' -and
+            $expectedFrameCounts.Contains([string]$document.name))
+        {
+            $expectedFrameCount = [int]$expectedFrameCounts[[string]$document.name]
+            $actualFrameCount = @($document.frames).Count
+            if ($actualFrameCount -ne $expectedFrameCount)
+            {
+                throw "$($document.name) frame count must be exactly $expectedFrameCount; actual $actualFrameCount."
+            }
+        }
         try
         {
             $schemaValid = Test-Json -Json $raw -SchemaFile $SchemaPath -ErrorAction Stop
@@ -522,7 +540,6 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             throw "JSON Schema validation failed for $($file.Name): $($_.Exception.Message)"
         }
         if (-not $schemaValid) { throw "JSON Schema validation returned false for $($file.Name)." }
-        $document = $raw | ConvertFrom-Json
         Assert-FiniteNumber $document $file.Name
         Assert-SortedProperties $document $file.Name
         if ($document.schemaVersion -ne 1 -or $document.referenceCommit -cne $lockedCommit -or
@@ -579,7 +596,8 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                 'maxAcceleration', 'maxBrakingDeceleration', 'position', 'rotationMode', 'stance', 'velocity', 'yaw') `
                 "$($file.Name).frames[$expectedIndex].physicalActual"
             Assert-ExactProperties $frame.nativeActual @('blendCoordinates', 'gait', 'lean', 'locomotionState',
-                'playRate', 'rotationMode', 'stance', 'stride', 'synthesizedAnimationPhase', 'targetYaw') `
+                'observedAnimationState', 'playRate', 'rotationMode', 'stance', 'stride',
+                'synthesizedAnimationPhase', 'targetYaw') `
                 "$($file.Name).frames[$expectedIndex].nativeActual"
             Assert-ExactProperties $frame.portExpected @('animationPhase', 'animationState', 'blendCoordinates',
                 'gait', 'lean', 'locomotionState', 'playRate', 'rotationMode', 'stance', 'stride', 'targetYaw') `
@@ -780,6 +798,20 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                 if ($landRecovery.Count -eq 0)
                 {
                     throw 'jump_land lacks grounded LandRecovery after FallLoop.'
+                }
+                $nativeLandRecoveryFrames = @($frames | Where-Object {
+                    $_.nativeActual.observedAnimationState -ceq 'LandRecovery'
+                } | ForEach-Object { $_.index })
+                $portLandRecoveryFrames = @($frames | Where-Object {
+                    $_.portExpected.animationState -ceq 'LandRecovery'
+                } | ForEach-Object { $_.index })
+                if (($nativeLandRecoveryFrames -join ',') -cne ((81..93) -join ','))
+                {
+                    throw "jump_land native LandRecovery frames must be 81..93; actual $($nativeLandRecoveryFrames -join ',')."
+                }
+                if (($portLandRecoveryFrames -join ',') -cne ((81..92) -join ','))
+                {
+                    throw "jump_land port LandRecovery frames must be 81..92; actual $($portLandRecoveryFrames -join ',')."
                 }
             }
         }
