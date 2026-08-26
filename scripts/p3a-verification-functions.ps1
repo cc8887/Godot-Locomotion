@@ -8,10 +8,10 @@ function Get-P3aExpectedDigest
 
     if ($CharacterCount -eq 1)
     {
-        return '302AA679C5C51AC1'
+        return '4E567B2CB05AF7DF'
     }
 
-    return 'B1A492086E5D2D83'
+    return '1623F6F27E89C051'
 }
 
 function ConvertFrom-P3aHarnessOutput

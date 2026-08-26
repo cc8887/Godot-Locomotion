@@ -10,6 +10,8 @@ public static class AlsLocomotionModel
     private const float SmallNumber = 1e-6f;
     private const float MinimumPlayRate = 0.0001f;
     private const float RecoveryTimeBoundaryTolerance = 1e-6f;
+    private const float VelocityTargetYawSpeed = 800f * MathF.PI / 180f;
+    private const float LookingTargetYawSpeed = 500f * MathF.PI / 180f;
 
     public static AlsGait CalculateActualGait(
         float speed,
@@ -173,13 +175,14 @@ public static class AlsLocomotionModel
                 AlsMath.DamperExactAlpha(input.DeltaTime, settings.AccelerationSmoothingHalfLife));
         }
 
-        var selectedTargetYaw = SelectTargetYaw(input, state, speed, firstFrame);
-        var targetYaw = firstFrame
-            ? selectedTargetYaw
-            : AlsMath.InterpolateAngleShortest(
-                state.TargetYaw,
-                selectedTargetYaw,
-                AlsMath.DamperExactAlpha(input.DeltaTime, settings.RotationInterpolationHalfLife));
+        var targetYaw = CalculateTargetYaw(
+            input,
+            actualGait,
+            localYaw,
+            speed,
+            firstFrame,
+            settings,
+            ref nextState);
 
         var referenceSpeed = SampleDirectionalSpeed(
             SelectGaitSpeeds(stanceSpeeds, actualGait),
@@ -261,8 +264,22 @@ public static class AlsLocomotionModel
         if (currentLocomotionState == AlsLocomotionState.InAir)
         {
             nextState.LandingRecoveryTime = 0f;
-            return jumped ? AlsAnimationState.JumpStart : AlsAnimationState.FallLoop;
+            if (jumped)
+            {
+                nextState.JumpStartActive = 1;
+                return AlsAnimationState.JumpStart;
+            }
+
+            if (nextState.JumpStartActive == 1 && input.ActualVelocity.Y > 0f)
+            {
+                return AlsAnimationState.JumpStart;
+            }
+
+            nextState.JumpStartActive = 0;
+            return AlsAnimationState.FallLoop;
         }
+
+        nextState.JumpStartActive = 0;
 
         if (landed)
         {
@@ -331,19 +348,59 @@ public static class AlsLocomotionModel
         return (float)value;
     }
 
-    private static float SelectTargetYaw(
+    private static float CalculateTargetYaw(
         in AlsFrameInput input,
-        in AlsRuntimeState state,
+        AlsGait actualGait,
+        float localYaw,
         float speed,
-        bool firstFrame) => input.RotationMode switch
+        bool firstFrame,
+        AlsLocomotionSettings settings,
+        ref AlsRuntimeState nextState)
+    {
+        if (speed <= settings.MovingSpeedThreshold &&
+            input.RotationMode != AlsRotationMode.Aiming)
         {
-            AlsRotationMode.VelocityDirection when speed > SmallNumber =>
-                MathF.Atan2(-input.ActualVelocity.X, -input.ActualVelocity.Z),
-            AlsRotationMode.VelocityDirection => firstFrame ? input.CharacterYaw : state.TargetYaw,
-            AlsRotationMode.LookingDirection => ExtractYaw(input.ViewRotation),
+            nextState.SmoothedTargetYaw = AlsMath.NormalizeAngleRadians(input.CharacterYaw);
+            return nextState.SmoothedTargetYaw;
+        }
+
+        var velocityYaw = speed > SmallNumber
+            ? MathF.Atan2(-input.ActualVelocity.X, -input.ActualVelocity.Z)
+            : input.CharacterYaw;
+        var selectedTargetYaw = input.RotationMode switch
+        {
+            AlsRotationMode.VelocityDirection => velocityYaw,
+            AlsRotationMode.LookingDirection when actualGait == AlsGait.Sprinting => velocityYaw,
+            AlsRotationMode.LookingDirection => AlsMath.NormalizeAngleRadians(
+                ExtractYaw(input.ViewRotation) + localYaw),
             AlsRotationMode.Aiming => ExtractYaw(input.AimRotation),
             _ => throw new ArgumentOutOfRangeException(nameof(input.RotationMode)),
         };
+
+        var previousSmoothedTarget = firstFrame
+            ? input.CharacterYaw
+            : nextState.SmoothedTargetYaw;
+        nextState.SmoothedTargetYaw = input.RotationMode switch
+        {
+            AlsRotationMode.VelocityDirection => AlsMath.InterpolateAngleConstant(
+                previousSmoothedTarget,
+                selectedTargetYaw,
+                input.DeltaTime,
+                VelocityTargetYawSpeed),
+            AlsRotationMode.LookingDirection => AlsMath.InterpolateAngleConstant(
+                previousSmoothedTarget,
+                selectedTargetYaw,
+                input.DeltaTime,
+                LookingTargetYawSpeed),
+            AlsRotationMode.Aiming => selectedTargetYaw,
+            _ => throw new ArgumentOutOfRangeException(nameof(input.RotationMode)),
+        };
+
+        return AlsMath.InterpolateAngleShortest(
+            input.CharacterYaw,
+            nextState.SmoothedTargetYaw,
+            AlsMath.DamperExactAlpha(input.DeltaTime, settings.RotationInterpolationHalfLife));
+    }
 
     private static float ExtractYaw(in Quaternion quaternion)
     {
@@ -465,6 +522,11 @@ public static class AlsLocomotionModel
             throw new ArgumentOutOfRangeException(nameof(state), "Initialized must be zero or one.");
         }
 
+        if (state.JumpStartActive > 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(state), "JumpStartActive must be zero or one.");
+        }
+
         if ((uint)state.LocomotionState > (uint)AlsLocomotionState.Recovering ||
             (uint)state.PreviousLocomotionState > (uint)AlsLocomotionState.Recovering ||
             (uint)state.ActualGait > (uint)AlsGait.Sprinting)
@@ -475,6 +537,7 @@ public static class AlsLocomotionModel
         if (!float.IsFinite(state.AnimationPhase) || state.AnimationPhase < 0f || state.AnimationPhase >= 1f ||
             !float.IsFinite(state.LandingRecoveryTime) || state.LandingRecoveryTime < 0f ||
             !float.IsFinite(state.GroundedEntrySpeed) || state.GroundedEntrySpeed < 0f ||
+            !float.IsFinite(state.SmoothedTargetYaw) ||
             !float.IsFinite(state.TargetYaw) ||
             !IsFinite(state.SmoothedLocalVelocity) ||
             !IsFinite(state.SmoothedLocalAcceleration) ||

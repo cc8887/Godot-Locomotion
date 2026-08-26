@@ -46,6 +46,9 @@ public static class AlsResultDigest
         Append(ref digest, result.TargetYaw);
     }
 
+    public static void AppendAppliedYaw(ref ulong digest, float appliedYaw) =>
+        Append(ref digest, appliedYaw);
+
     private static void Append(ref ulong digest, Vector2 value)
     {
         Append(ref digest, value.X);

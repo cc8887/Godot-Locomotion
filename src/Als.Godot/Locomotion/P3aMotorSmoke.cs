@@ -46,6 +46,7 @@ public partial class P3aMotorSmoke : Node
     private bool _crouchJumpChecked;
     private bool _responseMathBoundariesChecked;
     private bool _velocityTransactionChecked;
+    private bool _rotationCommitChecked;
     private AlsLocomotionSettings _coreSettings = null!;
     private float _reverseVelocity;
     private float _reverseAcceleration;
@@ -251,6 +252,8 @@ public partial class P3aMotorSmoke : Node
         Require(_crouchJumpChecked, "crouching jump control did not execute");
         Require(_responseMathBoundariesChecked, "response math boundary regression did not execute");
         Require(_velocityTransactionChecked, "velocity transaction regression did not execute");
+        VerifyRotationCommit();
+        Require(_rotationCommitChecked, "rotation commit regression did not execute");
         Require(_landingTransitions == 1, $"expected one landing transition, observed {_landingTransitions}");
         _passed[3] = true;
         Require(Array.TrueForAll(_passed, static passed => passed), "one or more motor smoke cases did not execute");
@@ -264,6 +267,90 @@ public partial class P3aMotorSmoke : Node
         GD.Print("GODOT_ALS_P3A_MOTOR_CLASSIFICATION cases=6");
         GD.Print("GODOT_ALS_P3A_MOTOR_OK cases=7");
         GetTree().Quit(0);
+    }
+
+    private void VerifyRotationCommit()
+    {
+        foreach (var mode in new[]
+        {
+            AlsRotationMode.VelocityDirection,
+            AlsRotationMode.LookingDirection,
+            AlsRotationMode.Aiming,
+        })
+        {
+            var currentYaw = ReadMotorYaw(_motor);
+            var input = CreateRotationInput(mode, currentYaw, new NumericsVector3(1f, 0f, 0f));
+            var state = default(AlsRuntimeState);
+            var result = AlsFrameResult.CreateDefault(input.Identity);
+            AlsLocomotionModel.Evaluate(input, ref state, ref result, _coreSettings);
+
+            _motor.ApplyTargetYaw(result.TargetYaw);
+            RequireNear(
+                AlsMath.NormalizeAngleRadians(ReadMotorYaw(_motor) - result.TargetYaw),
+                0f,
+                0.00001f,
+                $"{mode} committed GlobalBasis yaw");
+        }
+
+        var stoppedYaw = ReadMotorYaw(_motor);
+        var stoppedInput = CreateRotationInput(
+            AlsRotationMode.LookingDirection,
+            stoppedYaw,
+            NumericsVector3.Zero);
+        var stoppedState = new AlsRuntimeState
+        {
+            Initialized = 1,
+            LocomotionState = AlsLocomotionState.Grounded,
+            TargetYaw = stoppedYaw,
+            SmoothedTargetYaw = stoppedYaw,
+        };
+        var stoppedResult = AlsFrameResult.CreateDefault(stoppedInput.Identity);
+        AlsLocomotionModel.Evaluate(
+            stoppedInput,
+            ref stoppedState,
+            ref stoppedResult,
+            _coreSettings);
+        _motor.ApplyTargetYaw(stoppedResult.TargetYaw);
+        RequireNear(ReadMotorYaw(_motor), stoppedYaw, 0.00001f, "low-speed no-TIP yaw");
+        _rotationCommitChecked = true;
+    }
+
+    private static AlsFrameInput CreateRotationInput(
+        AlsRotationMode mode,
+        float characterYaw,
+        NumericsVector3 velocity)
+    {
+        var command = new AlsLocomotionCommand(
+            velocity == NumericsVector3.Zero ? NumericsVector2.Zero : NumericsVector2.UnitY,
+            ViewYaw: MathF.PI / 3f,
+            AimYaw: -MathF.PI / 2f,
+            RequestedGait: AlsGait.Running,
+            RequestedStance: AlsStance.Standing,
+            RequestedRotationMode: mode,
+            JumpPressed: 0);
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(1, 0, 1), DeltaTime);
+        return input with
+        {
+            ActualVelocity = velocity,
+            Floor = input.Floor with { IsGrounded = 1 },
+            RotationMode = mode,
+            Command = command,
+            CharacterYaw = characterYaw,
+            ViewRotation = System.Numerics.Quaternion.CreateFromAxisAngle(
+                NumericsVector3.UnitY,
+                command.ViewYaw),
+            AimRotation = System.Numerics.Quaternion.CreateFromAxisAngle(
+                NumericsVector3.UnitY,
+                command.AimYaw),
+            MaxAcceleration = 20f,
+            MaxBrakingDeceleration = 15f,
+        };
+    }
+
+    private static float ReadMotorYaw(AlsCharacterMotor motor)
+    {
+        var basis = motor.GlobalBasis.Orthonormalized();
+        return MathF.Atan2(basis.Z.X, basis.Z.Z);
     }
 
     private void Fail(Exception exception)

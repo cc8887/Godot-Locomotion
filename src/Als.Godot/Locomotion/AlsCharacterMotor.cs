@@ -211,6 +211,29 @@ public partial class AlsCharacterMotor : CharacterBody3D
         return input;
     }
 
+    public void ApplyTargetYaw(float targetYaw)
+    {
+        EnsureMainThread();
+        EnsureLiveInTree();
+        if (!_configured)
+        {
+            throw new InvalidOperationException("ALS character motor must be configured before rotation commit.");
+        }
+        if (!float.IsFinite(targetYaw))
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetYaw));
+        }
+
+        GlobalBasis = new Basis(Vector3.Up, targetYaw);
+    }
+
+    public float GetAppliedYaw()
+    {
+        EnsureMainThread();
+        EnsureLiveInTree();
+        return GetCharacterYaw();
+    }
+
     private void ValidateStep(long frameId, int characterId, int generation, float deltaTime)
     {
         EnsureMainThread();

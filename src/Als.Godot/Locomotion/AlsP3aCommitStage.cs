@@ -2,6 +2,7 @@ using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Diagnostics;
+using GodotAls.Core.Math;
 
 namespace GodotAls.Locomotion;
 
@@ -56,17 +57,26 @@ public partial class AlsP3aCommitStage : Node
                     continue;
                 }
 
+                entry.Motor.ApplyTargetYaw(result.TargetYaw);
+                var appliedYaw = entry.Motor.GetAppliedYaw();
+                if (MathF.Abs(AlsMath.NormalizeAngleRadians(appliedYaw - result.TargetYaw)) > 0.00001f)
+                {
+                    _context.RotationCommitMismatches++;
+                    continue;
+                }
                 var committedCoverage = result.Identity.CharacterId == 0
-                    ? CollectCommittedCoverage(entry, result)
+                    ? CollectCommittedCoverage(entry, result, appliedYaw)
                     : 0;
                 if (measure)
                 {
                     AlsResultDigest.Append(ref _context.Digest, result);
+                    AlsResultDigest.AppendAppliedYaw(ref _context.Digest, appliedYaw);
                     _context.MeasurementCoverage |= committedCoverage;
                 }
                 else
                 {
                     AlsResultDigest.Append(ref _context.WarmupDigest, result);
+                    AlsResultDigest.AppendAppliedYaw(ref _context.WarmupDigest, appliedYaw);
                 }
                 if (frameId == AlsP3aHarnessContext.ReplacementFrame &&
                     entry.Handle == _context.ReplacementHandle)
@@ -122,6 +132,7 @@ public partial class AlsP3aCommitStage : Node
             _context.OldGenerationRejected &&
             _context.ReplacementFrameCommitted &&
             _context.MeasurementCoverage == AlsP3aHarnessContext.RequiredCoverage &&
+            _context.RotationCommitMismatches == 0 &&
             _context.AffinityViolations == 0 &&
             offMainWorkers == expectedOffMain;
         var mode = _context.Mode == GodotAls.Dispatch.AlsHarnessMode.Single ? "single" : "parallel";
@@ -135,6 +146,7 @@ public partial class AlsP3aCommitStage : Node
                 $"old_generation_rejected={_context.OldGenerationRejected} " +
                 $"replacement_frame_committed={_context.ReplacementFrameCommitted} " +
                 $"coverage={_context.MeasurementCoverage:X} " +
+                $"rotation_commit_mismatches={_context.RotationCommitMismatches} " +
                 $"affinity_violations={_context.AffinityViolations} " +
                 $"first_gather_frame={_context.FirstGatherAllocationFrame} " +
                 $"first_model_frame={_context.FirstModelAllocationFrame} " +
@@ -180,7 +192,8 @@ public partial class AlsP3aCommitStage : Node
 
     private static int CollectCommittedCoverage(
         AlsP3aHarnessEntry entry,
-        in AlsFrameResult result)
+        in AlsFrameResult result,
+        float appliedYaw)
     {
         var coverage = result.ActualGait switch
         {
@@ -227,8 +240,15 @@ public partial class AlsP3aCommitStage : Node
             AlsRotationMode.Aiming => AlsP3aHarnessContext.CoverageAiming,
             _ => 0,
         };
+        if (entry.HasAppliedYaw != 0 &&
+            MathF.Abs(AlsMath.NormalizeAngleRadians(appliedYaw - entry.PreviousAppliedYaw)) > 0.0001f)
+        {
+            coverage |= AlsP3aHarnessContext.CoverageAppliedYaw;
+        }
         entry.PreviousCommittedLocomotionState = result.ResolvedLocomotionState;
         entry.HasCommittedResult = 1;
+        entry.PreviousAppliedYaw = appliedYaw;
+        entry.HasAppliedYaw = 1;
         return coverage;
     }
 }

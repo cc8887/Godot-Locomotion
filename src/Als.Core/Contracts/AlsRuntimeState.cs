@@ -26,6 +26,8 @@ public struct AlsRuntimeState
     public Vector2 SmoothedLocalAcceleration;
     public Vector2 SmoothedLean;
     public float LandingRecoveryTime;
+    public float SmoothedTargetYaw;
     public float TargetYaw;
+    public byte JumpStartActive;
     public byte Initialized;
 }
