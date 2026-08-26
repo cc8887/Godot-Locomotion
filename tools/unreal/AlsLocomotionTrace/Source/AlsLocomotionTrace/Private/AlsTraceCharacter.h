@@ -23,8 +23,8 @@ class AAlsTraceCharacter : public AAlsCharacter
 public:
     AAlsTraceCharacter(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
-    UAlsCharacterMovementComponent* GetTraceMovement() const;
-    UAlsAnimationInstance* GetTraceAnimationInstance() const;
+    const UAlsCharacterMovementComponent* GetTraceMovement() const;
+    const UAlsAnimationInstance* GetTraceAnimationInstance() const;
     const UAlsMovementSettings* GetTraceMovementSettings() const;
     const UAlsAnimationInstanceSettings* GetTraceAnimationSettings() const;
 

@@ -299,6 +299,15 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
     foreach ($file in $files)
     {
         $raw = Get-Content -LiteralPath $file.FullName -Raw
+        try
+        {
+            $schemaValid = Test-Json -Json $raw -SchemaFile $SchemaPath -ErrorAction Stop
+        }
+        catch
+        {
+            throw "JSON Schema validation failed for $($file.Name): $($_.Exception.Message)"
+        }
+        if (-not $schemaValid) { throw "JSON Schema validation returned false for $($file.Name)." }
         $document = $raw | ConvertFrom-Json
         Assert-FiniteNumber $document $file.Name
         Assert-SortedProperties $document $file.Name
@@ -417,10 +426,22 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             }
             'crouch_clearance'
             {
-                if ('Crouching' -cnotin @($frames.actual.stance) -or 'Standing' -cnotin @($frames.actual.stance) -or
-                    $true -cnotin @($frames.command.standBlocked))
+                $blockedCrouching = @($frames | Where-Object {
+                    $_.command.standBlocked -and $_.command.requestedStance -ceq 'Standing' -and
+                    $_.actual.stance -ceq 'Crouching'
+                })
+                if ($blockedCrouching.Count -eq 0)
                 {
-                    throw 'crouch_clearance lacks crouching, standing, or blocked stand intent evidence.'
+                    throw 'crouch_clearance never keeps the actual stance crouched while a blocked stand is requested.'
+                }
+                $lastBlockedFrame = ($blockedCrouching.index | Measure-Object -Maximum).Maximum
+                $clearStanding = @($frames | Where-Object {
+                    $_.index -gt $lastBlockedFrame -and -not $_.command.standBlocked -and
+                    $_.command.requestedStance -ceq 'Standing' -and $_.actual.stance -ceq 'Standing'
+                })
+                if ($clearStanding.Count -eq 0)
+                {
+                    throw 'crouch_clearance never transitions to actual standing after overhead clearance is restored.'
                 }
             }
             'rotation_modes'
@@ -432,13 +453,29 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             }
             'jump_land'
             {
-                $grounded = @($frames.actual.grounded)
-                $firstAir = [array]::IndexOf($grounded, $false)
-                if ($firstAir -lt 0 -or $true -cnotin @($frames.actual.jumpTransition) -or
-                    $true -cnotin @($grounded | Select-Object -Skip ($firstAir + 1)) -or
-                    'LandRecovery' -cnotin @($frames.actual.animationState))
+                $jumpStart = @($frames | Where-Object {
+                    $_.actual.animationState -ceq 'JumpStart' -and -not $_.actual.grounded -and
+                    $_.actual.jumpTransition -and [double]$_.actual.velocity.z -gt 0
+                } | Select-Object -First 1)
+                if ($jumpStart.Count -eq 0)
                 {
-                    throw 'jump_land lacks jump, airborne, landing, or recovery evidence.'
+                    throw 'jump_land lacks a real positive-vertical-motion JumpStart transition.'
+                }
+                $fallLoop = @($frames | Where-Object {
+                    $_.index -gt $jumpStart[0].index -and -not $_.actual.grounded -and
+                    $_.actual.animationState -ceq 'FallLoop'
+                } | Select-Object -First 1)
+                if ($fallLoop.Count -eq 0)
+                {
+                    throw 'jump_land lacks FallLoop after JumpStart.'
+                }
+                $landRecovery = @($frames | Where-Object {
+                    $_.index -gt $fallLoop[0].index -and $_.actual.grounded -and
+                    $_.actual.animationState -ceq 'LandRecovery'
+                } | Select-Object -First 1)
+                if ($landRecovery.Count -eq 0)
+                {
+                    throw 'jump_land lacks grounded LandRecovery after FallLoop.'
                 }
             }
         }

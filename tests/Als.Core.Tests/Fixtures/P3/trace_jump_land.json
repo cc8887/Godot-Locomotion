@@ -1901,7 +1901,7 @@
 					"z": 0
 				},
 				"animationPhase": 0.06640903651714325,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,

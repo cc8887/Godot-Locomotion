@@ -28,7 +28,6 @@
 #include "Settings/AlsMovementSettings.h"
 #include "State/AlsCrouchingState.h"
 #include "State/AlsGroundedState.h"
-#include "State/AlsInAirState.h"
 #include "State/AlsLeanState.h"
 #include "State/AlsLocomotionAnimationState.h"
 #include "State/AlsStandingState.h"
@@ -212,13 +211,9 @@ TArray<FSequenceDefinition> CreateSequenceDefinitions()
     Definitions.Add({TEXT("crouch_clearance"), 210, [](const int32 Frame)
     {
         FTraceCommand Command;
-        Command.MovementAxes.Y = Frame < 180 ? 0.75 : 0.0;
-        Command.Stance = Frame < 60 || Frame >= 150 ? AlsStanceTags::Standing : AlsStanceTags::Crouching;
-        if (Frame >= 90 && Frame < 150)
-        {
-            Command.Stance = AlsStanceTags::Standing;
-            Command.bStandBlocked = true;
-        }
+        Command.MovementAxes.Y = Frame < 90 || Frame >= 160 ? 0.75 : 0.0;
+        Command.Stance = Frame < 30 || Frame >= 120 ? AlsStanceTags::Standing : AlsStanceTags::Crouching;
+        Command.bStandBlocked = Frame >= 90 && Frame < 160;
         return Command;
     }});
     Definitions.Add({TEXT("rotation_modes"), 240, [](const int32 Frame)
@@ -280,7 +275,8 @@ void DestroyTraceWorld(UWorld* World)
 void TickTraceCharacter(AAlsTraceCharacter& Character)
 {
     Character.Tick(FixedDeltaSeconds);
-    Character.GetTraceMovement()->TickComponent(FixedDeltaSeconds, LEVELTICK_All, nullptr);
+    CastChecked<UAlsCharacterMovementComponent>(Character.GetCharacterMovement())->TickComponent(
+        FixedDeltaSeconds, LEVELTICK_All, nullptr);
     Character.GetMesh()->TickAnimation(FixedDeltaSeconds, false);
     Character.GetMesh()->RefreshBoneTransforms();
 }
@@ -405,13 +401,12 @@ TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTrac
                                       const int32 Frame, const FVector& Origin, const bool bWasGrounded,
                                       const float LandingRecoveryRemaining, float& AnimationPhase)
 {
-    UAlsCharacterMovementComponent* Movement{Character.GetTraceMovement()};
-    UAlsAnimationInstance* Animation{Character.GetTraceAnimationInstance()};
+    const UAlsCharacterMovementComponent* Movement{Character.GetTraceMovement()};
+    const UAlsAnimationInstance* Animation{Character.GetTraceAnimationInstance()};
     const FAlsStandingState* Standing{GetAnimationState<FAlsStandingState>(Animation, TEXT("StandingState"))};
     const FAlsCrouchingState* Crouching{GetAnimationState<FAlsCrouchingState>(Animation, TEXT("CrouchingState"))};
     const FAlsLeanState* Lean{GetAnimationState<FAlsLeanState>(Animation, TEXT("LeanState"))};
     const FAlsLocomotionAnimationState* Locomotion{GetAnimationState<FAlsLocomotionAnimationState>(Animation, TEXT("LocomotionState"))};
-    const FAlsInAirState* InAir{GetAnimationState<FAlsInAirState>(Animation, TEXT("InAirState"))};
     const bool bGrounded{Movement->IsMovingOnGround()};
     const FVector LocalVelocity{Character.GetActorQuat().UnrotateVector(Character.GetVelocity())};
     const float Stride{Character.GetStance() == AlsStanceTags::Crouching
@@ -423,7 +418,8 @@ TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTrac
     AnimationPhase = FMath::Fmod(AnimationPhase + static_cast<float>(FixedDeltaSeconds) * PlayRate, 1.0f);
 
     FString AnimationState{TEXT("Grounded")};
-    if (!bGrounded) AnimationState = InAir != nullptr && InAir->bJumped ? TEXT("JumpStart") : TEXT("FallLoop");
+    const bool bJumpStarted{!bGrounded && bWasGrounded && Command.bJumpPressed && Character.GetVelocity().Z > 0.0};
+    if (!bGrounded) AnimationState = bJumpStarted ? TEXT("JumpStart") : TEXT("FallLoop");
     else if (!bWasGrounded || LandingRecoveryRemaining > 0.0f) AnimationState = TEXT("LandRecovery");
 
     const TSharedRef<FJsonObject> Actual{MakeShared<FJsonObject>()};
@@ -490,13 +486,6 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
     for (int32 Frame{0}; Frame < Definition.FrameCount; ++Frame)
     {
         const FTraceCommand Command{Definition.GetCommand(Frame)};
-        Character->SetDesiredGait(Command.Gait);
-        Character->SetDesiredStance(Command.Stance);
-        Character->SetDesiredRotationMode(Command.RotationMode);
-        Character->SetDesiredAiming(Command.RotationMode == AlsRotationModeTags::Aiming);
-        Controller->SetControlRotation(FRotator{0.0,
-            Command.RotationMode == AlsRotationModeTags::Aiming ? Command.AimYaw : Command.ViewYaw, 0.0});
-
         if (Command.bStandBlocked && !IsValid(ClearanceBlocker))
         {
             ClearanceBlocker = World->SpawnActor<AActor>();
@@ -505,13 +494,23 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
             Collision->SetBoxExtent(FVector{80.0, 80.0, 10.0});
             Collision->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
             Collision->RegisterComponent();
-            ClearanceBlocker->SetActorLocation(Character->GetActorLocation() + FVector{0.0, 0.0, 145.0});
+            const UCapsuleComponent* Capsule{Character->GetCapsuleComponent()};
+            const double CrouchedCapsuleTop{Capsule->GetComponentLocation().Z + Capsule->GetScaledCapsuleHalfHeight()};
+            ClearanceBlocker->SetActorLocation(FVector{Character->GetActorLocation().X, Character->GetActorLocation().Y,
+                CrouchedCapsuleTop + 15.0});
         }
         else if (!Command.bStandBlocked && IsValid(ClearanceBlocker))
         {
             ClearanceBlocker->Destroy();
             ClearanceBlocker = nullptr;
         }
+
+        Character->SetDesiredGait(Command.Gait);
+        Character->SetDesiredStance(Command.Stance);
+        Character->SetDesiredRotationMode(Command.RotationMode);
+        Character->SetDesiredAiming(Command.RotationMode == AlsRotationModeTags::Aiming);
+        Controller->SetControlRotation(FRotator{0.0,
+            Command.RotationMode == AlsRotationModeTags::Aiming ? Command.AimYaw : Command.ViewYaw, 0.0});
 
         const FVector MovementDirection{Command.MovementAxes.Y, Command.MovementAxes.X, 0.0};
         if (!MovementDirection.IsNearlyZero()) Character->AddMovementInput(MovementDirection.GetSafeNormal(), 1.0f, true);
