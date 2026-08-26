@@ -135,18 +135,22 @@ Describe 'P3A verifier regression closure' {
         $finalTestsIndex = $script:VerifierSource.IndexOf(
             'dotnet test $solutionPath -c Release --no-restore',
             $matrixIndex)
+        $successIndex = $script:VerifierSource.IndexOf("Write-Output 'P3A_VERIFICATION_OK'", $matrixIndex)
 
         $matrixIndex | Should BeGreaterThan -1
         $p2bIndex | Should BeGreaterThan $matrixIndex
         $p1Index | Should BeGreaterThan $p2bIndex
         $p0Index | Should BeGreaterThan $p1Index
         $finalTestsIndex | Should BeGreaterThan $p0Index
+        $successIndex | Should BeGreaterThan $finalTestsIndex
     }
 
     It 'passes the selected Godot executable to every phase verifier' {
         foreach ($phase in @('p2b', 'p1', 'p0')) {
             $script:VerifierSource | Should Match ([regex]::Escape("'verify-$phase.ps1'"))
         }
+        $script:VerifierSource | Should Match ([regex]::Escape(
+            '& $p2bScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath -CleanImport'))
         $script:VerifierSource | Should Match ([regex]::Escape(
             '& $phaseScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath'))
     }
@@ -156,13 +160,14 @@ Describe 'P3A verifier regression closure' {
         $regressionIndex | Should BeGreaterThan -1
         if ($regressionIndex -lt 0) { return }
         $regressionSource = $script:VerifierSource.Substring($regressionIndex)
+        $regressionSource | Should Match '(?ms)& \$p2bScript .*? -CleanImport\s+if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}'
         $guardPattern = '(?ms)& \$phaseScript -GodotExecutable \$GodotExecutable -ProjectRoot \$projectRootPath\s+if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}'
         ([regex]::Matches($regressionSource, $guardPattern)).Count | Should Be 1
         $regressionSource | Should Match '(?ms)dotnet test \$solutionPath -c Release --no-restore\s+if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}'
     }
 
     It 'keeps the regression closure enabled by default and skippable only as one block' {
-        $script:VerifierSource | Should Match '(?ms)if \(-not \$SkipRegression\) \{\s+\$phaseScripts = @\('
+        $script:VerifierSource | Should Match '(?ms)if \(-not \$SkipRegression\) \{\s+\$p2bScript = '
         $script:VerifierSource | Should Not Match '\[switch\]\$RunRegression'
     }
 }

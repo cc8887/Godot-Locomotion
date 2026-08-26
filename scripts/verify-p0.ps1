@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'godot-output-functions.ps1')
 
 if (-not (Test-Path -LiteralPath $GodotExecutable -PathType Leaf)) {
     throw "Godot executable not found: $GodotExecutable"
@@ -29,9 +30,10 @@ $godotOutput = & $GodotExecutable --headless --path $ProjectRoot 2>&1
 $godotExitCode = $LASTEXITCODE
 $godotOutput | Write-Output
 
-if ($godotExitCode -ne 0) {
-    exit $godotExitCode
-}
+Assert-GodotInvocationSucceeded `
+    -OutputLines $godotOutput `
+    -ExitCode $godotExitCode `
+    -Context 'Godot P0 smoke'
 
 if (-not ($godotOutput -match 'GODOT_ALS_P0_OK')) {
     throw 'Godot smoke marker was not emitted.'

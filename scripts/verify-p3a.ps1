@@ -97,8 +97,11 @@ foreach ($characterCount in @(1, 10)) {
 }
 
 if (-not $SkipRegression) {
+    $p2bScript = Join-Path $PSScriptRoot 'verify-p2b.ps1'
+    & $p2bScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath -CleanImport
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
     $phaseScripts = @(
-        'verify-p2b.ps1',
         'verify-p1.ps1',
         'verify-p0.ps1'
     )
