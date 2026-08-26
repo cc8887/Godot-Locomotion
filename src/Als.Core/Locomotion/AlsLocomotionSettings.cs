@@ -97,9 +97,9 @@ public sealed class AlsLocomotionSettings
             throw new FormatException("playRateMinimum must not exceed playRateMaximum.");
         }
 
-        if (VelocityAngleInterpolationStart > VelocityAngleInterpolationEnd)
+        if (VelocityAngleInterpolationStart >= VelocityAngleInterpolationEnd)
         {
-            throw new FormatException("velocityAngleInterpolationStart must not exceed velocityAngleInterpolationEnd.");
+            throw new FormatException("velocityAngleInterpolationStart must be less than velocityAngleInterpolationEnd.");
         }
 
         Standing = new AlsStanceSpeeds(
@@ -182,8 +182,17 @@ public sealed class AlsLocomotionSettings
         }
     }
 
-    private static AlsDirectionalSpeeds CreateDirectional(float forward, float backward) =>
-        new(forward, forward, backward);
+    private AlsDirectionalSpeeds CreateDirectional(float forward, float backward)
+    {
+        var normalizedAngle = System.Math.Clamp(
+            (MathF.Abs(MathF.PI / 2f) - VelocityAngleInterpolationStart) /
+            (VelocityAngleInterpolationEnd - VelocityAngleInterpolationStart),
+            0f,
+            1f);
+        var amount = 1f - normalizedAngle;
+        var sideways = backward + ((forward - backward) * amount);
+        return new AlsDirectionalSpeeds(forward, sideways, backward);
+    }
 
     private static void ValidateObject(JsonElement element, string[] expectedProperties, string path)
     {
