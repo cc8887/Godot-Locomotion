@@ -401,14 +401,56 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
         {
             'idle_gaits'
             {
-                foreach ($gait in @('Walking', 'Running', 'Sprinting'))
+                $initialIdleFrames = @($frames | Where-Object { $_.index -ge 0 -and $_.index -le 29 })
+                if ($initialIdleFrames.Count -ne 30) { throw 'idle_gaits initial idle segment must contain frames 0 through 29.' }
+                $idleOrigin = $initialIdleFrames[0].actual.position
+                $idleMaximumSpeed = ($initialIdleFrames | ForEach-Object {
+                    [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
+                        ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y))
+                } | Measure-Object -Maximum).Maximum
+                $idleMaximumDisplacement = ($initialIdleFrames | ForEach-Object {
+                    $deltaX = [double]$_.actual.position.x - [double]$idleOrigin.x
+                    $deltaY = [double]$_.actual.position.y - [double]$idleOrigin.y
+                    [math]::Sqrt(($deltaX * $deltaX) + ($deltaY * $deltaY))
+                } | Measure-Object -Maximum).Maximum
+                if ($idleMaximumSpeed -gt 0.01 -or $idleMaximumDisplacement -gt 0.005)
                 {
-                    if ($gait -cnotin @($frames.actual.gait)) { throw "idle_gaits never reached $gait." }
+                    throw "idle_gaits initial idle segment moved beyond tolerance: speed=$idleMaximumSpeed displacement=$idleMaximumDisplacement."
                 }
-                if (@($frames | Select-Object -First 30 | Where-Object {
-                    [math]::Abs([double]$_.actual.velocity.x) -gt 0.01 -or
-                    [math]::Abs([double]$_.actual.velocity.y) -gt 0.01
-                }).Count -ne 0) { throw 'idle_gaits failed its initial idle segment.' }
+
+                $movementPhases = @(
+                    [pscustomobject]@{ Name = 'walk'; Start = 30; End = 89; Gait = 'Walking'; MinimumSpeed = 0.25; MinimumDisplacement = 1.0 },
+                    [pscustomobject]@{ Name = 'run'; Start = 90; End = 149; Gait = 'Running'; MinimumSpeed = 1.5; MinimumDisplacement = 2.0 },
+                    [pscustomobject]@{ Name = 'sprint'; Start = 150; End = 209; Gait = 'Sprinting'; MinimumSpeed = 3.0; MinimumDisplacement = 3.0 }
+                )
+                foreach ($phase in $movementPhases)
+                {
+                    $phaseFrames = @($frames | Where-Object { $_.index -ge $phase.Start -and $_.index -le $phase.End })
+                    $invalidCommands = @($phaseFrames | Where-Object {
+                        $_.command.requestedGait -cne $phase.Gait -or
+                        [math]::Sqrt(([double]$_.command.movementAxes.x * [double]$_.command.movementAxes.x) +
+                            ([double]$_.command.movementAxes.y * [double]$_.command.movementAxes.y)) -lt 0.5
+                    })
+                    if ($phaseFrames.Count -ne 60 -or $invalidCommands.Count -ne 0)
+                    {
+                        throw "idle_gaits $($phase.Name) command segment does not match its defined gait and movement input."
+                    }
+
+                    $movingWithActualGait = @($phaseFrames | Where-Object {
+                        $_.actual.gait -ceq $phase.Gait -and
+                        [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
+                            ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y)) -ge $phase.MinimumSpeed
+                    })
+                    $firstPosition = $phaseFrames[0].actual.position
+                    $lastPosition = $phaseFrames[-1].actual.position
+                    $deltaX = [double]$lastPosition.x - [double]$firstPosition.x
+                    $deltaY = [double]$lastPosition.y - [double]$firstPosition.y
+                    $phaseDisplacement = [math]::Sqrt(($deltaX * $deltaX) + ($deltaY * $deltaY))
+                    if ($movingWithActualGait.Count -lt 30 -or $phaseDisplacement -lt $phase.MinimumDisplacement)
+                    {
+                        throw "idle_gaits $($phase.Name) segment lacks real movement evidence for actual gait $($phase.Gait): movingFrames=$($movingWithActualGait.Count) displacement=$phaseDisplacement."
+                    }
+                }
             }
             'directions'
             {
@@ -507,6 +549,8 @@ function Replace-Atomically([string]$Source, [string]$Destination)
         if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force }
     }
 }
+
+if ($MyInvocation.InvocationName -ceq '.') { return }
 
 try
 {
