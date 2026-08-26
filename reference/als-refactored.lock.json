@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/Sixze/ALS-Refactored.git",
+  "commit": "b754d6f0f2bb03741d301f8fb88077ebfe561e17",
+  "observedDate": "2026-08-26",
+  "targetEngine": "5.9.0",
+  "compatibilityPatches": []
+}
