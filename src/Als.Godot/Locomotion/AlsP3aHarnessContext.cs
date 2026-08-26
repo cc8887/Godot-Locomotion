@@ -64,6 +64,8 @@ public sealed class AlsP3aHarnessContext
 
     public ulong Digest = AlsResultDigest.OffsetBasis;
 
+    public ulong WarmupDigest = AlsResultDigest.OffsetBasis;
+
     public long MissingResults;
 
     public long StaleResults;
@@ -84,13 +86,13 @@ public sealed class AlsP3aHarnessContext
 
     public long CommitAllocations;
 
+    public long FirstCommitAllocationFrame;
+
     public int ReplacementCount;
 
     public AlsSlotHandle ReplacementHandle;
 
     public bool OldGenerationRejected;
-
-    public bool NewGenerationCommitted;
 
     public bool ReplacementFrameCommitted;
 

@@ -851,7 +851,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 - [ ] **Step 2: Document verified ownership and commands**
 
-The architecture note records exact reference SHA, unit conversions, main/worker/commit ordering, why UE physics is not compared to Godot physics, marker format, fixture regeneration guard, and the four matrix rows.
+The architecture note records exact reference SHA, unit conversions, main/worker/commit ordering, why UE physics is not compared to Godot physics, marker format, fixture regeneration guard, and the four matrix rows. It must also distinguish the compiled `ExportRelease` artifact from the executed optimized `Debug`/`TOOLS` editor-host assembly and record that full exported-runtime verification remains an environment boundary when Godot export templates are unavailable.
 
 - [ ] **Step 3: Run the complete P3A gate**
 

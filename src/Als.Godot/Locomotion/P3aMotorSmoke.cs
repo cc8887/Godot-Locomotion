@@ -2,7 +2,9 @@ using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Math;
+using NumericsMatrix4x4 = System.Numerics.Matrix4x4;
 using NumericsVector2 = System.Numerics.Vector2;
+using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
 
@@ -34,6 +36,7 @@ public partial class P3aMotorSmoke : Node
     private bool _platformVelocityObserved;
     private bool _platformFeedbackChecked;
     private bool _platformDidNotBecomeSelfPropulsion;
+    private bool _platformUnavailableTupleChecked;
     private bool _minimumClearanceShapePreserved;
     private bool _freshJumpChecked;
     private bool _airborneJumpChecked;
@@ -64,6 +67,7 @@ public partial class P3aMotorSmoke : Node
                     Vector3.Up,
                     MathF.PI / 4f),
                 "floor collider classification ignored FloorMaxAngle");
+            ValidateResultClassification();
             AddChild(CreateBoxBody("Floor", new Vector3(20f, 1f, 20f), new Vector3(0f, -0.5f, 0f)));
             _ceiling = CreateBoxBody("Ceiling", new Vector3(6f, 0.2f, 6f), new Vector3(0f, 10f, 0f));
             AddChild(_ceiling);
@@ -240,6 +244,7 @@ public partial class P3aMotorSmoke : Node
         Require(_platformVelocityObserved, "moving-platform regression did not observe platform velocity");
         Require(_platformFeedbackChecked, "moving-platform regression did not execute its feedback check");
         Require(_platformDidNotBecomeSelfPropulsion, "actual platform velocity became requested self-propulsion");
+        Require(_platformUnavailableTupleChecked, "unavailable platform tuple regression did not execute");
         Require(_minimumClearanceShapePreserved, "minimum valid capsule was altered for stand clearance");
         Require(_reverseResponseChecked, "reverse response regression did not execute");
         Require(_gaitReductionChecked, "gait reduction regression did not execute");
@@ -256,6 +261,7 @@ public partial class P3aMotorSmoke : Node
         GD.Print(
             $"GODOT_ALS_P3A_MOTOR_MATH extreme_response={_extremeResponse:R} " +
             $"large_delta_response={_largeDeltaResponse:R} transaction_retry=1");
+        GD.Print("GODOT_ALS_P3A_MOTOR_CLASSIFICATION cases=6");
         GD.Print("GODOT_ALS_P3A_MOTOR_OK cases=7");
         GetTree().Quit(0);
     }
@@ -275,6 +281,7 @@ public partial class P3aMotorSmoke : Node
             CollisionLayer = 1,
             CollisionMask = 1,
             SyncToPhysics = true,
+            ConstantAngularVelocity = new Vector3(0f, 2f, 0f),
         };
         _movingPlatform.AddChild(new CollisionShape3D
         {
@@ -704,6 +711,18 @@ public partial class P3aMotorSmoke : Node
 
     private void ObserveMovingPlatform(in AlsFrameInput input)
     {
+        if (!_platformUnavailableTupleChecked && input.Floor.IsGrounded == 1)
+        {
+            Require(input.Floor.PlatformId == -1, "P3A exposed a partial moving-platform identity");
+            Require(
+                input.Floor.PlatformTransform == NumericsMatrix4x4.Identity,
+                "unavailable moving-platform transform was not identity");
+            Require(
+                input.Floor.PlatformAngularVelocity == NumericsVector3.Zero,
+                "unavailable moving-platform angular velocity was not zero");
+            _platformUnavailableTupleChecked = true;
+        }
+
         if (!_platformVelocityObserved &&
             _frameId >= 20 &&
             MathF.Abs(input.ActualVelocity.X) > 0.5f)
@@ -775,6 +794,43 @@ public partial class P3aMotorSmoke : Node
         Require(
             MathF.Abs(input.DesiredSpeed - expectedDesiredSpeed) <= Tolerance,
             $"motor desired speed {input.DesiredSpeed} did not match final-stance speed {expectedDesiredSpeed}");
+    }
+
+    private static void ValidateResultClassification()
+    {
+        const long expectedFrame = 10;
+        const int expectedCharacter = 2;
+        const int expectedGeneration = 3;
+        Require(
+            AlsP3aResultClassifier.Classify(
+                0, expectedFrame, expectedFrame, expectedCharacter, expectedGeneration,
+                expectedCharacter, expectedGeneration) == AlsP3aResultFailure.Missing,
+            "unpublished result was not classified as missing");
+        Require(
+            AlsP3aResultClassifier.Classify(
+                1, expectedFrame, expectedFrame - 1, expectedCharacter, expectedGeneration,
+                expectedCharacter, expectedGeneration) == AlsP3aResultFailure.Stale,
+            "old published frame was not classified as stale");
+        Require(
+            AlsP3aResultClassifier.Classify(
+                1, expectedFrame, expectedFrame + 1, expectedCharacter, expectedGeneration,
+                expectedCharacter, expectedGeneration) == AlsP3aResultFailure.Lag,
+            "future published frame was not classified as lagged");
+        Require(
+            AlsP3aResultClassifier.Classify(
+                1, expectedFrame, expectedFrame, expectedCharacter, expectedGeneration,
+                expectedCharacter + 1, expectedGeneration) == AlsP3aResultFailure.GenerationMismatch,
+            "wrong published character was not classified as generation mismatch");
+        Require(
+            AlsP3aResultClassifier.Classify(
+                1, expectedFrame, expectedFrame, expectedCharacter, expectedGeneration,
+                expectedCharacter, expectedGeneration + 1) == AlsP3aResultFailure.GenerationMismatch,
+            "wrong published generation was not classified as generation mismatch");
+        Require(
+            AlsP3aResultClassifier.Classify(
+                1, expectedFrame, expectedFrame, expectedCharacter, expectedGeneration,
+                expectedCharacter, expectedGeneration) == AlsP3aResultFailure.Missing,
+            "already-consumed matching result was not classified as missing");
     }
 
     private static StaticBody3D CreateBoxBody(string name, Vector3 size, Vector3 position)

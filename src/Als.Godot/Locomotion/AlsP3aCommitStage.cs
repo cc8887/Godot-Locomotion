@@ -50,40 +50,26 @@ public partial class AlsP3aCommitStage : Node
                     continue;
                 }
 
-                if (result.Identity.FrameId < entry.LastMotorFrameId)
-                {
-                    _context.StaleResults++;
-                    continue;
-                }
-                if (result.Identity.FrameId != frameId || entry.LastMotorFrameId != frameId)
+                if (entry.LastMotorFrameId != frameId)
                 {
                     _context.LaggedResults++;
                     continue;
                 }
-                if (result.Identity.CharacterId != entry.Handle.CharacterId ||
-                    result.Identity.SlotGeneration != entry.Handle.Generation)
-                {
-                    _context.GenerationMismatches++;
-                    continue;
-                }
 
+                var committedCoverage = result.Identity.CharacterId == 0
+                    ? CollectCommittedCoverage(entry, result)
+                    : 0;
                 if (measure)
                 {
                     AlsResultDigest.Append(ref _context.Digest, result);
-                    if (result.Identity.CharacterId == 0)
-                    {
-                        ObserveCommittedCoverage(entry, result);
-                    }
+                    _context.MeasurementCoverage |= committedCoverage;
                 }
-                if (frameId == AlsP3aHarnessContext.ReplacementFrame &&
-                    result.Identity.CharacterId == _context.ReplacementHandle.CharacterId &&
-                    result.Identity.SlotGeneration == _context.ReplacementHandle.Generation)
+                else
                 {
-                    _context.NewGenerationCommitted = true;
+                    AlsResultDigest.Append(ref _context.WarmupDigest, result);
                 }
                 if (frameId == AlsP3aHarnessContext.ReplacementFrame &&
-                    result.Identity.CharacterId == _context.ReplacementHandle.CharacterId &&
-                    result.Identity.SlotGeneration == _context.ReplacementHandle.Generation)
+                    entry.Handle == _context.ReplacementHandle)
                 {
                     _context.ReplacementFrameCommitted = true;
                 }
@@ -91,9 +77,14 @@ public partial class AlsP3aCommitStage : Node
 
             if (measure)
             {
+                var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                if (allocated != 0 && _context.FirstCommitAllocationFrame == 0)
+                {
+                    _context.FirstCommitAllocationFrame = frameId;
+                }
                 Interlocked.Add(
                     ref _context.CommitAllocations,
-                    GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
+                    allocated);
             }
 
             if (frameId == AlsP3aHarnessContext.TotalFrames)
@@ -129,7 +120,6 @@ public partial class AlsP3aCommitStage : Node
             allocations == 0 &&
             _context.ReplacementCount == 1 &&
             _context.OldGenerationRejected &&
-            _context.NewGenerationCommitted &&
             _context.ReplacementFrameCommitted &&
             _context.MeasurementCoverage == AlsP3aHarnessContext.RequiredCoverage &&
             _context.AffinityViolations == 0 &&
@@ -143,12 +133,12 @@ public partial class AlsP3aCommitStage : Node
                 $"model={_context.ModelAllocations} exchange={_context.ExchangeAllocations} " +
                 $"commit={_context.CommitAllocations} replacements={_context.ReplacementCount} " +
                 $"old_generation_rejected={_context.OldGenerationRejected} " +
-                $"new_generation_committed={_context.NewGenerationCommitted} " +
                 $"replacement_frame_committed={_context.ReplacementFrameCommitted} " +
                 $"coverage={_context.MeasurementCoverage:X} " +
                 $"affinity_violations={_context.AffinityViolations} " +
                 $"first_gather_frame={_context.FirstGatherAllocationFrame} " +
-                $"first_model_frame={_context.FirstModelAllocationFrame}");
+                $"first_model_frame={_context.FirstModelAllocationFrame} " +
+                $"first_commit_frame={_context.FirstCommitAllocationFrame}");
         }
         GD.Print(
             $"{marker} mode={mode} characters={_context.Entries.Length} " +
@@ -161,37 +151,38 @@ public partial class AlsP3aCommitStage : Node
 
     private void ClassifyMissingResult(AlsP3aHarnessEntry entry, long expectedFrameId)
     {
-        if (Volatile.Read(ref entry.HasPublishedResult) == 0)
+        var failure = AlsP3aResultClassifier.Classify(
+            Volatile.Read(ref entry.HasPublishedResult),
+            expectedFrameId,
+            Volatile.Read(ref entry.PublishedResultFrameId),
+            checked((int)entry.Handle.CharacterId),
+            checked((int)entry.Handle.Generation),
+            entry.PublishedResultCharacterId,
+            entry.PublishedResultGeneration);
+        switch (failure)
         {
-            _context.MissingResults++;
-            return;
-        }
-
-        var publishedFrameId = Volatile.Read(ref entry.PublishedResultFrameId);
-        if (publishedFrameId < expectedFrameId)
-        {
-            _context.StaleResults++;
-        }
-        else if (publishedFrameId > expectedFrameId)
-        {
-            _context.LaggedResults++;
-        }
-        else if (entry.PublishedResultCharacterId != checked((int)entry.Handle.CharacterId) ||
-            entry.PublishedResultGeneration != checked((int)entry.Handle.Generation))
-        {
-            _context.GenerationMismatches++;
-        }
-        else
-        {
-            _context.MissingResults++;
+            case AlsP3aResultFailure.Missing:
+                _context.MissingResults++;
+                break;
+            case AlsP3aResultFailure.Stale:
+                _context.StaleResults++;
+                break;
+            case AlsP3aResultFailure.Lag:
+                _context.LaggedResults++;
+                break;
+            case AlsP3aResultFailure.GenerationMismatch:
+                _context.GenerationMismatches++;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(failure));
         }
     }
 
-    private void ObserveCommittedCoverage(
+    private static int CollectCommittedCoverage(
         AlsP3aHarnessEntry entry,
         in AlsFrameResult result)
     {
-        _context.MeasurementCoverage |= result.ActualGait switch
+        var coverage = result.ActualGait switch
         {
             AlsGait.Walking => AlsP3aHarnessContext.CoverageWalking,
             AlsGait.Running => AlsP3aHarnessContext.CoverageRunning,
@@ -200,36 +191,36 @@ public partial class AlsP3aCommitStage : Node
         };
         if (result.ActualStance == AlsStance.Crouching)
         {
-            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageCrouching;
+            coverage |= AlsP3aHarnessContext.CoverageCrouching;
         }
         if (result.AnimationState == AlsAnimationState.JumpStart)
         {
-            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageJump;
+            coverage |= AlsP3aHarnessContext.CoverageJump;
         }
         if (entry.HasCommittedResult != 0 &&
             entry.PreviousCommittedLocomotionState == AlsLocomotionState.InAir &&
             result.ResolvedLocomotionState == AlsLocomotionState.Grounded &&
             result.AnimationState == AlsAnimationState.LandRecovery)
         {
-            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageLand;
+            coverage |= AlsP3aHarnessContext.CoverageLand;
         }
         if (result.BlendCoordinates.Y > 0.25f)
         {
-            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageForward;
+            coverage |= AlsP3aHarnessContext.CoverageForward;
         }
         if (result.BlendCoordinates.X > 0.25f)
         {
-            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageRight;
+            coverage |= AlsP3aHarnessContext.CoverageRight;
         }
         if (result.BlendCoordinates.Y < -0.25f)
         {
-            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageBackward;
+            coverage |= AlsP3aHarnessContext.CoverageBackward;
         }
         if (result.BlendCoordinates.X < -0.25f)
         {
-            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageLeft;
+            coverage |= AlsP3aHarnessContext.CoverageLeft;
         }
-        _context.MeasurementCoverage |= result.ActualRotationMode switch
+        coverage |= result.ActualRotationMode switch
         {
             AlsRotationMode.LookingDirection => AlsP3aHarnessContext.CoverageLookingDirection,
             AlsRotationMode.VelocityDirection => AlsP3aHarnessContext.CoverageVelocityDirection,
@@ -238,5 +229,6 @@ public partial class AlsP3aCommitStage : Node
         };
         entry.PreviousCommittedLocomotionState = result.ResolvedLocomotionState;
         entry.HasCommittedResult = 1;
+        return coverage;
     }
 }
