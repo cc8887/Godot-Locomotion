@@ -24,32 +24,42 @@ public readonly record struct AlsFrameInput(
     AlsLocomotionAction RequestedAction,
     AlsDriveMode CurrentDriveMode,
     AlsRagdollState RagdollState,
-    AlsAnimationQualityTier AnimationQualityTier)
+    AlsAnimationQualityTier AnimationQualityTier,
+    AlsLocomotionCommand Command,
+    float CharacterYaw,
+    float MaxAcceleration,
+    float MaxBrakingDeceleration,
+    byte JumpAccepted)
 {
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(deltaTime);
 
         return new AlsFrameInput(
-            identity,
-            deltaTime,
-            Matrix4x4.Identity,
-            Vector3.Zero,
-            Vector3.Zero,
-            Vector3.Zero,
-            0f,
-            Quaternion.Identity,
-            Quaternion.Identity,
-            new AlsFloorSample(0, Vector3.UnitY, -1, Matrix4x4.Identity, Vector3.Zero),
-            new AlsFootHit(0, Vector3.Zero, Vector3.UnitY),
-            new AlsFootHit(0, Vector3.Zero, Vector3.UnitY),
-            new AlsMantleProbeResult(0, Matrix4x4.Identity, -1),
-            AlsGait.Walking,
-            AlsStance.Standing,
-            AlsRotationMode.LookingDirection,
-            AlsLocomotionAction.None,
-            AlsDriveMode.MotorDriven,
-            AlsRagdollState.Inactive,
-            AlsAnimationQualityTier.Tier0);
+            Identity: identity,
+            DeltaTime: deltaTime,
+            CharacterTransform: Matrix4x4.Identity,
+            ActualVelocity: Vector3.Zero,
+            ActualAcceleration: Vector3.Zero,
+            InputDirection: Vector3.Zero,
+            DesiredSpeed: 0f,
+            ViewRotation: Quaternion.Identity,
+            AimRotation: Quaternion.Identity,
+            Floor: new AlsFloorSample(0, Vector3.UnitY, -1, Matrix4x4.Identity, Vector3.Zero),
+            LeftFootHit: new AlsFootHit(0, Vector3.Zero, Vector3.UnitY),
+            RightFootHit: new AlsFootHit(0, Vector3.Zero, Vector3.UnitY),
+            MantleProbe: new AlsMantleProbeResult(0, Matrix4x4.Identity, -1),
+            RequestedGait: AlsGait.Walking,
+            Stance: AlsStance.Standing,
+            RotationMode: AlsRotationMode.LookingDirection,
+            RequestedAction: AlsLocomotionAction.None,
+            CurrentDriveMode: AlsDriveMode.MotorDriven,
+            RagdollState: AlsRagdollState.Inactive,
+            AnimationQualityTier: AlsAnimationQualityTier.Tier0,
+            Command: AlsLocomotionCommand.CreateDefault(),
+            CharacterYaw: 0f,
+            MaxAcceleration: 0f,
+            MaxBrakingDeceleration: 0f,
+            JumpAccepted: 0);
     }
 }

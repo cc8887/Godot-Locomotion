@@ -19,4 +19,11 @@ public struct AlsRuntimeState
     public float PreviousCurveValue;
     public AlsRagdollState PendingRecoveryState;
     public AlsRootMotionDelta LastCommittedRootMotionFeedback;
+    public AlsGait ActualGait;
+    public AlsLocomotionState PreviousLocomotionState;
+    public float GroundedEntrySpeed;
+    public Vector2 SmoothedLocalVelocity;
+    public Vector2 SmoothedLocalAcceleration;
+    public Vector2 SmoothedLean;
+    public float LandingRecoveryTime;
 }
