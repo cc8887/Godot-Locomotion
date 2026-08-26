@@ -447,29 +447,12 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 NumericsVector3.Zero);
         }
 
-        var platformId = -1;
-        var platformTransform = NumericsMatrix4x4.Identity;
-        for (var index = 0; index < GetSlideCollisionCount(); index++)
-        {
-            var collision = GetSlideCollision(index);
-            if (!IsFloorCollision(collision.GetNormal(), UpDirection, FloorMaxAngle))
-            {
-                continue;
-            }
-
-            platformId = unchecked((int)collision.GetColliderId());
-            if (collision.GetCollider() is Node3D platform)
-            {
-                platformTransform = ToNumerics(platform.GlobalTransform);
-            }
-            break;
-        }
-
+        // P3A does not expose moving-platform identity; enumerating slide collisions allocates in Godot C#.
         return new AlsFloorSample(
             1,
             ToNumerics(GetFloorNormal()),
-            platformId,
-            platformTransform,
+            -1,
+            NumericsMatrix4x4.Identity,
             ToNumerics(GetPlatformAngularVelocity()));
     }
 
