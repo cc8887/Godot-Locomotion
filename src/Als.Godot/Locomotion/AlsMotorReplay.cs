@@ -57,7 +57,9 @@ public static class AlsMotorReplay
         var commands = new AlsLocomotionCommand[HarnessLastFrame + 1];
         Array.Fill(commands, AlsLocomotionCommand.CreateDefault());
 
-        Fill(commands, 1, 60, CreateCommand(Vector2.UnitY, AlsStance.Standing, AlsGait.Walking, 0));
+        // Exercise a grounded direction change before allocation measurement begins.
+        Fill(commands, 1, 30, CreateCommand(Vector2.UnitY, AlsStance.Standing, AlsGait.Walking, 0));
+        Fill(commands, 31, 60, CreateCommand(Vector2.UnitX, AlsStance.Standing, AlsGait.Walking, 0));
         Fill(commands, 61, 120, CreateCommand(Vector2.UnitY, AlsStance.Standing, AlsGait.Running, 0));
         commands[61] = commands[61] with { JumpPressed = 1 };
         Fill(commands, 121, 180, CreateCommand(Vector2.UnitY, AlsStance.Standing, AlsGait.Sprinting, 0));
@@ -85,7 +87,7 @@ public static class AlsMotorReplay
             commands,
             421,
             480,
-            CreateCommand(new Vector2(0.5f, 0.5f), AlsStance.Crouching, AlsGait.Running, 0));
+            CreateCommand(new Vector2(0.5f, 0.5f), AlsStance.Crouching, AlsGait.Sprinting, 0));
         Fill(commands, 481, 520, CreateCommand(Vector2.Zero, AlsStance.Standing, AlsGait.Running, 0));
         commands[481] = commands[481] with { JumpPressed = 1 };
         Fill(commands, 521, 600, CreateCommand(-Vector2.UnitX, AlsStance.Standing, AlsGait.Walking, 0));
@@ -93,7 +95,7 @@ public static class AlsMotorReplay
             commands,
             601,
             660,
-            CreateCommand(new Vector2(-0.7f, 0.7f), AlsStance.Standing, AlsGait.Sprinting, 0));
+            CreateCommand(new Vector2(-0.7f, 0.7f), AlsStance.Standing, AlsGait.Running, 0));
         Fill(commands, 661, HarnessLastFrame, CreateCommand(Vector2.Zero, AlsStance.Standing, AlsGait.Running, 0));
 
         return new AlsReplayInputAdapter(0, commands);

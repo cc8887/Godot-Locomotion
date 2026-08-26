@@ -70,18 +70,23 @@ public partial class AlsP3aCommitStage : Node
                 if (measure)
                 {
                     AlsResultDigest.Append(ref _context.Digest, result);
+                    if (result.Identity.CharacterId == 0)
+                    {
+                        ObserveCommittedCoverage(entry, result);
+                    }
                 }
-                if (frameId == AlsP3aHarnessContext.ReplacementFrame + 1 &&
+                if (frameId == AlsP3aHarnessContext.ReplacementFrame &&
                     result.Identity.CharacterId == _context.ReplacementHandle.CharacterId &&
                     result.Identity.SlotGeneration == _context.ReplacementHandle.Generation)
                 {
                     _context.NewGenerationCommitted = true;
                 }
-            }
-
-            if (frameId == AlsP3aHarnessContext.ReplacementFrame)
-            {
-                _harness.ReplaceCharacterZero();
+                if (frameId == AlsP3aHarnessContext.ReplacementFrame &&
+                    result.Identity.CharacterId == _context.ReplacementHandle.CharacterId &&
+                    result.Identity.SlotGeneration == _context.ReplacementHandle.Generation)
+                {
+                    _context.ReplacementFrameCommitted = true;
+                }
             }
 
             if (measure)
@@ -125,6 +130,7 @@ public partial class AlsP3aCommitStage : Node
             _context.ReplacementCount == 1 &&
             _context.OldGenerationRejected &&
             _context.NewGenerationCommitted &&
+            _context.ReplacementFrameCommitted &&
             _context.MeasurementCoverage == AlsP3aHarnessContext.RequiredCoverage &&
             _context.AffinityViolations == 0 &&
             offMainWorkers == expectedOffMain;
@@ -138,6 +144,7 @@ public partial class AlsP3aCommitStage : Node
                 $"commit={_context.CommitAllocations} replacements={_context.ReplacementCount} " +
                 $"old_generation_rejected={_context.OldGenerationRejected} " +
                 $"new_generation_committed={_context.NewGenerationCommitted} " +
+                $"replacement_frame_committed={_context.ReplacementFrameCommitted} " +
                 $"coverage={_context.MeasurementCoverage:X} " +
                 $"affinity_violations={_context.AffinityViolations} " +
                 $"first_gather_frame={_context.FirstGatherAllocationFrame} " +
@@ -178,5 +185,58 @@ public partial class AlsP3aCommitStage : Node
         {
             _context.MissingResults++;
         }
+    }
+
+    private void ObserveCommittedCoverage(
+        AlsP3aHarnessEntry entry,
+        in AlsFrameResult result)
+    {
+        _context.MeasurementCoverage |= result.ActualGait switch
+        {
+            AlsGait.Walking => AlsP3aHarnessContext.CoverageWalking,
+            AlsGait.Running => AlsP3aHarnessContext.CoverageRunning,
+            AlsGait.Sprinting => AlsP3aHarnessContext.CoverageSprinting,
+            _ => 0,
+        };
+        if (result.ActualStance == AlsStance.Crouching)
+        {
+            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageCrouching;
+        }
+        if (result.AnimationState == AlsAnimationState.JumpStart)
+        {
+            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageJump;
+        }
+        if (entry.HasCommittedResult != 0 &&
+            entry.PreviousCommittedLocomotionState == AlsLocomotionState.InAir &&
+            result.ResolvedLocomotionState == AlsLocomotionState.Grounded &&
+            result.AnimationState == AlsAnimationState.LandRecovery)
+        {
+            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageLand;
+        }
+        if (result.BlendCoordinates.Y > 0.25f)
+        {
+            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageForward;
+        }
+        if (result.BlendCoordinates.X > 0.25f)
+        {
+            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageRight;
+        }
+        if (result.BlendCoordinates.Y < -0.25f)
+        {
+            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageBackward;
+        }
+        if (result.BlendCoordinates.X < -0.25f)
+        {
+            _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageLeft;
+        }
+        _context.MeasurementCoverage |= result.ActualRotationMode switch
+        {
+            AlsRotationMode.LookingDirection => AlsP3aHarnessContext.CoverageLookingDirection,
+            AlsRotationMode.VelocityDirection => AlsP3aHarnessContext.CoverageVelocityDirection,
+            AlsRotationMode.Aiming => AlsP3aHarnessContext.CoverageAiming,
+            _ => 0,
+        };
+        entry.PreviousCommittedLocomotionState = result.ResolvedLocomotionState;
+        entry.HasCommittedResult = 1;
     }
 }
