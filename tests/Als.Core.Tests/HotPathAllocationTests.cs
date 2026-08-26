@@ -1,9 +1,8 @@
+using System.Runtime.CompilerServices;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Events;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
-
-[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
 
 namespace GodotAls.Core.Tests;
 
@@ -31,17 +30,22 @@ public sealed class HotPathAllocationTests
             acceleration: new System.Numerics.Vector3(1f, 0f, -2f),
             rotationMode: AlsRotationMode.VelocityDirection,
             characterYaw: 0.25f);
+        var allocated = MeasureConvenienceEvaluate(input);
+
+        Assert.Equal(0, allocated);
+    }
+
+    [Fact]
+    public void ExplicitLocomotionEvaluateDoesNotAllocateAfterWarmup()
+    {
+        var input = P3TestInput.Grounded(
+            velocity: new System.Numerics.Vector3(2f, 0f, -4f),
+            acceleration: new System.Numerics.Vector3(1f, 0f, -2f),
+            rotationMode: AlsRotationMode.VelocityDirection,
+            characterYaw: 0.25f);
         var resolved = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
 
-        RunEvaluate(input, resolved, 100);
-
-        long allocated = -1;
-        for (var attempt = 0; attempt < 4 && allocated != 0; attempt++)
-        {
-            var before = GC.GetAllocatedBytesForCurrentThread();
-            RunEvaluate(input, resolved, 10_000);
-            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-        }
+        var allocated = MeasureExplicitEvaluate(input, resolved);
 
         Assert.Equal(0, allocated);
     }
@@ -79,29 +83,63 @@ public sealed class HotPathAllocationTests
         }
     }
 
-    private static void RunEvaluate(
-        AlsFrameInput input,
-        AlsResolvedLocomotionCommand resolved,
-        int iterations)
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static long MeasureConvenienceEvaluate(AlsFrameInput input)
     {
-        var convenienceState = new AlsRuntimeState();
-        var convenienceResult = new AlsFrameResult();
-        var explicitState = new AlsRuntimeState();
-        var explicitResult = new AlsFrameResult();
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
 
-        for (var index = 0; index < iterations; index++)
+        for (var index = 0; index < 10_000; index++)
         {
             AlsLocomotionModel.Evaluate(
                 input,
-                ref convenienceState,
-                ref convenienceResult,
+                ref state,
+                ref result,
                 P3TestSettings.Reference);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 10_000; index++)
+        {
+            AlsLocomotionModel.Evaluate(
+                input,
+                ref state,
+                ref result,
+                P3TestSettings.Reference);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static long MeasureExplicitEvaluate(
+        AlsFrameInput input,
+        AlsResolvedLocomotionCommand resolved)
+    {
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        for (var index = 0; index < 10_000; index++)
+        {
             AlsLocomotionModel.Evaluate(
                 input,
                 resolved,
-                ref explicitState,
-                ref explicitResult,
+                ref state,
+                ref result,
                 P3TestSettings.Reference);
         }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 10_000; index++)
+        {
+            AlsLocomotionModel.Evaluate(
+                input,
+                resolved,
+                ref state,
+                ref result,
+                P3TestSettings.Reference);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 }

@@ -8,6 +8,61 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsLocomotionAnimationParameterTests
 {
     [Fact]
+    public void EvaluateSaturatesExtremeFiniteWorldValuesWithoutFailing()
+    {
+        var input = P3TestInput.Grounded(
+            velocity: new Vector3(float.MaxValue, 0f, float.MaxValue),
+            acceleration: new Vector3(float.MaxValue, 0f, -float.MaxValue),
+            characterYaw: MathF.PI / 4f,
+            maxAcceleration: float.MaxValue,
+            maxBrakingDeceleration: float.MaxValue);
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        AssertFinite(result.BlendCoordinates);
+        Assert.True(float.IsFinite(result.Stride));
+        Assert.True(float.IsFinite(result.PlayRate));
+        AssertFinite(result.Lean);
+        Assert.True(float.IsFinite(result.AnimationPhase));
+        Assert.True(float.IsFinite(result.TargetYaw));
+        AssertFinite(state.SmoothedLocalVelocity);
+        AssertFinite(state.SmoothedLocalAcceleration);
+        AssertFinite(state.SmoothedLean);
+        Assert.True(float.IsFinite(state.AnimationPhase));
+        Assert.True(float.IsFinite(state.TargetYaw));
+        Assert.True(float.IsFinite(state.GroundedEntrySpeed));
+        Assert.True(float.IsFinite(state.LandingRecoveryTime));
+    }
+
+    [Fact]
+    public void OppositeExtremeHistoriesUseOverflowSafeSmoothing()
+    {
+        var state = new AlsRuntimeState
+        {
+            Initialized = 1,
+            LocomotionState = AlsLocomotionState.Grounded,
+            SmoothedLocalVelocity = new Vector2(float.MaxValue, 0f),
+            SmoothedLocalAcceleration = new Vector2(float.MaxValue, 0f),
+        };
+        var result = new AlsFrameResult();
+        var input = P3TestInput.Grounded(
+            velocity: new Vector3(-float.MaxValue, 0f, 0f),
+            acceleration: new Vector3(-float.MaxValue, 0f, 0f),
+            deltaTime: 0.1f,
+            maxAcceleration: float.MaxValue,
+            maxBrakingDeceleration: float.MaxValue);
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        AssertFinite(state.SmoothedLocalVelocity);
+        AssertFinite(state.SmoothedLocalAcceleration);
+        Assert.Equal(0f, state.SmoothedLocalVelocity.X);
+        Assert.Equal(0f, state.SmoothedLocalAcceleration.X);
+    }
+
+    [Fact]
     public void FirstFrameLeanDampsFromZeroInsteadOfSnappingToTarget()
     {
         var state = new AlsRuntimeState();
@@ -260,6 +315,12 @@ public sealed class AlsLocomotionAnimationParameterTests
         Initialized = 1,
         LocomotionState = AlsLocomotionState.Grounded,
     };
+
+    private static void AssertFinite(Vector2 value)
+    {
+        Assert.True(float.IsFinite(value.X));
+        Assert.True(float.IsFinite(value.Y));
+    }
 
     private static AlsFrameResult EvaluateSequence(
         IEnumerable<AlsFrameInput> inputs,
