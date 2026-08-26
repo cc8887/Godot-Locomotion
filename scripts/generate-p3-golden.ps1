@@ -212,7 +212,64 @@ function Ensure-AlsJunction([string]$ProjectDirectory, [string]$ResolvedReferenc
     }
 }
 
-function Sync-OwnedPlugin([string]$RepositoryPlugin, [string]$ProjectDirectory)
+function Repair-OwnedPluginExchangeResidues([string]$PluginsDirectory, [string]$Destination)
+{
+    $pluginsDirectoryFull = Get-FullPath $PluginsDirectory
+    $destinationFull = Get-FullPath $Destination
+    $backupPrefix = '.AlsLocomotionTrace.exchange-backup.'
+    $stagingPrefix = '.AlsLocomotionTrace.staging.'
+    $backups = [System.Collections.Generic.List[object]]::new()
+    $stagingDirectories = [System.Collections.Generic.List[object]]::new()
+    foreach ($item in @(Get-ChildItem -LiteralPath $pluginsDirectoryFull -Force))
+    {
+        if ($item.Name.StartsWith($backupPrefix, [System.StringComparison]::Ordinal))
+        {
+            if ($item.Name -notmatch '^\.AlsLocomotionTrace\.exchange-backup\.[0-9a-f]{32}$' -or -not $item.PSIsContainer)
+            {
+                throw "Malformed owned trace plugin exchange backup: $($item.FullName)"
+            }
+            [void](Get-ValidatedTreeEntries $item.FullName 'Owned trace plugin exchange backup')
+            $backups.Add($item)
+        }
+        elseif ($item.Name.StartsWith($stagingPrefix, [System.StringComparison]::Ordinal))
+        {
+            if ($item.Name -notmatch '^\.AlsLocomotionTrace\.staging\.[0-9a-f]{32}$' -or -not $item.PSIsContainer)
+            {
+                throw "Malformed owned trace plugin staging residue: $($item.FullName)"
+            }
+            [void](Get-ValidatedTreeEntries $item.FullName 'Owned trace plugin staging residue')
+            $stagingDirectories.Add($item)
+        }
+    }
+
+    if (Test-Path -LiteralPath $destinationFull)
+    {
+        [void](Get-ValidatedTreeEntries $destinationFull 'Owned trace plugin destination')
+        foreach ($backup in $backups)
+        {
+            Remove-ValidatedTree $backup.FullName $pluginsDirectoryFull 'Committed trace plugin exchange backup'
+        }
+    }
+    elseif ($backups.Count -gt 1)
+    {
+        throw "Multiple uncommitted trace plugin exchange backups require manual inspection: $($backups.Count)"
+    }
+    elseif ($backups.Count -eq 1)
+    {
+        Move-Item -LiteralPath $backups[0].FullName -Destination $destinationFull
+        [void](Get-ValidatedTreeEntries $destinationFull 'Restored trace plugin destination')
+    }
+
+    foreach ($staging in $stagingDirectories)
+    {
+        Remove-ValidatedTree $staging.FullName $pluginsDirectoryFull 'Owned trace plugin staging residue'
+    }
+}
+
+function Sync-OwnedPlugin(
+    [string]$RepositoryPlugin,
+    [string]$ProjectDirectory,
+    [switch]$InjectBackupCleanupFailure)
 {
     $projectRoot = Get-FullPath $ProjectDirectory
     Assert-NoReparsePathComponents $projectRoot $projectRoot 'UE project root'
@@ -226,6 +283,7 @@ function Sync-OwnedPlugin([string]$RepositoryPlugin, [string]$ProjectDirectory)
 
     $destination = Get-FullPath (Join-Path $pluginsDirectory 'AlsLocomotionTrace')
     Assert-NoReparsePathComponents $destination $projectRoot 'Owned trace plugin destination'
+    Repair-OwnedPluginExchangeResidues $pluginsDirectory $destination
     $sourceRoot = Get-FullPath $RepositoryPlugin
     $sourceEntries = @(Get-ValidatedTreeEntries $sourceRoot 'Repository trace plugin source')
     $sourceFiles = @($sourceEntries | Where-Object { -not $_.PSIsContainer } | Sort-Object FullName)
@@ -236,12 +294,13 @@ function Sync-OwnedPlugin([string]$RepositoryPlugin, [string]$ProjectDirectory)
 
     $transactionId = [guid]::NewGuid().ToString('N')
     $staging = Join-Path $pluginsDirectory ".AlsLocomotionTrace.staging.$transactionId"
-    $backup = Join-Path $pluginsDirectory ".AlsLocomotionTrace.backup.$transactionId"
+    $backup = Join-Path $pluginsDirectory ".AlsLocomotionTrace.exchange-backup.$transactionId"
     Assert-NoReparsePathComponents $staging $projectRoot 'Owned trace plugin staging path'
     Assert-NoReparsePathComponents $backup $projectRoot 'Owned trace plugin backup path'
     New-Item -ItemType Directory -Path $staging | Out-Null
     $destinationMoved = $false
     $stagingMoved = $false
+    $exchangeCommitted = $false
     try
     {
         foreach ($sourceFile in $sourceFiles)
@@ -261,15 +320,24 @@ function Sync-OwnedPlugin([string]$RepositoryPlugin, [string]$ProjectDirectory)
         }
         Move-Item -LiteralPath $staging -Destination $destination
         $stagingMoved = $true
+        $exchangeCommitted = $true
         [void](Get-ValidatedTreeEntries $destination 'Synchronized trace plugin')
         if ($destinationMoved)
         {
-            $destinationMoved = $false
+            if ($InjectBackupCleanupFailure)
+            {
+                throw 'Injected committed plugin backup cleanup failure.'
+            }
             Remove-ValidatedTree $backup $pluginsDirectory 'Owned trace plugin backup'
+            $destinationMoved = $false
         }
     }
     catch
     {
+        if ($exchangeCommitted)
+        {
+            throw "Plugin exchange committed but cleanup failure: $($_.Exception.Message)"
+        }
         if ($stagingMoved -and (Test-Path -LiteralPath $destination))
         {
             Remove-ValidatedTree $destination $pluginsDirectory 'Failed synchronized trace plugin'
@@ -802,7 +870,35 @@ function Get-ValidatedP3OutputMappings([string]$OutputDirectory, [string]$Projec
     return @($mappings)
 }
 
-function Restore-P3OutputTransaction([string]$TransactionDirectory, [string]$ProjectRoot)
+function Write-P3OutputTransactionJournal(
+    [string]$TransactionDirectory,
+    [string]$ProjectRoot,
+    [object]$Journal)
+{
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    $transactionRoot = Get-P3OutputTransactionRoot $repositoryRoot
+    $transactionDirectoryFull = Get-FullPath $TransactionDirectory
+    if (-not (Test-IsChildPath $transactionDirectoryFull $transactionRoot))
+    {
+        throw "P3 output transaction journal escapes its owned root: $transactionDirectoryFull"
+    }
+    Assert-NoReparsePathComponents $transactionDirectoryFull $transactionRoot 'P3 output transaction'
+    [void](Get-ValidatedTreeEntries $transactionDirectoryFull 'P3 output transaction')
+    $journalPath = Join-Path $transactionDirectoryFull 'journal.json'
+    $journalTemporary = Join-Path $transactionDirectoryFull ("journal.$([guid]::NewGuid().ToString('N')).tmp")
+    [System.IO.File]::WriteAllText($journalTemporary, ($Journal | ConvertTo-Json -Depth 5),
+        [System.Text.UTF8Encoding]::new($false))
+    try
+    {
+        [System.IO.File]::Move($journalTemporary, $journalPath, $true)
+    }
+    finally
+    {
+        if (Test-Path -LiteralPath $journalTemporary) { Remove-Item -LiteralPath $journalTemporary -Force }
+    }
+}
+
+function Read-ValidatedP3OutputTransaction([string]$TransactionDirectory, [string]$ProjectRoot)
 {
     $repositoryRoot = Get-FullPath $ProjectRoot
     $transactionRoot = Get-P3OutputTransactionRoot $repositoryRoot
@@ -819,25 +915,45 @@ function Restore-P3OutputTransaction([string]$TransactionDirectory, [string]$Pro
         throw "P3 output transaction has no recovery journal: $transactionDirectoryFull"
     }
     $journal = Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json
-    Assert-ExactProperties $journal @('entries', 'version') $journalPath
-    if ($journal.version -ne 1 -or @($journal.entries).Count -ne $outputDestinations.Count)
+    Assert-ExactProperties $journal @('entries', 'state', 'version') $journalPath
+    if ($journal.version -ne 1 -or @($journal.entries).Count -ne $outputDestinations.Count -or
+        $journal.state -cnotin @('prepared', 'committed', 'rolledBack'))
     {
         throw "Invalid P3 output transaction journal: $journalPath"
     }
 
     $journalByRelativePath = @{}
+    $expectedBackupNames = @{}
+    $backupIndex = 0
+    foreach ($outputEntry in $outputDestinations.GetEnumerator())
+    {
+        $expectedBackupNames[[string]$outputEntry.Key] = "$backupIndex.bak"
+        $backupIndex++
+    }
     foreach ($entry in @($journal.entries))
     {
         Assert-ExactProperties $entry @('backupName', 'fileName', 'hadOriginal', 'relativeDestination') "$journalPath entry"
-        if ($entry.relativeDestination -cnotin @($outputDestinations.Values) -or
+        if ($entry.hadOriginal -isnot [bool] -or
+            $entry.relativeDestination -cnotin @($outputDestinations.Values) -or
             $outputDestinations[[string]$entry.fileName] -cne [string]$entry.relativeDestination -or
+            $expectedBackupNames[[string]$entry.fileName] -cne [string]$entry.backupName -or
             $journalByRelativePath.ContainsKey([string]$entry.relativeDestination))
         {
             throw "P3 output transaction journal contains an unexpected destination: $($entry.relativeDestination)"
         }
-        if ([System.IO.Path]::GetFileName([string]$entry.backupName) -cne [string]$entry.backupName)
+        $backup = Get-FullPath (Join-Path $transactionDirectoryFull ([string]$entry.backupName))
+        if (-not (Test-IsChildPath $backup $transactionDirectoryFull))
         {
-            throw "P3 output transaction journal contains an unsafe backup name: $($entry.backupName)"
+            throw "P3 output transaction journal contains an unsafe backup path: $backup"
+        }
+        if (Test-Path -LiteralPath $backup)
+        {
+            $backupItem = Get-Item -LiteralPath $backup -Force
+            if ($backupItem.PSIsContainer -or
+                ($backupItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+            {
+                throw "P3 output transaction backup is not a regular file: $backup"
+            }
         }
         $journalByRelativePath[[string]$entry.relativeDestination] = $entry
     }
@@ -845,23 +961,80 @@ function Restore-P3OutputTransaction([string]$TransactionDirectory, [string]$Pro
     {
         throw "P3 output transaction journal does not contain the exact six destinations: $journalPath"
     }
+    [pscustomobject]@{
+        Directory = $transactionDirectoryFull
+        Journal = $journal
+        JournalByRelativePath = $journalByRelativePath
+        JournalPath = $journalPath
+    }
+}
 
+function Remove-P3OutputTransactionResidue([object]$Transaction, [string]$ProjectRoot)
+{
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    $transactionRoot = Get-P3OutputTransactionRoot $repositoryRoot
+    $transactionDirectory = Get-FullPath ([string]$Transaction.Directory)
+    if (-not (Test-IsChildPath $transactionDirectory $transactionRoot))
+    {
+        throw "P3 output transaction cleanup escapes its owned root: $transactionDirectory"
+    }
+    Assert-NoReparsePathComponents $transactionDirectory $transactionRoot 'P3 output transaction cleanup'
+    $journalPath = Get-FullPath (Join-Path $transactionDirectory 'journal.json')
+    if (-not [System.StringComparer]::OrdinalIgnoreCase.Equals(
+        $journalPath, (Get-FullPath ([string]$Transaction.JournalPath))) -or
+        -not (Test-Path -LiteralPath $journalPath -PathType Leaf))
+    {
+        throw "P3 output transaction cleanup has an invalid journal path: $($Transaction.JournalPath)"
+    }
+    $entries = @(Get-ValidatedTreeEntries $transactionDirectory 'P3 output transaction cleanup')
+    foreach ($file in @($entries | Where-Object {
+        -not $_.PSIsContainer -and
+        -not [System.StringComparer]::OrdinalIgnoreCase.Equals($_.FullName, $journalPath)
+    }))
+    {
+        Remove-Item -LiteralPath $file.FullName -Force
+    }
+    foreach ($directory in @($entries | Where-Object { $_.PSIsContainer } |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }))
+    {
+        Remove-Item -LiteralPath $directory.FullName -Force
+    }
+    Remove-Item -LiteralPath $journalPath -Force
+    Remove-Item -LiteralPath $transactionDirectory -Force
+}
+
+function Assert-P3PublishedOutputSet([object[]]$Mappings, [string]$ProjectRoot)
+{
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    foreach ($mapping in $Mappings)
+    {
+        Assert-NoReparsePathComponents $mapping.Destination $repositoryRoot 'Published P3 output destination'
+        if (-not (Test-Path -LiteralPath $mapping.Destination -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $mapping.Source -Algorithm SHA256).Hash -cne
+            (Get-FileHash -LiteralPath $mapping.Destination -Algorithm SHA256).Hash)
+        {
+            throw "Published P3 output does not match its validated source: $($mapping.Destination)"
+        }
+    }
+}
+
+function Restore-P3OutputTransaction([string]$TransactionDirectory, [string]$ProjectRoot)
+{
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    $transaction = Read-ValidatedP3OutputTransaction $TransactionDirectory $repositoryRoot
+    if ($transaction.Journal.state -ceq 'committed' -or $transaction.Journal.state -ceq 'rolledBack')
+    {
+        Remove-P3OutputTransactionResidue $transaction $repositoryRoot
+        return
+    }
+
+    # Validate every rollback source and destination before modifying any published file.
     foreach ($relativeDestination in @($outputDestinations.Values))
     {
-        $entry = $journalByRelativePath[[string]$relativeDestination]
+        $entry = $transaction.JournalByRelativePath[[string]$relativeDestination]
         $destination = Get-FullPath (Join-Path $repositoryRoot $relativeDestination)
         Assert-NoReparsePathComponents $destination $repositoryRoot 'P3 rollback destination'
-        if ([bool]$entry.hadOriginal)
-        {
-            $backup = Get-FullPath (Join-Path $transactionDirectoryFull ([string]$entry.backupName))
-            if (-not (Test-IsChildPath $backup $transactionDirectoryFull) -or
-                -not (Test-Path -LiteralPath $backup -PathType Leaf))
-            {
-                throw "P3 rollback backup is missing or unsafe: $backup"
-            }
-            Replace-Atomically $backup $destination
-        }
-        elseif (Test-Path -LiteralPath $destination)
+        if (Test-Path -LiteralPath $destination)
         {
             $destinationItem = Get-Item -LiteralPath $destination -Force
             if ($destinationItem.PSIsContainer -or
@@ -869,10 +1042,35 @@ function Restore-P3OutputTransaction([string]$TransactionDirectory, [string]$Pro
             {
                 throw "P3 rollback refuses a non-regular destination: $destination"
             }
+        }
+        if ([bool]$entry.hadOriginal)
+        {
+            $backup = Get-FullPath (Join-Path $transaction.Directory ([string]$entry.backupName))
+            if (-not (Test-Path -LiteralPath $backup -PathType Leaf))
+            {
+                throw "P3 rollback backup is missing: $backup"
+            }
+        }
+    }
+
+    foreach ($relativeDestination in @($outputDestinations.Values))
+    {
+        $entry = $transaction.JournalByRelativePath[[string]$relativeDestination]
+        $destination = Get-FullPath (Join-Path $repositoryRoot $relativeDestination)
+        if ([bool]$entry.hadOriginal)
+        {
+            $backup = Get-FullPath (Join-Path $transaction.Directory ([string]$entry.backupName))
+            Replace-Atomically $backup $destination
+        }
+        elseif (Test-Path -LiteralPath $destination)
+        {
             Remove-Item -LiteralPath $destination -Force
         }
     }
-    Remove-ValidatedTree $transactionDirectoryFull $transactionRoot 'Completed P3 output transaction'
+    $transaction.Journal.state = 'rolledBack'
+    Write-P3OutputTransactionJournal $transaction.Directory $repositoryRoot $transaction.Journal
+    $transaction = Read-ValidatedP3OutputTransaction $transaction.Directory $repositoryRoot
+    Remove-P3OutputTransactionResidue $transaction $repositoryRoot
 }
 
 function Recover-P3OutputTransactions([string]$ProjectRoot)
@@ -901,7 +1099,8 @@ function Recover-P3OutputTransactions([string]$ProjectRoot)
 function Publish-P3GeneratedOutputSet(
     [string]$OutputDirectory,
     [string]$ProjectRoot,
-    [int]$InjectFailureAfter = 0)
+    [int]$InjectFailureAfter = 0,
+    [switch]$InjectCleanupFailureAfterCommit)
 {
     $repositoryRoot = Get-FullPath $ProjectRoot
     Recover-P3OutputTransactions $repositoryRoot
@@ -916,7 +1115,7 @@ function Publish-P3GeneratedOutputSet(
     Assert-NoReparsePathComponents $transactionRoot $repositoryRoot 'P3 output transaction root'
     $transactionDirectory = Join-Path $transactionRoot ([guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $transactionDirectory | Out-Null
-    $journalWritten = $false
+    $transactionState = 'unprepared'
     try
     {
         $journalEntries = [System.Collections.Generic.List[object]]::new()
@@ -937,12 +1136,9 @@ function Publish-P3GeneratedOutputSet(
             })
             $backupIndex++
         }
-        $journal = [ordered]@{ entries = @($journalEntries); version = 1 }
-        $journalTemporary = Join-Path $transactionDirectory 'journal.tmp'
-        [System.IO.File]::WriteAllText($journalTemporary, ($journal | ConvertTo-Json -Depth 5),
-            [System.Text.UTF8Encoding]::new($false))
-        Move-Item -LiteralPath $journalTemporary -Destination (Join-Path $transactionDirectory 'journal.json')
-        $journalWritten = $true
+        $journal = [ordered]@{ entries = @($journalEntries); state = 'prepared'; version = 1 }
+        Write-P3OutputTransactionJournal $transactionDirectory $repositoryRoot $journal
+        $transactionState = 'prepared'
 
         $replacementCount = 0
         foreach ($mapping in $mappings)
@@ -954,18 +1150,29 @@ function Publish-P3GeneratedOutputSet(
                 throw "Injected output publication failure after $replacementCount replacements."
             }
         }
-        Remove-ValidatedTree $transactionDirectory $transactionRoot 'Successful P3 output transaction'
-        $journalWritten = $false
+        Assert-P3PublishedOutputSet $mappings $repositoryRoot
+        $journal.state = 'committed'
+        Write-P3OutputTransactionJournal $transactionDirectory $repositoryRoot $journal
+        $transactionState = 'committed'
+        if ($InjectCleanupFailureAfterCommit)
+        {
+            throw 'Injected committed P3 output cleanup failure.'
+        }
+        $transaction = Read-ValidatedP3OutputTransaction $transactionDirectory $repositoryRoot
+        Remove-P3OutputTransactionResidue $transaction $repositoryRoot
     }
     catch
     {
         $publicationError = $_
-        if ($journalWritten -and (Test-Path -LiteralPath $transactionDirectory))
+        if ($transactionState -ceq 'prepared' -and (Test-Path -LiteralPath $transactionDirectory))
         {
             Restore-P3OutputTransaction $transactionDirectory $repositoryRoot
-            $journalWritten = $false
         }
-        elseif (Test-Path -LiteralPath $transactionDirectory)
+        elseif ($transactionState -ceq 'committed')
+        {
+            throw "P3 output publication committed but cleanup failure: $($publicationError.Exception.Message)"
+        }
+        elseif ($transactionState -ceq 'unprepared' -and (Test-Path -LiteralPath $transactionDirectory))
         {
             Remove-ValidatedTree $transactionDirectory $transactionRoot 'Failed unjournaled P3 output transaction'
         }
