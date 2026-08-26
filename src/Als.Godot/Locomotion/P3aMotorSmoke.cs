@@ -271,6 +271,17 @@ public partial class P3aMotorSmoke : Node
 
     private void VerifyRotationCommit()
     {
+        var commands = new AlsLocomotionCommand[4];
+        Array.Fill(commands, AlsLocomotionCommand.CreateDefault());
+        var rotationMotor = new AlsCharacterMotor
+        {
+            Name = "Order0RotationMotor",
+            Position = new Vector3(80f, 4f, 0f),
+        };
+        AddChild(rotationMotor);
+        rotationMotor.Configure(_settings, new AlsReplayInputAdapter(0, commands));
+        var frameId = 0;
+
         foreach (var mode in new[]
         {
             AlsRotationMode.VelocityDirection,
@@ -278,21 +289,28 @@ public partial class P3aMotorSmoke : Node
             AlsRotationMode.Aiming,
         })
         {
-            var currentYaw = ReadMotorYaw(_motor);
+            var currentYaw = ReadMotorYaw(rotationMotor);
             var input = CreateRotationInput(mode, currentYaw, new NumericsVector3(1f, 0f, 0f));
             var state = default(AlsRuntimeState);
             var result = AlsFrameResult.CreateDefault(input.Identity);
             AlsLocomotionModel.Evaluate(input, ref state, ref result, _coreSettings);
 
-            _motor.ApplyTargetYaw(result.TargetYaw);
+            var snapshot = rotationMotor.Step(frameId++, 9, 1, DeltaTime, 1, result.TargetYaw);
             RequireNear(
-                AlsMath.NormalizeAngleRadians(ReadMotorYaw(_motor) - result.TargetYaw),
+                AlsMath.NormalizeAngleRadians(ReadMotorYaw(rotationMotor) - result.TargetYaw),
                 0f,
                 0.00001f,
-                $"{mode} committed GlobalBasis yaw");
+                $"{mode} Order0 GlobalBasis yaw");
+            RequireNear(snapshot.CharacterYaw, ReadMotorYaw(rotationMotor), 0.00001f,
+                $"{mode} published CharacterYaw");
+            RequireNear(
+                MathF.Atan2(snapshot.CharacterTransform.M31, snapshot.CharacterTransform.M33),
+                snapshot.CharacterYaw,
+                0.00001f,
+                $"{mode} published CharacterTransform yaw");
         }
 
-        var stoppedYaw = ReadMotorYaw(_motor);
+        var stoppedYaw = ReadMotorYaw(rotationMotor);
         var stoppedInput = CreateRotationInput(
             AlsRotationMode.LookingDirection,
             stoppedYaw,
@@ -310,8 +328,10 @@ public partial class P3aMotorSmoke : Node
             ref stoppedState,
             ref stoppedResult,
             _coreSettings);
-        _motor.ApplyTargetYaw(stoppedResult.TargetYaw);
-        RequireNear(ReadMotorYaw(_motor), stoppedYaw, 0.00001f, "low-speed no-TIP yaw");
+        var stoppedSnapshot = rotationMotor.Step(frameId, 9, 1, DeltaTime, 1, stoppedResult.TargetYaw);
+        RequireNear(ReadMotorYaw(rotationMotor), stoppedYaw, 0.00001f, "low-speed no-TIP yaw");
+        RequireNear(stoppedSnapshot.CharacterYaw, stoppedYaw, 0.00001f, "low-speed published yaw");
+        rotationMotor.QueueFree();
         _rotationCommitChecked = true;
     }
 

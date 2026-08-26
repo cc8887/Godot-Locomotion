@@ -9,7 +9,7 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
     . $script:FunctionsPath
 }
 
-$script:ValidMarker = 'GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=4E567B2CB05AF7DF missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0'
+$script:ValidMarker = 'GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=5D0BC4F72F298F65 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0'
 $script:VerifierSource = [System.IO.File]::ReadAllText($script:VerifierPath)
 $script:SolutionSource = [System.IO.File]::ReadAllText($script:SolutionPath)
 
@@ -42,7 +42,7 @@ Describe 'P3A verifier marker parsing' {
             -ExpectedMode 'single' `
             -ExpectedCharacterCount 1
 
-        $result.Digest | Should Be '4E567B2CB05AF7DF'
+        $result.Digest | Should Be '5D0BC4F72F298F65'
     }
 
     It 'rejects a valid marker plus a malformed marker line' {
@@ -74,7 +74,7 @@ Describe 'P3A verifier marker parsing' {
     }
 
     It 'rejects a well-formed marker whose digest drifted from the character baseline' {
-        $drifted = $script:ValidMarker.Replace('4E567B2CB05AF7DF', '4E567B2CB05AF7DE')
+        $drifted = $script:ValidMarker.Replace('5D0BC4F72F298F65', '5D0BC4F72F298F64')
 
         Test-P3aParserRejects @($drifted) | Should Be $true
     }
@@ -88,10 +88,10 @@ Describe 'P3A verifier marker parsing' {
         }
 
         $single = [pscustomobject]@{
-            Mode = 'single'; Characters = 1; Digest = '4E567B2CB05AF7DE'
+            Mode = 'single'; Characters = 1; Digest = '5D0BC4F72F298F64'
         }
         $parallel = [pscustomobject]@{
-            Mode = 'parallel'; Characters = 1; Digest = '4E567B2CB05AF7DE'
+            Mode = 'parallel'; Characters = 1; Digest = '5D0BC4F72F298F64'
         }
         $rejected = $false
         try

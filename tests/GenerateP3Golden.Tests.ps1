@@ -58,15 +58,32 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
         }
     }
 
-    It 'keeps Node rotation writes in the main-thread commit stage' {
+    It 'keeps actual Node rotation writes in the Order 0 motor snapshot stage' {
         $commit = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
             'src\Als.Godot\Locomotion\AlsP3aCommitStage.cs'))
+        $harness = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
+            'src\Als.Godot\Locomotion\P3aLocomotionHarness.cs'))
+        $motor = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
+            'src\Als.Godot\Locomotion\AlsCharacterMotor.cs'))
         $worker = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
             'src\Als.Godot\Locomotion\AlsP3aWorkerRoot.cs'))
 
-        $commit | Should Match 'entry\.Motor\.ApplyTargetYaw\(result\.TargetYaw\)'
-        $commit | Should Match 'RotationCommitMismatches'
+        $commit | Should Not Match 'ApplyTargetYaw|GlobalBasis|GlobalRotation|GlobalTransform'
+        $commit | Should Match 'CommittedTargetYaw\s*=\s*result\.TargetYaw'
+        $harness | Should Match 'entry\.Motor\.Step\([\s\S]*entry\.HasCommittedTargetYaw[\s\S]*entry\.CommittedTargetYaw'
+        $motor | Should Match 'GlobalBasis\s*=\s*new Basis\(Vector3\.Up,\s*targetYaw\)[\s\S]*MoveAndSlide\(\)[\s\S]*characterTransform\s*=\s*GlobalTransform[\s\S]*CharacterTransform:\s*ToNumerics\(characterTransform\)'
         $worker | Should Not Match 'ApplyTargetYaw|GlobalBasis|GlobalRotation|GlobalTransform'
+    }
+
+    It 'keeps LookingDirection movement offset independent of actor yaw in both port oracles' {
+        $core = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
+            'src\Als.Core\Locomotion\AlsLocomotionModel.cs'))
+        $commandlet = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
+            'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\Private\AlsLocomotionTraceCommandlet.cpp'))
+
+        $core | Should Match 'movementYawOffset\s*=\s*AlsMath\.NormalizeAngleRadians\(velocityYaw\s*-\s*viewYaw\)'
+        $commandlet | Should Match 'MovementYawOffset\s*\{\s*NormalizeRadians\(VelocityYaw\s*-\s*ViewYaw\)\s*\}'
+        $commandlet | Should Not Match 'SelectedTargetYaw\s*=\s*NormalizeRadians\([^;]*LocalYaw'
     }
 
     It 'rejects trace content swapped between two valid filenames' {

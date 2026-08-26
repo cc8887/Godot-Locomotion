@@ -139,6 +139,10 @@ public sealed class AlsP3aHarnessEntry
 
     public float PreviousAppliedYaw;
 
+    public byte HasCommittedTargetYaw;
+
+    public float CommittedTargetYaw;
+
     public int HasPublishedResult;
 
     public long PublishedResultFrameId;

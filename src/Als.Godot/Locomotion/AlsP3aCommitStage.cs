@@ -57,9 +57,14 @@ public partial class AlsP3aCommitStage : Node
                     continue;
                 }
 
-                entry.Motor.ApplyTargetYaw(result.TargetYaw);
-                var appliedYaw = entry.Motor.GetAppliedYaw();
-                if (MathF.Abs(AlsMath.NormalizeAngleRadians(appliedYaw - result.TargetYaw)) > 0.00001f)
+                var appliedYaw = entry.PendingInput.CharacterYaw;
+                var transformYaw = MathF.Atan2(
+                    entry.PendingInput.CharacterTransform.M31,
+                    entry.PendingInput.CharacterTransform.M33);
+                if (MathF.Abs(AlsMath.NormalizeAngleRadians(appliedYaw - transformYaw)) > 0.00001f ||
+                    (entry.HasCommittedTargetYaw == 1 &&
+                     MathF.Abs(AlsMath.NormalizeAngleRadians(
+                         appliedYaw - entry.CommittedTargetYaw)) > 0.00001f))
                 {
                     _context.RotationCommitMismatches++;
                     continue;
@@ -83,6 +88,8 @@ public partial class AlsP3aCommitStage : Node
                 {
                     _context.ReplacementFrameCommitted = true;
                 }
+                entry.CommittedTargetYaw = result.TargetYaw;
+                entry.HasCommittedTargetYaw = 1;
             }
 
             if (measure)
