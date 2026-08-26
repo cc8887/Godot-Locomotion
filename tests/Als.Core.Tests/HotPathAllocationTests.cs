@@ -1,6 +1,9 @@
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Events;
 using GodotAls.Core.Exchange;
+using GodotAls.Core.Locomotion;
+
+[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
 
 namespace GodotAls.Core.Tests;
 
@@ -16,6 +19,29 @@ public sealed class HotPathAllocationTests
         var before = GC.GetAllocatedBytesForCurrentThread();
         Run(exchange, 10_000);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+    }
+
+    [Fact]
+    public void FullLocomotionEvaluateDoesNotAllocateAfterWarmup()
+    {
+        var input = P3TestInput.Grounded(
+            velocity: new System.Numerics.Vector3(2f, 0f, -4f),
+            acceleration: new System.Numerics.Vector3(1f, 0f, -2f),
+            rotationMode: AlsRotationMode.VelocityDirection,
+            characterYaw: 0.25f);
+        var resolved = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
+
+        RunEvaluate(input, resolved, 100);
+
+        long allocated = -1;
+        for (var attempt = 0; attempt < 4 && allocated != 0; attempt++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            RunEvaluate(input, resolved, 10_000);
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         Assert.Equal(0, allocated);
     }
@@ -50,6 +76,32 @@ public sealed class HotPathAllocationTests
                     1f,
                     AlsAnimationEventPhase.Trigger));
             buffer.Clear();
+        }
+    }
+
+    private static void RunEvaluate(
+        AlsFrameInput input,
+        AlsResolvedLocomotionCommand resolved,
+        int iterations)
+    {
+        var convenienceState = new AlsRuntimeState();
+        var convenienceResult = new AlsFrameResult();
+        var explicitState = new AlsRuntimeState();
+        var explicitResult = new AlsFrameResult();
+
+        for (var index = 0; index < iterations; index++)
+        {
+            AlsLocomotionModel.Evaluate(
+                input,
+                ref convenienceState,
+                ref convenienceResult,
+                P3TestSettings.Reference);
+            AlsLocomotionModel.Evaluate(
+                input,
+                resolved,
+                ref explicitState,
+                ref explicitResult,
+                P3TestSettings.Reference);
         }
     }
 }

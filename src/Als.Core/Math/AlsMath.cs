@@ -24,4 +24,47 @@ public static class AlsMath
 
         return target + ((current - target) * MathF.Exp(-smoothing * deltaTime));
     }
+
+    public static float DamperExactAlpha(float deltaTime, float halfLife)
+    {
+        if (!float.IsFinite(deltaTime) || deltaTime < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(deltaTime));
+        }
+
+        if (!float.IsFinite(halfLife) || halfLife < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(halfLife));
+        }
+
+        if (halfLife == 0f)
+        {
+            return 1f;
+        }
+
+        if (deltaTime == 0f)
+        {
+            return 0f;
+        }
+
+        return System.Math.Clamp(1f - MathF.Pow(2f, -deltaTime / halfLife), 0f, 1f);
+    }
+
+    public static float InterpolateAngleShortest(float current, float target, float alpha)
+    {
+        if (!float.IsFinite(current) || !float.IsFinite(target))
+        {
+            throw new ArgumentOutOfRangeException(nameof(current), "Angles must be finite.");
+        }
+
+        if (!float.IsFinite(alpha) || alpha < 0f || alpha > 1f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(alpha));
+        }
+
+        var normalizedCurrent = NormalizeAngleRadians(current);
+        var normalizedTarget = NormalizeAngleRadians(target);
+        var delta = NormalizeAngleRadians(normalizedTarget - normalizedCurrent);
+        return NormalizeAngleRadians(normalizedCurrent + (delta * alpha));
+    }
 }
