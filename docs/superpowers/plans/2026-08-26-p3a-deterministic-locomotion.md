@@ -816,7 +816,9 @@ Allocation counters separately cover gather/motor, model, exchange, and commit a
 
 Run: `pwsh -NoProfile -File scripts/verify-p3a.ps1 -GodotExecutable $godotExe -SkipRegression`
 
-Expected: four `GODOT_ALS_P3A_OK` markers followed by `P3A_VERIFICATION_OK`.
+Expected: four `GODOT_ALS_P3A_OK` markers followed by
+`P3A_FOCUSED_VERIFICATION_OK regression=skipped`. Only the default non-Skip gate may emit
+`P3A_VERIFICATION_OK` after the complete regression closure.
 
 - [ ] **Step 5: Commit**
 

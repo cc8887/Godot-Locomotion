@@ -179,10 +179,12 @@ Describe 'P3A verifier regression closure' {
     }
 
     It 'runs repository closure after full regression and before the full success marker' {
+        $script:VerifierSource | Should Match ([regex]::Escape(
+            '$p3aBaseCommit = ''e69f18bb3410d77ef50df38b073535b5e9f20635'''))
         $finalTestsIndex = $script:VerifierSource.LastIndexOf(
             'dotnet test $solutionPath -c Release --no-restore')
         $closureIndex = $script:VerifierSource.IndexOf(
-            'Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath',
+            'Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath -BaseCommit $p3aBaseCommit',
             $finalTestsIndex)
         $successIndex = $script:VerifierSource.LastIndexOf("Write-Output $completionMarker")
 
@@ -202,13 +204,18 @@ Describe 'P3A repository closure' {
         & git -C $script:ClosureRepository add tracked.txt
         & git -C $script:ClosureRepository commit --quiet -m baseline
         if ($LASTEXITCODE -ne 0) { throw 'Could not initialize closure test repository.' }
+        $script:ClosureBaseCommit = "$(& git -C $script:ClosureRepository rev-parse HEAD)".Trim()
     }
 
     It 'rejects a whitespace error in a tracked worktree change' {
         [System.IO.File]::WriteAllText((Join-Path $script:ClosureRepository 'tracked.txt'), "bad trailing whitespace   `n")
 
         $rejected = $false
-        try { Assert-P3aRepositoryClosure -RepositoryRoot $script:ClosureRepository }
+        try {
+            Assert-P3aRepositoryClosure `
+                -RepositoryRoot $script:ClosureRepository `
+                -BaseCommit $script:ClosureBaseCommit
+        }
         catch { $rejected = $true }
 
         $rejected | Should Be $true
@@ -222,7 +229,11 @@ Describe 'P3A repository closure' {
         & git -C $script:ClosureRepository commit --quiet -m generated
 
         $rejected = $false
-        try { Assert-P3aRepositoryClosure -RepositoryRoot $script:ClosureRepository }
+        try {
+            Assert-P3aRepositoryClosure `
+                -RepositoryRoot $script:ClosureRepository `
+                -BaseCommit $script:ClosureBaseCommit
+        }
         catch { $rejected = $true }
 
         $rejected | Should Be $true
@@ -230,10 +241,67 @@ Describe 'P3A repository closure' {
 
     It 'accepts a clean repository with source files only' {
         $rejected = $false
-        try { Assert-P3aRepositoryClosure -RepositoryRoot $script:ClosureRepository }
+        try {
+            Assert-P3aRepositoryClosure `
+                -RepositoryRoot $script:ClosureRepository `
+                -BaseCommit $script:ClosureBaseCommit
+        }
         catch { $rejected = $true }
 
         $rejected | Should Be $false
+    }
+
+    It 'rejects a whitespace error committed after the injected P3A base' {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $script:ClosureRepository 'committed.txt'),
+            "committed trailing whitespace   `n")
+        & git -C $script:ClosureRepository add committed.txt
+        & git -C $script:ClosureRepository commit --quiet -m whitespace
+
+        $failure = ''
+        try {
+            Assert-P3aRepositoryClosure `
+                -RepositoryRoot $script:ClosureRepository `
+                -BaseCommit $script:ClosureBaseCommit
+        }
+        catch { $failure = $_.Exception.Message }
+
+        $failure | Should Match 'Committed P3A range whitespace check failed'
+    }
+
+    It 'rejects a P3A base that does not exist' {
+        $failure = ''
+        try {
+            Assert-P3aRepositoryClosure `
+                -RepositoryRoot $script:ClosureRepository `
+                -BaseCommit ('0' * 40)
+        }
+        catch { $failure = $_.Exception.Message }
+
+        $failure | Should Match 'P3A base commit does not exist'
+    }
+
+    It 'rejects a P3A base that is not an ancestor of HEAD' {
+        $initialBranch = "$(& git -C $script:ClosureRepository branch --show-current)".Trim()
+        & git -C $script:ClosureRepository checkout --quiet -b unrelated
+        [System.IO.File]::WriteAllText((Join-Path $script:ClosureRepository 'unrelated.txt'), "side`n")
+        & git -C $script:ClosureRepository add unrelated.txt
+        & git -C $script:ClosureRepository commit --quiet -m unrelated
+        $unrelatedCommit = "$(& git -C $script:ClosureRepository rev-parse HEAD)".Trim()
+        & git -C $script:ClosureRepository checkout --quiet $initialBranch
+        [System.IO.File]::WriteAllText((Join-Path $script:ClosureRepository 'main.txt'), "main`n")
+        & git -C $script:ClosureRepository add main.txt
+        & git -C $script:ClosureRepository commit --quiet -m main
+
+        $failure = ''
+        try {
+            Assert-P3aRepositoryClosure `
+                -RepositoryRoot $script:ClosureRepository `
+                -BaseCommit $unrelatedCommit
+        }
+        catch { $failure = $_.Exception.Message }
+
+        $failure | Should Match 'P3A base commit is not an ancestor of HEAD'
     }
 }
 

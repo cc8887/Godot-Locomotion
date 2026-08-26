@@ -33,14 +33,42 @@ function Assert-P3aRepositoryClosure
 {
     param(
         [Parameter(Mandatory)]
-        [string]$RepositoryRoot
+        [string]$RepositoryRoot,
+        [Parameter(Mandatory)]
+        [string]$BaseCommit
     )
 
     $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+    $resolvedBaseOutput = @(& git -C $resolvedRoot rev-parse --verify "${BaseCommit}^{commit}" 2>&1)
+    if ($LASTEXITCODE -ne 0 -or
+        $resolvedBaseOutput.Count -ne 1 -or
+        "$($resolvedBaseOutput[0])" -notmatch '\A[0-9a-fA-F]{40}\z')
+    {
+        throw "P3A base commit does not exist: $BaseCommit"
+    }
+    $resolvedBaseCommit = "$($resolvedBaseOutput[0])"
+
+    $ancestorOutput = @(& git -C $resolvedRoot merge-base --is-ancestor $resolvedBaseCommit HEAD 2>&1)
+    $ancestorExitCode = $LASTEXITCODE
+    if ($ancestorExitCode -eq 1)
+    {
+        throw "P3A base commit is not an ancestor of HEAD: $resolvedBaseCommit"
+    }
+    if ($ancestorExitCode -ne 0)
+    {
+        throw "Could not verify the P3A base ancestry:$([Environment]::NewLine)$($ancestorOutput -join [Environment]::NewLine)"
+    }
+
+    $committedDiffOutput = @(& git -C $resolvedRoot diff "${resolvedBaseCommit}..HEAD" --check -- 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Committed P3A range whitespace check failed:$([Environment]::NewLine)$($committedDiffOutput -join [Environment]::NewLine)"
+    }
+
     $diffCheckOutput = @(& git -C $resolvedRoot diff HEAD --check -- 2>&1)
     if ($LASTEXITCODE -ne 0)
     {
-        throw "Repository whitespace check failed:$([Environment]::NewLine)$($diffCheckOutput -join [Environment]::NewLine)"
+        throw "P3A index/worktree whitespace check failed:$([Environment]::NewLine)$($diffCheckOutput -join [Environment]::NewLine)"
     }
 
     $trackedFiles = @(& git -C $resolvedRoot ls-files 2>&1)
