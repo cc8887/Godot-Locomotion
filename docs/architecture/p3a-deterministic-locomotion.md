@@ -186,7 +186,7 @@ completion evidence。reference/golden 再生成属于独立的受控维护操�
 
 正式 non-Skip 入口锁定 P3A base `e69f18bb3410d77ef50df38b073535b5e9f20635`。在打印
 `P3A_VERIFICATION_OK` 前，它先验证 base commit 存在且为 HEAD 祖先，再分别执行 base 到 HEAD 的 committed
-diff whitespace 检查与 HEAD 到 index/worktree 的 whitespace 检查；因此 feature 分支及 fast-forward 后的 main
+diff、HEAD 到 index 的 cached diff，以及 index 到 worktree 的 diff whitespace 检查；因此 feature 分支及 fast-forward 后的 main
 都覆盖完整 P3A 变更，而不是只检查未提交内容。随后检查全部 tracked 路径；
 `.godot/.mono/bin/obj`、UE `Binaries/Intermediate/Saved/DerivedDataCache/StagedBuilds/Cooked`、生成资产、
 benchmark/artifact 输出（保留 `.gdignore` sentinel）以及编译/打包扩展名均会使 gate 失败。负例测试锁定

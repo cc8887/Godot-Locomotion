@@ -221,6 +221,26 @@ Describe 'P3A repository closure' {
         $rejected | Should Be $true
     }
 
+    It 'rejects staged whitespace when the worktree is restored to the clean HEAD content' {
+        $trackedPath = Join-Path $script:ClosureRepository 'tracked.txt'
+        [System.IO.File]::WriteAllText($trackedPath, "bad staged whitespace   `n")
+        & git -C $script:ClosureRepository add tracked.txt
+        [System.IO.File]::WriteAllText($trackedPath, "clean`n")
+
+        $status = "$(& git -C $script:ClosureRepository status --short -- tracked.txt)".Trim()
+        $status | Should Match '^MM\s+tracked\.txt$'
+
+        $failure = ''
+        try {
+            Assert-P3aRepositoryClosure `
+                -RepositoryRoot $script:ClosureRepository `
+                -BaseCommit $script:ClosureBaseCommit
+        }
+        catch { $failure = $_.Exception.Message }
+
+        $failure | Should Match 'P3A index whitespace check failed'
+    }
+
     It 'rejects a mistakenly tracked generated output' {
         $generated = Join-Path $script:ClosureRepository '.godot\imported\cache.bin'
         [void](New-Item -ItemType Directory -Path (Split-Path -Parent $generated))

@@ -65,10 +65,16 @@ function Assert-P3aRepositoryClosure
         throw "Committed P3A range whitespace check failed:$([Environment]::NewLine)$($committedDiffOutput -join [Environment]::NewLine)"
     }
 
-    $diffCheckOutput = @(& git -C $resolvedRoot diff HEAD --check -- 2>&1)
+    $indexDiffOutput = @(& git -C $resolvedRoot diff --cached --check -- 2>&1)
     if ($LASTEXITCODE -ne 0)
     {
-        throw "P3A index/worktree whitespace check failed:$([Environment]::NewLine)$($diffCheckOutput -join [Environment]::NewLine)"
+        throw "P3A index whitespace check failed:$([Environment]::NewLine)$($indexDiffOutput -join [Environment]::NewLine)"
+    }
+
+    $worktreeDiffOutput = @(& git -C $resolvedRoot diff --check -- 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "P3A worktree whitespace check failed:$([Environment]::NewLine)$($worktreeDiffOutput -join [Environment]::NewLine)"
     }
 
     $trackedFiles = @(& git -C $resolvedRoot ls-files 2>&1)
