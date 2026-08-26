@@ -157,6 +157,30 @@ public sealed class AlsLocomotionGaitTests
         Assert.Equal(AlsGait.Walking, result.ActualGait);
     }
 
+    [Theory]
+    [InlineData(1.57079632679f, -2.5f, AlsGait.Sprinting)]
+    [InlineData(-1.57079632679f, 2.5f, AlsGait.Sprinting)]
+    [InlineData(1.57079632679f, 2.5f, AlsGait.Walking)]
+    public void EvaluateRecoversLocalDirectionFromRotatedWorldVelocity(
+        float characterYaw,
+        float worldVelocityX,
+        AlsGait expected)
+    {
+        var settings = LoadAsymmetricSettings();
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(5, 0, 1), 1f / 60f) with
+        {
+            ActualVelocity = new Vector3(worldVelocityX, 0f, 0f),
+            RequestedGait = AlsGait.Sprinting,
+            CharacterYaw = characterYaw,
+        };
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+
+        Assert.Equal(expected, result.ActualGait);
+    }
+
     [Fact]
     public void EvaluateRejectsUndefinedActualStance()
     {

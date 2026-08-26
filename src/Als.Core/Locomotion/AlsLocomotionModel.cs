@@ -82,7 +82,7 @@ public static class AlsLocomotionModel
         var localYaw = 0f;
         if (speed > 0f)
         {
-            var worldVelocityYaw = MathF.Atan2(input.ActualVelocity.X, -input.ActualVelocity.Z);
+            var worldVelocityYaw = MathF.Atan2(-input.ActualVelocity.X, -input.ActualVelocity.Z);
             localYaw = AlsMath.NormalizeAngleRadians(worldVelocityYaw - input.CharacterYaw);
         }
 
