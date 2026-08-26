@@ -121,14 +121,14 @@ try
         throw "ALS-Refactored repository has no readable origin remote: $($originOutput -join [Environment]::NewLine)"
     }
 
-    $origin = ($originOutput -join '').Trim()
-    $normalizedOrigin = $origin.TrimEnd('/')
+    $origin = $originOutput -join ''
+    $normalizedOrigin = $origin
     if ($normalizedOrigin.EndsWith('.git', [System.StringComparison]::Ordinal))
     {
         $normalizedOrigin = $normalizedOrigin.Substring(0, $normalizedOrigin.Length - 4)
     }
 
-    $normalizedLockedRepository = $lockedRepository.TrimEnd('/')
+    $normalizedLockedRepository = $lockedRepository
     if ($normalizedLockedRepository.EndsWith('.git', [System.StringComparison]::Ordinal))
     {
         $normalizedLockedRepository = $normalizedLockedRepository.Substring(0, $normalizedLockedRepository.Length - 4)
@@ -215,6 +215,36 @@ try
         if (-not (Test-Path -LiteralPath $patchFullPath -PathType Leaf))
         {
             throw "Compatibility patch file does not exist: '$patchRelativePath'."
+        }
+
+        $rootItem = Get-Item -LiteralPath $referenceFullPath -Force
+        if (($rootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+        {
+            throw "ALS-Refactored repository root must not be a reparse point: '$referenceFullPath'."
+        }
+
+        $normalizedRelativePath = [System.IO.Path]::GetRelativePath($referenceFullPath, $patchFullPath)
+        $pathComponents = @($normalizedRelativePath -split '[\\/]+')
+        $currentPath = $referenceFullPath
+        for ($componentIndex = 0; $componentIndex -lt $pathComponents.Count; $componentIndex++)
+        {
+            $currentPath = Join-Path $currentPath $pathComponents[$componentIndex]
+            $currentItem = Get-Item -LiteralPath $currentPath -Force
+            if (($currentItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+            {
+                throw "Compatibility patch path contains a reparse point: '$currentPath'."
+            }
+
+            if ($componentIndex -lt $pathComponents.Count - 1 -and -not $currentItem.PSIsContainer)
+            {
+                throw "Compatibility patch path component is not a directory: '$currentPath'."
+            }
+        }
+
+        if ($currentItem.PSIsContainer -or $currentItem -isnot [System.IO.FileInfo] -or
+            -not $currentItem.FullName.StartsWith($referencePathPrefix, [System.StringComparison]::OrdinalIgnoreCase))
+        {
+            throw "Compatibility patch must resolve to an ordinary file within the ALS-Refactored repository: '$patchRelativePath'."
         }
 
         if ($expectedSha256 -cnotmatch '^[0-9a-f]{64}$')
