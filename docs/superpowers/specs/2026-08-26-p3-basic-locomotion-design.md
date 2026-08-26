@@ -266,15 +266,17 @@ FallLoop --floor acquired--> LandRecovery --recovery complete--> Grounded
 
 `AlsLocomotionAnimationProfile` 明确映射：
 
-- standing locomotion BlendSpace；
-- crouching locomotion BlendSpace；
+- standing idle 与 locomotion sample grid；
+- crouching idle 与 locomotion sample grid；
 - Jump start；
 - Fall loop；
 - Land；
 - lean additive；
 - profile 使用的全部 animation sample。
 
-profile 在导入/编译阶段由 P2 `AlsAnimationSet` 的 stable ID 生成。缺少、重复、骨架不一致或 additive
+ALS V4 的基础 locomotion sampling 位于 AnimBP 组合逻辑中，并不假定存在可直接导出的独立 BlendSpace。
+profile 生成脚本使用审核过的完整 UE object-path 清单定位源 clip，一次性解析为 stable ID 和显式 sample
+坐标；编译后运行时只保存 integer animation ID、坐标和 rate scale。缺少、重复、骨架不一致或 additive
 合同不一致都使编译失败。运行时禁止按 asset name、object path 或磁盘文件名发现动画。
 
 ### 8.2 单骨架动画库
@@ -306,8 +308,9 @@ InAir
   Fall loop
 ```
 
-BlendSpace 参数范围和 sample 坐标直接来自编译的 `AlsBlendDefinition`。每个 sample 使用编译后的
-integer animation ID 和 rate scale。图构建后缓存所有参数路径，steady state 不进行字符串查找。
+BlendSpace 参数范围和 sample 坐标来自编译的 `AlsLocomotionAnimationProfile`；如果源数据包含匹配的
+`AlsBlendDefinition`，编译器还必须逐项验证两者一致。每个 sample 使用编译后的 integer animation ID
+和 rate scale。图构建后缓存所有参数路径，steady state 不进行字符串查找。
 
 ### 8.4 Stride、Play Rate、Lean 与 Phase
 
@@ -378,7 +381,7 @@ Godot integration replay 将统一命令送入真实 `AlsCharacterMotor`，验�
 
 ## 十一、错误处理
 
-- settings/profile/stable ID/动画/BlendSpace sample/图参数缺失时启动失败；
+- settings/profile/stable ID/动画/locomotion sample/图参数缺失时启动失败；
 - 禁止使用 idle、walk 或任意其他动画作为静默替代；
 - Debug/headless 中 worker 异常、非法 Node 访问、stale、missing、generation mismatch 立即失败；
 - 交互 Release 中 worker 失败时冻结最后有效视觉姿势，motor 保持安全 Grounded/InAir 逻辑并输出
