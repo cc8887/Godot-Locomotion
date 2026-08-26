@@ -106,6 +106,42 @@ public sealed class AlsLocomotionStateTests
     }
 
     [Fact]
+    public void ReferenceRecoveryLastsExactlyTwelveEvaluatedFramesAtSixtyHertz()
+    {
+        var settings = P3TestSettings.Reference;
+        Assert.Equal(0.2f, settings.LandingRecoveryDuration);
+        Assert.Equal(1f / 60f, settings.FixedDeltaSeconds);
+
+        var state = new AlsRuntimeState
+        {
+            Initialized = 1,
+            LocomotionState = AlsLocomotionState.InAir,
+        };
+        var result = new AlsFrameResult();
+        var grounded = P3TestInput.Grounded(deltaTime: settings.FixedDeltaSeconds);
+
+        // The landing transition is recovery frame 1; frames 1 through 12 are recovery.
+        for (var recoveryFrame = 1; recoveryFrame <= 12; recoveryFrame++)
+        {
+            AlsLocomotionModel.Evaluate(
+                grounded with { Identity = new AlsFrameIdentity(recoveryFrame, 0, 1) },
+                ref state,
+                ref result,
+                settings);
+            Assert.Equal(AlsAnimationState.LandRecovery, result.AnimationState);
+        }
+
+        Assert.Equal(0f, state.LandingRecoveryTime);
+
+        AlsLocomotionModel.Evaluate(
+            grounded with { Identity = new AlsFrameIdentity(13, 0, 1) },
+            ref state,
+            ref result,
+            settings);
+        Assert.Equal(AlsAnimationState.Grounded, result.AnimationState);
+    }
+
+    [Fact]
     public void InvalidStateInputsPreserveCallerStateAndResult()
     {
         var valid = P3TestInput.Grounded();

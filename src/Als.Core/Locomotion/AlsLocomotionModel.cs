@@ -9,6 +9,7 @@ public static class AlsLocomotionModel
 {
     private const float SmallNumber = 1e-6f;
     private const float MinimumPlayRate = 0.0001f;
+    private const float RecoveryTimeBoundaryTolerance = 1e-6f;
 
     public static AlsGait CalculateActualGait(
         float speed,
@@ -262,22 +263,27 @@ public static class AlsLocomotionModel
         if (landed)
         {
             nextState.GroundedEntrySpeed = speed;
-            nextState.LandingRecoveryTime = settings.LandingRecoveryDuration <= input.DeltaTime
-                ? 0f
-                : settings.LandingRecoveryDuration - input.DeltaTime;
+            nextState.LandingRecoveryTime = ConsumeRecoveryTime(
+                settings.LandingRecoveryDuration,
+                input.DeltaTime);
             return AlsAnimationState.LandRecovery;
         }
 
         if (nextState.LandingRecoveryTime > 0f)
         {
-            nextState.LandingRecoveryTime = nextState.LandingRecoveryTime <= input.DeltaTime
-                ? 0f
-                : nextState.LandingRecoveryTime - input.DeltaTime;
+            nextState.LandingRecoveryTime = ConsumeRecoveryTime(
+                nextState.LandingRecoveryTime,
+                input.DeltaTime);
             return AlsAnimationState.LandRecovery;
         }
 
         return AlsAnimationState.Grounded;
     }
+
+    private static float ConsumeRecoveryTime(float remainingTime, float deltaTime) =>
+        remainingTime <= deltaTime + RecoveryTimeBoundaryTolerance
+            ? 0f
+            : remainingTime - deltaTime;
 
     private static AlsDirectionalSpeeds SelectGaitSpeeds(
         in AlsStanceSpeeds speeds,
