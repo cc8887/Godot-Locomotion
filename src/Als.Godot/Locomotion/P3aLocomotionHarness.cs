@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
@@ -20,6 +22,12 @@ public partial class P3aLocomotionHarness : Node
             {
                 GetTree().Quit(2);
                 return;
+            }
+            var debugging = typeof(P3aLocomotionHarness).Assembly.GetCustomAttribute<DebuggableAttribute>();
+            if (debugging?.IsJITOptimizerDisabled != false)
+            {
+                throw new InvalidOperationException(
+                    "P3A requires an optimized editor-host assembly (Debug configuration with Optimize=true).");
             }
 
             ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;

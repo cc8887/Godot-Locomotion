@@ -447,13 +447,13 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 NumericsVector3.Zero);
         }
 
-        // P3A does not expose moving-platform identity; enumerating slide collisions allocates in Godot C#.
+        // P3A does not expose moving-platform data; enumerating slide collisions allocates in Godot C#.
         return new AlsFloorSample(
             1,
             ToNumerics(GetFloorNormal()),
             -1,
             NumericsMatrix4x4.Identity,
-            ToNumerics(GetPlatformAngularVelocity()));
+            NumericsVector3.Zero);
     }
 
     private bool ProbeInitialFloor()

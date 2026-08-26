@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRootPath = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $solutionPath = Join-Path $projectRootPath 'GodotALS.sln'
+$godotProjectPath = Join-Path $projectRootPath 'GodotALS.csproj'
 $scenePath = 'res://scenes/tests/p3a_locomotion_harness.tscn'
 . (Join-Path $PSScriptRoot 'p3a-verification-functions.ps1')
 
@@ -22,13 +23,25 @@ if (-not (Test-Path -LiteralPath $GodotExecutable -PathType Leaf)) {
 dotnet restore $solutionPath
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-dotnet build $solutionPath --no-restore
+dotnet build $solutionPath -c Release --no-restore
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (-not $SkipRegression) {
-    dotnet test $solutionPath --no-build --no-restore
+    dotnet test $solutionPath -c Release --no-build --no-restore
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    $pesterResult = Invoke-Pester (Join-Path $projectRootPath 'tests\*.Tests.ps1') -PassThru
+    if ($pesterResult.FailedCount -ne 0) {
+        throw "P3A PowerShell regression suite failed: $($pesterResult.FailedCount) failing test(s)."
+    }
+}
+
+# Godot's headless editor loads Debug/TOOLS assemblies. Optimize that host build explicitly;
+# this runtime evidence is not an execution of the ExportRelease artifact built above.
+dotnet build $godotProjectPath -c Debug -p:Optimize=true --no-restore --no-incremental
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+if (-not $SkipRegression) {
     $motorOutput = & $GodotExecutable --headless --path $projectRootPath `
         'res://scenes/tests/p3a_motor_smoke.tscn' 2>&1
     $motorExitCode = $LASTEXITCODE
@@ -73,13 +86,7 @@ foreach ($characterCount in @(1, 10)) {
     $single = Invoke-P3aHarness -Mode single -CharacterCount $characterCount
     $parallel = Invoke-P3aHarness -Mode parallel -CharacterCount $characterCount
 
-    if ($single.Mode -ne 'single' -or $parallel.Mode -ne 'parallel' -or
-        $single.Characters -ne $characterCount -or $parallel.Characters -ne $characterCount) {
-        throw "Godot P3A harness reported unexpected mode or character count for characters=$characterCount."
-    }
-    if ($single.Digest -cne $parallel.Digest) {
-        throw "P3A digest mismatch for characters=${characterCount}: single=$($single.Digest), parallel=$($parallel.Digest)."
-    }
+    Assert-P3aResultPair -Single $single -Parallel $parallel -CharacterCount $characterCount
 
     foreach ($result in @($single, $parallel)) {
         if ($result.Missing -ne 0 -or $result.Stale -ne 0 -or $result.Generation -ne 0 -or
