@@ -163,6 +163,7 @@ try
     }
 
     $patchCount = 0
+    $validatedPatches = @()
     $referencePathPrefix = $referenceFullPath + [System.IO.Path]::DirectorySeparatorChar
     foreach ($patchElement in $patchesElement.EnumerateArray())
     {
@@ -256,6 +257,20 @@ try
         if ($actualSha256 -cne $expectedSha256)
         {
             throw "Compatibility patch SHA256 mismatch for '$patchRelativePath'. Expected '$expectedSha256', actual '$actualSha256'."
+        }
+
+        $validatedPatches += [pscustomobject]@{
+            RelativePath = $patchRelativePath
+            FullPath = $patchFullPath
+        }
+    }
+
+    foreach ($validatedPatch in $validatedPatches)
+    {
+        $applyOutput = @(& git -C $referenceFullPath apply -- $validatedPatch.FullPath 2>&1)
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Could not apply compatibility patch '$($validatedPatch.RelativePath)': $($applyOutput -join [Environment]::NewLine)"
         }
     }
 }

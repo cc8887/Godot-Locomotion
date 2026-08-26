@@ -5,7 +5,8 @@ function New-P3ReferenceFixture
 {
     param(
         [string]$Origin,
-        [switch]$ExternalFileLink
+        [switch]$ExternalFileLink,
+        [switch]$InternalPatch
     )
 
     $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-reference-$([guid]::NewGuid().ToString('N'))"
@@ -17,11 +18,14 @@ function New-P3ReferenceFixture
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the reference fixture repository.' }
     & git -C $referenceRoot config user.email 'tests@example.invalid'
     & git -C $referenceRoot config user.name 'P3 Reference Tests'
+    & git -C $referenceRoot config core.autocrlf false
     & git -C $referenceRoot config core.symlinks true
     & git -C $referenceRoot remote add origin $Origin
 
     Set-Content -LiteralPath (Join-Path $referenceRoot 'seed.txt') -Value 'fixture' -NoNewline
-    & git -C $referenceRoot add seed.txt
+    $targetPath = Join-Path $referenceRoot 'target.txt'
+    Set-Content -LiteralPath $targetPath -Value 'before' -NoNewline
+    & git -C $referenceRoot add seed.txt target.txt
     & git -C $referenceRoot commit --quiet -m 'fixture seed'
     if ($LASTEXITCODE -ne 0) { throw 'Could not commit the reference fixture seed.' }
 
@@ -46,6 +50,25 @@ function New-P3ReferenceFixture
             }
         )
     }
+    elseif ($InternalPatch)
+    {
+        Set-Content -LiteralPath $targetPath -Value 'after' -NoNewline
+        $patchPath = Join-Path $referenceRoot 'change.patch'
+        & git -C $referenceRoot diff "--output=$patchPath" -- target.txt
+        if ($LASTEXITCODE -ne 0) { throw 'Could not generate the reference fixture patch.' }
+        Set-Content -LiteralPath $targetPath -Value 'before' -NoNewline
+
+        & git -C $referenceRoot add change.patch
+        & git -C $referenceRoot commit --quiet -m 'fixture patch'
+        if ($LASTEXITCODE -ne 0) { throw 'Could not commit the reference fixture patch.' }
+
+        $patches = @(
+            [ordered]@{
+                path = 'change.patch'
+                sha256 = (Get-FileHash -LiteralPath $patchPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        )
+    }
 
     $commit = (& git -C $referenceRoot rev-parse HEAD).Trim()
     $lock = [ordered]@{
@@ -62,6 +85,8 @@ function New-P3ReferenceFixture
         FixtureRoot = $fixtureRoot
         ProjectRoot = $projectRoot
         ReferenceRoot = $referenceRoot
+        TargetPath = $targetPath
+        Commit = $commit
     }
 }
 
@@ -91,6 +116,29 @@ Describe 'prepare-p3-reference.ps1' {
 
             $exitCode | Should Not Be 0
             ($output -join "`n") | Should Match 'origin mismatch'
+        }
+        finally
+        {
+            Remove-Item -LiteralPath $fixture.FixtureRoot -Recurse -Force
+        }
+    }
+
+    It 'applies a validated non-empty patch and reports the exact marker' {
+        $fixture = New-P3ReferenceFixture -Origin 'https://github.com/Sixze/ALS-Refactored.git' -InternalPatch
+        try
+        {
+            $output = @(& pwsh -NoProfile -File $script:PrepareScript -ReferenceRoot $fixture.ReferenceRoot -ProjectRoot $fixture.ProjectRoot 2>&1)
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0)
+            {
+                throw "prepare-p3-reference.ps1 failed unexpectedly: $($output -join "`n")"
+            }
+
+            $exitCode | Should Be 0
+            $output.Count | Should Be 1
+            $output[0].ToString() | Should Be "P3_REFERENCE_OK commit=$($fixture.Commit) patches=1"
+            (Get-Content -LiteralPath $fixture.TargetPath -Raw) | Should Be 'after'
         }
         finally
         {
