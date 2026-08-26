@@ -15,4 +15,9 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Als.Core/Als.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../assets/config/p3_locomotion_settings.json"
+          Link="Fixtures/P3/p3_locomotion_settings.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
