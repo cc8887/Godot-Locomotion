@@ -26,6 +26,15 @@
         "z": { "type": "number" }
       }
     },
+    "normalizedVector2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number", "minimum": -1, "maximum": 1 },
+        "y": { "type": "number", "minimum": -1, "maximum": 1 }
+      }
+    },
     "metadata": {
       "type": "object",
       "required": ["fixedDeltaSeconds", "kind", "patchHashes", "referenceCommit", "schemaVersion"],
@@ -34,9 +43,11 @@
         "kind": { "enum": ["settings", "trace"] },
         "patchHashes": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "const": "3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f" }
         },
-        "referenceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "referenceCommit": { "const": "b754d6f0f2bb03741d301f8fb88077ebfe561e17" },
         "schemaVersion": { "type": "integer", "const": 1 }
       }
     },
@@ -129,45 +140,71 @@
         "viewYaw": { "type": "number" }
       }
     },
-    "actual": {
+    "physicalActual": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "acceleration", "animationPhase", "animationState", "blendCoordinates", "gait",
-        "grounded", "jumpTransition", "lean", "locomotionState", "maxAcceleration",
-        "maxBrakingDeceleration", "playRate", "position", "rotationMode", "stance", "stride",
-        "targetYaw", "velocity", "yaw"
+        "acceleration", "grounded", "jumpTransition", "maxAcceleration", "maxBrakingDeceleration",
+        "position", "rotationMode", "stance", "velocity", "yaw"
       ],
       "properties": {
         "acceleration": { "$ref": "#/$defs/vector3" },
+        "grounded": { "type": "boolean" },
+        "jumpTransition": { "type": "boolean" },
+        "maxAcceleration": { "type": "number", "minimum": 0 },
+        "maxBrakingDeceleration": { "type": "number", "minimum": 0 },
+        "position": { "$ref": "#/$defs/vector3" },
+        "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
+        "stance": { "enum": ["Standing", "Crouching"] },
+        "velocity": { "$ref": "#/$defs/vector3" },
+        "yaw": { "type": "number" }
+      }
+    },
+    "nativeActual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blendCoordinates", "gait", "lean", "locomotionState", "playRate", "rotationMode", "stance", "stride", "synthesizedAnimationPhase", "targetYaw"],
+      "properties": {
+        "blendCoordinates": { "$ref": "#/$defs/vector2" },
+        "gait": { "enum": ["Walking", "Running", "Sprinting"] },
+        "lean": { "$ref": "#/$defs/normalizedVector2" },
+        "locomotionState": { "enum": ["Grounded", "InAir"] },
+        "playRate": { "type": "number", "minimum": 0, "maximum": 3 },
+        "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
+        "stance": { "enum": ["Standing", "Crouching"] },
+        "stride": { "type": "number", "minimum": 0, "maximum": 1 },
+        "synthesizedAnimationPhase": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+        "targetYaw": { "type": "number" }
+      }
+    },
+    "portExpected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["animationPhase", "animationState", "blendCoordinates", "gait", "lean", "locomotionState", "playRate", "rotationMode", "stance", "stride", "targetYaw"],
+      "properties": {
         "animationPhase": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
         "animationState": { "enum": ["Grounded", "JumpStart", "FallLoop", "LandRecovery"] },
         "blendCoordinates": { "$ref": "#/$defs/vector2" },
         "gait": { "enum": ["Walking", "Running", "Sprinting"] },
-        "grounded": { "type": "boolean" },
-        "jumpTransition": { "type": "boolean" },
-        "lean": { "$ref": "#/$defs/vector2" },
+        "lean": { "$ref": "#/$defs/normalizedVector2" },
         "locomotionState": { "enum": ["Grounded", "InAir"] },
-        "maxAcceleration": { "type": "number", "minimum": 0 },
-        "maxBrakingDeceleration": { "type": "number", "minimum": 0 },
-        "playRate": { "type": "number" },
-        "position": { "$ref": "#/$defs/vector3" },
+        "playRate": { "type": "number", "minimum": 0, "maximum": 3 },
         "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
         "stance": { "enum": ["Standing", "Crouching"] },
-        "stride": { "type": "number" },
-        "targetYaw": { "type": "number" },
-        "velocity": { "$ref": "#/$defs/vector3" },
-        "yaw": { "type": "number" }
+        "stride": { "type": "number", "minimum": 0, "maximum": 1 },
+        "targetYaw": { "type": "number" }
       }
     },
     "frame": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["actual", "command", "index", "tick", "time"],
+      "required": ["command", "index", "nativeActual", "physicalActual", "portExpected", "tick", "time"],
       "properties": {
-        "actual": { "$ref": "#/$defs/actual" },
         "command": { "$ref": "#/$defs/command" },
         "index": { "type": "integer", "minimum": 0 },
+        "nativeActual": { "$ref": "#/$defs/nativeActual" },
+        "physicalActual": { "$ref": "#/$defs/physicalActual" },
+        "portExpected": { "$ref": "#/$defs/portExpected" },
         "tick": { "type": "integer", "minimum": 0 },
         "time": { "type": "number", "minimum": 0 }
       }

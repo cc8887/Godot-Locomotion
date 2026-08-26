@@ -359,14 +359,21 @@ trace 至少包含五条序列：
 4. Velocity/Looking/Aiming rotation mode；
 5. jump -> ascend -> fall -> land -> grounded。
 
-每帧记录：命令、实际速度、实际加速度、floor、view/aim yaw、state、actual gait、actual stance、
-rotation mode、target yaw、stride、play rate、lean 和 phase。
+trace 仍由真实 `AAlsCharacter` 和 `UAlsAnimationInstance` tick 驱动，但每帧必须拆成三个严格对象：
+
+- `physicalActual`：tick 后的位置、速度、加速度、yaw、grounded、动态移动上限和实际 stance/rotation mode，作为移植模型的同帧输入证据；
+- `nativeActual`：UE 原生 AnimInstance/ALS 内部 gait、blend、stride、play rate、lean 和 target yaw，仅用于审计。`synthesizedAnimationPhase` 是 commandlet 生成的诊断值，不冒充原生动画字段，也不参与 pass/fail；
+- `portExpected`：commandlet 内独立 C++ oracle 仅消费同帧 `physicalActual`、command 和导出的 settings，并维护自己的跨帧状态，输出全部 `AlsFrameResult` 比较字段。oracle 不调用、不依赖 C# production model。
+
+真实物理状态和原生动画观测在同一 UE tick 内可能处于不同更新时间，因此 `nativeActual` 与
+`portExpected` 在 frame 0 合法不同。P3A 验证的是可移植 locomotion 核心语义，不是在缺少 AnimBP
+曲线和 pose curve 数据时逐值重建 UE AnimBP 内部状态。
 
 ### 10.2 两类 replay
 
-Cross-engine behavior replay 直接将 UE trace 中记录的实际速度、加速度和 floor sample 送入纯
-`AlsLocomotionModel`，用于比较 C++ 与 C# 的状态/参数语义。它不要求 Godot 与 UE 的物理引擎产生
-相同轨迹。
+Cross-engine behavior replay 将 `physicalActual` 送入纯 `AlsLocomotionModel`，只与独立 C++
+`portExpected` 比较；`nativeActual` 保留为审计信息且 comparer 必须忽略。它不要求 Godot 与 UE 的
+物理引擎产生相同轨迹，也不把 UE AnimBP 曲线值误当作 P3A 核心的 expected。
 
 Godot integration replay 将统一命令送入真实 `AlsCharacterMotor`，验证 Godot 内固定输入可重复、
 同帧无额外延迟以及串行/并行一致。物理位置只与同一 Godot fixture 的基线比较。

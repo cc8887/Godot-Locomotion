@@ -26,12 +26,12 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
             $idle = Get-Content -LiteralPath $idlePath -Raw | ConvertFrom-Json
             foreach ($frame in $idle.frames)
             {
-                $frame.actual.position.x = 0.0
-                $frame.actual.position.y = 0.0
-                $frame.actual.position.z = 0.0
-                $frame.actual.velocity.x = 0.0
-                $frame.actual.velocity.y = 0.0
-                $frame.actual.velocity.z = 0.0
+                $frame.physicalActual.position.x = 0.0
+                $frame.physicalActual.position.y = 0.0
+                $frame.physicalActual.position.z = 0.0
+                $frame.physicalActual.velocity.x = 0.0
+                $frame.physicalActual.velocity.y = 0.0
+                $frame.physicalActual.velocity.z = 0.0
             }
             [System.IO.File]::WriteAllText($idlePath, ($idle | ConvertTo-Json -Depth 20),
                 [System.Text.UTF8Encoding]::new($false))
@@ -55,8 +55,8 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
             $jump = Get-Content -LiteralPath $jumpPath -Raw | ConvertFrom-Json
             foreach ($frame in @($jump.frames | Where-Object { $_.index -ge 100 -and $_.index -le 169 }))
             {
-                $frame.actual.velocity.x = 3.75
-                $frame.actual.velocity.y = 0.0
+                $frame.physicalActual.velocity.x = 3.75
+                $frame.physicalActual.velocity.y = 0.0
             }
             [System.IO.File]::WriteAllText($jumpPath, ($jump | ConvertTo-Json -Depth 20),
                 [System.Text.UTF8Encoding]::new($false))
@@ -75,13 +75,24 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
     It 'captures dynamic movement limits in every frame' {
         $jump = Get-Content -LiteralPath (Join-Path $script:RepositoryRoot `
             'tests\Als.Core.Tests\Fixtures\P3\trace_jump_land.json') -Raw | ConvertFrom-Json
-        (@($jump.frames[0].actual.PSObject.Properties.Name) -contains 'maxAcceleration') | Should Be $true
-        (@($jump.frames[0].actual.PSObject.Properties.Name) -contains 'maxBrakingDeceleration') | Should Be $true
+        (@($jump.frames[0].physicalActual.PSObject.Properties.Name) -contains 'maxAcceleration') | Should Be $true
+        (@($jump.frames[0].physicalActual.PSObject.Properties.Name) -contains 'maxBrakingDeceleration') | Should Be $true
 
         $settings = Get-Content -LiteralPath (Join-Path $script:RepositoryRoot `
             'assets\config\p3_locomotion_settings.json') -Raw | ConvertFrom-Json
         (@($settings.values.PSObject.Properties.Name) -contains 'initialMaxAcceleration') | Should Be $true
         (@($settings.values.PSObject.Properties.Name) -contains 'initialMaxBrakingDeceleration') | Should Be $true
+    }
+
+    It 'separates physical evidence native observations and port expectations' {
+        $trace = Get-Content -LiteralPath (Join-Path $script:RepositoryRoot `
+            'tests\Als.Core.Tests\Fixtures\P3\trace_directions.json') -Raw | ConvertFrom-Json
+        $names = @($trace.frames[0].PSObject.Properties.Name)
+        ($names -contains 'physicalActual') | Should Be $true
+        ($names -contains 'nativeActual') | Should Be $true
+        ($names -contains 'portExpected') | Should Be $true
+        ($names -contains 'actual') | Should Be $false
+        $trace.frames[0].nativeActual.stride | Should Not Be $trace.frames[0].portExpected.stride
     }
 }
 

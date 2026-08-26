@@ -64,6 +64,57 @@ struct FSequenceDefinition
     TFunction<FTraceCommand(int32)> GetCommand;
 };
 
+struct FPortDirectionalSpeeds
+{
+    float Forward{0.0f};
+    float Sideways{0.0f};
+    float Backward{0.0f};
+};
+
+struct FPortStanceSpeeds
+{
+    FPortDirectionalSpeeds Walking;
+    FPortDirectionalSpeeds Running;
+    FPortDirectionalSpeeds Sprinting;
+};
+
+struct FPortSettings
+{
+    FPortStanceSpeeds Standing;
+    FPortStanceSpeeds Crouching;
+    float AnimatedWalkSpeed{0.0f};
+    float AnimatedRunSpeed{0.0f};
+    float AnimatedSprintSpeed{0.0f};
+    float AnimatedCrouchSpeed{0.0f};
+    float MovingSpeedThreshold{0.0f};
+    float VelocityAngleStart{0.0f};
+    float VelocityAngleEnd{0.0f};
+    float LeanHalfLife{0.0f};
+};
+
+struct FPortState
+{
+    bool bInitialized{false};
+    bool bGrounded{true};
+    float LandingRecoveryTime{0.0f};
+    FVector2D SmoothedLean{ForceInit};
+    float AnimationPhase{0.0f};
+    float TargetYaw{0.0f};
+};
+
+struct FPortResult
+{
+    FString LocomotionState;
+    FGameplayTag Gait;
+    FString AnimationState;
+    FVector2D BlendCoordinates{ForceInit};
+    float Stride{0.0f};
+    float PlayRate{0.0f};
+    FVector2D Lean{ForceInit};
+    float AnimationPhase{0.0f};
+    float TargetYaw{0.0f};
+};
+
 FString GetRequiredValue(const FString& Parameters, const TCHAR* Key)
 {
     FString Value;
@@ -177,6 +228,162 @@ TSharedRef<FJsonObject> Vector3Object(const FVector& Value)
     Object->SetNumberField(TEXT("y"), Value.Y / 100.0);
     Object->SetNumberField(TEXT("z"), Value.Z / 100.0);
     return Object;
+}
+
+float DamperExactAlpha(const float HalfLife)
+{
+    return HalfLife <= 0.0f ? 1.0f : 1.0f - FMath::Exp2(-static_cast<float>(FixedDeltaSeconds) / HalfLife);
+}
+
+float NormalizeRadians(const float Angle)
+{
+    return FMath::DegreesToRadians(FMath::UnwindDegrees(FMath::RadiansToDegrees(Angle)));
+}
+
+float SampleDirectionalSpeed(const FPortDirectionalSpeeds& Speeds, const float LocalYaw,
+                             const FPortSettings& Settings)
+{
+    const float Amount{1.0f - FMath::Clamp(
+        (FMath::Abs(NormalizeRadians(LocalYaw)) - Settings.VelocityAngleStart) /
+        (Settings.VelocityAngleEnd - Settings.VelocityAngleStart), 0.0f, 1.0f)};
+    return FMath::Lerp(Speeds.Backward, Speeds.Forward, Amount);
+}
+
+FPortDirectionalSpeeds MakeDirectional(const float Forward, const float Backward,
+                                       const float AngleStart, const float AngleEnd)
+{
+    const float Amount{1.0f - FMath::Clamp((PI * 0.5f - AngleStart) / (AngleEnd - AngleStart), 0.0f, 1.0f)};
+    return {Forward, FMath::Lerp(Backward, Forward, Amount), Backward};
+}
+
+FPortSettings CreatePortSettings(const AAlsTraceCharacter& Character)
+{
+    const UAlsMovementSettings* MovementSettings{Character.GetTraceMovementSettings()};
+    const UAlsAnimationInstanceSettings* AnimationSettings{Character.GetTraceAnimationSettings()};
+    const UAlsCharacterSettings* CharacterSettings{Character.GetSettings()};
+    const FAlsMovementStanceSettings* RotationSettings{MovementSettings->RotationModes.Find(AlsRotationModeTags::ViewDirection)};
+    const FAlsMovementGaitSettings* Standing{RotationSettings->Stances.Find(AlsStanceTags::Standing)};
+    const FAlsMovementGaitSettings* Crouching{RotationSettings->Stances.Find(AlsStanceTags::Crouching)};
+    FPortSettings Settings;
+    Settings.VelocityAngleStart = FMath::DegreesToRadians(MovementSettings->VelocityAngleToSpeedInterpolationRange.Min);
+    Settings.VelocityAngleEnd = FMath::DegreesToRadians(MovementSettings->VelocityAngleToSpeedInterpolationRange.Max);
+    Settings.Standing.Walking = MakeDirectional(Standing->WalkForwardSpeed / 100.0f, Standing->WalkBackwardSpeed / 100.0f,
+                                                Settings.VelocityAngleStart, Settings.VelocityAngleEnd);
+    Settings.Standing.Running = MakeDirectional(Standing->RunForwardSpeed / 100.0f, Standing->RunBackwardSpeed / 100.0f,
+                                                Settings.VelocityAngleStart, Settings.VelocityAngleEnd);
+    Settings.Standing.Sprinting = MakeDirectional(Standing->SprintSpeed / 100.0f, Standing->SprintSpeed / 100.0f,
+                                                  Settings.VelocityAngleStart, Settings.VelocityAngleEnd);
+    Settings.Crouching.Walking = MakeDirectional(Crouching->WalkForwardSpeed / 100.0f, Crouching->WalkForwardSpeed / 100.0f,
+                                                 Settings.VelocityAngleStart, Settings.VelocityAngleEnd);
+    Settings.Crouching.Running = MakeDirectional(Crouching->RunForwardSpeed / 100.0f, Crouching->RunForwardSpeed / 100.0f,
+                                                 Settings.VelocityAngleStart, Settings.VelocityAngleEnd);
+    Settings.Crouching.Sprinting = Settings.Crouching.Running;
+    Settings.AnimatedWalkSpeed = AnimationSettings->Standing.AnimatedWalkSpeed / 100.0f;
+    Settings.AnimatedRunSpeed = AnimationSettings->Standing.AnimatedRunSpeed / 100.0f;
+    Settings.AnimatedSprintSpeed = AnimationSettings->Standing.AnimatedSprintSpeed / 100.0f;
+    Settings.AnimatedCrouchSpeed = AnimationSettings->Crouching.AnimatedCrouchSpeed / 100.0f;
+    Settings.MovingSpeedThreshold = CharacterSettings->MovingSpeedThreshold / 100.0f;
+    Settings.LeanHalfLife = AnimationSettings->General.LeanInterpolationHalfLife;
+    return Settings;
+}
+
+FGameplayTag ResolveMaximumGait(const FTraceCommand& Command, const FGameplayTag& ActualStance)
+{
+    if (Command.Gait != AlsGaitTags::Sprinting) return Command.Gait;
+    if (ActualStance == AlsStanceTags::Crouching || Command.RotationMode == AlsRotationModeTags::Aiming)
+    {
+        return AlsGaitTags::Running;
+    }
+    const FVector2D Direction{Command.MovementAxes.GetSafeNormal()};
+    if (Direction.IsNearlyZero() ||
+        (Command.RotationMode == AlsRotationModeTags::ViewDirection && Direction.Y <= FMath::Cos(FMath::DegreesToRadians(50.0f))))
+    {
+        return AlsGaitTags::Running;
+    }
+    return AlsGaitTags::Sprinting;
+}
+
+FPortResult EvaluatePort(const AAlsTraceCharacter& Character, const FTraceCommand& Command,
+                         const bool bJumpTransition, const FPortSettings& Settings, FPortState& State)
+{
+    const UAlsCharacterMovementComponent* Movement{Character.GetTraceMovement()};
+    const bool bGrounded{Movement->IsMovingOnGround()};
+    const bool bLanded{!State.bGrounded && bGrounded};
+    const bool bJumped{State.bGrounded && !bGrounded && bJumpTransition && Command.bJumpPressed};
+    const FVector LocalVelocity{Character.GetActorQuat().UnrotateVector(Character.GetVelocity()) / 100.0f};
+    const FVector LocalAcceleration{Character.GetActorQuat().UnrotateVector(Movement->GetCurrentAcceleration()) / 100.0f};
+    const FVector2D Velocity{LocalVelocity.Y, LocalVelocity.X};
+    const FVector2D Acceleration{LocalAcceleration.Y, LocalAcceleration.X};
+    const float Speed{static_cast<float>(FVector2D{Character.GetVelocity().X, Character.GetVelocity().Y}.Size() / 100.0)};
+    const float LocalYaw{Speed > 0.0f ? static_cast<float>(FMath::Atan2(-Velocity.X, Velocity.Y)) : 0.0f};
+    const FGameplayTag ActualStance{Character.GetStance()};
+    const FPortStanceSpeeds& StanceSpeeds{ActualStance == AlsStanceTags::Crouching ? Settings.Crouching : Settings.Standing};
+    const float WalkSpeed{SampleDirectionalSpeed(StanceSpeeds.Walking, LocalYaw, Settings)};
+    const float RunSpeed{SampleDirectionalSpeed(StanceSpeeds.Running, LocalYaw, Settings)};
+    const FGameplayTag MaximumGait{ResolveMaximumGait(Command, ActualStance)};
+    const FGameplayTag ActualGait{Speed < WalkSpeed + 0.1f
+        ? AlsGaitTags::Walking
+        : (Speed < RunSpeed + 0.1f || MaximumGait != AlsGaitTags::Sprinting
+            ? AlsGaitTags::Running : AlsGaitTags::Sprinting)};
+
+    FString AnimationState{TEXT("Grounded")};
+    if (!bGrounded)
+    {
+        State.LandingRecoveryTime = 0.0f;
+        AnimationState = bJumped ? TEXT("JumpStart") : TEXT("FallLoop");
+    }
+    else if (bLanded)
+    {
+        State.LandingRecoveryTime = FMath::Max(0.0f, 0.2f - static_cast<float>(FixedDeltaSeconds));
+        AnimationState = TEXT("LandRecovery");
+    }
+    else if (State.LandingRecoveryTime > 0.0f)
+    {
+        State.LandingRecoveryTime = State.LandingRecoveryTime <= static_cast<float>(FixedDeltaSeconds) + 1.0e-6f
+            ? 0.0f : State.LandingRecoveryTime - static_cast<float>(FixedDeltaSeconds);
+        AnimationState = TEXT("LandRecovery");
+    }
+
+    float TargetYaw{State.TargetYaw};
+    if (Command.RotationMode == AlsRotationModeTags::VelocityDirection)
+    {
+        if (Speed > 1.0e-6f) TargetYaw = FMath::Atan2(Character.GetVelocity().Y, Character.GetVelocity().X);
+        else if (!State.bInitialized) TargetYaw = FMath::DegreesToRadians(Character.GetActorRotation().Yaw);
+    }
+    else TargetYaw = FMath::DegreesToRadians(Command.RotationMode == AlsRotationModeTags::Aiming ? Command.AimYaw : Command.ViewYaw);
+    if (State.bInitialized)
+    {
+        const float Delta{NormalizeRadians(TargetYaw - State.TargetYaw)};
+        TargetYaw = NormalizeRadians(State.TargetYaw + Delta * DamperExactAlpha(0.1f));
+    }
+
+    const FPortDirectionalSpeeds& GaitSpeeds{ActualGait == AlsGaitTags::Walking ? StanceSpeeds.Walking :
+        (ActualGait == AlsGaitTags::Running ? StanceSpeeds.Running : StanceSpeeds.Sprinting)};
+    const float ReferenceSpeed{SampleDirectionalSpeed(GaitSpeeds, LocalYaw, Settings)};
+    const float Stride{ReferenceSpeed > 1.0e-6f ? FMath::Clamp(Speed / ReferenceSpeed, 0.0f, 1.0f) : 0.0f};
+    const float AnimatedSpeed{ActualStance == AlsStanceTags::Crouching ? Settings.AnimatedCrouchSpeed :
+        (ActualGait == AlsGaitTags::Walking ? Settings.AnimatedWalkSpeed :
+            (ActualGait == AlsGaitTags::Running ? Settings.AnimatedRunSpeed : Settings.AnimatedSprintSpeed))};
+    const float Denominator{AnimatedSpeed * FMath::Max(Stride, 0.0001f)};
+    const float RawPlayRate{Denominator > 1.0e-6f ? Speed / Denominator : 0.0f};
+    const float PlayRate{FMath::Clamp(RawPlayRate, 0.0001f,
+        ActualStance == AlsStanceTags::Crouching ? 2.0f : 3.0f)};
+
+    FVector2D LeanTarget{ForceInit};
+    const float Limit{FVector2D::DotProduct(Velocity, Acceleration) >= 0.0f
+        ? Movement->GetMaxAcceleration() / 100.0f : Movement->GetMaxBrakingDeceleration() / 100.0f};
+    if (Limit > 1.0e-6f) LeanTarget = Acceleration.GetClampedToMaxSize(Limit) / Limit;
+    State.SmoothedLean = FMath::Lerp(State.SmoothedLean, LeanTarget, DamperExactAlpha(Settings.LeanHalfLife));
+
+    if (bGrounded && Speed > Settings.MovingSpeedThreshold)
+    {
+        State.AnimationPhase = FMath::Fmod(State.AnimationPhase + static_cast<float>(FixedDeltaSeconds) * PlayRate, 1.0f);
+    }
+    State.bInitialized = true;
+    State.bGrounded = bGrounded;
+    State.TargetYaw = TargetYaw;
+    return {bGrounded ? TEXT("Grounded") : TEXT("InAir"), ActualGait, AnimationState, Velocity,
+            Stride, PlayRate, State.SmoothedLean, State.AnimationPhase, TargetYaw};
 }
 
 bool SaveJson(const FString& Path, const TSharedRef<FJsonObject>& Object)
@@ -399,7 +606,8 @@ TSharedRef<FJsonObject> CreateCommandObject(const FTraceCommand& Command)
 
 TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTraceCommand& Command,
                                       const int32 Frame, const FVector& Origin, const bool bWasGrounded,
-                                      const float LandingRecoveryRemaining, float& AnimationPhase)
+                                      float& NativeAnimationPhase,
+                                      const FPortSettings& PortSettings, FPortState& PortState)
 {
     const UAlsCharacterMovementComponent* Movement{Character.GetTraceMovement()};
     const UAlsAnimationInstance* Animation{Character.GetTraceAnimationInstance()};
@@ -415,38 +623,53 @@ TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTrac
     const float PlayRate{Character.GetStance() == AlsStanceTags::Crouching
         ? (Crouching != nullptr ? Crouching->PlayRate : 1.0f)
         : (Standing != nullptr ? Standing->PlayRate : 1.0f)};
-    AnimationPhase = FMath::Fmod(AnimationPhase + static_cast<float>(FixedDeltaSeconds) * PlayRate, 1.0f);
+    NativeAnimationPhase = FMath::Fmod(NativeAnimationPhase + static_cast<float>(FixedDeltaSeconds) * PlayRate, 1.0f);
+    const bool bJumpTransition{!bGrounded && bWasGrounded};
+    const FPortResult Port{EvaluatePort(Character, Command, bJumpTransition, PortSettings, PortState)};
 
-    FString AnimationState{TEXT("Grounded")};
-    const bool bJumpStarted{!bGrounded && bWasGrounded && Command.bJumpPressed && Character.GetVelocity().Z > 0.0};
-    if (!bGrounded) AnimationState = bJumpStarted ? TEXT("JumpStart") : TEXT("FallLoop");
-    else if (!bWasGrounded || LandingRecoveryRemaining > 0.0f) AnimationState = TEXT("LandRecovery");
+    const TSharedRef<FJsonObject> PhysicalActual{MakeShared<FJsonObject>()};
+    PhysicalActual->SetObjectField(TEXT("acceleration"), Vector3Object(Movement->GetCurrentAcceleration()));
+    PhysicalActual->SetBoolField(TEXT("grounded"), bGrounded);
+    PhysicalActual->SetBoolField(TEXT("jumpTransition"), bJumpTransition);
+    PhysicalActual->SetNumberField(TEXT("maxAcceleration"), Movement->GetMaxAcceleration() / 100.0);
+    PhysicalActual->SetNumberField(TEXT("maxBrakingDeceleration"), Movement->GetMaxBrakingDeceleration() / 100.0);
+    PhysicalActual->SetObjectField(TEXT("position"), Vector3Object(Character.GetActorLocation() - Origin));
+    PhysicalActual->SetStringField(TEXT("rotationMode"), RotationModeName(Character.GetRotationMode()));
+    PhysicalActual->SetStringField(TEXT("stance"), StanceName(Character.GetStance()));
+    PhysicalActual->SetObjectField(TEXT("velocity"), Vector3Object(Character.GetVelocity()));
+    PhysicalActual->SetNumberField(TEXT("yaw"), FMath::DegreesToRadians(Character.GetActorRotation().Yaw));
 
-    const TSharedRef<FJsonObject> Actual{MakeShared<FJsonObject>()};
-    Actual->SetObjectField(TEXT("acceleration"), Vector3Object(Movement->GetCurrentAcceleration()));
-    Actual->SetNumberField(TEXT("animationPhase"), AnimationPhase);
-    Actual->SetStringField(TEXT("animationState"), AnimationState);
-    Actual->SetObjectField(TEXT("blendCoordinates"), Vector2Object(LocalVelocity.Y / 100.0, LocalVelocity.X / 100.0));
-    Actual->SetStringField(TEXT("gait"), GaitName(Character.GetGait()));
-    Actual->SetBoolField(TEXT("grounded"), bGrounded);
-    Actual->SetBoolField(TEXT("jumpTransition"), !bGrounded && bWasGrounded);
-    Actual->SetObjectField(TEXT("lean"), Vector2Object(Lean != nullptr ? Lean->RightAmount : 0.0, Lean != nullptr ? Lean->ForwardAmount : 0.0));
-    Actual->SetStringField(TEXT("locomotionState"), bGrounded ? TEXT("Grounded") : TEXT("InAir"));
-    Actual->SetNumberField(TEXT("maxAcceleration"), Movement->GetMaxAcceleration() / 100.0);
-    Actual->SetNumberField(TEXT("maxBrakingDeceleration"), Movement->GetMaxBrakingDeceleration() / 100.0);
-    Actual->SetNumberField(TEXT("playRate"), PlayRate);
-    Actual->SetObjectField(TEXT("position"), Vector3Object(Character.GetActorLocation() - Origin));
-    Actual->SetStringField(TEXT("rotationMode"), RotationModeName(Character.GetRotationMode()));
-    Actual->SetStringField(TEXT("stance"), StanceName(Character.GetStance()));
-    Actual->SetNumberField(TEXT("stride"), Stride);
-    Actual->SetNumberField(TEXT("targetYaw"), FMath::DegreesToRadians(Locomotion != nullptr ? Locomotion->TargetYawAngleWorldSpace : Character.GetActorRotation().Yaw));
-    Actual->SetObjectField(TEXT("velocity"), Vector3Object(Character.GetVelocity()));
-    Actual->SetNumberField(TEXT("yaw"), FMath::DegreesToRadians(Character.GetActorRotation().Yaw));
+    const TSharedRef<FJsonObject> NativeActual{MakeShared<FJsonObject>()};
+    NativeActual->SetObjectField(TEXT("blendCoordinates"), Vector2Object(LocalVelocity.Y / 100.0, LocalVelocity.X / 100.0));
+    NativeActual->SetStringField(TEXT("gait"), GaitName(Character.GetGait()));
+    NativeActual->SetObjectField(TEXT("lean"), Vector2Object(Lean != nullptr ? Lean->RightAmount : 0.0, Lean != nullptr ? Lean->ForwardAmount : 0.0));
+    NativeActual->SetStringField(TEXT("locomotionState"), bGrounded ? TEXT("Grounded") : TEXT("InAir"));
+    NativeActual->SetNumberField(TEXT("playRate"), PlayRate);
+    NativeActual->SetStringField(TEXT("rotationMode"), RotationModeName(Character.GetRotationMode()));
+    NativeActual->SetStringField(TEXT("stance"), StanceName(Character.GetStance()));
+    NativeActual->SetNumberField(TEXT("stride"), Stride);
+    NativeActual->SetNumberField(TEXT("synthesizedAnimationPhase"), NativeAnimationPhase);
+    NativeActual->SetNumberField(TEXT("targetYaw"), FMath::DegreesToRadians(Locomotion != nullptr ? Locomotion->TargetYawAngleWorldSpace : Character.GetActorRotation().Yaw));
+
+    const TSharedRef<FJsonObject> PortExpected{MakeShared<FJsonObject>()};
+    PortExpected->SetNumberField(TEXT("animationPhase"), Port.AnimationPhase);
+    PortExpected->SetStringField(TEXT("animationState"), Port.AnimationState);
+    PortExpected->SetObjectField(TEXT("blendCoordinates"), Vector2Object(Port.BlendCoordinates.X, Port.BlendCoordinates.Y));
+    PortExpected->SetStringField(TEXT("gait"), GaitName(Port.Gait));
+    PortExpected->SetObjectField(TEXT("lean"), Vector2Object(Port.Lean.X, Port.Lean.Y));
+    PortExpected->SetStringField(TEXT("locomotionState"), Port.LocomotionState);
+    PortExpected->SetNumberField(TEXT("playRate"), Port.PlayRate);
+    PortExpected->SetStringField(TEXT("rotationMode"), RotationModeName(Character.GetRotationMode()));
+    PortExpected->SetStringField(TEXT("stance"), StanceName(Character.GetStance()));
+    PortExpected->SetNumberField(TEXT("stride"), Port.Stride);
+    PortExpected->SetNumberField(TEXT("targetYaw"), Port.TargetYaw);
 
     const TSharedRef<FJsonObject> Object{MakeShared<FJsonObject>()};
-    Object->SetObjectField(TEXT("actual"), Actual);
     Object->SetObjectField(TEXT("command"), CreateCommandObject(Command));
     Object->SetNumberField(TEXT("index"), Frame);
+    Object->SetObjectField(TEXT("nativeActual"), NativeActual);
+    Object->SetObjectField(TEXT("physicalActual"), PhysicalActual);
+    Object->SetObjectField(TEXT("portExpected"), PortExpected);
     Object->SetNumberField(TEXT("tick"), Frame);
     Object->SetNumberField(TEXT("time"), Frame * FixedDeltaSeconds);
     return Object;
@@ -482,8 +705,9 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
     Frames.Reserve(Definition.FrameCount);
     AActor* ClearanceBlocker{nullptr};
     bool bWasGrounded{Character->GetTraceMovement()->IsMovingOnGround()};
-    float LandingRecoveryRemaining{0.0f};
-    float AnimationPhase{0.0f};
+    float NativeAnimationPhase{0.0f};
+    const FPortSettings PortSettings{CreatePortSettings(*Character)};
+    FPortState PortState;
 
     for (int32 Frame{0}; Frame < Definition.FrameCount; ++Frame)
     {
@@ -524,10 +748,8 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
 
         TickTraceCharacter(*Character);
         const bool bGrounded{Character->GetTraceMovement()->IsMovingOnGround()};
-        if (!bWasGrounded && bGrounded) LandingRecoveryRemaining = 0.2f;
-        else LandingRecoveryRemaining = FMath::Max(0.0f, LandingRecoveryRemaining - static_cast<float>(FixedDeltaSeconds));
         Frames.Add(MakeShared<FJsonValueObject>(SnapshotFrame(*Character, Command, Frame, Origin,
-            bWasGrounded, LandingRecoveryRemaining, AnimationPhase)));
+            bWasGrounded, NativeAnimationPhase, PortSettings, PortState)));
         bWasGrounded = bGrounded;
     }
 

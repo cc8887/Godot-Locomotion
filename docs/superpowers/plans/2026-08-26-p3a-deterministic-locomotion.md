@@ -4,7 +4,7 @@
 
 **Goal:** 实现与固定 `ALS-Refactored` C++ 行为对齐的确定性 locomotion 核心、UE golden trace、Godot `CharacterBody3D` motor 和 headless replay 门禁。
 
-**Architecture:** 统一的 `AlsLocomotionCommand` 先在 Godot 主线程解析并驱动 motor，motor 完成碰撞后发布实际物理快照；纯 C# `AlsLocomotionModel` 在 worker 上只消费定宽值类型并输出动画参数。UE trace 与 Godot motor replay 分开：前者验证跨引擎行为语义，后者只验证 Godot 物理的自身确定性和同帧顺序。
+**Architecture:** 统一的 `AlsLocomotionCommand` 先在 Godot 主线程解析并驱动 motor，motor 完成碰撞后发布实际物理快照；纯 C# `AlsLocomotionModel` 在 worker 上只消费定宽值类型并输出动画参数。UE trace 每帧分离 `physicalActual` 输入证据、`nativeActual` 审计观测和独立 C++ `portExpected` oracle；golden comparer 只比较后者。UE trace 与 Godot motor replay 分开：前者验证可移植核心语义，后者只验证 Godot 物理的自身确定性和同帧顺序。
 
 **Tech Stack:** C# 12 / .NET 8、xUnit、Godot 4.7.2 .NET、PowerShell、Unreal Engine 5.9 C++ commandlet、ALS-Refactored `b754d6f0f2bb03741d301f8fb88077ebfe561e17`
 
@@ -678,7 +678,10 @@ Expected: FAIL because the trace plugin/commandlet does not exist.
 - force 60 Hz and run exactly the five named sequences
 - drive public desired gait/stance/rotation/aiming APIs and movement input
 - tick the real character and UAlsAnimationInstance
-- serialize actual state after each tick
+- serialize post-tick physical evidence as `physicalActual`
+- serialize native AnimInstance observations as non-gating `nativeActual`; label the commandlet phase as `synthesizedAnimationPhase`
+- evaluate a stateful, independent C++ port oracle from the same physical evidence and serialize all model outputs as `portExpected`
+- permit native observations and port expectations to differ; only `portExpected` is a golden pass/fail oracle
 - serialize the resolved movement/animation settings as `p3_locomotion_settings.json`
 - convert centimeters to meters and degrees to radians at the boundary
 - sort JSON properties and sequence files deterministically

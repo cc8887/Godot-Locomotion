@@ -572,56 +572,62 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
         $expectedIndex = 0
         foreach ($frame in @($document.frames))
         {
-            Assert-ExactProperties $frame @('actual', 'command', 'index', 'tick', 'time') "$($file.Name).frames[$expectedIndex]"
+            Assert-ExactProperties $frame @('command', 'index', 'nativeActual', 'physicalActual', 'portExpected', 'tick', 'time') "$($file.Name).frames[$expectedIndex]"
             Assert-ExactProperties $frame.command @('aimYaw', 'jumpPressed', 'movementAxes', 'requestedGait',
                 'requestedRotationMode', 'requestedStance', 'standBlocked', 'viewYaw') "$($file.Name).frames[$expectedIndex].command"
-            Assert-ExactProperties $frame.actual @('acceleration', 'animationPhase', 'animationState',
-                'blendCoordinates', 'gait', 'grounded', 'jumpTransition', 'lean', 'locomotionState',
-                'maxAcceleration', 'maxBrakingDeceleration', 'playRate', 'position', 'rotationMode',
-                'stance', 'stride', 'targetYaw', 'velocity', 'yaw') `
-                "$($file.Name).frames[$expectedIndex].actual"
+            Assert-ExactProperties $frame.physicalActual @('acceleration', 'grounded', 'jumpTransition',
+                'maxAcceleration', 'maxBrakingDeceleration', 'position', 'rotationMode', 'stance', 'velocity', 'yaw') `
+                "$($file.Name).frames[$expectedIndex].physicalActual"
+            Assert-ExactProperties $frame.nativeActual @('blendCoordinates', 'gait', 'lean', 'locomotionState',
+                'playRate', 'rotationMode', 'stance', 'stride', 'synthesizedAnimationPhase', 'targetYaw') `
+                "$($file.Name).frames[$expectedIndex].nativeActual"
+            Assert-ExactProperties $frame.portExpected @('animationPhase', 'animationState', 'blendCoordinates',
+                'gait', 'lean', 'locomotionState', 'playRate', 'rotationMode', 'stance', 'stride', 'targetYaw') `
+                "$($file.Name).frames[$expectedIndex].portExpected"
             Assert-ExactProperties $frame.command.movementAxes @('x', 'y') "$($file.Name).frames[$expectedIndex].command.movementAxes"
             foreach ($vectorName in @('acceleration', 'position', 'velocity'))
             {
-                Assert-ExactProperties $frame.actual.$vectorName @('x', 'y', 'z') "$($file.Name).frames[$expectedIndex].actual.$vectorName"
+                Assert-ExactProperties $frame.physicalActual.$vectorName @('x', 'y', 'z') "$($file.Name).frames[$expectedIndex].physicalActual.$vectorName"
             }
             foreach ($vectorName in @('blendCoordinates', 'lean'))
             {
-                Assert-ExactProperties $frame.actual.$vectorName @('x', 'y') "$($file.Name).frames[$expectedIndex].actual.$vectorName"
+                Assert-ExactProperties $frame.nativeActual.$vectorName @('x', 'y') "$($file.Name).frames[$expectedIndex].nativeActual.$vectorName"
+                Assert-ExactProperties $frame.portExpected.$vectorName @('x', 'y') "$($file.Name).frames[$expectedIndex].portExpected.$vectorName"
             }
             if ($frame.index -ne $expectedIndex -or $frame.tick -ne $expectedIndex -or
                 [math]::Abs([double]$frame.time - ($expectedIndex / 60.0)) -gt 1e-9)
             {
                 throw "Non-deterministic tick/index/time at $($file.Name) frame $expectedIndex."
             }
-            if ($null -eq $frame.command.movementAxes -or $null -eq $frame.actual.position -or
-                $null -eq $frame.actual.velocity -or $null -eq $frame.actual.acceleration -or
-                $null -eq $frame.actual.blendCoordinates -or $null -eq $frame.actual.lean)
+            if ($null -eq $frame.command.movementAxes -or $null -eq $frame.physicalActual.position -or
+                $null -eq $frame.physicalActual.velocity -or $null -eq $frame.physicalActual.acceleration -or
+                $null -eq $frame.nativeActual.blendCoordinates -or $null -eq $frame.nativeActual.lean -or
+                $null -eq $frame.portExpected.blendCoordinates -or $null -eq $frame.portExpected.lean)
             {
                 throw "Trace frame lacks required command/actual vectors at $($file.Name) frame $expectedIndex."
             }
-            if ([double]$frame.actual.maxAcceleration -lt 0.0 -or
-                [double]$frame.actual.maxBrakingDeceleration -lt 0.0)
+            if ([double]$frame.physicalActual.maxAcceleration -lt 0.0 -or
+                [double]$frame.physicalActual.maxBrakingDeceleration -lt 0.0)
             {
                 throw "Trace frame has a negative dynamic movement limit at $($file.Name) frame $expectedIndex."
             }
-            $observedMaxAccelerations.Add([double]$frame.actual.maxAcceleration)
-            $observedMaxBrakingDecelerations.Add([double]$frame.actual.maxBrakingDeceleration)
+            $observedMaxAccelerations.Add([double]$frame.physicalActual.maxAcceleration)
+            $observedMaxBrakingDecelerations.Add([double]$frame.physicalActual.maxBrakingDeceleration)
             $expectedIndex++
         }
 
         $frames = @($document.frames)
-        if (@($frames.actual.maxAcceleration | Sort-Object -Unique).Count -gt 1)
+        if (@($frames.physicalActual.maxAcceleration | Sort-Object -Unique).Count -gt 1)
         {
             $hasDynamicMaxAcceleration = $true
         }
-        if (@($frames.actual.maxBrakingDeceleration | Sort-Object -Unique).Count -gt 1)
+        if (@($frames.physicalActual.maxBrakingDeceleration | Sort-Object -Unique).Count -gt 1)
         {
             $hasDynamicMaxBrakingDeceleration = $true
         }
         $maximumHorizontalSpeed = ($frames | ForEach-Object {
-            [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
-                ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y))
+            [math]::Sqrt(([double]$_.physicalActual.velocity.x * [double]$_.physicalActual.velocity.x) +
+                ([double]$_.physicalActual.velocity.y * [double]$_.physicalActual.velocity.y))
         } | Measure-Object -Maximum).Maximum
         if ($document.name -ne 'idle_gaits' -and $maximumHorizontalSpeed -le 0.1)
         {
@@ -634,14 +640,14 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             {
                 $initialIdleFrames = @($frames | Where-Object { $_.index -ge 0 -and $_.index -le 29 })
                 if ($initialIdleFrames.Count -ne 30) { throw 'idle_gaits initial idle segment must contain frames 0 through 29.' }
-                $idleOrigin = $initialIdleFrames[0].actual.position
+                $idleOrigin = $initialIdleFrames[0].physicalActual.position
                 $idleMaximumSpeed = ($initialIdleFrames | ForEach-Object {
-                    [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
-                        ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y))
+                    [math]::Sqrt(([double]$_.physicalActual.velocity.x * [double]$_.physicalActual.velocity.x) +
+                        ([double]$_.physicalActual.velocity.y * [double]$_.physicalActual.velocity.y))
                 } | Measure-Object -Maximum).Maximum
                 $idleMaximumDisplacement = ($initialIdleFrames | ForEach-Object {
-                    $deltaX = [double]$_.actual.position.x - [double]$idleOrigin.x
-                    $deltaY = [double]$_.actual.position.y - [double]$idleOrigin.y
+                    $deltaX = [double]$_.physicalActual.position.x - [double]$idleOrigin.x
+                    $deltaY = [double]$_.physicalActual.position.y - [double]$idleOrigin.y
                     [math]::Sqrt(($deltaX * $deltaX) + ($deltaY * $deltaY))
                 } | Measure-Object -Maximum).Maximum
                 if ($idleMaximumSpeed -gt 0.01 -or $idleMaximumDisplacement -gt 0.005)
@@ -668,12 +674,12 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                     }
 
                     $movingWithActualGait = @($phaseFrames | Where-Object {
-                        $_.actual.gait -ceq $phase.Gait -and
-                        [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
-                            ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y)) -ge $phase.MinimumSpeed
+                        $_.nativeActual.gait -ceq $phase.Gait -and
+                        [math]::Sqrt(([double]$_.physicalActual.velocity.x * [double]$_.physicalActual.velocity.x) +
+                            ([double]$_.physicalActual.velocity.y * [double]$_.physicalActual.velocity.y)) -ge $phase.MinimumSpeed
                     })
-                    $firstPosition = $phaseFrames[0].actual.position
-                    $lastPosition = $phaseFrames[-1].actual.position
+                    $firstPosition = $phaseFrames[0].physicalActual.position
+                    $lastPosition = $phaseFrames[-1].physicalActual.position
                     $deltaX = [double]$lastPosition.x - [double]$firstPosition.x
                     $deltaY = [double]$lastPosition.y - [double]$firstPosition.y
                     $phaseDisplacement = [math]::Sqrt(($deltaX * $deltaX) + ($deltaY * $deltaY))
@@ -686,13 +692,13 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             'directions'
             {
                 $movingFrames = @($frames | Where-Object {
-                    [math]::Abs([double]$_.actual.velocity.x) -gt 0.1 -or
-                    [math]::Abs([double]$_.actual.velocity.y) -gt 0.1
+                    [math]::Abs([double]$_.physicalActual.velocity.x) -gt 0.1 -or
+                    [math]::Abs([double]$_.physicalActual.velocity.y) -gt 0.1
                 })
-                if (-not ($movingFrames.actual.velocity.x | Where-Object { $_ -gt 0.1 }) -or
-                    -not ($movingFrames.actual.velocity.x | Where-Object { $_ -lt -0.1 }) -or
-                    -not ($movingFrames.actual.velocity.y | Where-Object { $_ -gt 0.1 }) -or
-                    -not ($movingFrames.actual.velocity.y | Where-Object { $_ -lt -0.1 }))
+                if (-not ($movingFrames.physicalActual.velocity.x | Where-Object { $_ -gt 0.1 }) -or
+                    -not ($movingFrames.physicalActual.velocity.x | Where-Object { $_ -lt -0.1 }) -or
+                    -not ($movingFrames.physicalActual.velocity.y | Where-Object { $_ -gt 0.1 }) -or
+                    -not ($movingFrames.physicalActual.velocity.y | Where-Object { $_ -lt -0.1 }))
                 {
                     throw 'directions does not cover positive and negative movement on both horizontal axes.'
                 }
@@ -701,7 +707,7 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             {
                 $blockedCrouching = @($frames | Where-Object {
                     $_.command.standBlocked -and $_.command.requestedStance -ceq 'Standing' -and
-                    $_.actual.stance -ceq 'Crouching'
+                    $_.physicalActual.stance -ceq 'Crouching'
                 })
                 if ($blockedCrouching.Count -eq 0)
                 {
@@ -710,7 +716,7 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                 $lastBlockedFrame = ($blockedCrouching.index | Measure-Object -Maximum).Maximum
                 $clearStanding = @($frames | Where-Object {
                     $_.index -gt $lastBlockedFrame -and -not $_.command.standBlocked -and
-                    $_.command.requestedStance -ceq 'Standing' -and $_.actual.stance -ceq 'Standing'
+                    $_.command.requestedStance -ceq 'Standing' -and $_.physicalActual.stance -ceq 'Standing'
                 })
                 if ($clearStanding.Count -eq 0)
                 {
@@ -721,14 +727,14 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             {
                 foreach ($mode in @('VelocityDirection', 'LookingDirection', 'Aiming'))
                 {
-                    if ($mode -cnotin @($frames.actual.rotationMode)) { throw "rotation_modes never reached $mode." }
+                    if ($mode -cnotin @($frames.physicalActual.rotationMode)) { throw "rotation_modes never reached $mode." }
                 }
             }
             'jump_land'
             {
                 if ($null -eq $settingsValues) { throw 'jump_land validation requires the settings document.' }
                 $analogFrames = @($frames | Where-Object {
-                    $_.index -ge 100 -and $_.index -le 169 -and $_.actual.grounded -and
+                    $_.index -ge 100 -and $_.index -le 169 -and $_.physicalActual.grounded -and
                     $_.command.requestedGait -ceq 'Running' -and
                     [math]::Abs([math]::Sqrt(
                         ([double]$_.command.movementAxes.x * [double]$_.command.movementAxes.x) +
@@ -739,8 +745,8 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                     throw "jump_land analog-limited segment is missing its grounded 0.65 input frames."
                 }
                 $analogSpeeds = @($analogFrames | ForEach-Object {
-                    [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
-                        ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y))
+                    [math]::Sqrt(([double]$_.physicalActual.velocity.x * [double]$_.physicalActual.velocity.x) +
+                        ([double]$_.physicalActual.velocity.y * [double]$_.physicalActual.velocity.y))
                 })
                 $analogSteadySpeeds = @($analogSpeeds | Select-Object -Last 30)
                 $analogMinimum = ($analogSteadySpeeds | Measure-Object -Minimum).Minimum
@@ -752,24 +758,24 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                 }
 
                 $jumpStart = @($frames | Where-Object {
-                    $_.actual.animationState -ceq 'JumpStart' -and -not $_.actual.grounded -and
-                    $_.actual.jumpTransition -and [double]$_.actual.velocity.z -gt 0
+                    $_.portExpected.animationState -ceq 'JumpStart' -and -not $_.physicalActual.grounded -and
+                    $_.physicalActual.jumpTransition -and [double]$_.physicalActual.velocity.z -gt 0
                 } | Select-Object -First 1)
                 if ($jumpStart.Count -eq 0)
                 {
                     throw 'jump_land lacks a real positive-vertical-motion JumpStart transition.'
                 }
                 $fallLoop = @($frames | Where-Object {
-                    $_.index -gt $jumpStart[0].index -and -not $_.actual.grounded -and
-                    $_.actual.animationState -ceq 'FallLoop'
+                    $_.index -gt $jumpStart[0].index -and -not $_.physicalActual.grounded -and
+                    $_.portExpected.animationState -ceq 'FallLoop'
                 } | Select-Object -First 1)
                 if ($fallLoop.Count -eq 0)
                 {
                     throw 'jump_land lacks FallLoop after JumpStart.'
                 }
                 $landRecovery = @($frames | Where-Object {
-                    $_.index -gt $fallLoop[0].index -and $_.actual.grounded -and
-                    $_.actual.animationState -ceq 'LandRecovery'
+                    $_.index -gt $fallLoop[0].index -and $_.physicalActual.grounded -and
+                    $_.portExpected.animationState -ceq 'LandRecovery'
                 } | Select-Object -First 1)
                 if ($landRecovery.Count -eq 0)
                 {
