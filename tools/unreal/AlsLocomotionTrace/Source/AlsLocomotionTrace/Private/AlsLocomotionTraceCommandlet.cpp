@@ -396,9 +396,12 @@ FPortResult EvaluatePort(const AAlsTraceCharacter& Character, const FTraceComman
     }
     else
     {
-        const float VelocityYaw{Speed > 1.0e-6f
+        const float RawVelocityYaw{Speed > 1.0e-6f
             ? static_cast<float>(FMath::Atan2(Character.GetVelocity().Y, Character.GetVelocity().X))
             : ActorYaw};
+        // Port output is converted from UE yaw to Godot yaw by negation. Preserve Core's +pi
+        // canonical boundary by emitting -pi before that conversion.
+        const float VelocityYaw{RawVelocityYaw == PI ? -PI : RawVelocityYaw};
         float SelectedTargetYaw;
         if (Command.RotationMode == AlsRotationModeTags::VelocityDirection ||
             (Command.RotationMode == AlsRotationModeTags::ViewDirection && ActualGait == AlsGaitTags::Sprinting))
@@ -407,7 +410,9 @@ FPortResult EvaluatePort(const AAlsTraceCharacter& Character, const FTraceComman
         }
         else if (Command.RotationMode == AlsRotationModeTags::ViewDirection)
         {
-            SelectedTargetYaw = NormalizeRadians(FMath::DegreesToRadians(Command.ViewYaw) - LocalYaw);
+            const float ViewYaw{FMath::DegreesToRadians(Command.ViewYaw)};
+            const float MovementYawOffset{NormalizeRadians(VelocityYaw - ViewYaw)};
+            SelectedTargetYaw = NormalizeRadians(ViewYaw + MovementYawOffset);
         }
         else
         {

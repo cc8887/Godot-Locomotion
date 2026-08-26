@@ -106,7 +106,9 @@ public partial class P3aLocomotionHarness : Node
                     frameId,
                     checked((int)entry.Handle.CharacterId),
                     checked((int)entry.Handle.Generation),
-                    AlsP3aHarnessContext.DeltaTime);
+                    AlsP3aHarnessContext.DeltaTime,
+                    entry.HasCommittedTargetYaw,
+                    entry.CommittedTargetYaw);
                 entry.LastMotorFrameId = entry.PendingInput.Identity.FrameId;
             }
             if (measure)

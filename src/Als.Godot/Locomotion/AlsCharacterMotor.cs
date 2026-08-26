@@ -92,9 +92,11 @@ public partial class AlsCharacterMotor : CharacterBody3D
         long frameId,
         int characterId,
         int generation,
-        float deltaTime)
+        float deltaTime,
+        byte hasTargetYaw = 0,
+        float targetYaw = 0f)
     {
-        ValidateStep(frameId, characterId, generation, deltaTime);
+        ValidateStep(frameId, characterId, generation, deltaTime, hasTargetYaw, targetYaw);
         var source = _source!;
         var command = source.GetCommand(frameId);
         if (command.JumpPressed > 1)
@@ -105,21 +107,26 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
 
         var currentStanceCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
+        var requestedStanceCommand = AlsLocomotionCommandResolver.Resolve(
+            command,
+            currentStanceCommand.RequestedStance);
         var currentVelocity = Velocity;
         RequireFiniteVector(currentVelocity, nameof(Velocity));
-        var characterYaw = GetCharacterYaw();
-        if (!float.IsFinite(characterYaw))
+        if (hasTargetYaw == 1)
+        {
+            GlobalBasis = new Basis(Vector3.Up, targetYaw);
+        }
+
+        var movementYaw = GetCharacterYaw();
+        if (!float.IsFinite(movementYaw))
         {
             throw new ArgumentOutOfRangeException(nameof(GlobalTransform), "Character yaw must be finite.");
         }
 
-        var requestedStanceCommand = AlsLocomotionCommandResolver.Resolve(
-            command,
-            currentStanceCommand.RequestedStance);
-        var currentDesiredSpeed = CalculateDesiredSpeed(currentStanceCommand, characterYaw, _actualStance);
+        var currentDesiredSpeed = CalculateDesiredSpeed(currentStanceCommand, movementYaw, _actualStance);
         var requestedDesiredSpeed = CalculateDesiredSpeed(
             requestedStanceCommand,
-            characterYaw,
+            movementYaw,
             currentStanceCommand.RequestedStance);
         var currentDesiredVelocity = ToGodot(currentStanceCommand.WorldDirection) * currentDesiredSpeed;
         var requestedDesiredVelocity = ToGodot(requestedStanceCommand.WorldDirection) * requestedDesiredSpeed;
@@ -174,6 +181,12 @@ public partial class AlsCharacterMotor : CharacterBody3D
         Velocity = nextVelocity;
         MoveAndSlide();
 
+        var characterTransform = GlobalTransform;
+        var characterYaw = GetCharacterYaw(characterTransform.Basis);
+        if (!float.IsFinite(characterYaw))
+        {
+            throw new ArgumentOutOfRangeException(nameof(GlobalTransform), "Final character yaw must be finite.");
+        }
         var actualVelocity = ToNumerics(GetRealVelocity());
         var actualAcceleration = (actualVelocity - _previousActualVelocity) / deltaTime;
         var grounded = IsOnFloor();
@@ -182,7 +195,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var input = new AlsFrameInput(
             Identity: identity,
             DeltaTime: deltaTime,
-            CharacterTransform: ToNumerics(GlobalTransform),
+            CharacterTransform: ToNumerics(characterTransform),
             ActualVelocity: actualVelocity,
             ActualAcceleration: actualAcceleration,
             InputDirection: resolvedCommand.WorldDirection,
@@ -211,30 +224,13 @@ public partial class AlsCharacterMotor : CharacterBody3D
         return input;
     }
 
-    public void ApplyTargetYaw(float targetYaw)
-    {
-        EnsureMainThread();
-        EnsureLiveInTree();
-        if (!_configured)
-        {
-            throw new InvalidOperationException("ALS character motor must be configured before rotation commit.");
-        }
-        if (!float.IsFinite(targetYaw))
-        {
-            throw new ArgumentOutOfRangeException(nameof(targetYaw));
-        }
-
-        GlobalBasis = new Basis(Vector3.Up, targetYaw);
-    }
-
-    public float GetAppliedYaw()
-    {
-        EnsureMainThread();
-        EnsureLiveInTree();
-        return GetCharacterYaw();
-    }
-
-    private void ValidateStep(long frameId, int characterId, int generation, float deltaTime)
+    private void ValidateStep(
+        long frameId,
+        int characterId,
+        int generation,
+        float deltaTime,
+        byte hasTargetYaw,
+        float targetYaw)
     {
         EnsureMainThread();
         EnsureLiveInTree();
@@ -246,6 +242,14 @@ public partial class AlsCharacterMotor : CharacterBody3D
         if (!float.IsFinite(deltaTime) || deltaTime <= 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be positive and finite.");
+        }
+        if (hasTargetYaw > 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hasTargetYaw), "HasTargetYaw must be zero or one.");
+        }
+        if (hasTargetYaw == 1 && !float.IsFinite(targetYaw))
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetYaw));
         }
 
         ArgumentOutOfRangeException.ThrowIfNegative(frameId);
@@ -509,9 +513,11 @@ public partial class AlsCharacterMotor : CharacterBody3D
         in Vector3 upDirection,
         float floorMaxAngle) => normal.Dot(upDirection) >= MathF.Cos(floorMaxAngle);
 
-    private float GetCharacterYaw()
+    private float GetCharacterYaw() => GetCharacterYaw(GlobalBasis);
+
+    private static float GetCharacterYaw(in Basis sourceBasis)
     {
-        var basis = GlobalBasis.Orthonormalized();
+        var basis = sourceBasis.Orthonormalized();
         return MathF.Atan2(basis.Z.X, basis.Z.Z);
     }
 

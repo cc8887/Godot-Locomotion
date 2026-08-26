@@ -74,7 +74,7 @@ public sealed class AlsLocomotionRotationTests
     }
 
     [Fact]
-    public void LookingDirectionCombinesViewYawWithCharacterLocalMovementOffset()
+    public void LookingDirectionUsesViewRelativeWorldMovementOffset()
     {
         var input = P3TestInput.Grounded(
             velocity: new Vector3(3f, 0f, 0f),
@@ -85,7 +85,40 @@ public sealed class AlsLocomotionRotationTests
 
         AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
 
-        Assert.InRange(result.TargetYaw, Degrees(-10f), -float.Epsilon);
+        Assert.InRange(result.TargetYaw, Degrees(-20f), -float.Epsilon);
+    }
+
+    [Theory]
+    [InlineData(-140f)]
+    [InlineData(110f)]
+    public void LookingDirectionFeedbackConvergesToTheSameWorldMovementTarget(float initialYawDegrees)
+    {
+        var expectedYaw = Degrees(-90f);
+        var characterYaw = Degrees(initialYawDegrees);
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+        var previousError = MathF.PI;
+
+        for (var frame = 0; frame < 180; frame++)
+        {
+            var input = P3TestInput.Grounded(
+                velocity: new Vector3(3f, 0f, 0f),
+                rotationMode: AlsRotationMode.LookingDirection,
+                characterYaw: characterYaw,
+                viewYaw: Degrees(45f));
+
+            AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+            var error = MathF.Abs(AlsMath.NormalizeAngleRadians(result.TargetYaw - expectedYaw));
+            Assert.True(error <= previousError + 0.00001f, $"rotation feedback oscillated at frame {frame}");
+            previousError = error;
+            characterYaw = result.TargetYaw;
+        }
+
+        Assert.InRange(
+            MathF.Abs(AlsMath.NormalizeAngleRadians(result.TargetYaw - expectedYaw)),
+            0f,
+            0.0001f);
     }
 
     [Theory]
