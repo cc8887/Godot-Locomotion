@@ -67,4 +67,27 @@ public static class AlsMath
         var delta = NormalizeAngleRadians(normalizedTarget - normalizedCurrent);
         return NormalizeAngleRadians(normalizedCurrent + (delta * alpha));
     }
+
+    public static float InterpolateAngleConstant(
+        float current,
+        float target,
+        float deltaTime,
+        float speed)
+    {
+        if (!float.IsFinite(current) || !float.IsFinite(target) ||
+            !float.IsFinite(deltaTime) || deltaTime < 0f ||
+            !float.IsFinite(speed) || speed < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(current));
+        }
+
+        var delta = NormalizeAngleRadians(target - current);
+        var maximumDelta = speed * deltaTime;
+        if (speed == 0f || MathF.Abs(delta) <= maximumDelta)
+        {
+            return NormalizeAngleRadians(target);
+        }
+
+        return NormalizeAngleRadians(current + (MathF.CopySign(maximumDelta, delta)));
+    }
 }

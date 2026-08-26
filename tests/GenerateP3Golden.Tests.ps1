@@ -17,7 +17,58 @@ function New-P3GeneratedFixture
     return $fixtureRoot
 }
 
+function Set-P3TraceDerivedAcceleration([object]$Trace)
+{
+    for ($index = 1; $index -lt $Trace.frames.Count; $index++)
+    {
+        foreach ($component in @('x', 'y', 'z'))
+        {
+            $Trace.frames[$index].physicalActual.acceleration.$component =
+                (([double]$Trace.frames[$index].physicalActual.velocity.$component -
+                  [double]$Trace.frames[$index - 1].physicalActual.velocity.$component) * 60.0)
+        }
+    }
+}
+
 Describe 'generate-p3-golden.ps1 semantic validation' {
+    It 'derives physical actual acceleration from consecutive post-tick velocities' {
+        $commandletPath = Join-Path $script:RepositoryRoot `
+            'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\Private\AlsLocomotionTraceCommandlet.cpp'
+        $source = [System.IO.File]::ReadAllText($commandletPath)
+
+        $source | Should Match 'ActualAcceleration\s*\{\s*\(ActualVelocity\s*-\s*PreviousActualVelocity\)\s*/\s*FixedDeltaSeconds\s*\}'
+        $source | Should Not Match 'PhysicalActual->SetObjectField\(TEXT\("acceleration"\),\s*Vector3Object\(Movement->GetCurrentAcceleration\(\)\)\)'
+        $source | Should Not Match 'LocalAcceleration\s*\{[^}]*GetCurrentAcceleration\(\)'
+    }
+
+    It 'locks generated acceleration to the post-tick velocity derivative after frame zero' {
+        foreach ($tracePath in Get-ChildItem -Path (Join-Path $script:RepositoryRoot `
+            'tests\Als.Core.Tests\Fixtures\P3\trace_*.json'))
+        {
+            $trace = Get-Content -LiteralPath $tracePath.FullName -Raw | ConvertFrom-Json
+            for ($index = 1; $index -lt $trace.frames.Count; $index++)
+            {
+                $previous = $trace.frames[$index - 1].physicalActual.velocity
+                $current = $trace.frames[$index].physicalActual.velocity
+                $actual = $trace.frames[$index].physicalActual.acceleration
+                [Math]::Abs([double]$actual.x - (([double]$current.x - [double]$previous.x) * 60.0)) | Should BeLessThan 0.000001
+                [Math]::Abs([double]$actual.y - (([double]$current.y - [double]$previous.y) * 60.0)) | Should BeLessThan 0.000001
+                [Math]::Abs([double]$actual.z - (([double]$current.z - [double]$previous.z) * 60.0)) | Should BeLessThan 0.000001
+            }
+        }
+    }
+
+    It 'keeps Node rotation writes in the main-thread commit stage' {
+        $commit = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
+            'src\Als.Godot\Locomotion\AlsP3aCommitStage.cs'))
+        $worker = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
+            'src\Als.Godot\Locomotion\AlsP3aWorkerRoot.cs'))
+
+        $commit | Should Match 'entry\.Motor\.ApplyTargetYaw\(result\.TargetYaw\)'
+        $commit | Should Match 'RotationCommitMismatches'
+        $worker | Should Not Match 'ApplyTargetYaw|GlobalBasis|GlobalRotation|GlobalTransform'
+    }
+
     It 'rejects trace content swapped between two valid filenames' {
         $fixtureRoot = New-P3GeneratedFixture
         try
@@ -109,6 +160,7 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
                 $frame.physicalActual.velocity.y = 0.0
                 $frame.physicalActual.velocity.z = 0.0
             }
+            Set-P3TraceDerivedAcceleration $idle
             [System.IO.File]::WriteAllText($idlePath, ($idle | ConvertTo-Json -Depth 20),
                 [System.Text.UTF8Encoding]::new($false))
 
@@ -134,6 +186,7 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
                 $frame.physicalActual.velocity.x = 3.75
                 $frame.physicalActual.velocity.y = 0.0
             }
+            Set-P3TraceDerivedAcceleration $jump
             [System.IO.File]::WriteAllText($jumpPath, ($jump | ConvertTo-Json -Depth 20),
                 [System.Text.UTF8Encoding]::new($false))
 

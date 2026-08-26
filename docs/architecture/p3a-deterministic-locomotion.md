@@ -31,6 +31,15 @@ Golden trace 明确分三层：
 表现层策略；若用它作硬期望，会把观察事实误写成当前切片的规范。通过标准是 physical evidence 足够、
 `portExpected` 可重放且与 Godot Core 结果一致。
 
+`physicalActual.acceleration` 不是输入命令或 `CharacterMovementComponent::GetCurrentAcceleration()`。
+commandlet 在每次固定 60 Hz tick 后读取实际速度，并以相邻 post-tick 速度差除以 `1/60 s` 得到实际加速度；
+frame 0 的前一速度取自最后一个 warmup tick，因此首帧同样有确定的物理历史。相同的 actual velocity 历史同时
+输入独立 C++ port oracle 和 Core replay，三层 trace 的职责保持分离。
+
+Godot/Core 中 `ActualVelocity.Y` 是 up。accepted jump 当帧进入 `JumpStart`，只要仍为 InAir 且垂直实际速度
+严格大于 0 就保持；`Y <= 0`（包含顶点恰好为 0）转为 `FallLoop`。没有 accepted jump 的 walk-off 直接进入
+`FallLoop`，落地清除 jump-start 子状态并进入 `Land`。
+
 ## 同帧管线、所有权与替换
 
 每个 physics frame 固定按以下顺序执行：
@@ -41,12 +50,20 @@ Golden trace 明确分三层：
    ResourceLoader 或文件系统，再发布 `AlsFrameResult`；single 模式在主线程运行同一模型，parallel 模式在
    sub-thread 运行；
 3. Main thread / Order 2：只消费 identity 与当前 frame/character/generation 完全一致的结果，并在同一
-   physics frame commit；missing、stale、generation mismatch 或 lag 均使 gate 失败。
+   physics frame commit；commit 调用 motor 的无分配 `ApplyTargetYaw(result.TargetYaw)` 写入
+   `CharacterBody3D.GlobalBasis`，再读回实际 yaw 校验并写入 digest；missing、stale、generation mismatch、
+   yaw commit mismatch 或 lag 均使 gate 失败。
 
 场景对象和 motor 归主线程；每个 worker 独占 runtime state，exchange 由该角色槽独占。identity 是
 `(frameId, characterId, slotGeneration)`。测量期 frame 420 替换 character 0：旧槽释放后 generation 从 1
 递增为 2，旧 generation 的结果必须仍可按旧 identity 读取、但必须被新 identity 拒绝；替换帧的新结果也
 必须在该帧 commit。这个合同阻止复用槽把旧角色结果提交给新角色。
+
+rotation 的生产所有权固定在 Order 2，worker 只能计算值类型 `TargetYaw`，不得访问 Node。规则来自锁定 ALS
+源码：`VelocityDirection` 在可靠移动速度下朝实际移动方向；`LookingDirection` 在移动时用 view yaw 加角色
+局部移动偏角（作为固定 `RotationYawOffset` 等价规则），低速停止时保持当前角色 yaw，不在本阶段执行 TIP；
+`Aiming` 朝 aim yaw。目标角先用对应固定角速度做最短角 constant interpolation，再从当前真实角色 yaw 做固定
+half-life 插值；commit 直接应用该帧插值后的最终 `TargetYaw`，所以下一帧 gather 读取的是已提交真实朝向。
 
 当前 floor 合同还没有 moving-platform identity。无论 grounded 与否，platform tuple 均明确为
 `PlatformId=-1`、`PlatformTransform=Identity`、`PlatformAngularVelocity=Zero`；这表示 unavailable，不能
@@ -63,21 +80,22 @@ HEAD/remote/clean 状态、锁定 patch、插件受控同步、cold editor `Read
 ## Harness 门禁与固定摘要
 
 每个矩阵先运行 120 个 warmup frame，再测量 600 frame，固定 60 Hz。warmup 用于稳定 JIT 与运行时路径，
-不进入正式 digest 或 allocation 结论。测量 coverage 的内部 bitmask 必须等于 `0x1FFF`，13 位依次表示
+不进入正式 digest 或 allocation 结论。测量 coverage 的内部 bitmask 必须等于 `0x3FFF`，14 位依次表示
 Walking、Running、Sprinting、Crouching、Jump、Land、Forward、Right、Backward、Left、
-LookingDirection、VelocityDirection、Aiming；coverage 是内部诊断，不进入公开成功 marker。
+LookingDirection、VelocityDirection、Aiming、AppliedYawVariation；最后一位证明提交后的实际 GlobalBasis yaw
+在测量期确实发生变化。coverage 是内部诊断，不进入公开成功 marker。
 
 四阶段 allocation 必须各自为 0：`gather_motor`、`model`、`exchange`、`commit`。公开四矩阵 marker 的
 完整固定格式与基线为：
 
 ```text
-GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=302AA679C5C51AC1 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=parallel characters=1 warmup=120 frames=600 digest=302AA679C5C51AC1 missing=0 stale=0 generation=0 off_main=1 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=single characters=10 warmup=120 frames=600 digest=B1A492086E5D2D83 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=parallel characters=10 warmup=120 frames=600 digest=B1A492086E5D2D83 missing=0 stale=0 generation=0 off_main=10 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=4E567B2CB05AF7DF missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=parallel characters=1 warmup=120 frames=600 digest=4E567B2CB05AF7DF missing=0 stale=0 generation=0 off_main=1 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=single characters=10 warmup=120 frames=600 digest=1623F6F27E89C051 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=parallel characters=10 warmup=120 frames=600 digest=1623F6F27E89C051 missing=0 stale=0 generation=0 off_main=10 lag=0 allocations=0
 ```
 
-1/10 角色的 fixed digest 分别为 `302AA679C5C51AC1` 与 `B1A492086E5D2D83`；single/parallel 必须命中各自
+1/10 角色的 fixed digest 分别为 `4E567B2CB05AF7DF` 与 `1623F6F27E89C051`；single/parallel 必须命中各自
 基线且相互相等。motor smoke 的成功 marker 为 `GODOT_ALS_P3A_MOTOR_OK cases=7`。
 
 Core 热路径对 gait、stance、rotation mode 和 locomotion history 的合法性检查使用连续 byte enum 的显式
@@ -85,13 +103,15 @@ Core 热路径对 gait、stance、rotation mode 和 locomotion history 的合法
 可能以固定 232-byte 单位重建，并被误记为 model/motor 业务分配。Core 单测通过 `Enum.GetValues<T>()`
 覆盖所有合法值，并锁定 Gait/Stance/RotationMode/LocomotionState 均以 byte 为底层、从 0 开始、连续到命名
 terminal；测试输入 `-1` 转为 byte enum 后实际值是 `255`，与 terminal+1 等上界外值一起验证拒绝行为。
-修复后连续三轮 focused 四矩阵均保持 `allocations=0`，digest 未变化。focused 结果只用于根因验证，正式
+修复后连续三轮 focused 四矩阵均保持 `allocations=0`，digest 未变化；digest 同时包含 Core result 与 commit
+后从 `GlobalBasis` 读回的实际 yaw。focused 结果只用于根因验证，正式
 完成仍以下面的非 skip 默认闭环为准。
 
 失败时先看 `GODOT_ALS_P3A_DIAGNOSTIC`：`gather_motor/model/exchange/commit` 定位分配阶段，
 `first_gather_frame/first_model_frame/first_commit_frame` 定位首帧，`replacements`、
 `old_generation_rejected`、`replacement_frame_committed` 检查替换，`coverage` 检查缺失行为，
-`affinity_violations` 检查线程归属。公开 marker 的 `missing/stale/generation/lag` 分别定位未发布、旧帧、
+`rotation_commit_mismatches` 检查 TargetYaw 写入与 GlobalBasis 读回是否一致，`affinity_violations` 检查线程归属。
+公开 marker 的 `missing/stale/generation/lag` 分别定位未发布、旧帧、
 旧 generation 和非同帧结果；`off_main` 错误表示 single 泄漏到 worker 或 parallel 没有实际离开主线程。
 脚本还把 Godot 输出中的 `SCRIPT ERROR`/`ERROR:` 视为失败，不能只看进程退出码。
 

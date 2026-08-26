@@ -44,8 +44,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782444041489,
+					"y": 13.098611451502626,
 					"z": 0
 				},
 				"grounded": true,
@@ -80,7 +80,7 @@
 				"gait": "Walking",
 				"lean":
 				{
-					"x": 0.036758435230374795,
+					"x": 0.036758435230374809,
 					"y": 0.042413579111970912
 				},
 				"locomotionState": "Grounded",
@@ -88,7 +88,7 @@
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.190476194024086,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0
 			},
 			"tick": 0,
 			"time": 0
@@ -136,8 +136,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.11378247444523,
+					"y": 13.098611477852538,
 					"z": 0
 				},
 				"grounded": true,
@@ -172,7 +172,7 @@
 				"gait": "Walking",
 				"lean":
 				{
-					"x": 0.070247980357873038,
+					"x": 0.070247980357873066,
 					"y": 0.083462388226219569
 				},
 				"locomotionState": "Grounded",
@@ -180,7 +180,7 @@
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.380952388048172,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.050415497273206711
 			},
 			"tick": 1,
 			"time": 0.016666666666666666
@@ -228,8 +228,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.11378250231532,
+					"y": 13.098611502006619,
 					"z": 0
 				},
 				"grounded": true,
@@ -264,15 +264,15 @@
 				"gait": "Walking",
 				"lean":
 				{
-					"x": 0.099516734642053462,
-					"y": 0.12402280869222579
+					"x": 0.099516734642053489,
+					"y": 0.12402280869222576
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.57142859697341919,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.12283645570278168
 			},
 			"tick": 2,
 			"time": 0.033333333333333333
@@ -320,8 +320,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782527862924,
+					"y": 13.098611524147859,
 					"z": 0
 				},
 				"grounded": true,
@@ -356,7 +356,7 @@
 				"gait": "Walking",
 				"lean":
 				{
-					"x": 0.12368253059900139,
+					"x": 0.1236825305990014,
 					"y": 0.16465351477271284
 				},
 				"locomotionState": "Grounded",
@@ -364,7 +364,7 @@
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.76190477609634399,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.21460649371147156
 			},
 			"tick": 3,
 			"time": 0.050000000000000003
@@ -412,8 +412,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.11378255128152,
+					"y": 13.098611544443987,
 					"z": 0
 				},
 				"grounded": true,
@@ -448,7 +448,7 @@
 				"gait": "Walking",
 				"lean":
 				{
-					"x": 0.14321711668326681,
+					"x": 0.14321711668326684,
 					"y": 0.20490057200245387
 				},
 				"locomotionState": "Grounded",
@@ -456,7 +456,7 @@
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.95238101482391357,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.27643191814422607
 			},
 			"tick": 4,
 			"time": 0.066666666666666666
@@ -504,8 +504,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782284476121,
+					"y": 13.098611313212633,
 					"z": 0
 				},
 				"grounded": true,
@@ -540,15 +540,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.15867577699711535,
-					"y": 0.24437090125261274
+					"x": 0.15867577699711538,
+					"y": 0.24437090125261277
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.53333336114883423,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.32926315069198608
 			},
 			"tick": 5,
 			"time": 0.083333333333333329
@@ -596,8 +596,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782612139302,
+					"y": 13.098611597187373,
 					"z": 0
 				},
 				"grounded": true,
@@ -632,15 +632,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.17057833979252174,
-					"y": 0.28278128727765267
+					"x": 0.17057833979252171,
+					"y": 0.28278128727765273
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.62222224473953247,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.37571701407432556
 			},
 			"tick": 6,
 			"time": 0.10000000000000001
@@ -688,8 +688,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782350374896,
+					"y": 13.098611370324955,
 					"z": 0
 				},
 				"grounded": true,
@@ -724,15 +724,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.17925119588956812,
-					"y": 0.3199868463984345
+					"x": 0.17925119588956817,
+					"y": 0.31998684639843455
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.71111112833023071,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.41909483075141907
 			},
 			"tick": 7,
 			"time": 0.11666666666666667
@@ -780,8 +780,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782650244833,
+					"y": 13.098611630212213,
 					"z": 0
 				},
 				"grounded": true,
@@ -816,15 +816,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.1849626450889314,
-					"y": 0.35589141856921164
+					"x": 0.18496264508893151,
+					"y": 0.35589141856921169
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.80000007152557373,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.46031865477561951
 			},
 			"tick": 8,
 			"time": 0.13333333333333333
@@ -872,8 +872,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782906483801,
+					"y": 13.098611852286041,
 					"z": 0
 				},
 				"grounded": true,
@@ -908,7 +908,7 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.18798281055842769,
+					"x": 0.18798281055842797,
 					"y": 0.39041904576969444
 				},
 				"locomotionState": "Grounded",
@@ -916,7 +916,7 @@
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.88888895511627197,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.4992927610874176
 			},
 			"tick": 9,
 			"time": 0.14999999999999999
@@ -964,8 +964,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 15.113782154133537,
+					"y": 13.098611200249042,
 					"z": 0
 				},
 				"grounded": true,
@@ -1000,15 +1000,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.18858290336615113,
-					"y": 0.42351336483934526
+					"x": 0.18858290336615136,
+					"y": 0.42351336483934532
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 0.97777783870697021,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.53590595722198486
 			},
 			"tick": 10,
 			"time": 0.16666666666666666
@@ -1056,8 +1056,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 3.7784361699098326,
+					"y": 3.2746446805886253,
 					"z": 0
 				},
 				"grounded": true,
@@ -1092,15 +1092,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.18703490958400307,
-					"y": 0.4551368690423192
+					"x": 0.18025763873210726,
+					"y": 0.4135917188135671
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.57002705335617065
 			},
 			"tick": 11,
 			"time": 0.18333333333333332
@@ -1148,8 +1148,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 1.1937117960769684e-13,
 					"z": 0
 				},
 				"grounded": true,
@@ -1184,15 +1184,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.18361182029802806,
-					"y": 0.48527006326342803
+					"x": 0.17014055249251747,
+					"y": 0.39037859388499896
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.60149765014648438
 			},
 			"tick": 12,
 			"time": 0.20000000000000001
@@ -1240,8 +1240,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -1276,15 +1276,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.17878496993738124,
-					"y": 0.51389162075490658
+					"x": 0.16059129480487808,
+					"y": 0.36846832185323197
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.62699031829833984
 			},
 			"tick": 13,
 			"time": 0.21666666666666667
@@ -1332,8 +1332,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -1368,15 +1368,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.17299133457432567,
-					"y": 0.54101434976178053
+					"x": 0.15157799589396212,
+					"y": 0.34778777918681913
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.64671111106872559
 			},
 			"tick": 14,
 			"time": 0.23333333333333334
@@ -1424,8 +1424,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -1460,15 +1460,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.16656395123305195,
-					"y": 0.56667920702472252
+					"x": 0.14307057469800094,
+					"y": 0.32826794646373669
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.66196674108505249
 			},
 			"tick": 15,
 			"time": 0.25
@@ -1516,8 +1516,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -1552,15 +1552,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.159754827600911,
-					"y": 0.59094216345442196
+					"x": 0.1350406384758886,
+					"y": 0.30984367802536839
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.67376834154129028
 			},
 			"tick": 16,
 			"time": 0.26666666666666666
@@ -1608,8 +1608,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -1644,15 +1644,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.1527531840522495,
-					"y": 0.61386642273258918
+					"x": 0.12746138804900214,
+					"y": 0.29245348455882053
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.68289786577224731
 			},
 			"tick": 17,
 			"time": 0.28333333333333333
@@ -1700,8 +1700,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -1736,15 +1736,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.14569979934808619,
-					"y": 0.6355178542288521
+					"x": 0.12030752836139091,
+					"y": 0.27603932788195734
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.68996036052703857
 			},
 			"tick": 18,
 			"time": 0.29999999999999999
@@ -1792,8 +1792,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": -2.7284841053187846e-13,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -1828,15 +1828,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.1386981982117679,
-					"y": 0.65596235032317007
+					"x": 0.11355518405983883,
+					"y": 0.26054642724626864
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.69542384147644043
 			},
 			"tick": 19,
 			"time": 0.31666666666666665
@@ -1884,8 +1884,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 2.5579538487363607e-13,
 					"z": 0
 				},
 				"grounded": true,
@@ -1920,15 +1920,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.13182335149635308,
-					"y": 0.67526433180263656
+					"x": 0.1071818198120513,
+					"y": 0.2459230765111301
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.69965028762817383
 			},
 			"tick": 20,
 			"time": 0.33333333333333331
@@ -1976,8 +1976,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2012,15 +2012,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.12512840590967589,
-					"y": 0.69348593659992808
+					"x": 0.10116616509704487,
+					"y": 0.2321204715792746
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.70291978120803833
 			},
 			"tick": 21,
 			"time": 0.34999999999999998
@@ -2068,8 +2068,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2104,15 +2104,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.11864988808146065,
-					"y": 0.71068661278924938
+					"x": 0.095488143216726606,
+					"y": 0.21909254751758242
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.70544910430908203
 			},
 			"tick": 22,
 			"time": 0.36666666666666664
@@ -2160,8 +2160,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2196,15 +2196,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.11241172428446582,
-					"y": 0.72692294923349865
+					"x": 0.090128804291746689,
+					"y": 0.20679582481957198
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.70740562677383423
 			},
 			"tick": 23,
 			"time": 0.3833333333333333
@@ -2252,8 +2252,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2288,15 +2288,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.10642832839968169,
-					"y": 0.74224864442967375
+					"x": 0.085070262018007686,
+					"y": 0.19518926429651928
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.7089192271232605
 			},
 			"tick": 24,
 			"time": 0.40000000000000002
@@ -2344,8 +2344,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2380,15 +2380,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.10070699145848426,
-					"y": 0.75671455395247911
+					"x": 0.080295633972758546,
+					"y": 0.18423413011291431
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71009010076522827
 			},
 			"tick": 25,
 			"time": 0.41666666666666669
@@ -2436,8 +2436,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2472,15 +2472,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.095249704426205617,
-					"y": 0.77036878140452436
+					"x": 0.075788985271050796,
+					"y": 0.17389386050914848
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71099597215652466
 			},
 			"tick": 26,
 			"time": 0.43333333333333335
@@ -2528,8 +2528,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2564,15 +2564,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.090054568907959487,
-					"y": 0.78325679175572838
+					"x": 0.071535275384515665,
+					"y": 0.1641339457799818
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.7116965651512146
 			},
 			"tick": 27,
 			"time": 0.45000000000000001
@@ -2620,8 +2620,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2656,15 +2656,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.085116867278693345,
-					"y": 0.7954215348701239
+					"x": 0.067520307944974586,
+					"y": 0.15492181310155401
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71223866939544678
 			},
 			"tick": 28,
 			"time": 0.46666666666666667
@@ -2712,8 +2712,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2748,15 +2748,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.080429882256616292,
-					"y": 0.8069035719523322
+					"x": 0.063730683365357185,
+					"y": 0.14622671782256041
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71265792846679688
 			},
 			"tick": 29,
 			"time": 0.48333333333333334
@@ -2804,8 +2804,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2840,15 +2840,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.075985521043560891,
-					"y": 0.81774120080484669
+					"x": 0.06015375411980349,
+					"y": 0.13801964085678664
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71298235654830933
 			},
 			"tick": 30,
 			"time": 0.5
@@ -2896,8 +2896,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -2932,15 +2932,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.071774792348715227,
-					"y": 0.82797057758832537
+					"x": 0.056777582533701666,
+					"y": 0.13027319183455921
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71323329210281372
 			},
 			"tick": 31,
 			"time": 0.51666666666666661
@@ -2988,8 +2988,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 5.1159076974727213e-13,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3024,15 +3024,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.067788163227316595,
-					"y": 0.83762583387172862
+					"x": 0.053590900942788559,
+					"y": 0.12296151768988985
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71342742443084717
 			},
 			"tick": 32,
 			"time": 0.53333333333333333
@@ -3080,8 +3080,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": -5.1159076974727213e-13,
 					"z": 0
 				},
 				"grounded": true,
@@ -3116,15 +3116,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.064015824896179643,
-					"y": 0.84673918837889062
+					"x": 0.050583074088351568,
+					"y": 0.11606021637822352
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71357768774032593
 			},
 			"tick": 33,
 			"time": 0.55000000000000004
@@ -3172,8 +3172,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3208,15 +3208,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.060447895053549056,
-					"y": 0.85534105321703413
+					"x": 0.047744063623025454,
+					"y": 0.10954625543685662
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71369379758834839
 			},
 			"tick": 34,
 			"time": 0.56666666666666665
@@ -3264,8 +3264,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3300,15 +3300,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.057074556529291401,
-					"y": 0.86346013460223958
+					"x": 0.045064394608718174,
+					"y": 0.10339789511618282
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.7137836217880249
 			},
 			"tick": 35,
 			"time": 0.58333333333333337
@@ -3356,8 +3356,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": -5.1159076974727213e-13,
 					"z": 0
 				},
 				"grounded": true,
@@ -3392,15 +3392,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.053886169469646042,
-					"y": 0.87112352819589089
+					"x": 0.04253512389487505,
+					"y": 0.097594615825270556
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71385312080383301
 			},
 			"tick": 36,
 			"time": 0.59999999999999998
@@ -3448,8 +3448,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 5.1159076974727213e-13,
 					"z": 0
 				},
 				"grounded": true,
@@ -3484,15 +3484,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.050873343594551014,
-					"y": 0.87835680925729531
+					"x": 0.040147810271537028,
+					"y": 0.092117049649608207
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71390694379806519
 			},
 			"tick": 37,
 			"time": 0.6166666666666667
@@ -3540,8 +3540,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3576,15 +3576,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.048026995189171758,
-					"y": 0.88518411783141637
+					"x": 0.037894486297558379,
+					"y": 0.086946915712445477
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71394848823547363
 			},
 			"tick": 38,
 			"time": 0.6333333333333333
@@ -3632,8 +3632,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3668,15 +3668,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0453383747392158,
-					"y": 0.89162823921602063
+					"x": 0.035767631710013653,
+					"y": 0.082066959164049297
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71398067474365234
 			},
 			"tick": 39,
 			"time": 0.65000000000000002
@@ -3724,8 +3724,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3760,15 +3760,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.042799085541623851,
-					"y": 0.8977106799457697
+					"x": 0.033760148326000758,
+					"y": 0.077460893595213492
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71400552988052368
 			},
 			"tick": 40,
 			"time": 0.66666666666666663
@@ -3816,8 +3816,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3852,15 +3852,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.04040110127073069,
-					"y": 0.90345173953178759
+					"x": 0.031865336353105074,
+					"y": 0.073113346682856781
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71402484178543091
 			},
 			"tick": 41,
 			"time": 0.68333333333333335
@@ -3908,8 +3908,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -3944,15 +3944,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.038136767611338662,
-					"y": 0.90887057818849959
+					"x": 0.030076872029454273,
+					"y": 0.069009808886298735
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71403974294662476
 			},
 			"tick": 42,
 			"time": 0.69999999999999996
@@ -4000,8 +4000,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4036,15 +4036,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.03599879632654629,
-					"y": 0.91398528076658303
+					"x": 0.028388786518740747,
+					"y": 0.06513658502299316
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71405118703842163
 			},
 			"tick": 43,
 			"time": 0.71666666666666667
@@ -4092,8 +4092,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4128,15 +4128,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.033980259658524969,
-					"y": 0.91881291710174007
+					"x": 0.026795445989775669,
+					"y": 0.06148074856210739
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71406018733978271
 			},
 			"tick": 44,
 			"time": 0.73333333333333328
@@ -4184,8 +4184,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4220,15 +4220,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.03207458130676176,
-					"y": 0.92336959897911597
+					"x": 0.025291532814092025,
+					"y": 0.058030098483406435
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71406698226928711
 			},
 			"tick": 45,
 			"time": 0.75
@@ -4276,8 +4276,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4312,15 +4312,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.030275524175860352,
-					"y": 0.92767053390219367
+					"x": 0.023872027818845381,
+					"y": 0.054773118557462495
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71407246589660645
 			},
 			"tick": 46,
 			"time": 0.76666666666666661
@@ -4368,8 +4368,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4404,15 +4404,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.028577178811005296,
-					"y": 0.93173007584477718
+					"x": 0.022532193535782993,
+					"y": 0.051698938911291216
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71407651901245117
 			},
 			"tick": 47,
 			"time": 0.78333333333333333
@@ -4460,8 +4460,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4496,15 +4496,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.026973952482493926,
-					"y": 0.93556177315506628
+					"x": 0.021267558390376272,
+					"y": 0.048797299751143552
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71407967805862427
 			},
 			"tick": 48,
 			"time": 0.80000000000000004
@@ -4552,8 +4552,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4588,15 +4588,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.025460551409317533,
-					"y": 0.9391784137715159
+					"x": 0.020073901778349272,
+					"y": 0.04605851712138135
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408224105834961
 			},
 			"tick": 49,
 			"time": 0.81666666666666665
@@ -4644,8 +4644,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4680,15 +4680,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.02403197145404563,
-					"y": 0.94259206790100902
+					"x": 0.018947239979797453,
+					"y": 0.043473450585159987
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 50,
 			"time": 0.83333333333333337
@@ -4736,8 +4736,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4772,15 +4772,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.022683571549446172,
-					"y": 0.94581412830130918
+					"x": 0.017883812863886409,
+					"y": 0.041033472719055386
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 51,
 			"time": 0.84999999999999998
@@ -4828,8 +4828,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4864,15 +4864,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.021410851534011142,
-					"y": 0.94885534830467366
+					"x": 0.01688007133975869,
+					"y": 0.038730440319826441
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 52,
 			"time": 0.8666666666666667
@@ -4920,8 +4920,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -4956,15 +4956,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.020209563820949412,
-					"y": 0.95172587770505435
+					"x": 0.015932665511767263,
+					"y": 0.036556667227218044
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 53,
 			"time": 0.8833333333333333
@@ -5012,8 +5012,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5048,15 +5048,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.019075699222253821,
-					"y": 0.95443529663210813
+					"x": 0.015038433499504802,
+					"y": 0.034504898672103358
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 54,
 			"time": 0.90000000000000002
@@ -5104,8 +5104,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5140,15 +5140,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.018005473568402448,
-					"y": 0.95699264752400404
+					"x": 0.014194390885316656,
+					"y": 0.032568287064354572
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 55,
 			"time": 0.91666666666666663
@@ -5196,8 +5196,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5232,15 +5232,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.016995315079038498,
-					"y": 0.95940646530573503
+					"x": 0.013397720754079544,
+					"y": 0.030740369139636348
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 56,
 			"time": 0.93333333333333335
@@ -5288,8 +5288,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5324,15 +5324,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.016041852442479642,
-					"y": 0.96168480587365035
+					"x": 0.012645764292004657,
+					"y": 0.029015044388851521
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 57,
 			"time": 0.94999999999999996
@@ -5380,8 +5380,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5416,15 +5416,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.015141903564273234,
-					"y": 0.96383527298127358
+					"x": 0.011936011913089512,
+					"y": 0.027386554698249254
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 58,
 			"time": 0.96666666666666667
@@ -5472,8 +5472,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": -1.0231815394945443e-12,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5508,15 +5508,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.014292464947246758,
-					"y": 0.96586504361613557
+					"x": 0.011266094883606925,
+					"y": 0.025849465132242906
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 59,
 			"time": 0.98333333333333328
@@ -5564,8 +5564,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 1.0231815394945443e-12,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5600,15 +5600,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.013490701667610376,
-					"y": 0.96778089195231487
+					"x": 0.010633777416658476,
+					"y": 0.024398645794825251
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 60,
 			"time": 1
@@ -5656,8 +5656,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5692,15 +5692,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.012733937913657746,
-					"y": 0.96958921195862457
+					"x": 0.010036949210466198,
+					"y": 0.023029254708978906
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 61,
 			"time": 1.0166666666666666
@@ -5748,8 +5748,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5784,15 +5784,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.012019648055488878,
-					"y": 0.97129603873789938
+					"x": 0.0094736184054089751,
+					"y": 0.021736721657048243
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 62,
 			"time": 1.0333333333333332
@@ -5840,8 +5840,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5876,15 +5876,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.011345448215951058,
-					"y": 0.97290706866859988
+					"x": 0.0089419049363840507,
+					"y": 0.020516732928042708
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 63,
 			"time": 1.05
@@ -5932,8 +5932,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -5968,15 +5968,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.010709088314666612,
-					"y": 0.97442767841595568
+					"x": 0.0084400342582594962,
+					"y": 0.019365216921022731
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 64,
 			"time": 1.0666666666666667
@@ -6024,8 +6024,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6060,15 +6060,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.010108444558595185,
-					"y": 0.97586294287609388
+					"x": 0.0079663314234919361,
+					"y": 0.01827833055650353
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 65,
 			"time": 1.0833333333333333
@@ -6116,8 +6116,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6152,15 +6152,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0095415123540684727,
-					"y": 0.97721765211304168
+					"x": 0.0075192154921421232,
+					"y": 0.017252446450528373
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 66,
 			"time": 1.1000000000000001
@@ -6208,8 +6208,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6244,15 +6244,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0090063996166419684,
-					"y": 0.97849632734512748
+					"x": 0.0070971942556323072,
+					"y": 0.016284140808605994
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 67,
 			"time": 1.1166666666666667
@@ -6300,8 +6300,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6336,15 +6336,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0085013204564359721,
-					"y": 0.9797032360341339
+					"x": 0.0066988592566364184,
+					"y": 0.015370181999109228
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 68,
 			"time": 1.1333333333333333
@@ -6392,8 +6392,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6428,15 +6428,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0080245892178912488,
-					"y": 0.98084240612756202
+					"x": 0.0063228810884823983,
+					"y": 0.014507519767999655
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 69,
 			"time": 1.1499999999999999
@@ -6484,8 +6484,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6520,15 +6520,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.007574614854047583,
-					"y": 0.98191763950153765
+					"x": 0.0059680049583788726,
+					"y": 0.013693275058883386
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 70,
 			"time": 1.1666666666666667
@@ -6576,8 +6576,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6612,15 +6612,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0071498956165698888,
-					"y": 0.98293252464922609
+					"x": 0.0056330464996588343,
+					"y": 0.012924730404423341
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 71,
 			"time": 1.1833333333333333
@@ -6668,8 +6668,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6704,15 +6704,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0067490140438003221,
-					"y": 0.98389044865710007
+					"x": 0.0053168878190640772,
+					"y": 0.012199320857040249
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 72,
 			"time": 1.2
@@ -6760,8 +6760,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6796,15 +6796,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0063706322301094803,
-					"y": 0.98479460850903144
+					"x": 0.0050184737658785688,
+					"y": 0.011514625428634405
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 73,
 			"time": 1.2166666666666666
@@ -6852,8 +6852,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6888,15 +6888,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0060134873607585789,
-					"y": 0.98564802175593291
+					"x": 0.0047368084104593179,
+					"y": 0.010868359010759037
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 74,
 			"time": 1.2333333333333334
@@ -6944,8 +6944,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -6980,15 +6980,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0056763874973706149,
-					"y": 0.98645353658655843
+					"x": 0.0044709517204121708,
+					"y": 0.010258364748279609
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 75,
 			"time": 1.25
@@ -7036,8 +7036,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7072,15 +7072,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0053582075999449178,
-					"y": 0.98721384133307311
+					"x": 0.0042200164233195617,
+					"y": 0.0096826068410668289
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 76,
 			"time": 1.2666666666666666
@@ -7128,8 +7128,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7164,15 +7164,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0050578857721389151,
-					"y": 0.98793147344311605
+					"x": 0.0039831650455498732,
+					"y": 0.0091391637496996865
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 77,
 			"time": 1.2833333333333332
@@ -7220,8 +7220,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7256,15 +7256,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0047744197172860919,
-					"y": 0.98860882794830041
+					"x": 0.0037596071172656892,
+					"y": 0.0086262217825031646
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 78,
 			"time": 1.3
@@ -7312,8 +7312,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7348,15 +7348,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.004506863393322424,
-					"y": 0.98924816545741223
+					"x": 0.0035485965343029233,
+					"y": 0.0081420690425179493
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "VelocityDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.71409070491790771
+				"targetYaw": 0.71408408880233765
 			},
 			"tick": 79,
 			"time": 1.3166666666666667
@@ -7404,8 +7404,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7440,15 +7440,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0041938289001030834,
-					"y": 0.9898515875421513
+					"x": 0.0033494290681163243,
+					"y": 0.0076850897142007064
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.75043302774429321
+				"targetYaw": 0.73091250658035278
 			},
 			"tick": 80,
 			"time": 1.3333333333333333
@@ -7496,8 +7496,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7532,15 +7532,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0038428499376331384,
-					"y": 0.99042105525682755
+					"x": 0.0031614400154810372,
+					"y": 0.0072537586707873084
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.78423845767974854
+				"targetYaw": 0.74766182899475098
 			},
 			"tick": 81,
 			"time": 1.3500000000000001
@@ -7588,8 +7588,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7624,15 +7624,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0034606226211884553,
-					"y": 0.9909584331415171
+					"x": 0.0029840019801063091,
+					"y": 0.006846636384321576
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.8157837986946106
+				"targetYaw": 0.75560915470123291
 			},
 			"tick": 82,
 			"time": 1.3666666666666667
@@ -7680,8 +7680,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7716,15 +7716,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0030530935763545164,
-					"y": 0.99146549210405044
+					"x": 0.00281652277875768,
+					"y": 0.0064623641213622223
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.84531569480895996
+				"targetYaw": 0.75768858194351196
 			},
 			"tick": 83,
 			"time": 1.3833333333333333
@@ -7772,8 +7772,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7808,15 +7808,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0026255318860501811,
-					"y": 0.99194391256857273
+					"x": 0.0026584434648995329,
+					"y": 0.006099659408334109
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.87305372953414917
+				"targetYaw": 0.75971430540084839
 			},
 			"tick": 84,
 			"time": 1.3999999999999999
@@ -7864,8 +7864,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7900,15 +7900,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.002182593267545334,
-					"y": 0.99239528779941888
+					"x": 0.0025092364632620895,
+					"y": 0.005757311751389842
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.89919370412826538
+				"targetYaw": 0.76169091463088989
 			},
 			"tick": 85,
 			"time": 1.4166666666666667
@@ -7956,8 +7956,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -7992,15 +7992,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0017283806509081991,
-					"y": 0.99282112734798611
+					"x": 0.0023684038091071409,
+					"y": 0.0054341785964971308
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.92390984296798706
+				"targetYaw": 0.7636224627494812
 			},
 			"tick": 86,
 			"time": 1.4333333333333333
@@ -8048,8 +8048,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8084,15 +8084,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.0012665013597624034,
-					"y": 0.99322286057439924
+					"x": 0.002235475486316221,
+					"y": 0.005129181516269077
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.94735759496688843
+				"targetYaw": 0.76551240682601929
 			},
 			"tick": 87,
 			"time": 1.45
@@ -8140,8 +8140,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8176,15 +8176,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.00080011361083793826,
-					"y": 0.99360184015058628
+					"x": 0.0021100078587547471,
+					"y": 0.0048413026108112822
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.96967530250549316
+				"targetYaw": 0.76736444234848022
 			},
 			"tick": 88,
 			"time": 1.4666666666666666
@@ -8232,8 +8232,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8268,15 +8268,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": 0.00033197414144244621,
-					"y": 0.99395934557581556
+					"x": 0.0019915821896769447,
+					"y": 0.0045695811105739333
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.99098622798919678
+				"targetYaw": 0.76918172836303711
 			},
 			"tick": 89,
 			"time": 1.4833333333333334
@@ -8324,8 +8324,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8360,15 +8360,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.00013552057231425266,
-					"y": 0.9942965866307647
+					"x": 0.0018798032442302109,
+					"y": 0.0043131101698711928
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.0114002227783203
+				"targetYaw": 0.77096676826477051
 			},
 			"tick": 90,
 			"time": 1.5
@@ -8416,8 +8416,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8452,15 +8452,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.00060029541038577293,
-					"y": 0.9946147067724761
+					"x": 0.0017742979703948959,
+					"y": 0.0040710338403665645
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.031015157699585
+				"targetYaw": 0.77272260189056396
 			},
 			"tick": 91,
 			"time": 1.5166666666666666
@@ -8508,8 +8508,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8544,15 +8544,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0010605673604387506,
-					"y": 0.99491478638936204
+					"x": 0.0016747142539572666,
+					"y": 0.0038425442144235065
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.0499181747436523
+				"targetYaw": 0.77445131540298462
 			},
 			"tick": 92,
 			"time": 1.5333333333333332
@@ -8600,8 +8600,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8636,15 +8636,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0015148141743852271,
-					"y": 0.99519784599471095
+					"x": 0.0015807197433604821,
+					"y": 0.0036268787287874957
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.0681869983673096
+				"targetYaw": 0.77615547180175781
 			},
 			"tick": 93,
 			"time": 1.55
@@ -8692,8 +8692,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8728,15 +8728,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.00196174478419545,
-					"y": 0.9954648493230277
+					"x": 0.0014920007405116328,
+					"y": 0.003423317619600825
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.0858907699584961
+				"targetYaw": 0.77783674001693726
 			},
 			"tick": 94,
 			"time": 1.5666666666666667
@@ -8784,8 +8784,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8820,15 +8820,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0024002713783174002,
-					"y": 0.99571670632335763
+					"x": 0.0014082611538430109,
+					"y": 0.0032311815202564773
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.1030911207199097
+				"targetYaw": 0.77949720621109009
 			},
 			"tick": 95,
 			"time": 1.5833333333333333
@@ -8876,8 +8876,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -8912,15 +8912,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.002829494255356951,
-					"y": 0.99595427593279329
+					"x": 0.0013292215101335506,
+					"y": 0.0030498291940741318
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.1198431253433228
+				"targetYaw": 0.78113865852355957
 			},
 			"tick": 96,
 			"time": 1.6000000000000001
@@ -8968,8 +8968,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9004,15 +9004,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0032486763181541261,
-					"y": 0.99617836884784106
+					"x": 0.0012546180217924822,
+					"y": 0.0028786553942313207
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.1361955404281616
+				"targetYaw": 0.78276246786117554
 			},
 			"tick": 97,
 			"time": 1.6166666666666667
@@ -9060,8 +9060,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9096,15 +9096,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0036572264728229431,
-					"y": 0.99638975010836983
+					"x": 0.0011842017064923442,
+					"y": 0.002717088843807447
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.1521919965744019
+				"targetYaw": 0.78437024354934692
 			},
 			"tick": 98,
 			"time": 1.6333333333333333
@@ -9152,8 +9152,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9188,15 +9188,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0040546802231122628,
-					"y": 0.99658914160858747
+					"x": 0.0011177375562132093,
+					"y": 0.0025645903291992463
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.167871356010437
+				"targetYaw": 0.78596311807632446
 			},
 			"tick": 99,
 			"time": 1.6499999999999999
@@ -9244,8 +9244,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9280,15 +9280,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0044406850906933805,
-					"y": 0.99677722445764827
+					"x": 0.001055003752924886,
+					"y": 0.0024206509005446426
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.1832681894302368
+				"targetYaw": 0.78754252195358276
 			},
 			"tick": 100,
 			"time": 1.6666666666666667
@@ -9336,8 +9336,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9372,15 +9372,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0048149905904602726,
-					"y": 0.9969546411897845
+					"x": 0.00099579092828950438,
+					"y": 0.002284790173149075
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.1984133720397949
+				"targetYaw": 0.78910952806472778
 			},
 			"tick": 101,
 			"time": 1.6833333333333333
@@ -9428,8 +9428,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9464,15 +9464,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0051774312954698211,
-					"y": 0.99712199795196632
+					"x": 0.00093990146491381495,
+					"y": 0.002156554724245462
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.213334321975708
+				"targetYaw": 0.79066509008407593
 			},
 			"tick": 102,
 			"time": 1.7
@@ -9520,8 +9520,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9556,15 +9556,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.005527922062198154,
-					"y": 0.99727986646160294
+					"x": 0.00088714883681919004,
+					"y": 0.0020355165797371344
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.228055477142334
+				"targetYaw": 0.79221004247665405
 			},
 			"tick": 103,
 			"time": 1.7166666666666666
@@ -9612,8 +9612,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9648,15 +9648,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0058664423142133319,
-					"y": 0.9974287859939035
+					"x": 0.00083735698692820912,
+					"y": 0.0019212717858733839
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.2425987720489502
+				"targetYaw": 0.79374551773071289
 			},
 			"tick": 104,
 			"time": 1.7333333333333334
@@ -9704,8 +9704,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9740,15 +9740,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0061930324177042768,
-					"y": 0.9975692651428234
+					"x": 0.000790359739490245,
+					"y": 0.0018134390610907197
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.2569835186004639
+				"targetYaw": 0.7952721118927002
 			},
 			"tick": 105,
 			"time": 1.75
@@ -9796,8 +9796,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9832,15 +9832,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0065077790508860887,
-					"y": 0.99770178362251571
+					"x": 0.00074600024548507641,
+					"y": 0.0017116585235204794
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.2712268829345703
+				"targetYaw": 0.79679059982299805
 			},
 			"tick": 106,
 			"time": 1.7666666666666666
@@ -9888,8 +9888,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -9924,15 +9924,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0068108126042698445,
-					"y": 0.99782679384655837
+					"x": 0.00070413045915361061,
+					"y": 0.0016155904899159673
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.2853444814682007
+				"targetYaw": 0.79830163717269897
 			},
 			"tick": 107,
 			"time": 1.7833333333333332
@@ -9980,8 +9980,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10016,15 +10016,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0071023009903591642,
-					"y": 0.99794472246823951
+					"x": 0.00066461064390868608,
+					"y": 0.0015249143419906474
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.2993500232696533
+				"targetYaw": 0.79980587959289551
 			},
 			"tick": 108,
 			"time": 1.8
@@ -10072,8 +10072,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10108,15 +10108,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0073824438008416107,
-					"y": 0.99805597184047945
+					"x": 0.0006273089059769775,
+					"y": 0.0014393274563839007
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.3132555484771729
+				"targetYaw": 0.80130380392074585
 			},
 			"tick": 109,
 			"time": 1.8166666666666667
@@ -10164,8 +10164,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10200,15 +10200,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0076514630552472459,
-					"y": 0.99816092144457791
+					"x": 0.00059210075421557565,
+					"y": 0.0013585441946832024
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.3270721435546875
+				"targetYaw": 0.8027961254119873
 			},
 			"tick": 110,
 			"time": 1.8333333333333333
@@ -10256,8 +10256,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10292,15 +10292,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0079096056784520846,
-					"y": 0.99825992910738326
+					"x": 0.00055886868463416979,
+					"y": 0.001282294950132013
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.3408094644546509
+				"targetYaw": 0.8042830228805542
 			},
 			"tick": 111,
 			"time": 1.8499999999999999
@@ -10348,8 +10348,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10384,15 +10384,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0081571346296043876,
-					"y": 0.99835333228935297
+					"x": 0.00052750178823621392,
+					"y": 0.0012103252478418561
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.3544760942459106
+				"targetYaw": 0.80576509237289429
 			},
 			"tick": 112,
 			"time": 1.8666666666666667
@@ -10440,8 +10440,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10476,15 +10476,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0083943242655078812,
-					"y": 0.99844144925880829
+					"x": 0.00049789538087028197,
+					"y": 0.001142394895505624
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.3680797815322876
+				"targetYaw": 0.807242751121521
 			},
 			"tick": 113,
 			"time": 1.8833333333333333
@@ -10532,8 +10532,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10568,15 +10568,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0086214634372807838,
-					"y": 0.9985245801101601
+					"x": 0.00046995065385627523,
+					"y": 0.0010782771817776939
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.3816275596618652
+				"targetYaw": 0.80871641635894775
 			},
 			"tick": 114,
 			"time": 1.8999999999999999
@@ -10624,8 +10624,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10660,15 +10660,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0088388472037068035,
-					"y": 0.99860300786549561
+					"x": 0.00044357434422047831,
+					"y": 0.0010177581196455217
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.3951252698898315
+				"targetYaw": 0.81018620729446411
 			},
 			"tick": 115,
 			"time": 1.9166666666666667
@@ -10716,8 +10716,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10752,15 +10752,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0090467764827201393,
-					"y": 0.99867699942389931
+					"x": 0.00041867842343890397,
+					"y": 0.00096063573226753409
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.4085785150527954
+				"targetYaw": 0.8116525411605835
 			},
 			"tick": 116,
 			"time": 1.9333333333333333
@@ -10808,8 +10808,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10844,15 +10844,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.009245557722462534,
-					"y": 0.99874680645852254
+					"x": 0.00039517980365013532,
+					"y": 0.00090671937889387098
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.4219921827316284
+				"targetYaw": 0.81311577558517456
 			},
 			"tick": 117,
 			"time": 1.95
@@ -10900,8 +10900,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -10936,15 +10936,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0094354951178198219,
-					"y": 0.99881266635863419
+					"x": 0.00037300006035717852,
+					"y": 0.00085582911862029686
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.4353704452514648
+				"targetYaw": 0.81457620859146118
 			},
 			"tick": 118,
 			"time": 1.9666666666666666
@@ -10992,8 +10992,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11028,15 +11028,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0096168944733226666,
-					"y": 0.99887480297905806
+					"x": 0.00035206517069286765,
+					"y": 0.00080779510985187037
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.4487172365188599
+				"targetYaw": 0.81603384017944336
 			},
 			"tick": 119,
 			"time": 1.9833333333333334
@@ -11084,8 +11084,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11120,15 +11120,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0097900631127440154,
-					"y": 0.99893342739490287
+					"x": 0.00033230526637530763,
+					"y": 0.00076245704347213574
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.4620361328125
+				"targetYaw": 0.81748920679092407
 			},
 			"tick": 120,
 			"time": 2
@@ -11176,8 +11176,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11212,15 +11212,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.0099553023207944163,
-					"y": 0.99898873870970606
+					"x": 0.00031365440052886562,
+					"y": 0.00071966360782609073
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.4753299951553345
+				"targetYaw": 0.81894218921661377
 			},
 			"tick": 121,
 			"time": 2.0166666666666666
@@ -11268,8 +11268,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11304,15 +11304,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.010112907682033158,
-					"y": 0.99904092472447004
+					"x": 0.00029605032759249779,
+					"y": 0.00067927198373135978
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.4886015653610229
+				"targetYaw": 0.82039326429367065
 			},
 			"tick": 122,
 			"time": 2.0333333333333332
@@ -11360,8 +11360,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11396,15 +11396,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.010263173137250319,
-					"y": 0.99909016252166427
+					"x": 0.00027943429558087521,
+					"y": 0.00064114736783221944
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.501853346824646
+				"targetYaw": 0.82184237241744995
 			},
 			"tick": 123,
 			"time": 2.0499999999999998
@@ -11452,8 +11452,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11488,15 +11488,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.010406387339203595,
-					"y": 0.99913661911204998
+					"x": 0.0002637508500049998,
+					"y": 0.00060516252270571239
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.5150874853134155
+				"targetYaw": 0.82328969240188599
 			},
 			"tick": 124,
 			"time": 2.0666666666666664
@@ -11544,8 +11544,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11580,15 +11580,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.01054283394938813,
-					"y": 0.99918045199799288
+					"x": 0.00024894764879791287,
+					"y": 0.00057119735221837118
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.5283060073852539
+				"targetYaw": 0.82473558187484741
 			},
 			"tick": 125,
 			"time": 2.0833333333333335
@@ -11636,8 +11636,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11672,15 +11672,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.010672788181667243,
-					"y": 0.99922180975344388
+					"x": 0.00023497528762782808,
+					"y": 0.00053913850071634359
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.5415103435516357
+				"targetYaw": 0.8261798620223999
 			},
 			"tick": 126,
 			"time": 2.1000000000000001
@@ -11728,8 +11728,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11764,15 +11764,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.010796517276385994,
-					"y": 0.99926083252381748
+					"x": 0.00022178713501568704,
+					"y": 0.0005088789747112524
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.5547022819519043
+				"targetYaw": 0.82762289047241211
 			},
 			"tick": 127,
 			"time": 2.1166666666666667
@@ -11820,8 +11820,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11856,15 +11856,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.010914280947876706,
-					"y": 0.99929765249794889
+					"x": 0.00020933917670685757,
+					"y": 0.00048031778579920166
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.5678831338882446
+				"targetYaw": 0.82906466722488403
 			},
 			"tick": 128,
 			"time": 2.1333333333333333
@@ -11912,8 +11912,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -11948,15 +11948,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.01102633554333227,
-					"y": 0.99933239430544163
+					"x": 0.00019758986877757966,
+					"y": 0.00045335961362120384
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.5810540914535522
+				"targetYaw": 0.83050543069839478
 			},
 			"tick": 129,
 			"time": 2.1499999999999999
@@ -12004,8 +12004,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": -2.0463630789890885e-12,
 					"z": 0
 				},
 				"grounded": true,
@@ -12040,15 +12040,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.011132926758810745,
-					"y": 0.99936517553645254
+					"x": 0.00018649999897904954,
+					"y": 0.00042791448773408212
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.5942161083221436
+				"targetYaw": 0.83194506168365479
 			},
 			"tick": 130,
 			"time": 2.1666666666666665
@@ -12096,8 +12096,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12132,15 +12132,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.011234293973512704,
-					"y": 0.99939610708790705
+					"x": 0.00017603255589799011,
+					"y": 0.00040389748736712573
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6073702573776245
+				"targetYaw": 0.83338373899459839
 			},
 			"tick": 131,
 			"time": 2.1833333333333331
@@ -12188,8 +12188,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12224,15 +12224,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.011330666867829662,
-					"y": 0.99942529358689358
+					"x": 0.00016615260539202463,
+					"y": 0.00038122845796904393
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6205174922943115
+				"targetYaw": 0.83482152223587036
 			},
 			"tick": 132,
 			"time": 2.2000000000000002
@@ -12280,8 +12280,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12316,15 +12316,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.011422269704171874,
-					"y": 0.99945283369371374
+					"x": 0.00015682717402885281,
+					"y": 0.0003598317437249903
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6336585283279419
+				"targetYaw": 0.83625853061676025
 			},
 			"tick": 133,
 			"time": 2.2166666666666668
@@ -12372,8 +12372,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12408,15 +12408,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.011509317894569517,
-					"y": 0.9994788204847268
+					"x": 0.00014802513903315921,
+					"y": 0.00033963593505572157
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6467938423156738
+				"targetYaw": 0.83769482374191284
 			},
 			"tick": 134,
 			"time": 2.2333333333333334
@@ -12464,8 +12464,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12500,15 +12500,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.01159201849740254,
-					"y": 0.99950334176544275
+					"x": 0.00013971712441719367,
+					"y": 0.00032057363029465013
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6599242687225342
+				"targetYaw": 0.83913052082061768
 			},
 			"tick": 135,
 			"time": 2.25
@@ -12556,8 +12556,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12592,15 +12592,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.011751726223282783,
-					"y": 0.99952536724741659
+					"x": 0.00013187540294109566,
+					"y": 0.0003025812107409386
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6730504035949707
+				"targetYaw": 0.84169602394104004
 			},
 			"tick": 136,
 			"time": 2.2666666666666666
@@ -12648,8 +12648,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12684,15 +12684,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.012158752132999356,
-					"y": 0.99954187072073519
+					"x": 0.00012447380357576395,
+					"y": 0.00028559862833789736
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6861724853515625
+				"targetYaw": 0.84669452905654907
 			},
 			"tick": 137,
 			"time": 2.2833333333333332
@@ -12740,8 +12740,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12776,15 +12776,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.012959425264682547,
-					"y": 0.99954798517443821
+					"x": 0.00011748762415943783,
+					"y": 0.00026956920526808058
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.6992912292480469
+				"targetYaw": 0.85392570495605469
 			},
 			"tick": 138,
 			"time": 2.2999999999999998
@@ -12832,8 +12832,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12868,15 +12868,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.014278574404281721,
-					"y": 0.99953603163938054
+					"x": 0.00011089354895648855,
+					"y": 0.00025443944479624792
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.7124067544937134
+				"targetYaw": 0.86320573091506958
 			},
 			"tick": 139,
 			"time": 2.3166666666666664
@@ -12924,8 +12924,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -12960,15 +12960,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.016221731308921933,
-					"y": 0.99949492760570047
+					"x": 0.00010466957084328162,
+					"y": 0.00024015885272889745
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.7255194187164307
+				"targetYaw": 0.87436622381210327
 			},
 			"tick": 140,
 			"time": 2.3333333333333335
@@ -13016,8 +13016,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13052,15 +13052,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.018877084591042665,
-					"y": 0.99940988812011267
+					"x": 9.8794917861411933e-05,
+					"y": 0.00022667976889450742
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.7386296987533569
+				"targetYaw": 0.88725221157073975
 			},
 			"tick": 141,
 			"time": 2.3500000000000001
@@ -13108,8 +13108,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13144,15 +13144,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.022317227283373285,
-					"y": 0.99926234864614349
+					"x": 9.3249983893190094e-05,
+					"y": 0.00021395720808206739
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.7517375946044922
+				"targetYaw": 0.9017217755317688
 			},
 			"tick": 142,
 			"time": 2.3666666666666667
@@ -13200,8 +13200,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13236,15 +13236,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.02660069249614876,
-					"y": 0.99903005531237432
+					"x": 8.8016263228015589e-05,
+					"y": 0.00020194870990704591
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.7648435831069946
+				"targetYaw": 0.91764461994171143
 			},
 			"tick": 143,
 			"time": 2.3833333333333333
@@ -13292,8 +13292,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13328,15 +13328,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.031773321447457953,
-					"y": 0.99868727720353767
+					"x": 8.3076288801258138e-05,
+					"y": 0.00019061419710373568
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.7779477834701538
+				"targetYaw": 0.93490117788314819
 			},
 			"tick": 144,
 			"time": 2.3999999999999999
@@ -13384,8 +13384,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13420,15 +13420,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.037869483418022647,
-					"y": 0.99820510516030891
+					"x": 7.8413573899525026e-05,
+					"y": 0.00017991584177104032
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.7910504341125488
+				"targetYaw": 0.95338159799575806
 			},
 			"tick": 145,
 			"time": 2.4166666666666665
@@ -13476,8 +13476,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13512,15 +13512,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.044913158363639058,
-					"y": 0.99755181025642969
+					"x": 7.4012557137761255e-05,
+					"y": 0.00016981793912530994
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.8041517734527588
+				"targetYaw": 0.97298520803451538
 			},
 			"tick": 146,
 			"time": 2.4333333333333331
@@ -13568,8 +13568,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13604,15 +13604,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.052918906585732534,
-					"y": 0.99669323957432254
+					"x": 6.9858550524548333e-05,
+					"y": 0.00016028678833888727
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.8172519207000732
+				"targetYaw": 0.99361968040466309
 			},
 			"tick": 147,
 			"time": 2.4500000000000002
@@ -13660,8 +13660,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13696,15 +13696,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.061892740274769063,
-					"y": 0.99559323223417184
+					"x": 6.5937690442274726e-05,
+					"y": 0.00015129058006667384
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.8303507566452026
+				"targetYaw": 1.0152000188827515
 			},
 			"tick": 148,
 			"time": 2.4666666666666668
@@ -13752,8 +13752,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13788,15 +13788,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.071832913734954956,
-					"y": 0.99421404159237758
+					"x": 6.2236891378578431e-05,
+					"y": 0.00014279929028534645
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.8434487581253052
+				"targetYaw": 1.0376485586166382
 			},
 			"tick": 149,
 			"time": 2.4833333333333334
@@ -13844,8 +13844,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13880,15 +13880,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.082730632770213891,
-					"y": 0.99251675589086552
+					"x": 5.874380225464482e-05,
+					"y": 0.00013478458009092196
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.8565459251403809
+				"targetYaw": 1.0608936548233032
 			},
 			"tick": 150,
 			"time": 2.5
@@ -13936,8 +13936,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -13972,15 +13972,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.094570708490449129,
-					"y": 0.99046170631808517
+					"x": 5.5446765204609343e-05,
+					"y": 0.00012721970112025393
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.8696422576904297
+				"targetYaw": 1.0848698616027832
 			},
 			"tick": 151,
 			"time": 2.5166666666666666
@@ -14028,8 +14028,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14064,15 +14064,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.10733214958313253,
-					"y": 0.98800886022921997
+					"x": 5.2334776668495133e-05,
+					"y": 0.00012007940628081405
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.8827378749847412
+				"targetYaw": 1.109516978263855
 			},
 			"tick": 152,
 			"time": 2.5333333333333332
@@ -14120,8 +14120,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14156,15 +14156,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.12098870868310072,
-					"y": 0.98511819350359375
+					"x": 4.9397450668836723e-05,
+					"y": 0.00011333986549082708
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.895832896232605
+				"targetYaw": 1.1347799301147461
 			},
 			"tick": 153,
 			"time": 2.5499999999999998
@@ -14212,8 +14212,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14248,15 +14248,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.13550938619825617,
-					"y": 0.98175003992255316
+					"x": 4.6624984148429003e-05,
+					"y": 0.0001069785861485498
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.908927321434021
+				"targetYaw": 1.1606078147888184
 			},
 			"tick": 154,
 			"time": 2.5666666666666664
@@ -14304,8 +14304,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14340,15 +14340,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.15085890815677647,
-					"y": 0.97786541073544808
+					"x": 4.4008124253519287e-05,
+					"y": 0.00010097433806526724
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.9220212697982788
+				"targetYaw": 1.1869543790817261
 			},
 			"tick": 155,
 			"time": 2.5833333333333335
@@ -14396,8 +14396,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14432,15 +14432,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.1670016984104995,
-					"y": 0.97342456551823742
+					"x": 4.1538137453253133e-05,
+					"y": 9.5307082611477298e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.935114860534668
+				"targetYaw": 1.2138317823410034
 			},
 			"tick": 156,
 			"time": 2.6000000000000001
@@ -14488,8 +14488,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14524,15 +14524,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.18390414831029012,
-					"y": 0.96838569580657186
+					"x": 3.9206780392312922e-05,
+					"y": 8.9957905839795202e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.9482080936431885
+				"targetYaw": 1.2412923574447632
 			},
 			"tick": 157,
 			"time": 2.6166666666666667
@@ -14580,8 +14580,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14616,15 +14616,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.20153243246567404,
-					"y": 0.96270561327057669
+					"x": 3.7006272379472483e-05,
+					"y": 8.4908955361381863e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.9613008499145508
+				"targetYaw": 1.2693620920181274
 			},
 			"tick": 158,
 			"time": 2.6333333333333333
@@ -14672,8 +14672,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14708,15 +14708,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.2198507786790278,
-					"y": 0.95634055191156986
+					"x": 3.492926942025089e-05,
+					"y": 8.0143380765226933e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 1.974393367767334
+				"targetYaw": 1.2980453968048096
 			},
 			"tick": 159,
 			"time": 2.6499999999999999
@@ -14764,8 +14764,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14800,15 +14800,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.24059912847686055,
-					"y": 0.94800071910225392
+					"x": 3.296883970700174e-05,
+					"y": 7.5645277381441273e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.025568962097168
+				"targetYaw": 1.4644551277160645
 			},
 			"tick": 160,
 			"time": 2.6666666666666665
@@ -14856,8 +14856,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14892,15 +14892,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.26446063537980208,
-					"y": 0.93667344420387089
+					"x": 3.1118440484638316e-05,
+					"y": 7.1399633200874084e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.072589635848999
+				"targetYaw": 1.5532054901123047
 			},
 			"tick": 161,
 			"time": 2.6833333333333331
@@ -14948,8 +14948,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -14984,15 +14984,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.29144173412281149,
-					"y": 0.92152973215092682
+					"x": 2.9371896214786188e-05,
+					"y": 6.7392278773903682e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.1159083843231201
+				"targetYaw": 1.6547044515609741
 			},
 			"tick": 162,
 			"time": 2.7000000000000002
@@ -15040,8 +15040,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15076,15 +15076,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.32048473854927745,
-					"y": 0.90280671708402305
+					"x": 2.7723377965487988e-05,
+					"y": 6.360983992119372e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.1559290885925293
+				"targetYaw": 1.7465345859527588
 			},
 			"tick": 163,
 			"time": 2.7166666666666668
@@ -15132,8 +15132,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15168,15 +15168,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.35073171649880958,
-					"y": 0.88083337639872517
+					"x": 2.6167383957675467e-05,
+					"y": 6.0039693098591363e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.1930115222930908
+				"targetYaw": 1.8297529220581055
 			},
 			"tick": 164,
 			"time": 2.7333333333333334
@@ -15224,8 +15224,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15260,15 +15260,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.3814990191656803,
-					"y": 0.8559856796260461
+					"x": 2.4698721203484438e-05,
+					"y": 5.6669923267201822e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.2274763584136963
+				"targetYaw": 1.9053018093109131
 			},
 			"tick": 165,
 			"time": 2.75
@@ -15316,8 +15316,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15352,15 +15352,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.41225114459370615,
-					"y": 0.82865540987797726
+					"x": 2.3312488175132137e-05,
+					"y": 5.348928412803445e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.2596089839935303
+				"targetYaw": 1.9740197658538818
 			},
 			"tick": 166,
 			"time": 2.7666666666666666
@@ -15408,8 +15408,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15444,15 +15444,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.44257609081728083,
-					"y": 0.79922928467292187
+					"x": 2.2004058446516007e-05,
+					"y": 5.0487160588507186e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.2896642684936523
+				"targetYaw": 2.036653995513916
 			},
 			"tick": 167,
 			"time": 2.7833333333333332
@@ -15500,8 +15500,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15536,15 +15536,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.47216325602412257,
-					"y": 0.76807561493356535
+					"x": 2.0769065252939181e-05,
+					"y": 4.7653533335544727e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.317868709564209
+				"targetYaw": 2.093869686126709
 			},
 			"tick": 168,
 			"time": 2.7999999999999998
@@ -15592,8 +15592,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15628,15 +15628,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.50078425446022823,
-					"y": 0.7355363827994188
+					"x": 1.9603386917432211e-05,
+					"y": 4.4978945397036394e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.3444240093231201
+				"targetYaw": 2.1462595462799072
 			},
 			"tick": 169,
 			"time": 2.8166666666666664
@@ -15684,8 +15684,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15720,15 +15720,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.52827664463228241,
-					"y": 0.70192310239526357
+					"x": 1.8503133095032688e-05,
+					"y": 4.2454470580055578e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.3695101737976074
+				"targetYaw": 2.1943514347076416
 			},
 			"tick": 170,
 			"time": 2.8333333333333335
@@ -15776,8 +15776,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15812,15 +15812,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.55453035347698632,
-					"y": 0.66751527624275064
+					"x": 1.7464631789114298e-05,
+					"y": 4.0071683680506248e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.3932874202728271
+				"targetYaw": 2.2386147975921631
 			},
 			"tick": 171,
 			"time": 2.8500000000000001
@@ -15868,8 +15868,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15904,15 +15904,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.57947649487388353,
-					"y": 0.63256054845257093
+					"x": 1.6484417096433519e-05,
+					"y": 3.7822632364773878e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.4158987998962402
+				"targetYaw": 2.2794692516326904
 			},
 			"tick": 172,
 			"time": 2.8666666666666667
@@ -15960,8 +15960,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -15996,15 +15996,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.60307824638073426,
-					"y": 0.59727600763314304
+					"x": 1.5559217639994146e-05,
+					"y": 3.5699810629538475e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.4374711513519287
+				"targetYaw": 2.3172869682312012
 			},
 			"tick": 173,
 			"time": 2.8833333333333333
@@ -16052,8 +16052,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16088,15 +16088,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.62532347298956981,
-					"y": 0.56185006141345673
+					"x": 1.4685945651125396e-05,
+					"y": 3.3696133751174142e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.458118200302124
+				"targetYaw": 2.3524003028869629
 			},
 			"tick": 174,
 			"time": 2.8999999999999999
@@ -16144,8 +16144,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16180,15 +16180,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.64621879782091052,
-					"y": 0.5264447351857372
+					"x": 1.3861686664336041e-05,
+					"y": 3.1804914641131133e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.4779410362243652
+				"targetYaw": 2.3851053714752197
 			},
 			"tick": 175,
 			"time": 2.9166666666666665
@@ -16236,8 +16236,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16272,15 +16272,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.66578486754770649,
-					"y": 0.49119806442153313
+					"x": 1.3083689790552051e-05,
+					"y": 3.0019841528388696e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.4970290660858154
+				"targetYaw": 2.4156651496887207
 			},
 			"tick": 176,
 			"time": 2.9333333333333331
@@ -16328,8 +16328,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16364,15 +16364,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.68405259585222089,
-					"y": 0.45622653903248545
+					"x": 1.2349358536275603e-05,
+					"y": 2.8334956894495847e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.5154626369476318
+				"targetYaw": 2.4443140029907227
 			},
 			"tick": 177,
 			"time": 2.9500000000000002
@@ -16420,8 +16420,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16456,15 +16456,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.70106019534529951,
-					"y": 0.42162742631968109
+					"x": 1.1656242138025213e-05,
+					"y": 2.6744637590897752e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.5333132743835449
+				"targetYaw": 2.471261739730835
 			},
 			"tick": 178,
 			"time": 2.9666666666666668
@@ -16512,8 +16512,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16548,15 +16548,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.71685085099018342,
-					"y": 0.3874809900191617
+					"x": 1.1002027383136495e-05,
+					"y": 2.5243576072191084e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.5506446361541748
+				"targetYaw": 2.4966936111450195
 			},
 			"tick": 179,
 			"time": 2.9833333333333334
@@ -16604,8 +16604,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16640,15 +16640,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.7314709035169058,
-					"y": 0.35385252619153185
+					"x": 1.0384530889626191e-05,
+					"y": 2.3826762682676073e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.5675129890441895
+				"targetYaw": 2.5207750797271729
 			},
 			"tick": 180,
 			"time": 3
@@ -16696,8 +16696,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16732,15 +16732,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.74496844376949622,
-					"y": 0.32079423188026801
+					"x": 9.8016918193542586e-06,
+					"y": 2.2489468937088228e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.5839693546295166
+				"targetYaw": 2.5436553955078125
 			},
 			"tick": 181,
 			"time": 3.0166666666666666
@@ -16788,8 +16788,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16824,15 +16824,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.75739224345409428,
-					"y": 0.28834693232954994
+					"x": 9.2515650001648281e-06,
+					"y": 2.1227231739710712e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.6000585556030273
+				"targetYaw": 2.5654644966125488
 			},
 			"tick": 182,
 			"time": 3.0333333333333332
@@ -16880,8 +16880,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -16916,15 +16916,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.76879093454455238,
-					"y": 0.25654158328497606
+					"x": 8.7323144340518213e-06,
+					"y": 2.0035838489200077e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.6158201694488525
+				"targetYaw": 2.5863204002380371
 			},
 			"tick": 183,
 			"time": 3.0499999999999998
@@ -16972,8 +16972,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17008,15 +17008,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.77921240463070807,
-					"y": 0.22540065020898414
+					"x": 8.2422071696833164e-06,
+					"y": 1.8911313019414092e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.6312904357910156
+				"targetYaw": 2.6063268184661865
 			},
 			"tick": 184,
 			"time": 3.0666666666666664
@@ -17064,8 +17064,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17100,15 +17100,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.78870334666796638,
-					"y": 0.19493930490025085
+					"x": 7.7796075188347836e-06,
+					"y": 1.7849902329320459e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.6465010643005371
+				"targetYaw": 2.6255769729614258
 			},
 			"tick": 185,
 			"time": 3.0833333333333335
@@ -17156,8 +17156,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17192,15 +17192,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.79730894699713162,
-					"y": 0.16516651589664064
+					"x": 7.3429715974290536e-06,
+					"y": 1.6848064057698696e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.6614804267883301
+				"targetYaw": 2.6441531181335449
 			},
 			"tick": 186,
 			"time": 3.1000000000000001
@@ -17248,8 +17248,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17284,15 +17284,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.80507266281085377,
-					"y": 0.13608597801771685
+					"x": 6.9308421729642368e-06,
+					"y": 1.590245466083315e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.6762537956237793
+				"targetYaw": 2.6621291637420654
 			},
 			"tick": 187,
 			"time": 3.1166666666666667
@@ -17340,8 +17340,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17376,15 +17376,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.81203608305095798,
-					"y": 0.10769694494200062
+					"x": 6.5418438011333659e-06,
+					"y": 1.5009918253741277e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.6908433437347412
+				"targetYaw": 2.6795706748962402
 			},
 			"tick": 188,
 			"time": 3.1333333333333333
@@ -17432,8 +17432,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17468,15 +17468,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.81823885396462415,
-					"y": 0.079994968537567629
+					"x": 6.1746782354046652e-06,
+					"y": 1.416747607769579e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.7052693367004395
+				"targetYaw": 2.6965365409851074
 			},
 			"tick": 189,
 			"time": 3.1499999999999999
@@ -17524,8 +17524,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17560,15 +17560,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.82371864154693009,
-					"y": 0.052972521950422236
+					"x": 5.8281200942423416e-06,
+					"y": 1.3372316558889516e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.7195494174957275
+				"targetYaw": 2.713078498840332
 			},
 			"tick": 190,
 			"time": 3.1666666666666665
@@ -17616,8 +17616,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17652,15 +17652,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.82851114672515691,
-					"y": 0.026619581928225451
+					"x": 5.5010127715076457e-06,
+					"y": 1.2621785925064642e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.7336997985839844
+				"targetYaw": 2.7292430400848389
 			},
 			"tick": 191,
 			"time": 3.1833333333333331
@@ -17708,8 +17708,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17744,15 +17744,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.83265012022848994,
-					"y": 0.00092407673808602223
+					"x": 5.1922645763915398e-06,
+					"y": 1.1913379348790223e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.747734546661377
+				"targetYaw": 2.7450711727142334
 			},
 			"tick": 192,
 			"time": 3.2000000000000002
@@ -17800,8 +17800,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17836,15 +17836,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.836167417230398,
-					"y": -0.024127682605538464
+					"x": 4.9008450899963421e-06,
+					"y": 1.1244732587829442e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.7616660594940186
+				"targetYaw": 2.7606000900268555
 			},
 			"tick": 193,
 			"time": 3.2166666666666668
@@ -17892,8 +17892,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -17928,15 +17928,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.83909306026771346,
-					"y": -0.048550641512845494
+					"x": 4.6257817264067857e-06,
+					"y": 1.0613614094697114e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.7755057811737061
+				"targetYaw": 2.7758622169494629
 			},
 			"tick": 194,
 			"time": 3.2333333333333334
@@ -17984,8 +17984,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18020,15 +18020,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84145531070173929,
-					"y": -0.072360693138827259
+					"x": 4.3661564867733687e-06,
+					"y": 1.0017917569073798e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.7892639636993408
+				"targetYaw": 2.7908868789672852
 			},
 			"tick": 195,
 			"time": 3.25
@@ -18076,8 +18076,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18112,15 +18112,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84328075103184763,
-					"y": -0.095574405194668435
+					"x": 4.1211028955750518e-06,
+					"y": 9.45565492822089e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8029489517211914
+				"targetYaw": 2.8056995868682861
 			},
 			"tick": 196,
 			"time": 3.2666666666666666
@@ -18168,8 +18168,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18204,15 +18204,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84459435969427576,
-					"y": -0.11820880602814314
+					"x": 3.8898031088363564e-06,
+					"y": 8.924949671936091e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8165690898895264
+				"targetYaw": 2.8203244209289551
 			},
 			"tick": 197,
 			"time": 3.2833333333333332
@@ -18260,8 +18260,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18296,15 +18296,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84541960455002907,
-					"y": -0.14028117372784296
+					"x": 3.6714851846478078e-06,
+					"y": 8.4240306199053973e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8301315307617188
+				"targetYaw": 2.8347809314727783
 			},
 			"tick": 198,
 			"time": 3.2999999999999998
@@ -18352,8 +18352,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18388,15 +18388,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84577851492298195,
-					"y": -0.16180889276155977
+					"x": 3.4654205068803243e-06,
+					"y": 7.9512260005505906e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8436424732208252
+				"targetYaw": 2.8490877151489258
 			},
 			"tick": 199,
 			"time": 3.3166666666666664
@@ -18444,8 +18444,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18480,15 +18480,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84569176812502278,
-					"y": -0.18280930888960961
+					"x": 3.2709213534954454e-06,
+					"y": 7.5049578716443137e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8571071624755859
+				"targetYaw": 2.8632619380950928
 			},
 			"tick": 200,
 			"time": 3.3333333333333335
@@ -18536,8 +18536,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18572,15 +18572,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84517877369194727,
-					"y": -0.2032996083880976
+					"x": 3.0873386013358513e-06,
+					"y": 7.0837368540720271e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8705313205718994
+				"targetYaw": 2.8773176670074463
 			},
 			"tick": 201,
 			"time": 3.3500000000000001
@@ -18628,8 +18628,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18664,15 +18664,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.844257745420254,
-					"y": -0.22329673215881099
+					"x": 2.9140595597361196e-06,
+					"y": 6.6861571611652658e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8839187622070312
+				"targetYaw": 2.8912672996520996
 			},
 			"tick": 202,
 			"time": 3.3666666666666667
@@ -18720,8 +18720,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18756,15 +18756,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84294577638885282,
-					"y": -0.24281729703445262
+					"x": 2.750505925723599e-06,
+					"y": 6.3108919070170486e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.8972737789154053
+				"targetYaw": 2.9051227569580078
 			},
 			"tick": 203,
 			"time": 3.3833333333333333
@@ -18812,8 +18812,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18848,15 +18848,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.84125891642748274,
-					"y": -0.2618775240444598
+					"x": 2.5961318539850644e-06,
+					"y": 5.9566886781213738e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.910599946975708
+				"targetYaw": 2.9188954830169678
 			},
 			"tick": 204,
 			"time": 3.3999999999999999
@@ -18904,8 +18904,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -18940,15 +18940,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.83921223381716825,
-					"y": -0.28049319747437551
+					"x": 2.4504221351578457e-06,
+					"y": 5.6223653535575448e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.9239006042480469
+				"targetYaw": 2.9325928688049316
 			},
 			"tick": 205,
 			"time": 3.4166666666666665
@@ -18996,8 +18996,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19032,15 +19032,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.83681988694670606,
-					"y": -0.29867961596079101
+					"x": 2.3128904763656426e-06,
+					"y": 5.3068061597695851e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.9371778964996338
+				"targetYaw": 2.9462237358093262
 			},
 			"tick": 206,
 			"time": 3.4333333333333331
@@ -19088,8 +19088,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19124,15 +19124,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.83409518773992397,
-					"y": -0.31645156049152734
+					"x": 2.1830778782604736e-06,
+					"y": 5.0089579467739183e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.950434684753418
+				"targetYaw": 2.9597957134246826
 			},
 			"tick": 207,
 			"time": 3.4499999999999997
@@ -19180,8 +19180,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19216,15 +19216,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.83105064678492835,
-					"y": -0.33382328939819572
+					"x": 2.0605511031542794e-06,
+					"y": 4.7278266733674983e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.9636731147766113
+				"targetYaw": 2.9733150005340576
 			},
 			"tick": 208,
 			"time": 3.4666666666666668
@@ -19272,8 +19272,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19308,15 +19308,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.82769803719575819,
-					"y": -0.35080851128884788
+					"x": 1.9449012291277143e-06,
+					"y": 4.4624740896061008e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.9768955707550049
+				"targetYaw": 2.9867873191833496
 			},
 			"tick": 209,
 			"time": 3.4833333333333334
@@ -19364,8 +19364,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19400,15 +19400,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.8240484392491505,
-					"y": -0.36742038436731361
+					"x": 1.835742285290595e-06,
+					"y": 4.2120146054808403e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 2.9901034832000732
+				"targetYaw": 3.0002174377441406
 			},
 			"tick": 210,
 			"time": 3.5
@@ -19456,8 +19456,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19492,15 +19492,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.82011229435843203,
-					"y": -0.38367150538850525
+					"x": 1.7327099636393127e-06,
+					"y": 3.9756123353424131e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.0032987594604492
+				"targetYaw": 3.0136110782623291
 			},
 			"tick": 211,
 			"time": 3.5166666666666666
@@ -19548,8 +19548,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19584,15 +19584,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.8158994487447413,
-					"y": -0.39957391195635261
+					"x": 1.635460403212149e-06,
+					"y": 3.7524783082090983e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.0164825916290283
+				"targetYaw": 3.0269706249237061
 			},
 			"tick": 212,
 			"time": 3.5333333333333332
@@ -19640,8 +19640,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19676,15 +19676,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.81141918639187449,
-					"y": -0.41513909669156884
+					"x": 1.5436690424847276e-06,
+					"y": 3.5418678346481775e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.029655933380127
+				"targetYaw": 3.0403010845184326
 			},
 			"tick": 213,
 			"time": 3.5499999999999998
@@ -19732,8 +19732,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19768,15 +19768,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.80668028173367645,
-					"y": -0.43037799924441622
+					"x": 1.4570295361755747e-06,
+					"y": 3.3430780214429792e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.0428202152252197
+				"targetYaw": 3.0536055564880371
 			},
 			"tick": 214,
 			"time": 3.5666666666666664
@@ -19824,8 +19824,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19860,15 +19860,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.8016910310271057,
-					"y": -0.44530102199159272
+					"x": 1.3752527328467259e-06,
+					"y": 3.1554454257509754e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.0559766292572021
+				"targetYaw": 3.0668864250183105
 			},
 			"tick": 215,
 			"time": 3.5833333333333335
@@ -19916,8 +19916,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -19952,15 +19952,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.79645928291007473,
-					"y": -0.45991804531781066
+					"x": 1.2980657098872157e-06,
+					"y": 2.9783438409239001e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.0691256523132324
+				"targetYaw": 3.080146312713623
 			},
 			"tick": 216,
 			"time": 3.6000000000000001
@@ -20008,8 +20008,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20044,15 +20044,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.79099246815824298,
-					"y": -0.47423844253432984
+					"x": 1.2252108626587942e-06,
+					"y": 2.8111822066002617e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.0822679996490479
+				"targetYaw": 3.0933876037597656
 			},
 			"tick": 217,
 			"time": 3.6166666666666667
@@ -20100,8 +20100,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20136,15 +20136,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.78529763948045672,
-					"y": -0.48827108417682619
+					"x": 1.1564450447639786e-06,
+					"y": 2.6534026360953803e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.0954048633575439
+				"targetYaw": 3.106611967086792
 			},
 			"tick": 218,
 			"time": 3.6333333333333333
@@ -20192,8 +20192,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20228,15 +20228,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.77938148868812784,
-					"y": -0.50202436365836411
+					"x": 1.0915387565671623e-06,
+					"y": 2.5044785545055383e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.1085364818572998
+				"targetYaw": 3.1198220252990723
 			},
 			"tick": 219,
 			"time": 3.6499999999999999
@@ -20284,8 +20284,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20320,15 +20320,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.7732503741308705,
-					"y": -0.51550621133236429
+					"x": 1.0302753792605455e-06,
+					"y": 2.3639129413123415e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.1216635704040527
+				"targetYaw": 3.1330192089080811
 			},
 			"tick": 220,
 			"time": 3.6666666666666665
@@ -20376,8 +20376,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 4.0927261579781771e-12,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20412,15 +20412,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.76691035861065715,
-					"y": -0.52872409850259727
+					"x": 9.7245045183695426e-07,
+					"y": 2.2312366601370744e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 3.1347866058349609
+				"targetYaw": -3.1369810104370117
 			},
 			"tick": 221,
 			"time": 3.6833333333333331
@@ -20468,8 +20468,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20504,15 +20504,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.76036721251291217,
-					"y": -0.54168507174663905
+					"x": 9.1787098905155608e-07,
+					"y": 2.1060069396640917e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.1352791786193848
+				"targetYaw": -3.1238059997558594
 			},
 			"tick": 222,
 			"time": 3.6999999999999997
@@ -20560,8 +20560,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20596,15 +20596,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.75362643916711047,
-					"y": -0.55439576534245205
+					"x": 8.663548368464713e-07,
+					"y": 1.9878058249727913e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.1221628189086914
+				"targetYaw": -3.1106405258178711
 			},
 			"tick": 223,
 			"time": 3.7166666666666668
@@ -20652,8 +20652,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20688,15 +20688,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.74669328790136202,
-					"y": -0.56686242308405044
+					"x": 8.1773006476961098e-07,
+					"y": 1.8762388306403226e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.1090493202209473
+				"targetYaw": -3.0974831581115723
 			},
 			"tick": 224,
 			"time": 3.7333333333333334
@@ -20744,8 +20744,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20780,15 +20780,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.73957278990308739,
-					"y": -0.57909090026944698
+					"x": 7.7183439208594271e-07,
+					"y": 1.7709336120145184e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.095937967300415
+				"targetYaw": -3.0843331813812256
 			},
 			"tick": 225,
 			"time": 3.75
@@ -20836,8 +20836,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20872,15 +20872,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.73226976965492951,
-					"y": -0.59108668527458397
+					"x": 7.2851464618036081e-07,
+					"y": 1.6715387225476327e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.0828292369842529
+				"targetYaw": -3.0711898803710938
 			},
 			"tick": 226,
 			"time": 3.7666666666666666
@@ -20928,8 +20928,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -20964,15 +20964,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.72478885576859542,
-					"y": -0.6028549198762102
+					"x": 6.8762625135807611e-07,
+					"y": 1.5777224408755905e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.0697224140167236
+				"targetYaw": -3.0580525398254395
 			},
 			"tick": 227,
 			"time": 3.7833333333333332
@@ -21020,8 +21020,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21056,15 +21056,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.71713449125123852,
-					"y": -0.61440041839507997
+					"x": 6.490327463364409e-07,
+					"y": 1.4891716637282375e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.056617259979248
+				"targetYaw": -3.0449202060699463
 			},
 			"tick": 228,
 			"time": 3.7999999999999998
@@ -21112,8 +21112,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21148,15 +21148,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.70931094323703392,
-					"y": -0.62572768572684234
+					"x": 6.126053288178835e-07,
+					"y": 1.4055908609757777e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.0435140132904053
+				"targetYaw": -3.0317926406860352
 			},
 			"tick": 229,
 			"time": 3.8166666666666664
@@ -21204,8 +21204,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21240,15 +21240,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.70132232452725551,
-					"y": -0.63684092584951268
+					"x": 5.7822242562400616e-07,
+					"y": 1.3267010893239611e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.030411958694458
+				"targetYaw": -3.0186688899993896
 			},
 			"tick": 230,
 			"time": 3.8333333333333335
@@ -21296,8 +21296,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21332,15 +21332,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.69317261451516876,
-					"y": -0.64774405062946749
+					"x": 5.4576928695620755e-07,
+					"y": 1.2522390613663197e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.0173113346099854
+				"targetYaw": -3.0055489540100098
 			},
 			"tick": 231,
 			"time": 3.8500000000000001
@@ -21388,8 +21388,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21424,15 +21424,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.68486565443724834,
-					"y": -0.65844070522859599
+					"x": 5.1513760342871205e-07,
+					"y": 1.1819562668864994e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -3.0042121410369873
+				"targetYaw": -2.9924323558807373
 			},
 			"tick": 232,
 			"time": 3.8666666666666667
@@ -21480,8 +21480,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21516,15 +21516,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.67640515499914677,
-					"y": -0.66893428327044235
+					"x": 4.8622514459588847e-07,
+					"y": 1.1156181434781141e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -2.9911136627197266
+				"targetYaw": -2.9793188571929932
 			},
 			"tick": 233,
 			"time": 3.8833333333333333
@@ -21572,8 +21572,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21608,15 +21608,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.66779471633669896,
-					"y": -0.67922793331869735
+					"x": 4.5893541776747665e-07,
+					"y": 1.053003293714141e-06
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -2.9780161380767822
+				"targetYaw": -2.96620774269104
 			},
 			"tick": 234,
 			"time": 3.8999999999999999
@@ -21664,8 +21664,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21700,15 +21700,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.65903783454564679,
-					"y": -0.68932457346172371
+					"x": 4.331773459730477e-07,
+					"y": 9.9390274625323165e-07
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -2.9649195671081543
+				"targetYaw": -2.953099250793457
 			},
 			"tick": 235,
 			"time": 3.9166666666666665
@@ -21756,8 +21756,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21792,15 +21792,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.65013789490603457,
-					"y": -0.69922691255429914
+					"x": 4.088649640009351e-07,
+					"y": 9.3811925841695e-07
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -2.9518237113952637
+				"targetYaw": -2.9399921894073486
 			},
 			"tick": 236,
 			"time": 3.9333333333333331
@@ -21848,8 +21848,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21884,15 +21884,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.6410982041168336,
-					"y": -0.70893744748048604
+					"x": 3.859171314971936e-07,
+					"y": 8.8546665791035056e-07
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -2.9387285709381104
+				"targetYaw": -2.9268872737884521
 			},
 			"tick": 237,
 			"time": 3.9499999999999997
@@ -21940,8 +21940,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -21976,15 +21976,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.63192198229621688,
-					"y": -0.7184584836848833
+					"x": 3.6425726216707966e-07,
+					"y": 8.3576922148895046e-07
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -2.9256339073181152
+				"targetYaw": -2.9137842655181885
 			},
 			"tick": 238,
 			"time": 3.9666666666666668
@@ -22032,8 +22032,8 @@
 			{
 				"acceleration":
 				{
-					"x": 15.11378165579635,
-					"y": 13.098610768356837,
+					"x": 0,
+					"y": 0,
 					"z": 0
 				},
 				"grounded": true,
@@ -22068,15 +22068,15 @@
 				"gait": "Running",
 				"lean":
 				{
-					"x": -0.62261236817325183,
-					"y": -0.72779214673037806
+					"x": 3.4381306817528904e-07,
+					"y": 7.888610884984528e-07
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
 				"rotationMode": "Aiming",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -2.9125397205352783
+				"targetYaw": -2.9006822109222412
 			},
 			"tick": 239,
 			"time": 3.9833333333333334

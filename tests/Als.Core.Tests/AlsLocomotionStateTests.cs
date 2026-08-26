@@ -8,7 +8,7 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsLocomotionStateTests
 {
     [Fact]
-    public void AcceptedJumpEntersJumpStartAndInAirOnTheSameFrame()
+    public void AcceptedJumpKeepsJumpStartUntilVerticalVelocityIsDescending()
     {
         var state = InitializedGroundedState();
         var result = new AlsFrameResult();
@@ -23,6 +23,7 @@ public sealed class AlsLocomotionStateTests
         Assert.Equal(AlsLocomotionState.Grounded, state.PreviousLocomotionState);
         Assert.Equal(AlsLocomotionState.InAir, result.ResolvedLocomotionState);
         Assert.Equal(AlsAnimationState.JumpStart, result.AnimationState);
+        Assert.Equal((byte)1, state.JumpStartActive);
         Assert.Equal(0.375f, result.AnimationPhase);
 
         AlsLocomotionModel.Evaluate(
@@ -31,8 +32,18 @@ public sealed class AlsLocomotionStateTests
             ref result,
             P3TestSettings.Reference);
 
-        Assert.Equal(AlsAnimationState.FallLoop, result.AnimationState);
+        Assert.Equal(AlsAnimationState.JumpStart, result.AnimationState);
+        Assert.Equal((byte)1, state.JumpStartActive);
         Assert.Equal(AlsLocomotionState.InAir, state.PreviousLocomotionState);
+
+        AlsLocomotionModel.Evaluate(
+            P3TestInput.Airborne(new Vector3(0f, 0f, -2f), frameId: 3),
+            ref state,
+            ref result,
+            P3TestSettings.Reference);
+
+        Assert.Equal(AlsAnimationState.FallLoop, result.AnimationState);
+        Assert.Equal((byte)0, state.JumpStartActive);
     }
 
     [Fact]
@@ -49,6 +60,7 @@ public sealed class AlsLocomotionStateTests
 
         Assert.Equal(AlsLocomotionState.InAir, result.ResolvedLocomotionState);
         Assert.Equal(AlsAnimationState.FallLoop, result.AnimationState);
+        Assert.Equal((byte)0, state.JumpStartActive);
     }
 
     [Fact]
@@ -69,6 +81,7 @@ public sealed class AlsLocomotionStateTests
         AlsLocomotionModel.Evaluate(landing, ref state, ref result, P3TestSettings.Reference);
 
         Assert.Equal(AlsAnimationState.LandRecovery, result.AnimationState);
+        Assert.Equal((byte)0, state.JumpStartActive);
         Assert.Equal(0.1f, state.LandingRecoveryTime, 5);
         Assert.Equal(2f, state.GroundedEntrySpeed, 5);
         Assert.NotEqual(0f, result.AnimationPhase);
@@ -172,6 +185,10 @@ public sealed class AlsLocomotionStateTests
         AssertTransactionalFailure(valid, InitializedGroundedState() with
         {
             ActualGait = (AlsGait)byte.MaxValue,
+        });
+        AssertTransactionalFailure(valid, InitializedGroundedState() with
+        {
+            JumpStartActive = 2,
         });
     }
 

@@ -27,7 +27,8 @@ public sealed class AlsP3aHarnessContext
     public const int CoverageLookingDirection = 1 << 10;
     public const int CoverageVelocityDirection = 1 << 11;
     public const int CoverageAiming = 1 << 12;
-    public const int RequiredCoverage = (1 << 13) - 1;
+    public const int CoverageAppliedYaw = 1 << 13;
+    public const int RequiredCoverage = (1 << 14) - 1;
 
     private string? _failure;
 
@@ -98,6 +99,8 @@ public sealed class AlsP3aHarnessContext
 
     public int MeasurementCoverage;
 
+    public long RotationCommitMismatches;
+
     public long AffinityViolations;
 
     public string? Failure => Volatile.Read(ref _failure);
@@ -131,6 +134,10 @@ public sealed class AlsP3aHarnessEntry
     public int HasCommittedResult;
 
     public AlsLocomotionState PreviousCommittedLocomotionState;
+
+    public int HasAppliedYaw;
+
+    public float PreviousAppliedYaw;
 
     public int HasPublishedResult;
 

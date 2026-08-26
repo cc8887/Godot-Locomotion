@@ -44,7 +44,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000201165651,
 					"y": 0,
 					"z": 0
 				},
@@ -81,7 +81,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.036481703969819534
+					"y": 0.036481705872488668
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -136,7 +136,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000247980134,
 					"y": 0,
 					"z": 0
 				},
@@ -173,7 +173,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.070915846749855668
+					"y": 0.070915850579780088
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -228,7 +228,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000290893423,
 					"y": 0,
 					"z": 0
 				},
@@ -265,7 +265,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.10341734914614795
+					"y": 0.10341735491558599
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666667461395264,
@@ -320,7 +320,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000139495715,
 					"y": 0,
 					"z": 0
 				},
@@ -357,7 +357,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.1340946819539979
+					"y": 0.1340946891292279
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -412,7 +412,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000382184238,
 					"y": 0,
 					"z": 0
 				},
@@ -449,7 +449,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.16305022796933982
+					"y": 0.1630502371525139
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -504,7 +504,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000223178986,
 					"y": 0,
 					"z": 0
 				},
@@ -541,7 +541,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.19038062368196976
+					"y": 0.19038063431417659
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666667461395264,
@@ -596,7 +596,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.00000007742416,
 					"y": 0,
 					"z": 0
 				},
@@ -633,7 +633,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.21617708179100259
+					"y": 0.21617709338188462
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666667461395264,
@@ -688,7 +688,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000325285283,
 					"y": 0,
 					"z": 0
 				},
@@ -725,7 +725,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.24052569561892331
+					"y": 0.24052570881024316
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -780,7 +780,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000552491356,
 					"y": 0,
 					"z": 0
 				},
@@ -817,7 +817,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.26350772644018627
+					"y": 0.26350774177972325
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
@@ -872,7 +872,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.000000001890919,
 					"y": 0,
 					"z": 0
 				},
@@ -909,7 +909,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.28519987468329572
+					"y": 0.28519989050533789
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
@@ -964,7 +964,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 13.00000024986241,
 					"y": 0,
 					"z": 0
 				},
@@ -1001,7 +1001,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.30567453591147947
+					"y": 0.30567455288482454
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1056,7 +1056,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 3.2499881528742947,
 					"y": 0,
 					"z": 0
 				},
@@ -1093,7 +1093,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.32500004243626796
+					"y": 0.29763874756773129
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1148,7 +1148,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -1185,7 +1185,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.34324089137034197
+					"y": 0.28093356437235217
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1240,7 +1240,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": -1.1937117960769684e-13,
 					"y": 0,
 					"z": 0
 				},
@@ -1277,7 +1277,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.36045795988075457
+					"y": 0.26516597128535613
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1332,7 +1332,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 1.1937117960769684e-13,
 					"y": 0,
 					"z": 0
 				},
@@ -1369,7 +1369,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.37670870836091513
+					"y": 0.25028334540515418
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1424,7 +1424,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -1461,7 +1461,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.39204737219940339
+					"y": 0.23623601732736751
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1516,7 +1516,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -1553,7 +1553,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.40652514278562457
+					"y": 0.22297710537773172
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1608,7 +1608,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -1645,7 +1645,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.4201903383563953
+					"y": 0.21046235914878947
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1700,7 +1700,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -1737,7 +1737,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.43308856525364525
+					"y": 0.19865001181819827
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1792,7 +1792,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -1829,7 +1829,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.44526287013141724
+					"y": 0.18750064075577616
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1884,7 +1884,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -1921,7 +1921,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.45675388362014285
+					"y": 0.17697703595407463
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -1976,7 +1976,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2013,7 +2013,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.46759995592766002
+					"y": 0.16704407584337788
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2068,7 +2068,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2105,7 +2105,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.47783728482952847
+					"y": 0.15766861007667216
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2160,7 +2160,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2197,7 +2197,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.48750003647579904
+					"y": 0.1488193488933908
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2252,7 +2252,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2289,7 +2289,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.49662045941741839
+					"y": 0.14046675869269659
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2344,7 +2344,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2381,7 +2381,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.50522899223282225
+					"y": 0.13258296346778681
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2436,7 +2436,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2473,7 +2473,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.51335436511390997
+					"y": 0.12514165177226697
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2528,7 +2528,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2565,7 +2565,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.52102369575043594
+					"y": 0.11811798890810195
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2620,7 +2620,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2657,7 +2657,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.52826257983282177
+					"y": 0.11148853404207991
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2712,7 +2712,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -2749,7 +2749,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.53509517647543525
+					"y": 0.1052311619741727
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -2804,9 +2804,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": 242.19999948889017
 				},
 				"grounded": false,
 				"jumpTransition": true,
@@ -2841,7 +2841,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.54154428884542716
+					"y": 0.099324989296701888
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -2884,7 +2884,7 @@
 					"y": 0.17543928325176239
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2896,9 +2896,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -2923,7 +2923,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -2933,7 +2933,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.54763144026621913
+					"y": 0.093750304697873252
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -2976,7 +2976,7 @@
 					"y": 0.2048114687204361
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -2988,9 +2988,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3015,7 +3015,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3025,7 +3025,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.55337694604962917
+					"y": 0.088488503177074296
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3068,7 +3068,7 @@
 					"y": 0.2325277179479599
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3080,9 +3080,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3107,7 +3107,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3117,7 +3117,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.5587999812963691
+					"y": 0.083522023952384214
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3160,7 +3160,7 @@
 					"y": 0.25868138670921326
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3172,9 +3172,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3199,7 +3199,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3209,7 +3209,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.5639186448911917
+					"y": 0.078834291853068367
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3252,7 +3252,7 @@
 					"y": 0.28336057066917419
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3264,9 +3264,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3291,7 +3291,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3301,7 +3301,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.56875001990626528
+					"y": 0.07440966200146007
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3344,7 +3344,7 @@
 					"y": 0.30664840340614319
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3356,9 +3356,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3383,7 +3383,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3393,7 +3393,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.57331023061436626
+					"y": 0.070233367599610505
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3436,7 +3436,7 @@
 					"y": 0.32862332463264465
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3448,9 +3448,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3475,7 +3475,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3485,7 +3485,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.57761449630216699
+					"y": 0.066291470646449496
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3528,7 +3528,7 @@
 					"y": 0.34935933351516724
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3540,9 +3540,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3567,7 +3567,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3577,7 +3577,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.58167718206321473
+					"y": 0.062570815420980141
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3620,7 +3620,7 @@
 					"y": 0.3689262866973877
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3632,9 +3632,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3659,7 +3659,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3669,7 +3669,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.58551184674011869
+					"y": 0.0590589845762617
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3712,7 +3712,7 @@
 					"y": 0.38739010691642761
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3724,9 +3724,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3751,7 +3751,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3761,7 +3761,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.5891312881759494
+					"y": 0.055744257697648528
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3804,7 +3804,7 @@
 					"y": 0.40481299161911011
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3816,9 +3816,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3843,7 +3843,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3853,7 +3853,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.5925475859258702
+					"y": 0.052615572186976801
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3896,7 +3896,7 @@
 					"y": 0.42125362157821655
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -3908,9 +3908,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -3935,7 +3935,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -3945,7 +3945,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.59577214157154967
+					"y": 0.049662486342153707
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -3988,7 +3988,7 @@
 					"y": 0.4367673397064209
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4000,9 +4000,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4027,7 +4027,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4037,7 +4037,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.59881571677289869
+					"y": 0.04687514450893053
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4080,7 +4080,7 @@
 					"y": 0.45140644907951355
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4092,9 +4092,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4119,7 +4119,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4129,7 +4129,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.60168846918412744
+					"y": 0.044244244188556887
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4172,7 +4172,7 @@
 					"y": 0.46522024273872375
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4184,9 +4184,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4211,7 +4211,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4221,7 +4221,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.60439998635398817
+					"y": 0.041761004991540923
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4264,7 +4264,7 @@
 					"y": 0.47825524210929871
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4276,9 +4276,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4303,7 +4303,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4313,7 +4313,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.60695931772334377
+					"y": 0.039417139333901438
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4356,7 +4356,7 @@
 					"y": 0.49055534601211548
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4368,9 +4368,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4395,7 +4395,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4405,7 +4405,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.60937500482684981
+					"y": 0.037204824778113418
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4448,7 +4448,7 @@
 					"y": 0.50216197967529297
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4460,9 +4460,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4487,7 +4487,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4497,7 +4497,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.61165510979954607
+					"y": 0.035116677926437356
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4540,7 +4540,7 @@
 					"y": 0.51311427354812622
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4552,9 +4552,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4579,7 +4579,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4589,7 +4589,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.61380724228349592
+					"y": 0.033145729779503745
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4632,7 +4632,7 @@
 					"y": 0.5234491229057312
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4644,9 +4644,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4671,7 +4671,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4681,7 +4681,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.61583858482427178
+					"y": 0.031285402477914288
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4724,7 +4724,7 @@
 					"y": 0.53320127725601196
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4736,9 +4736,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4763,7 +4763,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4773,7 +4773,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.61775591684204434
+					"y": 0.029529487349237049
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4816,7 +4816,7 @@
 					"y": 0.54240363836288452
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4828,9 +4828,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4855,7 +4855,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4865,7 +4865,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.61956563725727865
+					"y": 0.027872124187129334
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -4908,7 +4908,7 @@
 					"y": 0.55108720064163208
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -4920,9 +4920,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -4947,7 +4947,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -4957,7 +4957,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.62127378584654613
+					"y": 0.026307781693434364
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5000,7 +5000,7 @@
 					"y": 0.55928122997283936
 				},
 				"locomotionState": "InAir",
-				"observedAnimationState": "FallLoop",
+				"observedAnimationState": "JumpStart",
 				"playRate": 1.6249998807907104,
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
@@ -5012,9 +5012,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5039,7 +5039,7 @@
 			"portExpected":
 			{
 				"animationPhase": 0.50952374935150146,
-				"animationState": "FallLoop",
+				"animationState": "JumpStart",
 				"blendCoordinates":
 				{
 					"x": 0,
@@ -5049,7 +5049,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.62288606339972774
+					"y": 0.024831239017978932
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5104,9 +5104,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": -1.7053025658242404e-14,
 					"y": 0,
-					"z": 0
+					"z": -9.8000007458031178
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5141,7 +5141,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6244078507458789
+					"y": 0.023437568334462873
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5196,9 +5196,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 3.4106051316484808e-14,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5233,7 +5233,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.62584422671125517
+					"y": 0.022122118394289028
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5288,9 +5288,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5325,7 +5325,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.62719998506943098
+					"y": 0.020880499003445543
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5380,9 +5380,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5417,7 +5417,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.62847965054008093
+					"y": 0.019708566370634985
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5472,9 +5472,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5509,7 +5509,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.62968749388981859
+					"y": 0.018602409277749005
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5564,9 +5564,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5601,7 +5601,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63082754618548964
+					"y": 0.017558336026535299
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5656,9 +5656,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5693,7 +5693,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63190361224748937
+					"y": 0.016572862117891905
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5748,9 +5748,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5785,7 +5785,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63291928334800329
+					"y": 0.01564269862266976
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5840,9 +5840,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5877,7 +5877,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63387794919654983
+					"y": 0.014764741205172101
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -5932,9 +5932,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -5969,7 +5969,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63478280925282649
+					"y": 0.013936059762717655
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6024,9 +6024,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6061,7 +6061,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63563688340461388
+					"y": 0.013153888646690591
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6116,9 +6116,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6153,7 +6153,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63644302204637559
+					"y": 0.012415617432440908
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6208,9 +6208,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6245,7 +6245,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63720391559218947
+					"y": 0.01171878220723062
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6300,9 +6300,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6337,7 +6337,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63792210345475853
+					"y": 0.011061057347150068
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6392,9 +6392,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6429,7 +6429,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63859998252046912
+					"y": 0.01044024775556056
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6484,9 +6484,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6521,7 +6521,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63923981514878025
+					"y": 0.0098542815371598577
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6576,9 +6576,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6613,7 +6613,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.63984373672264139
+					"y": 0.0093012030832208704
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6668,9 +6668,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6705,7 +6705,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6404137627751384
+					"y": 0.0087791665449261664
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6760,9 +6760,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6797,7 +6797,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64095179571615069
+					"y": 0.0082864296730161633
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6852,9 +6852,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6889,7 +6889,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64145963118147065
+					"y": 0.0078213480031913713
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -6944,9 +6944,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -6981,7 +6981,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64193896402557415
+					"y": 0.0073823693678630132
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -7036,9 +7036,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -7073,7 +7073,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64239139397804224
+					"y": 0.0069680287159354856
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -7128,9 +7128,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -7165,7 +7165,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64281843098251268
+					"y": 0.0065769432233321549
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -7220,9 +7220,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -7257,7 +7257,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64322150023597902
+					"y": 0.0062078076779463216
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -7312,9 +7312,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -7349,7 +7349,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64360194694525508
+					"y": 0.0058593901236150409
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -7404,9 +7404,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
-					"z": 0
+					"z": -9.8000005111098289
 				},
 				"grounded": false,
 				"jumpTransition": false,
@@ -7441,7 +7441,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64396104081648009
+					"y": 0.0055305277485779665
 				},
 				"locomotionState": "InAir",
 				"playRate": 1.071428656578064,
@@ -7496,9 +7496,9 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 6.4801497501321139e-13,
 					"y": 0,
-					"z": 0
+					"z": 247.80002630129457
 				},
 				"grounded": true,
 				"jumpTransition": false,
@@ -7533,7 +7533,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64429998029264679
+					"y": 0.0052201230047011389
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -7588,7 +7588,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 3.5811353882309048e-13,
 					"y": 0,
 					"z": 0
 				},
@@ -7625,7 +7625,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64461989655329544
+					"y": 0.0049271399445039712
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -7680,7 +7680,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -7717,7 +7717,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64492185728972218
+					"y": 0.0046506007637863176
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -7772,7 +7772,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -7809,7 +7809,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64520687026830137
+					"y": 0.0043895825382948891
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -7864,7 +7864,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -7901,7 +7901,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64547588669381373
+					"y": 0.0041432141435455913
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -7956,7 +7956,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -7993,7 +7993,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64572980438400518
+					"y": 0.0039106733475262005
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8048,7 +8048,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8085,7 +8085,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.645969470765972
+					"y": 0.003691184066572129
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8140,7 +8140,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8177,7 +8177,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64619568570437091
+					"y": 0.0034840137752580927
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8232,7 +8232,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8269,7 +8269,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64640920417089454
+					"y": 0.003288471061661415
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8324,7 +8324,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8361,7 +8361,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6466107387639205
+					"y": 0.0031039033198378952
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8416,7 +8416,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8453,7 +8453,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64680096208674309
+					"y": 0.0029296945718090854
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8508,7 +8508,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8545,7 +8545,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64698050899232584
+					"y": 0.0027652634117920536
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8600,7 +8600,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8637,7 +8637,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64714997870206492
+					"y": 0.0026100610658106949
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8692,7 +8692,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8729,7 +8729,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64730993680563575
+					"y": 0.0024635695602127148
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8784,7 +8784,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8821,7 +8821,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64746091714859721
+					"y": 0.0023252999929798809
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8876,7 +8876,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -8913,7 +8913,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64760342361405221
+					"y": 0.0021947909020621969
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -8968,7 +8968,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9005,7 +9005,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6477379318043115
+					"y": 0.002071606725290465
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9060,7 +9060,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9097,7 +9097,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64786489062817298
+					"y": 0.0019553363467273328
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9152,7 +9152,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9189,7 +9189,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64798472379911398
+					"y": 0.0018455917246054088
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9244,7 +9244,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9281,7 +9281,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64809783124939591
+					"y": 0.0017420065962733087
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9336,7 +9336,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9373,7 +9373,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64820459046480194
+					"y": 0.0016442352558275145
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9428,7 +9428,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9465,7 +9465,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6483053577444613
+					"y": 0.0015519514003505014
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9520,7 +9520,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9557,7 +9557,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64840046938996487
+					"y": 0.0014648470409045573
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9612,7 +9612,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9649,7 +9649,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64849024282774137
+					"y": 0.0013826314746468373
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9704,7 +9704,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9741,7 +9741,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64857497766843875
+					"y": 0.0013050303146351807
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9796,7 +9796,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9833,7 +9833,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64865495670684747
+					"y": 0.0012317845740867567
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9888,7 +9888,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -9925,7 +9925,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64873044686570225
+					"y": 0.001162649802033334
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -9980,7 +9980,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10017,7 +10017,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64880170008651239
+					"y": 0.0010973952674885052
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10072,7 +10072,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10109,7 +10109,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64886895417039359
+					"y": 0.0010358031894040958
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10164,7 +10164,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10201,7 +10201,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64893243357170727
+					"y": 0.00097766800984580983
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10256,7 +10256,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10293,7 +10293,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6489923501471565
+					"y": 0.00092279570796240204
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10348,7 +10348,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10385,7 +10385,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64904890386283864
+					"y": 0.00087100315245880954
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10440,7 +10440,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10477,7 +10477,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6491022834616138
+					"y": 0.00082211749041218355
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10532,7 +10532,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10569,7 +10569,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64915266709301667
+					"y": 0.00077597557039104921
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10624,7 +10624,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10661,7 +10661,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64920022290781465
+					"y": 0.00073242339795230637
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10716,7 +10716,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10753,7 +10753,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64924510961919546
+					"y": 0.00069131562169884309
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10808,7 +10808,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10845,7 +10845,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64928747703245804
+					"y": 0.00065251504818252502
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10900,7 +10900,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -10937,7 +10937,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64932746654497397
+					"y": 0.00061589218403359494
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -10992,7 +10992,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11029,7 +11029,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64936521161808836
+					"y": 0.00058132480378837986
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11084,7 +11084,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11121,7 +11121,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6494008382225348
+					"y": 0.00054869754197297118
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11176,7 +11176,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11213,7 +11213,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64943446525885118
+					"y": 0.00051790150808149395
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11268,7 +11268,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11305,7 +11305,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64946620495419949
+					"y": 0.00048883392316399028
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11360,7 +11360,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11397,7 +11397,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6494961632369135
+					"y": 0.00046139777681106274
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11452,7 +11452,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11489,7 +11489,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64952444009002519
+					"y": 0.00043550150339049457
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11544,7 +11544,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11581,7 +11581,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64955112988494879
+					"y": 0.00041105867645531641
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11636,7 +11636,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11673,7 +11673,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64957632169643675
+					"y": 0.00038798772030343464
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11728,7 +11728,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11765,7 +11765,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64960009959985876
+					"y": 0.00036621163772617723
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11820,7 +11820,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11857,7 +11857,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64962254295179545
+					"y": 0.00034565775303714341
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -11912,7 +11912,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -11949,7 +11949,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64964372665488368
+					"y": 0.000326257469523739
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12004,7 +12004,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12041,7 +12041,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64966372140779749
+					"y": 0.00030794604051191443
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12096,7 +12096,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12133,7 +12133,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64968259394119821
+					"y": 0.00029066235328005453
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12188,7 +12188,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12225,7 +12225,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64970040724044209
+					"y": 0.00027434872510085262
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12280,7 +12280,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12317,7 +12317,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64971722075578819
+					"y": 0.00025895071073047727
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12372,7 +12372,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12409,7 +12409,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64973309060080808
+					"y": 0.00024441692070254465
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12464,7 +12464,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12501,7 +12501,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64974806973965982
+					"y": 0.00023069884982046868
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12556,7 +12556,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12593,7 +12593,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.649762208163851
+					"y": 0.00021775071527579826
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12648,7 +12648,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12685,7 +12685,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64977555305908086
+					"y": 0.00020552930385227627
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12740,7 +12740,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12777,7 +12777,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64978814896271819
+					"y": 0.00019399382770567778
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12832,7 +12832,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12869,7 +12869,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64980003791244079
+					"y": 0.00018310578823810578
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -12924,7 +12924,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -12961,7 +12961,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6498112595865323
+					"y": 0.00017282884761243749
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13016,7 +13016,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13053,7 +13053,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64982185143630489
+					"y": 0.00016312870747811232
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13108,7 +13108,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13145,7 +13145,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64983184881108969
+					"y": 0.00015397299450352003
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13200,7 +13200,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13237,7 +13237,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64984128507621175
+					"y": 0.00014533115233296366
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13292,7 +13292,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13329,7 +13329,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.649850191724344
+					"y": 0.00013717433960761368
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13384,7 +13384,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13421,7 +13421,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.649858598480611
+					"y": 0.00012947533371010744
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13476,7 +13476,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13513,7 +13513,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64986653340179379
+					"y": 0.00012220843991155055
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13568,7 +13568,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13605,7 +13605,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64987402296996699
+					"y": 0.00011534940561770626
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13660,7 +13660,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13697,7 +13697,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64988109218088019
+					"y": 0.00010887533942817771
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13752,7 +13752,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13789,7 +13789,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64988776462737907
+					"y": 0.00010276463473845008
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13844,7 +13844,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13881,7 +13881,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64989406257814442
+					"y": 9.6996897629821863e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -13936,7 +13936,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -13973,7 +13973,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64990000705201145
+					"y": 9.1552878806564053e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14028,7 +14028,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14065,7 +14065,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64990561788811874
+					"y": 8.6414409353154065e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14120,7 +14120,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14157,7 +14157,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6499109138121193
+					"y": 8.1564340097179863e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14212,7 +14212,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14249,7 +14249,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64991591249867564
+					"y": 7.6986484375543579e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14304,7 +14304,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14341,7 +14341,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64992063063044758
+					"y": 7.2665564012952061e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14396,7 +14396,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14433,7 +14433,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64992508395376891
+					"y": 6.8587158332402432e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14488,7 +14488,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14525,7 +14525,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64992928733119937
+					"y": 6.4737656027489914e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14580,7 +14580,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14617,7 +14617,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64993325479112718
+					"y": 6.110420973591607e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14672,7 +14672,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14709,7 +14709,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6499369995745875
+					"y": 5.7674693162590684e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14764,7 +14764,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14801,7 +14801,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64994053417945297
+					"y": 5.4437660609229639e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14856,7 +14856,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14893,7 +14893,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64994387040214441
+					"y": 5.138230877538243e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -14948,7 +14948,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -14985,7 +14985,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64994701937700039
+					"y": 4.8498440703403758e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15040,7 +15040,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15077,7 +15077,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64994999161343681
+					"y": 4.5776431747038874e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15132,7 +15132,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15169,7 +15169,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64995279703102127
+					"y": 4.3207197450045892e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15224,7 +15224,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15261,7 +15261,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64995544499257862
+					"y": 4.0782163227652914e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15316,7 +15316,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15353,7 +15353,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64995794433543874
+					"y": 3.8493235749664642e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15408,7 +15408,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15445,7 +15445,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64996030340093014
+					"y": 3.6332775929712156e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15500,7 +15500,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15537,7 +15537,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64996253006221838
+					"y": 3.4293573430499968e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15592,7 +15592,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15629,7 +15629,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64996463175058206
+					"y": 3.2368822599963961e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15684,7 +15684,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15721,7 +15721,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64996661548021417
+					"y": 3.0552099758029286e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15776,7 +15776,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15813,7 +15813,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.6499684878716312
+					"y": 2.8837341758164922e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15868,7 +15868,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15905,7 +15905,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64997025517376839
+					"y": 2.7218825752185972e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -15960,7 +15960,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -15997,7 +15997,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64997192328483511
+					"y": 2.5691150090770624e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -16052,7 +16052,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -16089,7 +16089,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64997349777199975
+					"y": 2.4249216295948967e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -16144,7 +16144,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -16181,7 +16181,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64997498388996944
+					"y": 2.2888212045398498e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -16236,7 +16236,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -16273,7 +16273,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64997638659852708
+					"y": 2.1603595111757975e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -16328,7 +16328,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -16365,7 +16365,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64997771057908438
+					"y": 2.0391078203358511e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -16420,7 +16420,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -16457,7 +16457,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64997896025030544
+					"y": 1.9246614655779275e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -16512,7 +16512,7 @@
 			{
 				"acceleration":
 				{
-					"x": 12.999999523162842,
+					"x": 0,
 					"y": 0,
 					"z": 0
 				},
@@ -16549,7 +16549,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.64998013978285385
+					"y": 1.8166384926474638e-05
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.071428656578064,
@@ -16604,7 +16604,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -19.815430365712444,
 					"y": 0,
 					"z": 0
 				},
@@ -16641,7 +16641,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.61349954914349225
+					"y": -0.056108553689938008
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.0714285373687744,
@@ -16696,7 +16696,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -19.633354550832706,
 					"y": 0,
 					"z": 0
 				},
@@ -16733,7 +16733,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.57906645720746219
+					"y": -0.10908512228530465
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1866800785064697,
@@ -16788,7 +16788,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -19.399166679888985,
 					"y": 0,
 					"z": 0
 				},
@@ -16825,7 +16825,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.54656594667582015
+					"y": -0.15908834385955878
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -16880,7 +16880,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -18.641752607587794,
 					"y": 0,
 					"z": 0
 				},
@@ -16917,7 +16917,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.51588955006352211
+					"y": -0.20628509959701202
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -16972,7 +16972,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -17.865012875096184,
 					"y": 0,
 					"z": 0
 				},
@@ -17009,7 +17009,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.48693488769910093
+					"y": -0.25083290435861055
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666666269302368,
@@ -17064,7 +17064,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -17.120637299812799,
 					"y": 0,
 					"z": 0
 				},
@@ -17101,7 +17101,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.45960532604186488
+					"y": -0.29288043237339489
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666667461395264,
@@ -17156,7 +17156,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -16.407277375114141,
 					"y": 0,
 					"z": 0
 				},
@@ -17193,7 +17193,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.43380965517628267
+					"y": -0.33256801342515835
 				},
 				"locomotionState": "Grounded",
 				"playRate": 1.1666667461395264,
@@ -17248,7 +17248,7 @@
 			{
 				"acceleration":
 				{
-					"x": 0,
+					"x": -17.36735909068253,
 					"y": 0,
 					"z": 0
 				},
@@ -17285,7 +17285,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.40946178440722247
+					"y": -0.36264016043371217
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -17377,7 +17377,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.38648045494012101
+					"y": -0.34228672740944416
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -17469,7 +17469,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.36478896868717947
+					"y": -0.32307564507070946
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -17561,7 +17561,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.34431493229450177
+					"y": -0.30494279818509584
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -17653,7 +17653,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.32499001553588885
+					"y": -0.28782767003252119
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -17745,7 +17745,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.30674972326695071
+					"y": -0.27167314043620838
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -17837,7 +17837,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.28953318017845325
+					"y": -0.25642529512931311
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -17929,7 +17929,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.27328292763053486
+					"y": -0.24203324582098326
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18021,7 +18021,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.25794473188974426
+					"y": -0.22844896036133669
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18113,7 +18113,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.2434674031289096
+					"y": -0.21562710243854863
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18205,7 +18205,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.22980262458576606
+					"y": -0.20352488027305241
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18297,7 +18297,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.21690479131017559
+					"y": -0.19210190380388403
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18389,7 +18389,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.20473085796177176
+					"y": -0.18132004989054329
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18481,7 +18481,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.19324019515006827
+					"y": -0.17114333508049484
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18573,7 +18573,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.18239445383757968
+					"y": -0.1615377955176823
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18665,7 +18665,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.17215743735341202
+					"y": -0.15247137359126126
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18757,7 +18757,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.16249498059017994
+					"y": -0.1439138109462515
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18849,7 +18849,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.15337483598108193
+					"y": -0.1358365474990412
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -18941,7 +18941,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.14476656587659176
+					"y": -0.12821262612071688
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19033,7 +19033,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.13664144096158365
+					"y": -0.12101660267010808
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19125,7 +19125,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.12897234437386737
+					"y": -0.1142244610762905
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19217,7 +19217,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.12173368120413779
+					"y": -0.10781353318714307
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19309,7 +19309,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.11490129307530307
+					"y": -0.10176242311646096
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19401,7 +19401,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.10845237751610798
+					"y": -0.096050935837139848
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19493,7 +19493,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.102365411859969
+					"y": -0.090660009782117759
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19585,7 +19585,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.096620081415040707
+					"y": -0.08557165322813616
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19677,7 +19677,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.09119721166578737
+					"y": -0.080768884250007153
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19769,7 +19769,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.086078704279788976
+					"y": -0.076235674044989404
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19861,7 +19861,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.081247476706209992
+					"y": -0.071956893438123198
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -19953,7 +19953,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.076687405164346398
+					"y": -0.067918262389991005
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20045,7 +20045,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.07238327083198047
+					"y": -0.064106302338390403
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20137,7 +20137,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.06832070905395185
+					"y": -0.060508291214863973
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20229,7 +20229,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.064486161401433109
+					"y": -0.057112220985957939
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20321,7 +20321,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.060866830421912092
+					"y": -0.053906757577507423
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20413,7 +20413,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.057450636928863166
+					"y": -0.050881203048199278
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20505,7 +20505,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.0542261796885656
+					"y": -0.048025459886170185
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20597,7 +20597,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.051182697369527498
+					"y": -0.0453299973094832
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20689,7 +20689,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.048310032627524993
+					"y": -0.042785819458013651
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20781,7 +20781,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.045598598206393726
+					"y": -0.040384435370587717
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20873,7 +20873,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.043039344941437185
+					"y": -0.038117830647175166
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -20965,7 +20965,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.040623731558666151
+					"y": -0.035978440701561337
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21057,7 +21057,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.038343696169076992
+					"y": -0.033959125515231656
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21149,7 +21149,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.036191629362833544
+					"y": -0.032053145808212079
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21241,7 +21241,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.034160348813556889
+					"y": -0.030254140547337799
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21333,7 +21333,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.032243075307967162
+					"y": -0.028556105716886111
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21425,7 +21425,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.030433410120878492
+					"y": -0.026953374280722409
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21517,7 +21517,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.028725313660038197
+					"y": -0.025440597269084753
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21609,7 +21609,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.027113085309539358
+					"y": -0.0240127259268859
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21701,7 +21701,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.025591344404535962
+					"y": -0.022664994863954402
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21793,7 +21793,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.024155012273765493
+					"y": -0.021392906150980214
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21885,7 +21885,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.022799295289947522
+					"y": -0.020192214308086497
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -21977,7 +21977,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.021519668871490542
+					"y": -0.019058912135928349
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,
@@ -22069,7 +22069,7 @@
 				"lean":
 				{
 					"x": 0,
-					"y": 0.020311862382114219
+					"y": -0.017989217342031041
 				},
 				"locomotionState": "Grounded",
 				"playRate": 9.9999997473787516e-05,

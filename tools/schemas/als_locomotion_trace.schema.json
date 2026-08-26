@@ -148,7 +148,10 @@
         "position", "rotationMode", "stance", "velocity", "yaw"
       ],
       "properties": {
-        "acceleration": { "$ref": "#/$defs/vector3" },
+        "acceleration": {
+          "$ref": "#/$defs/vector3",
+          "description": "Post-tick actual velocity delta divided by the fixed 60 Hz step; frame zero uses the final warmup velocity as history."
+        },
         "grounded": { "type": "boolean" },
         "jumpTransition": { "type": "boolean" },
         "maxAcceleration": { "type": "number", "minimum": 0 },

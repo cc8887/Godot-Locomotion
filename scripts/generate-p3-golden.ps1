@@ -595,6 +595,7 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             throw "Invalid or duplicate trace document: $($file.Name)"
         }
         $expectedIndex = 0
+        $previousPhysicalVelocity = $null
         foreach ($frame in @($document.frames))
         {
             Assert-ExactProperties $frame @('command', 'index', 'nativeActual', 'physicalActual', 'portExpected', 'tick', 'time') "$($file.Name).frames[$expectedIndex]"
@@ -632,6 +633,21 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             {
                 throw "Trace frame lacks required command/actual vectors at $($file.Name) frame $expectedIndex."
             }
+            if ($null -ne $previousPhysicalVelocity)
+            {
+                foreach ($component in @('x', 'y', 'z'))
+                {
+                    $expectedAcceleration =
+                        (([double]$frame.physicalActual.velocity.$component -
+                          [double]$previousPhysicalVelocity.$component) / (1.0 / 60.0))
+                    $actualAcceleration = [double]$frame.physicalActual.acceleration.$component
+                    if ([math]::Abs($actualAcceleration - $expectedAcceleration) -gt 1e-6)
+                    {
+                        throw "Trace actual acceleration is not the post-tick velocity derivative at $($file.Name) frame $expectedIndex component $component."
+                    }
+                }
+            }
+            $previousPhysicalVelocity = $frame.physicalActual.velocity
             if ([double]$frame.physicalActual.maxAcceleration -lt 0.0 -or
                 [double]$frame.physicalActual.maxBrakingDeceleration -lt 0.0)
             {

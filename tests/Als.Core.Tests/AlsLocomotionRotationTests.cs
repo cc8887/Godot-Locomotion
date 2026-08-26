@@ -51,12 +51,10 @@ public sealed class AlsLocomotionRotationTests
     }
 
     [Theory]
-    [InlineData(AlsRotationMode.VelocityDirection, -1.57079632679f)]
-    [InlineData(AlsRotationMode.LookingDirection, 0f)]
-    [InlineData(AlsRotationMode.Aiming, -1.57079632679f)]
-    public void FirstFrameSnapsToTheSelectedRotationTarget(
-        AlsRotationMode rotationMode,
-        float expectedYaw)
+    [InlineData(AlsRotationMode.VelocityDirection)]
+    [InlineData(AlsRotationMode.LookingDirection)]
+    [InlineData(AlsRotationMode.Aiming)]
+    public void FirstFrameAppliesTheFixedCommitRotationInterpolation(AlsRotationMode rotationMode)
     {
         var input = P3TestInput.Grounded(
             velocity: new Vector3(3f, 0f, 0f),
@@ -68,10 +66,66 @@ public sealed class AlsLocomotionRotationTests
 
         AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
 
-        Assert.Equal(expectedYaw, result.TargetYaw, 5);
-        Assert.Equal(expectedYaw, state.TargetYaw, 5);
+        Assert.InRange(result.TargetYaw, -MathF.PI / 2f, -float.Epsilon);
+        Assert.NotEqual(-MathF.PI / 2f, result.TargetYaw);
+        Assert.Equal(result.TargetYaw, state.TargetYaw, 5);
         Assert.Equal(rotationMode, result.ActualRotationMode);
         Assert.Equal((byte)1, state.Initialized);
+    }
+
+    [Fact]
+    public void LookingDirectionCombinesViewYawWithCharacterLocalMovementOffset()
+    {
+        var input = P3TestInput.Grounded(
+            velocity: new Vector3(3f, 0f, 0f),
+            rotationMode: AlsRotationMode.LookingDirection,
+            viewYaw: Degrees(45f));
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.InRange(result.TargetYaw, Degrees(-10f), -float.Epsilon);
+    }
+
+    [Theory]
+    [InlineData(AlsRotationMode.VelocityDirection)]
+    [InlineData(AlsRotationMode.LookingDirection)]
+    public void NonAimingLowSpeedDoesNotTurnInPlace(AlsRotationMode rotationMode)
+    {
+        var characterYaw = Degrees(37f);
+        var input = P3TestInput.Grounded(
+            rotationMode: rotationMode,
+            characterYaw: characterYaw,
+            viewYaw: Degrees(-120f));
+        var state = new AlsRuntimeState
+        {
+            Initialized = 1,
+            LocomotionState = AlsLocomotionState.Grounded,
+            TargetYaw = characterYaw,
+            SmoothedTargetYaw = characterYaw,
+        };
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.Equal(characterYaw, result.TargetYaw, 5);
+        Assert.Equal(characterYaw, state.SmoothedTargetYaw, 5);
+    }
+
+    [Fact]
+    public void AimingTurnsTowardAimYawEvenAtLowSpeed()
+    {
+        var input = P3TestInput.Grounded(
+            rotationMode: AlsRotationMode.Aiming,
+            characterYaw: Degrees(20f),
+            aimYaw: Degrees(-70f));
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.InRange(result.TargetYaw, Degrees(10f), Degrees(20f));
     }
 
     [Fact]
@@ -86,6 +140,7 @@ public sealed class AlsLocomotionRotationTests
         var result = new AlsFrameResult();
         var input = P3TestInput.Grounded(
             rotationMode: AlsRotationMode.Aiming,
+            characterYaw: Degrees(179f),
             aimYaw: Degrees(-179f));
 
         AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
@@ -109,7 +164,12 @@ public sealed class AlsLocomotionRotationTests
         AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
 
         Assert.True(float.IsFinite(result.TargetYaw));
-        Assert.Equal(MathF.PI / 2f, result.TargetYaw, 5);
+        Assert.Equal(
+            (MathF.PI / 2f) * AlsMath.DamperExactAlpha(
+                input.DeltaTime,
+                P3TestSettings.Reference.RotationInterpolationHalfLife),
+            result.TargetYaw,
+            5);
     }
 
     [Theory]
