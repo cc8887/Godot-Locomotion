@@ -42,6 +42,34 @@ public sealed class AlsLocomotionCommandResolverTests
         Assert.Equal(AlsGait.Running, resolved.MaxAllowedGait);
     }
 
+    [Fact]
+    public void ResolveNormalizesHugeFiniteAxesWithoutOverflow()
+    {
+        var resolved = AlsLocomotionCommandResolver.Resolve(
+            CreateCommand(new Vector2(1e20f, 1e20f), gait: AlsGait.Sprinting),
+            AlsStance.Standing);
+
+        var inverseSquareRootTwo = 1f / MathF.Sqrt(2f);
+        AssertVectorNear(
+            new Vector3(inverseSquareRootTwo, 0f, -inverseSquareRootTwo),
+            resolved.WorldDirection);
+        Assert.Equal(1f, resolved.InputAmount);
+        Assert.Equal(AlsGait.Sprinting, resolved.MaxAllowedGait);
+    }
+
+    [Fact]
+    public void ResolvePreservesTinyRepresentableInput()
+    {
+        var resolved = AlsLocomotionCommandResolver.Resolve(
+            CreateCommand(new Vector2(0f, 1e-30f), gait: AlsGait.Sprinting),
+            AlsStance.Standing);
+
+        AssertVectorNear(new Vector3(0f, 0f, -1f), resolved.WorldDirection);
+        Assert.True(resolved.InputAmount > 0f);
+        Assert.Equal(1e-30f, resolved.InputAmount);
+        Assert.Equal(AlsGait.Sprinting, resolved.MaxAllowedGait);
+    }
+
     [Theory]
     [InlineData(AlsStance.Crouching, AlsRotationMode.VelocityDirection)]
     [InlineData(AlsStance.Standing, AlsRotationMode.Aiming)]
@@ -213,6 +241,28 @@ public sealed class AlsLocomotionSettingsTests
         Assert.Equal(new AlsDirectionalSpeeds(1.5f, 1.5f, 1.5f), settings.Crouching.Walking);
         Assert.Equal(new AlsDirectionalSpeeds(2f, 2f, 2f), settings.Crouching.Running);
         Assert.Equal(settings.Crouching.Running, settings.Crouching.Sprinting);
+    }
+
+    [Fact]
+    public void SamplesSidewaysSpeedFromLoadedDirectionalEndpoints()
+    {
+        var original = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "P3",
+            "p3_locomotion_settings.json"));
+        var root = JsonNode.Parse(original)!.AsObject();
+        var values = root["values"]!.AsObject();
+        values["walkForwardSpeed"] = 10f;
+        values["walkBackwardSpeed"] = 2f;
+        values["velocityAngleInterpolationStart"] = 0f;
+        values["velocityAngleInterpolationEnd"] = MathF.PI;
+
+        var settings = AlsLocomotionSettings.Load(root.ToJsonString());
+
+        Assert.Equal(10f, settings.Standing.Walking.Forward);
+        Assert.Equal(6f, settings.Standing.Walking.Sideways, 5);
+        Assert.Equal(2f, settings.Standing.Walking.Backward);
     }
 
     [Theory]

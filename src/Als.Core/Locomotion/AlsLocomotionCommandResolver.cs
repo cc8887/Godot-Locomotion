@@ -33,11 +33,22 @@ public static class AlsLocomotionCommandResolver
     {
         Validate(command, actualStance);
 
-        var inputLength = command.MovementAxes.Length();
-        var inputAmount = MathF.Min(inputLength, 1f);
-        var localDirection = inputLength > 0f
-            ? command.MovementAxes / inputLength
-            : Vector2.Zero;
+        var maxAbsoluteAxis = MathF.Max(
+            MathF.Abs(command.MovementAxes.X),
+            MathF.Abs(command.MovementAxes.Y));
+        var localDirection = Vector2.Zero;
+        var inputAmount = 0f;
+        if (maxAbsoluteAxis > 0f)
+        {
+            var scaledAxes = command.MovementAxes / maxAbsoluteAxis;
+            var scaledLength = MathF.Sqrt(
+                (scaledAxes.X * scaledAxes.X) +
+                (scaledAxes.Y * scaledAxes.Y));
+            localDirection = scaledAxes / scaledLength;
+            inputAmount = maxAbsoluteAxis >= 1f / scaledLength
+                ? 1f
+                : maxAbsoluteAxis * scaledLength;
+        }
 
         var sin = MathF.Sin(command.ViewYaw);
         var cos = MathF.Cos(command.ViewYaw);
