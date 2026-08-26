@@ -11,7 +11,7 @@ public static class AlsMotorReplay
     public const long CrouchFrame = 100;
     public const long BlockedStandFrame = 102;
     public const long ClearCeilingFrame = 104;
-    public const long ClearStandFrame = 105;
+    public const long ClearStandFrame = ClearCeilingFrame;
     public const long LastSmokeFrame = 110;
 
     public static AlsReplayInputAdapter CreateSmokeSequence()
@@ -46,6 +46,7 @@ public static class AlsMotorReplay
         {
             commands[frame] = standingSprint;
         }
+        commands[BlockedStandFrame] = standingSprint with { JumpPressed = 1 };
 
         return new AlsReplayInputAdapter(0, commands);
     }

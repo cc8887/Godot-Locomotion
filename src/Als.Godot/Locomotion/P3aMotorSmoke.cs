@@ -1,6 +1,8 @@
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Math;
+using NumericsVector2 = System.Numerics.Vector2;
 
 namespace GodotAls.Locomotion;
 
@@ -15,6 +17,9 @@ public partial class P3aMotorSmoke : Node
     private AlsCharacterMotor _airborneJumpMotor = null!;
     private AlsCharacterMotor _invalidJumpMotor = null!;
     private AlsCharacterMotor _platformMotor = null!;
+    private AlsCharacterMotor _reverseMotor = null!;
+    private AlsCharacterMotor _gaitReductionMotor = null!;
+    private AlsCharacterMotor _crouchJumpMotor = null!;
     private AnimatableBody3D _movingPlatform = null!;
     private StaticBody3D _ceiling = null!;
     private AlsMotorSettings _settings;
@@ -32,6 +37,15 @@ public partial class P3aMotorSmoke : Node
     private bool _freshJumpChecked;
     private bool _airborneJumpChecked;
     private bool _invalidJumpChecked;
+    private bool _reverseResponseChecked;
+    private bool _gaitReductionChecked;
+    private bool _crouchJumpChecked;
+    private AlsLocomotionSettings _coreSettings = null!;
+    private float _reverseVelocity;
+    private float _reverseAcceleration;
+    private float _reverseLean;
+    private float _gaitVelocity;
+    private float _gaitAcceleration;
 
     public override void _Ready()
     {
@@ -81,6 +95,8 @@ public partial class P3aMotorSmoke : Node
             ConfigureFreshJumpProbe();
             ConfigureInvalidJumpProbe();
             ConfigureMovingPlatformProbe();
+            ConfigureResponseProbes();
+            ConfigureCrouchJumpProbe();
             ObserveMinimumCapsuleClearance(standingSpeeds, crouchingSpeeds);
         }
         catch (Exception exception)
@@ -95,9 +111,13 @@ public partial class P3aMotorSmoke : Node
         {
             ObserveInvalidJump();
             ObserveFreshJump();
+            ObserveCrouchJump();
             UpdateMovingPlatform();
             var platformInput = _platformMotor.Step(_frameId, 1, 1, DeltaTime);
             ObserveMovingPlatform(platformInput);
+            ObserveResponseProbes(
+                _reverseMotor.Step(_frameId, 5, 1, DeltaTime),
+                _gaitReductionMotor.Step(_frameId, 6, 1, DeltaTime));
             UpdateCeiling();
             var input = _motor.Step(_frameId, 0, 1, DeltaTime);
             Observe(input);
@@ -169,6 +189,9 @@ public partial class P3aMotorSmoke : Node
         if (_frameId == AlsMotorReplay.BlockedStandFrame)
         {
             Require(input.Stance == AlsStance.Crouching, "blocked uncrouch changed actual stance");
+            Require(input.JumpAccepted == 0, "blocked standing request accepted jump");
+            Require(input.Floor.IsGrounded == 1, "blocked standing request left the floor");
+            Require(input.ActualVelocity.Y <= Tolerance, "blocked standing request produced upward velocity");
             RequireFinalResolvedMovement(input, AlsGait.Running, expectedDesiredSpeed: 2f);
             _passed[5] = true;
         }
@@ -194,6 +217,7 @@ public partial class P3aMotorSmoke : Node
         }
         else if (_frameId == AlsMotorReplay.ClearCeilingFrame)
         {
+            _ceiling.CollisionLayer = 0;
             _ceiling.GlobalPosition = new Vector3(0f, 10f, 0f);
         }
     }
@@ -207,9 +231,16 @@ public partial class P3aMotorSmoke : Node
         Require(_platformFeedbackChecked, "moving-platform regression did not execute its feedback check");
         Require(_platformDidNotBecomeSelfPropulsion, "actual platform velocity became requested self-propulsion");
         Require(_minimumClearanceShapePreserved, "minimum valid capsule was altered for stand clearance");
+        Require(_reverseResponseChecked, "reverse response regression did not execute");
+        Require(_gaitReductionChecked, "gait reduction regression did not execute");
+        Require(_crouchJumpChecked, "crouching jump control did not execute");
         Require(_landingTransitions == 1, $"expected one landing transition, observed {_landingTransitions}");
         _passed[3] = true;
         Require(Array.TrueForAll(_passed, static passed => passed), "one or more motor smoke cases did not execute");
+        GD.Print(
+            $"GODOT_ALS_P3A_MOTOR_RESPONSE reverse_velocity={_reverseVelocity:R} " +
+            $"reverse_acceleration={_reverseAcceleration:R} reverse_lean={_reverseLean:R} " +
+            $"gait_velocity={_gaitVelocity:R} gait_acceleration={_gaitAcceleration:R}");
         GD.Print("GODOT_ALS_P3A_MOTOR_OK cases=7");
         GetTree().Quit(0);
     }
@@ -245,6 +276,176 @@ public partial class P3aMotorSmoke : Node
         };
         AddChild(_platformMotor);
         _platformMotor.Configure(_settings, new AlsReplayInputAdapter(0, commands));
+    }
+
+    private void ConfigureResponseProbes()
+    {
+        const float acceleration = 24f;
+        const float braking = 6f;
+        var reverseWalking = new AlsDirectionalSpeeds(0.24f, 0.24f, 1f);
+        var reverseSpeeds = new AlsStanceSpeeds(reverseWalking, reverseWalking, reverseWalking);
+        var reverseSettings = CreateResponseSettings(reverseSpeeds, acceleration, braking);
+        var reverseCommands = CreateIdleCommands();
+        reverseCommands[1] = CreateResponseCommand(NumericsVector2.UnitY, AlsGait.Walking);
+        for (var frame = 2; frame <= 4; frame++)
+        {
+            reverseCommands[frame] = CreateResponseCommand(-NumericsVector2.UnitY, AlsGait.Walking);
+        }
+        AddChild(CreateBoxBody("ReverseFloor", new Vector3(8f, 1f, 8f), new Vector3(115f, -0.5f, 0f)));
+        _reverseMotor = CreateResponseMotor("ReverseMotor", 115f, reverseSettings, reverseCommands);
+
+        var gaitSpeeds = new AlsStanceSpeeds(
+            new AlsDirectionalSpeeds(0.5f, 0.5f, 0.5f),
+            new AlsDirectionalSpeeds(1f, 1f, 1f),
+            new AlsDirectionalSpeeds(2f, 2f, 2f));
+        var gaitSettings = CreateResponseSettings(gaitSpeeds, acceleration, braking);
+        var gaitCommands = CreateIdleCommands();
+        for (var frame = 1; frame <= 10; frame++)
+        {
+            gaitCommands[frame] = CreateResponseCommand(NumericsVector2.UnitY, AlsGait.Sprinting);
+        }
+        gaitCommands[11] = CreateResponseCommand(NumericsVector2.UnitY, AlsGait.Walking);
+        AddChild(CreateBoxBody("GaitReductionFloor", new Vector3(8f, 1f, 8f), new Vector3(130f, -0.5f, 0f)));
+        _gaitReductionMotor = CreateResponseMotor("GaitReductionMotor", 130f, gaitSettings, gaitCommands);
+
+        var settingsJson = Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json");
+        _coreSettings = AlsLocomotionSettings.Load(settingsJson);
+    }
+
+    private void ConfigureCrouchJumpProbe()
+    {
+        AddChild(CreateBoxBody(
+            "CrouchJumpFloor",
+            new Vector3(6f, 1f, 6f),
+            new Vector3(145f, -0.5f, 0f)));
+        var crouch = CreateResponseCommand(NumericsVector2.Zero, AlsGait.Running) with
+        {
+            RequestedStance = AlsStance.Crouching,
+        };
+        _crouchJumpMotor = new AlsCharacterMotor
+        {
+            Name = "CrouchJumpMotor",
+            Position = new Vector3(145f, _settings.StandingHeight * 0.5f, 0f),
+        };
+        AddChild(_crouchJumpMotor);
+        _crouchJumpMotor.Configure(
+            _settings,
+            new AlsReplayInputAdapter(0, new[] { crouch, crouch with { JumpPressed = 1 } }));
+    }
+
+    private void ObserveCrouchJump()
+    {
+        if (_frameId > 1)
+        {
+            return;
+        }
+
+        var input = _crouchJumpMotor.Step(_frameId, 7, 1, DeltaTime);
+        Require(input.Stance == AlsStance.Crouching, "crouching jump control changed stance");
+        if (_frameId == 0)
+        {
+            Require(input.Floor.IsGrounded == 1, "crouching jump control did not settle on floor");
+            return;
+        }
+
+        Require(input.JumpAccepted == 1, "ordinary crouching jump was incorrectly suppressed");
+        Require(input.Floor.IsGrounded == 0, "ordinary crouching jump did not publish InAir");
+        _crouchJumpChecked = true;
+        _crouchJumpMotor.QueueFree();
+    }
+
+    private void ObserveResponseProbes(in AlsFrameInput reverseInput, in AlsFrameInput gaitInput)
+    {
+        if (_frameId == 2 || _frameId == 3)
+        {
+            var expectedVelocity = _frameId == 2 ? -0.14f : -0.04f;
+            RequireNear(reverseInput.ActualVelocity.Z, expectedVelocity, 0.015f, "reverse braking velocity");
+            RequireNear(reverseInput.ActualAcceleration.Z, 6f, 0.25f, "reverse braking acceleration");
+        }
+
+        if (_frameId == 4)
+        {
+            RequireNear(reverseInput.ActualVelocity.Z, 0.24f, 0.015f, "reverse crossing velocity");
+            RequireNear(reverseInput.ActualAcceleration.Z, 16.8f, 0.25f, "reverse crossing acceleration");
+            RequireNear(reverseInput.MaxAcceleration, 24f, Tolerance, "published acceleration capability");
+            RequireNear(reverseInput.MaxBrakingDeceleration, 6f, Tolerance, "published braking capability");
+
+            var state = default(AlsRuntimeState);
+            var result = AlsFrameResult.CreateDefault(reverseInput.Identity);
+            AlsLocomotionModel.Evaluate(reverseInput, ref state, ref result, _coreSettings);
+            var alpha = AlsMath.DamperExactAlpha(DeltaTime, _coreSettings.LeanHalfLife);
+            RequireNear(result.Lean.Length(), alpha * 0.7f, 0.01f, "reverse lean normalization");
+            Require(result.Lean.Length() < alpha * 0.9f, "reverse lean saturated at the acceleration limit");
+            _reverseVelocity = reverseInput.ActualVelocity.Z;
+            _reverseAcceleration = reverseInput.ActualAcceleration.Z;
+            _reverseLean = result.Lean.Length();
+            _reverseResponseChecked = true;
+        }
+
+        if (_frameId == 11)
+        {
+            RequireNear(gaitInput.ActualVelocity.Z, -1.9f, 0.015f, "gait reduction velocity");
+            RequireNear(gaitInput.ActualAcceleration.Z, 6f, 0.25f, "gait reduction braking");
+            _gaitVelocity = gaitInput.ActualVelocity.Z;
+            _gaitAcceleration = gaitInput.ActualAcceleration.Z;
+            _gaitReductionChecked = true;
+        }
+    }
+
+    private AlsCharacterMotor CreateResponseMotor(
+        string name,
+        float positionX,
+        in AlsMotorSettings settings,
+        AlsLocomotionCommand[] commands)
+    {
+        var motor = new AlsCharacterMotor
+        {
+            Name = name,
+            Position = new Vector3(positionX, settings.StandingHeight * 0.5f, 0f),
+        };
+        AddChild(motor);
+        motor.Configure(settings, new AlsReplayInputAdapter(0, commands));
+        return motor;
+    }
+
+    private static AlsLocomotionCommand[] CreateIdleCommands()
+    {
+        var commands = new AlsLocomotionCommand[AlsMotorReplay.LastSmokeFrame + 1];
+        Array.Fill(commands, AlsLocomotionCommand.CreateDefault());
+        return commands;
+    }
+
+    private AlsMotorSettings CreateResponseSettings(
+        in AlsStanceSpeeds speeds,
+        float acceleration,
+        float braking) => new(
+        _settings.CapsuleRadius,
+        _settings.StandingHeight,
+        _settings.CrouchingHeight,
+        speeds,
+        speeds,
+        acceleration,
+        braking,
+        _settings.Gravity,
+        _settings.JumpSpeed,
+        _settings.CollisionMask,
+        _settings.DirectionalSpeedForwardAngle,
+        _settings.DirectionalSpeedBackwardAngle);
+
+    private static AlsLocomotionCommand CreateResponseCommand(NumericsVector2 axes, AlsGait gait) => new(
+        axes,
+        ViewYaw: 0f,
+        AimYaw: 0f,
+        RequestedGait: gait,
+        RequestedStance: AlsStance.Standing,
+        RequestedRotationMode: AlsRotationMode.LookingDirection,
+        JumpPressed: 0);
+
+    private static void RequireNear(float actual, float expected, float tolerance, string message)
+    {
+        Require(
+            MathF.Abs(actual - expected) <= tolerance,
+            $"{message}: expected {expected}, actual {actual}");
     }
 
     private void ConfigureFreshJumpProbe()

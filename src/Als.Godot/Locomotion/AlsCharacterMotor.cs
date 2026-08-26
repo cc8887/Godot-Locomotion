@@ -106,7 +106,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
         var requestedCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
 
-        UpdateStance(requestedCommand.RequestedStance);
+        var standingRequestBlocked = UpdateStance(requestedCommand.RequestedStance);
         var resolvedCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
 
         var characterYaw = GetCharacterYaw();
@@ -114,16 +114,19 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var desiredVelocity = ToGodot(resolvedCommand.WorldDirection) * desiredSpeed;
         var currentVelocity = Velocity;
         var currentHorizontal = new Vector3(currentVelocity.X, 0f, currentVelocity.Z);
-        var horizontalVelocity = resolvedCommand.InputAmount > 0f
-            ? currentHorizontal.MoveToward(desiredVelocity, _settings.MaxAcceleration * deltaTime)
-            : currentHorizontal.MoveToward(Vector3.Zero, _settings.MaxBrakingDeceleration * deltaTime);
+        var horizontalVelocity = IntegrateHorizontalVelocity(
+            currentHorizontal,
+            desiredVelocity,
+            _settings.MaxAcceleration,
+            _settings.MaxBrakingDeceleration,
+            deltaTime);
 
         var verticalVelocity = Velocity.Y;
         byte jumpAccepted = 0;
         var groundedBeforeMove = IsOnFloor() || (_lastFrameId < 0 && ProbeInitialFloor());
         if (groundedBeforeMove)
         {
-            if (resolvedCommand.JumpPressed == 1)
+            if (resolvedCommand.JumpPressed == 1 && !standingRequestBlocked)
             {
                 verticalVelocity = _settings.JumpSpeed;
                 jumpAccepted = 1;
@@ -202,16 +205,16 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
     }
 
-    private void UpdateStance(AlsStance requestedStance)
+    private bool UpdateStance(AlsStance requestedStance)
     {
         if (requestedStance == _actualStance)
         {
-            return;
+            return false;
         }
 
         if (requestedStance == AlsStance.Standing && !CanStand())
         {
-            return;
+            return true;
         }
 
         var previousHeight = _actualStance == AlsStance.Standing
@@ -223,6 +226,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _capsuleShape!.Height = nextHeight;
         GlobalPosition += Vector3.Up * ((nextHeight - previousHeight) * 0.5f);
         _actualStance = requestedStance;
+        return false;
     }
 
     private bool CanStand()
@@ -262,6 +266,44 @@ public partial class AlsCharacterMotor : CharacterBody3D
             localYaw,
             _settings.DirectionalSpeedForwardAngle,
             _settings.DirectionalSpeedBackwardAngle);
+    }
+
+    private static Vector3 IntegrateHorizontalVelocity(
+        in Vector3 currentVelocity,
+        in Vector3 desiredVelocity,
+        float acceleration,
+        float brakingDeceleration,
+        float deltaTime)
+    {
+        var difference = desiredVelocity - currentVelocity;
+        var distance = difference.Length();
+        if (distance <= 0f)
+        {
+            return desiredVelocity;
+        }
+
+        if (currentVelocity.Dot(difference) >= 0f)
+        {
+            return currentVelocity.MoveToward(desiredVelocity, acceleration * deltaTime);
+        }
+
+        var direction = difference / distance;
+        var brakingDistance = MathF.Min(-currentVelocity.Dot(direction), distance);
+        var brakingTime = brakingDistance / brakingDeceleration;
+        if (brakingTime >= deltaTime)
+        {
+            return currentVelocity + (direction * (brakingDeceleration * deltaTime));
+        }
+
+        var velocityAtMinimum = currentVelocity + (direction * brakingDistance);
+        if (brakingDistance >= distance)
+        {
+            return desiredVelocity;
+        }
+
+        return velocityAtMinimum.MoveToward(
+            desiredVelocity,
+            acceleration * (deltaTime - brakingTime));
     }
 
     private AlsFloorSample CreateFloorSample(bool grounded)
