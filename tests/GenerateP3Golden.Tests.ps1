@@ -115,6 +115,43 @@ Describe 'generate-p3-golden.ps1 filesystem safety' {
         }
     }
 
+    It 'keeps the committed plugin after backup cleanup failure and cleans the residue on retry' {
+        $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-plugin-commit-$([guid]::NewGuid().ToString('N'))"
+        $repositoryPlugin = Join-Path $fixtureRoot 'repository-plugin'
+        $projectDirectory = Join-Path $fixtureRoot 'project'
+        $destination = Join-Path $projectDirectory 'Plugins\AlsLocomotionTrace'
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $repositoryPlugin 'Source'))
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $destination 'Source'))
+        [System.IO.File]::WriteAllText((Join-Path $repositoryPlugin 'Source\Owned.txt'), 'new-plugin')
+        [System.IO.File]::WriteAllText((Join-Path $destination 'Source\Owned.txt'), 'old-plugin')
+        [System.IO.File]::WriteAllText((Join-Path $destination 'Source\OldOnly.txt'), 'old-only')
+        try
+        {
+            $syncError = ''
+            try { Sync-OwnedPlugin $repositoryPlugin $projectDirectory -InjectBackupCleanupFailure }
+            catch { $syncError = $_.Exception.Message }
+            $syncError | Should Match 'committed.*cleanup failure'
+            [System.IO.File]::ReadAllText((Join-Path $destination 'Source\Owned.txt')) | Should Be 'new-plugin'
+            (Test-Path -LiteralPath (Join-Path $destination 'Source\OldOnly.txt')) | Should Be $false
+
+            $pluginsDirectory = Join-Path $projectDirectory 'Plugins'
+            $residualBackups = @(Get-ChildItem -LiteralPath $pluginsDirectory -Directory -Force |
+                Where-Object { $_.Name -like '.AlsLocomotionTrace.exchange-backup.*' })
+            $residualBackups.Count | Should Be 1
+            [System.IO.File]::ReadAllText((Join-Path $residualBackups[0].FullName 'Source\Owned.txt')) |
+                Should Be 'old-plugin'
+
+            Sync-OwnedPlugin $repositoryPlugin $projectDirectory
+            [System.IO.File]::ReadAllText((Join-Path $destination 'Source\Owned.txt')) | Should Be 'new-plugin'
+            @(Get-ChildItem -LiteralPath $pluginsDirectory -Force |
+                Where-Object { $_.Name -like '.AlsLocomotionTrace.*backup.*' }).Count | Should Be 0
+        }
+        finally
+        {
+            Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+        }
+    }
+
     It 'rolls back all six outputs when publication fails after the third replacement' {
         $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-publish-$([guid]::NewGuid().ToString('N'))"
         $projectRoot = Join-Path $fixtureRoot 'project'
@@ -148,6 +185,60 @@ Describe 'generate-p3-golden.ps1 filesystem safety' {
             }
             @(Get-ChildItem -LiteralPath (Join-Path $projectRoot '.p3-output-transactions') -Force `
                 -ErrorAction SilentlyContinue).Count | Should Be 0
+        }
+        finally
+        {
+            Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+        }
+    }
+
+    It 'keeps all six committed outputs when cleanup fails and recovery removes only residue' {
+        $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-publish-commit-$([guid]::NewGuid().ToString('N'))"
+        $projectRoot = Join-Path $fixtureRoot 'project'
+        $outputRoot = Join-Path $fixtureRoot 'output'
+        [void][System.IO.Directory]::CreateDirectory($outputRoot)
+        $relativeDestinations = @(
+            'assets\config\p3_locomotion_settings.json',
+            'tests\Als.Core.Tests\Fixtures\P3\trace_idle_gaits.json',
+            'tests\Als.Core.Tests\Fixtures\P3\trace_directions.json',
+            'tests\Als.Core.Tests\Fixtures\P3\trace_crouch_clearance.json',
+            'tests\Als.Core.Tests\Fixtures\P3\trace_rotation_modes.json',
+            'tests\Als.Core.Tests\Fixtures\P3\trace_jump_land.json'
+        )
+        try
+        {
+            foreach ($relative in $relativeDestinations)
+            {
+                $destination = Join-Path $projectRoot $relative
+                [void][System.IO.Directory]::CreateDirectory((Split-Path -Parent $destination))
+                [System.IO.File]::WriteAllText($destination, "original:$relative")
+                [System.IO.File]::WriteAllText((Join-Path $outputRoot (Split-Path -Leaf $relative)), "replacement:$relative")
+            }
+
+            $publishError = ''
+            try { Publish-P3GeneratedOutputSet $outputRoot $projectRoot -InjectCleanupFailureAfterCommit }
+            catch { $publishError = $_.Exception.Message }
+            $publishError | Should Match 'committed.*cleanup failure'
+            foreach ($relative in $relativeDestinations)
+            {
+                [System.IO.File]::ReadAllText((Join-Path $projectRoot $relative)) |
+                    Should Be "replacement:$relative"
+            }
+
+            $transactionRoot = Join-Path $projectRoot '.p3-output-transactions'
+            $transactions = @(Get-ChildItem -LiteralPath $transactionRoot -Directory -Force)
+            $transactions.Count | Should Be 1
+            $journal = Get-Content -LiteralPath (Join-Path $transactions[0].FullName 'journal.json') -Raw |
+                ConvertFrom-Json
+            $journal.state | Should Be 'committed'
+
+            Recover-P3OutputTransactions $projectRoot
+            foreach ($relative in $relativeDestinations)
+            {
+                [System.IO.File]::ReadAllText((Join-Path $projectRoot $relative)) |
+                    Should Be "replacement:$relative"
+            }
+            @(Get-ChildItem -LiteralPath $transactionRoot -Force -ErrorAction SilentlyContinue).Count | Should Be 0
         }
         finally
         {
