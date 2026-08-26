@@ -3,6 +3,7 @@ using GodotAls.Core.Simulation;
 
 namespace GodotAls.Core.Tests;
 
+[Collection(AllocationTestCollection.Name)]
 public sealed class AlsSyntheticLocomotionModelTests
 {
     [Fact]
