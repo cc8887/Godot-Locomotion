@@ -521,6 +521,14 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
     {
         $raw = Get-Content -LiteralPath $file.FullName -Raw
         $document = $raw | ConvertFrom-Json
+        if ($document.kind -ceq 'trace')
+        {
+            $expectedTraceFileName = "trace_$($document.name).json"
+            if ($file.Name -cne $expectedTraceFileName)
+            {
+                throw "$($file.Name) does not match trace name '$($document.name)'; expected $expectedTraceFileName."
+            }
+        }
         if ($document.kind -ceq 'trace' -and
             $expectedFrameCounts.Contains([string]$document.name))
         {
@@ -613,7 +621,7 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                 Assert-ExactProperties $frame.portExpected.$vectorName @('x', 'y') "$($file.Name).frames[$expectedIndex].portExpected.$vectorName"
             }
             if ($frame.index -ne $expectedIndex -or $frame.tick -ne $expectedIndex -or
-                [math]::Abs([double]$frame.time - ($expectedIndex / 60.0)) -gt 1e-9)
+                [math]::Abs([double]$frame.time - ($expectedIndex / 60.0)) -gt 1e-12)
             {
                 throw "Non-deterministic tick/index/time at $($file.Name) frame $expectedIndex."
             }

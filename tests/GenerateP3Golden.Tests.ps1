@@ -18,6 +18,51 @@ function New-P3GeneratedFixture
 }
 
 Describe 'generate-p3-golden.ps1 semantic validation' {
+    It 'rejects trace content swapped between two valid filenames' {
+        $fixtureRoot = New-P3GeneratedFixture
+        try
+        {
+            $directionsPath = Join-Path $fixtureRoot 'trace_directions.json'
+            $rotationModesPath = Join-Path $fixtureRoot 'trace_rotation_modes.json'
+            $directions = [System.IO.File]::ReadAllText($directionsPath)
+            $rotationModes = [System.IO.File]::ReadAllText($rotationModesPath)
+            [System.IO.File]::WriteAllText($directionsPath, $rotationModes,
+                [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::WriteAllText($rotationModesPath, $directions,
+                [System.Text.UTF8Encoding]::new($false))
+
+            $validationError = ''
+            try { Validate-GeneratedOutput $fixtureRoot $script:SchemaPath }
+            catch { $validationError = $_.Exception.Message }
+            $validationError | Should Match 'trace_(directions|rotation_modes)\.json.*name'
+        }
+        finally
+        {
+            Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+        }
+    }
+
+    It 'rejects a frame time offset by five tenths of a nanosecond' {
+        $fixtureRoot = New-P3GeneratedFixture
+        try
+        {
+            $tracePath = Join-Path $fixtureRoot 'trace_idle_gaits.json'
+            $trace = Get-Content -LiteralPath $tracePath -Raw | ConvertFrom-Json
+            $trace.frames[1].time = [double]$trace.frames[1].time + 5e-10
+            [System.IO.File]::WriteAllText($tracePath, ($trace | ConvertTo-Json -Depth 20),
+                [System.Text.UTF8Encoding]::new($false))
+
+            $validationError = ''
+            try { Validate-GeneratedOutput $fixtureRoot $script:SchemaPath }
+            catch { $validationError = $_.Exception.Message }
+            $validationError | Should Match 'Non-deterministic tick/index/time.*frame 1'
+        }
+        finally
+        {
+            Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+        }
+    }
+
     It 'rejects the wrong frame count for every named trace' {
         $expectedCounts = [ordered]@{
             idle_gaits = 240
