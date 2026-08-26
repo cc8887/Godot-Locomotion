@@ -116,6 +116,7 @@ public sealed class AlsLocomotionGaitTests
             ActualVelocity = new Vector3(0f, 25f, -actualSpeed),
             DesiredSpeed = desiredSpeed,
             RequestedGait = AlsGait.Sprinting,
+            Command = CreateSprintCommand(),
             Stance = AlsStance.Standing,
             RotationMode = AlsRotationMode.VelocityDirection,
         };
@@ -142,6 +143,7 @@ public sealed class AlsLocomotionGaitTests
         {
             ActualVelocity = new Vector3(0f, 0f, -2.5f),
             RequestedGait = AlsGait.Sprinting,
+            Command = CreateSprintCommand(),
         };
         var backwardInput = forwardInput with
         {
@@ -171,6 +173,7 @@ public sealed class AlsLocomotionGaitTests
         {
             ActualVelocity = new Vector3(worldVelocityX, 0f, 0f),
             RequestedGait = AlsGait.Sprinting,
+            Command = CreateSprintCommand(),
             CharacterYaw = characterYaw,
         };
         var state = new AlsRuntimeState();
@@ -179,6 +182,132 @@ public sealed class AlsLocomotionGaitTests
         AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
 
         Assert.Equal(expected, result.ActualGait);
+    }
+
+    [Fact]
+    public void ConvenienceEvaluateResolvesCrouchingSprintToRunning()
+    {
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(8, 0, 1), 1f / 60f) with
+        {
+            ActualVelocity = new Vector3(0f, 0f, -6.5f),
+            Stance = AlsStance.Crouching,
+            Command = CreateSprintCommand(),
+        };
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.Equal(AlsGait.Running, result.ActualGait);
+    }
+
+    [Fact]
+    public void ConvenienceEvaluateResolvesAimingSprintToRunning()
+    {
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(9, 0, 1), 1f / 60f) with
+        {
+            ActualVelocity = new Vector3(0f, 0f, -6.5f),
+            Command = CreateSprintCommand() with
+            {
+                RequestedRotationMode = AlsRotationMode.Aiming,
+            },
+        };
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.Equal(AlsGait.Running, result.ActualGait);
+    }
+
+    [Fact]
+    public void ExplicitEvaluateUsesResolvedMaximumInsteadOfLegacyRequestedGait()
+    {
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(10, 0, 1), 1f / 60f) with
+        {
+            ActualVelocity = new Vector3(0f, 0f, -6.5f),
+            RequestedGait = AlsGait.Sprinting,
+            Command = CreateSprintCommand(),
+        };
+        var resolved = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance) with
+        {
+            MaxAllowedGait = AlsGait.Running,
+        };
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, resolved, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.Equal(AlsGait.Running, result.ActualGait);
+    }
+
+    [Fact]
+    public void InvalidRawCommandPreservesStateAndResult()
+    {
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(11, 0, 1), 1f / 60f) with
+        {
+            Command = CreateSprintCommand() with
+            {
+                RequestedGait = (AlsGait)byte.MaxValue,
+            },
+        };
+        var state = CreateSentinelState();
+        var result = CreateSentinelResult();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference));
+
+        AssertSentinelsPreserved(state, result);
+    }
+
+    [Fact]
+    public void InvalidExplicitResolvedMaximumPreservesStateAndResult()
+    {
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(12, 0, 1), 1f / 60f);
+        var resolved = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance) with
+        {
+            MaxAllowedGait = (AlsGait)byte.MaxValue,
+        };
+        var state = CreateSentinelState();
+        var result = CreateSentinelResult();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            AlsLocomotionModel.Evaluate(input, resolved, ref state, ref result, P3TestSettings.Reference));
+
+        AssertSentinelsPreserved(state, result);
+    }
+
+    [Fact]
+    public void ExplicitEvaluateRejectsInvalidResolvedContractBeforeWrites()
+    {
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(13, 0, 1), 1f / 60f);
+        var resolved = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
+        var invalidCommands = new[]
+        {
+            resolved with { RequestedStance = (AlsStance)byte.MaxValue },
+            resolved with { RotationMode = (AlsRotationMode)byte.MaxValue },
+            resolved with { JumpPressed = 2 },
+            resolved with { WorldDirection = new Vector3(float.NaN, 0f, 0f) },
+            resolved with { InputAmount = float.PositiveInfinity },
+            resolved with { InputAmount = -0.01f },
+            resolved with { InputAmount = 1.01f },
+            resolved with { WorldDirection = Vector3.Zero, InputAmount = 0.5f },
+        };
+
+        foreach (var invalidCommand in invalidCommands)
+        {
+            var state = CreateSentinelState();
+            var result = CreateSentinelResult();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                AlsLocomotionModel.Evaluate(
+                    input,
+                    invalidCommand,
+                    ref state,
+                    ref result,
+                    P3TestSettings.Reference));
+            AssertSentinelsPreserved(state, result);
+        }
     }
 
     [Fact]
@@ -231,6 +360,7 @@ public sealed class AlsLocomotionGaitTests
         {
             ActualVelocity = new Vector3(2f, -1f, -4f),
             RequestedGait = AlsGait.Sprinting,
+            Command = CreateSprintCommand(),
             CharacterYaw = 0.25f,
         };
         var state = new AlsRuntimeState();
@@ -269,5 +399,40 @@ public sealed class AlsLocomotionGaitTests
         values["runForwardSpeed"] = 2f;
         values["runBackwardSpeed"] = 5f;
         return AlsLocomotionSettings.Load(root.ToJsonString());
+    }
+
+    private static AlsLocomotionCommand CreateSprintCommand() =>
+        AlsLocomotionCommand.CreateDefault() with
+        {
+            MovementAxes = Vector2.UnitY,
+            RequestedGait = AlsGait.Sprinting,
+        };
+
+    private static AlsRuntimeState CreateSentinelState() => new()
+    {
+        ActualGait = AlsGait.Sprinting,
+        AnimationPhase = 0.375f,
+        LandingRecoveryTime = 2.5f,
+    };
+
+    private static AlsFrameResult CreateSentinelResult() => new()
+    {
+        Identity = new AlsFrameIdentity(99, 7, 3),
+        ErrorCode = 701,
+        ActualGait = AlsGait.Sprinting,
+        AnimationPhase = 0.625f,
+    };
+
+    private static void AssertSentinelsPreserved(
+        in AlsRuntimeState state,
+        in AlsFrameResult result)
+    {
+        Assert.Equal(AlsGait.Sprinting, state.ActualGait);
+        Assert.Equal(0.375f, state.AnimationPhase);
+        Assert.Equal(2.5f, state.LandingRecoveryTime);
+        Assert.Equal(new AlsFrameIdentity(99, 7, 3), result.Identity);
+        Assert.Equal(701, result.ErrorCode);
+        Assert.Equal(AlsGait.Sprinting, result.ActualGait);
+        Assert.Equal(0.625f, result.AnimationPhase);
     }
 }

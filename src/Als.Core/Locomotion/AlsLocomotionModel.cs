@@ -73,10 +73,22 @@ public static class AlsLocomotionModel
         ref AlsFrameResult result,
         AlsLocomotionSettings settings)
     {
+        var resolvedCommand = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
+        Evaluate(input, resolvedCommand, ref state, ref result, settings);
+    }
+
+    public static void Evaluate(
+        in AlsFrameInput input,
+        in AlsResolvedLocomotionCommand resolvedCommand,
+        ref AlsRuntimeState state,
+        ref AlsFrameResult result,
+        AlsLocomotionSettings settings)
+    {
         ArgumentNullException.ThrowIfNull(settings);
         ValidateInput(input);
+        ValidateResolvedCommand(resolvedCommand);
 
-        result = AlsFrameResult.CreateDefault(input.Identity);
+        var nextResult = AlsFrameResult.CreateDefault(input.Identity);
 
         var speed = Hypot(input.ActualVelocity.X, input.ActualVelocity.Z);
         var localYaw = 0f;
@@ -109,12 +121,13 @@ public static class AlsLocomotionModel
             speed,
             maxWalkSpeed,
             maxRunSpeed,
-            input.RequestedGait);
+            resolvedCommand.MaxAllowedGait);
 
+        nextResult.ActualGait = actualGait;
+        nextResult.ActualStance = input.Stance;
+        nextResult.ActualRotationMode = input.RotationMode;
         state.ActualGait = actualGait;
-        result.ActualGait = actualGait;
-        result.ActualStance = input.Stance;
-        result.ActualRotationMode = input.RotationMode;
+        result = nextResult;
     }
 
     private static float Hypot(float x, float z)
@@ -157,6 +170,87 @@ public static class AlsLocomotionModel
         if (!Enum.IsDefined(input.RotationMode))
         {
             throw new ArgumentOutOfRangeException(nameof(input), input.RotationMode, "RotationMode must be defined.");
+        }
+    }
+
+    private static void ValidateResolvedCommand(in AlsResolvedLocomotionCommand resolvedCommand)
+    {
+        if (!Enum.IsDefined(resolvedCommand.MaxAllowedGait))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resolvedCommand),
+                resolvedCommand.MaxAllowedGait,
+                "MaxAllowedGait must be defined.");
+        }
+
+        if (!Enum.IsDefined(resolvedCommand.RequestedStance))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resolvedCommand),
+                resolvedCommand.RequestedStance,
+                "RequestedStance must be defined.");
+        }
+
+        if (!Enum.IsDefined(resolvedCommand.RotationMode))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resolvedCommand),
+                resolvedCommand.RotationMode,
+                "RotationMode must be defined.");
+        }
+
+        if (resolvedCommand.JumpPressed > 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resolvedCommand),
+                resolvedCommand.JumpPressed,
+                "JumpPressed must be zero or one.");
+        }
+
+        if (!float.IsFinite(resolvedCommand.WorldDirection.X) ||
+            !float.IsFinite(resolvedCommand.WorldDirection.Y) ||
+            !float.IsFinite(resolvedCommand.WorldDirection.Z))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resolvedCommand),
+                "WorldDirection must be finite.");
+        }
+
+        if (!float.IsFinite(resolvedCommand.InputAmount) ||
+            resolvedCommand.InputAmount < 0f ||
+            resolvedCommand.InputAmount > 1f)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resolvedCommand),
+                "InputAmount must be finite and within [0, 1].");
+        }
+
+        ValidateResolvedDirection(resolvedCommand);
+    }
+
+    private static void ValidateResolvedDirection(in AlsResolvedLocomotionCommand resolvedCommand)
+    {
+        var horizontalLength = Hypot(
+            resolvedCommand.WorldDirection.X,
+            resolvedCommand.WorldDirection.Z);
+        if (resolvedCommand.InputAmount == 0f)
+        {
+            if (resolvedCommand.WorldDirection != Vector3.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(resolvedCommand),
+                    "WorldDirection must be zero when InputAmount is zero.");
+            }
+
+            return;
+        }
+
+        if (MathF.Abs(resolvedCommand.WorldDirection.Y) > 1e-5f ||
+            MathF.Abs(horizontalLength - 1f) > 1e-4f)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resolvedCommand),
+                "A nonzero command must contain a horizontal unit WorldDirection.");
         }
     }
 
