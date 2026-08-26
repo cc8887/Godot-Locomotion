@@ -221,6 +221,8 @@ public sealed class AlsLocomotionSettingsTests
     [InlineData("commit")]
     [InlineData("nonfinite")]
     [InlineData("duplicate")]
+    [InlineData("wrongDelta")]
+    [InlineData("zeroDelta")]
     public void RejectsInvalidSettingsDocuments(string mutation)
     {
         var original = File.ReadAllText(Path.Combine(
@@ -242,6 +244,14 @@ public sealed class AlsLocomotionSettingsTests
             "duplicate" => original.Replace(
                 "\"kind\": \"settings\"",
                 "\"kind\": \"settings\", \"kind\": \"settings\"",
+                StringComparison.Ordinal),
+            "wrongDelta" => original.Replace(
+                "\"fixedDeltaSeconds\": 0.016666666666666666",
+                "\"fixedDeltaSeconds\": 0.02",
+                StringComparison.Ordinal),
+            "zeroDelta" => original.Replace(
+                "\"fixedDeltaSeconds\": 0.016666666666666666",
+                "\"fixedDeltaSeconds\": 0",
                 StringComparison.Ordinal),
             _ => throw new InvalidOperationException(),
         };
