@@ -75,15 +75,15 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
         $worker | Should Not Match 'ApplyTargetYaw|GlobalBasis|GlobalRotation|GlobalTransform'
     }
 
-    It 'keeps LookingDirection movement offset independent of actor yaw in both port oracles' {
+    It 'uses the documented zero-curve LookingDirection fallback in both port oracles' {
         $core = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
             'src\Als.Core\Locomotion\AlsLocomotionModel.cs'))
         $commandlet = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot `
             'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\Private\AlsLocomotionTraceCommandlet.cpp'))
 
-        $core | Should Match 'movementYawOffset\s*=\s*AlsMath\.NormalizeAngleRadians\(velocityYaw\s*-\s*viewYaw\)'
-        $commandlet | Should Match 'MovementYawOffset\s*\{\s*NormalizeRadians\(VelocityYaw\s*-\s*ViewYaw\)\s*\}'
-        $commandlet | Should Not Match 'SelectedTargetYaw\s*=\s*NormalizeRadians\([^;]*LocalYaw'
+        $core | Should Match 'AlsRotationMode\.LookingDirection\s*=>\s*ExtractYaw\(input\.ViewRotation\)'
+        $commandlet | Should Match 'SelectedTargetYaw\s*=\s*NormalizeRadians\(FMath::DegreesToRadians\(Command\.ViewYaw\)\)'
+        $commandlet | Should Not Match 'MovementYawOffset|SelectedTargetYaw\s*=\s*NormalizeRadians\([^;]*LocalYaw'
     }
 
     It 'rejects trace content swapped between two valid filenames' {

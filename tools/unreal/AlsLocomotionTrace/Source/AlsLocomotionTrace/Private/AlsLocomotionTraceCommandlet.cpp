@@ -410,9 +410,9 @@ FPortResult EvaluatePort(const AAlsTraceCharacter& Character, const FTraceComman
         }
         else if (Command.RotationMode == AlsRotationModeTags::ViewDirection)
         {
-            const float ViewYaw{FMath::DegreesToRadians(Command.ViewYaw)};
-            const float MovementYawOffset{NormalizeRadians(VelocityYaw - ViewYaw)};
-            SelectedTargetYaw = NormalizeRadians(ViewYaw + MovementYawOffset);
+            // P3A has no RotationYawOffsetCurve input. Its documented zero-curve fallback
+            // follows view yaw; nativeActual remains an independent ALS observation.
+            SelectedTargetYaw = NormalizeRadians(FMath::DegreesToRadians(Command.ViewYaw));
         }
         else
         {

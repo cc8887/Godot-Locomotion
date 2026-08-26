@@ -59,7 +59,7 @@ public sealed class AlsLocomotionRotationTests
         var input = P3TestInput.Grounded(
             velocity: new Vector3(3f, 0f, 0f),
             rotationMode: rotationMode,
-            viewYaw: 0f,
+            viewYaw: -MathF.PI / 4f,
             aimYaw: -MathF.PI / 2f);
         var state = new AlsRuntimeState();
         var result = new AlsFrameResult();
@@ -74,10 +74,53 @@ public sealed class AlsLocomotionRotationTests
     }
 
     [Fact]
-    public void LookingDirectionUsesViewRelativeWorldMovementOffset()
+    public void LookingDirectionUsesViewYawWhenRotationCurveIsUnavailable()
+    {
+        var viewYaw = Degrees(45f);
+        var input = P3TestInput.Grounded(
+            velocity: new Vector3(3f, 0f, 0f),
+            rotationMode: AlsRotationMode.LookingDirection,
+            viewYaw: viewYaw);
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+        Assert.InRange(result.TargetYaw, float.Epsilon, viewYaw);
+    }
+
+    [Fact]
+    public void LookingDirectionDoesNotDegenerateToVelocityDirection()
     {
         var input = P3TestInput.Grounded(
             velocity: new Vector3(3f, 0f, 0f),
+            viewYaw: Degrees(45f));
+        var lookingState = new AlsRuntimeState();
+        var lookingResult = new AlsFrameResult();
+        var velocityState = new AlsRuntimeState();
+        var velocityResult = new AlsFrameResult();
+
+        AlsLocomotionModel.Evaluate(
+            input with { RotationMode = AlsRotationMode.LookingDirection },
+            ref lookingState,
+            ref lookingResult,
+            P3TestSettings.Reference);
+        AlsLocomotionModel.Evaluate(
+            input with { RotationMode = AlsRotationMode.VelocityDirection },
+            ref velocityState,
+            ref velocityResult,
+            P3TestSettings.Reference);
+
+        Assert.NotEqual(lookingResult.TargetYaw, velocityResult.TargetYaw);
+        Assert.True(lookingResult.TargetYaw > 0f);
+        Assert.True(velocityResult.TargetYaw < 0f);
+    }
+
+    [Fact]
+    public void SprintingLookingDirectionUsesVelocityYaw()
+    {
+        var input = P3TestInput.Grounded(
+            velocity: new Vector3(7f, 0f, 0f),
             rotationMode: AlsRotationMode.LookingDirection,
             viewYaw: Degrees(45f));
         var state = new AlsRuntimeState();
@@ -85,7 +128,8 @@ public sealed class AlsLocomotionRotationTests
 
         AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
 
-        Assert.InRange(result.TargetYaw, Degrees(-20f), -float.Epsilon);
+        Assert.Equal(AlsGait.Sprinting, result.ActualGait);
+        Assert.True(result.TargetYaw < 0f);
     }
 
     [Theory]
@@ -93,7 +137,7 @@ public sealed class AlsLocomotionRotationTests
     [InlineData(110f)]
     public void LookingDirectionFeedbackConvergesToTheSameWorldMovementTarget(float initialYawDegrees)
     {
-        var expectedYaw = Degrees(-90f);
+        var expectedYaw = Degrees(45f);
         var characterYaw = Degrees(initialYawDegrees);
         var state = new AlsRuntimeState();
         var result = new AlsFrameResult();
