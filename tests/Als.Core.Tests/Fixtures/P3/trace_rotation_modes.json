@@ -26,6 +26,8 @@
 					"y": 0
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
 				"playRate": 1,
 				"position":
 				{
@@ -89,6 +91,8 @@
 					"y": 0.043624304234981537
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
 				"playRate": 0.72315454483032227,
 				"position":
 				{
@@ -152,6 +156,8 @@
 					"y": 0.086612820625305176
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
 				"playRate": 0.68423932790756226,
 				"position":
 				{
@@ -215,6 +221,8 @@
 					"y": 0.12953504920005798
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
 				"playRate": 0.737293541431427,
 				"position":
 				{
@@ -278,6 +286,8 @@
 					"y": 0.17194271087646484
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
 				"playRate": 0.89539754390716553,
 				"position":
 				{
@@ -341,6 +351,8 @@
 					"y": 0.21344834566116333
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 15,
 				"playRate": 1.1111111640930176,
 				"position":
 				{
@@ -404,6 +416,8 @@
 					"y": 0.25377455353736877
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.6875,
 				"playRate": 1.3333334922790527,
 				"position":
 				{
@@ -467,6 +481,8 @@
 					"y": 0.29278251528739929
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 14.27083251953125,
 				"playRate": 1.5555555820465088,
 				"position":
 				{
@@ -530,6 +546,8 @@
 					"y": 0.33038201928138733
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.854166259765625,
 				"playRate": 1.7777779102325439,
 				"position":
 				{
@@ -593,6 +611,8 @@
 					"y": 0.36650285124778748
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.4375,
 				"playRate": 2.0000002384185791,
 				"position":
 				{
@@ -656,6 +676,8 @@
 					"y": 0.40109410881996155
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 13.02083251953125,
 				"playRate": 2.2222223281860352,
 				"position":
 				{
@@ -719,6 +741,8 @@
 					"y": 0.43412354588508606
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.604166259765625,
 				"playRate": 2.4444446563720703,
 				"position":
 				{
@@ -782,6 +806,8 @@
 					"y": 0.42363062500953674
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -845,6 +871,8 @@
 					"y": 0.39974731206893921
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -908,6 +936,8 @@
 					"y": 0.37721046805381775
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -971,6 +1001,8 @@
 					"y": 0.35594421625137329
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1034,6 +1066,8 @@
 					"y": 0.33587688207626343
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1097,6 +1131,8 @@
 					"y": 0.31694090366363525
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1160,6 +1196,8 @@
 					"y": 0.2990725040435791
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1223,6 +1261,8 @@
 					"y": 0.28221148252487183
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1286,6 +1326,8 @@
 					"y": 0.26630103588104248
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1349,6 +1391,8 @@
 					"y": 0.25128757953643799
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1412,6 +1456,8 @@
 					"y": 0.23712056875228882
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1475,6 +1521,8 @@
 					"y": 0.22375226020812988
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1538,6 +1586,8 @@
 					"y": 0.21113762259483337
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1601,6 +1651,8 @@
 					"y": 0.19923417270183563
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1664,6 +1716,8 @@
 					"y": 0.18800181150436401
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1727,6 +1781,8 @@
 					"y": 0.17740270495414734
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1790,6 +1846,8 @@
 					"y": 0.16740114986896515
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1853,6 +1911,8 @@
 					"y": 0.15796345472335815
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1916,6 +1976,8 @@
 					"y": 0.14905783534049988
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -1979,6 +2041,8 @@
 					"y": 0.1406542956829071
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2042,6 +2106,8 @@
 					"y": 0.13272452354431152
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2105,6 +2171,8 @@
 					"y": 0.12524181604385376
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2168,6 +2236,8 @@
 					"y": 0.11818096786737442
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2231,6 +2301,8 @@
 					"y": 0.11151819676160812
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2294,6 +2366,8 @@
 					"y": 0.10523105412721634
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2357,6 +2431,8 @@
 					"y": 0.099298365414142609
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2420,6 +2496,8 @@
 					"y": 0.093700148165225983
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2483,6 +2561,8 @@
 					"y": 0.088417544960975647
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2546,6 +2626,8 @@
 					"y": 0.083432763814926147
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2609,6 +2691,8 @@
 					"y": 0.078729018568992615
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2672,6 +2756,8 @@
 					"y": 0.074290454387664795
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2735,6 +2821,8 @@
 					"y": 0.070102125406265259
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2798,6 +2886,8 @@
 					"y": 0.06614992767572403
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2861,6 +2951,8 @@
 					"y": 0.062420547008514404
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2924,6 +3016,8 @@
 					"y": 0.058901418000459671
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -2987,6 +3081,8 @@
 					"y": 0.055580690503120422
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3050,6 +3146,8 @@
 					"y": 0.052447177469730377
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3113,6 +3211,8 @@
 					"y": 0.049490325152873993
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3176,6 +3276,8 @@
 					"y": 0.046700172126293182
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3239,6 +3341,8 @@
 					"y": 0.044067323207855225
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3302,6 +3406,8 @@
 					"y": 0.041582908481359482
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3365,6 +3471,8 @@
 					"y": 0.039238560944795609
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3428,6 +3536,8 @@
 					"y": 0.037026379257440567
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3491,6 +3601,8 @@
 					"y": 0.034938916563987732
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3554,6 +3666,8 @@
 					"y": 0.032969139516353607
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3617,6 +3731,8 @@
 					"y": 0.031110415235161781
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3680,6 +3796,8 @@
 					"y": 0.02935648150742054
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3743,6 +3861,8 @@
 					"y": 0.027701430022716522
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3806,6 +3926,8 @@
 					"y": 0.026139687746763229
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3869,6 +3991,8 @@
 					"y": 0.024665992707014084
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3932,6 +4056,8 @@
 					"y": 0.023275380954146385
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -3995,6 +4121,8 @@
 					"y": 0.021963167935609818
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4058,6 +4186,8 @@
 					"y": 0.020724935457110405
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4121,6 +4251,8 @@
 					"y": 0.01955651119351387
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4184,6 +4316,8 @@
 					"y": 0.018453959375619888
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4247,6 +4381,8 @@
 					"y": 0.017413567751646042
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4310,6 +4446,8 @@
 					"y": 0.016431830823421478
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4373,6 +4511,8 @@
 					"y": 0.015505441464483738
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4436,6 +4576,8 @@
 					"y": 0.014631280675530434
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4499,6 +4641,8 @@
 					"y": 0.013806402683258057
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4562,6 +4706,8 @@
 					"y": 0.013028029352426529
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4625,6 +4771,8 @@
 					"y": 0.012293539009988308
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4688,6 +4836,8 @@
 					"y": 0.01160045713186264
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4751,6 +4901,8 @@
 					"y": 0.01094644982367754
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4814,6 +4966,8 @@
 					"y": 0.010329313576221466
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4877,6 +5031,8 @@
 					"y": 0.009746970608830452
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -4940,6 +5096,8 @@
 					"y": 0.0091974586248397827
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5003,6 +5161,8 @@
 					"y": 0.0086789270862936974
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5066,6 +5226,8 @@
 					"y": 0.0081896288320422173
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5129,6 +5291,8 @@
 					"y": 0.0077279163524508476
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5192,6 +5356,8 @@
 					"y": 0.0072922343388199806
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5255,6 +5421,8 @@
 					"y": 0.0068811150267720222
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5318,6 +5486,8 @@
 					"y": 0.0064931735396385193
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5381,6 +5551,8 @@
 					"y": 0.0061271032318472862
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5444,6 +5616,8 @@
 					"y": 0.0057816710323095322
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5507,6 +5681,8 @@
 					"y": 0.0054557137191295624
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5570,6 +5746,8 @@
 					"y": 0.0051481332629919052
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5633,6 +5811,8 @@
 					"y": 0.0048578931018710136
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5696,6 +5876,8 @@
 					"y": 0.004584016278386116
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5759,6 +5941,8 @@
 					"y": 0.0043255798518657684
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5822,6 +6006,8 @@
 					"y": 0.0040817135013639927
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5885,6 +6071,8 @@
 					"y": 0.003851595800369978
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -5948,6 +6136,8 @@
 					"y": 0.0036344516556710005
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6011,6 +6201,8 @@
 					"y": 0.0034295495133846998
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6074,6 +6266,8 @@
 					"y": 0.0032361992634832859
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6137,6 +6331,8 @@
 					"y": 0.0030537496786564589
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6200,6 +6396,8 @@
 					"y": 0.0028815863188356161
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6263,6 +6461,8 @@
 					"y": 0.0027191289700567722
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6326,6 +6526,8 @@
 					"y": 0.0025658307131379843
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6389,6 +6591,8 @@
 					"y": 0.002421175129711628
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6452,6 +6656,8 @@
 					"y": 0.0022846749052405357
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6515,6 +6721,8 @@
 					"y": 0.0021558701992034912
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6578,6 +6786,8 @@
 					"y": 0.0020343272481113672
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6641,6 +6851,8 @@
 					"y": 0.0019196365028619766
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6704,6 +6916,8 @@
 					"y": 0.0018114118138328195
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6767,6 +6981,8 @@
 					"y": 0.0017092885682359338
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6830,6 +7046,8 @@
 					"y": 0.001612922758795321
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6893,6 +7111,8 @@
 					"y": 0.0015219898195937276
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -6956,6 +7176,8 @@
 					"y": 0.0014361834619194269
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7019,6 +7241,8 @@
 					"y": 0.0013552147429436445
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7082,6 +7306,8 @@
 					"y": 0.0012788109015673399
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7145,6 +7371,8 @@
 					"y": 0.0012067144270986319
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7208,6 +7436,8 @@
 					"y": 0.0011386825935915112
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7271,6 +7501,8 @@
 					"y": 0.0010744862956926227
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7334,6 +7566,8 @@
 					"y": 0.0010139092337340117
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7397,6 +7631,8 @@
 					"y": 0.0009567473316565156
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7460,6 +7696,8 @@
 					"y": 0.00090280809672549367
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7523,6 +7761,8 @@
 					"y": 0.00085190986283123493
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7586,6 +7826,8 @@
 					"y": 0.00080388115020468831
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7649,6 +7891,8 @@
 					"y": 0.00075856019975617528
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7712,6 +7956,8 @@
 					"y": 0.00071579433279111981
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7775,6 +8021,8 @@
 					"y": 0.00067543948534876108
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7838,6 +8086,8 @@
 					"y": 0.00063735974254086614
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7901,6 +8151,8 @@
 					"y": 0.00060142687289044261
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -7964,6 +8216,8 @@
 					"y": 0.00056751980446279049
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8027,6 +8281,8 @@
 					"y": 0.00053552433382719755
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8090,6 +8346,8 @@
 					"y": 0.00050533271860331297
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8153,6 +8411,8 @@
 					"y": 0.00047684321179986
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8216,6 +8476,8 @@
 					"y": 0.00044995988719165325
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8279,6 +8541,8 @@
 					"y": 0.00042459217365831137
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8342,6 +8606,8 @@
 					"y": 0.00040065465145744383
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8405,6 +8671,8 @@
 					"y": 0.00037806667387485504
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8468,6 +8736,8 @@
 					"y": 0.00035675213439390063
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8531,6 +8801,8 @@
 					"y": 0.0003366392629686743
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8594,6 +8866,8 @@
 					"y": 0.00031766030588187277
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8657,6 +8931,8 @@
 					"y": 0.00029975135112181306
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8720,6 +8996,8 @@
 					"y": 0.00028285206644795835
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8783,6 +9061,8 @@
 					"y": 0.00026690552476793528
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8846,6 +9126,8 @@
 					"y": 0.00025185800041072071
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8909,6 +9191,8 @@
 					"y": 0.00023765882360748947
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -8972,6 +9256,8 @@
 					"y": 0.00022426016221288592
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9035,6 +9321,8 @@
 					"y": 0.00021161689073778689
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9098,6 +9386,8 @@
 					"y": 0.00019968641572631896
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9161,6 +9451,8 @@
 					"y": 0.00018842855934053659
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9224,6 +9516,8 @@
 					"y": 0.00017780538473743945
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9287,6 +9581,8 @@
 					"y": 0.00016778112330939621
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9350,6 +9646,8 @@
 					"y": 0.00015832201461307704
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9413,6 +9711,8 @@
 					"y": 0.00014939617540221661
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9476,6 +9776,8 @@
 					"y": 0.00014097355597186834
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9539,6 +9841,8 @@
 					"y": 0.00013302579463925213
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9602,6 +9906,8 @@
 					"y": 0.00012552610132843256
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9665,6 +9971,8 @@
 					"y": 0.00011844922846648842
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9728,6 +10036,8 @@
 					"y": 0.00011177133274031803
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9791,6 +10101,8 @@
 					"y": 0.00010546992416493595
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9854,6 +10166,8 @@
 					"y": 9.9523771496023983e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9917,6 +10231,8 @@
 					"y": 9.3912851298227906e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -9980,6 +10296,8 @@
 					"y": 8.8618260633666068e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10043,6 +10361,8 @@
 					"y": 8.3622166130226105e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10106,6 +10426,8 @@
 					"y": 7.8907738497946411e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10169,6 +10491,8 @@
 					"y": 7.4459101597312838e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10232,6 +10556,8 @@
 					"y": 7.0261266955640167e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10295,6 +10621,8 @@
 					"y": 6.630009738728404e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10358,6 +10686,8 @@
 					"y": 6.2562248785980046e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10421,6 +10751,8 @@
 					"y": 5.9035133745055646e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10484,6 +10816,8 @@
 					"y": 5.5706866987748072e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10547,6 +10881,8 @@
 					"y": 5.2566239901352674e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10610,6 +10946,8 @@
 					"y": 4.9602676881477237e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10673,6 +11011,8 @@
 					"y": 4.6806191676296294e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10736,6 +11076,8 @@
 					"y": 4.4167365558678284e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10799,6 +11141,8 @@
 					"y": 4.1677310946397483e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10862,6 +11206,8 @@
 					"y": 3.9327638660324737e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10925,6 +11271,8 @@
 					"y": 3.7110436096554622e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -10988,6 +11336,8 @@
 					"y": 3.5018234484596178e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11051,6 +11401,8 @@
 					"y": 3.3043987059500068e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11114,6 +11466,8 @@
 					"y": 3.118104359600693e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11177,6 +11531,8 @@
 					"y": 2.9423128580674529e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11240,6 +11596,8 @@
 					"y": 2.7764319384004921e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11303,6 +11661,8 @@
 					"y": 2.6199029889539815e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11366,6 +11726,8 @@
 					"y": 2.4721988665987737e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11429,6 +11791,8 @@
 					"y": 2.3328218958340585e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11492,6 +11856,8 @@
 					"y": 2.201302777393721e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11555,6 +11921,8 @@
 					"y": 2.0771984054590575e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11618,6 +11986,8 @@
 					"y": 1.9600907762651332e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11681,6 +12051,8 @@
 					"y": 1.8495853510103188e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11744,6 +12116,8 @@
 					"y": 1.7453099644626491e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11807,6 +12181,8 @@
 					"y": 1.6469133697682992e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11870,6 +12246,8 @@
 					"y": 1.554064147057943e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11933,6 +12311,8 @@
 					"y": 1.4664496120531112e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -11996,6 +12376,8 @@
 					"y": 1.3837745427736081e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12059,6 +12441,8 @@
 					"y": 1.3057605428912211e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12122,6 +12506,8 @@
 					"y": 1.2321447684371378e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12185,6 +12571,8 @@
 					"y": 1.1626792911556549e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12248,6 +12636,8 @@
 					"y": 1.0971300980600063e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12311,6 +12701,8 @@
 					"y": 1.0352764547860716e-05
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12374,6 +12766,8 @@
 					"y": 9.7690990514820442e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12437,6 +12831,8 @@
 					"y": 9.2183399829082191e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12500,6 +12896,8 @@
 					"y": 8.6986310634529218e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12563,6 +12961,8 @@
 					"y": 8.2082224253099412e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12626,6 +13026,8 @@
 					"y": 7.7454615166061558e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12689,6 +13091,8 @@
 					"y": 7.3087903729174286e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12752,6 +13156,8 @@
 					"y": 6.8967374318162911e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12815,6 +13221,8 @@
 					"y": 6.5079152591351885e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12878,6 +13286,8 @@
 					"y": 6.1410137277562171e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -12941,6 +13351,8 @@
 					"y": 5.7947972891270183e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13004,6 +13416,8 @@
 					"y": 5.4680999710399192e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13067,6 +13481,8 @@
 					"y": 5.1598208301584236e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13130,6 +13546,8 @@
 					"y": 4.8689221330278087e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13193,6 +13611,8 @@
 					"y": 4.5944234443595633e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13256,6 +13676,8 @@
 					"y": 4.3354002627893351e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13319,6 +13741,8 @@
 					"y": 4.0909803828981239e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13382,6 +13806,8 @@
 					"y": 3.8603402572334744e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13445,6 +13871,8 @@
 					"y": 3.6427031773200724e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13508,6 +13936,8 @@
 					"y": 3.4373358630546136e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13571,6 +14001,8 @@
 					"y": 3.2435466437163996e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13634,6 +14066,8 @@
 					"y": 3.0606829568569083e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13697,6 +14131,8 @@
 					"y": 2.8881286198156886e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13760,6 +14196,8 @@
 					"y": 2.7253024654783076e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13823,6 +14261,8 @@
 					"y": 2.5716560685395962e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13886,6 +14326,8 @@
 					"y": 2.4266719265142456e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -13949,6 +14391,8 @@
 					"y": 2.2898616407474037e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14012,6 +14456,8 @@
 					"y": 2.1607645521726226e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14075,6 +14521,8 @@
 					"y": 2.0389456949487794e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14138,6 +14586,8 @@
 					"y": 1.923994659591699e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14201,6 +14651,8 @@
 					"y": 1.8155242287321016e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14264,6 +14716,8 @@
 					"y": 1.7131691265603877e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14327,6 +14781,8 @@
 					"y": 1.6165845408977475e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14390,6 +14846,8 @@
 					"y": 1.5254452137014596e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14453,6 +14911,8 @@
 					"y": 1.4394440768228378e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14516,6 +14976,8 @@
 					"y": 1.3582915698862053e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14579,6 +15041,8 @@
 					"y": 1.2817141623600037e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14642,6 +15106,8 @@
 					"y": 1.2094540124962805e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14705,6 +15171,8 @@
 					"y": 1.1412677167754737e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14768,6 +15236,8 @@
 					"y": 1.0769256277853856e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14831,6 +15301,8 @@
 					"y": 1.0162110584133188e-06
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14894,6 +15366,8 @@
 					"y": 9.5891937235137448e-07
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -14957,6 +15431,8 @@
 					"y": 9.0485769987935782e-07
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -15020,6 +15496,8 @@
 					"y": 8.5384391468323884e-07
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{
@@ -15083,6 +15561,8 @@
 					"y": 8.0570612226438243e-07
 				},
 				"locomotionState": "Grounded",
+				"maxAcceleration": 20,
+				"maxBrakingDeceleration": 12.5,
 				"playRate": 2.5,
 				"position":
 				{

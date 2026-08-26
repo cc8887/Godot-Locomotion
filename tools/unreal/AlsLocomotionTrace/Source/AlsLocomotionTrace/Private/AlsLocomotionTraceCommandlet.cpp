@@ -346,11 +346,11 @@ TSharedRef<FJsonObject> CreateSettingsDocument(const FString& Commit, const AAls
     Values->SetNumberField(TEXT("crouchRunForwardSpeed"), Crouching->RunForwardSpeed / 100.0);
     Values->SetNumberField(TEXT("crouchWalkForwardSpeed"), Crouching->WalkForwardSpeed / 100.0);
     Values->SetNumberField(TEXT("gravity"), FMath::Abs(Movement->GetGravityZ()) / 100.0);
+    Values->SetNumberField(TEXT("initialMaxAcceleration"), Movement->GetMaxAcceleration() / 100.0);
+    Values->SetNumberField(TEXT("initialMaxBrakingDeceleration"), Movement->GetMaxBrakingDeceleration() / 100.0);
     Values->SetNumberField(TEXT("jumpSpeed"), Movement->JumpZVelocity / 100.0);
     Values->SetNumberField(TEXT("landingRecoveryDuration"), 0.2);
     Values->SetNumberField(TEXT("leanHalfLife"), AnimationSettings->General.LeanInterpolationHalfLife);
-    Values->SetNumberField(TEXT("maxAcceleration"), Movement->GetMaxAcceleration() / 100.0);
-    Values->SetNumberField(TEXT("maxBrakingDeceleration"), Movement->GetMaxBrakingDeceleration() / 100.0);
     Values->SetNumberField(TEXT("movingSpeedThreshold"), CharacterSettings->MovingSpeedThreshold / 100.0);
     Values->SetNumberField(TEXT("playRateMaximum"), 3.0);
     Values->SetNumberField(TEXT("playRateMinimum"), 0.0);
@@ -432,6 +432,8 @@ TSharedRef<FJsonObject> SnapshotFrame(AAlsTraceCharacter& Character, const FTrac
     Actual->SetBoolField(TEXT("jumpTransition"), !bGrounded && bWasGrounded);
     Actual->SetObjectField(TEXT("lean"), Vector2Object(Lean != nullptr ? Lean->RightAmount : 0.0, Lean != nullptr ? Lean->ForwardAmount : 0.0));
     Actual->SetStringField(TEXT("locomotionState"), bGrounded ? TEXT("Grounded") : TEXT("InAir"));
+    Actual->SetNumberField(TEXT("maxAcceleration"), Movement->GetMaxAcceleration() / 100.0);
+    Actual->SetNumberField(TEXT("maxBrakingDeceleration"), Movement->GetMaxBrakingDeceleration() / 100.0);
     Actual->SetNumberField(TEXT("playRate"), PlayRate);
     Actual->SetObjectField(TEXT("position"), Vector3Object(Character.GetActorLocation() - Origin));
     Actual->SetStringField(TEXT("rotationMode"), RotationModeName(Character.GetRotationMode()));
@@ -485,7 +487,8 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
 
     for (int32 Frame{0}; Frame < Definition.FrameCount; ++Frame)
     {
-        const FTraceCommand Command{Definition.GetCommand(Frame)};
+        FTraceCommand Command{Definition.GetCommand(Frame)};
+        Command.MovementAxes = Command.MovementAxes.GetClampedToMaxSize(1.0f);
         if (Command.bStandBlocked && !IsValid(ClearanceBlocker))
         {
             ClearanceBlocker = World->SpawnActor<AActor>();
@@ -513,7 +516,10 @@ bool GenerateSequence(UWorld* World, const FSequenceDefinition& Definition, cons
             Command.RotationMode == AlsRotationModeTags::Aiming ? Command.AimYaw : Command.ViewYaw, 0.0});
 
         const FVector MovementDirection{Command.MovementAxes.Y, Command.MovementAxes.X, 0.0};
-        if (!MovementDirection.IsNearlyZero()) Character->AddMovementInput(MovementDirection.GetSafeNormal(), 1.0f, true);
+        if (!MovementDirection.IsNearlyZero())
+        {
+            Character->AddMovementInput(MovementDirection.GetSafeNormal(), MovementDirection.Size(), true);
+        }
         if (Command.bJumpPressed) Character->Jump();
 
         TickTraceCharacter(*Character);

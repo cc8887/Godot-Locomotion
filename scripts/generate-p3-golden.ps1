@@ -17,6 +17,14 @@ $lockedCommit = 'b754d6f0f2bb03741d301f8fb88077ebfe561e17'
 $lockedPatchHash = '3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f'
 $sequenceNames = @('idle_gaits', 'directions', 'crouch_clearance', 'rotation_modes', 'jump_land')
 $expectedOutputNames = @($sequenceNames | ForEach-Object { "trace_$_.json" }) + 'p3_locomotion_settings.json'
+$outputDestinations = [ordered]@{
+    'p3_locomotion_settings.json' = 'assets\config\p3_locomotion_settings.json'
+    'trace_idle_gaits.json' = 'tests\Als.Core.Tests\Fixtures\P3\trace_idle_gaits.json'
+    'trace_directions.json' = 'tests\Als.Core.Tests\Fixtures\P3\trace_directions.json'
+    'trace_crouch_clearance.json' = 'tests\Als.Core.Tests\Fixtures\P3\trace_crouch_clearance.json'
+    'trace_rotation_modes.json' = 'tests\Als.Core.Tests\Fixtures\P3\trace_rotation_modes.json'
+    'trace_jump_land.json' = 'tests\Als.Core.Tests\Fixtures\P3\trace_jump_land.json'
+}
 $temporaryOutput = $null
 $resolvedProject = $null
 $projectFileHashAtStart = $null
@@ -34,6 +42,96 @@ function Test-IsChildPath([string]$Path, [string]$Root)
     $fullRoot = Get-FullPath $Root
     $fullPath.StartsWith($fullRoot + [System.IO.Path]::DirectorySeparatorChar,
         [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-IsSameOrChildPath([string]$Path, [string]$Root)
+{
+    $fullPath = Get-FullPath $Path
+    $fullRoot = Get-FullPath $Root
+    [System.StringComparer]::OrdinalIgnoreCase.Equals($fullPath, $fullRoot) -or
+        (Test-IsChildPath $fullPath $fullRoot)
+}
+
+function Assert-NoReparsePathComponents([string]$Path, [string]$Root, [string]$Description)
+{
+    $fullPath = Get-FullPath $Path
+    $fullRoot = Get-FullPath $Root
+    if (-not (Test-IsSameOrChildPath $fullPath $fullRoot))
+    {
+        throw "$Description escapes its trusted root: $fullPath"
+    }
+    if (-not (Test-Path -LiteralPath $fullRoot -PathType Container))
+    {
+        throw "$Description trusted root does not exist: $fullRoot"
+    }
+
+    $current = $fullRoot
+    $components = @()
+    $relative = [System.IO.Path]::GetRelativePath($fullRoot, $fullPath)
+    if ($relative -ne '.') { $components = @($relative -split '[\\/]+') }
+    foreach ($component in @('') + $components)
+    {
+        if (-not [string]::IsNullOrEmpty($component)) { $current = Join-Path $current $component }
+        if (-not (Test-Path -LiteralPath $current)) { break }
+        $item = Get-Item -LiteralPath $current -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+        {
+            throw "$Description contains a reparse point: $($item.FullName)"
+        }
+    }
+}
+
+function Get-ValidatedTreeEntries([string]$Root, [string]$Description)
+{
+    $fullRoot = Get-FullPath $Root
+    if (-not (Test-Path -LiteralPath $fullRoot -PathType Container))
+    {
+        throw "$Description tree does not exist: $fullRoot"
+    }
+    $rootItem = Get-Item -LiteralPath $fullRoot -Force
+    if (($rootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+    {
+        throw "$Description root is a reparse point: $fullRoot"
+    }
+
+    $entries = [System.Collections.Generic.List[object]]::new()
+    $directories = [System.Collections.Generic.Queue[string]]::new()
+    $directories.Enqueue($fullRoot)
+    while ($directories.Count -gt 0)
+    {
+        $directory = $directories.Dequeue()
+        foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force))
+        {
+            if (-not (Test-IsChildPath $item.FullName $fullRoot))
+            {
+                throw "$Description entry escapes its tree: $($item.FullName)"
+            }
+            if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+            {
+                throw "$Description contains a reparse point: $($item.FullName)"
+            }
+            $entries.Add($item)
+            if ($item.PSIsContainer) { $directories.Enqueue($item.FullName) }
+        }
+    }
+    return @($entries)
+}
+
+function Remove-ValidatedTree([string]$Root, [string]$TrustedParent, [string]$Description)
+{
+    if (-not (Test-Path -LiteralPath $Root)) { return }
+    if (-not (Test-IsChildPath $Root $TrustedParent)) { throw "Unsafe $Description removal path: $Root" }
+    $entries = @(Get-ValidatedTreeEntries $Root $Description)
+    foreach ($file in @($entries | Where-Object { -not $_.PSIsContainer }))
+    {
+        Remove-Item -LiteralPath $file.FullName -Force
+    }
+    foreach ($directory in @($entries | Where-Object { $_.PSIsContainer } |
+        Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }))
+    {
+        Remove-Item -LiteralPath $directory.FullName -Force
+    }
+    Remove-Item -LiteralPath (Get-FullPath $Root) -Force
 }
 
 function Invoke-NativeTool([string]$FileName, [string[]]$Arguments, [string]$LogPath)
@@ -116,38 +214,80 @@ function Ensure-AlsJunction([string]$ProjectDirectory, [string]$ResolvedReferenc
 
 function Sync-OwnedPlugin([string]$RepositoryPlugin, [string]$ProjectDirectory)
 {
-    $pluginsDirectory = Get-FullPath (Join-Path $ProjectDirectory 'Plugins')
-    $destination = Join-Path $pluginsDirectory 'AlsLocomotionTrace'
-    if (-not (Test-IsChildPath $destination $pluginsDirectory)) { throw "Unsafe plugin destination: $destination" }
+    $projectRoot = Get-FullPath $ProjectDirectory
+    Assert-NoReparsePathComponents $projectRoot $projectRoot 'UE project root'
+    $pluginsDirectory = Get-FullPath (Join-Path $projectRoot 'Plugins')
+    Assert-NoReparsePathComponents $pluginsDirectory $projectRoot 'UE Plugins directory'
+    if (-not (Test-Path -LiteralPath $pluginsDirectory))
+    {
+        New-Item -ItemType Directory -Path $pluginsDirectory | Out-Null
+    }
+    Assert-NoReparsePathComponents $pluginsDirectory $projectRoot 'UE Plugins directory'
+
+    $destination = Get-FullPath (Join-Path $pluginsDirectory 'AlsLocomotionTrace')
+    Assert-NoReparsePathComponents $destination $projectRoot 'Owned trace plugin destination'
+    $sourceRoot = Get-FullPath $RepositoryPlugin
+    $sourceEntries = @(Get-ValidatedTreeEntries $sourceRoot 'Repository trace plugin source')
+    $sourceFiles = @($sourceEntries | Where-Object { -not $_.PSIsContainer } | Sort-Object FullName)
     if (Test-Path -LiteralPath $destination)
     {
-        $destinationItem = Get-Item -LiteralPath $destination -Force
-        if (($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+        [void](Get-ValidatedTreeEntries $destination 'Owned trace plugin destination')
+    }
+
+    $transactionId = [guid]::NewGuid().ToString('N')
+    $staging = Join-Path $pluginsDirectory ".AlsLocomotionTrace.staging.$transactionId"
+    $backup = Join-Path $pluginsDirectory ".AlsLocomotionTrace.backup.$transactionId"
+    Assert-NoReparsePathComponents $staging $projectRoot 'Owned trace plugin staging path'
+    Assert-NoReparsePathComponents $backup $projectRoot 'Owned trace plugin backup path'
+    New-Item -ItemType Directory -Path $staging | Out-Null
+    $destinationMoved = $false
+    $stagingMoved = $false
+    try
+    {
+        foreach ($sourceFile in $sourceFiles)
         {
-            throw "Owned plugin destination must not be a reparse point: $destination"
+            $relative = [System.IO.Path]::GetRelativePath($sourceRoot, $sourceFile.FullName)
+            $target = Get-FullPath (Join-Path $staging $relative)
+            if (-not (Test-IsChildPath $target $staging)) { throw "Repository plugin file escapes staging: $relative" }
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+            Copy-Item -LiteralPath $sourceFile.FullName -Destination $target
+        }
+        [void](Get-ValidatedTreeEntries $staging 'Staged trace plugin')
+
+        if (Test-Path -LiteralPath $destination)
+        {
+            Move-Item -LiteralPath $destination -Destination $backup
+            $destinationMoved = $true
+        }
+        Move-Item -LiteralPath $staging -Destination $destination
+        $stagingMoved = $true
+        [void](Get-ValidatedTreeEntries $destination 'Synchronized trace plugin')
+        if ($destinationMoved)
+        {
+            $destinationMoved = $false
+            Remove-ValidatedTree $backup $pluginsDirectory 'Owned trace plugin backup'
         }
     }
-    else
+    catch
     {
-        New-Item -ItemType Directory -Path $destination | Out-Null
+        if ($stagingMoved -and (Test-Path -LiteralPath $destination))
+        {
+            Remove-ValidatedTree $destination $pluginsDirectory 'Failed synchronized trace plugin'
+            $stagingMoved = $false
+        }
+        if ($destinationMoved -and (Test-Path -LiteralPath $backup))
+        {
+            Move-Item -LiteralPath $backup -Destination $destination
+            $destinationMoved = $false
+        }
+        throw
     }
-
-    $sourceFiles = @(Get-ChildItem -LiteralPath $RepositoryPlugin -Recurse -File | Sort-Object FullName)
-    $relativeFiles = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($sourceFile in $sourceFiles)
+    finally
     {
-        $relative = [System.IO.Path]::GetRelativePath($RepositoryPlugin, $sourceFile.FullName)
-        [void]$relativeFiles.Add($relative)
-        $target = Join-Path $destination $relative
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
-        Copy-Item -LiteralPath $sourceFile.FullName -Destination $target -Force
-    }
-
-    foreach ($existing in @(Get-ChildItem -LiteralPath $destination -Recurse -File | Sort-Object FullName -Descending))
-    {
-        $relative = [System.IO.Path]::GetRelativePath($destination, $existing.FullName)
-        if ($relative -like 'Binaries\*' -or $relative -like 'Intermediate\*') { continue }
-        if (-not $relativeFiles.Contains($relative)) { Remove-Item -LiteralPath $existing.FullName -Force }
+        if (Test-Path -LiteralPath $staging)
+        {
+            Remove-ValidatedTree $staging $pluginsDirectory 'Owned trace plugin staging tree'
+        }
     }
 }
 
@@ -177,6 +317,7 @@ function Build-And-AuditEditorTarget([string]$ProjectPath, [string]$ProjectDirec
         'Win64',
         'Development',
         "-Project=$ProjectPath",
+        '-EnablePlugin=AlsLocomotionTrace+ALS',
         '-WaitMutex',
         '-NoHotReloadFromIDE'
     ) $buildLog
@@ -296,6 +437,11 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
     }
 
     $seenSequences = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $settingsValues = $null
+    $observedMaxAccelerations = [System.Collections.Generic.List[double]]::new()
+    $observedMaxBrakingDecelerations = [System.Collections.Generic.List[double]]::new()
+    $hasDynamicMaxAcceleration = $false
+    $hasDynamicMaxBrakingDeceleration = $false
     foreach ($file in $files)
     {
         $raw = Get-Content -LiteralPath $file.FullName -Raw
@@ -329,8 +475,8 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                 throw "Invalid settings document: $($file.Name)"
             }
             Assert-ExactProperties $document.sources @('animation', 'character', 'movement', 'portDefaults') "$($file.Name).sources"
-            $requiredValues = @('walkForwardSpeed', 'runForwardSpeed', 'sprintSpeed', 'maxAcceleration',
-                'maxBrakingDeceleration', 'crouchedHalfHeight', 'rotationInterpolationHalfLife',
+            $requiredValues = @('walkForwardSpeed', 'runForwardSpeed', 'sprintSpeed', 'initialMaxAcceleration',
+                'initialMaxBrakingDeceleration', 'crouchedHalfHeight', 'rotationInterpolationHalfLife',
                 'velocitySmoothingHalfLife', 'accelerationSmoothingHalfLife', 'leanHalfLife', 'jumpSpeed',
                 'landingRecoveryDuration', 'animatedWalkSpeed', 'animatedRunSpeed', 'animatedSprintSpeed',
                 'animatedCrouchSpeed', 'playRateMinimum', 'playRateMaximum', 'crouchRunForwardSpeed',
@@ -345,6 +491,7 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                     throw "Settings document is missing '$requiredValue'."
                 }
             }
+            $settingsValues = $document.values
             continue
         }
 
@@ -362,7 +509,8 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
                 'requestedRotationMode', 'requestedStance', 'standBlocked', 'viewYaw') "$($file.Name).frames[$expectedIndex].command"
             Assert-ExactProperties $frame.actual @('acceleration', 'animationPhase', 'animationState',
                 'blendCoordinates', 'gait', 'grounded', 'jumpTransition', 'lean', 'locomotionState',
-                'playRate', 'position', 'rotationMode', 'stance', 'stride', 'targetYaw', 'velocity', 'yaw') `
+                'maxAcceleration', 'maxBrakingDeceleration', 'playRate', 'position', 'rotationMode',
+                'stance', 'stride', 'targetYaw', 'velocity', 'yaw') `
                 "$($file.Name).frames[$expectedIndex].actual"
             Assert-ExactProperties $frame.command.movementAxes @('x', 'y') "$($file.Name).frames[$expectedIndex].command.movementAxes"
             foreach ($vectorName in @('acceleration', 'position', 'velocity'))
@@ -384,10 +532,25 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             {
                 throw "Trace frame lacks required command/actual vectors at $($file.Name) frame $expectedIndex."
             }
+            if ([double]$frame.actual.maxAcceleration -lt 0.0 -or
+                [double]$frame.actual.maxBrakingDeceleration -lt 0.0)
+            {
+                throw "Trace frame has a negative dynamic movement limit at $($file.Name) frame $expectedIndex."
+            }
+            $observedMaxAccelerations.Add([double]$frame.actual.maxAcceleration)
+            $observedMaxBrakingDecelerations.Add([double]$frame.actual.maxBrakingDeceleration)
             $expectedIndex++
         }
 
         $frames = @($document.frames)
+        if (@($frames.actual.maxAcceleration | Sort-Object -Unique).Count -gt 1)
+        {
+            $hasDynamicMaxAcceleration = $true
+        }
+        if (@($frames.actual.maxBrakingDeceleration | Sort-Object -Unique).Count -gt 1)
+        {
+            $hasDynamicMaxBrakingDeceleration = $true
+        }
         $maximumHorizontalSpeed = ($frames | ForEach-Object {
             [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
                 ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y))
@@ -495,6 +658,31 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
             }
             'jump_land'
             {
+                if ($null -eq $settingsValues) { throw 'jump_land validation requires the settings document.' }
+                $analogFrames = @($frames | Where-Object {
+                    $_.index -ge 100 -and $_.index -le 169 -and $_.actual.grounded -and
+                    $_.command.requestedGait -ceq 'Running' -and
+                    [math]::Abs([math]::Sqrt(
+                        ([double]$_.command.movementAxes.x * [double]$_.command.movementAxes.x) +
+                        ([double]$_.command.movementAxes.y * [double]$_.command.movementAxes.y)) - 0.65) -lt 1e-6
+                })
+                if ($analogFrames.Count -lt 60)
+                {
+                    throw "jump_land analog-limited segment is missing its grounded 0.65 input frames."
+                }
+                $analogSpeeds = @($analogFrames | ForEach-Object {
+                    [math]::Sqrt(([double]$_.actual.velocity.x * [double]$_.actual.velocity.x) +
+                        ([double]$_.actual.velocity.y * [double]$_.actual.velocity.y))
+                })
+                $analogSteadySpeeds = @($analogSpeeds | Select-Object -Last 30)
+                $analogMinimum = ($analogSteadySpeeds | Measure-Object -Minimum).Minimum
+                $analogMaximum = ($analogSteadySpeeds | Measure-Object -Maximum).Maximum
+                $fullRunSpeed = [double]$settingsValues.runForwardSpeed
+                if ($analogMinimum -le 0.1 -or $analogMaximum -ge ($fullRunSpeed * 0.9))
+                {
+                    throw "jump_land analog-limited 0.65 input does not produce a nonzero speed materially below the full running cap: min=$analogMinimum max=$analogMaximum fullRun=$fullRunSpeed."
+                }
+
                 $jumpStart = @($frames | Where-Object {
                     $_.actual.animationState -ceq 'JumpStart' -and -not $_.actual.grounded -and
                     $_.actual.jumpTransition -and [double]$_.actual.velocity.z -gt 0
@@ -523,6 +711,22 @@ function Validate-GeneratedOutput([string]$Directory, [string]$SchemaPath)
         }
     }
     if ($seenSequences.Count -ne 5) { throw "Expected five unique trace sequences, got $($seenSequences.Count)." }
+    if ($null -eq $settingsValues) { throw 'Generated output has no settings values.' }
+    if (-not $hasDynamicMaxAcceleration -or -not $hasDynamicMaxBrakingDeceleration)
+    {
+        throw "Generated traces do not observe runtime max acceleration/braking variation: acceleration=$hasDynamicMaxAcceleration braking=$hasDynamicMaxBrakingDeceleration."
+    }
+    foreach ($limit in @(
+        [pscustomobject]@{ Name = 'initialMaxAcceleration'; Initial = [double]$settingsValues.initialMaxAcceleration; Observed = $observedMaxAccelerations },
+        [pscustomobject]@{ Name = 'initialMaxBrakingDeceleration'; Initial = [double]$settingsValues.initialMaxBrakingDeceleration; Observed = $observedMaxBrakingDecelerations }
+    ))
+    {
+        $matchingInitialSample = @($limit.Observed | Where-Object { [math]::Abs($_ - $limit.Initial) -le 1e-6 })
+        if ($matchingInitialSample.Count -eq 0)
+        {
+            throw "Settings $($limit.Name)=$($limit.Initial) is not represented by any per-frame runtime sample."
+        }
+    }
 }
 
 function Replace-Atomically([string]$Source, [string]$Destination)
@@ -550,6 +754,225 @@ function Replace-Atomically([string]$Source, [string]$Destination)
     }
 }
 
+function Get-P3OutputTransactionRoot([string]$ProjectRoot)
+{
+    Get-FullPath (Join-Path (Get-FullPath $ProjectRoot) '.p3-output-transactions')
+}
+
+function Get-ValidatedP3OutputMappings([string]$OutputDirectory, [string]$ProjectRoot)
+{
+    $outputRoot = Get-FullPath $OutputDirectory
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    Assert-NoReparsePathComponents $outputRoot $outputRoot 'Generated output directory'
+    [void](Get-ValidatedTreeEntries $outputRoot 'Generated output directory')
+    Assert-NoReparsePathComponents $repositoryRoot $repositoryRoot 'Repository root'
+
+    $mappings = [System.Collections.Generic.List[object]]::new()
+    foreach ($entry in $outputDestinations.GetEnumerator())
+    {
+        $source = Get-FullPath (Join-Path $outputRoot $entry.Key)
+        if (-not (Test-IsChildPath $source $outputRoot) -or -not (Test-Path -LiteralPath $source -PathType Leaf))
+        {
+            throw "Generated output source is missing or unsafe: $source"
+        }
+        Assert-NoReparsePathComponents $source $outputRoot 'Generated output source'
+
+        $destination = Get-FullPath (Join-Path $repositoryRoot $entry.Value)
+        if (-not (Test-IsChildPath $destination $repositoryRoot))
+        {
+            throw "Generated output destination escapes repository root: $destination"
+        }
+        Assert-NoReparsePathComponents $destination $repositoryRoot 'Generated output destination'
+        if (Test-Path -LiteralPath $destination)
+        {
+            $destinationItem = Get-Item -LiteralPath $destination -Force
+            if ($destinationItem.PSIsContainer -or
+                ($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+            {
+                throw "Generated output destination is not a regular file: $destination"
+            }
+        }
+        $mappings.Add([pscustomobject]@{
+            FileName = [string]$entry.Key
+            RelativeDestination = [string]$entry.Value
+            Source = $source
+            Destination = $destination
+        })
+    }
+    return @($mappings)
+}
+
+function Restore-P3OutputTransaction([string]$TransactionDirectory, [string]$ProjectRoot)
+{
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    $transactionRoot = Get-P3OutputTransactionRoot $repositoryRoot
+    $transactionDirectoryFull = Get-FullPath $TransactionDirectory
+    if (-not (Test-IsChildPath $transactionDirectoryFull $transactionRoot))
+    {
+        throw "P3 output transaction escapes its owned root: $transactionDirectoryFull"
+    }
+    Assert-NoReparsePathComponents $transactionDirectoryFull $transactionRoot 'P3 output transaction'
+    [void](Get-ValidatedTreeEntries $transactionDirectoryFull 'P3 output transaction')
+    $journalPath = Join-Path $transactionDirectoryFull 'journal.json'
+    if (-not (Test-Path -LiteralPath $journalPath -PathType Leaf))
+    {
+        throw "P3 output transaction has no recovery journal: $transactionDirectoryFull"
+    }
+    $journal = Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json
+    Assert-ExactProperties $journal @('entries', 'version') $journalPath
+    if ($journal.version -ne 1 -or @($journal.entries).Count -ne $outputDestinations.Count)
+    {
+        throw "Invalid P3 output transaction journal: $journalPath"
+    }
+
+    $journalByRelativePath = @{}
+    foreach ($entry in @($journal.entries))
+    {
+        Assert-ExactProperties $entry @('backupName', 'fileName', 'hadOriginal', 'relativeDestination') "$journalPath entry"
+        if ($entry.relativeDestination -cnotin @($outputDestinations.Values) -or
+            $outputDestinations[[string]$entry.fileName] -cne [string]$entry.relativeDestination -or
+            $journalByRelativePath.ContainsKey([string]$entry.relativeDestination))
+        {
+            throw "P3 output transaction journal contains an unexpected destination: $($entry.relativeDestination)"
+        }
+        if ([System.IO.Path]::GetFileName([string]$entry.backupName) -cne [string]$entry.backupName)
+        {
+            throw "P3 output transaction journal contains an unsafe backup name: $($entry.backupName)"
+        }
+        $journalByRelativePath[[string]$entry.relativeDestination] = $entry
+    }
+    if ($journalByRelativePath.Count -ne $outputDestinations.Count)
+    {
+        throw "P3 output transaction journal does not contain the exact six destinations: $journalPath"
+    }
+
+    foreach ($relativeDestination in @($outputDestinations.Values))
+    {
+        $entry = $journalByRelativePath[[string]$relativeDestination]
+        $destination = Get-FullPath (Join-Path $repositoryRoot $relativeDestination)
+        Assert-NoReparsePathComponents $destination $repositoryRoot 'P3 rollback destination'
+        if ([bool]$entry.hadOriginal)
+        {
+            $backup = Get-FullPath (Join-Path $transactionDirectoryFull ([string]$entry.backupName))
+            if (-not (Test-IsChildPath $backup $transactionDirectoryFull) -or
+                -not (Test-Path -LiteralPath $backup -PathType Leaf))
+            {
+                throw "P3 rollback backup is missing or unsafe: $backup"
+            }
+            Replace-Atomically $backup $destination
+        }
+        elseif (Test-Path -LiteralPath $destination)
+        {
+            $destinationItem = Get-Item -LiteralPath $destination -Force
+            if ($destinationItem.PSIsContainer -or
+                ($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+            {
+                throw "P3 rollback refuses a non-regular destination: $destination"
+            }
+            Remove-Item -LiteralPath $destination -Force
+        }
+    }
+    Remove-ValidatedTree $transactionDirectoryFull $transactionRoot 'Completed P3 output transaction'
+}
+
+function Recover-P3OutputTransactions([string]$ProjectRoot)
+{
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    $transactionRoot = Get-P3OutputTransactionRoot $repositoryRoot
+    Assert-NoReparsePathComponents $transactionRoot $repositoryRoot 'P3 output transaction root'
+    if (-not (Test-Path -LiteralPath $transactionRoot)) { return }
+    [void](Get-ValidatedTreeEntries $transactionRoot 'P3 output transaction root')
+    foreach ($transaction in @(Get-ChildItem -LiteralPath $transactionRoot -Force))
+    {
+        if (-not $transaction.PSIsContainer) { throw "Unexpected file in P3 output transaction root: $($transaction.FullName)" }
+        $journalPath = Join-Path $transaction.FullName 'journal.json'
+        if (Test-Path -LiteralPath $journalPath -PathType Leaf)
+        {
+            Restore-P3OutputTransaction $transaction.FullName $repositoryRoot
+        }
+        else
+        {
+            # Publication never starts before the journal is durable, so an unjournaled staging directory is inert.
+            Remove-ValidatedTree $transaction.FullName $transactionRoot 'Unjournaled P3 output transaction'
+        }
+    }
+}
+
+function Publish-P3GeneratedOutputSet(
+    [string]$OutputDirectory,
+    [string]$ProjectRoot,
+    [int]$InjectFailureAfter = 0)
+{
+    $repositoryRoot = Get-FullPath $ProjectRoot
+    Recover-P3OutputTransactions $repositoryRoot
+    $mappings = @(Get-ValidatedP3OutputMappings $OutputDirectory $repositoryRoot)
+    if ($mappings.Count -ne $outputDestinations.Count) { throw 'P3 output publication requires exactly six mappings.' }
+
+    $transactionRoot = Get-P3OutputTransactionRoot $repositoryRoot
+    if (-not (Test-Path -LiteralPath $transactionRoot))
+    {
+        New-Item -ItemType Directory -Path $transactionRoot | Out-Null
+    }
+    Assert-NoReparsePathComponents $transactionRoot $repositoryRoot 'P3 output transaction root'
+    $transactionDirectory = Join-Path $transactionRoot ([guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $transactionDirectory | Out-Null
+    $journalWritten = $false
+    try
+    {
+        $journalEntries = [System.Collections.Generic.List[object]]::new()
+        $backupIndex = 0
+        foreach ($mapping in $mappings)
+        {
+            $hadOriginal = Test-Path -LiteralPath $mapping.Destination -PathType Leaf
+            $backupName = "$backupIndex.bak"
+            if ($hadOriginal)
+            {
+                Copy-Item -LiteralPath $mapping.Destination -Destination (Join-Path $transactionDirectory $backupName)
+            }
+            $journalEntries.Add([ordered]@{
+                backupName = $backupName
+                fileName = $mapping.FileName
+                hadOriginal = $hadOriginal
+                relativeDestination = $mapping.RelativeDestination
+            })
+            $backupIndex++
+        }
+        $journal = [ordered]@{ entries = @($journalEntries); version = 1 }
+        $journalTemporary = Join-Path $transactionDirectory 'journal.tmp'
+        [System.IO.File]::WriteAllText($journalTemporary, ($journal | ConvertTo-Json -Depth 5),
+            [System.Text.UTF8Encoding]::new($false))
+        Move-Item -LiteralPath $journalTemporary -Destination (Join-Path $transactionDirectory 'journal.json')
+        $journalWritten = $true
+
+        $replacementCount = 0
+        foreach ($mapping in $mappings)
+        {
+            Replace-Atomically $mapping.Source $mapping.Destination
+            $replacementCount++
+            if ($InjectFailureAfter -gt 0 -and $replacementCount -eq $InjectFailureAfter)
+            {
+                throw "Injected output publication failure after $replacementCount replacements."
+            }
+        }
+        Remove-ValidatedTree $transactionDirectory $transactionRoot 'Successful P3 output transaction'
+        $journalWritten = $false
+    }
+    catch
+    {
+        $publicationError = $_
+        if ($journalWritten -and (Test-Path -LiteralPath $transactionDirectory))
+        {
+            Restore-P3OutputTransaction $transactionDirectory $repositoryRoot
+            $journalWritten = $false
+        }
+        elseif (Test-Path -LiteralPath $transactionDirectory)
+        {
+            Remove-ValidatedTree $transactionDirectory $transactionRoot 'Failed unjournaled P3 output transaction'
+        }
+        throw $publicationError
+    }
+}
+
 if ($MyInvocation.InvocationName -ceq '.') { return }
 
 try
@@ -564,6 +987,7 @@ try
     {
         throw "Unexpected UE project file: $resolvedProject; expected $expectedProject"
     }
+    Recover-P3OutputTransactions $resolvedProjectRoot
 
     $referenceOutput = @(& (Join-Path $resolvedProjectRoot 'scripts\prepare-p3-reference.ps1') `
         -ReferenceRoot $resolvedReferenceRoot -ProjectRoot $resolvedProjectRoot)
@@ -635,14 +1059,7 @@ try
     $schemaPath = Join-Path $resolvedProjectRoot 'tools\schemas\als_locomotion_trace.schema.json'
     Validate-GeneratedOutput $temporaryOutput $schemaPath
 
-    Replace-Atomically (Join-Path $temporaryOutput 'p3_locomotion_settings.json') `
-        (Join-Path $resolvedProjectRoot 'assets\config\p3_locomotion_settings.json')
-    foreach ($sequenceName in $sequenceNames)
-    {
-        $fileName = "trace_$sequenceName.json"
-        Replace-Atomically (Join-Path $temporaryOutput $fileName) `
-            (Join-Path $resolvedProjectRoot "tests\Als.Core.Tests\Fixtures\P3\$fileName")
-    }
+    Publish-P3GeneratedOutputSet $temporaryOutput $resolvedProjectRoot
     if ((Get-FileHash -LiteralPath $resolvedProject -Algorithm SHA256).Hash -cne $projectFileHashAtStart)
     {
         throw 'UE project descriptor changed during trace generation.'
