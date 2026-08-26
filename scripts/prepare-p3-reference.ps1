@@ -265,12 +265,63 @@ try
         }
     }
 
-    foreach ($validatedPatch in $validatedPatches)
+    if ($validatedPatches.Count -gt 0)
     {
-        $applyOutput = @(& git -C $referenceFullPath apply -- $validatedPatch.FullPath 2>&1)
-        if ($LASTEXITCODE -ne 0)
+        $temporaryIndexPath = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-index-$([guid]::NewGuid().ToString('N'))"
+        $aggregatePatchPath = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-patches-$([guid]::NewGuid().ToString('N')).patch"
+        $previousIndexPath = [Environment]::GetEnvironmentVariable('GIT_INDEX_FILE', 'Process')
+        try
         {
-            throw "Could not apply compatibility patch '$($validatedPatch.RelativePath)': $($applyOutput -join [Environment]::NewLine)"
+            try
+            {
+                [Environment]::SetEnvironmentVariable('GIT_INDEX_FILE', $temporaryIndexPath, 'Process')
+
+                $readTreeOutput = @(& git -C $referenceFullPath read-tree HEAD 2>&1)
+                if ($LASTEXITCODE -ne 0)
+                {
+                    throw "Could not initialize the temporary ALS-Refactored git index: $($readTreeOutput -join [Environment]::NewLine)"
+                }
+
+                foreach ($validatedPatch in $validatedPatches)
+                {
+                    $cachedApplyOutput = @(& git -C $referenceFullPath apply --cached -- $validatedPatch.FullPath 2>&1)
+                    if ($LASTEXITCODE -ne 0)
+                    {
+                        throw "Could not apply compatibility patch '$($validatedPatch.RelativePath)' to the temporary index: $($cachedApplyOutput -join [Environment]::NewLine)"
+                    }
+                }
+
+                $diffOutput = @(& git -C $referenceFullPath diff --cached --binary "--output=$aggregatePatchPath" HEAD 2>&1)
+                if ($LASTEXITCODE -ne 0)
+                {
+                    throw "Could not create the aggregate compatibility patch: $($diffOutput -join [Environment]::NewLine)"
+                }
+            }
+            finally
+            {
+                [Environment]::SetEnvironmentVariable('GIT_INDEX_FILE', $previousIndexPath, 'Process')
+                foreach ($temporaryPath in @($temporaryIndexPath, "$temporaryIndexPath.lock"))
+                {
+                    if (Test-Path -LiteralPath $temporaryPath)
+                    {
+                        Remove-Item -LiteralPath $temporaryPath -Force
+                    }
+                }
+            }
+
+            $applyOutput = @(& git -C $referenceFullPath apply -- $aggregatePatchPath 2>&1)
+            if ($LASTEXITCODE -ne 0)
+            {
+                $patchList = @($validatedPatches | ForEach-Object { $_.RelativePath }) -join "', '"
+                throw "Could not apply compatibility patches '$patchList': $($applyOutput -join [Environment]::NewLine)"
+            }
+        }
+        finally
+        {
+            if (Test-Path -LiteralPath $aggregatePatchPath)
+            {
+                Remove-Item -LiteralPath $aggregatePatchPath -Force
+            }
         }
     }
 }

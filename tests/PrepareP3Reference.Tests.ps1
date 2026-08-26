@@ -6,7 +6,8 @@ function New-P3ReferenceFixture
     param(
         [string]$Origin,
         [switch]$ExternalFileLink,
-        [switch]$InternalPatch
+        [switch]$InternalPatch,
+        [switch]$AtomicFailurePatches
     )
 
     $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-reference-$([guid]::NewGuid().ToString('N'))"
@@ -24,8 +25,10 @@ function New-P3ReferenceFixture
 
     Set-Content -LiteralPath (Join-Path $referenceRoot 'seed.txt') -Value 'fixture' -NoNewline
     $targetPath = Join-Path $referenceRoot 'target.txt'
+    $secondTargetPath = Join-Path $referenceRoot 'target-two.txt'
     Set-Content -LiteralPath $targetPath -Value 'before' -NoNewline
-    & git -C $referenceRoot add seed.txt target.txt
+    Set-Content -LiteralPath $secondTargetPath -Value 'before-two' -NoNewline
+    & git -C $referenceRoot add seed.txt target.txt target-two.txt
     & git -C $referenceRoot commit --quiet -m 'fixture seed'
     if ($LASTEXITCODE -ne 0) { throw 'Could not commit the reference fixture seed.' }
 
@@ -69,6 +72,35 @@ function New-P3ReferenceFixture
             }
         )
     }
+    elseif ($AtomicFailurePatches)
+    {
+        Set-Content -LiteralPath $targetPath -Value 'after' -NoNewline
+        $firstPatchPath = Join-Path $referenceRoot 'first.patch'
+        & git -C $referenceRoot diff "--output=$firstPatchPath" -- target.txt
+        if ($LASTEXITCODE -ne 0) { throw 'Could not generate the first atomicity fixture patch.' }
+        Set-Content -LiteralPath $targetPath -Value 'before' -NoNewline
+
+        Set-Content -LiteralPath $secondTargetPath -Value 'after-two' -NoNewline
+        $secondPatchPath = Join-Path $referenceRoot 'second.patch'
+        & git -C $referenceRoot diff "--output=$secondPatchPath" -- target-two.txt
+        if ($LASTEXITCODE -ne 0) { throw 'Could not generate the second atomicity fixture patch.' }
+        Set-Content -LiteralPath $secondTargetPath -Value 'diverged-two' -NoNewline
+
+        & git -C $referenceRoot add first.patch second.patch target-two.txt
+        & git -C $referenceRoot commit --quiet -m 'fixture atomicity patches'
+        if ($LASTEXITCODE -ne 0) { throw 'Could not commit the atomicity fixture patches.' }
+
+        $patches = @(
+            [ordered]@{
+                path = 'first.patch'
+                sha256 = (Get-FileHash -LiteralPath $firstPatchPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            },
+            [ordered]@{
+                path = 'second.patch'
+                sha256 = (Get-FileHash -LiteralPath $secondPatchPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        )
+    }
 
     $commit = (& git -C $referenceRoot rev-parse HEAD).Trim()
     $lock = [ordered]@{
@@ -86,6 +118,7 @@ function New-P3ReferenceFixture
         ProjectRoot = $projectRoot
         ReferenceRoot = $referenceRoot
         TargetPath = $targetPath
+        SecondTargetPath = $secondTargetPath
         Commit = $commit
     }
 }
@@ -139,6 +172,25 @@ Describe 'prepare-p3-reference.ps1' {
             $output.Count | Should Be 1
             $output[0].ToString() | Should Be "P3_REFERENCE_OK commit=$($fixture.Commit) patches=1"
             (Get-Content -LiteralPath $fixture.TargetPath -Raw) | Should Be 'after'
+        }
+        finally
+        {
+            Remove-Item -LiteralPath $fixture.FixtureRoot -Recurse -Force
+        }
+    }
+
+    It 'does not partially apply validated patches when a later patch cannot apply' {
+        $fixture = New-P3ReferenceFixture -Origin 'https://github.com/Sixze/ALS-Refactored.git' -AtomicFailurePatches
+        try
+        {
+            $output = @(& pwsh -NoProfile -File $script:PrepareScript -ReferenceRoot $fixture.ReferenceRoot -ProjectRoot $fixture.ProjectRoot 2>&1)
+            $exitCode = $LASTEXITCODE
+
+            $exitCode | Should Not Be 0
+            ($output -join "`n") | Should Match 'Could not apply compatibility patch'
+            (Get-Content -LiteralPath $fixture.TargetPath -Raw) | Should Be 'before'
+            (Get-Content -LiteralPath $fixture.SecondTargetPath -Raw) | Should Be 'diverged-two'
+            @(& git -C $fixture.ReferenceRoot status --porcelain).Count | Should Be 0
         }
         finally
         {
