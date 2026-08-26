@@ -369,9 +369,7 @@ public static class AlsLocomotionModel
         {
             AlsRotationMode.VelocityDirection => velocityYaw,
             AlsRotationMode.LookingDirection when actualGait == AlsGait.Sprinting => velocityYaw,
-            AlsRotationMode.LookingDirection => CalculateLookingTargetYaw(
-                ExtractYaw(input.ViewRotation),
-                velocityYaw),
+            AlsRotationMode.LookingDirection => ExtractYaw(input.ViewRotation),
             AlsRotationMode.Aiming => ExtractYaw(input.AimRotation),
             _ => throw new ArgumentOutOfRangeException(nameof(input.RotationMode)),
         };
@@ -399,12 +397,6 @@ public static class AlsLocomotionModel
             input.CharacterYaw,
             nextState.SmoothedTargetYaw,
             AlsMath.DamperExactAlpha(input.DeltaTime, settings.RotationInterpolationHalfLife));
-    }
-
-    private static float CalculateLookingTargetYaw(float viewYaw, float velocityYaw)
-    {
-        var movementYawOffset = AlsMath.NormalizeAngleRadians(velocityYaw - viewYaw);
-        return AlsMath.NormalizeAngleRadians(viewYaw + movementYawOffset);
     }
 
     private static float ExtractYaw(in Quaternion quaternion)

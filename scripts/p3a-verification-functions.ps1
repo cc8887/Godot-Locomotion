@@ -8,10 +8,54 @@ function Get-P3aExpectedDigest
 
     if ($CharacterCount -eq 1)
     {
-        return '5D0BC4F72F298F65'
+        return '12CD6393BA75A1F9'
     }
 
-    return '7D7BF73D7B48D4AC'
+    return '7BE3F9467CC4EB63'
+}
+
+function Get-P3aCompletionMarker
+{
+    param(
+        [Parameter(Mandatory)]
+        [bool]$RegressionSkipped
+    )
+
+    if ($RegressionSkipped)
+    {
+        return 'P3A_FOCUSED_VERIFICATION_OK regression=skipped'
+    }
+
+    return 'P3A_VERIFICATION_OK'
+}
+
+function Assert-P3aRepositoryClosure
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepositoryRoot
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+    $diffCheckOutput = @(& git -C $resolvedRoot diff HEAD --check -- 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Repository whitespace check failed:$([Environment]::NewLine)$($diffCheckOutput -join [Environment]::NewLine)"
+    }
+
+    $trackedFiles = @(& git -C $resolvedRoot ls-files 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Could not enumerate tracked repository files:$([Environment]::NewLine)$($trackedFiles -join [Environment]::NewLine)"
+    }
+
+    $forbiddenPattern = '(?i)(^|/)(\.godot|\.mono|bin|obj|Binaries|Intermediate|Saved|DerivedDataCache|StagedBuilds|Cooked)(/|$)|^(assets/generated|artifacts/(?!\.gdignore$)|benchmark-results/(?!\.gdignore$))|\.(dll|pdb|modules|target|ubulk|uexp|pak|ucas|utoc|sav|log)$'
+    $forbiddenFiles = @($trackedFiles | ForEach-Object { "$_".Replace('\', '/') } |
+        Where-Object { $_ -match $forbiddenPattern })
+    if ($forbiddenFiles.Count -ne 0)
+    {
+        throw "Tracked generated/build output is forbidden:$([Environment]::NewLine)$($forbiddenFiles -join [Environment]::NewLine)"
+    }
 }
 
 function ConvertFrom-P3aHarnessOutput

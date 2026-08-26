@@ -9,7 +9,7 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
     . $script:FunctionsPath
 }
 
-$script:ValidMarker = 'GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=5D0BC4F72F298F65 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0'
+$script:ValidMarker = 'GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=12CD6393BA75A1F9 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0'
 $script:VerifierSource = [System.IO.File]::ReadAllText($script:VerifierPath)
 $script:SolutionSource = [System.IO.File]::ReadAllText($script:SolutionPath)
 
@@ -42,7 +42,7 @@ Describe 'P3A verifier marker parsing' {
             -ExpectedMode 'single' `
             -ExpectedCharacterCount 1
 
-        $result.Digest | Should Be '5D0BC4F72F298F65'
+        $result.Digest | Should Be '12CD6393BA75A1F9'
     }
 
     It 'rejects a valid marker plus a malformed marker line' {
@@ -74,7 +74,7 @@ Describe 'P3A verifier marker parsing' {
     }
 
     It 'rejects a well-formed marker whose digest drifted from the character baseline' {
-        $drifted = $script:ValidMarker.Replace('5D0BC4F72F298F65', '5D0BC4F72F298F64')
+        $drifted = $script:ValidMarker.Replace('12CD6393BA75A1F9', '12CD6393BA75A1F8')
 
         Test-P3aParserRejects @($drifted) | Should Be $true
     }
@@ -88,10 +88,10 @@ Describe 'P3A verifier marker parsing' {
         }
 
         $single = [pscustomobject]@{
-            Mode = 'single'; Characters = 1; Digest = '5D0BC4F72F298F64'
+            Mode = 'single'; Characters = 1; Digest = '12CD6393BA75A1F8'
         }
         $parallel = [pscustomobject]@{
-            Mode = 'parallel'; Characters = 1; Digest = '5D0BC4F72F298F64'
+            Mode = 'parallel'; Characters = 1; Digest = '12CD6393BA75A1F8'
         }
         $rejected = $false
         try
@@ -135,7 +135,7 @@ Describe 'P3A verifier regression closure' {
         $finalTestsIndex = $script:VerifierSource.IndexOf(
             'dotnet test $solutionPath -c Release --no-restore',
             $matrixIndex)
-        $successIndex = $script:VerifierSource.IndexOf("Write-Output 'P3A_VERIFICATION_OK'", $matrixIndex)
+        $successIndex = $script:VerifierSource.IndexOf('Write-Output $completionMarker', $matrixIndex)
 
         $matrixIndex | Should BeGreaterThan -1
         $p2bIndex | Should BeGreaterThan $matrixIndex
@@ -169,6 +169,71 @@ Describe 'P3A verifier regression closure' {
     It 'keeps the regression closure enabled by default and skippable only as one block' {
         $script:VerifierSource | Should Match '(?ms)if \(-not \$SkipRegression\) \{\s+\$p2bScript = '
         $script:VerifierSource | Should Not Match '\[switch\]\$RunRegression'
+    }
+
+    It 'emits a focused marker that cannot impersonate full verification' {
+        Get-P3aCompletionMarker -RegressionSkipped $true |
+            Should Be 'P3A_FOCUSED_VERIFICATION_OK regression=skipped'
+        Get-P3aCompletionMarker -RegressionSkipped $false | Should Be 'P3A_VERIFICATION_OK'
+        $script:VerifierSource | Should Match 'Get-P3aCompletionMarker -RegressionSkipped \(\[bool\]\$SkipRegression\)'
+    }
+
+    It 'runs repository closure after full regression and before the full success marker' {
+        $finalTestsIndex = $script:VerifierSource.LastIndexOf(
+            'dotnet test $solutionPath -c Release --no-restore')
+        $closureIndex = $script:VerifierSource.IndexOf(
+            'Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath',
+            $finalTestsIndex)
+        $successIndex = $script:VerifierSource.LastIndexOf("Write-Output $completionMarker")
+
+        $closureIndex | Should BeGreaterThan $finalTestsIndex
+        $successIndex | Should BeGreaterThan $closureIndex
+    }
+}
+
+Describe 'P3A repository closure' {
+    BeforeEach {
+        $script:ClosureRepository = Join-Path $TestDrive ([Guid]::NewGuid().ToString('N'))
+        [void](New-Item -ItemType Directory -Path $script:ClosureRepository)
+        & git -C $script:ClosureRepository init --quiet
+        & git -C $script:ClosureRepository config user.email 'p3a-tests@example.invalid'
+        & git -C $script:ClosureRepository config user.name 'P3A Tests'
+        [System.IO.File]::WriteAllText((Join-Path $script:ClosureRepository 'tracked.txt'), "clean`n")
+        & git -C $script:ClosureRepository add tracked.txt
+        & git -C $script:ClosureRepository commit --quiet -m baseline
+        if ($LASTEXITCODE -ne 0) { throw 'Could not initialize closure test repository.' }
+    }
+
+    It 'rejects a whitespace error in a tracked worktree change' {
+        [System.IO.File]::WriteAllText((Join-Path $script:ClosureRepository 'tracked.txt'), "bad trailing whitespace   `n")
+
+        $rejected = $false
+        try { Assert-P3aRepositoryClosure -RepositoryRoot $script:ClosureRepository }
+        catch { $rejected = $true }
+
+        $rejected | Should Be $true
+    }
+
+    It 'rejects a mistakenly tracked generated output' {
+        $generated = Join-Path $script:ClosureRepository '.godot\imported\cache.bin'
+        [void](New-Item -ItemType Directory -Path (Split-Path -Parent $generated))
+        [System.IO.File]::WriteAllBytes($generated, [byte[]](1, 2, 3))
+        & git -C $script:ClosureRepository add --force .godot/imported/cache.bin
+        & git -C $script:ClosureRepository commit --quiet -m generated
+
+        $rejected = $false
+        try { Assert-P3aRepositoryClosure -RepositoryRoot $script:ClosureRepository }
+        catch { $rejected = $true }
+
+        $rejected | Should Be $true
+    }
+
+    It 'accepts a clean repository with source files only' {
+        $rejected = $false
+        try { Assert-P3aRepositoryClosure -RepositoryRoot $script:ClosureRepository }
+        catch { $rejected = $true }
+
+        $rejected | Should Be $false
     }
 }
 

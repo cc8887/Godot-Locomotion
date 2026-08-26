@@ -64,9 +64,11 @@ Godot/Core 中 `ActualVelocity.Y` 是 up。accepted jump 当帧进入 `JumpStart
 
 rotation 的 SceneTree 生产所有权固定在 Order 0 motor/collision/actual snapshot；worker 只能计算值类型
 `TargetYaw`，Order 2 也只能提交值，二者均不得访问 Node。规则来自锁定 ALS 源码：`VelocityDirection` 在可靠
-移动速度下朝实际移动方向；`LookingDirection` 在移动时先计算世界速度方向相对 view 的偏角
-`Normalize(VelocityYaw - ViewYaw)`，再以 `ViewYaw + offset` 得到目标。这一规则不依赖 actor-local velocity，
-因此把上一帧 `TargetYaw` 回灌为下一帧 `CharacterYaw` 时，不同初始 actor yaw 会收敛到同一 ALS 目标且不会振荡。
+移动速度下朝实际移动方向；`LookingDirection` 非 Sprint 时采用 P3A 计划锁定的无曲线降级合同：
+`RotationYawOffsetCurve` 不可用时 offset 固定为 0，目标直接取 view yaw；Sprint 仍朝 velocity yaw。这不是对
+ALS native curve 行为的冒充，`nativeActual` 继续作为独立观察。真实 `RotationYawOffsetCurve` 的动画图输入与
+采样属于 P3B 接入项。降级规则不依赖 actor yaw，因此把上一帧 `TargetYaw` 回灌为下一帧 `CharacterYaw` 时，
+不同初始 actor yaw 会稳定收敛到同一 view 目标，且 view/velocity 不同时 Looking 不会退化成 VelocityDirection。
 低速停止保持当前角色 yaw，本阶段不执行 TIP；`Aiming` 朝 aim yaw。目标角先用对应固定角速度做最短角
 constant interpolation，再从当前真实角色 yaw 做固定 half-life 插值。Order 2 提交该帧最终 `TargetYaw`，
 下一帧 Order 0 在移动前应用；该帧 gather 发布的 yaw 与 transform 则严格对应移动后的最终 body basis。
@@ -95,13 +97,13 @@ LookingDirection、VelocityDirection、Aiming、AppliedYawVariation；最后一�
 完整固定格式与基线为：
 
 ```text
-GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=5D0BC4F72F298F65 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=parallel characters=1 warmup=120 frames=600 digest=5D0BC4F72F298F65 missing=0 stale=0 generation=0 off_main=1 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=single characters=10 warmup=120 frames=600 digest=7D7BF73D7B48D4AC missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=parallel characters=10 warmup=120 frames=600 digest=7D7BF73D7B48D4AC missing=0 stale=0 generation=0 off_main=10 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=12CD6393BA75A1F9 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=parallel characters=1 warmup=120 frames=600 digest=12CD6393BA75A1F9 missing=0 stale=0 generation=0 off_main=1 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=single characters=10 warmup=120 frames=600 digest=7BE3F9467CC4EB63 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=parallel characters=10 warmup=120 frames=600 digest=7BE3F9467CC4EB63 missing=0 stale=0 generation=0 off_main=10 lag=0 allocations=0
 ```
 
-1/10 角色的 fixed digest 分别为 `5D0BC4F72F298F65` 与 `7D7BF73D7B48D4AC`；single/parallel 必须命中各自
+1/10 角色的 fixed digest 分别为 `12CD6393BA75A1F9` 与 `7BE3F9467CC4EB63`；single/parallel 必须命中各自
 基线且相互相等。motor smoke 的成功 marker 为 `GODOT_ALS_P3A_MOTOR_OK cases=7`。
 
 Core 热路径对 gait、stance、rotation mode 和 locomotion history 的合法性检查使用连续 byte enum 的显式
@@ -178,10 +180,14 @@ pwsh -NoProfile -File scripts/verify-p2b.ps1 `
 `P3A_VERIFICATION_OK`；同时 Release Core/Import、Pester、motor 与四矩阵都必须通过且无脚本错误。
 
 `-SkipRegression` 只允许 focused 开发迭代：它跳过 Pester、motor 以及上述 P2B/P1/P0/final test 回归，
-仅保留 build 与 P3A 四矩阵以缩短定位周期。它不是默认值，任何带该开关的运行均禁止作为 completion
-evidence。reference/golden 再生成属于独立的受控维护操作，也不能由 `-SkipRegression` 替代。
+仅保留 build 与 P3A 四矩阵以缩短定位周期。该路径只输出
+`P3A_FOCUSED_VERIFICATION_OK regression=skipped`，绝不输出 `P3A_VERIFICATION_OK`，因此不能冒充正式
+completion evidence。reference/golden 再生成属于独立的受控维护操作，也不能由 `-SkipRegression` 替代。
 
-仓库收口还需执行：
+正式 non-Skip 入口在打印 `P3A_VERIFICATION_OK` 前自动执行 `git diff HEAD --check`，并检查全部 tracked 路径；
+`.godot/.mono/bin/obj`、UE `Binaries/Intermediate/Saved/DerivedDataCache/StagedBuilds/Cooked`、生成资产、
+benchmark/artifact 输出（保留 `.gdignore` sentinel）以及编译/打包扩展名均会使 gate 失败。负例测试锁定
+whitespace error 和误跟踪输出都不能越过正式成功 marker。人工收口复核仍执行：
 
 ```powershell
 git diff --check

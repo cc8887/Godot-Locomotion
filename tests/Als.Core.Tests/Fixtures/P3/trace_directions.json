@@ -3492,7 +3492,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.37540975213050842,
-				"targetYaw": -0.015868136659264565
+				"targetYaw": 0
 			},
 			"tick": 37,
 			"time": 0.6166666666666667
@@ -3584,7 +3584,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.56588590145111084,
-				"targetYaw": -0.031736269593238831
+				"targetYaw": 0
 			},
 			"tick": 38,
 			"time": 0.6333333333333333
@@ -3676,7 +3676,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.75636208057403564,
-				"targetYaw": -0.047604408115148544
+				"targetYaw": 0
 			},
 			"tick": 39,
 			"time": 0.65000000000000002
@@ -3768,7 +3768,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.94683831930160522,
-				"targetYaw": -0.063472539186477661
+				"targetYaw": 0
 			},
 			"tick": 40,
 			"time": 0.66666666666666663
@@ -3860,7 +3860,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.53074675798416138,
-				"targetYaw": -0.079340681433677673
+				"targetYaw": 0
 			},
 			"tick": 41,
 			"time": 0.68333333333333335
@@ -3952,7 +3952,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.61963564157485962,
-				"targetYaw": -0.095208808779716492
+				"targetYaw": 0
 			},
 			"tick": 42,
 			"time": 0.69999999999999996
@@ -4044,7 +4044,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.70852458477020264,
-				"targetYaw": -0.11107694357633591
+				"targetYaw": 0
 			},
 			"tick": 43,
 			"time": 0.71666666666666667
@@ -4136,7 +4136,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.79741346836090088,
-				"targetYaw": -0.12694507837295532
+				"targetYaw": 0
 			},
 			"tick": 44,
 			"time": 0.73333333333333328
@@ -4228,7 +4228,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.88630235195159912,
-				"targetYaw": -0.14281320571899414
+				"targetYaw": 0
 			},
 			"tick": 45,
 			"time": 0.75
@@ -4320,7 +4320,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.97519123554229736,
-				"targetYaw": -0.15868136286735535
+				"targetYaw": 0
 			},
 			"tick": 46,
 			"time": 0.76666666666666661
@@ -4412,7 +4412,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.17454950511455536
+				"targetYaw": 0
 			},
 			"tick": 47,
 			"time": 0.78333333333333333
@@ -4504,7 +4504,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.19041763246059418
+				"targetYaw": 0
 			},
 			"tick": 48,
 			"time": 0.80000000000000004
@@ -4596,7 +4596,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.20628577470779419
+				"targetYaw": 0
 			},
 			"tick": 49,
 			"time": 0.81666666666666665
@@ -4688,7 +4688,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.22215390205383301
+				"targetYaw": 0
 			},
 			"tick": 50,
 			"time": 0.83333333333333337
@@ -4780,7 +4780,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.23802204430103302
+				"targetYaw": 0
 			},
 			"tick": 51,
 			"time": 0.84999999999999998
@@ -4872,7 +4872,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.25389015674591064
+				"targetYaw": 0
 			},
 			"tick": 52,
 			"time": 0.8666666666666667
@@ -4964,7 +4964,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.26975828409194946
+				"targetYaw": 0
 			},
 			"tick": 53,
 			"time": 0.8833333333333333
@@ -5056,7 +5056,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.28562641143798828
+				"targetYaw": 0
 			},
 			"tick": 54,
 			"time": 0.90000000000000002
@@ -5148,7 +5148,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.30149450898170471
+				"targetYaw": 0
 			},
 			"tick": 55,
 			"time": 0.91666666666666663
@@ -5240,7 +5240,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.31736266613006592
+				"targetYaw": 0
 			},
 			"tick": 56,
 			"time": 0.93333333333333335
@@ -5332,7 +5332,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.33323076367378235
+				"targetYaw": 0
 			},
 			"tick": 57,
 			"time": 0.94999999999999996
@@ -5424,7 +5424,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.34275171160697937
+				"targetYaw": 0
 			},
 			"tick": 58,
 			"time": 0.96666666666666667
@@ -5516,7 +5516,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.34275171160697937
+				"targetYaw": 0
 			},
 			"tick": 59,
 			"time": 0.98333333333333328
@@ -5608,7 +5608,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.94620746374130249,
-				"targetYaw": -0.32688358426094055
+				"targetYaw": 0
 			},
 			"tick": 60,
 			"time": 1
@@ -5700,7 +5700,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.91934549808502197,
-				"targetYaw": -0.31101539731025696
+				"targetYaw": 0
 			},
 			"tick": 61,
 			"time": 1.0166666666666666
@@ -5792,7 +5792,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.9166678786277771,
-				"targetYaw": -0.28550675511360168
+				"targetYaw": 0.0096405074000358582
 			},
 			"tick": 62,
 			"time": 1.0333333333333332
@@ -5884,7 +5884,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.93444538116455078,
-				"targetYaw": -0.25107479095458984
+				"targetYaw": 0.02820427343249321
 			},
 			"tick": 63,
 			"time": 1.05
@@ -5976,7 +5976,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.96871763467788696,
-				"targetYaw": -0.20838356018066406
+				"targetYaw": 0.055027391761541367
 			},
 			"tick": 64,
 			"time": 1.0666666666666667
@@ -6068,7 +6068,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.15820474922657013
+				"targetYaw": 0.089495368301868439
 			},
 			"tick": 65,
 			"time": 1.0833333333333333
@@ -6160,7 +6160,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.10630784928798676
+				"targetYaw": 0.13103941082954407
 			},
 			"tick": 66,
 			"time": 1.1000000000000001
@@ -6252,7 +6252,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.049239784479141235
+				"targetYaw": 0.17903755605220795
 			},
 			"tick": 67,
 			"time": 1.1166666666666667
@@ -6344,7 +6344,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.0093787712976336479
+				"targetYaw": 0.22975440323352814
 			},
 			"tick": 68,
 			"time": 1.1333333333333333
@@ -6436,7 +6436,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.068279936909675598
+				"targetYaw": 0.28180029988288879
 			},
 			"tick": 69,
 			"time": 1.1499999999999999
@@ -6528,7 +6528,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.11278095841407776
+				"targetYaw": 0.32037273049354553
 			},
 			"tick": 70,
 			"time": 1.1666666666666667
@@ -6620,7 +6620,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.14514081180095673
+				"targetYaw": 0.34761714935302734
 			},
 			"tick": 71,
 			"time": 1.1833333333333333
@@ -6712,7 +6712,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.16725428402423859
+				"targetYaw": 0.36532464623451233
 			},
 			"tick": 72,
 			"time": 1.2
@@ -6804,7 +6804,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.18082739412784576
+				"targetYaw": 0.37510755658149719
 			},
 			"tick": 73,
 			"time": 1.2166666666666666
@@ -6896,7 +6896,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.18737252056598663
+				"targetYaw": 0.37839540839195251
 			},
 			"tick": 74,
 			"time": 1.2333333333333334
@@ -6988,7 +6988,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.18821366131305695
+				"targetYaw": 0.37643909454345703
 			},
 			"tick": 75,
 			"time": 1.25
@@ -7080,7 +7080,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.1844966858625412
+				"targetYaw": 0.37032091617584229
 			},
 			"tick": 76,
 			"time": 1.2666666666666666
@@ -7172,7 +7172,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.17720374464988708
+				"targetYaw": 0.36096757650375366
 			},
 			"tick": 77,
 			"time": 1.2833333333333332
@@ -7264,7 +7264,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.16716855764389038
+				"targetYaw": 0.34916502237319946
 			},
 			"tick": 78,
 			"time": 1.3
@@ -7356,7 +7356,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.15509270131587982
+				"targetYaw": 0.33557340502738953
 			},
 			"tick": 79,
 			"time": 1.3166666666666667
@@ -7448,7 +7448,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.14156101644039154
+				"targetYaw": 0.3207419216632843
 			},
 			"tick": 80,
 			"time": 1.3333333333333333
@@ -7540,7 +7540,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.1270565539598465
+				"targetYaw": 0.30512309074401855
 			},
 			"tick": 81,
 			"time": 1.3500000000000001
@@ -7632,7 +7632,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.11197422444820404
+				"targetYaw": 0.28908532857894897
 			},
 			"tick": 82,
 			"time": 1.3666666666666667
@@ -7724,7 +7724,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.096633262932300568
+				"targetYaw": 0.27292525768280029
 			},
 			"tick": 83,
 			"time": 1.3833333333333333
@@ -7816,7 +7816,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.081288397312164307
+				"targetYaw": 0.25687822699546814
 			},
 			"tick": 84,
 			"time": 1.3999999999999999
@@ -7908,7 +7908,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.066139586269855499
+				"targetYaw": 0.24112752079963684
 			},
 			"tick": 85,
 			"time": 1.4166666666666667
@@ -8000,7 +8000,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.051341202110052109
+				"targetYaw": 0.22581319510936737
 			},
 			"tick": 86,
 			"time": 1.4333333333333333
@@ -8092,7 +8092,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.037009235471487045
+				"targetYaw": 0.21103893220424652
 			},
 			"tick": 87,
 			"time": 1.45
@@ -8184,7 +8184,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.023227941244840622
+				"targetYaw": 0.19687855243682861
 			},
 			"tick": 88,
 			"time": 1.4666666666666666
@@ -8276,7 +8276,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.010055647231638432
+				"targetYaw": 0.18338130414485931
 			},
 			"tick": 89,
 			"time": 1.4833333333333334
@@ -8368,7 +8368,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.77780753374099731,
-				"targetYaw": -0.0031389514915645123
+				"targetYaw": 0.17057661712169647
 			},
 			"tick": 90,
 			"time": 1.5
@@ -8460,7 +8460,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.57445168495178223,
-				"targetYaw": -0.015832841396331787
+				"targetYaw": 0.15847791731357574
 			},
 			"tick": 91,
 			"time": 1.5166666666666666
@@ -8552,7 +8552,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.84376329183578491,
-				"targetYaw": -0.028069967404007912
+				"targetYaw": 0.14724564552307129
 			},
 			"tick": 92,
 			"time": 1.5333333333333332
@@ -8644,7 +8644,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.51291626691818237,
-				"targetYaw": -0.040517333894968033
+				"targetYaw": 0.1368011087179184
 			},
 			"tick": 93,
 			"time": 1.55
@@ -9012,7 +9012,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.37782931327819824,
-				"targetYaw": 0.12288194894790649
+				"targetYaw": 0.093674510717391968
 			},
 			"tick": 97,
 			"time": 1.6166666666666667
@@ -9104,7 +9104,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.56812113523483276,
-				"targetYaw": 0.13323991000652313
+				"targetYaw": 0.088164336979389191
 			},
 			"tick": 98,
 			"time": 1.6333333333333333
@@ -9196,7 +9196,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.75851476192474365,
-				"targetYaw": 0.1434081494808197
+				"targetYaw": 0.082464434206485748
 			},
 			"tick": 99,
 			"time": 1.6499999999999999
@@ -9288,7 +9288,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.94894659519195557,
-				"targetYaw": 0.15374352037906647
+				"targetYaw": 0.076931685209274292
 			},
 			"tick": 100,
 			"time": 1.6666666666666667
@@ -9380,7 +9380,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.53171837329864502,
-				"targetYaw": 0.16432760655879974
+				"targetYaw": 0.071647629141807556
 			},
 			"tick": 101,
 			"time": 1.6833333333333333
@@ -9472,7 +9472,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.62059950828552246,
-				"targetYaw": 0.1751861572265625
+				"targetYaw": 0.066638059914112091
 			},
 			"tick": 102,
 			"time": 1.7
@@ -9564,7 +9564,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.70948320627212524,
-				"targetYaw": 0.18632616102695465
+				"targetYaw": 0.061909940093755722
 			},
 			"tick": 103,
 			"time": 1.7166666666666666
@@ -9656,7 +9656,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.79836857318878174,
-				"targetYaw": 0.19774675369262695
+				"targetYaw": 0.057462383061647415
 			},
 			"tick": 104,
 			"time": 1.7333333333333334
@@ -9748,7 +9748,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.88725501298904419,
-				"targetYaw": 0.20944243669509888
+				"targetYaw": 0.053289927542209625
 			},
 			"tick": 105,
 			"time": 1.75
@@ -9840,7 +9840,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.97614210844039917,
-				"targetYaw": 0.22124992311000824
+				"targetYaw": 0.04938434436917305
 			},
 			"tick": 106,
 			"time": 1.7666666666666666
@@ -9932,7 +9932,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.21753016114234924
+				"targetYaw": 0.045735724270343781
 			},
 			"tick": 107,
 			"time": 1.7833333333333332
@@ -10024,7 +10024,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.21406778693199158
+				"targetYaw": 0.042333140969276428
 			},
 			"tick": 108,
 			"time": 1.8
@@ -10116,7 +10116,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.21084843575954437
+				"targetYaw": 0.039165060967206955
 			},
 			"tick": 109,
 			"time": 1.8166666666666667
@@ -10208,7 +10208,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.20785929262638092
+				"targetYaw": 0.036219846457242966
 			},
 			"tick": 110,
 			"time": 1.8333333333333333
@@ -10300,7 +10300,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.20508776605129242
+				"targetYaw": 0.03348599374294281
 			},
 			"tick": 111,
 			"time": 1.8499999999999999
@@ -10392,7 +10392,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.20252150297164917
+				"targetYaw": 0.030951984226703644
 			},
 			"tick": 112,
 			"time": 1.8666666666666667
@@ -10484,7 +10484,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.20014829933643341
+				"targetYaw": 0.028606448322534561
 			},
 			"tick": 113,
 			"time": 1.8833333333333333
@@ -10576,7 +10576,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.19795612990856171
+				"targetYaw": 0.026437994092702866
 			},
 			"tick": 114,
 			"time": 1.8999999999999999
@@ -10668,7 +10668,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.19593295454978943
+				"targetYaw": 0.024435130879282951
 			},
 			"tick": 115,
 			"time": 1.9166666666666667
@@ -10760,7 +10760,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.19406686723232269
+				"targetYaw": 0.022586477920413017
 			},
 			"tick": 116,
 			"time": 1.9333333333333333
@@ -10852,7 +10852,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.19234639406204224
+				"targetYaw": 0.020880943164229393
 			},
 			"tick": 117,
 			"time": 1.95
@@ -10944,7 +10944,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.19076050817966461
+				"targetYaw": 0.019307859241962433
 			},
 			"tick": 118,
 			"time": 1.9666666666666666
@@ -11036,7 +11036,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.18929876387119293
+				"targetYaw": 0.017857056111097336
 			},
 			"tick": 119,
 			"time": 1.9833333333333334
@@ -11128,7 +11128,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.83057922124862671,
-				"targetYaw": 0.17347846925258636
+				"targetYaw": 0.016518939286470413
 			},
 			"tick": 120,
 			"time": 2
@@ -11220,7 +11220,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.69062262773513794,
-				"targetYaw": 0.15637591481208801
+				"targetYaw": 0.01528452429920435
 			},
 			"tick": 121,
 			"time": 2.0166666666666666
@@ -11312,7 +11312,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.58592641353607178,
-				"targetYaw": 0.14547212421894073
+				"targetYaw": 0.020248876884579659
 			},
 			"tick": 122,
 			"time": 2.0333333333333332
@@ -11404,7 +11404,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.52040696144104004,
-				"targetYaw": 0.14108555018901825
+				"targetYaw": 0.031730454415082932
 			},
 			"tick": 123,
 			"time": 2.0499999999999998
@@ -11496,7 +11496,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.49417448043823242,
-				"targetYaw": 0.14317461848258972
+				"targetYaw": 0.049687676131725311
 			},
 			"tick": 124,
 			"time": 2.0666666666666664
@@ -11588,7 +11588,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.50233030319213867,
-				"targetYaw": 0.1377558559179306
+				"targetYaw": 0.060137048363685608
 			},
 			"tick": 125,
 			"time": 2.0833333333333335
@@ -11680,7 +11680,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.53672397136688232,
-				"targetYaw": 0.12596052885055542
+				"targetYaw": 0.064209863543510437
 			},
 			"tick": 126,
 			"time": 2.1000000000000001
@@ -11772,7 +11772,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.58923566341400146,
-				"targetYaw": 0.1094248965382576
+				"targetYaw": 0.063542373478412628
 			},
 			"tick": 127,
 			"time": 2.1166666666666667
@@ -11864,7 +11864,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.65364521741867065,
-				"targetYaw": 0.089697085320949554
+				"targetYaw": 0.059682711958885193
 			},
 			"tick": 128,
 			"time": 2.1333333333333333
@@ -11956,7 +11956,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.72576946020126343,
-				"targetYaw": 0.073642663657665253
+				"targetYaw": 0.059496428817510605
 			},
 			"tick": 129,
 			"time": 2.1499999999999999
@@ -12048,7 +12048,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.80293786525726318,
-				"targetYaw": 0.062955029308795929
+				"targetYaw": 0.064676932990550995
 			},
 			"tick": 130,
 			"time": 2.1666666666666665
@@ -12140,7 +12140,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.88346207141876221,
-				"targetYaw": 0.055932857096195221
+				"targetYaw": 0.073522895574569702
 			},
 			"tick": 131,
 			"time": 2.1833333333333331
@@ -12232,7 +12232,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.96626508235931396,
-				"targetYaw": 0.051098804920911789
+				"targetYaw": 0.084556981921195984
 			},
 			"tick": 132,
 			"time": 2.2000000000000002
@@ -12324,7 +12324,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.047207452356815338
+				"targetYaw": 0.09653376042842865
 			},
 			"tick": 133,
 			"time": 2.2166666666666668
@@ -12416,7 +12416,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.043693892657756805
+				"targetYaw": 0.10841997712850571
 			},
 			"tick": 134,
 			"time": 2.2333333333333334
@@ -12508,7 +12508,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.051660813391208649
+				"targetYaw": 0.11937014758586884
 			},
 			"tick": 135,
 			"time": 2.25
@@ -12600,7 +12600,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.058467131108045578
+				"targetYaw": 0.12873771786689758
 			},
 			"tick": 136,
 			"time": 2.2666666666666666
@@ -12692,7 +12692,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.063542410731315613
+				"targetYaw": 0.13601098954677582
 			},
 			"tick": 137,
 			"time": 2.2833333333333332
@@ -12784,7 +12784,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.066424444317817688
+				"targetYaw": 0.14077867567539215
 			},
 			"tick": 138,
 			"time": 2.2999999999999998
@@ -12876,7 +12876,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.066760264337062836
+				"targetYaw": 0.14273181557655334
 			},
 			"tick": 139,
 			"time": 2.3166666666666664
@@ -12968,7 +12968,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.064368113875389099
+				"targetYaw": 0.14172656834125519
 			},
 			"tick": 140,
 			"time": 2.3333333333333335
@@ -13060,7 +13060,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.05920812115073204
+				"targetYaw": 0.13775579631328583
 			},
 			"tick": 141,
 			"time": 2.3500000000000001
@@ -13152,7 +13152,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.051293913275003433
+				"targetYaw": 0.13086117804050446
 			},
 			"tick": 142,
 			"time": 2.3666666666666667
@@ -13244,7 +13244,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.04068363830447197
+				"targetYaw": 0.12112502753734589
 			},
 			"tick": 143,
 			"time": 2.3833333333333333
@@ -13336,7 +13336,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.02747228741645813
+				"targetYaw": 0.10866298526525497
 			},
 			"tick": 144,
 			"time": 2.3999999999999999
@@ -13428,7 +13428,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.011784829199314117
+				"targetYaw": 0.093617886304855347
 			},
 			"tick": 145,
 			"time": 2.4166666666666665
@@ -13520,7 +13520,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.006229108665138483
+				"targetYaw": 0.07615458220243454
 			},
 			"tick": 146,
 			"time": 2.4333333333333331
@@ -13612,7 +13612,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.026400048285722733
+				"targetYaw": 0.056455623358488083
 			},
 			"tick": 147,
 			"time": 2.4500000000000002
@@ -13704,7 +13704,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.048542656004428864
+				"targetYaw": 0.034717585891485214
 			},
 			"tick": 148,
 			"time": 2.4666666666666668
@@ -13796,7 +13796,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.072458900511264801
+				"targetYaw": 0.011148145422339439
 			},
 			"tick": 149,
 			"time": 2.4833333333333334
@@ -13888,7 +13888,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.94912934303283691,
-				"targetYaw": -0.081775382161140442
+				"targetYaw": -0.014036481268703938
 			},
 			"tick": 150,
 			"time": 2.5
@@ -13980,7 +13980,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.92483806610107422,
-				"targetYaw": -0.09248429536819458
+				"targetYaw": -0.040613535791635513
 			},
 			"tick": 151,
 			"time": 2.5166666666666666
@@ -14072,7 +14072,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.92427700757980347,
-				"targetYaw": -0.097664408385753632
+				"targetYaw": -0.06166178360581398
 			},
 			"tick": 152,
 			"time": 2.5333333333333332
@@ -14164,7 +14164,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.94370174407958984,
-				"targetYaw": -0.096361614763736725
+				"targetYaw": -0.076227135956287384
 			},
 			"tick": 153,
 			"time": 2.5499999999999998
@@ -14256,7 +14256,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.9792022705078125,
-				"targetYaw": -0.088148809969425201
+				"targetYaw": -0.083882465958595276
 			},
 			"tick": 154,
 			"time": 2.5666666666666664
@@ -14348,7 +14348,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.074418224394321442
+				"targetYaw": -0.084702804684638977
 			},
 			"tick": 155,
 			"time": 2.5833333333333335
@@ -14440,7 +14440,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.058626171201467514
+				"targetYaw": -0.079151876270771027
 			},
 			"tick": 156,
 			"time": 2.6000000000000001
@@ -14532,7 +14532,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.03798452764749527
+				"targetYaw": -0.067477494478225708
 			},
 			"tick": 157,
 			"time": 2.6166666666666667
@@ -14624,7 +14624,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.013375584967434406
+				"targetYaw": -0.050677742809057236
 			},
 			"tick": 158,
 			"time": 2.6333333333333333
@@ -14716,7 +14716,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.01438448578119278
+				"targetYaw": -0.02969055250287056
 			},
 			"tick": 159,
 			"time": 2.6499999999999999
@@ -14808,7 +14808,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.04453461617231369
+				"targetYaw": -0.0053965752013027668
 			},
 			"tick": 160,
 			"time": 2.6666666666666665
@@ -14900,7 +14900,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.076375074684619904
+				"targetYaw": 0.021391903981566429
 			},
 			"tick": 161,
 			"time": 2.6833333333333331
@@ -14992,7 +14992,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.10926971584558487
+				"targetYaw": 0.049935664981603622
 			},
 			"tick": 162,
 			"time": 2.7000000000000002
@@ -15084,7 +15084,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.14264535903930664
+				"targetYaw": 0.079568937420845032
 			},
 			"tick": 163,
 			"time": 2.7166666666666668
@@ -15176,7 +15176,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.17598918080329895
+				"targetYaw": 0.10969670116901398
 			},
 			"tick": 164,
 			"time": 2.7333333333333334
@@ -15268,7 +15268,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.20891089737415314
+				"targetYaw": 0.13985659182071686
 			},
 			"tick": 165,
 			"time": 2.75
@@ -15360,7 +15360,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.241151362657547
+				"targetYaw": 0.16972644627094269
 			},
 			"tick": 166,
 			"time": 2.7666666666666666
@@ -15452,7 +15452,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.27251085638999939
+				"targetYaw": 0.19905191659927368
 			},
 			"tick": 167,
 			"time": 2.7833333333333332
@@ -15544,7 +15544,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.30283945798873901
+				"targetYaw": 0.22763577103614807
 			},
 			"tick": 168,
 			"time": 2.7999999999999998
@@ -15636,7 +15636,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.33202874660491943
+				"targetYaw": 0.2553287148475647
 			},
 			"tick": 169,
 			"time": 2.8166666666666664
@@ -15728,7 +15728,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.36000445485115051
+				"targetYaw": 0.28202134370803833
 			},
 			"tick": 170,
 			"time": 2.8333333333333335
@@ -15820,7 +15820,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.38672026991844177
+				"targetYaw": 0.30763700604438782
 			},
 			"tick": 171,
 			"time": 2.8500000000000001
@@ -15912,7 +15912,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.41215291619300842
+				"targetYaw": 0.33212646842002869
 			},
 			"tick": 172,
 			"time": 2.8666666666666667
@@ -16004,7 +16004,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.436297208070755
+				"targetYaw": 0.35546225309371948
 			},
 			"tick": 173,
 			"time": 2.8833333333333333
@@ -16096,7 +16096,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.45916301012039185
+				"targetYaw": 0.37763488292694092
 			},
 			"tick": 174,
 			"time": 2.8999999999999999
@@ -16188,7 +16188,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.48077133297920227
+				"targetYaw": 0.39864906668663025
 			},
 			"tick": 175,
 			"time": 2.9166666666666665
@@ -16280,7 +16280,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.50115251541137695
+				"targetYaw": 0.41852089762687683
 			},
 			"tick": 176,
 			"time": 2.9333333333333331
@@ -16372,7 +16372,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.52034348249435425
+				"targetYaw": 0.43727526068687439
 			},
 			"tick": 177,
 			"time": 2.9500000000000002
@@ -16464,7 +16464,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.53838610649108887
+				"targetYaw": 0.45494371652603149
 			},
 			"tick": 178,
 			"time": 2.9666666666666668
@@ -16556,7 +16556,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.55532610416412354
+				"targetYaw": 0.47156289219856262
 			},
 			"tick": 179,
 			"time": 2.9833333333333334
@@ -16648,7 +16648,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.77780681848526001,
-				"targetYaw": 0.57055115699768066
+				"targetYaw": 0.48717284202575684
 			},
 			"tick": 180,
 			"time": 3
@@ -16740,7 +16740,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.57444995641708374,
-				"targetYaw": 0.58460712432861328
+				"targetYaw": 0.50181639194488525
 			},
 			"tick": 181,
 			"time": 3.0166666666666666
@@ -16832,7 +16832,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.84375631809234619,
-				"targetYaw": 0.59693533182144165
+				"targetYaw": 0.51513653993606567
 			},
 			"tick": 182,
 			"time": 3.0333333333333332
@@ -16924,7 +16924,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.51290398836135864,
-				"targetYaw": 0.6069304347038269
+				"targetYaw": 0.52710872888565063
 			},
 			"tick": 183,
 			"time": 3.0499999999999998
@@ -17660,7 +17660,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.53169983625411987,
-				"targetYaw": 0.57408219575881958
+				"targetYaw": 0.58601319789886475
 			},
 			"tick": 191,
 			"time": 3.1833333333333331
@@ -17752,7 +17752,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.62058120965957642,
-				"targetYaw": 0.56772035360336304
+				"targetYaw": 0.5955195426940918
 			},
 			"tick": 192,
 			"time": 3.2000000000000002
@@ -17844,7 +17844,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.70946502685546875,
-				"targetYaw": 0.56040352582931519
+				"targetYaw": 0.60407084226608276
 			},
 			"tick": 193,
 			"time": 3.2166666666666668
@@ -17936,7 +17936,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.79835051298141479,
-				"targetYaw": 0.55228036642074585
+				"targetYaw": 0.61181581020355225
 			},
 			"tick": 194,
 			"time": 3.2333333333333334
@@ -18028,7 +18028,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.88723695278167725,
-				"targetYaw": 0.54345870018005371
+				"targetYaw": 0.6188623309135437
 			},
 			"tick": 195,
 			"time": 3.25
@@ -18120,7 +18120,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.976124107837677,
-				"targetYaw": 0.53402233123779297
+				"targetYaw": 0.625294029712677
 			},
 			"tick": 196,
 			"time": 3.2666666666666666
@@ -18212,7 +18212,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.52403831481933594
+				"targetYaw": 0.63117814064025879
 			},
 			"tick": 197,
 			"time": 3.2833333333333332
@@ -18304,7 +18304,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.51356267929077148
+				"targetYaw": 0.63657069206237793
 			},
 			"tick": 198,
 			"time": 3.2999999999999998
@@ -18396,7 +18396,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.50264322757720947
+				"targetYaw": 0.64151936769485474
 			},
 			"tick": 199,
 			"time": 3.3166666666666664
@@ -18488,7 +18488,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.49131965637207031
+				"targetYaw": 0.64606392383575439
 			},
 			"tick": 200,
 			"time": 3.3333333333333335
@@ -18580,7 +18580,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.47962722182273865
+				"targetYaw": 0.65023964643478394
 			},
 			"tick": 201,
 			"time": 3.3500000000000001
@@ -18672,7 +18672,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.46759778261184692
+				"targetYaw": 0.65407836437225342
 			},
 			"tick": 202,
 			"time": 3.3666666666666667
@@ -18764,7 +18764,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.45526012778282166
+				"targetYaw": 0.65760880708694458
 			},
 			"tick": 203,
 			"time": 3.3833333333333333
@@ -18856,7 +18856,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.44264054298400879
+				"targetYaw": 0.66085737943649292
 			},
 			"tick": 204,
 			"time": 3.3999999999999999
@@ -18948,7 +18948,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.42976272106170654
+				"targetYaw": 0.66384762525558472
 			},
 			"tick": 205,
 			"time": 3.4166666666666665
@@ -19040,7 +19040,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.41664803028106689
+				"targetYaw": 0.66660106182098389
 			},
 			"tick": 206,
 			"time": 3.4333333333333331
@@ -19132,7 +19132,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.41216212511062622
+				"targetYaw": 0.66913753747940063
 			},
 			"tick": 207,
 			"time": 3.4499999999999997
@@ -19224,7 +19224,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.41448688507080078
+				"targetYaw": 0.67147481441497803
 			},
 			"tick": 208,
 			"time": 3.4666666666666668
@@ -19316,7 +19316,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.41663047671318054
+				"targetYaw": 0.6736292839050293
 			},
 			"tick": 209,
 			"time": 3.4833333333333334
@@ -19408,7 +19408,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.94611614942550659,
-				"targetYaw": 1.0882525444030762
+				"targetYaw": 0.67561578750610352
 			},
 			"tick": 210,
 			"time": 3.5
@@ -19500,7 +19500,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.9191734790802002,
-				"targetYaw": 1.074216365814209
+				"targetYaw": 0.6774478554725647
 			},
 			"tick": 211,
 			"time": 3.5166666666666666
@@ -19592,7 +19592,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.91642946004867554,
-				"targetYaw": 1.0504035949707031
+				"targetYaw": 0.66950315237045288
 			},
 			"tick": 212,
 			"time": 3.5333333333333332
@@ -19684,7 +19684,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.93415528535842896,
-				"targetYaw": 1.0175414085388184
+				"targetYaw": 0.65250903367996216
 			},
 			"tick": 213,
 			"time": 3.5499999999999998
@@ -19776,7 +19776,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 0.96838897466659546,
-				"targetYaw": 0.97630292177200317
+				"targetYaw": 0.62713873386383057
 			},
 			"tick": 214,
 			"time": 3.5666666666666664
@@ -19868,7 +19868,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.92743229866027832
+				"targetYaw": 0.59401553869247437
 			},
 			"tick": 215,
 			"time": 3.5833333333333335
@@ -19960,7 +19960,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.87677675485610962
+				"targetYaw": 0.55371624231338501
 			},
 			"tick": 216,
 			"time": 3.6000000000000001
@@ -20052,7 +20052,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.8208356499671936
+				"targetYaw": 0.50684821605682373
 			},
 			"tick": 217,
 			"time": 3.6166666666666667
@@ -20144,7 +20144,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.76325803995132446
+				"targetYaw": 0.45717528462409973
 			},
 			"tick": 218,
 			"time": 3.6333333333333333
@@ -20236,7 +20236,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.70491063594818115
+				"targetYaw": 0.40568572282791138
 			},
 			"tick": 219,
 			"time": 3.6499999999999999
@@ -20328,7 +20328,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.6465187668800354
+				"targetYaw": 0.35322469472885132
 			},
 			"tick": 220,
 			"time": 3.6666666666666665
@@ -20420,7 +20420,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.58867710828781128
+				"targetYaw": 0.30050048232078552
 			},
 			"tick": 221,
 			"time": 3.6833333333333331
@@ -20512,7 +20512,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.53186458349227905
+				"targetYaw": 0.24809564650058746
 			},
 			"tick": 222,
 			"time": 3.6999999999999997
@@ -20604,7 +20604,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.47645804286003113
+				"targetYaw": 0.19648076593875885
 			},
 			"tick": 223,
 			"time": 3.7166666666666668
@@ -20696,7 +20696,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.42274683713912964
+				"targetYaw": 0.14602817595005035
 			},
 			"tick": 224,
 			"time": 3.7333333333333334
@@ -20788,7 +20788,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.37094584107398987
+				"targetYaw": 0.097025729715824127
 			},
 			"tick": 225,
 			"time": 3.75
@@ -20880,7 +20880,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.32120725512504578
+				"targetYaw": 0.049689322710037231
 			},
 			"tick": 226,
 			"time": 3.7666666666666666
@@ -20972,7 +20972,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.27363127470016479
+				"targetYaw": 0.0041745416820049286
 			},
 			"tick": 227,
 			"time": 3.7833333333333332
@@ -21064,7 +21064,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.2282753586769104
+				"targetYaw": -0.039413321763277054
 			},
 			"tick": 228,
 			"time": 3.7999999999999998
@@ -21156,7 +21156,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.18516182899475098
+				"targetYaw": -0.081010453402996063
 			},
 			"tick": 229,
 			"time": 3.8166666666666664
@@ -21248,7 +21248,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.14428503811359406
+				"targetYaw": -0.12058696150779724
 			},
 			"tick": 230,
 			"time": 3.8333333333333335
@@ -21340,7 +21340,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.10561690479516983
+				"targetYaw": -0.15814024209976196
 			},
 			"tick": 231,
 			"time": 3.8500000000000001
@@ -21432,7 +21432,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.06911187618970871
+				"targetYaw": -0.19368945062160492
 			},
 			"tick": 232,
 			"time": 3.8666666666666667
@@ -21524,7 +21524,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.034710757434368134
+				"targetYaw": -0.22727115452289581
 			},
 			"tick": 233,
 			"time": 3.8833333333333333
@@ -21616,7 +21616,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": 0.0023443805985152721
+				"targetYaw": -0.25893506407737732
 			},
 			"tick": 234,
 			"time": 3.8999999999999999
@@ -21708,7 +21708,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.028063725680112839
+				"targetYaw": -0.28874099254608154
 			},
 			"tick": 235,
 			"time": 3.9166666666666665
@@ -21800,7 +21800,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.056594967842102051
+				"targetYaw": -0.31675606966018677
 			},
 			"tick": 236,
 			"time": 3.9333333333333331
@@ -21892,7 +21892,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.083333969116210938
+				"targetYaw": -0.34305268526077271
 			},
 			"tick": 237,
 			"time": 3.9499999999999997
@@ -21984,7 +21984,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.10806455463171005
+				"targetYaw": -0.36740398406982422
 			},
 			"tick": 238,
 			"time": 3.9666666666666668
@@ -22076,7 +22076,7 @@
 				"rotationMode": "LookingDirection",
 				"stance": "Standing",
 				"stride": 1,
-				"targetYaw": -0.13125260174274445
+				"targetYaw": -0.39026695489883423
 			},
 			"tick": 239,
 			"time": 3.9833333333333334

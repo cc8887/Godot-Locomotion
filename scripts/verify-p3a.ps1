@@ -113,7 +113,10 @@ if (-not $SkipRegression) {
 
     dotnet test $solutionPath -c Release --no-restore
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath
 }
 
-Write-Output 'P3A_VERIFICATION_OK'
+$completionMarker = Get-P3aCompletionMarker -RegressionSkipped ([bool]$SkipRegression)
+Write-Output $completionMarker
 exit 0
