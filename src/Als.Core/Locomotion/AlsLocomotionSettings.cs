@@ -156,6 +156,7 @@ public sealed class AlsLocomotionSettings
             RequireInt32(root, "schemaVersion", 1);
             RequireString(root, "kind", "settings");
             RequireString(root, "referenceCommit", ReferenceCommit);
+            RequireDouble(root, "fixedDeltaSeconds", 1d / 60d);
             ValidatePatchHashes(root.GetProperty("patchHashes"));
 
             var sources = root.GetProperty("sources");
@@ -243,6 +244,18 @@ public sealed class AlsLocomotionSettings
         if (element.ValueKind != JsonValueKind.String || element.GetString() != expected)
         {
             throw new FormatException($"{propertyName} does not match the locked value.");
+        }
+    }
+
+    private static void RequireDouble(JsonElement parent, string propertyName, double expected)
+    {
+        var element = parent.GetProperty(propertyName);
+        if (element.ValueKind != JsonValueKind.Number ||
+            !element.TryGetDouble(out var value) ||
+            !double.IsFinite(value) ||
+            value != expected)
+        {
+            throw new FormatException($"{propertyName} does not match the locked value {expected:R}.");
         }
     }
 
