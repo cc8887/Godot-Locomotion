@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "mannequin": "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07",
+  "standingIdle": "621a81bf492cb9120b45cfd91b685854afb7dc75",
+  "crouchingIdle": "146fff5000e151a3790ba5aca8a5bfee4363e909",
+  "standingSamples": [
+    {
+      "animation": "6124eafdcbeaaf04bca366add34c821faa0e4963",
+      "x": 0.0,
+      "y": 0.5,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "44a7f89b2c1dac832ca63753c131a037420f9d7e",
+      "x": -0.353553,
+      "y": 0.353553,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "fc2d3a4142a1bd82d20877d806c783ff56dfe688",
+      "x": 0.353553,
+      "y": 0.353553,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+      "x": 0.0,
+      "y": -0.5,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+      "x": -0.353553,
+      "y": -0.353553,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "eb84a748fee4615754ce3cbcd3c259b33918b935",
+      "x": 0.353553,
+      "y": -0.353553,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "572c3c83c9007964c233db4c7288ae38e20c3dec",
+      "x": 0.0,
+      "y": 1.0,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "8ae1b9703a7d0144e570247d88629530b376885f",
+      "x": -0.707107,
+      "y": 0.707107,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "945bdda63e8a379694c792c3545fe11dd166b724",
+      "x": 0.707107,
+      "y": 0.707107,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "859f8a49c55747e7382a1ae15970b23cc12f3f85",
+      "x": 0.0,
+      "y": -1.0,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "b07a51bbab122c81679ac30d3f2f78f45ac14dc8",
+      "x": -0.707107,
+      "y": -0.707107,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+      "x": 0.707107,
+      "y": -0.707107,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "8bd6ad52ad04a2ad23b47187886c630701df5260",
+      "x": 0.0,
+      "y": 1.5,
+      "rateScale": 1.0
+    }
+  ],
+  "crouchingSamples": [
+    {
+      "animation": "8eb8837c9f32973628b83ed2b98f7d68a0e82aa9",
+      "x": 0.0,
+      "y": 1.0,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "21c24bd7df5192db2e2a860457f2b7b0681de41d",
+      "x": -1.0,
+      "y": 0.0,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "db60b2c35ce5ef5216c782fc1f33549cbcf8278d",
+      "x": 1.0,
+      "y": 0.0,
+      "rateScale": 1.0
+    },
+    {
+      "animation": "f9ec8804e251f03c57e04dde4db9bd921457bae4",
+      "x": 0.0,
+      "y": -1.0,
+      "rateScale": 1.0
+    }
+  ],
+  "jumpStart": "0b439429cf3a3692eaea77a81b275ae96eab937f",
+  "fallLoop": "8b1315b68336709c4a00bcd18871f0b3ba44308a",
+  "land": "8e310a7484f5a1fda4a549e1b80fd0405b1d4f35",
+  "leanAdditive": "6cdc10621a632cfe5aae96e76a82b37da26891e3"
+}
