@@ -20,5 +20,7 @@
     <None Include="../../assets/config/p3_locomotion_settings.json"
           Link="Fixtures/P3/p3_locomotion_settings.json"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/P3/*.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
