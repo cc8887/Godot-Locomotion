@@ -11,6 +11,9 @@ public partial class P3aMotorSmoke : Node
 
     private readonly bool[] _passed = new bool[7];
     private AlsCharacterMotor _motor = null!;
+    private AlsCharacterMotor _freshJumpMotor = null!;
+    private AlsCharacterMotor _airborneJumpMotor = null!;
+    private AlsCharacterMotor _invalidJumpMotor = null!;
     private AlsCharacterMotor _platformMotor = null!;
     private AnimatableBody3D _movingPlatform = null!;
     private StaticBody3D _ceiling = null!;
@@ -26,6 +29,9 @@ public partial class P3aMotorSmoke : Node
     private bool _platformFeedbackChecked;
     private bool _platformDidNotBecomeSelfPropulsion;
     private bool _minimumClearanceShapePreserved;
+    private bool _freshJumpChecked;
+    private bool _airborneJumpChecked;
+    private bool _invalidJumpChecked;
 
     public override void _Ready()
     {
@@ -51,7 +57,7 @@ public partial class P3aMotorSmoke : Node
             var crouchingSpeeds = new AlsStanceSpeeds(
                 new AlsDirectionalSpeeds(1f, 1f, 1f),
                 new AlsDirectionalSpeeds(2f, 2f, 2f),
-                new AlsDirectionalSpeeds(2f, 2f, 2f));
+                new AlsDirectionalSpeeds(9f, 9f, 9f));
             _settings = new AlsMotorSettings(
                 capsuleRadius: 0.35f,
                 standingHeight: 2f,
@@ -72,6 +78,8 @@ public partial class P3aMotorSmoke : Node
             AddChild(_motor);
             _motor.Configure(_settings, AlsMotorReplay.CreateSmokeSequence());
 
+            ConfigureFreshJumpProbe();
+            ConfigureInvalidJumpProbe();
             ConfigureMovingPlatformProbe();
             ObserveMinimumCapsuleClearance(standingSpeeds, crouchingSpeeds);
         }
@@ -85,6 +93,8 @@ public partial class P3aMotorSmoke : Node
     {
         try
         {
+            ObserveInvalidJump();
+            ObserveFreshJump();
             UpdateMovingPlatform();
             var platformInput = _platformMotor.Step(_frameId, 1, 1, DeltaTime);
             ObserveMovingPlatform(platformInput);
@@ -150,6 +160,7 @@ public partial class P3aMotorSmoke : Node
         if (_frameId == AlsMotorReplay.CrouchFrame)
         {
             Require(input.Stance == AlsStance.Crouching, "crouch command did not change actual stance");
+            RequireFinalResolvedMovement(input, AlsGait.Running, expectedDesiredSpeed: 2f);
             var crouchingFootY = _motor.GlobalPosition.Y - (_settings.CrouchingHeight * 0.5f);
             Require(MathF.Abs(crouchingFootY - _standingFootY) <= Tolerance, "crouch moved the capsule foot");
             _passed[4] = true;
@@ -158,6 +169,7 @@ public partial class P3aMotorSmoke : Node
         if (_frameId == AlsMotorReplay.BlockedStandFrame)
         {
             Require(input.Stance == AlsStance.Crouching, "blocked uncrouch changed actual stance");
+            RequireFinalResolvedMovement(input, AlsGait.Running, expectedDesiredSpeed: 2f);
             _passed[5] = true;
         }
 
@@ -166,6 +178,7 @@ public partial class P3aMotorSmoke : Node
             Require(
                 input.Stance == AlsStance.Standing,
                 $"clear uncrouch did not restore standing ({DescribeStandClearance()})");
+            RequireFinalResolvedMovement(input, AlsGait.Sprinting, expectedDesiredSpeed: 6f);
             _passed[6] = true;
         }
 
@@ -187,6 +200,9 @@ public partial class P3aMotorSmoke : Node
 
     private void Finish()
     {
+        Require(_freshJumpChecked, "fresh frame-zero jump regression did not execute");
+        Require(_airborneJumpChecked, "airborne frame-zero jump control did not execute");
+        Require(_invalidJumpChecked, "invalid jump-byte regression did not execute");
         Require(_platformVelocityObserved, "moving-platform regression did not observe platform velocity");
         Require(_platformFeedbackChecked, "moving-platform regression did not execute its feedback check");
         Require(_platformDidNotBecomeSelfPropulsion, "actual platform velocity became requested self-propulsion");
@@ -229,6 +245,106 @@ public partial class P3aMotorSmoke : Node
         };
         AddChild(_platformMotor);
         _platformMotor.Configure(_settings, new AlsReplayInputAdapter(0, commands));
+    }
+
+    private void ConfigureFreshJumpProbe()
+    {
+        AddChild(CreateBoxBody(
+            "FreshJumpFloor",
+            new Vector3(6f, 1f, 6f),
+            new Vector3(-25f, -0.5f, 0f)));
+        var command = new AlsLocomotionCommand(
+            System.Numerics.Vector2.Zero,
+            ViewYaw: 0f,
+            AimYaw: 0f,
+            RequestedGait: AlsGait.Running,
+            RequestedStance: AlsStance.Standing,
+            RequestedRotationMode: AlsRotationMode.LookingDirection,
+            JumpPressed: 1);
+        _freshJumpMotor = new AlsCharacterMotor
+        {
+            Name = "FreshJumpMotor",
+            Position = new Vector3(-25f, _settings.StandingHeight * 0.5f, 0f),
+        };
+        AddChild(_freshJumpMotor);
+        var transformBeforeConfigure = _freshJumpMotor.GlobalTransform;
+        _freshJumpMotor.Configure(
+            _settings,
+            new AlsReplayInputAdapter(0, new[] { command }));
+        Require(!_freshJumpMotor.IsOnFloor(), "Configure established floor history before Step");
+        Require(
+            _freshJumpMotor.GlobalTransform == transformBeforeConfigure,
+            "Configure moved the fresh grounded motor");
+
+        _airborneJumpMotor = new AlsCharacterMotor
+        {
+            Name = "AirborneJumpMotor",
+            Position = new Vector3(-35f, 10f, 0f),
+        };
+        AddChild(_airborneJumpMotor);
+        _airborneJumpMotor.Configure(
+            _settings,
+            new AlsReplayInputAdapter(0, new[] { command }));
+    }
+
+    private void ConfigureInvalidJumpProbe()
+    {
+        _invalidJumpMotor = new AlsCharacterMotor
+        {
+            Name = "InvalidJumpMotor",
+            Position = new Vector3(75f, _settings.StandingHeight * 0.5f, 0f),
+        };
+        AddChild(_invalidJumpMotor);
+        _invalidJumpMotor.Configure(_settings, new InvalidThenValidJumpSource());
+    }
+
+    private void ObserveInvalidJump()
+    {
+        if (_frameId != 0)
+        {
+            return;
+        }
+
+        var transformBefore = _invalidJumpMotor.GlobalTransform;
+        var velocityBefore = _invalidJumpMotor.Velocity;
+        var rejected = false;
+        try
+        {
+            _invalidJumpMotor.Step(0, 3, 1, DeltaTime);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            rejected = true;
+        }
+
+        Require(rejected, "JumpPressed outside 0/1 was not rejected");
+        Require(_invalidJumpMotor.GlobalTransform == transformBefore, "invalid command changed motor transform");
+        Require(_invalidJumpMotor.Velocity == velocityBefore, "invalid command changed motor velocity");
+        var retry = _invalidJumpMotor.Step(0, 3, 1, DeltaTime);
+        Require(retry.Identity.FrameId == 0, "invalid command polluted frame history");
+        Require(retry.Stance == AlsStance.Standing, "invalid command polluted actual stance");
+        _invalidJumpChecked = true;
+        _invalidJumpMotor.QueueFree();
+    }
+
+    private void ObserveFreshJump()
+    {
+        if (_frameId != 0)
+        {
+            return;
+        }
+
+        var input = _freshJumpMotor.Step(0, 2, 1, DeltaTime);
+        Require(input.JumpAccepted == 1, "fresh grounded frame-zero jump was not accepted");
+        Require(input.Floor.IsGrounded == 0, "fresh frame-zero jump did not publish InAir");
+        _freshJumpChecked = true;
+        _freshJumpMotor.QueueFree();
+
+        var airborneInput = _airborneJumpMotor.Step(0, 4, 1, DeltaTime);
+        Require(airborneInput.JumpAccepted == 0, "airborne frame-zero jump was incorrectly accepted");
+        Require(airborneInput.Floor.IsGrounded == 0, "airborne frame-zero control became grounded");
+        _airborneJumpChecked = true;
+        _airborneJumpMotor.QueueFree();
     }
 
     private void UpdateMovingPlatform()
@@ -302,6 +418,18 @@ public partial class P3aMotorSmoke : Node
         return $"collider={collider?.Name ?? "unknown"} normal={normal}";
     }
 
+    private static void RequireFinalResolvedMovement(
+        in AlsFrameInput input,
+        AlsGait expectedMaxGait,
+        float expectedDesiredSpeed)
+    {
+        var workerResolved = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
+        Require(workerResolved.MaxAllowedGait == expectedMaxGait, "worker final-stance max gait mismatch");
+        Require(
+            MathF.Abs(input.DesiredSpeed - expectedDesiredSpeed) <= Tolerance,
+            $"motor desired speed {input.DesiredSpeed} did not match final-stance speed {expectedDesiredSpeed}");
+    }
+
     private static StaticBody3D CreateBoxBody(string name, Vector3 size, Vector3 position)
     {
         var body = new StaticBody3D
@@ -323,6 +451,29 @@ public partial class P3aMotorSmoke : Node
         if (!condition)
         {
             throw new InvalidOperationException(message);
+        }
+    }
+
+    private sealed class InvalidThenValidJumpSource : IAlsLocomotionCommandSource
+    {
+        private int _calls;
+
+        public AlsLocomotionCommand GetCommand(long frameId)
+        {
+            if (frameId != 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(frameId));
+            }
+
+            var command = AlsLocomotionCommand.CreateDefault();
+            return _calls++ == 0
+                ? command with
+                {
+                    MovementAxes = System.Numerics.Vector2.UnitY,
+                    RequestedStance = AlsStance.Crouching,
+                    JumpPressed = 2,
+                }
+                : command;
         }
     }
 }

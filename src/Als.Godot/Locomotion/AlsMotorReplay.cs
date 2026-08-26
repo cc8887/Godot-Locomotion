@@ -27,10 +27,24 @@ public static class AlsMotorReplay
         }
 
         commands[JumpFrame] = CreateCommand(Vector2.Zero, AlsStance.Standing, jumpPressed: 1);
-        var crouchingIdle = CreateCommand(Vector2.Zero, AlsStance.Crouching, jumpPressed: 0);
+        var crouchingSprint = CreateCommand(
+            Vector2.UnitY,
+            AlsStance.Crouching,
+            AlsGait.Sprinting,
+            jumpPressed: 0);
         for (var frame = CrouchFrame; frame < BlockedStandFrame; frame++)
         {
-            commands[frame] = crouchingIdle;
+            commands[frame] = crouchingSprint;
+        }
+
+        var standingSprint = CreateCommand(
+            Vector2.UnitY,
+            AlsStance.Standing,
+            AlsGait.Sprinting,
+            jumpPressed: 0);
+        for (var frame = BlockedStandFrame; frame <= ClearStandFrame; frame++)
+        {
+            commands[frame] = standingSprint;
         }
 
         return new AlsReplayInputAdapter(0, commands);
@@ -39,11 +53,21 @@ public static class AlsMotorReplay
     private static AlsLocomotionCommand CreateCommand(
         Vector2 movementAxes,
         AlsStance stance,
+        byte jumpPressed) => CreateCommand(
+            movementAxes,
+            stance,
+            AlsGait.Running,
+            jumpPressed);
+
+    private static AlsLocomotionCommand CreateCommand(
+        Vector2 movementAxes,
+        AlsStance stance,
+        AlsGait requestedGait,
         byte jumpPressed) => new(
             movementAxes,
             ViewYaw: 0f,
             AimYaw: 0f,
-            RequestedGait: AlsGait.Running,
+            RequestedGait: requestedGait,
             RequestedStance: stance,
             RequestedRotationMode: AlsRotationMode.LookingDirection,
             JumpPressed: jumpPressed);

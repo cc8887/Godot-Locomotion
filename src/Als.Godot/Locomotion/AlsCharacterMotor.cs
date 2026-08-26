@@ -15,6 +15,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private CollisionShape3D? _collisionNode;
     private CapsuleShape3D? _capsuleShape;
     private ShapeCast3D? _standClearance;
+    private KinematicCollision3D? _initialFloorProbe;
     private AlsMotorSettings _settings;
     private AlsStance _actualStance = AlsStance.Standing;
     private NumericsVector3 _previousActualVelocity;
@@ -70,6 +71,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         AddChild(standClearance);
         _collisionNode = collisionNode;
         _standClearance = standClearance;
+        _initialFloorProbe = new KinematicCollision3D();
 
         _capsuleShape = capsuleShape;
         _settings = settings;
@@ -95,9 +97,17 @@ public partial class AlsCharacterMotor : CharacterBody3D
         ValidateStep(frameId, characterId, generation, deltaTime);
         var source = _source!;
         var command = source.GetCommand(frameId);
-        var resolvedCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
+        if (command.JumpPressed > 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(command),
+                "JumpPressed must be zero or one.");
+        }
 
-        UpdateStance(resolvedCommand.RequestedStance);
+        var requestedCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
+
+        UpdateStance(requestedCommand.RequestedStance);
+        var resolvedCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
 
         var characterYaw = GetCharacterYaw();
         var desiredSpeed = CalculateDesiredSpeed(resolvedCommand, characterYaw);
@@ -110,7 +120,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
         var verticalVelocity = Velocity.Y;
         byte jumpAccepted = 0;
-        if (IsOnFloor())
+        var groundedBeforeMove = IsOnFloor() || (_lastFrameId < 0 && ProbeInitialFloor());
+        if (groundedBeforeMove)
         {
             if (resolvedCommand.JumpPressed == 1)
             {
@@ -289,6 +300,31 @@ public partial class AlsCharacterMotor : CharacterBody3D
             platformId,
             platformTransform,
             ToNumerics(GetPlatformAngularVelocity()));
+    }
+
+    private bool ProbeInitialFloor()
+    {
+        var collision = _initialFloorProbe!;
+        if (!TestMove(
+                GlobalTransform,
+                -UpDirection * FloorSnapLength,
+                collision,
+                SafeMargin,
+                recoveryAsCollision: true,
+                maxCollisions: 4))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < collision.GetCollisionCount(); index++)
+        {
+            if (IsFloorCollision(collision.GetNormal(index), UpDirection, FloorMaxAngle))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static bool IsFloorCollision(
