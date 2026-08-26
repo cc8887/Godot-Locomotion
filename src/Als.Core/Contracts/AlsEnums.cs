@@ -59,3 +59,11 @@ public enum AlsAnimationQualityTier : byte
     Tier1,
     Tier2,
 }
+
+public enum AlsAnimationState : byte
+{
+    Grounded,
+    JumpStart,
+    FallLoop,
+    LandRecovery,
+}

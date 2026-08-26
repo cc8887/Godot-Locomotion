@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using GodotAls.Core.Contracts;
 
@@ -22,6 +23,29 @@ public sealed class ContractLayoutTests
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFrameInput>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsRuntimeState>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFrameResult>());
+    }
+
+    [Fact]
+    public void P3ContractsContainOnlyUnmanagedData()
+    {
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsLocomotionCommand>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFrameInput>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsRuntimeState>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFrameResult>());
+    }
+
+    [Fact]
+    public void DefaultCommandIsStandingRunningLookingDirection()
+    {
+        var command = AlsLocomotionCommand.CreateDefault();
+
+        Assert.Equal(Vector2.Zero, command.MovementAxes);
+        Assert.Equal(0f, command.ViewYaw);
+        Assert.Equal(0f, command.AimYaw);
+        Assert.Equal(AlsGait.Running, command.RequestedGait);
+        Assert.Equal(AlsStance.Standing, command.RequestedStance);
+        Assert.Equal(AlsRotationMode.LookingDirection, command.RequestedRotationMode);
+        Assert.Equal((byte)0, command.JumpPressed);
     }
 
     [Fact]

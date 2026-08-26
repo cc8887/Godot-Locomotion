@@ -34,6 +34,22 @@ public static class AlsResultDigest
         }
 
         Append(ref digest, result.ErrorCode);
+        Append(ref digest, (byte)result.ActualGait);
+        Append(ref digest, (byte)result.ActualStance);
+        Append(ref digest, (byte)result.ActualRotationMode);
+        Append(ref digest, (byte)result.AnimationState);
+        Append(ref digest, result.BlendCoordinates);
+        Append(ref digest, result.Stride);
+        Append(ref digest, result.PlayRate);
+        Append(ref digest, result.Lean);
+        Append(ref digest, result.AnimationPhase);
+        Append(ref digest, result.TargetYaw);
+    }
+
+    private static void Append(ref ulong digest, Vector2 value)
+    {
+        Append(ref digest, value.X);
+        Append(ref digest, value.Y);
     }
 
     private static void Append(ref ulong digest, Vector3 value)

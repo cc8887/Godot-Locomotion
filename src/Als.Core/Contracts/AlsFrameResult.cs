@@ -19,6 +19,16 @@ public struct AlsFrameResult
     public AlsEventBuffer TypedEvents;
     public long WorkerElapsedTicks;
     public int ErrorCode;
+    public AlsGait ActualGait;
+    public AlsStance ActualStance;
+    public AlsRotationMode ActualRotationMode;
+    public AlsAnimationState AnimationState;
+    public Vector2 BlendCoordinates;
+    public float Stride;
+    public float PlayRate;
+    public Vector2 Lean;
+    public float AnimationPhase;
+    public float TargetYaw;
 
     public static AlsFrameResult CreateDefault(AlsFrameIdentity identity) => new()
     {
