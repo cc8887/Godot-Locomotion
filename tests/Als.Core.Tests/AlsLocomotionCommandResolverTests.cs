@@ -157,6 +157,75 @@ public sealed class AlsLocomotionCommandResolverTests
                 AlsStance.Standing));
     }
 
+    [Theory]
+    [InlineData(AlsGait.Walking)]
+    [InlineData(AlsGait.Running)]
+    [InlineData(AlsGait.Sprinting)]
+    public void ResolveAcceptsEveryDefinedGait(AlsGait gait)
+    {
+        _ = AlsLocomotionCommandResolver.Resolve(
+            CreateCommand(Vector2.UnitY, gait: gait),
+            AlsStance.Standing);
+    }
+
+    [Theory]
+    [InlineData(AlsStance.Standing)]
+    [InlineData(AlsStance.Crouching)]
+    public void ResolveAcceptsEveryDefinedStance(AlsStance stance)
+    {
+        var command = CreateCommand(Vector2.UnitY) with { RequestedStance = stance };
+
+        _ = AlsLocomotionCommandResolver.Resolve(command, stance);
+    }
+
+    [Theory]
+    [InlineData(AlsRotationMode.VelocityDirection)]
+    [InlineData(AlsRotationMode.LookingDirection)]
+    [InlineData(AlsRotationMode.Aiming)]
+    public void ResolveAcceptsEveryDefinedRotationMode(AlsRotationMode rotationMode)
+    {
+        _ = AlsLocomotionCommandResolver.Resolve(
+            CreateCommand(Vector2.UnitY, rotationMode: rotationMode),
+            AlsStance.Standing);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(3)]
+    [InlineData(255)]
+    public void ResolveRejectsGaitValuesOutsideTheDefinedRange(int value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            AlsLocomotionCommandResolver.Resolve(
+                CreateCommand(Vector2.UnitY, gait: (AlsGait)value),
+                AlsStance.Standing));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(2)]
+    [InlineData(255)]
+    public void ResolveRejectsStanceValuesOutsideTheDefinedRange(int value)
+    {
+        var invalid = (AlsStance)value;
+        var command = CreateCommand(Vector2.UnitY) with { RequestedStance = invalid };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            AlsLocomotionCommandResolver.Resolve(command, invalid));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(3)]
+    [InlineData(255)]
+    public void ResolveRejectsRotationModesOutsideTheDefinedRange(int value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            AlsLocomotionCommandResolver.Resolve(
+                CreateCommand(Vector2.UnitY, rotationMode: (AlsRotationMode)value),
+                AlsStance.Standing));
+    }
+
     [Fact]
     public void ResolverValueContractsContainOnlyUnmanagedData()
     {

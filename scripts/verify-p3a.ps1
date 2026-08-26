@@ -27,9 +27,6 @@ dotnet build $solutionPath -c Release --no-restore
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (-not $SkipRegression) {
-    dotnet test $solutionPath -c Release --no-build --no-restore
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
     $pesterResult = Invoke-Pester (Join-Path $projectRootPath 'tests\*.Tests.ps1') -PassThru
     if ($pesterResult.FailedCount -ne 0) {
         throw "P3A PowerShell regression suite failed: $($pesterResult.FailedCount) failing test(s)."
@@ -97,6 +94,22 @@ foreach ($characterCount in @(1, 10)) {
     if ($single.OffMain -ne 0 -or $parallel.OffMain -ne $characterCount) {
         throw "P3A worker affinity failed for characters=${characterCount}: single=$($single.OffMain) parallel=$($parallel.OffMain)."
     }
+}
+
+if (-not $SkipRegression) {
+    $phaseScripts = @(
+        'verify-p2b.ps1',
+        'verify-p1.ps1',
+        'verify-p0.ps1'
+    )
+    foreach ($phaseScriptName in $phaseScripts) {
+        $phaseScript = Join-Path $PSScriptRoot $phaseScriptName
+        & $phaseScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+
+    dotnet test $solutionPath -c Release --no-restore
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 Write-Output 'P3A_VERIFICATION_OK'

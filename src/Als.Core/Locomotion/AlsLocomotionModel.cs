@@ -20,7 +20,7 @@ public static class AlsLocomotionModel
         ValidateSpeed(speed, nameof(speed));
         ValidateSpeed(maxWalkSpeed, nameof(maxWalkSpeed));
         ValidateSpeed(maxRunSpeed, nameof(maxRunSpeed));
-        if (!Enum.IsDefined(maxAllowedGait))
+        if ((uint)maxAllowedGait > (uint)AlsGait.Sprinting)
         {
             throw new ArgumentOutOfRangeException(nameof(maxAllowedGait));
         }
@@ -447,12 +447,12 @@ public static class AlsLocomotionModel
             throw new ArgumentOutOfRangeException(nameof(input), "JumpAccepted must be zero or one.");
         }
 
-        if (!Enum.IsDefined(input.Stance))
+        if ((uint)input.Stance > (uint)AlsStance.Crouching)
         {
             throw new ArgumentOutOfRangeException(nameof(input), input.Stance, "Stance must be defined.");
         }
 
-        if (!Enum.IsDefined(input.RotationMode))
+        if ((uint)input.RotationMode > (uint)AlsRotationMode.Aiming)
         {
             throw new ArgumentOutOfRangeException(nameof(input), input.RotationMode, "RotationMode must be defined.");
         }
@@ -465,9 +465,9 @@ public static class AlsLocomotionModel
             throw new ArgumentOutOfRangeException(nameof(state), "Initialized must be zero or one.");
         }
 
-        if (!Enum.IsDefined(state.LocomotionState) ||
-            !Enum.IsDefined(state.PreviousLocomotionState) ||
-            !Enum.IsDefined(state.ActualGait))
+        if ((uint)state.LocomotionState > (uint)AlsLocomotionState.Recovering ||
+            (uint)state.PreviousLocomotionState > (uint)AlsLocomotionState.Recovering ||
+            (uint)state.ActualGait > (uint)AlsGait.Sprinting)
         {
             throw new ArgumentOutOfRangeException(nameof(state), "Locomotion history enums must be defined.");
         }
@@ -486,7 +486,7 @@ public static class AlsLocomotionModel
 
     private static void ValidateResolvedCommand(in AlsResolvedLocomotionCommand resolvedCommand)
     {
-        if (!Enum.IsDefined(resolvedCommand.MaxAllowedGait))
+        if ((uint)resolvedCommand.MaxAllowedGait > (uint)AlsGait.Sprinting)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(resolvedCommand),
@@ -494,7 +494,7 @@ public static class AlsLocomotionModel
                 "MaxAllowedGait must be defined.");
         }
 
-        if (!Enum.IsDefined(resolvedCommand.RequestedStance))
+        if ((uint)resolvedCommand.RequestedStance > (uint)AlsStance.Crouching)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(resolvedCommand),
@@ -502,7 +502,7 @@ public static class AlsLocomotionModel
                 "RequestedStance must be defined.");
         }
 
-        if (!Enum.IsDefined(resolvedCommand.RotationMode))
+        if ((uint)resolvedCommand.RotationMode > (uint)AlsRotationMode.Aiming)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(resolvedCommand),
