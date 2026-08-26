@@ -113,17 +113,18 @@ public static class AlsLocomotionCommandResolver
             throw new ArgumentOutOfRangeException(nameof(command), "View and aim yaw must be finite.");
         }
 
-        if (!Enum.IsDefined(command.RequestedGait))
+        if ((uint)command.RequestedGait > (uint)AlsGait.Sprinting)
         {
             throw new ArgumentOutOfRangeException(nameof(command), "Requested gait is invalid.");
         }
 
-        if (!Enum.IsDefined(command.RequestedStance) || !Enum.IsDefined(actualStance))
+        if ((uint)command.RequestedStance > (uint)AlsStance.Crouching ||
+            (uint)actualStance > (uint)AlsStance.Crouching)
         {
             throw new ArgumentOutOfRangeException(nameof(actualStance), "Stance is invalid.");
         }
 
-        if (!Enum.IsDefined(command.RequestedRotationMode))
+        if ((uint)command.RequestedRotationMode > (uint)AlsRotationMode.Aiming)
         {
             throw new ArgumentOutOfRangeException(nameof(command), "Rotation mode is invalid.");
         }

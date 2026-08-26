@@ -2,6 +2,8 @@ $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $script:FunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p3a-verification-functions.ps1'
 $script:VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p3a.ps1'
 $script:SolutionPath = Join-Path $script:RepositoryRoot 'GodotALS.sln'
+$script:CommandResolverPath = Join-Path $script:RepositoryRoot 'src\Als.Core\Locomotion\AlsLocomotionCommandResolver.cs'
+$script:LocomotionModelPath = Join-Path $script:RepositoryRoot 'src\Als.Core\Locomotion\AlsLocomotionModel.cs'
 if (Test-Path -LiteralPath $script:FunctionsPath)
 {
     . $script:FunctionsPath
@@ -112,14 +114,62 @@ Describe 'P3A verifier build configuration' {
         $script:SolutionSource | Should Match "${project}\.Release\|Any CPU\.Build\.0 = ExportRelease\|Any CPU"
     }
 
-    It 'builds and tests Release before rebuilding the optimized Debug editor host' {
+    It 'builds Release and the optimized Debug editor host before the final Release tests' {
         $script:VerifierSource | Should Match 'dotnet build \$solutionPath -c Release --no-restore'
-        $script:VerifierSource | Should Match 'dotnet test \$solutionPath -c Release --no-build --no-restore'
         $script:VerifierSource | Should Match 'dotnet build \$godotProjectPath -c Debug -p:Optimize=true --no-restore --no-incremental'
+        $script:VerifierSource | Should Match 'dotnet test \$solutionPath -c Release --no-restore'
     }
 
     It 'runs the repository Pester suite during non-skipped regression verification' {
         $script:VerifierSource | Should Match 'Invoke-Pester'
         $script:VerifierSource | Should Match "tests\\\*\.Tests\.ps1"
+    }
+}
+
+Describe 'P3A verifier regression closure' {
+    It 'runs P2B P1 P0 and the final Release tests in order after the P3A matrix' {
+        $matrixIndex = $script:VerifierSource.IndexOf('foreach ($characterCount in @(1, 10))')
+        $p2bIndex = $script:VerifierSource.IndexOf("'verify-p2b.ps1'", $matrixIndex)
+        $p1Index = $script:VerifierSource.IndexOf("'verify-p1.ps1'", $matrixIndex)
+        $p0Index = $script:VerifierSource.IndexOf("'verify-p0.ps1'", $matrixIndex)
+        $finalTestsIndex = $script:VerifierSource.IndexOf(
+            'dotnet test $solutionPath -c Release --no-restore',
+            $matrixIndex)
+
+        $matrixIndex | Should BeGreaterThan -1
+        $p2bIndex | Should BeGreaterThan $matrixIndex
+        $p1Index | Should BeGreaterThan $p2bIndex
+        $p0Index | Should BeGreaterThan $p1Index
+        $finalTestsIndex | Should BeGreaterThan $p0Index
+    }
+
+    It 'passes the selected Godot executable to every phase verifier' {
+        foreach ($phase in @('p2b', 'p1', 'p0')) {
+            $script:VerifierSource | Should Match ([regex]::Escape("'verify-$phase.ps1'"))
+        }
+        $script:VerifierSource | Should Match ([regex]::Escape(
+            '& $phaseScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath'))
+    }
+
+    It 'fails immediately after each non-zero regression command' {
+        $regressionIndex = $script:VerifierSource.IndexOf("'verify-p2b.ps1'")
+        $regressionIndex | Should BeGreaterThan -1
+        if ($regressionIndex -lt 0) { return }
+        $regressionSource = $script:VerifierSource.Substring($regressionIndex)
+        $guardPattern = '(?ms)& \$phaseScript -GodotExecutable \$GodotExecutable -ProjectRoot \$projectRootPath\s+if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}'
+        ([regex]::Matches($regressionSource, $guardPattern)).Count | Should Be 1
+        $regressionSource | Should Match '(?ms)dotnet test \$solutionPath -c Release --no-restore\s+if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}'
+    }
+
+    It 'keeps the regression closure enabled by default and skippable only as one block' {
+        $script:VerifierSource | Should Match '(?ms)if \(-not \$SkipRegression\) \{\s+\$phaseScripts = @\('
+        $script:VerifierSource | Should Not Match '\[switch\]\$RunRegression'
+    }
+}
+
+Describe 'P3A hot-path enum validation' {
+    It 'does not use reflection-backed Enum.IsDefined in locomotion hot paths' {
+        [System.IO.File]::ReadAllText($script:CommandResolverPath) | Should Not Match 'Enum\.IsDefined'
+        [System.IO.File]::ReadAllText($script:LocomotionModelPath) | Should Not Match 'Enum\.IsDefined'
     }
 }
