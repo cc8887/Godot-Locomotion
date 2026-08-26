@@ -151,20 +151,12 @@ try
         throw "ALS-Refactored HEAD mismatch. Expected '$lockedCommit', actual '$headCommit'."
     }
 
-    $statusOutput = @(& git -C $referenceFullPath status --porcelain 2>&1)
-    if ($LASTEXITCODE -ne 0)
-    {
-        throw "Could not read ALS-Refactored worktree status: $($statusOutput -join [Environment]::NewLine)"
-    }
-
-    if ($statusOutput.Count -ne 0)
-    {
-        throw "ALS-Refactored worktree is not clean: $($statusOutput -join [Environment]::NewLine)"
-    }
-
     $patchCount = 0
     $validatedPatches = @()
-    $referencePathPrefix = $referenceFullPath + [System.IO.Path]::DirectorySeparatorChar
+    $projectFullPath = [System.IO.Path]::GetFullPath($ProjectRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $projectPathPrefix = $projectFullPath + [System.IO.Path]::DirectorySeparatorChar
     foreach ($patchElement in $patchesElement.EnumerateArray())
     {
         $patchCount++
@@ -207,10 +199,10 @@ try
             throw "Compatibility patch path must be a non-empty repository-relative path: '$patchRelativePath'."
         }
 
-        $patchFullPath = [System.IO.Path]::GetFullPath((Join-Path $referenceFullPath $patchRelativePath))
-        if (-not $patchFullPath.StartsWith($referencePathPrefix, [System.StringComparison]::OrdinalIgnoreCase))
+        $patchFullPath = [System.IO.Path]::GetFullPath((Join-Path $projectFullPath $patchRelativePath))
+        if (-not $patchFullPath.StartsWith($projectPathPrefix, [System.StringComparison]::OrdinalIgnoreCase))
         {
-            throw "Compatibility patch path escapes the ALS-Refactored repository: '$patchRelativePath'."
+            throw "Compatibility patch path escapes the GodotALS project repository: '$patchRelativePath'."
         }
 
         if (-not (Test-Path -LiteralPath $patchFullPath -PathType Leaf))
@@ -218,15 +210,15 @@ try
             throw "Compatibility patch file does not exist: '$patchRelativePath'."
         }
 
-        $rootItem = Get-Item -LiteralPath $referenceFullPath -Force
+        $rootItem = Get-Item -LiteralPath $projectFullPath -Force
         if (($rootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
         {
-            throw "ALS-Refactored repository root must not be a reparse point: '$referenceFullPath'."
+            throw "GodotALS project repository root must not be a reparse point: '$projectFullPath'."
         }
 
-        $normalizedRelativePath = [System.IO.Path]::GetRelativePath($referenceFullPath, $patchFullPath)
+        $normalizedRelativePath = [System.IO.Path]::GetRelativePath($projectFullPath, $patchFullPath)
         $pathComponents = @($normalizedRelativePath -split '[\\/]+')
-        $currentPath = $referenceFullPath
+        $currentPath = $projectFullPath
         for ($componentIndex = 0; $componentIndex -lt $pathComponents.Count; $componentIndex++)
         {
             $currentPath = Join-Path $currentPath $pathComponents[$componentIndex]
@@ -243,9 +235,9 @@ try
         }
 
         if ($currentItem.PSIsContainer -or $currentItem -isnot [System.IO.FileInfo] -or
-            -not $currentItem.FullName.StartsWith($referencePathPrefix, [System.StringComparison]::OrdinalIgnoreCase))
+            -not $currentItem.FullName.StartsWith($projectPathPrefix, [System.StringComparison]::OrdinalIgnoreCase))
         {
-            throw "Compatibility patch must resolve to an ordinary file within the ALS-Refactored repository: '$patchRelativePath'."
+            throw "Compatibility patch must resolve to an ordinary file within the GodotALS project repository: '$patchRelativePath'."
         }
 
         if ($expectedSha256 -cnotmatch '^[0-9a-f]{64}$')
@@ -269,6 +261,7 @@ try
     {
         $temporaryIndexPath = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-index-$([guid]::NewGuid().ToString('N'))"
         $aggregatePatchPath = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-patches-$([guid]::NewGuid().ToString('N')).patch"
+        $currentDiffPath = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-current-$([guid]::NewGuid().ToString('N')).patch"
         $previousIndexPath = [Environment]::GetEnvironmentVariable('GIT_INDEX_FILE', 'Process')
         try
         {
@@ -299,7 +292,14 @@ try
             }
             finally
             {
-                [Environment]::SetEnvironmentVariable('GIT_INDEX_FILE', $previousIndexPath, 'Process')
+                if ([string]::IsNullOrEmpty($previousIndexPath))
+                {
+                    Remove-Item Env:GIT_INDEX_FILE -ErrorAction SilentlyContinue
+                }
+                else
+                {
+                    [Environment]::SetEnvironmentVariable('GIT_INDEX_FILE', $previousIndexPath, 'Process')
+                }
                 foreach ($temporaryPath in @($temporaryIndexPath, "$temporaryIndexPath.lock"))
                 {
                     if (Test-Path -LiteralPath $temporaryPath)
@@ -309,19 +309,71 @@ try
                 }
             }
 
-            $applyOutput = @(& git -C $referenceFullPath apply -- $aggregatePatchPath 2>&1)
+            $statusOutput = @(& git -C $referenceFullPath status --porcelain --untracked-files=all 2>&1)
             if ($LASTEXITCODE -ne 0)
             {
-                $patchList = @($validatedPatches | ForEach-Object { $_.RelativePath }) -join "', '"
-                throw "Could not apply compatibility patches '$patchList': $($applyOutput -join [Environment]::NewLine)"
+                throw "Could not read ALS-Refactored worktree status: $($statusOutput -join [Environment]::NewLine)"
+            }
+
+            if ($statusOutput.Count -eq 0)
+            {
+                $applyOutput = @(& git -C $referenceFullPath apply -- $aggregatePatchPath 2>&1)
+                if ($LASTEXITCODE -ne 0)
+                {
+                    $patchList = @($validatedPatches | ForEach-Object { $_.RelativePath }) -join "', '"
+                    throw "Could not apply compatibility patches '$patchList': $($applyOutput -join [Environment]::NewLine)"
+                }
+            }
+            else
+            {
+                if (@($statusOutput | Where-Object { $_.StartsWith('?? ', [System.StringComparison]::Ordinal) }).Count -gt 0)
+                {
+                    throw "ALS-Refactored worktree contains untracked files outside the locked patch result: $($statusOutput -join [Environment]::NewLine)"
+                }
+
+                $currentDiffOutput = @(& git -C $referenceFullPath diff --binary "--output=$currentDiffPath" HEAD 2>&1)
+                if ($LASTEXITCODE -ne 0)
+                {
+                    throw "Could not inspect the current ALS-Refactored worktree diff: $($currentDiffOutput -join [Environment]::NewLine)"
+                }
+
+                $expectedDiffHash = (Get-FileHash -LiteralPath $aggregatePatchPath -Algorithm SHA256).Hash
+                $currentDiffHash = (Get-FileHash -LiteralPath $currentDiffPath -Algorithm SHA256).Hash
+                if ($currentDiffHash -cne $expectedDiffHash)
+                {
+                    throw "ALS-Refactored worktree differs from the exact locked compatibility patch result: $($statusOutput -join [Environment]::NewLine)"
+                }
+            }
+
+            $verifiedDiffOutput = @(& git -C $referenceFullPath diff --binary "--output=$currentDiffPath" HEAD 2>&1)
+            if ($LASTEXITCODE -ne 0 -or
+                (Get-FileHash -LiteralPath $currentDiffPath -Algorithm SHA256).Hash -cne
+                (Get-FileHash -LiteralPath $aggregatePatchPath -Algorithm SHA256).Hash)
+            {
+                throw 'ALS-Refactored worktree did not reach the exact locked compatibility patch result.'
             }
         }
         finally
         {
-            if (Test-Path -LiteralPath $aggregatePatchPath)
+            foreach ($temporaryPath in @($aggregatePatchPath, $currentDiffPath))
             {
-                Remove-Item -LiteralPath $aggregatePatchPath -Force
+                if (Test-Path -LiteralPath $temporaryPath)
+                {
+                    Remove-Item -LiteralPath $temporaryPath -Force
+                }
             }
+        }
+    }
+    else
+    {
+        $statusOutput = @(& git -C $referenceFullPath status --porcelain --untracked-files=all 2>&1)
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Could not read ALS-Refactored worktree status: $($statusOutput -join [Environment]::NewLine)"
+        }
+        if ($statusOutput.Count -ne 0)
+        {
+            throw "ALS-Refactored worktree is not clean: $($statusOutput -join [Environment]::NewLine)"
         }
     }
 }

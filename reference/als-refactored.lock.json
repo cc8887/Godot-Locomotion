@@ -4,5 +4,10 @@
   "commit": "b754d6f0f2bb03741d301f8fb88077ebfe561e17",
   "observedDate": "2026-08-26",
   "targetEngine": "5.9.0",
-  "compatibilityPatches": []
+  "compatibilityPatches": [
+    {
+      "path": "reference/patches/als-refactored-ue-5.9-engine-version.patch",
+      "sha256": "3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f"
+    }
+  ]
 }
