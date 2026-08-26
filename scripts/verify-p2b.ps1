@@ -7,6 +7,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $markerPattern = 'P2B_IMPORT_OK assets=(\d+) files=(\d+) skeletal=(\d+) static=(\d+) animations=(\d+) textures=(\d+)'
+$expectedManifestSha256 = '369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327'
+. (Join-Path $PSScriptRoot 'p2b-verification-functions.ps1')
 
 if (-not (Test-Path -LiteralPath $GodotExecutable -PathType Leaf)) {
     throw "Godot executable not found: $GodotExecutable"
@@ -19,6 +21,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Formal ALS manifest not found: $manifestPath"
 }
 
+Assert-P2bManifestHash -ManifestPath $manifestPath -ExpectedSha256 $expectedManifestSha256
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 if ($manifest.auditSummary.status -ne 'complete') {
     throw "ALS manifest audit is not complete: $($manifest.auditSummary.status)"

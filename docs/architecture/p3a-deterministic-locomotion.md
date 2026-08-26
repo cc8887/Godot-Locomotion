@@ -82,9 +82,11 @@ GODOT_ALS_P3A_OK mode=parallel characters=10 warmup=120 frames=600 digest=B1A492
 
 Core 热路径对 gait、stance、rotation mode 和 locomotion history 的合法性检查使用连续 byte enum 的显式
 范围判断，不使用会依赖运行时 enum metadata cache 的 `Enum.IsDefined<T>`。后者的 cache 在测量期被回收后
-可能以固定 232-byte 单位重建，并被误记为 model/motor 业务分配。合法值与负数/上界外值均由 Core 单测
-锁定；修复后连续三轮 focused 四矩阵均保持 `allocations=0`，digest 未变化。focused 结果只用于根因验证，
-正式完成仍以下面的非 skip 默认闭环为准。
+可能以固定 232-byte 单位重建，并被误记为 model/motor 业务分配。Core 单测通过 `Enum.GetValues<T>()`
+覆盖所有合法值，并锁定 Gait/Stance/RotationMode/LocomotionState 均以 byte 为底层、从 0 开始、连续到命名
+terminal；测试输入 `-1` 转为 byte enum 后实际值是 `255`，与 terminal+1 等上界外值一起验证拒绝行为。
+修复后连续三轮 focused 四矩阵均保持 `allocations=0`，digest 未变化。focused 结果只用于根因验证，正式
+完成仍以下面的非 skip 默认闭环为准。
 
 失败时先看 `GODOT_ALS_P3A_DIAGNOSTIC`：`gather_motor/model/exchange/commit` 定位分配阶段，
 `first_gather_frame/first_model_frame/first_commit_frame` 定位首帧，`replacements`、
@@ -122,10 +124,13 @@ pwsh -NoProfile -File scripts/verify-p3a.ps1 `
 ```
 
 入口先 restore/build Release，运行 Pester、自身 motor smoke、optimized Debug editor host 和 P3A 四矩阵；
-四矩阵通过后严格按顺序执行，任一步非零立即退出：
+四矩阵通过后先校验正式 P2A manifest SHA-256
+`369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327`，再严格按以下顺序执行。P2B 默认
+强制 `-CleanImport`，只清理当前 worktree 的 Godot/ignored asset cache；任一步非零或 Godot 输出含
+`SCRIPT ERROR`/`ERROR:` 均立即失败，不会继续打印 P3A success：
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-p2b.ps1 -GodotExecutable '<Godot console>'
+pwsh -NoProfile -File scripts/verify-p2b.ps1 -GodotExecutable '<Godot console>' -CleanImport
 pwsh -NoProfile -File scripts/verify-p1.ps1 -GodotExecutable '<Godot console>'
 pwsh -NoProfile -File scripts/verify-p0.ps1 -GodotExecutable '<Godot console>'
 dotnet test GodotALS.sln -c Release --no-restore

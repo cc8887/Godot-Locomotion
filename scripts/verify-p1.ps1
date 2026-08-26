@@ -10,6 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $markerPattern = 'GODOT_ALS_P1_OK mode=(single|parallel) characters=(\d+) frames=(\d+) digest=([0-9A-F]{16}) missing=(\d+) replacements=(\d+) allocations=(\d+) off_main=(\d+)'
+. (Join-Path $PSScriptRoot 'godot-output-functions.ps1')
 
 if (-not (Test-Path -LiteralPath $GodotExecutable -PathType Leaf)) {
     throw "Godot executable not found: $GodotExecutable"
@@ -51,9 +52,10 @@ function Invoke-P1Harness {
     $godotExitCode = $LASTEXITCODE
     $godotOutput | ForEach-Object { Write-Host $_ }
 
-    if ($godotExitCode -ne 0) {
-        throw "Godot P1 harness failed for mode=$Mode characters=$CharacterCount with exit code $godotExitCode."
-    }
+    Assert-GodotInvocationSucceeded `
+        -OutputLines $godotOutput `
+        -ExitCode $godotExitCode `
+        -Context "Godot P1 harness for mode=$Mode characters=$CharacterCount"
 
     $joinedOutput = $godotOutput -join [Environment]::NewLine
     $match = [regex]::Match($joinedOutput, $markerPattern)

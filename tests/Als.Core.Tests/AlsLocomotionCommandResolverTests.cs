@@ -9,6 +9,15 @@ namespace GodotAls.Core.Tests;
 [Collection(AllocationTestCollection.Name)]
 public sealed class AlsLocomotionCommandResolverTests
 {
+    public static IEnumerable<object[]> DefinedGaits =>
+        Enum.GetValues<AlsGait>().Select(value => new object[] { value });
+
+    public static IEnumerable<object[]> DefinedStances =>
+        Enum.GetValues<AlsStance>().Select(value => new object[] { value });
+
+    public static IEnumerable<object[]> DefinedRotationModes =>
+        Enum.GetValues<AlsRotationMode>().Select(value => new object[] { value });
+
     [Theory]
     [InlineData(0f, 2f, 0f, 0f, 0f, -1f, 1f)]
     [InlineData(2f, 0f, 1.57079632679f, 0f, 0f, -1f, 1f)]
@@ -158,9 +167,7 @@ public sealed class AlsLocomotionCommandResolverTests
     }
 
     [Theory]
-    [InlineData(AlsGait.Walking)]
-    [InlineData(AlsGait.Running)]
-    [InlineData(AlsGait.Sprinting)]
+    [MemberData(nameof(DefinedGaits))]
     public void ResolveAcceptsEveryDefinedGait(AlsGait gait)
     {
         _ = AlsLocomotionCommandResolver.Resolve(
@@ -169,8 +176,7 @@ public sealed class AlsLocomotionCommandResolverTests
     }
 
     [Theory]
-    [InlineData(AlsStance.Standing)]
-    [InlineData(AlsStance.Crouching)]
+    [MemberData(nameof(DefinedStances))]
     public void ResolveAcceptsEveryDefinedStance(AlsStance stance)
     {
         var command = CreateCommand(Vector2.UnitY) with { RequestedStance = stance };
@@ -179,9 +185,7 @@ public sealed class AlsLocomotionCommandResolverTests
     }
 
     [Theory]
-    [InlineData(AlsRotationMode.VelocityDirection)]
-    [InlineData(AlsRotationMode.LookingDirection)]
-    [InlineData(AlsRotationMode.Aiming)]
+    [MemberData(nameof(DefinedRotationModes))]
     public void ResolveAcceptsEveryDefinedRotationMode(AlsRotationMode rotationMode)
     {
         _ = AlsLocomotionCommandResolver.Resolve(
@@ -227,6 +231,15 @@ public sealed class AlsLocomotionCommandResolverTests
     }
 
     [Fact]
+    public void RangeValidatedEnumsAreByteBackedZeroBasedAndContiguous()
+    {
+        AssertRangeContract(AlsGait.Sprinting);
+        AssertRangeContract(AlsStance.Crouching);
+        AssertRangeContract(AlsRotationMode.Aiming);
+        AssertRangeContract(AlsLocomotionState.Recovering);
+    }
+
+    [Fact]
     public void ResolverValueContractsContainOnlyUnmanagedData()
     {
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsDirectionalSpeeds>());
@@ -252,6 +265,20 @@ public sealed class AlsLocomotionCommandResolverTests
         {
             _ = AlsLocomotionCommandResolver.Resolve(command, AlsStance.Standing);
         }
+    }
+
+    private static void AssertRangeContract<TEnum>(TEnum terminal)
+        where TEnum : struct, Enum
+    {
+        Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(TEnum)));
+        var values = Enum.GetValues<TEnum>().Select(value => Convert.ToByte(value)).ToArray();
+        var terminalValue = Convert.ToByte(terminal);
+
+        Assert.Equal(0, values[0]);
+        Assert.Equal(terminalValue, values[^1]);
+        Assert.Equal(
+            Enumerable.Range(0, terminalValue + 1).Select(value => (byte)value),
+            values);
     }
 
     private static AlsLocomotionCommand CreateCommand(
