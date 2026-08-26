@@ -9,10 +9,11 @@ $ErrorActionPreference = 'Stop'
 $projectRootPath = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $solutionPath = Join-Path $projectRootPath 'GodotALS.sln'
 $scenePath = 'res://scenes/tests/p3a_locomotion_harness.tscn'
-$markerPattern = '(?m)^GODOT_ALS_P3A_OK mode=(single|parallel) characters=(1|10) warmup=120 frames=600 digest=([0-9A-F]{16}) missing=(\d+) stale=(\d+) generation=(\d+) off_main=(\d+) lag=(\d+) allocations=(\d+)$'
+. (Join-Path $PSScriptRoot 'p3a-verification-functions.ps1')
 
 # Tier promotion can charge runtime bookkeeping to an otherwise allocation-free measured frame.
 $env:DOTNET_TieredCompilation = '0'
+$env:COMPlus_TieredCompilation = '0'
 
 if (-not (Test-Path -LiteralPath $GodotExecutable -PathType Leaf)) {
     throw "Godot executable not found: $GodotExecutable"
@@ -55,32 +56,17 @@ function Invoke-P3aHarness {
         "--als-mode=$Mode" "--als-characters=$CharacterCount" 2>&1
     $godotExitCode = $LASTEXITCODE
     $godotOutput | ForEach-Object { Write-Host $_ }
-    $joinedOutput = $godotOutput -join [Environment]::NewLine
     $errorLines = @($godotOutput | Where-Object { "$_" -match 'SCRIPT ERROR|ERROR:' })
-    $failLines = @($godotOutput | Where-Object { "$_" -match '^GODOT_ALS_P3A_FAIL(?: |$)' })
 
-    if ($godotExitCode -ne 0 -or $errorLines.Count -ne 0 -or $failLines.Count -ne 0) {
+    if ($godotExitCode -ne 0 -or $errorLines.Count -ne 0) {
         $details = $errorLines -join [Environment]::NewLine
         throw "Godot P3A harness failed for mode=$Mode characters=$CharacterCount with exit code $godotExitCode.$([Environment]::NewLine)$details"
     }
 
-    $matches = [regex]::Matches($joinedOutput, $markerPattern)
-    if ($matches.Count -ne 1) {
-        throw "Expected exactly one Godot P3A marker for mode=$Mode characters=$CharacterCount; observed $($matches.Count)."
-    }
-
-    $match = $matches[0]
-    return [pscustomobject]@{
-        Mode = $match.Groups[1].Value
-        Characters = [int]$match.Groups[2].Value
-        Digest = $match.Groups[3].Value
-        Missing = [long]$match.Groups[4].Value
-        Stale = [long]$match.Groups[5].Value
-        Generation = [long]$match.Groups[6].Value
-        OffMain = [long]$match.Groups[7].Value
-        Lag = [long]$match.Groups[8].Value
-        Allocations = [long]$match.Groups[9].Value
-    }
+    return ConvertFrom-P3aHarnessOutput `
+        -OutputLines $godotOutput `
+        -ExpectedMode $Mode `
+        -ExpectedCharacterCount $CharacterCount
 }
 
 foreach ($characterCount in @(1, 10)) {

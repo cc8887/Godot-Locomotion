@@ -92,9 +92,9 @@ public sealed class AlsP3aHarnessContext
 
     public bool NewGenerationCommitted;
 
-    public int MeasurementCoverage;
+    public bool ReplacementFrameCommitted;
 
-    public bool MeasurementSawAirborne;
+    public int MeasurementCoverage;
 
     public long AffinityViolations;
 
@@ -126,7 +126,9 @@ public sealed class AlsP3aHarnessEntry
 
     public int ObservedOffMainThread;
 
-    public byte PreviousGrounded;
+    public int HasCommittedResult;
+
+    public AlsLocomotionState PreviousCommittedLocomotionState;
 
     public int HasPublishedResult;
 

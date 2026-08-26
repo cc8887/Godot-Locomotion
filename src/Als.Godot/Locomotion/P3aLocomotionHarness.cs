@@ -87,6 +87,10 @@ public partial class P3aLocomotionHarness : Node
 
             var measure = frameId > AlsP3aHarnessContext.WarmupFrames;
             var allocatedBefore = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            if (frameId == AlsP3aHarnessContext.ReplacementFrame)
+            {
+                ReplaceCharacterZero(frameId);
+            }
             for (var index = 0; index < _context.Entries.Length; index++)
             {
                 var entry = _context.Entries[index];
@@ -96,10 +100,6 @@ public partial class P3aLocomotionHarness : Node
                     checked((int)entry.Handle.Generation),
                     AlsP3aHarnessContext.DeltaTime);
                 entry.LastMotorFrameId = entry.PendingInput.Identity.FrameId;
-                if (index == 0)
-                {
-                    ObserveMeasurementTraversal(entry, measure);
-                }
             }
             if (measure)
             {
@@ -134,26 +134,12 @@ public partial class P3aLocomotionHarness : Node
         }
     }
 
-    public void ReplaceCharacterZero()
+    private void ReplaceCharacterZero(long frameId)
     {
         var oldEntry = _context.Entries[0];
-        SetCharacterActive(oldEntry, active: false);
-        if (!_context.Registry.Release(oldEntry.Handle))
-        {
-            throw new InvalidOperationException("Failed to release the P3A character slot.");
-        }
-
-        var acquiredHandle = _context.Registry.Acquire();
         var newEntry = _context.SpareEntry;
-        if (acquiredHandle != newEntry.Handle ||
-            acquiredHandle.CharacterId != oldEntry.Handle.CharacterId ||
-            acquiredHandle.Generation != oldEntry.Handle.Generation + 1)
-        {
-            throw new InvalidOperationException("P3A slot generation was not incremented on reuse.");
-        }
-
         var staleIdentity = new AlsFrameIdentity(
-            AlsP3aHarnessContext.ReplacementFrame + 1,
+            frameId,
             oldEntry.Handle.CharacterId,
             oldEntry.Handle.Generation);
         oldEntry.Exchange.PublishResult(AlsFrameResult.CreateDefault(staleIdentity));
@@ -167,6 +153,21 @@ public partial class P3aLocomotionHarness : Node
             oldEntry.Exchange.TryConsumeResult(staleIdentity, out var staleResult) &&
             staleResult.Identity == staleIdentity;
         _context.OldGenerationRejected = currentGenerationRejected && oldGenerationPreserved;
+
+        SetCharacterActive(oldEntry, active: false);
+        if (!_context.Registry.Release(oldEntry.Handle))
+        {
+            throw new InvalidOperationException("Failed to release the P3A character slot.");
+        }
+
+        var acquiredHandle = _context.Registry.Acquire();
+        if (acquiredHandle != newEntry.Handle ||
+            acquiredHandle.CharacterId != oldEntry.Handle.CharacterId ||
+            acquiredHandle.Generation != oldEntry.Handle.Generation + 1)
+        {
+            throw new InvalidOperationException("P3A slot generation was not incremented on reuse.");
+        }
+
         _context.Entries[0] = newEntry;
         SetCharacterActive(newEntry, active: true);
         _context.ReplacementHandle = newEntry.Handle;
@@ -224,62 +225,6 @@ public partial class P3aLocomotionHarness : Node
         entry.Motor.CollisionLayer = active ? 1u : 0u;
         entry.Motor.CollisionMask = active ? _context.MotorSettings.CollisionMask : 0u;
         entry.Worker.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
-    }
-
-    private void ObserveMeasurementTraversal(AlsP3aHarnessEntry entry, bool measure)
-    {
-        var grounded = entry.PendingInput.Floor.IsGrounded;
-        if (measure)
-        {
-            var command = entry.PendingInput.Command;
-            _context.MeasurementCoverage |= command.RequestedGait switch
-            {
-                AlsGait.Walking => AlsP3aHarnessContext.CoverageWalking,
-                AlsGait.Running => AlsP3aHarnessContext.CoverageRunning,
-                AlsGait.Sprinting => AlsP3aHarnessContext.CoverageSprinting,
-                _ => 0,
-            };
-            if (entry.PendingInput.Stance == AlsStance.Crouching)
-            {
-                _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageCrouching;
-            }
-            if (entry.PendingInput.JumpAccepted == 1)
-            {
-                _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageJump;
-            }
-            if (grounded == 0)
-            {
-                _context.MeasurementSawAirborne = true;
-            }
-            if (_context.MeasurementSawAirborne && entry.PreviousGrounded == 0 && grounded == 1)
-            {
-                _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageLand;
-            }
-            if (command.MovementAxes.Y > 0f)
-            {
-                _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageForward;
-            }
-            if (command.MovementAxes.X > 0f)
-            {
-                _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageRight;
-            }
-            if (command.MovementAxes.Y < 0f)
-            {
-                _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageBackward;
-            }
-            if (command.MovementAxes.X < 0f)
-            {
-                _context.MeasurementCoverage |= AlsP3aHarnessContext.CoverageLeft;
-            }
-            _context.MeasurementCoverage |= entry.PendingInput.RotationMode switch
-            {
-                AlsRotationMode.LookingDirection => AlsP3aHarnessContext.CoverageLookingDirection,
-                AlsRotationMode.VelocityDirection => AlsP3aHarnessContext.CoverageVelocityDirection,
-                AlsRotationMode.Aiming => AlsP3aHarnessContext.CoverageAiming,
-                _ => 0,
-            };
-        }
-        entry.PreviousGrounded = grounded;
     }
 
     private static StaticBody3D CreateFloor()
