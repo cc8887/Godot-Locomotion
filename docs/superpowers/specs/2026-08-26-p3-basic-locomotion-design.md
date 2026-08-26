@@ -209,15 +209,18 @@ TargetYaw
 - Standing 允许 Walking、Running、Sprinting；
 - Crouching 最大为 Running，并使用独立蹲伏速度表；
 - Sprint 还要求有效移动输入与 rotation mode 允许冲刺；
-- 阈值带进入/退出滞回，临界速度不得逐帧反复切换。
+- `ActualGait` 精确采用固定 C++ 的 `MaxWalkSpeed + 0.1 m/s`、`MaxRunSpeed + 0.1 m/s`
+  判定；P3 不额外引入依赖 previous gait 的迟滞状态；
+- 临界值、单位换算和比较运算符由 golden trace 锁定，不能用模糊 epsilon 改变转换帧。
 
 阈值、滞回和允许条件从固定 `ALS-Refactored` commit 的 locomotion settings/character 逻辑提取，
 以版本化数值 fixture 进入 `AlsLocomotionSettings`，禁止运行时读取第三方源码或 UE 资产。
 
 ### 7.3 方向相关速度
 
-Standing/Crouching 的每个 gait 保存 forward、sideways 和 backward 三个参考速度。motor 根据相机或
-角色局部移动角度在三者之间连续插值，避免只使用单一标量最大速度。
+Standing/Crouching 的每个 gait 保存 forward、sideways 和 backward 三个采样参考速度。motor 根据
+相机或角色局部移动角度连续插值，避免只使用单一标量最大速度。固定 C++ 配置只有 forward/backward
+端点时，sideways 值必须由同一角度曲线在 90 度处确定性采样得到，不能人为增加第三套行为参数。
 
 实际速度超过当前 requested gait 限制时，由加速度/减速度逐步收敛，不瞬间截断已有速度。无输入时
 使用 braking/deceleration；反向输入使用独立转向响应。
@@ -424,7 +427,7 @@ P3 headless gate 使用 120 帧 warmup 和 600 帧 measurement：
 | 10 | parallel | Tier 0 | 与 single 一致，10 workers 离开主线程 |
 
 warmup 后 Gather、worker model、AnimationTree/Skeleton、exchange 和 commit 的托管分配都必须为
-`0 B`。P3 记录阶段墙钟 p95/p99，但最终 i7-10700 十分钟预算仍在 P6 验收。
+`0 B`。P3 记录阶段墙钟 p95/p99，但最终 i7-10700 十分钟预算仍在 P7 验收。
 
 ### 12.4 回归
 
