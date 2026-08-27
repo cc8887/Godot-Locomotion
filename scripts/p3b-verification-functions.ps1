@@ -1,3 +1,69 @@
+function Test-P3bFailureMarkerLine
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string]$Line
+    )
+
+    return [regex]::IsMatch(
+        $Line,
+        '\AGODOT_ALS_P3B_FAIL(?:\z|\s)',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+}
+
+function Get-P3bRequiredProperty
+{
+    param(
+        [AllowNull()]
+        [object]$InputObject,
+        [Parameter(Mandatory)]
+        [string]$PropertyName,
+        [Parameter(Mandatory)]
+        [string]$Context
+    )
+
+    if ($null -eq $InputObject)
+    {
+        throw "$Context result is null."
+    }
+
+    $property = $InputObject.PSObject.Properties[$PropertyName]
+    if ($null -eq $property)
+    {
+        throw "$Context result is missing required property '$PropertyName'."
+    }
+
+    return $property
+}
+
+function Get-P3bValidatedSummaries
+{
+    param(
+        [AllowNull()]
+        [object]$InputObject,
+        [Parameter(Mandatory)]
+        [string]$Context
+    )
+
+    $values = @{}
+    foreach ($propertyName in @('Digest', 'Pose', 'FullPose', 'Root'))
+    {
+        $property = Get-P3bRequiredProperty `
+            -InputObject $InputObject `
+            -PropertyName $propertyName `
+            -Context $Context
+        $value = $property.Value
+        if ($value -isnot [string] -or $value -cnotmatch '\A[0-9A-F]{16}\z')
+        {
+            throw "$Context property '$propertyName' must be an uppercase 16-hex string."
+        }
+        $values[$propertyName] = $value
+    }
+
+    return [pscustomobject]$values
+}
+
 function ConvertFrom-P3bHarnessOutput
 {
     param(
@@ -20,14 +86,14 @@ function ConvertFrom-P3bHarnessOutput
 
     $markerLines = @($lines | Where-Object {
         $_.StartsWith('GODOT_ALS_P3B_OK', [StringComparison]::Ordinal) -or
-        $_.StartsWith('GODOT_ALS_P3B_FAIL', [StringComparison]::Ordinal)
+        (Test-P3bFailureMarkerLine -Line $_)
     })
     if ($markerLines.Count -ne 1)
     {
         throw "Expected exactly one P3B result marker; observed $($markerLines.Count)."
     }
 
-    $markerPattern = '\AGODOT_ALS_P3B_OK mode=(single|parallel) characters=(1|10) warmup=120 frames=600 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) missing=(\d+) stale=(\d+) generation=(\d+) off_main=(\d+) lag=(\d+) allocations=(\d+) p95_us=(\d+) p99_us=(\d+)\z'
+    $markerPattern = '\AGODOT_ALS_P3B_OK mode=(single|parallel) characters=(1|10) warmup=120 frames=600 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) missing=(\d+) stale=(\d+) generation=(\d+) off_main=(\d+) lag=(\d+) allocations=(\d+) p95_us=(\d+) p99_us=(\d+)\z'
     $marker = [regex]::Match($markerLines[0], $markerPattern)
     if (-not $marker.Success)
     {
@@ -41,12 +107,12 @@ function ConvertFrom-P3bHarnessOutput
         throw "Unexpected P3B identity: expected mode=$ExpectedMode characters=$ExpectedCharacterCount, observed mode=$mode characters=$characters."
     }
 
-    $missing = [long]$marker.Groups[5].Value
-    $stale = [long]$marker.Groups[6].Value
-    $generation = [long]$marker.Groups[7].Value
-    $offMain = [long]$marker.Groups[8].Value
-    $lag = [long]$marker.Groups[9].Value
-    $allocations = [long]$marker.Groups[10].Value
+    $missing = [long]$marker.Groups[7].Value
+    $stale = [long]$marker.Groups[8].Value
+    $generation = [long]$marker.Groups[9].Value
+    $offMain = [long]$marker.Groups[10].Value
+    $lag = [long]$marker.Groups[11].Value
+    $allocations = [long]$marker.Groups[12].Value
     if ($missing -ne 0 -or $stale -ne 0 -or $generation -ne 0 -or
         $lag -ne 0 -or $allocations -ne 0)
     {
@@ -59,8 +125,8 @@ function ConvertFrom-P3bHarnessOutput
         throw "P3B worker affinity mismatch: expected off_main=$expectedOffMain, observed=$offMain."
     }
 
-    $p95 = [long]$marker.Groups[11].Value
-    $p99 = [long]$marker.Groups[12].Value
+    $p95 = [long]$marker.Groups[13].Value
+    $p99 = [long]$marker.Groups[14].Value
     if ($p95 -gt $p99)
     {
         throw "P3B timing percentiles are invalid: p95_us=$p95 p99_us=$p99."
@@ -153,6 +219,8 @@ function ConvertFrom-P3bHarnessOutput
         Characters = $characters
         Digest = $marker.Groups[3].Value
         Pose = $marker.Groups[4].Value
+        FullPose = $marker.Groups[5].Value
+        Root = $marker.Groups[6].Value
         Missing = $missing
         Stale = $stale
         Generation = $generation
@@ -175,26 +243,137 @@ function Assert-P3bResultPair
 {
     param(
         [Parameter(Mandatory)]
-        [psobject]$Single,
+        [AllowNull()]
+        [object]$Single,
         [Parameter(Mandatory)]
-        [psobject]$Parallel,
+        [AllowNull()]
+        [object]$Parallel,
         [Parameter(Mandatory)]
         [ValidateSet(1, 10)]
         [int]$CharacterCount
     )
 
-    if ($Single.Mode -cne 'single' -or $Parallel.Mode -cne 'parallel' -or
-        $Single.Characters -ne $CharacterCount -or $Parallel.Characters -ne $CharacterCount)
+    $singleMode = (Get-P3bRequiredProperty $Single Mode 'Single P3B').Value
+    $parallelMode = (Get-P3bRequiredProperty $Parallel Mode 'Parallel P3B').Value
+    $singleCharacters = (Get-P3bRequiredProperty $Single Characters 'Single P3B').Value
+    $parallelCharacters = (Get-P3bRequiredProperty $Parallel Characters 'Parallel P3B').Value
+    if ($singleMode -isnot [string] -or $singleMode -cne 'single' -or
+        $parallelMode -isnot [string] -or $parallelMode -cne 'parallel' -or
+        $singleCharacters -isnot [int] -or $singleCharacters -ne $CharacterCount -or
+        $parallelCharacters -isnot [int] -or $parallelCharacters -ne $CharacterCount)
     {
         throw "P3B result pair identity mismatch for characters=$CharacterCount."
     }
-    if ($Single.Digest -cne $Parallel.Digest)
+
+    $singleSummaries = Get-P3bValidatedSummaries $Single 'Single P3B'
+    $parallelSummaries = Get-P3bValidatedSummaries $Parallel 'Parallel P3B'
+    if ($singleSummaries.Digest -cne $parallelSummaries.Digest)
     {
-        throw "P3B digest mismatch for characters=${CharacterCount}: single=$($Single.Digest), parallel=$($Parallel.Digest)."
+        throw "P3B digest mismatch for characters=${CharacterCount}: single=$($singleSummaries.Digest), parallel=$($parallelSummaries.Digest)."
     }
-    if ($Single.Pose -cne $Parallel.Pose)
+    if ($singleSummaries.Pose -cne $parallelSummaries.Pose)
     {
-        throw "P3B pose mismatch for characters=${CharacterCount}: single=$($Single.Pose), parallel=$($Parallel.Pose)."
+        throw "P3B pose mismatch for characters=${CharacterCount}: single=$($singleSummaries.Pose), parallel=$($parallelSummaries.Pose)."
+    }
+    if ($singleSummaries.FullPose -cne $parallelSummaries.FullPose)
+    {
+        throw "P3B full-pose mismatch for characters=${CharacterCount}: single=$($singleSummaries.FullPose), parallel=$($parallelSummaries.FullPose)."
+    }
+    if ($singleSummaries.Root -cne $parallelSummaries.Root)
+    {
+        throw "P3B root mismatch for characters=${CharacterCount}: single=$($singleSummaries.Root), parallel=$($parallelSummaries.Root)."
+    }
+}
+
+function ConvertFrom-P3bFrameOrderOutput
+{
+    param(
+        [Parameter(Mandatory)]
+        [object[]]$OutputLines,
+        [Parameter(Mandatory)]
+        [ValidateSet('single', 'parallel')]
+        [string]$ExpectedMode
+    )
+
+    $lines = @($OutputLines | ForEach-Object { "$_" })
+    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR:|ERROR:' })
+    if ($errorLines.Count -ne 0)
+    {
+        throw "Godot emitted a frame-order error line:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
+    }
+
+    $markerLines = @($lines | Where-Object {
+        $_.StartsWith('GODOT_ALS_P3B_FRAME_ORDER_OK', [StringComparison]::Ordinal) -or
+        (Test-P3bFailureMarkerLine -Line $_)
+    })
+    if ($markerLines.Count -ne 1)
+    {
+        throw "Expected exactly one P3B frame-order result marker; observed $($markerLines.Count)."
+    }
+
+    $markerPattern = '\AGODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1\z'
+    $marker = [regex]::Match($markerLines[0], $markerPattern)
+    if (-not $marker.Success)
+    {
+        throw "Malformed or unsuccessful P3B frame-order marker: $($markerLines[0])"
+    }
+
+    $mode = $marker.Groups[1].Value
+    if ($mode -cne $ExpectedMode)
+    {
+        throw "Unexpected P3B frame-order mode: expected $ExpectedMode, observed $mode."
+    }
+
+    [pscustomobject]@{
+        Mode = $mode
+        Frames = 180
+        Digest = $marker.Groups[2].Value
+        Pose = $marker.Groups[3].Value
+        FullPose = $marker.Groups[4].Value
+        Root = $marker.Groups[5].Value
+    }
+}
+
+function Assert-P3bFrameOrderPair
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$Single,
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$Parallel
+    )
+
+    $singleMode = (Get-P3bRequiredProperty $Single Mode 'Single P3B frame-order').Value
+    $parallelMode = (Get-P3bRequiredProperty $Parallel Mode 'Parallel P3B frame-order').Value
+    $singleFrames = (Get-P3bRequiredProperty $Single Frames 'Single P3B frame-order').Value
+    $parallelFrames = (Get-P3bRequiredProperty $Parallel Frames 'Parallel P3B frame-order').Value
+    if ($singleMode -isnot [string] -or $singleMode -cne 'single' -or
+        $parallelMode -isnot [string] -or $parallelMode -cne 'parallel' -or
+        $singleFrames -isnot [int] -or $singleFrames -ne 180 -or
+        $parallelFrames -isnot [int] -or $parallelFrames -ne 180)
+    {
+        throw 'P3B frame-order result pair identity mismatch.'
+    }
+
+    $singleSummaries = Get-P3bValidatedSummaries $Single 'Single P3B frame-order'
+    $parallelSummaries = Get-P3bValidatedSummaries $Parallel 'Parallel P3B frame-order'
+    if ($singleSummaries.Digest -cne $parallelSummaries.Digest)
+    {
+        throw "P3B frame-order digest mismatch: single=$($singleSummaries.Digest), parallel=$($parallelSummaries.Digest)."
+    }
+    if ($singleSummaries.Pose -cne $parallelSummaries.Pose)
+    {
+        throw "P3B frame-order pose mismatch: single=$($singleSummaries.Pose), parallel=$($parallelSummaries.Pose)."
+    }
+    if ($singleSummaries.FullPose -cne $parallelSummaries.FullPose)
+    {
+        throw "P3B frame-order full-pose mismatch: single=$($singleSummaries.FullPose), parallel=$($parallelSummaries.FullPose)."
+    }
+    if ($singleSummaries.Root -cne $parallelSummaries.Root)
+    {
+        throw "P3B frame-order root mismatch: single=$($singleSummaries.Root), parallel=$($parallelSummaries.Root)."
     }
 }
 

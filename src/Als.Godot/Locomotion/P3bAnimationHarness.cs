@@ -31,6 +31,8 @@ public partial class P3bAnimationHarness : Node
     private bool[] _hasFullPoseDigest = [];
     private ulong _resultDigest = AlsResultDigest.OffsetBasis;
     private ulong _poseDigest = AlsResultDigest.OffsetBasis;
+    private ulong _fullPoseDigest = AlsResultDigest.OffsetBasis;
+    private ulong _rootDigest = AlsResultDigest.OffsetBasis;
     private int _physicsTicks;
     private bool _replacementRequested;
     private bool _measurementStarted;
@@ -186,7 +188,9 @@ public partial class P3bAnimationHarness : Node
             }
 
             AlsResultDigest.Append(ref _resultDigest, diagnostics.Result);
-            Append(ref _poseDigest, diagnostics.FullPoseDigest);
+            Append(ref _poseDigest, diagnostics.PoseDigest);
+            Append(ref _fullPoseDigest, diagnostics.FullPoseDigest);
+            Append(ref _rootDigest, diagnostics.RootDigest);
             if (_hasFullPoseDigest[index] &&
                 diagnostics.FullPoseDigest != _previousFullPoseDigests[index])
             {
@@ -311,7 +315,8 @@ public partial class P3bAnimationHarness : Node
         var marker =
             $"GODOT_ALS_P3B_OK mode={mode} characters={_characterCount} " +
             $"warmup={AlsP3bHarnessContext.WarmupFrames} frames={AlsP3bHarnessContext.MeasurementFrames} " +
-            $"digest={_resultDigest:X16} pose={_poseDigest:X16} missing={missing} stale={stale} " +
+            $"digest={_resultDigest:X16} pose={_poseDigest:X16} " +
+            $"full_pose={_fullPoseDigest:X16} root={_rootDigest:X16} missing={missing} stale={stale} " +
             $"generation={generationErrors} off_main={offMain} lag={lag} allocations={allocations} " +
             $"p95_us={timing.P95Microseconds} p99_us={timing.P99Microseconds}";
 
