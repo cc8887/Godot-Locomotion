@@ -20,7 +20,7 @@ public partial class AlsOrbitCamera : Node3D
 
     public float Pitch => _pitch;
 
-    public Vector3 FollowOffset { get; } = new(0f, 1.45f, 0f);
+    public Vector3 FollowOffset { get; } = new(0f, 0.53f, 0f);
 
     public Node3D? Target =>
         _target is not null && GodotObject.IsInstanceValid(_target)
