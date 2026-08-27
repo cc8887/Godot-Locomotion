@@ -16,6 +16,12 @@ if ([string]::IsNullOrWhiteSpace($OutputPath))
 {
     $OutputPath = Join-Path $ProjectRoot 'assets\config\p3_locomotion_profile.json'
 }
+$ManifestPath = [System.IO.Path]::GetFullPath($ManifestPath)
+$OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+if ([System.StringComparer]::OrdinalIgnoreCase.Equals($ManifestPath, $OutputPath))
+{
+    throw "Manifest and output resolve to the same file: $ManifestPath"
+}
 
 function Resolve-ExactManifestAsset(
     [object]$Manifest,
@@ -117,15 +123,50 @@ $profile = [ordered]@{
     leanAdditive = [string](Resolve-ExactManifestAsset $manifest 'blendSpaces' $leanAdditivePath).id
 }
 
-$outputDirectory = Split-Path -Parent $OutputPath
+$outputDirectory = [System.IO.Path]::GetDirectoryName($OutputPath)
 if (-not [string]::IsNullOrWhiteSpace($outputDirectory))
 {
     [void][System.IO.Directory]::CreateDirectory($outputDirectory)
 }
 $json = $profile | ConvertTo-Json -Depth 10
-[System.IO.File]::WriteAllText(
-    [System.IO.Path]::GetFullPath($OutputPath),
-    "$json$([Environment]::NewLine)",
-    [System.Text.UTF8Encoding]::new($false))
+$bytes = [System.Text.UTF8Encoding]::new($false).GetBytes("$json$([Environment]::NewLine)")
+$temporaryPath = Join-Path $outputDirectory `
+    ".$([System.IO.Path]::GetFileName($OutputPath)).$([guid]::NewGuid().ToString('N')).tmp"
+try
+{
+    $stream = [System.IO.FileStream]::new($temporaryPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None, 4096, [System.IO.FileOptions]::WriteThrough)
+    try
+    {
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.Flush($true)
+    }
+    finally
+    {
+        $stream.Dispose()
+    }
+
+    if ([System.IO.File]::Exists($OutputPath))
+    {
+        [System.IO.File]::Replace(
+            $temporaryPath,
+            $OutputPath,
+            [System.Management.Automation.Language.NullString]::Value)
+    }
+    else
+    {
+        [System.IO.File]::Move($temporaryPath, $OutputPath)
+    }
+}
+catch
+{
+    throw "Failed to publish P3 profile atomically: $($_.Exception.Message)"
+}
+finally
+{
+    if ([System.IO.File]::Exists($temporaryPath))
+    {
+        [System.IO.File]::Delete($temporaryPath)
+    }
+}
 
 Write-Output "P3_PROFILE_GENERATION_OK standing=$($standingSamples.Count) crouching=$($crouchingSamples.Count)"

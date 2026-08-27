@@ -39,6 +39,32 @@ public sealed class AlsLocomotionProfileCompilerTests
     }
 
     [Fact]
+    public void AllAnimationIdsAreTheExactSortedUniqueRuntimeUnion()
+    {
+        var definition = P3RepositoryFixtures.LoadAnimationSet();
+        var first = AlsLocomotionProfileCompiler.Compile(P3RepositoryFixtures.ReadProfile(), definition);
+        var second = AlsLocomotionProfileCompiler.Compile(P3RepositoryFixtures.ReadProfile(), definition);
+        var expected = new[]
+            {
+                first.StandingIdleAnimationId,
+                first.CrouchingIdleAnimationId,
+            }
+            .Concat(first.StandingSamples.Select(sample => sample.AnimationId))
+            .Concat(first.CrouchingSamples.Select(sample => sample.AnimationId))
+            .Concat([first.JumpStartAnimationId, first.FallLoopAnimationId, first.LandAnimationId])
+            .Concat(first.LeanAdditiveSamples.Select(sample => sample.AnimationId))
+            .Append(first.LeanAdditiveBasePoseAnimationId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToArray();
+
+        Assert.Equal(expected, first.AllAnimationIds);
+        Assert.Equal(first.AllAnimationIds.Length, first.AllAnimationIds.Distinct().Count());
+        Assert.Equal(first.AllAnimationIds.OrderBy(id => id), first.AllAnimationIds);
+        Assert.Equal(first.AllAnimationIds, second.AllAnimationIds);
+    }
+
+    [Fact]
     public void RepositoryProfileHasTheExactTopLevelContract()
     {
         using var document = JsonDocument.Parse(P3RepositoryFixtures.ReadProfile());
@@ -79,6 +105,41 @@ public sealed class AlsLocomotionProfileCompilerTests
         Assert.Contains(exception.Issues, issue =>
             issue.FieldPath == "$.fallback" &&
             issue.Message.Contains("unknown property", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void UnknownSamplePropertyIsRejected()
+    {
+        var exception = CompileFailure(P3RepositoryFixtures.WithUnknownSampleProperty());
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.FieldPath == "$.standingSamples[0].fallback" &&
+            issue.Message.Contains("unknown property", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DuplicateJsonPropertyIsRejected()
+    {
+        var json = P3RepositoryFixtures.ReadProfile().Replace(
+            "\"schemaVersion\": 1,",
+            "\"schemaVersion\": 1,\n  \"schemaVersion\": 1,",
+            StringComparison.Ordinal);
+
+        var exception = CompileFailure(json);
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.FieldPath == "$.schemaVersion" &&
+            issue.Message.Contains("duplicate JSON property", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void NonFiniteSampleCoordinateIsRejected()
+    {
+        var exception = CompileFailure(P3RepositoryFixtures.WithInvalidSampleNumber());
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.FieldPath == "$.standingSamples[0].x" &&
+            issue.Message.Contains("finite", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]
@@ -167,6 +228,27 @@ public sealed class AlsLocomotionProfileCompilerTests
 
         Assert.Contains(exception.Issues, issue =>
             issue.Message.Contains("base pose mismatch", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void MismatchedLeanBasePoseFrameIsRejectedWithSpecificDiagnostic()
+    {
+        var definition = P3RepositoryFixtures.LoadAnimationSet();
+        var profile = AlsLocomotionProfileCompiler.Compile(P3RepositoryFixtures.ReadProfile(), definition);
+        var animations = definition.Animations.ToArray();
+        var id = profile.LeanAdditiveSamples[0].AnimationId;
+        animations[id] = animations[id] with { AdditiveBasePoseFrame = 7 };
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsLocomotionProfileCompiler.Compile(
+                P3RepositoryFixtures.ReadProfile(), definition with { Animations = animations }));
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.Code == "ALSPROFILE022" &&
+            issue.FieldPath == "$.leanAdditive.samples[1]" &&
+            issue.Message.Contains("base pose frame mismatch", StringComparison.OrdinalIgnoreCase) &&
+            issue.Expected == "7" &&
+            issue.Actual == "0");
     }
 
     private static AlsCompilationException CompileFailure(string json) =>

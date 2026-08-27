@@ -110,6 +110,7 @@ public static class AlsLocomotionProfileCompiler
                 .Concat(leanSamples.Select(sample => sample.AnimationId))
                 .Append(leanBasePoseId)
                 .Distinct()
+                .OrderBy(id => id)
                 .ToArray();
 
             return new AlsLocomotionAnimationProfile(
@@ -316,6 +317,7 @@ public static class AlsLocomotionProfileCompiler
         var compiled = new AlsLocomotionAnimationSample[blend.Samples.Length];
         var basePoseId = -1;
         var basePoseType = -1;
+        var basePoseFrame = -1;
         for (var index = 0; index < blend.Samples.Length; index++)
         {
             var sample = blend.Samples[index];
@@ -343,11 +345,18 @@ public static class AlsLocomotionProfileCompiler
             {
                 basePoseId = animation.AdditiveBasePoseAnimationId;
                 basePoseType = animation.AdditiveBasePoseType;
+                basePoseFrame = animation.AdditiveBasePoseFrame;
             }
             else if (animation.AdditiveBasePoseAnimationId != basePoseId ||
                      animation.AdditiveBasePoseType != basePoseType)
             {
                 throw Failure("ALSPROFILE022", path, "Lean additive base pose mismatch.", assetId: animation.StableId);
+            }
+            else if (animation.AdditiveBasePoseFrame != basePoseFrame)
+            {
+                throw Failure(
+                    "ALSPROFILE022", path, "Lean additive base pose frame mismatch.",
+                    basePoseFrame.ToString(), animation.AdditiveBasePoseFrame.ToString(), animation.StableId);
             }
 
             RequireSkeleton(animationSet.Animations[animation.AdditiveBasePoseAnimationId], skeletonId, path);
