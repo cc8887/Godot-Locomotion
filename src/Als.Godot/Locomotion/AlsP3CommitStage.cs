@@ -19,7 +19,8 @@ public partial class AlsP3CommitStage : Node
 
     public override void _PhysicsProcess(double delta)
     {
-        if (Volatile.Read(ref _state.Active) == 0)
+        if (Volatile.Read(ref _state.Active) == 0 ||
+            Volatile.Read(ref _state.CommitSuspended) != 0)
         {
             return;
         }
@@ -96,7 +97,7 @@ public partial class AlsP3CommitStage : Node
     private void ClassifyMissing(long expectedFrameId)
     {
         var failure = AlsP3aResultClassifier.Classify(
-            Volatile.Read(ref _state.HasPublishedResult),
+            _state.HasPublishedResult,
             expectedFrameId,
             _state.ResultPublishedFrameId,
             checked((int)_state.Handle.CharacterId),

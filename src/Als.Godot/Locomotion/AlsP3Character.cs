@@ -33,23 +33,31 @@ public partial class AlsP3Character : Node3D
     public int FailureDiagnosticCount =>
         Volatile.Read(ref _state.FailureDiagnosticCount);
 
-    internal AlsP3CharacterState RuntimeState
+    internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
+        _state.CaptureRuntimeDiagnostics();
+
+    internal int FailurePendingIdentityCount =>
+        _state.CaptureRuntimeDiagnostics().PendingFailureIdentityCount;
+
+    internal int FailureRetainedIdentityCount =>
+        _state.CaptureRuntimeDiagnostics().RetainedFailureIdentityCount;
+
+    public AlsP3LifecycleDiagnostics LifecycleDiagnostics
     {
         get
         {
             EnsureConfigured();
-            return _state;
+            var hasProcessing = ProcessMode != ProcessModeEnum.Disabled ||
+                _motor.ProcessMode != ProcessModeEnum.Disabled ||
+                _worker.ProcessMode != ProcessModeEnum.Disabled ||
+                _commit.ProcessMode != ProcessModeEnum.Disabled;
+            return new AlsP3LifecycleDiagnostics(
+                Volatile.Read(ref _disposed) != 0,
+                Volatile.Read(ref _state.Active) != 0,
+                _motor.CollisionLayer != 0 || _motor.CollisionMask != 0,
+                hasProcessing);
         }
     }
-
-    internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
-        RuntimeState.CaptureRuntimeDiagnostics();
-
-    internal int FailurePendingIdentityCount =>
-        RuntimeState.CaptureRuntimeDiagnostics().PendingFailureIdentityCount;
-
-    internal int FailureRetainedIdentityCount =>
-        RuntimeState.CaptureRuntimeDiagnostics().RetainedFailureIdentityCount;
 
     public AlsP3FrameDiagnostics Diagnostics
     {
@@ -67,9 +75,22 @@ public partial class AlsP3Character : Node3D
         AlsSlotHandle handle,
         IAlsLocomotionCommandSource commandSource)
     {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        Configure(context, handle, commandSource, new AlsP3ExchangeSlot());
+    }
+
+    internal void Configure(
+        AlsP3RuntimeContext context,
+        AlsSlotHandle handle,
+        IAlsLocomotionCommandSource commandSource,
+        AlsP3ExchangeSlot exchangeSlot)
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(commandSource);
-        EnsureMainThread();
+        ArgumentNullException.ThrowIfNull(exchangeSlot);
         if (!IsInsideTree())
         {
             throw new InvalidOperationException("P3 character must be in the scene tree before Configure().");
@@ -84,7 +105,7 @@ public partial class AlsP3Character : Node3D
         }
 
         _context = context;
-        _state = new AlsP3CharacterState(handle);
+        _state = new AlsP3CharacterState(handle, exchangeSlot);
         try
         {
             _motor = new AlsCharacterMotor { Name = "Motor" };
@@ -142,8 +163,9 @@ public partial class AlsP3Character : Node3D
 
     public void SetActive(bool active)
     {
-        EnsureConfigured();
         EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
         Volatile.Write(ref _state.Active, active ? 1 : 0);
         _motor.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _motor.CollisionLayer = active ? 1u : 0u;
@@ -154,8 +176,9 @@ public partial class AlsP3Character : Node3D
 
     public void ResumeAt(long completedFrameId)
     {
-        EnsureConfigured();
         EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
         ArgumentOutOfRangeException.ThrowIfNegative(completedFrameId);
         if (Volatile.Read(ref _state.Active) != 0 || Volatile.Read(ref _state.PublishedFrameId) != 0)
         {
@@ -184,6 +207,60 @@ public partial class AlsP3Character : Node3D
         DisposeRuntimeCore(allowActive: false);
     }
 
+    internal void BeginReplacementRequest(long completedFrameId)
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
+        if (Volatile.Read(ref _state.Active) == 0 ||
+            Volatile.Read(ref _state.PublishedFrameId) != completedFrameId ||
+            Volatile.Read(ref _state.CommittedFrameId) != completedFrameId)
+        {
+            throw new InvalidOperationException(
+                "P3 replacement must begin at an active fully committed frame boundary.");
+        }
+        Volatile.Write(ref _state.CommitSuspended, 1);
+    }
+
+    internal void RetireForReplacement()
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        Volatile.Write(ref _state.GatherSuspended, 1);
+        Volatile.Write(ref _state.WorkerSuspended, 1);
+        Volatile.Write(ref _state.CommitSuspended, 1);
+        SetActive(false);
+    }
+
+    internal void StartReplacementClassification(long completedFrameId)
+    {
+        ResumeAt(completedFrameId);
+        Volatile.Write(ref _state.GatherSuspended, 0);
+        Volatile.Write(ref _state.WorkerSuspended, 1);
+        Volatile.Write(ref _state.CommitSuspended, 0);
+        SetActive(true);
+    }
+
+    internal void StartReplacementRecovery()
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        Volatile.Write(ref _state.GatherSuspended, 1);
+        Volatile.Write(ref _state.WorkerSuspended, 0);
+    }
+
+    internal void CompleteReplacementRecovery()
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        Volatile.Write(ref _state.GatherSuspended, 0);
+        Volatile.Write(ref _state.WorkerSuspended, 0);
+    }
+
+    internal long RuntimeCommittedFrameId => Volatile.Read(ref _state.CommittedFrameId);
+
+    internal int WorkerInFlight => Volatile.Read(ref _state.WorkerInFlight);
+
     public override void _ExitTree()
     {
         if (GodotThread.IsMainThread() && _configured)
@@ -211,6 +288,28 @@ public partial class AlsP3Character : Node3D
             throw new InvalidOperationException(
                 "P3 character runtime disposal was rejected while its worker callback was in flight.");
         }
+
+        Volatile.Write(ref _state.Active, 0);
+        DisableRuntimeNodes();
+    }
+
+    private void DisableRuntimeNodes()
+    {
+        ProcessMode = ProcessModeEnum.Disabled;
+        if (_motor is not null)
+        {
+            _motor.ProcessMode = ProcessModeEnum.Disabled;
+            _motor.CollisionLayer = 0;
+            _motor.CollisionMask = 0;
+        }
+        if (_worker is not null)
+        {
+            _worker.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (_commit is not null)
+        {
+            _commit.ProcessMode = ProcessModeEnum.Disabled;
+        }
     }
 
     private void EnsureConfigured()
@@ -226,6 +325,14 @@ public partial class AlsP3Character : Node3D
         if (!GodotThread.IsMainThread())
         {
             throw new InvalidOperationException("P3 character lifecycle is restricted to Godot's main thread.");
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            throw new ObjectDisposedException(nameof(AlsP3Character));
         }
     }
 }

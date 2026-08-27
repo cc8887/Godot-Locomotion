@@ -17,6 +17,21 @@ public readonly record struct AlsP3FrameDiagnostics(
     AlsFrameResult Result,
     ulong PoseDigest);
 
+public readonly record struct AlsP3LifecycleDiagnostics(
+    bool IsDisposed,
+    bool IsActive,
+    bool HasCollision,
+    bool HasProcessing);
+
+public readonly record struct AlsP3SlotReplacementDiagnostics(
+    bool Requested,
+    bool RetiredResultObserved,
+    AlsFrameIdentity RetiredResultIdentity,
+    bool RetiredNodeReleased,
+    bool GenerationMismatchObserved,
+    long CommittedFrameAtClassification,
+    bool RecoveryCommitted);
+
 internal readonly record struct AlsP3RuntimeDiagnostics(
     ulong LastPublishedPoseDigest,
     ulong LastPublishedFullPoseDigest,
@@ -86,15 +101,17 @@ internal sealed class AlsP3CharacterState
     private AlsP3FailureIdentity _lastPublishedFailureIdentity;
     private bool _hasLastPublishedFailureIdentity;
 
-    public AlsP3CharacterState(AlsSlotHandle handle)
+    public AlsP3CharacterState(AlsSlotHandle handle, AlsP3ExchangeSlot exchangeSlot)
     {
         Handle = handle;
-        Exchange = new AlsFrameExchange();
+        ExchangeSlot = exchangeSlot ?? throw new ArgumentNullException(nameof(exchangeSlot));
     }
 
     public AlsSlotHandle Handle { get; }
 
-    public AlsFrameExchange Exchange { get; }
+    public AlsP3ExchangeSlot ExchangeSlot { get; }
+
+    public AlsFrameExchange Exchange => ExchangeSlot.Exchange;
 
     public ulong PublishedPoseDigest;
 
@@ -118,13 +135,13 @@ internal sealed class AlsP3CharacterState
 
     public long PoseAdvanceFrameId;
 
-    public long ResultPublishedFrameId;
+    public long ResultPublishedFrameId => ExchangeSlot.ResultPublishedFrameId;
 
-    public int ResultPublishedCharacterId;
+    public int ResultPublishedCharacterId => ExchangeSlot.ResultPublishedCharacterId;
 
-    public int ResultPublishedGeneration;
+    public int ResultPublishedGeneration => ExchangeSlot.ResultPublishedGeneration;
 
-    public int HasPublishedResult;
+    public int HasPublishedResult => Volatile.Read(ref ExchangeSlot.HasPublishedResult);
 
     public byte HasCommittedTargetYaw;
 
@@ -141,6 +158,8 @@ internal sealed class AlsP3CharacterState
     public int GatherSuspended;
 
     public int WorkerSuspended;
+
+    public int CommitSuspended;
 
     public int ObservedOffMainThread;
 
@@ -225,11 +244,44 @@ internal sealed class AlsP3CharacterState
         PublishedPoseDigest = poseDigest;
         PublishedFullPoseDigest = fullPoseDigest;
         PublishedRootDigest = rootDigest;
+        ExchangeSlot.PublishResult(result);
+    }
+}
+
+internal sealed class AlsP3ExchangeSlot
+{
+    public AlsFrameExchange Exchange { get; } = new();
+
+    public long ResultPublishedFrameId;
+
+    public int ResultPublishedCharacterId;
+
+    public int ResultPublishedGeneration;
+
+    public int HasPublishedResult;
+
+    public void PublishResult(in AlsFrameResult result)
+    {
         ResultPublishedCharacterId = checked((int)result.Identity.CharacterId);
         ResultPublishedGeneration = checked((int)result.Identity.SlotGeneration);
         ResultPublishedFrameId = result.Identity.FrameId;
         Exchange.PublishResult(result);
         Volatile.Write(ref HasPublishedResult, 1);
+    }
+
+    public bool TryGetPublishedIdentity(out AlsFrameIdentity identity)
+    {
+        if (Volatile.Read(ref HasPublishedResult) == 0)
+        {
+            identity = default;
+            return false;
+        }
+
+        identity = new AlsFrameIdentity(
+            ResultPublishedFrameId,
+            checked((uint)ResultPublishedCharacterId),
+            checked((uint)ResultPublishedGeneration));
+        return true;
     }
 }
 
