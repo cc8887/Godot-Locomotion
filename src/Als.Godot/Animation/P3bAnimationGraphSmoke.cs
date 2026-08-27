@@ -1,6 +1,7 @@
 using Godot;
 using GodotAls.Assets;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Locomotion;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
 
@@ -45,10 +46,22 @@ public partial class P3bAnimationGraphSmoke : Node
         using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
         using var controller = new AlsLocomotionAnimationController(graph, library.Skeleton);
         controller.Warmup();
+        var settings = AlsLocomotionSettings.Load(
+            Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
+        VerifyGaitBlendMapping(controller, graph, settings);
+        VerifyActionNaturalAdvance(controller, graph, library.Skeleton, settings);
 
         var segments = CreateSegments();
-        var previousState = segments[0].ExpectedState;
-        var previousStance = segments[0].ExpectedStance;
+        var advanceCountBeforeSegments = controller.ManualAdvanceCount;
+        var topPlayback = graph.Tree.Get(
+            graph.Handles.TopPlaybackPath).As<AnimationNodeStateMachinePlayback>()
+            ?? throw new InvalidOperationException("P3 graph top playback is unavailable.");
+        var groundedPlayback = graph.Tree.Get(
+            graph.Handles.GroundedPlaybackPath).As<AnimationNodeStateMachinePlayback>()
+            ?? throw new InvalidOperationException("P3 graph Grounded playback is unavailable.");
+        var previousState = AlsAnimationState.Grounded;
+        var previousStance = AlsStance.Standing;
+        var hasPreviousActualState = false;
         var transitions = 0;
         long frameId = 0;
         foreach (var segment in segments)
@@ -62,14 +75,13 @@ public partial class P3bAnimationGraphSmoke : Node
                 controller.Apply(in result, DeltaTime);
             }
 
-            if (controller.ActiveAnimationState != segment.ExpectedState ||
-                controller.ActiveStance != segment.ExpectedStance)
-            {
-                throw new InvalidOperationException(
-                    $"P3 graph state mismatch for {segment.Name}: " +
-                    $"expected={segment.ExpectedState}/{segment.ExpectedStance} " +
-                    $"actual={controller.ActiveAnimationState}/{controller.ActiveStance}");
-            }
+            var actualState = AssertActualPlaybackState(
+                graph,
+                topPlayback,
+                groundedPlayback,
+                segment.ExpectedState,
+                segment.ExpectedStance,
+                segment.Name);
 
             var current = AlsPoseDigest.CapturePoses(library.Skeleton, PoseBoneNames);
             for (var boneIndex = 0; boneIndex < PoseBoneNames.Length; boneIndex++)
@@ -84,14 +96,16 @@ public partial class P3bAnimationGraphSmoke : Node
                 }
             }
 
-            if (segment.ExpectedState != previousState ||
-                (segment.ExpectedState == AlsAnimationState.Grounded &&
-                 segment.ExpectedStance != previousStance))
+            if (hasPreviousActualState &&
+                (actualState.State != previousState ||
+                 (actualState.State == AlsAnimationState.Grounded &&
+                  actualState.Stance != previousStance)))
             {
                 transitions++;
             }
-            previousState = segment.ExpectedState;
-            previousStance = segment.ExpectedStance;
+            previousState = actualState.State;
+            previousStance = actualState.Stance;
+            hasPreviousActualState = true;
         }
 
         if (transitions != 5)
@@ -99,16 +113,351 @@ public partial class P3bAnimationGraphSmoke : Node
             throw new InvalidOperationException(
                 $"P3 graph transition count mismatch: expected=5 actual={transitions}");
         }
-        if (controller.ManualAdvanceCount != frameId)
+        if (controller.ManualAdvanceCount - advanceCountBeforeSegments != frameId)
         {
             throw new InvalidOperationException(
                 $"P3 graph must advance exactly once per Apply: " +
-                $"applies={frameId} advances={controller.ManualAdvanceCount}");
+                $"applies={frameId} " +
+                $"advances={controller.ManualAdvanceCount - advanceCountBeforeSegments}");
         }
 
+        VerifyLandingRecoveryBoundary(controller, graph, settings);
         var digest = controller.ComputePoseDigest(frameId);
         VerifyLifecycle(definition, profile);
         return digest;
+    }
+
+    private static ActualPlaybackState AssertActualPlaybackState(
+        AlsLocomotionGraphBuildResult graph,
+        AnimationNodeStateMachinePlayback topPlayback,
+        AnimationNodeStateMachinePlayback groundedPlayback,
+        AlsAnimationState expectedState,
+        AlsStance expectedStance,
+        string label)
+    {
+        using var actualTop = topPlayback.GetCurrentNode();
+        var expectedTop = graph.Handles.StateNames[(int)expectedState];
+        var actualState = FindActualState(graph, actualTop);
+        if (actualState != expectedState)
+        {
+            throw new InvalidOperationException(
+                $"P3 actual top playback mismatch for {label}: " +
+                $"expected={expectedTop} actual={actualTop}");
+        }
+        if (actualState != AlsAnimationState.Grounded)
+        {
+            return new ActualPlaybackState(actualState, expectedStance);
+        }
+
+        using var actualGrounded = groundedPlayback.GetCurrentNode();
+        var expectedGrounded = graph.Handles.StanceNames[(int)expectedStance];
+        var actualStance = FindActualStance(graph, actualGrounded);
+        if (actualStance != expectedStance)
+        {
+            throw new InvalidOperationException(
+                $"P3 actual Grounded playback mismatch for {label}: " +
+                $"expected={expectedGrounded} actual={actualGrounded}");
+        }
+        return new ActualPlaybackState(actualState, actualStance);
+    }
+
+    private static AlsAnimationState FindActualState(
+        AlsLocomotionGraphBuildResult graph,
+        StringName actual)
+    {
+        for (var index = 0; index < graph.Handles.StateNames.Count; index++)
+        {
+            if (actual.Equals(graph.Handles.StateNames[index]))
+            {
+                return (AlsAnimationState)index;
+            }
+        }
+        throw new InvalidOperationException($"P3 graph entered an unknown top state: {actual}");
+    }
+
+    private static AlsStance FindActualStance(
+        AlsLocomotionGraphBuildResult graph,
+        StringName actual)
+    {
+        for (var index = 0; index < graph.Handles.StanceNames.Count; index++)
+        {
+            if (actual.Equals(graph.Handles.StanceNames[index]))
+            {
+                return (AlsStance)index;
+            }
+        }
+        throw new InvalidOperationException($"P3 graph entered an unknown Grounded stance: {actual}");
+    }
+
+    private static void VerifyLandingRecoveryBoundary(
+        AlsLocomotionAnimationController controller,
+        AlsLocomotionGraphBuildResult graph,
+        AlsLocomotionSettings settings)
+    {
+        var topPlayback = graph.Tree.Get(
+            graph.Handles.TopPlaybackPath).As<AnimationNodeStateMachinePlayback>()
+            ?? throw new InvalidOperationException("P3 graph top playback is unavailable.");
+        var groundedPlayback = graph.Tree.Get(
+            graph.Handles.GroundedPlaybackPath).As<AnimationNodeStateMachinePlayback>()
+            ?? throw new InvalidOperationException("P3 graph Grounded playback is unavailable.");
+        var recoveryFrames = checked((int)Math.Ceiling(
+            settings.LandingRecoveryDuration / settings.FixedDeltaSeconds));
+        var state = new AlsRuntimeState
+        {
+            Initialized = 1,
+            LocomotionState = AlsLocomotionState.InAir,
+            PreviousLocomotionState = AlsLocomotionState.Grounded,
+            ActualGait = AlsGait.Running,
+            AnimationPhase = 0.4f,
+        };
+        var result = new AlsFrameResult();
+
+        for (var frame = 1; frame <= recoveryFrames + 1; frame++)
+        {
+            var input = CreateModelInput(
+                300 + frame,
+                System.Numerics.Vector3.Zero,
+                AlsStance.Standing,
+                true,
+                settings.FixedDeltaSeconds);
+            AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+            var expected = frame <= recoveryFrames
+                ? AlsAnimationState.LandRecovery
+                : AlsAnimationState.Grounded;
+            if (result.ResolvedLocomotionState != AlsLocomotionState.Grounded ||
+                result.AnimationState != expected)
+            {
+                throw new InvalidOperationException(
+                    $"P3 landing recovery model boundary mismatch: frame={frame} " +
+                    $"expected=Grounded/{expected} " +
+                    $"actual={result.ResolvedLocomotionState}/{result.AnimationState} " +
+                    $"remaining={state.LandingRecoveryTime:R}");
+            }
+
+            controller.Apply(in result, settings.FixedDeltaSeconds);
+            AssertActualPlaybackState(
+                graph,
+                topPlayback,
+                groundedPlayback,
+                expected,
+                AlsStance.Standing,
+                $"landing frame {frame}");
+            if (frame == recoveryFrames && state.LandingRecoveryTime != 0f)
+            {
+                throw new InvalidOperationException(
+                    $"P3 landing recovery timer did not expire at its boundary: " +
+                    $"frame={frame} remaining={state.LandingRecoveryTime:R}");
+            }
+        }
+    }
+
+    private static void VerifyGaitBlendMapping(
+        AlsLocomotionAnimationController controller,
+        AlsLocomotionGraphBuildResult graph,
+        AlsLocomotionSettings settings)
+    {
+        var cases = new[]
+        {
+            new GaitBlendCase(0, 0f, 0f, AlsGait.Walking, Vector2.Zero),
+            new GaitBlendCase(88, 0f, 0.875f, AlsGait.Walking, new Vector2(0f, 0.5f)),
+            new GaitBlendCase(175, 0f, 1.75f, AlsGait.Walking, new Vector2(0f, 0.5f)),
+            new GaitBlendCase(375, 0f, 3.75f, AlsGait.Running, new Vector2(0f, 1f)),
+            new GaitBlendCase(650, 0f, 6.5f, AlsGait.Sprinting, new Vector2(0f, 1.5f)),
+            new GaitBlendCase(
+                175,
+                1.2374369f,
+                1.2374369f,
+                AlsGait.Walking,
+                new Vector2(0.353553f, 0.353553f)),
+        };
+
+        for (var index = 0; index < cases.Length; index++)
+        {
+            var item = cases[index];
+            var state = new AlsRuntimeState();
+            var result = new AlsFrameResult();
+            var input = CreateModelInput(
+                index + 1,
+                new System.Numerics.Vector3(item.RightSpeed, 0f, -item.ForwardSpeed),
+                AlsStance.Standing,
+                true,
+                settings.FixedDeltaSeconds);
+            AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+            if (result.ActualGait != item.ExpectedGait)
+            {
+                throw new InvalidOperationException(
+                    $"P3 model gait fixture mismatch at {item.SpeedCentimeters} cm/s: " +
+                    $"expected={item.ExpectedGait} actual={result.ActualGait}");
+            }
+
+            controller.Apply(in result, settings.FixedDeltaSeconds);
+            var actual = graph.Tree.Get(
+                graph.Handles.GroundedStanding.BlendPositionPath!).AsVector2();
+            if (!actual.IsEqualApprox(item.ExpectedBlendPosition))
+            {
+                throw new InvalidOperationException(
+                    $"P3 gait ring mapping mismatch at {item.SpeedCentimeters} cm/s: " +
+                    $"expected={item.ExpectedBlendPosition} actual={actual}");
+            }
+            var actualTimeScale = graph.Tree.Get(
+                graph.Handles.GroundedStanding.PlayRatePath).AsSingle();
+            var expectedTimeScale = result.PlayRate * result.Stride;
+            if (!Mathf.IsEqualApprox(actualTimeScale, expectedTimeScale))
+            {
+                throw new InvalidOperationException(
+                    $"P3 grounded stride time-scale mismatch at {item.SpeedCentimeters} cm/s: " +
+                    $"expected={expectedTimeScale:R} actual={actualTimeScale:R}");
+            }
+        }
+
+        var crouchingState = new AlsRuntimeState();
+        var crouchingResult = new AlsFrameResult();
+        var crouchingInput = CreateModelInput(
+            cases.Length + 1,
+            new System.Numerics.Vector3(0f, 0f, -1f),
+            AlsStance.Crouching,
+            true,
+            settings.FixedDeltaSeconds);
+        AlsLocomotionModel.Evaluate(
+            crouchingInput,
+            ref crouchingState,
+            ref crouchingResult,
+            settings);
+        controller.Apply(in crouchingResult, settings.FixedDeltaSeconds);
+        var actualCrouchingBlend = graph.Tree.Get(
+            graph.Handles.GroundedCrouching.BlendPositionPath!).AsVector2();
+        var expectedCrouchingBlend = new Vector2(0f, 1f);
+        if (!actualCrouchingBlend.IsEqualApprox(expectedCrouchingBlend))
+        {
+            throw new InvalidOperationException(
+                $"P3 crouching outer-ring mapping mismatch: " +
+                $"expected={expectedCrouchingBlend} actual={actualCrouchingBlend}");
+        }
+    }
+
+    private static void VerifyActionNaturalAdvance(
+        AlsLocomotionAnimationController controller,
+        AlsLocomotionGraphBuildResult graph,
+        Skeleton3D skeleton,
+        AlsLocomotionSettings settings)
+    {
+        var topPlayback = graph.Tree.Get(
+            graph.Handles.TopPlaybackPath).As<AnimationNodeStateMachinePlayback>()
+            ?? throw new InvalidOperationException("P3 graph top playback is unavailable.");
+        var state = new AlsRuntimeState
+        {
+            Initialized = 1,
+            LocomotionState = AlsLocomotionState.Grounded,
+            PreviousLocomotionState = AlsLocomotionState.Grounded,
+            ActualGait = AlsGait.Running,
+            AnimationPhase = 0.375f,
+        };
+        var result = new AlsFrameResult();
+        long frameId = 100;
+
+        VerifyAction(
+            AlsAnimationState.JumpStart,
+            iteration => CreateModelInput(
+                ++frameId,
+                new System.Numerics.Vector3(0f, iteration == 0 ? 4.2f : 3f, -2f),
+                AlsStance.Standing,
+                false,
+                settings.FixedDeltaSeconds,
+                iteration == 0 ? (byte)1 : (byte)0));
+        VerifyAction(
+            AlsAnimationState.FallLoop,
+            _ => CreateModelInput(
+                ++frameId,
+                new System.Numerics.Vector3(0f, -1f, -2f),
+                AlsStance.Standing,
+                false,
+                settings.FixedDeltaSeconds));
+        VerifyAction(
+            AlsAnimationState.LandRecovery,
+            _ => CreateModelInput(
+                ++frameId,
+                System.Numerics.Vector3.Zero,
+                AlsStance.Standing,
+                true,
+                settings.FixedDeltaSeconds));
+
+        void VerifyAction(
+            AlsAnimationState expectedState,
+            Func<int, AlsFrameInput> inputFactory)
+        {
+            var firstPosition = 0f;
+            var firstPose = Array.Empty<AlsBonePose>();
+            for (var iteration = 0; iteration < 8; iteration++)
+            {
+                var input = inputFactory(iteration);
+                AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+                if (result.AnimationState != expectedState ||
+                    !Mathf.IsEqualApprox(result.AnimationPhase, 0.375f))
+                {
+                    throw new InvalidOperationException(
+                        $"P3 constant-phase action fixture mismatch: " +
+                        $"expected={expectedState}/0.375 " +
+                        $"actual={result.AnimationState}/{result.AnimationPhase:R}");
+                }
+                controller.Apply(in result, settings.FixedDeltaSeconds);
+
+                if (iteration == 6)
+                {
+                    firstPosition = topPlayback.GetCurrentPlayPosition();
+                    firstPose = AlsPoseDigest.CapturePoses(skeleton, PoseBoneNames);
+                }
+                else if (iteration == 7)
+                {
+                    var secondPosition = topPlayback.GetCurrentPlayPosition();
+                    var secondPose = AlsPoseDigest.CapturePoses(skeleton, PoseBoneNames);
+                    if (secondPosition <= firstPosition + (settings.FixedDeltaSeconds * 0.5f) ||
+                        !AlsPoseDigest.HasChanged(firstPose, secondPose))
+                    {
+                        throw new InvalidOperationException(
+                            $"P3 action playback froze on constant P3A phase: state={expectedState} " +
+                            $"first={firstPosition:R} second={secondPosition:R}");
+                    }
+                }
+            }
+        }
+    }
+
+    private static AlsFrameInput CreateModelInput(
+        long frameId,
+        System.Numerics.Vector3 velocity,
+        AlsStance stance,
+        bool grounded,
+        float deltaTime,
+        byte jumpAccepted = 0)
+    {
+        var command = new AlsLocomotionCommand(
+            System.Numerics.Vector2.UnitY,
+            0f,
+            0f,
+            AlsGait.Sprinting,
+            stance,
+            AlsRotationMode.LookingDirection,
+            jumpAccepted);
+        return AlsFrameInput.CreateDefault(new AlsFrameIdentity(frameId, 0, 1), deltaTime) with
+        {
+            ActualVelocity = velocity,
+            InputDirection = velocity.LengthSquared() > 0f
+                ? System.Numerics.Vector3.Normalize(new System.Numerics.Vector3(velocity.X, 0f, velocity.Z))
+                : System.Numerics.Vector3.Zero,
+            DesiredSpeed = MathF.Sqrt((velocity.X * velocity.X) + (velocity.Z * velocity.Z)),
+            Floor = new AlsFloorSample(
+                grounded ? (byte)1 : (byte)0,
+                System.Numerics.Vector3.UnitY,
+                -1,
+                System.Numerics.Matrix4x4.Identity,
+                System.Numerics.Vector3.Zero),
+            RequestedGait = AlsGait.Sprinting,
+            Stance = stance,
+            Command = command,
+            MaxAcceleration = 20f,
+            MaxBrakingDeceleration = 15f,
+            JumpAccepted = jumpAccepted,
+        };
     }
 
     private void VerifyLifecycle(
@@ -240,4 +589,15 @@ public partial class P3bAnimationGraphSmoke : Node
         AlsAnimationState ExpectedState,
         AlsStance ExpectedStance,
         int FrameCount);
+
+    private readonly record struct GaitBlendCase(
+        int SpeedCentimeters,
+        float RightSpeed,
+        float ForwardSpeed,
+        AlsGait ExpectedGait,
+        Vector2 ExpectedBlendPosition);
+
+    private readonly record struct ActualPlaybackState(
+        AlsAnimationState State,
+        AlsStance Stance);
 }

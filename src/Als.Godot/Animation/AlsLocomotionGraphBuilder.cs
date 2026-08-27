@@ -71,6 +71,8 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         StringName groundedPlaybackPath,
         StringName[] stateNames,
         StringName[] stanceNames,
+        float[] standingGaitRadii,
+        float crouchingRadius,
         AlsLocomotionGraphParameterSet groundedStanding,
         AlsLocomotionGraphParameterSet groundedCrouching,
         AlsLocomotionGraphParameterSet jumpStart,
@@ -82,6 +84,8 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         GroundedPlaybackPath = groundedPlaybackPath;
         StateNames = stateNames;
         StanceNames = stanceNames;
+        StandingGaitRadii = standingGaitRadii;
+        CrouchingRadius = crouchingRadius;
         GroundedStanding = groundedStanding;
         GroundedCrouching = groundedCrouching;
         JumpStart = jumpStart;
@@ -112,6 +116,10 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
     public IReadOnlyList<StringName> StateNames { get; }
 
     public IReadOnlyList<StringName> StanceNames { get; }
+
+    public IReadOnlyList<float> StandingGaitRadii { get; }
+
+    public float CrouchingRadius { get; }
 
     public AlsLocomotionGraphParameterSet GroundedStanding { get; }
 
@@ -144,7 +152,7 @@ public sealed class AlsLocomotionGraphParameterSet
         StringName leanPositionPath,
         StringName leanAmountPath,
         StringName playRatePath,
-        StringName phasePath,
+        StringName? phasePath,
         Vector2 blendMinimum,
         Vector2 blendMaximum,
         Vector2 leanMinimum,
@@ -159,9 +167,19 @@ public sealed class AlsLocomotionGraphParameterSet
         BlendMaximum = blendMaximum;
         LeanMinimum = leanMinimum;
         LeanMaximum = leanMaximum;
-        OwnedHandles = blendPositionPath is null
-            ? [leanPositionPath, leanAmountPath, playRatePath, phasePath]
-            : [blendPositionPath, leanPositionPath, leanAmountPath, playRatePath, phasePath];
+        var ownedHandles = new List<IDisposable>(5);
+        if (blendPositionPath is not null)
+        {
+            ownedHandles.Add(blendPositionPath);
+        }
+        ownedHandles.Add(leanPositionPath);
+        ownedHandles.Add(leanAmountPath);
+        ownedHandles.Add(playRatePath);
+        if (phasePath is not null)
+        {
+            ownedHandles.Add(phasePath);
+        }
+        OwnedHandles = ownedHandles.ToArray();
     }
 
     public StringName? BlendPositionPath { get; }
@@ -172,7 +190,7 @@ public sealed class AlsLocomotionGraphParameterSet
 
     public StringName PlayRatePath { get; }
 
-    public StringName PhasePath { get; }
+    public StringName? PhasePath { get; }
 
     public Vector2 BlendMinimum { get; }
 
@@ -336,25 +354,30 @@ public static class AlsLocomotionGraphBuilder
             new StringName("Standing"),
             new StringName("Crouching"),
         };
+        var standingGaitRadii = CalculateStandingGaitRadii(profile.StandingSamples);
+        var crouchingRadius = CalculateCrouchingRadius(profile.CrouchingSamples);
         var leanBounds = Bounds(profile.LeanAdditiveSamples, false);
-        var standingBounds = Bounds(profile.StandingSamples, true);
-        var crouchingBounds = Bounds(profile.CrouchingSamples, true);
+        var standingBounds = RadialBounds(standingGaitRadii[(int)AlsGait.Sprinting]);
+        var crouchingBounds = RadialBounds(crouchingRadius);
         return new AlsLocomotionGraphHandles(
             new NodePath("../AlsAnimationPlayer"),
             new StringName("parameters/playback"),
             new StringName("parameters/Grounded/playback"),
             stateNames,
             stanceNames,
-            CreateParameterSet("Grounded/Standing", true, standingBounds, leanBounds),
-            CreateParameterSet("Grounded/Crouching", true, crouchingBounds, leanBounds),
-            CreateParameterSet("JumpStart", false, default, leanBounds),
-            CreateParameterSet("FallLoop", false, default, leanBounds),
-            CreateParameterSet("LandRecovery", false, default, leanBounds));
+            standingGaitRadii,
+            crouchingRadius,
+            CreateParameterSet("Grounded/Standing", true, true, standingBounds, leanBounds),
+            CreateParameterSet("Grounded/Crouching", true, true, crouchingBounds, leanBounds),
+            CreateParameterSet("JumpStart", false, false, default, leanBounds),
+            CreateParameterSet("FallLoop", false, false, default, leanBounds),
+            CreateParameterSet("LandRecovery", false, false, default, leanBounds));
     }
 
     private static AlsLocomotionGraphParameterSet CreateParameterSet(
         string prefix,
         bool hasBlendPosition,
+        bool hasPhasePath,
         (Vector2 Minimum, Vector2 Maximum) blendBounds,
         (Vector2 Minimum, Vector2 Maximum) leanBounds) => new(
             hasBlendPosition
@@ -363,7 +386,7 @@ public static class AlsLocomotionGraphBuilder
             new StringName($"parameters/{prefix}/Lean/blend_position"),
             new StringName($"parameters/{prefix}/LeanAdd/add_amount"),
             new StringName($"parameters/{prefix}/Scale/scale"),
-            new StringName($"parameters/{prefix}/Seek/seek_request"),
+            hasPhasePath ? new StringName($"parameters/{prefix}/Seek/seek_request") : null,
             blendBounds.Minimum,
             blendBounds.Maximum,
             leanBounds.Minimum,
@@ -382,7 +405,16 @@ public static class AlsLocomotionGraphBuilder
         {
             samples[index + 1] = locomotionSamples[index];
         }
-        return BuildLayeredBranch(library, samples, leanSamples, true, ownedResources);
+        var outerRadius = samples
+            .Select(sample => MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y)))
+            .Max();
+        return BuildLayeredBranch(
+            library,
+            samples,
+            leanSamples,
+            true,
+            RadialBounds(outerRadius),
+            ownedResources);
     }
 
     private static AnimationNodeBlendTree BuildActionBranch(
@@ -403,11 +435,12 @@ public static class AlsLocomotionGraphBuilder
         IReadOnlyList<AlsLocomotionAnimationSample> locomotionSamples,
         IReadOnlyList<AlsLocomotionAnimationSample> leanSamples,
         bool loop,
+        (Vector2 Minimum, Vector2 Maximum)? locomotionBounds,
         List<IDisposable> ownedResources)
     {
         var tree = Own(ownedResources, new AnimationNodeBlendTree());
         var locomotion = BuildBlendSpace(
-            library, locomotionSamples, loop, ownedResources);
+            library, locomotionSamples, loop, locomotionBounds, ownedResources);
         AddLayerAndTimingNodes(tree, locomotion, library, leanSamples, ownedResources);
         return tree;
     }
@@ -419,7 +452,7 @@ public static class AlsLocomotionGraphBuilder
         IReadOnlyList<AlsLocomotionAnimationSample> leanSamples,
         List<IDisposable> ownedResources)
     {
-        var lean = BuildBlendSpace(library, leanSamples, true, ownedResources);
+        var lean = BuildBlendSpace(library, leanSamples, true, null, ownedResources);
         var leanAdd = Own(ownedResources, new AnimationNodeAdd2());
         var scale = Own(ownedResources, new AnimationNodeTimeScale());
         var seek = Own(ownedResources, new AnimationNodeTimeSeek());
@@ -446,6 +479,7 @@ public static class AlsLocomotionGraphBuilder
         AlsAnimationLibraryBuildResult library,
         IReadOnlyList<AlsLocomotionAnimationSample> samples,
         bool loop,
+        (Vector2 Minimum, Vector2 Maximum)? explicitBounds,
         List<IDisposable> ownedResources)
     {
         if (samples.Count == 0)
@@ -453,7 +487,7 @@ public static class AlsLocomotionGraphBuilder
             throw new InvalidOperationException("P3 graph blend space cannot be empty.");
         }
 
-        var bounds = Bounds(samples, false);
+        var bounds = explicitBounds ?? Bounds(samples, false);
         var blend = Own(ownedResources, new AnimationNodeBlendSpace2D
         {
             AutoTriangles = true,
@@ -563,6 +597,60 @@ public static class AlsLocomotionGraphBuilder
             maximum.Y += 0.001f;
         }
         return (minimum, maximum);
+    }
+
+    private static float[] CalculateStandingGaitRadii(
+        IReadOnlyList<AlsLocomotionAnimationSample> samples)
+    {
+        const float tolerance = 1e-4f;
+        var radii = new List<float>(3);
+        foreach (var sample in samples)
+        {
+            var radius = MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y));
+            if (radius <= tolerance)
+            {
+                throw new InvalidOperationException(
+                    "P3 standing locomotion sample cannot occupy the idle origin.");
+            }
+            if (!radii.Any(existing => MathF.Abs(existing - radius) <= tolerance))
+            {
+                radii.Add(radius);
+            }
+        }
+        radii.Sort();
+        if (radii.Count != 3)
+        {
+            throw new InvalidOperationException(
+                $"P3 standing locomotion profile must contain exactly three gait rings: " +
+                $"actual={radii.Count}");
+        }
+        return radii.ToArray();
+    }
+
+    private static float CalculateCrouchingRadius(
+        IReadOnlyList<AlsLocomotionAnimationSample> samples)
+    {
+        const float tolerance = 1e-4f;
+        var outerRadius = samples
+            .Select(sample => MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y)))
+            .Max();
+        if (outerRadius <= tolerance ||
+            samples.Any(sample => MathF.Abs(
+                MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y)) - outerRadius) > tolerance))
+        {
+            throw new InvalidOperationException(
+                "P3 crouching locomotion profile must contain one nonzero outer ring.");
+        }
+        return outerRadius;
+    }
+
+    private static (Vector2 Minimum, Vector2 Maximum) RadialBounds(float radius)
+    {
+        if (!float.IsFinite(radius) || radius <= 0f)
+        {
+            throw new InvalidOperationException("P3 locomotion ring radius must be positive and finite.");
+        }
+        return (new Vector2(-radius, -radius), new Vector2(radius, radius));
     }
 
     private static T Own<T>(List<IDisposable> resources, T resource)
