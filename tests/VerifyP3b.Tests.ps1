@@ -3,17 +3,29 @@ $script:FunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p3b-verificati
 $script:WorkerPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3WorkerRoot.cs'
 $script:RuntimePath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3RuntimeContext.cs'
 $script:HarnessPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P3bAnimationHarness.cs'
+$script:FrameOrderPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P3bFrameOrderSmoke.cs'
 $script:VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p3b.ps1'
 if (Test-Path -LiteralPath $script:FunctionsPath)
 {
     . $script:FunctionsPath
 }
 
-$script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=FEDCBA9876543210 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 p95_us=100 p99_us=200'
+$script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 p95_us=100 p99_us=200'
+$script:ValidFrameOrderMarker = 'GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1'
 $script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0'
 $script:ValidReplacement = 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1'
 $script:ValidPose = 'GODOT_ALS_P3B_POSE character=0 changes=42'
 $script:VerifierSource = [System.IO.File]::ReadAllText($script:VerifierPath)
+$script:HarnessAggregationPatterns = @(
+    '(?m)^\s*AlsResultDigest\s*\.\s*Append\s*\(\s*ref\s+_resultDigest\s*,\s*diagnostics\s*\.\s*Result\s*\)\s*;\s*$',
+    '(?m)^\s*Append\s*\(\s*ref\s+_poseDigest\s*,\s*diagnostics\s*\.\s*PoseDigest\s*\)\s*;\s*$',
+    '(?m)^\s*Append\s*\(\s*ref\s+_fullPoseDigest\s*,\s*diagnostics\s*\.\s*FullPoseDigest\s*\)\s*;\s*$',
+    '(?m)^\s*Append\s*\(\s*ref\s+_rootDigest\s*,\s*diagnostics\s*\.\s*RootDigest\s*\)\s*;\s*$')
+$script:FrameOrderAggregationPatterns = @(
+    '(?m)^\s*AlsResultDigest\s*\.\s*Append\s*\(\s*ref\s+_resultDigest\s*,\s*frame\s*\.\s*Result\s*\)\s*;\s*$',
+    '(?m)^\s*Append\s*\(\s*ref\s+_poseDigest\s*,\s*frame\s*\.\s*PoseDigest\s*\)\s*;\s*$',
+    '(?m)^\s*Append\s*\(\s*ref\s+_fullPoseDigest\s*,\s*frame\s*\.\s*FullPoseDigest\s*\)\s*;\s*$',
+    '(?m)^\s*Append\s*\(\s*ref\s+_rootDigest\s*,\s*frame\s*\.\s*RootDigest\s*\)\s*;\s*$')
 
 function Get-P3bOutput
 {
@@ -42,6 +54,121 @@ function Test-P3bParserRejects
             -OutputLines $OutputLines `
             -ExpectedMode $ExpectedMode `
             -ExpectedCharacterCount $ExpectedCharacterCount | Out-Null
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
+function Get-P3bFrameOrderOutput
+{
+    param([string]$Marker = $script:ValidFrameOrderMarker)
+
+    return @('Godot Engine test', $Marker)
+}
+
+function Test-P3bFrameOrderParserRejects
+{
+    param(
+        [object[]]$OutputLines,
+        [string]$ExpectedMode = 'single'
+    )
+
+    try
+    {
+        ConvertFrom-P3bFrameOrderOutput `
+            -OutputLines $OutputLines `
+            -ExpectedMode $ExpectedMode | Out-Null
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
+function New-P3bParityResult
+{
+    param([string]$Mode)
+
+    return [pscustomobject]@{
+        Mode = $Mode
+        Characters = 1
+        Digest = '0123456789ABCDEF'
+        Pose = '1111111111111111'
+        FullPose = '2222222222222222'
+        Root = '3333333333333333'
+    }
+}
+
+function Test-P3bResultPairFieldRejects
+{
+    param([string]$Field)
+
+    $single = New-P3bParityResult -Mode single
+    $parallel = New-P3bParityResult -Mode parallel
+    $parallel.$Field = 'FFFFFFFFFFFFFFFF'
+    return Test-P3bResultPairRejects -Single $single -Parallel $parallel
+}
+
+function Test-P3bResultPairRejects
+{
+    param(
+        [AllowNull()]
+        [object]$Single,
+        [AllowNull()]
+        [object]$Parallel
+    )
+
+    try
+    {
+        Assert-P3bResultPair -Single $Single -Parallel $Parallel -CharacterCount 1
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
+function New-P3bFrameOrderParityResult
+{
+    param([string]$Mode)
+
+    return [pscustomobject]@{
+        Mode = $Mode
+        Frames = 180
+        Digest = '0123456789ABCDEF'
+        Pose = '1111111111111111'
+        FullPose = '2222222222222222'
+        Root = '3333333333333333'
+    }
+}
+
+function Test-P3bFrameOrderPairFieldRejects
+{
+    param([string]$Field)
+
+    $single = New-P3bFrameOrderParityResult -Mode single
+    $parallel = New-P3bFrameOrderParityResult -Mode parallel
+    $parallel.$Field = 'FFFFFFFFFFFFFFFF'
+    return Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel
+}
+
+function Test-P3bFrameOrderPairRejects
+{
+    param(
+        [AllowNull()]
+        [object]$Single,
+        [AllowNull()]
+        [object]$Parallel
+    )
+
+    try
+    {
+        Assert-P3bFrameOrderPair -Single $Single -Parallel $Parallel
         return $false
     }
     catch
@@ -89,10 +216,14 @@ function Test-P3bCleanWorktreeRejects
 }
 
 Describe 'P3B verifier contracts' {
-    It 'provides the Task 6 parser and pair validator' {
+    It 'provides harness and frame-order parsers and pair validators' {
         Get-Command ConvertFrom-P3bHarnessOutput -ErrorAction SilentlyContinue |
             Should Not BeNullOrEmpty
         Get-Command Assert-P3bResultPair -ErrorAction SilentlyContinue |
+            Should Not BeNullOrEmpty
+        Get-Command ConvertFrom-P3bFrameOrderOutput -ErrorAction SilentlyContinue |
+            Should Not BeNullOrEmpty
+        Get-Command Assert-P3bFrameOrderPair -ErrorAction SilentlyContinue |
             Should Not BeNullOrEmpty
     }
 
@@ -108,7 +239,9 @@ Describe 'P3B verifier contracts' {
             -ExpectedCharacterCount 1
 
         $result.Digest | Should Be '0123456789ABCDEF'
-        $result.Pose | Should Be 'FEDCBA9876543210'
+        $result.Pose | Should Be '1111111111111111'
+        $result.FullPose | Should Be '2222222222222222'
+        $result.Root | Should Be '3333333333333333'
         $result.P95Microseconds | Should Be 100
         $result.P99Microseconds | Should Be 200
     }
@@ -137,6 +270,11 @@ Describe 'P3B verifier contracts' {
             Should Be $true
         Test-P3bParserRejects (Get-P3bOutput -Marker ($script:ValidMarker + ' extra=1')) |
             Should Be $true
+        Test-P3bParserRejects (Get-P3bOutput -Marker $script:ValidMarker.Replace(
+            'pose=1111111111111111 full_pose=2222222222222222',
+            'full_pose=2222222222222222 pose=1111111111111111')) | Should Be $true
+        Test-P3bParserRejects (Get-P3bOutput -Marker $script:ValidMarker.Replace(
+            ' full_pose=2222222222222222 root=3333333333333333', '')) | Should Be $true
         Test-P3bParserRejects (Get-P3bOutput) -ExpectedMode parallel | Should Be $true
         Test-P3bParserRejects (Get-P3bOutput) -ExpectedCharacterCount 10 | Should Be $true
     }
@@ -245,51 +383,410 @@ Describe 'P3B verifier contracts' {
             Should Be $true
     }
 
-    It 'rejects digest or pose mismatch between execution modes' {
-        if ($null -eq (Get-Command Assert-P3bResultPair -ErrorAction SilentlyContinue))
+    It 'accepts blank engine output lines without emitting binding errors' {
+        $previousErrorActionPreference = $ErrorActionPreference
+        try
         {
-            return
+            $ErrorActionPreference = 'Stop'
+            ConvertFrom-P3bHarnessOutput `
+                -OutputLines ((Get-P3bOutput) + '') `
+                -ExpectedMode single `
+                -ExpectedCharacterCount 1 | Out-Null
+            ConvertFrom-P3bFrameOrderOutput `
+                -OutputLines ((Get-P3bFrameOrderOutput) + '') `
+                -ExpectedMode single | Out-Null
+        }
+        finally
+        {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+    }
+
+    It 'accepts matching harness digest summaries between execution modes' {
+        Assert-P3bResultPair `
+            -Single (New-P3bParityResult -Mode single) `
+            -Parallel (New-P3bParityResult -Mode parallel) `
+            -CharacterCount 1
+    }
+
+    It 'rejects harness Digest mismatch independently' {
+        Test-P3bResultPairFieldRejects -Field Digest | Should Be $true
+    }
+
+    It 'rejects harness Pose mismatch independently' {
+        Test-P3bResultPairFieldRejects -Field Pose | Should Be $true
+    }
+
+    It 'rejects harness FullPose mismatch independently' {
+        Test-P3bResultPairFieldRejects -Field FullPose | Should Be $true
+    }
+
+    It 'rejects harness Root mismatch independently' {
+        Test-P3bResultPairFieldRejects -Field Root | Should Be $true
+    }
+
+    It 'rejects harness pairs with summaries absent from both or either result' {
+        $singleWithoutSummaries = [pscustomobject]@{ Mode = 'single'; Characters = 1 }
+        $parallelWithoutSummaries = [pscustomobject]@{ Mode = 'parallel'; Characters = 1 }
+        Test-P3bResultPairRejects `
+            -Single $singleWithoutSummaries `
+            -Parallel $parallelWithoutSummaries | Should Be $true
+
+        foreach ($field in @('Digest', 'Pose', 'FullPose', 'Root'))
+        {
+            $single = New-P3bParityResult -Mode single
+            $parallel = New-P3bParityResult -Mode parallel
+            $single.PSObject.Properties.Remove($field)
+            Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+            $single = New-P3bParityResult -Mode single
+            $parallel = New-P3bParityResult -Mode parallel
+            $parallel.PSObject.Properties.Remove($field)
+            Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+        }
+    }
+
+    It 'rejects equal invalid harness summary values before comparing parity' {
+        foreach ($field in @('Digest', 'Pose', 'FullPose', 'Root'))
+        {
+            foreach ($invalidValue in @(
+                $null,
+                '',
+                'abcdef0123456789',
+                '0123456789ABCDEG',
+                42))
+            {
+                $single = New-P3bParityResult -Mode single
+                $parallel = New-P3bParityResult -Mode parallel
+                $single.$field = $invalidValue
+                $parallel.$field = $invalidValue
+                Test-P3bResultPairRejects -Single $single -Parallel $parallel |
+                    Should Be $true
+            }
+        }
+    }
+
+    It 'rejects missing mistyped and incorrect harness identities' {
+        foreach ($field in @('Mode', 'Characters'))
+        {
+            $single = New-P3bParityResult -Mode single
+            $parallel = New-P3bParityResult -Mode parallel
+            $single.PSObject.Properties.Remove($field)
+            Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+            $single = New-P3bParityResult -Mode single
+            $parallel = New-P3bParityResult -Mode parallel
+            $parallel.PSObject.Properties.Remove($field)
+            Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
         }
 
-        $single = [pscustomobject]@{
-            Mode = 'single'; Characters = 1; Digest = '0123456789ABCDEF'; Pose = 'FEDCBA9876543210'
-        }
-        $parallel = [pscustomobject]@{
-            Mode = 'parallel'; Characters = 1; Digest = '0123456789ABCDEE'; Pose = 'FEDCBA9876543210'
-        }
-        $digestRejected = $false
-        try
+        $single = New-P3bParityResult -Mode single
+        $parallel = New-P3bParityResult -Mode parallel
+        $single.Mode = 'parallel'
+        Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bParityResult -Mode single
+        $parallel = New-P3bParityResult -Mode parallel
+        $parallel.Characters = 10
+        Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bParityResult -Mode single
+        $parallel = New-P3bParityResult -Mode parallel
+        $single.Characters = '1'
+        $parallel.Characters = '1'
+        Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        Test-P3bResultPairRejects -Single $null -Parallel $parallel | Should Be $true
+        Test-P3bResultPairRejects -Single $single -Parallel $null | Should Be $true
+    }
+
+    It 'rejects singleton array harness identities and summaries' {
+        $single = New-P3bParityResult -Mode single
+        $parallel = New-P3bParityResult -Mode parallel
+        $single.Mode = [string[]]@('single')
+        Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bParityResult -Mode single
+        $parallel = New-P3bParityResult -Mode parallel
+        $single.Characters = [int[]]@(1)
+        Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        foreach ($field in @('Digest', 'Pose', 'FullPose', 'Root'))
         {
-            Assert-P3bResultPair -Single $single -Parallel $parallel -CharacterCount 1
+            $single = New-P3bParityResult -Mode single
+            $parallel = New-P3bParityResult -Mode parallel
+            $single.$field = [string[]]@($single.$field)
+            Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
         }
-        catch
+    }
+
+    It 'rejects singleton generic-list harness identity and summary values' {
+        $single = New-P3bParityResult -Mode single
+        $parallel = New-P3bParityResult -Mode parallel
+        $modeList = [System.Collections.Generic.List[string]]::new()
+        [void]$modeList.Add('single')
+        $single.Mode = $modeList
+        Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bParityResult -Mode single
+        $parallel = New-P3bParityResult -Mode parallel
+        $digestList = [System.Collections.Generic.List[string]]::new()
+        [void]$digestList.Add($single.Digest)
+        $single.Digest = $digestList
+        Test-P3bResultPairRejects -Single $single -Parallel $parallel | Should Be $true
+    }
+}
+
+Describe 'P3B frame-order verifier contracts' {
+    It 'accepts one exact frame-order marker and returns all summaries' {
+        $result = ConvertFrom-P3bFrameOrderOutput `
+            -OutputLines (Get-P3bFrameOrderOutput) `
+            -ExpectedMode single
+
+        $result.Mode | Should Be 'single'
+        $result.Frames | Should Be 180
+        $result.Digest | Should Be '0123456789ABCDEF'
+        $result.Pose | Should Be '1111111111111111'
+        $result.FullPose | Should Be '2222222222222222'
+        $result.Root | Should Be '3333333333333333'
+    }
+
+    It 'accepts the exact parallel frame-order identity' {
+        $parallelMarker = $script:ValidFrameOrderMarker.Replace('mode=single', 'mode=parallel')
+        $result = ConvertFrom-P3bFrameOrderOutput `
+            -OutputLines (Get-P3bFrameOrderOutput -Marker $parallelMarker) `
+            -ExpectedMode parallel
+        $result.Mode | Should Be 'parallel'
+    }
+
+    It 'rejects malformed duplicate missing and trailing frame-order markers' {
+        Test-P3bFrameOrderParserRejects @('GODOT_ALS_P3B_FRAME_ORDER_OK malformed') |
+            Should Be $true
+        Test-P3bFrameOrderParserRejects ((Get-P3bFrameOrderOutput) +
+            $script:ValidFrameOrderMarker) | Should Be $true
+        Test-P3bFrameOrderParserRejects @('Godot Engine test') | Should Be $true
+        Test-P3bFrameOrderParserRejects (Get-P3bFrameOrderOutput -Marker (
+            $script:ValidFrameOrderMarker + ' extra=1')) | Should Be $true
+        Test-P3bFrameOrderParserRejects (Get-P3bFrameOrderOutput -Marker (
+            $script:ValidFrameOrderMarker.Replace(
+                'pose=1111111111111111 full_pose=2222222222222222',
+                'full_pose=2222222222222222 pose=1111111111111111'))) | Should Be $true
+    }
+
+    It 'rejects wrong frame-order mode and fixed evidence' {
+        Test-P3bFrameOrderParserRejects (Get-P3bFrameOrderOutput) -ExpectedMode parallel |
+            Should Be $true
+        foreach ($mutation in @(
+            @('frames=180', 'frames=179'),
+            @('lag=0', 'lag=1'),
+            @('stale=0', 'stale=1'),
+            @('generation=1', 'generation=0'),
+            @('old_generation_rejected=1', 'old_generation_rejected=0'),
+            @('retired_released=1', 'retired_released=0'),
+            @('max_visible=1', 'max_visible=2'),
+            @('recovery_zero_visible=1', 'recovery_zero_visible=0')
+        ))
         {
-            $digestRejected = $true
+            $marker = $script:ValidFrameOrderMarker.Replace($mutation[0], $mutation[1])
+            Test-P3bFrameOrderParserRejects (Get-P3bFrameOrderOutput -Marker $marker) |
+                Should Be $true
         }
-        $digestRejected | Should Be $true
-        $parallel.Digest = $single.Digest
-        $parallel.Pose = 'FEDCBA9876543211'
-        $poseRejected = $false
-        try
+    }
+
+    It 'rejects Godot errors and explicit failure markers' {
+        Test-P3bFrameOrderParserRejects ((Get-P3bFrameOrderOutput) +
+            'SCRIPT ERROR: failed') | Should Be $true
+        Test-P3bFrameOrderParserRejects ((Get-P3bFrameOrderOutput) +
+            'ERROR: failed') | Should Be $true
+        Test-P3bFrameOrderParserRejects ((Get-P3bFrameOrderOutput) +
+            'GODOT_ALS_P3B_FAIL') | Should Be $true
+        Test-P3bFrameOrderParserRejects ((Get-P3bFrameOrderOutput) +
+            'GODOT_ALS_P3B_FAIL code=runtime') |
+            Should Be $true
+    }
+
+    It 'ignores successful failure-policy evidence beside the frame-order marker' {
+        $output = (Get-P3bFrameOrderOutput) + @(
+            'GODOT_ALS_P3B_FAILURE_POLICY_OK mode=interactive motor_frame=12 pose_frame=10 diagnostics=2',
+            'GODOT_ALS_P3B_FAILURE_RETENTION_OK mode=single diagnostics=256 pending=0 retained=0')
+
+        $result = ConvertFrom-P3bFrameOrderOutput -OutputLines $output -ExpectedMode single
+        $result.Mode | Should Be 'single'
+    }
+
+    It 'accepts matching frame-order digest summaries between execution modes' {
+        Assert-P3bFrameOrderPair `
+            -Single (New-P3bFrameOrderParityResult -Mode single) `
+            -Parallel (New-P3bFrameOrderParityResult -Mode parallel)
+    }
+
+    It 'rejects frame-order Digest mismatch independently' {
+        Test-P3bFrameOrderPairFieldRejects -Field Digest | Should Be $true
+    }
+
+    It 'rejects frame-order Pose mismatch independently' {
+        Test-P3bFrameOrderPairFieldRejects -Field Pose | Should Be $true
+    }
+
+    It 'rejects frame-order FullPose mismatch independently' {
+        Test-P3bFrameOrderPairFieldRejects -Field FullPose | Should Be $true
+    }
+
+    It 'rejects frame-order Root mismatch independently' {
+        Test-P3bFrameOrderPairFieldRejects -Field Root | Should Be $true
+    }
+
+    It 'rejects frame-order pairs with summaries absent from both or either result' {
+        $singleWithoutSummaries = [pscustomobject]@{ Mode = 'single'; Frames = 180 }
+        $parallelWithoutSummaries = [pscustomobject]@{ Mode = 'parallel'; Frames = 180 }
+        Test-P3bFrameOrderPairRejects `
+            -Single $singleWithoutSummaries `
+            -Parallel $parallelWithoutSummaries | Should Be $true
+
+        foreach ($field in @('Digest', 'Pose', 'FullPose', 'Root'))
         {
-            Assert-P3bResultPair -Single $single -Parallel $parallel -CharacterCount 1
+            $single = New-P3bFrameOrderParityResult -Mode single
+            $parallel = New-P3bFrameOrderParityResult -Mode parallel
+            $single.PSObject.Properties.Remove($field)
+            Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+            $single = New-P3bFrameOrderParityResult -Mode single
+            $parallel = New-P3bFrameOrderParityResult -Mode parallel
+            $parallel.PSObject.Properties.Remove($field)
+            Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
         }
-        catch
+    }
+
+    It 'rejects equal invalid frame-order summary values before comparing parity' {
+        foreach ($field in @('Digest', 'Pose', 'FullPose', 'Root'))
         {
-            $poseRejected = $true
+            foreach ($invalidValue in @(
+                $null,
+                '',
+                'abcdef0123456789',
+                '0123456789ABCDEG',
+                42))
+            {
+                $single = New-P3bFrameOrderParityResult -Mode single
+                $parallel = New-P3bFrameOrderParityResult -Mode parallel
+                $single.$field = $invalidValue
+                $parallel.$field = $invalidValue
+                Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel |
+                    Should Be $true
+            }
         }
-        $poseRejected | Should Be $true
+    }
+
+    It 'rejects missing mistyped and incorrect frame-order identities' {
+        foreach ($field in @('Mode', 'Frames'))
+        {
+            $single = New-P3bFrameOrderParityResult -Mode single
+            $parallel = New-P3bFrameOrderParityResult -Mode parallel
+            $single.PSObject.Properties.Remove($field)
+            Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+            $single = New-P3bFrameOrderParityResult -Mode single
+            $parallel = New-P3bFrameOrderParityResult -Mode parallel
+            $parallel.PSObject.Properties.Remove($field)
+            Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+        }
+
+        $single = New-P3bFrameOrderParityResult -Mode single
+        $parallel = New-P3bFrameOrderParityResult -Mode parallel
+        $parallel.Mode = 'single'
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bFrameOrderParityResult -Mode single
+        $parallel = New-P3bFrameOrderParityResult -Mode parallel
+        $single.Frames = 179
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bFrameOrderParityResult -Mode single
+        $parallel = New-P3bFrameOrderParityResult -Mode parallel
+        $single.Frames = '180'
+        $parallel.Frames = '180'
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        Test-P3bFrameOrderPairRejects -Single $null -Parallel $parallel | Should Be $true
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $null | Should Be $true
+    }
+
+    It 'rejects singleton array frame-order identities and summaries' {
+        $single = New-P3bFrameOrderParityResult -Mode single
+        $parallel = New-P3bFrameOrderParityResult -Mode parallel
+        $single.Mode = [string[]]@('single')
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bFrameOrderParityResult -Mode single
+        $parallel = New-P3bFrameOrderParityResult -Mode parallel
+        $single.Frames = [int[]]@(180)
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        foreach ($field in @('Digest', 'Pose', 'FullPose', 'Root'))
+        {
+            $single = New-P3bFrameOrderParityResult -Mode single
+            $parallel = New-P3bFrameOrderParityResult -Mode parallel
+            $single.$field = [string[]]@($single.$field)
+            Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+        }
+    }
+
+    It 'rejects singleton generic-list frame-order identity and summary values' {
+        $single = New-P3bFrameOrderParityResult -Mode single
+        $parallel = New-P3bFrameOrderParityResult -Mode parallel
+        $modeList = [System.Collections.Generic.List[string]]::new()
+        [void]$modeList.Add('single')
+        $single.Mode = $modeList
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+
+        $single = New-P3bFrameOrderParityResult -Mode single
+        $parallel = New-P3bFrameOrderParityResult -Mode parallel
+        $rootList = [System.Collections.Generic.List[string]]::new()
+        [void]$rootList.Add($single.Root)
+        $single.Root = $rootList
+        Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
     }
 }
 
 Describe 'P3B raw-pose and timing instrumentation' {
-    It 'publishes the frame-independent full skeleton digest to the harness' {
+    It 'aggregates result pose full-pose and root independently in both smokes' {
         $runtimeSource = [System.IO.File]::ReadAllText($script:RuntimePath)
         $harnessSource = [System.IO.File]::ReadAllText($script:HarnessPath)
+        $frameOrderSource = [System.IO.File]::ReadAllText($script:FrameOrderPath)
 
         $runtimeSource | Should Match 'ulong FullPoseDigest'
-        $harnessSource | Should Match 'diagnostics\.FullPoseDigest'
-        $harnessSource | Should Not Match 'Append\(ref _poseDigest, diagnostics\.PoseDigest\)'
+        foreach ($pattern in $script:HarnessAggregationPatterns)
+        {
+            $harnessSource | Should Match $pattern
+        }
+        foreach ($pattern in $script:FrameOrderAggregationPatterns)
+        {
+            $frameOrderSource | Should Match $pattern
+        }
+        $harnessSource | Should Not Match `
+            '(?m)^\s*Append\s*\(\s*ref\s+_poseDigest\s*,\s*diagnostics\s*\.\s*FullPoseDigest\s*\)\s*;\s*$'
+    }
+
+    It 'does not accept commented aggregation calls as source evidence' {
+        $commentOnlyHarness = @(
+            '// AlsResultDigest.Append(ref _resultDigest, diagnostics.Result);',
+            '// Append(ref _poseDigest, diagnostics.PoseDigest);',
+            '// Append(ref _fullPoseDigest, diagnostics.FullPoseDigest);',
+            '// Append(ref _rootDigest, diagnostics.RootDigest);') -join [Environment]::NewLine
+        $commentOnlyFrameOrder = @(
+            '// AlsResultDigest.Append(ref _resultDigest, frame.Result);',
+            '// Append(ref _poseDigest, frame.PoseDigest);',
+            '// Append(ref _fullPoseDigest, frame.FullPoseDigest);',
+            '// Append(ref _rootDigest, frame.RootDigest);') -join [Environment]::NewLine
+
+        foreach ($pattern in $script:HarnessAggregationPatterns)
+        {
+            $commentOnlyHarness | Should Not Match $pattern
+        }
+        foreach ($pattern in $script:FrameOrderAggregationPatterns)
+        {
+            $commentOnlyFrameOrder | Should Not Match $pattern
+        }
     }
 
     It 'sums only bounded production segments into worker timing' {
