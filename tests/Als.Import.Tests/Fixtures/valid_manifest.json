@@ -114,18 +114,18 @@
             "postInfinity": "Constant",
             "keys": [
               {
-                "timeSeconds": 0.0,
-                "value": 0.0,
+                "timeSeconds": 0.12345678901234566,
+                "value": 9007199254740991,
                 "interpolation": "Linear",
-                "arriveTangent": 0.0,
-                "leaveTangent": 90.0
+                "arriveTangent": -0.0,
+                "leaveTangent": 1.2345678901234567
               },
               {
-                "timeSeconds": 1.0,
-                "value": 90.0,
+                "timeSeconds": 1.0000000000000002,
+                "value": -123456789.12345679,
                 "interpolation": "Cubic",
-                "arriveTangent": 90.0,
-                "leaveTangent": 0.0
+                "arriveTangent": 9007199254740991,
+                "leaveTangent": -1.2345678901234567
               }
             ]
           }

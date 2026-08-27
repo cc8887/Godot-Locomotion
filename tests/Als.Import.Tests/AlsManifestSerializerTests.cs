@@ -1,11 +1,20 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GodotAls.Import.Manifest;
 using GodotAls.Import.Metadata;
+using Json.Schema;
 
 namespace GodotAls.Import.Tests;
 
 public sealed class AlsManifestSerializerTests
 {
+    private static readonly Lazy<JsonSchema> ManifestSchema = new(() =>
+    {
+        var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var schemaPath = Path.Combine(repositoryRoot, "tools", "schemas", "als_manifest.schema.json");
+        return JsonSchema.FromText(File.ReadAllText(schemaPath));
+    });
+
     [Fact]
     public void LoadsTheCanonicalFixtureWithExactPropertyNames()
     {
@@ -36,29 +45,34 @@ public sealed class AlsManifestSerializerTests
     public void FloatCurveKeysRoundTripWithoutLoss()
     {
         var manifest = AlsManifestSerializer.Load(FixturePath());
+        var metadata = AlsAnimationMetadata.Read(manifest.Animations[0].Metadata);
+        var serialized = JsonSerializer.Serialize(metadata, AlsManifestSerializer.JsonOptions);
+        using var document = JsonDocument.Parse(serialized);
+        var restored = AlsAnimationMetadata.Read(document.RootElement);
 
-        Assert.Null(Record.Exception(() => AlsAnimationMetadata.Read(manifest.Animations[0].Metadata)));
+        var curve = Assert.Single(restored.Curves);
+        Assert.Equal(0, curve.StableCurveId);
+        Assert.Equal("None", curve.CanonicalKind);
+        Assert.Equal("RotationAmount", curve.SourceName);
+        Assert.Equal("source_curve", curve.SourceProvenance);
+        Assert.Equal("Constant", curve.PreInfinity);
+        Assert.Equal("Constant", curve.PostInfinity);
+        Assert.Equal(2, curve.Keys.Length);
 
-        var curve = Assert.Single(manifest.Animations[0].Metadata.GetProperty("curves").EnumerateArray());
-        Assert.Equal(0, curve.GetProperty("stableCurveId").GetInt32());
-        Assert.Equal("None", curve.GetProperty("canonicalKind").GetString());
-        Assert.Equal("RotationAmount", curve.GetProperty("sourceName").GetString());
-        Assert.Equal("source_curve", curve.GetProperty("sourceProvenance").GetString());
-        Assert.Equal("Constant", curve.GetProperty("preInfinity").GetString());
-        Assert.Equal("Constant", curve.GetProperty("postInfinity").GetString());
-
-        var keys = curve.GetProperty("keys").EnumerateArray().ToArray();
-        Assert.Equal(2, keys.Length);
-        Assert.Equal(0.0, keys[0].GetProperty("timeSeconds").GetDouble());
-        Assert.Equal(0.0, keys[0].GetProperty("value").GetDouble());
-        Assert.Equal("Linear", keys[0].GetProperty("interpolation").GetString());
-        Assert.Equal(0.0, keys[0].GetProperty("arriveTangent").GetDouble());
-        Assert.Equal(90.0, keys[0].GetProperty("leaveTangent").GetDouble());
-        Assert.Equal(1.0, keys[1].GetProperty("timeSeconds").GetDouble());
-        Assert.Equal(90.0, keys[1].GetProperty("value").GetDouble());
-        Assert.Equal("Cubic", keys[1].GetProperty("interpolation").GetString());
-        Assert.Equal(90.0, keys[1].GetProperty("arriveTangent").GetDouble());
-        Assert.Equal(0.0, keys[1].GetProperty("leaveTangent").GetDouble());
+        AssertCurveKey(
+            curve.Keys[0],
+            0.12345678901234566,
+            9007199254740991,
+            "Linear",
+            -0.0,
+            1.2345678901234567);
+        AssertCurveKey(
+            curve.Keys[1],
+            1.0000000000000002,
+            -123456789.12345679,
+            "Cubic",
+            9007199254740991,
+            -1.2345678901234567);
     }
 
     [Fact]
@@ -87,11 +101,64 @@ public sealed class AlsManifestSerializerTests
     public void NonFiniteCurveValueIsRejected()
     {
         var json = File.ReadAllText(FixturePath()).Replace(
-            "\"value\": 90.0",
+            "\"value\": 9007199254740991",
             "\"value\": 1e400",
             StringComparison.Ordinal);
 
         Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Fact]
+    public void SchemaRejectsAnimationCurveBypassThroughClassPath()
+    {
+        var json = File.ReadAllText(FixturePath())
+            .Replace("\"classPath\": \"/Script/Engine.AnimSequence\"", "\"classPath\": \"/Script/Engine.Texture2D\"", StringComparison.Ordinal)
+            .Replace("\"sourceName\": \"RotationAmount\",", "\"sourceName\": \"RotationAmount\", \"unexpected\": true,", StringComparison.Ordinal);
+
+        Assert.False(IsSchemaValid(json));
+    }
+
+    [Fact]
+    public void SchemaRejectsLegacyCurveNamesThroughClassPathBypass()
+    {
+        var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
+        var animation = root["animations"]!.AsArray()[0]!.AsObject();
+        animation["classPath"] = "/Script/Engine.Texture2D";
+        animation["metadata"]!.AsObject()["curves"] = new JsonArray("RotationAmount");
+
+        Assert.False(IsSchemaValid(root.ToJsonString()));
+    }
+
+    [Fact]
+    public void SchemaRejectsOverflowingCurveDouble()
+    {
+        var json = File.ReadAllText(FixturePath()).Replace(
+            "\"value\": 9007199254740991",
+            "\"value\": 1e400",
+            StringComparison.Ordinal);
+
+        Assert.False(IsSchemaValid(json));
+    }
+
+    private static void AssertCurveKey(
+        AlsExportedFloatCurveKeyMetadata actual,
+        double timeSeconds,
+        double value,
+        string interpolation,
+        double arriveTangent,
+        double leaveTangent)
+    {
+        Assert.Equal(BitConverter.DoubleToInt64Bits(timeSeconds), BitConverter.DoubleToInt64Bits(actual.TimeSeconds));
+        Assert.Equal(BitConverter.DoubleToInt64Bits(value), BitConverter.DoubleToInt64Bits(actual.Value));
+        Assert.Equal(interpolation, actual.Interpolation);
+        Assert.Equal(BitConverter.DoubleToInt64Bits(arriveTangent), BitConverter.DoubleToInt64Bits(actual.ArriveTangent));
+        Assert.Equal(BitConverter.DoubleToInt64Bits(leaveTangent), BitConverter.DoubleToInt64Bits(actual.LeaveTangent));
+    }
+
+    private static bool IsSchemaValid(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return ManifestSchema.Value.Evaluate(document.RootElement).IsValid;
     }
 
     internal static string FixturePath() =>
