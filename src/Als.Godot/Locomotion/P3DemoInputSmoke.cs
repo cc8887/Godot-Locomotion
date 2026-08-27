@@ -8,20 +8,20 @@ namespace GodotAls.Locomotion;
 
 public partial class P3DemoInputSmoke : Node
 {
+    private readonly record struct InputSmokeEvidence(
+        int DirectionCount,
+        int CameraBasisChecks,
+        int PitchChecks,
+        int AimingChecks,
+        int ClearChecks);
+
     private bool _finished;
 
-    public override void _Ready()
+    public override async void _Ready()
     {
         try
         {
-            ValidateActionMap();
-            ValidateGodotInputBridge();
-            ValidateCommandSemantics();
-            ValidateCameraSemantics();
-            ValidateHudSemantics();
-            Require(typeof(P3LocomotionDemo).IsSubclassOf(typeof(Node3D)),
-                "demo root was not a Node3D production scene root");
-            GD.Print("GODOT_ALS_P3_DEMO_INPUT_OK actions=11 frames=8 camera=1 hud=1");
+            await RunSmokeAsync();
             _finished = true;
             GetTree().Quit();
         }
@@ -31,6 +31,21 @@ public partial class P3DemoInputSmoke : Node
             GD.PushError($"GODOT_ALS_P3_DEMO_INPUT_FAIL {exception}");
             GetTree().Quit(1);
         }
+    }
+
+    private async Task RunSmokeAsync()
+    {
+        ValidateActionMap();
+        ValidateCommandSemantics();
+        var evidence = await ValidateCameraRelativeMovementMatrixAsync();
+        ValidateHudSemantics();
+        Require(typeof(P3LocomotionDemo).IsSubclassOf(typeof(Node3D)),
+            "demo root was not a Node3D production scene root");
+        GD.Print(
+            $"GODOT_ALS_P3_DEMO_INPUT_OK actions={ControlledActions.Length} " +
+            $"directions={evidence.DirectionCount} camera_basis={evidence.CameraBasisChecks} " +
+            $"pitch={evidence.PitchChecks} aiming={evidence.AimingChecks} " +
+            $"cleared={evidence.ClearChecks} hud=1");
     }
 
     public override void _ExitTree()
@@ -174,71 +189,228 @@ public partial class P3DemoInputSmoke : Node
         Require(adapter.GetCommand(8).JumpPressed == 0, "default snapshot emitted a jump edge");
     }
 
-    private static void ValidateGodotInputBridge()
+    private async Task<InputSmokeEvidence> ValidateCameraRelativeMovementMatrixAsync()
     {
+        var previousMouseMode = Input.MouseMode;
+        Node3D? target = null;
+        AlsOrbitCamera? orbit = null;
+        var directionCount = 0;
+        var cameraBasisChecks = 0;
+        var pitchChecks = 0;
+        var aimingChecks = 0;
+        var clearChecks = 0;
         ReleaseControlledActions();
         try
         {
+            target = new Node3D { Name = "CameraTarget" };
+            AddChild(target);
+            target.GlobalPosition = new Vector3(3f, 2f, -4f);
+
+            orbit = new AlsOrbitCamera { Name = "OrbitCamera" };
+            var springArm = new SpringArm3D { Name = "SpringArm3D" };
+            var camera = new Camera3D { Name = "Camera3D" };
+            springArm.AddChild(camera);
+            orbit.AddChild(springArm);
+            AddChild(orbit);
+            orbit.Configure(target);
+            orbit._Process(0d);
+
+            Require(orbit.Target == target, "orbit camera did not retain its live target");
+            Require(orbit.FollowOffset == new Vector3(0f, 0.53f, 0f),
+                $"orbit follow offset was not aligned to the movement anchor: {orbit.FollowOffset}");
+            Require(orbit.GlobalPosition == target.GlobalPosition + orbit.FollowOffset,
+                "orbit camera did not follow its target at shoulder height");
+            Require(camera.IsInsideTree(), "camera basis probe was not live in the scene tree");
+
+            orbit.SetMouseCaptured(false);
+            orbit.ToggleMouseCapture();
+            Require(orbit.IsMouseCaptured, "Esc capture toggle did not capture the mouse");
+            orbit.ToggleMouseCapture();
+            Require(!orbit.IsMouseCaptured, "second Esc capture toggle did not release the mouse");
+            orbit.SetMouseCaptured(true);
+
+            var initialPitch = orbit.Pitch;
+            await DispatchMouseMotionAsync(orbit, new Vector2(0f, 80f));
+            Require(orbit.Pitch < initialPitch, "mouse down did not pitch the camera down");
+            var pitchedForward = -camera.GlobalBasis.Z;
+            Require(Mathf.Abs(pitchedForward.Y) > 0.01f,
+                "real Camera3D forward did not contain the expected pitch component");
+            var downwardPitch = orbit.Pitch;
+            await DispatchMouseMotionAsync(orbit, new Vector2(0f, -160f));
+            Require(orbit.Pitch > downwardPitch, "mouse up did not pitch the camera up");
+            await DispatchMouseMotionAsync(orbit, new Vector2(0f, 10000f));
+            Require(orbit.Pitch == orbit.MinimumPitch, "orbit pitch minimum was not clamped");
+            await DispatchMouseMotionAsync(orbit, new Vector2(0f, -20000f));
+            Require(orbit.Pitch == orbit.MaximumPitch, "orbit pitch maximum was not clamped");
+            pitchChecks = 1;
+
             var adapter = new AlsPlayerInputAdapter();
+            var frameId = 0L;
+            var targetYaws = new[] { 0f, Mathf.Pi * 0.5f, -Mathf.Pi * 0.5f };
+            var actions = new[]
+            {
+                "move_forward",
+                "move_left",
+                "move_back",
+                "move_right",
+            };
 
-            Input.ActionPress("move_forward");
-            adapter.CaptureGodotFrame(1, 0f);
-            var forward = adapter.GetCommand(1);
-            Require(forward.MovementAxes == NumericsVector2.UnitY,
-                "W did not map to ALS local forward +Y");
-            var resolvedForward = AlsLocomotionCommandResolver.Resolve(
-                forward, AlsStance.Standing);
-            Require(resolvedForward.WorldDirection.X == 0f &&
-                resolvedForward.WorldDirection.Y == 0f &&
-                resolvedForward.WorldDirection.Z == -1f,
-                "W did not resolve to Godot world forward -Z");
-            Input.ActionRelease("move_forward");
+            foreach (var targetYaw in targetYaws)
+            {
+                foreach (var action in actions)
+                {
+                    orbit.SetMouseCaptured(true);
+                    var deltaYaw = Mathf.Wrap(targetYaw - orbit.Yaw, -Mathf.Pi, Mathf.Pi);
+                    await DispatchMouseMotionAsync(
+                        orbit,
+                        new Vector2(-deltaYaw / orbit.MouseSensitivity, 0f));
+                    Require(Mathf.Abs(Mathf.Wrap(
+                            orbit.Yaw - targetYaw,
+                            -Mathf.Pi,
+                            Mathf.Pi)) < 1e-4f,
+                        $"real mouse input did not reach target yaw {targetYaw:R}: " +
+                        $"actual={orbit.Yaw:R}");
 
-            Input.ActionPress("move_back");
-            adapter.CaptureGodotFrame(2, 0f);
-            var backward = adapter.GetCommand(2);
-            Require(backward.MovementAxes == -NumericsVector2.UnitY,
-                "S did not map to ALS local backward -Y");
-            var resolvedBackward = AlsLocomotionCommandResolver.Resolve(
-                backward, AlsStance.Standing);
-            Require(resolvedBackward.WorldDirection.X == 0f &&
-                resolvedBackward.WorldDirection.Y == 0f &&
-                resolvedBackward.WorldDirection.Z == 1f,
-                "S did not resolve to Godot world backward +Z");
-            Input.ActionRelease("move_back");
+                    var forward = -camera.GlobalBasis.Z;
+                    forward.Y = 0f;
+                    forward = forward.Normalized();
+                    var right = camera.GlobalBasis.X;
+                    right.Y = 0f;
+                    right = right.Normalized();
+                    var basisYaw = Mathf.Atan2(-forward.X, -forward.Z);
+                    Require(Mathf.Abs(Mathf.Wrap(
+                            orbit.Yaw - basisYaw,
+                            -Mathf.Pi,
+                            Mathf.Pi)) < 1e-4f,
+                        $"orbit yaw did not match the real Camera3D basis: " +
+                        $"target={targetYaw:R} orbit={orbit.Yaw:R} " +
+                        $"basis={basisYaw:R} forward={forward}");
 
-            Input.ActionPress("move_forward");
-            Input.ActionPress("sprint");
-            adapter.CaptureGodotFrame(3, 0f);
-            var sprint = adapter.GetCommand(3);
-            Require(sprint.RequestedGait == AlsGait.Sprinting,
-                "Shift+W did not request sprinting");
-            Require(AlsLocomotionCommandResolver.Resolve(sprint, AlsStance.Standing)
-                    .MaxAllowedGait == AlsGait.Sprinting,
-                "Shift+W did not satisfy LookingDirection forward sprint conditions");
-            Input.ActionRelease("sprint");
-            Input.ActionRelease("move_forward");
+                    Input.ActionPress(action);
+                    try
+                    {
+                        frameId++;
+                        adapter.CaptureGodotFrame(frameId, orbit.Yaw);
+                        var command = adapter.GetCommand(frameId);
+                        var resolved = AlsLocomotionCommandResolver.Resolve(
+                            command,
+                            AlsStance.Standing);
+                        var expectedDirection = action switch
+                        {
+                            "move_forward" => forward,
+                            "move_left" => -right,
+                            "move_back" => -forward,
+                            "move_right" => right,
+                            _ => throw new InvalidOperationException(
+                                $"unsupported movement action {action}"),
+                        };
+                        Require(NumericsVector3.Distance(
+                                resolved.WorldDirection,
+                                ToNumerics(expectedDirection)) < 1e-4f,
+                            $"camera-relative movement mismatch for yaw={targetYaw:R} " +
+                            $"action={action}");
+                        directionCount++;
+                    }
+                    finally
+                    {
+                        Input.ActionRelease(action);
+                    }
+                }
+            }
 
-            adapter.CaptureGodotFrame(4, 0f);
-            var cleared = adapter.GetCommand(4);
+            Require(directionCount == 12,
+                $"camera-relative movement matrix completed {directionCount} directions");
+            cameraBasisChecks = 1;
+
+            frameId++;
+            adapter.CaptureGodotFrame(frameId, orbit.Yaw);
+            var cleared = adapter.GetCommand(frameId);
+            var resolvedCleared = AlsLocomotionCommandResolver.Resolve(
+                cleared,
+                AlsStance.Standing);
             Require(cleared.MovementAxes == NumericsVector2.Zero &&
                 cleared.RequestedGait == AlsGait.Running &&
                 cleared.RequestedStance == AlsStance.Standing &&
                 cleared.RequestedRotationMode == AlsRotationMode.LookingDirection &&
-                cleared.JumpPressed == 0,
+                cleared.JumpPressed == 0 &&
+                resolvedCleared.WorldDirection == NumericsVector3.Zero,
                 "released Godot actions contaminated the next command frame");
+            clearChecks = 1;
+
+            Input.ActionPress("aim");
+            Input.ActionPress("move_forward");
+            try
+            {
+                frameId++;
+                adapter.CaptureGodotFrame(frameId, orbit.Yaw);
+                var aiming = adapter.GetCommand(frameId);
+                var resolvedAiming = AlsLocomotionCommandResolver.Resolve(
+                    aiming,
+                    AlsStance.Standing);
+                var aimingForward = -camera.GlobalBasis.Z;
+                aimingForward.Y = 0f;
+                aimingForward = aimingForward.Normalized();
+                Require(aiming.RequestedRotationMode == AlsRotationMode.Aiming,
+                    "RMB+W did not request aiming rotation mode");
+                Require(NumericsVector3.Distance(
+                        resolvedAiming.WorldDirection,
+                        ToNumerics(aimingForward)) < 1e-4f,
+                    "RMB+W did not remain camera-forward");
+                aimingChecks = 1;
+            }
+            finally
+            {
+                Input.ActionRelease("move_forward");
+                Input.ActionRelease("aim");
+            }
+
+            return new InputSmokeEvidence(
+                directionCount,
+                cameraBasisChecks,
+                pitchChecks,
+                aimingChecks,
+                clearChecks);
         }
         finally
         {
             ReleaseControlledActions();
-        }
-
-        foreach (var action in ControlledActions)
-        {
-            Require(!Input.IsActionPressed(action),
-                $"headless input smoke leaked pressed action {action}");
+            Input.MouseMode = previousMouseMode;
+            if (orbit is not null && GodotObject.IsInstanceValid(orbit))
+            {
+                if (orbit.GetParent() == this)
+                {
+                    RemoveChild(orbit);
+                }
+                orbit.Free();
+            }
+            if (target is not null && GodotObject.IsInstanceValid(target))
+            {
+                if (target.GetParent() == this)
+                {
+                    RemoveChild(target);
+                }
+                target.Free();
+            }
+            Require(Input.MouseMode == previousMouseMode,
+                "input smoke did not restore the prior mouse mode");
+            foreach (var action in ControlledActions)
+            {
+                Require(!Input.IsActionPressed(action),
+                    $"headless input smoke leaked pressed action {action}");
+            }
         }
     }
+
+    private async Task DispatchMouseMotionAsync(AlsOrbitCamera orbit, Vector2 relative)
+    {
+        Require(orbit.IsMouseCaptured,
+            "synthetic mouse motion was dispatched while the orbit was uncaptured");
+        Input.ParseInputEvent(new InputEventMouseMotion { Relative = relative });
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+    }
+
+    private static NumericsVector3 ToNumerics(in Vector3 value) =>
+        new(value.X, value.Y, value.Z);
 
     private static readonly string[] ControlledActions =
     [
@@ -261,47 +433,6 @@ public partial class P3DemoInputSmoke : Node
         {
             Input.ActionRelease(action);
         }
-    }
-
-    private void ValidateCameraSemantics()
-    {
-        var target = new Node3D { Name = "CameraTarget" };
-        AddChild(target);
-        target.GlobalPosition = new Vector3(3f, 2f, -4f);
-        var orbit = new AlsOrbitCamera { Name = "OrbitCamera" };
-        var springArm = new SpringArm3D { Name = "SpringArm3D" };
-        springArm.AddChild(new Camera3D { Name = "Camera3D" });
-        orbit.AddChild(springArm);
-        AddChild(orbit);
-        orbit.Configure(target);
-        orbit._Process(0d);
-        Require(orbit.Target == target, "orbit camera did not retain its live target");
-        Require(orbit.GlobalPosition == target.GlobalPosition + orbit.FollowOffset,
-            "orbit camera did not follow its target at shoulder height");
-
-        var initialPitch = orbit.Pitch;
-        orbit.ApplyMouseMotion(new Vector2(0f, 100f));
-        Require(orbit.Pitch < initialPitch, "mouse down did not pitch the camera down");
-        var downwardPitch = orbit.Pitch;
-        orbit.ApplyMouseMotion(new Vector2(0f, -200f));
-        Require(orbit.Pitch > downwardPitch, "mouse up did not pitch the camera up");
-        orbit.ApplyMouseMotion(new Vector2(1000f, 10000f));
-        Require(orbit.Pitch == orbit.MinimumPitch, "orbit pitch minimum was not clamped");
-        var firstYaw = orbit.Yaw;
-        orbit.ApplyMouseMotion(new Vector2(-1000f, -20000f));
-        Require(orbit.Pitch == orbit.MaximumPitch, "orbit pitch maximum was not clamped");
-        Require(orbit.Yaw != firstYaw, "horizontal mouse motion did not change orbit yaw");
-
-        orbit.SetMouseCaptured(false);
-        orbit.ToggleMouseCapture();
-        Require(orbit.IsMouseCaptured, "Esc capture toggle did not capture the mouse");
-        orbit.ToggleMouseCapture();
-        Require(!orbit.IsMouseCaptured, "second Esc capture toggle did not release the mouse");
-
-        RemoveChild(orbit);
-        orbit.Free();
-        RemoveChild(target);
-        target.Free();
     }
 
     private void ValidateHudSemantics()
