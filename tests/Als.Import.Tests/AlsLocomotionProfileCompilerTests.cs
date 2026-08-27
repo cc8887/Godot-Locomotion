@@ -171,7 +171,7 @@ public sealed class AlsLocomotionProfileCompilerTests
             P3RepositoryFixtures.ReadProfile(), P3RepositoryFixtures.LoadAnimationSet());
         Assert.Equal(new System.Numerics.Vector3(0f, -0.92f, 0f),
             profile.Presentation.TranslationMeters);
-        Assert.InRange(MathF.Abs(profile.Presentation.YawRadians - MathF.PI / 2f), 0f, 1e-6f);
+        Assert.InRange(MathF.Abs(profile.Presentation.YawRadians + MathF.PI / 2f), 0f, 1e-6f);
     }
 
     [Fact]
@@ -500,9 +500,9 @@ public sealed class AlsLocomotionProfileCompilerTests
 
     private static string WithDuplicateYawRadiansProperty() =>
         P3RepositoryFixtures.ReadProfile().Replace(
-            "\"yawRadians\": 1.5707963267948966",
-            $"\"yawRadians\": 1.5707963267948966,{Environment.NewLine}" +
-            "    \"yawRadians\": 1.5707963267948966",
+            "\"yawRadians\": -1.5707963267948966",
+            $"\"yawRadians\": -1.5707963267948966,{Environment.NewLine}" +
+            "    \"yawRadians\": -1.5707963267948966",
             StringComparison.Ordinal);
 
     private static AlsCompilationException CompileFailure(string json) =>

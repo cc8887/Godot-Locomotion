@@ -27,7 +27,9 @@ Formal manifest 状态为 `complete`，统计为 267 assets / 141 files / 7 skel
 
 ## 3. Stable-ID locomotion profile
 
-`assets/config/p3_locomotion_profile.json` 是 schema v2。`presentation` 是必填且唯一的 Mannequin 展示修正来源，当前固定为 translation `(0, -0.92, 0) m` 与 yaw `pi/2`；其余字段只保存完整 UE object path 经过 formal manifest 唯一解析所得的 SHA-1 stable ID。编译器拒绝未知字段、缺失或重复 ID、跨 skeleton 引用、空或退化 sample grid、不支持的 additive 类型以及 additive base pose/type/frame 不一致；没有 basename 或运行时 fallback。
+`assets/config/p3_locomotion_profile.json` 是 schema v2。`presentation` 是必填且唯一的 Mannequin 展示修正来源，当前固定为 translation `(0, -0.92, 0) m` 与 yaw `-pi/2`；其余字段只保存完整 UE object path 经过 formal manifest 唯一解析所得的 SHA-1 stable ID。编译器拒绝未知字段、缺失或重复 ID、跨 skeleton 引用、空或退化 sample grid、不支持的 additive 类型以及 additive base pose/type/frame 不一致；没有 basename 或运行时 fallback。
+
+正式导入场景的 visual-root 局部前向不是先前假定的 `+X`。Presentation smoke 在角色尚未 active、Worker idle 的窗口读取真实 `Skeleton3D`，把左右 `Foot_* -> ball_*` global rest-pose 方向转换回 visual-root 局部空间并求平均，得到 raw `-X` 前向；`-pi/2` presentation 将其映射到 Godot gameplay `-Z`。该断言独立于 profile 常量，避免配置与测试用同一硬编码轴互相证明。
 
 Motor/model 的 logical transform 不包含 mesh 修正，visual root 独占展示修正，最终变换严格为 `logical * presentation`。Profile 的 translation/yaw 在编译时必须是 finite `float`，否则以 `ALSPROFILE013` 拒绝；运行期在写 visual root 前后再次验证完整 basis/origin。若 compose 或 animation apply 产生非 finite 值，worker failure 路径恢复已捕获的全骨骼 pose 与 visual root，headless/debug 以失败 marker 和非零退出收束，interactive release 冻结最后有效 pose 而 motor 继续。
 
@@ -151,10 +153,10 @@ HUD 状态字符串只在 committed frame 改变时格式化，性能字符串�
 
 | Mode | Characters | `digest` | `pose` | `full_pose` | `root` | off_main | p95 us | p99 us |
 | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: |
-| single | 1 | `21A9D10F0AB9D1D5` | `AF7B2D64BC136E10` | `0D87D2E73CA95BEB` | `D50528153FCD66F1` | 0 | 342 | 431 |
-| parallel | 1 | `21A9D10F0AB9D1D5` | `AF7B2D64BC136E10` | `0D87D2E73CA95BEB` | `D50528153FCD66F1` | 1 | 351 | 582 |
-| single | 10 | `6C58FCA799D913B6` | `81D39CE09ED66F1A` | `53B465443D67B4E0` | `6D3EDB8B91527FCD` | 0 | 341 | 457 |
-| parallel | 10 | `6C58FCA799D913B6` | `81D39CE09ED66F1A` | `53B465443D67B4E0` | `6D3EDB8B91527FCD` | 10 | 764 | 1033 |
+| single | 1 | `21A9D10F0AB9D1D5` | `AF7B2D64BC136E10` | `0D87D2E73CA95BEB` | `7EC949BA897B48E2` | 0 | 323 | 432 |
+| parallel | 1 | `21A9D10F0AB9D1D5` | `AF7B2D64BC136E10` | `0D87D2E73CA95BEB` | `7EC949BA897B48E2` | 1 | 402 | 524 |
+| single | 10 | `6C58FCA799D913B6` | `81D39CE09ED66F1A` | `53B465443D67B4E0` | `506FC5CF1C2C4ECE` | 0 | 302 | 443 |
+| parallel | 10 | `6C58FCA799D913B6` | `81D39CE09ED66F1A` | `53B465443D67B4E0` | `506FC5CF1C2C4ECE` | 10 | 741 | 1030 |
 
 四行均为 `missing=0 stale=0 generation=0 lag=0 allocations=0`。每个角色有且仅有 `600` 次 measured advance 和 `599` 次 full-skeleton pose change；character 0 的生产替换均观测到 `old_generation_rejected=1`。
 
@@ -181,12 +183,12 @@ Task 7 focused 路径在 1/10 harness matrix 前严格运行 input、library、p
 GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1
 GODOT_ALS_P3B_LIBRARY_OK bones=68 clips=28 skeletons=1
 GODOT_ALS_P3B_LIBRARY_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1
-GODOT_ALS_P3_PRESENTATION_OK yaws=3 identity=1 root=09CE8BFFC4D374CB
-GODOT_ALS_P3B_INITIAL_ROLLBACK_OK mode=parallel corrected=1 visual_ready=0 visible=0 full_pose=2F655001D369ED6F root=09CE8BFFC4D374CB
+GODOT_ALS_P3_PRESENTATION_OK yaws=3 identity=1 root=BF238D7292E4DC0B
+GODOT_ALS_P3B_INITIAL_ROLLBACK_OK mode=parallel corrected=1 visual_ready=0 visible=0 full_pose=2F655001D369ED6F root=BF238D7292E4DC0B
 GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1
 GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=DD72BD02BE20DCC3 digest=3B75E5CD3AF16FEC
-GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=A1BDC3E389EC1725 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
-GODOT_ALS_P3B_FRAME_ORDER_OK mode=parallel frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=A1BDC3E389EC1725 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
+GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=B572790CE85F0C70 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
+GODOT_ALS_P3B_FRAME_ORDER_OK mode=parallel frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=B572790CE85F0C70 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
 GODOT_ALS_P3_DEMO_OK frames=300 errors=0 ready=1 visible=1 max_visible=1
 P3B_FOCUSED_VERIFICATION_OK regression=skipped
 ```

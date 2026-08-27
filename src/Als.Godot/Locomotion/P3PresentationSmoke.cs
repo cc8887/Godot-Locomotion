@@ -17,6 +17,8 @@ public partial class P3PresentationSmoke : Node
     private const int CharacterCount = 3;
     private const int MaximumPhysicsTicks = 240;
     private const float TransformTolerance = 0.00001f;
+    private const float AssetForwardTolerance = 0.001f;
+    private const float MinimumFootForwardAgreement = 0.98f;
 
     private static readonly float[] LogicalYaws = [0f, MathF.PI / 2f, -MathF.PI / 2f];
 
@@ -129,6 +131,10 @@ public partial class P3PresentationSmoke : Node
             var configured = character.LifecycleDiagnostics;
             Require(!configured.IsVisible && !configured.IsVisualReady,
                 $"character {index} exposed an uncommitted configured visual");
+            if (index == 0)
+            {
+                ValidateImportedAssetForward(character);
+            }
             character.SetActive(true);
             var activated = character.LifecycleDiagnostics;
             Require(activated.IsActive && !activated.IsVisible && !activated.IsVisualReady,
@@ -182,10 +188,6 @@ public partial class P3PresentationSmoke : Node
             if (index == 0)
             {
                 presentation = ReadPresentationTransform();
-                RequireVectorNear(
-                    presentation.Basis * Vector3.Right,
-                    Vector3.Forward,
-                    "logical identity did not map raw local +X to world -Z");
             }
             var expected = logical * presentation;
             RequireTransformNear(actual, expected,
@@ -345,11 +347,85 @@ public partial class P3PresentationSmoke : Node
             "profile presentation translation Y drifted");
         RequireNear(_profile.Presentation.TranslationMeters.Z, 0f,
             "profile presentation translation Z drifted");
-        RequireNear(_profile.Presentation.YawRadians, MathF.PI / 2f,
+        RequireNear(_profile.Presentation.YawRadians, -MathF.PI / 2f,
             "profile presentation yaw drifted");
     }
 
     private Transform3D ReadPresentationTransform() => _context.PresentationTransform;
+
+    private void ValidateImportedAssetForward(AlsP3Character character)
+    {
+        Require(!character.LifecycleDiagnostics.IsActive && character.WorkerInFlight == 0,
+            "mannequin rest-pose inspection requires an inactive idle Worker");
+        var animationTree = character.FindChild(
+            "AlsLocomotionAnimationTree", recursive: true, owned: false) as AnimationTree;
+        var visualRoot = animationTree?.GetParent() as Node3D
+            ?? throw new InvalidOperationException("real locomotion visual root was not found");
+        var skeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(visualRoot)
+            ?? throw new InvalidOperationException("real locomotion character has no Skeleton3D");
+        var importedAssetForward = ReadImportedAssetForward(visualRoot, skeleton);
+        RequireVectorNear(
+            ReadPresentationTransform().Basis * importedAssetForward,
+            Vector3.Forward,
+            "presentation did not map the imported mannequin forward to Godot -Z",
+            AssetForwardTolerance);
+    }
+
+    private static Vector3 ReadImportedAssetForward(Node3D visualRoot, Skeleton3D skeleton)
+    {
+        var leftForward = ReadFootForward(visualRoot, skeleton, "Foot_L", "ball_l");
+        var rightForward = ReadFootForward(visualRoot, skeleton, "Foot_R", "ball_r");
+        var combined = leftForward + rightForward;
+        Require(combined.LengthSquared() > TransformTolerance * TransformTolerance,
+            "mannequin rest-pose foot directions cancelled out");
+        var importedForward = combined.Normalized();
+        Require(leftForward.Dot(importedForward) >= MinimumFootForwardAgreement,
+            $"left mannequin foot did not agree with derived asset forward: " +
+            $"foot={leftForward} forward={importedForward}");
+        Require(rightForward.Dot(importedForward) >= MinimumFootForwardAgreement,
+            $"right mannequin foot did not agree with derived asset forward: " +
+            $"foot={rightForward} forward={importedForward}");
+        return importedForward;
+    }
+
+    private static Vector3 ReadFootForward(
+        Node3D visualRoot,
+        Skeleton3D skeleton,
+        string footBoneName,
+        string ballBoneName)
+    {
+        var footBone = FindBoneOrdinalIgnoreCase(skeleton, footBoneName);
+        var ballBone = FindBoneOrdinalIgnoreCase(skeleton, ballBoneName);
+        Require(footBone >= 0, $"mannequin skeleton has no {footBoneName} bone");
+        Require(ballBone >= 0, $"mannequin skeleton has no {ballBoneName} bone");
+        var footOrigin = visualRoot.ToLocal(
+            skeleton.ToGlobal(skeleton.GetBoneGlobalRest(footBone).Origin));
+        var ballOrigin = visualRoot.ToLocal(
+            skeleton.ToGlobal(skeleton.GetBoneGlobalRest(ballBone).Origin));
+        var forward = ballOrigin - footOrigin;
+        forward.Y = 0f;
+        Require(forward.LengthSquared() > TransformTolerance * TransformTolerance,
+            $"mannequin {footBoneName}->{ballBoneName} horizontal rest direction was degenerate");
+        return forward.Normalized();
+    }
+
+    private static int FindBoneOrdinalIgnoreCase(Skeleton3D skeleton, string boneName)
+    {
+        var match = -1;
+        for (var bone = 0; bone < skeleton.GetBoneCount(); bone++)
+        {
+            if (!string.Equals(
+                    skeleton.GetBoneName(bone).ToString(),
+                    boneName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            Require(match < 0, $"mannequin skeleton has duplicate {boneName} bones");
+            match = bone;
+        }
+        return match;
+    }
 
     private static (Transform3D Transform, ulong RootDigest) ReadVisualEvidence(
         in AlsP3FrameDiagnostics frame)
@@ -478,9 +554,13 @@ public partial class P3PresentationSmoke : Node
         RequireVectorNear(actual.Origin, expected.Origin, message);
     }
 
-    private static void RequireVectorNear(in Vector3 actual, in Vector3 expected, string message)
+    private static void RequireVectorNear(
+        in Vector3 actual,
+        in Vector3 expected,
+        string message,
+        float tolerance = TransformTolerance)
     {
-        Require((actual - expected).Length() <= TransformTolerance,
+        Require((actual - expected).Length() <= tolerance,
             $"{message}: expected={expected} actual={actual}");
     }
 
