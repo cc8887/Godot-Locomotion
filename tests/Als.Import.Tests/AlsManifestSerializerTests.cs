@@ -78,12 +78,27 @@ public sealed class AlsManifestSerializerTests
     [Fact]
     public void DuplicateCurveKeyTimeIsRejected()
     {
-        var json = File.ReadAllText(FixturePath()).Replace(
-            "\"timeSeconds\": 1.0",
-            "\"timeSeconds\": 0.0",
-            StringComparison.Ordinal);
+        var json = WithCurveKeyTimes(
+            File.ReadAllText(FixturePath()),
+            0.12345678901234566,
+            0.12345678901234566);
 
-        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("duplicate time", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NonIncreasingCurveKeyTimeIsRejected()
+    {
+        var json = WithCurveKeyTimes(
+            File.ReadAllText(FixturePath()),
+            0.12345678901234566,
+            0.12345678901234565);
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("strictly increasing", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -140,6 +155,17 @@ public sealed class AlsManifestSerializerTests
         Assert.False(IsSchemaValid(json));
     }
 
+    [Fact]
+    public void SchemaAcceptsFiniteNegativeCurveTime()
+    {
+        var json = WithCurveKeyTimes(
+            File.ReadAllText(FixturePath()),
+            -0.12345678901234566,
+            1.0000000000000002);
+
+        Assert.True(IsSchemaValid(json));
+    }
+
     private static void AssertCurveKey(
         AlsExportedFloatCurveKeyMetadata actual,
         double timeSeconds,
@@ -159,6 +185,16 @@ public sealed class AlsManifestSerializerTests
     {
         using var document = JsonDocument.Parse(json);
         return ManifestSchema.Value.Evaluate(document.RootElement).IsValid;
+    }
+
+    private static string WithCurveKeyTimes(string json, double firstTime, double secondTime)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        var keys = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!
+            .AsArray()[0]!.AsObject()["keys"]!.AsArray();
+        keys[0]!.AsObject()["timeSeconds"] = firstTime;
+        keys[1]!.AsObject()["timeSeconds"] = secondTime;
+        return root.ToJsonString();
     }
 
     internal static string FixturePath() =>
