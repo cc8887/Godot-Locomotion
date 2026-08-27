@@ -262,7 +262,7 @@ function Test-P3bSceneGateRejects
             -ProjectRoot $script:RepositoryRoot `
             -ScenePath 'res://probe.tscn' `
             -ExpectedExactMarkers $ExpectedExactMarkers `
-            -ExpectedRegexMarkers $ExpectedRegexMarkers | Out-Null
+            -ExpectedRegexMarkers $ExpectedRegexMarkers 6>$null | Out-Null
         return $false
     }
     catch
@@ -401,6 +401,21 @@ Describe 'P3B focused scene gate contracts' {
         {
             Test-P3bSceneGateRejects -Lines ($valid + $failureLine) | Should Be $true
         }
+    }
+
+    It 'does not leak rejected probe fixtures into parent verifier output' {
+        if ($null -eq (Get-Command Invoke-P3bSceneGate -ErrorAction SilentlyContinue))
+        {
+            return
+        }
+
+        $captured = @(Test-P3bSceneGateRejects -Lines @(
+            'EXACT_ONE',
+            'REGEX value=0123456789ABCDEF',
+            'SCRIPT ERROR: failed') *>&1)
+
+        $captured.Count | Should Be 1
+        $captured[0] | Should Be $true
     }
 
     It 'rejects every missing duplicate and malformed expected marker' {
