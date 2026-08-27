@@ -1,9 +1,12 @@
 $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $script:FunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p3b-verification-functions.ps1'
 $script:WorkerPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3WorkerRoot.cs'
+$script:CharacterPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3Character.cs'
+$script:SlotPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3CharacterSlot.cs'
 $script:RuntimePath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3RuntimeContext.cs'
 $script:HarnessPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P3bAnimationHarness.cs'
 $script:FrameOrderPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P3bFrameOrderSmoke.cs'
+$script:PresentationPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P3PresentationSmoke.cs'
 $script:VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p3b.ps1'
 if (Test-Path -LiteralPath $script:FunctionsPath)
 {
@@ -11,7 +14,7 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
 }
 
 $script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 p95_us=100 p99_us=200'
-$script:ValidFrameOrderMarker = 'GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1'
+$script:ValidFrameOrderMarker = 'GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1'
 $script:ValidGraphMarker = 'GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=0123456789ABCDEF digest=1111111111111111'
 $script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0'
 $script:ValidReplacement = 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1'
@@ -1016,6 +1019,7 @@ Describe 'P3B frame-order verifier contracts' {
             @('old_generation_rejected=1', 'old_generation_rejected=0'),
             @('retired_released=1', 'retired_released=0'),
             @('max_visible=1', 'max_visible=2'),
+            @('real_rig_visibility=1', 'real_rig_visibility=0'),
             @('recovery_zero_visible=1', 'recovery_zero_visible=0')
         ))
         {
@@ -1177,6 +1181,27 @@ Describe 'P3B frame-order verifier contracts' {
         [void]$rootList.Add($single.Root)
         $single.Root = $rootList
         Test-P3bFrameOrderPairRejects -Single $single -Parallel $parallel | Should Be $true
+    }
+}
+
+Describe 'P3B real rig visibility contracts' {
+    It 'keeps a continuous Node3D visibility chain and audits the real visual root' {
+        $workerSource = [System.IO.File]::ReadAllText($script:WorkerPath)
+        $characterSource = [System.IO.File]::ReadAllText($script:CharacterPath)
+        $slotSource = [System.IO.File]::ReadAllText($script:SlotPath)
+        $frameOrderSource = [System.IO.File]::ReadAllText($script:FrameOrderPath)
+        $presentationSource = [System.IO.File]::ReadAllText($script:PresentationPath)
+
+        $workerSource | Should Match 'partial class AlsP3WorkerRoot\s*:\s*Node3D'
+        $workerSource | Should Match 'PublishVisualRootVisibility\(frameId\)'
+        $workerSource | Should Match '_visualRoot!\.IsVisibleInTree\(\)'
+        $characterSource | Should Match 'internal bool ObservedVisualRootVisibleInTree'
+        $characterSource | Should Match `
+            'Volatile\.Read\(ref _state\.ObservedVisualRootVisible\)'
+        $slotSource | Should Match 'character\.ObservedVisualRootVisibleInTree'
+        $frameOrderSource | Should Match '_inactiveRigHiddenAfterSeparation'
+        $presentationSource | Should Match 'GeometryInstance3D'
+        $presentationSource | Should Match 'FindVisibilityInheritanceBreak'
     }
 }
 

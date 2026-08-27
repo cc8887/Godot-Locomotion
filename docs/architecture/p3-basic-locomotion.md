@@ -108,6 +108,8 @@ Order 2 / main: AlsP3CommitStage
   -> CommittedFrameId release -> owner reveal
 Order 3 / main: AlsP3CharacterSlot
   replacement phase progression -> retired release -> visibility invariants
+Order 4 / main (test only): P3bFrameOrderSmoke
+  committed/replacement/real-rig visibility acceptance
 ```
 
 所有 Godot 资源、graph、animation library、参数 handle 和双缓冲 exchange 均在 worker process group 开启前创建。运行期不查找字符串路径、不重建 animation graph。single 模式把 Order 1 放在 main thread，parallel 模式放在 subthread；Order 0、2、3 始终属于 main thread。
@@ -116,7 +118,9 @@ Worker 在 exchange result 前发布不可见的 visual commit candidate；candi
 
 `Active`、`Visible` 与 visual-ready 是三个独立合同。新建 active 与预建 spare 都从 `Visible=false, VisualReady=0` 开始；Active 只控制 process/collision，首个完整 commit 才能 reveal。停用会先隐藏并清 ready，重复 `SetActive(true)` 保持既有有效状态，停用后重激活则重新等待 commit。任何可见角色都必须同时 Active 且 visual-ready，slot 内 `max_visible <= 1`。
 
-角色替换只在完整 committed frame 边界发生。旧 generation 先隐藏、退役并从 registry 释放；预建 spare 成为 active 后仍保持 hidden/ready=0，先分类并真实拒绝旧 generation result，再恢复 worker 并等待新 generation 的下一帧 commit。在 `AwaitingGenerationMismatch` 与 `AwaitingRecoveryCommit` 之间允许且要求一个 zero-visible window，绝不允许旧/新 rig 同时可见；实测 marker 为 `old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1`。Teardown 会先停 process、拒绝 inflight dispose、再释放 graph/library/skeleton。
+正式 rig 的层级固定为 `AlsP3Character(Node3D) -> AlsP3WorkerRoot(Node3D) -> visualRoot(Node3D)`，不允许普通 `Node` 截断 3D render visibility ancestor chain。Presentation smoke 在 Configure 完成、SetActive 前且 Worker idle 的主线程窗口枚举真实 `GeometryInstance3D`，要求 inactive rig 的 visual root 与全部 geometry 均 `IsVisibleInTree()==false`，并要求到 character 的祖先链全部为 `Node3D`。运行期不允许主线程读取 Worker-owned visual root；Worker 在 Configure 切换线程组前发布 frame 0 实测值，之后每个 Worker frame 在自身线程读取 `IsVisibleInTree()`，通过 `Volatile` 发布纯标量与 observation frame。Commit Order 2 晚于 Worker Order 1，因此 false-to-true 允许一个明确的 process-stage/下一 Worker frame 观测滞后；任何已发布 true 对应 inactive、not-ready 或 local hidden 都立即违反 slot invariant。
+
+角色替换只在完整 committed frame 边界发生。旧 generation 先隐藏、退役并从 registry 释放；预建 spare 成为 active 后仍保持 hidden/ready=0，先分类并真实拒绝旧 generation result，再恢复 worker 并等待新 generation 的下一帧 commit。在 `AwaitingGenerationMismatch` 与 `AwaitingRecoveryCommit` 之间允许且要求一个 zero-visible window，绝不允许旧/新 rig 同时可见；frame-order smoke 还要求 active 移动离开初始位置后，Worker 已实测 active visual root 可见且 slot 的 published real-rig count 仍为 1。实测 marker 为 `old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1`。Teardown 会先停 process、拒绝 inflight dispose、再释放 graph/library/skeleton。
 
 ## 6. 可玩示例
 
@@ -187,8 +191,8 @@ GODOT_ALS_P3_PRESENTATION_OK yaws=3 identity=1 root=BF238D7292E4DC0B
 GODOT_ALS_P3B_INITIAL_ROLLBACK_OK mode=parallel corrected=1 visual_ready=0 visible=0 full_pose=2F655001D369ED6F root=BF238D7292E4DC0B
 GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1
 GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=DD72BD02BE20DCC3 digest=3B75E5CD3AF16FEC
-GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=B572790CE85F0C70 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
-GODOT_ALS_P3B_FRAME_ORDER_OK mode=parallel frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=B572790CE85F0C70 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
+GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=B572790CE85F0C70 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1
+GODOT_ALS_P3B_FRAME_ORDER_OK mode=parallel frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=B572790CE85F0C70 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1
 GODOT_ALS_P3_DEMO_OK frames=300 errors=0 ready=1 visible=1 max_visible=1
 P3B_FOCUSED_VERIFICATION_OK regression=skipped
 ```

@@ -36,6 +36,8 @@ public partial class P3bFrameOrderSmoke : Node
     private bool _retiredNodeReleased;
     private bool _replacementRequested;
     private int _maximumVisibleCharacterCount;
+    private Vector3 _initialMovementAnchorPosition;
+    private bool _inactiveRigHiddenAfterSeparation;
     private bool _recoveryZeroVisible;
     private bool _disposeGuardsChecked;
     private bool _workerFailureInjected;
@@ -97,6 +99,7 @@ public partial class P3bFrameOrderSmoke : Node
                 () => CreateCommandSource(_failurePolicy),
                 new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f));
             _active = _slot.ActiveCharacter;
+            _initialMovementAnchorPosition = _active.MovementAnchor.GlobalPosition;
             ValidateLifecycleThreadAndSchedulingContracts();
             var lifecycle = _active.LifecycleDiagnostics;
             Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
@@ -193,8 +196,11 @@ public partial class P3bFrameOrderSmoke : Node
         var lifecycle = _active.LifecycleDiagnostics;
         Require(lifecycle.IsActive && lifecycle.IsVisualReady && lifecycle.IsVisible,
             "committed active P3 character did not reveal its ready visual");
-        Require(_slot.ReplacementDiagnostics.VisibleCharacterCount == 1,
-            "committed active P3 character was not the slot's sole visible visual");
+        var visibility = _slot.ReplacementDiagnostics;
+        Require(visibility.VisibleCharacterCount <= 1,
+            "committed P3 character observed more than one real visual root");
+        Require(_active.VisualRootVisibilityObservationFrameId == frame.CommittedFrameId,
+            "real visual-root visibility was not observed by the same Worker frame");
         var motorVelocity = ((CharacterBody3D)_active.MovementAnchor).GetRealVelocity();
         Require(MathF.Abs(frame.ActualVelocity.X - motorVelocity.X) < 0.00001f &&
             MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
@@ -294,6 +300,8 @@ public partial class P3bFrameOrderSmoke : Node
         Require(_retiredNodeReleased, "retired replacement node remained alive or in the tree");
         Require(_maximumVisibleCharacterCount == 1,
             "P3 slot did not preserve a maximum of one visible character");
+        Require(_inactiveRigHiddenAfterSeparation,
+            "P3 slot did not prove the inactive rig hidden after active movement separation");
         Require(_recoveryZeroVisible,
             "P3 slot replacement did not expose a zero-visible recovery frame");
         Require(_context.AffinityViolations == 0, "worker process-group affinity was violated");
@@ -308,6 +316,7 @@ public partial class P3bFrameOrderSmoke : Node
             $"full_pose={_fullPoseDigest:X16} root={_rootDigest:X16} " +
             "lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 " +
             $"max_visible={_maximumVisibleCharacterCount} " +
+            $"real_rig_visibility={(_inactiveRigHiddenAfterSeparation ? 1 : 0)} " +
             $"recovery_zero_visible={(_recoveryZeroVisible ? 1 : 0)}");
         _slot.DisposeRuntime();
         _quitting = true;
@@ -642,6 +651,16 @@ public partial class P3bFrameOrderSmoke : Node
         _maximumVisibleCharacterCount = Math.Max(
             _maximumVisibleCharacterCount,
             replacement.VisibleCharacterCount);
+
+        if (!_inactiveRigHiddenAfterSeparation && !replacement.Requested &&
+            _active.MovementAnchor.GlobalPosition.DistanceTo(_initialMovementAnchorPosition) > 0.1f)
+        {
+            Require(_active.ObservedVisualRootVisibleInTree,
+                "moving active rig was not observed visible by its Worker");
+            Require(replacement.VisibleCharacterCount == 1,
+                "inactive spare rig remained visible after the active rig moved away");
+            _inactiveRigHiddenAfterSeparation = true;
+        }
 
         var lifecycle = _active.LifecycleDiagnostics;
         Require(lifecycle.IsVisible == _active.Visible,

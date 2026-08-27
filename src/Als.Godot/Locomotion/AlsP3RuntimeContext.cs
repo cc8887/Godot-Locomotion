@@ -219,6 +219,10 @@ internal sealed class AlsP3CharacterState
 
     public int VisualReady;
 
+    public int ObservedVisualRootVisible;
+
+    public long VisualRootVisibilityObservationFrameId;
+
     public int ProcessingEnabled;
 
     public int WorkerFrozen;

@@ -536,7 +536,7 @@ function ConvertFrom-P3bFrameOrderOutput
         throw "Expected exactly one P3B frame-order result marker; observed $($markerLines.Count)."
     }
 
-    $markerPattern = '\AGODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1\z'
+    $markerPattern = '\AGODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1\z'
     $marker = [regex]::Match($markerLines[0], $markerPattern)
     if (-not $marker.Success)
     {
