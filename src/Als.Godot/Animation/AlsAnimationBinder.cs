@@ -89,7 +89,7 @@ public static class AlsAnimationBinder
         }
     }
 
-    private static void RewriteTrackPaths(
+    internal static void RewriteTrackPaths(
         Node targetRoot,
         Skeleton3D targetSkeleton,
         Godot.Animation animation,
@@ -130,7 +130,7 @@ public static class AlsAnimationBinder
         }
     }
 
-    private static void ValidateTargetSkeleton(
+    internal static void ValidateTargetSkeleton(
         Skeleton3D skeleton,
         AlsSkeletonDefinition definition,
         string clipName)
