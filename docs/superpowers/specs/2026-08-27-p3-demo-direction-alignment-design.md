@@ -115,10 +115,12 @@ visual root 的朝向。
 
 ```text
 translationMeters = (0, -0.92, 0)
-yawRadians = +PI / 2
+yawRadians = -PI / 2
 ```
 
-Godot 正 90 度绕 Y 旋转把导入 Mannequin 的 raw `+X` 视觉前向映射到 gameplay `-Z` 前向。
+实际窗口与正式导入场景证明 Mannequin visual root 的 raw `-X` 是视觉前向；Godot 负 90 度绕 Y
+旋转把它映射到 gameplay `-Z` 前向。该轴由真实 `Skeleton3D` 的左右 `Foot_* -> ball_*` 水平
+rest-pose 方向在 visual-root 局部空间内推导，不再由硬编码 `+X` 自证。
 每帧 visual root 世界变换的组合顺序固定为：
 
 ```text
@@ -149,7 +151,7 @@ Mannequin presentation yaw 推导，也不能用 visual root 替代。
 {
   "presentation": {
     "translationMeters": [0.0, -0.92, 0.0],
-    "yawRadians": 1.5707963267948966
+    "yawRadians": -1.5707963267948966
   }
 }
 ```
@@ -161,7 +163,7 @@ Mannequin presentation yaw 推导，也不能用 visual root 替代。
 - 缺失、额外、错误大小写、重复或类型错误字段全部失败；
 - compiler 输出纯 C# 只读值类型，例如
   `readonly record struct AlsPresentationDefinition(Vector3 TranslationMeters, float YawRadians)`；
-- yaw 测试使用浮点容差验证其编译结果等于 `MathF.PI / 2`，不要求 JSON double 与 runtime float
+- yaw 测试使用浮点容差验证其编译结果等于 `-MathF.PI / 2`，不要求 JSON double 与 runtime float
   位级相等；
 - generator、tracked profile、compiler、profile 持有的只读 presentation 值和 exact-property tests
   同步升级到 v2；
@@ -272,7 +274,7 @@ D = flattened Camera3D right
 - `Aiming`：角色逻辑前向朝 aim yaw，移动仍为相机相对方向。
 
 完整 ALS 还包含第一人称、空中瞄准、冲刺优先级等额外策略，本设计不声称 P3 已全部实现。
-presentation 的 90 度校正叠加在逻辑 yaw 之后，只对齐资产，不改变 rotation mode 语义。
+presentation 的负 90 度校正叠加在逻辑 yaw 之后，只对齐资产，不改变 rotation mode 语义。
 
 ## 七、动画方向
 
@@ -295,7 +297,7 @@ presentation 后，F/B/侧向混合、Jump、Fall 和 Land 都在同一个校正
 ### 8.1 Pure、generator 与 profile
 
 - schema v2 精确属性集合通过；v1、缺失、额外、重复、非有限、错误长度和错误类型全部失败；
-- compiler 在容差内得到 `(0,-0.92,0)` 与 `MathF.PI/2`；
+- compiler 在容差内得到 `(0,-0.92,0)` 与 `-MathF.PI/2`；
 - generator 确定性输出 schema v2 presentation；
 - 代表性 F/B/L/R 完整 object path 到 stable ID 和 sample 坐标逐项锁定；
 - compiler 产物进入 runtime context 后不丢失 presentation。
@@ -323,7 +325,8 @@ resolved movement 与真实 basis 比较。这样不会用同一个硬编码 yaw
 
 使用正式 Mannequin/profile 验证：
 
-- logical identity 时 raw `+X` forward 映射为 world `-Z`；
+- 角色尚未 active、Worker idle 时，从真实 `Skeleton3D` 左右脚掌到脚趾的 rest pose 推导 raw `-X`
+  forward，并验证 presentation 将其映射为 world `-Z`；
 - Worker 内部断言 visual root 等于 `logical * presentation`，并发布 numerical snapshot/root digest；
 - motor `Y=0.90` 时 visual root `Y=-0.02`；
 - logical yaw `0`、`+PI/2`、`-PI/2` 时相对校正不变；

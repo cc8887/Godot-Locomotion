@@ -37,7 +37,7 @@ Describe 'generate-p3-profile.ps1 strict source mapping' {
             'translationMeters,yawRadians'
         (@($profile.presentation.translationMeters | ForEach-Object { [double]$_ }) -join ',') |
             Should Be '0,-0.92,0'
-        [Math]::Abs([double]$profile.presentation.yawRadians - ([Math]::PI / 2.0)) |
+        [Math]::Abs([double]$profile.presentation.yawRadians + ([Math]::PI / 2.0)) |
             Should BeLessThan 1e-12
         [Convert]::ToBase64String([IO.File]::ReadAllBytes($first)) | Should Be `
             ([Convert]::ToBase64String([IO.File]::ReadAllBytes(
