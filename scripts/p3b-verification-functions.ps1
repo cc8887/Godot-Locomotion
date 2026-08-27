@@ -112,6 +112,33 @@ function ConvertFrom-P3bHarnessOutput
         $advances[$character] = $frames
     }
 
+    $poseLines = @($lines | Where-Object {
+        $_.StartsWith('GODOT_ALS_P3B_POSE', [StringComparison]::Ordinal)
+    })
+    if ($poseLines.Count -ne $characters)
+    {
+        throw "Expected $characters P3B pose lines; observed $($poseLines.Count)."
+    }
+    $poseChanges = @{}
+    foreach ($line in $poseLines)
+    {
+        $poseMatch = [regex]::Match(
+            $line,
+            '\AGODOT_ALS_P3B_POSE character=(\d+) changes=(\d+)\z')
+        if (-not $poseMatch.Success)
+        {
+            throw "Malformed P3B pose evidence: $line"
+        }
+        $character = [int]$poseMatch.Groups[1].Value
+        $changes = [long]$poseMatch.Groups[2].Value
+        if ($character -lt 0 -or $character -ge $characters -or
+            $poseChanges.ContainsKey($character) -or $changes -le 0)
+        {
+            throw "Invalid P3B pose evidence: $line"
+        }
+        $poseChanges[$character] = $changes
+    }
+
     $replacementLines = @($lines | Where-Object {
         $_.StartsWith('GODOT_ALS_P3B_REPLACEMENT', [StringComparison]::Ordinal)
     })
@@ -135,6 +162,7 @@ function ConvertFrom-P3bHarnessOutput
         P95Microseconds = $p95
         P99Microseconds = $p99
         Advances = $advances
+        PoseChanges = $poseChanges
         ModelAllocations = $allocationBuckets[0]
         ControllerAllocations = $allocationBuckets[1]
         SkeletonAllocations = $allocationBuckets[2]

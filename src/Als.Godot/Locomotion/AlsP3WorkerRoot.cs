@@ -87,11 +87,19 @@ public partial class AlsP3WorkerRoot : Node
             var measurementIndex = -1;
             var measure = measurement is not null &&
                 measurement.TryGetMeasurementIndex(identity, out measurementIndex);
-            var workerStartedAt = measure ? Stopwatch.GetTimestamp() : 0L;
+            var productionElapsedTicks = 0L;
             var allocatedBeforeExchange = measure
                 ? GC.GetAllocatedBytesForCurrentThread()
                 : 0L;
-            if (!_state.Exchange.TryReadInput(identity, out var input))
+            var productionSegmentStartedAt = measure
+                ? Stopwatch.GetTimestamp()
+                : 0L;
+            var hasInput = _state.Exchange.TryReadInput(identity, out var input);
+            if (measure)
+            {
+                productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
+            }
+            if (!hasInput)
             {
                 return;
             }
@@ -117,6 +125,9 @@ public partial class AlsP3WorkerRoot : Node
                 var allocatedBeforeModel = measure
                     ? GC.GetAllocatedBytesForCurrentThread()
                     : 0L;
+                productionSegmentStartedAt = measure
+                    ? Stopwatch.GetTimestamp()
+                    : 0L;
                 AlsLocomotionModel.Evaluate(
                     input,
                     ref _runtimeState,
@@ -124,6 +135,7 @@ public partial class AlsP3WorkerRoot : Node
                     _context.Settings);
                 if (measure)
                 {
+                    productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddModelAllocations(
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeModel);
                 }
@@ -131,11 +143,15 @@ public partial class AlsP3WorkerRoot : Node
                 var allocatedBeforeSkeleton = measure
                     ? GC.GetAllocatedBytesForCurrentThread()
                     : 0L;
+                productionSegmentStartedAt = measure
+                    ? Stopwatch.GetTimestamp()
+                    : 0L;
                 CapturePose();
                 poseCaptured = true;
                 _visualRoot!.GlobalTransform = ToGodot(input.CharacterTransform);
                 if (measure)
                 {
+                    productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddSkeletonAllocations(
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeSkeleton);
                 }
@@ -143,9 +159,13 @@ public partial class AlsP3WorkerRoot : Node
                 var allocatedBeforeController = measure
                     ? GC.GetAllocatedBytesForCurrentThread()
                     : 0L;
+                productionSegmentStartedAt = measure
+                    ? Stopwatch.GetTimestamp()
+                    : 0L;
                 _controller!.Apply(_result, input.DeltaTime);
                 if (measure)
                 {
+                    productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddControllerAllocations(
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeController);
                 }
@@ -153,17 +173,24 @@ public partial class AlsP3WorkerRoot : Node
                 allocatedBeforeSkeleton = measure
                     ? GC.GetAllocatedBytesForCurrentThread()
                     : 0L;
+                productionSegmentStartedAt = measure
+                    ? Stopwatch.GetTimestamp()
+                    : 0L;
                 var poseDigest = _controller.ComputePoseDigest(frameId);
                 var fullPoseDigest = ComputeFullPoseDigest();
                 var rootDigest = ComputeRootDigest(_visualRoot.GlobalTransform);
                 if (measure)
                 {
+                    productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddSkeletonAllocations(
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeSkeleton);
                 }
 
                 allocatedBeforeExchange = measure
                     ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
+                productionSegmentStartedAt = measure
+                    ? Stopwatch.GetTimestamp()
                     : 0L;
                 _state.PublishResult(
                     _result,
@@ -174,11 +201,12 @@ public partial class AlsP3WorkerRoot : Node
                     frameId);
                 if (measure)
                 {
+                    productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddExchangeAllocations(
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
                     measurement.RecordWorkerAdvance(
                         measurementIndex,
-                        Stopwatch.GetTimestamp() - workerStartedAt);
+                        productionElapsedTicks);
                 }
             }
             catch (Exception exception)

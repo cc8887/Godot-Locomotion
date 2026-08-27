@@ -88,7 +88,8 @@ public partial class AlsP3CommitStage : Node
             frameId,
             _state.MotorActualVelocity,
             result,
-            _state.PublishedPoseDigest);
+            _state.PublishedPoseDigest,
+            _state.PublishedFullPoseDigest);
         Volatile.Write(ref _state.CommittedFrameId, frameId);
         if (measure)
         {

@@ -26,6 +26,9 @@ public partial class P3bAnimationHarness : Node
     private long[] _warmupAdvances = [];
     private long[] _firstMeasurementFrames = [];
     private long[] _measuredAdvances = [];
+    private ulong[] _previousFullPoseDigests = [];
+    private long[] _fullPoseChanges = [];
+    private bool[] _hasFullPoseDigest = [];
     private ulong _resultDigest = AlsResultDigest.OffsetBasis;
     private ulong _poseDigest = AlsResultDigest.OffsetBasis;
     private int _physicsTicks;
@@ -50,6 +53,9 @@ public partial class P3bAnimationHarness : Node
             _warmupAdvances = new long[_characterCount];
             _firstMeasurementFrames = new long[_characterCount];
             _measuredAdvances = new long[_characterCount];
+            _previousFullPoseDigests = new ulong[_characterCount];
+            _fullPoseChanges = new long[_characterCount];
+            _hasFullPoseDigest = new bool[_characterCount];
 
             var animationSetResource = ResourceLoader.Load<AlsAnimationSetResource>(
                 AlsGodotImportCoordinator.CompiledResourcePath)
@@ -180,7 +186,14 @@ public partial class P3bAnimationHarness : Node
             }
 
             AlsResultDigest.Append(ref _resultDigest, diagnostics.Result);
-            Append(ref _poseDigest, diagnostics.PoseDigest);
+            Append(ref _poseDigest, diagnostics.FullPoseDigest);
+            if (_hasFullPoseDigest[index] &&
+                diagnostics.FullPoseDigest != _previousFullPoseDigests[index])
+            {
+                _fullPoseChanges[index]++;
+            }
+            _previousFullPoseDigests[index] = diagnostics.FullPoseDigest;
+            _hasFullPoseDigest[index] = true;
             _measuredAdvances[index]++;
         }
     }
@@ -259,6 +272,8 @@ public partial class P3bAnimationHarness : Node
                 $"character {index} did not complete exactly 600 measured commits");
             Require(_measurement.GetAdvanceCount(index) == AlsP3bHarnessContext.MeasurementFrames,
                 $"character {index} did not complete exactly 600 measured animation advances");
+            Require(_hasFullPoseDigest[index] && _fullPoseChanges[index] > 0,
+                $"character {index} full skeleton pose did not change during measurement");
             Require(!_characters[index].IsPoseFrozen,
                 $"character {index} animation pose froze during the matrix run");
             Require(_characters[index].FailureDiagnosticCount == 0,
@@ -309,6 +324,8 @@ public partial class P3bAnimationHarness : Node
             GD.Print(
                 $"GODOT_ALS_P3B_ADVANCE character={index} " +
                 $"frames={_measurement.GetAdvanceCount(index)}");
+            GD.Print(
+                $"GODOT_ALS_P3B_POSE character={index} changes={_fullPoseChanges[index]}");
         }
         GD.Print("GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1");
         GD.Print(marker);
