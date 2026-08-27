@@ -13,7 +13,7 @@ public partial class AlsP3CharacterSlot : Node
     private Func<IAlsLocomotionCommandSource> _commandSourceFactory = null!;
     private AlsP3Character _active = null!;
     private AlsP3Character? _spare;
-    private ReplacementPhase _replacementPhase;
+    private AlsP3ReplacementPhase _replacementPhase;
     private long _replacementCompletedFrameId;
     private long _generationMismatchBaseline;
     private AlsFrameIdentity _retiredResultIdentity;
@@ -28,7 +28,7 @@ public partial class AlsP3CharacterSlot : Node
     public AlsP3CharacterSlot()
     {
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-        ProcessThreadGroupOrder = 2;
+        ProcessThreadGroupOrder = 3;
     }
 
     public AlsP3Character ActiveCharacter
@@ -41,14 +41,23 @@ public partial class AlsP3CharacterSlot : Node
         }
     }
 
-    public AlsP3SlotReplacementDiagnostics ReplacementDiagnostics => new(
-        _replacementPhase != ReplacementPhase.None,
-        _retiredResultObserved,
-        _retiredResultIdentity,
-        _retiredNodeReleased,
-        _generationMismatchObserved,
-        _committedFrameAtClassification,
-        _recoveryCommitted);
+    public AlsP3SlotReplacementDiagnostics ReplacementDiagnostics
+    {
+        get
+        {
+            EnsureMainThread();
+            return new AlsP3SlotReplacementDiagnostics(
+                _replacementPhase != AlsP3ReplacementPhase.None,
+                _retiredResultObserved,
+                _retiredResultIdentity,
+                _retiredNodeReleased,
+                _generationMismatchObserved,
+                _committedFrameAtClassification,
+                _recoveryCommitted,
+                _replacementPhase,
+                CountVisibleCharacters());
+        }
+    }
 
     public void Configure(
         AlsP3RuntimeContext context,
@@ -80,6 +89,7 @@ public partial class AlsP3CharacterSlot : Node
             _active = CreateCharacter(activeHandle, characterPosition, active: true);
             _spare = CreateCharacter(spareHandle, characterPosition, active: false);
             _configured = true;
+            ValidateVisibilityInvariants();
         }
         catch
         {
@@ -95,7 +105,7 @@ public partial class AlsP3CharacterSlot : Node
         ThrowIfDisposed();
         EnsureConfigured();
         ArgumentOutOfRangeException.ThrowIfNegative(completedFrameId);
-        if (_replacementPhase != ReplacementPhase.None)
+        if (_replacementPhase != AlsP3ReplacementPhase.None)
         {
             throw new InvalidOperationException("P3 slot replacement is already in progress.");
         }
@@ -103,7 +113,8 @@ public partial class AlsP3CharacterSlot : Node
         _active.BeginReplacementRequest(completedFrameId);
         _replacementCompletedFrameId = completedFrameId;
         _generationMismatchBaseline = Volatile.Read(ref _context.GenerationMismatches);
-        _replacementPhase = ReplacementPhase.AwaitingRetiredResult;
+        _replacementPhase = AlsP3ReplacementPhase.AwaitingRetiredResult;
+        ValidateVisibilityInvariants();
     }
 
     public override void _PhysicsProcess(double delta)
@@ -113,18 +124,20 @@ public partial class AlsP3CharacterSlot : Node
             return;
         }
 
+        ValidateVisibilityInvariants();
         switch (_replacementPhase)
         {
-            case ReplacementPhase.AwaitingRetiredResult:
+            case AlsP3ReplacementPhase.AwaitingRetiredResult:
                 TryReplaceAfterRetiredResult();
                 break;
-            case ReplacementPhase.AwaitingGenerationMismatch:
+            case AlsP3ReplacementPhase.AwaitingGenerationMismatch:
                 TryStartRecovery();
                 break;
-            case ReplacementPhase.AwaitingRecoveryCommit:
+            case AlsP3ReplacementPhase.AwaitingRecoveryCommit:
                 TryCompleteRecovery();
                 break;
         }
+        ValidateVisibilityInvariants();
     }
 
     public void DisposeRuntime()
@@ -156,6 +169,7 @@ public partial class AlsP3CharacterSlot : Node
         {
             Name = $"Character_{handle.CharacterId}_Generation_{handle.Generation}",
             Position = characterPosition,
+            Visible = false,
         };
         AddChild(character);
         try
@@ -166,6 +180,7 @@ public partial class AlsP3CharacterSlot : Node
         }
         catch
         {
+            character.Visible = false;
             RemoveChild(character);
             character.Free();
             throw;
@@ -183,13 +198,19 @@ public partial class AlsP3CharacterSlot : Node
         if (_active.WorkerInFlight != 0)
         {
             throw new InvalidOperationException(
-                "P3 slot replacement reached Order 2 with a worker callback still in flight.");
+                "P3 slot replacement reached Order 3 with a worker callback still in flight.");
         }
 
         _retiredResultIdentity = publishedIdentity;
         _retiredResultObserved = true;
         var retired = _active;
+        retired.ResetVisualReady();
         retired.RetireForReplacement();
+        if (retired.Visible)
+        {
+            throw new InvalidOperationException(
+                "P3 retired character remained visible before registry release.");
+        }
         if (!_registry.Release(retired.Handle))
         {
             throw new InvalidOperationException("P3 slot failed to release its retired generation.");
@@ -202,9 +223,15 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         var replacement = _spare;
+        replacement.ResetVisualReady();
         _spare = null;
-        replacement.StartReplacementClassification(_replacementCompletedFrameId);
+        if (retired.Visible)
+        {
+            throw new InvalidOperationException(
+                "P3 retired character became visible before replacement activation.");
+        }
         _active = replacement;
+        _active.StartReplacementClassification(_replacementCompletedFrameId);
 
         retired.DisposeRuntime();
         retired.DisposeRuntime();
@@ -215,7 +242,7 @@ public partial class AlsP3CharacterSlot : Node
         {
             throw new InvalidOperationException("P3 retired character remained valid after Free().");
         }
-        _replacementPhase = ReplacementPhase.AwaitingGenerationMismatch;
+        _replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
     }
 
     private void TryStartRecovery()
@@ -237,9 +264,15 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         _active.StartReplacementRecovery();
+        var lifecycle = _active.LifecycleDiagnostics;
+        if (lifecycle.IsVisible || lifecycle.IsVisualReady)
+        {
+            throw new InvalidOperationException(
+                "P3 replacement revealed stale visual state during generation recovery.");
+        }
         _committedFrameAtClassification = _active.RuntimeCommittedFrameId;
         _generationMismatchObserved = true;
-        _replacementPhase = ReplacementPhase.AwaitingRecoveryCommit;
+        _replacementPhase = AlsP3ReplacementPhase.AwaitingRecoveryCommit;
     }
 
     private void TryCompleteRecovery()
@@ -251,14 +284,30 @@ public partial class AlsP3CharacterSlot : Node
 
         _active.CompleteReplacementRecovery();
         _recoveryCommitted = true;
-        _replacementPhase = ReplacementPhase.Complete;
+        _replacementPhase = AlsP3ReplacementPhase.Complete;
     }
 
     private void DisposeRuntimeCore(bool freeNodes)
     {
+        HideCharacter(_active);
+        HideCharacter(_spare);
         DisposeCharacter(_active, freeNodes);
         DisposeCharacter(_spare, freeNodes);
         _spare = null;
+    }
+
+    private static void HideCharacter(AlsP3Character? character)
+    {
+        if (character is null || !GodotObject.IsInstanceValid(character))
+        {
+            return;
+        }
+
+        character.Visible = false;
+        if (!character.LifecycleDiagnostics.IsDisposed)
+        {
+            character.ResetVisualReady();
+        }
     }
 
     private void DisposeCharacter(AlsP3Character? character, bool freeNode)
@@ -284,6 +333,63 @@ public partial class AlsP3CharacterSlot : Node
                 RemoveChild(character);
             }
             character.Free();
+        }
+    }
+
+    private int CountVisibleCharacters()
+    {
+        var count = 0;
+        if (_active is not null && GodotObject.IsInstanceValid(_active) && _active.Visible)
+        {
+            count++;
+        }
+        if (_spare is not null && GodotObject.IsInstanceValid(_spare) && _spare.Visible)
+        {
+            count++;
+        }
+        return count;
+    }
+
+    private void ValidateVisibilityInvariants()
+    {
+        if (!_context.HeadlessOrDebug)
+        {
+            return;
+        }
+
+        var visibleCount = CountVisibleCharacters();
+        if (visibleCount > 1)
+        {
+            throw new InvalidOperationException(
+                "P3 slot exposed more than one character visual.");
+        }
+        ValidateCharacterVisibility(_active);
+        ValidateCharacterVisibility(_spare);
+        if (visibleCount == 0 && _replacementPhase is
+            AlsP3ReplacementPhase.AwaitingGenerationMismatch or
+            AlsP3ReplacementPhase.AwaitingRecoveryCommit)
+        {
+            return;
+        }
+    }
+
+    private static void ValidateCharacterVisibility(AlsP3Character? character)
+    {
+        if (character is null || !GodotObject.IsInstanceValid(character))
+        {
+            return;
+        }
+
+        var lifecycle = character.LifecycleDiagnostics;
+        if (lifecycle.IsVisible && !lifecycle.IsActive)
+        {
+            throw new InvalidOperationException(
+                "P3 slot exposed an inactive character visual.");
+        }
+        if (lifecycle.IsVisible && !lifecycle.IsVisualReady)
+        {
+            throw new InvalidOperationException(
+                "P3 slot exposed a character visual without committed readiness.");
         }
     }
 
@@ -315,12 +421,4 @@ public partial class AlsP3CharacterSlot : Node
         }
     }
 
-    private enum ReplacementPhase : byte
-    {
-        None,
-        AwaitingRetiredResult,
-        AwaitingGenerationMismatch,
-        AwaitingRecoveryCommit,
-        Complete,
-    }
 }

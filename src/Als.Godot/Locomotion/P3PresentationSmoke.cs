@@ -113,7 +113,11 @@ public partial class P3PresentationSmoke : Node
         for (var index = 0; index < CharacterCount; index++)
         {
             var character = new AlsP3Character { Name = $"PresentationCharacter_{index}" };
+            Require(!character.Visible,
+                $"character {index} was visible before AddChild and Configure");
             AddChild(character);
+            Require(!character.Visible,
+                $"character {index} became visible when added to the scene tree");
             character.GlobalTransform = new Transform3D(
                 new Basis(Vector3.Up, LogicalYaws[index]),
                 new Vector3(index * 4f, standingOrigin, 0f));
@@ -122,7 +126,13 @@ public partial class P3PresentationSmoke : Node
                 new AlsSlotHandle(checked((uint)index), 1),
                 new FixedIdleCommandSource(LogicalYaws[index]),
                 new AlsP3ExchangeSlot());
+            var configured = character.LifecycleDiagnostics;
+            Require(!configured.IsVisible && !configured.IsVisualReady,
+                $"character {index} exposed an uncommitted configured visual");
             character.SetActive(true);
+            var activated = character.LifecycleDiagnostics;
+            Require(activated.IsActive && !activated.IsVisible && !activated.IsVisualReady,
+                $"character {index} became visible before its first valid commit");
             _characters[index] = character;
         }
     }
@@ -145,6 +155,19 @@ public partial class P3PresentationSmoke : Node
                 $"character {index} did not publish same-frame presentation evidence");
             Require(frame.CommittedFrameId >= _lastObservedFrames[index],
                 $"character {index} diagnostics moved backwards");
+            var lifecycle = character.LifecycleDiagnostics;
+            Require(lifecycle.IsActive && lifecycle.IsVisible && lifecycle.IsVisualReady,
+                $"character {index} did not reveal only its committed visual");
+            if (index == 0)
+            {
+                var committedFrameId = frame.CommittedFrameId;
+                character.SetActive(true);
+                var repeatedActivation = character.LifecycleDiagnostics;
+                Require(repeatedActivation.IsActive && repeatedActivation.IsVisible &&
+                    repeatedActivation.IsVisualReady &&
+                    character.Diagnostics.CommittedFrameId == committedFrameId,
+                    "repeated active SetActive(true) hid or reset the committed visual");
+            }
             _lastObservedFrames[index] = frame.CommittedFrameId;
         }
 
@@ -185,6 +208,9 @@ public partial class P3PresentationSmoke : Node
         for (var index = 0; index < CharacterCount; index++)
         {
             _characters[index].SetActive(false);
+            var lifecycle = _characters[index].LifecycleDiagnostics;
+            Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
+                $"character {index} retained visual state after deactivation");
             _characters[index].DisposeRuntime();
             RemoveChild(_characters[index]);
             _characters[index].Free();
@@ -199,7 +225,11 @@ public partial class P3PresentationSmoke : Node
     {
         var standingOrigin = _context.MotorSettings.StandingHeight * 0.5f;
         var character = new AlsP3Character { Name = "InitialRollbackCharacter" };
+        Require(!character.Visible,
+            "initial rollback character was visible before AddChild and Configure");
         AddChild(character);
+        Require(!character.Visible,
+            "initial rollback character became visible when added to the scene tree");
         character.GlobalTransform = new Transform3D(
             Basis.Identity,
             new Vector3(0f, standingOrigin, 0f));
@@ -209,6 +239,11 @@ public partial class P3PresentationSmoke : Node
             new FixedIdleCommandSource(0f),
             new AlsP3ExchangeSlot());
         character.SetActive(true);
+        var lifecycle = character.LifecycleDiagnostics;
+        Require(lifecycle.IsActive && !lifecycle.IsVisualReady && !lifecycle.IsVisible,
+            "initial rollback character became visible before a successful Worker commit");
+        Require(character.WorkerInFlight == 0,
+            "initial rollback visual inspection raced a Worker callback");
 
         var animationTree = character.FindChild(
             "AlsLocomotionAnimationTree", recursive: true, owned: false) as AnimationTree;
@@ -238,6 +273,9 @@ public partial class P3PresentationSmoke : Node
         character.RetireForReplacement();
         Require(character.WorkerInFlight == 0,
             "initial rollback worker was still in flight after suspension");
+        var lifecycle = character.LifecycleDiagnostics;
+        Require(!lifecycle.IsVisualReady && !lifecycle.IsVisible,
+            "failed first Worker frame retained ready or visible state");
         ValidateFailurePose();
         var runtime = character.RuntimeDiagnostics;
         Require(runtime.RollbackVerified,
@@ -258,6 +296,8 @@ public partial class P3PresentationSmoke : Node
         character.Free();
         GD.Print(
             "GODOT_ALS_P3B_INITIAL_ROLLBACK_OK mode=parallel corrected=1 " +
+            $"visual_ready={(lifecycle.IsVisualReady ? 1 : 0)} " +
+            $"visible={(lifecycle.IsVisible ? 1 : 0)} " +
             $"full_pose={runtime.RollbackFullPoseDigest:X16} root={runtime.RollbackRootDigest:X16}");
         _quitting = true;
         GetTree().Quit();

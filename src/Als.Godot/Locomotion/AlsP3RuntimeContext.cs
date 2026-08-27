@@ -67,7 +67,18 @@ public readonly record struct AlsP3LifecycleDiagnostics(
     bool IsDisposed,
     bool IsActive,
     bool HasCollision,
-    bool HasProcessing);
+    bool HasProcessing,
+    bool IsVisible,
+    bool IsVisualReady);
+
+public enum AlsP3ReplacementPhase : byte
+{
+    None,
+    AwaitingRetiredResult,
+    AwaitingGenerationMismatch,
+    AwaitingRecoveryCommit,
+    Complete,
+}
 
 public readonly record struct AlsP3SlotReplacementDiagnostics(
     bool Requested,
@@ -76,7 +87,9 @@ public readonly record struct AlsP3SlotReplacementDiagnostics(
     bool RetiredNodeReleased,
     bool GenerationMismatchObserved,
     long CommittedFrameAtClassification,
-    bool RecoveryCommitted);
+    bool RecoveryCommitted,
+    AlsP3ReplacementPhase Phase,
+    int VisibleCharacterCount);
 
 internal readonly record struct AlsP3RuntimeDiagnostics(
     ulong LastPublishedPoseDigest,
@@ -203,6 +216,10 @@ internal sealed class AlsP3CharacterState
     public long CommittedFrameId;
 
     public int Active;
+
+    public int VisualReady;
+
+    public int ProcessingEnabled;
 
     public int WorkerFrozen;
 

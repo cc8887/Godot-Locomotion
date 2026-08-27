@@ -8,11 +8,16 @@ public partial class AlsP3CommitStage : Node
 {
     private AlsP3RuntimeContext _context = null!;
     private AlsP3CharacterState _state = null!;
+    private AlsP3Character _owner = null!;
 
-    internal void Configure(AlsP3RuntimeContext context, AlsP3CharacterState state)
+    internal void Configure(
+        AlsP3RuntimeContext context,
+        AlsP3CharacterState state,
+        AlsP3Character owner)
     {
         _context = context;
         _state = state;
+        _owner = owner;
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
         ProcessThreadGroupOrder = 2;
     }
@@ -98,7 +103,9 @@ public partial class AlsP3CommitStage : Node
             candidate.FullPoseDigest,
             candidate.RootTransform,
             candidate.RootDigest);
+        Volatile.Write(ref _state.VisualReady, 1);
         Volatile.Write(ref _state.CommittedFrameId, frameId);
+        _owner.ShowCommittedVisual(identity);
         if (measure)
         {
             measurement!.AddCommitAllocations(
