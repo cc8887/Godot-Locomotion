@@ -27,7 +27,9 @@ Formal manifest 状态为 `complete`，统计为 267 assets / 141 files / 7 skel
 
 ## 3. Stable-ID locomotion profile
 
-`assets/config/p3_locomotion_profile.json` 只保存完整 UE object path 经过 formal manifest 唯一解析所得的 SHA-1 stable ID。编译器拒绝未知字段、缺失或重复 ID、跨 skeleton 引用、空或退化 sample grid、不支持的 additive 类型以及 additive base pose/type/frame 不一致；没有 basename 或运行时 fallback。
+`assets/config/p3_locomotion_profile.json` 是 schema v2。`presentation` 是必填且唯一的 Mannequin 展示修正来源，当前固定为 translation `(0, -0.92, 0) m` 与 yaw `pi/2`；其余字段只保存完整 UE object path 经过 formal manifest 唯一解析所得的 SHA-1 stable ID。编译器拒绝未知字段、缺失或重复 ID、跨 skeleton 引用、空或退化 sample grid、不支持的 additive 类型以及 additive base pose/type/frame 不一致；没有 basename 或运行时 fallback。
+
+Motor/model 的 logical transform 不包含 mesh 修正，visual root 独占展示修正，最终变换严格为 `logical * presentation`。Profile 的 translation/yaw 在编译时必须是 finite `float`，否则以 `ALSPROFILE013` 拒绝；运行期在写 visual root 前后再次验证完整 basis/origin。若 compose 或 animation apply 产生非 finite 值，worker failure 路径恢复已捕获的全骨骼 pose 与 visual root，headless/debug 以失败 marker 和非零退出收束，interactive release 冻结最后有效 pose 而 motor 继续。
 
 基础与动作映射：
 
@@ -68,6 +70,8 @@ Crouching sample ring：
 | Walk R | `(1, 0)` | `db60b2c35ce5ef5216c782fc1f33549cbcf8278d` |
 | Walk B | `(0, -1)` | `f9ec8804e251f03c57e04dde4db9bd921457bae4` |
 
+持久 exact asset gate 共锁定 14 个方向样本的完整 object path、stable ID 与坐标：Standing Walk 六方向、Standing Run 六方向，以及 Crouching Walk L/R。因断言先按坐标唯一定位再回查 path/ID，交换任意 Run/Walk 方向资产都会失败；Sprint F 与 Crouching F/B 仍由完整 profile 编译与 grid 合同覆盖，但不计入这 14 个精确方向锁。
+
 Lean BlendSpace 在初始化期展开为 5 个 additive clips：center `3c7efe09469508fd9e40015b3bf593dde39c540b`、forward `bbee3b8e0605aecaa74a14b1e60765c5a1c8d455`、back `15d6284bb8404d8015e3d35c704a0097f54bb1e3`、left `59c6b48109bab7ffcd187cec52f931e56e4873d7`、right `32e7c873dcf8fafd51e1140b17fa35081a941126`。五者必须共享 `ALS_N_Run_BasePose` stable ID `8e23008795aa766a761798e916907dd97aee6506`、additive type `1`、base pose type `3` 和 frame `0`。因此最终 library 含 28 个去重 profile clips。
 
 ## 4. Animation library 与 graph
@@ -95,18 +99,26 @@ LandRecovery: clip + Lean + Scale
 Order 0 / main: AlsP3Character
   input command -> CharacterBody3D motor -> post-move snapshot -> exchange input
 Order 1 / main or subthread: AlsP3WorkerRoot
-  model Evaluate -> visual root -> AnimationTree Apply/advance -> pose digest -> exchange result
+  model Evaluate -> logical * presentation -> AnimationTree Apply/advance
+  -> visual commit candidate (identity/root/pose/full-pose/root digest) -> exchange result
 Order 2 / main: AlsP3CommitStage
-  identity/generation/frame validation -> diagnostics/HUD publication
+  identity/generation/frame validation -> diagnostics -> visual-ready
+  -> CommittedFrameId release -> owner reveal
+Order 3 / main: AlsP3CharacterSlot
+  replacement phase progression -> retired release -> visibility invariants
 ```
 
-所有 Godot 资源、graph、animation library、参数 handle 和双缓冲 exchange 均在 worker process group 开启前创建。运行期不查找字符串路径、不重建 animation graph。single 模式把 Order 1 放在 main thread，parallel 模式放在 subthread；Order 0 和 Order 2 始终属于 main thread。
+所有 Godot 资源、graph、animation library、参数 handle 和双缓冲 exchange 均在 worker process group 开启前创建。运行期不查找字符串路径、不重建 animation graph。single 模式把 Order 1 放在 main thread，parallel 模式放在 subthread；Order 0、2、3 始终属于 main thread。
 
-角色替换只在完整 committed frame 边界发生：registry 提升 generation，旧 generation 结果必须被真实拒绝，active/spare visual rig 交换后继续同帧恢复。teardown 会先停 process、等待 inflight worker、再释放 graph/library/skeleton；worker 异常时恢复捕获的 68-bone pose 和 visual root，headless/debug 发布稳定失败码并非零退出，interactive release 保留最后有效 pose。
+Worker 在 exchange result 前发布不可见的 visual commit candidate；candidate 与 result 必须具有同一 frame/character/generation identity，且 command、motor snapshot、model result、pose advance 四个 frame ID 全部匹配。Order 2 随后依次写 committed yaw 与 diagnostics、把 `VisualReady` 置 1、release-write `CommittedFrameId`，最后由 owner 在主线程验证 Active、完整 identity、ready 后设置 `Visible=true`。Candidate publication 本身、未完成 commit 或 generation mismatch 都没有 reveal 权限。
+
+`Active`、`Visible` 与 visual-ready 是三个独立合同。新建 active 与预建 spare 都从 `Visible=false, VisualReady=0` 开始；Active 只控制 process/collision，首个完整 commit 才能 reveal。停用会先隐藏并清 ready，重复 `SetActive(true)` 保持既有有效状态，停用后重激活则重新等待 commit。任何可见角色都必须同时 Active 且 visual-ready，slot 内 `max_visible <= 1`。
+
+角色替换只在完整 committed frame 边界发生。旧 generation 先隐藏、退役并从 registry 释放；预建 spare 成为 active 后仍保持 hidden/ready=0，先分类并真实拒绝旧 generation result，再恢复 worker 并等待新 generation 的下一帧 commit。在 `AwaitingGenerationMismatch` 与 `AwaitingRecoveryCommit` 之间允许且要求一个 zero-visible window，绝不允许旧/新 rig 同时可见；实测 marker 为 `old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1`。Teardown 会先停 process、拒绝 inflight dispose、再释放 graph/library/skeleton。
 
 ## 6. 可玩示例
 
-主场景为 `res://scenes/demo/p3_locomotion_demo.tscn`，包含真实 Mannequin、平地、低障碍、缓坡、方向光、`SpringArm3D` orbit camera 和无边框诊断 HUD。Camera 跟随实际移动的 motor anchor，不跟随静止的组合根；HUD 显示实际速度、state、gait、stance、rotation mode、blend、stride、rate、lean、phase、worker timing 和 error count。
+主场景为 `res://scenes/demo/p3_locomotion_demo.tscn`，包含真实 Mannequin、平地、低障碍、缓坡、方向光、`SpringArm3D` orbit camera 和无边框诊断 HUD。Camera 跟随实际移动的 motor anchor，不跟随静止的组合根；P3 临时 follow offset 固定为 `(0, 0.53, 0) m`。HUD 显示实际速度、state、gait、stance、rotation mode、blend、stride、rate、lean、phase、worker timing 和 error count。
 
 | 输入 | 行为 |
 | --- | --- |
@@ -122,18 +134,29 @@ Order 2 / main: AlsP3CommitStage
 
 HUD 状态字符串只在 committed frame 改变时格式化，性能字符串每 15 次 refresh 更新一次，避免 render refresh 持续产生无意义字符串分配。
 
+输入 smoke 使用真实 scene-tree `Camera3D` 与 `SpringArm3D`，通过 mouse motion 驱动 yaw/pitch，并覆盖 3 个 yaw 乘 W/A/S/D 的 12 个 camera-relative 方向。Godot camera forward 是 `-GlobalBasis.Z`；从真实 forward 反求 yaw 的正确符号为 `Atan2(-forward.X, -forward.Z)`，随后以水平 forward/right 直接验证 resolver 的世界方向。这个 `0.53 m` orbit rig 只承担 P3 可玩与方向合同，碰撞响应、肩位切换、完整第三/第一人称 ALS Camera 明确延后到 P6。
+
 ## 7. P3B 实测矩阵
 
-以下数据来自 2026-08-27 的完整非 `-SkipRegression` gate；每行先 warmup 120 帧，再测量 600 帧。p95/p99 记录的是 worker 内六个有界 production segments 的合计墙钟时间，不包含 allocation probes、结果记录和事后 percentile 排序。
+以下数据来自 2026-08-28 的 Task 7 focused gate；每行先 warmup 120 帧，再测量 600 帧。p95/p99 记录的是 worker 内六个有界 production segments 的合计墙钟时间，不包含 allocation probes、结果记录和事后 percentile 排序。
 
-| Mode | Characters | Result digest | Raw pose digest | off_main | p95 us | p99 us |
-| --- | ---: | --- | --- | ---: | ---: | ---: |
-| single | 1 | `21A9D10F0AB9D1D5` | `0D87D2E73CA95BEB` | 0 | 402 | 563 |
-| parallel | 1 | `21A9D10F0AB9D1D5` | `0D87D2E73CA95BEB` | 1 | 378 | 520 |
-| single | 10 | `6C58FCA799D913B6` | `53B465443D67B4E0` | 0 | 369 | 497 |
-| parallel | 10 | `6C58FCA799D913B6` | `53B465443D67B4E0` | 10 | 836 | 1053 |
+四个摘要字段彼此独立：
 
-四行均为 `missing=0 stale=0 generation=0 lag=0 allocations=0`。每个角色有且仅有 `600` 次 measured advance 和 `599` 次 raw skeleton pose change；character 0 的生产替换均观测到 `old_generation_rejected=1`。
+| Marker field | 含义 |
+| --- | --- |
+| `digest` | 按帧聚合的 deterministic `AlsFrameResult` contract |
+| `pose` | controller 选定的 pelvis/spine/hands/feet 六骨骼 pose（含 frame ID） |
+| `full_pose` | 全部 68 个 skeleton bone pose 的聚合 |
+| `root` | `logical * presentation` 后 visual root basis/origin 的聚合 |
+
+| Mode | Characters | `digest` | `pose` | `full_pose` | `root` | off_main | p95 us | p99 us |
+| --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: |
+| single | 1 | `21A9D10F0AB9D1D5` | `AF7B2D64BC136E10` | `0D87D2E73CA95BEB` | `D50528153FCD66F1` | 0 | 342 | 431 |
+| parallel | 1 | `21A9D10F0AB9D1D5` | `AF7B2D64BC136E10` | `0D87D2E73CA95BEB` | `D50528153FCD66F1` | 1 | 351 | 582 |
+| single | 10 | `6C58FCA799D913B6` | `81D39CE09ED66F1A` | `53B465443D67B4E0` | `6D3EDB8B91527FCD` | 0 | 341 | 457 |
+| parallel | 10 | `6C58FCA799D913B6` | `81D39CE09ED66F1A` | `53B465443D67B4E0` | `6D3EDB8B91527FCD` | 10 | 764 | 1033 |
+
+四行均为 `missing=0 stale=0 generation=0 lag=0 allocations=0`。每个角色有且仅有 `600` 次 measured advance 和 `599` 次 full-skeleton pose change；character 0 的生产替换均观测到 `old_generation_rejected=1`。
 
 五个独立 allocation buckets 在四行中均为：
 
@@ -152,21 +175,27 @@ pwsh -NoProfile -File scripts/verify-p3b.ps1 `
   -GodotExecutable 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
 ```
 
-本次完整 gate 的关键证据：
+Task 7 focused 路径在 1/10 harness matrix 前严格运行 input、library、presentation normal/initial、graph 两次、frame-order single/parallel、300-frame demo。本次实测场景证据为：
 
-- P3B 四矩阵通过，single/parallel result digest 与 raw pose digest 精确相等；
-- 完整 P3A motor smoke 与四矩阵通过：motor `cases=7`，1 角色 digest `12CD6393BA75A1F9`，10 角色 digest `7BE3F9467CC4EB63`；
-- PowerShell regression suite 全部通过且 `FailedCount=0`；
-- P2B 以 `-CleanImport` 重新生成 Godot import cache，并再次确认 formal manifest hash 与 267 assets / 141 files；
-- `P2B_VERIFICATION_OK`、`P1_VERIFICATION_OK`、`P0_VERIFICATION_OK` 均来自真实子脚本的唯一精确 marker；
-- Release tests：`Als.Core.Tests 253/253`、`Als.Import.Tests 64/64`；
-- `P3B_RELEASE_TESTS_OK`；
-- `P3B_REPOSITORY_CLOSURE_OK p3a_base=e69f18bb3410d77ef50df38b073535b5e9f20635`；
-- 最终 `P3B_VERIFICATION_OK`，进程退出码 `0`。
+```text
+GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1
+GODOT_ALS_P3B_LIBRARY_OK bones=68 clips=28 skeletons=1
+GODOT_ALS_P3B_LIBRARY_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1
+GODOT_ALS_P3_PRESENTATION_OK yaws=3 identity=1 root=09CE8BFFC4D374CB
+GODOT_ALS_P3B_INITIAL_ROLLBACK_OK mode=parallel corrected=1 visual_ready=0 visible=0 full_pose=2F655001D369ED6F root=09CE8BFFC4D374CB
+GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1
+GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=DD72BD02BE20DCC3 digest=3B75E5CD3AF16FEC
+GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=A1BDC3E389EC1725 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
+GODOT_ALS_P3B_FRAME_ORDER_OK mode=parallel frames=180 digest=7B90A6091F0E9792 pose=58CFCD9345395C5D full_pose=3F7A6D5792A49292 root=A1BDC3E389EC1725 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
+GODOT_ALS_P3_DEMO_OK frames=300 errors=0 ready=1 visible=1 max_visible=1
+P3B_FOCUSED_VERIFICATION_OK regression=skipped
+```
 
-P3B 非 Skip 路径直接调用完整 `verify-p3a.ps1`，不传 `-SkipRegression`。因此 P3A 自身负责运行 Pester、motor smoke、P3A 四矩阵、P2B `-CleanImport`、P1、P0、Release tests 和锁定 base 的 repository closure；P3B 捕获一次完整输出，并分别要求唯一 `P3A_VERIFICATION_OK`、`P2B_VERIFICATION_OK`、`P1_VERIFICATION_OK` 和 `P0_VERIFICATION_OK`。Task 7 之后再显式运行一次 `dotnet test GodotALS.sln -c Release --no-restore`，防止 P3B 后处理绕过最终 Release tests。
+Graph 两次运行必须同时匹配 `direction_digest` 与最终 `digest`；frame-order 必须通过现有 parser，并逐字段比较 `digest/pose/full_pose/root`。Scene gate 用 `*>&1` 捕获所有 PowerShell streams，要求 exit `0`，拒绝 `SCRIPT ERROR:`、`ERROR:` 与边界严格的任意 `GODOT_ALS_*FAIL` marker，并要求每个 exact/anchored-regex marker 名称只有一个候选且恰好匹配一次。
 
-完整 P3A 子脚本用 `*>&1` 捕获 success、error、warning、verbose、debug 和 information streams。每个 child marker 必须同时满足 P3A 进程退出码 `0`、唯一精确成功 marker、全部 streams 不含任意位置的 `SCRIPT ERROR:` 或 `ERROR:`。因此从 `Write-Host` information stream 输出的 `Godot: ERROR:`，即使同时存在成功 marker，也会使 P3B 失败。
+P3B 非 Skip 路径在同一 focused 场景与矩阵之后直接调用完整 `verify-p3a.ps1`，不传 `-SkipRegression`。因此 P3A 自身负责运行 Pester、motor smoke、P3A 四矩阵、P2B `-CleanImport`、P1、P0、Release tests 和锁定 base 的 repository closure；P3B 捕获一次完整输出，并分别要求唯一 `P3A_VERIFICATION_OK`、`P2B_VERIFICATION_OK`、`P1_VERIFICATION_OK` 和 `P0_VERIFICATION_OK`。随后再显式运行一次 `dotnet test GodotALS.sln -c Release --no-restore`，防止 P3B 后处理绕过最终 Release tests。
+
+完整 P3A 子脚本同样用 `*>&1` 捕获 success、error、warning、verbose、debug 和 information streams。每个 child marker 必须同时满足 P3A 进程退出码 `0`、唯一精确成功 marker、全部 streams 不含任意位置的 `SCRIPT ERROR:` 或 `ERROR:`。因此从 `Write-Host` information stream 输出的 `Godot: ERROR:`，即使同时存在成功 marker，也会使 P3B 失败。
 
 完成 locked-base repository closure 后，P3B 还执行 `git status --porcelain --untracked-files=all`。tracked modification、staged change 或 untracked file 任一存在都不允许输出 full success；ignored `.godot`、`bin`、`obj` 和生成资产不会出现在 porcelain 结果中。`-SkipRegression` 只输出 `P3B_FOCUSED_VERIFICATION_OK regression=skipped`，不能冒充完整 `P3B_VERIFICATION_OK`。
 
@@ -176,7 +205,7 @@ P3B 非 Skip 路径直接调用完整 `verify-p3a.ps1`，不传 `-SkipRegression
 
 ```powershell
 & 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' `
-  --path 'D:\GodotALS\.worktrees\p3b-real-animation-demo' `
+  --path 'D:\GodotALS-p3-direction-alignment' `
   --editor 'res://scenes/demo/p3_locomotion_demo.tscn'
 ```
 

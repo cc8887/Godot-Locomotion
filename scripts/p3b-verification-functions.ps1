@@ -12,6 +12,231 @@ function Test-P3bFailureMarkerLine
         [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
 }
 
+function Test-P3bSceneFailureMarkerLine
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string]$Line
+    )
+
+    return [regex]::IsMatch(
+        $Line,
+        '(?:\A|\s)GODOT_ALS_[A-Z0-9_]*FAIL(?:\z|\s)',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+}
+
+function Get-P3bExpectedMarkerName
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Expectation,
+        [Parameter(Mandatory)]
+        [bool]$IsRegex
+    )
+
+    if (-not $IsRegex)
+    {
+        return $Expectation.Split(' ', 2)[0]
+    }
+
+    $nameMatch = [regex]::Match(
+        $Expectation,
+        '\A\\A(?<name>[A-Z0-9_]+)',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+    if (-not $nameMatch.Success -or
+        -not $Expectation.EndsWith('\z', [StringComparison]::Ordinal))
+    {
+        throw "Scene-gate regex markers must use anchored uppercase marker names: $Expectation"
+    }
+    return $nameMatch.Groups['name'].Value
+}
+
+function Invoke-P3bSceneGate
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$PhaseName,
+        [Parameter(Mandatory)]
+        [string]$GodotExecutable,
+        [Parameter(Mandatory)]
+        [string]$ProjectRoot,
+        [Parameter(Mandatory)]
+        [string]$ScenePath,
+        [AllowEmptyCollection()]
+        [string[]]$SceneArguments = @(),
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]$ExpectedExactMarkers,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]$ExpectedRegexMarkers
+    )
+
+    if (@($ExpectedExactMarkers | Select-Object -Unique).Count -ne $ExpectedExactMarkers.Count -or
+        @($ExpectedRegexMarkers | Select-Object -Unique).Count -ne $ExpectedRegexMarkers.Count)
+    {
+        throw "$PhaseName scene gate contains duplicate marker expectations."
+    }
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
+    $godotArguments = @('--headless', '--path', $resolvedRoot, $ScenePath)
+    if ($SceneArguments.Count -ne 0)
+    {
+        $godotArguments += '--'
+        $godotArguments += $SceneArguments
+    }
+
+    $sceneOutput = @(& $GodotExecutable @godotArguments *>&1)
+    $sceneExitCode = $LASTEXITCODE
+    $sceneOutput | ForEach-Object { Write-Host $_ }
+    $lines = @($sceneOutput | ForEach-Object { "$_" })
+    if ($sceneExitCode -ne 0)
+    {
+        throw "$PhaseName scene gate exited with code $sceneExitCode."
+    }
+
+    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR:|ERROR:' })
+    if ($errorLines.Count -ne 0)
+    {
+        throw "$PhaseName scene gate emitted an error line:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
+    }
+
+    $failureLines = @($lines | Where-Object {
+        Test-P3bSceneFailureMarkerLine -Line $_
+    })
+    if ($failureLines.Count -ne 0)
+    {
+        throw "$PhaseName scene gate emitted an ALS failure marker:$([Environment]::NewLine)$($failureLines -join [Environment]::NewLine)"
+    }
+
+    $expectedMarkerNames = [System.Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($expectedMarker in $ExpectedExactMarkers)
+    {
+        $markerName = Get-P3bExpectedMarkerName -Expectation $expectedMarker -IsRegex $false
+        if (-not $expectedMarkerNames.Add($markerName))
+        {
+            throw "$PhaseName scene gate contains duplicate marker name '$markerName'."
+        }
+        $candidateLines = @($lines | Where-Object {
+            $_ -ceq $markerName -or
+            $_.StartsWith("$markerName ", [StringComparison]::Ordinal)
+        })
+        $matches = @($lines | Where-Object { $_ -ceq $expectedMarker })
+        if ($candidateLines.Count -ne 1 -or $matches.Count -ne 1)
+        {
+            throw "$PhaseName scene gate expected exactly one well-formed '$expectedMarker' marker; observed candidates=$($candidateLines.Count) matches=$($matches.Count)."
+        }
+    }
+
+    foreach ($expectedPattern in $ExpectedRegexMarkers)
+    {
+        $markerName = Get-P3bExpectedMarkerName -Expectation $expectedPattern -IsRegex $true
+        if (-not $expectedMarkerNames.Add($markerName))
+        {
+            throw "$PhaseName scene gate contains duplicate marker name '$markerName'."
+        }
+        $candidateLines = @($lines | Where-Object {
+            $_ -ceq $markerName -or
+            $_.StartsWith("$markerName ", [StringComparison]::Ordinal)
+        })
+        $matches = @($lines | Where-Object {
+            [regex]::IsMatch(
+                $_,
+                $expectedPattern,
+                [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+        })
+        if ($candidateLines.Count -ne 1 -or $matches.Count -ne 1)
+        {
+            throw "$PhaseName scene gate expected exactly one well-formed '$expectedPattern' regex marker; observed candidates=$($candidateLines.Count) matches=$($matches.Count)."
+        }
+    }
+
+    return $lines
+}
+
+function ConvertFrom-P3bGraphOutput
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$OutputLines
+    )
+
+    $lines = @($OutputLines | ForEach-Object { "$_" })
+    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR:|ERROR:' })
+    if ($errorLines.Count -ne 0)
+    {
+        throw "Godot emitted a graph error line:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
+    }
+    $failureLines = @($lines | Where-Object {
+        Test-P3bSceneFailureMarkerLine -Line $_
+    })
+    if ($failureLines.Count -ne 0)
+    {
+        throw "Godot emitted a graph failure marker:$([Environment]::NewLine)$($failureLines -join [Environment]::NewLine)"
+    }
+
+    $markerLines = @($lines | Where-Object {
+        $_.StartsWith('GODOT_ALS_P3B_GRAPH_OK', [StringComparison]::Ordinal)
+    })
+    if ($markerLines.Count -ne 1)
+    {
+        throw "Expected exactly one P3B graph result marker; observed $($markerLines.Count)."
+    }
+
+    $marker = [regex]::Match(
+        $markerLines[0],
+        '\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=([0-9A-F]{16}) digest=([0-9A-F]{16})\z',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+    if (-not $marker.Success)
+    {
+        throw "Malformed or unsuccessful P3B graph marker: $($markerLines[0])"
+    }
+
+    return [pscustomobject]@{
+        DirectionDigest = $marker.Groups[1].Value
+        Digest = $marker.Groups[2].Value
+    }
+}
+
+function Assert-P3bGraphPair
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$First,
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$Second
+    )
+
+    $firstValues = @{}
+    $secondValues = @{}
+    foreach ($propertyName in @('DirectionDigest', 'Digest'))
+    {
+        $firstValue = (Get-P3bRequiredProperty $First $propertyName 'First P3B graph').Value
+        $secondValue = (Get-P3bRequiredProperty $Second $propertyName 'Second P3B graph').Value
+        if ($firstValue -isnot [string] -or $firstValue -cnotmatch '\A[0-9A-F]{16}\z' -or
+            $secondValue -isnot [string] -or $secondValue -cnotmatch '\A[0-9A-F]{16}\z')
+        {
+            throw "P3B graph property '$propertyName' must be an uppercase 16-hex string."
+        }
+        $firstValues[$propertyName] = $firstValue
+        $secondValues[$propertyName] = $secondValue
+    }
+
+    if ($firstValues.DirectionDigest -cne $secondValues.DirectionDigest)
+    {
+        throw "P3B graph direction digest mismatch: first=$($firstValues.DirectionDigest), second=$($secondValues.DirectionDigest)."
+    }
+    if ($firstValues.Digest -cne $secondValues.Digest)
+    {
+        throw "P3B graph digest mismatch: first=$($firstValues.Digest), second=$($secondValues.Digest)."
+    }
+}
+
 function Get-P3bRequiredProperty
 {
     param(
