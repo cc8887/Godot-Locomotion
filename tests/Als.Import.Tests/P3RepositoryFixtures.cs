@@ -31,6 +31,12 @@ internal static class P3RepositoryFixtures
     public static string WithEmptyGrid(string propertyName) => Mutate(root =>
         root[propertyName] = new JsonArray());
 
+    public static string WithUnknownSampleProperty() => Mutate(root =>
+        root["standingSamples"]![0]!["fallback"] = 0);
+
+    public static string WithInvalidSampleNumber() => Mutate(root =>
+        root["standingSamples"]![0]!["x"] = 1e100);
+
     private static string Mutate(Action<JsonObject> mutation)
     {
         var root = JsonNode.Parse(ReadProfile())!.AsObject();

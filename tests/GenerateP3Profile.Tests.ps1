@@ -88,6 +88,82 @@ Describe 'generate-p3-profile.ps1 strict source mapping' {
         $source | Should Match ([regex]::Escape('/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Mannequin.Mannequin'))
         $source | Should Match ([regex]::Escape('/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose.ALS_N_Pose'))
         $source | Should Match ([regex]::Escape('/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Lean.ALS_N_Lean'))
-        $source | Should Not Match '\.assetName|AssetName|Split-Path.*-Leaf|GetFileName'
+        $assetResolutionSource = $source.Substring(
+            $source.IndexOf('function Resolve-ExactManifestAsset'),
+            $source.IndexOf('$outputDirectory =') - $source.IndexOf('function Resolve-ExactManifestAsset'))
+        $assetResolutionSource | Should Not Match '\.assetName|AssetName|Split-Path.*-Leaf|GetFileName'
+    }
+
+    It 'rejects identical normalized manifest and output paths before changing the manifest' {
+        $fixture = Join-Path $TestDrive 'same-path.json'
+        [System.IO.File]::Copy($script:Manifest, $fixture)
+        $beforeBytes = [System.IO.File]::ReadAllBytes($fixture)
+        $beforeHash = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash
+        $outputAlias = Join-Path (Split-Path -Parent $fixture) '.\same-path.json'
+
+        $result = Invoke-P3ProfileGenerator $fixture $outputAlias
+
+        $result.ExitCode | Should Not Be 0
+        $result.Output | Should Match 'manifest.*output.*same file'
+        (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash | Should Be $beforeHash
+        [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($fixture)) | Should Be `
+            ([Convert]::ToBase64String($beforeBytes))
+    }
+
+    It 'keeps the old output and removes same-directory temp residue when atomic replacement fails' {
+        $output = Join-Path $TestDrive 'locked-output.json'
+        [System.IO.File]::WriteAllText(
+            $output, '{"sentinel":"original"}', [System.Text.UTF8Encoding]::new($false))
+        $outputBytes = [System.IO.File]::ReadAllBytes($output)
+        $outputHash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash
+        $manifestHash = (Get-FileHash -LiteralPath $script:Manifest -Algorithm SHA256).Hash
+        $lock = [System.IO.FileStream]::new(
+            $output,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::None)
+        try
+        {
+            $result = Invoke-P3ProfileGenerator $script:Manifest $output
+        }
+        finally
+        {
+            $lock.Dispose()
+        }
+
+        $result.ExitCode | Should Not Be 0
+        $result.Output | Should Match 'publish.*atomically'
+        (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash | Should Be $outputHash
+        [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($output)) | Should Be `
+            ([Convert]::ToBase64String($outputBytes))
+        (Get-FileHash -LiteralPath $script:Manifest -Algorithm SHA256).Hash | Should Be $manifestHash
+        @(Get-ChildItem -LiteralPath $TestDrive -Filter '.locked-output.json.*.tmp').Count | Should Be 0
+    }
+
+    It 'atomically replaces an existing unlocked output without backup residue' {
+        $output = Join-Path $TestDrive 'existing-output.json'
+        [System.IO.File]::WriteAllText(
+            $output, '{"sentinel":"old"}', [System.Text.UTF8Encoding]::new($false))
+
+        $result = Invoke-P3ProfileGenerator $script:Manifest $output
+
+        $result.ExitCode | Should Be 0
+        $profile = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        $profile.schemaVersion | Should Be 1
+        @(Get-ChildItem -LiteralPath $TestDrive -Filter '.existing-output.json.*.tmp').Count | Should Be 0
+        @(Get-ChildItem -LiteralPath $TestDrive -Filter '.existing-output.json.*.bak').Count | Should Be 0
+    }
+
+    It 'uses durable same-directory temporary publication without a production failure hook' {
+        $source = [System.IO.File]::ReadAllText($script:Generator)
+
+        $source.IndexOf('[System.IO.Path]::GetFullPath($ManifestPath)') | Should BeLessThan `
+            $source.IndexOf('Get-Content -LiteralPath $ManifestPath')
+        $source | Should Match 'OrdinalIgnoreCase\.Equals'
+        $source | Should Match '\[System\.IO\.FileStream\].*WriteThrough'
+        $source | Should Match '\.Flush\(\$true\)'
+        $source | Should Match '\[System\.IO\.File\]::Replace'
+        $source | Should Match '\[System\.IO\.File\]::Move'
+        $source | Should Not Match 'Inject|TestHook|FailureHook'
     }
 }
