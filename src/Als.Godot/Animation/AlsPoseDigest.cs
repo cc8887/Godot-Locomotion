@@ -21,11 +21,7 @@ public static class AlsPoseDigest
                 throw new InvalidOperationException($"Pose digest bone is missing: {boneNames[index]}");
             }
 
-            var rotation = skeleton.GetBonePoseRotation(boneIndex).Normalized();
-            if (rotation.W < 0f)
-            {
-                rotation = new Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W);
-            }
+            var rotation = CanonicalizeRotation(skeleton.GetBonePoseRotation(boneIndex));
             poses[index] = new AlsBonePose(
                 skeleton.GetBonePosePosition(boneIndex),
                 rotation,
@@ -97,4 +93,18 @@ public static class AlsPoseDigest
 
     private static bool ApproximatelyEqual(Quaternion left, Quaternion right) =>
         1f - MathF.Abs(left.Dot(right)) <= 1e-7f;
+
+    internal static Quaternion CanonicalizeRotation(Quaternion value)
+    {
+        var rotation = value.Normalized();
+        var negate = rotation.W < 0f ||
+                     (rotation.W == 0f &&
+                      (rotation.Z < 0f ||
+                       (rotation.Z == 0f &&
+                        (rotation.Y < 0f ||
+                         (rotation.Y == 0f && rotation.X < 0f)))));
+        return negate
+            ? new Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W)
+            : rotation;
+    }
 }

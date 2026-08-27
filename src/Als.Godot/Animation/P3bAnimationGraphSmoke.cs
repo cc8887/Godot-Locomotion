@@ -4,6 +4,7 @@ using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
+using System.Text;
 
 namespace GodotAls.Animation;
 
@@ -40,14 +41,20 @@ public partial class P3bAnimationGraphSmoke : Node
         var definition = resource.LoadDefinition();
         var profile = AlsLocomotionProfileCompiler.Compile(
             File.ReadAllText(ProjectSettings.GlobalizePath(ProfilePath)), definition);
+        var settings = AlsLocomotionSettings.Load(
+            Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
+
+        VerifyWarmupFailureRetries(definition, profile, settings);
+        VerifyProfileValidation(definition, profile);
+        VerifyApplyAtomicValidation(definition, profile, settings);
 
         using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
         AddChild(library.Root);
         using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
-        using var controller = new AlsLocomotionAnimationController(graph, library.Skeleton);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, library.Skeleton, settings);
         controller.Warmup();
-        var settings = AlsLocomotionSettings.Load(
-            Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
+        VerifyQuaternionCanonicalization(controller, library.Skeleton);
         VerifyGaitBlendMapping(controller, graph, settings);
         VerifyActionNaturalAdvance(controller, graph, library.Skeleton, settings);
 
@@ -123,8 +130,271 @@ public partial class P3bAnimationGraphSmoke : Node
 
         VerifyLandingRecoveryBoundary(controller, graph, settings);
         var digest = controller.ComputePoseDigest(frameId);
-        VerifyLifecycle(definition, profile);
+        VerifyLifecycle(definition, profile, settings);
         return digest;
+    }
+
+    private void VerifyWarmupFailureRetries(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile,
+        AlsLocomotionSettings settings)
+    {
+        using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
+        AddChild(library.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, library.Skeleton, settings);
+        graph.Dispose();
+
+        for (var attempt = 1; attempt <= 2; attempt++)
+        {
+            try
+            {
+                controller.Warmup();
+                throw new InvalidOperationException(
+                    $"P3 Warmup attempt {attempt} treated an invalid graph as ready.");
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+    }
+
+    private void VerifyProfileValidation(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile)
+    {
+        using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
+        AddChild(library.Root);
+        var failures = new List<string>();
+
+        var malformedStandingRing = profile.StandingSamples.ToArray();
+        malformedStandingRing[^1] = malformedStandingRing[^1] with { X = 0.6f, Y = 0.8f };
+        ExpectInvalid("standing ring", profile with { StandingSamples = malformedStandingRing });
+
+        var malformedCrouchingRing = profile.CrouchingSamples.ToArray();
+        malformedCrouchingRing[0] = malformedCrouchingRing[0] with { X = 0f, Y = 0.5f };
+        ExpectInvalid("crouching ring", profile with { CrouchingSamples = malformedCrouchingRing });
+
+        var duplicateStanding = profile.StandingSamples.ToArray();
+        duplicateStanding[1] = duplicateStanding[1] with
+        {
+            X = duplicateStanding[0].X,
+            Y = duplicateStanding[0].Y,
+        };
+        ExpectInvalid("standing duplicate", profile with { StandingSamples = duplicateStanding });
+
+        var duplicateCrouching = profile.CrouchingSamples.ToArray();
+        duplicateCrouching[1] = duplicateCrouching[1] with
+        {
+            X = duplicateCrouching[0].X,
+            Y = duplicateCrouching[0].Y,
+        };
+        ExpectInvalid("crouching duplicate", profile with { CrouchingSamples = duplicateCrouching });
+
+        var duplicateLean = profile.LeanAdditiveSamples.ToArray();
+        duplicateLean[1] = duplicateLean[1] with
+        {
+            X = duplicateLean[0].X,
+            Y = duplicateLean[0].Y,
+        };
+        ExpectInvalid("lean duplicate", profile with { LeanAdditiveSamples = duplicateLean });
+
+        var degenerateLean = profile.LeanAdditiveSamples
+            .Select((sample, index) => sample with { X = 0f, Y = index })
+            .ToArray();
+        ExpectInvalid("lean degenerate grid", profile with { LeanAdditiveSamples = degenerateLean });
+
+        var chainedRadii = profile.StandingSamples.ToArray();
+        chainedRadii[0] = chainedRadii[0] with { X = 0f, Y = 0.50009f };
+        chainedRadii[1] = chainedRadii[1] with { X = -0.5f, Y = 0f };
+        chainedRadii[2] = chainedRadii[2] with { X = 0.50018f, Y = 0f };
+        ExpectInvalid("standing chained radii", profile with { StandingSamples = chainedRadii });
+
+        var shuffledProfile = profile with
+        {
+            StandingSamples = profile.StandingSamples.Reverse().ToArray(),
+            CrouchingSamples = profile.CrouchingSamples.Reverse().ToArray(),
+            LeanAdditiveSamples = profile.LeanAdditiveSamples.Reverse().ToArray(),
+        };
+        using (var baseline = AlsLocomotionGraphBuilder.Build(library, profile, definition))
+        using (var shuffled = AlsLocomotionGraphBuilder.Build(library, shuffledProfile, definition))
+        {
+            AssertEquivalentLayout(baseline.Handles, shuffled.Handles, failures);
+        }
+
+        if (failures.Count != 0)
+        {
+            throw new InvalidOperationException(
+                "P3 profile validation contract failed: " + string.Join("; ", failures));
+        }
+
+        void ExpectInvalid(string label, AlsLocomotionAnimationProfile invalidProfile)
+        {
+            try
+            {
+                using var unexpected = AlsLocomotionGraphBuilder.Build(
+                    library, invalidProfile, definition);
+                failures.Add($"{label} was accepted");
+            }
+            catch (InvalidOperationException)
+            {
+            }
+
+            using var rebuilt = AlsLocomotionGraphBuilder.Build(library, profile, definition);
+        }
+    }
+
+    private static void AssertEquivalentLayout(
+        AlsLocomotionGraphHandles baseline,
+        AlsLocomotionGraphHandles shuffled,
+        List<string> failures)
+    {
+        if (!baseline.StandingGaitRadii.SequenceEqual(shuffled.StandingGaitRadii) ||
+            baseline.CrouchingRadius != shuffled.CrouchingRadius ||
+            baseline.GroundedStanding.BlendMinimum != shuffled.GroundedStanding.BlendMinimum ||
+            baseline.GroundedStanding.BlendMaximum != shuffled.GroundedStanding.BlendMaximum ||
+            baseline.GroundedStanding.LeanMinimum != shuffled.GroundedStanding.LeanMinimum ||
+            baseline.GroundedStanding.LeanMaximum != shuffled.GroundedStanding.LeanMaximum ||
+            baseline.AnimationPlayerPath.ToString() != shuffled.AnimationPlayerPath.ToString() ||
+            baseline.TopPlaybackPath.ToString() != shuffled.TopPlaybackPath.ToString() ||
+            baseline.GroundedPlaybackPath.ToString() != shuffled.GroundedPlaybackPath.ToString())
+        {
+            failures.Add("shuffled samples changed radii, bounds, or handles");
+        }
+    }
+
+    private void VerifyApplyAtomicValidation(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile,
+        AlsLocomotionSettings settings)
+    {
+        var invalidGait = Result(
+            AlsAnimationState.JumpStart,
+            AlsStance.Standing,
+            new System.Numerics.Vector2(0.2f, 0.8f));
+        invalidGait.ActualGait = (AlsGait)byte.MaxValue;
+        VerifyRejected("invalid gait", invalidGait);
+
+        var excessivePlayRate = Result(
+            AlsAnimationState.JumpStart,
+            AlsStance.Standing,
+            new System.Numerics.Vector2(0.2f, 0.8f));
+        excessivePlayRate.PlayRate = settings.PlayRateMaximum + 0.25f;
+        VerifyRejected("excessive play rate", excessivePlayRate);
+
+        void VerifyRejected(string label, AlsFrameResult invalidResult)
+        {
+            using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
+            AddChild(library.Root);
+            using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
+            using var controller = new AlsLocomotionAnimationController(
+                graph, library.Skeleton, settings);
+            controller.Warmup();
+            var before = CaptureRuntimeSnapshot(controller, graph);
+            Exception? rejection = null;
+            try
+            {
+                controller.Apply(in invalidResult, settings.FixedDeltaSeconds);
+            }
+            catch (Exception exception)
+            {
+                rejection = exception;
+            }
+
+            if (rejection?.GetType() != typeof(ArgumentOutOfRangeException))
+            {
+                throw new InvalidOperationException(
+                    $"P3 Apply {label} rejection type mismatch: " +
+                    $"expected={nameof(ArgumentOutOfRangeException)} " +
+                    $"actual={rejection?.GetType().Name ?? "none"}");
+            }
+
+            var after = CaptureRuntimeSnapshot(controller, graph);
+            if (before != after)
+            {
+                throw new InvalidOperationException(
+                    $"P3 Apply {label} mutated runtime before rejection: " +
+                    $"before={before} after={after}");
+            }
+        }
+    }
+
+    private static void VerifyQuaternionCanonicalization(
+        AlsLocomotionAnimationController controller,
+        Skeleton3D skeleton)
+    {
+        var pelvis = skeleton.FindBone("pelvis");
+        if (pelvis < 0)
+        {
+            throw new InvalidOperationException("P3 digest fixture is missing pelvis.");
+        }
+
+        var original = skeleton.GetBonePoseRotation(pelvis);
+        try
+        {
+            var rotation = new Quaternion(0f, 0f, 1f, 0f);
+            skeleton.SetBonePoseRotation(pelvis, rotation);
+            var positiveDigest = controller.ComputePoseDigest(777);
+            skeleton.SetBonePoseRotation(
+                pelvis,
+                new Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W));
+            var negativeDigest = controller.ComputePoseDigest(777);
+            if (positiveDigest != negativeDigest)
+            {
+                throw new InvalidOperationException(
+                    $"P3 180-degree quaternion sign changed pose digest: " +
+                    $"q={positiveDigest:X16} negativeQ={negativeDigest:X16}");
+            }
+        }
+        finally
+        {
+            skeleton.SetBonePoseRotation(pelvis, original);
+        }
+    }
+
+    private static GraphRuntimeSnapshot CaptureRuntimeSnapshot(
+        AlsLocomotionAnimationController controller,
+        AlsLocomotionGraphBuildResult graph)
+    {
+        var topPlayback = graph.Tree.Get(
+            graph.Handles.TopPlaybackPath).As<AnimationNodeStateMachinePlayback>()
+            ?? throw new InvalidOperationException("P3 graph top playback is unavailable.");
+        var groundedPlayback = graph.Tree.Get(
+            graph.Handles.GroundedPlaybackPath).As<AnimationNodeStateMachinePlayback>()
+            ?? throw new InvalidOperationException("P3 graph Grounded playback is unavailable.");
+        using var topNode = topPlayback.GetCurrentNode();
+        using var groundedNode = groundedPlayback.GetCurrentNode();
+        var builder = new StringBuilder();
+        Append(graph.Handles.GroundedStanding);
+        Append(graph.Handles.GroundedCrouching);
+        Append(graph.Handles.JumpStart);
+        Append(graph.Handles.FallLoop);
+        Append(graph.Handles.LandRecovery);
+        return new GraphRuntimeSnapshot(
+            topNode.ToString(),
+            groundedNode.ToString(),
+            string.Join(",", topPlayback.GetTravelPath().Select(name => name.ToString())),
+            string.Join(",", groundedPlayback.GetTravelPath().Select(name => name.ToString())),
+            controller.ActiveAnimationState,
+            controller.ActiveStance,
+            controller.ManualAdvanceCount,
+            builder.ToString());
+
+        void Append(AlsLocomotionGraphParameterSet parameters)
+        {
+            if (parameters.BlendPositionPath is not null)
+            {
+                builder.Append(graph.Tree.Get(parameters.BlendPositionPath).AsVector2()).Append('|');
+            }
+            builder.Append(graph.Tree.Get(parameters.LeanPositionPath).AsVector2()).Append('|');
+            builder.Append(graph.Tree.Get(parameters.LeanAmountPath).AsSingle()).Append('|');
+            builder.Append(graph.Tree.Get(parameters.PlayRatePath).AsSingle()).Append('|');
+            if (parameters.PhasePath is not null)
+            {
+                builder.Append(graph.Tree.Get(parameters.PhasePath).AsSingle()).Append('|');
+            }
+        }
     }
 
     private static ActualPlaybackState AssertActualPlaybackState(
@@ -462,7 +732,8 @@ public partial class P3bAnimationGraphSmoke : Node
 
     private void VerifyLifecycle(
         AlsAnimationSetDefinition definition,
-        AlsLocomotionAnimationProfile profile)
+        AlsLocomotionAnimationProfile profile,
+        AlsLocomotionSettings settings)
     {
         var independentLibrary = AlsAnimationLibraryBuilder.Build(definition, profile);
         AddChild(independentLibrary.Root);
@@ -512,7 +783,7 @@ public partial class P3bAnimationGraphSmoke : Node
         using (var rebuiltGraph = AlsLocomotionGraphBuilder.Build(
                    partialLibrary, profile, definition))
         using (var rebuiltController = new AlsLocomotionAnimationController(
-                   rebuiltGraph, partialLibrary.Skeleton))
+                   rebuiltGraph, partialLibrary.Skeleton, settings))
         {
             rebuiltController.Warmup();
         }
@@ -600,4 +871,14 @@ public partial class P3bAnimationGraphSmoke : Node
     private readonly record struct ActualPlaybackState(
         AlsAnimationState State,
         AlsStance Stance);
+
+    private readonly record struct GraphRuntimeSnapshot(
+        string TopNode,
+        string GroundedNode,
+        string TopTravelPath,
+        string GroundedTravelPath,
+        AlsAnimationState ControllerState,
+        AlsStance ControllerStance,
+        long AdvanceCount,
+        string Parameters);
 }
