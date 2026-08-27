@@ -5,12 +5,13 @@ namespace GodotAls.Import.Compilation;
 
 public static class AlsLocomotionProfileCompiler
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
     private const int SupportedLeanAdditiveType = 1;
 
     private static readonly string[] RequiredProperties =
     [
         "schemaVersion",
+        "presentation",
         "mannequin",
         "standingIdle",
         "crouchingIdle",
@@ -24,6 +25,15 @@ public static class AlsLocomotionProfileCompiler
 
     private static readonly HashSet<string> RequiredPropertySet =
         new(RequiredProperties, StringComparer.Ordinal);
+
+    private static readonly string[] PresentationProperties =
+    [
+        "translationMeters",
+        "yawRadians",
+    ];
+
+    private static readonly HashSet<string> PresentationPropertySet =
+        new(PresentationProperties, StringComparer.Ordinal);
 
     private static readonly HashSet<string> SamplePropertySet =
         new(["animation", "x", "y", "rateScale"], StringComparer.Ordinal);
@@ -66,6 +76,7 @@ public static class AlsLocomotionProfileCompiler
                     SchemaVersion.ToString(), version.ToString());
             }
 
+            var presentation = ReadPresentation(properties["presentation"], "$.presentation");
             var stableIds = new HashSet<string>(StringComparer.Ordinal);
             var mannequinStableId = ReadStableId(properties["mannequin"], "$.mannequin", stableIds);
             var standingIdleStableId = ReadStableId(
@@ -116,6 +127,7 @@ public static class AlsLocomotionProfileCompiler
             return new AlsLocomotionAnimationProfile(
                 skeletonId,
                 mannequinId,
+                presentation,
                 standingIdleId,
                 crouchingIdleId,
                 standingSamples,
@@ -194,6 +206,33 @@ public static class AlsLocomotionProfileCompiler
         return stableId;
     }
 
+    private static AlsPresentationDefinition ReadPresentation(JsonElement element, string path)
+    {
+        var properties = ValidateObject(
+            element, PresentationPropertySet, path, PresentationProperties);
+        var translationPath = $"{path}.translationMeters";
+        var translationElement = properties["translationMeters"];
+        if (translationElement.ValueKind != JsonValueKind.Array)
+        {
+            throw Failure("ALSPROFILE025", translationPath, "Expected a translation array.");
+        }
+
+        var translationValues = translationElement.EnumerateArray().ToArray();
+        if (translationValues.Length != 3)
+        {
+            throw Failure(
+                "ALSPROFILE026", translationPath, "Expected exactly three translation values.",
+                "3", translationValues.Length.ToString());
+        }
+
+        return new AlsPresentationDefinition(
+            new System.Numerics.Vector3(
+                ReadFiniteSingle(translationValues[0], $"{translationPath}[0]"),
+                ReadFiniteSingle(translationValues[1], $"{translationPath}[1]"),
+                ReadFiniteSingle(translationValues[2], $"{translationPath}[2]")),
+            ReadFiniteSingle(properties["yawRadians"], $"{path}.yawRadians"));
+    }
+
     private static ProfileSampleSource[] ReadSamples(
         JsonElement element,
         string path,
@@ -229,7 +268,7 @@ public static class AlsLocomotionProfileCompiler
             !element.TryGetSingle(out var value) ||
             !float.IsFinite(value))
         {
-            throw Failure("ALSPROFILE013", path, "Expected a finite sample coordinate.");
+            throw Failure("ALSPROFILE013", path, "Expected a finite single-precision value.");
         }
         return value;
     }

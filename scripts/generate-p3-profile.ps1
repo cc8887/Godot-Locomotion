@@ -111,7 +111,11 @@ $crouchingSamples = @($crouchingSourceMap | ForEach-Object {
 })
 
 $profile = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
+    presentation = [ordered]@{
+        translationMeters = @([double]0.0, [double]-0.92, [double]0.0)
+        yawRadians = [double]([Math]::PI / 2.0)
+    }
     mannequin = [string](Resolve-ExactManifestAsset $manifest 'skeletalMeshes' $mannequinPath).id
     standingIdle = [string](Resolve-ExactManifestAsset $manifest 'animations' $standingIdlePath).id
     crouchingIdle = [string](Resolve-ExactManifestAsset $manifest 'animations' $crouchingIdlePath).id

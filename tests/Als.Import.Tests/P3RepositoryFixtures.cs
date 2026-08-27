@@ -18,6 +18,11 @@ internal static class P3RepositoryFixtures
     public static string ProfilePath() => Path.Combine(
         RepositoryRoot.Find(), "assets", "config", "p3_locomotion_profile.json");
 
+    public static string WithProfileMutation(Action<JsonObject> mutation) => Mutate(mutation);
+
+    public static string WithPresentationMutation(Action<JsonObject> mutation) =>
+        Mutate(root => mutation(root["presentation"]!.AsObject()));
+
     public static string WithMissingJumpClip() => Mutate(root =>
         root["jumpStart"] = "ffffffffffffffffffffffffffffffffffffffff");
 
