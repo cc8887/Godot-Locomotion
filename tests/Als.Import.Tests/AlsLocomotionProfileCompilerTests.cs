@@ -41,6 +41,130 @@ public sealed class AlsLocomotionProfileCompilerTests
     }
 
     [Fact]
+    public void RepositoryProfileLocksDirectionalObjectPathsStableIdsAndCoordinates()
+    {
+        var definition = P3RepositoryFixtures.LoadAnimationSet();
+        var profile = AlsLocomotionProfileCompiler.Compile(
+            P3RepositoryFixtures.ReadProfile(), definition);
+
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Walk_F.ALS_N_Walk_F",
+            "6124eafdcbeaaf04bca366add34c821faa0e4963",
+            0f,
+            0.5f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Walk_B.ALS_N_Walk_B",
+            "32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+            0f,
+            -0.5f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Walk_LF.ALS_N_Walk_LF",
+            "44a7f89b2c1dac832ca63753c131a037420f9d7e",
+            -0.353553f,
+            0.353553f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Walk_LB.ALS_N_Walk_LB",
+            "a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+            -0.353553f,
+            -0.353553f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Walk_RF.ALS_N_Walk_RF",
+            "fc2d3a4142a1bd82d20877d806c783ff56dfe688",
+            0.353553f,
+            0.353553f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Walk_RB.ALS_N_Walk_RB",
+            "eb84a748fee4615754ce3cbcd3c259b33918b935",
+            0.353553f,
+            -0.353553f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Run_F.ALS_N_Run_F",
+            "572c3c83c9007964c233db4c7288ae38e20c3dec",
+            0f,
+            1f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Run_B.ALS_N_Run_B",
+            "859f8a49c55747e7382a1ae15970b23cc12f3f85",
+            0f,
+            -1f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Run_LF.ALS_N_Run_LF",
+            "8ae1b9703a7d0144e570247d88629530b376885f",
+            -0.707107f,
+            0.707107f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Run_LB.ALS_N_Run_LB",
+            "b07a51bbab122c81679ac30d3f2f78f45ac14dc8",
+            -0.707107f,
+            -0.707107f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Run_RF.ALS_N_Run_RF",
+            "945bdda63e8a379694c792c3545fe11dd166b724",
+            0.707107f,
+            0.707107f);
+        AssertSample(
+            profile.StandingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_N_Run_RB.ALS_N_Run_RB",
+            "245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+            0.707107f,
+            -0.707107f);
+        AssertSample(
+            profile.CrouchingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_CLF_Walk_L.ALS_CLF_Walk_L",
+            "21c24bd7df5192db2e2a860457f2b7b0681de41d",
+            -1f,
+            0f);
+        AssertSample(
+            profile.CrouchingSamples,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/" +
+            "AnimationExamples/Base/Locomotion/ALS_CLF_Walk_R.ALS_CLF_Walk_R",
+            "db60b2c35ce5ef5216c782fc1f33549cbcf8278d",
+            1f,
+            0f);
+
+        void AssertSample(
+            AlsLocomotionAnimationSample[] samples,
+            string expectedObjectPath,
+            string expectedStableId,
+            float expectedX,
+            float expectedY)
+        {
+            var sample = Assert.Single(
+                samples,
+                candidate => candidate.X == expectedX && candidate.Y == expectedY);
+            var animation = definition.Animations[sample.AnimationId];
+            Assert.Equal(expectedObjectPath, animation.ObjectPath);
+            Assert.Equal(expectedStableId, animation.StableId);
+            Assert.Equal(expectedX, sample.X);
+            Assert.Equal(expectedY, sample.Y);
+        }
+    }
+
+    [Fact]
     public void RepositoryPresentationCompilesToTheLockedGodotTransform()
     {
         var profile = AlsLocomotionProfileCompiler.Compile(
