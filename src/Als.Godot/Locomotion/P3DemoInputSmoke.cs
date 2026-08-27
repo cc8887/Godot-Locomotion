@@ -1,5 +1,6 @@
 using Godot;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Locomotion;
 using NumericsVector2 = System.Numerics.Vector2;
 
 namespace GodotAls.Locomotion;
@@ -13,6 +14,7 @@ public partial class P3DemoInputSmoke : Node
         try
         {
             ValidateActionMap();
+            ValidateGodotInputBridge();
             ValidateCommandSemantics();
             ValidateCameraSemantics();
             ValidateHudSemantics();
@@ -169,6 +171,95 @@ public partial class P3DemoInputSmoke : Node
 
         adapter.CaptureFrame(8, default, 0f);
         Require(adapter.GetCommand(8).JumpPressed == 0, "default snapshot emitted a jump edge");
+    }
+
+    private static void ValidateGodotInputBridge()
+    {
+        ReleaseControlledActions();
+        try
+        {
+            var adapter = new AlsPlayerInputAdapter();
+
+            Input.ActionPress("move_forward");
+            adapter.CaptureGodotFrame(1, 0f);
+            var forward = adapter.GetCommand(1);
+            Require(forward.MovementAxes == NumericsVector2.UnitY,
+                "W did not map to ALS local forward +Y");
+            var resolvedForward = AlsLocomotionCommandResolver.Resolve(
+                forward, AlsStance.Standing);
+            Require(resolvedForward.WorldDirection.X == 0f &&
+                resolvedForward.WorldDirection.Y == 0f &&
+                resolvedForward.WorldDirection.Z == -1f,
+                "W did not resolve to Godot world forward -Z");
+            Input.ActionRelease("move_forward");
+
+            Input.ActionPress("move_back");
+            adapter.CaptureGodotFrame(2, 0f);
+            var backward = adapter.GetCommand(2);
+            Require(backward.MovementAxes == -NumericsVector2.UnitY,
+                "S did not map to ALS local backward -Y");
+            var resolvedBackward = AlsLocomotionCommandResolver.Resolve(
+                backward, AlsStance.Standing);
+            Require(resolvedBackward.WorldDirection.X == 0f &&
+                resolvedBackward.WorldDirection.Y == 0f &&
+                resolvedBackward.WorldDirection.Z == 1f,
+                "S did not resolve to Godot world backward +Z");
+            Input.ActionRelease("move_back");
+
+            Input.ActionPress("move_forward");
+            Input.ActionPress("sprint");
+            adapter.CaptureGodotFrame(3, 0f);
+            var sprint = adapter.GetCommand(3);
+            Require(sprint.RequestedGait == AlsGait.Sprinting,
+                "Shift+W did not request sprinting");
+            Require(AlsLocomotionCommandResolver.Resolve(sprint, AlsStance.Standing)
+                    .MaxAllowedGait == AlsGait.Sprinting,
+                "Shift+W did not satisfy LookingDirection forward sprint conditions");
+            Input.ActionRelease("sprint");
+            Input.ActionRelease("move_forward");
+
+            adapter.CaptureGodotFrame(4, 0f);
+            var cleared = adapter.GetCommand(4);
+            Require(cleared.MovementAxes == NumericsVector2.Zero &&
+                cleared.RequestedGait == AlsGait.Running &&
+                cleared.RequestedStance == AlsStance.Standing &&
+                cleared.RequestedRotationMode == AlsRotationMode.LookingDirection &&
+                cleared.JumpPressed == 0,
+                "released Godot actions contaminated the next command frame");
+        }
+        finally
+        {
+            ReleaseControlledActions();
+        }
+
+        foreach (var action in ControlledActions)
+        {
+            Require(!Input.IsActionPressed(action),
+                $"headless input smoke leaked pressed action {action}");
+        }
+    }
+
+    private static readonly string[] ControlledActions =
+    [
+        "move_left",
+        "move_right",
+        "move_forward",
+        "move_back",
+        "walk",
+        "sprint",
+        "crouch_toggle",
+        "jump",
+        "rotation_mode_toggle",
+        "aim",
+        "mouse_capture_toggle",
+    ];
+
+    private static void ReleaseControlledActions()
+    {
+        foreach (var action in ControlledActions)
+        {
+            Input.ActionRelease(action);
+        }
     }
 
     private void ValidateCameraSemantics()
