@@ -33,29 +33,23 @@ public partial class AlsP3Character : Node3D
     public int FailureDiagnosticCount =>
         Volatile.Read(ref _state.FailureDiagnosticCount);
 
-    internal long RuntimeCommittedFrameId
+    internal AlsP3CharacterState RuntimeState
     {
         get
         {
             EnsureConfigured();
-            return Volatile.Read(ref _state.CommittedFrameId);
+            return _state;
         }
     }
 
-    internal void SetRuntimeSuspension(bool gatherSuspended, bool workerSuspended)
-    {
-        EnsureConfigured();
-        EnsureMainThread();
-        Volatile.Write(ref _state.GatherSuspended, gatherSuspended ? 1 : 0);
-        Volatile.Write(ref _state.WorkerSuspended, workerSuspended ? 1 : 0);
-    }
+    internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
+        RuntimeState.CaptureRuntimeDiagnostics();
 
-    internal void PublishRuntimeResult(in AlsFrameResult result)
-    {
-        EnsureConfigured();
-        EnsureMainThread();
-        _state.PublishResult(result, 0, result.Identity.FrameId, result.Identity.FrameId);
-    }
+    internal int FailurePendingIdentityCount =>
+        RuntimeState.CaptureRuntimeDiagnostics().PendingFailureIdentityCount;
+
+    internal int FailureRetainedIdentityCount =>
+        RuntimeState.CaptureRuntimeDiagnostics().RetainedFailureIdentityCount;
 
     public AlsP3FrameDiagnostics Diagnostics
     {
@@ -108,7 +102,7 @@ public partial class AlsP3Character : Node3D
         }
         catch
         {
-            DisposeRuntime();
+            DisposeRuntimeCore(allowActive: true);
             throw;
         }
     }
@@ -179,22 +173,43 @@ public partial class AlsP3Character : Node3D
 
     public void DisposeRuntime()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        EnsureMainThread();
+        EnsureConfigured();
+        if (Volatile.Read(ref _state.Active) != 0)
         {
-            return;
+            throw new InvalidOperationException(
+                "P3 character must be inactive before runtime disposal.");
         }
 
-        if (_worker is not null)
-        {
-            _worker.DisposeRuntime();
-        }
+        DisposeRuntimeCore(allowActive: false);
     }
 
     public override void _ExitTree()
     {
-        if (GodotThread.IsMainThread())
+        if (GodotThread.IsMainThread() && _configured)
         {
-            DisposeRuntime();
+            DisposeRuntimeCore(allowActive: true);
+        }
+    }
+
+    private void DisposeRuntimeCore(bool allowActive)
+    {
+        EnsureMainThread();
+        if (!allowActive && Volatile.Read(ref _state.Active) != 0)
+        {
+            throw new InvalidOperationException(
+                "P3 character must be inactive before runtime disposal.");
+        }
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return;
+        }
+
+        if (_worker is not null && !_worker.TryDisposeRuntime())
+        {
+            Volatile.Write(ref _disposed, 0);
+            throw new InvalidOperationException(
+                "P3 character runtime disposal was rejected while its worker callback was in flight.");
         }
     }
 

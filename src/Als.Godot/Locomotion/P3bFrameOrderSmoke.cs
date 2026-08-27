@@ -31,6 +31,18 @@ public partial class P3bFrameOrderSmoke : Node
     private bool _replacementGenerationObserved;
     private bool _replacementRecoveryCommitted;
     private bool _retiredNodeReleased;
+    private bool _disposeGuardsChecked;
+    private bool _workerFailureInjected;
+    private long _workerFailureCommittedFrame;
+    private ulong _workerFailurePoseDigest;
+    private Node3D? _workerFailureVisualRoot;
+    private Skeleton3D? _workerFailureSkeleton;
+    private Vector3[] _workerFailurePositions = [];
+    private Quaternion[] _workerFailureRotations = [];
+    private Vector3[] _workerFailureScales = [];
+    private Transform3D _workerFailureRootTransform;
+    private ulong _workerFailureFullPoseDigest;
+    private ulong _workerFailureRootDigest;
     private bool _quitting;
     private string? _failurePolicy;
 
@@ -70,16 +82,14 @@ public partial class P3bFrameOrderSmoke : Node
                 animationSet,
                 profile,
                 System.Environment.CurrentManagedThreadId,
-                headlessOrDebug: _failurePolicy != "interactive");
+                headlessOrDebug: _failurePolicy is null or "headless");
             _registry = new AlsSlotRegistry(1);
 
             AddChild(CreateFloor());
             _active = CreateCharacter(
                 _registry.Acquire(),
                 active: true,
-                _failurePolicy is null
-                    ? AlsMotorReplay.CreateHarnessSequence()
-                    : new MultiFailureCommandSource());
+                CreateCommandSource(_failurePolicy));
             _spare = CreateCharacter(new AlsSlotHandle(0, 2), active: false);
         }
         catch (Exception exception)
@@ -108,6 +118,11 @@ public partial class P3bFrameOrderSmoke : Node
             {
                 ValidateCommitted(committed);
                 _lastCommittedFrame = committed.CommittedFrameId;
+            }
+
+            if (!_disposeGuardsChecked && committed.CommittedFrameId > 0)
+            {
+                ValidateDisposeGuards();
             }
 
             RecoverReplacementGeneration(committed);
@@ -187,7 +202,8 @@ public partial class P3bFrameOrderSmoke : Node
         Require(currentHandle == _spare.Handle, "replacement generation did not advance");
         _active = _spare;
         _active.ResumeAt(ReplacementFrame);
-        _active.SetRuntimeSuspension(gatherSuspended: false, workerSuspended: true);
+        Volatile.Write(ref _active.RuntimeState.GatherSuspended, 0);
+        Volatile.Write(ref _active.RuntimeState.WorkerSuspended, 1);
         _active.SetActive(true);
 
         old.DisposeRuntime();
@@ -200,7 +216,13 @@ public partial class P3bFrameOrderSmoke : Node
             "retired replacement node accumulated under the owner");
         _retiredNodeReleased = true;
 
-        _active.PublishRuntimeResult(AlsFrameResult.CreateDefault(staleIdentity));
+        _active.RuntimeState.PublishResult(
+            AlsFrameResult.CreateDefault(staleIdentity),
+            0,
+            0,
+            0,
+            staleIdentity.FrameId,
+            staleIdentity.FrameId);
         _replacementRecoveryPending = true;
     }
 
@@ -209,9 +231,10 @@ public partial class P3bFrameOrderSmoke : Node
         if (_replacementRecoveryPending && !_replacementGenerationObserved &&
             _context.GenerationMismatches == 1)
         {
-            Require(_active.RuntimeCommittedFrameId == ReplacementFrame,
+            Require(Volatile.Read(ref _active.RuntimeState.CommittedFrameId) == ReplacementFrame,
                 "old-generation result advanced production commit");
-            _active.SetRuntimeSuspension(gatherSuspended: true, workerSuspended: false);
+            Volatile.Write(ref _active.RuntimeState.GatherSuspended, 1);
+            Volatile.Write(ref _active.RuntimeState.WorkerSuspended, 0);
             _oldGenerationRejected = true;
             _replacementGenerationObserved = true;
             return;
@@ -220,7 +243,8 @@ public partial class P3bFrameOrderSmoke : Node
         if (_replacementGenerationObserved && !_replacementRecoveryCommitted &&
             committed.CommittedFrameId == ReplacementFrame + 1)
         {
-            _active.SetRuntimeSuspension(gatherSuspended: false, workerSuspended: false);
+            Volatile.Write(ref _active.RuntimeState.GatherSuspended, 0);
+            Volatile.Write(ref _active.RuntimeState.WorkerSuspended, 0);
             _replacementRecoveryCommitted = true;
             _replacementRecoveryPending = false;
         }
@@ -249,6 +273,7 @@ public partial class P3bFrameOrderSmoke : Node
             $"GODOT_ALS_P3B_FRAME_ORDER_OK mode={mode} frames={LastFrame} " +
             $"digest={_resultDigest:X16} pose={_poseDigest:X16} lag=0 stale=0 generation=1 " +
             "old_generation_rejected=1 retired_released=1");
+        _active.SetActive(false);
         _active.DisposeRuntime();
         _spare.DisposeRuntime();
         _quitting = true;
@@ -257,8 +282,14 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void ValidateFailurePolicy()
     {
-        if (_failurePolicy == "headless")
+        if (_failurePolicy is "worker" or "headless")
         {
+            ValidateWorkerFailure();
+            return;
+        }
+        if (_failurePolicy == "bounded")
+        {
+            ValidateBoundedFailureRetention();
             return;
         }
         if (_active.PublishedFrameId < 12)
@@ -274,6 +305,7 @@ public partial class P3bFrameOrderSmoke : Node
         GD.Print(
             $"GODOT_ALS_P3B_FAILURE_POLICY_OK mode=interactive motor_frame={_active.PublishedFrameId} " +
             $"pose_frame={_active.Diagnostics.CommittedFrameId} diagnostics=2");
+        _active.SetActive(false);
         _active.DisposeRuntime();
         _spare.DisposeRuntime();
         _quitting = true;
@@ -302,11 +334,207 @@ public partial class P3bFrameOrderSmoke : Node
             {
                 "--als-failure-policy=headless" => "headless",
                 "--als-failure-policy=interactive" => "interactive",
+                "--als-failure-policy=worker" => "worker",
+                "--als-failure-policy=bounded" => "bounded",
                 var value => throw new InvalidOperationException(
                     $"Unsupported P3B failure policy fixture: {value}"),
             };
         }
         return (mode, failurePolicy);
+    }
+
+    private static IAlsLocomotionCommandSource CreateCommandSource(string? failurePolicy) =>
+        failurePolicy switch
+        {
+            "interactive" => new MultiFailureCommandSource(),
+            "bounded" => new BoundedFailureCommandSource(),
+            _ => AlsMotorReplay.CreateHarnessSequence(),
+        };
+
+    private void ValidateDisposeGuards()
+    {
+        var activeRejected = false;
+        try
+        {
+            _active.DisposeRuntime();
+        }
+        catch (InvalidOperationException exception) when (
+            exception.Message.Contains("inactive", StringComparison.OrdinalIgnoreCase))
+        {
+            activeRejected = true;
+        }
+        Require(activeRejected, "active P3 runtime disposal was not rejected");
+
+        Exception? offMainFailure = null;
+        Task.Run(() =>
+        {
+            try
+            {
+                _active.DisposeRuntime();
+            }
+            catch (Exception exception)
+            {
+                offMainFailure = exception;
+            }
+        }).GetAwaiter().GetResult();
+        Require(offMainFailure is InvalidOperationException &&
+            offMainFailure.Message.Contains("main thread", StringComparison.OrdinalIgnoreCase),
+            "off-main P3 runtime disposal was not rejected by thread ownership");
+        _disposeGuardsChecked = true;
+    }
+
+    private void ValidateWorkerFailure()
+    {
+        if (!_workerFailureInjected)
+        {
+            var committed = _active.Diagnostics;
+            if (committed.CommittedFrameId < 12)
+            {
+                return;
+            }
+
+            _workerFailureCommittedFrame = committed.CommittedFrameId;
+            _workerFailurePoseDigest = committed.PoseDigest;
+            var animationTree = _active.FindChild(
+                "AlsLocomotionAnimationTree", recursive: true, owned: false) as AnimationTree;
+            Require(animationTree is not null, "real locomotion AnimationTree was not found");
+            _workerFailureVisualRoot = animationTree!.GetParent() as Node3D;
+            Require(_workerFailureVisualRoot is not null,
+                "real locomotion visual root was not found");
+            _workerFailureSkeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(
+                _workerFailureVisualRoot!);
+            Require(_workerFailureSkeleton is not null,
+                "real locomotion skeleton was not found");
+            CaptureWorkerFailurePose();
+            animationTree!.Free();
+            _workerFailureInjected = true;
+            return;
+        }
+
+        if (_failurePolicy == "headless")
+        {
+            return;
+        }
+        if (_active.FailureDiagnosticCount == 0 ||
+            _active.PublishedFrameId < _workerFailureCommittedFrame + 8)
+        {
+            return;
+        }
+
+        var runtime = _active.RuntimeDiagnostics;
+        ValidateWorkerFailurePose();
+        Require(_active.IsPoseFrozen, "worker failure did not freeze the visual pose");
+        Require(_active.Diagnostics.CommittedFrameId == _workerFailureCommittedFrame,
+            "worker failure advanced the committed result");
+        Require(runtime.LastPublishedPoseDigest == _workerFailurePoseDigest,
+            "worker failure replaced the last successful pose digest");
+        Require(runtime.RollbackVerified,
+            "worker failure did not restore the full skeleton and root transform");
+        Require(runtime.LastPublishedFullPoseDigest == runtime.RollbackFullPoseDigest,
+            "worker failure changed the committed full skeleton pose");
+        Require(runtime.LastPublishedRootDigest == runtime.RollbackRootDigest,
+            "worker failure changed the committed visual root transform");
+        Require(runtime.RollbackFullPoseDigest == _workerFailureFullPoseDigest,
+            "worker rollback digest differed from the independently captured skeleton pose");
+        Require(runtime.RollbackRootDigest == _workerFailureRootDigest,
+            "worker rollback digest differed from the independently captured visual root");
+        Require(_active.PublishedFrameId > _workerFailureCommittedFrame,
+            "worker failure stopped the main-thread motor");
+
+        GD.Print(
+            $"GODOT_ALS_P3B_WORKER_ROLLBACK_OK mode={_mode.ToString().ToLowerInvariant()} " +
+            $"motor_frame={_active.PublishedFrameId} pose_frame={_workerFailureCommittedFrame} " +
+            $"full={runtime.RollbackFullPoseDigest:X16} root={runtime.RollbackRootDigest:X16}");
+        _active.SetActive(false);
+        _active.DisposeRuntime();
+        _spare.DisposeRuntime();
+        _quitting = true;
+        GetTree().Quit();
+    }
+
+    private void CaptureWorkerFailurePose()
+    {
+        var boneCount = _workerFailureSkeleton!.GetBoneCount();
+        _workerFailurePositions = new Vector3[boneCount];
+        _workerFailureRotations = new Quaternion[boneCount];
+        _workerFailureScales = new Vector3[boneCount];
+        for (var index = 0; index < boneCount; index++)
+        {
+            _workerFailurePositions[index] = _workerFailureSkeleton.GetBonePosePosition(index);
+            _workerFailureRotations[index] = _workerFailureSkeleton.GetBonePoseRotation(index);
+            _workerFailureScales[index] = _workerFailureSkeleton.GetBonePoseScale(index);
+        }
+        _workerFailureRootTransform = _workerFailureVisualRoot!.GlobalTransform;
+        _workerFailureFullPoseDigest = ComputePoseDigest(_workerFailureSkeleton);
+        _workerFailureRootDigest = ComputeTransformDigest(_workerFailureRootTransform);
+    }
+
+    private void ValidateWorkerFailurePose()
+    {
+        Require(_workerFailureVisualRoot!.GlobalTransform == _workerFailureRootTransform,
+            "worker rollback did not restore the exact visual root transform");
+        for (var index = 0; index < _workerFailurePositions.Length; index++)
+        {
+            Require(_workerFailureSkeleton!.GetBonePosePosition(index) ==
+                    _workerFailurePositions[index] &&
+                _workerFailureSkeleton.GetBonePoseRotation(index) ==
+                    _workerFailureRotations[index] &&
+                _workerFailureSkeleton.GetBonePoseScale(index) ==
+                    _workerFailureScales[index],
+                $"worker rollback did not restore exact bone pose index {index}");
+        }
+        Require(ComputePoseDigest(_workerFailureSkeleton!) == _workerFailureFullPoseDigest,
+            "worker rollback did not restore the quantized full skeleton pose");
+        Require(ComputeTransformDigest(_workerFailureVisualRoot.GlobalTransform) ==
+                _workerFailureRootDigest,
+            "worker rollback did not restore the quantized visual root transform");
+    }
+
+    private static ulong ComputePoseDigest(Skeleton3D skeleton)
+    {
+        var digest = AlsResultDigest.OffsetBasis;
+        for (var index = 0; index < skeleton.GetBoneCount(); index++)
+        {
+            Append(ref digest, skeleton.GetBonePosePosition(index));
+            Append(ref digest, skeleton.GetBonePoseRotation(index));
+            Append(ref digest, skeleton.GetBonePoseScale(index));
+        }
+        return digest;
+    }
+
+    private static ulong ComputeTransformDigest(in Transform3D transform)
+    {
+        var digest = AlsResultDigest.OffsetBasis;
+        Append(ref digest, transform.Basis.X);
+        Append(ref digest, transform.Basis.Y);
+        Append(ref digest, transform.Basis.Z);
+        Append(ref digest, transform.Origin);
+        return digest;
+    }
+
+    private void ValidateBoundedFailureRetention()
+    {
+        if (_active.PublishedFrameId < 72)
+        {
+            return;
+        }
+
+        Require(_active.FailureDiagnosticCount == BoundedFailureCommandSource.FailureCount,
+            "bounded failure identities were not diagnosed exactly once");
+        Require(_active.FailurePendingIdentityCount == 0,
+            "published failure identities remained pending");
+        Require(_active.FailureRetainedIdentityCount <= 1,
+            "failure identity retention grew with historical frames");
+        Require(_active.Diagnostics.CommittedFrameId < _active.PublishedFrameId,
+            "bounded failures stopped the main-thread motor");
+        GD.Print(
+            $"GODOT_ALS_P3B_FAILURE_RETENTION_OK mode={_mode.ToString().ToLowerInvariant()} " +
+            $"diagnostics={_active.FailureDiagnosticCount} pending=0 retained={_active.FailureRetainedIdentityCount}");
+        _active.SetActive(false);
+        _active.DisposeRuntime();
+        _spare.DisposeRuntime();
+        _quitting = true;
+        GetTree().Quit();
     }
 
     private static StaticBody3D CreateFloor()
@@ -346,6 +574,32 @@ public partial class P3bFrameOrderSmoke : Node
         }
     }
 
+    private static void Append(ref ulong digest, Vector3 value)
+    {
+        Append(ref digest, value.X);
+        Append(ref digest, value.Y);
+        Append(ref digest, value.Z);
+    }
+
+    private static void Append(ref ulong digest, Quaternion value)
+    {
+        Append(ref digest, value.X);
+        Append(ref digest, value.Y);
+        Append(ref digest, value.Z);
+        Append(ref digest, value.W);
+    }
+
+    private static void Append(ref ulong digest, float value)
+    {
+        const ulong prime = 1099511628211UL;
+        var quantized = checked((int)MathF.Round(value * 100_000f, MidpointRounding.AwayFromZero));
+        for (var shift = 0; shift < 32; shift += 8)
+        {
+            digest ^= (byte)(quantized >> shift);
+            digest *= prime;
+        }
+    }
+
     private static void Require(bool condition, string message)
     {
         if (!condition)
@@ -369,6 +623,24 @@ public partial class P3bFrameOrderSmoke : Node
             }
             if (frameId == 8 && _frameEightCalls++ == 0)
             {
+                return command with { JumpPressed = 2 };
+            }
+            return command;
+        }
+    }
+
+    private sealed class BoundedFailureCommandSource : IAlsLocomotionCommandSource
+    {
+        public const int FailureCount = 64;
+        private readonly AlsReplayInputAdapter _inner = AlsMotorReplay.CreateHarnessSequence();
+        private long _lastInjectedFrame = -1;
+
+        public AlsLocomotionCommand GetCommand(long frameId)
+        {
+            var command = _inner.GetCommand(frameId);
+            if (frameId is >= 5 and < 5 + FailureCount && frameId != _lastInjectedFrame)
+            {
+                _lastInjectedFrame = frameId;
                 return command with { JumpPressed = 2 };
             }
             return command;

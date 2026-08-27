@@ -17,6 +17,16 @@ public readonly record struct AlsP3FrameDiagnostics(
     AlsFrameResult Result,
     ulong PoseDigest);
 
+internal readonly record struct AlsP3RuntimeDiagnostics(
+    ulong LastPublishedPoseDigest,
+    ulong LastPublishedFullPoseDigest,
+    ulong LastPublishedRootDigest,
+    ulong RollbackFullPoseDigest,
+    ulong RollbackRootDigest,
+    bool RollbackVerified,
+    int PendingFailureIdentityCount,
+    int RetainedFailureIdentityCount);
+
 public sealed class AlsP3RuntimeContext
 {
     public AlsP3RuntimeContext(
@@ -72,7 +82,9 @@ internal sealed class AlsP3CharacterState
 {
     private readonly object _failureGate = new();
     private readonly Queue<AlsP3WorkerFailure> _failures = new();
-    private readonly HashSet<AlsP3FailureIdentity> _failureIdentities = new();
+    private readonly HashSet<AlsP3FailureIdentity> _pendingFailureIdentities = new();
+    private AlsP3FailureIdentity _lastPublishedFailureIdentity;
+    private bool _hasLastPublishedFailureIdentity;
 
     public AlsP3CharacterState(AlsSlotHandle handle)
     {
@@ -85,6 +97,16 @@ internal sealed class AlsP3CharacterState
     public AlsFrameExchange Exchange { get; }
 
     public ulong PublishedPoseDigest;
+
+    public ulong PublishedFullPoseDigest;
+
+    public ulong PublishedRootDigest;
+
+    public ulong RollbackFullPoseDigest;
+
+    public ulong RollbackRootDigest;
+
+    public int RollbackVerified;
 
     public long PublishedFrameId;
 
@@ -124,13 +146,20 @@ internal sealed class AlsP3CharacterState
 
     public int FailureDiagnosticCount;
 
+    public int WorkerInFlight;
+
     public void RecordFailure(string code, AlsFrameIdentity identity, Exception exception)
     {
         var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
         var failure = new AlsP3WorkerFailure(code, identity, exceptionType);
+        var failureIdentity = new AlsP3FailureIdentity(code, identity);
         lock (_failureGate)
         {
-            if (_failureIdentities.Add(new AlsP3FailureIdentity(code, identity)))
+            // Frame identities are monotonic. Pending identities plus the last published
+            // identity suppress retries without retaining an unbounded frame history.
+            if ((!_hasLastPublishedFailureIdentity ||
+                 _lastPublishedFailureIdentity != failureIdentity) &&
+                _pendingFailureIdentities.Add(failureIdentity))
             {
                 _failures.Enqueue(failure);
             }
@@ -149,19 +178,53 @@ internal sealed class AlsP3CharacterState
             }
 
             failure = _failures.Dequeue();
+            var failureIdentity = new AlsP3FailureIdentity(failure.Code, failure.Identity);
+            _pendingFailureIdentities.Remove(failureIdentity);
+            _lastPublishedFailureIdentity = failureIdentity;
+            _hasLastPublishedFailureIdentity = true;
             return true;
         }
+    }
+
+    public AlsP3RuntimeDiagnostics CaptureRuntimeDiagnostics()
+    {
+        lock (_failureGate)
+        {
+            return new AlsP3RuntimeDiagnostics(
+                PublishedPoseDigest,
+                PublishedFullPoseDigest,
+                PublishedRootDigest,
+                RollbackFullPoseDigest,
+                RollbackRootDigest,
+                Volatile.Read(ref RollbackVerified) != 0,
+                _pendingFailureIdentities.Count,
+                _hasLastPublishedFailureIdentity ? 1 : 0);
+        }
+    }
+
+    public void RecordRollback(
+        ulong fullPoseDigest,
+        ulong rootDigest,
+        bool verified)
+    {
+        RollbackFullPoseDigest = fullPoseDigest;
+        RollbackRootDigest = rootDigest;
+        Volatile.Write(ref RollbackVerified, verified ? 1 : 0);
     }
 
     public void PublishResult(
         in AlsFrameResult result,
         ulong poseDigest,
+        ulong fullPoseDigest,
+        ulong rootDigest,
         long modelFrameId,
         long poseFrameId)
     {
         ModelResultFrameId = modelFrameId;
         PoseAdvanceFrameId = poseFrameId;
         PublishedPoseDigest = poseDigest;
+        PublishedFullPoseDigest = fullPoseDigest;
+        PublishedRootDigest = rootDigest;
         ResultPublishedCharacterId = checked((int)result.Identity.CharacterId);
         ResultPublishedGeneration = checked((int)result.Identity.SlotGeneration);
         ResultPublishedFrameId = result.Identity.FrameId;
