@@ -363,12 +363,63 @@ public partial class P3PresentationSmoke : Node
             ?? throw new InvalidOperationException("real locomotion visual root was not found");
         var skeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(visualRoot)
             ?? throw new InvalidOperationException("real locomotion character has no Skeleton3D");
+        var (geometryCount, visibleGeometryCount) = InspectGeometryVisibility(visualRoot);
+        Require(geometryCount > 0,
+            "real locomotion visual root did not contain any GeometryInstance3D nodes");
+        var visibilityBreak = FindVisibilityInheritanceBreak(visualRoot, character);
+        Require(visibilityBreak is null,
+            "inactive rig visibility inheritance was interrupted before reaching its character: " +
+            $"node={visibilityBreak?.Name} type={visibilityBreak?.GetType().Name}");
+        Require(!visualRoot.IsVisibleInTree() && visibleGeometryCount == 0,
+            "inactive hidden character leaked its real rig into the scene tree: " +
+            $"root_visible={(visualRoot.IsVisibleInTree() ? 1 : 0)} " +
+            $"visible_geometry={visibleGeometryCount}/{geometryCount}");
         var importedAssetForward = ReadImportedAssetForward(visualRoot, skeleton);
         RequireVectorNear(
             ReadPresentationTransform().Basis * importedAssetForward,
             Vector3.Forward,
             "presentation did not map the imported mannequin forward to Godot -Z",
             AssetForwardTolerance);
+    }
+
+    private static (int Total, int Visible) InspectGeometryVisibility(Node node)
+    {
+        var total = 0;
+        var visible = 0;
+        foreach (var child in node.GetChildren())
+        {
+            if (child is GeometryInstance3D geometry)
+            {
+                total++;
+                if (geometry.IsVisibleInTree())
+                {
+                    visible++;
+                }
+            }
+            var nested = InspectGeometryVisibility(child);
+            total += nested.Total;
+            visible += nested.Visible;
+        }
+        return (total, visible);
+    }
+
+    private static Node? FindVisibilityInheritanceBreak(Node3D visualRoot, Node3D character)
+    {
+        var ancestor = visualRoot.GetParent();
+        while (ancestor != character)
+        {
+            if (ancestor is null)
+            {
+                throw new InvalidOperationException(
+                    "real locomotion visual root was not a descendant of its character");
+            }
+            if (ancestor is not Node3D)
+            {
+                return ancestor;
+            }
+            ancestor = ancestor.GetParent();
+        }
+        return null;
     }
 
     private static Vector3 ReadImportedAssetForward(Node3D visualRoot, Skeleton3D skeleton)

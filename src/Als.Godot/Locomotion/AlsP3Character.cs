@@ -59,6 +59,12 @@ public partial class AlsP3Character : Node3D
     internal int FailureRetainedIdentityCount =>
         _state.CaptureRuntimeDiagnostics().RetainedFailureIdentityCount;
 
+    internal bool ObservedVisualRootVisibleInTree =>
+        Volatile.Read(ref _state.ObservedVisualRootVisible) != 0;
+
+    internal long VisualRootVisibilityObservationFrameId =>
+        Volatile.Read(ref _state.VisualRootVisibilityObservationFrameId);
+
     public AlsP3LifecycleDiagnostics LifecycleDiagnostics
     {
         get

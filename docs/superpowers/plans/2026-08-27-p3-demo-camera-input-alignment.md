@@ -577,7 +577,7 @@ Extend the smokes to prove:
 - character is invisible before `AddChild()`/Configure and before its first valid commit;
 - an active character becomes visible only when its current-generation candidate is committed;
 - inactive spare is never visible;
-- every replacement phase has `VisibleCharacterCount <= 1`;
+- every replacement phase has real visual-root `VisibleCharacterCount <= 1`;
 - recovery has at least one frame with zero visible characters;
 - retired character hides before release;
 - generation mismatch resets ready and cannot reveal stale pose;
@@ -646,8 +646,10 @@ In `AlsP3CharacterSlot`:
 
 - hide old active before retirement/free;
 - keep prebuilt spare hidden through classification and recovery;
-- count `_active` and `_spare` local `Visible` flags directly, without `GetChildren()` enumeration or per-frame allocation;
-- throw in headless/debug if the count exceeds one, if an inactive child is visible, or if a visible child is not ready;
+- keep `AlsP3WorkerRoot` as a `Node3D` so the character-to-visual-root render visibility ancestor chain is continuous;
+- publish the real visual-root `IsVisibleInTree()` result from the owning Worker as a `Volatile` scalar at Configure/frame 0 and on every Worker frame; slot/main code must never read the Worker-owned visual root;
+- count `_active` and `_spare` published real visual-root flags directly, without `GetChildren()` enumeration or per-frame allocation;
+- allow the false-to-true observation to trail Commit Order 2 until the next Worker frame, but throw if a published visible rig belongs to an inactive, local-hidden or not-ready character;
 - explicitly allow count zero during `AwaitingGenerationMismatch` and `AwaitingRecoveryCommit`.
 
 `StartReplacementClassification()` explicitly calls `ResetVisualReady()` before `SetActive(true)`. Before assigning the spare into `_active`, assert that the retired local variable is already hidden. Teardown always hides both active and spare before disposal.
@@ -656,7 +658,7 @@ Do not add motor position/velocity transfer; camera/world continuity during repl
 
 - [ ] **Step 5: Remove unsafe steady-state test reads of Worker-owned Nodes**
 
-Change normal `P3bFrameOrderSmoke` checks to consume `Diagnostics.VisualRootTransform` and `RootDigest`. In `P3bFrameOrderSmoke._Ready()`, change its own `ProcessThreadGroupOrder` from 0 to 3; `AlsP3CharacterSlot` already explicitly owns main-thread order 2, so replacement choreography remains unchanged. Require `WorkerInFlight == 0` before inspecting/freeing the visual `AnimationTree`; return immediately so the next physics frame performs the expected failure. Do not add a production test hook.
+Change normal `P3bFrameOrderSmoke` checks to consume `Diagnostics.VisualRootTransform` and `RootDigest`. The final scheduling is Commit Order 2, `AlsP3CharacterSlot` Order 3 and `P3bFrameOrderSmoke` Order 4. Require `WorkerInFlight == 0` before inspecting/freeing the visual `AnimationTree`; return immediately so the next physics frame performs the expected failure. Do not add a production test hook.
 
 - [ ] **Step 6: Run lifecycle verification**
 
@@ -676,7 +678,7 @@ dotnet build .\GodotALS.csproj -c Debug -p:Optimize=true --no-restore --no-incre
 Expected: normal presentation smoke passes; initial-failure marker includes `visual_ready=0 visible=0`. Final fixed-field marker forms are:
 
 ```text
-GODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=[0-9A-F]{16} pose=[0-9A-F]{16} full_pose=[0-9A-F]{16} root=[0-9A-F]{16} lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1
+GODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=[0-9A-F]{16} pose=[0-9A-F]{16} full_pose=[0-9A-F]{16} root=[0-9A-F]{16} lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1
 GODOT_ALS_P3_DEMO_OK frames=300 errors=0 ready=1 visible=1 max_visible=1
 ```
 
@@ -1004,7 +1006,7 @@ The other final gate markers are:
 GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1
 \AGODOT_ALS_P3_PRESENTATION_OK yaws=3 identity=1 root=([0-9A-F]{16})\z
 \AGODOT_ALS_P3B_INITIAL_ROLLBACK_OK mode=parallel corrected=1 visual_ready=0 visible=0 full_pose=([0-9A-F]{16}) root=([0-9A-F]{16})\z
-\AGODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1\z
+\AGODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1\z
 GODOT_ALS_P3_DEMO_OK frames=300 errors=0 ready=1 visible=1 max_visible=1
 ```
 
@@ -1107,7 +1109,7 @@ Use `superpowers:finishing-a-development-branch` after review and all verificati
 
 - schema v2 strictly carries `(0,-0.92,0)` and `-PI/2` from generator through compiler/runtime context;
 - real visual root initializes and advances as `logical * presentation`, with corrected rollback on first failure;
-- active/inactive/ready/visible remain separate; no slot ever shows two or unready rigs;
+- active/inactive/ready/visible remain separate; the real rig hierarchy inherits visibility continuously and no slot ever shows two or unready rigs;
 - actual `Camera3D.GlobalBasis` proves all 12 WASD/yaw cases and Aiming remains camera-relative;
 - P3 camera still follows the motor and uses only the temporary `0.53 m` composition offset;
 - directional paths, stable IDs, coordinates, pose distinctions and rotation modes are locked;

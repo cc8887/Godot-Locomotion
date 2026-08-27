@@ -8,7 +8,7 @@ using GodotAls.Dispatch;
 
 namespace GodotAls.Locomotion;
 
-public partial class AlsP3WorkerRoot : Node
+public partial class AlsP3WorkerRoot : Node3D
 {
     private AlsP3RuntimeContext _context = null!;
     private AlsP3CharacterState _state = null!;
@@ -58,6 +58,7 @@ public partial class AlsP3WorkerRoot : Node
             _visualRoot.GlobalTransform = correctedRoot;
             AlsP3Presentation.ThrowIfNonFinite(_visualRoot.GlobalTransform);
             CapturePose();
+            PublishVisualRootVisibility(0);
 
             // Thread ownership is assigned only after the complete visual rig is built and warmed.
             ProcessThreadGroupOrder = 1;
@@ -123,6 +124,7 @@ public partial class AlsP3WorkerRoot : Node
             var poseCaptured = false;
             try
             {
+                PublishVisualRootVisibility(frameId);
                 var isMain = System.Environment.CurrentManagedThreadId == _context.MainManagedThreadId;
                 if ((_context.Mode == AlsHarnessMode.Single) != isMain)
                 {
@@ -290,6 +292,13 @@ public partial class AlsP3WorkerRoot : Node
         }
         _capturedFullPoseDigest = ComputeFullPoseDigest();
         _capturedRootDigest = AlsP3Presentation.ComputeDigest(_capturedRootTransform);
+    }
+
+    private void PublishVisualRootVisibility(long observationFrameId)
+    {
+        var visible = _visualRoot!.IsVisibleInTree() ? 1 : 0;
+        Volatile.Write(ref _state.ObservedVisualRootVisible, visible);
+        Volatile.Write(ref _state.VisualRootVisibilityObservationFrameId, observationFrameId);
     }
 
     private void RestorePose()

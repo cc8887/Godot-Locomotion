@@ -339,11 +339,13 @@ public partial class AlsP3CharacterSlot : Node
     private int CountVisibleCharacters()
     {
         var count = 0;
-        if (_active is not null && GodotObject.IsInstanceValid(_active) && _active.Visible)
+        if (_active is not null && GodotObject.IsInstanceValid(_active) &&
+            _active.ObservedVisualRootVisibleInTree)
         {
             count++;
         }
-        if (_spare is not null && GodotObject.IsInstanceValid(_spare) && _spare.Visible)
+        if (_spare is not null && GodotObject.IsInstanceValid(_spare) &&
+            _spare.ObservedVisualRootVisibleInTree)
         {
             count++;
         }
@@ -381,6 +383,13 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         var lifecycle = character.LifecycleDiagnostics;
+        var visualRootVisible = character.ObservedVisualRootVisibleInTree;
+        if (visualRootVisible &&
+            (!lifecycle.IsVisible || !lifecycle.IsActive || !lifecycle.IsVisualReady))
+        {
+            throw new InvalidOperationException(
+                "P3 real visual root remained visible without an active ready character.");
+        }
         if (lifecycle.IsVisible && !lifecycle.IsActive)
         {
             throw new InvalidOperationException(
