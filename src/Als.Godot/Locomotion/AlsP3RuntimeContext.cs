@@ -17,7 +17,8 @@ public readonly record struct AlsP3FrameDiagnostics(
     long CommittedFrameId,
     NumericsVector3 ActualVelocity,
     AlsFrameResult Result,
-    ulong PoseDigest);
+    ulong PoseDigest,
+    ulong FullPoseDigest);
 
 public readonly record struct AlsP3LifecycleDiagnostics(
     bool IsDisposed,

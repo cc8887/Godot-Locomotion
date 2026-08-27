@@ -1,5 +1,8 @@
 $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $script:FunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p3b-verification-functions.ps1'
+$script:WorkerPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3WorkerRoot.cs'
+$script:RuntimePath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3RuntimeContext.cs'
+$script:HarnessPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P3bAnimationHarness.cs'
 if (Test-Path -LiteralPath $script:FunctionsPath)
 {
     . $script:FunctionsPath
@@ -8,6 +11,7 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
 $script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=FEDCBA9876543210 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 p95_us=100 p99_us=200'
 $script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0'
 $script:ValidReplacement = 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1'
+$script:ValidPose = 'GODOT_ALS_P3B_POSE character=0 changes=42'
 
 function Get-P3bOutput
 {
@@ -15,10 +19,11 @@ function Get-P3bOutput
         [string]$Marker = $script:ValidMarker,
         [string]$Allocation = $script:ValidAllocation,
         [string[]]$Advances = @('GODOT_ALS_P3B_ADVANCE character=0 frames=600'),
+        [string[]]$Poses = @($script:ValidPose),
         [string]$Replacement = $script:ValidReplacement
     )
 
-    return @('Godot Engine test', $Allocation) + $Advances + @($Replacement, $Marker)
+    return @('Godot Engine test', $Allocation) + $Advances + $Poses + @($Replacement, $Marker)
 }
 
 function Test-P3bParserRejects
@@ -139,8 +144,11 @@ Describe 'P3B verifier contracts' {
         $tenAdvances = @(0..9 | ForEach-Object {
             "GODOT_ALS_P3B_ADVANCE character=$_ frames=600"
         })
+        $tenPoses = @(0..9 | ForEach-Object {
+            "GODOT_ALS_P3B_POSE character=$_ changes=42"
+        })
         $result = ConvertFrom-P3bHarnessOutput `
-            -OutputLines (Get-P3bOutput -Marker $tenMarker -Advances $tenAdvances) `
+            -OutputLines (Get-P3bOutput -Marker $tenMarker -Advances $tenAdvances -Poses $tenPoses) `
             -ExpectedMode single `
             -ExpectedCharacterCount 10
         $result.Advances.Count | Should Be 10
@@ -155,6 +163,15 @@ Describe 'P3B verifier contracts' {
         Test-P3bParserRejects (Get-P3bOutput -Replacement '') | Should Be $true
         Test-P3bParserRejects (Get-P3bOutput -Replacement 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=0') |
             Should Be $true
+    }
+
+    It 'requires nonzero raw skeleton pose changes for every character' {
+        Test-P3bParserRejects (Get-P3bOutput -Poses @()) | Should Be $true
+        Test-P3bParserRejects (Get-P3bOutput -Poses @(
+            'GODOT_ALS_P3B_POSE character=0 changes=0')) | Should Be $true
+        Test-P3bParserRejects (Get-P3bOutput -Poses @(
+            'GODOT_ALS_P3B_POSE character=0 changes=1',
+            'GODOT_ALS_P3B_POSE character=0 changes=2')) | Should Be $true
     }
 
     It 'rejects wrong worker affinity and invalid percentiles' {
@@ -222,5 +239,39 @@ Describe 'P3B verifier contracts' {
             $poseRejected = $true
         }
         $poseRejected | Should Be $true
+    }
+}
+
+Describe 'P3B raw-pose and timing instrumentation' {
+    It 'publishes the frame-independent full skeleton digest to the harness' {
+        $runtimeSource = [System.IO.File]::ReadAllText($script:RuntimePath)
+        $harnessSource = [System.IO.File]::ReadAllText($script:HarnessPath)
+
+        $runtimeSource | Should Match 'ulong FullPoseDigest'
+        $harnessSource | Should Match 'diagnostics\.FullPoseDigest'
+        $harnessSource | Should Not Match 'Append\(ref _poseDigest, diagnostics\.PoseDigest\)'
+    }
+
+    It 'sums only bounded production segments into worker timing' {
+        $workerSource = [System.IO.File]::ReadAllText($script:WorkerPath)
+
+        $workerSource | Should Not Match 'workerStartedAt'
+        $workerSource | Should Match 'RecordWorkerAdvance\(\s*measurementIndex,\s*productionElapsedTicks\)'
+        ([regex]::Matches(
+            $workerSource,
+            'productionSegmentStartedAt = measure\s*\? Stopwatch\.GetTimestamp\(\)\s*:\s*0L;')).Count |
+            Should Be 6
+        ([regex]::Matches(
+            $workerSource,
+            'productionElapsedTicks \+= Stopwatch\.GetTimestamp\(\) - productionSegmentStartedAt;')).Count |
+            Should Be 6
+
+        $firstProbe = $workerSource.IndexOf('GC.GetAllocatedBytesForCurrentThread()')
+        $firstSegment = $workerSource.IndexOf('productionSegmentStartedAt')
+        $firstRecord = $workerSource.IndexOf('RecordWorkerAdvance')
+        $lastAllocationRecord = $workerSource.LastIndexOf('AddExchangeAllocations')
+        $firstProbe | Should BeGreaterThan -1
+        $firstSegment | Should BeGreaterThan $firstProbe
+        $firstRecord | Should BeGreaterThan $lastAllocationRecord
     }
 }

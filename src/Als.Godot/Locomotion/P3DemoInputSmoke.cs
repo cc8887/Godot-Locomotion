@@ -323,7 +323,8 @@ public partial class P3DemoInputSmoke : Node
             42,
             new NumericsVector3(3f, 0f, 4f),
             result,
-            0);
+            PoseDigest: 0,
+            FullPoseDigest: 0);
         hud.Refresh(diagnostics, framesPerSecond: 60d, errors: 0);
         Require(hud.StateText.Contains("Grounded", StringComparison.Ordinal),
             "HUD did not expose locomotion state");
