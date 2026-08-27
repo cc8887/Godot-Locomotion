@@ -11,15 +11,19 @@ public sealed class AlsLocomotionGraphBuildResult : IDisposable
 
     internal AlsLocomotionGraphBuildResult(
         AnimationTree tree,
+        Skeleton3D targetSkeleton,
         AlsLocomotionGraphHandles handles,
         List<IDisposable> ownedResources)
     {
         Tree = tree;
+        TargetSkeleton = targetSkeleton;
         Handles = handles;
         _ownedResources = ownedResources;
     }
 
     public AnimationTree Tree { get; }
+
+    public Skeleton3D TargetSkeleton { get; }
 
     public AlsLocomotionGraphHandles Handles { get; }
 
@@ -289,7 +293,8 @@ public static class AlsLocomotionGraphBuilder
             }
             tree.AnimPlayer = handles.AnimationPlayerPath;
 
-            var result = new AlsLocomotionGraphBuildResult(tree, handles, ownedResources);
+            var result = new AlsLocomotionGraphBuildResult(
+                tree, library.Skeleton, handles, ownedResources);
             tree = null;
             handles = null;
             return result;
@@ -707,6 +712,32 @@ public static class AlsLocomotionGraphBuilder
             throw new InvalidOperationException(
                 $"P3 {label} blend grid must span both coordinate axes.");
         }
+
+        var coordinateScale = (double)MathF.Max(
+            maximumX - minimumX,
+            maximumY - minimumY);
+        var areaTolerance = coordinateScale * coordinateScale * CoordinateTolerance;
+        for (var first = 0; first < samples.Count - 2; first++)
+        {
+            for (var second = first + 1; second < samples.Count - 1; second++)
+            {
+                var firstX = (double)samples[second].X - samples[first].X;
+                var firstY = (double)samples[second].Y - samples[first].Y;
+                for (var third = second + 1; third < samples.Count; third++)
+                {
+                    var secondX = (double)samples[third].X - samples[first].X;
+                    var secondY = (double)samples[third].Y - samples[first].Y;
+                    var area = Math.Abs((firstX * secondY) - (firstY * secondX));
+                    if (area > areaTolerance)
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"P3 {label} blend grid must contain a non-collinear sample triangle.");
     }
 
     private static float[] CalculateStandingGaitRadii(

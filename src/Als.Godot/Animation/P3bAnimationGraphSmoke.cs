@@ -46,17 +46,18 @@ public partial class P3bAnimationGraphSmoke : Node
 
         VerifyWarmupFailureRetries(definition, profile, settings);
         VerifyProfileValidation(definition, profile);
+        VerifyGraphTargetSkeletonBinding(definition, profile, settings);
         VerifyApplyAtomicValidation(definition, profile, settings);
 
         using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
         AddChild(library.Root);
         using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
         using var controller = new AlsLocomotionAnimationController(
-            graph, library.Skeleton, settings);
+            graph, settings);
         controller.Warmup();
-        VerifyQuaternionCanonicalization(controller, library.Skeleton);
+        VerifyQuaternionCanonicalization(controller, graph.TargetSkeleton);
         VerifyGaitBlendMapping(controller, graph, settings);
-        VerifyActionNaturalAdvance(controller, graph, library.Skeleton, settings);
+        VerifyActionNaturalAdvance(controller, graph, graph.TargetSkeleton, settings);
 
         var segments = CreateSegments();
         var advanceCountBeforeSegments = controller.ManualAdvanceCount;
@@ -73,7 +74,7 @@ public partial class P3bAnimationGraphSmoke : Node
         long frameId = 0;
         foreach (var segment in segments)
         {
-            var initial = AlsPoseDigest.CapturePoses(library.Skeleton, PoseBoneNames);
+            var initial = AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
             for (var frame = 0; frame < segment.FrameCount; frame++)
             {
                 var result = segment.Result;
@@ -90,7 +91,7 @@ public partial class P3bAnimationGraphSmoke : Node
                 segment.ExpectedStance,
                 segment.Name);
 
-            var current = AlsPoseDigest.CapturePoses(library.Skeleton, PoseBoneNames);
+            var current = AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
             for (var boneIndex = 0; boneIndex < PoseBoneNames.Length; boneIndex++)
             {
                 if (!AlsPoseDigest.HasChanged(
@@ -143,7 +144,7 @@ public partial class P3bAnimationGraphSmoke : Node
         AddChild(library.Root);
         using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
         using var controller = new AlsLocomotionAnimationController(
-            graph, library.Skeleton, settings);
+            graph, settings);
         graph.Dispose();
 
         for (var attempt = 1; attempt <= 2; attempt++)
@@ -204,6 +205,22 @@ public partial class P3bAnimationGraphSmoke : Node
             .Select((sample, index) => sample with { X = 0f, Y = index })
             .ToArray();
         ExpectInvalid("lean degenerate grid", profile with { LeanAdditiveSamples = degenerateLean });
+
+        var collinearLean = profile.LeanAdditiveSamples
+            .Select((sample, index) => sample with { X = index, Y = index })
+            .ToArray();
+        ExpectInvalid("lean collinear grid", profile with { LeanAdditiveSamples = collinearLean });
+
+        var nearlyCollinearLean = profile.LeanAdditiveSamples
+            .Select((sample, index) => sample with
+            {
+                X = index,
+                Y = index + ((index & 1) == 0 ? 1e-6f : -1e-6f),
+            })
+            .ToArray();
+        ExpectInvalid(
+            "lean nearly-collinear grid",
+            profile with { LeanAdditiveSamples = nearlyCollinearLean });
 
         var chainedRadii = profile.StandingSamples.ToArray();
         chainedRadii[0] = chainedRadii[0] with { X = 0f, Y = 0.50009f };
@@ -289,7 +306,7 @@ public partial class P3bAnimationGraphSmoke : Node
             AddChild(library.Root);
             using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
             using var controller = new AlsLocomotionAnimationController(
-                graph, library.Skeleton, settings);
+                graph, settings);
             controller.Warmup();
             var before = CaptureRuntimeSnapshot(controller, graph);
             Exception? rejection = null;
@@ -317,6 +334,69 @@ public partial class P3bAnimationGraphSmoke : Node
                     $"P3 Apply {label} mutated runtime before rejection: " +
                     $"before={before} after={after}");
             }
+        }
+    }
+
+    private void VerifyGraphTargetSkeletonBinding(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile,
+        AlsLocomotionSettings settings)
+    {
+        using var libraryA = AlsAnimationLibraryBuilder.Build(definition, profile);
+        using var libraryB = AlsAnimationLibraryBuilder.Build(definition, profile);
+        AddChild(libraryA.Root);
+        AddChild(libraryB.Root);
+        using var graphA = AlsLocomotionGraphBuilder.Build(libraryA, profile, definition);
+        using var graphB = AlsLocomotionGraphBuilder.Build(libraryB, profile, definition);
+
+        if (!ReferenceEquals(graphA.TargetSkeleton, libraryA.Skeleton) ||
+            ReferenceEquals(graphA.TargetSkeleton, libraryB.Skeleton) ||
+            !ReferenceEquals(graphB.TargetSkeleton, libraryB.Skeleton) ||
+            typeof(AlsLocomotionAnimationController)
+                .GetConstructors()
+                .SelectMany(constructor => constructor.GetParameters())
+                .Any(parameter => parameter.ParameterType == typeof(Skeleton3D)))
+        {
+            throw new InvalidOperationException(
+                "P3 graph/controller API does not enforce its unique target skeleton.");
+        }
+
+        using var controller = new AlsLocomotionAnimationController(graphA, settings);
+        controller.Warmup();
+        var pelvisA = graphA.TargetSkeleton.FindBone("pelvis");
+        var pelvisB = graphB.TargetSkeleton.FindBone("pelvis");
+        if (pelvisA < 0 || pelvisB < 0)
+        {
+            throw new InvalidOperationException("P3 target skeleton fixture is missing pelvis.");
+        }
+
+        var originalA = graphA.TargetSkeleton.GetBonePoseRotation(pelvisA);
+        var originalB = graphB.TargetSkeleton.GetBonePoseRotation(pelvisB);
+        try
+        {
+            var changedRotation = new Quaternion(0f, 0f, 1f, 0f);
+            if (MathF.Abs(originalA.Normalized().Dot(changedRotation)) > 0.99f)
+            {
+                changedRotation = new Quaternion(0.70710677f, 0f, 0f, 0.70710677f);
+            }
+
+            var baselineDigest = controller.ComputePoseDigest(901);
+            graphB.TargetSkeleton.SetBonePoseRotation(pelvisB, changedRotation);
+            var foreignDigest = controller.ComputePoseDigest(901);
+            graphA.TargetSkeleton.SetBonePoseRotation(pelvisA, changedRotation);
+            var targetDigest = controller.ComputePoseDigest(901);
+            if (foreignDigest != baselineDigest || targetDigest == baselineDigest)
+            {
+                throw new InvalidOperationException(
+                    $"P3 controller digest did not bind exclusively to graph target: " +
+                    $"baseline={baselineDigest:X16} foreign={foreignDigest:X16} " +
+                    $"target={targetDigest:X16}");
+            }
+        }
+        finally
+        {
+            graphA.TargetSkeleton.SetBonePoseRotation(pelvisA, originalA);
+            graphB.TargetSkeleton.SetBonePoseRotation(pelvisB, originalB);
         }
     }
 
@@ -742,6 +822,8 @@ public partial class P3bAnimationGraphSmoke : Node
         independentGraph.Dispose();
         independentGraph.Dispose();
         if (!GodotObject.IsInstanceValid(independentLibrary.Root) ||
+            !GodotObject.IsInstanceValid(independentGraph.TargetSkeleton) ||
+            !ReferenceEquals(independentGraph.TargetSkeleton, independentLibrary.Skeleton) ||
             independentLibrary.Player.GetAnimationList().Length != profile.AllAnimationIds.Length)
         {
             throw new InvalidOperationException(
@@ -783,7 +865,7 @@ public partial class P3bAnimationGraphSmoke : Node
         using (var rebuiltGraph = AlsLocomotionGraphBuilder.Build(
                    partialLibrary, profile, definition))
         using (var rebuiltController = new AlsLocomotionAnimationController(
-                   rebuiltGraph, partialLibrary.Skeleton, settings))
+                   rebuiltGraph, settings))
         {
             rebuiltController.Warmup();
         }

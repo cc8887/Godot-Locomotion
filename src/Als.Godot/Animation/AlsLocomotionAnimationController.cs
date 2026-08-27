@@ -29,11 +29,10 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
     public AlsLocomotionAnimationController(
         AlsLocomotionGraphBuildResult graph,
-        Skeleton3D skeleton,
         AlsLocomotionSettings settings)
     {
         _graph = graph ?? throw new ArgumentNullException(nameof(graph));
-        _skeleton = skeleton ?? throw new ArgumentNullException(nameof(skeleton));
+        _skeleton = graph.TargetSkeleton;
         ArgumentNullException.ThrowIfNull(settings);
         _playRateMaximum = settings.PlayRateMaximum;
     }
