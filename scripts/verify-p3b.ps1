@@ -54,6 +54,104 @@ function Invoke-P3bHarness
         -ExpectedCharacterCount $CharacterCount
 }
 
+$inputOutput = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3 demo input' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3_demo_input_smoke.tscn' `
+    -ExpectedExactMarkers @(
+        'GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1') `
+    -ExpectedRegexMarkers @())
+
+$libraryOutput = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3B animation library' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3b_animation_library_smoke.tscn' `
+    -ExpectedExactMarkers @(
+        'GODOT_ALS_P3B_LIBRARY_OK bones=68 clips=28 skeletons=1',
+        'GODOT_ALS_P3B_LIBRARY_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1') `
+    -ExpectedRegexMarkers @())
+
+$presentationOutput = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3 presentation' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3_presentation_smoke.tscn' `
+    -ExpectedExactMarkers @() `
+    -ExpectedRegexMarkers @(
+        '\AGODOT_ALS_P3_PRESENTATION_OK yaws=3 identity=1 root=([0-9A-F]{16})\z'))
+
+$initialRollbackOutput = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3 presentation initial rollback' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3_presentation_smoke.tscn' `
+    -SceneArguments @('--als-failure-policy=initial') `
+    -ExpectedExactMarkers @() `
+    -ExpectedRegexMarkers @(
+        '\AGODOT_ALS_P3B_INITIAL_ROLLBACK_OK mode=parallel corrected=1 visual_ready=0 visible=0 full_pose=([0-9A-F]{16}) root=([0-9A-F]{16})\z'))
+
+$graphOutputFirst = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3B animation graph first' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3b_animation_graph_smoke.tscn' `
+    -ExpectedExactMarkers @(
+        'GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1') `
+    -ExpectedRegexMarkers @(
+        '\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=([0-9A-F]{16}) digest=([0-9A-F]{16})\z'))
+$graphFirst = ConvertFrom-P3bGraphOutput -OutputLines $graphOutputFirst
+
+$graphOutputSecond = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3B animation graph second' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3b_animation_graph_smoke.tscn' `
+    -ExpectedExactMarkers @(
+        'GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1') `
+    -ExpectedRegexMarkers @(
+        '\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=([0-9A-F]{16}) digest=([0-9A-F]{16})\z'))
+$graphSecond = ConvertFrom-P3bGraphOutput -OutputLines $graphOutputSecond
+Assert-P3bGraphPair -First $graphFirst -Second $graphSecond
+
+$frameOrderSingleOutput = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3B frame order single' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3b_frame_order_smoke.tscn' `
+    -SceneArguments @('--als-mode=single') `
+    -ExpectedExactMarkers @() `
+    -ExpectedRegexMarkers @(
+        '\AGODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1\z'))
+$frameOrderSingle = ConvertFrom-P3bFrameOrderOutput `
+    -OutputLines $frameOrderSingleOutput `
+    -ExpectedMode single
+
+$frameOrderParallelOutput = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3B frame order parallel' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/tests/p3b_frame_order_smoke.tscn' `
+    -SceneArguments @('--als-mode=parallel') `
+    -ExpectedExactMarkers @() `
+    -ExpectedRegexMarkers @(
+        '\AGODOT_ALS_P3B_FRAME_ORDER_OK mode=(single|parallel) frames=180 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1\z'))
+$frameOrderParallel = ConvertFrom-P3bFrameOrderOutput `
+    -OutputLines $frameOrderParallelOutput `
+    -ExpectedMode parallel
+Assert-P3bFrameOrderPair -Single $frameOrderSingle -Parallel $frameOrderParallel
+
+$demoOutput = @(Invoke-P3bSceneGate `
+    -PhaseName 'P3 locomotion demo' `
+    -GodotExecutable $GodotExecutable `
+    -ProjectRoot $projectRootPath `
+    -ScenePath 'res://scenes/demo/p3_locomotion_demo.tscn' `
+    -SceneArguments @('--als-smoke-frames=300') `
+    -ExpectedExactMarkers @(
+        'GODOT_ALS_P3_DEMO_OK frames=300 errors=0 ready=1 visible=1 max_visible=1') `
+    -ExpectedRegexMarkers @())
+
 foreach ($characterCount in @(1, 10))
 {
     $single = Invoke-P3bHarness -Mode single -CharacterCount $characterCount

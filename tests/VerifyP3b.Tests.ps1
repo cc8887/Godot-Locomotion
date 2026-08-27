@@ -12,6 +12,7 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
 
 $script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 p95_us=100 p99_us=200'
 $script:ValidFrameOrderMarker = 'GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 recovery_zero_visible=1'
+$script:ValidGraphMarker = 'GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=0123456789ABCDEF digest=1111111111111111'
 $script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0'
 $script:ValidReplacement = 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1'
 $script:ValidPose = 'GODOT_ALS_P3B_POSE character=0 changes=42'
@@ -212,6 +213,422 @@ function Test-P3bCleanWorktreeRejects
     catch
     {
         return $true
+    }
+}
+
+function New-P3bSceneGateProbeScript
+{
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Lines,
+        [int]$ExitCode = 0,
+        [switch]$EmitArguments
+    )
+
+    $path = Join-Path $TestDrive ("scene-gate-{0}.ps1" -f ([Guid]::NewGuid().ToString('N')))
+    $statements = @()
+    for ($index = 0; $index -lt $Lines.Count; $index++)
+    {
+        $command = if ($index -eq 0) { 'Write-Output' } else { 'Write-Host' }
+        $statements += "$command '{0}'" -f $Lines[$index].Replace("'", "''")
+    }
+    if ($EmitArguments)
+    {
+        $statements += "Write-Output ('PROBE_ARGS=' + (`$args -join '|'))"
+    }
+    $statements += "exit $ExitCode"
+    [System.IO.File]::WriteAllText(
+        $path,
+        ($statements -join [Environment]::NewLine) + [Environment]::NewLine)
+    return $path
+}
+
+function Test-P3bSceneGateRejects
+{
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Lines,
+        [int]$ExitCode = 0,
+        [string[]]$ExpectedExactMarkers = @('EXACT_ONE'),
+        [string[]]$ExpectedRegexMarkers = @('\AREGEX value=([0-9A-F]{16})\z')
+    )
+
+    $probe = New-P3bSceneGateProbeScript -Lines $Lines -ExitCode $ExitCode
+    try
+    {
+        Invoke-P3bSceneGate `
+            -PhaseName 'probe' `
+            -GodotExecutable $probe `
+            -ProjectRoot $script:RepositoryRoot `
+            -ScenePath 'res://probe.tscn' `
+            -ExpectedExactMarkers $ExpectedExactMarkers `
+            -ExpectedRegexMarkers $ExpectedRegexMarkers | Out-Null
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
+function Test-P3bGraphParserRejects
+{
+    param(
+        [AllowEmptyCollection()]
+        [object[]]$OutputLines
+    )
+
+    try
+    {
+        ConvertFrom-P3bGraphOutput -OutputLines $OutputLines | Out-Null
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
+function New-P3bGraphParityResult
+{
+    param(
+        [string]$DirectionDigest = '0123456789ABCDEF',
+        [string]$Digest = '1111111111111111'
+    )
+
+    return [pscustomobject]@{
+        DirectionDigest = $DirectionDigest
+        Digest = $Digest
+    }
+}
+
+function Test-P3bGraphPairRejects
+{
+    param(
+        [AllowNull()]
+        [object]$First,
+        [AllowNull()]
+        [object]$Second
+    )
+
+    try
+    {
+        Assert-P3bGraphPair -First $First -Second $Second
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
+function Get-P3bVerifierCommandAsts
+{
+    $tokens = $null
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+        $script:VerifierPath,
+        [ref]$tokens,
+        [ref]$parseErrors)
+    if ($parseErrors.Count -ne 0)
+    {
+        throw "Verifier source did not parse: $($parseErrors -join [Environment]::NewLine)"
+    }
+
+    return @($ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst]
+    }, $true))
+}
+
+Describe 'P3B focused scene gate contracts' {
+    It 'provides strict scene and graph digest gate functions' {
+        Get-Command Invoke-P3bSceneGate -ErrorAction SilentlyContinue |
+            Should Not BeNullOrEmpty
+        Get-Command ConvertFrom-P3bGraphOutput -ErrorAction SilentlyContinue |
+            Should Not BeNullOrEmpty
+        Get-Command Assert-P3bGraphPair -ErrorAction SilentlyContinue |
+            Should Not BeNullOrEmpty
+    }
+
+    It 'accepts multiple unique exact and regex markers from all captured streams' {
+        if ($null -eq (Get-Command Invoke-P3bSceneGate -ErrorAction SilentlyContinue))
+        {
+            return
+        }
+
+        $probe = New-P3bSceneGateProbeScript -Lines @(
+            'EXACT_ONE',
+            'EXACT_TWO',
+            'REGEX value=0123456789ABCDEF',
+            'REGEX_TWO digest=1111111111111111',
+            'GODOT_ALS_P3B_FAILURE_POLICY_OK phase=recovery') -EmitArguments
+        $output = @(Invoke-P3bSceneGate `
+            -PhaseName 'probe' `
+            -GodotExecutable $probe `
+            -ProjectRoot $script:RepositoryRoot `
+            -ScenePath 'res://probe.tscn' `
+            -SceneArguments @('--probe=1') `
+            -ExpectedExactMarkers @('EXACT_ONE', 'EXACT_TWO') `
+            -ExpectedRegexMarkers @(
+                '\AREGEX value=([0-9A-F]{16})\z',
+                '\AREGEX_TWO digest=([0-9A-F]{16})\z'))
+
+        @($output | Where-Object { $_ -ceq 'EXACT_ONE' }).Count | Should Be 1
+        @($output | Where-Object {
+            $_ -ceq 'REGEX_TWO digest=1111111111111111'
+        }).Count | Should Be 1
+        $expectedArguments = 'PROBE_ARGS=--headless|--path|{0}|res://probe.tscn|--|--probe=1' -f `
+            (Resolve-Path -LiteralPath $script:RepositoryRoot).Path
+        @($output | Where-Object { $_ -ceq $expectedArguments }).Count | Should Be 1
+    }
+
+    It 'rejects nonzero exit engine errors and exact ALS failure marker lines' {
+        if ($null -eq (Get-Command Invoke-P3bSceneGate -ErrorAction SilentlyContinue))
+        {
+            return
+        }
+
+        $valid = @('EXACT_ONE', 'REGEX value=0123456789ABCDEF')
+        Test-P3bSceneGateRejects -Lines $valid -ExitCode 7 | Should Be $true
+        foreach ($failureLine in @(
+            'SCRIPT ERROR: failed',
+            'Godot: ERROR: failed',
+            'GODOT_ALS_P3B_FAIL code=runtime',
+            'GODOT_ALS_P3_DEMO_INPUT_FAIL code=input',
+            'GODOT_ALS_P3_DEMO_FAIL code=demo',
+            'GODOT_ALS_P3_PRESENTATION_FAIL code=presentation'))
+        {
+            Test-P3bSceneGateRejects -Lines ($valid + $failureLine) | Should Be $true
+        }
+    }
+
+    It 'rejects every missing duplicate and malformed expected marker' {
+        if ($null -eq (Get-Command Invoke-P3bSceneGate -ErrorAction SilentlyContinue))
+        {
+            return
+        }
+
+        Test-P3bSceneGateRejects -Lines @('REGEX value=0123456789ABCDEF') |
+            Should Be $true
+        Test-P3bSceneGateRejects -Lines @(
+            'EXACT_ONE', 'EXACT_ONE', 'REGEX value=0123456789ABCDEF') |
+            Should Be $true
+        Test-P3bSceneGateRejects -Lines @('EXACT_ONE') | Should Be $true
+        Test-P3bSceneGateRejects -Lines @(
+            'EXACT_ONE',
+            'REGEX value=0123456789ABCDEF',
+            'REGEX value=1111111111111111') | Should Be $true
+        Test-P3bSceneGateRejects -Lines @('EXACT_ONE', 'REGEX value=malformed') |
+            Should Be $true
+        Test-P3bSceneGateRejects -Lines @(
+            'EXACT_ONE',
+            'EXACT_ONE malformed',
+            'REGEX value=0123456789ABCDEF') | Should Be $true
+        Test-P3bSceneGateRejects -Lines @(
+            'EXACT_ONE',
+            'REGEX value=0123456789ABCDEF',
+            'REGEX value=malformed') | Should Be $true
+    }
+
+    It 'parses both graph captures and rejects malformed duplicate or failed output' {
+        if ($null -eq (Get-Command ConvertFrom-P3bGraphOutput -ErrorAction SilentlyContinue))
+        {
+            return
+        }
+
+        $result = ConvertFrom-P3bGraphOutput -OutputLines @($script:ValidGraphMarker)
+        $result.DirectionDigest | Should Be '0123456789ABCDEF'
+        $result.Digest | Should Be '1111111111111111'
+        Test-P3bGraphParserRejects -OutputLines @() | Should Be $true
+        Test-P3bGraphParserRejects -OutputLines @(
+            $script:ValidGraphMarker,
+            $script:ValidGraphMarker) |
+            Should Be $true
+        Test-P3bGraphParserRejects -OutputLines @($script:ValidGraphMarker + ' extra=1') |
+            Should Be $true
+        Test-P3bGraphParserRejects -OutputLines @('GODOT_ALS_P3B_FAIL code=graph') |
+            Should Be $true
+    }
+
+    It 'requires both graph digest captures to be valid and equal' {
+        if ($null -eq (Get-Command Assert-P3bGraphPair -ErrorAction SilentlyContinue))
+        {
+            return
+        }
+
+        Assert-P3bGraphPair `
+            -First (New-P3bGraphParityResult) `
+            -Second (New-P3bGraphParityResult)
+        foreach ($field in @('DirectionDigest', 'Digest'))
+        {
+            $first = New-P3bGraphParityResult
+            $second = New-P3bGraphParityResult
+            $first.$field = 'AAAAAAAAAAAAAAAA'
+            Test-P3bGraphPairRejects -First $first -Second $second | Should Be $true
+
+            $first = New-P3bGraphParityResult
+            $second = New-P3bGraphParityResult
+            $first.PSObject.Properties.Remove($field)
+            Test-P3bGraphPairRejects -First $first -Second $second | Should Be $true
+
+            foreach ($invalidValue in @($null, '', 'abcdef0123456789', '0123456789ABCDEG', 42))
+            {
+                $first = New-P3bGraphParityResult
+                $second = New-P3bGraphParityResult
+                $first.$field = $invalidValue
+                $second.$field = $invalidValue
+                Test-P3bGraphPairRejects -First $first -Second $second |
+                    Should Be $true
+            }
+        }
+    }
+
+    It 'runs all focused scene gates in the required order before the harness matrix' {
+        $commands = @(Get-P3bVerifierCommandAsts)
+        $sceneCalls = @($commands | Where-Object {
+            $_.GetCommandName() -ceq 'Invoke-P3bSceneGate'
+        })
+        $sceneCalls.Count | Should Be 9
+        if ($sceneCalls.Count -ne 9)
+        {
+            return
+        }
+
+        $inputCall = @($sceneCalls | Where-Object {
+            $_.Extent.Text.Contains('p3_demo_input_smoke.tscn')
+        })
+        $libraryCall = @($sceneCalls | Where-Object {
+            $_.Extent.Text.Contains('p3b_animation_library_smoke.tscn')
+        })
+        $presentationCalls = @($sceneCalls | Where-Object {
+            $_.Extent.Text.Contains('p3_presentation_smoke.tscn')
+        } | Sort-Object { $_.Extent.StartOffset })
+        $graphCalls = @($sceneCalls | Where-Object {
+            $_.Extent.Text.Contains('p3b_animation_graph_smoke.tscn')
+        } | Sort-Object { $_.Extent.StartOffset })
+        $frameCalls = @($sceneCalls | Where-Object {
+            $_.Extent.Text.Contains('p3b_frame_order_smoke.tscn')
+        })
+        $frameSingle = @($frameCalls | Where-Object {
+            $_.Extent.Text.Contains('--als-mode=single')
+        })
+        $frameParallel = @($frameCalls | Where-Object {
+            $_.Extent.Text.Contains('--als-mode=parallel')
+        })
+        $demoCall = @($sceneCalls | Where-Object {
+            $_.Extent.Text.Contains('p3_locomotion_demo.tscn')
+        })
+
+        @(
+            $inputCall.Count,
+            $libraryCall.Count,
+            $presentationCalls.Count,
+            $graphCalls.Count,
+            $frameSingle.Count,
+            $frameParallel.Count,
+            $demoCall.Count) -join ',' | Should Be '1,1,2,2,1,1,1'
+        if ($inputCall.Count -ne 1 -or $libraryCall.Count -ne 1 -or
+            $presentationCalls.Count -ne 2 -or $graphCalls.Count -ne 2 -or
+            $frameSingle.Count -ne 1 -or $frameParallel.Count -ne 1 -or
+            $demoCall.Count -ne 1)
+        {
+            return
+        }
+
+        $presentationCalls[0].Extent.Text | Should Not Match '--als-failure-policy=initial'
+        $presentationCalls[1].Extent.Text | Should Match '--als-failure-policy=initial'
+        $demoCall[0].Extent.Text | Should Match '--als-smoke-frames=300'
+        $inputCall[0].Extent.Text | Should Match 'GODOT_ALS_P3_DEMO_INPUT_OK'
+        $libraryCall[0].Extent.Text | Should Match 'GODOT_ALS_P3B_LIBRARY_OK'
+        $libraryCall[0].Extent.Text | Should Match 'GODOT_ALS_P3B_LIBRARY_LIFECYCLE_OK'
+        $presentationCalls[0].Extent.Text | Should Match 'GODOT_ALS_P3_PRESENTATION_OK'
+        $presentationCalls[1].Extent.Text | Should Match 'GODOT_ALS_P3B_INITIAL_ROLLBACK_OK'
+        foreach ($graphCall in $graphCalls)
+        {
+            $graphCall.Extent.Text | Should Match 'GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK'
+            $graphCall.Extent.Text | Should Match 'GODOT_ALS_P3B_GRAPH_OK'
+        }
+        $frameSingle[0].Extent.Text | Should Match 'GODOT_ALS_P3B_FRAME_ORDER_OK'
+        $frameParallel[0].Extent.Text | Should Match 'GODOT_ALS_P3B_FRAME_ORDER_OK'
+        $demoCall[0].Extent.Text | Should Match 'GODOT_ALS_P3_DEMO_OK'
+        $orderedOffsets = @(
+            $inputCall[0].Extent.StartOffset,
+            $libraryCall[0].Extent.StartOffset,
+            $presentationCalls[0].Extent.StartOffset,
+            $presentationCalls[1].Extent.StartOffset,
+            $graphCalls[0].Extent.StartOffset,
+            $graphCalls[1].Extent.StartOffset,
+            $frameSingle[0].Extent.StartOffset,
+            $frameParallel[0].Extent.StartOffset,
+            $demoCall[0].Extent.StartOffset)
+        ($orderedOffsets -join ',') | Should Be (($orderedOffsets | Sort-Object) -join ',')
+        $matrixIndex = $script:VerifierSource.IndexOf('foreach ($characterCount in @(1, 10))')
+        $matrixIndex | Should BeGreaterThan $demoCall[0].Extent.EndOffset
+    }
+
+    It 'uses strict marker contracts and compares graph and frame-order pairs before the matrix' {
+        $commands = @(Get-P3bVerifierCommandAsts)
+        $sceneCalls = @($commands | Where-Object {
+            $_.GetCommandName() -ceq 'Invoke-P3bSceneGate'
+        })
+        $sceneText = $sceneCalls.Extent.Text -join [Environment]::NewLine
+        foreach ($marker in @(
+            'GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1',
+            'GODOT_ALS_P3B_LIBRARY_OK bones=68 clips=28 skeletons=1',
+            'GODOT_ALS_P3B_LIBRARY_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1',
+            'GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1',
+            'GODOT_ALS_P3_DEMO_OK frames=300 errors=0 ready=1 visible=1 max_visible=1'))
+        {
+            $sceneText | Should Match ([regex]::Escape($marker))
+        }
+        foreach ($regexMarkerName in @(
+            'GODOT_ALS_P3_PRESENTATION_OK',
+            'GODOT_ALS_P3B_INITIAL_ROLLBACK_OK',
+            'GODOT_ALS_P3B_GRAPH_OK',
+            'GODOT_ALS_P3B_FRAME_ORDER_OK'))
+        {
+            $sceneText | Should Match $regexMarkerName
+        }
+
+        $graphParsers = @($commands | Where-Object {
+            $_.GetCommandName() -ceq 'ConvertFrom-P3bGraphOutput'
+        })
+        $graphPairs = @($commands | Where-Object {
+            $_.GetCommandName() -ceq 'Assert-P3bGraphPair'
+        })
+        $frameParsers = @($commands | Where-Object {
+            $_.GetCommandName() -ceq 'ConvertFrom-P3bFrameOrderOutput'
+        })
+        $framePairs = @($commands | Where-Object {
+            $_.GetCommandName() -ceq 'Assert-P3bFrameOrderPair'
+        })
+        $graphParsers.Count | Should Be 2
+        $graphPairs.Count | Should Be 1
+        $frameParsers.Count | Should Be 2
+        $framePairs.Count | Should Be 1
+        if ($graphParsers.Count -eq 2 -and $graphPairs.Count -eq 1 -and
+            $frameParsers.Count -eq 2 -and $framePairs.Count -eq 1)
+        {
+            $graphParsers = @($graphParsers | Sort-Object { $_.Extent.StartOffset })
+            $frameParsers = @($frameParsers | Sort-Object { $_.Extent.StartOffset })
+            $graphCalls = @($sceneCalls | Where-Object {
+                $_.Extent.Text.Contains('p3b_animation_graph_smoke.tscn')
+            } | Sort-Object { $_.Extent.StartOffset })
+            $frameCalls = @($sceneCalls | Where-Object {
+                $_.Extent.Text.Contains('p3b_frame_order_smoke.tscn')
+            } | Sort-Object { $_.Extent.StartOffset })
+            ($graphCalls[0].Extent.StartOffset -lt $graphParsers[0].Extent.StartOffset -and
+                $graphParsers[0].Extent.StartOffset -lt $graphCalls[1].Extent.StartOffset -and
+                $graphCalls[1].Extent.StartOffset -lt $graphParsers[1].Extent.StartOffset -and
+                $graphParsers[1].Extent.StartOffset -lt $graphPairs[0].Extent.StartOffset) |
+                Should Be $true
+            ($frameCalls[0].Extent.StartOffset -lt $frameParsers[0].Extent.StartOffset -and
+                $frameParsers[0].Extent.StartOffset -lt $frameCalls[1].Extent.StartOffset -and
+                $frameCalls[1].Extent.StartOffset -lt $frameParsers[1].Extent.StartOffset -and
+                $frameParsers[1].Extent.StartOffset -lt $framePairs[0].Extent.StartOffset) |
+                Should Be $true
+        }
     }
 }
 
