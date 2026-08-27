@@ -99,7 +99,7 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
             "move_forward",
             "move_back");
         return new AlsPlayerInputSnapshot(
-            new NumericsVector2(movement.X, movement.Y),
+            new NumericsVector2(movement.X, -movement.Y),
             Input.IsActionPressed("walk"),
             Input.IsActionPressed("sprint"),
             Input.IsActionJustPressed("crouch_toggle"),
