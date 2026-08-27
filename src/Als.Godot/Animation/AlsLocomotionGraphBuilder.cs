@@ -207,6 +207,8 @@ public static class AlsLocomotionGraphBuilder
 {
     private const string LibraryName = "als";
     private const float TransitionTime = 0.08f;
+    private const float CoordinateTolerance = 1e-5f;
+    private const float RingTolerance = 1e-4f;
 
     public static AlsLocomotionGraphBuildResult Build(
         AlsAnimationLibraryBuildResult library,
@@ -217,13 +219,14 @@ public static class AlsLocomotionGraphBuilder
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(animationSet);
         ValidateInputs(library, profile, animationSet);
+        var layout = ValidateProfileLayout(profile);
 
         var ownedResources = new List<IDisposable>();
         AlsLocomotionGraphHandles? handles = null;
         AnimationTree? tree = null;
         try
         {
-            handles = CreateHandles(profile);
+            handles = CreateHandles(layout);
             var top = Own(ownedResources, new AnimationNodeStateMachine
             {
                 StateMachineType = AnimationNodeStateMachine.StateMachineTypeEnum.Root,
@@ -339,39 +342,71 @@ public static class AlsLocomotionGraphBuilder
         }
     }
 
-    private static AlsLocomotionGraphHandles CreateHandles(
-        AlsLocomotionAnimationProfile profile)
+    private static AlsLocomotionGraphHandles CreateHandles(GraphProfileLayout layout)
     {
-        var stateNames = new[]
+        var allocated = new List<IDisposable>();
+        try
         {
-            new StringName("Grounded"),
-            new StringName("JumpStart"),
-            new StringName("FallLoop"),
-            new StringName("LandRecovery"),
-        };
-        var stanceNames = new[]
+            var stateNames = new[]
+            {
+                AllocateHandle(allocated, new StringName("Grounded")),
+                AllocateHandle(allocated, new StringName("JumpStart")),
+                AllocateHandle(allocated, new StringName("FallLoop")),
+                AllocateHandle(allocated, new StringName("LandRecovery")),
+            };
+            var stanceNames = new[]
+            {
+                AllocateHandle(allocated, new StringName("Standing")),
+                AllocateHandle(allocated, new StringName("Crouching")),
+            };
+            var animationPlayerPath = AllocateHandle(
+                allocated, new NodePath("../AlsAnimationPlayer"));
+            var topPlaybackPath = AllocateHandle(
+                allocated, new StringName("parameters/playback"));
+            var groundedPlaybackPath = AllocateHandle(
+                allocated, new StringName("parameters/Grounded/playback"));
+            var groundedStanding = CreateParameterSet(
+                "Grounded/Standing",
+                true,
+                true,
+                layout.StandingBounds,
+                layout.LeanBounds,
+                allocated);
+            var groundedCrouching = CreateParameterSet(
+                "Grounded/Crouching",
+                true,
+                true,
+                layout.CrouchingBounds,
+                layout.LeanBounds,
+                allocated);
+            var jumpStart = CreateParameterSet(
+                "JumpStart", false, false, default, layout.LeanBounds, allocated);
+            var fallLoop = CreateParameterSet(
+                "FallLoop", false, false, default, layout.LeanBounds, allocated);
+            var landRecovery = CreateParameterSet(
+                "LandRecovery", false, false, default, layout.LeanBounds, allocated);
+            return new AlsLocomotionGraphHandles(
+                animationPlayerPath,
+                topPlaybackPath,
+                groundedPlaybackPath,
+                stateNames,
+                stanceNames,
+                layout.StandingGaitRadii,
+                layout.CrouchingRadius,
+                groundedStanding,
+                groundedCrouching,
+                jumpStart,
+                fallLoop,
+                landRecovery);
+        }
+        catch
         {
-            new StringName("Standing"),
-            new StringName("Crouching"),
-        };
-        var standingGaitRadii = CalculateStandingGaitRadii(profile.StandingSamples);
-        var crouchingRadius = CalculateCrouchingRadius(profile.CrouchingSamples);
-        var leanBounds = Bounds(profile.LeanAdditiveSamples, false);
-        var standingBounds = RadialBounds(standingGaitRadii[(int)AlsGait.Sprinting]);
-        var crouchingBounds = RadialBounds(crouchingRadius);
-        return new AlsLocomotionGraphHandles(
-            new NodePath("../AlsAnimationPlayer"),
-            new StringName("parameters/playback"),
-            new StringName("parameters/Grounded/playback"),
-            stateNames,
-            stanceNames,
-            standingGaitRadii,
-            crouchingRadius,
-            CreateParameterSet("Grounded/Standing", true, true, standingBounds, leanBounds),
-            CreateParameterSet("Grounded/Crouching", true, true, crouchingBounds, leanBounds),
-            CreateParameterSet("JumpStart", false, false, default, leanBounds),
-            CreateParameterSet("FallLoop", false, false, default, leanBounds),
-            CreateParameterSet("LandRecovery", false, false, default, leanBounds));
+            for (var index = allocated.Count - 1; index >= 0; index--)
+            {
+                allocated[index].Dispose();
+            }
+            throw;
+        }
     }
 
     private static AlsLocomotionGraphParameterSet CreateParameterSet(
@@ -379,14 +414,21 @@ public static class AlsLocomotionGraphBuilder
         bool hasBlendPosition,
         bool hasPhasePath,
         (Vector2 Minimum, Vector2 Maximum) blendBounds,
-        (Vector2 Minimum, Vector2 Maximum) leanBounds) => new(
+        (Vector2 Minimum, Vector2 Maximum) leanBounds,
+        List<IDisposable> allocated) => new(
             hasBlendPosition
-                ? new StringName($"parameters/{prefix}/Locomotion/blend_position")
+                ? AllocateHandle(
+                    allocated,
+                    new StringName($"parameters/{prefix}/Locomotion/blend_position"))
                 : null,
-            new StringName($"parameters/{prefix}/Lean/blend_position"),
-            new StringName($"parameters/{prefix}/LeanAdd/add_amount"),
-            new StringName($"parameters/{prefix}/Scale/scale"),
-            hasPhasePath ? new StringName($"parameters/{prefix}/Seek/seek_request") : null,
+            AllocateHandle(allocated, new StringName($"parameters/{prefix}/Lean/blend_position")),
+            AllocateHandle(allocated, new StringName($"parameters/{prefix}/LeanAdd/add_amount")),
+            AllocateHandle(allocated, new StringName($"parameters/{prefix}/Scale/scale")),
+            hasPhasePath
+                ? AllocateHandle(
+                    allocated,
+                    new StringName($"parameters/{prefix}/Seek/seek_request"))
+                : null,
             blendBounds.Minimum,
             blendBounds.Maximum,
             leanBounds.Minimum,
@@ -599,49 +641,126 @@ public static class AlsLocomotionGraphBuilder
         return (minimum, maximum);
     }
 
+    private static GraphProfileLayout ValidateProfileLayout(
+        AlsLocomotionAnimationProfile profile)
+    {
+        ValidateSampleGrid("standing", profile.StandingSamples);
+        ValidateSampleGrid("crouching", profile.CrouchingSamples);
+        ValidateSampleGrid("lean", profile.LeanAdditiveSamples);
+
+        var standingGaitRadii = CalculateStandingGaitRadii(profile.StandingSamples);
+        var crouchingRadius = CalculateCrouchingRadius(profile.CrouchingSamples);
+        return new GraphProfileLayout(
+            standingGaitRadii,
+            crouchingRadius,
+            RadialBounds(standingGaitRadii[(int)AlsGait.Sprinting]),
+            RadialBounds(crouchingRadius),
+            Bounds(profile.LeanAdditiveSamples, false));
+    }
+
+    private static void ValidateSampleGrid(
+        string label,
+        IReadOnlyList<AlsLocomotionAnimationSample> samples)
+    {
+        if (samples.Count < 3)
+        {
+            throw new InvalidOperationException(
+                $"P3 {label} blend grid must contain at least three samples.");
+        }
+
+        var minimumX = float.PositiveInfinity;
+        var minimumY = float.PositiveInfinity;
+        var maximumX = float.NegativeInfinity;
+        var maximumY = float.NegativeInfinity;
+        for (var index = 0; index < samples.Count; index++)
+        {
+            var sample = samples[index];
+            if (!float.IsFinite(sample.X) ||
+                !float.IsFinite(sample.Y) ||
+                !float.IsFinite(sample.RateScale) ||
+                sample.RateScale <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"P3 {label} blend grid contains an invalid sample at index {index}.");
+            }
+
+            for (var previous = 0; previous < index; previous++)
+            {
+                if (MathF.Abs(sample.X - samples[previous].X) <= CoordinateTolerance &&
+                    MathF.Abs(sample.Y - samples[previous].Y) <= CoordinateTolerance)
+                {
+                    throw new InvalidOperationException(
+                        $"P3 {label} blend grid contains duplicate coordinates at " +
+                        $"indices {previous} and {index}.");
+                }
+            }
+
+            minimumX = MathF.Min(minimumX, sample.X);
+            minimumY = MathF.Min(minimumY, sample.Y);
+            maximumX = MathF.Max(maximumX, sample.X);
+            maximumY = MathF.Max(maximumY, sample.Y);
+        }
+
+        if (maximumX - minimumX <= CoordinateTolerance ||
+            maximumY - minimumY <= CoordinateTolerance)
+        {
+            throw new InvalidOperationException(
+                $"P3 {label} blend grid must span both coordinate axes.");
+        }
+    }
+
     private static float[] CalculateStandingGaitRadii(
         IReadOnlyList<AlsLocomotionAnimationSample> samples)
     {
-        const float tolerance = 1e-4f;
-        var radii = new List<float>(3);
-        foreach (var sample in samples)
+        var sortedRadii = samples
+            .Select(sample => MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y)))
+            .OrderBy(radius => radius)
+            .ToArray();
+        if (sortedRadii[0] <= RingTolerance)
         {
-            var radius = MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y));
-            if (radius <= tolerance)
+            throw new InvalidOperationException(
+                "P3 standing locomotion sample cannot occupy the idle origin.");
+        }
+
+        var clusters = new List<List<float>>(3);
+        foreach (var radius in sortedRadii)
+        {
+            if (clusters.Count == 0 ||
+                radius - clusters[^1][0] > RingTolerance)
             {
-                throw new InvalidOperationException(
-                    "P3 standing locomotion sample cannot occupy the idle origin.");
+                clusters.Add(new List<float> { radius });
             }
-            if (!radii.Any(existing => MathF.Abs(existing - radius) <= tolerance))
+            else
             {
-                radii.Add(radius);
+                clusters[^1].Add(radius);
             }
         }
-        radii.Sort();
-        if (radii.Count != 3)
+        if (clusters.Count != 3)
         {
             throw new InvalidOperationException(
                 $"P3 standing locomotion profile must contain exactly three gait rings: " +
-                $"actual={radii.Count}");
+                $"actual={clusters.Count}");
         }
-        return radii.ToArray();
+
+        return clusters
+            .Select(cluster => (float)cluster.Average(value => (double)value))
+            .ToArray();
     }
 
     private static float CalculateCrouchingRadius(
         IReadOnlyList<AlsLocomotionAnimationSample> samples)
     {
-        const float tolerance = 1e-4f;
-        var outerRadius = samples
+        var sortedRadii = samples
             .Select(sample => MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y)))
-            .Max();
-        if (outerRadius <= tolerance ||
-            samples.Any(sample => MathF.Abs(
-                MathF.Sqrt((sample.X * sample.X) + (sample.Y * sample.Y)) - outerRadius) > tolerance))
+            .OrderBy(radius => radius)
+            .ToArray();
+        if (sortedRadii[0] <= RingTolerance ||
+            sortedRadii[^1] - sortedRadii[0] > RingTolerance)
         {
             throw new InvalidOperationException(
                 "P3 crouching locomotion profile must contain one nonzero outer ring.");
         }
-        return outerRadius;
+        return (float)sortedRadii.Average(value => (double)value);
     }
 
     private static (Vector2 Minimum, Vector2 Maximum) RadialBounds(float radius)
@@ -659,4 +778,18 @@ public static class AlsLocomotionGraphBuilder
         resources.Add(resource);
         return resource;
     }
+
+    private static T AllocateHandle<T>(List<IDisposable> allocated, T handle)
+        where T : IDisposable
+    {
+        allocated.Add(handle);
+        return handle;
+    }
+
+    private readonly record struct GraphProfileLayout(
+        float[] StandingGaitRadii,
+        float CrouchingRadius,
+        (Vector2 Minimum, Vector2 Maximum) StandingBounds,
+        (Vector2 Minimum, Vector2 Maximum) CrouchingBounds,
+        (Vector2 Minimum, Vector2 Maximum) LeanBounds);
 }

@@ -1,10 +1,14 @@
 using Godot;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Animation;
 
 public sealed class AlsLocomotionAnimationController : IDisposable
 {
+    private const int WarmupUninitialized = 0;
+    private const int WarmupInitializing = 1;
+    private const int WarmupReady = 2;
     private const ulong DigestOffsetBasis = 14695981039346656037UL;
     private const ulong DigestPrime = 1099511628211UL;
     private const float QuantizationScale = 100_000f;
@@ -16,18 +20,22 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
     private readonly AlsLocomotionGraphBuildResult _graph;
     private readonly Skeleton3D _skeleton;
+    private readonly float _playRateMaximum;
     private readonly int[] _poseBoneIndices = new int[PoseBoneNames.Length];
     private AnimationNodeStateMachinePlayback? _topPlayback;
     private AnimationNodeStateMachinePlayback? _groundedPlayback;
-    private int _warmed;
+    private int _warmupState;
     private int _disposed;
 
     public AlsLocomotionAnimationController(
         AlsLocomotionGraphBuildResult graph,
-        Skeleton3D skeleton)
+        Skeleton3D skeleton,
+        AlsLocomotionSettings settings)
     {
         _graph = graph ?? throw new ArgumentNullException(nameof(graph));
         _skeleton = skeleton ?? throw new ArgumentNullException(nameof(skeleton));
+        ArgumentNullException.ThrowIfNull(settings);
+        _playRateMaximum = settings.PlayRateMaximum;
     }
 
     public AlsAnimationState ActiveAnimationState { get; private set; } = AlsAnimationState.Grounded;
@@ -39,43 +47,69 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     public void Warmup()
     {
         ThrowIfDisposed();
-        if (Interlocked.Exchange(ref _warmed, 1) != 0)
+        var previousState = Interlocked.CompareExchange(
+            ref _warmupState,
+            WarmupInitializing,
+            WarmupUninitialized);
+        if (previousState == WarmupReady)
         {
             return;
         }
-        if (!GodotObject.IsInstanceValid(_graph.Tree) ||
-            !GodotObject.IsInstanceValid(_skeleton))
+        if (previousState == WarmupInitializing)
         {
-            throw new ObjectDisposedException(nameof(AlsLocomotionGraphBuildResult));
+            throw new InvalidOperationException(
+                "P3 locomotion animation controller Warmup() is already initializing.");
         }
 
         try
         {
+            if (!GodotObject.IsInstanceValid(_graph.Tree) ||
+                !GodotObject.IsInstanceValid(_skeleton))
+            {
+                throw new ObjectDisposedException(nameof(AlsLocomotionGraphBuildResult));
+            }
+
             _graph.Tree.Active = true;
-            _topPlayback = GetPlayback(_graph.Handles.TopPlaybackPath, "top");
-            _groundedPlayback = GetPlayback(_graph.Handles.GroundedPlaybackPath, "Grounded");
+            var topPlayback = GetPlayback(_graph.Handles.TopPlaybackPath, "top");
+            var groundedPlayback = GetPlayback(_graph.Handles.GroundedPlaybackPath, "Grounded");
+            var poseBoneIndices = new int[PoseBoneNames.Length];
             for (var index = 0; index < PoseBoneNames.Length; index++)
             {
-                _poseBoneIndices[index] = _skeleton.FindBone(PoseBoneNames[index]);
-                if (_poseBoneIndices[index] < 0)
+                poseBoneIndices[index] = _skeleton.FindBone(PoseBoneNames[index]);
+                if (poseBoneIndices[index] < 0)
                 {
                     throw new InvalidOperationException(
                         $"P3 graph pose digest bone is missing: {PoseBoneNames[index]}");
                 }
             }
 
-            _topPlayback.Start(
+            topPlayback.Start(
                 _graph.Handles.StateNames[(int)AlsAnimationState.Grounded], true);
-            _groundedPlayback.Start(
+            groundedPlayback.Start(
                 _graph.Handles.StanceNames[(int)AlsStance.Standing], true);
-            SetParameters(_graph.Handles.GroundedStanding, Vector2.Zero, 1f, Vector2.Zero, 0f);
+            SetParameters(
+                _graph.Handles.GroundedStanding,
+                Vector2.Zero,
+                1f,
+                Vector2.Zero,
+                0f,
+                0f);
             _graph.Tree.Advance(0.0);
+
+            _topPlayback = topPlayback;
+            _groundedPlayback = groundedPlayback;
+            poseBoneIndices.CopyTo(_poseBoneIndices, 0);
+            Volatile.Write(ref _warmupState, WarmupReady);
         }
         catch
         {
-            Interlocked.Exchange(ref _warmed, 0);
             _topPlayback = null;
             _groundedPlayback = null;
+            if (GodotObject.IsInstanceValid(_graph.Tree))
+            {
+                _graph.Tree.Active = false;
+            }
+            Volatile.Write(ref _warmupState, WarmupUninitialized);
             throw;
         }
     }
@@ -83,11 +117,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     public void Apply(in AlsFrameResult result, double deltaTime)
     {
         ThrowIfDisposed();
-        if (Volatile.Read(ref _warmed) == 0)
+        if (Volatile.Read(ref _warmupState) != WarmupReady)
         {
             throw new InvalidOperationException("P3 locomotion animation controller must be warmed before Apply().");
         }
-        Validate(result, deltaTime);
+        var prepared = Prepare(result, deltaTime);
 
         var stateChanged = result.AnimationState != ActiveAnimationState;
         if (stateChanged)
@@ -104,13 +138,13 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                 _graph.Handles.StanceNames[(int)result.ActualStance], true);
         }
 
-        var parameters = GetParameters(result.AnimationState, result.ActualStance);
-        var blend = MapBlendPosition(result);
-        var lean = new Vector2(result.Lean.X, result.Lean.Y);
-        var effectivePlayRate = result.AnimationState == AlsAnimationState.Grounded
-            ? result.PlayRate * result.Stride
-            : 1f;
-        SetParameters(parameters, blend, effectivePlayRate, lean, result.AnimationPhase);
+        SetParameters(
+            prepared.Parameters,
+            prepared.Blend,
+            prepared.EffectivePlayRate,
+            prepared.Lean,
+            prepared.LeanAmount,
+            prepared.Phase);
 
         _graph.Tree.Advance(deltaTime);
         ManualAdvanceCount++;
@@ -121,7 +155,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     public ulong ComputePoseDigest(long frameId)
     {
         ThrowIfDisposed();
-        if (Volatile.Read(ref _warmed) == 0)
+        if (Volatile.Read(ref _warmupState) != WarmupReady)
         {
             throw new InvalidOperationException(
                 "P3 locomotion animation controller must be warmed before pose digest computation.");
@@ -133,11 +167,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             var boneIndex = _poseBoneIndices[index];
             var position = _skeleton.GetBonePosePosition(boneIndex);
-            var rotation = _skeleton.GetBonePoseRotation(boneIndex).Normalized();
-            if (rotation.W < 0f)
-            {
-                rotation = new Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W);
-            }
+            var rotation = AlsPoseDigest.CanonicalizeRotation(
+                _skeleton.GetBonePoseRotation(boneIndex));
             var scale = _skeleton.GetBonePoseScale(boneIndex);
             Append(ref digest, position);
             Append(ref digest, rotation);
@@ -182,18 +213,17 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         Vector2 blend,
         float playRate,
         Vector2 lean,
+        float leanAmount,
         float phase)
     {
         if (parameters.BlendPositionPath is not null)
         {
             _graph.Tree.Set(
                 parameters.BlendPositionPath,
-                Clamp(blend, parameters.BlendMinimum, parameters.BlendMaximum));
+                blend);
         }
-        _graph.Tree.Set(
-            parameters.LeanPositionPath,
-            Clamp(lean, parameters.LeanMinimum, parameters.LeanMaximum));
-        _graph.Tree.Set(parameters.LeanAmountPath, lean.LengthSquared() > 1e-12f ? 1f : 0f);
+        _graph.Tree.Set(parameters.LeanPositionPath, lean);
+        _graph.Tree.Set(parameters.LeanAmountPath, leanAmount);
         _graph.Tree.Set(parameters.PlayRatePath, playRate);
         if (parameters.PhasePath is not null)
         {
@@ -223,7 +253,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         Math.Clamp(value.X, minimum.X, maximum.X),
         Math.Clamp(value.Y, minimum.Y, maximum.Y));
 
-    private static void Validate(in AlsFrameResult result, double deltaTime)
+    private PreparedApply Prepare(in AlsFrameResult result, double deltaTime)
     {
         if (!double.IsFinite(deltaTime) || deltaTime < 0.0)
         {
@@ -237,17 +267,25 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             throw new ArgumentOutOfRangeException(nameof(result), "Stance is invalid.");
         }
+        if ((uint)result.ActualGait > (uint)AlsGait.Sprinting)
+        {
+            throw new ArgumentOutOfRangeException(nameof(result), "Gait is invalid.");
+        }
         if (!float.IsFinite(result.BlendCoordinates.X) ||
             !float.IsFinite(result.BlendCoordinates.Y) ||
             !float.IsFinite(result.Stride) ||
             result.Stride < 0f || result.Stride > 1f ||
             !float.IsFinite(result.PlayRate) ||
             result.PlayRate <= 0f ||
+            result.PlayRate > _playRateMaximum ||
             !float.IsFinite(result.Lean.X) ||
             !float.IsFinite(result.Lean.Y) ||
             !float.IsFinite(result.AnimationPhase))
         {
-            throw new ArgumentException("P3 animation parameters must be finite and valid.", nameof(result));
+            throw new ArgumentOutOfRangeException(
+                nameof(result),
+                $"P3 animation parameters must be finite and within the fixed settings range; " +
+                $"playRateMaximum={_playRateMaximum:R}.");
         }
         if (result.AnimationState == AlsAnimationState.LandRecovery &&
             result.ResolvedLocomotionState != AlsLocomotionState.Grounded)
@@ -255,6 +293,48 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             throw new ArgumentException(
                 "LandRecovery requires a physically Grounded locomotion result.", nameof(result));
         }
+
+        var parameters = GetParameters(result.AnimationState, result.ActualStance);
+        var blend = MapBlendPosition(result);
+        if (!float.IsFinite(blend.X) || !float.IsFinite(blend.Y))
+        {
+            throw new ArgumentOutOfRangeException(nameof(result), "Derived blend position is not finite.");
+        }
+        blend = Clamp(blend, parameters.BlendMinimum, parameters.BlendMaximum);
+
+        var effectivePlayRateValue = result.AnimationState == AlsAnimationState.Grounded
+            ? (double)result.PlayRate * result.Stride
+            : 1d;
+        if (!double.IsFinite(effectivePlayRateValue) ||
+            effectivePlayRateValue < 0d ||
+            effectivePlayRateValue > _playRateMaximum)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(result),
+                "Derived animation time scale is outside the fixed settings range.");
+        }
+        var effectivePlayRate = (float)effectivePlayRateValue;
+        if (!float.IsFinite(effectivePlayRate))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(result),
+                "Derived animation time scale is not finite.");
+        }
+
+        var lean = Clamp(
+            new Vector2(result.Lean.X, result.Lean.Y),
+            parameters.LeanMinimum,
+            parameters.LeanMaximum);
+        var leanLengthSquared = ((double)lean.X * lean.X) + ((double)lean.Y * lean.Y);
+        var leanAmount = leanLengthSquared > 1e-12d ? 1f : 0f;
+        var phase = Math.Clamp(result.AnimationPhase, 0f, 1f);
+        return new PreparedApply(
+            parameters,
+            blend,
+            effectivePlayRate,
+            lean,
+            leanAmount,
+            phase);
     }
 
     private static void Append(ref ulong digest, Vector3 value)
@@ -290,4 +370,12 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
     }
+
+    private readonly record struct PreparedApply(
+        AlsLocomotionGraphParameterSet Parameters,
+        Vector2 Blend,
+        float EffectivePlayRate,
+        Vector2 Lean,
+        float LeanAmount,
+        float Phase);
 }
