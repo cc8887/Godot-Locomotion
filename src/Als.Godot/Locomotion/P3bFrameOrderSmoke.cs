@@ -18,9 +18,10 @@ public partial class P3bFrameOrderSmoke : Node
 
     private AlsHarnessMode _mode;
     private AlsP3RuntimeContext _context = null!;
-    private AlsSlotRegistry _registry = null!;
+    private AlsP3CharacterSlot _slot = null!;
     private AlsP3Character _active = null!;
-    private AlsP3Character _spare = null!;
+    private AlsP3Character? _retiredCharacter;
+    private AlsFrameIdentity _expectedRetiredResultIdentity;
     private ulong _resultDigest = AlsResultDigest.OffsetBasis;
     private ulong _poseDigest = AlsResultDigest.OffsetBasis;
     private long _lastCommittedFrame;
@@ -31,6 +32,7 @@ public partial class P3bFrameOrderSmoke : Node
     private bool _replacementGenerationObserved;
     private bool _replacementRecoveryCommitted;
     private bool _retiredNodeReleased;
+    private bool _replacementRequested;
     private bool _disposeGuardsChecked;
     private bool _workerFailureInjected;
     private long _workerFailureCommittedFrame;
@@ -83,14 +85,14 @@ public partial class P3bFrameOrderSmoke : Node
                 profile,
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: _failurePolicy is null or "headless");
-            _registry = new AlsSlotRegistry(1);
-
             AddChild(CreateFloor());
-            _active = CreateCharacter(
-                _registry.Acquire(),
-                active: true,
-                CreateCommandSource(_failurePolicy));
-            _spare = CreateCharacter(new AlsSlotHandle(0, 2), active: false);
+            _slot = new AlsP3CharacterSlot { Name = "CharacterSlot" };
+            AddChild(_slot);
+            _slot.Configure(
+                _context,
+                () => CreateCommandSource(_failurePolicy),
+                new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f));
+            _active = _slot.ActiveCharacter;
         }
         catch (Exception exception)
         {
@@ -107,6 +109,7 @@ public partial class P3bFrameOrderSmoke : Node
 
         try
         {
+            _active = _slot.ActiveCharacter;
             if (_failurePolicy is not null)
             {
                 ValidateFailurePolicy();
@@ -127,7 +130,8 @@ public partial class P3bFrameOrderSmoke : Node
 
             RecoverReplacementGeneration(committed);
 
-            if (_active.PublishedFrameId == ReplacementFrame &&
+            if (!_replacementRequested &&
+                _active.PublishedFrameId == ReplacementFrame &&
                 _active.Diagnostics.CommittedFrameId == ReplacementFrame)
             {
                 ReplaceCharacter();
@@ -144,22 +148,19 @@ public partial class P3bFrameOrderSmoke : Node
         }
     }
 
-    private AlsP3Character CreateCharacter(
-        AlsSlotHandle handle,
-        bool active,
-        IAlsLocomotionCommandSource? commandSource = null)
+    private AlsP3Character CreateDisposeProbe()
     {
         var character = new AlsP3Character
         {
-            Name = $"Character_{handle.CharacterId}_Generation_{handle.Generation}",
+            Name = "DisposedLifecycleProbe",
             Position = new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f),
         };
         AddChild(character);
         character.Configure(
             _context,
-            handle,
-            commandSource ?? AlsMotorReplay.CreateHarnessSequence());
-        character.SetActive(active);
+            new AlsSlotHandle(1, 1),
+            AlsMotorReplay.CreateHarnessSequence());
+        character.SetActive(false);
         return character;
     }
 
@@ -192,59 +193,43 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void ReplaceCharacter()
     {
-        var old = _active;
-        var childCountBefore = GetChildCount();
-        var staleIdentity = old.HandleIdentity(ReplacementFrame + 1);
-
-        old.SetActive(false);
-        Require(_registry.Release(old.Handle), "old generation registry release failed");
-        var currentHandle = _registry.Acquire();
-        Require(currentHandle == _spare.Handle, "replacement generation did not advance");
-        _active = _spare;
-        _active.ResumeAt(ReplacementFrame);
-        Volatile.Write(ref _active.RuntimeState.GatherSuspended, 0);
-        Volatile.Write(ref _active.RuntimeState.WorkerSuspended, 1);
-        _active.SetActive(true);
-
-        old.DisposeRuntime();
-        old.DisposeRuntime();
-        RemoveChild(old);
-        old.Free();
-        Require(!GodotObject.IsInstanceValid(old),
-            "retired replacement node remained valid after owner disposal");
-        Require(GetChildCount() == childCountBefore - 1,
-            "retired replacement node accumulated under the owner");
-        _retiredNodeReleased = true;
-
-        _active.RuntimeState.PublishResult(
-            AlsFrameResult.CreateDefault(staleIdentity),
-            0,
-            0,
-            0,
-            staleIdentity.FrameId,
-            staleIdentity.FrameId);
+        _retiredCharacter = _active;
+        _expectedRetiredResultIdentity = _active.HandleIdentity(ReplacementFrame + 1);
+        _slot.RequestReplacement(ReplacementFrame);
+        _replacementRequested = true;
         _replacementRecoveryPending = true;
     }
 
     private void RecoverReplacementGeneration(in AlsP3FrameDiagnostics committed)
     {
-        if (_replacementRecoveryPending && !_replacementGenerationObserved &&
-            _context.GenerationMismatches == 1)
+        var replacement = _slot.ReplacementDiagnostics;
+        if (replacement.RetiredNodeReleased && !_retiredNodeReleased)
         {
-            Require(Volatile.Read(ref _active.RuntimeState.CommittedFrameId) == ReplacementFrame,
+            Require(replacement.RetiredResultObserved &&
+                replacement.RetiredResultIdentity == _expectedRetiredResultIdentity,
+                "slot replacement did not preserve the naturally published retired result");
+            Require(_retiredCharacter is not null &&
+                !GodotObject.IsInstanceValid(_retiredCharacter),
+                "retired replacement node remained valid after slot-owner disposal");
+            _retiredNodeReleased = true;
+        }
+        if (_replacementRecoveryPending && !_replacementGenerationObserved &&
+            replacement.GenerationMismatchObserved)
+        {
+            Require(_context.GenerationMismatches == 1,
+                "slot replacement generation mismatch count was not exactly one");
+            Require(replacement.CommittedFrameAtClassification == ReplacementFrame,
                 "old-generation result advanced production commit");
-            Volatile.Write(ref _active.RuntimeState.GatherSuspended, 1);
-            Volatile.Write(ref _active.RuntimeState.WorkerSuspended, 0);
             _oldGenerationRejected = true;
             _replacementGenerationObserved = true;
             return;
         }
 
         if (_replacementGenerationObserved && !_replacementRecoveryCommitted &&
-            committed.CommittedFrameId == ReplacementFrame + 1)
+            replacement.RecoveryCommitted)
         {
-            Volatile.Write(ref _active.RuntimeState.GatherSuspended, 0);
-            Volatile.Write(ref _active.RuntimeState.WorkerSuspended, 0);
+            Require(committed.CommittedFrameId == ReplacementFrame + 1,
+                "slot replacement did not recover the rejected frame");
             _replacementRecoveryCommitted = true;
             _replacementRecoveryPending = false;
         }
@@ -273,9 +258,7 @@ public partial class P3bFrameOrderSmoke : Node
             $"GODOT_ALS_P3B_FRAME_ORDER_OK mode={mode} frames={LastFrame} " +
             $"digest={_resultDigest:X16} pose={_poseDigest:X16} lag=0 stale=0 generation=1 " +
             "old_generation_rejected=1 retired_released=1");
-        _active.SetActive(false);
-        _active.DisposeRuntime();
-        _spare.DisposeRuntime();
+        _slot.DisposeRuntime();
         _quitting = true;
         GetTree().Quit();
     }
@@ -305,9 +288,7 @@ public partial class P3bFrameOrderSmoke : Node
         GD.Print(
             $"GODOT_ALS_P3B_FAILURE_POLICY_OK mode=interactive motor_frame={_active.PublishedFrameId} " +
             $"pose_frame={_active.Diagnostics.CommittedFrameId} diagnostics=2");
-        _active.SetActive(false);
-        _active.DisposeRuntime();
-        _spare.DisposeRuntime();
+        _slot.DisposeRuntime();
         _quitting = true;
         GetTree().Quit();
     }
@@ -380,7 +361,39 @@ public partial class P3bFrameOrderSmoke : Node
         Require(offMainFailure is InvalidOperationException &&
             offMainFailure.Message.Contains("main thread", StringComparison.OrdinalIgnoreCase),
             "off-main P3 runtime disposal was not rejected by thread ownership");
+
+        var probe = CreateDisposeProbe();
+        probe.DisposeRuntime();
+        RequireDisposed(() => probe.SetActive(true), "disposed SetActive");
+        RequireDisposed(() => probe.ResumeAt(0), "disposed ResumeAt");
+        RequireDisposed(
+            () => probe.Configure(
+                _context,
+                new AlsSlotHandle(1, 2),
+                AlsMotorReplay.CreateHarnessSequence()),
+            "disposed Configure");
+        var lifecycle = probe.LifecycleDiagnostics;
+        Require(lifecycle.IsDisposed && !lifecycle.IsActive,
+            "disposed P3 character lifecycle state was reversible");
+        Require(!lifecycle.HasCollision && !lifecycle.HasProcessing,
+            "disposed P3 character retained collision or processing");
+        probe.DisposeRuntime();
+        RemoveChild(probe);
+        probe.Free();
         _disposeGuardsChecked = true;
+    }
+
+    private static void RequireDisposed(Action action, string operation)
+    {
+        try
+        {
+            action();
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+        throw new InvalidOperationException($"{operation} was not rejected irreversibly");
     }
 
     private void ValidateWorkerFailure()
@@ -445,9 +458,7 @@ public partial class P3bFrameOrderSmoke : Node
             $"GODOT_ALS_P3B_WORKER_ROLLBACK_OK mode={_mode.ToString().ToLowerInvariant()} " +
             $"motor_frame={_active.PublishedFrameId} pose_frame={_workerFailureCommittedFrame} " +
             $"full={runtime.RollbackFullPoseDigest:X16} root={runtime.RollbackRootDigest:X16}");
-        _active.SetActive(false);
-        _active.DisposeRuntime();
-        _spare.DisposeRuntime();
+        _slot.DisposeRuntime();
         _quitting = true;
         GetTree().Quit();
     }
@@ -530,9 +541,7 @@ public partial class P3bFrameOrderSmoke : Node
         GD.Print(
             $"GODOT_ALS_P3B_FAILURE_RETENTION_OK mode={_mode.ToString().ToLowerInvariant()} " +
             $"diagnostics={_active.FailureDiagnosticCount} pending=0 retained={_active.FailureRetainedIdentityCount}");
-        _active.SetActive(false);
-        _active.DisposeRuntime();
-        _spare.DisposeRuntime();
+        _slot.DisposeRuntime();
         _quitting = true;
         GetTree().Quit();
     }
