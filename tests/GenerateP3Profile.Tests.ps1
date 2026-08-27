@@ -30,8 +30,35 @@ Describe 'generate-p3-profile.ps1 strict source mapping' {
         (Get-FileHash $first -Algorithm SHA256).Hash | Should Be `
             (Get-FileHash $second -Algorithm SHA256).Hash
         $profile = Get-Content -LiteralPath $first -Raw | ConvertFrom-Json
+        $profile.schemaVersion | Should Be 2
         (@($profile.PSObject.Properties.Name) -join ',') | Should Be `
-            'schemaVersion,mannequin,standingIdle,crouchingIdle,standingSamples,crouchingSamples,jumpStart,fallLoop,land,leanAdditive'
+            'schemaVersion,presentation,mannequin,standingIdle,crouchingIdle,standingSamples,crouchingSamples,jumpStart,fallLoop,land,leanAdditive'
+        (@($profile.presentation.PSObject.Properties.Name) -join ',') | Should Be `
+            'translationMeters,yawRadians'
+        (@($profile.presentation.translationMeters | ForEach-Object { [double]$_ }) -join ',') |
+            Should Be '0,-0.92,0'
+        [Math]::Abs([double]$profile.presentation.yawRadians - ([Math]::PI / 2.0)) |
+            Should BeLessThan 1e-12
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes($first)) | Should Be `
+            ([Convert]::ToBase64String([IO.File]::ReadAllBytes(
+                (Join-Path $script:RepositoryRoot 'assets\config\p3_locomotion_profile.json'))))
+
+        $directionLocks = @(
+            [pscustomobject]@{ Grid='standingSamples'; Index=0; Path='/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_F.ALS_N_Walk_F'; Id='6124eafdcbeaaf04bca366add34c821faa0e4963'; X=0.0; Y=0.5 },
+            [pscustomobject]@{ Grid='standingSamples'; Index=3; Path='/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_B.ALS_N_Walk_B'; Id='32fe18c71ccb860fe35c01d6b2b10fa2e4d98297'; X=0.0; Y=-0.5 },
+            [pscustomobject]@{ Grid='crouchingSamples'; Index=1; Path='/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_L.ALS_CLF_Walk_L'; Id='21c24bd7df5192db2e2a860457f2b7b0681de41d'; X=-1.0; Y=0.0 },
+            [pscustomobject]@{ Grid='crouchingSamples'; Index=2; Path='/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_R.ALS_CLF_Walk_R'; Id='db60b2c35ce5ef5216c782fc1f33549cbcf8278d'; X=1.0; Y=0.0 }
+        )
+        $manifest = Get-Content -LiteralPath $script:Manifest -Raw | ConvertFrom-Json
+        foreach ($lock in $directionLocks) {
+            $asset = @($manifest.animations | Where-Object { $_.objectPath -ceq $lock.Path })
+            $asset.Count | Should Be 1
+            [string]$asset[0].id | Should Be $lock.Id
+            $sample = @($profile.($lock.Grid))[$lock.Index]
+            [string]$sample.animation | Should Be $lock.Id
+            [double]$sample.x | Should Be $lock.X
+            [double]$sample.y | Should Be $lock.Y
+        }
         @($profile.standingSamples).Count | Should Be 13
         @($profile.crouchingSamples).Count | Should Be 4
         foreach ($sample in @($profile.standingSamples) + @($profile.crouchingSamples))
@@ -149,7 +176,7 @@ Describe 'generate-p3-profile.ps1 strict source mapping' {
 
         $result.ExitCode | Should Be 0
         $profile = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
-        $profile.schemaVersion | Should Be 1
+        $profile.schemaVersion | Should Be 2
         @(Get-ChildItem -LiteralPath $TestDrive -Filter '.existing-output.json.*.tmp').Count | Should Be 0
         @(Get-ChildItem -LiteralPath $TestDrive -Filter '.existing-output.json.*.bak').Count | Should Be 0
     }

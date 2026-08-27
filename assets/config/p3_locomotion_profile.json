@@ -1,5 +1,13 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "presentation": {
+    "translationMeters": [
+      0.0,
+      -0.92,
+      0.0
+    ],
+    "yawRadians": 1.5707963267948966
+  },
   "mannequin": "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07",
   "standingIdle": "621a81bf492cb9120b45cfd91b685854afb7dc75",
   "crouchingIdle": "146fff5000e151a3790ba5aca8a5bfee4363e909",

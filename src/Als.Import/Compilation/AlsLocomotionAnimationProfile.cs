@@ -1,8 +1,13 @@
 namespace GodotAls.Import.Compilation;
 
+public readonly record struct AlsPresentationDefinition(
+    System.Numerics.Vector3 TranslationMeters,
+    float YawRadians);
+
 public sealed record AlsLocomotionAnimationProfile(
     int SkeletonId,
     int MannequinMeshId,
+    AlsPresentationDefinition Presentation,
     int StandingIdleAnimationId,
     int CrouchingIdleAnimationId,
     AlsLocomotionAnimationSample[] StandingSamples,
