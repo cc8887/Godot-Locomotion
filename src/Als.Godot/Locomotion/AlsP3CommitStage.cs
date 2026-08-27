@@ -24,10 +24,13 @@ public partial class AlsP3CommitStage : Node
             return;
         }
 
-        var failure = _state.Failure;
-        if (failure is not null)
+        if (_state.TryDequeueFailure(out var failure))
         {
-            PublishFailure(failure);
+            PublishFailure(failure!);
+            return;
+        }
+        if (Volatile.Read(ref _state.WorkerFrozen) != 0)
+        {
             return;
         }
 
@@ -74,11 +77,6 @@ public partial class AlsP3CommitStage : Node
 
     private void PublishFailure(AlsP3WorkerFailure failure)
     {
-        if (Interlocked.Exchange(ref _state.FailureDiagnosticPublished, 1) != 0)
-        {
-            return;
-        }
-
         var details =
             $"code={failure.Code} frame={failure.Identity.FrameId} " +
             $"character={failure.Identity.CharacterId} generation={failure.Identity.SlotGeneration} " +
@@ -92,6 +90,7 @@ public partial class AlsP3CommitStage : Node
         {
             GD.Print($"GODOT_ALS_P3B_DIAGNOSTIC {details} pose=frozen motor=continuing");
         }
+        Interlocked.Increment(ref _state.FailureDiagnosticCount);
     }
 
     private void ClassifyMissing(long expectedFrameId)

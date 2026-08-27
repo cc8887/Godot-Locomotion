@@ -27,6 +27,10 @@ public partial class P3bFrameOrderSmoke : Node
     private long _firstJumpFrame;
     private long _firstLandingFrame;
     private bool _oldGenerationRejected;
+    private bool _replacementRecoveryPending;
+    private bool _replacementGenerationObserved;
+    private bool _replacementRecoveryCommitted;
+    private bool _retiredNodeReleased;
     private bool _quitting;
     private string? _failurePolicy;
 
@@ -75,7 +79,7 @@ public partial class P3bFrameOrderSmoke : Node
                 active: true,
                 _failurePolicy is null
                     ? AlsMotorReplay.CreateHarnessSequence()
-                    : new OneShotInvalidCommandSource());
+                    : new MultiFailureCommandSource());
             _spare = CreateCharacter(new AlsSlotHandle(0, 2), active: false);
         }
         catch (Exception exception)
@@ -105,6 +109,8 @@ public partial class P3bFrameOrderSmoke : Node
                 ValidateCommitted(committed);
                 _lastCommittedFrame = committed.CommittedFrameId;
             }
+
+            RecoverReplacementGeneration(committed);
 
             if (_active.PublishedFrameId == ReplacementFrame &&
                 _active.Diagnostics.CommittedFrameId == ReplacementFrame)
@@ -172,6 +178,7 @@ public partial class P3bFrameOrderSmoke : Node
     private void ReplaceCharacter()
     {
         var old = _active;
+        var childCountBefore = GetChildCount();
         var staleIdentity = old.HandleIdentity(ReplacementFrame + 1);
 
         old.SetActive(false);
@@ -180,14 +187,43 @@ public partial class P3bFrameOrderSmoke : Node
         Require(currentHandle == _spare.Handle, "replacement generation did not advance");
         _active = _spare;
         _active.ResumeAt(ReplacementFrame);
+        _active.SetRuntimeSuspension(gatherSuspended: false, workerSuspended: true);
         _active.SetActive(true);
 
-        var replacementExchange = new AlsFrameExchange();
-        replacementExchange.PublishResult(AlsFrameResult.CreateDefault(staleIdentity));
-        _oldGenerationRejected = !replacementExchange.TryConsumeResult(
-            _active.HandleIdentity(staleIdentity.FrameId), out _);
-        Require(_oldGenerationRejected, "old-generation result was accepted");
         old.DisposeRuntime();
+        old.DisposeRuntime();
+        RemoveChild(old);
+        old.Free();
+        Require(!GodotObject.IsInstanceValid(old),
+            "retired replacement node remained valid after owner disposal");
+        Require(GetChildCount() == childCountBefore - 1,
+            "retired replacement node accumulated under the owner");
+        _retiredNodeReleased = true;
+
+        _active.PublishRuntimeResult(AlsFrameResult.CreateDefault(staleIdentity));
+        _replacementRecoveryPending = true;
+    }
+
+    private void RecoverReplacementGeneration(in AlsP3FrameDiagnostics committed)
+    {
+        if (_replacementRecoveryPending && !_replacementGenerationObserved &&
+            _context.GenerationMismatches == 1)
+        {
+            Require(_active.RuntimeCommittedFrameId == ReplacementFrame,
+                "old-generation result advanced production commit");
+            _active.SetRuntimeSuspension(gatherSuspended: true, workerSuspended: false);
+            _oldGenerationRejected = true;
+            _replacementGenerationObserved = true;
+            return;
+        }
+
+        if (_replacementGenerationObserved && !_replacementRecoveryCommitted &&
+            committed.CommittedFrameId == ReplacementFrame + 1)
+        {
+            _active.SetRuntimeSuspension(gatherSuspended: false, workerSuspended: false);
+            _replacementRecoveryCommitted = true;
+            _replacementRecoveryPending = false;
+        }
     }
 
     private void Finish()
@@ -198,7 +234,11 @@ public partial class P3bFrameOrderSmoke : Node
         Require(_context.LaggedResults == 0, "lagged results were observed");
         Require(_context.StaleResults == 0, "stale results were observed");
         Require(_context.MissingResults == 0, "missing results were observed");
-        Require(_context.GenerationMismatches == 0, "generation mismatch reached commit");
+        Require(_context.GenerationMismatches == 1,
+            "replacement old generation did not reach production commit classification exactly once");
+        Require(_replacementRecoveryCommitted,
+            "replacement worker did not recover and commit the rejected frame");
+        Require(_retiredNodeReleased, "retired replacement node remained alive or in the tree");
         Require(_context.AffinityViolations == 0, "worker process-group affinity was violated");
         Require(
             _active.WorkerObservedOffMainThread == (_mode == AlsHarnessMode.Parallel),
@@ -207,8 +247,8 @@ public partial class P3bFrameOrderSmoke : Node
         var mode = _mode == AlsHarnessMode.Single ? "single" : "parallel";
         GD.Print(
             $"GODOT_ALS_P3B_FRAME_ORDER_OK mode={mode} frames={LastFrame} " +
-            $"digest={_resultDigest:X16} pose={_poseDigest:X16} lag=0 stale=0 " +
-            "old_generation_rejected=1");
+            $"digest={_resultDigest:X16} pose={_poseDigest:X16} lag=0 stale=0 generation=1 " +
+            "old_generation_rejected=1 retired_released=1");
         _active.DisposeRuntime();
         _spare.DisposeRuntime();
         _quitting = true;
@@ -221,19 +261,19 @@ public partial class P3bFrameOrderSmoke : Node
         {
             return;
         }
-        if (_active.PublishedFrameId < 10)
+        if (_active.PublishedFrameId < 12)
         {
             return;
         }
 
         Require(_active.IsPoseFrozen, "interactive failure did not freeze the last valid pose");
-        Require(_active.FailureDiagnosticCount == 1,
-            "interactive failure did not publish exactly one diagnostic");
+        Require(_active.FailureDiagnosticCount == 2,
+            "interactive failures were not diagnosed exactly once per identity");
         Require(_active.Diagnostics.CommittedFrameId < _active.PublishedFrameId,
             "interactive failure did not keep the motor running after pose freeze");
         GD.Print(
             $"GODOT_ALS_P3B_FAILURE_POLICY_OK mode=interactive motor_frame={_active.PublishedFrameId} " +
-            $"pose_frame={_active.Diagnostics.CommittedFrameId} diagnostics=1");
+            $"pose_frame={_active.Diagnostics.CommittedFrameId} diagnostics=2");
         _active.DisposeRuntime();
         _spare.DisposeRuntime();
         _quitting = true;
@@ -314,17 +354,21 @@ public partial class P3bFrameOrderSmoke : Node
         }
     }
 
-    private sealed class OneShotInvalidCommandSource : IAlsLocomotionCommandSource
+    private sealed class MultiFailureCommandSource : IAlsLocomotionCommandSource
     {
         private readonly AlsReplayInputAdapter _inner = AlsMotorReplay.CreateHarnessSequence();
-        private bool _injected;
+        private int _frameFiveCalls;
+        private int _frameEightCalls;
 
         public AlsLocomotionCommand GetCommand(long frameId)
         {
             var command = _inner.GetCommand(frameId);
-            if (frameId == 5 && !_injected)
+            if (frameId == 5 && _frameFiveCalls++ < 2)
             {
-                _injected = true;
+                return command with { JumpPressed = 2 };
+            }
+            if (frameId == 8 && _frameEightCalls++ == 0)
+            {
                 return command with { JumpPressed = 2 };
             }
             return command;

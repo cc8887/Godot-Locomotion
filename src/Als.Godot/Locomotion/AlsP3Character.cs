@@ -31,7 +31,31 @@ public partial class AlsP3Character : Node3D
     public bool IsPoseFrozen => Volatile.Read(ref _state.WorkerFrozen) != 0;
 
     public int FailureDiagnosticCount =>
-        Volatile.Read(ref _state.FailureDiagnosticPublished);
+        Volatile.Read(ref _state.FailureDiagnosticCount);
+
+    internal long RuntimeCommittedFrameId
+    {
+        get
+        {
+            EnsureConfigured();
+            return Volatile.Read(ref _state.CommittedFrameId);
+        }
+    }
+
+    internal void SetRuntimeSuspension(bool gatherSuspended, bool workerSuspended)
+    {
+        EnsureConfigured();
+        EnsureMainThread();
+        Volatile.Write(ref _state.GatherSuspended, gatherSuspended ? 1 : 0);
+        Volatile.Write(ref _state.WorkerSuspended, workerSuspended ? 1 : 0);
+    }
+
+    internal void PublishRuntimeResult(in AlsFrameResult result)
+    {
+        EnsureConfigured();
+        EnsureMainThread();
+        _state.PublishResult(result, 0, result.Identity.FrameId, result.Identity.FrameId);
+    }
 
     public AlsP3FrameDiagnostics Diagnostics
     {
@@ -92,7 +116,8 @@ public partial class AlsP3Character : Node3D
     public override void _PhysicsProcess(double delta)
     {
         if (!_configured || Volatile.Read(ref _disposed) != 0 ||
-            Volatile.Read(ref _state.Active) == 0)
+            Volatile.Read(ref _state.Active) == 0 ||
+            Volatile.Read(ref _state.GatherSuspended) != 0)
         {
             return;
         }
