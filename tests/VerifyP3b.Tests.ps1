@@ -73,6 +73,21 @@ function Test-P3bChildGateRejects
     }
 }
 
+function Test-P3bCleanWorktreeRejects
+{
+    param([string]$RepositoryRoot)
+
+    try
+    {
+        Assert-P3bCleanWorktree -RepositoryRoot $RepositoryRoot
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
 Describe 'P3B verifier contracts' {
     It 'provides the Task 6 parser and pair validator' {
         Get-Command ConvertFrom-P3bHarnessOutput -ErrorAction SilentlyContinue |
@@ -302,12 +317,33 @@ Describe 'P3B raw-pose and timing instrumentation' {
 }
 
 Describe 'P3B final regression closure' {
-    It 'accepts exactly one expected child gate marker without errors' {
-        Assert-P3bChildGateOutput `
-            -PhaseName 'P3A' `
-            -OutputLines @('build output', 'P3A_FOCUSED_VERIFICATION_OK regression=skipped') `
-            -ExitCode 0 `
-            -ExpectedMarker 'P3A_FOCUSED_VERIFICATION_OK regression=skipped'
+    BeforeEach {
+        $script:ClosureRepository = Join-Path $TestDrive ([Guid]::NewGuid().ToString('N'))
+        [void](New-Item -ItemType Directory -Path $script:ClosureRepository)
+        & git -C $script:ClosureRepository init --quiet
+        & git -C $script:ClosureRepository config user.email 'p3b-tests@example.invalid'
+        & git -C $script:ClosureRepository config user.name 'P3B Tests'
+        [System.IO.File]::WriteAllText((Join-Path $script:ClosureRepository 'tracked.txt'), "clean`n")
+        & git -C $script:ClosureRepository add tracked.txt
+        & git -C $script:ClosureRepository commit --quiet -m baseline
+        if ($LASTEXITCODE -ne 0) { throw 'Could not initialize P3B closure test repository.' }
+    }
+
+    It 'accepts every unique full P3A closure marker without errors' {
+        $output = @(
+            'P2B_VERIFICATION_OK',
+            'P1_VERIFICATION_OK',
+            'P0_VERIFICATION_OK',
+            'P3A_VERIFICATION_OK'
+        )
+        foreach ($marker in $output)
+        {
+            Assert-P3bChildGateOutput `
+                -PhaseName $marker `
+                -OutputLines $output `
+                -ExitCode 0 `
+                -ExpectedMarker $marker
+        }
     }
 
     It 'rejects missing duplicate and successful-looking error output' {
@@ -332,33 +368,113 @@ Describe 'P3B final regression closure' {
             -ExpectedMarker 'P1_VERIFICATION_OK' | Should Be $true
     }
 
-    It 'runs every real regression gate in order after the P3B matrix' {
+    It 'captures and rejects information-stream errors from a real child script' {
+        $probe = Join-Path $TestDrive 'information-error.ps1'
+        [System.IO.File]::WriteAllText(
+            $probe,
+            "Write-Host 'Godot: ERROR: information stream failure'`nWrite-Output 'P3A_VERIFICATION_OK'`nexit 0`n")
+        $output = @(& $probe *>&1)
+        $exitCode = $LASTEXITCODE
+
+        Test-P3bChildGateRejects `
+            -OutputLines $output `
+            -ExitCode $exitCode `
+            -ExpectedMarker 'P3A_VERIFICATION_OK' | Should Be $true
+    }
+
+    It 'accepts Pester descriptions that name error tokens without emitting an error line' {
+        Assert-P3bChildGateOutput `
+            -PhaseName 'P3A' `
+            -OutputLines @(
+                '[+] rejects SCRIPT ERROR and ERROR lines even with exit zero',
+                'P3A_VERIFICATION_OK') `
+            -ExitCode 0 `
+            -ExpectedMarker 'P3A_VERIFICATION_OK'
+    }
+
+    It 'runs full P3A and final Release tests after the P3B matrix' {
         $matrixIndex = $script:VerifierSource.IndexOf('foreach ($characterCount in @(1, 10))')
         $p3aIndex = $script:VerifierSource.IndexOf("'verify-p3a.ps1'", $matrixIndex)
-        $p2bIndex = $script:VerifierSource.IndexOf("'verify-p2b.ps1'", $matrixIndex)
-        $p1Index = $script:VerifierSource.IndexOf("'verify-p1.ps1'", $matrixIndex)
-        $p0Index = $script:VerifierSource.IndexOf("'verify-p0.ps1'", $matrixIndex)
         $testsIndex = $script:VerifierSource.IndexOf(
             'dotnet test $solutionPath -c Release --no-restore',
             $matrixIndex)
-        $successIndex = $script:VerifierSource.LastIndexOf("Write-Output 'P3B_VERIFICATION_OK'")
+        $successIndex = $script:VerifierSource.LastIndexOf('Write-Output $completionMarker')
 
         $matrixIndex | Should BeGreaterThan -1
         $p3aIndex | Should BeGreaterThan $matrixIndex
-        $p2bIndex | Should BeGreaterThan $p3aIndex
-        $p1Index | Should BeGreaterThan $p2bIndex
-        $p0Index | Should BeGreaterThan $p1Index
-        $testsIndex | Should BeGreaterThan $p0Index
+        $testsIndex | Should BeGreaterThan $p3aIndex
         $successIndex | Should BeGreaterThan $testsIndex
     }
 
-    It 'uses focused P3A verification and validates real child output instead of printing phase markers' {
+    It 'captures all full P3A streams and validates its four real completion markers' {
         $script:VerifierSource | Should Match ([regex]::Escape(
+            '& $p3aScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath *>&1'))
+        $script:VerifierSource | Should Not Match ([regex]::Escape(
             '& $p3aScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath -SkipRegression'))
         $script:VerifierSource | Should Match 'Assert-P3bChildGateOutput'
-        $script:VerifierSource | Should Not Match "Write-Output 'P3A_(FOCUSED_)?VERIFICATION_OK"
+        foreach ($marker in @(
+            'P3A_VERIFICATION_OK',
+            'P2B_VERIFICATION_OK',
+            'P1_VERIFICATION_OK',
+            'P0_VERIFICATION_OK'))
+        {
+            $script:VerifierSource | Should Match ([regex]::Escape("ExpectedMarker '$marker'"))
+        }
+        $script:VerifierSource | Should Not Match "Write-Output 'P3A_VERIFICATION_OK"
         $script:VerifierSource | Should Not Match "Write-Output 'P2B_VERIFICATION_OK"
         $script:VerifierSource | Should Not Match "Write-Output 'P1_VERIFICATION_OK"
         $script:VerifierSource | Should Not Match "Write-Output 'P0_VERIFICATION_OK"
+    }
+
+    It 'uses a focused marker that cannot impersonate full verification' {
+        Get-P3bCompletionMarker -RegressionSkipped $true |
+            Should Be 'P3B_FOCUSED_VERIFICATION_OK regression=skipped'
+        Get-P3bCompletionMarker -RegressionSkipped $false |
+            Should Be 'P3B_VERIFICATION_OK'
+        $script:VerifierSource | Should Match 'Get-P3bCompletionMarker -RegressionSkipped \(\[bool\]\$SkipRegression\)'
+    }
+
+    It 'runs the locked P3A closure and clean-worktree closure before full success' {
+        $p3aClosureIndex = $script:VerifierSource.IndexOf(
+            'Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath -BaseCommit $p3aBaseCommit')
+        $cleanClosureIndex = $script:VerifierSource.IndexOf(
+            'Assert-P3bCleanWorktree -RepositoryRoot $projectRootPath')
+        $successIndex = $script:VerifierSource.LastIndexOf('Write-Output $completionMarker')
+
+        $p3aClosureIndex | Should BeGreaterThan -1
+        $cleanClosureIndex | Should BeGreaterThan $p3aClosureIndex
+        $successIndex | Should BeGreaterThan $cleanClosureIndex
+    }
+
+    It 'accepts a clean repository' {
+        $failure = ''
+        try { Assert-P3bCleanWorktree -RepositoryRoot $script:ClosureRepository }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should BeNullOrEmpty
+    }
+
+    It 'rejects a dirty tracked worktree' {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $script:ClosureRepository 'tracked.txt'),
+            "modified`n")
+        Test-P3bCleanWorktreeRejects -RepositoryRoot $script:ClosureRepository |
+            Should Be $true
+    }
+
+    It 'rejects staged changes' {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $script:ClosureRepository 'staged.txt'),
+            "staged`n")
+        & git -C $script:ClosureRepository add staged.txt
+        Test-P3bCleanWorktreeRejects -RepositoryRoot $script:ClosureRepository |
+            Should Be $true
+    }
+
+    It 'rejects untracked files' {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $script:ClosureRepository 'untracked.txt'),
+            "untracked`n")
+        Test-P3bCleanWorktreeRejects -RepositoryRoot $script:ClosureRepository |
+            Should Be $true
     }
 }

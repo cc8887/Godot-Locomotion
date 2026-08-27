@@ -12,7 +12,7 @@ function ConvertFrom-P3bHarnessOutput
     )
 
     $lines = @($OutputLines | ForEach-Object { "$_" })
-    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR|ERROR:' })
+    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR:|ERROR:' })
     if ($errorLines.Count -ne 0)
     {
         throw "Godot emitted an error line:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
@@ -217,7 +217,7 @@ function Assert-P3bChildGateOutput
         throw "$PhaseName gate exited with code $ExitCode."
     }
 
-    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR|ERROR:' })
+    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR:|ERROR:' })
     if ($errorLines.Count -ne 0)
     {
         throw "$PhaseName gate emitted an error line:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
@@ -227,5 +227,41 @@ function Assert-P3bChildGateOutput
     if ($markerLines.Count -ne 1)
     {
         throw "$PhaseName gate expected exactly one '$ExpectedMarker' marker; observed $($markerLines.Count)."
+    }
+}
+
+function Get-P3bCompletionMarker
+{
+    param(
+        [Parameter(Mandatory)]
+        [bool]$RegressionSkipped
+    )
+
+    if ($RegressionSkipped)
+    {
+        return 'P3B_FOCUSED_VERIFICATION_OK regression=skipped'
+    }
+
+    return 'P3B_VERIFICATION_OK'
+}
+
+function Assert-P3bCleanWorktree
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepositoryRoot
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+    $statusOutput = @(& git -C $resolvedRoot status --porcelain --untracked-files=all *>&1)
+    $statusExitCode = $LASTEXITCODE
+    if ($statusExitCode -ne 0)
+    {
+        throw "Could not inspect P3B repository status (exit $statusExitCode):$([Environment]::NewLine)$($statusOutput -join [Environment]::NewLine)"
+    }
+
+    if ($statusOutput.Count -ne 0)
+    {
+        throw "P3B full verification requires a clean worktree:$([Environment]::NewLine)$($statusOutput -join [Environment]::NewLine)"
     }
 }

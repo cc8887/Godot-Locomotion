@@ -155,17 +155,20 @@ pwsh -NoProfile -File scripts/verify-p3b.ps1 `
 本次完整 gate 的关键证据：
 
 - P3B 四矩阵通过，single/parallel result digest 与 raw pose digest 精确相等；
-- Pester `80 passed / 0 failed`；
-- focused P3A 四矩阵通过：1 角色 digest `12CD6393BA75A1F9`，10 角色 digest `7BE3F9467CC4EB63`；
+- 完整 P3A motor smoke 与四矩阵通过：motor `cases=7`，1 角色 digest `12CD6393BA75A1F9`，10 角色 digest `7BE3F9467CC4EB63`；
+- PowerShell regression suite 全部通过且 `FailedCount=0`；
+- P2B 以 `-CleanImport` 重新生成 Godot import cache，并再次确认 formal manifest hash 与 267 assets / 141 files；
 - `P2B_VERIFICATION_OK`、`P1_VERIFICATION_OK`、`P0_VERIFICATION_OK` 均来自真实子脚本的唯一精确 marker；
 - Release tests：`Als.Core.Tests 253/253`、`Als.Import.Tests 64/64`；
 - `P3B_RELEASE_TESTS_OK`；
 - `P3B_REPOSITORY_CLOSURE_OK p3a_base=e69f18bb3410d77ef50df38b073535b5e9f20635`；
 - 最终 `P3B_VERIFICATION_OK`，进程退出码 `0`。
 
-为避免把 P2B/P1/P0 和 Release tests 重复执行两遍，P3B 调用 `verify-p3a.ps1 -SkipRegression` 得到真实 `P3A_FOCUSED_VERIFICATION_OK regression=skipped`，然后显式执行 P2B、P1、P0、Release tests，并复用 P3A 的同一 `Assert-P3aRepositoryClosure` 与锁定 base commit。P3B 不伪造 `P3A_VERIFICATION_OK`；上述组合证据与 P3A full closure 的覆盖范围等价，但只运行一次下游回归。
+P3B 非 Skip 路径直接调用完整 `verify-p3a.ps1`，不传 `-SkipRegression`。因此 P3A 自身负责运行 Pester、motor smoke、P3A 四矩阵、P2B `-CleanImport`、P1、P0、Release tests 和锁定 base 的 repository closure；P3B 捕获一次完整输出，并分别要求唯一 `P3A_VERIFICATION_OK`、`P2B_VERIFICATION_OK`、`P1_VERIFICATION_OK` 和 `P0_VERIFICATION_OK`。Task 7 之后再显式运行一次 `dotnet test GodotALS.sln -c Release --no-restore`，防止 P3B 后处理绕过最终 Release tests。
 
-每个 child gate 必须同时满足退出码 `0`、唯一精确成功 marker、全部输出不含任意位置的 `SCRIPT ERROR` 或 `ERROR:`。因此“成功 marker 后仍有错误行”不能形成假阳性。
+完整 P3A 子脚本用 `*>&1` 捕获 success、error、warning、verbose、debug 和 information streams。每个 child marker 必须同时满足 P3A 进程退出码 `0`、唯一精确成功 marker、全部 streams 不含任意位置的 `SCRIPT ERROR:` 或 `ERROR:`。因此从 `Write-Host` information stream 输出的 `Godot: ERROR:`，即使同时存在成功 marker，也会使 P3B 失败。
+
+完成 locked-base repository closure 后，P3B 还执行 `git status --porcelain --untracked-files=all`。tracked modification、staged change 或 untracked file 任一存在都不允许输出 full success；ignored `.godot`、`bin`、`obj` 和生成资产不会出现在 porcelain 结果中。`-SkipRegression` 只输出 `P3B_FOCUSED_VERIFICATION_OK regression=skipped`，不能冒充完整 `P3B_VERIFICATION_OK`。
 
 ## 9. 手工验收
 
