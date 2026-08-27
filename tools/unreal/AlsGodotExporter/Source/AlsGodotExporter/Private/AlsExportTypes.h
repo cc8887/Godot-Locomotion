@@ -38,5 +38,25 @@ struct FAlsExportFile
     int64 Size = 0;
 };
 
+struct FAlsExportedFloatCurveKey
+{
+    double TimeSeconds = 0.0;
+    double Value = 0.0;
+    FString Interpolation = TEXT("Constant");
+    double ArriveTangent = 0.0;
+    double LeaveTangent = 0.0;
+};
+
+struct FAlsExportedFloatCurve
+{
+    int32 StableCurveId = INDEX_NONE;
+    FString CanonicalKind = TEXT("None");
+    FString SourceName;
+    FString SourceProvenance = TEXT("source_curve");
+    FString PreInfinity = TEXT("Constant");
+    FString PostInfinity = TEXT("Constant");
+    TArray<FAlsExportedFloatCurveKey> Keys;
+};
+
 const TCHAR* AlsAssetKindToString(EAlsAssetKind Kind);
 bool AlsAssetKindIsExportable(EAlsAssetKind Kind);

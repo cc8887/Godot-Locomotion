@@ -5,7 +5,42 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimCurveTypes.h"
 
-bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJsonObject>& OutMetadata, FString& OutError)
+namespace
+{
+    bool TryMapInterpolation(const ERichCurveInterpMode Mode, FString& OutInterpolation)
+    {
+        switch (Mode)
+        {
+        case RCIM_Constant: OutInterpolation = TEXT("Constant"); return true;
+        case RCIM_Linear: OutInterpolation = TEXT("Linear"); return true;
+        case RCIM_Cubic: OutInterpolation = TEXT("Cubic"); return true;
+        default: return false;
+        }
+    }
+
+    bool TryMapInfinity(const ERichCurveExtrapolation Mode, FString& OutInfinity)
+    {
+        switch (Mode)
+        {
+        case RCCE_None:
+        case RCCE_Constant: OutInfinity = TEXT("Constant"); return true;
+        case RCCE_Linear: OutInfinity = TEXT("Linear"); return true;
+        case RCCE_Cycle: OutInfinity = TEXT("Cycle"); return true;
+        case RCCE_CycleWithOffset: OutInfinity = TEXT("CycleWithOffset"); return true;
+        case RCCE_Oscillate: OutInfinity = TEXT("Oscillate"); return true;
+        default: return false;
+        }
+    }
+
+    bool IsFiniteCurveKey(const FAlsExportedFloatCurveKey& Key)
+    {
+        return FMath::IsFinite(Key.TimeSeconds) && FMath::IsFinite(Key.Value) &&
+            FMath::IsFinite(Key.ArriveTangent) && FMath::IsFinite(Key.LeaveTangent);
+    }
+}
+
+bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJsonObject>& OutMetadata,
+    TArray<FAlsExportedFloatCurve>& OutCurves, FString& OutError)
 {
     const UAnimSequence* Sequence = Cast<UAnimSequence>(Asset.AssetData.GetAsset());
     if (!Sequence)
@@ -44,21 +79,63 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
         OutMetadata->SetStringField(TEXT("skeletonObjectPath"), FString());
     }
 
-    TArray<FString> CurveNames;
+    OutCurves.Reset();
     if (const IAnimationDataModel* DataModel = Sequence->GetDataModel())
     {
         for (const FFloatCurve& Curve : DataModel->GetFloatCurves())
         {
-            CurveNames.Add(Curve.GetName().ToString());
+            FAlsExportedFloatCurve ExportedCurve;
+            ExportedCurve.SourceName = Curve.GetName().ToString();
+            if (!TryMapInfinity(Curve.FloatCurve.PreInfinityExtrap, ExportedCurve.PreInfinity) ||
+                !TryMapInfinity(Curve.FloatCurve.PostInfinityExtrap, ExportedCurve.PostInfinity))
+            {
+                OutError = FString::Printf(TEXT("Unsupported float curve infinity mode on %s."), *ExportedCurve.SourceName);
+                return false;
+            }
+
+            for (const FRichCurveKey& Key : Curve.FloatCurve.GetConstRefOfKeys())
+            {
+                FAlsExportedFloatCurveKey ExportedKey;
+                ExportedKey.TimeSeconds = Key.Time;
+                ExportedKey.Value = Key.Value;
+                ExportedKey.ArriveTangent = Key.ArriveTangent;
+                ExportedKey.LeaveTangent = Key.LeaveTangent;
+                if (!TryMapInterpolation(Key.InterpMode, ExportedKey.Interpolation))
+                {
+                    OutError = FString::Printf(TEXT("Unsupported float curve interpolation on %s."), *ExportedCurve.SourceName);
+                    return false;
+                }
+                if (!IsFiniteCurveKey(ExportedKey))
+                {
+                    OutError = FString::Printf(TEXT("Non-finite float curve key on %s."), *ExportedCurve.SourceName);
+                    return false;
+                }
+                ExportedCurve.Keys.Add(MoveTemp(ExportedKey));
+            }
+
+            ExportedCurve.Keys.Sort([](const FAlsExportedFloatCurveKey& Left, const FAlsExportedFloatCurveKey& Right)
+            {
+                return Left.TimeSeconds < Right.TimeSeconds;
+            });
+            for (int32 KeyIndex = 1; KeyIndex < ExportedCurve.Keys.Num(); ++KeyIndex)
+            {
+                if (ExportedCurve.Keys[KeyIndex - 1].TimeSeconds >= ExportedCurve.Keys[KeyIndex].TimeSeconds)
+                {
+                    OutError = FString::Printf(TEXT("Duplicate float curve key time on %s."), *ExportedCurve.SourceName);
+                    return false;
+                }
+            }
+            OutCurves.Add(MoveTemp(ExportedCurve));
         }
     }
-    CurveNames.Sort();
-    TArray<TSharedPtr<FJsonValue>> Curves;
-    for (const FString& CurveName : CurveNames)
+    OutCurves.Sort([](const FAlsExportedFloatCurve& Left, const FAlsExportedFloatCurve& Right)
     {
-        Curves.Add(MakeShared<FJsonValueString>(CurveName));
+        return Left.SourceName.Compare(Right.SourceName, ESearchCase::CaseSensitive) < 0;
+    });
+    for (int32 CurveIndex = 0; CurveIndex < OutCurves.Num(); ++CurveIndex)
+    {
+        OutCurves[CurveIndex].StableCurveId = CurveIndex;
     }
-    OutMetadata->SetArrayField(TEXT("curves"), Curves);
 
     TArray<TSharedPtr<FJsonValue>> Notifies;
     for (int32 NotifyIndex = 0; NotifyIndex < Sequence->Notifies.Num(); ++NotifyIndex)
