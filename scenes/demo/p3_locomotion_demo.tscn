@@ -1,0 +1,112 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://src/Als.Godot/Locomotion/P3LocomotionDemo.cs" id="1_demo"]
+[ext_resource type="Script" path="res://src/Als.Godot/Locomotion/AlsP3CharacterSlot.cs" id="2_slot"]
+[ext_resource type="Script" path="res://src/Als.Godot/Locomotion/AlsOrbitCamera.cs" id="3_camera"]
+[ext_resource type="Script" path="res://src/Als.Godot/Locomotion/AlsLocomotionHud.cs" id="4_hud"]
+
+[sub_resource type="StandardMaterial3D" id="Material_floor"]
+albedo_color = Color(0.24, 0.3, 0.23, 1)
+roughness = 0.92
+
+[sub_resource type="BoxMesh" id="Mesh_floor"]
+material = SubResource("Material_floor")
+size = Vector3(40, 0.5, 40)
+
+[sub_resource type="BoxShape3D" id="Shape_floor"]
+size = Vector3(40, 0.5, 40)
+
+[sub_resource type="StandardMaterial3D" id="Material_obstacle"]
+albedo_color = Color(0.58, 0.12, 0.14, 1)
+roughness = 0.72
+
+[sub_resource type="BoxMesh" id="Mesh_obstacle"]
+material = SubResource("Material_obstacle")
+size = Vector3(3, 0.55, 1)
+
+[sub_resource type="BoxShape3D" id="Shape_obstacle"]
+size = Vector3(3, 0.55, 1)
+
+[sub_resource type="StandardMaterial3D" id="Material_ramp"]
+albedo_color = Color(0.35, 0.38, 0.41, 1)
+metallic = 0.08
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="Mesh_ramp"]
+material = SubResource("Material_ramp")
+size = Vector3(4, 0.3, 7)
+
+[sub_resource type="BoxShape3D" id="Shape_ramp"]
+size = Vector3(4, 0.3, 7)
+
+[node name="P3LocomotionDemo" type="Node3D"]
+process_thread_group_order = -1
+script = ExtResource("1_demo")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-52, -32, 0)
+shadow_enabled = true
+directional_shadow_max_distance = 40.0
+
+[node name="Floor" type="StaticBody3D" parent="."]
+position = Vector3(0, -0.25, 0)
+collision_layer = 1
+collision_mask = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("Mesh_floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("Shape_floor")
+
+[node name="LowObstacle" type="StaticBody3D" parent="."]
+position = Vector3(0, 0.275, -4.5)
+collision_layer = 1
+collision_mask = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="LowObstacle"]
+mesh = SubResource("Mesh_obstacle")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="LowObstacle"]
+shape = SubResource("Shape_obstacle")
+
+[node name="MotorRamp" type="StaticBody3D" parent="."]
+position = Vector3(6, 0.62, -6)
+rotation_degrees = Vector3(-12, 0, 0)
+collision_layer = 1
+collision_mask = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="MotorRamp"]
+mesh = SubResource("Mesh_ramp")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MotorRamp"]
+shape = SubResource("Shape_ramp")
+
+[node name="CharacterSlot" type="Node" parent="."]
+script = ExtResource("2_slot")
+
+[node name="OrbitCamera" type="Node3D" parent="."]
+script = ExtResource("3_camera")
+
+[node name="SpringArm3D" type="SpringArm3D" parent="OrbitCamera"]
+spring_length = 5.5
+margin = 0.2
+collision_mask = 1
+
+[node name="Camera3D" type="Camera3D" parent="OrbitCamera/SpringArm3D"]
+current = true
+fov = 72.0
+
+[node name="HudLayer" type="CanvasLayer" parent="."]
+
+[node name="HudMargin" type="MarginContainer" parent="HudLayer"]
+offset_left = 18.0
+offset_top = 16.0
+offset_right = 520.0
+offset_bottom = 100.0
+mouse_filter = 2
+
+[node name="LocomotionHud" type="VBoxContainer" parent="HudLayer/HudMargin"]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_hud")

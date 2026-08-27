@@ -26,7 +26,8 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-$godotOutput = & $GodotExecutable --headless --path $ProjectRoot 2>&1
+$godotOutput = & $GodotExecutable --headless --path $ProjectRoot `
+    'res://scenes/tests/headless_smoke.tscn' 2>&1
 $godotExitCode = $LASTEXITCODE
 $godotOutput | Write-Output
 
