@@ -17,6 +17,7 @@ public partial class AlsP3Character : Node3D
 
     public AlsP3Character()
     {
+        Visible = false;
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
         ProcessThreadGroupOrder = 0;
     }
@@ -62,16 +63,15 @@ public partial class AlsP3Character : Node3D
     {
         get
         {
+            EnsureMainThread();
             EnsureConfigured();
-            var hasProcessing = ProcessMode != ProcessModeEnum.Disabled ||
-                _motor.ProcessMode != ProcessModeEnum.Disabled ||
-                _worker.ProcessMode != ProcessModeEnum.Disabled ||
-                _commit.ProcessMode != ProcessModeEnum.Disabled;
             return new AlsP3LifecycleDiagnostics(
                 Volatile.Read(ref _disposed) != 0,
                 Volatile.Read(ref _state.Active) != 0,
                 _motor.CollisionLayer != 0 || _motor.CollisionMask != 0,
-                hasProcessing);
+                Volatile.Read(ref _state.ProcessingEnabled) != 0,
+                Visible,
+                Volatile.Read(ref _state.VisualReady) != 0);
         }
     }
 
@@ -133,9 +133,10 @@ public partial class AlsP3Character : Node3D
             _worker.Configure(context, _state, _motor.GlobalTransform);
 
             _commit = new AlsP3CommitStage { Name = "Commit" };
-            _commit.Configure(context, _state);
+            _commit.Configure(context, _state, this);
             AddChild(_commit);
             _configured = true;
+            Volatile.Write(ref _state.ProcessingEnabled, 1);
         }
         catch
         {
@@ -194,12 +195,46 @@ public partial class AlsP3Character : Node3D
         EnsureMainThread();
         ThrowIfDisposed();
         EnsureConfigured();
+        if (active && Volatile.Read(ref _state.Active) != 0)
+        {
+            return;
+        }
+        ResetVisualReady();
         Volatile.Write(ref _state.Active, active ? 1 : 0);
+        ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _motor.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _motor.CollisionLayer = active ? 1u : 0u;
         _motor.CollisionMask = active ? _context.MotorSettings.CollisionMask : 0u;
         _worker.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _commit.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+        Volatile.Write(ref _state.ProcessingEnabled, active ? 1 : 0);
+    }
+
+    internal void ResetVisualReady()
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
+        Visible = false;
+        Volatile.Write(ref _state.VisualReady, 0);
+    }
+
+    internal void ShowCommittedVisual(AlsFrameIdentity identity)
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
+        if (Volatile.Read(ref _state.Active) == 0 ||
+            identity.CharacterId != _state.Handle.CharacterId ||
+            identity.SlotGeneration != _state.Handle.Generation ||
+            Volatile.Read(ref _state.CommittedFrameId) != identity.FrameId ||
+            Volatile.Read(ref _state.VisualReady) != 1)
+        {
+            throw new InvalidOperationException(
+                "P3 character cannot reveal a visual without its active committed identity.");
+        }
+
+        Visible = true;
     }
 
     public void ResumeAt(long completedFrameId)
@@ -266,6 +301,7 @@ public partial class AlsP3Character : Node3D
         Volatile.Write(ref _state.GatherSuspended, 0);
         Volatile.Write(ref _state.WorkerSuspended, 1);
         Volatile.Write(ref _state.CommitSuspended, 0);
+        ResetVisualReady();
         SetActive(true);
     }
 
@@ -300,6 +336,9 @@ public partial class AlsP3Character : Node3D
     private void DisposeRuntimeCore(bool allowActive)
     {
         EnsureMainThread();
+        Visible = false;
+        Volatile.Write(ref _state.VisualReady, 0);
+        Volatile.Write(ref _state.ProcessingEnabled, 0);
         if (!allowActive && Volatile.Read(ref _state.Active) != 0)
         {
             throw new InvalidOperationException(
@@ -323,6 +362,7 @@ public partial class AlsP3Character : Node3D
 
     private void DisableRuntimeNodes()
     {
+        Volatile.Write(ref _state.ProcessingEnabled, 0);
         ProcessMode = ProcessModeEnum.Disabled;
         if (_motor is not null)
         {

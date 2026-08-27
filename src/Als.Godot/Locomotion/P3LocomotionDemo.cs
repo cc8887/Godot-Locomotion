@@ -26,6 +26,7 @@ public partial class P3LocomotionDemo : Node3D
     private Vector3 _initialMovementAnchorPosition;
     private Vector3 _finalMovementAnchorPosition;
     private int _cameraFollowChecks;
+    private int _maximumVisibleCharacterCount;
     private bool _quitting;
 
     public P3LocomotionDemo()
@@ -70,6 +71,11 @@ public partial class P3LocomotionDemo : Node3D
                 () => commandSource,
                 new Vector3(0f, motorSettings.StandingHeight * 0.5f, 0f));
             var active = _slot.ActiveCharacter;
+            var lifecycle = active.LifecycleDiagnostics;
+            Require(lifecycle.IsActive && !lifecycle.IsVisualReady && !lifecycle.IsVisible,
+                "demo character became visible before its first committed visual");
+            Require(_slot.ReplacementDiagnostics.VisibleCharacterCount == 0,
+                "demo active or spare character was visible before the first commit");
             EnsureCameraTarget(active);
             _initialMovementAnchorPosition = active.MovementAnchor.GlobalPosition;
             _hud.Refresh(default, Engine.GetFramesPerSecond(), errors: 0);
@@ -90,6 +96,7 @@ public partial class P3LocomotionDemo : Node3D
         try
         {
             var active = _slot.ActiveCharacter;
+            ObserveVisibility(active);
             var committed = active.Diagnostics;
             ObserveTransitions(committed);
             if (_smokeFrames != 0)
@@ -181,6 +188,11 @@ public partial class P3LocomotionDemo : Node3D
         Require(!active.IsPoseFrozen, "demo real-animation pose was frozen");
         Require(active.WorkerObservedOffMainThread,
             "demo production worker did not execute on the parallel process group");
+        var lifecycle = active.LifecycleDiagnostics;
+        Require(lifecycle.IsVisualReady && lifecycle.IsVisible,
+            "demo committed character visual was not ready and visible");
+        Require(_maximumVisibleCharacterCount == 1,
+            "demo exposed more than one visible character");
         _finalMovementAnchorPosition = active.MovementAnchor.GlobalPosition;
         Require(_finalMovementAnchorPosition.DistanceTo(_initialMovementAnchorPosition) > 0.1f,
             "demo smoke movement anchor did not move");
@@ -201,9 +213,26 @@ public partial class P3LocomotionDemo : Node3D
             () =>
             {
                 _quitting = true;
-                GD.Print($"GODOT_ALS_P3_DEMO_OK frames={_smokeFrames} errors=0");
+                GD.Print(
+                    $"GODOT_ALS_P3_DEMO_OK frames={_smokeFrames} errors=0 ready=1 visible=1 " +
+                    $"max_visible={_maximumVisibleCharacterCount}");
                 GetTree().Quit();
             });
+    }
+
+    private void ObserveVisibility(AlsP3Character active)
+    {
+        var replacement = _slot.ReplacementDiagnostics;
+        Require(replacement.VisibleCharacterCount <= 1,
+            "demo slot exposed more than one visible character");
+        _maximumVisibleCharacterCount = Math.Max(
+            _maximumVisibleCharacterCount,
+            replacement.VisibleCharacterCount);
+        var lifecycle = active.LifecycleDiagnostics;
+        Require(lifecycle.IsVisible == active.Visible,
+            "demo lifecycle visibility did not report local Visible");
+        Require(!lifecycle.IsVisible || lifecycle.IsVisualReady,
+            "demo character was visible without committed visual readiness");
     }
 
     private void ValidateCameraFollow(AlsP3Character active, double delta)

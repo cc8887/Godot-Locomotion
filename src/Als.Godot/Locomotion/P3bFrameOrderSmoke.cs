@@ -24,6 +24,8 @@ public partial class P3bFrameOrderSmoke : Node
     private AlsFrameIdentity _expectedRetiredResultIdentity;
     private ulong _resultDigest = AlsResultDigest.OffsetBasis;
     private ulong _poseDigest = AlsResultDigest.OffsetBasis;
+    private ulong _fullPoseDigest = AlsResultDigest.OffsetBasis;
+    private ulong _rootDigest = AlsResultDigest.OffsetBasis;
     private long _lastCommittedFrame;
     private long _firstJumpFrame;
     private long _firstLandingFrame;
@@ -33,6 +35,8 @@ public partial class P3bFrameOrderSmoke : Node
     private bool _replacementRecoveryCommitted;
     private bool _retiredNodeReleased;
     private bool _replacementRequested;
+    private int _maximumVisibleCharacterCount;
+    private bool _recoveryZeroVisible;
     private bool _disposeGuardsChecked;
     private bool _workerFailureInjected;
     private long _workerFailureCommittedFrame;
@@ -54,7 +58,7 @@ public partial class P3bFrameOrderSmoke : Node
         {
             (_mode, _failurePolicy) = ReadOptions();
             ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-            ProcessThreadGroupOrder = 0;
+            ProcessThreadGroupOrder = 4;
 
             var animationSetResource = ResourceLoader.Load<AlsAnimationSetResource>(
                 AlsGodotImportCoordinator.CompiledResourcePath)
@@ -93,6 +97,12 @@ public partial class P3bFrameOrderSmoke : Node
                 () => CreateCommandSource(_failurePolicy),
                 new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f));
             _active = _slot.ActiveCharacter;
+            ValidateLifecycleThreadAndSchedulingContracts();
+            var lifecycle = _active.LifecycleDiagnostics;
+            Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
+                "active P3 character was visible before its first committed visual");
+            Require(_slot.ReplacementDiagnostics.VisibleCharacterCount == 0,
+                "P3 slot exposed its active or spare character before the first commit");
         }
         catch (Exception exception)
         {
@@ -110,6 +120,7 @@ public partial class P3bFrameOrderSmoke : Node
         try
         {
             _active = _slot.ActiveCharacter;
+            ObserveVisibility();
             if (_failurePolicy is not null)
             {
                 ValidateFailurePolicy();
@@ -155,12 +166,20 @@ public partial class P3bFrameOrderSmoke : Node
             Name = "DisposedLifecycleProbe",
             Position = new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f),
         };
+        Require(!character.Visible,
+            "P3 character was visible before AddChild and Configure");
         AddChild(character);
         character.Configure(
             _context,
             new AlsSlotHandle(1, 1),
             AlsMotorReplay.CreateHarnessSequence());
+        var configured = character.LifecycleDiagnostics;
+        Require(!configured.IsVisible && !configured.IsVisualReady,
+            "configured inactive P3 character exposed an uncommitted visual");
         character.SetActive(false);
+        var inactive = character.LifecycleDiagnostics;
+        Require(!inactive.IsVisible && !inactive.IsVisualReady,
+            "inactive P3 character remained visible after SetActive(false)");
         return character;
     }
 
@@ -171,6 +190,11 @@ public partial class P3bFrameOrderSmoke : Node
         Require(frame.ModelResultFrameId == frame.CommittedFrameId, "model result lagged commit");
         Require(frame.PoseAdvanceFrameId == frame.CommittedFrameId, "pose advance lagged commit");
         Require(frame.Identity == _active.HandleIdentity(frame.CommittedFrameId), "commit identity mismatch");
+        var lifecycle = _active.LifecycleDiagnostics;
+        Require(lifecycle.IsActive && lifecycle.IsVisualReady && lifecycle.IsVisible,
+            "committed active P3 character did not reveal its ready visual");
+        Require(_slot.ReplacementDiagnostics.VisibleCharacterCount == 1,
+            "committed active P3 character was not the slot's sole visible visual");
         var motorVelocity = ((CharacterBody3D)_active.MovementAnchor).GetRealVelocity();
         Require(MathF.Abs(frame.ActualVelocity.X - motorVelocity.X) < 0.00001f &&
             MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
@@ -194,6 +218,15 @@ public partial class P3bFrameOrderSmoke : Node
 
         AlsResultDigest.Append(ref _resultDigest, frame.Result);
         Append(ref _poseDigest, frame.PoseDigest);
+        Append(ref _fullPoseDigest, frame.FullPoseDigest);
+        Append(ref _rootDigest, frame.RootDigest);
+        var snapshotDigest = AlsResultDigest.OffsetBasis;
+        Append(ref snapshotDigest, frame.VisualRootTransform.BasisX);
+        Append(ref snapshotDigest, frame.VisualRootTransform.BasisY);
+        Append(ref snapshotDigest, frame.VisualRootTransform.BasisZ);
+        Append(ref snapshotDigest, frame.VisualRootTransform.Origin);
+        Require(frame.RootDigest != 0 && snapshotDigest == frame.RootDigest,
+            "committed root diagnostics did not match the numerical visual snapshot");
     }
 
     private void ReplaceCharacter()
@@ -216,6 +249,8 @@ public partial class P3bFrameOrderSmoke : Node
             Require(_retiredCharacter is not null &&
                 !GodotObject.IsInstanceValid(_retiredCharacter),
                 "retired replacement node remained valid after slot-owner disposal");
+            Require(replacement.Phase == AlsP3ReplacementPhase.AwaitingGenerationMismatch,
+                "retired replacement did not enter generation mismatch classification");
             _retiredNodeReleased = true;
         }
         if (_replacementRecoveryPending && !_replacementGenerationObserved &&
@@ -225,6 +260,8 @@ public partial class P3bFrameOrderSmoke : Node
                 "slot replacement generation mismatch count was not exactly one");
             Require(replacement.CommittedFrameAtClassification == ReplacementFrame,
                 "old-generation result advanced production commit");
+            Require(replacement.Phase == AlsP3ReplacementPhase.AwaitingRecoveryCommit,
+                "generation mismatch did not enter hidden recovery");
             _oldGenerationRejected = true;
             _replacementGenerationObserved = true;
             return;
@@ -235,6 +272,8 @@ public partial class P3bFrameOrderSmoke : Node
         {
             Require(committed.CommittedFrameId == ReplacementFrame + 1,
                 "slot replacement did not recover the rejected frame");
+            Require(replacement.Phase == AlsP3ReplacementPhase.Complete,
+                "slot replacement did not publish its complete phase");
             _replacementRecoveryCommitted = true;
             _replacementRecoveryPending = false;
         }
@@ -253,6 +292,10 @@ public partial class P3bFrameOrderSmoke : Node
         Require(_replacementRecoveryCommitted,
             "replacement worker did not recover and commit the rejected frame");
         Require(_retiredNodeReleased, "retired replacement node remained alive or in the tree");
+        Require(_maximumVisibleCharacterCount == 1,
+            "P3 slot did not preserve a maximum of one visible character");
+        Require(_recoveryZeroVisible,
+            "P3 slot replacement did not expose a zero-visible recovery frame");
         Require(_context.AffinityViolations == 0, "worker process-group affinity was violated");
         Require(
             _active.WorkerObservedOffMainThread == (_mode == AlsHarnessMode.Parallel),
@@ -261,8 +304,11 @@ public partial class P3bFrameOrderSmoke : Node
         var mode = _mode == AlsHarnessMode.Single ? "single" : "parallel";
         GD.Print(
             $"GODOT_ALS_P3B_FRAME_ORDER_OK mode={mode} frames={LastFrame} " +
-            $"digest={_resultDigest:X16} pose={_poseDigest:X16} lag=0 stale=0 generation=1 " +
-            "old_generation_rejected=1 retired_released=1");
+            $"digest={_resultDigest:X16} pose={_poseDigest:X16} " +
+            $"full_pose={_fullPoseDigest:X16} root={_rootDigest:X16} " +
+            "lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 " +
+            $"max_visible={_maximumVisibleCharacterCount} " +
+            $"recovery_zero_visible={(_recoveryZeroVisible ? 1 : 0)}");
         _slot.DisposeRuntime();
         _quitting = true;
         GetTree().Quit();
@@ -386,6 +432,8 @@ public partial class P3bFrameOrderSmoke : Node
             "disposed P3 character lifecycle state was reversible");
         Require(!lifecycle.HasCollision && !lifecycle.HasProcessing,
             "disposed P3 character retained collision or processing");
+        Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
+            "disposed P3 character retained visible or ready state");
         probe.DisposeRuntime();
         RemoveChild(probe);
         probe.Free();
@@ -411,6 +459,10 @@ public partial class P3bFrameOrderSmoke : Node
         {
             var committed = _active.Diagnostics;
             if (committed.CommittedFrameId < 12)
+            {
+                return;
+            }
+            if (_active.WorkerInFlight != 0)
             {
                 return;
             }
@@ -582,6 +634,80 @@ public partial class P3bFrameOrderSmoke : Node
         GetTree().Quit(1);
     }
 
+    private void ObserveVisibility()
+    {
+        var replacement = _slot.ReplacementDiagnostics;
+        Require(replacement.VisibleCharacterCount <= 1,
+            "P3 slot exposed more than one visible character");
+        _maximumVisibleCharacterCount = Math.Max(
+            _maximumVisibleCharacterCount,
+            replacement.VisibleCharacterCount);
+
+        var lifecycle = _active.LifecycleDiagnostics;
+        Require(lifecycle.IsVisible == _active.Visible,
+            "P3 lifecycle visibility did not report the character's local Visible flag");
+        Require(!lifecycle.IsVisible || lifecycle.IsVisualReady,
+            "P3 character was visible without a committed visual-ready identity");
+        if (replacement.Phase is AlsP3ReplacementPhase.AwaitingGenerationMismatch or
+            AlsP3ReplacementPhase.AwaitingRecoveryCommit)
+        {
+            Require(replacement.VisibleCharacterCount == 0,
+                "P3 replacement exposed stale visuals during mismatch or recovery");
+            Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
+                "P3 replacement retained ready state after its generation changed");
+            _recoveryZeroVisible = true;
+        }
+    }
+
+    private void ValidateLifecycleThreadAndSchedulingContracts()
+    {
+        var characterFailure = CaptureOffMainFailure(
+            () => _ = _active.LifecycleDiagnostics);
+        var slotFailure = CaptureOffMainFailure(
+            () => _ = _slot.ReplacementDiagnostics);
+        var commit = _active.FindChild(
+            "Commit", recursive: true, owned: false) as AlsP3CommitStage;
+        Require(commit is not null,
+            "P3 frame-order smoke could not find the production Commit stage");
+
+        Require(
+            IsMainThreadRejection(characterFailure) &&
+            IsMainThreadRejection(slotFailure) &&
+            commit!.ProcessThreadGroupOrder == 2 &&
+            _slot.ProcessThreadGroupOrder == 3 &&
+            ProcessThreadGroupOrder == 4,
+            "P3 lifecycle/thread scheduling contract was not enforced: " +
+            $"character={DescribeFailure(characterFailure)} " +
+            $"slot={DescribeFailure(slotFailure)} " +
+            $"orders={commit!.ProcessThreadGroupOrder}/{_slot.ProcessThreadGroupOrder}/" +
+            $"{ProcessThreadGroupOrder}");
+    }
+
+    private static Exception? CaptureOffMainFailure(Action action)
+    {
+        Exception? failure = null;
+        Task.Run(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        }).GetAwaiter().GetResult();
+        return failure;
+    }
+
+    private static bool IsMainThreadRejection(Exception? failure) =>
+        failure is InvalidOperationException &&
+        failure.Message.Contains("main thread", StringComparison.OrdinalIgnoreCase);
+
+    private static string DescribeFailure(Exception? failure) => failure is null
+        ? "none"
+        : $"{failure.GetType().Name}:{failure.Message}";
+
     private static void Append(ref ulong digest, ulong value)
     {
         const ulong prime = 1099511628211UL;
@@ -593,6 +719,13 @@ public partial class P3bFrameOrderSmoke : Node
     }
 
     private static void Append(ref ulong digest, Vector3 value)
+    {
+        Append(ref digest, value.X);
+        Append(ref digest, value.Y);
+        Append(ref digest, value.Z);
+    }
+
+    private static void Append(ref ulong digest, System.Numerics.Vector3 value)
     {
         Append(ref digest, value.X);
         Append(ref digest, value.Y);
