@@ -7,18 +7,27 @@ namespace GodotAls.Animation;
 
 public sealed class AlsAnimationLibraryBuildResult : IDisposable
 {
+    private readonly AnimationLibrary _ownedLibrary;
+    private readonly StringName _ownedLibraryName;
+    private readonly OwnedStringNameTable _ownedClipNames;
+    private int _disposed;
+
     internal AlsAnimationLibraryBuildResult(
         Node root,
         Skeleton3D skeleton,
         AnimationPlayer player,
         AnimationLibrary library,
-        IReadOnlyDictionary<int, StringName> clipNames)
+        StringName libraryName,
+        OwnedStringNameTable clipNames)
     {
         Root = root;
         Skeleton = skeleton;
         Player = player;
         Library = library;
-        ClipNames = clipNames;
+        ClipNames = clipNames.View;
+        _ownedLibrary = library;
+        _ownedLibraryName = libraryName;
+        _ownedClipNames = clipNames;
     }
 
     public Node Root { get; }
@@ -31,7 +40,39 @@ public sealed class AlsAnimationLibraryBuildResult : IDisposable
 
     public IReadOnlyDictionary<int, StringName> ClipNames { get; }
 
-    public void Dispose() => Root.Free();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            if (GodotObject.IsInstanceValid(Root))
+            {
+                Root.Free();
+            }
+        }
+        finally
+        {
+            try
+            {
+                _ownedLibrary.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    _ownedLibraryName.Dispose();
+                }
+                finally
+                {
+                    _ownedClipNames.Dispose();
+                }
+            }
+        }
+    }
 }
 
 public static class AlsAnimationLibraryBuilder
@@ -47,9 +88,13 @@ public static class AlsAnimationLibraryBuilder
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
 
+        using var importedAnimationName = new StringName(ImportedAnimationName);
         var mannequin = GetMannequin(animationSet, profile);
         var targetScene = LoadScene(mannequin.ResourcePath, mannequin.Name, "target");
         var targetRoot = targetScene.Instantiate();
+        AnimationLibrary? library = null;
+        StringName? libraryName = null;
+        OwnedStringNameTable? names = null;
         try
         {
             var targetSkeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(targetRoot)
@@ -59,8 +104,9 @@ public static class AlsAnimationLibraryBuilder
             AlsAnimationBinder.ValidateTargetSkeleton(
                 targetSkeleton, skeletonDefinition, mannequin.Name);
 
-            var library = new AnimationLibrary();
-            var names = new Dictionary<int, StringName>(profile.AllAnimationIds.Length);
+            library = new AnimationLibrary();
+            libraryName = new StringName(LibraryName);
+            names = new OwnedStringNameTable(profile.AllAnimationIds.Length);
             foreach (var animationId in profile.AllAnimationIds)
             {
                 var clip = GetClip(animationSet, animationId, profile.SkeletonId);
@@ -69,13 +115,13 @@ public static class AlsAnimationLibraryBuilder
                 var sourcePlayer = AlsImportedResourceAuditor.FindFirst<AnimationPlayer>(sourceRoot.Value)
                     ?? throw new InvalidOperationException(
                         $"Animation scene has no AnimationPlayer: {clip.Name}");
-                if (!sourcePlayer.HasAnimation(ImportedAnimationName))
+                if (!sourcePlayer.HasAnimation(importedAnimationName))
                 {
                     throw new InvalidOperationException(
                         $"Animation scene does not contain '{ImportedAnimationName}': {clip.Name}");
                 }
 
-                var sourceAnimation = sourcePlayer.GetAnimation(ImportedAnimationName);
+                using var sourceAnimation = sourcePlayer.GetAnimation(importedAnimationName);
                 if (sourceAnimation is null || sourceAnimation.GetTrackCount() == 0)
                 {
                     throw new InvalidOperationException($"Imported animation is empty: {clip.Name}");
@@ -88,43 +134,55 @@ public static class AlsAnimationLibraryBuilder
                         $"expected={clip.PlayLength} actual={sourceAnimation.Length}");
                 }
 
-                var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
+                using var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
                 AlsAnimationBinder.RewriteTrackPaths(
                     targetRoot, targetSkeleton, boundAnimation, clip.Name);
-                var animationName = new StringName($"clip_{animationId}");
-                ThrowIfError(
-                    library.AddAnimation(animationName, boundAnimation),
-                    "add animation library clip",
-                    clip.Name);
-                if (!names.TryAdd(animationId, animationName))
+                StringName? animationName = new($"clip_{animationId}");
+                try
                 {
-                    throw new InvalidOperationException(
-                        $"P3 profile contains duplicate animation ID: {animationId}");
+                    ThrowIfError(
+                        library.AddAnimation(animationName, boundAnimation),
+                        "add animation library clip",
+                        clip.Name);
+                    names.Add(animationId, animationName);
+                    animationName = null;
+                }
+                finally
+                {
+                    animationName?.Dispose();
                 }
             }
 
             var player = new AnimationPlayer
             {
                 Name = "AlsAnimationPlayer",
-                RootNode = new NodePath(".."),
                 CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual,
             };
+            using (var rootPath = new NodePath(".."))
+            {
+                player.RootNode = rootPath;
+            }
             targetRoot.AddChild(player);
             ThrowIfError(
-                player.AddAnimationLibrary(LibraryName, library),
+                player.AddAnimationLibrary(libraryName, library),
                 "add animation library",
                 mannequin.Name);
 
-            return new AlsAnimationLibraryBuildResult(
+            var result = new AlsAnimationLibraryBuildResult(
                 targetRoot,
                 targetSkeleton,
                 player,
                 library,
-                new ReadOnlyDictionary<int, StringName>(names));
+                libraryName,
+                names);
+            library = null;
+            libraryName = null;
+            names = null;
+            return result;
         }
         catch
         {
-            targetRoot.Free();
+            ReleasePartialBuild(targetRoot, library, libraryName, names);
             throw;
         }
     }
@@ -192,6 +250,39 @@ public static class AlsAnimationLibraryBuilder
         }
     }
 
+    private static void ReleasePartialBuild(
+        Node targetRoot,
+        AnimationLibrary? library,
+        StringName? libraryName,
+        OwnedStringNameTable? names)
+    {
+        try
+        {
+            if (GodotObject.IsInstanceValid(targetRoot))
+            {
+                targetRoot.Free();
+            }
+        }
+        finally
+        {
+            try
+            {
+                library?.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    libraryName?.Dispose();
+                }
+                finally
+                {
+                    names?.Dispose();
+                }
+            }
+        }
+    }
+
     private sealed class OwnedNode : IDisposable
     {
         public OwnedNode(Node value) => Value = value;
@@ -199,5 +290,42 @@ public static class AlsAnimationLibraryBuilder
         public Node Value { get; }
 
         public void Dispose() => Value.Free();
+    }
+}
+
+internal sealed class OwnedStringNameTable : IDisposable
+{
+    private readonly Dictionary<int, StringName> _values;
+    private int _disposed;
+
+    public OwnedStringNameTable(int capacity)
+    {
+        _values = new Dictionary<int, StringName>(capacity);
+        View = new ReadOnlyDictionary<int, StringName>(_values);
+    }
+
+    public IReadOnlyDictionary<int, StringName> View { get; }
+
+    public void Add(int animationId, StringName animationName)
+    {
+        if (!_values.TryAdd(animationId, animationName))
+        {
+            throw new InvalidOperationException(
+                $"P3 profile contains duplicate animation ID: {animationId}");
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        foreach (var value in _values.Values)
+        {
+            value.Dispose();
+        }
+        _values.Clear();
     }
 }

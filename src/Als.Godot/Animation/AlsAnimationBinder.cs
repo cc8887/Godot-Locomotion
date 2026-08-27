@@ -38,6 +38,9 @@ public static class AlsAnimationBinder
         AlsAnimationDefinition clip,
         AlsSkeletonDefinition skeletonDefinition)
     {
+        using var importedAnimationName = new StringName(ImportedAnimationName);
+        using var boundAnimationName = new StringName(AnimationName);
+        using var libraryName = new StringName(LibraryName);
         var targetRoot = targetScene.Instantiate();
         try
         {
@@ -48,12 +51,12 @@ public static class AlsAnimationBinder
             using var sourceRoot = new OwnedNode(sourceScene.Instantiate());
             var sourcePlayer = AlsImportedResourceAuditor.FindFirst<AnimationPlayer>(sourceRoot.Value)
                 ?? throw new InvalidOperationException($"Animation scene has no AnimationPlayer: {clip.Name}");
-            if (!sourcePlayer.HasAnimation(ImportedAnimationName))
+            if (!sourcePlayer.HasAnimation(importedAnimationName))
             {
                 throw new InvalidOperationException(
                     $"Animation scene does not contain '{ImportedAnimationName}': {clip.Name}");
             }
-            var sourceAnimation = sourcePlayer.GetAnimation(ImportedAnimationName);
+            using var sourceAnimation = sourcePlayer.GetAnimation(importedAnimationName);
             if (sourceAnimation is null || sourceAnimation.GetTrackCount() == 0)
             {
                 throw new InvalidOperationException($"Imported animation is empty: {clip.Name}");
@@ -64,19 +67,22 @@ public static class AlsAnimationBinder
                     $"Animation length mismatch for {clip.Name}: expected={clip.PlayLength} actual={sourceAnimation.Length}");
             }
 
-            var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
+            using var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
             RewriteTrackPaths(targetRoot, targetSkeleton, boundAnimation, clip.Name);
 
-            var library = new AnimationLibrary();
-            ThrowIfError(library.AddAnimation(AnimationName, boundAnimation), "add bound animation", clip.Name);
+            using var library = new AnimationLibrary();
+            ThrowIfError(library.AddAnimation(boundAnimationName, boundAnimation), "add bound animation", clip.Name);
             var player = new AnimationPlayer
             {
                 Name = "AlsAnimationPlayer",
-                RootNode = new NodePath(".."),
                 CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual,
             };
+            using (var rootPath = new NodePath(".."))
+            {
+                player.RootNode = rootPath;
+            }
             targetRoot.AddChild(player);
-            ThrowIfError(player.AddAnimationLibrary(LibraryName, library), "add animation library", clip.Name);
+            ThrowIfError(player.AddAnimationLibrary(libraryName, library), "add animation library", clip.Name);
             var qualifiedName = $"{LibraryName}/{AnimationName}";
             player.Play(qualifiedName);
             player.Advance(0.0);
@@ -95,7 +101,8 @@ public static class AlsAnimationBinder
         Godot.Animation animation,
         string clipName)
     {
-        var skeletonPath = targetRoot.GetPathTo(targetSkeleton).ToString();
+        using var targetSkeletonPath = targetRoot.GetPathTo(targetSkeleton);
+        var skeletonPath = targetSkeletonPath.ToString();
         for (var trackIndex = 0; trackIndex < animation.GetTrackCount(); trackIndex++)
         {
             var trackType = animation.TrackGetType(trackIndex);
@@ -107,7 +114,7 @@ public static class AlsAnimationBinder
                     $"Unsupported animation track type for {clipName}: index={trackIndex} type={trackType}");
             }
 
-            var sourcePath = animation.TrackGetPath(trackIndex);
+            using var sourcePath = animation.TrackGetPath(trackIndex);
             string boneName;
             try
             {
@@ -126,7 +133,8 @@ public static class AlsAnimationBinder
                     $"Animation track targets a missing physical bone for {clipName}: index={trackIndex} bone={boneName}");
             }
 
-            animation.TrackSetPath(trackIndex, new NodePath($"{skeletonPath}:{boneName}"));
+            using var targetPath = new NodePath($"{skeletonPath}:{boneName}");
+            animation.TrackSetPath(trackIndex, targetPath);
         }
     }
 

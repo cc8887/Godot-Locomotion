@@ -33,7 +33,7 @@ public partial class P3bAnimationLibrarySmoke : Node
         var profile = AlsLocomotionProfileCompiler.Compile(
             File.ReadAllText(ProjectSettings.GlobalizePath(ProfilePath)), definition);
 
-        using var result = AlsAnimationLibraryBuilder.Build(definition, profile);
+        var result = AlsAnimationLibraryBuilder.Build(definition, profile);
         AddChild(result.Root);
 
         var skeletonCount = CountSkeletons(result.Root);
@@ -57,12 +57,13 @@ public partial class P3bAnimationLibrarySmoke : Node
         var expectedIds = profile.AllAnimationIds;
         if (expectedIds.Distinct().Count() != expectedIds.Length ||
             result.ClipNames.Count != expectedIds.Length ||
-            result.Library.GetAnimationList().Count != expectedIds.Length)
+            result.Player.GetAnimationList().Length != expectedIds.Length)
         {
             throw new InvalidOperationException("P3 profile animations were not inserted exactly once.");
         }
 
-        var targetSkeletonPath = result.Root.GetPathTo(result.Skeleton).ToString();
+        using var targetSkeletonNodePath = result.Root.GetPathTo(result.Skeleton);
+        var targetSkeletonPath = targetSkeletonNodePath.ToString();
         foreach (var animationId in expectedIds)
         {
             if (!result.ClipNames.TryGetValue(animationId, out var animationName))
@@ -77,7 +78,7 @@ public partial class P3bAnimationLibrarySmoke : Node
                     $"P3 animation ID {animationId} has an invalid deterministic clip name.");
             }
 
-            var animation = result.Library.GetAnimation(animationName)
+            using var animation = result.Library.GetAnimation(animationName)
                 ?? throw new InvalidOperationException(
                     $"P3 animation library returned a null clip for animation ID {animationId}.");
             var definitionClip = definition.Animations[animationId];
@@ -101,7 +102,8 @@ public partial class P3bAnimationLibrarySmoke : Node
                         $"animation={animationId} index={trackIndex} type={trackType}");
                 }
 
-                var path = animation.TrackGetPath(trackIndex).ToString();
+                using var trackPath = animation.TrackGetPath(trackIndex);
+                var path = trackPath.ToString();
                 var separator = path.LastIndexOf(':');
                 if (separator <= 0 ||
                     !string.Equals(path[..separator], targetSkeletonPath, StringComparison.Ordinal))
@@ -116,6 +118,43 @@ public partial class P3bAnimationLibrarySmoke : Node
         GD.Print(
             $"GODOT_ALS_P3B_LIBRARY_OK bones={result.Skeleton.GetBoneCount()} " +
             $"clips={expectedIds.Length} skeletons={skeletonCount}");
+
+        result.Dispose();
+        result.Dispose();
+
+        var parent = new Node { Name = "P3bParentFreedOwner" };
+        AddChild(parent);
+        var parentFreedResult = AlsAnimationLibraryBuilder.Build(definition, profile);
+        parent.AddChild(parentFreedResult.Root);
+        parent.Free();
+        parentFreedResult.Dispose();
+        parentFreedResult.Dispose();
+
+        var partialIds = profile.AllAnimationIds
+            .Take(3)
+            .Append(definition.Animations.Length)
+            .ToArray();
+        var partialProfile = profile with { AllAnimationIds = partialIds };
+        try
+        {
+            using var unexpected = AlsAnimationLibraryBuilder.Build(definition, partialProfile);
+            throw new InvalidOperationException("P3 partial-build fixture unexpectedly succeeded.");
+        }
+        catch (InvalidOperationException exception) when (
+            exception.Message.Contains("animation ID is out of range", StringComparison.Ordinal))
+        {
+        }
+
+        var rebuilt = AlsAnimationLibraryBuilder.Build(definition, profile);
+        AddChild(rebuilt.Root);
+        if (rebuilt.Player.GetAnimationList().Length != expectedIds.Length)
+        {
+            throw new InvalidOperationException("P3 animation library could not rebuild after partial failure.");
+        }
+        rebuilt.Dispose();
+        rebuilt.Dispose();
+
+        GD.Print("GODOT_ALS_P3B_LIBRARY_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1");
     }
 
     private static int CountSkeletons(Node root)
