@@ -63,48 +63,39 @@ foreach ($characterCount in @(1, 10))
 
 if (-not $SkipRegression)
 {
-    $pesterResult = Invoke-Pester (Join-Path $projectRootPath 'tests\*.Tests.ps1') -PassThru
-    if ($pesterResult.FailedCount -ne 0)
-    {
-        throw "P3B PowerShell regression suite failed: $($pesterResult.FailedCount) failing test(s)."
-    }
-
     $p3aScript = Join-Path $PSScriptRoot 'verify-p3a.ps1'
-    $p3aOutput = @(& $p3aScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath -SkipRegression 2>&1)
+    $p3aOutput = @(& $p3aScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath *>&1)
     $p3aExitCode = $LASTEXITCODE
     $p3aOutput | ForEach-Object { Write-Host $_ }
     Assert-P3bChildGateOutput `
-        -PhaseName 'P3A focused' `
+        -PhaseName 'P3A' `
         -OutputLines $p3aOutput `
         -ExitCode $p3aExitCode `
-        -ExpectedMarker 'P3A_FOCUSED_VERIFICATION_OK regression=skipped'
+        -ExpectedMarker 'P3A_VERIFICATION_OK'
+    Assert-P3bChildGateOutput `
+        -PhaseName 'P2B through P3A' `
+        -OutputLines $p3aOutput `
+        -ExitCode $p3aExitCode `
+        -ExpectedMarker 'P2B_VERIFICATION_OK'
+    Assert-P3bChildGateOutput `
+        -PhaseName 'P1 through P3A' `
+        -OutputLines $p3aOutput `
+        -ExitCode $p3aExitCode `
+        -ExpectedMarker 'P1_VERIFICATION_OK'
+    Assert-P3bChildGateOutput `
+        -PhaseName 'P0 through P3A' `
+        -OutputLines $p3aOutput `
+        -ExitCode $p3aExitCode `
+        -ExpectedMarker 'P0_VERIFICATION_OK'
 
-    $childGates = @(
-        [pscustomobject]@{ Name = 'P2B'; Script = 'verify-p2b.ps1'; Marker = 'P2B_VERIFICATION_OK' },
-        [pscustomobject]@{ Name = 'P1'; Script = 'verify-p1.ps1'; Marker = 'P1_VERIFICATION_OK' },
-        [pscustomobject]@{ Name = 'P0'; Script = 'verify-p0.ps1'; Marker = 'P0_VERIFICATION_OK' }
-    )
-    foreach ($childGate in $childGates)
-    {
-        $childScript = Join-Path $PSScriptRoot $childGate.Script
-        $childOutput = @(& $childScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath 2>&1)
-        $childExitCode = $LASTEXITCODE
-        $childOutput | ForEach-Object { Write-Host $_ }
-        Assert-P3bChildGateOutput `
-            -PhaseName $childGate.Name `
-            -OutputLines $childOutput `
-            -ExitCode $childExitCode `
-            -ExpectedMarker $childGate.Marker
-    }
-
-    $releaseTestOutput = @(dotnet test $solutionPath -c Release --no-restore 2>&1)
+    $releaseTestOutput = @(dotnet test $solutionPath -c Release --no-restore *>&1)
     $releaseTestExitCode = $LASTEXITCODE
     $releaseTestOutput | ForEach-Object { Write-Host $_ }
     if ($releaseTestExitCode -ne 0)
     {
         throw "P3B Release tests exited with code $releaseTestExitCode."
     }
-    $releaseTestErrors = @($releaseTestOutput | Where-Object { "$_" -match 'SCRIPT ERROR|ERROR:' })
+    $releaseTestErrors = @($releaseTestOutput | Where-Object { "$_" -match 'SCRIPT ERROR:|ERROR:' })
     if ($releaseTestErrors.Count -ne 0)
     {
         throw "P3B Release tests emitted an error line:$([Environment]::NewLine)$($releaseTestErrors -join [Environment]::NewLine)"
@@ -112,8 +103,10 @@ if (-not $SkipRegression)
     Write-Output 'P3B_RELEASE_TESTS_OK'
 
     Assert-P3aRepositoryClosure -RepositoryRoot $projectRootPath -BaseCommit $p3aBaseCommit
+    Assert-P3bCleanWorktree -RepositoryRoot $projectRootPath
     Write-Output "P3B_REPOSITORY_CLOSURE_OK p3a_base=$p3aBaseCommit"
 }
 
-Write-Output 'P3B_VERIFICATION_OK'
+$completionMarker = Get-P3bCompletionMarker -RegressionSkipped ([bool]$SkipRegression)
+Write-Output $completionMarker
 exit 0
