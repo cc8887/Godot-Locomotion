@@ -53,7 +53,8 @@ public sealed class AlsP3RuntimeContext
         AlsAnimationSetDefinition animationSet,
         AlsLocomotionAnimationProfile profile,
         int mainManagedThreadId,
-        bool headlessOrDebug)
+        bool headlessOrDebug,
+        AlsP3bHarnessContext? measurement = null)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         AnimationSet = animationSet ?? throw new ArgumentNullException(nameof(animationSet));
@@ -68,6 +69,7 @@ public sealed class AlsP3RuntimeContext
         MotorSettings = motorSettings;
         MainManagedThreadId = mainManagedThreadId;
         HeadlessOrDebug = headlessOrDebug;
+        Measurement = measurement;
     }
 
     public AlsHarnessMode Mode { get; }
@@ -83,6 +85,8 @@ public sealed class AlsP3RuntimeContext
     public int MainManagedThreadId { get; }
 
     public bool HeadlessOrDebug { get; }
+
+    public AlsP3bHarnessContext? Measurement { get; }
 
     public long MissingResults;
 
