@@ -8,7 +8,7 @@
 
 **UE 资产源工程：** `../AdvancedLocomotionSystemV`
 
-**参考实现：** `Sixze/ALS-Refactored`，固定使用 tag `4.17`，commit `cb03d53526fed8eaf62637621d4593a57753b317`
+**参考实现：** `Sixze/ALS-Refactored`，固定使用 commit `b754d6f0f2bb03741d301f8fb88077ebfe561e17`
 
 ## 一、项目目标
 
@@ -29,7 +29,7 @@
 - 单线程和多线程模式具有可验证的等价行为；
 - 在 Intel i7-10700 上，至少 10 个全质量角色以 60 Hz physics 稳定运行于 60 FPS。
 
-里程碑 B 不包含网络预测、完整武器/持物 Overlay 框架和任意异骨架的运行时重定向。这些能力可以在基础系统稳定后作为独立项目继续设计。
+里程碑 B 不包含网络预测和任意异骨架的运行时重定向。完整武器/持物 Overlay 框架按 P5B 实施，依赖 P4 分层姿态和 P5A 事件/动作基础。
 
 ## 二、仓库与工程边界
 
@@ -141,8 +141,7 @@ GodotALS/
 
 ```text
 Repository: https://github.com/Sixze/ALS-Refactored.git
-Tag:        4.17
-Commit:     cb03d53526fed8eaf62637621d4593a57753b317
+Commit:     b754d6f0f2bb03741d301f8fb88077ebfe561e17
 ```
 
 固定提交的目的，是避免开发过程中上游 `main` 更新导致行为依据漂移。每个 Godot 功能都要记录：
@@ -851,7 +850,6 @@ StableReasonCode
 - 不实现通用 `.uasset` 读取器；
 - 不实现任意异骨架运行时重定向；
 - 里程碑 B 不实现网络预测；
-- 里程碑 B 不实现完整武器/Overlay 框架；
 - worker 不直接调用 gameplay 或修改外部 SceneTree；
 - 没有 Profiler 证据时不提前重写为 GDExtension；
 - 不把平均 FPS 当成唯一验收指标。
