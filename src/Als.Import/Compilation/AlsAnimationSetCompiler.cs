@@ -119,7 +119,7 @@ public static class AlsAnimationSetCompiler
                 metadata.RootMotionRootLock, metadata.ForceRootLock, metadata.UseNormalizedRootMotionScale,
                 metadata.AdditiveType, metadata.AdditiveBasePoseType, metadata.AdditiveBasePoseFrame,
                 string.IsNullOrEmpty(metadata.AdditiveBasePoseId) ? -1 : animationIds[metadata.AdditiveBasePoseId],
-                metadata.Curves.ToArray(),
+                metadata.Curves.Select(value => value.SourceName).ToArray(),
                 metadata.Notifies.Select(value => new AlsAnimationNotifyDefinition(
                     value.Name, value.Time, value.Duration, value.SourceIndex)).ToArray(),
                 metadata.SyncMarkers.Select(value => new AlsAnimationSyncMarkerDefinition(value.Name, value.Time)).ToArray(),

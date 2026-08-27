@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GodotAls.Import.Metadata;
 
 namespace GodotAls.Import.Manifest;
 
@@ -19,6 +20,10 @@ public static class AlsManifestSerializer
         var manifest = JsonSerializer.Deserialize<AlsManifest>(json, JsonOptions)
             ?? throw new JsonException("ALS manifest deserialized to null.");
         EnsureRequiredMembers(manifest);
+        foreach (var animation in manifest.Animations)
+        {
+            AlsAnimationMetadata.Read(animation.Metadata);
+        }
         return manifest;
     }
 

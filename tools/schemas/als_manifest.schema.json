@@ -67,6 +67,25 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "objectPath", "packagePath", "assetName", "classPath", "outputPath", "dependencies", "metadata"],
+      "allOf": [
+        {
+          "if": { "properties": { "classPath": { "const": "/Script/Engine.AnimSequence" } } },
+          "then": {
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "required": ["curves"],
+                "properties": {
+                  "curves": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/floatCurve" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "id": { "$ref": "#/$defs/stableId" },
         "objectPath": { "type": "string", "pattern": "^/Game/.+\\.[^./]+$" },
@@ -81,6 +100,35 @@
         },
         "dependencies": { "type": "array", "items": { "$ref": "#/$defs/stableId" }, "uniqueItems": true },
         "metadata": { "type": "object" }
+      }
+    },
+    "floatCurveKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeSeconds", "value", "interpolation", "arriveTangent", "leaveTangent"],
+      "properties": {
+        "timeSeconds": { "type": "number" },
+        "value": { "type": "number" },
+        "interpolation": { "enum": ["Constant", "Linear", "Cubic"] },
+        "arriveTangent": { "type": "number" },
+        "leaveTangent": { "type": "number" }
+      }
+    },
+    "floatCurve": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableCurveId", "canonicalKind", "sourceName", "sourceProvenance", "preInfinity", "postInfinity", "keys"],
+      "properties": {
+        "stableCurveId": { "type": "integer", "minimum": 0 },
+        "canonicalKind": { "const": "None" },
+        "sourceName": { "type": "string", "minLength": 1 },
+        "sourceProvenance": { "const": "source_curve" },
+        "preInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
+        "postInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
+        "keys": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/floatCurveKey" }
+        }
       }
     },
     "file": {

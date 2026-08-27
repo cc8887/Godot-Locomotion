@@ -104,7 +104,32 @@
         "additiveBasePoseId": "",
         "skeletonId": "09ee83c5ee0df9c7343e9ebc943d4902498af3e5",
         "skeletonObjectPath": "/Game/Test/Skeleton.Skeleton",
-        "curves": [],
+        "curves": [
+          {
+            "stableCurveId": 0,
+            "canonicalKind": "None",
+            "sourceName": "RotationAmount",
+            "sourceProvenance": "source_curve",
+            "preInfinity": "Constant",
+            "postInfinity": "Constant",
+            "keys": [
+              {
+                "timeSeconds": 0.0,
+                "value": 0.0,
+                "interpolation": "Linear",
+                "arriveTangent": 0.0,
+                "leaveTangent": 90.0
+              },
+              {
+                "timeSeconds": 1.0,
+                "value": 90.0,
+                "interpolation": "Cubic",
+                "arriveTangent": 90.0,
+                "leaveTangent": 0.0
+              }
+            ]
+          }
+        ],
         "notifies": [],
         "syncMarkers": []
       }

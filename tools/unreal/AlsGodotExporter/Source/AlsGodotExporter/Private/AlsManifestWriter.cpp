@@ -65,7 +65,8 @@ namespace
         return true;
     }
 
-    bool ReadMetadata(const FAlsExportAsset& Asset, TSharedRef<FJsonObject>& Metadata, FString& OutError)
+    bool ReadMetadata(const FAlsExportAsset& Asset, TSharedRef<FJsonObject>& Metadata,
+        TArray<FAlsExportedFloatCurve>& OutFloatCurves, FString& OutError)
     {
         Metadata->SetBoolField(TEXT("overlay"), Asset.AssetData.GetObjectPathString().Contains(TEXT("/Overlay/")));
         Metadata->SetBoolField(TEXT("prop"), Asset.AssetData.GetObjectPathString().Contains(TEXT("/Props/")));
@@ -77,7 +78,7 @@ namespace
         case EAlsAssetKind::PhysicsAsset:
             return FAlsRigMetadataReader::Read(Asset, Metadata, OutError);
         case EAlsAssetKind::AnimationSequence:
-            return FAlsAnimationMetadataReader::Read(Asset, Metadata, OutError);
+            return FAlsAnimationMetadataReader::Read(Asset, Metadata, OutFloatCurves, OutError);
         case EAlsAssetKind::AnimMontage:
         case EAlsAssetKind::BlendSpace:
         case EAlsAssetKind::AimOffset:
@@ -102,8 +103,55 @@ namespace
         return Json;
     }
 
+    FString SerializeFloatCurves(const TArray<FAlsExportedFloatCurve>& Curves)
+    {
+        FString Json;
+        const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+            TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json);
+        Writer->WriteArrayStart();
+        for (const FAlsExportedFloatCurve& Curve : Curves)
+        {
+            Writer->WriteObjectStart();
+            Writer->WriteValue(TEXT("stableCurveId"), Curve.StableCurveId);
+            Writer->WriteValue(TEXT("canonicalKind"), Curve.CanonicalKind);
+            Writer->WriteValue(TEXT("sourceName"), Curve.SourceName);
+            Writer->WriteValue(TEXT("sourceProvenance"), Curve.SourceProvenance);
+            Writer->WriteValue(TEXT("preInfinity"), Curve.PreInfinity);
+            Writer->WriteValue(TEXT("postInfinity"), Curve.PostInfinity);
+            Writer->WriteArrayStart(TEXT("keys"));
+            for (const FAlsExportedFloatCurveKey& Key : Curve.Keys)
+            {
+                Writer->WriteObjectStart();
+                Writer->WriteValue(TEXT("timeSeconds"), Key.TimeSeconds);
+                Writer->WriteValue(TEXT("value"), Key.Value);
+                Writer->WriteValue(TEXT("interpolation"), Key.Interpolation);
+                Writer->WriteValue(TEXT("arriveTangent"), Key.ArriveTangent);
+                Writer->WriteValue(TEXT("leaveTangent"), Key.LeaveTangent);
+                Writer->WriteObjectEnd();
+            }
+            Writer->WriteArrayEnd();
+            Writer->WriteObjectEnd();
+        }
+        Writer->WriteArrayEnd();
+        Writer->Close();
+        return Json;
+    }
+
+    FString SerializeAnimationMetadata(const TSharedRef<FJsonObject>& Metadata,
+        const TArray<FAlsExportedFloatCurve>& Curves)
+    {
+        FString Json = SerializeMetadata(Metadata);
+        check(Json.EndsWith(TEXT("}")));
+        Json.LeftChopInline(1);
+        Json.Append(TEXT(",\"curves\":"));
+        Json.Append(SerializeFloatCurves(Curves));
+        Json.AppendChar(TEXT('}'));
+        return Json;
+    }
+
     void WriteAsset(const TSharedRef<TJsonWriter<>>& Writer, const FAlsExportAsset& Asset,
-        const TMap<FString, TSharedRef<FJsonObject>>& MetadataById)
+        const TMap<FString, TSharedRef<FJsonObject>>& MetadataById,
+        const TMap<FString, TArray<FAlsExportedFloatCurve>>& FloatCurvesById)
     {
         Writer->WriteObjectStart();
         Writer->WriteValue(TEXT("id"), Asset.Id);
@@ -125,12 +173,22 @@ namespace
             Writer->WriteValue(Dependency);
         }
         Writer->WriteArrayEnd();
-        Writer->WriteRawJSONValue(TEXT("metadata"), SerializeMetadata(MetadataById.FindChecked(Asset.Id)));
+        const TSharedRef<FJsonObject>& Metadata = MetadataById.FindChecked(Asset.Id);
+        if (Asset.Kind == EAlsAssetKind::AnimationSequence)
+        {
+            Writer->WriteRawJSONValue(TEXT("metadata"),
+                SerializeAnimationMetadata(Metadata, FloatCurvesById.FindChecked(Asset.Id)));
+        }
+        else
+        {
+            Writer->WriteRawJSONValue(TEXT("metadata"), SerializeMetadata(Metadata));
+        }
         Writer->WriteObjectEnd();
     }
 
     void WriteAssetArray(const TSharedRef<TJsonWriter<>>& Writer, const TCHAR* FieldName,
         const TArray<FAlsExportAsset>& Assets, const TMap<FString, TSharedRef<FJsonObject>>& MetadataById,
+        const TMap<FString, TArray<FAlsExportedFloatCurve>>& FloatCurvesById,
         const TFunctionRef<bool(EAlsAssetKind)> Predicate)
     {
         Writer->WriteArrayStart(FieldName);
@@ -138,7 +196,7 @@ namespace
         {
             if (Predicate(Asset.Kind))
             {
-                WriteAsset(Writer, Asset, MetadataById);
+                WriteAsset(Writer, Asset, MetadataById, FloatCurvesById);
             }
         }
         Writer->WriteArrayEnd();
@@ -157,14 +215,17 @@ bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>
     }
 
     TMap<FString, TSharedRef<FJsonObject>> MetadataById;
+    TMap<FString, TArray<FAlsExportedFloatCurve>> FloatCurvesById;
     for (const FAlsExportAsset& Asset : Assets)
     {
         TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
-        if (!ReadMetadata(Asset, Metadata, OutError))
+        TArray<FAlsExportedFloatCurve> FloatCurves;
+        if (!ReadMetadata(Asset, Metadata, FloatCurves, OutError))
         {
             return false;
         }
         MetadataById.Add(Asset.Id, Metadata);
+        FloatCurvesById.Add(Asset.Id, MoveTemp(FloatCurves));
     }
     for (const FAlsExportAsset& Asset : Assets)
     {
@@ -192,18 +253,18 @@ bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>
     Writer->WriteObjectEnd();
     Writer->WriteValue(TEXT("unitScale"), 0.01);
 
-    WriteAssetArray(Writer, TEXT("skeletons"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Skeleton; });
-    WriteAssetArray(Writer, TEXT("skeletalMeshes"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::SkeletalMesh; });
-    WriteAssetArray(Writer, TEXT("staticMeshes"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::StaticMesh; });
-    WriteAssetArray(Writer, TEXT("animations"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::AnimationSequence; });
-    WriteAssetArray(Writer, TEXT("montages"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::AnimMontage; });
-    WriteAssetArray(Writer, TEXT("blendSpaces"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::BlendSpace; });
-    WriteAssetArray(Writer, TEXT("aimOffsets"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::AimOffset; });
-    WriteAssetArray(Writer, TEXT("materials"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Material || Kind == EAlsAssetKind::MaterialInstance; });
-    WriteAssetArray(Writer, TEXT("textures"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Texture; });
-    WriteAssetArray(Writer, TEXT("physicsAssets"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::PhysicsAsset; });
-    WriteAssetArray(Writer, TEXT("curves"), Assets, MetadataById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Curve; });
-    WriteAssetArray(Writer, TEXT("configAssets"), Assets, MetadataById, [](EAlsAssetKind Kind)
+    WriteAssetArray(Writer, TEXT("skeletons"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Skeleton; });
+    WriteAssetArray(Writer, TEXT("skeletalMeshes"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::SkeletalMesh; });
+    WriteAssetArray(Writer, TEXT("staticMeshes"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::StaticMesh; });
+    WriteAssetArray(Writer, TEXT("animations"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::AnimationSequence; });
+    WriteAssetArray(Writer, TEXT("montages"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::AnimMontage; });
+    WriteAssetArray(Writer, TEXT("blendSpaces"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::BlendSpace; });
+    WriteAssetArray(Writer, TEXT("aimOffsets"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::AimOffset; });
+    WriteAssetArray(Writer, TEXT("materials"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Material || Kind == EAlsAssetKind::MaterialInstance; });
+    WriteAssetArray(Writer, TEXT("textures"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Texture; });
+    WriteAssetArray(Writer, TEXT("physicsAssets"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::PhysicsAsset; });
+    WriteAssetArray(Writer, TEXT("curves"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind) { return Kind == EAlsAssetKind::Curve; });
+    WriteAssetArray(Writer, TEXT("configAssets"), Assets, MetadataById, FloatCurvesById, [](EAlsAssetKind Kind)
     {
         return Kind == EAlsAssetKind::DataTable || Kind == EAlsAssetKind::Blueprint || Kind == EAlsAssetKind::OtherConfig;
     });
