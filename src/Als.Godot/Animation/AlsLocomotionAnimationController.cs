@@ -74,9 +74,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         catch
         {
             Interlocked.Exchange(ref _warmed, 0);
-            _topPlayback?.Dispose();
             _topPlayback = null;
-            _groundedPlayback?.Dispose();
             _groundedPlayback = null;
             throw;
         }
@@ -107,12 +105,12 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         }
 
         var parameters = GetParameters(result.AnimationState, result.ActualStance);
-        var stride = MathF.Max(0f, result.Stride);
-        var blend = new Vector2(
-            result.BlendCoordinates.X * stride,
-            result.BlendCoordinates.Y * stride);
+        var blend = MapBlendPosition(result);
         var lean = new Vector2(result.Lean.X, result.Lean.Y);
-        SetParameters(parameters, blend, result.PlayRate, lean, result.AnimationPhase);
+        var effectivePlayRate = result.AnimationState == AlsAnimationState.Grounded
+            ? result.PlayRate * result.Stride
+            : 1f;
+        SetParameters(parameters, blend, effectivePlayRate, lean, result.AnimationPhase);
 
         _graph.Tree.Advance(deltaTime);
         ManualAdvanceCount++;
@@ -155,9 +153,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             return;
         }
 
-        _topPlayback?.Dispose();
         _topPlayback = null;
-        _groundedPlayback?.Dispose();
         _groundedPlayback = null;
     }
 
@@ -199,7 +195,28 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             Clamp(lean, parameters.LeanMinimum, parameters.LeanMaximum));
         _graph.Tree.Set(parameters.LeanAmountPath, lean.LengthSquared() > 1e-12f ? 1f : 0f);
         _graph.Tree.Set(parameters.PlayRatePath, playRate);
-        _graph.Tree.Set(parameters.PhasePath, Math.Clamp(phase, 0f, 1f));
+        if (parameters.PhasePath is not null)
+        {
+            _graph.Tree.Set(parameters.PhasePath, Math.Clamp(phase, 0f, 1f));
+        }
+    }
+
+    private Vector2 MapBlendPosition(in AlsFrameResult result)
+    {
+        var right = (double)result.BlendCoordinates.X;
+        var forward = (double)result.BlendCoordinates.Y;
+        var magnitude = Math.Sqrt((right * right) + (forward * forward));
+        if (magnitude <= 1e-6)
+        {
+            return Vector2.Zero;
+        }
+
+        var radius = result.ActualStance == AlsStance.Crouching
+            ? _graph.Handles.CrouchingRadius
+            : _graph.Handles.StandingGaitRadii[(int)result.ActualGait];
+        return new Vector2(
+            (float)((right / magnitude) * radius),
+            (float)((forward / magnitude) * radius));
     }
 
     private static Vector2 Clamp(Vector2 value, Vector2 minimum, Vector2 maximum) => new(
@@ -223,7 +240,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         if (!float.IsFinite(result.BlendCoordinates.X) ||
             !float.IsFinite(result.BlendCoordinates.Y) ||
             !float.IsFinite(result.Stride) ||
-            result.Stride < 0f ||
+            result.Stride < 0f || result.Stride > 1f ||
             !float.IsFinite(result.PlayRate) ||
             result.PlayRate <= 0f ||
             !float.IsFinite(result.Lean.X) ||
