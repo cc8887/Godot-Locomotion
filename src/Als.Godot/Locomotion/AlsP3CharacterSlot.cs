@@ -105,6 +105,14 @@ public partial class AlsP3CharacterSlot : Node
         ThrowIfDisposed();
         EnsureConfigured();
         ArgumentOutOfRangeException.ThrowIfNegative(completedFrameId);
+        if (completedFrameId >
+            AlsP3VisualRootVisibilityObservation.MaximumResumableCompletedFrameId)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(completedFrameId),
+                completedFrameId,
+                "P3 replacement frame is too large to resume safely.");
+        }
         if (_replacementPhase != AlsP3ReplacementPhase.None)
         {
             throw new InvalidOperationException("P3 slot replacement is already in progress.");
@@ -143,6 +151,11 @@ public partial class AlsP3CharacterSlot : Node
     public void DisposeRuntime()
     {
         EnsureMainThread();
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+        DeactivateCharactersForDisposal();
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
         {
             return;
@@ -152,9 +165,13 @@ public partial class AlsP3CharacterSlot : Node
 
     public override void _ExitTree()
     {
-        if (GodotThread.IsMainThread() && Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        if (GodotThread.IsMainThread() && Volatile.Read(ref _disposed) == 0)
         {
-            DisposeRuntimeCore(freeNodes: false);
+            DeactivateCharactersForDisposal();
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+            {
+                DisposeRuntimeCore(freeNodes: false);
+            }
         }
     }
 
@@ -204,7 +221,6 @@ public partial class AlsP3CharacterSlot : Node
         _retiredResultIdentity = publishedIdentity;
         _retiredResultObserved = true;
         var retired = _active;
-        retired.ResetVisualReady();
         retired.RetireForReplacement();
         if (retired.Visible)
         {
@@ -289,24 +305,26 @@ public partial class AlsP3CharacterSlot : Node
 
     private void DisposeRuntimeCore(bool freeNodes)
     {
-        HideCharacter(_active);
-        HideCharacter(_spare);
         DisposeCharacter(_active, freeNodes);
         DisposeCharacter(_spare, freeNodes);
         _spare = null;
     }
 
-    private static void HideCharacter(AlsP3Character? character)
+    private void DeactivateCharactersForDisposal()
+    {
+        DeactivateCharacterForDisposal(_active);
+        DeactivateCharacterForDisposal(_spare);
+    }
+
+    private static void DeactivateCharacterForDisposal(AlsP3Character? character)
     {
         if (character is null || !GodotObject.IsInstanceValid(character))
         {
             return;
         }
-
-        character.Visible = false;
         if (!character.LifecycleDiagnostics.IsDisposed)
         {
-            character.ResetVisualReady();
+            character.SetActive(false);
         }
     }
 
@@ -340,12 +358,12 @@ public partial class AlsP3CharacterSlot : Node
     {
         var count = 0;
         if (_active is not null && GodotObject.IsInstanceValid(_active) &&
-            _active.ObservedVisualRootVisibleInTree)
+            _active.VisualRootVisibilityObservation.IsVisible)
         {
             count++;
         }
         if (_spare is not null && GodotObject.IsInstanceValid(_spare) &&
-            _spare.ObservedVisualRootVisibleInTree)
+            _spare.VisualRootVisibilityObservation.IsVisible)
         {
             count++;
         }
@@ -383,8 +401,8 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         var lifecycle = character.LifecycleDiagnostics;
-        var visualRootVisible = character.ObservedVisualRootVisibleInTree;
-        if (visualRootVisible &&
+        var visibility = character.VisualRootVisibilityObservation;
+        if (visibility.IsVisible &&
             (!lifecycle.IsVisible || !lifecycle.IsActive || !lifecycle.IsVisualReady))
         {
             throw new InvalidOperationException(

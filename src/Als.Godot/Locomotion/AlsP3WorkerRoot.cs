@@ -75,7 +75,10 @@ public partial class AlsP3WorkerRoot : Node3D
 
     public override void _PhysicsProcess(double delta)
     {
-        Interlocked.Increment(ref _state.WorkerInFlight);
+        if (!_state.TryEnterWorker())
+        {
+            return;
+        }
         try
         {
             if (Volatile.Read(ref _disposed) != 0 || Volatile.Read(ref _state.Active) == 0 ||
@@ -251,7 +254,7 @@ public partial class AlsP3WorkerRoot : Node3D
         }
         finally
         {
-            Interlocked.Decrement(ref _state.WorkerInFlight);
+            _state.ExitWorker();
         }
     }
 
@@ -261,7 +264,7 @@ public partial class AlsP3WorkerRoot : Node3D
         {
             return true;
         }
-        if (Volatile.Read(ref _state.WorkerInFlight) != 0)
+        if (!_state.IsWorkerAdmissionClosed || _state.WorkerInFlightCount != 0)
         {
             Volatile.Write(ref _disposed, 0);
             return false;
@@ -296,9 +299,10 @@ public partial class AlsP3WorkerRoot : Node3D
 
     private void PublishVisualRootVisibility(long observationFrameId)
     {
-        var visible = _visualRoot!.IsVisibleInTree() ? 1 : 0;
-        Volatile.Write(ref _state.ObservedVisualRootVisible, visible);
-        Volatile.Write(ref _state.VisualRootVisibilityObservationFrameId, observationFrameId);
+        var snapshot = AlsP3VisualRootVisibilityObservation.EncodeWorker(
+            observationFrameId,
+            _visualRoot!.IsVisibleInTree());
+        Volatile.Write(ref _state.VisualRootVisibilitySnapshot, snapshot);
     }
 
     private void RestorePose()

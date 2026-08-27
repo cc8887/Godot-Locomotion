@@ -159,8 +159,50 @@ public sealed class AlsP3RuntimeContext
     public long AffinityViolations;
 }
 
+internal readonly record struct AlsP3VisualRootVisibilityObservation(
+    long FrameId,
+    bool IsVisible,
+    bool IsWorkerObservation)
+{
+    public const long MainThreadKnownHiddenValue = -1;
+    public const long MaximumWorkerFrameId = long.MaxValue >> 1;
+    public const long MaximumResumableCompletedFrameId = MaximumWorkerFrameId - 1;
+
+    public static AlsP3VisualRootVisibilityObservation Decode(long snapshot)
+    {
+        if (snapshot == MainThreadKnownHiddenValue)
+        {
+            return new AlsP3VisualRootVisibilityObservation(-1, false, false);
+        }
+        if (snapshot < 0)
+        {
+            throw new InvalidOperationException("P3 visual-root visibility snapshot is invalid.");
+        }
+
+        return new AlsP3VisualRootVisibilityObservation(
+            snapshot >> 1,
+            (snapshot & 1L) != 0,
+            true);
+    }
+
+    public static long EncodeWorker(long frameId, bool visible)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(frameId);
+        if (frameId > MaximumWorkerFrameId)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(frameId),
+                frameId,
+                "P3 visibility observation frame cannot be encoded.");
+        }
+
+        return (frameId << 1) | (visible ? 1L : 0L);
+    }
+}
+
 internal sealed class AlsP3CharacterState
 {
+    private const int WorkerAdmissionClosedValue = -1;
     private readonly object _failureGate = new();
     private readonly Queue<AlsP3WorkerFailure> _failures = new();
     private readonly HashSet<AlsP3FailureIdentity> _pendingFailureIdentities = new();
@@ -219,9 +261,8 @@ internal sealed class AlsP3CharacterState
 
     public int VisualReady;
 
-    public int ObservedVisualRootVisible;
-
-    public long VisualRootVisibilityObservationFrameId;
+    public long VisualRootVisibilitySnapshot =
+        AlsP3VisualRootVisibilityObservation.MainThreadKnownHiddenValue;
 
     public int ProcessingEnabled;
 
@@ -237,7 +278,56 @@ internal sealed class AlsP3CharacterState
 
     public int FailureDiagnosticCount;
 
-    public int WorkerInFlight;
+    private int _workerAdmissionState = WorkerAdmissionClosedValue;
+
+    public int WorkerInFlightCount => Math.Max(0, Volatile.Read(ref _workerAdmissionState));
+
+    public bool IsWorkerAdmissionClosed =>
+        Volatile.Read(ref _workerAdmissionState) == WorkerAdmissionClosedValue;
+
+    public bool TryCloseWorkerAdmission() =>
+        Interlocked.CompareExchange(
+            ref _workerAdmissionState,
+            WorkerAdmissionClosedValue,
+            0) == 0;
+
+    public void OpenWorkerAdmission()
+    {
+        if (Interlocked.CompareExchange(ref _workerAdmissionState, 0, WorkerAdmissionClosedValue) !=
+            WorkerAdmissionClosedValue)
+        {
+            throw new InvalidOperationException(
+                "P3 Worker admission can only open from the closed idle state.");
+        }
+    }
+
+    public bool TryEnterWorker()
+    {
+        while (true)
+        {
+            var state = Volatile.Read(ref _workerAdmissionState);
+            if (state == WorkerAdmissionClosedValue)
+            {
+                return false;
+            }
+            if (state == int.MaxValue)
+            {
+                throw new InvalidOperationException("P3 Worker admission count overflowed.");
+            }
+            if (Interlocked.CompareExchange(ref _workerAdmissionState, state + 1, state) == state)
+            {
+                return true;
+            }
+        }
+    }
+
+    public void ExitWorker()
+    {
+        if (Interlocked.Decrement(ref _workerAdmissionState) < 0)
+        {
+            throw new InvalidOperationException("P3 Worker exited without admission.");
+        }
+    }
 
     public void RecordFailure(string code, AlsFrameIdentity identity, Exception exception)
     {

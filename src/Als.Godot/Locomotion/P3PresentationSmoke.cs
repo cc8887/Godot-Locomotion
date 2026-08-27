@@ -24,6 +24,7 @@ public partial class P3PresentationSmoke : Node
 
     private readonly AlsP3Character[] _characters = new AlsP3Character[CharacterCount];
     private readonly long[] _lastObservedFrames = new long[CharacterCount];
+    private readonly long[] _framesBeforeDeactivation = new long[CharacterCount];
     private AlsP3RuntimeContext _context = null!;
     private AlsLocomotionAnimationProfile _profile = null!;
     private AlsP3Character? _failureCharacter;
@@ -36,6 +37,9 @@ public partial class P3PresentationSmoke : Node
     private ulong _failureFullPoseDigest;
     private ulong _failureRootDigest;
     private int _physicsTicks;
+    private int _normalLifecyclePhaseStartedAtTick;
+    private ulong _normalMarkerRootDigest;
+    private NormalLifecyclePhase _normalLifecyclePhase;
     private bool _initialFailure;
     private bool _quitting;
 
@@ -65,6 +69,8 @@ public partial class P3PresentationSmoke : Node
                 headlessOrDebug: !_initialFailure);
 
             ValidateProfileDefinition();
+            ValidateVisualRootVisibilityEncoding();
+            ValidateWorkerAdmissionStateMachine();
             AddChild(CreateFloor());
             if (_initialFailure)
             {
@@ -145,6 +151,17 @@ public partial class P3PresentationSmoke : Node
 
     private void ValidateNormalCharacters()
     {
+        if (_normalLifecyclePhase == NormalLifecyclePhase.InactiveHold)
+        {
+            ValidateInactiveHold();
+            return;
+        }
+        if (_normalLifecyclePhase == NormalLifecyclePhase.Reactivating)
+        {
+            ValidateReactivation();
+            return;
+        }
+
         for (var index = 0; index < CharacterCount; index++)
         {
             var character = _characters[index];
@@ -175,6 +192,14 @@ public partial class P3PresentationSmoke : Node
                     "repeated active SetActive(true) hid or reset the committed visual");
             }
             _lastObservedFrames[index] = frame.CommittedFrameId;
+        }
+
+        for (var index = 0; index < CharacterCount; index++)
+        {
+            if (!_characters[index].VisualRootVisibilityObservation.IsVisible)
+            {
+                return;
+            }
         }
 
         var presentation = default(Transform3D);
@@ -209,16 +234,99 @@ public partial class P3PresentationSmoke : Node
 
         for (var index = 0; index < CharacterCount; index++)
         {
+            Require(_characters[index].VisualRootVisibilityObservation.IsVisible,
+                $"character {index} was not observed visible before deactivation");
+            Require(_characters[index].WorkerInFlight == 0,
+                $"character {index} deactivation did not begin at an idle Worker boundary");
+            _framesBeforeDeactivation[index] = _characters[index].Diagnostics.CommittedFrameId;
             _characters[index].SetActive(false);
             var lifecycle = _characters[index].LifecycleDiagnostics;
-            Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
+            Require(!lifecycle.IsActive && !lifecycle.IsVisible && !lifecycle.IsVisualReady,
                 $"character {index} retained visual state after deactivation");
-            _characters[index].DisposeRuntime();
-            RemoveChild(_characters[index]);
-            _characters[index].Free();
+            var visibility = _characters[index].VisualRootVisibilityObservation;
+            Require(!visibility.IsVisible && !visibility.IsWorkerObservation &&
+                visibility.FrameId == -1,
+                $"character {index} retained a stale visible observation after deactivation");
+        }
+        _normalMarkerRootDigest = markerRootDigest;
+        _normalLifecyclePhase = NormalLifecyclePhase.InactiveHold;
+        _normalLifecyclePhaseStartedAtTick = _physicsTicks;
+    }
+
+    private void ValidateInactiveHold()
+    {
+        Require(_physicsTicks > _normalLifecyclePhaseStartedAtTick,
+            "deactivated characters were not retained across a physics tick");
+        for (var index = 0; index < CharacterCount; index++)
+        {
+            var character = _characters[index];
+            Require(character.WorkerInFlight == 0,
+                $"inactive character {index} unexpectedly retained an in-flight Worker");
+            var lifecycle = character.LifecycleDiagnostics;
+            var visibility = character.VisualRootVisibilityObservation;
+            Require(!lifecycle.IsActive && !lifecycle.IsVisible && !lifecycle.IsVisualReady,
+                $"inactive character {index} changed lifecycle state during the hold tick");
+            Require(!visibility.IsWorkerObservation && !visibility.IsVisible &&
+                visibility.FrameId == -1,
+                $"inactive character {index} visibility sentinel changed during the hold tick");
+
+            character.SetActive(true);
+            lifecycle = character.LifecycleDiagnostics;
+            visibility = character.VisualRootVisibilityObservation;
+            Require(lifecycle.IsActive && !lifecycle.IsVisible && !lifecycle.IsVisualReady,
+                $"reactivated character {index} skipped its hidden pre-commit state");
+            Require(!visibility.IsWorkerObservation && !visibility.IsVisible &&
+                visibility.FrameId == -1,
+                $"reactivated character {index} exposed stale visibility before a new Worker frame");
+        }
+
+        _normalLifecyclePhase = NormalLifecyclePhase.Reactivating;
+        _normalLifecyclePhaseStartedAtTick = _physicsTicks;
+    }
+
+    private void ValidateReactivation()
+    {
+        Require(_physicsTicks > _normalLifecyclePhaseStartedAtTick,
+            "reactivated characters did not advance to a new physics tick");
+        var allRecovered = true;
+        for (var index = 0; index < CharacterCount; index++)
+        {
+            var character = _characters[index];
+            var lifecycle = character.LifecycleDiagnostics;
+            var frame = character.Diagnostics;
+            var visibility = character.VisualRootVisibilityObservation;
+            Require(!visibility.IsVisible ||
+                (lifecycle.IsActive && lifecycle.IsVisible && lifecycle.IsVisualReady),
+                $"reactivated character {index} published visible without an active ready visual");
+            if (frame.CommittedFrameId <= _framesBeforeDeactivation[index] ||
+                !lifecycle.IsActive || !lifecycle.IsVisible || !lifecycle.IsVisualReady ||
+                !visibility.IsWorkerObservation || !visibility.IsVisible ||
+                visibility.FrameId != frame.CommittedFrameId)
+            {
+                allRecovered = false;
+            }
+        }
+        if (!allRecovered)
+        {
+            return;
+        }
+
+        for (var index = 0; index < CharacterCount; index++)
+        {
+            var character = _characters[index];
+            Require(character.WorkerInFlight == 0,
+                $"reactivated character {index} teardown raced a Worker callback");
+            character.SetActive(false);
+            var visibility = character.VisualRootVisibilityObservation;
+            Require(!visibility.IsWorkerObservation && !visibility.IsVisible &&
+                visibility.FrameId == -1,
+                $"reactivated character {index} retained visibility during final teardown");
+            character.DisposeRuntime();
+            RemoveChild(character);
+            character.Free();
         }
         GD.Print(
-            $"GODOT_ALS_P3_PRESENTATION_OK yaws={CharacterCount} identity=1 root={markerRootDigest:X16}");
+            $"GODOT_ALS_P3_PRESENTATION_OK yaws={CharacterCount} identity=1 root={_normalMarkerRootDigest:X16}");
         _quitting = true;
         GetTree().Quit();
     }
@@ -349,6 +457,71 @@ public partial class P3PresentationSmoke : Node
             "profile presentation translation Z drifted");
         RequireNear(_profile.Presentation.YawRadians, -MathF.PI / 2f,
             "profile presentation yaw drifted");
+    }
+
+    private static void ValidateVisualRootVisibilityEncoding()
+    {
+        var frameIds = new[]
+        {
+            0L,
+            1L,
+            AlsP3VisualRootVisibilityObservation.MaximumWorkerFrameId,
+        };
+        foreach (var frameId in frameIds)
+        {
+            foreach (var visible in new[] { false, true })
+            {
+                var snapshot = AlsP3VisualRootVisibilityObservation.EncodeWorker(frameId, visible);
+                var observation = AlsP3VisualRootVisibilityObservation.Decode(snapshot);
+                Require(observation.IsWorkerObservation && observation.FrameId == frameId &&
+                    observation.IsVisible == visible,
+                    $"visual-root visibility snapshot did not round-trip frame {frameId}");
+            }
+        }
+
+        var hidden = AlsP3VisualRootVisibilityObservation.Decode(
+            AlsP3VisualRootVisibilityObservation.MainThreadKnownHiddenValue);
+        Require(!hidden.IsWorkerObservation && !hidden.IsVisible && hidden.FrameId == -1,
+            "main-known-hidden visibility sentinel did not decode exactly");
+
+        var overflowRejected = false;
+        try
+        {
+            _ = AlsP3VisualRootVisibilityObservation.EncodeWorker(
+                AlsP3VisualRootVisibilityObservation.MaximumWorkerFrameId + 1,
+                false);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            overflowRejected = true;
+        }
+        Require(overflowRejected, "visual-root visibility snapshot accepted an unencodable frame");
+    }
+
+    private static void ValidateWorkerAdmissionStateMachine()
+    {
+        var state = new AlsP3CharacterState(
+            new AlsSlotHandle(0, 1),
+            new AlsP3ExchangeSlot());
+        Require(state.IsWorkerAdmissionClosed && state.WorkerInFlightCount == 0,
+            "new P3 Worker admission state was not closed and idle");
+        Require(!state.TryEnterWorker(),
+            "closed P3 Worker admission accepted an entrant");
+
+        state.OpenWorkerAdmission();
+        Require(!state.IsWorkerAdmissionClosed && state.TryEnterWorker() &&
+            state.WorkerInFlightCount == 1,
+            "open P3 Worker admission did not count its entrant");
+        Require(!state.TryCloseWorkerAdmission() && !state.IsWorkerAdmissionClosed &&
+            state.WorkerInFlightCount == 1,
+            "P3 Worker admission closed while a callback was in flight");
+
+        state.ExitWorker();
+        Require(state.WorkerInFlightCount == 0 && state.TryCloseWorkerAdmission() &&
+            state.IsWorkerAdmissionClosed,
+            "idle P3 Worker admission did not close atomically");
+        Require(!state.TryEnterWorker() && state.WorkerInFlightCount == 0,
+            "closed P3 Worker admission accepted a later entrant");
     }
 
     private Transform3D ReadPresentationTransform() => _context.PresentationTransform;
@@ -639,5 +812,12 @@ public partial class P3PresentationSmoke : Node
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(frameId);
             return _command;
         }
+    }
+
+    private enum NormalLifecyclePhase
+    {
+        InitialCommit,
+        InactiveHold,
+        Reactivating,
     }
 }

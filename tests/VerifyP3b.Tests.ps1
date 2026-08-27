@@ -1210,19 +1210,98 @@ Describe 'P3B real rig visibility contracts' {
         $workerSource = [System.IO.File]::ReadAllText($script:WorkerPath)
         $characterSource = [System.IO.File]::ReadAllText($script:CharacterPath)
         $slotSource = [System.IO.File]::ReadAllText($script:SlotPath)
+        $runtimeSource = [System.IO.File]::ReadAllText($script:RuntimePath)
         $frameOrderSource = [System.IO.File]::ReadAllText($script:FrameOrderPath)
         $presentationSource = [System.IO.File]::ReadAllText($script:PresentationPath)
 
         $workerSource | Should Match 'partial class AlsP3WorkerRoot\s*:\s*Node3D'
         $workerSource | Should Match 'PublishVisualRootVisibility\(frameId\)'
         $workerSource | Should Match '_visualRoot!\.IsVisibleInTree\(\)'
-        $characterSource | Should Match 'internal bool ObservedVisualRootVisibleInTree'
+        $workerSource | Should Match `
+            'Volatile\.Write\(ref _state\.VisualRootVisibilitySnapshot, snapshot\)'
+        $runtimeSource | Should Match `
+            'record struct AlsP3VisualRootVisibilityObservation'
+        $runtimeSource | Should Match `
+            'MainThreadKnownHiddenValue\s*=\s*-1'
+        $runtimeSource | Should Match `
+            'MaximumWorkerFrameId\s*=\s*long\.MaxValue\s*>>\s*1'
+        $runtimeSource | Should Match `
+            'return \(frameId << 1\) \| \(visible \? 1L : 0L\)'
+        $runtimeSource | Should Not Match 'ObservedVisualRootVisible\s*;'
+        $runtimeSource | Should Not Match 'VisualRootVisibilityObservationFrameId\s*;'
         $characterSource | Should Match `
-            'Volatile\.Read\(ref _state\.ObservedVisualRootVisible\)'
-        $slotSource | Should Match 'character\.ObservedVisualRootVisibleInTree'
+            'internal AlsP3VisualRootVisibilityObservation VisualRootVisibilityObservation'
+        $characterSource | Should Match `
+            'Volatile\.Read\(ref _state\.VisualRootVisibilitySnapshot\)'
+        $characterSource | Should Match `
+            'CloseWorkerAdmissionForDeactivation\(\)'
+        $runtimeSource | Should Match `
+            'TryCloseWorkerAdmission\(\)[\s\S]{0,300}' +
+            'Interlocked\.CompareExchange\([\s\S]{0,200}' +
+            'WorkerAdmissionClosedValue[\s\S]{0,100}0\)'
+        $runtimeSource | Should Match 'TryEnterWorker\(\)'
+        $runtimeSource | Should Match 'ExitWorker\(\)'
+        $workerSource | Should Match '_state\.TryEnterWorker\(\)'
+        $workerSource | Should Match '_state\.ExitWorker\(\)'
+        $characterSource | Should Match `
+            'MaximumResumableCompletedFrameId[\s\S]{0,300}' +
+            'ArgumentOutOfRangeException'
+        $retireStart = $characterSource.IndexOf('internal void RetireForReplacement()',
+            [StringComparison]::Ordinal)
+        $retireEnd = $characterSource.IndexOf('internal void StartReplacementClassification(',
+            $retireStart,
+            [StringComparison]::Ordinal)
+        $retireStart | Should BeGreaterThan -1
+        $retireEnd | Should BeGreaterThan $retireStart
+        $retireSource = $characterSource.Substring($retireStart, $retireEnd - $retireStart)
+        $retireSource.IndexOf('SetActive(false)', [StringComparison]::Ordinal) |
+            Should BeLessThan $retireSource.IndexOf('GatherSuspended', [StringComparison]::Ordinal)
+        $characterSource | Should Match `
+            'Volatile\.Write\([\s\S]*VisualRootVisibilitySnapshot[\s\S]*MainThreadKnownHiddenValue'
+        $characterSource | Should Match `
+            'DisposeRuntimeCore\(bool allowActive\)[\s\S]{0,900}' +
+            'TryCloseWorkerAdmission\(\)[\s\S]{0,900}ResetVisualReadyCore\(\)'
+        $slotSource | Should Match 'character\.VisualRootVisibilityObservation'
+        $slotSource | Should Match `
+            'RequestReplacement\(long completedFrameId\)[\s\S]{0,700}' +
+            'MaximumResumableCompletedFrameId[\s\S]{0,700}' +
+            '_active\.BeginReplacementRequest'
+        $slotDisposeStart = $slotSource.IndexOf('public void DisposeRuntime()',
+            [StringComparison]::Ordinal)
+        $slotDisposeEnd = $slotSource.IndexOf('public override void _ExitTree()',
+            $slotDisposeStart,
+            [StringComparison]::Ordinal)
+        $slotDisposeStart | Should BeGreaterThan -1
+        $slotDisposeEnd | Should BeGreaterThan $slotDisposeStart
+        $slotDisposeSource = $slotSource.Substring(
+            $slotDisposeStart,
+            $slotDisposeEnd - $slotDisposeStart)
+        $slotDisposeSource.IndexOf('DeactivateCharactersForDisposal()',
+            [StringComparison]::Ordinal) | Should BeLessThan `
+            $slotDisposeSource.IndexOf('Interlocked.CompareExchange',
+                [StringComparison]::Ordinal)
+        $slotDeactivateStart = $slotSource.IndexOf(
+            'private static void DeactivateCharacterForDisposal(',
+            [StringComparison]::Ordinal)
+        $slotDeactivateEnd = $slotSource.IndexOf('private void DisposeCharacter(',
+            $slotDeactivateStart,
+            [StringComparison]::Ordinal)
+        $slotDeactivateStart | Should BeGreaterThan -1
+        $slotDeactivateEnd | Should BeGreaterThan $slotDeactivateStart
+        $slotSource.Substring(
+            $slotDeactivateStart,
+            $slotDeactivateEnd - $slotDeactivateStart) | Should Match 'SetActive\(false\)'
         $frameOrderSource | Should Match '_inactiveRigHiddenAfterSeparation'
         $presentationSource | Should Match 'GeometryInstance3D'
         $presentationSource | Should Match 'FindVisibilityInheritanceBreak'
+        $presentationSource | Should Match 'NormalLifecyclePhase\.InactiveHold'
+        $presentationSource | Should Match 'ValidateReactivation\(\)'
+        $presentationSource | Should Match '_framesBeforeDeactivation'
+        $presentationSource | Should Match 'ValidateVisualRootVisibilityEncoding\(\)'
+        $presentationSource | Should Match 'ValidateWorkerAdmissionStateMachine\(\)'
+        $presentationSource | Should Match `
+            '!state\.TryCloseWorkerAdmission\(\)[\s\S]{0,300}' +
+            'state\.ExitWorker\(\)[\s\S]{0,300}state\.TryCloseWorkerAdmission\(\)'
     }
 }
 

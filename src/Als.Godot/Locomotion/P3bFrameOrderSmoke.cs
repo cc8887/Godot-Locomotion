@@ -199,7 +199,9 @@ public partial class P3bFrameOrderSmoke : Node
         var visibility = _slot.ReplacementDiagnostics;
         Require(visibility.VisibleCharacterCount <= 1,
             "committed P3 character observed more than one real visual root");
-        Require(_active.VisualRootVisibilityObservationFrameId == frame.CommittedFrameId,
+        var visualRootObservation = _active.VisualRootVisibilityObservation;
+        Require(visualRootObservation.IsWorkerObservation &&
+            visualRootObservation.FrameId == frame.CommittedFrameId,
             "real visual-root visibility was not observed by the same Worker frame");
         var motorVelocity = ((CharacterBody3D)_active.MovementAnchor).GetRealVelocity();
         Require(MathF.Abs(frame.ActualVelocity.X - motorVelocity.X) < 0.00001f &&
@@ -394,6 +396,8 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void ValidateDisposeGuards()
     {
+        var lifecycleBeforeRejectedDispose = _active.LifecycleDiagnostics;
+        var visibilityBeforeRejectedDispose = _active.VisualRootVisibilityObservation;
         var activeRejected = false;
         try
         {
@@ -405,6 +409,9 @@ public partial class P3bFrameOrderSmoke : Node
             activeRejected = true;
         }
         Require(activeRejected, "active P3 runtime disposal was not rejected");
+        Require(_active.LifecycleDiagnostics == lifecycleBeforeRejectedDispose &&
+            _active.VisualRootVisibilityObservation == visibilityBeforeRejectedDispose,
+            "rejected active P3 runtime disposal changed lifecycle or visibility state");
 
         Exception? offMainFailure = null;
         Task.Run(() =>
@@ -421,11 +428,28 @@ public partial class P3bFrameOrderSmoke : Node
         Require(offMainFailure is InvalidOperationException &&
             offMainFailure.Message.Contains("main thread", StringComparison.OrdinalIgnoreCase),
             "off-main P3 runtime disposal was not rejected by thread ownership");
+        Require(_active.LifecycleDiagnostics == lifecycleBeforeRejectedDispose &&
+            _active.VisualRootVisibilityObservation == visibilityBeforeRejectedDispose,
+            "rejected off-main P3 runtime disposal changed lifecycle or visibility state");
+
+        RequireOutOfRange(
+            () => _slot.RequestReplacement(
+                AlsP3VisualRootVisibilityObservation.MaximumResumableCompletedFrameId + 1),
+            "oversized replacement frame");
+        Require(!_slot.ReplacementDiagnostics.Requested &&
+            _active.LifecycleDiagnostics == lifecycleBeforeRejectedDispose,
+            "oversized replacement request changed slot or character lifecycle state");
 
         var probe = CreateDisposeProbe();
         var movementAnchor = probe.MovementAnchor;
         Require(movementAnchor != probe && movementAnchor.IsInsideTree(),
             "P3 character did not expose its live motor movement anchor");
+        RequireOutOfRange(
+            () => probe.ResumeAt(
+                AlsP3VisualRootVisibilityObservation.MaximumResumableCompletedFrameId + 1),
+            "oversized ResumeAt frame");
+        Require(probe.PublishedFrameId == 0,
+            "oversized ResumeAt changed the inactive probe frame");
         probe.DisposeRuntime();
         RequireDisposed(() => _ = probe.MovementAnchor, "disposed MovementAnchor");
         RequireDisposed(() => probe.SetActive(true), "disposed SetActive");
@@ -643,6 +667,19 @@ public partial class P3bFrameOrderSmoke : Node
         GetTree().Quit(1);
     }
 
+    private static void RequireOutOfRange(Action action, string operation)
+    {
+        try
+        {
+            action();
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return;
+        }
+        throw new InvalidOperationException($"P3 {operation} was not rejected as out of range.");
+    }
+
     private void ObserveVisibility()
     {
         var replacement = _slot.ReplacementDiagnostics;
@@ -655,7 +692,7 @@ public partial class P3bFrameOrderSmoke : Node
         if (!_inactiveRigHiddenAfterSeparation && !replacement.Requested &&
             _active.MovementAnchor.GlobalPosition.DistanceTo(_initialMovementAnchorPosition) > 0.1f)
         {
-            Require(_active.ObservedVisualRootVisibleInTree,
+            Require(_active.VisualRootVisibilityObservation.IsVisible,
                 "moving active rig was not observed visible by its Worker");
             Require(replacement.VisibleCharacterCount == 1,
                 "inactive spare rig remained visible after the active rig moved away");
