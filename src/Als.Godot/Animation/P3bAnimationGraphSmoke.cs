@@ -2,6 +2,7 @@ using Godot;
 using GodotAls.Assets;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Math;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
 using System.Text;
@@ -18,12 +19,22 @@ public partial class P3bAnimationGraphSmoke : Node
         "pelvis", "spine_03", "hand_l", "hand_r", "foot_l", "foot_r",
     ];
 
+    private static readonly DirectionCase[] DirectionCases =
+    [
+        new("forward", System.Numerics.Vector2.UnitY, new Vector2(0f, 1f)),
+        new("left", -System.Numerics.Vector2.UnitX, new Vector2(-1f, 0f)),
+        new("back", -System.Numerics.Vector2.UnitY, new Vector2(0f, -1f)),
+        new("right", System.Numerics.Vector2.UnitX, new Vector2(1f, 0f)),
+    ];
+
     public override void _Ready()
     {
         try
         {
-            var digest = RunSmoke();
-            GD.Print($"GODOT_ALS_P3B_GRAPH_OK transitions=5 digest={digest:X16}");
+            var (directionDigest, digest) = RunSmoke();
+            GD.Print(
+                $"GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 " +
+                $"direction_digest={directionDigest:X16} digest={digest:X16}");
             GetTree().Quit();
         }
         catch (Exception exception)
@@ -33,8 +44,9 @@ public partial class P3bAnimationGraphSmoke : Node
         }
     }
 
-    private ulong RunSmoke()
+    private (ulong DirectionDigest, ulong Digest) RunSmoke()
     {
+        VerifyFiniteBlendGuard();
         var resource = ResourceLoader.Load<AlsAnimationSetResource>(
             AlsGodotImportCoordinator.CompiledResourcePath)
             ?? throw new InvalidOperationException("Compiled ALS animation set could not be loaded.");
@@ -48,6 +60,7 @@ public partial class P3bAnimationGraphSmoke : Node
         VerifyProfileValidation(definition, profile);
         VerifyGraphTargetSkeletonBinding(definition, profile, settings);
         VerifyApplyAtomicValidation(definition, profile, settings);
+        var directionDigest = VerifyDirectionMatrix(definition, profile, settings);
 
         using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
         AddChild(library.Root);
@@ -132,7 +145,7 @@ public partial class P3bAnimationGraphSmoke : Node
         VerifyLandingRecoveryBoundary(controller, graph, settings);
         var digest = controller.ComputePoseDigest(frameId);
         VerifyLifecycle(definition, profile, settings);
-        return digest;
+        return (directionDigest, digest);
     }
 
     private void VerifyWarmupFailureRetries(
@@ -685,6 +698,372 @@ public partial class P3bAnimationGraphSmoke : Node
         }
     }
 
+    private ulong VerifyDirectionMatrix(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile,
+        AlsLocomotionSettings settings)
+    {
+        long frameId = 0;
+        using (var library = AlsAnimationLibraryBuilder.Build(definition, profile))
+        {
+            AddChild(library.Root);
+            using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
+            using var controller = new AlsLocomotionAnimationController(graph, settings);
+            controller.Warmup();
+            VerifyLookingDirectionMatrix(controller, graph, settings, ref frameId);
+            VerifyAimingDirectionMatrix(controller, graph, settings, ref frameId);
+            VerifyVelocityDirectionMatrix(controller, graph, settings, ref frameId);
+        }
+
+        return VerifyDirectionalPoseEvidence(definition, profile, settings);
+    }
+
+    private static void VerifyLookingDirectionMatrix(
+        AlsLocomotionAnimationController controller,
+        AlsLocomotionGraphBuildResult graph,
+        AlsLocomotionSettings settings,
+        ref long frameId)
+    {
+        const float viewYaw = MathF.PI / 3f;
+        foreach (var item in DirectionCases)
+        {
+            var command = CreateDirectionalCommand(
+                item.MovementAxes,
+                viewYaw,
+                viewYaw,
+                AlsRotationMode.LookingDirection);
+            var worldDirection = RequireCameraRelativeDirection(command, item.Name);
+            var state = new AlsRuntimeState();
+            var result = new AlsFrameResult();
+            var input = CreateDirectionalInput(
+                ++frameId,
+                command,
+                worldDirection * 3.75f,
+                viewYaw,
+                settings.FixedDeltaSeconds);
+            AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+            RequireDirectionalResult(result, AlsRotationMode.LookingDirection, item.Name);
+            controller.Apply(in result, settings.FixedDeltaSeconds);
+            RequireStandingBlend(graph, item.ExpectedBlendPosition, 1e-4f,
+                $"LookingDirection {item.Name}");
+        }
+    }
+
+    private static void VerifyAimingDirectionMatrix(
+        AlsLocomotionAnimationController controller,
+        AlsLocomotionGraphBuildResult graph,
+        AlsLocomotionSettings settings,
+        ref long frameId)
+    {
+        const float aimYaw = MathF.PI / 2f;
+        foreach (var item in DirectionCases)
+        {
+            var command = CreateDirectionalCommand(
+                item.MovementAxes,
+                aimYaw,
+                aimYaw,
+                AlsRotationMode.Aiming);
+            var worldDirection = RequireCameraRelativeDirection(command, item.Name);
+            var characterYaw = -MathF.PI / 2f;
+            var state = new AlsRuntimeState();
+            var result = new AlsFrameResult();
+            var previousFrameConverged = false;
+            var converged = false;
+            for (var frame = 0; frame < 240; frame++)
+            {
+                var input = CreateDirectionalInput(
+                    ++frameId,
+                    command,
+                    worldDirection * 3.75f,
+                    characterYaw,
+                    settings.FixedDeltaSeconds);
+                AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+                RequireDirectionalResult(result, AlsRotationMode.Aiming, item.Name);
+                controller.Apply(in result, settings.FixedDeltaSeconds);
+                characterYaw = result.TargetYaw;
+                var currentFrameConverged = NormalizedYawError(characterYaw, aimYaw) < 1e-3f;
+                if (currentFrameConverged && previousFrameConverged)
+                {
+                    converged = true;
+                    break;
+                }
+                previousFrameConverged = currentFrameConverged;
+            }
+
+            if (!converged || NormalizedYawError(result.TargetYaw, aimYaw) >= 1e-3f)
+            {
+                throw new InvalidOperationException(
+                    $"P3 Aiming {item.Name} did not converge to aim yaw: " +
+                    $"expected={aimYaw:R} actual={result.TargetYaw:R}");
+            }
+            RequireStandingBlend(graph, item.ExpectedBlendPosition, 1e-3f,
+                $"Aiming {item.Name}");
+        }
+    }
+
+    private static void VerifyVelocityDirectionMatrix(
+        AlsLocomotionAnimationController controller,
+        AlsLocomotionGraphBuildResult graph,
+        AlsLocomotionSettings settings,
+        ref long frameId)
+    {
+        foreach (var item in DirectionCases)
+        {
+            var command = CreateDirectionalCommand(
+                item.MovementAxes,
+                0f,
+                0f,
+                AlsRotationMode.VelocityDirection);
+            var worldDirection = RequireCameraRelativeDirection(command, item.Name);
+            var expectedYaw = MathF.Atan2(-worldDirection.X, -worldDirection.Z);
+            var characterYaw = MathF.PI * 0.75f;
+            var state = new AlsRuntimeState();
+            var result = new AlsFrameResult();
+            var previousFrameConverged = false;
+            var converged = false;
+            for (var frame = 0; frame < 240; frame++)
+            {
+                var input = CreateDirectionalInput(
+                    ++frameId,
+                    command,
+                    worldDirection * 3.75f,
+                    characterYaw,
+                    settings.FixedDeltaSeconds);
+                AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+                RequireDirectionalResult(result, AlsRotationMode.VelocityDirection, item.Name);
+                controller.Apply(in result, settings.FixedDeltaSeconds);
+                characterYaw = result.TargetYaw;
+                var currentFrameConverged = NormalizedYawError(characterYaw, expectedYaw) < 1e-3f;
+                if (currentFrameConverged && previousFrameConverged)
+                {
+                    converged = true;
+                    break;
+                }
+                previousFrameConverged = currentFrameConverged;
+            }
+
+            if (!converged || NormalizedYawError(result.TargetYaw, expectedYaw) >= 1e-3f)
+            {
+                throw new InvalidOperationException(
+                    $"P3 VelocityDirection {item.Name} did not converge to velocity yaw: " +
+                    $"expected={expectedYaw:R} actual={result.TargetYaw:R}");
+            }
+            var actualBlend = ReadStandingBlend(graph);
+            RequireFiniteBlend(actualBlend, $"VelocityDirection {item.Name}");
+            if (MathF.Abs(actualBlend.X) >= 1e-3f || actualBlend.Y <= 0f)
+            {
+                throw new InvalidOperationException(
+                    $"P3 VelocityDirection {item.Name} did not face local forward after convergence: " +
+                    $"actual={actualBlend}");
+            }
+        }
+    }
+
+    private static AlsLocomotionCommand CreateDirectionalCommand(
+        System.Numerics.Vector2 movementAxes,
+        float viewYaw,
+        float aimYaw,
+        AlsRotationMode rotationMode) => new(
+        movementAxes,
+        viewYaw,
+        aimYaw,
+        AlsGait.Running,
+        AlsStance.Standing,
+        rotationMode,
+        0);
+
+    private static System.Numerics.Vector3 RequireCameraRelativeDirection(
+        in AlsLocomotionCommand command,
+        string label)
+    {
+        var resolved = AlsLocomotionCommandResolver.Resolve(command, AlsStance.Standing);
+        var localDirection = new System.Numerics.Vector3(
+            command.MovementAxes.X,
+            0f,
+            -command.MovementAxes.Y);
+        var expected = System.Numerics.Vector3.Transform(
+            localDirection,
+            System.Numerics.Matrix4x4.CreateRotationY(command.ViewYaw));
+        if (System.Numerics.Vector3.Distance(resolved.WorldDirection, expected) >= 1e-5f)
+        {
+            throw new InvalidOperationException(
+                $"P3 camera-relative {label} world direction mismatch: " +
+                $"expected={expected} actual={resolved.WorldDirection}");
+        }
+        return resolved.WorldDirection;
+    }
+
+    private static AlsFrameInput CreateDirectionalInput(
+        long frameId,
+        in AlsLocomotionCommand command,
+        System.Numerics.Vector3 actualVelocity,
+        float characterYaw,
+        float deltaTime)
+    {
+        var input = AlsFrameInput.CreateDefault(
+            new AlsFrameIdentity(frameId, 0, 1),
+            deltaTime);
+        return input with
+        {
+            CharacterTransform = System.Numerics.Matrix4x4.CreateRotationY(characterYaw),
+            ActualVelocity = actualVelocity,
+            InputDirection = System.Numerics.Vector3.Normalize(actualVelocity),
+            DesiredSpeed = actualVelocity.Length(),
+            ViewRotation = System.Numerics.Quaternion.CreateFromAxisAngle(
+                System.Numerics.Vector3.UnitY,
+                command.ViewYaw),
+            AimRotation = System.Numerics.Quaternion.CreateFromAxisAngle(
+                System.Numerics.Vector3.UnitY,
+                command.AimYaw),
+            Floor = input.Floor with { IsGrounded = 1 },
+            RequestedGait = command.RequestedGait,
+            Stance = command.RequestedStance,
+            RotationMode = command.RequestedRotationMode,
+            Command = command,
+            CharacterYaw = characterYaw,
+            MaxAcceleration = 20f,
+            MaxBrakingDeceleration = 15f,
+        };
+    }
+
+    private static void RequireDirectionalResult(
+        in AlsFrameResult result,
+        AlsRotationMode expectedRotationMode,
+        string label)
+    {
+        if (result.ResolvedLocomotionState != AlsLocomotionState.Grounded ||
+            result.ActualGait != AlsGait.Running ||
+            result.ActualStance != AlsStance.Standing ||
+            result.ActualRotationMode != expectedRotationMode ||
+            result.AnimationState != AlsAnimationState.Grounded)
+        {
+            throw new InvalidOperationException(
+                $"P3 {expectedRotationMode} {label} result contract mismatch: " +
+                $"state={result.ResolvedLocomotionState}/{result.AnimationState} " +
+                $"gait={result.ActualGait} stance={result.ActualStance} " +
+                $"rotation={result.ActualRotationMode}");
+        }
+    }
+
+    private static Vector2 ReadStandingBlend(AlsLocomotionGraphBuildResult graph) =>
+        graph.Tree.Get(graph.Handles.GroundedStanding.BlendPositionPath!).AsVector2();
+
+    private static void RequireStandingBlend(
+        AlsLocomotionGraphBuildResult graph,
+        Vector2 expected,
+        float tolerance,
+        string label)
+    {
+        var actual = ReadStandingBlend(graph);
+        RequireFiniteBlend(actual, label);
+        if (actual.DistanceTo(expected) >= tolerance)
+        {
+            throw new InvalidOperationException(
+                $"P3 {label} standing-run blend mismatch: expected={expected} actual={actual}");
+        }
+    }
+
+    private static void RequireFiniteBlend(Vector2 blend, string label)
+    {
+        if (!float.IsFinite(blend.X) || !float.IsFinite(blend.Y))
+        {
+            throw new InvalidOperationException(
+                $"P3 {label} blend was not finite: {blend}");
+        }
+    }
+
+    private static void VerifyFiniteBlendGuard()
+    {
+        var invalidBlends = new[]
+        {
+            new Vector2(float.NaN, 0f),
+            new Vector2(0f, float.PositiveInfinity),
+            new Vector2(float.NegativeInfinity, 0f),
+        };
+        foreach (var invalidBlend in invalidBlends)
+        {
+            try
+            {
+                RequireFiniteBlend(invalidBlend, "finite guard probe");
+                throw new InvalidOperationException(
+                    $"P3 finite blend guard accepted {invalidBlend}.");
+            }
+            catch (InvalidOperationException exception) when (
+                exception.Message.Contains("not finite", StringComparison.Ordinal))
+            {
+            }
+        }
+    }
+
+    private static float NormalizedYawError(float actual, float expected) =>
+        MathF.Abs(AlsMath.NormalizeAngleRadians(actual - expected));
+
+    private ulong VerifyDirectionalPoseEvidence(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile,
+        AlsLocomotionSettings settings)
+    {
+        var poseDigests = new ulong[4];
+        var poseOrder = new[] { 0, 2, 1, 3 };
+        for (var poseIndex = 0; poseIndex < poseOrder.Length; poseIndex++)
+        {
+            var item = DirectionCases[poseOrder[poseIndex]];
+            using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
+            AddChild(library.Root);
+            using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
+            using var controller = new AlsLocomotionAnimationController(graph, settings);
+            controller.Warmup();
+
+            var command = CreateDirectionalCommand(
+                item.MovementAxes,
+                0f,
+                0f,
+                AlsRotationMode.LookingDirection);
+            var worldDirection = RequireCameraRelativeDirection(command, item.Name);
+            var state = new AlsRuntimeState();
+            var result = new AlsFrameResult();
+            for (var frame = 1; frame <= 8; frame++)
+            {
+                var input = CreateDirectionalInput(
+                    frame,
+                    command,
+                    worldDirection * 3.75f,
+                    0f,
+                    settings.FixedDeltaSeconds);
+                AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+                RequireDirectionalResult(result, AlsRotationMode.LookingDirection, item.Name);
+                result.AnimationPhase = 0.375f;
+                controller.Apply(in result, settings.FixedDeltaSeconds);
+            }
+            poseDigests[poseIndex] = controller.ComputePoseDigest(777);
+        }
+
+        if (poseDigests.Distinct().Count() != poseDigests.Length)
+        {
+            throw new InvalidOperationException(
+                "P3 F/B/left/right pose digests were not pairwise distinct: " +
+                string.Join(",", poseDigests.Select(value => $"{value:X16}")));
+        }
+
+        const ulong offsetBasis = 14695981039346656037UL;
+        var directionDigest = offsetBasis;
+        foreach (var poseDigest in poseDigests)
+        {
+            AppendDirectionDigest(ref directionDigest, poseDigest);
+        }
+        return directionDigest;
+    }
+
+    private static void AppendDirectionDigest(ref ulong digest, ulong value)
+    {
+        const ulong prime = 1099511628211UL;
+        for (var shift = 0; shift < 64; shift += 8)
+        {
+            digest ^= (byte)(value >> shift);
+            digest *= prime;
+        }
+    }
+
     private static void VerifyActionNaturalAdvance(
         AlsLocomotionAnimationController controller,
         AlsLocomotionGraphBuildResult graph,
@@ -948,6 +1327,11 @@ public partial class P3bAnimationGraphSmoke : Node
         float RightSpeed,
         float ForwardSpeed,
         AlsGait ExpectedGait,
+        Vector2 ExpectedBlendPosition);
+
+    private readonly record struct DirectionCase(
+        string Name,
+        System.Numerics.Vector2 MovementAxes,
         Vector2 ExpectedBlendPosition);
 
     private readonly record struct ActualPlaybackState(
