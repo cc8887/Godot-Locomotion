@@ -171,6 +171,11 @@ public partial class P3bFrameOrderSmoke : Node
         Require(frame.ModelResultFrameId == frame.CommittedFrameId, "model result lagged commit");
         Require(frame.PoseAdvanceFrameId == frame.CommittedFrameId, "pose advance lagged commit");
         Require(frame.Identity == _active.HandleIdentity(frame.CommittedFrameId), "commit identity mismatch");
+        var motorVelocity = ((CharacterBody3D)_active.MovementAnchor).GetRealVelocity();
+        Require(MathF.Abs(frame.ActualVelocity.X - motorVelocity.X) < 0.00001f &&
+            MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
+            MathF.Abs(frame.ActualVelocity.Z - motorVelocity.Z) < 0.00001f,
+            "committed diagnostics did not carry the same-frame motor actual velocity");
 
         if (_firstJumpFrame == 0 && frame.Result.ResolvedLocomotionState == AlsLocomotionState.InAir)
         {
@@ -363,7 +368,11 @@ public partial class P3bFrameOrderSmoke : Node
             "off-main P3 runtime disposal was not rejected by thread ownership");
 
         var probe = CreateDisposeProbe();
+        var movementAnchor = probe.MovementAnchor;
+        Require(movementAnchor != probe && movementAnchor.IsInsideTree(),
+            "P3 character did not expose its live motor movement anchor");
         probe.DisposeRuntime();
+        RequireDisposed(() => _ = probe.MovementAnchor, "disposed MovementAnchor");
         RequireDisposed(() => probe.SetActive(true), "disposed SetActive");
         RequireDisposed(() => probe.ResumeAt(0), "disposed ResumeAt");
         RequireDisposed(

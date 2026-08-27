@@ -23,6 +23,9 @@ public partial class P3LocomotionDemo : Node3D
     private int _smokeFrames;
     private bool _observedJump;
     private bool _observedLanding;
+    private Vector3 _initialMovementAnchorPosition;
+    private Vector3 _finalMovementAnchorPosition;
+    private int _cameraFollowChecks;
     private bool _quitting;
 
     public P3LocomotionDemo()
@@ -66,7 +69,9 @@ public partial class P3LocomotionDemo : Node3D
                 _context,
                 () => commandSource,
                 new Vector3(0f, motorSettings.StandingHeight * 0.5f, 0f));
-            _orbitCamera.Configure(_slot.ActiveCharacter);
+            var active = _slot.ActiveCharacter;
+            EnsureCameraTarget(active);
+            _initialMovementAnchorPosition = active.MovementAnchor.GlobalPosition;
             _hud.Refresh(default, Engine.GetFramesPerSecond(), errors: 0);
         }
         catch (Exception exception)
@@ -118,6 +123,11 @@ public partial class P3LocomotionDemo : Node3D
         try
         {
             var active = _slot.ActiveCharacter;
+            EnsureCameraTarget(active);
+            if (_smokeFrames != 0)
+            {
+                ValidateCameraFollow(active, delta);
+            }
             var errors = CountErrors(active);
             _hud.Refresh(active.Diagnostics, Engine.GetFramesPerSecond(), errors);
         }
@@ -171,6 +181,13 @@ public partial class P3LocomotionDemo : Node3D
         Require(!active.IsPoseFrozen, "demo real-animation pose was frozen");
         Require(active.WorkerObservedOffMainThread,
             "demo production worker did not execute on the parallel process group");
+        _finalMovementAnchorPosition = active.MovementAnchor.GlobalPosition;
+        Require(_finalMovementAnchorPosition.DistanceTo(_initialMovementAnchorPosition) > 0.1f,
+            "demo smoke movement anchor did not move");
+        Require(_cameraFollowChecks > 0, "demo smoke did not validate camera follow");
+        Require(_orbitCamera.GlobalPosition.IsEqualApprox(
+                _finalMovementAnchorPosition + _orbitCamera.FollowOffset),
+            "demo camera did not finish at movement anchor plus offset");
 
         var animationTree = active.FindChild(
             "AlsLocomotionAnimationTree", recursive: true, owned: false) as AnimationTree;
@@ -179,10 +196,33 @@ public partial class P3LocomotionDemo : Node3D
         Require(skeleton is not null && skeleton.GetBoneCount() == ExpectedMannequinBones,
             "demo did not run the real 68-bone Mannequin");
 
-        GD.Print($"GODOT_ALS_P3_DEMO_OK frames={_smokeFrames} errors=0");
-        _slot.DisposeRuntime();
-        _quitting = true;
-        GetTree().Quit();
+        CompleteAfterCleanup(
+            () => _slot.DisposeRuntime(),
+            () =>
+            {
+                _quitting = true;
+                GD.Print($"GODOT_ALS_P3_DEMO_OK frames={_smokeFrames} errors=0");
+                GetTree().Quit();
+            });
+    }
+
+    private void ValidateCameraFollow(AlsP3Character active, double delta)
+    {
+        var anchor = active.MovementAnchor;
+        _orbitCamera._Process(delta);
+        Require(_orbitCamera.GlobalPosition.IsEqualApprox(
+                anchor.GlobalPosition + _orbitCamera.FollowOffset),
+            "demo camera target diverged from movement anchor");
+        _cameraFollowChecks++;
+    }
+
+    private void EnsureCameraTarget(AlsP3Character active)
+    {
+        var anchor = active.MovementAnchor;
+        if (_orbitCamera.Target != anchor)
+        {
+            _orbitCamera.Configure(anchor);
+        }
     }
 
     private long CountErrors(AlsP3Character active) =>
@@ -232,6 +272,14 @@ public partial class P3LocomotionDemo : Node3D
         }
         throw new InvalidOperationException(
             "P3 demo accepts only --als-smoke-frames=300 in automated smoke mode.");
+    }
+
+    internal static void CompleteAfterCleanup(Action cleanup, Action publishSuccess)
+    {
+        ArgumentNullException.ThrowIfNull(cleanup);
+        ArgumentNullException.ThrowIfNull(publishSuccess);
+        cleanup();
+        publishSuccess();
     }
 
     private void Fail(string code, Exception exception)
