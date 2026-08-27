@@ -8,6 +8,19 @@ using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
 
+public readonly record struct AlsP3VisualTransformSnapshot(
+    NumericsVector3 BasisX,
+    NumericsVector3 BasisY,
+    NumericsVector3 BasisZ,
+    NumericsVector3 Origin);
+
+internal readonly record struct AlsP3VisualCommitCandidate(
+    AlsFrameIdentity Identity,
+    AlsP3VisualTransformSnapshot RootTransform,
+    ulong PoseDigest,
+    ulong FullPoseDigest,
+    ulong RootDigest);
+
 public readonly record struct AlsP3FrameDiagnostics(
     AlsFrameIdentity Identity,
     long CommandFrameId,
@@ -18,7 +31,37 @@ public readonly record struct AlsP3FrameDiagnostics(
     NumericsVector3 ActualVelocity,
     AlsFrameResult Result,
     ulong PoseDigest,
-    ulong FullPoseDigest);
+    ulong FullPoseDigest,
+    AlsP3VisualTransformSnapshot VisualRootTransform,
+    ulong RootDigest)
+{
+    public AlsP3FrameDiagnostics(
+        AlsFrameIdentity Identity,
+        long CommandFrameId,
+        long MotorSnapshotFrameId,
+        long ModelResultFrameId,
+        long PoseAdvanceFrameId,
+        long CommittedFrameId,
+        NumericsVector3 ActualVelocity,
+        AlsFrameResult Result,
+        ulong PoseDigest,
+        ulong FullPoseDigest)
+        : this(
+            Identity,
+            CommandFrameId,
+            MotorSnapshotFrameId,
+            ModelResultFrameId,
+            PoseAdvanceFrameId,
+            CommittedFrameId,
+            ActualVelocity,
+            Result,
+            PoseDigest,
+            FullPoseDigest,
+            default,
+            0)
+    {
+    }
+}
 
 public readonly record struct AlsP3LifecycleDiagnostics(
     bool IsDisposed,
@@ -60,6 +103,7 @@ public sealed class AlsP3RuntimeContext
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         AnimationSet = animationSet ?? throw new ArgumentNullException(nameof(animationSet));
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
+        PresentationTransform = AlsP3Presentation.Create(profile.Presentation);
         motorSettings.Validate();
         if (mainManagedThreadId <= 0)
         {
@@ -82,6 +126,8 @@ public sealed class AlsP3RuntimeContext
     public AlsAnimationSetDefinition AnimationSet { get; }
 
     public AlsLocomotionAnimationProfile Profile { get; }
+
+    public Godot.Transform3D PresentationTransform { get; }
 
     public int MainManagedThreadId { get; }
 
@@ -120,11 +166,7 @@ internal sealed class AlsP3CharacterState
 
     public AlsFrameExchange Exchange => ExchangeSlot.Exchange;
 
-    public ulong PublishedPoseDigest;
-
-    public ulong PublishedFullPoseDigest;
-
-    public ulong PublishedRootDigest;
+    public AlsP3VisualCommitCandidate VisualCommitCandidate;
 
     public ulong RollbackFullPoseDigest;
 
@@ -218,10 +260,11 @@ internal sealed class AlsP3CharacterState
     {
         lock (_failureGate)
         {
+            var candidate = VisualCommitCandidate;
             return new AlsP3RuntimeDiagnostics(
-                PublishedPoseDigest,
-                PublishedFullPoseDigest,
-                PublishedRootDigest,
+                candidate.PoseDigest,
+                candidate.FullPoseDigest,
+                candidate.RootDigest,
                 RollbackFullPoseDigest,
                 RollbackRootDigest,
                 Volatile.Read(ref RollbackVerified) != 0,
@@ -242,17 +285,13 @@ internal sealed class AlsP3CharacterState
 
     public void PublishResult(
         in AlsFrameResult result,
-        ulong poseDigest,
-        ulong fullPoseDigest,
-        ulong rootDigest,
+        in AlsP3VisualCommitCandidate candidate,
         long modelFrameId,
         long poseFrameId)
     {
         ModelResultFrameId = modelFrameId;
         PoseAdvanceFrameId = poseFrameId;
-        PublishedPoseDigest = poseDigest;
-        PublishedFullPoseDigest = fullPoseDigest;
-        PublishedRootDigest = rootDigest;
+        VisualCommitCandidate = candidate;
         ExchangeSlot.PublishResult(result);
     }
 }

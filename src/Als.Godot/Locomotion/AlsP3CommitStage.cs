@@ -62,6 +62,12 @@ public partial class AlsP3CommitStage : Node
             ClassifyMissing(frameId);
             return;
         }
+        var candidate = _state.VisualCommitCandidate;
+        if (candidate.Identity != identity || result.Identity != candidate.Identity)
+        {
+            Interlocked.Increment(ref _context.LaggedResults);
+            return;
+        }
 
         var allocatedBeforeCommit = measure
             ? GC.GetAllocatedBytesForCurrentThread()
@@ -80,7 +86,7 @@ public partial class AlsP3CommitStage : Node
         _state.HasCommittedTargetYaw = 1;
         _state.CommittedTargetYaw = result.TargetYaw;
         _state.Diagnostics = new AlsP3FrameDiagnostics(
-            identity,
+            candidate.Identity,
             commandFrame,
             motorFrame,
             modelFrame,
@@ -88,8 +94,10 @@ public partial class AlsP3CommitStage : Node
             frameId,
             _state.MotorActualVelocity,
             result,
-            _state.PublishedPoseDigest,
-            _state.PublishedFullPoseDigest);
+            candidate.PoseDigest,
+            candidate.FullPoseDigest,
+            candidate.RootTransform,
+            candidate.RootDigest);
         Volatile.Write(ref _state.CommittedFrameId, frameId);
         if (measure)
         {

@@ -27,7 +27,10 @@ public partial class AlsP3WorkerRoot : Node
     private AlsFrameResult _result;
     private int _disposed;
 
-    internal void Configure(AlsP3RuntimeContext context, AlsP3CharacterState state)
+    internal void Configure(
+        AlsP3RuntimeContext context,
+        AlsP3CharacterState state,
+        in Transform3D initialLogicalTransform)
     {
         _context = context;
         _state = state;
@@ -47,6 +50,14 @@ public partial class AlsP3WorkerRoot : Node
             _posePositions = new Vector3[boneCount];
             _poseRotations = new Quaternion[boneCount];
             _poseScales = new Vector3[boneCount];
+
+            var correctedRoot = AlsP3Presentation.Compose(
+                initialLogicalTransform,
+                context.PresentationTransform);
+            AlsP3Presentation.ThrowIfNonFinite(correctedRoot);
+            _visualRoot.GlobalTransform = correctedRoot;
+            AlsP3Presentation.ThrowIfNonFinite(_visualRoot.GlobalTransform);
+            CapturePose();
 
             // Thread ownership is assigned only after the complete visual rig is built and warmed.
             ProcessThreadGroupOrder = 1;
@@ -148,7 +159,11 @@ public partial class AlsP3WorkerRoot : Node
                     : 0L;
                 CapturePose();
                 poseCaptured = true;
-                _visualRoot!.GlobalTransform = ToGodot(input.CharacterTransform);
+                var correctedRoot = AlsP3Presentation.Compose(
+                    input.CharacterTransform,
+                    _context.PresentationTransform);
+                AlsP3Presentation.ThrowIfNonFinite(correctedRoot);
+                _visualRoot!.GlobalTransform = correctedRoot;
                 if (measure)
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
@@ -163,6 +178,8 @@ public partial class AlsP3WorkerRoot : Node
                     ? Stopwatch.GetTimestamp()
                     : 0L;
                 _controller!.Apply(_result, input.DeltaTime);
+                var appliedRoot = _visualRoot.GlobalTransform;
+                AlsP3Presentation.ThrowIfNonFinite(appliedRoot);
                 if (measure)
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
@@ -178,7 +195,7 @@ public partial class AlsP3WorkerRoot : Node
                     : 0L;
                 var poseDigest = _controller.ComputePoseDigest(frameId);
                 var fullPoseDigest = ComputeFullPoseDigest();
-                var rootDigest = ComputeRootDigest(_visualRoot.GlobalTransform);
+                var rootDigest = AlsP3Presentation.ComputeDigest(appliedRoot);
                 if (measure)
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
@@ -192,11 +209,15 @@ public partial class AlsP3WorkerRoot : Node
                 productionSegmentStartedAt = measure
                     ? Stopwatch.GetTimestamp()
                     : 0L;
-                _state.PublishResult(
-                    _result,
+                var candidate = new AlsP3VisualCommitCandidate(
+                    _result.Identity,
+                    AlsP3Presentation.Capture(appliedRoot),
                     poseDigest,
                     fullPoseDigest,
-                    rootDigest,
+                    rootDigest);
+                _state.PublishResult(
+                    _result,
+                    candidate,
                     _result.Identity.FrameId,
                     frameId);
                 if (measure)
@@ -215,7 +236,8 @@ public partial class AlsP3WorkerRoot : Node
                 {
                     RestorePose();
                     var restoredFullPoseDigest = ComputeFullPoseDigest();
-                    var restoredRootDigest = ComputeRootDigest(_visualRoot!.GlobalTransform);
+                    var restoredRootDigest = AlsP3Presentation.ComputeDigest(
+                        _visualRoot!.GlobalTransform);
                     _state.RecordRollback(
                         restoredFullPoseDigest,
                         restoredRootDigest,
@@ -267,7 +289,7 @@ public partial class AlsP3WorkerRoot : Node
             _poseScales[index] = _skeleton.GetBonePoseScale(index);
         }
         _capturedFullPoseDigest = ComputeFullPoseDigest();
-        _capturedRootDigest = ComputeRootDigest(_capturedRootTransform);
+        _capturedRootDigest = AlsP3Presentation.ComputeDigest(_capturedRootTransform);
     }
 
     private void RestorePose()
@@ -290,16 +312,6 @@ public partial class AlsP3WorkerRoot : Node
             Append(ref digest, _skeleton.GetBonePoseRotation(index));
             Append(ref digest, _skeleton.GetBonePoseScale(index));
         }
-        return digest;
-    }
-
-    private static ulong ComputeRootDigest(in Transform3D transform)
-    {
-        var digest = 14695981039346656037UL;
-        Append(ref digest, transform.Basis.X);
-        Append(ref digest, transform.Basis.Y);
-        Append(ref digest, transform.Basis.Z);
-        Append(ref digest, transform.Origin);
         return digest;
     }
 
@@ -329,10 +341,4 @@ public partial class AlsP3WorkerRoot : Node
         }
     }
 
-    private static Transform3D ToGodot(in System.Numerics.Matrix4x4 value) => new(
-        new Basis(
-            new Vector3(value.M11, value.M12, value.M13),
-            new Vector3(value.M21, value.M22, value.M23),
-            new Vector3(value.M31, value.M32, value.M33)),
-        new Vector3(value.M41, value.M42, value.M43));
 }

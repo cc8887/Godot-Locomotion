@@ -130,7 +130,7 @@ public partial class AlsP3Character : Node3D
 
             _worker = new AlsP3WorkerRoot { Name = "VisualWorker" };
             AddChild(_worker);
-            _worker.Configure(context, _state);
+            _worker.Configure(context, _state, _motor.GlobalTransform);
 
             _commit = new AlsP3CommitStage { Name = "Commit" };
             _commit.Configure(context, _state);
