@@ -59,11 +59,9 @@ public partial class AlsP3Character : Node3D
     internal int FailureRetainedIdentityCount =>
         _state.CaptureRuntimeDiagnostics().RetainedFailureIdentityCount;
 
-    internal bool ObservedVisualRootVisibleInTree =>
-        Volatile.Read(ref _state.ObservedVisualRootVisible) != 0;
-
-    internal long VisualRootVisibilityObservationFrameId =>
-        Volatile.Read(ref _state.VisualRootVisibilityObservationFrameId);
+    internal AlsP3VisualRootVisibilityObservation VisualRootVisibilityObservation =>
+        AlsP3VisualRootVisibilityObservation.Decode(
+            Volatile.Read(ref _state.VisualRootVisibilitySnapshot));
 
     public AlsP3LifecycleDiagnostics LifecycleDiagnostics
     {
@@ -162,7 +160,12 @@ public partial class AlsP3Character : Node3D
 
         try
         {
-            var frameId = Volatile.Read(ref _state.PublishedFrameId) + 1;
+            var completedFrameId = Volatile.Read(ref _state.PublishedFrameId);
+            if (completedFrameId >= AlsP3VisualRootVisibilityObservation.MaximumWorkerFrameId)
+            {
+                throw new InvalidOperationException("P3 frame sequence reached its supported limit.");
+            }
+            var frameId = completedFrameId + 1;
             var input = _motor.Step(
                 frameId,
                 checked((int)_state.Handle.CharacterId),
@@ -189,9 +192,14 @@ public partial class AlsP3Character : Node3D
         }
         catch (Exception exception)
         {
+            var completedFrameId = Volatile.Read(ref _state.PublishedFrameId);
+            var failureFrameId = completedFrameId >=
+                AlsP3VisualRootVisibilityObservation.MaximumWorkerFrameId
+                    ? AlsP3VisualRootVisibilityObservation.MaximumWorkerFrameId
+                    : Math.Max(0, completedFrameId + 1);
             _state.RecordFailure(
                 "motor_step",
-                HandleIdentity(Math.Max(0, Volatile.Read(ref _state.PublishedFrameId) + 1)),
+                HandleIdentity(failureFrameId),
                 exception);
         }
     }
@@ -205,7 +213,14 @@ public partial class AlsP3Character : Node3D
         {
             return;
         }
-        ResetVisualReady();
+        if (active)
+        {
+            ResetVisualReady();
+        }
+        else
+        {
+            CloseWorkerAdmissionForDeactivation();
+        }
         Volatile.Write(ref _state.Active, active ? 1 : 0);
         ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _motor.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
@@ -214,6 +229,14 @@ public partial class AlsP3Character : Node3D
         _worker.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _commit.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         Volatile.Write(ref _state.ProcessingEnabled, active ? 1 : 0);
+        if (!active)
+        {
+            ResetVisualReadyCore();
+        }
+        else
+        {
+            _state.OpenWorkerAdmission();
+        }
     }
 
     internal void ResetVisualReady()
@@ -221,8 +244,12 @@ public partial class AlsP3Character : Node3D
         EnsureMainThread();
         ThrowIfDisposed();
         EnsureConfigured();
-        Visible = false;
-        Volatile.Write(ref _state.VisualReady, 0);
+        if (!_state.IsWorkerAdmissionClosed)
+        {
+            throw new InvalidOperationException(
+                "P3 visual readiness can only be reset with Worker admission closed.");
+        }
+        ResetVisualReadyCore();
     }
 
     internal void ShowCommittedVisual(AlsFrameIdentity identity)
@@ -243,12 +270,47 @@ public partial class AlsP3Character : Node3D
         Visible = true;
     }
 
+    private void ResetVisualReadyCore()
+    {
+        Visible = false;
+        Volatile.Write(ref _state.VisualReady, 0);
+        Volatile.Write(
+            ref _state.VisualRootVisibilitySnapshot,
+            AlsP3VisualRootVisibilityObservation.MainThreadKnownHiddenValue);
+    }
+
+    private void CloseWorkerAdmissionForDeactivation()
+    {
+        if (Volatile.Read(ref _state.Active) == 0)
+        {
+            if (!_state.IsWorkerAdmissionClosed)
+            {
+                throw new InvalidOperationException(
+                    "Inactive P3 character unexpectedly retained open Worker admission.");
+            }
+            return;
+        }
+        if (!_state.TryCloseWorkerAdmission())
+        {
+            throw new InvalidOperationException(
+                "P3 character can only be deactivated at an idle Worker boundary.");
+        }
+    }
+
     public void ResumeAt(long completedFrameId)
     {
         EnsureMainThread();
         ThrowIfDisposed();
         EnsureConfigured();
         ArgumentOutOfRangeException.ThrowIfNegative(completedFrameId);
+        if (completedFrameId >
+            AlsP3VisualRootVisibilityObservation.MaximumResumableCompletedFrameId)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(completedFrameId),
+                completedFrameId,
+                "P3 completed frame is too large to resume safely.");
+        }
         if (Volatile.Read(ref _state.Active) != 0 || Volatile.Read(ref _state.PublishedFrameId) != 0)
         {
             throw new InvalidOperationException("Only an unused inactive P3 character can resume a frame sequence.");
@@ -295,10 +357,10 @@ public partial class AlsP3Character : Node3D
     {
         EnsureMainThread();
         ThrowIfDisposed();
+        SetActive(false);
         Volatile.Write(ref _state.GatherSuspended, 1);
         Volatile.Write(ref _state.WorkerSuspended, 1);
         Volatile.Write(ref _state.CommitSuspended, 1);
-        SetActive(false);
     }
 
     internal void StartReplacementClassification(long completedFrameId)
@@ -329,7 +391,7 @@ public partial class AlsP3Character : Node3D
 
     internal long RuntimeCommittedFrameId => Volatile.Read(ref _state.CommittedFrameId);
 
-    internal int WorkerInFlight => Volatile.Read(ref _state.WorkerInFlight);
+    internal int WorkerInFlight => _state.WorkerInFlightCount;
 
     public override void _ExitTree()
     {
@@ -342,19 +404,23 @@ public partial class AlsP3Character : Node3D
     private void DisposeRuntimeCore(bool allowActive)
     {
         EnsureMainThread();
-        Visible = false;
-        Volatile.Write(ref _state.VisualReady, 0);
-        Volatile.Write(ref _state.ProcessingEnabled, 0);
         if (!allowActive && Volatile.Read(ref _state.Active) != 0)
         {
             throw new InvalidOperationException(
                 "P3 character must be inactive before runtime disposal.");
+        }
+        if (!_state.IsWorkerAdmissionClosed && !_state.TryCloseWorkerAdmission())
+        {
+            throw new InvalidOperationException(
+                "P3 character runtime disposal was rejected while its Worker callback was in flight.");
         }
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
         {
             return;
         }
 
+        ResetVisualReadyCore();
+        Volatile.Write(ref _state.ProcessingEnabled, 0);
         if (_worker is not null && !_worker.TryDisposeRuntime())
         {
             Volatile.Write(ref _disposed, 0);

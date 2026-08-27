@@ -647,9 +647,13 @@ In `AlsP3CharacterSlot`:
 - hide old active before retirement/free;
 - keep prebuilt spare hidden through classification and recovery;
 - keep `AlsP3WorkerRoot` as a `Node3D` so the character-to-visual-root render visibility ancestor chain is continuous;
-- publish the real visual-root `IsVisibleInTree()` result from the owning Worker as a `Volatile` scalar at Configure/frame 0 and on every Worker frame; slot/main code must never read the Worker-owned visual root;
-- count `_active` and `_spare` published real visual-root flags directly, without `GetChildren()` enumeration or per-frame allocation;
+- encode the real visual-root visibility and observation frame in one atomic `long`: non-negative `(frameId << 1) | visibleBit` is an owning-Worker `IsVisibleInTree()` observation, while `-1` is `main_known_hidden` published only after an idle-boundary main-thread hide; slot/main code must never read the Worker-owned visual root;
+- use one CAS Worker-admission state for closed/open plus in-flight count, so deactivation atomically succeeds only from open+idle and a rejected lifecycle call changes no Active/process/visibility state;
+- reject `ResumeAt` and replacement completed-frame values that cannot produce another encodable Worker frame before changing slot generation or lifecycle state;
+- count `_active` and `_spare` decoded published real visual-root observations directly, without `GetChildren()` enumeration or per-frame allocation;
 - allow the false-to-true observation to trail Commit Order 2 until the next Worker frame, but throw if a published visible rig belongs to an inactive, local-hidden or not-ready character;
+- make presentation smoke wait for a Worker-visible observation, keep deactivated characters alive across one physics tick, then reactivate and require a new commit plus a new Worker-visible observation before teardown;
+- pre-deactivate every slot character before setting the slot disposed flag, so an in-flight admission rejection cannot strand an active visual under a permanently stopped slot;
 - explicitly allow count zero during `AwaitingGenerationMismatch` and `AwaitingRecoveryCommit`.
 
 `StartReplacementClassification()` explicitly calls `ResetVisualReady()` before `SetActive(true)`. Before assigning the spare into `_active`, assert that the retired local variable is already hidden. Teardown always hides both active and spare before disposal.
