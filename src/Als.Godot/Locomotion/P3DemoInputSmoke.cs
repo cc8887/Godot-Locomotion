@@ -2,6 +2,7 @@ using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using NumericsVector2 = System.Numerics.Vector2;
+using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
 
@@ -274,14 +275,21 @@ public partial class P3DemoInputSmoke : Node
         AddChild(orbit);
         orbit.Configure(target);
         orbit._Process(0d);
-        Require(orbit.GlobalPosition == target.GlobalPosition + new Vector3(0f, 1.45f, 0f),
+        Require(orbit.Target == target, "orbit camera did not retain its live target");
+        Require(orbit.GlobalPosition == target.GlobalPosition + orbit.FollowOffset,
             "orbit camera did not follow its target at shoulder height");
 
+        var initialPitch = orbit.Pitch;
+        orbit.ApplyMouseMotion(new Vector2(0f, 100f));
+        Require(orbit.Pitch < initialPitch, "mouse down did not pitch the camera down");
+        var downwardPitch = orbit.Pitch;
+        orbit.ApplyMouseMotion(new Vector2(0f, -200f));
+        Require(orbit.Pitch > downwardPitch, "mouse up did not pitch the camera up");
         orbit.ApplyMouseMotion(new Vector2(1000f, 10000f));
-        Require(orbit.Pitch == orbit.MaximumPitch, "orbit pitch maximum was not clamped");
+        Require(orbit.Pitch == orbit.MinimumPitch, "orbit pitch minimum was not clamped");
         var firstYaw = orbit.Yaw;
         orbit.ApplyMouseMotion(new Vector2(-1000f, -20000f));
-        Require(orbit.Pitch == orbit.MinimumPitch, "orbit pitch minimum was not clamped");
+        Require(orbit.Pitch == orbit.MaximumPitch, "orbit pitch maximum was not clamped");
         Require(orbit.Yaw != firstYaw, "horizontal mouse motion did not change orbit yaw");
 
         orbit.SetMouseCaptured(false);
@@ -300,15 +308,58 @@ public partial class P3DemoInputSmoke : Node
     {
         var hud = new AlsLocomotionHud { Name = "LocomotionHud" };
         AddChild(hud);
-        hud.Refresh(default, framesPerSecond: 60d, errors: 0);
+        var result = AlsFrameResult.CreateDefault(new AlsFrameIdentity(42, 0, 1));
+        result.BlendCoordinates = new NumericsVector2(0.25f, -0.5f);
+        result.Stride = 1.2f;
+        result.PlayRate = 0.9f;
+        result.Lean = new NumericsVector2(0.1f, -0.2f);
+        result.AnimationPhase = 0.75f;
+        var diagnostics = new AlsP3FrameDiagnostics(
+            result.Identity,
+            42,
+            42,
+            42,
+            42,
+            42,
+            new NumericsVector3(3f, 0f, 4f),
+            result,
+            0);
+        hud.Refresh(diagnostics, framesPerSecond: 60d, errors: 0);
         Require(hud.StateText.Contains("Grounded", StringComparison.Ordinal),
             "HUD did not expose locomotion state");
+        Require(hud.StateText.Contains("Speed 5.00", StringComparison.Ordinal) &&
+            hud.StateText.Contains("Blend (0.25, -0.50)", StringComparison.Ordinal) &&
+            hud.StateText.Contains("Stride 1.20", StringComparison.Ordinal) &&
+            hud.StateText.Contains("Rate 0.90", StringComparison.Ordinal) &&
+            hud.StateText.Contains("Lean (0.10, -0.20)", StringComparison.Ordinal) &&
+            hud.StateText.Contains("Phase 0.75", StringComparison.Ordinal),
+            "HUD did not expose committed movement and animation diagnostics");
         Require(hud.PerformanceText.Contains("FPS 60", StringComparison.Ordinal) &&
             hud.PerformanceText.Contains("Errors 0", StringComparison.Ordinal),
             "HUD did not expose runtime performance");
         Require(!hud.StateText.Contains("WASD", StringComparison.OrdinalIgnoreCase) &&
             !hud.PerformanceText.Contains("Space", StringComparison.OrdinalIgnoreCase),
             "HUD contained forbidden tutorial text");
+        var minimumSize = hud.GetCombinedMinimumSize();
+        Require(minimumSize.X <= 502f && minimumSize.Y <= 134f,
+            $"HUD text exceeded its unframed demo bounds: {minimumSize}");
+        for (var frame = 1; frame < 300; frame++)
+        {
+            hud.Refresh(diagnostics, framesPerSecond: 60d, errors: 0);
+        }
+        Require(hud.RefreshCallCount == 300, "HUD did not observe every render refresh request");
+        Require(hud.StateFormatCount == 1,
+            "HUD reformatted unchanged committed state more than once");
+        Require(hud.PerformanceFormatCount <= 21,
+            "HUD performance text was formatted more often than 4 Hz at 60 FPS");
+
+        var successPublished = false;
+        RequireThrows<InvalidOperationException>(
+            () => P3LocomotionDemo.CompleteAfterCleanup(
+                () => throw new InvalidOperationException("cleanup rejected"),
+                () => successPublished = true),
+            "demo completion swallowed a cleanup failure");
+        Require(!successPublished, "demo success was published before cleanup completed");
         RemoveChild(hud);
         hud.Free();
     }

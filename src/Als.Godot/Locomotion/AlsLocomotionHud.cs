@@ -5,12 +5,20 @@ namespace GodotAls.Locomotion;
 
 public partial class AlsLocomotionHud : VBoxContainer
 {
+    private const long PerformanceRefreshInterval = 15;
     private Label _stateLabel = null!;
     private Label _performanceLabel = null!;
+    private long _lastStateFrame = long.MinValue;
 
     public string StateText => _stateLabel.Text;
 
     public string PerformanceText => _performanceLabel.Text;
+
+    public long RefreshCallCount { get; private set; }
+
+    public long StateFormatCount { get; private set; }
+
+    public long PerformanceFormatCount { get; private set; }
 
     public override void _Ready()
     {
@@ -30,16 +38,34 @@ public partial class AlsLocomotionHud : VBoxContainer
             throw new ArgumentOutOfRangeException(nameof(framesPerSecond));
         }
 
+        RefreshCallCount++;
         var result = diagnostics.Result;
-        _stateLabel.Text =
-            $"Frame {diagnostics.CommittedFrameId} | " +
-            $"{result.ResolvedLocomotionState}/{result.AnimationState}\n" +
-            $"{result.ActualGait} | {result.ActualStance} | {result.ActualRotationMode}";
-        var workerMicroseconds = result.WorkerElapsedTicks <= 0
-            ? 0d
-            : result.WorkerElapsedTicks * 1_000_000d / Stopwatch.Frequency;
-        _performanceLabel.Text =
-            $"FPS {Math.Round(framesPerSecond):0} | Worker {workerMicroseconds:0.0} us | Errors {errors}";
+        if (diagnostics.CommittedFrameId != _lastStateFrame)
+        {
+            var speed = diagnostics.ActualVelocity.Length();
+            _stateLabel.Text =
+                $"Frame {diagnostics.CommittedFrameId} | " +
+                $"{result.ResolvedLocomotionState}/{result.AnimationState}\n" +
+                $"{result.ActualGait} | {result.ActualStance} | {result.ActualRotationMode}\n" +
+                $"Speed {speed:0.00} | Blend ({result.BlendCoordinates.X:0.00}, " +
+                $"{result.BlendCoordinates.Y:0.00})\n" +
+                $"Stride {result.Stride:0.00} | Rate {result.PlayRate:0.00} | " +
+                $"Lean ({result.Lean.X:0.00}, {result.Lean.Y:0.00}) | " +
+                $"Phase {result.AnimationPhase:0.00}";
+            _lastStateFrame = diagnostics.CommittedFrameId;
+            StateFormatCount++;
+        }
+
+        if (RefreshCallCount == 1 || RefreshCallCount % PerformanceRefreshInterval == 0)
+        {
+            var workerMicroseconds = result.WorkerElapsedTicks <= 0
+                ? 0d
+                : result.WorkerElapsedTicks * 1_000_000d / Stopwatch.Frequency;
+            _performanceLabel.Text =
+                $"FPS {Math.Round(framesPerSecond):0} | Worker {workerMicroseconds:0.0} us | " +
+                $"Errors {errors}";
+            PerformanceFormatCount++;
+        }
     }
 
     private Label CreateLabel(string name)

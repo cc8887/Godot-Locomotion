@@ -33,6 +33,22 @@ public partial class AlsP3Character : Node3D
     public int FailureDiagnosticCount =>
         Volatile.Read(ref _state.FailureDiagnosticCount);
 
+    public Node3D MovementAnchor
+    {
+        get
+        {
+            EnsureMainThread();
+            EnsureConfigured();
+            ThrowIfDisposed();
+            if (!GodotObject.IsInstanceValid(_motor) ||
+                _motor.IsQueuedForDeletion() || !_motor.IsInsideTree())
+            {
+                throw new ObjectDisposedException(nameof(AlsP3Character));
+            }
+            return _motor;
+        }
+    }
+
     internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
         _state.CaptureRuntimeDiagnostics();
 
@@ -149,6 +165,7 @@ public partial class AlsP3Character : Node3D
                 _state.CommittedTargetYaw);
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
+            _state.MotorActualVelocity = input.ActualVelocity;
             _state.Exchange.PublishInput(input);
             Volatile.Write(ref _state.PublishedFrameId, frameId);
         }

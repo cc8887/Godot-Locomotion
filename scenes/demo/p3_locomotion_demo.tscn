@@ -103,7 +103,7 @@ fov = 72.0
 offset_left = 18.0
 offset_top = 16.0
 offset_right = 520.0
-offset_bottom = 100.0
+offset_bottom = 150.0
 mouse_filter = 2
 
 [node name="LocomotionHud" type="VBoxContainer" parent="HudLayer/HudMargin"]

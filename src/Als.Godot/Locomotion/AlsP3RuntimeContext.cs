@@ -4,6 +4,7 @@ using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
 using GodotAls.Import.Compilation;
+using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
 
@@ -14,6 +15,7 @@ public readonly record struct AlsP3FrameDiagnostics(
     long ModelResultFrameId,
     long PoseAdvanceFrameId,
     long CommittedFrameId,
+    NumericsVector3 ActualVelocity,
     AlsFrameResult Result,
     ulong PoseDigest);
 
@@ -130,6 +132,8 @@ internal sealed class AlsP3CharacterState
     public long CommandFrameId;
 
     public long MotorSnapshotFrameId;
+
+    public NumericsVector3 MotorActualVelocity;
 
     public long ModelResultFrameId;
 

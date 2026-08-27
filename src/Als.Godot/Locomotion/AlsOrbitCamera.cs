@@ -4,7 +4,6 @@ namespace GodotAls.Locomotion;
 
 public partial class AlsOrbitCamera : Node3D
 {
-    private static readonly Vector3 FollowOffset = new(0f, 1.45f, 0f);
     private Node3D? _target;
     private SpringArm3D? _springArm;
     private float _yaw;
@@ -20,6 +19,13 @@ public partial class AlsOrbitCamera : Node3D
     public float Yaw => _yaw;
 
     public float Pitch => _pitch;
+
+    public Vector3 FollowOffset { get; } = new(0f, 1.45f, 0f);
+
+    public Node3D? Target =>
+        _target is not null && GodotObject.IsInstanceValid(_target)
+            ? _target
+            : null;
 
     public bool IsMouseCaptured { get; private set; }
 
@@ -75,7 +81,7 @@ public partial class AlsOrbitCamera : Node3D
         }
         _yaw = Mathf.Wrap(_yaw - (relative.X * MouseSensitivity), -Mathf.Pi, Mathf.Pi);
         _pitch = Mathf.Clamp(
-            _pitch + (relative.Y * MouseSensitivity),
+            _pitch - (relative.Y * MouseSensitivity),
             MinimumPitch,
             MaximumPitch);
         ApplyOrbit();
