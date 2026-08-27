@@ -3,6 +3,7 @@ $script:FunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p3b-verificati
 $script:WorkerPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3WorkerRoot.cs'
 $script:RuntimePath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP3RuntimeContext.cs'
 $script:HarnessPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P3bAnimationHarness.cs'
+$script:VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p3b.ps1'
 if (Test-Path -LiteralPath $script:FunctionsPath)
 {
     . $script:FunctionsPath
@@ -12,6 +13,7 @@ $script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 fram
 $script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0'
 $script:ValidReplacement = 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1'
 $script:ValidPose = 'GODOT_ALS_P3B_POSE character=0 changes=42'
+$script:VerifierSource = [System.IO.File]::ReadAllText($script:VerifierPath)
 
 function Get-P3bOutput
 {
@@ -40,6 +42,29 @@ function Test-P3bParserRejects
             -OutputLines $OutputLines `
             -ExpectedMode $ExpectedMode `
             -ExpectedCharacterCount $ExpectedCharacterCount | Out-Null
+        return $false
+    }
+    catch
+    {
+        return $true
+    }
+}
+
+function Test-P3bChildGateRejects
+{
+    param(
+        [object[]]$OutputLines,
+        [int]$ExitCode,
+        [string]$ExpectedMarker
+    )
+
+    try
+    {
+        Assert-P3bChildGateOutput `
+            -PhaseName 'test' `
+            -OutputLines $OutputLines `
+            -ExitCode $ExitCode `
+            -ExpectedMarker $ExpectedMarker
         return $false
     }
     catch
@@ -273,5 +298,67 @@ Describe 'P3B raw-pose and timing instrumentation' {
         $firstProbe | Should BeGreaterThan -1
         $firstSegment | Should BeGreaterThan $firstProbe
         $firstRecord | Should BeGreaterThan $lastAllocationRecord
+    }
+}
+
+Describe 'P3B final regression closure' {
+    It 'accepts exactly one expected child gate marker without errors' {
+        Assert-P3bChildGateOutput `
+            -PhaseName 'P3A' `
+            -OutputLines @('build output', 'P3A_FOCUSED_VERIFICATION_OK regression=skipped') `
+            -ExitCode 0 `
+            -ExpectedMarker 'P3A_FOCUSED_VERIFICATION_OK regression=skipped'
+    }
+
+    It 'rejects missing duplicate and successful-looking error output' {
+        foreach ($output in @(
+            ,@('build output'),
+            ,@('P2B_VERIFICATION_OK', 'P2B_VERIFICATION_OK'),
+            ,@('P2B_VERIFICATION_OK', 'SCRIPT ERROR: failed'),
+            ,@('P2B_VERIFICATION_OK', 'Godot: ERROR: failed')
+        ))
+        {
+            Test-P3bChildGateRejects `
+                -OutputLines $output `
+                -ExitCode 0 `
+                -ExpectedMarker 'P2B_VERIFICATION_OK' | Should Be $true
+        }
+    }
+
+    It 'rejects a child gate nonzero exit even with the expected marker' {
+        Test-P3bChildGateRejects `
+            -OutputLines @('P1_VERIFICATION_OK') `
+            -ExitCode 7 `
+            -ExpectedMarker 'P1_VERIFICATION_OK' | Should Be $true
+    }
+
+    It 'runs every real regression gate in order after the P3B matrix' {
+        $matrixIndex = $script:VerifierSource.IndexOf('foreach ($characterCount in @(1, 10))')
+        $p3aIndex = $script:VerifierSource.IndexOf("'verify-p3a.ps1'", $matrixIndex)
+        $p2bIndex = $script:VerifierSource.IndexOf("'verify-p2b.ps1'", $matrixIndex)
+        $p1Index = $script:VerifierSource.IndexOf("'verify-p1.ps1'", $matrixIndex)
+        $p0Index = $script:VerifierSource.IndexOf("'verify-p0.ps1'", $matrixIndex)
+        $testsIndex = $script:VerifierSource.IndexOf(
+            'dotnet test $solutionPath -c Release --no-restore',
+            $matrixIndex)
+        $successIndex = $script:VerifierSource.LastIndexOf("Write-Output 'P3B_VERIFICATION_OK'")
+
+        $matrixIndex | Should BeGreaterThan -1
+        $p3aIndex | Should BeGreaterThan $matrixIndex
+        $p2bIndex | Should BeGreaterThan $p3aIndex
+        $p1Index | Should BeGreaterThan $p2bIndex
+        $p0Index | Should BeGreaterThan $p1Index
+        $testsIndex | Should BeGreaterThan $p0Index
+        $successIndex | Should BeGreaterThan $testsIndex
+    }
+
+    It 'uses focused P3A verification and validates real child output instead of printing phase markers' {
+        $script:VerifierSource | Should Match ([regex]::Escape(
+            '& $p3aScript -GodotExecutable $GodotExecutable -ProjectRoot $projectRootPath -SkipRegression'))
+        $script:VerifierSource | Should Match 'Assert-P3bChildGateOutput'
+        $script:VerifierSource | Should Not Match "Write-Output 'P3A_(FOCUSED_)?VERIFICATION_OK"
+        $script:VerifierSource | Should Not Match "Write-Output 'P2B_VERIFICATION_OK"
+        $script:VerifierSource | Should Not Match "Write-Output 'P1_VERIFICATION_OK"
+        $script:VerifierSource | Should Not Match "Write-Output 'P0_VERIFICATION_OK"
     }
 }
