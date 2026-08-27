@@ -45,12 +45,27 @@ public partial class AlsP3CommitStage : Node
             frameId,
             _state.Handle.CharacterId,
             _state.Handle.Generation);
-        if (!_state.Exchange.TryConsumeResult(identity, out var result))
+        var measurement = _context.Measurement;
+        var measure = measurement is not null &&
+            measurement.TryGetMeasurementIndex(identity, out _);
+        var allocatedBeforeExchange = measure
+            ? GC.GetAllocatedBytesForCurrentThread()
+            : 0L;
+        var consumed = _state.Exchange.TryConsumeResult(identity, out var result);
+        if (measure)
+        {
+            measurement!.AddExchangeAllocations(
+                GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
+        }
+        if (!consumed)
         {
             ClassifyMissing(frameId);
             return;
         }
 
+        var allocatedBeforeCommit = measure
+            ? GC.GetAllocatedBytesForCurrentThread()
+            : 0L;
         var commandFrame = _state.CommandFrameId;
         var motorFrame = _state.MotorSnapshotFrameId;
         var modelFrame = _state.ModelResultFrameId;
@@ -75,6 +90,11 @@ public partial class AlsP3CommitStage : Node
             result,
             _state.PublishedPoseDigest);
         Volatile.Write(ref _state.CommittedFrameId, frameId);
+        if (measure)
+        {
+            measurement!.AddCommitAllocations(
+                GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeCommit);
+        }
     }
 
     private void PublishFailure(AlsP3WorkerFailure failure)

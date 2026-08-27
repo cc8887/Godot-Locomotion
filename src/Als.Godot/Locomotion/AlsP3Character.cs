@@ -166,7 +166,18 @@ public partial class AlsP3Character : Node3D
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
             _state.MotorActualVelocity = input.ActualVelocity;
+            var measurement = _context.Measurement;
+            var measure = measurement is not null &&
+                measurement.TryGetMeasurementIndex(input.Identity, out _);
+            var allocatedBeforeExchange = measure
+                ? GC.GetAllocatedBytesForCurrentThread()
+                : 0L;
             _state.Exchange.PublishInput(input);
+            if (measure)
+            {
+                measurement!.AddExchangeAllocations(
+                    GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
+            }
             Volatile.Write(ref _state.PublishedFrameId, frameId);
         }
         catch (Exception exception)

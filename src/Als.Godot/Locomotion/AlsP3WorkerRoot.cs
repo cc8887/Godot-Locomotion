@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 using Godot;
 using GodotAls.Animation;
@@ -82,9 +83,22 @@ public partial class AlsP3WorkerRoot : Node
                 frameId,
                 _state.Handle.CharacterId,
                 _state.Handle.Generation);
+            var measurement = _context.Measurement;
+            var measurementIndex = -1;
+            var measure = measurement is not null &&
+                measurement.TryGetMeasurementIndex(identity, out measurementIndex);
+            var workerStartedAt = measure ? Stopwatch.GetTimestamp() : 0L;
+            var allocatedBeforeExchange = measure
+                ? GC.GetAllocatedBytesForCurrentThread()
+                : 0L;
             if (!_state.Exchange.TryReadInput(identity, out var input))
             {
                 return;
+            }
+            if (measure)
+            {
+                measurement!.AddExchangeAllocations(
+                    GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
             }
 
             var poseCaptured = false;
@@ -100,14 +114,57 @@ public partial class AlsP3WorkerRoot : Node
                     Volatile.Write(ref _state.ObservedOffMainThread, 1);
                 }
 
-                AlsLocomotionModel.Evaluate(input, ref _runtimeState, ref _result, _context.Settings);
+                var allocatedBeforeModel = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
+                AlsLocomotionModel.Evaluate(
+                    input,
+                    ref _runtimeState,
+                    ref _result,
+                    _context.Settings);
+                if (measure)
+                {
+                    measurement!.AddModelAllocations(
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeModel);
+                }
+
+                var allocatedBeforeSkeleton = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 CapturePose();
                 poseCaptured = true;
                 _visualRoot!.GlobalTransform = ToGodot(input.CharacterTransform);
+                if (measure)
+                {
+                    measurement!.AddSkeletonAllocations(
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeSkeleton);
+                }
+
+                var allocatedBeforeController = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 _controller!.Apply(_result, input.DeltaTime);
+                if (measure)
+                {
+                    measurement!.AddControllerAllocations(
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeController);
+                }
+
+                allocatedBeforeSkeleton = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 var poseDigest = _controller.ComputePoseDigest(frameId);
                 var fullPoseDigest = ComputeFullPoseDigest();
                 var rootDigest = ComputeRootDigest(_visualRoot.GlobalTransform);
+                if (measure)
+                {
+                    measurement!.AddSkeletonAllocations(
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeSkeleton);
+                }
+
+                allocatedBeforeExchange = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 _state.PublishResult(
                     _result,
                     poseDigest,
@@ -115,6 +172,14 @@ public partial class AlsP3WorkerRoot : Node
                     rootDigest,
                     _result.Identity.FrameId,
                     frameId);
+                if (measure)
+                {
+                    measurement!.AddExchangeAllocations(
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
+                    measurement.RecordWorkerAdvance(
+                        measurementIndex,
+                        Stopwatch.GetTimestamp() - workerStartedAt);
+                }
             }
             catch (Exception exception)
             {
