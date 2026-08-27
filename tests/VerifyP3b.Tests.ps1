@@ -15,7 +15,8 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
 
 $script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 p95_us=100 p99_us=200'
 $script:ValidFrameOrderMarker = 'GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1'
-$script:ValidGraphMarker = 'GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=0123456789ABCDEF digest=1111111111111111'
+$script:ExpectedGraphDirectionDigest = 'DD72BD02BE20DCC3'
+$script:ValidGraphMarker = 'GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=DD72BD02BE20DCC3 digest=1111111111111111'
 $script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0'
 $script:ValidReplacement = 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1'
 $script:ValidPose = 'GODOT_ALS_P3B_POSE character=0 changes=42'
@@ -295,7 +296,7 @@ function Test-P3bGraphParserRejects
 function New-P3bGraphParityResult
 {
     param(
-        [string]$DirectionDigest = '0123456789ABCDEF',
+        [string]$DirectionDigest = 'DD72BD02BE20DCC3',
         [string]$Digest = '1111111111111111'
     )
 
@@ -347,6 +348,10 @@ function Get-P3bVerifierCommandAsts
 Describe 'P3B focused scene gate contracts' {
     It 'provides strict scene and graph digest gate functions' {
         Get-Command Invoke-P3bSceneGate -ErrorAction SilentlyContinue |
+            Should Not BeNullOrEmpty
+        Get-Command Get-P3bExpectedGraphDirectionDigest -ErrorAction SilentlyContinue |
+            Should Not BeNullOrEmpty
+        Get-Command Get-P3bExpectedGraphMarkerPattern -ErrorAction SilentlyContinue |
             Should Not BeNullOrEmpty
         Get-Command ConvertFrom-P3bGraphOutput -ErrorAction SilentlyContinue |
             Should Not BeNullOrEmpty
@@ -456,7 +461,7 @@ Describe 'P3B focused scene gate contracts' {
         }
 
         $result = ConvertFrom-P3bGraphOutput -OutputLines @($script:ValidGraphMarker)
-        $result.DirectionDigest | Should Be '0123456789ABCDEF'
+        $result.DirectionDigest | Should Be $script:ExpectedGraphDirectionDigest
         $result.Digest | Should Be '1111111111111111'
         Test-P3bGraphParserRejects -OutputLines @() | Should Be $true
         Test-P3bGraphParserRejects -OutputLines @(
@@ -467,6 +472,23 @@ Describe 'P3B focused scene gate contracts' {
             Should Be $true
         Test-P3bGraphParserRejects -OutputLines @('GODOT_ALS_P3B_FAIL code=graph') |
             Should Be $true
+    }
+
+    It 'locks graph direction evidence to the formal asset golden before pair parity' {
+        $wrongDirectionDigest = '0123456789ABCDEF'
+        $wrongMarker = $script:ValidGraphMarker.Replace(
+            $script:ExpectedGraphDirectionDigest,
+            $wrongDirectionDigest)
+        Test-P3bGraphParserRejects -OutputLines @($wrongMarker) | Should Be $true
+
+        $wrongFirst = New-P3bGraphParityResult -DirectionDigest $wrongDirectionDigest
+        $wrongSecond = New-P3bGraphParityResult -DirectionDigest $wrongDirectionDigest
+        Test-P3bGraphPairRejects -First $wrongFirst -Second $wrongSecond |
+            Should Be $true
+
+        Get-P3bExpectedGraphDirectionDigest | Should Be $script:ExpectedGraphDirectionDigest
+        Get-P3bExpectedGraphMarkerPattern | Should Be `
+            '\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=(DD72BD02BE20DCC3) digest=([0-9A-F]{16})\z'
     }
 
     It 'requires both graph digest captures to be valid and equal' {
@@ -565,7 +587,7 @@ Describe 'P3B focused scene gate contracts' {
         foreach ($graphCall in $graphCalls)
         {
             $graphCall.Extent.Text | Should Match 'GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK'
-            $graphCall.Extent.Text | Should Match 'GODOT_ALS_P3B_GRAPH_OK'
+            $graphCall.Extent.Text | Should Match 'Get-P3bExpectedGraphMarkerPattern'
         }
         $frameSingle[0].Extent.Text | Should Match 'GODOT_ALS_P3B_FRAME_ORDER_OK'
         $frameParallel[0].Extent.Text | Should Match 'GODOT_ALS_P3B_FRAME_ORDER_OK'
@@ -603,7 +625,6 @@ Describe 'P3B focused scene gate contracts' {
         foreach ($regexMarkerName in @(
             'GODOT_ALS_P3_PRESENTATION_OK',
             'GODOT_ALS_P3B_INITIAL_ROLLBACK_OK',
-            'GODOT_ALS_P3B_GRAPH_OK',
             'GODOT_ALS_P3B_FRAME_ORDER_OK'))
         {
             $sceneText | Should Match $regexMarkerName
@@ -1320,6 +1341,15 @@ Describe 'P3B final regression closure' {
             -OutputLines @('P1_VERIFICATION_OK') `
             -ExitCode 7 `
             -ExpectedMarker 'P1_VERIFICATION_OK' | Should Be $true
+    }
+
+    It 'rejects an explicit ALS failure result even with child success and exit zero' {
+        Test-P3bChildGateRejects `
+            -OutputLines @(
+                'P3A_VERIFICATION_OK',
+                'GODOT_ALS_P3A_FAIL code=synthetic') `
+            -ExitCode 0 `
+            -ExpectedMarker 'P3A_VERIFICATION_OK' | Should Be $true
     }
 
     It 'captures and rejects information-stream errors from a real child script' {

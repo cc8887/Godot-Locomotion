@@ -100,7 +100,7 @@ $graphOutputFirst = @(Invoke-P3bSceneGate `
     -ExpectedExactMarkers @(
         'GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1') `
     -ExpectedRegexMarkers @(
-        '\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=([0-9A-F]{16}) digest=([0-9A-F]{16})\z'))
+        (Get-P3bExpectedGraphMarkerPattern)))
 $graphFirst = ConvertFrom-P3bGraphOutput -OutputLines $graphOutputFirst
 
 $graphOutputSecond = @(Invoke-P3bSceneGate `
@@ -111,7 +111,7 @@ $graphOutputSecond = @(Invoke-P3bSceneGate `
     -ExpectedExactMarkers @(
         'GODOT_ALS_P3B_GRAPH_LIFECYCLE_OK double_dispose=1 parent_free=1 partial=1 rebuild=1 borrowed=1') `
     -ExpectedRegexMarkers @(
-        '\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=([0-9A-F]{16}) digest=([0-9A-F]{16})\z'))
+        (Get-P3bExpectedGraphMarkerPattern)))
 $graphSecond = ConvertFrom-P3bGraphOutput -OutputLines $graphOutputSecond
 Assert-P3bGraphPair -First $graphFirst -Second $graphSecond
 

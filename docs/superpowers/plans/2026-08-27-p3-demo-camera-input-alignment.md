@@ -831,7 +831,7 @@ forward = forward.Normalized();
 var right = camera.GlobalBasis.X;
 right.Y = 0f;
 right = right.Normalized();
-var basisYaw = Mathf.Atan2(forward.X, -forward.Z);
+var basisYaw = Mathf.Atan2(-forward.X, -forward.Z);
 Require(Mathf.Abs(Mathf.Wrap(orbit.Yaw - basisYaw, -Mathf.Pi, Mathf.Pi)) < 1e-4f,
     "orbit yaw did not match the real Camera3D basis");
 ```

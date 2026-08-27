@@ -26,6 +26,17 @@ function Test-P3bSceneFailureMarkerLine
         [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
 }
 
+function Get-P3bExpectedGraphDirectionDigest
+{
+    return 'DD72BD02BE20DCC3'
+}
+
+function Get-P3bExpectedGraphMarkerPattern
+{
+    $directionDigest = Get-P3bExpectedGraphDirectionDigest
+    return "\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=($directionDigest) digest=([0-9A-F]{16})\z"
+}
+
 function Get-P3bExpectedMarkerName
 {
     param(
@@ -188,7 +199,7 @@ function ConvertFrom-P3bGraphOutput
 
     $marker = [regex]::Match(
         $markerLines[0],
-        '\AGODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=([0-9A-F]{16}) digest=([0-9A-F]{16})\z',
+        (Get-P3bExpectedGraphMarkerPattern),
         [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
     if (-not $marker.Success)
     {
@@ -225,6 +236,13 @@ function Assert-P3bGraphPair
         }
         $firstValues[$propertyName] = $firstValue
         $secondValues[$propertyName] = $secondValue
+    }
+
+    $expectedDirectionDigest = Get-P3bExpectedGraphDirectionDigest
+    if ($firstValues.DirectionDigest -cne $expectedDirectionDigest -or
+        $secondValues.DirectionDigest -cne $expectedDirectionDigest)
+    {
+        throw "P3B graph direction digest must match the formal asset golden '$expectedDirectionDigest': first=$($firstValues.DirectionDigest), second=$($secondValues.DirectionDigest)."
     }
 
     if ($firstValues.DirectionDigest -cne $secondValues.DirectionDigest)
@@ -625,6 +643,14 @@ function Assert-P3bChildGateOutput
     if ($errorLines.Count -ne 0)
     {
         throw "$PhaseName gate emitted an error line:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
+    }
+
+    $failureLines = @($lines | Where-Object {
+        Test-P3bSceneFailureMarkerLine -Line $_
+    })
+    if ($failureLines.Count -ne 0)
+    {
+        throw "$PhaseName gate emitted an ALS failure marker:$([Environment]::NewLine)$($failureLines -join [Environment]::NewLine)"
     }
 
     $markerLines = @($lines | Where-Object { $_ -ceq $ExpectedMarker })
