@@ -51,7 +51,8 @@ public partial class AlsP3WorkerRoot : Node
     public override void _PhysicsProcess(double delta)
     {
         if (Volatile.Read(ref _disposed) != 0 || Volatile.Read(ref _state.Active) == 0 ||
-            Volatile.Read(ref _state.WorkerFrozen) != 0)
+            Volatile.Read(ref _state.WorkerFrozen) != 0 ||
+            Volatile.Read(ref _state.WorkerSuspended) != 0)
         {
             return;
         }
@@ -84,17 +85,10 @@ public partial class AlsP3WorkerRoot : Node
             }
 
             AlsLocomotionModel.Evaluate(input, ref _runtimeState, ref _result, _context.Settings);
-            _state.ModelResultFrameId = _result.Identity.FrameId;
             _visualRoot!.GlobalTransform = ToGodot(input.CharacterTransform);
             _controller!.Apply(_result, input.DeltaTime);
             var poseDigest = _controller.ComputePoseDigest(frameId);
-            _state.PoseAdvanceFrameId = frameId;
-            _state.PublishedPoseDigest = poseDigest;
-            _state.ResultPublishedCharacterId = checked((int)_result.Identity.CharacterId);
-            _state.ResultPublishedGeneration = checked((int)_result.Identity.SlotGeneration);
-            _state.ResultPublishedFrameId = _result.Identity.FrameId;
-            _state.Exchange.PublishResult(_result);
-            Volatile.Write(ref _state.HasPublishedResult, 1);
+            _state.PublishResult(_result, poseDigest, _result.Identity.FrameId, frameId);
         }
         catch (Exception exception)
         {

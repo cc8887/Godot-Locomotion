@@ -70,7 +70,9 @@ public sealed class AlsP3RuntimeContext
 
 internal sealed class AlsP3CharacterState
 {
-    private AlsP3WorkerFailure? _failure;
+    private readonly object _failureGate = new();
+    private readonly Queue<AlsP3WorkerFailure> _failures = new();
+    private readonly HashSet<AlsP3FailureIdentity> _failureIdentities = new();
 
     public AlsP3CharacterState(AlsSlotHandle handle)
     {
@@ -114,20 +116,63 @@ internal sealed class AlsP3CharacterState
 
     public int WorkerFrozen;
 
+    public int GatherSuspended;
+
+    public int WorkerSuspended;
+
     public int ObservedOffMainThread;
 
-    public int FailureDiagnosticPublished;
-
-    public AlsP3WorkerFailure? Failure => Volatile.Read(ref _failure);
+    public int FailureDiagnosticCount;
 
     public void RecordFailure(string code, AlsFrameIdentity identity, Exception exception)
     {
         var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
         var failure = new AlsP3WorkerFailure(code, identity, exceptionType);
-        Interlocked.CompareExchange(ref _failure, failure, null);
+        lock (_failureGate)
+        {
+            if (_failureIdentities.Add(new AlsP3FailureIdentity(code, identity)))
+            {
+                _failures.Enqueue(failure);
+            }
+        }
         Interlocked.Exchange(ref WorkerFrozen, 1);
     }
+
+    public bool TryDequeueFailure(out AlsP3WorkerFailure? failure)
+    {
+        lock (_failureGate)
+        {
+            if (_failures.Count == 0)
+            {
+                failure = null;
+                return false;
+            }
+
+            failure = _failures.Dequeue();
+            return true;
+        }
+    }
+
+    public void PublishResult(
+        in AlsFrameResult result,
+        ulong poseDigest,
+        long modelFrameId,
+        long poseFrameId)
+    {
+        ModelResultFrameId = modelFrameId;
+        PoseAdvanceFrameId = poseFrameId;
+        PublishedPoseDigest = poseDigest;
+        ResultPublishedCharacterId = checked((int)result.Identity.CharacterId);
+        ResultPublishedGeneration = checked((int)result.Identity.SlotGeneration);
+        ResultPublishedFrameId = result.Identity.FrameId;
+        Exchange.PublishResult(result);
+        Volatile.Write(ref HasPublishedResult, 1);
+    }
 }
+
+internal readonly record struct AlsP3FailureIdentity(
+    string Code,
+    AlsFrameIdentity Identity);
 
 internal sealed record AlsP3WorkerFailure(
     string Code,
