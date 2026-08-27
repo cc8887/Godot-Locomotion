@@ -31,7 +31,10 @@
     "skeletons": { "$ref": "#/$defs/assets" },
     "skeletalMeshes": { "$ref": "#/$defs/assets" },
     "staticMeshes": { "$ref": "#/$defs/assets" },
-    "animations": { "$ref": "#/$defs/assets" },
+    "animations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/animationAsset" }
+    },
     "montages": { "$ref": "#/$defs/assets" },
     "blendSpaces": { "$ref": "#/$defs/assets" },
     "aimOffsets": { "$ref": "#/$defs/assets" },
@@ -67,25 +70,6 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "objectPath", "packagePath", "assetName", "classPath", "outputPath", "dependencies", "metadata"],
-      "allOf": [
-        {
-          "if": { "properties": { "classPath": { "const": "/Script/Engine.AnimSequence" } } },
-          "then": {
-            "properties": {
-              "metadata": {
-                "type": "object",
-                "required": ["curves"],
-                "properties": {
-                  "curves": {
-                    "type": "array",
-                    "items": { "$ref": "#/$defs/floatCurve" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      ],
       "properties": {
         "id": { "$ref": "#/$defs/stableId" },
         "objectPath": { "type": "string", "pattern": "^/Game/.+\\.[^./]+$" },
@@ -102,16 +86,37 @@
         "metadata": { "type": "object" }
       }
     },
+    "animationAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/asset" },
+        {
+          "properties": {
+            "classPath": { "const": "/Script/Engine.AnimSequence" },
+            "metadata": { "$ref": "#/$defs/animationMetadata" }
+          }
+        }
+      ]
+    },
+    "animationMetadata": {
+      "type": "object",
+      "required": ["curves"],
+      "properties": {
+        "curves": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/floatCurve" }
+        }
+      }
+    },
     "floatCurveKey": {
       "type": "object",
       "additionalProperties": false,
       "required": ["timeSeconds", "value", "interpolation", "arriveTangent", "leaveTangent"],
       "properties": {
-        "timeSeconds": { "type": "number" },
-        "value": { "type": "number" },
+        "timeSeconds": { "type": "number", "minimum": 0, "maximum": 1.7976931348623157e308 },
+        "value": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
         "interpolation": { "enum": ["Constant", "Linear", "Cubic"] },
-        "arriveTangent": { "type": "number" },
-        "leaveTangent": { "type": "number" }
+        "arriveTangent": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
+        "leaveTangent": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 }
       }
     },
     "floatCurve": {
