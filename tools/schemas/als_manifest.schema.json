@@ -112,7 +112,7 @@
       "additionalProperties": false,
       "required": ["timeSeconds", "value", "interpolation", "arriveTangent", "leaveTangent"],
       "properties": {
-        "timeSeconds": { "type": "number", "minimum": 0, "maximum": 1.7976931348623157e308 },
+        "timeSeconds": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
         "value": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
         "interpolation": { "enum": ["Constant", "Linear", "Cubic"] },
         "arriveTangent": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },

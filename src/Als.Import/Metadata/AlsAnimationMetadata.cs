@@ -94,7 +94,11 @@ public sealed record AlsAnimationMetadata(
                 {
                     throw new JsonException($"Animation float curve key at index {curveIndex}:{keyIndex} violates the export contract.");
                 }
-                if (previousTime is not null && key.TimeSeconds <= previousTime.Value)
+                if (previousTime is not null && key.TimeSeconds == previousTime.Value)
+                {
+                    throw new JsonException($"Animation float curve keys contain a duplicate time at index {curveIndex}:{keyIndex}.");
+                }
+                if (previousTime is not null && key.TimeSeconds < previousTime.Value)
                 {
                     throw new JsonException($"Animation float curve keys must be strictly increasing at index {curveIndex}:{keyIndex}.");
                 }
