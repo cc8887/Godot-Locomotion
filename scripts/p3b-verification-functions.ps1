@@ -197,3 +197,35 @@ function Assert-P3bResultPair
         throw "P3B pose mismatch for characters=${CharacterCount}: single=$($Single.Pose), parallel=$($Parallel.Pose)."
     }
 }
+
+function Assert-P3bChildGateOutput
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$PhaseName,
+        [Parameter(Mandatory)]
+        [object[]]$OutputLines,
+        [Parameter(Mandatory)]
+        [int]$ExitCode,
+        [Parameter(Mandatory)]
+        [string]$ExpectedMarker
+    )
+
+    $lines = @($OutputLines | ForEach-Object { "$_" })
+    if ($ExitCode -ne 0)
+    {
+        throw "$PhaseName gate exited with code $ExitCode."
+    }
+
+    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR|ERROR:' })
+    if ($errorLines.Count -ne 0)
+    {
+        throw "$PhaseName gate emitted an error line:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
+    }
+
+    $markerLines = @($lines | Where-Object { $_ -ceq $ExpectedMarker })
+    if ($markerLines.Count -ne 1)
+    {
+        throw "$PhaseName gate expected exactly one '$ExpectedMarker' marker; observed $($markerLines.Count)."
+    }
+}
