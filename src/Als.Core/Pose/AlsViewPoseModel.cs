@@ -20,7 +20,10 @@ public static class AlsViewPoseModel
     private const float AffineTolerance = 1e-5f;
     private const float BasisLengthTolerance = 1e-3f;
     private const float BasisOrthogonalityTolerance = 1e-4f;
-    private const float CharacterYawTolerance = 1e-4f;
+    private const float ForwardComponentTolerance = 1e-4f;
+    private const double ForwardDotTolerance = 1e-5d;
+    // One ULP from vertical, float quaternion XZ bearings can drift by about 0.38 rad.
+    private const double HorizontalDirectionDotTolerance = 0.9d;
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static bool TryEvaluate(
@@ -47,6 +50,10 @@ public static class AlsViewPoseModel
         }
 
         if (!IsFinite(input.CharacterYaw) ||
+            !IsFinite(input.Command.ViewYaw) ||
+            !IsFinite(input.Command.ViewPitch) ||
+            !IsFinite(input.Command.AimYaw) ||
+            !IsFinite(input.Command.AimPitch) ||
             input.Floor.IsGrounded > 1 ||
             (uint)input.RotationMode > (uint)AlsRotationMode.Aiming ||
             currentState.Initialized > 1 ||
@@ -56,13 +63,11 @@ public static class AlsViewPoseModel
             return false;
         }
 
-        if (!TryExtractTransformYawPitch(
+        var characterYaw = NormalizeAngle(input.CharacterYaw);
+        if (!TryExtractCharacterPitch(
                 input.CharacterTransform,
-                out var characterTransformYaw,
-                out var characterPitch) ||
-            MathF.Abs(NormalizeAngle(
-                (double)NormalizeAngle(input.CharacterYaw) - characterTransformYaw)) >
-                CharacterYawTolerance)
+                characterYaw,
+                out var characterPitch))
         {
             reason = AlsP4ReasonCode.NonFiniteInput;
             return false;
@@ -71,20 +76,29 @@ public static class AlsViewPoseModel
         var onRotatingPlatform = input.Floor.IsGrounded == 1 && input.Floor.PlatformId >= 0;
         if (onRotatingPlatform &&
             (!IsFinite(input.Floor.PlatformAngularVelocity) ||
-             !TryExtractTransformYawPitch(input.Floor.PlatformTransform, out _, out _)))
+             !ValidateRigidTransform(input.Floor.PlatformTransform, out _)))
         {
             reason = AlsP4ReasonCode.NonFiniteInput;
             return false;
         }
 
-        if (!TryExtractYawPitch(input.ViewRotation, out var viewYaw, out var viewPitch) ||
-            !TryExtractYawPitch(input.AimRotation, out var aimYaw, out var aimPitch))
+        var viewYaw = NormalizeAngle(input.Command.ViewYaw);
+        var viewPitch = System.Math.Clamp(
+            NormalizeAngle(input.Command.ViewPitch),
+            -MathF.PI / 2f,
+            MathF.PI / 2f);
+        var aimYaw = NormalizeAngle(input.Command.AimYaw);
+        var aimPitch = System.Math.Clamp(
+            NormalizeAngle(input.Command.AimPitch),
+            -MathF.PI / 2f,
+            MathF.PI / 2f);
+        if (!IsRotationDirectionConsistent(input.ViewRotation, viewYaw, viewPitch) ||
+            !IsRotationDirectionConsistent(input.AimRotation, aimYaw, aimPitch))
         {
             reason = AlsP4ReasonCode.InvalidRotation;
             return false;
         }
 
-        var characterYaw = NormalizeAngle(input.CharacterYaw);
         var relativeViewYaw = NormalizeAngle((double)viewYaw - characterYaw);
         var relativeViewPitch = System.Math.Clamp(
             NormalizeAngle((double)viewPitch - characterPitch),
@@ -224,13 +238,41 @@ public static class AlsViewPoseModel
     private static float Lerp(float current, float target, float alpha) =>
         (float)((double)current + (((double)target - current) * alpha));
 
-    private static bool TryExtractYawPitch(
+    private static bool IsRotationDirectionConsistent(
         in Quaternion rotation,
-        out float yaw,
-        out float pitch)
+        float canonicalYaw,
+        float canonicalPitch)
     {
-        yaw = 0f;
-        pitch = 0f;
+        if (!TryGetNormalizedForward(rotation, out var actualForward))
+        {
+            return false;
+        }
+
+        var expectedRotation = Quaternion.CreateFromYawPitchRoll(
+            canonicalYaw,
+            canonicalPitch,
+            0f);
+        var expectedForward = Vector3.Transform(-Vector3.UnitZ, expectedRotation);
+        if (!TryNormalizeDirection(actualForward, out var normalizedActualForward) ||
+            !TryNormalizeDirection(expectedForward, out var normalizedExpectedForward) ||
+            !DirectionsAgree(normalizedActualForward, normalizedExpectedForward))
+        {
+            return false;
+        }
+
+        if (canonicalPitch == MathF.PI / 2f || canonicalPitch == -MathF.PI / 2f)
+        {
+            return true;
+        }
+
+        return HorizontalDirectionMatchesYaw(normalizedActualForward, canonicalYaw);
+    }
+
+    private static bool TryGetNormalizedForward(
+        in Quaternion rotation,
+        out Vector3 forward)
+    {
+        forward = default;
         if (!IsFinite(rotation))
         {
             return false;
@@ -255,13 +297,12 @@ public static class AlsViewPoseModel
         w *= inverseLength;
 
         // Transform local forward (-Z) directly. Roll is rotation around this direction,
-        // so it cannot leak into the extracted yaw or pitch.
+        // so it cannot leak into the validated view direction.
         var forwardX = -2d * ((x * z) + (w * y));
         var forwardY = 2d * ((w * x) - (y * z));
         var forwardZ = -1d + (2d * ((x * x) + (y * y)));
-        yaw = NormalizeAngle(System.Math.Atan2(-forwardX, -forwardZ));
-        pitch = (float)System.Math.Asin(System.Math.Clamp(forwardY, -1d, 1d));
-        return float.IsFinite(yaw) && float.IsFinite(pitch);
+        forward = new Vector3((float)forwardX, (float)forwardY, (float)forwardZ);
+        return IsFinite(forward);
     }
 
     private static float NormalizeAngle(double angle)
@@ -302,13 +343,58 @@ public static class AlsViewPoseModel
         IsFinite(value.M31) && IsFinite(value.M32) && IsFinite(value.M33) && IsFinite(value.M34) &&
         IsFinite(value.M41) && IsFinite(value.M42) && IsFinite(value.M43) && IsFinite(value.M44);
 
-    private static bool TryExtractTransformYawPitch(
+    private static bool TryExtractCharacterPitch(
         in Matrix4x4 value,
-        out float yaw,
+        float canonicalYaw,
         out float pitch)
     {
-        yaw = 0f;
         pitch = 0f;
+        if (!ValidateRigidTransform(value, out var basisZ))
+        {
+            return false;
+        }
+
+        var forward = -basisZ;
+        var horizontalLengthSquared =
+            ((double)forward.X * forward.X) +
+            ((double)forward.Z * forward.Z);
+        pitch = horizontalLengthSquared <=
+                (double)ForwardComponentTolerance * ForwardComponentTolerance
+            ? MathF.CopySign(MathF.PI / 2f, forward.Y)
+            : (float)System.Math.Asin(System.Math.Clamp((double)forward.Y, -1d, 1d));
+
+        var sinYaw = MathF.Sin(canonicalYaw);
+        var cosYaw = MathF.Cos(canonicalYaw);
+        var sinPitch = MathF.Sin(pitch);
+        var cosPitch = MathF.Cos(pitch);
+        var expectedForward = new Vector3(
+            -sinYaw * cosPitch,
+            sinPitch,
+            -cosYaw * cosPitch);
+        if (!TryNormalizeDirection(expectedForward, out var normalizedExpectedForward) ||
+            !DirectionsAgree(forward, normalizedExpectedForward))
+        {
+            return false;
+        }
+
+        if (horizontalLengthSquared <=
+            (double)ForwardComponentTolerance * ForwardComponentTolerance)
+        {
+            return true;
+        }
+
+        var inverseHorizontalLength = 1d / System.Math.Sqrt(horizontalLengthSquared);
+        var horizontalDot =
+            ((double)forward.X * inverseHorizontalLength * -sinYaw) +
+            ((double)forward.Z * inverseHorizontalLength * -cosYaw);
+        return horizontalDot >= HorizontalDirectionDotTolerance;
+    }
+
+    private static bool ValidateRigidTransform(
+        in Matrix4x4 value,
+        out Vector3 basisZ)
+    {
+        basisZ = default;
         if (!IsFinite(value) ||
             MathF.Abs(value.M14) > AffineTolerance ||
             MathF.Abs(value.M24) > AffineTolerance ||
@@ -322,7 +408,7 @@ public static class AlsViewPoseModel
                 out var basisY) ||
             !TryNormalizeBasis(
                 new Vector3(value.M31, value.M32, value.M33),
-                out var basisZ))
+                out basisZ))
         {
             return false;
         }
@@ -336,9 +422,50 @@ public static class AlsViewPoseModel
             return false;
         }
 
-        yaw = NormalizeAngle(System.Math.Atan2(basisZ.X, basisZ.Z));
-        pitch = (float)System.Math.Asin(System.Math.Clamp(-(double)basisZ.Y, -1d, 1d));
-        return IsFinite(yaw) && IsFinite(pitch);
+        return true;
+    }
+
+    private static bool TryNormalizeDirection(in Vector3 value, out Vector3 normalized)
+    {
+        normalized = default;
+        var length = System.Math.Sqrt(
+            ((double)value.X * value.X) +
+            ((double)value.Y * value.Y) +
+            ((double)value.Z * value.Z));
+        if (!double.IsFinite(length) || length <= 1e-12d)
+        {
+            return false;
+        }
+
+        normalized = new Vector3(
+            (float)(value.X / length),
+            (float)(value.Y / length),
+            (float)(value.Z / length));
+        return true;
+    }
+
+    private static bool DirectionsAgree(in Vector3 actual, in Vector3 expected) =>
+        MathF.Abs(actual.X - expected.X) <= ForwardComponentTolerance &&
+        MathF.Abs(actual.Y - expected.Y) <= ForwardComponentTolerance &&
+        MathF.Abs(actual.Z - expected.Z) <= ForwardComponentTolerance &&
+        Vector3.Dot(actual, expected) >= 1d - ForwardDotTolerance;
+
+    private static bool HorizontalDirectionMatchesYaw(
+        in Vector3 actual,
+        float canonicalYaw)
+    {
+        var actualLengthSquared =
+            ((double)actual.X * actual.X) + ((double)actual.Z * actual.Z);
+        if (actualLengthSquared == 0d)
+        {
+            return false;
+        }
+
+        var inverseLength = 1d / System.Math.Sqrt(actualLengthSquared);
+        var dot =
+            ((double)actual.X * inverseLength * -MathF.Sin(canonicalYaw)) +
+            ((double)actual.Z * inverseLength * -MathF.Cos(canonicalYaw));
+        return dot >= HorizontalDirectionDotTolerance;
     }
 
     private static bool TryNormalizeBasis(in Vector3 value, out Vector3 normalized)

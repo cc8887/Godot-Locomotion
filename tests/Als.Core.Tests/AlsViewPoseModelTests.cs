@@ -319,7 +319,11 @@ public sealed class AlsViewPoseModelTests
             rotation.Y * 7f,
             rotation.Z * 7f,
             rotation.W * 7f);
-        var input = Input() with
+        var input = Input(
+            viewYaw: 0.6f,
+            viewPitch: 0.35f,
+            aimYaw: 0.6f,
+            aimPitch: 0.35f) with
         {
             ViewRotation = scaled,
             AimRotation = scaled,
@@ -367,6 +371,30 @@ public sealed class AlsViewPoseModelTests
             AlsViewPoseSettings.CreateDefault(),
             SentinelState(),
             AlsP4ReasonCode.NonFiniteInput);
+    }
+
+    [Fact]
+    public void ExactVerticalCharacterTransformUsesCanonicalYawAndPhysicalPitch()
+    {
+        const float pitch = MathF.PI / 2f;
+        var input = Input(
+            characterYaw: 1f,
+            characterPitch: pitch,
+            viewYaw: 1.25f,
+            viewPitch: pitch,
+            aimYaw: 0.75f,
+            aimPitch: pitch,
+            rotationMode: AlsRotationMode.Aiming) with
+        {
+            CharacterTransform = Matrix4x4.CreateFromQuaternion(
+                Quaternion.CreateFromYawPitchRoll(-2f, pitch, 0f)),
+        };
+
+        Assert.True(Evaluate(input, InitializedState(), out var next, out var output, out _));
+        Assert.Equal(0.25f, next.ViewPose.RelativeYaw, Tolerance);
+        Assert.Equal(0f, next.ViewPose.RelativePitch, Tolerance);
+        Assert.Equal(-0.25f, output.AimRelativeYaw, Tolerance);
+        Assert.Equal(0f, output.AimRelativePitch, Tolerance);
     }
 
     [Fact]
@@ -468,12 +496,10 @@ public sealed class AlsViewPoseModelTests
     public void ViewAndAimPitchAreClampedAfterNormalization()
     {
         var settings = AlsViewPoseSettings.CreateDefault() with { PitchClamp = 0.3f };
-        var input = Input() with
-        {
-            ViewRotation = Quaternion.CreateFromYawPitchRoll(0f, 0.6f, 0f),
-            AimRotation = Quaternion.CreateFromYawPitchRoll(0f, -0.6f, 0f),
-            RotationMode = AlsRotationMode.Aiming,
-        };
+        var input = Input(
+            viewPitch: 0.6f,
+            aimPitch: -0.6f,
+            rotationMode: AlsRotationMode.Aiming);
 
         Assert.True(AlsViewPoseModel.TryEvaluate(
             settings,
@@ -537,6 +563,168 @@ public sealed class AlsViewPoseModelTests
         Assert.True(Evaluate(input, InitializedState(), out _, out var output, out _));
 
         Assert.Equal(pitch, output.AimRelativePitch, Tolerance);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CanonicalYawRemainsContinuousAtAndNextToVertical(
+        bool down,
+        bool nearVertical)
+    {
+        var verticalPitch = down ? -MathF.PI / 2f : MathF.PI / 2f;
+        var pitch = nearVertical
+            ? (down
+                ? MathF.BitIncrement(verticalPitch)
+                : MathF.BitDecrement(verticalPitch))
+            : verticalPitch;
+        const float viewYaw = 1f;
+        const float aimYaw = -0.75f;
+        const float deltaTime = 0.25f;
+        var state = InitializedState(lastWorldYaw: 0.75f, relativeYaw: 0.75f);
+
+        Assert.True(Evaluate(
+            Input(
+                viewYaw: viewYaw,
+                viewPitch: pitch,
+                aimYaw: aimYaw,
+                aimPitch: pitch,
+                deltaTime: deltaTime,
+                rotationMode: AlsRotationMode.Aiming),
+            state,
+            out var next,
+            out var output,
+            out var reason));
+
+        Assert.Equal(AlsP4ReasonCode.None, reason);
+        Assert.Equal(viewYaw, next.ViewPose.RelativeYaw, Tolerance);
+        Assert.Equal(viewYaw, next.ViewPose.LastWorldYaw, Tolerance);
+        Assert.Equal(1f, next.ViewPose.YawSpeed, Tolerance);
+        Assert.Equal(pitch, next.ViewPose.RelativePitch, Tolerance);
+        Assert.Equal(aimYaw, output.AimRelativeYaw, Tolerance);
+        Assert.Equal(pitch, output.AimRelativePitch, Tolerance);
+    }
+
+    [Fact]
+    public void ExactVerticalQuaternionAllowsASeparateCanonicalYaw()
+    {
+        const float pitch = MathF.PI / 2f;
+        var input = Input(
+            viewYaw: 1f,
+            viewPitch: pitch,
+            aimYaw: -0.5f,
+            aimPitch: pitch,
+            rotationMode: AlsRotationMode.Aiming) with
+        {
+            ViewRotation = Quaternion.CreateFromYawPitchRoll(-2f, pitch, 0f),
+            AimRotation = Quaternion.CreateFromYawPitchRoll(2.5f, pitch, 0f),
+        };
+
+        Assert.True(Evaluate(
+            input,
+            InitializedState(),
+            out var next,
+            out var output,
+            out var reason));
+
+        Assert.Equal(AlsP4ReasonCode.None, reason);
+        Assert.Equal(1f, next.ViewPose.RelativeYaw, Tolerance);
+        Assert.Equal(-0.5f, output.AimRelativeYaw, Tolerance);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NearVerticalQuaternionMustMatchCanonicalYaw(bool aim)
+    {
+        var pitch = MathF.BitDecrement(MathF.PI / 2f);
+        var input = Input(
+            viewYaw: 1f,
+            viewPitch: pitch,
+            aimYaw: 1f,
+            aimPitch: pitch,
+            rotationMode: AlsRotationMode.Aiming);
+        var mismatched = Quaternion.CreateFromYawPitchRoll(0f, pitch, 0f);
+        input = aim
+            ? input with { AimRotation = mismatched }
+            : input with { ViewRotation = mismatched };
+
+        AssertTransactionalFailure(
+            input,
+            AlsViewPoseSettings.CreateDefault(),
+            SentinelState(),
+            AlsP4ReasonCode.InvalidRotation);
+    }
+
+    [Theory]
+    [InlineData(-1f)]
+    [InlineData(1e30f)]
+    [InlineData(-1e30f)]
+    public void QuaternionSignAndExtremeFiniteScalePreserveCanonicalDirection(float scale)
+    {
+        const float yaw = 0.6f;
+        const float pitch = 0.35f;
+        var rotation = Quaternion.CreateFromYawPitchRoll(yaw, pitch, 1.1f);
+        var scaled = new Quaternion(
+            rotation.X * scale,
+            rotation.Y * scale,
+            rotation.Z * scale,
+            rotation.W * scale);
+        var input = Input(
+            viewYaw: yaw,
+            viewPitch: pitch,
+            aimYaw: yaw,
+            aimPitch: pitch,
+            rotationMode: AlsRotationMode.Aiming) with
+        {
+            ViewRotation = scaled,
+            AimRotation = scaled,
+        };
+
+        Assert.True(Evaluate(input, InitializedState(), out var next, out var output, out _));
+        Assert.Equal(yaw, next.ViewPose.RelativeYaw, Tolerance);
+        Assert.Equal(pitch, next.ViewPose.RelativePitch, Tolerance);
+        Assert.Equal(yaw, output.AimRelativeYaw, Tolerance);
+        Assert.Equal(pitch, output.AimRelativePitch, Tolerance);
+    }
+
+    [Fact]
+    public void NonFiniteCanonicalAnglesAreTransactional()
+    {
+        var valid = Input();
+        var cases = new[]
+        {
+            valid with { Command = valid.Command with { ViewYaw = float.NaN } },
+            valid with { Command = valid.Command with { ViewPitch = float.PositiveInfinity } },
+            valid with { Command = valid.Command with { AimYaw = float.NegativeInfinity } },
+            valid with { Command = valid.Command with { AimPitch = float.NaN } },
+        };
+
+        foreach (var input in cases)
+        {
+            AssertTransactionalFailure(
+                input,
+                AlsViewPoseSettings.CreateDefault(),
+                SentinelState(),
+                AlsP4ReasonCode.NonFiniteInput);
+        }
+    }
+
+    [Fact]
+    public void NonVerticalQuaternionMismatchIsTransactional()
+    {
+        var input = Input(viewYaw: 0.8f, viewPitch: 0.3f) with
+        {
+            ViewRotation = Quaternion.CreateFromYawPitchRoll(-0.4f, 0.3f, 0f),
+        };
+
+        AssertTransactionalFailure(
+            input,
+            AlsViewPoseSettings.CreateDefault(),
+            SentinelState(),
+            AlsP4ReasonCode.InvalidRotation);
     }
 
     [Fact]
@@ -1073,6 +1261,13 @@ public sealed class AlsViewPoseModelTests
             CharacterYaw = characterYaw,
             ViewRotation = Quaternion.CreateFromYawPitchRoll(viewYaw, viewPitch, 0f),
             AimRotation = Quaternion.CreateFromYawPitchRoll(aimYaw, aimPitch, 0f),
+            Command = input.Command with
+            {
+                ViewYaw = viewYaw,
+                ViewPitch = viewPitch,
+                AimYaw = aimYaw,
+                AimPitch = aimPitch,
+            },
             Floor = input.Floor with { IsGrounded = 1 },
             RotationMode = rotationMode,
         };
