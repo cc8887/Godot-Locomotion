@@ -69,6 +69,22 @@ function Publish-AlsExportLock {
     finally { if ([IO.File]::Exists($temporaryPath)) { [IO.File]::Delete($temporaryPath) } }
 }
 
+function Invoke-AlsP2aCompareAndPublish {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$GateToken,
+        [Parameter(Mandatory)][scriptblock]$CompareAction,
+        [Parameter(Mandatory)][scriptblock]$PublishAction,
+        [switch]$UpdateAssetLock
+    )
+
+    if ($GateToken -cne 'P2A_EXPORT_GATES_COMPLETE') {
+        throw "P2A compare/publish orchestration requires the completed export gate token."
+    }
+    & $CompareAction
+    if ($UpdateAssetLock) { & $PublishAction }
+}
+
 function Assert-AlsExportLock {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$ManifestPath, [Parameter(Mandatory)][string]$AssetRoot, [Parameter(Mandatory)][string]$LockPath)
@@ -80,13 +96,35 @@ function Assert-AlsExportLock {
     if ([int]$manifest.auditSummary.assetCount -ne $lock.AssetCount -or @($manifest.files).Count -ne $lock.FileCount -or
         @($manifest.animations).Count -ne $lock.AnimationCount -or [string]$manifest.exporterVersion -cne $lock.ExporterVersion -or
         [string]$manifest.sourceProjectId -cne $lock.SourceProjectId) { throw 'Formal ALS manifest counts or producer identity differ from tracked lock.' }
-    foreach ($file in @($manifest.files)) {
-        $path = Join-Path $AssetRoot ([string]$file.relativePath)
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Locked ALS export file is missing: $($file.relativePath)" }
+    $assetRootFullPath = [IO.Path]::GetFullPath($AssetRoot)
+    if (-not (Test-Path -LiteralPath $assetRootFullPath -PathType Container)) { throw "ALS asset root does not exist: $assetRootFullPath" }
+    $canonicalRoot = $assetRootFullPath.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    $canonicalRelativePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $files = @($manifest.files)
+    for ($index = 0; $index -lt $files.Count; $index++) {
+        $file = $files[$index]
+        $relativePath = [string]$file.relativePath
+        $fieldPath = "files[$index].relativePath"
+        if ([string]::IsNullOrWhiteSpace($relativePath)) { throw "$fieldPath must be a non-empty relative file path." }
+        if ([IO.Path]::IsPathRooted($relativePath)) { throw "$fieldPath must be relative, not rooted or absolute: $relativePath" }
+        $segments = @($relativePath -split '[\\/]')
+        if ($segments | Where-Object { $_ -ceq '.' -or $_ -ceq '..' }) {
+            throw "$fieldPath contains a forbidden '.' or '..' path segment: $relativePath"
+        }
+        try { $path = [IO.Path]::GetFullPath([IO.Path]::Combine($assetRootFullPath, $relativePath)) }
+        catch { throw "$fieldPath is not a valid relative path '$relativePath': $($_.Exception.Message)" }
+        if (-not $path.StartsWith($canonicalRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "$fieldPath escapes outside the ALS asset root: $relativePath"
+        }
+        $canonicalRelativePath = ([IO.Path]::GetRelativePath($assetRootFullPath, $path)).Replace([IO.Path]::DirectorySeparatorChar, '/')
+        if (-not $canonicalRelativePaths.Add($canonicalRelativePath)) {
+            throw "$fieldPath duplicates a normalized manifest file path: $relativePath"
+        }
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "$fieldPath target must resolve to a file: $relativePath" }
         $info = Get-Item -LiteralPath $path
-        if ($info.Length -ne [long]$file.size) { throw "Locked ALS export file size mismatch: $($file.relativePath)" }
+        if ($info.Length -ne [long]$file.size) { throw "Locked ALS export file size mismatch at ${fieldPath}: $relativePath" }
         $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($hash -cne [string]$file.sha256) { throw "Locked ALS export file SHA-256 mismatch: $($file.relativePath)" }
+        if ($hash -cne [string]$file.sha256) { throw "Locked ALS export file SHA-256 mismatch at ${fieldPath}: $relativePath" }
     }
     return $lock
 }

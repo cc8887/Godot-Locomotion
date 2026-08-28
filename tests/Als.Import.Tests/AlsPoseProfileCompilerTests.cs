@@ -15,6 +15,10 @@ public sealed class AlsPoseProfileCompilerTests
         Assert.Equal(1, profile.SchemaVersion);
         Assert.Equal(set.AssetIndex.GetSkeletonId("b5b52715012cad50bf7a625ddf01e4335bb4fcf0"), profile.SkeletonId);
         Assert.Equal(set.AssetIndex.GetAimOffsetId("b4bf2befd979de45f53f300dc0e60c702fc3a686"), profile.Aim.AimOffsetId);
+        Assert.Collection(set.AimOffsets[profile.Aim.AimOffsetId].Parameters,
+            parameter => Assert.Equal(new AlsBlendParameterDefinition("Pitch", -90f, 90f, 4), parameter),
+            parameter => Assert.Equal(new AlsBlendParameterDefinition("None", 0f, 100f, 4), parameter),
+            parameter => Assert.Equal(new AlsBlendParameterDefinition("None", 0f, 100f, 4), parameter));
         Assert.Equal(8, profile.Turns.Length);
         Assert.Equal(4, profile.Rotates.Length);
         Assert.All(profile.Turns, turn =>
@@ -157,7 +161,7 @@ public sealed class AlsPoseProfileCompilerTests
         var exception = Assert.Throws<AlsCompilationException>(() =>
             AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
 
-        AssertSlotFailure(exception, "$.aim.down", AimDownPath, up);
+        AssertObjectPathFailure(exception, "$.aim.down", AimDownPath, AimUpPath, up);
     }
 
     [Fact]
@@ -185,7 +189,7 @@ public sealed class AlsPoseProfileCompilerTests
         var exception = Assert.Throws<AlsCompilationException>(() =>
             AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
 
-        AssertSlotFailure(exception, "$.aim.aimOffset", AimOffsetPath, aims[aimId].StableId);
+        AssertObjectPathFailure(exception, "$.aim.aimOffset", AimOffsetPath, "/Game/Wrong/Aim.Aim", aims[aimId].StableId);
     }
 
     [Theory]
@@ -201,10 +205,12 @@ public sealed class AlsPoseProfileCompilerTests
         var wrongId = root["rotates"]![wrongRotateIndex]!["animation"]!.GetValue<string>();
         root["aim"]![role] = wrongId;
 
+        var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
 
-        AssertSlotFailure(exception, $"$.aim.{role}", expectedPath, wrongId);
+        var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
+        AssertObjectPathFailure(exception, $"$.aim.{role}", expectedPath, actualPath, wrongId);
     }
 
     [Theory]
@@ -235,6 +241,76 @@ public sealed class AlsPoseProfileCompilerTests
         Assert.Contains(exception.Issues, issue => issue.Message.Contains("sample", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void AimOffsetRejectsAFourthSampleAtItsExactSampleValuePath()
+    {
+        var set = P3RepositoryFixtures.LoadAnimationSet();
+        var aimId = set.AssetIndex.GetAimOffsetId("b4bf2befd979de45f53f300dc0e60c702fc3a686");
+        var aims = set.AimOffsets.ToArray();
+        var extra = aims[aimId].Samples[0] with { SampleValue = [45f, 0f, 0f] };
+        aims[aimId] = aims[aimId] with { Samples = [.. aims[aimId].Samples, extra] };
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+
+        Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.aim.aimOffset.samples[3].sampleValue");
+    }
+
+    [Theory]
+    [InlineData(0, 7f)]
+    [InlineData(1, float.NaN)]
+    [InlineData(2, float.PositiveInfinity)]
+    public void AimOffsetRejectsNonUnitOrNonFiniteRateScaleAtTheSampleIndex(int sampleIndex, float rateScale)
+    {
+        var set = P3RepositoryFixtures.LoadAnimationSet();
+        var aimId = set.AssetIndex.GetAimOffsetId("b4bf2befd979de45f53f300dc0e60c702fc3a686");
+        var aims = set.AimOffsets.ToArray();
+        var samples = aims[aimId].Samples.ToArray();
+        samples[sampleIndex] = samples[sampleIndex] with { RateScale = rateScale };
+        aims[aimId] = aims[aimId] with { Samples = samples };
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+
+        Assert.Contains(exception.Issues, issue => issue.FieldPath == $"$.aim.aimOffset.samples[{sampleIndex}].rateScale");
+    }
+
+    [Theory]
+    [InlineData(0, "name")]
+    [InlineData(0, "minimum")]
+    [InlineData(0, "maximum")]
+    [InlineData(0, "gridDivisions")]
+    [InlineData(1, "name")]
+    [InlineData(1, "minimum")]
+    [InlineData(1, "maximum")]
+    [InlineData(1, "gridDivisions")]
+    [InlineData(2, "name")]
+    [InlineData(2, "minimum")]
+    [InlineData(2, "maximum")]
+    [InlineData(2, "gridDivisions")]
+    public void AimOffsetRejectsParameterAxisDriftAtTheExactField(int parameterIndex, string field)
+    {
+        var set = P3RepositoryFixtures.LoadAnimationSet();
+        var aimId = set.AssetIndex.GetAimOffsetId("b4bf2befd979de45f53f300dc0e60c702fc3a686");
+        var aims = set.AimOffsets.ToArray();
+        var parameters = aims[aimId].Parameters.ToArray();
+        var parameter = parameters[parameterIndex];
+        parameters[parameterIndex] = field switch
+        {
+            "name" => parameter with { Name = "Wrong" },
+            "minimum" => parameter with { Minimum = parameter.Minimum + 1f },
+            "maximum" => parameter with { Maximum = parameter.Maximum - 1f },
+            "gridDivisions" => parameter with { GridDivisions = parameter.GridDivisions + 1 },
+            _ => throw new ArgumentOutOfRangeException(nameof(field)),
+        };
+        aims[aimId] = aims[aimId] with { Parameters = parameters };
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+
+        Assert.Contains(exception.Issues, issue => issue.FieldPath == $"$.aim.aimOffset.parameters[{parameterIndex}].{field}");
+    }
+
     [Theory]
     [InlineData(0, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.ALS_N_TurnIP_L90")]
     [InlineData(1, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.ALS_N_TurnIP_R90")]
@@ -251,10 +327,12 @@ public sealed class AlsPoseProfileCompilerTests
         var wrongId = root["rotates"]![index % 4]!["animation"]!.GetValue<string>();
         turns[index]!["animation"] = wrongId;
 
+        var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
 
-        AssertSlotFailure(exception, $"$.turns[{index}].animation", expectedPath, wrongId);
+        var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
+        AssertObjectPathFailure(exception, $"$.turns[{index}].animation", expectedPath, actualPath, wrongId);
     }
 
     [Fact]
@@ -267,7 +345,8 @@ public sealed class AlsPoseProfileCompilerTests
         var exception = Assert.Throws<AlsCompilationException>(() =>
             AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
 
-        AssertSlotFailure(exception, "$.turns[0].animation", TurnStandingLeft90Path, actualId);
+        AssertObjectPathFailure(exception, "$.turns[0].animation", TurnStandingLeft90Path,
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.ALS_N_TurnIP_R90", actualId);
     }
 
     [Fact]
@@ -295,10 +374,12 @@ public sealed class AlsPoseProfileCompilerTests
         var wrongId = root["turns"]![index]!["animation"]!.GetValue<string>();
         root["rotates"]![index]!["animation"] = wrongId;
 
+        var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
 
-        AssertSlotFailure(exception, $"$.rotates[{index}].animation", expectedPath, wrongId);
+        var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
+        AssertObjectPathFailure(exception, $"$.rotates[{index}].animation", expectedPath, actualPath, wrongId);
     }
 
     [Theory]
@@ -310,12 +391,13 @@ public sealed class AlsPoseProfileCompilerTests
         SwapAnimationIds(root["rotates"]!.AsArray(), 0, secondIndex);
         var wrongId = root["rotates"]![0]!["animation"]!.GetValue<string>();
 
+        var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
-
-        AssertSlotFailure(exception, "$.rotates[0].animation",
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
+        var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
+        AssertObjectPathFailure(exception, "$.rotates[0].animation",
             "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90",
-            wrongId);
+            actualPath, wrongId);
     }
 
     [Fact]
@@ -357,6 +439,16 @@ public sealed class AlsPoseProfileCompilerTests
         string actualStableId) =>
         Assert.Contains(exception.Issues, issue =>
             issue.FieldPath == path && issue.Expected == expectedObjectPath && issue.Actual == actualStableId);
+
+    private static void AssertObjectPathFailure(
+        AlsCompilationException exception,
+        string path,
+        string expectedObjectPath,
+        string actualObjectPath,
+        string assetId) =>
+        Assert.Contains(exception.Issues, issue =>
+            issue.FieldPath == path && issue.Expected == expectedObjectPath &&
+            issue.Actual == actualObjectPath && issue.AssetId == assetId);
 
     private const string AimOffsetPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look.ALS_N_Look";
     private const string AimDownPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep.ALS_N_Look_D_Sweep";
