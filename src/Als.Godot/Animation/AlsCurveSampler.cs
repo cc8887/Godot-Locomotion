@@ -73,8 +73,7 @@ public sealed class AlsCurveSampler
         {
             return false;
         }
-        value = Sample(curve.Keys, timeSeconds);
-        return true;
+        return TryCalculate(curve.Keys, timeSeconds, out value);
     }
 
     public bool TrySample(
@@ -89,7 +88,8 @@ public sealed class AlsCurveSampler
 
         for (var index = 0; index < curveIds.Length; index++)
         {
-            if (!TryFindCurve(curveIds[index], out _))
+            if (!TryFindCurve(curveIds[index], out var curve) ||
+                !TryCalculate(curve.Keys, timeSeconds, out _))
             {
                 return false;
             }
@@ -98,7 +98,7 @@ public sealed class AlsCurveSampler
         for (var index = 0; index < curveIds.Length; index++)
         {
             TryFindCurve(curveIds[index], out var curve);
-            destination[index] = Sample(curve.Keys, timeSeconds);
+            TryCalculate(curve.Keys, timeSeconds, out destination[index]);
         }
         return true;
     }
@@ -129,15 +129,21 @@ public sealed class AlsCurveSampler
         return false;
     }
 
-    private static float Sample(AlsFloatCurveKeyDefinition[] keys, float timeSeconds)
+    private static bool TryCalculate(
+        AlsFloatCurveKeyDefinition[] keys,
+        float timeSeconds,
+        out float value)
     {
+        value = 0f;
         if (timeSeconds <= keys[0].TimeSeconds)
         {
-            return keys[0].Value;
+            value = keys[0].Value;
+            return true;
         }
         if (timeSeconds >= keys[^1].TimeSeconds)
         {
-            return keys[^1].Value;
+            value = keys[^1].Value;
+            return true;
         }
 
         var low = 0;
@@ -159,35 +165,45 @@ public sealed class AlsCurveSampler
         ref readonly var right = ref keys[high];
         if (timeSeconds == left.TimeSeconds)
         {
-            return left.Value;
+            value = left.Value;
+            return true;
         }
         if (timeSeconds == right.TimeSeconds)
         {
-            return right.Value;
+            value = right.Value;
+            return true;
         }
 
-        var duration = right.TimeSeconds - left.TimeSeconds;
-        var alpha = (timeSeconds - left.TimeSeconds) / duration;
-        return left.Interpolation switch
+        var duration = (double)right.TimeSeconds - left.TimeSeconds;
+        var alpha = ((double)timeSeconds - left.TimeSeconds) / duration;
+        var calculated = left.Interpolation switch
         {
             AlsCurveInterpolation.Constant => left.Value,
-            AlsCurveInterpolation.Linear => left.Value + ((right.Value - left.Value) * alpha),
+            AlsCurveInterpolation.Linear =>
+                ((double)left.Value * (1d - alpha)) + ((double)right.Value * alpha),
             AlsCurveInterpolation.Cubic => Hermite(in left, in right, duration, alpha),
             _ => throw new InvalidOperationException("Validated curve contained an unsupported interpolation."),
         };
+        if (!double.IsFinite(calculated) ||
+            calculated < -float.MaxValue || calculated > float.MaxValue)
+        {
+            return false;
+        }
+        value = (float)calculated;
+        return float.IsFinite(value);
     }
 
-    private static float Hermite(
+    private static double Hermite(
         in AlsFloatCurveKeyDefinition left,
         in AlsFloatCurveKeyDefinition right,
-        float duration,
-        float alpha)
+        double duration,
+        double alpha)
     {
         var alpha2 = alpha * alpha;
         var alpha3 = alpha2 * alpha;
-        var h00 = (2f * alpha3) - (3f * alpha2) + 1f;
-        var h10 = alpha3 - (2f * alpha2) + alpha;
-        var h01 = (-2f * alpha3) + (3f * alpha2);
+        var h00 = (2d * alpha3) - (3d * alpha2) + 1d;
+        var h10 = alpha3 - (2d * alpha2) + alpha;
+        var h01 = (-2d * alpha3) + (3d * alpha2);
         var h11 = alpha3 - alpha2;
         return (h00 * left.Value) +
             (h10 * left.LeaveTangent * duration) +

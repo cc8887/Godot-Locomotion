@@ -87,10 +87,31 @@ public static class AlsAnimationLibraryBuilder
     {
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
+        return BuildInternal(animationSet, profile, profile.AllAnimationIds);
+    }
 
+    public static AlsAnimationLibraryBuildResult Build(
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile)
+    {
+        ArgumentNullException.ThrowIfNull(animationSet);
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(poseProfile);
+        return BuildInternal(
+            animationSet,
+            profile,
+            BuildP4AnimationClosure(animationSet, profile, poseProfile));
+    }
+
+    private static AlsAnimationLibraryBuildResult BuildInternal(
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile profile,
+        IReadOnlyList<int> animationIds)
+    {
         using var importedAnimationName = new StringName(ImportedAnimationName);
         var mannequin = GetMannequin(animationSet, profile);
-        var targetScene = LoadScene(mannequin.ResourcePath, mannequin.Name, "target");
+        using var targetScene = LoadScene(mannequin.ResourcePath, mannequin.Name, "target");
         var targetRoot = targetScene.Instantiate();
         AnimationLibrary? library = null;
         StringName? libraryName = null;
@@ -106,11 +127,11 @@ public static class AlsAnimationLibraryBuilder
 
             library = new AnimationLibrary();
             libraryName = new StringName(LibraryName);
-            names = new OwnedStringNameTable(profile.AllAnimationIds.Length);
-            foreach (var animationId in profile.AllAnimationIds)
+            names = new OwnedStringNameTable(animationIds.Count);
+            foreach (var animationId in animationIds)
             {
                 var clip = GetClip(animationSet, animationId, profile.SkeletonId);
-                var sourceScene = LoadScene(clip.ResourcePath, clip.Name, "animation");
+                using var sourceScene = LoadScene(clip.ResourcePath, clip.Name, "animation");
                 using var sourceRoot = new OwnedNode(sourceScene.Instantiate());
                 var sourcePlayer = AlsImportedResourceAuditor.FindFirst<AnimationPlayer>(sourceRoot.Value)
                     ?? throw new InvalidOperationException(
@@ -184,6 +205,73 @@ public static class AlsAnimationLibraryBuilder
         {
             ReleasePartialBuild(targetRoot, library, libraryName, names);
             throw;
+        }
+    }
+
+    private static int[] BuildP4AnimationClosure(
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile)
+    {
+        if ((uint)profile.SkeletonId >= (uint)animationSet.Skeletons.Length ||
+            poseProfile.SkeletonId != profile.SkeletonId ||
+            poseProfile.Turns.Length != 8 ||
+            poseProfile.Rotates.Length != 4)
+        {
+            throw new InvalidOperationException(
+                "P4 animation library profile skeleton or fixed slot count is invalid.");
+        }
+
+        var closure = new HashSet<int>();
+        foreach (var animationId in profile.AllAnimationIds)
+        {
+            ValidateClosureAnimation(animationSet, animationId, profile.SkeletonId, "P3");
+            if (!closure.Add(animationId))
+            {
+                throw new InvalidOperationException(
+                    $"P3 animation library profile contains duplicate animation ID: {animationId}");
+            }
+        }
+
+        var p4Ids = poseProfile.Turns.Select(value => value.AnimationId)
+            .Concat(poseProfile.Rotates.Select(value => value.AnimationId))
+            .Concat([
+                poseProfile.Aim.DownAnimationId,
+                poseProfile.Aim.ForwardAnimationId,
+                poseProfile.Aim.UpAnimationId,
+                poseProfile.Aim.AdditiveBasePoseAnimationId,
+            ])
+            .ToArray();
+        var uniqueP4 = new HashSet<int>();
+        foreach (var animationId in p4Ids)
+        {
+            ValidateClosureAnimation(animationSet, animationId, profile.SkeletonId, "P4");
+            if (!uniqueP4.Add(animationId))
+            {
+                throw new InvalidOperationException(
+                    $"P4 animation library profile contains duplicate semantic animation ID: {animationId}");
+            }
+            closure.Add(animationId);
+        }
+
+        return closure.OrderBy(value => value).ToArray();
+    }
+
+    private static void ValidateClosureAnimation(
+        AlsAnimationSetDefinition animationSet,
+        int animationId,
+        int skeletonId,
+        string label)
+    {
+        if ((uint)animationId >= (uint)animationSet.Animations.Length)
+        {
+            throw new InvalidOperationException(
+                $"{label} animation library profile ID is out of range: {animationId}");
+        }
+        if (animationSet.Animations[animationId].SkeletonId != skeletonId)
+        {
+            throw new InvalidOperationException(
+                $"{label} animation library profile targets another skeleton: {animationId}");
         }
     }
 
