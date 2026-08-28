@@ -26,13 +26,14 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     if (FParse::Param(*Params, TEXT("ReadyCheck")))
     {
+        int32 SelfTestCaseCount = 0;
         FString SelfTestError;
-        if (!FAlsAnimationMetadataReader::RunCurveKeySelfTest(SelfTestError))
+        if (!FAlsAnimationMetadataReader::RunCurveKeySelfTest(SelfTestCaseCount, SelfTestError))
         {
             UE_LOG(LogAlsGodotExporter, Error, TEXT("Curve export self-test failed: %s"), *SelfTestError);
             return 7;
         }
-        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=14"));
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=%d"), SelfTestCaseCount);
         const FEngineVersion EngineVersion = FEngineVersion::Current();
         UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_EXPORTER_READY engine=%d.%d.%d plugin=1.0.0"),
             EngineVersion.GetMajor(), EngineVersion.GetMinor(), EngineVersion.GetPatch());

@@ -27,23 +27,33 @@ public sealed record AlsAnimationMetadata(
     AlsAnimationCurves Curves,
     AlsAnimationNotifyMetadata[] Notifies,
     AlsAnimationSyncMarkerMetadata[] SyncMarkers,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? CanonicalRotationYawSourceConvention = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? CanonicalRotationYawProfileSignProvenance = null)
 {
     public static AlsAnimationMetadata Read(JsonElement element)
     {
         var metadata = element.Deserialize<AlsAnimationMetadata>(AlsManifestSerializer.JsonOptions)
             ?? throw new JsonException("Animation metadata deserialized to null.");
-        ValidateFloatCurves(metadata.Curves);
-        ValidateCanonicalRotationYawProvenance(metadata);
+        var hasCanonicalRotationYaw = ValidateFloatCurves(metadata.Curves, metadata.PlayLength);
+        ValidateCanonicalRotationYawProvenance(element, metadata, hasCanonicalRotationYaw);
         return metadata;
     }
 
-    private static void ValidateCanonicalRotationYawProvenance(AlsAnimationMetadata metadata)
+    private static void ValidateCanonicalRotationYawProvenance(
+        JsonElement element, AlsAnimationMetadata metadata, bool hasCanonicalRotationYaw)
     {
-        if (!metadata.Curves.IsStructured || !metadata.Curves.RequireStructuredPayload().Any(curve =>
-            curve.CanonicalKind is "RotationYawSpeedRadiansPerSecond"))
+        if (!hasCanonicalRotationYaw)
         {
+            if (element.TryGetProperty("canonicalRotationYawSourceConvention", out _))
+            {
+                throw new JsonException("Animation canonicalRotationYawSourceConvention must be absent without a canonical rotation yaw curve.");
+            }
+            if (element.TryGetProperty("canonicalRotationYawProfileSignProvenance", out _))
+            {
+                throw new JsonException("Animation canonicalRotationYawProfileSignProvenance must be absent without a canonical rotation yaw curve.");
+            }
             return;
         }
         if (metadata.CanonicalRotationYawSourceConvention is not "ue_root_bone_rotator_yaw_degrees_z_up")
@@ -56,7 +66,7 @@ public sealed record AlsAnimationMetadata(
         }
     }
 
-    private static void ValidateFloatCurves(AlsAnimationCurves? curves)
+    private static bool ValidateFloatCurves(AlsAnimationCurves? curves, float playLength)
     {
         if (curves is null)
         {
@@ -64,10 +74,11 @@ public sealed record AlsAnimationMetadata(
         }
         if (!curves.IsStructured)
         {
-            return;
+            return false;
         }
 
         var structuredCurves = curves.RequireStructuredPayload();
+        var hasCanonicalRotationYaw = false;
         string? previousSourceName = null;
         for (var curveIndex = 0; curveIndex < structuredCurves.Length; curveIndex++)
         {
@@ -95,6 +106,7 @@ public sealed record AlsAnimationMetadata(
                 throw new JsonException($"Animation float curves[{curveIndex}] has an unsupported canonical kind/source provenance contract.");
             }
             var isCanonicalRotationYaw = curve.CanonicalKind is "RotationYawSpeedRadiansPerSecond";
+            hasCanonicalRotationYaw |= isCanonicalRotationYaw;
             if (string.IsNullOrEmpty(curve.SourceName))
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].sourceName is required.");
@@ -132,6 +144,14 @@ public sealed record AlsAnimationMetadata(
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].keys are required.");
             }
+            if (isCanonicalRotationYaw && (!float.IsFinite(playLength) || playLength <= 0f))
+            {
+                throw new JsonException("Animation playLength must be finite and positive for canonical rotation yaw.");
+            }
+            if (isCanonicalRotationYaw && curve.Keys.Length < 2)
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].keys must contain at least two canonical rotation yaw samples.");
+            }
 
             double? previousTime = null;
             for (var keyIndex = 0; keyIndex < curve.Keys.Length; keyIndex++)
@@ -161,7 +181,16 @@ public sealed record AlsAnimationMetadata(
                 }
                 previousTime = key.TimeSeconds;
             }
+            if (isCanonicalRotationYaw && Math.Abs(curve.Keys[0].TimeSeconds) > 1e-4)
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].keys[0].timeSeconds must be zero for canonical rotation yaw.");
+            }
+            if (isCanonicalRotationYaw && Math.Abs(curve.Keys[^1].TimeSeconds - playLength) > 1e-4)
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].keys[{curve.Keys.Length - 1}].timeSeconds must match playLength for canonical rotation yaw.");
+            }
         }
+        return hasCanonicalRotationYaw;
     }
 
     private static bool IsInfinityMode(string? value) =>

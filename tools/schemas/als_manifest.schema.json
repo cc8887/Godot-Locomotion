@@ -117,6 +117,14 @@
               "canonicalRotationYawSourceConvention": { "const": "ue_root_bone_rotator_yaw_degrees_z_up" },
               "canonicalRotationYawProfileSignProvenance": { "const": "runtime_profile_sign_pending" }
             }
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["canonicalRotationYawSourceConvention"] },
+                { "required": ["canonicalRotationYawProfileSignProvenance"] }
+              ]
+            }
           }
         }
       ],
@@ -159,6 +167,15 @@
               "preInfinity": { "const": "Constant" },
               "postInfinity": { "const": "Constant" },
               "keys": {
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "allOf": [
+                      { "properties": { "timeSeconds": { "const": 0 } } },
+                      { "properties": { "interpolation": { "const": "Linear" } } }
+                    ]
+                  }
+                ],
                 "items": {
                   "properties": { "interpolation": { "const": "Linear" } }
                 }
