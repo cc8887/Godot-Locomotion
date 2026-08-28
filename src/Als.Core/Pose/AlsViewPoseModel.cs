@@ -22,8 +22,6 @@ public static class AlsViewPoseModel
     private const float BasisOrthogonalityTolerance = 1e-4f;
     private const float ForwardComponentTolerance = 1e-4f;
     private const double ForwardDotTolerance = 1e-5d;
-    // One ULP from vertical, float quaternion XZ bearings can drift by about 0.38 rad.
-    private const double HorizontalDirectionDotTolerance = 0.9d;
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static bool TryEvaluate(
@@ -260,12 +258,7 @@ public static class AlsViewPoseModel
             return false;
         }
 
-        if (canonicalPitch == MathF.PI / 2f || canonicalPitch == -MathF.PI / 2f)
-        {
-            return true;
-        }
-
-        return HorizontalDirectionMatchesYaw(normalizedActualForward, canonicalYaw);
+        return true;
     }
 
     private static bool TryGetNormalizedForward(
@@ -377,17 +370,7 @@ public static class AlsViewPoseModel
             return false;
         }
 
-        if (horizontalLengthSquared <=
-            (double)ForwardComponentTolerance * ForwardComponentTolerance)
-        {
-            return true;
-        }
-
-        var inverseHorizontalLength = 1d / System.Math.Sqrt(horizontalLengthSquared);
-        var horizontalDot =
-            ((double)forward.X * inverseHorizontalLength * -sinYaw) +
-            ((double)forward.Z * inverseHorizontalLength * -cosYaw);
-        return horizontalDot >= HorizontalDirectionDotTolerance;
+        return true;
     }
 
     private static bool ValidateRigidTransform(
@@ -449,24 +432,6 @@ public static class AlsViewPoseModel
         MathF.Abs(actual.Y - expected.Y) <= ForwardComponentTolerance &&
         MathF.Abs(actual.Z - expected.Z) <= ForwardComponentTolerance &&
         Vector3.Dot(actual, expected) >= 1d - ForwardDotTolerance;
-
-    private static bool HorizontalDirectionMatchesYaw(
-        in Vector3 actual,
-        float canonicalYaw)
-    {
-        var actualLengthSquared =
-            ((double)actual.X * actual.X) + ((double)actual.Z * actual.Z);
-        if (actualLengthSquared == 0d)
-        {
-            return false;
-        }
-
-        var inverseLength = 1d / System.Math.Sqrt(actualLengthSquared);
-        var dot =
-            ((double)actual.X * inverseLength * -MathF.Sin(canonicalYaw)) +
-            ((double)actual.Z * inverseLength * -MathF.Cos(canonicalYaw));
-        return dot >= HorizontalDirectionDotTolerance;
-    }
 
     private static bool TryNormalizeBasis(in Vector3 value, out Vector3 normalized)
     {
