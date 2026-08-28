@@ -152,6 +152,36 @@ public readonly record struct AlsP3FrameDiagnostics(
         NumericsVector3 ActualVelocity,
         AlsFrameResult Result,
         ulong PoseDigest,
+        ulong FullPoseDigest,
+        AlsP3VisualTransformSnapshot VisualRootTransform,
+        ulong RootDigest)
+        : this(
+            Identity,
+            CommandFrameId,
+            MotorSnapshotFrameId,
+            ModelResultFrameId,
+            PoseAdvanceFrameId,
+            CommittedFrameId,
+            ActualVelocity,
+            Result,
+            PoseDigest,
+            FullPoseDigest,
+            VisualRootTransform,
+            RootDigest,
+            default)
+    {
+    }
+
+    public AlsP3FrameDiagnostics(
+        AlsFrameIdentity Identity,
+        long CommandFrameId,
+        long MotorSnapshotFrameId,
+        long ModelResultFrameId,
+        long PoseAdvanceFrameId,
+        long CommittedFrameId,
+        NumericsVector3 ActualVelocity,
+        AlsFrameResult Result,
+        ulong PoseDigest,
         ulong FullPoseDigest)
         : this(
             Identity,
@@ -168,6 +198,34 @@ public readonly record struct AlsP3FrameDiagnostics(
             0,
             default)
     {
+    }
+
+    public void Deconstruct(
+        out AlsFrameIdentity Identity,
+        out long CommandFrameId,
+        out long MotorSnapshotFrameId,
+        out long ModelResultFrameId,
+        out long PoseAdvanceFrameId,
+        out long CommittedFrameId,
+        out NumericsVector3 ActualVelocity,
+        out AlsFrameResult Result,
+        out ulong PoseDigest,
+        out ulong FullPoseDigest,
+        out AlsP3VisualTransformSnapshot VisualRootTransform,
+        out ulong RootDigest)
+    {
+        Identity = this.Identity;
+        CommandFrameId = this.CommandFrameId;
+        MotorSnapshotFrameId = this.MotorSnapshotFrameId;
+        ModelResultFrameId = this.ModelResultFrameId;
+        PoseAdvanceFrameId = this.PoseAdvanceFrameId;
+        CommittedFrameId = this.CommittedFrameId;
+        ActualVelocity = this.ActualVelocity;
+        Result = this.Result;
+        PoseDigest = this.PoseDigest;
+        FullPoseDigest = this.FullPoseDigest;
+        VisualRootTransform = this.VisualRootTransform;
+        RootDigest = this.RootDigest;
     }
 }
 

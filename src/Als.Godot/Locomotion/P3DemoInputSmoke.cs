@@ -458,6 +458,7 @@ public partial class P3DemoInputSmoke : Node
             result,
             PoseDigest: 0,
             FullPoseDigest: 0);
+        ValidateFrameDiagnosticsCompatibility(result);
         hud.Refresh(diagnostics, framesPerSecond: 60d, errors: 0);
         Require(hud.StateText.Contains("Grounded", StringComparison.Ordinal),
             "HUD did not expose locomotion state");
@@ -496,6 +497,66 @@ public partial class P3DemoInputSmoke : Node
         Require(!successPublished, "demo success was published before cleanup completed");
         RemoveChild(hud);
         hud.Free();
+    }
+
+    private static void ValidateFrameDiagnosticsCompatibility(in AlsFrameResult result)
+    {
+        var visualRoot = new AlsP3VisualTransformSnapshot(
+            NumericsVector3.UnitX,
+            NumericsVector3.UnitY,
+            NumericsVector3.UnitZ,
+            new NumericsVector3(1f, 2f, 3f));
+        var legacy = new AlsP3FrameDiagnostics(
+            result.Identity,
+            40,
+            41,
+            42,
+            43,
+            44,
+            new NumericsVector3(3f, 0f, 4f),
+            result,
+            45,
+            46,
+            visualRoot,
+            47);
+        var (
+            identity,
+            commandFrame,
+            motorFrame,
+            modelFrame,
+            poseFrame,
+            committedFrame,
+            actualVelocity,
+            legacyResult,
+            poseDigest,
+            fullPoseDigest,
+            deconstructedVisualRoot,
+            rootDigest) = legacy;
+        Require(identity == result.Identity &&
+                commandFrame == 40 && motorFrame == 41 && modelFrame == 42 &&
+                poseFrame == 43 && committedFrame == 44 &&
+                actualVelocity == new NumericsVector3(3f, 0f, 4f) &&
+                legacyResult.Identity == result.Identity && poseDigest == 45 &&
+                fullPoseDigest == 46 && deconstructedVisualRoot == visualRoot &&
+                rootDigest == 47 && legacy.FootProbeSource == default,
+            "legacy 12-field frame diagnostics contract did not round-trip");
+
+        var current = legacy with
+        {
+            FootProbeSource = new AlsP4FootProbeSourceSnapshot(
+                result.Identity,
+                1,
+                2,
+                visualRoot,
+                visualRoot,
+                NumericsVector3.UnitX,
+                NumericsVector3.UnitY),
+        };
+        var (
+            _, _, _, _, _, _, _, _, _, _, _, _,
+            footProbeSource) = current;
+        Require(footProbeSource == current.FootProbeSource,
+            "current 13-field frame diagnostics deconstruction was unavailable");
     }
 
     private static void RequireKey(string action, Key physicalKey)
