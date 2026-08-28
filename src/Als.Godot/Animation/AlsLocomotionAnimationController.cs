@@ -66,11 +66,25 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private readonly int[] _poseBoneIndices = new int[PoseBoneNames.Length];
     private AnimationNodeStateMachinePlayback? _topPlayback;
     private AnimationNodeStateMachinePlayback? _groundedPlayback;
-    private AnimationNodeStateMachinePlayback? _turnPlayback;
-    private AnimationNodeStateMachinePlayback? _rotatePlayback;
     private int _warmupState;
     private int _disposed;
     private byte _activeP4Mode;
+    private float _activeTurnBlendSeconds;
+    private byte _turnBank;
+    private byte _rotateBank;
+    private byte _turnTargetBank;
+    private byte _rotateTargetBank;
+    private bool _turnBlendActive;
+    private bool _rotateBlendActive;
+    private double _turnBlendElapsed;
+    private double _rotateBlendElapsed;
+    private float _turnBlendDuration;
+    private float _rotateBlendDuration;
+    private float _actionBlendAmount;
+    private float _actionBlendTarget;
+    private float _actionBlendDuration;
+    private float _actionModeBlendAmount;
+    private float _actionModeBlendTarget;
 
     public AlsLocomotionAnimationController(
         AlsLocomotionGraphBuildResult graph,
@@ -120,12 +134,6 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             _graph.Tree.Active = true;
             var topPlayback = GetPlayback(_graph.Handles.TopPlaybackPath, "top");
             var groundedPlayback = GetPlayback(_graph.Handles.GroundedPlaybackPath, "Grounded");
-            var turnPlayback = _graph.Handles.P4 is null
-                ? null
-                : GetPlayback(_graph.Handles.P4.TurnPlaybackPath, "P4Turn");
-            var rotatePlayback = _graph.Handles.P4 is null
-                ? null
-                : GetPlayback(_graph.Handles.P4.RotatePlaybackPath, "P4Rotate");
             var poseBoneIndices = new int[PoseBoneNames.Length];
             for (var index = 0; index < PoseBoneNames.Length; index++)
             {
@@ -141,11 +149,6 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                 _graph.Handles.StateNames[(int)AlsAnimationState.Grounded], true);
             groundedPlayback.Start(
                 _graph.Handles.StanceNames[(int)AlsStance.Standing], true);
-            if (_graph.Handles.P4 is not null)
-            {
-                turnPlayback!.Start(_graph.Handles.P4.InitialTurnBinding.StateName, true);
-                rotatePlayback!.Start(_graph.Handles.P4.InitialRotateBinding.StateName, true);
-            }
             SetParameters(
                 _graph.Handles.GroundedStanding,
                 Vector2.Zero,
@@ -155,14 +158,12 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                 0f);
             if (_graph.Handles.P4 is not null)
             {
-                SetP4Parameters(_graph.Handles.P4, PreparedP4.Disabled);
+                SetP4Parameters(_graph.Handles.P4, PreparedP4.Disabled, 0, 0, 0f, 0f, 0f, 0f);
             }
             _graph.Tree.Advance(0.0);
 
             _topPlayback = topPlayback;
             _groundedPlayback = groundedPlayback;
-            _turnPlayback = turnPlayback;
-            _rotatePlayback = rotatePlayback;
             poseBoneIndices.CopyTo(_poseBoneIndices, 0);
             Volatile.Write(ref _warmupState, WarmupReady);
         }
@@ -170,8 +171,6 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             _topPlayback = null;
             _groundedPlayback = null;
-            _turnPlayback = null;
-            _rotatePlayback = null;
             if (GodotObject.IsInstanceValid(_graph.Tree))
             {
                 _graph.Tree.Active = false;
@@ -202,39 +201,103 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
         var requestedP4Mode = preparedP4.TurnActive ? (byte)1 :
             preparedP4.RotateActive ? (byte)2 : (byte)0;
+        var p4Handles = _graph.Handles.P4;
         var stateChanged = result.AnimationState != ActiveAnimationState;
-        if (requestedP4Mode != _activeP4Mode ||
-            (requestedP4Mode == 0 && stateChanged))
+        if (stateChanged)
         {
-            var stateName = requestedP4Mode switch
+            _topPlayback!.Travel(_graph.Handles.StateNames[(int)result.AnimationState], true);
+        }
+        var nextActionBlendAmount = _actionBlendAmount;
+        var nextActionBlendTarget = _actionBlendTarget;
+        var nextActionBlendDuration = _actionBlendDuration;
+        var nextActionModeBlendAmount = _actionModeBlendAmount;
+        var nextActionModeBlendTarget = _actionModeBlendTarget;
+        if (requestedP4Mode != _activeP4Mode)
+        {
+            nextActionBlendTarget = requestedP4Mode == 0 ? 0f : 1f;
+            nextActionBlendDuration = requestedP4Mode switch
             {
-                1 => _graph.Handles.P4!.TurnStateName,
-                2 => _graph.Handles.P4!.RotateStateName,
-                _ => _graph.Handles.StateNames[(int)result.AnimationState],
+                1 => preparedP4.TurnBinding.BlendSeconds,
+                2 => preparedP4.RotateBinding.BlendSeconds,
+                _ when _activeP4Mode == 1 => _activeTurnBlendSeconds,
+                _ => 0.08f,
             };
-            if (requestedP4Mode == 0)
+            nextActionModeBlendTarget = requestedP4Mode == 2 ? 1f : 0f;
+            if (_activeP4Mode == 0 || requestedP4Mode == 0)
             {
-                _topPlayback!.Travel(stateName, true);
-            }
-            else
-            {
-                _topPlayback!.Start(stateName, true);
+                nextActionModeBlendAmount = nextActionModeBlendTarget;
             }
         }
+        nextActionBlendAmount = MoveBlend(
+            nextActionBlendAmount, nextActionBlendTarget, nextActionBlendDuration, deltaTime);
+        nextActionModeBlendAmount = MoveBlend(
+            nextActionModeBlendAmount, nextActionModeBlendTarget, 0.08f, deltaTime);
+        var nextTurnBank = _turnBank;
+        var nextRotateBank = _rotateBank;
+        var nextTurnTargetBank = _turnTargetBank;
+        var nextRotateTargetBank = _rotateTargetBank;
+        var nextTurnBlendActive = _turnBlendActive;
+        var nextRotateBlendActive = _rotateBlendActive;
+        var nextTurnBlendElapsed = _turnBlendElapsed;
+        var nextRotateBlendElapsed = _rotateBlendElapsed;
+        var nextTurnBlendDuration = _turnBlendDuration;
+        var nextRotateBlendDuration = _rotateBlendDuration;
         if (preparedP4.TurnActive &&
             p4Input.ActiveTurnAnimationId != ActiveTurnAnimationId)
         {
-            _turnPlayback!.Start(preparedP4.TurnBinding.StateName, true);
+            nextTurnTargetBank = _activeP4Mode == 1 ? (byte)(1 - _turnBank) : _turnBank;
+            nextTurnBlendDuration = preparedP4.TurnBinding.BlendSeconds;
+            nextTurnBlendElapsed = 0.0;
+            nextTurnBlendActive = _activeP4Mode == 1 && nextTurnBlendDuration > 0f;
+            _graph.Tree.Set(
+                p4Handles!.GetTurnRequestPath(nextTurnTargetBank),
+                preparedP4.TurnBinding.StateName);
         }
         if (preparedP4.RotateActive &&
             p4Input.ActiveRotateAnimationId != ActiveRotateAnimationId)
         {
-            _rotatePlayback!.Start(preparedP4.RotateBinding.StateName, true);
+            nextRotateTargetBank = _activeP4Mode == 2 ? (byte)(1 - _rotateBank) : _rotateBank;
+            nextRotateBlendDuration = preparedP4.RotateBinding.BlendSeconds;
+            nextRotateBlendElapsed = 0.0;
+            nextRotateBlendActive = _activeP4Mode == 2 && nextRotateBlendDuration > 0f;
+            _graph.Tree.Set(
+                p4Handles!.GetRotateRequestPath(nextRotateTargetBank),
+                preparedP4.RotateBinding.StateName);
+        }
+        var turnParameterBank = nextTurnBlendActive ? nextTurnTargetBank : nextTurnBank;
+        var rotateParameterBank = nextRotateBlendActive ? nextRotateTargetBank : nextRotateBank;
+        var turnBlendAmount = (float)nextTurnBank;
+        var rotateBlendAmount = (float)nextRotateBank;
+        if (preparedP4.TurnActive && nextTurnBlendActive)
+        {
+            nextTurnBlendElapsed = Math.Min(
+                nextTurnBlendElapsed + deltaTime, nextTurnBlendDuration);
+            var alpha = (float)(nextTurnBlendElapsed / nextTurnBlendDuration);
+            turnBlendAmount = nextTurnTargetBank == 1 ? alpha : 1f - alpha;
+            if (nextTurnBlendElapsed >= nextTurnBlendDuration - 1e-6)
+            {
+                nextTurnBank = nextTurnTargetBank;
+                nextTurnBlendActive = false;
+                turnBlendAmount = nextTurnBank;
+            }
+        }
+        if (preparedP4.RotateActive && nextRotateBlendActive)
+        {
+            nextRotateBlendElapsed = Math.Min(
+                nextRotateBlendElapsed + deltaTime, nextRotateBlendDuration);
+            var alpha = (float)(nextRotateBlendElapsed / nextRotateBlendDuration);
+            rotateBlendAmount = nextRotateTargetBank == 1 ? alpha : 1f - alpha;
+            if (nextRotateBlendElapsed >= nextRotateBlendDuration - 1e-6)
+            {
+                nextRotateBank = nextRotateTargetBank;
+                nextRotateBlendActive = false;
+                rotateBlendAmount = nextRotateBank;
+            }
         }
 
         var stanceChanged = result.ActualStance != ActiveStance;
         if (result.AnimationState == AlsAnimationState.Grounded &&
-            ((requestedP4Mode == 0 && stateChanged) || stanceChanged))
+            (stateChanged || stanceChanged))
         {
             _groundedPlayback!.Travel(
                 _graph.Handles.StanceNames[(int)result.ActualStance], true);
@@ -249,7 +312,15 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             prepared.Phase);
         if (_graph.Handles.P4 is not null)
         {
-            SetP4Parameters(_graph.Handles.P4, preparedP4);
+            SetP4Parameters(
+                _graph.Handles.P4,
+                preparedP4,
+                turnParameterBank,
+                rotateParameterBank,
+                turnBlendAmount,
+                rotateBlendAmount,
+                nextActionModeBlendAmount,
+                nextActionBlendAmount);
         }
 
         _graph.Tree.Advance(deltaTime);
@@ -259,6 +330,25 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         ActiveTurnAnimationId = p4Input.ActiveTurnAnimationId;
         ActiveRotateAnimationId = p4Input.ActiveRotateAnimationId;
         _activeP4Mode = requestedP4Mode;
+        _turnBank = nextTurnBank;
+        _rotateBank = nextRotateBank;
+        _turnTargetBank = nextTurnTargetBank;
+        _rotateTargetBank = nextRotateTargetBank;
+        _turnBlendActive = nextTurnBlendActive;
+        _rotateBlendActive = nextRotateBlendActive;
+        _turnBlendElapsed = nextTurnBlendElapsed;
+        _rotateBlendElapsed = nextRotateBlendElapsed;
+        _turnBlendDuration = nextTurnBlendDuration;
+        _rotateBlendDuration = nextRotateBlendDuration;
+        _actionBlendAmount = nextActionBlendAmount;
+        _actionBlendTarget = nextActionBlendTarget;
+        _actionBlendDuration = nextActionBlendDuration;
+        _actionModeBlendAmount = nextActionModeBlendAmount;
+        _actionModeBlendTarget = nextActionModeBlendTarget;
+        if (preparedP4.TurnActive)
+        {
+            _activeTurnBlendSeconds = preparedP4.TurnBinding.BlendSeconds;
+        }
     }
 
     public ulong ComputePoseDigest(long frameId)
@@ -295,8 +385,6 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
         _topPlayback = null;
         _groundedPlayback = null;
-        _turnPlayback = null;
-        _rotatePlayback = null;
     }
 
     private AnimationNodeStateMachinePlayback GetPlayback(StringName path, string label)
@@ -304,6 +392,18 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         var playback = _graph.Tree.Get(path).As<AnimationNodeStateMachinePlayback>();
         return playback ?? throw new InvalidOperationException(
             $"P3 animation graph did not expose the {label} state-machine playback resource.");
+    }
+
+    private static float MoveBlend(float current, float target, float duration, double deltaTime)
+    {
+        if (current == target || duration <= 0f)
+        {
+            return target;
+        }
+        var step = (float)(deltaTime / duration);
+        return current < target
+            ? MathF.Min(current + step, target)
+            : MathF.Max(current - step, target);
     }
 
     private AlsLocomotionGraphParameterSet GetParameters(
@@ -342,18 +442,30 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         }
     }
 
-    private void SetP4Parameters(AlsP4GraphHandles handles, in PreparedP4 prepared)
+    private void SetP4Parameters(
+        AlsP4GraphHandles handles,
+        in PreparedP4 prepared,
+        byte turnBank,
+        byte rotateBank,
+        float turnBlendAmount,
+        float rotateBlendAmount,
+        float actionModeBlendAmount,
+        float actionBlendAmount)
     {
         if (prepared.TurnActive)
         {
-            _graph.Tree.Set(prepared.TurnBinding.PlayRatePath, prepared.TurnPlayRate);
-            _graph.Tree.Set(prepared.TurnBinding.PhasePath, prepared.TurnPhase);
+            _graph.Tree.Set(prepared.TurnBinding.GetPlayRatePath(turnBank), prepared.TurnPlayRate);
+            _graph.Tree.Set(prepared.TurnBinding.GetPhasePath(turnBank), prepared.TurnPhase);
         }
         if (prepared.RotateActive)
         {
-            _graph.Tree.Set(prepared.RotateBinding.PlayRatePath, prepared.RotatePlayRate);
-            _graph.Tree.Set(prepared.RotateBinding.PhasePath, prepared.RotatePhase);
+            _graph.Tree.Set(prepared.RotateBinding.GetPlayRatePath(rotateBank), prepared.RotatePlayRate);
+            _graph.Tree.Set(prepared.RotateBinding.GetPhasePath(rotateBank), prepared.RotatePhase);
         }
+        _graph.Tree.Set(handles.TurnBlendPath, turnBlendAmount);
+        _graph.Tree.Set(handles.RotateBlendPath, rotateBlendAmount);
+        _graph.Tree.Set(handles.ActionModeBlendPath, actionModeBlendAmount);
+        _graph.Tree.Set(handles.ActionBlendPath, actionBlendAmount);
         _graph.Tree.Set(handles.AimDownPhasePath, prepared.AimDownPhase);
         _graph.Tree.Set(handles.AimDownWeightPath, prepared.AimDownWeight);
         _graph.Tree.Set(handles.AimForwardPhasePath, prepared.AimForwardPhase);

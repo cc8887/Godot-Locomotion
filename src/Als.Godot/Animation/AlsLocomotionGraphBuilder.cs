@@ -170,15 +170,24 @@ public sealed class AlsP4GraphHandles
 {
     private readonly Dictionary<int, AlsP4ClipBinding> _turnBindings;
     private readonly Dictionary<int, AlsP4ClipBinding> _rotateBindings;
-
     internal AlsP4GraphHandles(
         StringName turnStateName,
         StringName rotateStateName,
         StringName aimDownStateName,
         StringName aimForwardStateName,
         StringName aimUpStateName,
-        StringName turnPlaybackPath,
-        StringName rotatePlaybackPath,
+        StringName turnBankARequestPath,
+        StringName turnBankACurrentStatePath,
+        StringName turnBankBRequestPath,
+        StringName turnBankBCurrentStatePath,
+        StringName turnBlendPath,
+        StringName rotateBankARequestPath,
+        StringName rotateBankACurrentStatePath,
+        StringName rotateBankBRequestPath,
+        StringName rotateBankBCurrentStatePath,
+        StringName rotateBlendPath,
+        StringName actionModeBlendPath,
+        StringName actionBlendPath,
         StringName aimDownPhasePath,
         StringName aimDownWeightPath,
         StringName aimForwardPhasePath,
@@ -193,8 +202,18 @@ public sealed class AlsP4GraphHandles
         AimDownStateName = aimDownStateName;
         AimForwardStateName = aimForwardStateName;
         AimUpStateName = aimUpStateName;
-        TurnPlaybackPath = turnPlaybackPath;
-        RotatePlaybackPath = rotatePlaybackPath;
+        TurnBankARequestPath = turnBankARequestPath;
+        TurnBankACurrentStatePath = turnBankACurrentStatePath;
+        TurnBankBRequestPath = turnBankBRequestPath;
+        TurnBankBCurrentStatePath = turnBankBCurrentStatePath;
+        TurnBlendPath = turnBlendPath;
+        RotateBankARequestPath = rotateBankARequestPath;
+        RotateBankACurrentStatePath = rotateBankACurrentStatePath;
+        RotateBankBRequestPath = rotateBankBRequestPath;
+        RotateBankBCurrentStatePath = rotateBankBCurrentStatePath;
+        RotateBlendPath = rotateBlendPath;
+        ActionModeBlendPath = actionModeBlendPath;
+        ActionBlendPath = actionBlendPath;
         AimDownPhasePath = aimDownPhasePath;
         AimDownWeightPath = aimDownWeightPath;
         AimForwardPhasePath = aimForwardPhasePath;
@@ -208,7 +227,11 @@ public sealed class AlsP4GraphHandles
         OwnedHandles =
         [
             turnStateName, rotateStateName, aimDownStateName, aimForwardStateName, aimUpStateName,
-            turnPlaybackPath, rotatePlaybackPath,
+            turnBankARequestPath, turnBankACurrentStatePath,
+            turnBankBRequestPath, turnBankBCurrentStatePath, turnBlendPath,
+            rotateBankARequestPath, rotateBankACurrentStatePath,
+            rotateBankBRequestPath, rotateBankBCurrentStatePath, rotateBlendPath,
+            actionModeBlendPath, actionBlendPath,
             aimDownPhasePath, aimDownWeightPath,
             aimForwardPhasePath, aimForwardWeightPath,
             aimUpPhasePath, aimUpWeightPath,
@@ -222,8 +245,18 @@ public sealed class AlsP4GraphHandles
     public StringName AimDownStateName { get; }
     public StringName AimForwardStateName { get; }
     public StringName AimUpStateName { get; }
-    public StringName TurnPlaybackPath { get; }
-    public StringName RotatePlaybackPath { get; }
+    public StringName TurnBankARequestPath { get; }
+    public StringName TurnBankACurrentStatePath { get; }
+    public StringName TurnBankBRequestPath { get; }
+    public StringName TurnBankBCurrentStatePath { get; }
+    public StringName TurnBlendPath { get; }
+    public StringName RotateBankARequestPath { get; }
+    public StringName RotateBankACurrentStatePath { get; }
+    public StringName RotateBankBRequestPath { get; }
+    public StringName RotateBankBCurrentStatePath { get; }
+    public StringName RotateBlendPath { get; }
+    public StringName ActionModeBlendPath { get; }
+    public StringName ActionBlendPath { get; }
     public StringName AimDownPhasePath { get; }
     public StringName AimDownWeightPath { get; }
     public StringName AimForwardPhasePath { get; }
@@ -261,16 +294,36 @@ public sealed class AlsP4GraphHandles
 
     public bool TryGetRotateBinding(int animationId, out AlsP4ClipBinding binding) =>
         _rotateBindings.TryGetValue(animationId, out binding);
+
+    public StringName GetTurnRequestPath(byte bank) =>
+        bank == 0 ? TurnBankARequestPath : TurnBankBRequestPath;
+
+    public StringName GetTurnCurrentStatePath(byte bank) =>
+        bank == 0 ? TurnBankACurrentStatePath : TurnBankBCurrentStatePath;
+
+    public StringName GetRotateRequestPath(byte bank) =>
+        bank == 0 ? RotateBankARequestPath : RotateBankBRequestPath;
+
+    public StringName GetRotateCurrentStatePath(byte bank) =>
+        bank == 0 ? RotateBankACurrentStatePath : RotateBankBCurrentStatePath;
 }
 
 public readonly record struct AlsP4ClipBinding(
     float Selection,
     float DurationSeconds,
+    float BlendSeconds,
     StringName StateName,
-    StringName PlayRatePath,
-    StringName PhasePath)
+    StringName PlayRatePathA,
+    StringName PhasePathA,
+    StringName PlayRatePathB,
+    StringName PhasePathB)
 {
-    internal IDisposable[] OwnedHandles => [StateName, PlayRatePath, PhasePath];
+    internal IDisposable[] OwnedHandles =>
+        [StateName, PlayRatePathA, PhasePathA, PlayRatePathB, PhasePathB];
+
+    public StringName GetPlayRatePath(byte bank) => bank == 0 ? PlayRatePathA : PlayRatePathB;
+
+    public StringName GetPhasePath(byte bank) => bank == 0 ? PhasePathA : PhasePathB;
 }
 
 public sealed class AlsLocomotionGraphParameterSet
@@ -422,32 +475,27 @@ public static class AlsLocomotionGraphBuilder
             if (poseProfile is not null)
             {
                 var p4 = handles.P4!;
-                baseStateMachine.AddNode(
-                    p4.TurnStateName,
-                    BuildP4ActionBranch(
-                        library,
-                        poseProfile.Turns.Select(value => value.AnimationId).ToArray(),
-                        p4,
-                        true,
-                        ownedResources));
-                baseStateMachine.AddNode(
-                    p4.RotateStateName,
-                    BuildP4ActionBranch(
-                        library,
-                        poseProfile.Rotates.Select(value => value.AnimationId).ToArray(),
-                        p4,
-                        false,
-                        ownedResources));
-                AddAllStateTransitions(
-                    baseStateMachine,
-                    [
-                        .. handles.StateNames,
-                        p4.TurnStateName,
-                        p4.RotateStateName,
-                    ],
+                var turnBranch = BuildP4ActionBranch(
+                    library,
+                    poseProfile.Turns.Select(value => value.AnimationId).ToArray(),
+                    p4,
+                    true,
                     ownedResources);
+                var rotateBranch = BuildP4ActionBranch(
+                    library,
+                    poseProfile.Rotates.Select(value => value.AnimationId).ToArray(),
+                    p4,
+                    false,
+                    ownedResources);
+                AddAllStateTransitions(baseStateMachine, handles.StateNames, ownedResources);
                 graphRoot = BuildP4LayeredRoot(
-                    library, baseStateMachine, poseProfile, p4, ownedResources);
+                    library,
+                    baseStateMachine,
+                    turnBranch,
+                    rotateBranch,
+                    poseProfile,
+                    p4,
+                    ownedResources);
             }
             else
             {
@@ -683,9 +731,12 @@ public static class AlsLocomotionGraphBuilder
                     new AlsP4ClipBinding(
                         index,
                         animationSet.Animations[animationId].PlayLength,
+                        profile.Turns[index].BlendSeconds,
                         stateName,
-                        Handle($"parameters/Base/P4Turn/{stateName}/Scale/scale"),
-                        Handle($"parameters/Base/P4Turn/{stateName}/Seek/seek_request"))))
+                        Handle($"parameters/P4Turn/BankA/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Turn/BankA/{stateName}/Seek/seek_request"),
+                        Handle($"parameters/P4Turn/BankB/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Turn/BankB/{stateName}/Seek/seek_request"))))
             {
                 throw new InvalidOperationException(
                     $"P4 graph contains duplicate Turn animation ID: {profile.Turns[index].AnimationId}");
@@ -701,9 +752,12 @@ public static class AlsLocomotionGraphBuilder
                     new AlsP4ClipBinding(
                         index,
                         animationSet.Animations[animationId].PlayLength,
+                        TransitionTime,
                         stateName,
-                        Handle($"parameters/Base/P4Rotate/{stateName}/Scale/scale"),
-                        Handle($"parameters/Base/P4Rotate/{stateName}/Seek/seek_request"))))
+                        Handle($"parameters/P4Rotate/BankA/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Rotate/BankA/{stateName}/Seek/seek_request"),
+                        Handle($"parameters/P4Rotate/BankB/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Rotate/BankB/{stateName}/Seek/seek_request"))))
             {
                 throw new InvalidOperationException(
                     $"P4 graph contains duplicate Rotate animation ID: {profile.Rotates[index].AnimationId}");
@@ -716,8 +770,18 @@ public static class AlsLocomotionGraphBuilder
             Handle("P4AimDown"),
             Handle("P4AimForward"),
             Handle("P4AimUp"),
-            Handle("parameters/Base/P4Turn/playback"),
-            Handle("parameters/Base/P4Rotate/playback"),
+            Handle("parameters/P4Turn/BankA/Select/transition_request"),
+            Handle("parameters/P4Turn/BankA/Select/current_state"),
+            Handle("parameters/P4Turn/BankB/Select/transition_request"),
+            Handle("parameters/P4Turn/BankB/Select/current_state"),
+            Handle("parameters/P4Turn/Blend/blend_amount"),
+            Handle("parameters/P4Rotate/BankA/Select/transition_request"),
+            Handle("parameters/P4Rotate/BankA/Select/current_state"),
+            Handle("parameters/P4Rotate/BankB/Select/transition_request"),
+            Handle("parameters/P4Rotate/BankB/Select/current_state"),
+            Handle("parameters/P4Rotate/Blend/blend_amount"),
+            Handle("parameters/ActionMode/blend_amount"),
+            Handle("parameters/ActionBlend/blend_amount"),
             Handle("parameters/P4AimDown/Seek/seek_request"),
             Handle("parameters/AimDownAdd/add_amount"),
             Handle("parameters/P4AimForward/Seek/seek_request"),
@@ -769,7 +833,7 @@ public static class AlsLocomotionGraphBuilder
         return tree;
     }
 
-    private static AnimationNodeStateMachine BuildP4ActionBranch(
+    private static AnimationNodeBlendTree BuildP4ActionBranch(
         AlsAnimationLibraryBuildResult library,
         IReadOnlyList<int> animationIds,
         AlsP4GraphHandles handles,
@@ -781,11 +845,42 @@ public static class AlsLocomotionGraphBuilder
             throw new InvalidOperationException("P4 action bank requires at least two clips.");
         }
 
-        var stateMachine = Own(ownedResources, new AnimationNodeStateMachine
+        var root = Own(ownedResources, new AnimationNodeBlendTree());
+        var bankA = BuildP4ActionBank(
+            library, animationIds, handles, turn, ownedResources);
+        var bankB = BuildP4ActionBank(
+            library, animationIds, handles, turn, ownedResources);
+        var blend = Own(ownedResources, new AnimationNodeBlend2());
+        using var bankAName = new StringName("BankA");
+        using var bankBName = new StringName("BankB");
+        using var blendName = new StringName("Blend");
+        using var outputName = new StringName("output");
+        root.AddNode(bankAName, bankA);
+        root.AddNode(bankBName, bankB);
+        root.AddNode(blendName, blend);
+        root.ConnectNode(blendName, 0, bankAName);
+        root.ConnectNode(blendName, 1, bankBName);
+        root.ConnectNode(outputName, 0, blendName);
+        return root;
+    }
+
+    private static AnimationNodeBlendTree BuildP4ActionBank(
+        AlsAnimationLibraryBuildResult library,
+        IReadOnlyList<int> animationIds,
+        AlsP4GraphHandles handles,
+        bool turn,
+        List<IDisposable> ownedResources)
+    {
+        var tree = Own(ownedResources, new AnimationNodeBlendTree());
+        var selector = Own(ownedResources, new AnimationNodeTransition
         {
-            StateMachineType = AnimationNodeStateMachine.StateMachineTypeEnum.Nested,
+            InputCount = animationIds.Count,
+            XfadeTime = 0.0,
+            AllowTransitionToSelf = true,
         });
-        var stateNames = new StringName[animationIds.Count];
+        using var selectorName = new StringName("Select");
+        using var outputName = new StringName("output");
+        tree.AddNode(selectorName, selector);
         for (var index = 0; index < animationIds.Count; index++)
         {
             var animationId = animationIds[index];
@@ -797,13 +892,15 @@ public static class AlsLocomotionGraphBuilder
                 throw new InvalidOperationException(
                     $"P4 action graph has no exact binding for animation ID: {animationId}");
             }
-            stateNames[index] = binding.StateName;
-            stateMachine.AddNode(
+            selector.SetInputName(index, binding.StateName.ToString());
+            selector.SetInputReset(index, true);
+            tree.AddNode(
                 binding.StateName,
                 BuildP4ClipBranch(library, animationId, ownedResources));
+            tree.ConnectNode(selectorName, index, binding.StateName);
         }
-        AddAllStateTransitions(stateMachine, stateNames, ownedResources);
-        return stateMachine;
+        tree.ConnectNode(outputName, 0, selectorName);
+        return tree;
     }
 
     private static AnimationNodeBlendTree BuildP4ClipBranch(
@@ -831,6 +928,8 @@ public static class AlsLocomotionGraphBuilder
     private static AnimationNodeBlendTree BuildP4LayeredRoot(
         AlsAnimationLibraryBuildResult library,
         AnimationNodeStateMachine baseStateMachine,
+        AnimationNodeBlendTree turnBranch,
+        AnimationNodeBlendTree rotateBranch,
         AlsPoseAnimationProfile profile,
         AlsP4GraphHandles handles,
         List<IDisposable> ownedResources)
@@ -854,19 +953,31 @@ public static class AlsLocomotionGraphBuilder
         var downAdd = Own(ownedResources, new AnimationNodeAdd2());
         var forwardAdd = Own(ownedResources, new AnimationNodeAdd2());
         var upAdd = Own(ownedResources, new AnimationNodeAdd2());
+        var actionMode = Own(ownedResources, new AnimationNodeBlend2());
+        var actionBlend = Own(ownedResources, new AnimationNodeBlend2());
         using var baseName = new StringName("Base");
+        using var actionModeName = new StringName("ActionMode");
+        using var actionBlendName = new StringName("ActionBlend");
         using var downAddName = new StringName("AimDownAdd");
         using var forwardAddName = new StringName("AimForwardAdd");
         using var upAddName = new StringName("AimUpAdd");
         using var outputName = new StringName("output");
         root.AddNode(baseName, baseStateMachine);
+        root.AddNode(handles.TurnStateName, turnBranch);
+        root.AddNode(handles.RotateStateName, rotateBranch);
+        root.AddNode(actionModeName, actionMode);
+        root.AddNode(actionBlendName, actionBlend);
         root.AddNode(handles.AimDownStateName, down);
         root.AddNode(handles.AimForwardStateName, forward);
         root.AddNode(handles.AimUpStateName, up);
         root.AddNode(downAddName, downAdd);
         root.AddNode(forwardAddName, forwardAdd);
         root.AddNode(upAddName, upAdd);
-        root.ConnectNode(downAddName, 0, baseName);
+        root.ConnectNode(actionModeName, 0, handles.TurnStateName);
+        root.ConnectNode(actionModeName, 1, handles.RotateStateName);
+        root.ConnectNode(actionBlendName, 0, baseName);
+        root.ConnectNode(actionBlendName, 1, actionModeName);
+        root.ConnectNode(downAddName, 0, actionBlendName);
         root.ConnectNode(downAddName, 1, handles.AimDownStateName);
         root.ConnectNode(forwardAddName, 0, downAddName);
         root.ConnectNode(forwardAddName, 1, handles.AimForwardStateName);
@@ -883,8 +994,8 @@ public static class AlsLocomotionGraphBuilder
         List<IDisposable> ownedResources)
     {
         var tree = Own(ownedResources, new AnimationNodeBlendTree());
-        var basePose = CreateAnimationNode(library, baseAnimationId, true, ownedResources);
-        var aim = CreateAnimationNode(library, aimAnimationId, true, ownedResources);
+        var basePose = CreateAnimationNode(library, baseAnimationId, false, ownedResources);
+        var aim = CreateAnimationNode(library, aimAnimationId, false, ownedResources);
         var delta = Own(ownedResources, new AnimationNodeSub2());
         var seek = Own(ownedResources, new AnimationNodeTimeSeek());
         using var baseName = new StringName("AdditiveBase");
