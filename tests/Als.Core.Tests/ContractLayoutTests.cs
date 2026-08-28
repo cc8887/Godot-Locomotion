@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Pose;
 
 namespace GodotAls.Core.Tests;
 
@@ -63,6 +64,10 @@ public sealed class ContractLayoutTests
             "ActivationSeconds", "Phase", "PlayRate", "RemainingYaw", "NominalDegrees",
             "Direction", "Active", "Stance");
         AssertFieldOrder<AlsRotateInPlaceState>("Phase", "PlayRate", "Direction", "Active", "Stance");
+        AssertFieldOrder<AlsTurnRotateSelection>(
+            "YawSource", "AnimationId", "CurveId", "PreviousPhase", "CurrentPhase", "DeltaTime",
+            "PhasePlayRate", "YawScale", "EffectiveDeltaTime", "BlendSeconds", "RemainingYaw",
+            "NominalDegrees", "Direction", "ScaleAngle", "Active");
         AssertFieldOrder<AlsFootLockState>(
             "LocalPosition", "LocalRotation", "Offset", "Rotation", "PlatformId", "Amount", "Locked");
         AssertFieldOrder<AlsPelvisCorrectionState>(

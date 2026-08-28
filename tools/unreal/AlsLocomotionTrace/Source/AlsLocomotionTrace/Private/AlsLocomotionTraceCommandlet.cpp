@@ -41,6 +41,8 @@ IMPLEMENT_MODULE(FDefaultModuleImpl, AlsLocomotionTrace)
 namespace AlsLocomotionTrace
 {
 constexpr double FixedDeltaSeconds{1.0 / 60.0};
+constexpr float StationaryYawSpeedThreshold{0.1f};
+constexpr float StationaryYawAccelerationThreshold{0.1f};
 constexpr int32 SchemaVersion{1};
 constexpr const TCHAR* LockedReferenceCommit{TEXT("b754d6f0f2bb03741d301f8fb88077ebfe561e17")};
 constexpr const TCHAR* LockedPatchHash{TEXT("3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f")};
@@ -390,7 +392,17 @@ FPortResult EvaluatePort(const AAlsTraceCharacter& Character, const FTraceComman
     const float ActorYaw{FMath::DegreesToRadians(
         static_cast<float>(Character.GetActorRotation().Yaw))};
     float TargetYaw{ActorYaw};
-    if (Speed <= Settings.MovingSpeedThreshold && Command.RotationMode != AlsRotationModeTags::Aiming)
+    const float HorizontalAcceleration{static_cast<float>(
+        FVector2D{ActualAcceleration.X, ActualAcceleration.Y}.Size() / 100.0)};
+    const bool bStationaryYawCandidate{
+        bGrounded &&
+        Speed <= StationaryYawSpeedThreshold &&
+        HorizontalAcceleration <= StationaryYawAccelerationThreshold &&
+        (Command.RotationMode == AlsRotationModeTags::ViewDirection ||
+         Command.RotationMode == AlsRotationModeTags::Aiming)};
+    if (bStationaryYawCandidate ||
+        (Speed <= Settings.MovingSpeedThreshold &&
+         Command.RotationMode == AlsRotationModeTags::VelocityDirection))
     {
         State.SmoothedTargetYaw = ActorYaw;
     }

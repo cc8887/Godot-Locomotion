@@ -188,11 +188,7 @@ public sealed class AlsLocomotionRotationTests
 
         Assert.Equal(characterYaw, result.TargetYaw, 5);
         Assert.Equal(characterYaw, state.SmoothedTargetYaw, 5);
-        Assert.Equal(
-            rotationMode == AlsRotationMode.LookingDirection
-                ? AlsYawSource.None
-                : AlsYawSource.Locomotion,
-            state.YawSource);
+        Assert.Equal(AlsYawSource.Locomotion, state.YawSource);
     }
 
     [Fact]
@@ -209,7 +205,7 @@ public sealed class AlsLocomotionRotationTests
 
         Assert.Equal(Degrees(20f), result.TargetYaw, 5);
         Assert.Equal(Degrees(20f), state.SmoothedTargetYaw, 5);
-        Assert.Equal(AlsYawSource.None, state.YawSource);
+        Assert.Equal(AlsYawSource.Locomotion, state.YawSource);
     }
 
     [Fact]
@@ -249,7 +245,7 @@ public sealed class AlsLocomotionRotationTests
         AlsLocomotionModel.Evaluate(
             exactInput, ref exactState, ref exactResult, P3TestSettings.Reference);
         Assert.Equal(characterYaw, exactResult.TargetYaw, 5);
-        Assert.Equal(AlsYawSource.None, exactState.YawSource);
+        Assert.Equal(AlsYawSource.Locomotion, exactState.YawSource);
 
         var movingInput = exactInput with
         {
@@ -286,6 +282,44 @@ public sealed class AlsLocomotionRotationTests
             airborneInput, ref airborneState, ref airborneResult, P3TestSettings.Reference);
         Assert.NotEqual(characterYaw, airborneResult.TargetYaw);
         Assert.Equal(AlsYawSource.Locomotion, airborneState.YawSource);
+    }
+
+    [Fact]
+    public void EverySuccessfulP3FrameHasLocomotionYawOwnershipAcrossBoundaries()
+    {
+        var speeds = new[] { 0f, 0.05f, 0.1f, 0.2f, 0.333f, 0.5f, 1f };
+        var accelerations = new[] { 0f, 0.1f, MathF.BitIncrement(0.1f) };
+        var modes = new[]
+        {
+            AlsRotationMode.VelocityDirection,
+            AlsRotationMode.LookingDirection,
+            AlsRotationMode.Aiming,
+        };
+
+        foreach (var speed in speeds)
+        foreach (var acceleration in accelerations)
+        foreach (var grounded in new[] { true, false })
+        foreach (var mode in modes)
+        {
+            var input = P3TestInput.Grounded(
+                velocity: new Vector3(speed, 0f, 0f),
+                acceleration: new Vector3(acceleration, 0f, 0f),
+                rotationMode: mode,
+                characterYaw: Degrees(20f),
+                viewYaw: Degrees(-70f),
+                aimYaw: Degrees(-70f));
+            if (!grounded)
+            {
+                input = input with { Floor = input.Floor with { IsGrounded = 0 } };
+            }
+
+            var state = new AlsRuntimeState();
+            var result = new AlsFrameResult();
+            AlsLocomotionModel.Evaluate(input, ref state, ref result, P3TestSettings.Reference);
+
+            Assert.True(float.IsFinite(result.TargetYaw));
+            Assert.Equal(AlsYawSource.Locomotion, state.YawSource);
+        }
     }
 
     [Fact]

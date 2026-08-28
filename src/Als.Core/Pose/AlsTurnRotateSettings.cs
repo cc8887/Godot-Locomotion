@@ -55,8 +55,8 @@ public readonly record struct AlsTurnRotateSettings(
 
         return new AlsTurnRotateSettings(
             1,
-            0.1f,
-            0.1f,
+            AlsYawOwnershipThresholds.StationarySpeed,
+            AlsYawOwnershipThresholds.StationaryAcceleration,
             Degrees(45f),
             Degrees(50f),
             0f,
@@ -89,13 +89,8 @@ public readonly record struct AlsTurnRotateSettings(
             return false;
         }
 
-        if (Enabled == 0)
-        {
-            return true;
-        }
-
-        return IsNonnegativeFinite(StationarySpeedThreshold) &&
-               IsNonnegativeFinite(StationaryAccelerationThreshold) &&
+        return StationarySpeedThreshold == AlsYawOwnershipThresholds.StationarySpeed &&
+               StationaryAccelerationThreshold == AlsYawOwnershipThresholds.StationaryAcceleration &&
                IsAngleThreshold(TurnYawThreshold) &&
                IsNonnegativeFinite(TurnYawSpeedThreshold) &&
                IsNonnegativeFinite(TurnDelayAtThreshold) &&

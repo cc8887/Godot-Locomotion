@@ -31,6 +31,29 @@ function Set-P3TraceDerivedAcceleration([object]$Trace)
 }
 
 Describe 'generate-p3-golden.ps1 semantic validation' {
+    It 'locks approved reference patch bytes to LF on autocrlf hosts' {
+        $attributes = [System.IO.File]::ReadAllText(
+            (Join-Path $script:RepositoryRoot '.gitattributes'))
+
+        $attributes | Should Match `
+            '(?m)^reference/patches/\*\.patch text eol=lf whitespace=-space-before-tab$'
+    }
+
+    It 'keeps the commandlet port yaw oracle aligned with the shared stationary ownership boundary' {
+        $commandletPath = Join-Path $script:RepositoryRoot `
+            'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\Private\AlsLocomotionTraceCommandlet.cpp'
+        $source = [System.IO.File]::ReadAllText($commandletPath)
+
+        $source | Should Match 'StationaryYawSpeedThreshold\{0\.1f\}'
+        $source | Should Match 'StationaryYawAccelerationThreshold\{0\.1f\}'
+        $source | Should Match 'bStationaryYawCandidate'
+        $source | Should Match 'Speed\s*<=\s*StationaryYawSpeedThreshold'
+        $source | Should Match 'ActualAcceleration\.X.*ActualAcceleration\.Y'
+        $source | Should Match 'Command\.RotationMode\s*==\s*AlsRotationModeTags::Aiming'
+        $source | Should Not Match `
+            'Speed\s*<=\s*Settings\.MovingSpeedThreshold\s*&&\s*Command\.RotationMode\s*!=\s*AlsRotationModeTags::Aiming'
+    }
+
     It 'derives physical actual acceleration from consecutive post-tick velocities' {
         $commandletPath = Join-Path $script:RepositoryRoot `
             'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\Private\AlsLocomotionTraceCommandlet.cpp'
