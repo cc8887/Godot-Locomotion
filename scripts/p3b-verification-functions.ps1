@@ -336,7 +336,7 @@ function ConvertFrom-P3bHarnessOutput
         throw "Expected exactly one P3B result marker; observed $($markerLines.Count)."
     }
 
-    $markerPattern = '\AGODOT_ALS_P3B_OK mode=(single|parallel) characters=(1|10) warmup=120 frames=600 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) missing=(\d+) stale=(\d+) generation=(\d+) off_main=(\d+) lag=(\d+) allocations=(\d+) p95_us=(\d+) p99_us=(\d+)\z'
+    $markerPattern = '\AGODOT_ALS_P3B_OK mode=(single|parallel) characters=(1|10) warmup=120 frames=600 digest=([0-9A-F]{16}) pose=([0-9A-F]{16}) full_pose=([0-9A-F]{16}) root=([0-9A-F]{16}) missing=(\d+) stale=(\d+) generation=(\d+) off_main=(\d+) lag=(\d+) allocations=(\d+) foot_gather=(\d+) total_managed_allocations=(\d+) p95_us=(\d+) p99_us=(\d+)\z'
     $marker = [regex]::Match($markerLines[0], $markerPattern)
     if (-not $marker.Success)
     {
@@ -356,10 +356,13 @@ function ConvertFrom-P3bHarnessOutput
     $offMain = [long]$marker.Groups[10].Value
     $lag = [long]$marker.Groups[11].Value
     $allocations = [long]$marker.Groups[12].Value
+    $footGather = [long]$marker.Groups[13].Value
+    $totalManagedAllocations = [long]$marker.Groups[14].Value
     if ($missing -ne 0 -or $stale -ne 0 -or $generation -ne 0 -or
-        $lag -ne 0 -or $allocations -ne 0)
+        $lag -ne 0 -or $allocations -ne 0 -or $footGather -le 0 -or
+        $totalManagedAllocations -ne $allocations + $footGather)
     {
-        throw "P3B counters must be zero: missing=$missing stale=$stale generation=$generation lag=$lag allocations=$allocations."
+        throw "P3B counters or allocation accounting are invalid: missing=$missing stale=$stale generation=$generation lag=$lag allocations=$allocations foot_gather=$footGather total_managed_allocations=$totalManagedAllocations."
     }
 
     $expectedOffMain = if ($mode -ceq 'parallel') { $characters } else { 0 }
@@ -368,8 +371,8 @@ function ConvertFrom-P3bHarnessOutput
         throw "P3B worker affinity mismatch: expected off_main=$expectedOffMain, observed=$offMain."
     }
 
-    $p95 = [long]$marker.Groups[13].Value
-    $p99 = [long]$marker.Groups[14].Value
+    $p95 = [long]$marker.Groups[15].Value
+    $p99 = [long]$marker.Groups[16].Value
     if ($p95 -gt $p99)
     {
         throw "P3B timing percentiles are invalid: p95_us=$p95 p99_us=$p99."
@@ -382,7 +385,7 @@ function ConvertFrom-P3bHarnessOutput
     {
         throw "Expected exactly one P3B allocation line; observed $($allocationLines.Count)."
     }
-    $allocationPattern = '\AGODOT_ALS_P3B_ALLOC model=(\d+) controller=(\d+) skeleton=(\d+) exchange=(\d+) commit=(\d+)\z'
+    $allocationPattern = '\AGODOT_ALS_P3B_ALLOC model=(\d+) controller=(\d+) skeleton=(\d+) exchange=(\d+) commit=(\d+) foot_gather=(\d+) total_managed_allocations=(\d+)\z'
     $allocationMatch = [regex]::Match($allocationLines[0], $allocationPattern)
     if (-not $allocationMatch.Success)
     {
@@ -392,6 +395,13 @@ function ConvertFrom-P3bHarnessOutput
     if (@($allocationBuckets | Where-Object { $_ -ne 0 }).Count -ne 0)
     {
         throw "P3B allocation buckets must all be zero: $($allocationLines[0])"
+    }
+    $allocationFootGather = [long]$allocationMatch.Groups[6].Value
+    $allocationTotal = [long]$allocationMatch.Groups[7].Value
+    if ($allocationFootGather -ne $footGather -or
+        $allocationTotal -ne $totalManagedAllocations)
+    {
+        throw "P3B allocation evidence does not match the result marker: $($allocationLines[0])"
     }
 
     $advanceLines = @($lines | Where-Object {
@@ -470,6 +480,8 @@ function ConvertFrom-P3bHarnessOutput
         OffMain = $offMain
         Lag = $lag
         Allocations = $allocations
+        FootGather = $footGather
+        TotalManagedAllocations = $totalManagedAllocations
         P95Microseconds = $p95
         P99Microseconds = $p99
         Advances = $advances

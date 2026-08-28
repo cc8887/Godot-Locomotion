@@ -9,7 +9,7 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
     . $script:FunctionsPath
 }
 
-$script:ValidMarker = 'GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=B79EDC1516A133F9 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0'
+$script:ValidMarker = 'GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=B79EDC1516A133F9 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 foot_gather=382272 total_managed_allocations=382272'
 $script:VerifierSource = [System.IO.File]::ReadAllText($script:VerifierPath)
 $script:SolutionSource = [System.IO.File]::ReadAllText($script:SolutionPath)
 
@@ -43,6 +43,9 @@ Describe 'P3A verifier marker parsing' {
             -ExpectedCharacterCount 1
 
         $result.Digest | Should Be 'B79EDC1516A133F9'
+        $result.Allocations | Should Be 0
+        $result.FootGather | Should Be 382272
+        $result.TotalManagedAllocations | Should Be 382272
     }
 
     It 'rejects a valid marker plus a malformed marker line' {
@@ -63,6 +66,13 @@ Describe 'P3A verifier marker parsing' {
 
     It 'rejects a marker with an extra field' {
         Test-P3aParserRejects @($script:ValidMarker + ' extra=1') | Should Be $true
+    }
+
+    It 'rejects hidden or arithmetically inconsistent Foot Gather allocations' {
+        Test-P3aParserRejects @($script:ValidMarker.Replace('foot_gather=382272', 'foot_gather=0')) |
+            Should Be $true
+        Test-P3aParserRejects @($script:ValidMarker.Replace('total_managed_allocations=382272', 'total_managed_allocations=1')) |
+            Should Be $true
     }
 
     It 'rejects a valid marker with an unexpected mode' {

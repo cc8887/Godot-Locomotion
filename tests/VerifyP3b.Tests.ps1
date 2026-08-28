@@ -13,11 +13,11 @@ if (Test-Path -LiteralPath $script:FunctionsPath)
     . $script:FunctionsPath
 }
 
-$script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 p95_us=100 p99_us=200'
+$script:ValidMarker = 'GODOT_ALS_P3B_OK mode=single characters=1 warmup=120 frames=600 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0 foot_gather=382272 total_managed_allocations=382272 p95_us=100 p99_us=200'
 $script:ValidFrameOrderMarker = 'GODOT_ALS_P3B_FRAME_ORDER_OK mode=single frames=180 digest=0123456789ABCDEF pose=1111111111111111 full_pose=2222222222222222 root=3333333333333333 lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 max_visible=1 real_rig_visibility=1 recovery_zero_visible=1'
 $script:ExpectedGraphDirectionDigest = 'DD72BD02BE20DCC3'
 $script:ValidGraphMarker = 'GODOT_ALS_P3B_GRAPH_OK transitions=5 direction_poses=4 rotation_modes=3 direction_digest=DD72BD02BE20DCC3 digest=1111111111111111'
-$script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0'
+$script:ValidAllocation = 'GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0 foot_gather=382272 total_managed_allocations=382272'
 $script:ValidReplacement = 'GODOT_ALS_P3B_REPLACEMENT character=0 old_generation_rejected=1'
 $script:ValidPose = 'GODOT_ALS_P3B_POSE character=0 changes=42'
 $script:VerifierSource = [System.IO.File]::ReadAllText($script:VerifierPath)
@@ -698,6 +698,9 @@ Describe 'P3B verifier contracts' {
         $result.Pose | Should Be '1111111111111111'
         $result.FullPose | Should Be '2222222222222222'
         $result.Root | Should Be '3333333333333333'
+        $result.Allocations | Should Be 0
+        $result.FootGather | Should Be 382272
+        $result.TotalManagedAllocations | Should Be 382272
         $result.P95Microseconds | Should Be 100
         $result.P99Microseconds | Should Be 200
     }
@@ -759,6 +762,15 @@ Describe 'P3B verifier contracts' {
             Test-P3bParserRejects (Get-P3bOutput -Allocation $script:ValidAllocation.Replace("$field=0", "$field=1")) |
                 Should Be $true
         }
+    }
+
+    It 'rejects hidden mismatched or arithmetically inconsistent Foot Gather allocations' {
+        Test-P3bParserRejects (Get-P3bOutput -Marker $script:ValidMarker.Replace(
+            'foot_gather=382272', 'foot_gather=0')) | Should Be $true
+        Test-P3bParserRejects (Get-P3bOutput -Marker $script:ValidMarker.Replace(
+            'total_managed_allocations=382272', 'total_managed_allocations=1')) | Should Be $true
+        Test-P3bParserRejects (Get-P3bOutput -Allocation $script:ValidAllocation.Replace(
+            'foot_gather=382272', 'foot_gather=382271')) | Should Be $true
     }
 
     It 'requires exactly one 600-frame advance line for every character' {
