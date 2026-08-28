@@ -57,13 +57,13 @@ public sealed record AlsAnimationDefinition(
 
     public AlsFloatCurveDefinition[] Curves
     {
-        get => _curves;
+        get => _curves.ToArray();
         init => _curves = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
     }
 
     public string[] LegacyCurveNames
     {
-        get => _legacyCurveNames;
+        get => _legacyCurveNames.ToArray();
         init => _legacyCurveNames = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
     }
 }
@@ -105,7 +105,7 @@ public sealed record AlsFloatCurveDefinition(
 
     public AlsFloatCurveKeyDefinition[] Keys
     {
-        get => _keys;
+        get => _keys.ToArray();
         init => _keys = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
     }
 }

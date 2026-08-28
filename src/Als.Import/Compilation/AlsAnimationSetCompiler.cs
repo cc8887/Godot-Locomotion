@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using GodotAls.Import.Manifest;
 using GodotAls.Import.Metadata;
@@ -39,7 +37,7 @@ public static class AlsAnimationSetCompiler
             skeletons, skeletalMeshes, staticMeshes, animations, montages,
             blendSpaces, aimOffsets, materials, textures, physicsAssets, curves, configAssets);
 
-        return new AlsAnimationSetDefinition(
+        var definition = new AlsAnimationSetDefinition(
             skeletons,
             skeletalMeshes,
             staticMeshes,
@@ -53,7 +51,11 @@ public static class AlsAnimationSetCompiler
             curves,
             configAssets,
             assetIndex,
-            CreateDigest(manifest, skeletons));
+            string.Empty);
+        return definition with
+        {
+            DefinitionDigest = AlsAnimationSetPayload.ComputeDefinitionDigest(definition),
+        };
     }
 
     private static AlsSkeletalMeshDefinition[] CompileSkeletalMeshes(
@@ -142,7 +144,7 @@ public static class AlsAnimationSetCompiler
         {
             var legacyNames = metadata.Curves.LegacyNames
                 ?? throw ContentError("ALSCURVE001", asset.Id, $"{metadataPath}.curves", "Legacy curve names are required.");
-            ValidateCanonicalMetadata(asset.Id, metadataPath, metadata, hasCanonicalYaw: false);
+            ValidateCanonicalMetadata(asset, metadataPath, metadata, hasCanonicalYaw: false);
             return ([], legacyNames.ToArray());
         }
 
@@ -245,7 +247,7 @@ public static class AlsAnimationSetCompiler
                 curveIndex, canonicalKind, source.SourceName, provenance, keys);
         }
 
-        ValidateCanonicalMetadata(asset.Id, metadataPath, metadata, canonicalYawCount != 0);
+        ValidateCanonicalMetadata(asset, metadataPath, metadata, canonicalYawCount != 0);
         return (curves.ToArray(), []);
     }
 
@@ -295,34 +297,40 @@ public static class AlsAnimationSetCompiler
     }
 
     private static void ValidateCanonicalMetadata(
-        string assetId,
+        AlsManifestAsset asset,
         string metadataPath,
         AlsAnimationMetadata metadata,
         bool hasCanonicalYaw)
     {
+        var hasSourceConventionProperty = asset.Metadata.TryGetProperty(
+            "canonicalRotationYawSourceConvention", out _);
+        var hasSignProvenanceProperty = asset.Metadata.TryGetProperty(
+            "canonicalRotationYawProfileSignProvenance", out _);
         if (!hasCanonicalYaw)
         {
-            if (metadata.CanonicalRotationYawSourceConvention is not null)
+            if (hasSourceConventionProperty)
             {
-                throw ContentError("ALSCURVE001", assetId, $"{metadataPath}.canonicalRotationYawSourceConvention",
+                throw ContentError("ALSCURVE001", asset.Id, $"{metadataPath}.canonicalRotationYawSourceConvention",
                     "Canonical source convention must be absent without a canonical curve.");
             }
-            if (metadata.CanonicalRotationYawProfileSignProvenance is not null)
+            if (hasSignProvenanceProperty)
             {
-                throw ContentError("ALSCURVE001", assetId, $"{metadataPath}.canonicalRotationYawProfileSignProvenance",
+                throw ContentError("ALSCURVE001", asset.Id, $"{metadataPath}.canonicalRotationYawProfileSignProvenance",
                     "Canonical sign provenance must be absent without a canonical curve.");
             }
             return;
         }
 
-        if (metadata.CanonicalRotationYawSourceConvention is not "ue_root_bone_rotator_yaw_degrees_z_up")
+        if (!hasSourceConventionProperty ||
+            metadata.CanonicalRotationYawSourceConvention is not "ue_root_bone_rotator_yaw_degrees_z_up")
         {
-            throw ContentError("ALSCURVE001", assetId, $"{metadataPath}.canonicalRotationYawSourceConvention",
+            throw ContentError("ALSCURVE001", asset.Id, $"{metadataPath}.canonicalRotationYawSourceConvention",
                 "Canonical source convention is invalid.");
         }
-        if (metadata.CanonicalRotationYawProfileSignProvenance is not "runtime_profile_sign_pending")
+        if (!hasSignProvenanceProperty ||
+            metadata.CanonicalRotationYawProfileSignProvenance is not "runtime_profile_sign_pending")
         {
-            throw ContentError("ALSCURVE001", assetId, $"{metadataPath}.canonicalRotationYawProfileSignProvenance",
+            throw ContentError("ALSCURVE001", asset.Id, $"{metadataPath}.canonicalRotationYawProfileSignProvenance",
                 "Canonical sign provenance is invalid.");
         }
     }
@@ -574,16 +582,6 @@ public static class AlsAnimationSetCompiler
         {
             throw ContentError("ALSMETA003", asset.Id, $"$.{section}[{index}].outputPath", "Output path is required.");
         }
-    }
-
-    private static string CreateDigest(AlsManifest manifest, AlsSkeletonDefinition[] skeletons)
-    {
-        var manifestJson = JsonSerializer.Serialize(manifest, AlsManifestSerializer.JsonOptions);
-        var digestInput = string.Concat(
-            manifestJson,
-            "\n",
-            string.Join("\n", skeletons.Select(value => value.TargetPhysicalRestPoseHash)));
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(digestInput))).ToLowerInvariant();
     }
 
     private static AlsCompilationException ContentError(string code, string assetId, string path, string message) =>
