@@ -94,6 +94,7 @@ public sealed record AlsAnimationMetadata(
             {
                 throw new JsonException($"Animation float curves[{curveIndex}] has an unsupported canonical kind/source provenance contract.");
             }
+            var isCanonicalRotationYaw = curve.CanonicalKind is "RotationYawSpeedRadiansPerSecond";
             if (string.IsNullOrEmpty(curve.SourceName))
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].sourceName is required.");
@@ -115,9 +116,17 @@ public sealed record AlsAnimationMetadata(
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].preInfinity is invalid.");
             }
+            if (isCanonicalRotationYaw && curve.PreInfinity is not "Constant")
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].preInfinity must be Constant for canonical rotation yaw.");
+            }
             if (!IsInfinityMode(curve.PostInfinity))
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].postInfinity is invalid.");
+            }
+            if (isCanonicalRotationYaw && curve.PostInfinity is not "Constant")
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].postInfinity must be Constant for canonical rotation yaw.");
             }
             if (curve.Keys is null)
             {
@@ -137,6 +146,10 @@ public sealed record AlsAnimationMetadata(
                     key.Interpolation is not ("Constant" or "Linear" or "Cubic"))
                 {
                     throw new JsonException($"Animation float curves[{curveIndex}].keys[{keyIndex}] violates the export contract.");
+                }
+                if (isCanonicalRotationYaw && key.Interpolation is not "Linear")
+                {
+                    throw new JsonException($"Animation float curves[{curveIndex}].keys[{keyIndex}].interpolation must be Linear for canonical rotation yaw.");
                 }
                 if (previousTime is not null && key.TimeSeconds == previousTime.Value)
                 {

@@ -13,6 +13,87 @@ namespace
 {
     constexpr TCHAR CanonicalRotationYawCurveName[] = TEXT("RotationYawSpeedRadiansPerSecond");
     constexpr TCHAR CanonicalRotationYawKind[] = TEXT("RotationYawSpeedRadiansPerSecond");
+    constexpr double CanonicalYawDurationToleranceSeconds = 1e-4;
+
+    bool FailCanonicalYawDuration(const FString& SequencePath, const FFrameRate& FrameRate, const int32 KeyCount,
+        const double SequenceDuration, const double DataModelDuration, const double ComputedLastTime,
+        const TCHAR* Reason, FString& OutError)
+    {
+        OutError = FString::Printf(TEXT("Invalid canonical root yaw duration: asset=%s keyCount=%d frameRateNumerator=%d frameRateDenominator=%d duration=%.17g sequenceDuration=%.17g computedLastTime=%.17g reason=%s."),
+            *SequencePath, KeyCount, FrameRate.Numerator, FrameRate.Denominator, DataModelDuration,
+            SequenceDuration, ComputedLastTime, Reason);
+        return false;
+    }
+
+    bool ValidateCanonicalYawSampleDuration(const FString& SequencePath, const FFrameRate& FrameRate,
+        const int32 KeyCount, const double SequenceDuration, const double DataModelDuration, FString& OutError)
+    {
+        const double FramesPerSecond = FrameRate.AsDecimal();
+        const double ComputedLastTime = FMath::IsFinite(FramesPerSecond) && FramesPerSecond > 0.0 && KeyCount > 0
+            ? static_cast<double>(KeyCount - 1) / FramesPerSecond
+            : std::numeric_limits<double>::quiet_NaN();
+        if (FrameRate.Numerator <= 0 || FrameRate.Denominator <= 0 || !FMath::IsFinite(FramesPerSecond) || FramesPerSecond <= 0.0)
+        {
+            return FailCanonicalYawDuration(SequencePath, FrameRate, KeyCount, SequenceDuration, DataModelDuration,
+                ComputedLastTime, TEXT("invalid frame rate"), OutError);
+        }
+        if (KeyCount < 2)
+        {
+            return FailCanonicalYawDuration(SequencePath, FrameRate, KeyCount, SequenceDuration, DataModelDuration,
+                ComputedLastTime, TEXT("insufficient key count"), OutError);
+        }
+        if (!FMath::IsFinite(SequenceDuration) || !FMath::IsFinite(DataModelDuration))
+        {
+            return FailCanonicalYawDuration(SequencePath, FrameRate, KeyCount, SequenceDuration, DataModelDuration,
+                ComputedLastTime, TEXT("non-finite duration"), OutError);
+        }
+        if (SequenceDuration <= 0.0 || DataModelDuration <= 0.0)
+        {
+            return FailCanonicalYawDuration(SequencePath, FrameRate, KeyCount, SequenceDuration, DataModelDuration,
+                ComputedLastTime, TEXT("non-positive duration"), OutError);
+        }
+        if (!FMath::IsNearlyEqual(SequenceDuration, DataModelDuration, CanonicalYawDurationToleranceSeconds))
+        {
+            return FailCanonicalYawDuration(SequencePath, FrameRate, KeyCount, SequenceDuration, DataModelDuration,
+                ComputedLastTime, TEXT("sequence/data-model duration mismatch"), OutError);
+        }
+        if (!FMath::IsNearlyEqual(DataModelDuration, ComputedLastTime, CanonicalYawDurationToleranceSeconds))
+        {
+            return FailCanonicalYawDuration(SequencePath, FrameRate, KeyCount, SequenceDuration, DataModelDuration,
+                ComputedLastTime, TEXT("duration/key-time mismatch"), OutError);
+        }
+        return true;
+    }
+
+    bool TryExtractCanonicalRootYawDegrees(const FString& SequencePath, const int32 FrameIndex, FQuat Rotation,
+        double& OutYawDegrees, FString& OutError)
+    {
+        const double SizeSquared = Rotation.SizeSquared();
+        const TCHAR* Reason = nullptr;
+        if (Rotation.ContainsNaN() || !FMath::IsFinite(SizeSquared))
+        {
+            Reason = TEXT("non-finite quaternion");
+        }
+        else if (SizeSquared <= SMALL_NUMBER)
+        {
+            Reason = TEXT("zero-length quaternion");
+        }
+        if (Reason)
+        {
+            OutError = FString::Printf(TEXT("Invalid canonical root yaw quaternion: asset=%s frame=%d X=%.17g Y=%.17g Z=%.17g W=%.17g sizeSquared=%.17g reason=%s."),
+                *SequencePath, FrameIndex, Rotation.X, Rotation.Y, Rotation.Z, Rotation.W, SizeSquared, Reason);
+            return false;
+        }
+        Rotation.Normalize();
+        OutYawDegrees = Rotation.Rotator().Yaw;
+        if (!FMath::IsFinite(OutYawDegrees))
+        {
+            OutError = FString::Printf(TEXT("Invalid canonical root yaw quaternion: asset=%s frame=%d X=%.17g Y=%.17g Z=%.17g W=%.17g sizeSquared=%.17g reason=non-finite yaw."),
+                *SequencePath, FrameIndex, Rotation.X, Rotation.Y, Rotation.Z, Rotation.W, SizeSquared);
+            return false;
+        }
+        return true;
+    }
 
     bool RequiresCanonicalRotationYawCurve(const FString& SequencePath)
     {
@@ -152,10 +233,11 @@ namespace
         const FFrameRate FrameRate = DataModel->GetFrameRate();
         const double FramesPerSecond = FrameRate.AsDecimal();
         const int32 FrameCount = DataModel->GetNumberOfKeys();
-        if (!FMath::IsFinite(FramesPerSecond) || FramesPerSecond <= 0.0 || FrameCount < 2)
+        const double SequenceDuration = Sequence.GetPlayLength();
+        const double DataModelDuration = DataModel->GetPlayLength();
+        if (!ValidateCanonicalYawSampleDuration(SequencePath, FrameRate, FrameCount,
+            SequenceDuration, DataModelDuration, OutError))
         {
-            OutError = FString::Printf(TEXT("Canonical root yaw source has invalid sampling: asset=%s frameRate=%.17g frameCount=%d."),
-                *SequencePath, FramesPerSecond, FrameCount);
             return false;
         }
         TArray<FTransform> RootTransforms;
@@ -173,14 +255,12 @@ namespace
         WrappedYawDegrees.Reserve(FrameCount);
         for (int32 FrameIndex = 0; FrameIndex < FrameCount; ++FrameIndex)
         {
-            FQuat Rotation = RootTransforms[FrameIndex].GetRotation();
-            if (Rotation.ContainsNaN() || Rotation.SizeSquared() <= SMALL_NUMBER)
+            double YawDegrees = 0.0;
+            if (!TryExtractCanonicalRootYawDegrees(SequencePath, FrameIndex, RootTransforms[FrameIndex].GetRotation(),
+                YawDegrees, OutError))
             {
-                OutError = FString::Printf(TEXT("Invalid canonical root yaw quaternion: asset=%s frame=%d."), *SequencePath, FrameIndex);
                 return false;
             }
-            Rotation.Normalize();
-            const double YawDegrees = Rotation.Rotator().Yaw;
             Times.Add(static_cast<double>(FrameIndex) / FramesPerSecond);
             WrappedYawDegrees.Add(YawDegrees);
         }
@@ -504,6 +584,58 @@ bool FAlsAnimationMetadataReader::RunCurveKeySelfTest(FString& OutError)
         !OutError.Contains(TEXT("Duplicate exported float curve source name")))
     {
         OutError = FString::Printf(TEXT("Curve export self-test canonical uniqueness case failed: %s"), *OutError);
+        return false;
+    }
+
+    const FFrameRate DurationTestRate(30, 1);
+    OutError.Reset();
+    if (!ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, 2.0, 2.0, OutError) || !OutError.IsEmpty())
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test canonical duration valid case failed: %s"), *OutError);
+        return false;
+    }
+    OutError.Reset();
+    if (ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, 0.0, 0.0, OutError) ||
+        !OutError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) ||
+        !OutError.Contains(TEXT("keyCount=61")) || !OutError.Contains(TEXT("frameRateNumerator=30")) ||
+        !OutError.Contains(TEXT("frameRateDenominator=1")) || !OutError.Contains(TEXT("reason=non-positive duration")))
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test canonical duration zero case failed: %s"), *OutError);
+        return false;
+    }
+    OutError.Reset();
+    if (ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, NaN, NaN, OutError) ||
+        !OutError.Contains(TEXT("duration=nan")) || !OutError.Contains(TEXT("reason=non-finite duration")))
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test canonical duration non-finite case failed: %s"), *OutError);
+        return false;
+    }
+    OutError.Reset();
+    if (ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, 1.5, 1.5, OutError) ||
+        !OutError.Contains(TEXT("computedLastTime=2")) || !OutError.Contains(TEXT("reason=duration/key-time mismatch")))
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test canonical duration mismatch case failed: %s"), *OutError);
+        return false;
+    }
+
+    double TestExtractedYawDegrees = 0.0;
+    OutError.Reset();
+    if (TryExtractCanonicalRootYawDegrees(SequencePath, 4, FQuat(NaN, 0.0, 0.0, 1.0), TestExtractedYawDegrees, OutError) ||
+        !OutError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) ||
+        !OutError.Contains(TEXT("frame=4")) || !OutError.Contains(TEXT("X=nan")) ||
+        !OutError.Contains(TEXT("Y=0")) || !OutError.Contains(TEXT("Z=0")) || !OutError.Contains(TEXT("W=1")) ||
+        !OutError.Contains(TEXT("sizeSquared=nan")) || !OutError.Contains(TEXT("reason=non-finite quaternion")))
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test non-finite root quaternion case failed: %s"), *OutError);
+        return false;
+    }
+    OutError.Reset();
+    if (TryExtractCanonicalRootYawDegrees(SequencePath, 5, FQuat::Identity * 0.0, TestExtractedYawDegrees, OutError) ||
+        !OutError.Contains(TEXT("frame=5")) || !OutError.Contains(TEXT("X=0")) || !OutError.Contains(TEXT("Y=0")) ||
+        !OutError.Contains(TEXT("Z=0")) || !OutError.Contains(TEXT("W=0")) || !OutError.Contains(TEXT("sizeSquared=0")) ||
+        !OutError.Contains(TEXT("reason=zero-length quaternion")))
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test zero-length root quaternion case failed: %s"), *OutError);
         return false;
     }
 
