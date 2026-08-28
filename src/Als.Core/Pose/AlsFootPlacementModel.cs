@@ -18,6 +18,8 @@ public static class AlsFootPlacementModel
 {
     private readonly record struct FootReachCandidate(
         Vector3 FootTarget,
+        Quaternion TargetRotation,
+        Vector3 SurfaceNormal,
         Vector3 LockTarget,
         float PelvisRequirement,
         byte HasLockTarget,
@@ -125,7 +127,7 @@ public static class AlsFootPlacementModel
         var rawHipPosition = characterPosition +
                              (characterUp * settings.CapsuleHalfHeightMeters);
 
-        if (!TryEvaluateFoot(
+        if (!TryBuildFootCandidate(
                 settings,
                 leftHit,
                 currentLeft,
@@ -135,22 +137,14 @@ public static class AlsFootPlacementModel
                 characterUp,
                 grounded,
                 motorDriven,
-                input.Floor.PlatformId,
                 leftIkWeight,
-                leftLockCurve,
-                input.DeltaTime,
-                false,
-                rawHipPosition,
-                out _,
-                out _,
-                out _,
                 out var leftCandidate))
         {
             reason = AlsP4ReasonCode.NonFiniteInput;
             return false;
         }
 
-        if (!TryEvaluateFoot(
+        if (!TryBuildFootCandidate(
                 settings,
                 rightHit,
                 currentRight,
@@ -160,15 +154,7 @@ public static class AlsFootPlacementModel
                 characterUp,
                 grounded,
                 motorDriven,
-                input.Floor.PlatformId,
                 rightIkWeight,
-                rightLockCurve,
-                input.DeltaTime,
-                false,
-                rawHipPosition,
-                out _,
-                out _,
-                out _,
                 out var rightCandidate))
         {
             reason = AlsP4ReasonCode.NonFiniteInput;
@@ -177,6 +163,44 @@ public static class AlsFootPlacementModel
 
         var leftHasPelvisTarget = leftCandidate.HasPelvisTarget == 1;
         var rightHasPelvisTarget = rightCandidate.HasPelvisTarget == 1;
+        var eligibilityPelvisTargetY = SolvePelvisTargetY(
+            settings,
+            leftCandidate.PelvisRequirement,
+            leftHasPelvisTarget,
+            rightCandidate.PelvisRequirement,
+            rightHasPelvisTarget);
+        var eligibilityHipPosition = rawHipPosition +
+                                     (characterUp * eligibilityPelvisTargetY);
+        var leftOverextended = IsOverextended(
+            leftCandidate, eligibilityHipPosition, settings.MaximumLegReachMeters);
+        var rightOverextended = IsOverextended(
+            rightCandidate, eligibilityHipPosition, settings.MaximumLegReachMeters);
+        var pelvisEligibilityChanged =
+            (leftHasPelvisTarget && leftOverextended) ||
+            (rightHasPelvisTarget && rightOverextended);
+        leftHasPelvisTarget &= !leftOverextended;
+        rightHasPelvisTarget &= !rightOverextended;
+
+        if (pelvisEligibilityChanged)
+        {
+            eligibilityPelvisTargetY = SolvePelvisTargetY(
+                settings,
+                leftCandidate.PelvisRequirement,
+                leftHasPelvisTarget,
+                rightCandidate.PelvisRequirement,
+                rightHasPelvisTarget);
+        }
+
+        eligibilityHipPosition = rawHipPosition +
+                                 (characterUp * eligibilityPelvisTargetY);
+        var secondLeftOverextended = !leftOverextended && IsOverextended(
+            leftCandidate, eligibilityHipPosition, settings.MaximumLegReachMeters);
+        var secondRightOverextended = !rightOverextended && IsOverextended(
+            rightCandidate, eligibilityHipPosition, settings.MaximumLegReachMeters);
+        leftOverextended |= secondLeftOverextended;
+        rightOverextended |= secondRightOverextended;
+        leftHasPelvisTarget &= !secondLeftOverextended;
+        rightHasPelvisTarget &= !secondRightOverextended;
         if (!TrySolvePelvis(
                 settings,
                 currentState.PelvisCorrection,
@@ -186,7 +210,7 @@ public static class AlsFootPlacementModel
                 leftHasPelvisTarget,
                 rightCandidate.PelvisRequirement,
                 rightHasPelvisTarget,
-                out var nextPelvisY,
+                out _,
                 out var pelvisOffset,
                 out var pelvisTarget,
                 out var pelvisVelocity))
@@ -196,62 +220,6 @@ public static class AlsFootPlacementModel
         }
 
         var correctedHipPosition = rawHipPosition + pelvisOffset;
-        var leftOverextended = IsOverextended(
-            leftCandidate, correctedHipPosition, settings.MaximumLegReachMeters);
-        var rightOverextended = IsOverextended(
-            rightCandidate, correctedHipPosition, settings.MaximumLegReachMeters);
-        var pelvisEligibilityChanged =
-            (leftHasPelvisTarget && leftOverextended) ||
-            (rightHasPelvisTarget && rightOverextended);
-        leftHasPelvisTarget &= !leftOverextended;
-        rightHasPelvisTarget &= !rightOverextended;
-
-        if (pelvisEligibilityChanged &&
-            !TrySolvePelvis(
-                settings,
-                currentState.PelvisCorrection,
-                characterUp,
-                input.DeltaTime,
-                leftCandidate.PelvisRequirement,
-                leftHasPelvisTarget,
-                rightCandidate.PelvisRequirement,
-                rightHasPelvisTarget,
-                out nextPelvisY,
-                out pelvisOffset,
-                out pelvisTarget,
-                out pelvisVelocity))
-        {
-            reason = AlsP4ReasonCode.NonFiniteInput;
-            return false;
-        }
-
-        correctedHipPosition = rawHipPosition + pelvisOffset;
-        var secondLeftOverextended = !leftOverextended && IsOverextended(
-            leftCandidate, correctedHipPosition, settings.MaximumLegReachMeters);
-        var secondRightOverextended = !rightOverextended && IsOverextended(
-            rightCandidate, correctedHipPosition, settings.MaximumLegReachMeters);
-        leftOverextended |= secondLeftOverextended;
-        rightOverextended |= secondRightOverextended;
-        if ((secondLeftOverextended || secondRightOverextended) &&
-            !TrySolvePelvis(
-                settings,
-                currentState.PelvisCorrection,
-                characterUp,
-                input.DeltaTime,
-                leftCandidate.PelvisRequirement,
-                leftHasPelvisTarget && !secondLeftOverextended,
-                rightCandidate.PelvisRequirement,
-                rightHasPelvisTarget && !secondRightOverextended,
-                out nextPelvisY,
-                out pelvisOffset,
-                out pelvisTarget,
-                out pelvisVelocity))
-        {
-            reason = AlsP4ReasonCode.NonFiniteInput;
-            return false;
-        }
-
-        correctedHipPosition = rawHipPosition + pelvisOffset;
         if (!TryEvaluateFoot(
                 settings,
                 leftHit,
@@ -327,7 +295,7 @@ public static class AlsFootPlacementModel
         return true;
     }
 
-    private static bool TryEvaluateFoot(
+    private static bool TryBuildFootCandidate(
         in AlsFootPlacementSettings settings,
         in AlsFootHit hit,
         in AlsFootLockState current,
@@ -337,22 +305,10 @@ public static class AlsFootPlacementModel
         in Vector3 characterUp,
         bool grounded,
         bool motorDriven,
-        int floorPlatformId,
         float ikWeight,
-        float lockCurve,
-        float deltaTime,
-        bool forceOverextended,
-        in Vector3 reachHipPosition,
-        out AlsFootLockState next,
-        out AlsFootPoseOutput output,
-        out AlsFootReleaseReason releaseReason,
         out FootReachCandidate candidate)
     {
-        next = current;
-        output = AlsFootPoseOutput.CreateDefault();
-        releaseReason = AlsFootReleaseReason.None;
         candidate = default;
-
         var usableHit = hit.Valid == 1 && hit.Walkable == 1;
         var footTarget = probeOrigin;
         var targetRotation = characterRotation;
@@ -400,12 +356,9 @@ public static class AlsFootPlacementModel
 
         var hasPelvisTarget = grounded && motorDriven && usableHit &&
                               ikWeight > settings.LockWeightEpsilon;
-        var pelvisRequirement = 0f;
-        if (hasPelvisTarget)
-        {
-            pelvisRequirement = Vector3.Dot(footTarget - probeOrigin, characterUp);
-        }
-
+        var pelvisRequirement = hasPelvisTarget
+            ? Vector3.Dot(footTarget - probeOrigin, characterUp)
+            : 0f;
         var lockTarget = footTarget;
         var hasLockTarget = current.Locked == 1 && usableHit;
         if (hasLockTarget)
@@ -419,11 +372,60 @@ public static class AlsFootPlacementModel
 
         candidate = new FootReachCandidate(
             footTarget,
+            targetRotation,
+            surfaceNormal,
             lockTarget,
             pelvisRequirement,
             hasLockTarget ? (byte)1 : (byte)0,
             hasPelvisTarget ? (byte)1 : (byte)0,
             usableHit ? (byte)1 : (byte)0);
+        return true;
+    }
+
+    private static bool TryEvaluateFoot(
+        in AlsFootPlacementSettings settings,
+        in AlsFootHit hit,
+        in AlsFootLockState current,
+        in Vector3 probeOrigin,
+        in Vector3 characterPosition,
+        in Quaternion characterRotation,
+        in Vector3 characterUp,
+        bool grounded,
+        bool motorDriven,
+        int floorPlatformId,
+        float ikWeight,
+        float lockCurve,
+        float deltaTime,
+        bool forceOverextended,
+        in Vector3 reachHipPosition,
+        out AlsFootLockState next,
+        out AlsFootPoseOutput output,
+        out AlsFootReleaseReason releaseReason,
+        out FootReachCandidate candidate)
+    {
+        next = current;
+        output = AlsFootPoseOutput.CreateDefault();
+        releaseReason = AlsFootReleaseReason.None;
+        if (!TryBuildFootCandidate(
+                settings,
+                hit,
+                current,
+                probeOrigin,
+                characterPosition,
+                characterRotation,
+                characterUp,
+                grounded,
+                motorDriven,
+                ikWeight,
+                out candidate))
+        {
+            return false;
+        }
+
+        var usableHit = candidate.HasReachTarget == 1;
+        var footTarget = candidate.FootTarget;
+        var targetRotation = candidate.TargetRotation;
+        var surfaceNormal = candidate.SurfaceNormal;
 
         if (current.Locked == 0)
         {
@@ -570,8 +572,7 @@ public static class AlsFootPlacementModel
             }
         }
 
-        if (forceOverextended && next.Locked != 1 &&
-            !TryClampLegReach(
+        if (!TryClampLegReach(
                 reachHipPosition,
                 settings.MaximumLegReachMeters,
                 ref worldPosition))
@@ -1184,19 +1185,12 @@ public static class AlsFootPlacementModel
         return 2f * MathF.Acos(System.Math.Clamp(dot, -1f, 1f));
     }
 
-    private static bool TrySolvePelvis(
+    private static float SolvePelvisTargetY(
         in AlsFootPlacementSettings settings,
-        in AlsPelvisCorrectionState current,
-        in Vector3 characterUp,
-        float deltaTime,
         float leftRequirement,
         bool hasLeftTarget,
         float rightRequirement,
-        bool hasRightTarget,
-        out float nextPelvisY,
-        out Vector3 pelvisOffset,
-        out Vector3 pelvisTarget,
-        out float pelvisVelocity)
+        bool hasRightTarget)
     {
         var targetY = 0f;
         if (hasLeftTarget && hasRightTarget)
@@ -1215,10 +1209,32 @@ public static class AlsFootPlacementModel
         var maximumDescent = MathF.Min(
             settings.MaximumPelvisCorrectionMeters,
             settings.MaximumLegReachMeters - settings.CapsuleHalfHeightMeters);
-        targetY = System.Math.Clamp(
+        return System.Math.Clamp(
             targetY,
             -maximumDescent,
             settings.MaximumPelvisCorrectionMeters);
+    }
+
+    private static bool TrySolvePelvis(
+        in AlsFootPlacementSettings settings,
+        in AlsPelvisCorrectionState current,
+        in Vector3 characterUp,
+        float deltaTime,
+        float leftRequirement,
+        bool hasLeftTarget,
+        float rightRequirement,
+        bool hasRightTarget,
+        out float nextPelvisY,
+        out Vector3 pelvisOffset,
+        out Vector3 pelvisTarget,
+        out float pelvisVelocity)
+    {
+        var targetY = SolvePelvisTargetY(
+            settings,
+            leftRequirement,
+            hasLeftTarget,
+            rightRequirement,
+            hasRightTarget);
         var currentY = Vector3.Dot(current.CurrentOffset, characterUp);
         var halfLife = targetY > currentY
             ? settings.PelvisUpHalfLifeSeconds

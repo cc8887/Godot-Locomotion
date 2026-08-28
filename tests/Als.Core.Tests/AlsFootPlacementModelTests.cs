@@ -767,7 +767,7 @@ public sealed class AlsFootPlacementModelTests
 
         Assert.True(Evaluate(settings,
             Input(Hit(position: hitPosition, normal: steepNormal)),
-            1f, 0f, 1f, 0f, state, out _, out var output, out _));
+            1f, 0f, 1f, 0f, state, out var next, out var output, out _));
 
         var rotatedUp = Vector3.Transform(Vector3.UnitY, output.LeftFoot.Rotation);
         Assert.InRange(Angle(Vector3.UnitY, rotatedUp), 0f, Degrees(30f) + Tolerance);
@@ -776,8 +776,7 @@ public sealed class AlsFootPlacementModelTests
             0f,
             output.LeftFoot.Position.Z));
         Assert.InRange(Angle(-Vector3.UnitZ, horizontal), 0f, Degrees(20f) + Tolerance);
-        Assert.Equal(settings.FootHeightMeters,
-            Vector3.Dot(steepNormal, output.LeftFoot.Position - hitPosition), Tolerance);
+        AssertWithinReach(next, output, settings);
     }
 
     [Fact]
@@ -888,6 +887,104 @@ public sealed class AlsFootPlacementModelTests
         Assert.Equal((byte)0, next.LeftFootLock.Locked);
         Assert.Equal((byte)0, next.RightFootLock.Locked);
         AssertWithinReach(next, output, settings);
+    }
+
+    [Fact]
+    public void ProvisionalPelvisTargetCannotOverflowVelocityBeforeReachEligibilityStabilizes()
+    {
+        var settings = ReachSettings() with
+        {
+            PelvisUpHalfLifeSeconds = float.Epsilon,
+            PelvisDownHalfLifeSeconds = float.Epsilon,
+        };
+        var left = Hit(position: new Vector3(-0.2f, -1f, 0f));
+        var right = Hit(position: new Vector3(0.2f, -1f, 0f));
+        var input = Input(left, right, float.Epsilon);
+
+        Assert.True(Evaluate(settings, input, 1f, 1f, 1f, 1f, ReachState(),
+            out var next, out var output, out var reason));
+
+        Assert.Equal(AlsP4ReasonCode.None, reason);
+        Assert.Equal(Vector3.Zero, output.PelvisOffset);
+        Assert.Equal(Vector3.Zero, next.PelvisCorrection.TargetOffset);
+        Assert.Equal(0f, next.PelvisCorrection.VerticalVelocity);
+        Assert.Equal((byte)0, next.LeftFootLock.Locked);
+        Assert.Equal((byte)0, next.RightFootLock.Locked);
+        AssertWithinReach(next, output, settings);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(1f)]
+    public void ActualDampedPelvisHipClampsOrdinaryAcquireAndHeldOutputs(float lockCurve)
+    {
+        var settings = ReachSettings() with
+        {
+            PelvisUpHalfLifeSeconds = 1f,
+            PelvisDownHalfLifeSeconds = 1f,
+        };
+        var left = Hit(position: new Vector3(0f, -0.4f, 0f));
+        var right = Hit(position: new Vector3(0f, -0.4f, 0f));
+
+        Assert.True(Evaluate(settings, Input(left, right),
+            1f, 1f, lockCurve, lockCurve, ReachState(),
+            out var firstState, out var first, out _));
+
+        Assert.Equal(lockCurve > 0f ? (byte)1 : (byte)0, firstState.LeftFootLock.Locked);
+        Assert.Equal(lockCurve > 0f ? (byte)1 : (byte)0, firstState.RightFootLock.Locked);
+        Assert.True(first.PelvisOffset.Y > -0.3f);
+        AssertWithinReach(firstState, first, settings);
+
+        if (lockCurve > 0f)
+        {
+            Assert.True(Evaluate(settings, Input(left, right),
+                1f, 1f, lockCurve, lockCurve, firstState,
+                out var heldState, out var held, out _));
+            Assert.Equal((byte)1, heldState.LeftFootLock.Locked);
+            Assert.Equal((byte)1, heldState.RightFootLock.Locked);
+            Assert.Equal(AlsFootReleaseReason.None, held.LeftReleaseReason);
+            Assert.Equal(AlsFootReleaseReason.None, held.RightReleaseReason);
+            AssertWithinReach(heldState, held, settings);
+        }
+    }
+
+    [Fact]
+    public void RayMissReleaseAndRecoveredHitLocked2ClampBothWorldLocks()
+    {
+        var settings = ReachSettings() with
+        {
+            LockReleaseHalfLifeSeconds = 1f,
+        };
+        var left = Hit(position: new Vector3(-0.2f, -0.2f, 0f));
+        var right = Hit(position: new Vector3(0.2f, -0.2f, 0f));
+        Assert.True(Evaluate(settings, Input(left, right), 1f, 1f, 1f, 1f, ReachState(),
+            out var locked, out _, out _));
+        locked.LeftFootLock = locked.LeftFootLock with
+        {
+            LocalPosition = new Vector3(-0.2f, -1f, 0f),
+        };
+        locked.RightFootLock = locked.RightFootLock with
+        {
+            LocalPosition = new Vector3(0.2f, -1f, 0f),
+        };
+
+        Assert.True(Evaluate(settings, Input(AlsFootHit.Invalid, AlsFootHit.Invalid),
+            1f, 1f, 1f, 1f, locked, out var released, out var first, out _));
+        Assert.Equal(AlsFootReleaseReason.RayMiss, first.LeftReleaseReason);
+        Assert.Equal(AlsFootReleaseReason.RayMiss, first.RightReleaseReason);
+        Assert.Equal((byte)2, released.LeftFootLock.Locked);
+        Assert.Equal((byte)2, released.RightFootLock.Locked);
+        AssertWithinReach(released, first, settings);
+
+        var recoveredLeft = Hit(position: new Vector3(-0.2f, 0f, 0f));
+        var recoveredRight = Hit(position: new Vector3(0.2f, 0f, 0f));
+        Assert.True(Evaluate(settings, Input(recoveredLeft, recoveredRight),
+            1f, 1f, 1f, 1f, released, out var latched, out var second, out _));
+        Assert.Equal(AlsFootReleaseReason.RayMiss, second.LeftReleaseReason);
+        Assert.Equal(AlsFootReleaseReason.RayMiss, second.RightReleaseReason);
+        Assert.Equal((byte)2, latched.LeftFootLock.Locked);
+        Assert.Equal((byte)2, latched.RightFootLock.Locked);
+        AssertWithinReach(latched, second, settings);
     }
 
     [Theory]
