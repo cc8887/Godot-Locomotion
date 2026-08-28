@@ -280,6 +280,23 @@ public sealed class AlsManifestSerializerTests
         Assert.Null(metadata.Curves.LegacyNames);
     }
 
+    [Fact]
+    public void EmptyCurveArrayUsesTheStructuredPayloadEncoding()
+    {
+        var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
+        var metadataNode = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+        metadataNode["curves"] = new JsonArray();
+        using var metadataDocument = JsonDocument.Parse(metadataNode.ToJsonString());
+
+        var metadata = AlsAnimationMetadata.Read(metadataDocument.RootElement);
+
+        Assert.True(metadata.Curves.IsStructured);
+        Assert.Empty(metadata.Curves.RequireStructuredPayload());
+        var serialized = JsonSerializer.Serialize(metadata, AlsManifestSerializer.JsonOptions);
+        using var serializedDocument = JsonDocument.Parse(serialized);
+        Assert.Equal(0, serializedDocument.RootElement.GetProperty("curves").GetArrayLength());
+    }
+
     private static void AssertCurveKey(
         AlsExportedFloatCurveKeyMetadata actual,
         double timeSeconds,

@@ -69,6 +69,11 @@ if ($LASTEXITCODE -ne 0) {
     throw "Unreal ready check failed with exit code $LASTEXITCODE."
 }
 
+$curveSelfTestMarker = 'GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=4'
+if (-not (($readyOutput | Out-String).Contains($curveSelfTestMarker, [StringComparison]::Ordinal))) {
+    throw "Native curve export self-test marker was not found: $curveSelfTestMarker"
+}
+
 $marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=1.0.0'
 if (-not (($readyOutput | Out-String).Contains($marker, [StringComparison]::Ordinal))) {
     throw "Ready marker was not found: $marker"

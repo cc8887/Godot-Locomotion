@@ -5,6 +5,8 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimCurveTypes.h"
 
+#include <limits>
+
 namespace
 {
     bool TryMapInterpolation(const ERichCurveInterpMode Mode, FString& OutInterpolation)
@@ -198,5 +200,62 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
         SyncMarkers.Add(MakeShared<FJsonValueObject>(Value));
     }
     OutMetadata->SetArrayField(TEXT("syncMarkers"), SyncMarkers);
+    return true;
+}
+
+bool FAlsAnimationMetadataReader::RunCurveKeySelfTest(FString& OutError)
+{
+    constexpr int32 CurveIndex = 7;
+    constexpr int32 KeyIndex = 3;
+    const FString SequencePath = TEXT("/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence");
+    const FString CurveName = TEXT("CurveSelfTest");
+    FRichCurveKey Key;
+    Key.Time = 0.25f;
+    Key.Value = 2.5f;
+    Key.InterpMode = RCIM_Cubic;
+    Key.ArriveTangent = -1.25f;
+    Key.LeaveTangent = 3.5f;
+
+    FAlsExportedFloatCurveKey ExportedKey;
+    if (!TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError) ||
+        ExportedKey.TimeSeconds != Key.Time || ExportedKey.Value != Key.Value ||
+        ExportedKey.Interpolation != TEXT("Cubic") || ExportedKey.ArriveTangent != Key.ArriveTangent ||
+        ExportedKey.LeaveTangent != Key.LeaveTangent)
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test valid cubic case failed: %s"), *OutError);
+        return false;
+    }
+
+    Key.TangentWeightMode = RCTWM_WeightedBoth;
+    Key.ArriveTangentWeight = 0.75f;
+    Key.LeaveTangentWeight = 0.5f;
+    if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError) ||
+        !OutError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) ||
+        !OutError.Contains(TEXT("curve[7]=CurveSelfTest")) || !OutError.Contains(TEXT("key[3] time=0.25")) ||
+        !OutError.Contains(TEXT("tangentWeightMode=3")) || !OutError.Contains(TEXT("arriveTangentWeight=0.75")) ||
+        !OutError.Contains(TEXT("leaveTangentWeight=0.5")))
+    {
+        OutError = FString::Printf(TEXT("Curve export self-test weighted cubic case failed: %s"), *OutError);
+        return false;
+    }
+
+    Key.TangentWeightMode = RCTWM_WeightedNone;
+    Key.InterpMode = static_cast<ERichCurveInterpMode>(255);
+    if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError))
+    {
+        OutError = TEXT("Curve export self-test invalid interpolation case unexpectedly succeeded.");
+        return false;
+    }
+
+    Key.InterpMode = RCIM_Cubic;
+    Key.Value = std::numeric_limits<float>::infinity();
+    Key.ArriveTangent = std::numeric_limits<float>::infinity();
+    if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError))
+    {
+        OutError = TEXT("Curve export self-test non-finite value/tangent case unexpectedly succeeded.");
+        return false;
+    }
+
+    OutError.Reset();
     return true;
 }
