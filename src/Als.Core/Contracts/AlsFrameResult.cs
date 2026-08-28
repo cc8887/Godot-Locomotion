@@ -14,6 +14,7 @@ public enum AlsP4ReasonCode : ushort
     InvalidSelection = 5,
     NonFiniteCurve = 6,
     InvalidRuntimeState = 7,
+    PoseRestoreFailed = 8,
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -280,19 +280,38 @@ public partial class AlsP3WorkerRoot : Node3D
             }
             catch (Exception exception)
             {
-                if (poseCaptured)
+                Exception? restoreException = null;
+                try
                 {
-                    RestorePose();
-                    var restoredFullPoseDigest = ComputeFullPoseDigest();
-                    var restoredRootDigest = AlsP3Presentation.ComputeDigest(
-                        _visualRoot!.GlobalTransform);
-                    _state.RecordRollback(
-                        restoredFullPoseDigest,
-                        restoredRootDigest,
-                        restoredFullPoseDigest == _capturedFullPoseDigest &&
-                        restoredRootDigest == _capturedRootDigest);
+                    if (poseCaptured)
+                    {
+                        RestorePose();
+                        var restoredFullPoseDigest = ComputeFullPoseDigest();
+                        var restoredRootDigest = AlsP3Presentation.ComputeDigest(
+                            _visualRoot!.GlobalTransform);
+                        _state.RecordRollback(
+                            restoredFullPoseDigest,
+                            restoredRootDigest,
+                            restoredFullPoseDigest == _capturedFullPoseDigest &&
+                            restoredRootDigest == _capturedRootDigest);
+                    }
                 }
-                _state.RecordFailure("worker_evaluate", identity, exception);
+                catch (Exception secondaryException)
+                {
+                    restoreException = secondaryException;
+                }
+                finally
+                {
+                    _state.RecordFailure(
+                        "worker_evaluate",
+                        identity,
+                        restoreException is null
+                            ? exception
+                            : new AggregateException(
+                                "Worker evaluation and pose restoration both failed.",
+                                exception,
+                                restoreException));
+                }
             }
         }
         finally

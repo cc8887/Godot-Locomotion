@@ -33,6 +33,7 @@ public sealed class AlsPoseScratch
         UpComponentPose = new Transform3D[count];
         Parents = new int[count];
         Affected = new bool[count];
+        ValidationVisited = new bool[count];
         Order = new int[count];
         AffectedOrder = new int[count];
 
@@ -80,6 +81,8 @@ public sealed class AlsPoseScratch
     public int[] Parents { get; }
 
     public bool[] Affected { get; }
+
+    public bool[] ValidationVisited { get; }
 
     public int[] Order { get; }
 
