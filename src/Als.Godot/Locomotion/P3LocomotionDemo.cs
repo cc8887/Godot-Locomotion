@@ -111,7 +111,7 @@ public partial class P3LocomotionDemo : Node3D
             var nextFrame = active.PublishedFrameId + 1;
             if (_playerInput.CapturedFrameId < nextFrame)
             {
-                _playerInput.CaptureGodotFrame(nextFrame, _orbitCamera.Yaw);
+                _playerInput.CaptureGodotFrame(nextFrame, _orbitCamera.Yaw, _orbitCamera.Pitch);
             }
         }
         catch (Exception exception)

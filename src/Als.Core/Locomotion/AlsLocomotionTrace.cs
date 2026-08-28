@@ -212,7 +212,9 @@ public sealed class AlsLocomotionTrace
         var command = new AlsLocomotionCommand(
             commandAxes,
             viewYaw,
+            0f,
             aimYaw,
+            0f,
             requestedGait,
             requestedStance,
             requestedRotationMode,

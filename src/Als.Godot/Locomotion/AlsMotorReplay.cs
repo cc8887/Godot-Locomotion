@@ -129,7 +129,9 @@ public static class AlsMotorReplay
         byte jumpPressed) => new(
             movementAxes,
             ViewYaw: 0f,
+            ViewPitch: 0f,
             AimYaw: 0f,
+            AimPitch: 0f,
             RequestedGait: requestedGait,
             RequestedStance: stance,
             RequestedRotationMode: AlsRotationMode.LookingDirection,

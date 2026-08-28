@@ -13,9 +13,27 @@ public readonly record struct AlsFloorSample(
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsFootHit(
-    byte HasHit,
+    byte Valid,
+    byte Walkable,
     Vector3 Position,
-    Vector3 Normal);
+    Vector3 Normal,
+    int PlatformId,
+    Vector3 PlatformPosition,
+    Quaternion PlatformRotation,
+    long ColliderId,
+    Vector3 PointVelocity)
+{
+    public static AlsFootHit Invalid => new(
+        0,
+        0,
+        Vector3.Zero,
+        Vector3.UnitY,
+        -1,
+        Vector3.Zero,
+        Quaternion.Identity,
+        -1,
+        Vector3.Zero);
+}
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsMantleProbeResult(
