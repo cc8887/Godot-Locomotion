@@ -87,50 +87,95 @@ public sealed class AlsResultDigestTests
     [Fact]
     public void DigestIncludesEveryP4PoseOutput()
     {
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.AimRelativeYaw = 0.1f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.AimRelativePitch = 0.2f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.HeadWeight = 0.3f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.SpineWeight = 0.4f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.UpperBodyWeight = 0.5f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.SpineResidualYaw = 0.6f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnAnimationId = 1);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnCurveId = 2);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnPhase = 0.7f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnPlayRate = 0.8f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnNominalDegrees = 90);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnDirection = -1);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnActive = 1);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.TurnYawDelta = 0.9f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.RotateAnimationId = 3);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.RotateCurveId = 4);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.RotatePhase = 0.11f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.RotatePlayRate = 0.12f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.RotateDirection = 1);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.RotateActive = 1);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.RotateYawDelta = 0.13f);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.PelvisOffset = new Vector3(1f, 2f, 3f));
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.LeftFootPose = result.LeftFootPose with { Position = new Vector3(1f, 0f, 0f) });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.LeftFootPose = result.LeftFootPose with { Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.2f) });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.LeftFootPose = result.LeftFootPose with { LockAmount = 0.3f });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.LeftFootPose = result.LeftFootPose with { PlatformId = 5 });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.RightFootPose = result.RightFootPose with { Position = new Vector3(0f, 1f, 0f) });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.RightFootPose = result.RightFootPose with { Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitX, 0.4f) });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.RightFootPose = result.RightFootPose with { LockAmount = 0.5f });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.RightFootPose = result.RightFootPose with { PlatformId = 6 });
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.NextLeftFootProbeOrigin = new Vector3(4f, 5f, 6f));
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
-            result.NextRightFootProbeOrigin = new Vector3(7f, 8f, 9f));
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.P4ModifierElapsedTicks = 17);
-        AssertMutationChangesDigest(static (ref AlsFrameResult result) => result.P4ReasonCode = (AlsP4ReasonCode)1);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.AimRelativeYaw = 0.1f,
+            static (ref AlsFrameResult result) => result.AimRelativeYaw = 0.2f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.AimRelativePitch = 0.2f,
+            static (ref AlsFrameResult result) => result.AimRelativePitch = 0.3f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.HeadWeight = 0.3f,
+            static (ref AlsFrameResult result) => result.HeadWeight = 0.4f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.SpineWeight = 0.4f,
+            static (ref AlsFrameResult result) => result.SpineWeight = 0.5f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.UpperBodyWeight = 0.5f,
+            static (ref AlsFrameResult result) => result.UpperBodyWeight = 0.6f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.SpineResidualYaw = 0.6f,
+            static (ref AlsFrameResult result) => result.SpineResidualYaw = 0.7f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnAnimationId = 1,
+            static (ref AlsFrameResult result) => result.TurnAnimationId = 2);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnCurveId = 2,
+            static (ref AlsFrameResult result) => result.TurnCurveId = 3);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnPhase = 0.7f,
+            static (ref AlsFrameResult result) => result.TurnPhase = 0.8f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnPlayRate = 0.8f,
+            static (ref AlsFrameResult result) => result.TurnPlayRate = 0.9f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnNominalDegrees = 90,
+            static (ref AlsFrameResult result) => result.TurnNominalDegrees = 180);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnDirection = -1,
+            static (ref AlsFrameResult result) => result.TurnDirection = 1);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnActive = 1,
+            static (ref AlsFrameResult result) => result.TurnActive = 2);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.TurnYawDelta = 0.9f,
+            static (ref AlsFrameResult result) => result.TurnYawDelta = 1.0f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RotateAnimationId = 3,
+            static (ref AlsFrameResult result) => result.RotateAnimationId = 4);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RotateCurveId = 4,
+            static (ref AlsFrameResult result) => result.RotateCurveId = 5);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RotatePhase = 0.11f,
+            static (ref AlsFrameResult result) => result.RotatePhase = 0.12f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RotatePlayRate = 0.12f,
+            static (ref AlsFrameResult result) => result.RotatePlayRate = 0.13f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RotateDirection = -1,
+            static (ref AlsFrameResult result) => result.RotateDirection = 1);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RotateActive = 1,
+            static (ref AlsFrameResult result) => result.RotateActive = 2);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RotateYawDelta = 0.13f,
+            static (ref AlsFrameResult result) => result.RotateYawDelta = 0.14f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) =>
+                result.LeftFootPose = result.LeftFootPose with { LockAmount = 0.3f },
+            static (ref AlsFrameResult result) =>
+                result.LeftFootPose = result.LeftFootPose with { LockAmount = 0.4f });
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) =>
+                result.LeftFootPose = result.LeftFootPose with { PlatformId = 5 },
+            static (ref AlsFrameResult result) =>
+                result.LeftFootPose = result.LeftFootPose with { PlatformId = 6 });
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) =>
+                result.RightFootPose = result.RightFootPose with { LockAmount = 0.5f },
+            static (ref AlsFrameResult result) =>
+                result.RightFootPose = result.RightFootPose with { LockAmount = 0.6f });
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) =>
+                result.RightFootPose = result.RightFootPose with { PlatformId = 6 },
+            static (ref AlsFrameResult result) =>
+                result.RightFootPose = result.RightFootPose with { PlatformId = 7 });
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.P4ModifierElapsedTicks = 17,
+            static (ref AlsFrameResult result) => result.P4ModifierElapsedTicks = 18);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.P4ReasonCode = (AlsP4ReasonCode)1,
+            static (ref AlsFrameResult result) => result.P4ReasonCode = (AlsP4ReasonCode)2);
     }
 
     [Fact]
@@ -210,11 +255,13 @@ public sealed class AlsResultDigestTests
             Rotation = second.LeftFootPose.Rotation with { X = RawFloat(0x7FC00002) },
         };
 
+        AssertP4ExtensionActive(first);
+        AssertP4ExtensionActive(second);
         AssertResultsHaveDifferentDigests(first, second);
     }
 
     [Fact]
-    public void NestedSignedZeroP4ComponentsAreBitDistinct()
+    public void NestedSignedZeroP4ComponentsActivateTheVersionedExtension()
     {
         AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
             result.LeftFootPose = result.LeftFootPose with
@@ -222,6 +269,21 @@ public sealed class AlsResultDigestTests
                 Rotation = result.LeftFootPose.Rotation with { X = RawFloat(0x80000000) },
             });
         AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with
+            {
+                Position = result.RightFootPose.Position with { Y = RawFloat(0x80000000) },
+            });
+    }
+
+    [Fact]
+    public void DigestIncludesNestedSignedZeroP4RawBitsWithinAnActiveExtension()
+    {
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with
+            {
+                Rotation = result.LeftFootPose.Rotation with { X = RawFloat(0x80000000) },
+            });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
             result.RightFootPose = result.RightFootPose with
             {
                 Position = result.RightFootPose.Position with { Y = RawFloat(0x80000000) },
@@ -241,7 +303,22 @@ public sealed class AlsResultDigestTests
         var baseline = CreateActiveP4Result();
         var changed = baseline;
         mutate(ref changed);
+        AssertP4ExtensionActive(baseline);
+        AssertP4ExtensionActive(changed);
         AssertResultsHaveDifferentDigests(baseline, changed);
+    }
+
+    private static void AssertP4ValueChangesDigest(
+        ResultMutation setFirstValue,
+        ResultMutation setSecondValue)
+    {
+        var first = AlsFrameResult.CreateDefault(new AlsFrameIdentity(1, 0, 1));
+        var second = first;
+        setFirstValue(ref first);
+        setSecondValue(ref second);
+        AssertP4ExtensionActive(first);
+        AssertP4ExtensionActive(second);
+        AssertResultsHaveDifferentDigests(first, second);
     }
 
     private static AlsFrameResult CreateActiveP4Result()
@@ -262,6 +339,16 @@ public sealed class AlsResultDigestTests
         AlsResultDigest.Append(ref changedDigest, second);
 
         Assert.NotEqual(baselineDigest, changedDigest);
+    }
+
+    private static void AssertP4ExtensionActive(in AlsFrameResult result)
+    {
+        var inactive = AlsFrameResult.CreateDefault(result.Identity);
+        var inactiveDigest = AlsResultDigest.OffsetBasis;
+        var activeDigest = AlsResultDigest.OffsetBasis;
+        AlsResultDigest.Append(ref inactiveDigest, inactive);
+        AlsResultDigest.Append(ref activeDigest, result);
+        Assert.NotEqual(inactiveDigest, activeDigest);
     }
 
     private static float RawFloat(uint bits) =>
