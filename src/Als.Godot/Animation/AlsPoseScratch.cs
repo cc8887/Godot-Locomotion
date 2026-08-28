@@ -23,6 +23,8 @@ public sealed class AlsPoseScratch
         LocalPose = new Transform3D[count];
         OriginalComponentPose = new Transform3D[count];
         ComponentPose = new Transform3D[count];
+        ComponentInverses = new Transform3D[count];
+        ComponentInverseValid = new bool[count];
         BaseLocalPose = new Transform3D[count];
         BaseComponentPose = new Transform3D[count];
         DownLocalPose = new Transform3D[count];
@@ -61,6 +63,10 @@ public sealed class AlsPoseScratch
     public Transform3D[] OriginalComponentPose { get; }
 
     public Transform3D[] ComponentPose { get; }
+
+    public Transform3D[] ComponentInverses { get; }
+
+    public bool[] ComponentInverseValid { get; }
 
     public Transform3D[] BaseLocalPose { get; }
 

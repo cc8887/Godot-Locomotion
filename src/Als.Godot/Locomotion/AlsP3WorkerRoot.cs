@@ -228,12 +228,13 @@ public partial class AlsP3WorkerRoot : Node3D
                         out var modifierReason))
                 {
                     _result.P4ReasonCode = modifierReason;
-                    throw new InvalidOperationException(
+                    throw new AlsP4EvaluationException(
+                        modifierReason,
                         $"P4 component pose modifier failed: {modifierReason}");
                 }
                 // Frame-result ticks are deterministic work units so they can participate in
                 // exact single/parallel digests. Wall-clock evidence stays in Measurement.
-                _result.P4ModifierElapsedTicks = modifierOutput.DeterministicElapsedTicks;
+                _result.P4ModifierOperationTicks = modifierOutput.OperationTicks;
                 _result.P4ReasonCode = AlsP4ReasonCode.None;
                 var appliedRoot = _visualRoot.GlobalTransform;
                 AlsP3Presentation.ThrowIfNonFinite(appliedRoot);
@@ -311,6 +312,9 @@ public partial class AlsP3WorkerRoot : Node3D
                 }
                 finally
                 {
+                    var failureReason = exception is AlsP4EvaluationException p4Failure
+                        ? p4Failure.ReasonCode
+                        : _result.P4ReasonCode;
                     _state.RecordFailure(
                         "worker_evaluate",
                         identity,
@@ -320,7 +324,7 @@ public partial class AlsP3WorkerRoot : Node3D
                                 "Worker evaluation and pose restoration both failed.",
                                 exception,
                                 restoreException),
-                        _result.P4ReasonCode);
+                        failureReason);
                 }
             }
         }
@@ -393,8 +397,9 @@ public partial class AlsP3WorkerRoot : Node3D
                 out var view,
                 out var viewReason))
         {
-            nextResult.P4ReasonCode = viewReason;
-            throw new InvalidOperationException($"P4 view pose evaluation failed: {viewReason}");
+            throw new AlsP4EvaluationException(
+                viewReason,
+                $"P4 view pose evaluation failed: {viewReason}");
         }
         if (!AlsTurnRotateModel.TrySelectAndAdvance(
                 in _turnRotateSettings,
@@ -405,8 +410,8 @@ public partial class AlsP3WorkerRoot : Node3D
                 out var selection,
                 out var selectionReason))
         {
-            nextResult.P4ReasonCode = selectionReason;
-            throw new InvalidOperationException(
+            throw new AlsP4EvaluationException(
+                selectionReason,
                 $"P4 Turn/Rotate selection failed: {selectionReason}");
         }
 
@@ -424,8 +429,8 @@ public partial class AlsP3WorkerRoot : Node3D
                     out var previousCurve,
                     out var currentCurve))
             {
-                nextResult.P4ReasonCode = AlsP4ReasonCode.NonFiniteCurve;
-                throw new InvalidOperationException(
+                throw new AlsP4EvaluationException(
+                    AlsP4ReasonCode.NonFiniteCurve,
                     "P4 Turn/Rotate curve lookup failed.");
             }
             if (!AlsTurnRotateModel.TryFinalizeYaw(
@@ -435,8 +440,8 @@ public partial class AlsP3WorkerRoot : Node3D
                     out var turnRotate,
                     out var curveReason))
             {
-                nextResult.P4ReasonCode = curveReason;
-                throw new InvalidOperationException(
+                throw new AlsP4EvaluationException(
+                    curveReason,
                     $"P4 Turn/Rotate curve evaluation failed: {curveReason}");
             }
             nextResult.TargetYaw = AlsMath.NormalizeAngleRadians(
@@ -513,6 +518,14 @@ public partial class AlsP3WorkerRoot : Node3D
                 0f);
         }
         return AlsP4AnimationInput.Disabled;
+    }
+
+    private sealed class AlsP4EvaluationException : InvalidOperationException
+    {
+        public AlsP4EvaluationException(AlsP4ReasonCode reasonCode, string message)
+            : base(message) => ReasonCode = reasonCode;
+
+        public AlsP4ReasonCode ReasonCode { get; }
     }
 
     private void CompileCurveSamplers(

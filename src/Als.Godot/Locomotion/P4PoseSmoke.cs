@@ -70,6 +70,7 @@ public partial class P4PoseSmoke : Node
         var basePose = PoseSnapshot.Capture(graph.TargetSkeleton, (Node3D)library.Root);
         var protectedIds = ProtectedBoneNames.Select(graph.TargetSkeleton.FindBone).ToArray();
         Require(protectedIds.All(id => id >= 0), "protected Mannequin bones are missing");
+        VerifyNonCommutingLocalDeltaOracle();
 
         var cases = new[]
         {
@@ -94,7 +95,7 @@ public partial class P4PoseSmoke : Node
                 "modifier did not use the validated additive base animation");
             Require(output.WriteTransactionCount == 1,
                 "modifier did not publish exactly one Skeleton write transaction");
-            Require(output.DeterministicElapsedTicks > 0,
+            Require(output.OperationTicks > 0,
                 "modifier did not publish deterministic operation ticks");
             if (index == 0)
             {
@@ -115,7 +116,7 @@ public partial class P4PoseSmoke : Node
             var repeated = default(AlsPoseModifierOutput);
             Require(modifier.TryApply(in input, ref repeated, out reason) &&
                     repeated.PoseDigest == digests[index] &&
-                    repeated.DeterministicElapsedTicks == output.DeterministicElapsedTicks,
+                    repeated.OperationTicks == output.OperationTicks,
                 $"{cases[index].Name} pose digest was not stable: " +
                 $"first={digests[index]:X16} repeated={repeated.PoseDigest:X16} reason={reason}");
         }
@@ -206,7 +207,47 @@ public partial class P4PoseSmoke : Node
             $"P4_POSE_TOPOLOGY_PERF iterations=10000 elapsed_ms={steadyElapsed.TotalMilliseconds:F3} " +
             $"bones={graph.TargetSkeleton.GetBoneCount()} alloc={allocated}B");
 
+        basePose.Restore(graph.TargetSkeleton, (Node3D)library.Root);
+        var activeInput = cases[1].ToInput() with { ArmLocalWeight = 0.37f };
+        var activeOutput = default(AlsPoseModifierOutput);
+        for (var index = 0; index < 100; index++)
+        {
+            Require(modifier.TryApply(in activeInput, ref activeOutput, out _),
+                "active Aim allocation warmup failed");
+        }
+        var activeNameValidations = modifier.NameValidationCount;
+        var activeAllocationBefore = GC.GetAllocatedBytesForCurrentThread();
+        var activeStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        for (var index = 0; index < 10_000; index++)
+        {
+            if (!modifier.TryApply(in activeInput, ref activeOutput, out _))
+            {
+                throw new InvalidOperationException("active Aim steady evaluation failed");
+            }
+        }
+        var activeElapsed = System.Diagnostics.Stopwatch.GetElapsedTime(activeStartedAt);
+        var activeAllocated = GC.GetAllocatedBytesForCurrentThread() - activeAllocationBefore;
+        Require(activeAllocated == 0, $"active Aim path allocated {activeAllocated} B");
+        Require(modifier.NameValidationCount == activeNameValidations,
+            "active Aim path entered the name-validation cold path");
+        Require(activeOutput.PoseDigest != 0 && activeOutput.OperationTicks > 0 &&
+                activeOutput.WriteTransactionCount == 1,
+            "active Aim path did not execute the production modifier stages");
+        GD.Print(
+            $"P4_POSE_ACTIVE_PERF iterations=10000 elapsed_ms={activeElapsed.TotalMilliseconds:F3} " +
+            $"bones={graph.TargetSkeleton.GetBoneCount()} affected={activeOutput.AffectedBoneCount} " +
+            $"alloc={activeAllocated}B writes=1");
+        basePose.Restore(graph.TargetSkeleton, (Node3D)library.Root);
+
         VerifyWriteFailureTransactions(
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            library,
+            definition,
+            poseProfile,
+            cases[0].ToInput());
+        VerifyNonInvertibleTransactions(
             basePose,
             graph.TargetSkeleton,
             (Node3D)library.Root,
@@ -324,12 +365,19 @@ public partial class P4PoseSmoke : Node
         var perturbedRotation = (new Quaternion(Vector3.Up, 0.23f) *
             skeleton.GetBonePoseRotation(armParentId)).Normalized();
         skeleton.SetBonePoseRotation(armParentId, perturbedRotation);
+        var armRotation = (skeleton.GetBonePoseRotation(armBoneId) *
+            new Quaternion(new Vector3(0.31f, 0.73f, 0.19f).Normalized(), 0.37f)).Normalized();
+        skeleton.SetBonePoseRotation(armBoneId, armRotation);
+        skeleton.SetBonePosePosition(
+            armBoneId,
+            skeleton.GetBonePosePosition(armBoneId) + new Vector3(0.013f, -0.009f, 0.017f));
         var underlyingPose = PoseSnapshot.Capture(skeleton, visualRoot);
         var originalLocal = skeleton.GetBoneRest(armBoneId) *
             underlyingPose.GetBonePose(armBoneId);
-        var localDelta = forwardLocal * baseLocal.AffineInverse();
-        var expectedFullLocal = Transform3D.Identity.InterpolateWith(
-            localDelta, input.UpperBodyWeight) * originalLocal;
+        var localDelta = baseLocal.AffineInverse() * forwardLocal;
+        var weightedLocalDelta = Transform3D.Identity.InterpolateWith(
+            localDelta, input.UpperBodyWeight);
+        var expectedFullLocal = originalLocal * weightedLocalDelta;
 
         underlyingPose.Restore(skeleton, visualRoot);
         var fullLocal = input with { ArmLocalWeight = 1f };
@@ -364,6 +412,31 @@ public partial class P4PoseSmoke : Node
             $"full-local and full-mesh Arm endpoints were not distinct: " +
             $"bone={skeletonDefinition.PhysicalBones[armBoneId].Name} " +
             $"local={fullLocalComponent} mesh={actualFullMesh}");
+    }
+
+    private static void VerifyNonCommutingLocalDeltaOracle()
+    {
+        var baseLocal = new Transform3D(
+            new Basis(new Quaternion(new Vector3(0.23f, 0.71f, 0.41f).Normalized(), 0.47f)),
+            new Vector3(0.31f, -0.17f, 0.23f));
+        var authoredDelta = new Transform3D(
+            new Basis(new Quaternion(new Vector3(0.67f, 0.19f, 0.53f).Normalized(), -0.38f)),
+            new Vector3(-0.11f, 0.29f, 0.07f));
+        var aimLocal = baseLocal * authoredDelta;
+        var currentLocal = new Transform3D(
+            new Basis(new Quaternion(new Vector3(0.13f, 0.83f, 0.37f).Normalized(), 0.61f)),
+            new Vector3(0.43f, 0.05f, -0.27f));
+        const float weight = 0.63f;
+        var expected = currentLocal * Transform3D.Identity.InterpolateWith(authoredDelta, weight);
+        var legacy = Transform3D.Identity.InterpolateWith(
+            aimLocal * baseLocal.AffineInverse(), weight) * currentLocal;
+        Require(!TransformNear(expected, legacy, 1e-4f),
+            "synthetic B/D/C fixture does not distinguish local multiplication order");
+        Require(AlsComponentPoseModifier.TryComposeLocalResult(
+                in currentLocal, in baseLocal, in aimLocal, weight, out var actual),
+            "synthetic local composition unexpectedly failed");
+        RequireTransformNear(actual, expected, 1e-5f,
+            "local-space delta composition did not match the independent B^-1*A oracle");
     }
 
     private static void VerifyTopologyMutationRejected(
@@ -445,6 +518,98 @@ public partial class P4PoseSmoke : Node
         RequireOutputExact(frozenOutput, frozenExpected, "persistent setter failure");
         Require(!frozenBefore.IsExact(skeleton, visualRoot),
             "persistent setter failure did not leave an observable frozen partial pose");
+        basePose.Restore(skeleton, visualRoot);
+    }
+
+    private static void VerifyNonInvertibleTransactions(
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition definition,
+        AlsPoseAnimationProfile profile,
+        in AlsPoseModifierInput input)
+    {
+        var fixtures = new[]
+        {
+            AlsPoseAffineTestFixture.SingularBase,
+            AlsPoseAffineTestFixture.NearSingularBase,
+            AlsPoseAffineTestFixture.SingularAim,
+            AlsPoseAffineTestFixture.NearSingularAim,
+        };
+        foreach (var fixture in fixtures)
+        {
+            basePose.Restore(skeleton, visualRoot);
+            var before = PoseSnapshot.Capture(skeleton, visualRoot);
+            var writer = new FaultingSkeletonPoseWriter(skeleton);
+            writer.Configure(int.MaxValue, persistent: false);
+            using var modifier = new AlsComponentPoseModifier(
+                skeleton, visualRoot, library, definition, profile, writer, fixture);
+            var expected = SentinelOutput();
+            var output = expected;
+            Require(!modifier.TryApply(in input, ref output, out var reason),
+                $"{fixture} affine fixture unexpectedly succeeded");
+            Require(reason == AlsP4ReasonCode.NonFiniteInput,
+                $"{fixture} returned unstable reason: {reason}");
+            Require(writer.WriteCount == 0, $"{fixture} wrote Skeleton state before rejection");
+            RequireOutputExact(output, expected, fixture.ToString());
+            before.RequireExact(skeleton, visualRoot, fixture.ToString());
+        }
+
+        var guardedWriter = new FaultingSkeletonPoseWriter(skeleton);
+        guardedWriter.Configure(int.MaxValue, persistent: false);
+        using var guardedModifier = new AlsComponentPoseModifier(
+            skeleton, visualRoot, library, definition, profile, guardedWriter);
+        var skeletonDefinition = definition.Skeletons[profile.SkeletonId];
+        var armMask = profile.Masks.Entries.Single(entry => entry.Kind == AlsPoseMaskKind.LeftArm);
+        var armId = skeletonDefinition.LogicalToPhysical[armMask.RootBoneId];
+        var parentId = skeleton.GetBoneParent(armId);
+        Require(parentId >= 0, "singular current-parent fixture has no parent");
+        foreach (var scale in new[] { Vector3.Zero, new Vector3(1f, 1e-7f, 1f) })
+        {
+            basePose.Restore(skeleton, visualRoot);
+            skeleton.SetBonePoseScale(parentId, scale);
+            var before = PoseSnapshot.Capture(skeleton, visualRoot);
+            guardedWriter.Configure(int.MaxValue, persistent: false);
+            var expected = SentinelOutput();
+            var output = expected;
+            Require(!guardedModifier.TryApply(in input, ref output, out var reason),
+                "singular/near-singular current parent unexpectedly succeeded");
+            Require(reason == AlsP4ReasonCode.NonFiniteInput && guardedWriter.WriteCount == 0,
+                $"current parent rejection was not zero-write/stable: {reason}");
+            RequireOutputExact(output, expected, "current parent affine failure");
+            before.RequireExact(skeleton, visualRoot, "current parent affine failure");
+        }
+
+        var restId = skeleton.FindBone("hand_l");
+        Require(restId >= 0, "singular rest fixture bone is missing");
+        var originalRest = skeleton.GetBoneRest(restId);
+        foreach (var basis in new[]
+        {
+            Basis.FromScale(Vector3.Zero),
+            Basis.FromScale(new Vector3(1f, 1e-7f, 1f)),
+        })
+        {
+            basePose.Restore(skeleton, visualRoot);
+            guardedWriter.Configure(int.MaxValue, persistent: false);
+            var expected = SentinelOutput();
+            var output = expected;
+            try
+            {
+                skeleton.SetBoneRest(restId, new Transform3D(basis, originalRest.Origin));
+                var before = PoseSnapshot.Capture(skeleton, visualRoot);
+                Require(!guardedModifier.TryApply(in input, ref output, out var reason),
+                    "singular/near-singular rest unexpectedly succeeded");
+                Require(reason == AlsP4ReasonCode.InvalidRuntimeState && guardedWriter.WriteCount == 0,
+                    $"rest rejection was not zero-write/stable: {reason}");
+                RequireOutputExact(output, expected, "rest affine failure");
+                before.RequireExact(skeleton, visualRoot, "rest affine failure");
+            }
+            finally
+            {
+                skeleton.SetBoneRest(restId, originalRest);
+            }
+        }
         basePose.Restore(skeleton, visualRoot);
     }
 
@@ -795,7 +960,7 @@ public partial class P4PoseSmoke : Node
     private static AlsPoseModifierOutput SentinelOutput() => new()
     {
         PoseDigest = 0x1122334455667788UL,
-        DeterministicElapsedTicks = 31337,
+        OperationTicks = 31337,
         WriteTransactionCount = 17,
         AffectedBoneCount = 19,
         ArmLocalWeight = 0.25f,
@@ -809,7 +974,7 @@ public partial class P4PoseSmoke : Node
         string label)
     {
         Require(actual.PoseDigest == expected.PoseDigest &&
-                actual.DeterministicElapsedTicks == expected.DeterministicElapsedTicks &&
+                actual.OperationTicks == expected.OperationTicks &&
                 actual.WriteTransactionCount == expected.WriteTransactionCount &&
                 actual.AffectedBoneCount == expected.AffectedBoneCount &&
                 BitConverter.SingleToInt32Bits(actual.ArmLocalWeight) ==
@@ -932,6 +1097,8 @@ public partial class P4PoseSmoke : Node
         private bool _triggered;
 
         public FaultingSkeletonPoseWriter(Skeleton3D skeleton) => _skeleton = skeleton;
+
+        public int WriteCount => _writeCount;
 
         public void Configure(int throwAt, bool persistent)
         {

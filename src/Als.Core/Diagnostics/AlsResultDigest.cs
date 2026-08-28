@@ -82,7 +82,7 @@ public static class AlsResultDigest
             Append(ref digest, result.RightFootPose.PlatformId);
             Append(ref digest, result.NextLeftFootProbeOrigin);
             Append(ref digest, result.NextRightFootProbeOrigin);
-            Append(ref digest, result.P4ModifierElapsedTicks);
+            Append(ref digest, result.P4ModifierOperationTicks);
             Append(ref digest, (ushort)result.P4ReasonCode);
         }
     }
@@ -114,7 +114,7 @@ public static class AlsResultDigest
         !IsDefault(result.RightFootPose) ||
         !IsPositiveZero(result.NextLeftFootProbeOrigin) ||
         !IsPositiveZero(result.NextRightFootProbeOrigin) ||
-        result.P4ModifierElapsedTicks != 0 ||
+        result.P4ModifierOperationTicks != 0 ||
         result.P4ReasonCode != AlsP4ReasonCode.None;
 
     private static bool IsDefault(in AlsFootPoseOutput output) =>

@@ -115,7 +115,7 @@ public sealed class ContractLayoutTests
             "RotateAnimationId", "RotateCurveId", "RotatePhase", "RotatePlayRate",
             "RotateDirection", "RotateActive", "RotateYawDelta", "PelvisOffset", "LeftFootPose",
             "RightFootPose", "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
-            "P4ModifierElapsedTicks", "P4ReasonCode");
+            "P4ModifierOperationTicks", "P4ReasonCode");
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class ContractLayoutTests
         Assert.Equal(typeof(ushort), Enum.GetUnderlyingType(typeof(AlsP4ReasonCode)));
         Assert.Equal(
             typeof(long),
-            typeof(AlsFrameResult).GetField(nameof(AlsFrameResult.P4ModifierElapsedTicks))?.FieldType);
+            typeof(AlsFrameResult).GetField(nameof(AlsFrameResult.P4ModifierOperationTicks))?.FieldType);
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public sealed class ContractLayoutTests
         Assert.Equal(Vector3.Zero, result.PelvisOffset);
         Assert.Equal(Vector3.Zero, result.NextLeftFootProbeOrigin);
         Assert.Equal(Vector3.Zero, result.NextRightFootProbeOrigin);
-        Assert.Equal(0L, result.P4ModifierElapsedTicks);
+        Assert.Equal(0L, result.P4ModifierOperationTicks);
         Assert.Equal(AlsP4ReasonCode.None, result.P4ReasonCode);
     }
 

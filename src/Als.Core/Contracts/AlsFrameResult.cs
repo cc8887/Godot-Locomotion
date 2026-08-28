@@ -82,7 +82,7 @@ public struct AlsFrameResult
     public AlsFootPoseOutput RightFootPose;
     public Vector3 NextLeftFootProbeOrigin;
     public Vector3 NextRightFootProbeOrigin;
-    public long P4ModifierElapsedTicks;
+    public long P4ModifierOperationTicks;
     public AlsP4ReasonCode P4ReasonCode;
 
     public static AlsFrameResult CreateDefault(AlsFrameIdentity identity) => new()
