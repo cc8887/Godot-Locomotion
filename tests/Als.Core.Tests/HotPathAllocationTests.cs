@@ -97,6 +97,34 @@ public sealed class HotPathAllocationTests
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
     }
 
+    [Fact]
+    public void FootPlacementEvaluateDoesNotAllocateAfterWarmup()
+    {
+        var leftHit = new AlsFootHit(
+            1, 1, new System.Numerics.Vector3(-0.2f, 0f, 0f),
+            System.Numerics.Vector3.UnitY, -1, System.Numerics.Vector3.Zero,
+            System.Numerics.Quaternion.Identity, 10, System.Numerics.Vector3.Zero);
+        var rightHit = leftHit with
+        {
+            Position = new System.Numerics.Vector3(0.2f, 0f, 0f),
+            ColliderId = 11,
+        };
+        var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(1, 0, 1), 1f / 60f) with
+        {
+            CharacterTransform = System.Numerics.Matrix4x4.Identity,
+            Floor = new AlsFloorSample(
+                1, System.Numerics.Vector3.UnitY, -1,
+                System.Numerics.Matrix4x4.Identity, System.Numerics.Vector3.Zero),
+            LeftFootHit = leftHit,
+            RightFootHit = rightHit,
+            CurrentDriveMode = AlsDriveMode.MotorDriven,
+        };
+
+        var allocated = MeasureFootPlacementEvaluate(input);
+
+        Assert.Equal(0, allocated);
+    }
+
     private static void Run(AlsFrameExchange exchange, int iterations)
     {
         var buffer = new AlsEventBuffer();
@@ -212,6 +240,40 @@ public sealed class HotPathAllocationTests
                     settings, input, state, out state, out _, out _))
             {
                 throw new InvalidOperationException("View pose measurement failed.");
+            }
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static long MeasureFootPlacementEvaluate(AlsFrameInput input)
+    {
+        var state = AlsRuntimeState.CreateDefault();
+        state.Initialized = 1;
+        state.LocomotionState = AlsLocomotionState.Grounded;
+        state.LeftFootProbeOrigin = new System.Numerics.Vector3(-0.2f, 0.13f, 0f);
+        state.RightFootProbeOrigin = new System.Numerics.Vector3(0.2f, 0.13f, 0f);
+        var settings = AlsFootPlacementSettings.CreateReference();
+
+        for (var index = 0; index < 10_000; index++)
+        {
+            if (!AlsFootPlacementModel.TryEvaluate(
+                    settings, input, 1f, 1f, 1f, 1f, state,
+                    out state, out _, out _))
+            {
+                throw new InvalidOperationException("Foot placement warmup failed.");
+            }
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 10_000; index++)
+        {
+            if (!AlsFootPlacementModel.TryEvaluate(
+                    settings, input, 1f, 1f, 1f, 1f, state,
+                    out state, out _, out _))
+            {
+                throw new InvalidOperationException("Foot placement measurement failed.");
             }
         }
 

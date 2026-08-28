@@ -74,7 +74,8 @@ public sealed class ContractLayoutTests
             "PhasePlayRate", "YawScale", "EffectiveDeltaTime", "PhaseTravel", "Duration",
             "BlendSeconds", "RemainingYaw", "NominalDegrees", "Direction", "ScaleAngle", "Active");
         AssertFieldOrder<AlsFootLockState>(
-            "LocalPosition", "LocalRotation", "Offset", "Rotation", "PlatformId", "Amount", "Locked");
+            "LocalPosition", "LocalRotation", "Offset", "Rotation", "ProvenancePosition",
+            "ProvenanceRotation", "PlatformId", "Amount", "Locked");
         AssertFieldOrder<AlsPelvisCorrectionState>(
             "CurrentOffset", "TargetOffset", "VerticalVelocity");
         AssertFieldOrder<AlsFootHit>(

@@ -7,6 +7,7 @@ using GodotAls.Core.Pose;
 
 namespace GodotAls.Core.Tests;
 
+[Collection(AllocationTestCollection.Name)]
 public sealed class AlsViewPoseModelTests
 {
     private const float Tolerance = 1e-5f;

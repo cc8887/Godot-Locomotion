@@ -57,11 +57,15 @@ public readonly record struct AlsFootLockState(
     Quaternion LocalRotation,
     Vector3 Offset,
     Quaternion Rotation,
+    Vector3 ProvenancePosition,
+    Quaternion ProvenanceRotation,
     int PlatformId,
     float Amount,
     byte Locked)
 {
     public static AlsFootLockState CreateDefault() => new(
+        Vector3.Zero,
+        Quaternion.Identity,
         Vector3.Zero,
         Quaternion.Identity,
         Vector3.Zero,
