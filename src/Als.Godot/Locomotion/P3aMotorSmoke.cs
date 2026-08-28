@@ -3,6 +3,7 @@ using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Math;
 using NumericsMatrix4x4 = System.Numerics.Matrix4x4;
+using NumericsQuaternion = System.Numerics.Quaternion;
 using NumericsVector2 = System.Numerics.Vector2;
 using NumericsVector3 = System.Numerics.Vector3;
 
@@ -36,7 +37,7 @@ public partial class P3aMotorSmoke : Node
     private bool _platformVelocityObserved;
     private bool _platformFeedbackChecked;
     private bool _platformDidNotBecomeSelfPropulsion;
-    private bool _platformUnavailableTupleChecked;
+    private bool _platformTupleChecked;
     private bool _minimumClearanceShapePreserved;
     private bool _freshJumpChecked;
     private bool _airborneJumpChecked;
@@ -245,7 +246,7 @@ public partial class P3aMotorSmoke : Node
         Require(_platformVelocityObserved, "moving-platform regression did not observe platform velocity");
         Require(_platformFeedbackChecked, "moving-platform regression did not execute its feedback check");
         Require(_platformDidNotBecomeSelfPropulsion, "actual platform velocity became requested self-propulsion");
-        Require(_platformUnavailableTupleChecked, "unavailable platform tuple regression did not execute");
+        Require(_platformTupleChecked, "moving platform tuple regression did not execute");
         Require(_minimumClearanceShapePreserved, "minimum valid capsule was altered for stand clearance");
         Require(_reverseResponseChecked, "reverse response regression did not execute");
         Require(_gaitReductionChecked, "gait reduction regression did not execute");
@@ -824,16 +825,39 @@ public partial class P3aMotorSmoke : Node
 
     private void ObserveMovingPlatform(in AlsFrameInput input)
     {
-        if (!_platformUnavailableTupleChecked && input.Floor.IsGrounded == 1)
+        if (!_platformTupleChecked && input.Floor.IsGrounded == 1)
         {
-            Require(input.Floor.PlatformId == -1, "P3A exposed a partial moving-platform identity");
+            var platformTransform = _movingPlatform.GlobalTransform;
+            var platformRotation = platformTransform.Basis.Orthonormalized()
+                .GetRotationQuaternion().Normalized();
+            var expectedTransform = NumericsMatrix4x4.CreateFromQuaternion(
+                new NumericsQuaternion(
+                    platformRotation.X,
+                    platformRotation.Y,
+                    platformRotation.Z,
+                    platformRotation.W));
+            expectedTransform.Translation = new NumericsVector3(
+                platformTransform.Origin.X,
+                platformTransform.Origin.Y,
+                platformTransform.Origin.Z);
+            var actualAngular = _platformMotor.GetPlatformAngularVelocity();
+            var expectedAngular = new NumericsVector3(
+                actualAngular.X,
+                actualAngular.Y,
+                actualAngular.Z);
             Require(
-                input.Floor.PlatformTransform == NumericsMatrix4x4.Identity,
-                "unavailable moving-platform transform was not identity");
-            Require(
-                input.Floor.PlatformAngularVelocity == NumericsVector3.Zero,
-                "unavailable moving-platform angular velocity was not zero");
-            _platformUnavailableTupleChecked = true;
+                input.Floor.PlatformId ==
+                AlsCharacterMotor.CreatePlatformId(_movingPlatform.GetInstanceId()),
+                "P3A moving-platform compact identity did not match the floor collider");
+            Require(input.Floor.PlatformTransform == expectedTransform,
+                "P3A moving-platform transform did not match the normalized current collider transform");
+            Require(input.Floor.PlatformAngularVelocity == expectedAngular &&
+                    float.IsFinite(expectedAngular.X) &&
+                    float.IsFinite(expectedAngular.Y) &&
+                    float.IsFinite(expectedAngular.Z) &&
+                    actualAngular.DistanceTo(_movingPlatform.ConstantAngularVelocity) <= Tolerance,
+                "P3A moving-platform angular velocity was incomplete or non-finite");
+            _platformTupleChecked = true;
         }
 
         if (!_platformVelocityObserved &&

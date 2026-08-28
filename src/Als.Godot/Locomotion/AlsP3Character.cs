@@ -58,6 +58,8 @@ public partial class AlsP3Character : Node3D
     internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
         _state.CaptureRuntimeDiagnostics();
 
+    internal AlsFrameInput LatestMotorInput => _state.MotorInput;
+
     internal int FailurePendingIdentityCount =>
         _state.CaptureRuntimeDiagnostics().PendingFailureIdentityCount;
 
@@ -205,6 +207,7 @@ public partial class AlsP3Character : Node3D
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
             _state.MotorActualVelocity = input.ActualVelocity;
+            _state.MotorInput = input;
             var measurement = _context.Measurement;
             var measure = measurement is not null &&
                 measurement.TryGetMeasurementIndex(input.Identity, out _);

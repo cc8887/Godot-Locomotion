@@ -14,6 +14,7 @@ namespace GodotAls.Locomotion;
 public partial class P3bFrameOrderSmoke : Node
 {
     private const string ProfilePath = "res://assets/config/p3_locomotion_profile.json";
+    private const string PoseProfilePath = "res://assets/config/p4_pose_profile.json";
     private const long LastFrame = 180;
     private const long ReplacementFrame = 120;
 
@@ -38,6 +39,11 @@ public partial class P3bFrameOrderSmoke : Node
     private bool _replacementRequested;
     private int _maximumVisibleCharacterCount;
     private Vector3 _initialMovementAnchorPosition;
+    private int _leftFootBoneId;
+    private int _rightFootBoneId;
+    private AlsFrameIdentity _previousFootProbeIdentity;
+    private System.Numerics.Vector3 _previousLeftFootProbeOrigin;
+    private System.Numerics.Vector3 _previousRightFootProbeOrigin;
     private bool _inactiveRigHiddenAfterSeparation;
     private bool _recoveryZeroVisible;
     private bool _disposeGuardsChecked;
@@ -117,6 +123,13 @@ public partial class P3bFrameOrderSmoke : Node
                 new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f));
             _active = _slot.ActiveCharacter;
             _initialMovementAnchorPosition = _active.MovementAnchor.GlobalPosition;
+            var poseProfile = AlsPoseProfileCompiler.Compile(
+                Godot.FileAccess.GetFileAsString(PoseProfilePath), animationSet);
+            var skeletonDefinition = animationSet.Skeletons[poseProfile.SkeletonId];
+            _leftFootBoneId = skeletonDefinition.LogicalToPhysical[
+                poseProfile.Feet.LeftFootRootBoneId];
+            _rightFootBoneId = skeletonDefinition.LogicalToPhysical[
+                poseProfile.Feet.RightFootRootBoneId];
             ValidateLifecycleThreadAndSchedulingContracts();
             var lifecycle = _active.LifecycleDiagnostics;
             Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
@@ -225,6 +238,7 @@ public partial class P3bFrameOrderSmoke : Node
             MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
             MathF.Abs(frame.ActualVelocity.Z - motorVelocity.Z) < 0.00001f,
             "committed diagnostics did not carry the same-frame motor actual velocity");
+        ValidateProductionFootProbeOrigins(frame);
 
         if (_firstJumpFrame == 0 && frame.Result.ResolvedLocomotionState == AlsLocomotionState.InAir)
         {
@@ -408,6 +422,92 @@ public partial class P3bFrameOrderSmoke : Node
         }
         return (mode, failurePolicy);
     }
+
+    private void ValidateProductionFootProbeOrigins(in AlsP3FrameDiagnostics frame)
+    {
+        var source = frame.FootProbeSource;
+        Require(source.Identity == frame.Identity &&
+                source.LeftPhysicalBoneId == _leftFootBoneId &&
+                source.RightPhysicalBoneId == _rightFootBoneId &&
+                source.LeftPhysicalBoneId != source.RightPhysicalBoneId,
+            "production Worker foot probe source snapshot had invalid identity or bone IDs");
+        var characterTransform = ToGodot(source.CharacterTransform);
+        var skeletonTransform = ToGodot(source.SkeletonTransform);
+        var inverseCharacter = characterTransform.AffineInverse();
+        var leftWorld = skeletonTransform * new Vector3(
+            source.LeftComponentOrigin.X,
+            source.LeftComponentOrigin.Y,
+            source.LeftComponentOrigin.Z);
+        var rightWorld = skeletonTransform * new Vector3(
+            source.RightComponentOrigin.X,
+            source.RightComponentOrigin.Y,
+            source.RightComponentOrigin.Z);
+        var expectedLeft = inverseCharacter * leftWorld;
+        var expectedRight = inverseCharacter * rightWorld;
+        Require(frame.Result.NextLeftFootProbeOrigin.LengthSquared() > 1e-8f &&
+                frame.Result.NextRightFootProbeOrigin.LengthSquared() > 1e-8f,
+            "production Worker published zero foot probe origins");
+        Require(IsApprox(frame.Result.NextLeftFootProbeOrigin, expectedLeft) &&
+                IsApprox(frame.Result.NextRightFootProbeOrigin, expectedRight),
+            "production Worker foot probe origins did not come from the uncorrected foot bones");
+
+        var motorInput = _active.LatestMotorInput;
+        var motor = (AlsCharacterMotor)_active.MovementAnchor;
+        if (_previousFootProbeIdentity.CharacterId == motorInput.Identity.CharacterId &&
+            _previousFootProbeIdentity.SlotGeneration == motorInput.Identity.SlotGeneration &&
+            _previousFootProbeIdentity.FrameId + 1 == motorInput.Identity.FrameId)
+        {
+            var gatherCharacterTransform = AlsP3Presentation.ToGodot(motorInput.CharacterTransform);
+            var expectedLeftRay = gatherCharacterTransform * new Vector3(
+                _previousLeftFootProbeOrigin.X,
+                _previousLeftFootProbeOrigin.Y,
+                _previousLeftFootProbeOrigin.Z);
+            var expectedRightRay = gatherCharacterTransform * new Vector3(
+                _previousRightFootProbeOrigin.X,
+                _previousRightFootProbeOrigin.Y,
+                _previousRightFootProbeOrigin.Z);
+            Require(motor.LastFootGatherConsumed &&
+                    motor.LastFootGatherRequestIdentity == _previousFootProbeIdentity &&
+                    motor.LastLeftFootQueryWorldOrigin.DistanceSquaredTo(expectedLeftRay) < 1e-8f &&
+                    motor.LastRightFootQueryWorldOrigin.DistanceSquaredTo(expectedRightRay) < 1e-8f &&
+                    (motorInput.LeftFootHit.Valid == 0 ||
+                     (MathF.Abs(motorInput.LeftFootHit.Position.X - expectedLeftRay.X) < 0.0001f &&
+                      MathF.Abs(motorInput.LeftFootHit.Position.Z - expectedLeftRay.Z) < 0.0001f)) &&
+                    (motorInput.RightFootHit.Valid == 0 ||
+                     (MathF.Abs(motorInput.RightFootHit.Position.X - expectedRightRay.X) < 0.0001f &&
+                      MathF.Abs(motorInput.RightFootHit.Position.Z - expectedRightRay.Z) < 0.0001f)),
+                "Commit/Gather N+1 did not consume the previous production foot-bone origins: " +
+                $"frame={motorInput.Identity.FrameId} " +
+                $"left={motorInput.LeftFootHit.Valid}/" +
+                $"{motorInput.LeftFootHit.Position.X:F4},{motorInput.LeftFootHit.Position.Z:F4} " +
+                $"expected={expectedLeftRay.X:F4},{expectedLeftRay.Z:F4} " +
+                $"right={motorInput.RightFootHit.Valid}/" +
+                $"{motorInput.RightFootHit.Position.X:F4},{motorInput.RightFootHit.Position.Z:F4} " +
+                $"expected={expectedRightRay.X:F4},{expectedRightRay.Z:F4}");
+        }
+        else if (_previousFootProbeIdentity.CharacterId == motorInput.Identity.CharacterId &&
+                 _previousFootProbeIdentity.SlotGeneration != 0 &&
+                 _previousFootProbeIdentity.SlotGeneration != motorInput.Identity.SlotGeneration)
+        {
+            Require(!motor.LastFootGatherConsumed,
+                "replacement lifecycle consumed a retired-generation foot probe request");
+        }
+        _previousFootProbeIdentity = frame.Identity;
+        _previousLeftFootProbeOrigin = frame.Result.NextLeftFootProbeOrigin;
+        _previousRightFootProbeOrigin = frame.Result.NextRightFootProbeOrigin;
+    }
+
+    private static bool IsApprox(in System.Numerics.Vector3 actual, in Vector3 expected) =>
+        MathF.Abs(actual.X - expected.X) < 0.0001f &&
+        MathF.Abs(actual.Y - expected.Y) < 0.0001f &&
+        MathF.Abs(actual.Z - expected.Z) < 0.0001f;
+
+    private static Transform3D ToGodot(in AlsP3VisualTransformSnapshot snapshot) => new(
+        new Basis(
+            new Vector3(snapshot.BasisX.X, snapshot.BasisX.Y, snapshot.BasisX.Z),
+            new Vector3(snapshot.BasisY.X, snapshot.BasisY.Y, snapshot.BasisY.Z),
+            new Vector3(snapshot.BasisZ.X, snapshot.BasisZ.Y, snapshot.BasisZ.Z)),
+        new Vector3(snapshot.Origin.X, snapshot.Origin.Y, snapshot.Origin.Z));
 
     private static void VerifyFailureReasonPublicationOrder()
     {

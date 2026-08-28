@@ -34,6 +34,14 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     internal long LastFootGatherManagedAllocations { get; private set; }
 
+    internal AlsFrameIdentity LastFootGatherRequestIdentity { get; private set; }
+
+    internal Vector3 LastLeftFootQueryWorldOrigin { get; private set; }
+
+    internal Vector3 LastRightFootQueryWorldOrigin { get; private set; }
+
+    internal bool LastFootGatherConsumed { get; private set; }
+
     public AlsCharacterMotor()
     {
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
@@ -301,6 +309,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
     {
         left = AlsFootHit.Invalid;
         right = AlsFootHit.Invalid;
+        LastFootGatherConsumed = false;
+        LastFootGatherRequestIdentity = default;
+        LastLeftFootQueryWorldOrigin = default;
+        LastRightFootQueryWorldOrigin = default;
         if (HasCharacterDiscontinuity(characterTransform))
         {
             _footProbeExchange.Clear();
@@ -313,6 +325,13 @@ public partial class AlsCharacterMotor : CharacterBody3D
         {
             return;
         }
+
+        LastFootGatherConsumed = true;
+        LastFootGatherRequestIdentity = leftRequest.Identity;
+        LastLeftFootQueryWorldOrigin = characterTransform * ToGodot(
+            leftRequest.CharacterLocalOrigin);
+        LastRightFootQueryWorldOrigin = characterTransform * ToGodot(
+            rightRequest.CharacterLocalOrigin);
 
         left = GatherFootHit(leftRequest, characterTransform, _footQueries[0]);
         right = GatherFootHit(rightRequest, characterTransform, _footQueries[1]);
@@ -371,7 +390,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var platformTransform = collider.GlobalTransform;
         var platformBasis = platformTransform.Basis.Orthonormalized();
         var platformRotation = platformBasis.GetRotationQuaternion().Normalized();
-        var pointVelocity = GetPointVelocity(collider, position);
+        if (!TryGetPointVelocity(collider, position, out var pointVelocity))
+        {
+            return AlsFootHit.Invalid;
+        }
         if (!IsFinite(platformTransform.Origin) || !IsFinite(platformBasis) ||
             !IsFinite(platformRotation) || !IsFinite(pointVelocity))
         {
@@ -426,18 +448,46 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _hasPreviousGatherTransform = true;
     }
 
-    private static Vector3 GetPointVelocity(CollisionObject3D collider, in Vector3 worldPoint)
+    private static bool TryGetPointVelocity(
+        CollisionObject3D collider,
+        in Vector3 worldPoint,
+        out Vector3 pointVelocity)
     {
-        return collider switch
+        pointVelocity = Vector3.Zero;
+        switch (collider)
         {
-            RigidBody3D rigid => rigid.LinearVelocity +
-                                 rigid.AngularVelocity.Cross(worldPoint - rigid.GlobalPosition),
-            StaticBody3D staticBody => staticBody.ConstantLinearVelocity +
-                                       staticBody.ConstantAngularVelocity.Cross(
-                                           worldPoint - staticBody.GlobalPosition),
-            CharacterBody3D character => character.GetRealVelocity(),
-            _ => Vector3.Zero,
-        };
+            case RigidBody3D rigid:
+            {
+                var directState = PhysicsServer3D.BodyGetDirectState(rigid.GetRid());
+                if (directState is null ||
+                    !IsFinite(directState.Transform) ||
+                    !IsFinite(directState.CenterOfMassLocal) ||
+                    !IsFinite(directState.LinearVelocity) ||
+                    !IsFinite(directState.AngularVelocity))
+                {
+                    return false;
+                }
+                var state = directState!;
+                var worldCenterOfMass =
+                    state.Transform * state.CenterOfMassLocal;
+                if (!IsFinite(worldCenterOfMass))
+                {
+                    return false;
+                }
+                pointVelocity = state.LinearVelocity +
+                    state.AngularVelocity.Cross(worldPoint - worldCenterOfMass);
+                break;
+            }
+            case StaticBody3D staticBody:
+                pointVelocity = staticBody.ConstantLinearVelocity +
+                    staticBody.ConstantAngularVelocity.Cross(
+                        worldPoint - staticBody.GlobalPosition);
+                break;
+            case CharacterBody3D character:
+                pointVelocity = character.GetRealVelocity();
+                break;
+        }
+        return IsFinite(pointVelocity);
     }
 
     private static bool IsMovingPlatform(CollisionObject3D collider) => collider switch
@@ -459,6 +509,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     private static bool IsFinite(in Basis value) =>
         IsFinite(value.X) && IsFinite(value.Y) && IsFinite(value.Z);
+
+    private static bool IsFinite(in Transform3D value) =>
+        IsFinite(value.Basis) && IsFinite(value.Origin);
 
     private static bool IsFinite(in Quaternion value) =>
         float.IsFinite(value.X) && float.IsFinite(value.Y) &&
@@ -759,38 +812,150 @@ public partial class AlsCharacterMotor : CharacterBody3D
         in Vector3 floorNormal,
         out CollisionObject3D collider)
     {
-        // Movement-base authority comes from this frame's MoveAndSlide collisions, not foot rays.
+        // MoveAndSlide owns grounded/platform evidence. TestMove only supplies allocation-free
+        // support candidates for deterministic matching against that evidence.
         collider = null!;
-        var bestAlignment = -1f;
-        for (var slideIndex = 0; slideIndex < GetSlideCollisionCount(); slideIndex++)
+        var platformVelocity = GetPlatformVelocity();
+        var platformAngularVelocity = GetPlatformAngularVelocity();
+        if (!IsFinite(platformVelocity) || !IsFinite(platformAngularVelocity))
         {
-            var collision = GetSlideCollision(slideIndex);
-            if (collision is null)
+            return false;
+        }
+        var bestVelocityError = float.PositiveInfinity;
+        var bestAngularError = float.PositiveInfinity;
+        var bestMovingEligibility = false;
+        var bestAlignment = -1f;
+        var bestColliderId = ulong.MaxValue;
+        var collision = _initialFloorProbe!;
+        if (!TestMove(
+                GlobalTransform,
+                -UpDirection * FloorSnapLength,
+                collision,
+                SafeMargin,
+                recoveryAsCollision: true,
+                maxCollisions: 4))
+        {
+            return false;
+        }
+        for (var collisionIndex = 0;
+             collisionIndex < collision.GetCollisionCount();
+             collisionIndex++)
+        {
+            var normal = collision.GetNormal(collisionIndex);
+            if (!IsFinite(normal) ||
+                !IsFloorCollision(normal, UpDirection, FloorMaxAngle))
             {
                 continue;
             }
-            for (var collisionIndex = 0;
-                 collisionIndex < collision.GetCollisionCount();
-                 collisionIndex++)
+            var alignment = normal.Normalized().Dot(floorNormal);
+            var candidate = collision.GetCollider(collisionIndex) as CollisionObject3D;
+            var candidateVelocity = collision.GetColliderVelocity(collisionIndex);
+            if (candidate is null || !GodotObject.IsInstanceValid(candidate) ||
+                !IsFinite(candidateVelocity) ||
+                !TryGetAngularVelocity(candidate, out var candidateAngularVelocity))
             {
-                var normal = collision.GetNormal(collisionIndex);
-                if (!IsFinite(normal) ||
-                    !IsFloorCollision(normal, UpDirection, FloorMaxAngle))
-                {
-                    continue;
-                }
-                var alignment = normal.Normalized().Dot(floorNormal);
-                var candidate = collision.GetCollider(collisionIndex) as CollisionObject3D;
-                if (candidate is null || !GodotObject.IsInstanceValid(candidate) ||
-                    alignment <= bestAlignment)
-                {
-                    continue;
-                }
-                bestAlignment = alignment;
-                collider = candidate;
+                continue;
             }
+            var velocityError = (candidateVelocity - platformVelocity).LengthSquared();
+            var angularError =
+                (candidateAngularVelocity - platformAngularVelocity).LengthSquared();
+            if (!float.IsFinite(velocityError) || !float.IsFinite(angularError) ||
+                !float.IsFinite(alignment))
+            {
+                continue;
+            }
+            var movingEligibility = IsMovingPlatform(candidate);
+            var colliderId = candidate.GetInstanceId();
+            if (!IsBetterFloorCandidate(
+                    velocityError,
+                    angularError,
+                    movingEligibility,
+                    alignment,
+                    colliderId,
+                    bestVelocityError,
+                    bestAngularError,
+                    bestMovingEligibility,
+                    bestAlignment,
+                    bestColliderId))
+            {
+                continue;
+            }
+            bestVelocityError = velocityError;
+            bestAngularError = angularError;
+            bestMovingEligibility = movingEligibility;
+            bestAlignment = alignment;
+            bestColliderId = colliderId;
+            collider = candidate;
         }
         return collider is not null;
+    }
+
+    private static bool TryGetAngularVelocity(
+        CollisionObject3D collider,
+        out Vector3 angularVelocity)
+    {
+        angularVelocity = Vector3.Zero;
+        switch (collider)
+        {
+            case RigidBody3D rigid:
+            {
+                var state = PhysicsServer3D.BodyGetDirectState(rigid.GetRid());
+                if (state is null || !IsFinite(state.AngularVelocity))
+                {
+                    return false;
+                }
+                angularVelocity = state.AngularVelocity;
+                break;
+            }
+            case StaticBody3D staticBody:
+                angularVelocity = staticBody.ConstantAngularVelocity;
+                break;
+        }
+        return IsFinite(angularVelocity);
+    }
+
+    private static bool IsBetterFloorCandidate(
+        float velocityError,
+        float angularError,
+        bool movingEligibility,
+        float alignment,
+        ulong colliderId,
+        float bestVelocityError,
+        float bestAngularError,
+        bool bestMovingEligibility,
+        float bestAlignment,
+        ulong bestColliderId)
+    {
+        const float comparisonEpsilon = 1e-8f;
+        if (velocityError < bestVelocityError - comparisonEpsilon)
+        {
+            return true;
+        }
+        if (velocityError > bestVelocityError + comparisonEpsilon)
+        {
+            return false;
+        }
+        if (angularError < bestAngularError - comparisonEpsilon)
+        {
+            return true;
+        }
+        if (angularError > bestAngularError + comparisonEpsilon)
+        {
+            return false;
+        }
+        if (movingEligibility != bestMovingEligibility)
+        {
+            return movingEligibility;
+        }
+        if (alignment > bestAlignment + comparisonEpsilon)
+        {
+            return true;
+        }
+        if (alignment < bestAlignment - comparisonEpsilon)
+        {
+            return false;
+        }
+        return colliderId < bestColliderId;
     }
 
     private bool ProbeInitialFloor()

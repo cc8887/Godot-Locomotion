@@ -8,6 +8,7 @@ using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
 using GodotAls.Import.Compilation;
+using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
 
@@ -27,6 +28,13 @@ public partial class AlsP3WorkerRoot : Node3D
     private AlsCurveSampler[] _p4CurveSamplers = [];
     private Node3D? _visualRoot;
     private Skeleton3D? _skeleton;
+    private int _footSkeletonBoneCount;
+    private int _leftFootBoneId = -1;
+    private int _rightFootBoneId = -1;
+    private int _leftFootParentId = -1;
+    private int _rightFootParentId = -1;
+    private Transform3D _leftFootRest;
+    private Transform3D _rightFootRest;
     private Vector3[] _posePositions = [];
     private Quaternion[] _poseRotations = [];
     private Vector3[] _poseScales = [];
@@ -71,6 +79,7 @@ public partial class AlsP3WorkerRoot : Node3D
             _controller = new AlsLocomotionAnimationController(_graph, context.Settings);
             _controller.Warmup();
             _skeleton = _graph.TargetSkeleton;
+            ConfigureFootProbeSource(context.AnimationSet, _poseProfile);
             var poseWriter = context.PoseWriterFactory?.Invoke(_skeleton);
             _poseModifier = poseWriter is null
                 ? new AlsComponentPoseModifier(
@@ -220,6 +229,18 @@ public partial class AlsP3WorkerRoot : Node3D
                     : 0L;
                 var p4AnimationInput = CreateP4AnimationInput(in _result);
                 _controller!.Apply(in _result, in p4AnimationInput, input.DeltaTime);
+                if (!TryCaptureFootProbeOrigins(
+                        input.Identity,
+                        input.CharacterTransform,
+                        out _result.NextLeftFootProbeOrigin,
+                        out _result.NextRightFootProbeOrigin,
+                        out var footProbeSource))
+                {
+                    _result.P4ReasonCode = AlsP4ReasonCode.InvalidRuntimeState;
+                    throw new AlsP4EvaluationException(
+                        AlsP4ReasonCode.InvalidRuntimeState,
+                        "P4 foot probe source pose or transform was invalid.");
+                }
                 var modifierInput = AlsPoseModifierInput.FromResult(in _result);
                 var modifierOutput = default(AlsPoseModifierOutput);
                 if (!_poseModifier!.TryApply(
@@ -272,7 +293,8 @@ public partial class AlsP3WorkerRoot : Node3D
                     AlsP3Presentation.Capture(appliedRoot),
                     poseDigest,
                     fullPoseDigest,
-                    rootDigest);
+                    rootDigest,
+                    footProbeSource);
                 _state.PublishResult(
                     _result,
                     candidate,
@@ -356,6 +378,13 @@ public partial class AlsP3WorkerRoot : Node3D
         _library = null;
         _visualRoot = null;
         _skeleton = null;
+        _footSkeletonBoneCount = 0;
+        _leftFootBoneId = -1;
+        _rightFootBoneId = -1;
+        _leftFootParentId = -1;
+        _rightFootParentId = -1;
+        _leftFootRest = default;
+        _rightFootRest = default;
         _poseProfile = null;
         _p4CurveAnimationIds = [];
         _p4CurveSamplers = [];
@@ -364,6 +393,137 @@ public partial class AlsP3WorkerRoot : Node3D
         _poseScales = [];
         return true;
     }
+
+    private void ConfigureFootProbeSource(
+        AlsAnimationSetDefinition animationSet,
+        AlsPoseAnimationProfile poseProfile)
+    {
+        var skeletonDefinition = animationSet.Skeletons[poseProfile.SkeletonId];
+        var mappings = skeletonDefinition.LogicalToPhysical;
+        var leftLogicalId = poseProfile.Feet.LeftFootRootBoneId;
+        var rightLogicalId = poseProfile.Feet.RightFootRootBoneId;
+        if ((uint)leftLogicalId >= (uint)mappings.Length ||
+            (uint)rightLogicalId >= (uint)mappings.Length)
+        {
+            throw new InvalidOperationException(
+                "P4 foot probe logical bone ID is outside the compiled skeleton topology.");
+        }
+
+        var leftPhysicalId = mappings[leftLogicalId];
+        var rightPhysicalId = mappings[rightLogicalId];
+        var boneCount = _skeleton!.GetBoneCount();
+        if ((uint)leftPhysicalId >= (uint)boneCount ||
+            (uint)rightPhysicalId >= (uint)boneCount ||
+            leftPhysicalId == rightPhysicalId)
+        {
+            throw new InvalidOperationException(
+                "P4 foot probe bones do not resolve to distinct physical Skeleton bones.");
+        }
+
+        _footSkeletonBoneCount = boneCount;
+        _leftFootBoneId = leftPhysicalId;
+        _rightFootBoneId = rightPhysicalId;
+        _leftFootParentId = skeletonDefinition.PhysicalBones[leftPhysicalId].ParentPhysicalId;
+        _rightFootParentId = skeletonDefinition.PhysicalBones[rightPhysicalId].ParentPhysicalId;
+        _leftFootRest = _skeleton.GetBoneRest(leftPhysicalId);
+        _rightFootRest = _skeleton.GetBoneRest(rightPhysicalId);
+        if (_skeleton.GetBoneParent(leftPhysicalId) != _leftFootParentId ||
+            _skeleton.GetBoneParent(rightPhysicalId) != _rightFootParentId ||
+            !IsAffineInvertible(_leftFootRest) ||
+            !IsAffineInvertible(_rightFootRest))
+        {
+            throw new InvalidOperationException(
+                "P4 foot probe bones do not match the compiled Skeleton topology.");
+        }
+    }
+
+    private bool TryCaptureFootProbeOrigins(
+        in AlsFrameIdentity identity,
+        in System.Numerics.Matrix4x4 characterTransform,
+        out NumericsVector3 leftOrigin,
+        out NumericsVector3 rightOrigin,
+        out AlsP4FootProbeSourceSnapshot source)
+    {
+        leftOrigin = default;
+        rightOrigin = default;
+        source = default;
+        if (_skeleton is null || !GodotObject.IsInstanceValid(_skeleton) ||
+            _skeleton.GetBoneCount() != _footSkeletonBoneCount ||
+            (uint)_leftFootBoneId >= (uint)_footSkeletonBoneCount ||
+            (uint)_rightFootBoneId >= (uint)_footSkeletonBoneCount ||
+            _skeleton.GetBoneParent(_leftFootBoneId) != _leftFootParentId ||
+            _skeleton.GetBoneParent(_rightFootBoneId) != _rightFootParentId ||
+            _skeleton.GetBoneRest(_leftFootBoneId) != _leftFootRest ||
+            _skeleton.GetBoneRest(_rightFootBoneId) != _rightFootRest)
+        {
+            return false;
+        }
+
+        var character = AlsP3Presentation.ToGodot(characterTransform);
+        var skeleton = _skeleton.GlobalTransform;
+        var leftComponent = _skeleton.GetBoneGlobalPose(_leftFootBoneId);
+        var rightComponent = _skeleton.GetBoneGlobalPose(_rightFootBoneId);
+        if (!TryAffineInverse(character, out var inverseCharacter) ||
+            !IsAffineInvertible(skeleton) ||
+            !IsAffineInvertible(leftComponent) ||
+            !IsAffineInvertible(rightComponent))
+        {
+            return false;
+        }
+
+        var leftLocal = inverseCharacter * skeleton * leftComponent;
+        var rightLocal = inverseCharacter * skeleton * rightComponent;
+        if (!IsFinite(leftLocal) || !IsFinite(rightLocal))
+        {
+            return false;
+        }
+        leftOrigin = ToNumerics(leftLocal.Origin);
+        rightOrigin = ToNumerics(rightLocal.Origin);
+        if (!IsFinite(leftOrigin) || !IsFinite(rightOrigin))
+        {
+            return false;
+        }
+        source = new AlsP4FootProbeSourceSnapshot(
+            identity,
+            _leftFootBoneId,
+            _rightFootBoneId,
+            AlsP3Presentation.Capture(character),
+            AlsP3Presentation.Capture(skeleton),
+            ToNumerics(leftComponent.Origin),
+            ToNumerics(rightComponent.Origin));
+        return true;
+    }
+
+    private static bool TryAffineInverse(
+        in Transform3D value,
+        out Transform3D inverse)
+    {
+        inverse = default;
+        if (!IsAffineInvertible(value))
+        {
+            return false;
+        }
+        inverse = value.AffineInverse();
+        return IsFinite(inverse);
+    }
+
+    private static bool IsAffineInvertible(in Transform3D value) =>
+        IsFinite(value) &&
+        float.IsFinite(value.Basis.Determinant()) &&
+        MathF.Abs(value.Basis.Determinant()) > 1e-8f;
+
+    private static bool IsFinite(in Transform3D value) =>
+        IsFinite(value.Basis.X) && IsFinite(value.Basis.Y) &&
+        IsFinite(value.Basis.Z) && IsFinite(value.Origin);
+
+    private static bool IsFinite(in Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+
+    private static bool IsFinite(in NumericsVector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+
+    private static NumericsVector3 ToNumerics(in Vector3 value) =>
+        new(value.X, value.Y, value.Z);
 
     private void CapturePose()
     {
