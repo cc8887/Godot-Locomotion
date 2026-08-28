@@ -11,6 +11,15 @@ public enum AlsPoseModifierFailureStage : byte
     AfterAim,
 }
 
+internal enum AlsPoseAffineTestFixture : byte
+{
+    None,
+    SingularBase,
+    NearSingularBase,
+    SingularAim,
+    NearSingularAim,
+}
+
 public readonly record struct AlsPoseModifierInput(
     float AimPhase,
     float AimDownWeight,
@@ -46,7 +55,7 @@ public readonly record struct AlsPoseModifierInput(
 public struct AlsPoseModifierOutput
 {
     public ulong PoseDigest;
-    public long DeterministicElapsedTicks;
+    public long OperationTicks;
     public int WriteTransactionCount;
     public int AffectedBoneCount;
     public float ArmLocalWeight;
@@ -71,11 +80,17 @@ public sealed class AlsComponentPoseModifier : IDisposable
     private const byte WeightHead = 2;
     private const byte WeightArm = 3;
     private const byte WeightHand = 4;
+    private const float MinimumAffineAxisScale = 1e-6f;
+    private const float MaximumAffineAxisRatio = 1e6f;
+    private const float MinimumRelativeDeterminant = 1e-5f;
 
     private readonly Skeleton3D _skeleton;
     private readonly Node3D _visualRoot;
     private readonly AlsPoseScratch _scratch;
     private readonly Transform3D[] _rests;
+    private readonly Transform3D[] _restInverses;
+    private readonly Transform3D[] _baseLocalInverses;
+    private readonly Transform3D[] _baseComponentInverses;
     private readonly string[] _boneNames;
     private readonly byte[] _weightKinds;
     private readonly ClipBinding _base;
@@ -85,6 +100,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
     private readonly double _baseTime;
     private readonly int _baseAnimationId;
     private readonly IAlsSkeletonPoseWriter? _testWriter;
+    private readonly AlsPoseAffineTestFixture _testAffineFixture;
     private ulong _skeletonVersion;
     private int _nameValidationCount;
     private int _disposed;
@@ -105,7 +121,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
         AlsAnimationLibraryBuildResult library,
         AlsAnimationSetDefinition animationSet,
         AlsPoseAnimationProfile profile,
-        IAlsSkeletonPoseWriter? testWriter)
+        IAlsSkeletonPoseWriter? testWriter,
+        AlsPoseAffineTestFixture testAffineFixture = AlsPoseAffineTestFixture.None)
     {
         _skeleton = skeleton ?? throw new ArgumentNullException(nameof(skeleton));
         _visualRoot = visualRoot ?? throw new ArgumentNullException(nameof(visualRoot));
@@ -113,6 +130,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
         _testWriter = testWriter;
+        _testAffineFixture = testAffineFixture;
         if (!GodotObject.IsInstanceValid(skeleton) || !GodotObject.IsInstanceValid(visualRoot) ||
             profile.SkeletonId < 0 || profile.SkeletonId >= animationSet.Skeletons.Length)
         {
@@ -123,6 +141,9 @@ public sealed class AlsComponentPoseModifier : IDisposable
         AlsAnimationBinder.ValidateTargetSkeleton(skeleton, skeletonDefinition, "P4 component pose modifier");
         _scratch = new AlsPoseScratch(skeleton);
         _rests = new Transform3D[_scratch.BoneCount];
+        _restInverses = new Transform3D[_scratch.BoneCount];
+        _baseLocalInverses = new Transform3D[_scratch.BoneCount];
+        _baseComponentInverses = new Transform3D[_scratch.BoneCount];
         _boneNames = new string[_scratch.BoneCount];
         _weightKinds = new byte[_scratch.BoneCount];
         for (var boneId = 0; boneId < _rests.Length; boneId++)
@@ -132,7 +153,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
             // Cache the validated runtime spelling so the hot check is exact and allocation-free.
             _boneNames[boneId] = skeleton.GetBoneName(boneId);
             var expectedParent = skeletonDefinition.PhysicalBones[boneId].ParentPhysicalId;
-            if (_scratch.Parents[boneId] != expectedParent || !IsFinite(_rests[boneId]))
+            if (_scratch.Parents[boneId] != expectedParent ||
+                !TryAffineInverse(_rests[boneId], out _restInverses[boneId]))
             {
                 throw new InvalidOperationException(
                     $"P4 modifier skeleton parent/rest mismatch: bone={boneId}");
@@ -161,6 +183,23 @@ public sealed class AlsComponentPoseModifier : IDisposable
         _down = BindClip(library, profile.Aim.DownAnimationId);
         _forward = BindClip(library, profile.Aim.ForwardAnimationId);
         _up = BindClip(library, profile.Aim.UpAnimationId);
+        if (!SampleClip(_base, _baseTime, _scratch.BaseLocalPose, _scratch.BaseComponentPose))
+        {
+            throw new InvalidOperationException("P4 additive base pose is non-invertible.");
+        }
+        for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
+        {
+            if (!TryAffineInverse(
+                    _scratch.BaseLocalPose[boneId],
+                    out _baseLocalInverses[boneId]) ||
+                !TryAffineInverse(
+                    _scratch.BaseComponentPose[boneId],
+                    out _baseComponentInverses[boneId]))
+            {
+                throw new InvalidOperationException(
+                    $"P4 additive base pose inverse failed: bone={boneId}");
+            }
+        }
         _skeletonVersion = skeleton.GetVersion();
     }
 
@@ -192,46 +231,58 @@ public sealed class AlsComponentPoseModifier : IDisposable
             return false;
         }
 
+        var writeStarted = false;
         try
         {
-            long deterministicTicks = _scratch.BoneCount * 4L;
+            long operationTicks = _scratch.BoneCount * 4L;
             var hasInfluence = input.HeadWeight > 0f ||
                 input.SpineWeight > 0f || input.UpperBodyWeight > 0f;
             if (hasInfluence)
             {
-                if (!SampleAimPoses(in input) || !ApplyAim(in input))
+                if (!SampleAimPoses(in input, out var sampledClipCount))
                 {
-                    return FailAfterCapture(
-                        capturedRoot, AlsP4ReasonCode.NonFiniteInput, out reason);
+                    reason = AlsP4ReasonCode.NonFiniteInput;
+                    return false;
                 }
-                deterministicTicks += _scratch.BoneCount * 20L;
-                deterministicTicks += _scratch.AffectedCount * 8L;
+                ApplyTestAffineFixture();
+                if (!ApplyAim(in input))
+                {
+                    reason = AlsP4ReasonCode.NonFiniteInput;
+                    return false;
+                }
+                operationTicks += _scratch.BoneCount * sampledClipCount * 5L;
+                operationTicks += _scratch.AffectedCount * 8L;
             }
 
             if (input.InjectFailure == AlsPoseModifierFailureStage.AfterAim)
             {
-                return FailAfterCapture(
-                    capturedRoot, AlsP4ReasonCode.InvalidRuntimeState, out reason);
+                reason = AlsP4ReasonCode.InvalidRuntimeState;
+                return false;
             }
 
             var writeTransactions = 0;
             if (hasInfluence)
             {
-                if (!WriteAffectedPose())
+                if (!WriteAffectedPose(ref writeStarted))
                 {
-                    return FailAfterCapture(
-                        capturedRoot, AlsP4ReasonCode.NonFiniteInput, out reason);
+                    if (writeStarted)
+                    {
+                        return FailAfterCapture(
+                            capturedRoot, AlsP4ReasonCode.NonFiniteInput, out reason);
+                    }
+                    reason = AlsP4ReasonCode.NonFiniteInput;
+                    return false;
                 }
                 writeTransactions = 1;
-                deterministicTicks += _scratch.AffectedCount * 4L;
+                operationTicks += _scratch.AffectedCount * 4L;
             }
 
             var poseDigest = ComputePoseDigest();
-            deterministicTicks += _scratch.BoneCount * 4L;
+            operationTicks += _scratch.BoneCount * 4L;
             var candidate = new AlsPoseModifierOutput
             {
                 PoseDigest = poseDigest,
-                DeterministicElapsedTicks = deterministicTicks,
+                OperationTicks = operationTicks,
                 WriteTransactionCount = writeTransactions,
                 AffectedBoneCount = _scratch.AffectedCount,
                 ArmLocalWeight = input.ArmLocalWeight,
@@ -244,6 +295,11 @@ public sealed class AlsComponentPoseModifier : IDisposable
         }
         catch
         {
+            if (!writeStarted)
+            {
+                reason = AlsP4ReasonCode.InvalidRuntimeState;
+                return false;
+            }
             return FailAfterCapture(
                 capturedRoot, AlsP4ReasonCode.InvalidRuntimeState, out reason);
         }
@@ -424,7 +480,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             _scratch.OriginalRotations[boneId] = rotation;
             _scratch.OriginalScales[boneId] = scale;
             var pose = PoseTransform(position, rotation, scale);
-            if (!IsFinite(pose))
+            if (!IsAffineInvertible(pose))
             {
                 return false;
             }
@@ -443,15 +499,41 @@ public sealed class AlsComponentPoseModifier : IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private bool SampleAimPoses(in AlsPoseModifierInput input)
+    private bool SampleAimPoses(in AlsPoseModifierInput input, out int sampledClipCount)
     {
+        sampledClipCount = 0;
         var downTime = _down.Animation.Length * input.AimPhase;
         var forwardTime = _forward.Animation.Length * input.AimPhase;
         var upTime = _up.Animation.Length * input.AimPhase;
-        return SampleClip(_base, _baseTime, _scratch.BaseLocalPose, _scratch.BaseComponentPose) &&
-            SampleClip(_down, downTime, _scratch.DownLocalPose, _scratch.DownComponentPose) &&
-            SampleClip(_forward, forwardTime, _scratch.ForwardLocalPose, _scratch.ForwardComponentPose) &&
-            SampleClip(_up, upTime, _scratch.UpLocalPose, _scratch.UpComponentPose);
+        if (input.AimDownWeight > 0f)
+        {
+            sampledClipCount++;
+            if (!SampleClip(_down, downTime, _scratch.DownLocalPose, _scratch.DownComponentPose))
+            {
+                return false;
+            }
+        }
+        if (input.AimForwardWeight > 0f)
+        {
+            sampledClipCount++;
+            if (!SampleClip(
+                    _forward,
+                    forwardTime,
+                    _scratch.ForwardLocalPose,
+                    _scratch.ForwardComponentPose))
+            {
+                return false;
+            }
+        }
+        if (input.AimUpWeight > 0f)
+        {
+            sampledClipCount++;
+            if (!SampleClip(_up, upTime, _scratch.UpLocalPose, _scratch.UpComponentPose))
+            {
+                return false;
+            }
+        }
+        return sampledClipCount > 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -484,7 +566,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             }
             var pose = PoseTransform(position, rotation, scale);
             locals[boneId] = _rests[boneId] * pose;
-            if (!IsFinite(locals[boneId]))
+            if (!IsAffineInvertible(locals[boneId]))
             {
                 return false;
             }
@@ -502,7 +584,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             components[boneId] = parent < 0
                 ? locals[boneId]
                 : components[parent] * locals[boneId];
-            if (!IsFinite(components[boneId]))
+            if (!IsAffineInvertible(components[boneId]))
             {
                 return false;
             }
@@ -514,6 +596,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
     private bool ApplyAim(in AlsPoseModifierInput input)
     {
         var armMeshWeight = 1f - input.ArmLocalWeight;
+        Array.Clear(_scratch.ComponentInverseValid);
         for (var orderIndex = 0; orderIndex < _scratch.AffectedCount; orderIndex++)
         {
             var boneId = _scratch.AffectedOrder[orderIndex];
@@ -535,7 +618,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 input.AimDownWeight,
                 input.AimForwardWeight,
                 input.AimUpWeight);
-            if (!IsFinite(aimComponent) || !IsFinite(aimLocal))
+            if (!IsAffineInvertible(aimComponent) || !IsAffineInvertible(aimLocal))
             {
                 return false;
             }
@@ -547,14 +630,19 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 WeightArm or WeightHand => input.UpperBodyWeight,
                 _ => 0f,
             };
-            var localDelta = aimLocal * _scratch.BaseLocalPose[boneId].AffineInverse();
-            var componentDelta = aimComponent *
-                _scratch.BaseComponentPose[boneId].AffineInverse();
+            if (!TryComposeLocalResultFromInverse(
+                    in _scratch.LocalPose[boneId],
+                    in _baseLocalInverses[boneId],
+                    in aimLocal,
+                    weight,
+                    out var localResult))
+            {
+                return false;
+            }
+            var componentDelta = aimComponent * _baseComponentInverses[boneId];
             Transform3D resultComponent;
             if (_weightKinds[boneId] is WeightArm or WeightHand)
             {
-                var localResult = Transform3D.Identity.InterpolateWith(localDelta, weight) *
-                    _scratch.LocalPose[boneId];
                 var fullLocalComponent = parentComponent * localResult;
                 var fullMeshComponent = Transform3D.Identity.InterpolateWith(
                         componentDelta,
@@ -569,16 +657,31 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 resultComponent = Transform3D.Identity.InterpolateWith(componentDelta, weight) *
                     _scratch.OriginalComponentPose[boneId];
             }
-            if (!IsFinite(localDelta) || !IsFinite(componentDelta) ||
-                !IsFinite(resultComponent))
+            if (!IsAffineInvertible(componentDelta) || !IsAffineInvertible(resultComponent))
             {
                 return false;
             }
             _scratch.ComponentPose[boneId] = resultComponent;
-            _scratch.LocalPose[boneId] = parent < 0
-                ? resultComponent
-                : parentComponent.AffineInverse() * resultComponent;
-            if (!IsFinite(_scratch.LocalPose[boneId]))
+            if (parent < 0)
+            {
+                _scratch.LocalPose[boneId] = resultComponent;
+            }
+            else
+            {
+                if (!_scratch.ComponentInverseValid[parent])
+                {
+                    if (!TryAffineInverse(
+                            parentComponent,
+                            out _scratch.ComponentInverses[parent]))
+                    {
+                        return false;
+                    }
+                    _scratch.ComponentInverseValid[parent] = true;
+                }
+                _scratch.LocalPose[boneId] =
+                    _scratch.ComponentInverses[parent] * resultComponent;
+            }
+            if (!IsAffineInvertible(_scratch.LocalPose[boneId]))
             {
                 return false;
             }
@@ -587,12 +690,12 @@ public sealed class AlsComponentPoseModifier : IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private bool WriteAffectedPose()
+    private bool WriteAffectedPose(ref bool writeStarted)
     {
         for (var orderIndex = 0; orderIndex < _scratch.AffectedCount; orderIndex++)
         {
             var boneId = _scratch.AffectedOrder[orderIndex];
-            var pose = _rests[boneId].AffineInverse() * _scratch.LocalPose[boneId];
+            var pose = _restInverses[boneId] * _scratch.LocalPose[boneId];
             var position = pose.Origin;
             var rotation = pose.Basis.GetRotationQuaternion();
             var scale = pose.Basis.Scale;
@@ -608,12 +711,63 @@ public sealed class AlsComponentPoseModifier : IDisposable
 
         for (var orderIndex = 0; orderIndex < _scratch.AffectedCount; orderIndex++)
         {
+            writeStarted = true;
             var boneId = _scratch.AffectedOrder[orderIndex];
             SetBonePosePosition(boneId, _scratch.ResultPositions[boneId]);
             SetBonePoseRotation(boneId, _scratch.ResultRotations[boneId]);
             SetBonePoseScale(boneId, _scratch.ResultScales[boneId]);
         }
         return true;
+    }
+
+    private void ApplyTestAffineFixture()
+    {
+        if (_testAffineFixture == AlsPoseAffineTestFixture.None)
+        {
+            return;
+        }
+        var boneId = _scratch.AffectedOrder[0];
+        var epsilon = _testAffineFixture is AlsPoseAffineTestFixture.NearSingularBase or
+            AlsPoseAffineTestFixture.NearSingularAim
+                ? 1e-7f
+                : 0f;
+        var invalidBasis = new Basis(
+            Vector3.Right,
+            new Vector3(1f, epsilon, 0f),
+            Vector3.Back);
+        if (_testAffineFixture is AlsPoseAffineTestFixture.SingularBase or
+            AlsPoseAffineTestFixture.NearSingularBase)
+        {
+            _scratch.BaseLocalPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.BaseLocalPose[boneId].Origin);
+            _scratch.BaseComponentPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.BaseComponentPose[boneId].Origin);
+            _baseLocalInverses[boneId] = new Transform3D(invalidBasis, Vector3.Zero);
+            _baseComponentInverses[boneId] = new Transform3D(invalidBasis, Vector3.Zero);
+        }
+        else
+        {
+            _scratch.DownLocalPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.DownLocalPose[boneId].Origin);
+            _scratch.ForwardLocalPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.ForwardLocalPose[boneId].Origin);
+            _scratch.UpLocalPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.UpLocalPose[boneId].Origin);
+            _scratch.DownComponentPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.DownComponentPose[boneId].Origin);
+            _scratch.ForwardComponentPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.ForwardComponentPose[boneId].Origin);
+            _scratch.UpComponentPose[boneId] = new Transform3D(
+                invalidBasis,
+                _scratch.UpComponentPose[boneId].Origin);
+        }
     }
 
     private bool FailAfterCapture(
@@ -787,6 +941,76 @@ public sealed class AlsComponentPoseModifier : IDisposable
         return upWeight > 0f && accumulated > 0f
             ? result.InterpolateWith(up, upWeight)
             : result;
+    }
+
+    internal static bool TryComposeLocalResult(
+        in Transform3D currentLocal,
+        in Transform3D baseLocal,
+        in Transform3D aimLocal,
+        float weight,
+        out Transform3D result)
+    {
+        result = default;
+        if (!float.IsFinite(weight) || weight < 0f || weight > 1f ||
+            !IsAffineInvertible(currentLocal) ||
+            !IsAffineInvertible(aimLocal) ||
+            !TryAffineInverse(baseLocal, out var baseInverse))
+        {
+            return false;
+        }
+        return TryComposeLocalResultFromInverse(
+            in currentLocal,
+            in baseInverse,
+            in aimLocal,
+            weight,
+            out result);
+    }
+
+    private static bool TryComposeLocalResultFromInverse(
+        in Transform3D currentLocal,
+        in Transform3D baseInverse,
+        in Transform3D aimLocal,
+        float weight,
+        out Transform3D result)
+    {
+        result = default;
+        var delta = baseInverse * aimLocal;
+        if (!IsAffineInvertible(delta))
+        {
+            return false;
+        }
+        result = currentLocal * Transform3D.Identity.InterpolateWith(delta, weight);
+        return IsAffineInvertible(result);
+    }
+
+    private static bool TryAffineInverse(in Transform3D value, out Transform3D inverse)
+    {
+        inverse = default;
+        if (!IsAffineInvertible(value))
+        {
+            return false;
+        }
+        inverse = value.AffineInverse();
+        return IsAffineInvertible(inverse);
+    }
+
+    private static bool IsAffineInvertible(in Transform3D value)
+    {
+        if (!IsFinite(value))
+        {
+            return false;
+        }
+        var scaleX = value.Basis.X.Length();
+        var scaleY = value.Basis.Y.Length();
+        var scaleZ = value.Basis.Z.Length();
+        var minimumScale = MathF.Min(scaleX, MathF.Min(scaleY, scaleZ));
+        var maximumScale = MathF.Max(scaleX, MathF.Max(scaleY, scaleZ));
+        var scaleProduct = scaleX * scaleY * scaleZ;
+        var determinant = MathF.Abs(value.Basis.Determinant());
+        return float.IsFinite(scaleProduct) && float.IsFinite(determinant) &&
+            minimumScale >= MinimumAffineAxisScale &&
+            maximumScale / minimumScale <= MaximumAffineAxisRatio &&
+            determinant >= scaleProduct * MinimumRelativeDeterminant;
     }
 
     private static AlsAnimationDefinition GetAnimationDefinition(

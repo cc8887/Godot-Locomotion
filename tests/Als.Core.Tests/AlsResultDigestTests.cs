@@ -183,8 +183,8 @@ public sealed class AlsResultDigestTests
             static (ref AlsFrameResult result) =>
                 result.RightFootPose = result.RightFootPose with { PlatformId = 7 });
         AssertP4ValueChangesDigest(
-            static (ref AlsFrameResult result) => result.P4ModifierElapsedTicks = 17,
-            static (ref AlsFrameResult result) => result.P4ModifierElapsedTicks = 18);
+            static (ref AlsFrameResult result) => result.P4ModifierOperationTicks = 17,
+            static (ref AlsFrameResult result) => result.P4ModifierOperationTicks = 18);
         AssertP4ValueChangesDigest(
             static (ref AlsFrameResult result) => result.P4ReasonCode = (AlsP4ReasonCode)1,
             static (ref AlsFrameResult result) => result.P4ReasonCode = (AlsP4ReasonCode)2);
@@ -426,7 +426,7 @@ public sealed class AlsResultDigestTests
             RawFloat(0x3D1E1E01),
             RawFloat(0x3D1E1E02),
             RawFloat(0x3D1E1E03));
-        result.P4ModifierElapsedTicks = 0x0102030405060708L;
+        result.P4ModifierOperationTicks = 0x0102030405060708L;
         result.P4ReasonCode = (AlsP4ReasonCode)0x2345;
         return result;
     }

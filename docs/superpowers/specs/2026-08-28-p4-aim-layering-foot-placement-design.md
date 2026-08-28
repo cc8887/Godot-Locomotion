@@ -246,7 +246,7 @@ Turn 和 Rotate 是 Grounded 内的并行姿态状态，不扩展 `AlsAnimationS
 - pelvis offset；
 - left/right foot target、rotation、lock amount 和 platform ID；
 - 下一帧 left/right foot probe origin；
-- P4 modifier elapsed ticks 和稳定 reason code。
+- P4 modifier deterministic operation ticks（不是 wall-clock elapsed time）和稳定 reason code。
 
 所有字段必须进入 `AlsResultDigest`、single/parallel pair comparison、回滚验证、默认值和非法值测试。
 

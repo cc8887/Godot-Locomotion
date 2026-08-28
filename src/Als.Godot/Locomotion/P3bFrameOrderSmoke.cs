@@ -66,6 +66,7 @@ public partial class P3bFrameOrderSmoke : Node
         try
         {
             (_mode, _failurePolicy) = ReadOptions();
+            VerifyFailureReasonPublicationOrder();
             ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
             ProcessThreadGroupOrder = 4;
 
@@ -406,6 +407,58 @@ public partial class P3bFrameOrderSmoke : Node
             };
         }
         return (mode, failurePolicy);
+    }
+
+    private static void VerifyFailureReasonPublicationOrder()
+    {
+        var state = new AlsP3CharacterState(
+            new AlsSlotHandle(77, 3),
+            new AlsP3ExchangeSlot());
+        using var enqueued = new ManualResetEventSlim();
+        using var releaseProducer = new ManualResetEventSlim();
+        using var consumerStarted = new ManualResetEventSlim();
+        state.FailureEnqueuedTestHook = () =>
+        {
+            enqueued.Set();
+            releaseProducer.Wait();
+        };
+        var identity = new AlsFrameIdentity(19, 77, 3);
+        var producer = Task.Run(() => state.RecordFailure(
+            "reason_order",
+            identity,
+            new InvalidOperationException("coordinated failure"),
+            AlsP4ReasonCode.NonFiniteCurve));
+        AlsP3WorkerFailure? observed = null;
+        Task<bool>? consumer = null;
+        try
+        {
+            Require(enqueued.Wait(TimeSpan.FromSeconds(5)),
+                "failure producer did not reach the coordinated enqueue point");
+            Require((AlsP4ReasonCode)Volatile.Read(ref state.LastFailureReasonCode) ==
+                    AlsP4ReasonCode.NonFiniteCurve,
+                "failure queue became visible before its reason was atomically published");
+            consumer = Task.Run(() =>
+            {
+                consumerStarted.Set();
+                return state.TryDequeueFailure(out observed);
+            });
+            Require(consumerStarted.Wait(TimeSpan.FromSeconds(5)),
+                "failure consumer did not start");
+            Require(!consumer.IsCompleted,
+                "failure consumer bypassed the producer's publication lock");
+        }
+        finally
+        {
+            releaseProducer.Set();
+        }
+        Require(producer.Wait(TimeSpan.FromSeconds(5)) && consumer is not null &&
+                consumer.Wait(TimeSpan.FromSeconds(5)) && consumer.Result,
+            "coordinated failure publication did not complete");
+        Require(observed is not null &&
+                observed.ReasonCode == AlsP4ReasonCode.NonFiniteCurve &&
+                (AlsP4ReasonCode)Volatile.Read(ref state.LastFailureReasonCode) ==
+                    observed.ReasonCode,
+            "failure consumer observed a queue item without its stable reason");
     }
 
     private void ValidatePoseRestoreFailure()

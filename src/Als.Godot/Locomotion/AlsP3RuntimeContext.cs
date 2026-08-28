@@ -284,6 +284,8 @@ internal sealed class AlsP3CharacterState
 
     public int LastFailureReasonCode;
 
+    internal Action? FailureEnqueuedTestHook;
+
     private int _workerAdmissionState = WorkerAdmissionClosedValue;
 
     public int WorkerInFlightCount => Math.Max(0, Volatile.Read(ref _workerAdmissionState));
@@ -346,6 +348,13 @@ internal sealed class AlsP3CharacterState
         var failureIdentity = new AlsP3FailureIdentity(code, identity);
         lock (_failureGate)
         {
+            if (reasonCode != AlsP4ReasonCode.None)
+            {
+                Interlocked.CompareExchange(
+                    ref LastFailureReasonCode,
+                    (int)reasonCode,
+                    (int)AlsP4ReasonCode.None);
+            }
             // Frame identities are monotonic. Pending identities plus the last published
             // identity suppress retries without retaining an unbounded frame history.
             if ((!_hasLastPublishedFailureIdentity ||
@@ -353,14 +362,8 @@ internal sealed class AlsP3CharacterState
                 _pendingFailureIdentities.Add(failureIdentity))
             {
                 _failures.Enqueue(failure);
+                FailureEnqueuedTestHook?.Invoke();
             }
-        }
-        if (reasonCode != AlsP4ReasonCode.None)
-        {
-            Interlocked.CompareExchange(
-                ref LastFailureReasonCode,
-                (int)reasonCode,
-                (int)AlsP4ReasonCode.None);
         }
         Interlocked.Exchange(ref WorkerFrozen, 1);
     }
