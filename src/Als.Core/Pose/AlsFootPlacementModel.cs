@@ -614,6 +614,7 @@ public static class AlsFootPlacementModel
                 hit.PlatformPosition,
                 hit.PlatformRotation,
                 hit.PlatformId,
+                hit.ColliderId,
                 amount,
                 1,
                 AlsFootReleaseReason.None);
@@ -627,6 +628,7 @@ public static class AlsFootPlacementModel
             characterPosition,
             characterRotation,
             -1,
+            hit.ColliderId,
             amount,
             1,
             AlsFootReleaseReason.None);
@@ -680,7 +682,8 @@ public static class AlsFootPlacementModel
                 return AlsFootReleaseReason.RayMiss;
             }
 
-            if (hit.PlatformId != current.PlatformId)
+            if (hit.PlatformId != current.PlatformId ||
+                hit.ColliderId != current.ColliderId)
             {
                 return AlsFootReleaseReason.BaseChanged;
             }
@@ -710,6 +713,11 @@ public static class AlsFootPlacementModel
             }
 
             if (hit.PlatformId >= 0)
+            {
+                return AlsFootReleaseReason.BaseChanged;
+            }
+
+            if (hit.ColliderId != current.ColliderId)
             {
                 return AlsFootReleaseReason.BaseChanged;
             }
@@ -997,6 +1005,8 @@ public static class AlsFootPlacementModel
         canonical = default;
         if (source.Locked > 2 ||
             source.PlatformId < -1 ||
+            source.ColliderId < -1 ||
+            (source.Locked != 0 && source.ColliderId < 0) ||
             (uint)source.ReleaseReason > (uint)AlsFootReleaseReason.Overextended ||
             (source.Locked == 0 && source.ReleaseReason != AlsFootReleaseReason.None) ||
             (source.Locked == 1 && source.ReleaseReason != AlsFootReleaseReason.None) ||
@@ -1019,7 +1029,8 @@ public static class AlsFootPlacementModel
             ProvenanceRotation = provenanceRotation,
         };
         return canonical.Locked != 0 ||
-               (canonical.PlatformId == -1 && canonical.Amount == 0f &&
+               (canonical.PlatformId == -1 && canonical.ColliderId == -1 &&
+                canonical.Amount == 0f &&
                 canonical.LocalPosition == Vector3.Zero &&
                 canonical.LocalRotation == Quaternion.Identity &&
                 canonical.ProvenancePosition == Vector3.Zero &&

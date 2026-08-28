@@ -9,6 +9,7 @@ public partial class AlsP3CharacterSlot : Node
 {
     private readonly AlsSlotRegistry _registry = new(1);
     private readonly AlsP3ExchangeSlot _exchangeSlot = new();
+    private readonly AlsP4FootProbeExchange _footProbeExchange = new();
     private AlsP3RuntimeContext _context = null!;
     private Func<IAlsLocomotionCommandSource> _commandSourceFactory = null!;
     private AlsP3Character _active = null!;
@@ -191,7 +192,12 @@ public partial class AlsP3CharacterSlot : Node
         AddChild(character);
         try
         {
-            character.Configure(_context, handle, commandSource, _exchangeSlot);
+            character.Configure(
+                _context,
+                handle,
+                commandSource,
+                _exchangeSlot,
+                _footProbeExchange);
             character.SetActive(active);
             return character;
         }

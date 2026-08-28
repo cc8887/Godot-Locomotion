@@ -10,17 +10,29 @@ namespace GodotAls.Locomotion;
 public partial class AlsCharacterMotor : CharacterBody3D
 {
     private const float ClearanceMargin = 0.002f;
+    private static readonly StringName ColliderKey = "collider";
+    private static readonly StringName NormalKey = "normal";
+    private static readonly StringName PositionKey = "position";
 
     private IAlsLocomotionCommandSource? _source;
     private CollisionShape3D? _collisionNode;
     private CapsuleShape3D? _capsuleShape;
     private ShapeCast3D? _standClearance;
     private KinematicCollision3D? _initialFloorProbe;
+    private readonly PhysicsRayQueryParameters3D[] _footQueries =
+        new PhysicsRayQueryParameters3D[AlsP4FootProbeExchange.FootCount];
+    private AlsP4FootProbeExchange _footProbeExchange = null!;
+    private AlsP4FootGatherSettings _footGatherSettings;
+    private AlsP3RuntimeContext? _runtimeContext;
     private AlsMotorSettings _settings;
     private AlsStance _actualStance = AlsStance.Standing;
     private NumericsVector3 _previousActualVelocity;
     private long _lastFrameId = -1;
+    private Transform3D _previousGatherTransform;
+    private bool _hasPreviousGatherTransform;
     private bool _configured;
+
+    internal long LastFootGatherManagedAllocations { get; private set; }
 
     public AlsCharacterMotor()
     {
@@ -30,8 +42,28 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     public void Configure(in AlsMotorSettings settings, IAlsLocomotionCommandSource source)
     {
+        Configure(
+            settings,
+            source,
+            new AlsP4FootProbeExchange(),
+            AlsP4FootGatherSettings.CreateReference(),
+            runtimeContext: null);
+    }
+
+    internal void Configure(
+        in AlsMotorSettings settings,
+        IAlsLocomotionCommandSource source,
+        AlsP4FootProbeExchange footProbeExchange,
+        in AlsP4FootGatherSettings footGatherSettings,
+        AlsP3RuntimeContext? runtimeContext)
+    {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(footProbeExchange);
         settings.Validate();
+        if (!footGatherSettings.IsValid)
+        {
+            throw new ArgumentOutOfRangeException(nameof(footGatherSettings));
+        }
         EnsureMainThread();
         EnsureLiveInTree();
         if (_configured)
@@ -72,13 +104,30 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _collisionNode = collisionNode;
         _standClearance = standClearance;
         _initialFloorProbe = new KinematicCollision3D();
+        var excludedBodies = new Godot.Collections.Array<Rid> { GetRid() };
+        for (var index = 0; index < _footQueries.Length; index++)
+        {
+            _footQueries[index] = PhysicsRayQueryParameters3D.Create(
+                Vector3.Zero,
+                Vector3.Zero,
+                settings.CollisionMask,
+                excludedBodies);
+            _footQueries[index].CollideWithAreas = false;
+            _footQueries[index].CollideWithBodies = true;
+            _footQueries[index].HitFromInside = false;
+        }
 
         _capsuleShape = capsuleShape;
+        _footProbeExchange = footProbeExchange;
+        _footGatherSettings = footGatherSettings;
+        _runtimeContext = runtimeContext;
         _settings = settings;
         _source = source;
         _actualStance = AlsStance.Standing;
         _previousActualVelocity = NumericsVector3.Zero;
         _lastFrameId = -1;
+        _previousGatherTransform = GlobalTransform;
+        _hasPreviousGatherTransform = false;
         Velocity = Vector3.Zero;
         CollisionMask = settings.CollisionMask;
         MotionMode = MotionModeEnum.Grounded;
@@ -187,11 +236,25 @@ public partial class AlsCharacterMotor : CharacterBody3D
         {
             throw new ArgumentOutOfRangeException(nameof(GlobalTransform), "Final character yaw must be finite.");
         }
+        var identity = new AlsFrameIdentity(frameId, (uint)characterId, (uint)generation);
+        var allocatedBeforeFootGather = GC.GetAllocatedBytesForCurrentThread();
+        GatherFootHits(
+            identity,
+            characterTransform,
+            out var leftFootHit,
+            out var rightFootHit);
         var actualVelocity = ToNumerics(GetRealVelocity());
         var actualAcceleration = (actualVelocity - _previousActualVelocity) / deltaTime;
         var grounded = IsOnFloor();
         var floor = CreateFloorSample(grounded);
-        var identity = new AlsFrameIdentity(frameId, (uint)characterId, (uint)generation);
+        LastFootGatherManagedAllocations =
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeFootGather;
+        if (_runtimeContext is not null)
+        {
+            Interlocked.Add(
+                ref _runtimeContext.FootGatherManagedAllocations,
+                LastFootGatherManagedAllocations);
+        }
         var input = new AlsFrameInput(
             Identity: identity,
             DeltaTime: deltaTime,
@@ -209,8 +272,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 command.AimPitch,
                 0f),
             Floor: floor,
-            LeftFootHit: AlsFootHit.Invalid,
-            RightFootHit: AlsFootHit.Invalid,
+            LeftFootHit: leftFootHit,
+            RightFootHit: rightFootHit,
             MantleProbe: new AlsMantleProbeResult(0, NumericsMatrix4x4.Identity, -1),
             RequestedGait: command.RequestedGait,
             Stance: _actualStance,
@@ -229,6 +292,180 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _lastFrameId = frameId;
         return input;
     }
+
+    private void GatherFootHits(
+        in AlsFrameIdentity identity,
+        in Transform3D characterTransform,
+        out AlsFootHit left,
+        out AlsFootHit right)
+    {
+        left = AlsFootHit.Invalid;
+        right = AlsFootHit.Invalid;
+        if (HasCharacterDiscontinuity(characterTransform))
+        {
+            _footProbeExchange.Clear();
+            RememberGatherTransform(characterTransform);
+            return;
+        }
+        RememberGatherTransform(characterTransform);
+
+        if (!_footProbeExchange.TryReadForGather(identity, out var leftRequest, out var rightRequest))
+        {
+            return;
+        }
+
+        left = GatherFootHit(leftRequest, characterTransform, _footQueries[0]);
+        right = GatherFootHit(rightRequest, characterTransform, _footQueries[1]);
+        if (_runtimeContext is not null)
+        {
+            Interlocked.Add(ref _runtimeContext.FootGatherQueries, 2);
+        }
+    }
+
+    private AlsFootHit GatherFootHit(
+        in AlsP4FootProbeRequest request,
+        in Transform3D characterTransform,
+        PhysicsRayQueryParameters3D query)
+    {
+        var localOrigin = ToGodot(request.CharacterLocalOrigin);
+        var worldOrigin = characterTransform * localOrigin;
+        var up = characterTransform.Basis.Y.Normalized();
+        if (!IsFinite(worldOrigin) || !IsFinite(up) || up.IsZeroApprox())
+        {
+            return AlsFootHit.Invalid;
+        }
+
+        query.From = worldOrigin + (up * _footGatherSettings.TraceUpMeters);
+        query.To = worldOrigin - (up * _footGatherSettings.TraceDownMeters);
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+        if (hit.Count == 0 ||
+            !hit.TryGetValue(PositionKey, out var positionVariant) ||
+            !hit.TryGetValue(NormalKey, out var normalVariant) ||
+            !hit.TryGetValue(ColliderKey, out var colliderVariant))
+        {
+            return AlsFootHit.Invalid;
+        }
+
+        var position = positionVariant.AsVector3();
+        var normal = normalVariant.AsVector3();
+        var collider = colliderVariant.AsGodotObject() as CollisionObject3D;
+        if (!IsFinite(position) || !IsFinite(normal) || normal.IsZeroApprox() ||
+            collider is null || !GodotObject.IsInstanceValid(collider))
+        {
+            return AlsFootHit.Invalid;
+        }
+        normal = normal.Normalized();
+        if (!IsFinite(normal))
+        {
+            return AlsFootHit.Invalid;
+        }
+
+        var rawColliderId = collider.GetInstanceId();
+        if (rawColliderId > long.MaxValue)
+        {
+            return AlsFootHit.Invalid;
+        }
+        var colliderId = (long)rawColliderId;
+        var movingPlatform = IsMovingPlatform(collider);
+        var platformId = movingPlatform ? CreatePlatformId(rawColliderId) : -1;
+        var platformTransform = collider.GlobalTransform;
+        var platformBasis = platformTransform.Basis.Orthonormalized();
+        var platformRotation = platformBasis.GetRotationQuaternion().Normalized();
+        var pointVelocity = GetPointVelocity(collider, position);
+        if (!IsFinite(platformTransform.Origin) || !IsFinite(platformBasis) ||
+            !IsFinite(platformRotation) || !IsFinite(pointVelocity))
+        {
+            return AlsFootHit.Invalid;
+        }
+
+        var walkable = IsFloorCollision(normal, up, FloorMaxAngle) ? (byte)1 : (byte)0;
+        return new AlsFootHit(
+            1,
+            walkable,
+            ToNumerics(position),
+            ToNumerics(normal),
+            platformId,
+            movingPlatform ? ToNumerics(platformTransform.Origin) : NumericsVector3.Zero,
+            movingPlatform
+                ? new NumericsQuaternion(
+                    platformRotation.X,
+                    platformRotation.Y,
+                    platformRotation.Z,
+                    platformRotation.W)
+                : NumericsQuaternion.Identity,
+            colliderId,
+            ToNumerics(pointVelocity));
+    }
+
+    private bool HasCharacterDiscontinuity(in Transform3D current)
+    {
+        if (!_hasPreviousGatherTransform)
+        {
+            return false;
+        }
+
+        var translation = current.Origin - _previousGatherTransform.Origin;
+        var maximumDistance = _footGatherSettings.CharacterTeleportDistanceMeters;
+        if (!IsFinite(translation) || translation.LengthSquared() > maximumDistance * maximumDistance)
+        {
+            return true;
+        }
+
+        var previousRotation = _previousGatherTransform.Basis.Orthonormalized()
+            .GetRotationQuaternion().Normalized();
+        var currentRotation = current.Basis.Orthonormalized()
+            .GetRotationQuaternion().Normalized();
+        return !IsFinite(previousRotation) || !IsFinite(currentRotation) ||
+               previousRotation.AngleTo(currentRotation) >
+               _footGatherSettings.CharacterTeleportAngleRadians;
+    }
+
+    private void RememberGatherTransform(in Transform3D current)
+    {
+        _previousGatherTransform = current;
+        _hasPreviousGatherTransform = true;
+    }
+
+    private static Vector3 GetPointVelocity(CollisionObject3D collider, in Vector3 worldPoint)
+    {
+        return collider switch
+        {
+            RigidBody3D rigid => rigid.LinearVelocity +
+                                 rigid.AngularVelocity.Cross(worldPoint - rigid.GlobalPosition),
+            StaticBody3D staticBody => staticBody.ConstantLinearVelocity +
+                                       staticBody.ConstantAngularVelocity.Cross(
+                                           worldPoint - staticBody.GlobalPosition),
+            CharacterBody3D character => character.GetRealVelocity(),
+            _ => Vector3.Zero,
+        };
+    }
+
+    private static bool IsMovingPlatform(CollisionObject3D collider) => collider switch
+    {
+        AnimatableBody3D => true,
+        RigidBody3D => true,
+        CharacterBody3D => true,
+        StaticBody3D staticBody =>
+            !staticBody.ConstantLinearVelocity.IsZeroApprox() ||
+            !staticBody.ConstantAngularVelocity.IsZeroApprox(),
+        _ => false,
+    };
+
+    internal static int CreatePlatformId(ulong colliderId)
+    {
+        var folded = colliderId ^ (colliderId >> 32);
+        return (int)(folded & int.MaxValue);
+    }
+
+    private static bool IsFinite(in Basis value) =>
+        IsFinite(value.X) && IsFinite(value.Y) && IsFinite(value.Z);
+
+    private static bool IsFinite(in Quaternion value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) &&
+        float.IsFinite(value.Z) && float.IsFinite(value.W);
+
+    private static bool IsFinite(in Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
     private void ValidateStep(
         long frameId,
@@ -480,13 +717,80 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 NumericsVector3.Zero);
         }
 
-        // P3A does not expose moving-platform data; enumerating slide collisions allocates in Godot C#.
+        var floorNormal = GetFloorNormal();
+        if (TryFindFloorCollider(floorNormal, out var floorCollider) &&
+            IsMovingPlatform(floorCollider))
+        {
+            var platformTransform = floorCollider.GlobalTransform;
+            var platformBasis = platformTransform.Basis.Orthonormalized();
+            var platformRotation = platformBasis.GetRotationQuaternion().Normalized();
+            var angularVelocity = ToNumerics(GetPlatformAngularVelocity());
+            var colliderId = floorCollider.GetInstanceId();
+            if (colliderId <= long.MaxValue &&
+                IsFinite(platformTransform.Origin) &&
+                IsFinite(platformBasis) && IsFinite(platformRotation) &&
+                IsFinite(angularVelocity))
+            {
+                var transform = NumericsMatrix4x4.CreateFromQuaternion(
+                    new NumericsQuaternion(
+                        platformRotation.X,
+                        platformRotation.Y,
+                        platformRotation.Z,
+                        platformRotation.W));
+                transform.Translation = ToNumerics(platformTransform.Origin);
+                return new AlsFloorSample(
+                    1,
+                    ToNumerics(floorNormal),
+                    CreatePlatformId(colliderId),
+                    transform,
+                    angularVelocity);
+            }
+        }
+
         return new AlsFloorSample(
             1,
-            ToNumerics(GetFloorNormal()),
+            ToNumerics(floorNormal),
             -1,
             NumericsMatrix4x4.Identity,
             NumericsVector3.Zero);
+    }
+
+    private bool TryFindFloorCollider(
+        in Vector3 floorNormal,
+        out CollisionObject3D collider)
+    {
+        // Movement-base authority comes from this frame's MoveAndSlide collisions, not foot rays.
+        collider = null!;
+        var bestAlignment = -1f;
+        for (var slideIndex = 0; slideIndex < GetSlideCollisionCount(); slideIndex++)
+        {
+            var collision = GetSlideCollision(slideIndex);
+            if (collision is null)
+            {
+                continue;
+            }
+            for (var collisionIndex = 0;
+                 collisionIndex < collision.GetCollisionCount();
+                 collisionIndex++)
+            {
+                var normal = collision.GetNormal(collisionIndex);
+                if (!IsFinite(normal) ||
+                    !IsFloorCollision(normal, UpDirection, FloorMaxAngle))
+                {
+                    continue;
+                }
+                var alignment = normal.Normalized().Dot(floorNormal);
+                var candidate = collision.GetCollider(collisionIndex) as CollisionObject3D;
+                if (candidate is null || !GodotObject.IsInstanceValid(candidate) ||
+                    alignment <= bestAlignment)
+                {
+                    continue;
+                }
+                bestAlignment = alignment;
+                collider = candidate;
+            }
+        }
+        return collider is not null;
     }
 
     private bool ProbeInitialFloor()
@@ -545,6 +849,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     private static NumericsVector3 ToNumerics(in Vector3 value) =>
         new(value.X, value.Y, value.Z);
+
+    private static bool IsFinite(in NumericsVector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
     private static Vector3 ToGodot(in NumericsVector3 value) =>
         new(value.X, value.Y, value.Z);

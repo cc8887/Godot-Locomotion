@@ -16,6 +16,100 @@ public readonly record struct AlsP3VisualTransformSnapshot(
     NumericsVector3 BasisZ,
     NumericsVector3 Origin);
 
+internal readonly record struct AlsP4FootGatherSettings(
+    float TraceUpMeters,
+    float TraceDownMeters,
+    float CharacterTeleportDistanceMeters,
+    float CharacterTeleportAngleRadians)
+{
+    public static AlsP4FootGatherSettings CreateReference() => new(
+        0.5f,
+        0.75f,
+        1f,
+        MathF.PI / 4f);
+
+    public bool IsValid =>
+        float.IsFinite(TraceUpMeters) && TraceUpMeters >= 0f &&
+        float.IsFinite(TraceDownMeters) && TraceDownMeters > 0f &&
+        float.IsFinite(CharacterTeleportDistanceMeters) &&
+        CharacterTeleportDistanceMeters > 0f &&
+        float.IsFinite(CharacterTeleportAngleRadians) &&
+        CharacterTeleportAngleRadians > 0f && CharacterTeleportAngleRadians <= MathF.PI;
+}
+
+internal readonly record struct AlsP4FootProbeRequest(
+    AlsFrameIdentity Identity,
+    NumericsVector3 CharacterLocalOrigin);
+
+internal sealed class AlsP4FootProbeExchange
+{
+    public const int FootCount = 2;
+    public const int LeftFootIndex = 0;
+    public const int RightFootIndex = 1;
+
+    private readonly AlsP4FootProbeRequest[] _requests = new AlsP4FootProbeRequest[FootCount];
+    private bool _hasRequests;
+
+    public bool TryCopyFromWorker(
+        in AlsFrameIdentity identity,
+        in NumericsVector3 leftOrigin,
+        in NumericsVector3 rightOrigin)
+    {
+        if (identity.FrameId < 0 || identity.SlotGeneration == 0 ||
+            !IsFinite(leftOrigin) || !IsFinite(rightOrigin))
+        {
+            Clear();
+            return false;
+        }
+
+        _requests[LeftFootIndex] = new AlsP4FootProbeRequest(identity, leftOrigin);
+        _requests[RightFootIndex] = new AlsP4FootProbeRequest(identity, rightOrigin);
+        _hasRequests = true;
+        return true;
+    }
+
+    public bool TryReadForGather(
+        in AlsFrameIdentity gatherIdentity,
+        out AlsP4FootProbeRequest left,
+        out AlsP4FootProbeRequest right)
+    {
+        left = default;
+        right = default;
+        if (!_hasRequests)
+        {
+            return false;
+        }
+
+        var candidateLeft = _requests[LeftFootIndex];
+        var candidateRight = _requests[RightFootIndex];
+        if (candidateLeft.Identity != candidateRight.Identity ||
+            candidateLeft.Identity.CharacterId != gatherIdentity.CharacterId ||
+            candidateLeft.Identity.SlotGeneration != gatherIdentity.SlotGeneration ||
+            candidateLeft.Identity.FrameId == long.MaxValue ||
+            candidateLeft.Identity.FrameId + 1 != gatherIdentity.FrameId)
+        {
+            Clear();
+            return false;
+        }
+
+        left = candidateLeft;
+        right = candidateRight;
+        return true;
+    }
+
+    public void Clear()
+    {
+        _requests[LeftFootIndex] = default;
+        _requests[RightFootIndex] = default;
+        _hasRequests = false;
+    }
+
+    internal bool HasRequests => _hasRequests;
+
+    private static bool IsFinite(in NumericsVector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+}
+
 internal readonly record struct AlsP3VisualCommitCandidate(
     AlsFrameIdentity Identity,
     AlsP3VisualTransformSnapshot RootTransform,
@@ -119,6 +213,7 @@ public sealed class AlsP3RuntimeContext
         AnimationSet = animationSet ?? throw new ArgumentNullException(nameof(animationSet));
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
         PresentationTransform = AlsP3Presentation.Create(profile.Presentation);
+        FootGatherSettings = LoadFootGatherSettings(animationSet);
         motorSettings.Validate();
         if (mainManagedThreadId <= 0)
         {
@@ -144,6 +239,8 @@ public sealed class AlsP3RuntimeContext
 
     public Godot.Transform3D PresentationTransform { get; }
 
+    internal AlsP4FootGatherSettings FootGatherSettings { get; }
+
     public int MainManagedThreadId { get; }
 
     public bool HeadlessOrDebug { get; }
@@ -161,6 +258,33 @@ public sealed class AlsP3RuntimeContext
     public long GenerationMismatches;
 
     public long AffinityViolations;
+
+    public long FootGatherManagedAllocations;
+
+    public long FootGatherQueries;
+
+    public long InvalidFootProbeRequests;
+
+    private static AlsP4FootGatherSettings LoadFootGatherSettings(
+        AlsAnimationSetDefinition animationSet)
+    {
+        const string profilePath = "res://assets/config/p4_pose_profile.json";
+        var profile = AlsPoseProfileCompiler.Compile(
+            File.ReadAllText(ProjectSettings.GlobalizePath(profilePath)),
+            animationSet);
+        var settings = new AlsP4FootGatherSettings(
+            profile.Feet.TraceUpMeters,
+            profile.Feet.TraceDownMeters,
+            GodotAls.Core.Pose.AlsFootPlacementSettings.CreateReference()
+                .PlatformTeleportDistanceMeters,
+            GodotAls.Core.Pose.AlsFootPlacementSettings.CreateReference()
+                .PlatformTeleportAngleRadians);
+        if (!settings.IsValid)
+        {
+            throw new InvalidOperationException("P4 foot Gather settings are invalid.");
+        }
+        return settings;
+    }
 }
 
 internal readonly record struct AlsP3VisualRootVisibilityObservation(
@@ -214,9 +338,19 @@ internal sealed class AlsP3CharacterState
     private bool _hasLastPublishedFailureIdentity;
 
     public AlsP3CharacterState(AlsSlotHandle handle, AlsP3ExchangeSlot exchangeSlot)
+        : this(handle, exchangeSlot, new AlsP4FootProbeExchange())
+    {
+    }
+
+    public AlsP3CharacterState(
+        AlsSlotHandle handle,
+        AlsP3ExchangeSlot exchangeSlot,
+        AlsP4FootProbeExchange footProbeExchange)
     {
         Handle = handle;
         ExchangeSlot = exchangeSlot ?? throw new ArgumentNullException(nameof(exchangeSlot));
+        FootProbeExchange = footProbeExchange ??
+            throw new ArgumentNullException(nameof(footProbeExchange));
     }
 
     public AlsSlotHandle Handle { get; }
@@ -224,6 +358,8 @@ internal sealed class AlsP3CharacterState
     public AlsP3ExchangeSlot ExchangeSlot { get; }
 
     public AlsFrameExchange Exchange => ExchangeSlot.Exchange;
+
+    public AlsP4FootProbeExchange FootProbeExchange { get; }
 
     public AlsP3VisualCommitCandidate VisualCommitCandidate;
 

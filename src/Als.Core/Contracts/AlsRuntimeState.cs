@@ -60,6 +60,7 @@ public readonly record struct AlsFootLockState(
     Vector3 ProvenancePosition,
     Quaternion ProvenanceRotation,
     int PlatformId,
+    long ColliderId,
     float Amount,
     byte Locked,
     AlsFootReleaseReason ReleaseReason)
@@ -71,6 +72,7 @@ public readonly record struct AlsFootLockState(
         Quaternion.Identity,
         Vector3.Zero,
         Quaternion.Identity,
+        -1,
         -1,
         0f,
         0,
