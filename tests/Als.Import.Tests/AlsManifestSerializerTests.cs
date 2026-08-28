@@ -154,6 +154,56 @@ public sealed class AlsManifestSerializerTests
         AlsManifestSerializer.Deserialize(json);
     }
 
+    [Theory]
+    [InlineData("empty", "curves[0].keys", false)]
+    [InlineData("single", "curves[0].keys", false)]
+    [InlineData("first", "curves[0].keys[0].timeSeconds", false)]
+    [InlineData("last", "curves[0].keys[1].timeSeconds", true)]
+    public void RejectsCanonicalRotationYawCurveWithIncompleteTimeline(
+        string mutation, string expectedPath, bool schemaCanEvaluateParentDuration)
+    {
+        var root = CreateCanonicalRotationYawManifest();
+        var curve = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!
+            .AsArray()[0]!.AsObject();
+        var keys = curve["keys"]!.AsArray();
+        switch (mutation)
+        {
+        case "empty":
+            keys.Clear();
+            break;
+        case "single":
+            keys.RemoveAt(1);
+            break;
+        case "first":
+            keys[0]!.AsObject()["timeSeconds"] = 0.01;
+            break;
+        case "last":
+            keys[1]!.AsObject()["timeSeconds"] = 0.9;
+            break;
+        }
+        var json = root.ToJsonString();
+
+        Assert.Equal(schemaCanEvaluateParentDuration, IsSchemaValid(json));
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains(expectedPath, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("canonicalRotationYawSourceConvention")]
+    [InlineData("canonicalRotationYawProfileSignProvenance")]
+    public void RejectsCanonicalProvenanceFieldsOnRawAnimation(string field)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
+        root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()[field] = "phantom";
+        var json = root.ToJsonString();
+
+        Assert.False(IsSchemaValid(json));
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains(field, exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void DuplicateCurveKeyTimeIsRejected()
     {
@@ -407,6 +457,8 @@ public sealed class AlsManifestSerializerTests
         curve["sourceProvenance"] = "derived_root_track";
         curve["preInfinity"] = "Constant";
         curve["postInfinity"] = "Constant";
+        curve["keys"]!.AsArray()[0]!.AsObject()["timeSeconds"] = 0.0;
+        curve["keys"]!.AsArray()[1]!.AsObject()["timeSeconds"] = 1.0;
         foreach (var key in curve["keys"]!.AsArray())
         {
             key!.AsObject()["interpolation"] = "Linear";

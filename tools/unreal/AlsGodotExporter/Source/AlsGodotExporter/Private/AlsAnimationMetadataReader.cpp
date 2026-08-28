@@ -114,6 +114,14 @@ namespace
         return RequiredPaths.Contains(SequencePath);
     }
 
+    bool HasCanonicalRotationYawCurve(const TArray<FAlsExportedFloatCurve>& Curves)
+    {
+        return Curves.ContainsByPredicate([](const FAlsExportedFloatCurve& Curve)
+        {
+            return Curve.CanonicalKind == CanonicalRotationYawKind;
+        });
+    }
+
     double ShortestSignedYawDeltaDegrees(double DeltaDegrees)
     {
         double Normalized = FMath::Fmod(DeltaDegrees, 360.0);
@@ -168,7 +176,7 @@ namespace
             const int32 LastIndex = FrameIndex == UnwrappedYawDegrees.Num() - 1
                 ? UnwrappedYawDegrees.Num() - 1 : FrameIndex + 1;
             const double DerivativeRadiansPerSecond = (UnwrappedYawDegrees[LastIndex] - UnwrappedYawDegrees[FirstIndex]) /
-                (TimeSeconds[LastIndex] - TimeSeconds[FirstIndex]) * (PI / 180.0);
+                (TimeSeconds[LastIndex] - TimeSeconds[FirstIndex]) * (UE_DOUBLE_PI / 180.0);
             if (!FMath::IsFinite(DerivativeRadiansPerSecond))
             {
                 OutError = FString::Printf(TEXT("Non-finite canonical root yaw derivative: asset=%s frame=%d time=%.17g value=%.17g."),
@@ -433,7 +441,7 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
     {
         return false;
     }
-    if (RequiresCanonicalRotationYawCurve(SequencePath))
+    if (HasCanonicalRotationYawCurve(OutCurves))
     {
         // This is raw UE root-bone FRotator::Yaw (positive Z yaw); profile conversion signs are deferred to P4 runtime.
         OutMetadata->SetStringField(TEXT("canonicalRotationYawSourceConvention"), TEXT("ue_root_bone_rotator_yaw_degrees_z_up"));
@@ -470,175 +478,244 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
     return true;
 }
 
-bool FAlsAnimationMetadataReader::RunCurveKeySelfTest(FString& OutError)
+bool FAlsAnimationMetadataReader::RunCurveKeySelfTest(int32& OutCaseCount, FString& OutError)
 {
+    constexpr int32 ExpectedCaseCount = 16;
     constexpr int32 CurveIndex = 7;
     constexpr int32 KeyIndex = 3;
+    constexpr double ExpectedRadiansPerDegree = 0.017453292519943295769236907684886;
     const FString SequencePath = TEXT("/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence");
     const FString CurveName = TEXT("CurveSelfTest");
-    FRichCurveKey Key;
-    Key.Time = 0.25f;
-    Key.Value = 2.5f;
-    Key.InterpMode = RCIM_Cubic;
-    Key.ArriveTangent = -1.25f;
-    Key.LeaveTangent = 3.5f;
-
-    FAlsExportedFloatCurveKey ExportedKey;
-    OutError.Reset();
-    if (!TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError) ||
-        !OutError.IsEmpty() ||
-        ExportedKey.TimeSeconds != Key.Time || ExportedKey.Value != Key.Value ||
-        ExportedKey.Interpolation != TEXT("Cubic") || ExportedKey.ArriveTangent != Key.ArriveTangent ||
-        ExportedKey.LeaveTangent != Key.LeaveTangent)
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test valid cubic case failed: %s"), *OutError);
-        return false;
-    }
-
-    Key.TangentWeightMode = RCTWM_WeightedBoth;
-    Key.ArriveTangentWeight = 0.75f;
-    Key.LeaveTangentWeight = 0.5f;
-    OutError.Reset();
-    if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError) ||
-        !OutError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) ||
-        !OutError.Contains(TEXT("curve[7]=CurveSelfTest")) || !OutError.Contains(TEXT("key[3] time=0.25")) ||
-        !OutError.Contains(TEXT("tangentWeightMode=3")) || !OutError.Contains(TEXT("arriveTangentWeight=0.75")) ||
-        !OutError.Contains(TEXT("leaveTangentWeight=0.5")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test weighted cubic case failed: %s"), *OutError);
-        return false;
-    }
-
-    Key.TangentWeightMode = RCTWM_WeightedNone;
-    Key.InterpMode = static_cast<ERichCurveInterpMode>(255);
-    OutError.Reset();
-    if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError))
-    {
-        OutError = TEXT("Curve export self-test invalid interpolation case unexpectedly succeeded.");
-        return false;
-    }
-
-    Key.InterpMode = RCIM_Cubic;
-    Key.Value = std::numeric_limits<float>::infinity();
-    Key.ArriveTangent = std::numeric_limits<float>::infinity();
-    OutError.Reset();
-    if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, OutError))
-    {
-        OutError = TEXT("Curve export self-test non-finite value/tangent case unexpectedly succeeded.");
-        return false;
-    }
-
-    const TArray<double> TestTimes = { 0.0, 0.1, 0.2, 0.3 };
-    const TArray<double> TestYawDegrees = { 170.0, 179.0, -179.0, -170.0 };
-    FAlsExportedFloatCurve CanonicalCurve;
-    OutError.Reset();
-    if (!DeriveRotationYawCurve(SequencePath, TestTimes, TestYawDegrees, CanonicalCurve, OutError) ||
-        !OutError.IsEmpty() ||
-        CanonicalCurve.CanonicalKind != CanonicalRotationYawKind ||
-        CanonicalCurve.SourceName != CanonicalRotationYawCurveName ||
-        CanonicalCurve.SourceProvenance != TEXT("derived_root_track") ||
-        CanonicalCurve.PreInfinity != TEXT("Constant") || CanonicalCurve.PostInfinity != TEXT("Constant") ||
-        CanonicalCurve.Keys.Num() != 4 ||
-        !FMath::IsNearlyEqual(CanonicalCurve.Keys[0].Value, 90.0 * PI / 180.0, 1e-12) ||
-        !FMath::IsNearlyEqual(CanonicalCurve.Keys[1].Value, 55.0 * PI / 180.0, 1e-12) ||
-        !FMath::IsNearlyEqual(CanonicalCurve.Keys[2].Value, 55.0 * PI / 180.0, 1e-12) ||
-        !FMath::IsNearlyEqual(CanonicalCurve.Keys[3].Value, 90.0 * PI / 180.0, 1e-12))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test canonical unwrap/derivative case failed: %s"), *OutError);
-        return false;
-    }
-
-    TArray<double> InvalidTimes = { 0.0, 0.0 };
-    OutError.Reset();
-    if (DeriveRotationYawCurve(SequencePath, InvalidTimes, { 0.0, 1.0 }, CanonicalCurve, OutError) ||
-        !OutError.Contains(TEXT("Non-increasing canonical root yaw time")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test invalid time case failed: %s"), *OutError);
-        return false;
-    }
-
     const double NaN = std::numeric_limits<double>::quiet_NaN();
+    OutCaseCount = 0;
     OutError.Reset();
-    if (DeriveRotationYawCurve(SequencePath, { 0.0, 0.1 }, { 0.0, NaN }, CanonicalCurve, OutError) ||
-        !OutError.Contains(TEXT("Non-finite canonical root yaw sample")))
+
     {
-        OutError = FString::Printf(TEXT("Curve export self-test non-finite root yaw case failed: %s"), *OutError);
-        return false;
+        FRichCurveKey Key;
+        Key.Time = 0.25f;
+        Key.Value = 2.5f;
+        Key.InterpMode = RCIM_Cubic;
+        Key.ArriveTangent = -1.25f;
+        Key.LeaveTangent = 3.5f;
+        FAlsExportedFloatCurveKey ExportedKey;
+        FString CaseError;
+        if (!TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, CaseError) || !CaseError.IsEmpty() ||
+            ExportedKey.TimeSeconds != Key.Time || ExportedKey.Value != Key.Value || ExportedKey.Interpolation != TEXT("Cubic") ||
+            ExportedKey.ArriveTangent != Key.ArriveTangent || ExportedKey.LeaveTangent != Key.LeaveTangent)
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test valid cubic case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FRichCurveKey Key;
+        Key.Time = 0.25f;
+        Key.Value = 2.5f;
+        Key.InterpMode = RCIM_Cubic;
+        Key.TangentWeightMode = RCTWM_WeightedBoth;
+        Key.ArriveTangentWeight = 0.75f;
+        Key.LeaveTangentWeight = 0.5f;
+        FAlsExportedFloatCurveKey ExportedKey;
+        FString CaseError;
+        if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, CaseError) ||
+            !CaseError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) ||
+            !CaseError.Contains(TEXT("curve[7]=CurveSelfTest")) || !CaseError.Contains(TEXT("key[3] time=0.25")) ||
+            !CaseError.Contains(TEXT("tangentWeightMode=3")) || !CaseError.Contains(TEXT("arriveTangentWeight=0.75")) ||
+            !CaseError.Contains(TEXT("leaveTangentWeight=0.5")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test weighted cubic case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FRichCurveKey Key;
+        Key.InterpMode = static_cast<ERichCurveInterpMode>(255);
+        FAlsExportedFloatCurveKey ExportedKey;
+        FString CaseError;
+        if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, CaseError) || CaseError.IsEmpty())
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test invalid interpolation case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FRichCurveKey Key;
+        Key.InterpMode = RCIM_Cubic;
+        Key.Value = std::numeric_limits<float>::infinity();
+        Key.ArriveTangent = std::numeric_limits<float>::infinity();
+        FAlsExportedFloatCurveKey ExportedKey;
+        FString CaseError;
+        if (TryExportCurveKey(SequencePath, CurveIndex, CurveName, KeyIndex, Key, ExportedKey, CaseError) || CaseError.IsEmpty())
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test non-finite value/tangent case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FAlsExportedFloatCurve CanonicalCurve;
+        FString CaseError;
+        if (!DeriveRotationYawCurve(SequencePath, { 0.0, 0.1, 0.2, 0.3 }, { 170.0, 179.0, -179.0, -170.0 }, CanonicalCurve, CaseError) ||
+            !CaseError.IsEmpty() || CanonicalCurve.CanonicalKind != CanonicalRotationYawKind ||
+            CanonicalCurve.SourceName != CanonicalRotationYawCurveName || CanonicalCurve.SourceProvenance != TEXT("derived_root_track") ||
+            CanonicalCurve.PreInfinity != TEXT("Constant") || CanonicalCurve.PostInfinity != TEXT("Constant") || CanonicalCurve.Keys.Num() != 4 ||
+            !FMath::IsNearlyEqual(CanonicalCurve.Keys[0].Value, 90.0 * ExpectedRadiansPerDegree, 1e-12) ||
+            !FMath::IsNearlyEqual(CanonicalCurve.Keys[1].Value, 55.0 * ExpectedRadiansPerDegree, 1e-12) ||
+            !FMath::IsNearlyEqual(CanonicalCurve.Keys[2].Value, 55.0 * ExpectedRadiansPerDegree, 1e-12) ||
+            !FMath::IsNearlyEqual(CanonicalCurve.Keys[3].Value, 90.0 * ExpectedRadiansPerDegree, 1e-12))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical unwrap/derivative case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FAlsExportedFloatCurve InvalidCurve;
+        FString CaseError;
+        if (DeriveRotationYawCurve(SequencePath, { 0.0, 0.0 }, { 0.0, 1.0 }, InvalidCurve, CaseError) ||
+            !CaseError.Contains(TEXT("Non-increasing canonical root yaw time")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test invalid time case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FAlsExportedFloatCurve InvalidCurve;
+        FString CaseError;
+        if (DeriveRotationYawCurve(SequencePath, { 0.0, 0.1 }, { 0.0, NaN }, InvalidCurve, CaseError) ||
+            !CaseError.Contains(TEXT("Non-finite canonical root yaw sample")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test non-finite root yaw case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FAlsExportedFloatCurve CanonicalCurve;
+        FString CaseError;
+        if (!DeriveRotationYawCurve(SequencePath, { 0.0, 0.1 }, { 0.0, 9.0 }, CanonicalCurve, CaseError) || !CaseError.IsEmpty())
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical append preparation failed: %s"), *CaseError);
+            return false;
+        }
+        FAlsExportedFloatCurve RawCurve;
+        RawCurve.SourceName = TEXT("RawCurve");
+        RawCurve.Keys.AddDefaulted_GetRef().Value = 4.0;
+        TArray<FAlsExportedFloatCurve> Curves = { RawCurve, CanonicalCurve };
+        CaseError.Reset();
+        if (!SortAndAssignCurveIds(SequencePath, Curves, CaseError) || !CaseError.IsEmpty() || Curves.Num() != 2 ||
+            Curves[0].SourceName != TEXT("RawCurve") || Curves[0].StableCurveId != 0 || Curves[0].Keys[0].Value != 4.0 ||
+            Curves[1].SourceName != CanonicalRotationYawCurveName || Curves[1].StableCurveId != 1)
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical append/raw preservation/sort case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FAlsExportedFloatCurve FirstCanonicalCurve;
+        FirstCanonicalCurve.SourceName = CanonicalRotationYawCurveName;
+        FirstCanonicalCurve.CanonicalKind = CanonicalRotationYawKind;
+        FAlsExportedFloatCurve DuplicateCanonicalCurve;
+        DuplicateCanonicalCurve.SourceName = CanonicalRotationYawCurveName;
+        DuplicateCanonicalCurve.CanonicalKind = CanonicalRotationYawKind;
+        TArray<FAlsExportedFloatCurve> Curves = { FirstCanonicalCurve, DuplicateCanonicalCurve };
+        FString CaseError;
+        if (SortAndAssignCurveIds(SequencePath, Curves, CaseError) || !CaseError.Contains(TEXT("Duplicate exported float curve source name")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical uniqueness case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FString CaseError;
+        if (!ValidateCanonicalYawSampleDuration(SequencePath, FFrameRate(30, 1), 61, 2.0, 2.0, CaseError) || !CaseError.IsEmpty())
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical duration valid case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FString CaseError;
+        if (ValidateCanonicalYawSampleDuration(SequencePath, FFrameRate(30, 1), 61, 0.0, 0.0, CaseError) ||
+            !CaseError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) || !CaseError.Contains(TEXT("keyCount=61")) ||
+            !CaseError.Contains(TEXT("frameRateNumerator=30")) || !CaseError.Contains(TEXT("frameRateDenominator=1")) ||
+            !CaseError.Contains(TEXT("reason=non-positive duration")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical duration zero case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FString CaseError;
+        if (ValidateCanonicalYawSampleDuration(SequencePath, FFrameRate(30, 1), 61, NaN, NaN, CaseError) ||
+            !CaseError.Contains(TEXT("duration=nan")) || !CaseError.Contains(TEXT("reason=non-finite duration")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical duration non-finite case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        FString CaseError;
+        if (ValidateCanonicalYawSampleDuration(SequencePath, FFrameRate(30, 1), 61, 1.5, 1.5, CaseError) ||
+            !CaseError.Contains(TEXT("computedLastTime=2")) || !CaseError.Contains(TEXT("reason=duration/key-time mismatch")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test canonical duration mismatch case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        double ExtractedYawDegrees = 0.0;
+        FString CaseError;
+        if (!TryExtractCanonicalRootYawDegrees(SequencePath, 3, FQuat(0.0, 0.0, 0.0, 2.0), ExtractedYawDegrees, CaseError) ||
+            !CaseError.IsEmpty() || !FMath::IsNearlyEqual(ExtractedYawDegrees, 0.0, 1e-12))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test non-unit root quaternion case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        double ExtractedYawDegrees = 0.0;
+        FString CaseError;
+        if (TryExtractCanonicalRootYawDegrees(SequencePath, 4, FQuat(NaN, 0.0, 0.0, 1.0), ExtractedYawDegrees, CaseError) ||
+            !CaseError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) || !CaseError.Contains(TEXT("frame=4")) ||
+            !CaseError.Contains(TEXT("X=nan")) || !CaseError.Contains(TEXT("Y=0")) || !CaseError.Contains(TEXT("Z=0")) ||
+            !CaseError.Contains(TEXT("W=1")) || !CaseError.Contains(TEXT("sizeSquared=nan")) || !CaseError.Contains(TEXT("reason=non-finite quaternion")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test non-finite root quaternion case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    {
+        double ExtractedYawDegrees = 0.0;
+        FString CaseError;
+        if (TryExtractCanonicalRootYawDegrees(SequencePath, 5, FQuat::Identity * 0.0, ExtractedYawDegrees, CaseError) ||
+            !CaseError.Contains(TEXT("frame=5")) || !CaseError.Contains(TEXT("X=0")) || !CaseError.Contains(TEXT("Y=0")) ||
+            !CaseError.Contains(TEXT("Z=0")) || !CaseError.Contains(TEXT("W=0")) || !CaseError.Contains(TEXT("sizeSquared=0")) ||
+            !CaseError.Contains(TEXT("reason=zero-length quaternion")))
+        {
+            OutError = FString::Printf(TEXT("Curve export self-test zero-length root quaternion case failed: %s"), *CaseError);
+            return false;
+        }
+        ++OutCaseCount;
     }
 
-    FAlsExportedFloatCurve RawCurve;
-    RawCurve.SourceName = TEXT("RawCurve");
-    RawCurve.Keys.AddDefaulted_GetRef().Value = 4.0;
-    TArray<FAlsExportedFloatCurve> Curves = { RawCurve, CanonicalCurve };
-    OutError.Reset();
-    if (!SortAndAssignCurveIds(SequencePath, Curves, OutError) || !OutError.IsEmpty() || Curves.Num() != 2 ||
-        Curves[0].SourceName != TEXT("RawCurve") || Curves[0].StableCurveId != 0 || Curves[0].Keys[0].Value != 4.0 ||
-        Curves[1].SourceName != CanonicalRotationYawCurveName || Curves[1].StableCurveId != 1)
+    if (OutCaseCount != ExpectedCaseCount)
     {
-        OutError = FString::Printf(TEXT("Curve export self-test canonical append/raw preservation/sort case failed: %s"), *OutError);
+        OutError = FString::Printf(TEXT("Curve export self-test case count mismatch: expected=%d actual=%d."), ExpectedCaseCount, OutCaseCount);
         return false;
     }
-    Curves.Add(RawCurve);
-    OutError.Reset();
-    if (SortAndAssignCurveIds(SequencePath, Curves, OutError) ||
-        !OutError.Contains(TEXT("Duplicate exported float curve source name")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test canonical uniqueness case failed: %s"), *OutError);
-        return false;
-    }
-
-    const FFrameRate DurationTestRate(30, 1);
-    OutError.Reset();
-    if (!ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, 2.0, 2.0, OutError) || !OutError.IsEmpty())
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test canonical duration valid case failed: %s"), *OutError);
-        return false;
-    }
-    OutError.Reset();
-    if (ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, 0.0, 0.0, OutError) ||
-        !OutError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) ||
-        !OutError.Contains(TEXT("keyCount=61")) || !OutError.Contains(TEXT("frameRateNumerator=30")) ||
-        !OutError.Contains(TEXT("frameRateDenominator=1")) || !OutError.Contains(TEXT("reason=non-positive duration")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test canonical duration zero case failed: %s"), *OutError);
-        return false;
-    }
-    OutError.Reset();
-    if (ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, NaN, NaN, OutError) ||
-        !OutError.Contains(TEXT("duration=nan")) || !OutError.Contains(TEXT("reason=non-finite duration")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test canonical duration non-finite case failed: %s"), *OutError);
-        return false;
-    }
-    OutError.Reset();
-    if (ValidateCanonicalYawSampleDuration(SequencePath, DurationTestRate, 61, 1.5, 1.5, OutError) ||
-        !OutError.Contains(TEXT("computedLastTime=2")) || !OutError.Contains(TEXT("reason=duration/key-time mismatch")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test canonical duration mismatch case failed: %s"), *OutError);
-        return false;
-    }
-
-    double TestExtractedYawDegrees = 0.0;
-    OutError.Reset();
-    if (TryExtractCanonicalRootYawDegrees(SequencePath, 4, FQuat(NaN, 0.0, 0.0, 1.0), TestExtractedYawDegrees, OutError) ||
-        !OutError.Contains(TEXT("asset=/Game/AlsGodotExporterSelfTest/CurveSequence.CurveSequence")) ||
-        !OutError.Contains(TEXT("frame=4")) || !OutError.Contains(TEXT("X=nan")) ||
-        !OutError.Contains(TEXT("Y=0")) || !OutError.Contains(TEXT("Z=0")) || !OutError.Contains(TEXT("W=1")) ||
-        !OutError.Contains(TEXT("sizeSquared=nan")) || !OutError.Contains(TEXT("reason=non-finite quaternion")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test non-finite root quaternion case failed: %s"), *OutError);
-        return false;
-    }
-    OutError.Reset();
-    if (TryExtractCanonicalRootYawDegrees(SequencePath, 5, FQuat::Identity * 0.0, TestExtractedYawDegrees, OutError) ||
-        !OutError.Contains(TEXT("frame=5")) || !OutError.Contains(TEXT("X=0")) || !OutError.Contains(TEXT("Y=0")) ||
-        !OutError.Contains(TEXT("Z=0")) || !OutError.Contains(TEXT("W=0")) || !OutError.Contains(TEXT("sizeSquared=0")) ||
-        !OutError.Contains(TEXT("reason=zero-length quaternion")))
-    {
-        OutError = FString::Printf(TEXT("Curve export self-test zero-length root quaternion case failed: %s"), *OutError);
-        return false;
-    }
-
     OutError.Reset();
     return true;
 }
