@@ -38,7 +38,11 @@ public readonly record struct AlsViewPoseSettings(
         IsWeight(AimingSpineWeight) &&
         IsWeight(NonAimingSpineWeight) &&
         IsWeight(AimingUpperBodyWeight) &&
-        IsWeight(NonAimingUpperBodyWeight);
+        IsWeight(NonAimingUpperBodyWeight) &&
+        (AimingHeadWeight > 0f || AimingSpineWeight > 0f) &&
+        (NonAimingHeadWeight > 0f || NonAimingSpineWeight > 0f) &&
+        (AimingSpineWeight != NonAimingSpineWeight ||
+         AimingUpperBodyWeight == NonAimingUpperBodyWeight);
 
     private static bool IsWeight(float value) =>
         float.IsFinite(value) && value >= 0f && value <= 1f;

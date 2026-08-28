@@ -59,7 +59,10 @@ public sealed class HotPathAllocationTests
             rotationMode: AlsRotationMode.Aiming,
             characterYaw: 0.25f,
             viewYaw: 0.4f,
-            aimYaw: 0.5f);
+            aimYaw: 0.5f) with
+        {
+            CharacterTransform = System.Numerics.Matrix4x4.CreateRotationY(0.25f),
+        };
 
         var allocated = MeasureViewPoseEvaluate(input);
 
