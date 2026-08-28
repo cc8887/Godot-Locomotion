@@ -37,6 +37,39 @@ namespace
         return FMath::IsFinite(Key.TimeSeconds) && FMath::IsFinite(Key.Value) &&
             FMath::IsFinite(Key.ArriveTangent) && FMath::IsFinite(Key.LeaveTangent);
     }
+
+    bool TryExportCurveKey(const FString& SequencePath, const int32 CurveIndex, const FString& CurveName,
+        const int32 KeyIndex, const FRichCurveKey& Key, FAlsExportedFloatCurveKey& OutKey, FString& OutError)
+    {
+        const int32 TangentWeightMode = static_cast<int32>(Key.TangentWeightMode.GetValue());
+        if (Key.TangentWeightMode != RCTWM_WeightedNone)
+        {
+            OutError = FString::Printf(TEXT("Unsupported weighted float curve key: asset=%s curve[%d]=%s key[%d] time=%.17g tangentWeightMode=%d arriveTangentWeight=%.17g leaveTangentWeight=%.17g."),
+                *SequencePath, CurveIndex, *CurveName, KeyIndex, Key.Time, TangentWeightMode,
+                Key.ArriveTangentWeight, Key.LeaveTangentWeight);
+            return false;
+        }
+
+        OutKey.TimeSeconds = Key.Time;
+        OutKey.Value = Key.Value;
+        OutKey.ArriveTangent = Key.ArriveTangent;
+        OutKey.LeaveTangent = Key.LeaveTangent;
+        if (!TryMapInterpolation(Key.InterpMode, OutKey.Interpolation))
+        {
+            OutError = FString::Printf(TEXT("Unsupported float curve interpolation: asset=%s curve[%d]=%s key[%d] time=%.17g interpolation=%d."),
+                *SequencePath, CurveIndex, *CurveName, KeyIndex, Key.Time,
+                static_cast<int32>(Key.InterpMode.GetValue()));
+            return false;
+        }
+        if (!IsFiniteCurveKey(OutKey))
+        {
+            OutError = FString::Printf(TEXT("Non-finite float curve key: asset=%s curve[%d]=%s key[%d] time=%.17g value=%.17g arriveTangent=%.17g leaveTangent=%.17g."),
+                *SequencePath, CurveIndex, *CurveName, KeyIndex, Key.Time, Key.Value,
+                Key.ArriveTangent, Key.LeaveTangent);
+            return false;
+        }
+        return true;
+    }
 }
 
 bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJsonObject>& OutMetadata,
@@ -48,6 +81,7 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
         OutError = FString::Printf(TEXT("Unable to load animation sequence: %s"), *Asset.AssetData.GetObjectPathString());
         return false;
     }
+    const FString SequencePath = Asset.AssetData.GetObjectPathString();
 
     const FFrameRate FrameRate = Sequence->GetSamplingFrameRate();
     OutMetadata->SetNumberField(TEXT("playLength"), Sequence->GetPlayLength());
@@ -82,32 +116,30 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
     OutCurves.Reset();
     if (const IAnimationDataModel* DataModel = Sequence->GetDataModel())
     {
-        for (const FFloatCurve& Curve : DataModel->GetFloatCurves())
+        const TArray<FFloatCurve>& FloatCurves = DataModel->GetFloatCurves();
+        for (int32 CurveIndex = 0; CurveIndex < FloatCurves.Num(); ++CurveIndex)
         {
+            const FFloatCurve& Curve = FloatCurves[CurveIndex];
             FAlsExportedFloatCurve ExportedCurve;
             ExportedCurve.SourceName = Curve.GetName().ToString();
             if (!TryMapInfinity(Curve.FloatCurve.PreInfinityExtrap, ExportedCurve.PreInfinity) ||
                 !TryMapInfinity(Curve.FloatCurve.PostInfinityExtrap, ExportedCurve.PostInfinity))
             {
-                OutError = FString::Printf(TEXT("Unsupported float curve infinity mode on %s."), *ExportedCurve.SourceName);
+                OutError = FString::Printf(TEXT("Unsupported float curve infinity mode: asset=%s curve[%d]=%s preInfinity=%d postInfinity=%d."),
+                    *SequencePath, CurveIndex, *ExportedCurve.SourceName,
+                    static_cast<int32>(Curve.FloatCurve.PreInfinityExtrap),
+                    static_cast<int32>(Curve.FloatCurve.PostInfinityExtrap));
                 return false;
             }
 
-            for (const FRichCurveKey& Key : Curve.FloatCurve.GetConstRefOfKeys())
+            const TArray<FRichCurveKey>& CurveKeys = Curve.FloatCurve.GetConstRefOfKeys();
+            for (int32 KeyIndex = 0; KeyIndex < CurveKeys.Num(); ++KeyIndex)
             {
+                const FRichCurveKey& Key = CurveKeys[KeyIndex];
                 FAlsExportedFloatCurveKey ExportedKey;
-                ExportedKey.TimeSeconds = Key.Time;
-                ExportedKey.Value = Key.Value;
-                ExportedKey.ArriveTangent = Key.ArriveTangent;
-                ExportedKey.LeaveTangent = Key.LeaveTangent;
-                if (!TryMapInterpolation(Key.InterpMode, ExportedKey.Interpolation))
+                if (!TryExportCurveKey(SequencePath, CurveIndex, ExportedCurve.SourceName, KeyIndex,
+                    Key, ExportedKey, OutError))
                 {
-                    OutError = FString::Printf(TEXT("Unsupported float curve interpolation on %s."), *ExportedCurve.SourceName);
-                    return false;
-                }
-                if (!IsFiniteCurveKey(ExportedKey))
-                {
-                    OutError = FString::Printf(TEXT("Non-finite float curve key on %s."), *ExportedCurve.SourceName);
                     return false;
                 }
                 ExportedCurve.Keys.Add(MoveTemp(ExportedKey));
@@ -121,7 +153,9 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
             {
                 if (ExportedCurve.Keys[KeyIndex - 1].TimeSeconds >= ExportedCurve.Keys[KeyIndex].TimeSeconds)
                 {
-                    OutError = FString::Printf(TEXT("Duplicate float curve key time on %s."), *ExportedCurve.SourceName);
+                    OutError = FString::Printf(TEXT("Duplicate float curve key time: asset=%s curve[%d]=%s key[%d] time=%.17g previousTime=%.17g."),
+                        *SequencePath, CurveIndex, *ExportedCurve.SourceName, KeyIndex,
+                        ExportedCurve.Keys[KeyIndex].TimeSeconds, ExportedCurve.Keys[KeyIndex - 1].TimeSeconds);
                     return false;
                 }
             }
