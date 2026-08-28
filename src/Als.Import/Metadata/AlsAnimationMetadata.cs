@@ -181,7 +181,7 @@ public sealed record AlsAnimationMetadata(
                 }
                 previousTime = key.TimeSeconds;
             }
-            if (isCanonicalRotationYaw && Math.Abs(curve.Keys[0].TimeSeconds) > 1e-4)
+            if (isCanonicalRotationYaw && curve.Keys[0].TimeSeconds != 0.0)
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].keys[0].timeSeconds must be zero for canonical rotation yaw.");
             }
