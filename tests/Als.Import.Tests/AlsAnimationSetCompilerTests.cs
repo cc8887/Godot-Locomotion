@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GodotAls.Import.Compilation;
 using GodotAls.Import.Manifest;
 
@@ -6,6 +7,239 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsAnimationSetCompilerTests
 {
+    [Fact]
+    public void CompilesStructuredCurvesByStableIdWithoutLosingSemanticFields()
+    {
+        var definition = AlsAnimationSetCompiler.Compile(ManifestWithTwoStructuredCurves());
+
+        var clip = Assert.Single(definition.Animations);
+        Assert.Empty(clip.LegacyCurveNames);
+        Assert.Collection(
+            clip.Curves,
+            curve =>
+            {
+                Assert.Equal(0, curve.CurveId);
+                Assert.Equal(AlsCanonicalCurveKind.None, curve.CanonicalKind);
+                Assert.Equal("RotationAmount", curve.SourceName);
+                Assert.Equal(AlsCurveProvenance.SourceCurve, curve.Provenance);
+                Assert.Equal(AlsCurveInterpolation.Cubic, curve.Keys[1].Interpolation);
+                Assert.Equal(9007199254740991f, curve.Keys[1].ArriveTangent);
+                Assert.Equal(-1.2345679f, curve.Keys[1].LeaveTangent);
+            },
+            curve =>
+            {
+                Assert.Equal(1, curve.CurveId);
+                Assert.Equal(AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond, curve.CanonicalKind);
+                Assert.Equal("RotationYawSpeedRadiansPerSecond", curve.SourceName);
+                Assert.Equal(AlsCurveProvenance.DerivedRootTrack, curve.Provenance);
+                Assert.Equal([0f, 1f], curve.Keys.Select(key => key.TimeSeconds));
+                Assert.All(curve.Keys, key => Assert.Equal(AlsCurveInterpolation.Linear, key.Interpolation));
+            });
+    }
+
+    [Fact]
+    public void LegacyCurveNamesRemainExplicitAndDoNotCreateTypedCurves()
+    {
+        var manifest = MutateAnimationMetadata(root =>
+            root["curves"] = new JsonArray("RotationAmount", "YawOffset"));
+
+        var definition = AlsAnimationSetCompiler.Compile(manifest);
+        var clip = Assert.Single(definition.Animations);
+
+        Assert.Empty(clip.Curves);
+        Assert.Equal(["RotationAmount", "YawOffset"], clip.LegacyCurveNames);
+
+        var restored = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(definition));
+        Assert.Empty(restored.Animations[0].Curves);
+        Assert.Equal(["RotationAmount", "YawOffset"], restored.Animations[0].LegacyCurveNames);
+    }
+
+    [Fact]
+    public void LegacyCurvesRejectPhantomCanonicalProvenanceAtItsExactPath()
+    {
+        var manifest = MutateAnimationMetadata(root =>
+        {
+            root["curves"] = new JsonArray("RotationAmount");
+            root["canonicalRotationYawSourceConvention"] = "ue_root_bone_rotator_yaw_degrees_z_up";
+        });
+
+        AssertCompilationIssuePath(
+            manifest,
+            "$.animations[0].metadata.canonicalRotationYawSourceConvention");
+    }
+
+    [Fact]
+    public void CurveDefinitionsDefensivelyCopyCallerOwnedArrays()
+    {
+        var keys = new[]
+        {
+            new AlsFloatCurveKeyDefinition(0f, 1f, 2f, 3f, AlsCurveInterpolation.Linear),
+        };
+        var curve = new AlsFloatCurveDefinition(
+            0, AlsCanonicalCurveKind.None, "Curve", AlsCurveProvenance.SourceCurve, keys);
+
+        keys[0] = new AlsFloatCurveKeyDefinition(0f, 99f, 99f, 99f, AlsCurveInterpolation.Constant);
+
+        Assert.Equal(1f, curve.Keys[0].Value);
+        Assert.Equal(AlsCurveInterpolation.Linear, curve.Keys[0].Interpolation);
+    }
+
+    [Fact]
+    public void AnimationDefinitionsDefensivelyCopyCallerOwnedCurveArrays()
+    {
+        var original = AlsAnimationSetCompiler.Compile(ManifestWithTwoStructuredCurves()).Animations[0];
+        var callerOwnedCurves = original.Curves.ToArray();
+        var clip = original with { Curves = callerOwnedCurves };
+
+        callerOwnedCurves[0] = callerOwnedCurves[1];
+
+        Assert.Equal(0, clip.Curves[0].CurveId);
+        Assert.Equal("RotationAmount", clip.Curves[0].SourceName);
+    }
+
+    [Theory]
+    [InlineData("canonicalKind", "Unknown", "$.animations[0].metadata.curves[0].canonicalKind")]
+    [InlineData("sourceProvenance", "Unknown", "$.animations[0].metadata.curves[0].sourceProvenance")]
+    public void RejectsUnknownCurveEnumsAtTheirExactPath(string property, string value, string expectedPath)
+    {
+        var manifest = MutateAnimationMetadata(root =>
+            root["curves"]![0]![property] = value);
+
+        AssertCompilationIssuePath(manifest, expectedPath);
+    }
+
+    [Fact]
+    public void RejectsUnknownKeyInterpolationAtItsExactPath()
+    {
+        var manifest = MutateAnimationMetadata(root =>
+            root["curves"]![0]!["keys"]![0]!["interpolation"] = "Unknown");
+
+        AssertCompilationIssuePath(
+            manifest,
+            "$.animations[0].metadata.curves[0].keys[0].interpolation");
+    }
+
+    [Fact]
+    public void RejectsNonFiniteKeyValuesAtTheirExactPath()
+    {
+        var fixture = AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath());
+        var rawMetadata = fixture.Animations[0].Metadata.GetRawText().Replace(
+            "9007199254740991",
+            "1e309",
+            StringComparison.Ordinal);
+        using var document = JsonDocument.Parse(rawMetadata);
+        var manifest = fixture with
+        {
+            Animations = [fixture.Animations[0] with { Metadata = document.RootElement.Clone() }],
+        };
+
+        AssertCompilationIssuePath(
+            manifest,
+            "$.animations[0].metadata.curves[0].keys[0].value");
+    }
+
+    [Fact]
+    public void RejectsNonIncreasingCurveTimesAtTheirExactPath()
+    {
+        var manifest = MutateAnimationMetadata(root =>
+            root["curves"]![0]!["keys"]![1]!["timeSeconds"] =
+                root["curves"]![0]!["keys"]![0]!["timeSeconds"]!.DeepClone());
+
+        AssertCompilationIssuePath(
+            manifest,
+            "$.animations[0].metadata.curves[0].keys[1].timeSeconds");
+    }
+
+    [Theory]
+    [InlineData(-0.01, 0)]
+    [InlineData(1.01, 1)]
+    public void RejectsCurveTimesOutsideTheClipAtTheirExactPath(double time, int keyIndex)
+    {
+        var manifest = MutateAnimationMetadata(root =>
+            root["curves"]![0]!["keys"]![keyIndex]!["timeSeconds"] = time);
+
+        AssertCompilationIssuePath(
+            manifest,
+            $"$.animations[0].metadata.curves[0].keys[{keyIndex}].timeSeconds");
+    }
+
+    [Fact]
+    public void RejectsASecondCanonicalYawCurveAtItsExactPath()
+    {
+        var manifest = ManifestWithTwoStructuredCurves();
+        var root = JsonNode.Parse(manifest.Animations[0].Metadata.GetRawText())!.AsObject();
+        var duplicate = root["curves"]![1]!.DeepClone();
+        duplicate["stableCurveId"] = 2;
+        root["curves"]!.AsArray().Add(duplicate);
+        manifest = WithAnimationMetadata(manifest, root);
+
+        AssertCompilationIssuePath(
+            manifest,
+            "$.animations[0].metadata.curves[2].canonicalKind");
+    }
+
+    [Fact]
+    public void PayloadAndDefinitionDigestsCoverAllCurveSemanticsButEventDigestDoesNot()
+    {
+        var original = AlsAnimationSetCompiler.Compile(ManifestWithTwoStructuredCurves());
+        var changed = AlsAnimationSetCompiler.Compile(MutateAnimationMetadata(root =>
+            root["curves"]![0]!["keys"]![0]!["arriveTangent"] = 42.0));
+
+        var originalPayload = AlsAnimationSetPayload.Serialize(original);
+        var changedPayload = AlsAnimationSetPayload.Serialize(changed);
+        Assert.NotEqual(original.DefinitionDigest, changed.DefinitionDigest);
+        Assert.NotEqual(
+            AlsAnimationSetPayload.ComputeSha256(originalPayload),
+            AlsAnimationSetPayload.ComputeSha256(changedPayload));
+
+        using var payloadDocument = JsonDocument.Parse(originalPayload);
+        var curve = payloadDocument.RootElement.GetProperty("animations")[0].GetProperty("curves")[1];
+        Assert.Equal(1, curve.GetProperty("curveId").GetInt32());
+        Assert.Equal((int)AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond,
+            curve.GetProperty("canonicalKind").GetInt32());
+        Assert.Equal("RotationYawSpeedRadiansPerSecond", curve.GetProperty("sourceName").GetString());
+        Assert.Equal((int)AlsCurveProvenance.DerivedRootTrack, curve.GetProperty("provenance").GetInt32());
+        var key = curve.GetProperty("keys")[0];
+        Assert.True(key.TryGetProperty("timeSeconds", out _));
+        Assert.True(key.TryGetProperty("value", out _));
+        Assert.True(key.TryGetProperty("arriveTangent", out _));
+        Assert.True(key.TryGetProperty("leaveTangent", out _));
+        Assert.Equal((int)AlsCurveInterpolation.Linear, key.GetProperty("interpolation").GetInt32());
+
+        var originalEventDigest = AlsAnimationEventDigest.OffsetBasis;
+        var changedEventDigest = AlsAnimationEventDigest.OffsetBasis;
+        AlsAnimationEventDigest.Advance(original.Animations[0], 0.0, 1.0, ref originalEventDigest);
+        AlsAnimationEventDigest.Advance(changed.Animations[0], 0.0, 1.0, ref changedEventDigest);
+        Assert.Equal(originalEventDigest, changedEventDigest);
+    }
+
+    [Fact]
+    public void EveryCurveSemanticFieldAffectsDefinitionAndPayloadDigests()
+    {
+        var original = AlsAnimationSetCompiler.Compile(
+            AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath()));
+        var originalPayloadDigest = AlsAnimationSetPayload.ComputeSha256(
+            AlsAnimationSetPayload.Serialize(original));
+        Action<JsonObject>[] mutations =
+        [
+            root => root["curves"]![0]!["sourceName"] = "RotationAmountChanged",
+            root => root["curves"]![0]!["keys"]![0]!["timeSeconds"] = 0.2,
+            root => root["curves"]![0]!["keys"]![0]!["value"] = 7.0,
+            root => root["curves"]![0]!["keys"]![0]!["arriveTangent"] = 7.0,
+            root => root["curves"]![0]!["keys"]![0]!["leaveTangent"] = 7.0,
+            root => root["curves"]![0]!["keys"]![0]!["interpolation"] = "Constant",
+            MakeFirstCurveCanonical,
+        ];
+
+        foreach (var mutation in mutations)
+        {
+            var changed = AlsAnimationSetCompiler.Compile(MutateAnimationMetadata(mutation));
+            Assert.NotEqual(original.DefinitionDigest, changed.DefinitionDigest);
+            Assert.NotEqual(originalPayloadDigest, AlsAnimationSetPayload.ComputeSha256(
+                AlsAnimationSetPayload.Serialize(changed)));
+        }
+    }
+
     [Fact]
     public void CompilesStableIndicesAndTypedClipSemantics()
     {
@@ -252,5 +486,64 @@ public sealed class AlsAnimationSetCompilerTests
             outputPath,
             dependencies,
             JsonSerializer.SerializeToElement(metadata, AlsManifestSerializer.JsonOptions));
+    }
+
+    private static AlsManifest ManifestWithTwoStructuredCurves() => MutateAnimationMetadata(root =>
+    {
+        var curves = root["curves"]!.AsArray();
+        curves.Add(JsonNode.Parse("""
+            {
+              "stableCurveId": 1,
+              "canonicalKind": "RotationYawSpeedRadiansPerSecond",
+              "sourceName": "RotationYawSpeedRadiansPerSecond",
+              "sourceProvenance": "derived_root_track",
+              "preInfinity": "Constant",
+              "postInfinity": "Constant",
+              "keys": [
+                { "timeSeconds": 0.0, "value": 1.0, "interpolation": "Linear", "arriveTangent": 0.0, "leaveTangent": 0.0 },
+                { "timeSeconds": 1.0, "value": 2.0, "interpolation": "Linear", "arriveTangent": 0.0, "leaveTangent": 0.0 }
+              ]
+            }
+            """));
+        root["canonicalRotationYawSourceConvention"] = "ue_root_bone_rotator_yaw_degrees_z_up";
+        root["canonicalRotationYawProfileSignProvenance"] = "runtime_profile_sign_pending";
+    });
+
+    private static void MakeFirstCurveCanonical(JsonObject root)
+    {
+        var curve = root["curves"]![0]!;
+        curve["canonicalKind"] = "RotationYawSpeedRadiansPerSecond";
+        curve["sourceName"] = "RotationYawSpeedRadiansPerSecond";
+        curve["sourceProvenance"] = "derived_root_track";
+        curve["keys"]![0]!["timeSeconds"] = 0.0;
+        curve["keys"]![0]!["interpolation"] = "Linear";
+        curve["keys"]![1]!["timeSeconds"] = 1.0;
+        curve["keys"]![1]!["interpolation"] = "Linear";
+        root["canonicalRotationYawSourceConvention"] = "ue_root_bone_rotator_yaw_degrees_z_up";
+        root["canonicalRotationYawProfileSignProvenance"] = "runtime_profile_sign_pending";
+    }
+
+    private static AlsManifest MutateAnimationMetadata(Action<JsonObject> mutation)
+    {
+        var manifest = AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath());
+        var root = JsonNode.Parse(manifest.Animations[0].Metadata.GetRawText())!.AsObject();
+        mutation(root);
+        return WithAnimationMetadata(manifest, root);
+    }
+
+    private static AlsManifest WithAnimationMetadata(AlsManifest manifest, JsonObject metadata)
+    {
+        using var document = JsonDocument.Parse(metadata.ToJsonString());
+        return manifest with
+        {
+            Animations = [manifest.Animations[0] with { Metadata = document.RootElement.Clone() }],
+        };
+    }
+
+    private static void AssertCompilationIssuePath(AlsManifest manifest, string expectedPath)
+    {
+        var exception = Assert.Throws<AlsCompilationException>(() => AlsAnimationSetCompiler.Compile(manifest));
+        Assert.Contains(exception.Issues, issue => issue.AssetId == manifest.Animations[0].Id &&
+            issue.FieldPath == expectedPath);
     }
 }
