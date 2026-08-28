@@ -70,16 +70,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private int _disposed;
     private byte _activeP4Mode;
     private float _activeTurnBlendSeconds;
-    private byte _turnBank;
-    private byte _rotateBank;
-    private byte _turnTargetBank;
-    private byte _rotateTargetBank;
-    private bool _turnBlendActive;
-    private bool _rotateBlendActive;
-    private double _turnBlendElapsed;
-    private double _rotateBlendElapsed;
-    private float _turnBlendDuration;
-    private float _rotateBlendDuration;
+    private P4BlendChannelState _turnChannel;
+    private P4BlendChannelState _rotateChannel;
     private float _actionBlendAmount;
     private float _actionBlendTarget;
     private float _actionBlendDuration;
@@ -158,7 +150,19 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                 0f);
             if (_graph.Handles.P4 is not null)
             {
-                SetP4Parameters(_graph.Handles.P4, PreparedP4.Disabled, 0, 0, 0f, 0f, 0f, 0f);
+                _turnChannel = P4BlendChannelState.Initial(
+                    _graph.Handles.P4.InitialTurnBinding);
+                _rotateChannel = P4BlendChannelState.Initial(
+                    _graph.Handles.P4.InitialRotateBinding);
+                var turnUpdate = P4BlendChannelUpdate.Idle(_turnChannel);
+                var rotateUpdate = P4BlendChannelUpdate.Idle(_rotateChannel);
+                SetP4Parameters(
+                    _graph.Handles.P4,
+                    PreparedP4.Disabled,
+                    turnUpdate,
+                    rotateUpdate,
+                    0f,
+                    0f);
             }
             _graph.Tree.Advance(0.0);
 
@@ -202,6 +206,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         var requestedP4Mode = preparedP4.TurnActive ? (byte)1 :
             preparedP4.RotateActive ? (byte)2 : (byte)0;
         var p4Handles = _graph.Handles.P4;
+        var turnBranchVisible = _actionBlendAmount > 0f && _actionModeBlendAmount < 1f;
+        var rotateBranchVisible = _actionBlendAmount > 0f && _actionModeBlendAmount > 0f;
         var stateChanged = result.AnimationState != ActiveAnimationState;
         if (stateChanged)
         {
@@ -232,68 +238,22 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             nextActionBlendAmount, nextActionBlendTarget, nextActionBlendDuration, deltaTime);
         nextActionModeBlendAmount = MoveBlend(
             nextActionModeBlendAmount, nextActionModeBlendTarget, 0.08f, deltaTime);
-        var nextTurnBank = _turnBank;
-        var nextRotateBank = _rotateBank;
-        var nextTurnTargetBank = _turnTargetBank;
-        var nextRotateTargetBank = _rotateTargetBank;
-        var nextTurnBlendActive = _turnBlendActive;
-        var nextRotateBlendActive = _rotateBlendActive;
-        var nextTurnBlendElapsed = _turnBlendElapsed;
-        var nextRotateBlendElapsed = _rotateBlendElapsed;
-        var nextTurnBlendDuration = _turnBlendDuration;
-        var nextRotateBlendDuration = _rotateBlendDuration;
-        if (preparedP4.TurnActive &&
-            p4Input.ActiveTurnAnimationId != ActiveTurnAnimationId)
-        {
-            nextTurnTargetBank = _activeP4Mode == 1 ? (byte)(1 - _turnBank) : _turnBank;
-            nextTurnBlendDuration = preparedP4.TurnBinding.BlendSeconds;
-            nextTurnBlendElapsed = 0.0;
-            nextTurnBlendActive = _activeP4Mode == 1 && nextTurnBlendDuration > 0f;
-            _graph.Tree.Set(
-                p4Handles!.GetTurnRequestPath(nextTurnTargetBank),
-                preparedP4.TurnBinding.StateName);
-        }
-        if (preparedP4.RotateActive &&
-            p4Input.ActiveRotateAnimationId != ActiveRotateAnimationId)
-        {
-            nextRotateTargetBank = _activeP4Mode == 2 ? (byte)(1 - _rotateBank) : _rotateBank;
-            nextRotateBlendDuration = preparedP4.RotateBinding.BlendSeconds;
-            nextRotateBlendElapsed = 0.0;
-            nextRotateBlendActive = _activeP4Mode == 2 && nextRotateBlendDuration > 0f;
-            _graph.Tree.Set(
-                p4Handles!.GetRotateRequestPath(nextRotateTargetBank),
-                preparedP4.RotateBinding.StateName);
-        }
-        var turnParameterBank = nextTurnBlendActive ? nextTurnTargetBank : nextTurnBank;
-        var rotateParameterBank = nextRotateBlendActive ? nextRotateTargetBank : nextRotateBank;
-        var turnBlendAmount = (float)nextTurnBank;
-        var rotateBlendAmount = (float)nextRotateBank;
-        if (preparedP4.TurnActive && nextTurnBlendActive)
-        {
-            nextTurnBlendElapsed = Math.Min(
-                nextTurnBlendElapsed + deltaTime, nextTurnBlendDuration);
-            var alpha = (float)(nextTurnBlendElapsed / nextTurnBlendDuration);
-            turnBlendAmount = nextTurnTargetBank == 1 ? alpha : 1f - alpha;
-            if (nextTurnBlendElapsed >= nextTurnBlendDuration - 1e-6)
-            {
-                nextTurnBank = nextTurnTargetBank;
-                nextTurnBlendActive = false;
-                turnBlendAmount = nextTurnBank;
-            }
-        }
-        if (preparedP4.RotateActive && nextRotateBlendActive)
-        {
-            nextRotateBlendElapsed = Math.Min(
-                nextRotateBlendElapsed + deltaTime, nextRotateBlendDuration);
-            var alpha = (float)(nextRotateBlendElapsed / nextRotateBlendDuration);
-            rotateBlendAmount = nextRotateTargetBank == 1 ? alpha : 1f - alpha;
-            if (nextRotateBlendElapsed >= nextRotateBlendDuration - 1e-6)
-            {
-                nextRotateBank = nextRotateTargetBank;
-                nextRotateBlendActive = false;
-                rotateBlendAmount = nextRotateBank;
-            }
-        }
+        var turnUpdate = UpdateP4BlendChannel(
+            _turnChannel,
+            preparedP4.TurnActive,
+            turnBranchVisible,
+            preparedP4.TurnBinding,
+            preparedP4.TurnPlayRate,
+            preparedP4.TurnPhase,
+            deltaTime);
+        var rotateUpdate = UpdateP4BlendChannel(
+            _rotateChannel,
+            preparedP4.RotateActive,
+            rotateBranchVisible,
+            preparedP4.RotateBinding,
+            preparedP4.RotatePlayRate,
+            preparedP4.RotatePhase,
+            deltaTime);
 
         var stanceChanged = result.ActualStance != ActiveStance;
         if (result.AnimationState == AlsAnimationState.Grounded &&
@@ -315,10 +275,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             SetP4Parameters(
                 _graph.Handles.P4,
                 preparedP4,
-                turnParameterBank,
-                rotateParameterBank,
-                turnBlendAmount,
-                rotateBlendAmount,
+                turnUpdate,
+                rotateUpdate,
                 nextActionModeBlendAmount,
                 nextActionBlendAmount);
         }
@@ -330,16 +288,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         ActiveTurnAnimationId = p4Input.ActiveTurnAnimationId;
         ActiveRotateAnimationId = p4Input.ActiveRotateAnimationId;
         _activeP4Mode = requestedP4Mode;
-        _turnBank = nextTurnBank;
-        _rotateBank = nextRotateBank;
-        _turnTargetBank = nextTurnTargetBank;
-        _rotateTargetBank = nextRotateTargetBank;
-        _turnBlendActive = nextTurnBlendActive;
-        _rotateBlendActive = nextRotateBlendActive;
-        _turnBlendElapsed = nextTurnBlendElapsed;
-        _rotateBlendElapsed = nextRotateBlendElapsed;
-        _turnBlendDuration = nextTurnBlendDuration;
-        _rotateBlendDuration = nextRotateBlendDuration;
+        _turnChannel = turnUpdate.State;
+        _rotateChannel = rotateUpdate.State;
         _actionBlendAmount = nextActionBlendAmount;
         _actionBlendTarget = nextActionBlendTarget;
         _actionBlendDuration = nextActionBlendDuration;
@@ -406,6 +356,172 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             : MathF.Max(current - step, target);
     }
 
+    private static P4BlendChannelUpdate UpdateP4BlendChannel(
+        P4BlendChannelState state,
+        bool active,
+        bool branchVisible,
+        in AlsP4ClipBinding binding,
+        float playRate,
+        float phase,
+        double deltaTime)
+    {
+        if (!active)
+        {
+            return P4BlendChannelUpdate.Idle(state with { Pending = false });
+        }
+
+        var next = state;
+        var requestBinding = false;
+        var requestBank = state.Bank;
+
+        if (!branchVisible)
+        {
+            var currentBinding = next.GetBinding(next.Bank);
+            requestBinding = !SameBinding(currentBinding, binding);
+            requestBank = next.Bank;
+            next = next
+                .WithBinding(next.Bank, binding)
+                .WithParameters(next.Bank, playRate, phase) with
+            {
+                TargetBank = next.Bank,
+                BlendActive = false,
+                BlendElapsed = 0.0,
+                BlendDuration = binding.BlendSeconds,
+                BlendAmount = next.Bank,
+                Pending = false,
+            };
+        }
+        else if (next.BlendActive)
+        {
+            var targetBinding = next.GetBinding(next.TargetBank);
+            if (SameBinding(targetBinding, binding))
+            {
+                next = next
+                    .WithParameters(next.TargetBank, playRate, phase) with
+                {
+                    Pending = false,
+                };
+            }
+            else
+            {
+                next = next with
+                {
+                    Pending = true,
+                    PendingBinding = binding,
+                    PendingPlayRate = playRate,
+                    PendingPhase = phase,
+                };
+            }
+        }
+        else if (SameBinding(next.GetBinding(next.Bank), binding))
+        {
+            next = next
+                .WithParameters(next.Bank, playRate, phase) with
+            {
+                Pending = false,
+            };
+        }
+        else
+        {
+            StartP4Blend(
+                ref next,
+                in binding,
+                playRate,
+                phase,
+                ref requestBinding,
+                ref requestBank);
+        }
+
+        var remainingDelta = deltaTime;
+        for (var transition = 0;
+             transition < 2 && next.BlendActive && remainingDelta >= 0.0;
+             transition++)
+        {
+            var remainingBlend = Math.Max(0.0, next.BlendDuration - next.BlendElapsed);
+            var consumed = Math.Min(remainingDelta, remainingBlend);
+            var elapsed = Math.Min(next.BlendElapsed + consumed, next.BlendDuration);
+            var alpha = (float)(elapsed / next.BlendDuration);
+            next = next with
+            {
+                BlendElapsed = elapsed,
+                BlendAmount = next.TargetBank == 1 ? alpha : 1f - alpha,
+            };
+            remainingDelta -= consumed;
+            if (elapsed < next.BlendDuration - 1e-6)
+            {
+                break;
+            }
+
+            next = next with
+            {
+                Bank = next.TargetBank,
+                BlendActive = false,
+                BlendElapsed = next.BlendDuration,
+                BlendAmount = next.TargetBank,
+            };
+            if (!next.Pending)
+            {
+                break;
+            }
+
+            var pendingBinding = next.PendingBinding;
+            var pendingPlayRate = next.PendingPlayRate;
+            var pendingPhase = next.PendingPhase;
+            next = next with { Pending = false };
+            StartP4Blend(
+                ref next,
+                in pendingBinding,
+                pendingPlayRate,
+                pendingPhase,
+                ref requestBinding,
+                ref requestBank);
+            if (remainingDelta <= 0.0)
+            {
+                break;
+            }
+        }
+
+        return new P4BlendChannelUpdate(
+            next,
+            requestBinding,
+            requestBank);
+    }
+
+    private static void StartP4Blend(
+        ref P4BlendChannelState state,
+        in AlsP4ClipBinding binding,
+        float playRate,
+        float phase,
+        ref bool requestBinding,
+        ref byte requestBank)
+    {
+        var targetBank = (byte)(1 - state.Bank);
+        requestBinding = !SameBinding(state.GetBinding(targetBank), binding);
+        requestBank = targetBank;
+        state = state
+            .WithBinding(targetBank, binding)
+            .WithParameters(targetBank, playRate, phase) with
+        {
+            TargetBank = targetBank,
+            BlendActive = binding.BlendSeconds > 0f,
+            BlendElapsed = 0.0,
+            BlendDuration = binding.BlendSeconds,
+            Pending = false,
+        };
+        if (binding.BlendSeconds <= 0f)
+        {
+            state = state with
+            {
+                Bank = targetBank,
+                BlendAmount = targetBank,
+            };
+        }
+    }
+
+    private static bool SameBinding(
+        in AlsP4ClipBinding left,
+        in AlsP4ClipBinding right) => left.StateName == right.StateName;
+
     private AlsLocomotionGraphParameterSet GetParameters(
         AlsAnimationState state,
         AlsStance stance) => state switch
@@ -445,25 +561,38 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private void SetP4Parameters(
         AlsP4GraphHandles handles,
         in PreparedP4 prepared,
-        byte turnBank,
-        byte rotateBank,
-        float turnBlendAmount,
-        float rotateBlendAmount,
+        in P4BlendChannelUpdate turn,
+        in P4BlendChannelUpdate rotate,
         float actionModeBlendAmount,
         float actionBlendAmount)
     {
-        if (prepared.TurnActive)
+        if (turn.RequestBinding)
         {
-            _graph.Tree.Set(prepared.TurnBinding.GetPlayRatePath(turnBank), prepared.TurnPlayRate);
-            _graph.Tree.Set(prepared.TurnBinding.GetPhasePath(turnBank), prepared.TurnPhase);
+            _graph.Tree.Set(
+                handles.GetTurnRequestPath(turn.RequestBank),
+                turn.State.GetBinding(turn.RequestBank).StateName);
         }
-        if (prepared.RotateActive)
+        if (rotate.RequestBinding)
         {
-            _graph.Tree.Set(prepared.RotateBinding.GetPlayRatePath(rotateBank), prepared.RotatePlayRate);
-            _graph.Tree.Set(prepared.RotateBinding.GetPhasePath(rotateBank), prepared.RotatePhase);
+            _graph.Tree.Set(
+                handles.GetRotateRequestPath(rotate.RequestBank),
+                rotate.State.GetBinding(rotate.RequestBank).StateName);
         }
-        _graph.Tree.Set(handles.TurnBlendPath, turnBlendAmount);
-        _graph.Tree.Set(handles.RotateBlendPath, rotateBlendAmount);
+        for (byte bank = 0; bank < 2; bank++)
+        {
+            var binding = turn.State.GetBinding(bank);
+            _graph.Tree.Set(
+                binding.GetPlayRatePath(bank), turn.State.GetPlayRate(bank));
+            _graph.Tree.Set(
+                binding.GetPhasePath(bank), turn.State.GetPhase(bank));
+            binding = rotate.State.GetBinding(bank);
+            _graph.Tree.Set(
+                binding.GetPlayRatePath(bank), rotate.State.GetPlayRate(bank));
+            _graph.Tree.Set(
+                binding.GetPhasePath(bank), rotate.State.GetPhase(bank));
+        }
+        _graph.Tree.Set(handles.TurnBlendPath, turn.State.BlendAmount);
+        _graph.Tree.Set(handles.RotateBlendPath, rotate.State.BlendAmount);
         _graph.Tree.Set(handles.ActionModeBlendPath, actionModeBlendAmount);
         _graph.Tree.Set(handles.ActionBlendPath, actionBlendAmount);
         _graph.Tree.Set(handles.AimDownPhasePath, prepared.AimDownPhase);
@@ -689,6 +818,52 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+    }
+
+    private readonly record struct P4BlendChannelState(
+        byte Bank,
+        byte TargetBank,
+        bool BlendActive,
+        double BlendElapsed,
+        float BlendDuration,
+        float BlendAmount,
+        AlsP4ClipBinding BankA,
+        AlsP4ClipBinding BankB,
+        float BankAPlayRate,
+        float BankAPhase,
+        float BankBPlayRate,
+        float BankBPhase,
+        bool Pending,
+        AlsP4ClipBinding PendingBinding,
+        float PendingPlayRate,
+        float PendingPhase)
+    {
+        public static P4BlendChannelState Initial(in AlsP4ClipBinding binding) =>
+            new(0, 0, false, 0.0, binding.BlendSeconds, 0f,
+                binding, binding, 1f, 0f, 1f, 0f, false, default, 1f, 0f);
+
+        public AlsP4ClipBinding GetBinding(byte bank) => bank == 0 ? BankA : BankB;
+
+        public P4BlendChannelState WithBinding(byte bank, in AlsP4ClipBinding binding) =>
+            bank == 0 ? this with { BankA = binding } : this with { BankB = binding };
+
+        public P4BlendChannelState WithParameters(byte bank, float playRate, float phase) =>
+            bank == 0
+                ? this with { BankAPlayRate = playRate, BankAPhase = phase }
+                : this with { BankBPlayRate = playRate, BankBPhase = phase };
+
+        public float GetPlayRate(byte bank) => bank == 0 ? BankAPlayRate : BankBPlayRate;
+
+        public float GetPhase(byte bank) => bank == 0 ? BankAPhase : BankBPhase;
+    }
+
+    private readonly record struct P4BlendChannelUpdate(
+        P4BlendChannelState State,
+        bool RequestBinding,
+        byte RequestBank)
+    {
+        public static P4BlendChannelUpdate Idle(in P4BlendChannelState state) =>
+            new(state, false, state.Bank);
     }
 
     private readonly record struct PreparedApply(
