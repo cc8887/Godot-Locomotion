@@ -170,6 +170,17 @@ public sealed class ContractLayoutTests
     }
 
     [Fact]
+    public void ProductionEntryValidationRejectsClrZeroRuntimeState()
+    {
+        var initialized = AlsRuntimeState.CreateDefault();
+        var clrZero = default(AlsRuntimeState);
+
+        AlsRuntimeState.ValidateP4Defaults(in initialized);
+        Assert.Throws<InvalidOperationException>(() =>
+            AlsRuntimeState.ValidateP4Defaults(in clrZero));
+    }
+
+    [Fact]
     public void DefaultFrameResultUsesInactiveP4Outputs()
     {
         var result = AlsFrameResult.CreateDefault(new AlsFrameIdentity(0, 0, 1));

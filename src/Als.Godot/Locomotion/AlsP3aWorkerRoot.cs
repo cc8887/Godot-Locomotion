@@ -10,11 +10,12 @@ public partial class AlsP3aWorkerRoot : Node
 {
     private AlsP3aHarnessContext _context = null!;
     private AlsP3aHarnessEntry _entry = null!;
-    private AlsRuntimeState _runtimeState;
+    private AlsRuntimeState _runtimeState = AlsRuntimeState.CreateDefault();
     private AlsFrameResult _result;
 
     public void Configure(AlsP3aHarnessContext context, AlsP3aHarnessEntry entry)
     {
+        AlsRuntimeState.ValidateP4Defaults(in _runtimeState);
         _context = context;
         _entry = entry;
         ProcessThreadGroup = context.Mode == AlsHarnessMode.Parallel

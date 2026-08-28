@@ -97,4 +97,20 @@ public struct AlsRuntimeState
         LeftFootLock = AlsFootLockState.CreateDefault(),
         RightFootLock = AlsFootLockState.CreateDefault(),
     };
+
+    public static void ValidateP4Defaults(in AlsRuntimeState state)
+    {
+        if (state.ViewPose != default ||
+            state.TurnInPlace != default ||
+            state.RotateInPlace != default ||
+            state.LeftFootLock != AlsFootLockState.CreateDefault() ||
+            state.RightFootLock != AlsFootLockState.CreateDefault() ||
+            state.PelvisCorrection != default ||
+            state.LeftFootProbeOrigin != Vector3.Zero ||
+            state.RightFootProbeOrigin != Vector3.Zero)
+        {
+            throw new InvalidOperationException(
+                "Runtime state must enter production with the fixed P4 defaults.");
+        }
+    }
 }

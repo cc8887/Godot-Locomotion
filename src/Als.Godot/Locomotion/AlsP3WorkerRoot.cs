@@ -23,7 +23,7 @@ public partial class AlsP3WorkerRoot : Node3D
     private Transform3D _capturedRootTransform;
     private ulong _capturedFullPoseDigest;
     private ulong _capturedRootDigest;
-    private AlsRuntimeState _runtimeState;
+    private AlsRuntimeState _runtimeState = AlsRuntimeState.CreateDefault();
     private AlsFrameResult _result;
     private int _disposed;
 
@@ -32,6 +32,7 @@ public partial class AlsP3WorkerRoot : Node3D
         AlsP3CharacterState state,
         in Transform3D initialLogicalTransform)
     {
+        AlsRuntimeState.ValidateP4Defaults(in _runtimeState);
         _context = context;
         _state = state;
         ProcessMode = ProcessModeEnum.Disabled;
