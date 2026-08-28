@@ -9,8 +9,10 @@ public sealed class AlsPoseProfileCompilerTests
     public void RepositoryProfileCompilesExactAimTurnRotateMasksAndFeet()
     {
         var set = P3RepositoryFixtures.LoadAnimationSet();
+        var locomotion = AlsLocomotionProfileCompiler.Compile(
+            P3RepositoryFixtures.ReadProfile(), set);
 
-        var profile = AlsPoseProfileCompiler.Compile(ReadProfile(), set);
+        var profile = AlsPoseProfileCompiler.Compile(ReadProfile(), set, locomotion);
 
         Assert.Equal(1, profile.SchemaVersion);
         Assert.Equal(set.AssetIndex.GetSkeletonId("b5b52715012cad50bf7a625ddf01e4335bb4fcf0"), profile.SkeletonId);
@@ -38,6 +40,65 @@ public sealed class AlsPoseProfileCompilerTests
             .GroupBy(value => value), value => value.Count() > 1);
         Assert.True(profile.Feet.TraceUpMeters > 0f);
         Assert.True(profile.Feet.TraceDownMeters > 0f);
+        Assert.Equal(0.08f, profile.Feet.PelvisUpHalfLifeSeconds);
+        Assert.Equal(0.1f, profile.Feet.PelvisDownHalfLifeSeconds);
+        Assert.Equal(1.2f, profile.Feet.MaximumLegReachMeters);
+        Assert.Equal(90f * MathF.PI / 180f, profile.Feet.MaximumThighAngleRadians, 5);
+        Assert.Equal(40f * MathF.PI / 180f, profile.Feet.MaximumFootAngleRadians, 5);
+        Assert.Equal(1f, profile.Feet.PlatformTeleportDistanceMeters);
+        Assert.Equal(45f * MathF.PI / 180f, profile.Feet.PlatformTeleportAngleRadians, 5);
+        Assert.Equal(1e-4f, profile.Feet.LockWeightEpsilon);
+        Assert.Equal(AlsCapsuleHalfHeightSource.CharacterController, profile.Feet.CapsuleHalfHeightSource);
+
+        Assert.Equal(34, profile.FootCurves.Bindings.Length);
+        Assert.Equal(34, profile.FootCurves.Bindings.Select(value => value.AnimationId).Distinct().Count());
+        Assert.Equal(1f, profile.FootCurves.GroundedIkWeight);
+        Assert.Equal(0f, profile.FootCurves.JumpStartIkWeight);
+        Assert.Equal(0f, profile.FootCurves.FallLoopIkWeight);
+        Assert.Equal(1f, profile.FootCurves.LandRecoveryIkWeight);
+        Assert.All(profile.FootCurves.Bindings, binding =>
+        {
+            var animation = set.Animations[binding.AnimationId];
+            if (binding.LeftLockCurveId >= 0)
+            {
+                Assert.Equal("FootLock_L", animation.Curves.Single(
+                    value => value.CurveId == binding.LeftLockCurveId).SourceName);
+            }
+            else
+            {
+                Assert.Equal(0f, binding.LeftLockDefault);
+            }
+            if (binding.RightLockCurveId >= 0)
+            {
+                Assert.Equal("FootLock_R", animation.Curves.Single(
+                    value => value.CurveId == binding.RightLockCurveId).SourceName);
+            }
+            else
+            {
+                Assert.Equal(0f, binding.RightLockDefault);
+            }
+        });
+        Assert.Contains(profile.FootCurves.Bindings,
+            value => value.LeftLockCurveId >= 0 || value.RightLockCurveId >= 0);
+        Assert.Contains(profile.FootCurves.Bindings,
+            value => value.LeftLockCurveId < 0 && value.RightLockCurveId < 0);
+    }
+
+    [Fact]
+    public void FootCurveCompilerRejectsInventedCurveNamesAndUnknownStateDefaults()
+    {
+        var set = P3RepositoryFixtures.LoadAnimationSet();
+        var locomotion = AlsLocomotionProfileCompiler.Compile(
+            P3RepositoryFixtures.ReadProfile(), set);
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        root["feet"]!["curves"]!["leftLock"] = "Enable_FootIK";
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set, locomotion));
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.FieldPath == "$.feet.curves.leftLock" &&
+            issue.Message.Contains("reachable", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

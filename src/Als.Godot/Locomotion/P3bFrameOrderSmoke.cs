@@ -124,7 +124,9 @@ public partial class P3bFrameOrderSmoke : Node
             _active = _slot.ActiveCharacter;
             _initialMovementAnchorPosition = _active.MovementAnchor.GlobalPosition;
             var poseProfile = AlsPoseProfileCompiler.Compile(
-                Godot.FileAccess.GetFileAsString(PoseProfilePath), animationSet);
+                Godot.FileAccess.GetFileAsString(PoseProfilePath),
+                animationSet,
+                _context.Profile);
             var skeletonDefinition = animationSet.Skeletons[poseProfile.SkeletonId];
             _leftFootBoneId = skeletonDefinition.LogicalToPhysical[
                 poseProfile.Feet.LeftFootRootBoneId];

@@ -14,6 +14,11 @@ public readonly record struct AlsFootPlacementOutput(
     AlsFootReleaseReason LeftReleaseReason,
     AlsFootReleaseReason RightReleaseReason);
 
+[StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsFootProbeWorldOrigins(
+    Vector3 Left,
+    Vector3 Right);
+
 public static class AlsFootPlacementModel
 {
     private readonly record struct FootReachCandidate(
@@ -41,6 +46,32 @@ public static class AlsFootPlacementModel
         float rightIkWeight,
         float leftLockCurve,
         float rightLockCurve,
+        in AlsRuntimeState currentState,
+        out AlsRuntimeState nextState,
+        out AlsFootPlacementOutput output,
+        out AlsP4ReasonCode reason)
+    {
+        // Compatibility overload: historical callers stored world origins in these fields.
+        // Production code must use the explicit world-origin overload below.
+        var worldOrigins = new AlsFootProbeWorldOrigins(
+            currentState.LeftFootProbeOrigin,
+            currentState.RightFootProbeOrigin);
+        return TryEvaluate(
+            settings, input,
+            leftIkWeight, rightIkWeight, leftLockCurve, rightLockCurve,
+            worldOrigins, currentState,
+            out nextState, out output, out reason);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    public static bool TryEvaluate(
+        in AlsFootPlacementSettings settings,
+        in AlsFrameInput input,
+        float leftIkWeight,
+        float rightIkWeight,
+        float leftLockCurve,
+        float rightLockCurve,
+        in AlsFootProbeWorldOrigins worldOrigins,
         in AlsRuntimeState currentState,
         out AlsRuntimeState nextState,
         out AlsFootPlacementOutput output,
@@ -109,6 +140,12 @@ public static class AlsFootPlacementModel
         var leftHit = input.LeftFootHit with { PlatformRotation = leftPlatformRotation };
         var rightHit = input.RightFootHit with { PlatformRotation = rightPlatformRotation };
 
+        if (!IsFinite(worldOrigins.Left) || !IsFinite(worldOrigins.Right))
+        {
+            reason = AlsP4ReasonCode.NonFiniteInput;
+            return false;
+        }
+
         if (!TryCanonicalizeFootState(currentState.LeftFootLock, out var currentLeft) ||
             !TryCanonicalizeFootState(currentState.RightFootLock, out var currentRight) ||
             !IsFinite(currentState.PelvisCorrection.CurrentOffset) ||
@@ -132,7 +169,7 @@ public static class AlsFootPlacementModel
                 settings,
                 leftHit,
                 currentLeft,
-                currentState.LeftFootProbeOrigin,
+                worldOrigins.Left,
                 characterPosition,
                 characterRotation,
                 characterUp,
@@ -149,7 +186,7 @@ public static class AlsFootPlacementModel
                 settings,
                 rightHit,
                 currentRight,
-                currentState.RightFootProbeOrigin,
+                worldOrigins.Right,
                 characterPosition,
                 characterRotation,
                 characterUp,
@@ -225,7 +262,7 @@ public static class AlsFootPlacementModel
                 settings,
                 leftHit,
                 currentLeft,
-                currentState.LeftFootProbeOrigin,
+                worldOrigins.Left,
                 characterPosition,
                 characterRotation,
                 characterUp,
@@ -246,7 +283,7 @@ public static class AlsFootPlacementModel
                 settings,
                 rightHit,
                 currentRight,
-                currentState.RightFootProbeOrigin,
+                worldOrigins.Right,
                 characterPosition,
                 characterRotation,
                 characterUp,

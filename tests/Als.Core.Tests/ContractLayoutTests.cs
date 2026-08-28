@@ -148,7 +148,9 @@ public sealed class ContractLayoutTests
             "TurnNominalDegrees", "TurnDirection", "TurnActive", "TurnYawDelta",
             "RotateAnimationId", "RotateCurveId", "RotatePhase", "RotatePlayRate",
             "RotateDirection", "RotateActive", "RotateYawDelta", "PelvisOffset", "LeftFootPose",
-            "RightFootPose", "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
+            "RightFootPose", "LeftFootReleaseReason", "RightFootReleaseReason",
+            "LeftFootIkWeight", "RightFootIkWeight", "LeftFootLockCurve", "RightFootLockCurve",
+            "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
             "P4ModifierOperationTicks", "P4ReasonCode");
     }
 
@@ -290,6 +292,12 @@ public sealed class ContractLayoutTests
         Assert.Equal(Quaternion.Identity, result.LeftFootPose.Rotation);
         Assert.Equal(-1, result.RightFootPose.PlatformId);
         Assert.Equal(Quaternion.Identity, result.RightFootPose.Rotation);
+        Assert.Equal(AlsFootReleaseReason.None, result.LeftFootReleaseReason);
+        Assert.Equal(AlsFootReleaseReason.None, result.RightFootReleaseReason);
+        Assert.Equal(0f, result.LeftFootIkWeight);
+        Assert.Equal(0f, result.RightFootIkWeight);
+        Assert.Equal(0f, result.LeftFootLockCurve);
+        Assert.Equal(0f, result.RightFootLockCurve);
         Assert.Equal(0f, result.AimRelativeYaw);
         Assert.Equal(0f, result.AimRelativePitch);
         Assert.Equal(0f, result.HeadWeight);

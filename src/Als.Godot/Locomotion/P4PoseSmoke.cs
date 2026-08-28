@@ -59,7 +59,9 @@ public partial class P4PoseSmoke : Node
         var locomotionProfile = AlsLocomotionProfileCompiler.Compile(
             File.ReadAllText(ProjectSettings.GlobalizePath(P3ProfilePath)), definition);
         var poseProfile = AlsPoseProfileCompiler.Compile(
-            File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)), definition);
+            File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)),
+            definition,
+            locomotionProfile);
         var settings = AlsLocomotionSettings.Load(
             Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
 
@@ -68,7 +70,8 @@ public partial class P4PoseSmoke : Node
         AddChild(library.Root);
         using var graph = AlsLocomotionGraphBuilder.Build(
             library, locomotionProfile, poseProfile, definition);
-        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, settings, poseProfile, definition);
         controller.Warmup();
         using var modifier = new AlsComponentPoseModifier(
             graph.TargetSkeleton,

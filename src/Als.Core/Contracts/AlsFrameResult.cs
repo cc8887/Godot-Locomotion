@@ -80,6 +80,12 @@ public struct AlsFrameResult
     public Vector3 PelvisOffset;
     public AlsFootPoseOutput LeftFootPose;
     public AlsFootPoseOutput RightFootPose;
+    public AlsFootReleaseReason LeftFootReleaseReason;
+    public AlsFootReleaseReason RightFootReleaseReason;
+    public float LeftFootIkWeight;
+    public float RightFootIkWeight;
+    public float LeftFootLockCurve;
+    public float RightFootLockCurve;
     public Vector3 NextLeftFootProbeOrigin;
     public Vector3 NextRightFootProbeOrigin;
     public long P4ModifierOperationTicks;

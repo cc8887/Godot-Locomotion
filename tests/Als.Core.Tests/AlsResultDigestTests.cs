@@ -33,8 +33,8 @@ public sealed class AlsResultDigestTests
 
         AlsResultDigest.Append(ref digest, result);
 
-        // This locks the P4 marker, version 1, declaration order, and exactly-once hashing.
-        Assert.Equal(17974511757808246964UL, digest);
+        // This locks the P4 marker, version 2, declaration order, and exactly-once hashing.
+        Assert.Equal(18222991105242177202UL, digest);
     }
 
     [Fact]
@@ -182,6 +182,24 @@ public sealed class AlsResultDigestTests
                 result.RightFootPose = result.RightFootPose with { PlatformId = 6 },
             static (ref AlsFrameResult result) =>
                 result.RightFootPose = result.RightFootPose with { PlatformId = 7 });
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.LeftFootReleaseReason = AlsFootReleaseReason.RayMiss,
+            static (ref AlsFrameResult result) => result.LeftFootReleaseReason = AlsFootReleaseReason.BaseChanged);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RightFootReleaseReason = AlsFootReleaseReason.WeightLost,
+            static (ref AlsFrameResult result) => result.RightFootReleaseReason = AlsFootReleaseReason.Teleported);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.LeftFootIkWeight = 0.25f,
+            static (ref AlsFrameResult result) => result.LeftFootIkWeight = 0.75f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RightFootIkWeight = 0.25f,
+            static (ref AlsFrameResult result) => result.RightFootIkWeight = 0.75f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.LeftFootLockCurve = 0.25f,
+            static (ref AlsFrameResult result) => result.LeftFootLockCurve = 0.75f);
+        AssertP4ValueChangesDigest(
+            static (ref AlsFrameResult result) => result.RightFootLockCurve = 0.25f,
+            static (ref AlsFrameResult result) => result.RightFootLockCurve = 0.75f);
         AssertP4ValueChangesDigest(
             static (ref AlsFrameResult result) => result.P4ModifierOperationTicks = 17,
             static (ref AlsFrameResult result) => result.P4ModifierOperationTicks = 18);
@@ -418,6 +436,12 @@ public sealed class AlsResultDigestTests
                 RawFloat(0x3D1B1B04)),
             RawFloat(0x3D1C1C1C),
             302);
+        result.LeftFootReleaseReason = AlsFootReleaseReason.BaseChanged;
+        result.RightFootReleaseReason = AlsFootReleaseReason.Teleported;
+        result.LeftFootIkWeight = RawFloat(0x3D1C1D1D);
+        result.RightFootIkWeight = RawFloat(0x3D1C1E1E);
+        result.LeftFootLockCurve = RawFloat(0x3D1C1F1F);
+        result.RightFootLockCurve = RawFloat(0x3D1C2020);
         result.NextLeftFootProbeOrigin = new Vector3(
             RawFloat(0x3D1D1D01),
             RawFloat(0x3D1D1D02),

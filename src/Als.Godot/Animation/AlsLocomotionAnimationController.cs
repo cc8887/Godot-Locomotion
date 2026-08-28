@@ -1,6 +1,7 @@
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
+using GodotAls.Import.Compilation;
 
 namespace GodotAls.Animation;
 
@@ -46,6 +47,37 @@ public readonly record struct AlsP4AnimationInput(
             aimDownWeight, aimForwardWeight, aimUpWeight);
 }
 
+public readonly record struct AlsPreparedAnimationFrame(
+    long OwnerId,
+    long Revision,
+    AlsAnimationState AnimationState,
+    AlsStance Stance,
+    int BaseAnimationIdA,
+    int BaseAnimationIdB,
+    int BaseAnimationIdC,
+    float BaseWeightA,
+    float BaseWeightB,
+    float BaseWeightC,
+    float BasePhaseNormalized,
+    int TurnAnimationIdA,
+    int TurnAnimationIdB,
+    float TurnPhaseA,
+    float TurnPhaseB,
+    float TurnBlendAmount,
+    int RotateAnimationIdA,
+    int RotateAnimationIdB,
+    float RotatePhaseA,
+    float RotatePhaseB,
+    float RotateBlendAmount,
+    float ActionModeBlendAmount,
+    float ActionBlendAmount);
+
+public readonly record struct AlsFootCurveSample(
+    float LeftIkWeight,
+    float RightIkWeight,
+    float LeftLockCurve,
+    float RightLockCurve);
+
 public sealed class AlsLocomotionAnimationController : IDisposable
 {
     private const int WarmupUninitialized = 0;
@@ -54,6 +86,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private const ulong DigestOffsetBasis = 14695981039346656037UL;
     private const ulong DigestPrime = 1099511628211UL;
     private const float QuantizationScale = 100_000f;
+    private static long _nextOwnerId;
 
     private static readonly string[] PoseBoneNames =
     [
@@ -63,6 +96,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private readonly AlsLocomotionGraphBuildResult _graph;
     private readonly Skeleton3D _skeleton;
     private readonly float _playRateMaximum;
+    private readonly long _ownerId = Interlocked.Increment(ref _nextOwnerId);
     private readonly int[] _poseBoneIndices = new int[PoseBoneNames.Length];
     private AnimationNodeStateMachinePlayback? _topPlayback;
     private AnimationNodeStateMachinePlayback? _groundedPlayback;
@@ -77,6 +111,33 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private float _actionBlendDuration;
     private float _actionModeBlendAmount;
     private float _actionModeBlendTarget;
+    private AlsFootCurveBinding[] _footCurveBindingsByAnimation = [];
+    private AlsCurveSampler?[] _footCurveSamplersByAnimation = [];
+    private byte[] _hasFootCurveBinding = [];
+    private float[] _animationPlayLengths = [];
+    private BaseCurveBlendResolver? _standingBaseCurves;
+    private BaseCurveBlendResolver? _crouchingBaseCurves;
+    private float _groundedIkWeight;
+    private float _jumpStartIkWeight;
+    private float _fallLoopIkWeight;
+    private float _landRecoveryIkWeight;
+    private long _preparedRevision;
+    private byte _hasPreparedFrame;
+    private PreparedApply _pendingPrepared;
+    private PreparedP4 _pendingPreparedP4;
+    private P4BlendChannelUpdate _pendingTurnUpdate;
+    private P4BlendChannelUpdate _pendingRotateUpdate;
+    private AlsP4AnimationInput _pendingP4Input;
+    private double _pendingDeltaTime;
+    private byte _pendingRequestedP4Mode;
+    private float _pendingActionBlendAmount;
+    private float _pendingActionBlendTarget;
+    private float _pendingActionBlendDuration;
+    private float _pendingActionModeBlendAmount;
+    private float _pendingActionModeBlendTarget;
+    private AlsPreparedAnimationFrame _pendingDecision;
+    private double _baseStateElapsed;
+    private double _pendingBaseStateElapsed;
 
     public AlsLocomotionAnimationController(
         AlsLocomotionGraphBuildResult graph,
@@ -86,6 +147,54 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _skeleton = graph.TargetSkeleton;
         ArgumentNullException.ThrowIfNull(settings);
         _playRateMaximum = settings.PlayRateMaximum;
+    }
+
+    public AlsLocomotionAnimationController(
+        AlsLocomotionGraphBuildResult graph,
+        AlsLocomotionSettings settings,
+        AlsPoseAnimationProfile poseProfile,
+        AlsAnimationSetDefinition animationSet)
+        : this(graph, settings)
+    {
+        ArgumentNullException.ThrowIfNull(poseProfile);
+        ArgumentNullException.ThrowIfNull(animationSet);
+        var curveProfile = poseProfile.FootCurves;
+        _groundedIkWeight = curveProfile.GroundedIkWeight;
+        _jumpStartIkWeight = curveProfile.JumpStartIkWeight;
+        _fallLoopIkWeight = curveProfile.FallLoopIkWeight;
+        _landRecoveryIkWeight = curveProfile.LandRecoveryIkWeight;
+        _footCurveBindingsByAnimation = new AlsFootCurveBinding[animationSet.Animations.Length];
+        _footCurveSamplersByAnimation = new AlsCurveSampler?[animationSet.Animations.Length];
+        _hasFootCurveBinding = new byte[animationSet.Animations.Length];
+        _animationPlayLengths = new float[animationSet.Animations.Length];
+        for (var index = 0; index < animationSet.Animations.Length; index++)
+        {
+            _animationPlayLengths[index] = animationSet.Animations[index].PlayLength;
+        }
+        var bindings = curveProfile.Bindings;
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            var binding = bindings[index];
+            var animationId = binding.AnimationId;
+            if ((uint)animationId >= (uint)animationSet.Animations.Length)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(poseProfile), "Foot curve binding animation ID is invalid.");
+            }
+            if (_hasFootCurveBinding[animationId] != 0)
+            {
+                throw new ArgumentException(
+                    "Foot curve bindings contain a duplicate animation ID.", nameof(poseProfile));
+            }
+            _footCurveBindingsByAnimation[animationId] = binding;
+            _footCurveSamplersByAnimation[animationId] = new AlsCurveSampler(
+                animationSet.Animations[animationId].Curves);
+            _hasFootCurveBinding[animationId] = 1;
+        }
+        _standingBaseCurves = new BaseCurveBlendResolver(
+            graph.Handles.BaseCurves.StandingSamples);
+        _crouchingBaseCurves = new BaseCurveBlendResolver(
+            graph.Handles.BaseCurves.CrouchingSamples);
     }
 
     public AlsAnimationState ActiveAnimationState { get; private set; } = AlsAnimationState.Grounded;
@@ -195,24 +304,28 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         in AlsP4AnimationInput p4Input,
         double deltaTime)
     {
+        var prepared = PrepareFrame(in result, in p4Input, deltaTime);
+        ApplyPrepared(in prepared);
+    }
+
+    public AlsPreparedAnimationFrame PrepareFrame(
+        in AlsFrameResult result,
+        in AlsP4AnimationInput p4Input,
+        double deltaTime)
+    {
         ThrowIfDisposed();
         if (Volatile.Read(ref _warmupState) != WarmupReady)
         {
-            throw new InvalidOperationException("P3 locomotion animation controller must be warmed before Apply().");
+            throw new InvalidOperationException(
+                "P3 locomotion animation controller must be warmed before PrepareFrame().");
         }
         var prepared = Prepare(result, deltaTime);
         var preparedP4 = PrepareP4(in p4Input);
 
         var requestedP4Mode = preparedP4.TurnActive ? (byte)1 :
             preparedP4.RotateActive ? (byte)2 : (byte)0;
-        var p4Handles = _graph.Handles.P4;
         var turnBranchVisible = _actionBlendAmount > 0f && _actionModeBlendAmount < 1f;
         var rotateBranchVisible = _actionBlendAmount > 0f && _actionModeBlendAmount > 0f;
-        var stateChanged = result.AnimationState != ActiveAnimationState;
-        if (stateChanged)
-        {
-            _topPlayback!.Travel(_graph.Handles.StateNames[(int)result.AnimationState], true);
-        }
         var nextActionBlendAmount = _actionBlendAmount;
         var nextActionBlendTarget = _actionBlendTarget;
         var nextActionBlendDuration = _actionBlendDuration;
@@ -255,50 +368,281 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             preparedP4.RotatePhase,
             deltaTime);
 
-        var stanceChanged = result.ActualStance != ActiveStance;
-        if (result.AnimationState == AlsAnimationState.Grounded &&
+        var baseDecision = PrepareBaseCurveDecision(
+            result.AnimationState,
+            result.ActualStance,
+            prepared.Blend,
+            prepared.Phase,
+            deltaTime,
+            out var nextBaseStateElapsed);
+
+        var revision = checked(_preparedRevision + 1);
+        var decision = new AlsPreparedAnimationFrame(
+            _ownerId,
+            revision,
+            result.AnimationState,
+            result.ActualStance,
+            baseDecision.AnimationIdA,
+            baseDecision.AnimationIdB,
+            baseDecision.AnimationIdC,
+            baseDecision.WeightA,
+            baseDecision.WeightB,
+            baseDecision.WeightC,
+            baseDecision.PhaseNormalized,
+            turnUpdate.State.BankA.AnimationId,
+            turnUpdate.State.BankB.AnimationId,
+            turnUpdate.State.BankAPhase,
+            turnUpdate.State.BankBPhase,
+            turnUpdate.State.BlendAmount,
+            rotateUpdate.State.BankA.AnimationId,
+            rotateUpdate.State.BankB.AnimationId,
+            rotateUpdate.State.BankAPhase,
+            rotateUpdate.State.BankBPhase,
+            rotateUpdate.State.BlendAmount,
+            nextActionModeBlendAmount,
+            nextActionBlendAmount);
+        _pendingPrepared = prepared;
+        _pendingPreparedP4 = preparedP4;
+        _pendingTurnUpdate = turnUpdate;
+        _pendingRotateUpdate = rotateUpdate;
+        _pendingP4Input = p4Input;
+        _pendingDeltaTime = deltaTime;
+        _pendingRequestedP4Mode = requestedP4Mode;
+        _pendingActionBlendAmount = nextActionBlendAmount;
+        _pendingActionBlendTarget = nextActionBlendTarget;
+        _pendingActionBlendDuration = nextActionBlendDuration;
+        _pendingActionModeBlendAmount = nextActionModeBlendAmount;
+        _pendingActionModeBlendTarget = nextActionModeBlendTarget;
+        _pendingDecision = decision;
+        _pendingBaseStateElapsed = nextBaseStateElapsed;
+        _preparedRevision = revision;
+        _hasPreparedFrame = 1;
+        return decision;
+    }
+
+    public AlsFootCurveSample SampleFootCurves(
+        in AlsPreparedAnimationFrame prepared)
+    {
+        ThrowIfDisposed();
+        ValidatePrepared(in prepared);
+        var ikWeight = prepared.AnimationState switch
+        {
+            AlsAnimationState.Grounded => _groundedIkWeight,
+            AlsAnimationState.JumpStart => _jumpStartIkWeight,
+            AlsAnimationState.FallLoop => _fallLoopIkWeight,
+            AlsAnimationState.LandRecovery => _landRecoveryIkWeight,
+            _ => 0f,
+        };
+        SampleBaseCurves(in prepared, out var baseLeft, out var baseRight);
+        SampleActionBank(
+            prepared.TurnAnimationIdA, prepared.TurnPhaseA,
+            out var turnLeftA, out var turnRightA);
+        SampleActionBank(
+            prepared.TurnAnimationIdB, prepared.TurnPhaseB,
+            out var turnLeftB, out var turnRightB);
+        SampleActionBank(
+            prepared.RotateAnimationIdA, prepared.RotatePhaseA,
+            out var rotateLeftA, out var rotateRightA);
+        SampleActionBank(
+            prepared.RotateAnimationIdB, prepared.RotatePhaseB,
+            out var rotateLeftB, out var rotateRightB);
+        var turnLeft = Lerp(turnLeftA, turnLeftB, prepared.TurnBlendAmount);
+        var turnRight = Lerp(turnRightA, turnRightB, prepared.TurnBlendAmount);
+        var rotateLeft = Lerp(rotateLeftA, rotateLeftB, prepared.RotateBlendAmount);
+        var rotateRight = Lerp(rotateRightA, rotateRightB, prepared.RotateBlendAmount);
+        var actionLeft = Lerp(turnLeft, rotateLeft, prepared.ActionModeBlendAmount);
+        var actionRight = Lerp(turnRight, rotateRight, prepared.ActionModeBlendAmount);
+        var leftLock = Lerp(baseLeft, actionLeft, prepared.ActionBlendAmount);
+        var rightLock = Lerp(baseRight, actionRight, prepared.ActionBlendAmount);
+        return new AlsFootCurveSample(
+            ikWeight,
+            ikWeight,
+            Math.Clamp(leftLock, 0f, 1f),
+            Math.Clamp(rightLock, 0f, 1f));
+    }
+
+    public void ApplyPrepared(in AlsPreparedAnimationFrame prepared)
+    {
+        ThrowIfDisposed();
+        ValidatePrepared(in prepared);
+        _hasPreparedFrame = 0;
+        var stateChanged = prepared.AnimationState != ActiveAnimationState;
+        if (stateChanged)
+        {
+            _topPlayback!.Travel(
+                _graph.Handles.StateNames[(int)prepared.AnimationState], true);
+        }
+
+        var stanceChanged = prepared.Stance != ActiveStance;
+        if (prepared.AnimationState == AlsAnimationState.Grounded &&
             (stateChanged || stanceChanged))
         {
             _groundedPlayback!.Travel(
-                _graph.Handles.StanceNames[(int)result.ActualStance], true);
+                _graph.Handles.StanceNames[(int)prepared.Stance], true);
         }
 
         SetParameters(
-            prepared.Parameters,
-            prepared.Blend,
-            prepared.EffectivePlayRate,
-            prepared.Lean,
-            prepared.LeanAmount,
-            prepared.Phase);
+            _pendingPrepared.Parameters,
+            _pendingPrepared.Blend,
+            _pendingPrepared.EffectivePlayRate,
+            _pendingPrepared.Lean,
+            _pendingPrepared.LeanAmount,
+            _pendingPrepared.Phase);
         if (_graph.Handles.P4 is not null)
         {
             SetP4Parameters(
                 _graph.Handles.P4,
-                preparedP4,
-                turnUpdate,
-                rotateUpdate,
-                nextActionModeBlendAmount,
-                nextActionBlendAmount);
+                _pendingPreparedP4,
+                _pendingTurnUpdate,
+                _pendingRotateUpdate,
+                _pendingActionModeBlendAmount,
+                _pendingActionBlendAmount);
         }
 
-        _graph.Tree.Advance(deltaTime);
+        _graph.Tree.Advance(_pendingDeltaTime);
         ManualAdvanceCount++;
-        ActiveAnimationState = result.AnimationState;
-        ActiveStance = result.ActualStance;
-        ActiveTurnAnimationId = p4Input.ActiveTurnAnimationId;
-        ActiveRotateAnimationId = p4Input.ActiveRotateAnimationId;
-        _activeP4Mode = requestedP4Mode;
-        _turnChannel = turnUpdate.State;
-        _rotateChannel = rotateUpdate.State;
-        _actionBlendAmount = nextActionBlendAmount;
-        _actionBlendTarget = nextActionBlendTarget;
-        _actionBlendDuration = nextActionBlendDuration;
-        _actionModeBlendAmount = nextActionModeBlendAmount;
-        _actionModeBlendTarget = nextActionModeBlendTarget;
-        if (preparedP4.TurnActive)
+        ActiveAnimationState = prepared.AnimationState;
+        ActiveStance = prepared.Stance;
+        ActiveTurnAnimationId = _pendingP4Input.ActiveTurnAnimationId;
+        ActiveRotateAnimationId = _pendingP4Input.ActiveRotateAnimationId;
+        _activeP4Mode = _pendingRequestedP4Mode;
+        _turnChannel = _pendingTurnUpdate.State;
+        _rotateChannel = _pendingRotateUpdate.State;
+        _actionBlendAmount = _pendingActionBlendAmount;
+        _actionBlendTarget = _pendingActionBlendTarget;
+        _actionBlendDuration = _pendingActionBlendDuration;
+        _actionModeBlendAmount = _pendingActionModeBlendAmount;
+        _actionModeBlendTarget = _pendingActionModeBlendTarget;
+        _baseStateElapsed = _pendingBaseStateElapsed;
+        if (_pendingPreparedP4.TurnActive)
         {
-            _activeTurnBlendSeconds = preparedP4.TurnBinding.BlendSeconds;
+            _activeTurnBlendSeconds = _pendingPreparedP4.TurnBinding.BlendSeconds;
         }
+    }
+
+    private void ValidatePrepared(in AlsPreparedAnimationFrame prepared)
+    {
+        if (prepared.OwnerId != _ownerId ||
+            _hasPreparedFrame != 1 ||
+            prepared != _pendingDecision)
+        {
+            throw new InvalidOperationException(
+                "Prepared animation frame is stale, foreign or already applied.");
+        }
+    }
+
+    private BaseCurveDecision PrepareBaseCurveDecision(
+        AlsAnimationState state,
+        AlsStance stance,
+        Vector2 blend,
+        float groundedPhase,
+        double deltaTime,
+        out double nextStateElapsed)
+    {
+        if (state == AlsAnimationState.Grounded)
+        {
+            nextStateElapsed = 0.0;
+            var resolver = stance == AlsStance.Standing
+                ? _standingBaseCurves
+                : _crouchingBaseCurves;
+            return resolver is null
+                ? BaseCurveDecision.Empty(groundedPhase)
+                : resolver.Resolve(blend, groundedPhase);
+        }
+
+        nextStateElapsed = state == ActiveAnimationState
+            ? _baseStateElapsed + deltaTime
+            : deltaTime;
+        var animationId = state switch
+        {
+            AlsAnimationState.JumpStart => _graph.Handles.BaseCurves.JumpStartAnimationId,
+            AlsAnimationState.FallLoop => _graph.Handles.BaseCurves.FallLoopAnimationId,
+            AlsAnimationState.LandRecovery => _graph.Handles.BaseCurves.LandRecoveryAnimationId,
+            _ => -1,
+        };
+        var playLength = (uint)animationId < (uint)_animationPlayLengths.Length
+            ? _animationPlayLengths[animationId]
+            : 0f;
+        var phase = 0f;
+        if (playLength > 0f)
+        {
+            var elapsed = state == AlsAnimationState.FallLoop
+                ? nextStateElapsed % playLength
+                : Math.Min(nextStateElapsed, playLength);
+            phase = (float)(elapsed / playLength);
+        }
+        return new BaseCurveDecision(animationId, -1, -1, 1f, 0f, 0f, phase);
+    }
+
+    private void SampleActionBank(
+        int animationId,
+        float phase,
+        out float left,
+        out float right)
+    {
+        SampleAnimationCurves(animationId, phase, out left, out right);
+    }
+
+    private static float Lerp(float from, float to, float amount) =>
+        from + ((to - from) * amount);
+
+    private void SampleBaseCurves(
+        in AlsPreparedAnimationFrame prepared,
+        out float left,
+        out float right)
+    {
+        SampleAnimationCurvesNormalized(
+            prepared.BaseAnimationIdA, prepared.BasePhaseNormalized,
+            out var leftA, out var rightA);
+        SampleAnimationCurvesNormalized(
+            prepared.BaseAnimationIdB, prepared.BasePhaseNormalized,
+            out var leftB, out var rightB);
+        SampleAnimationCurvesNormalized(
+            prepared.BaseAnimationIdC, prepared.BasePhaseNormalized,
+            out var leftC, out var rightC);
+        left = (leftA * prepared.BaseWeightA) +
+               (leftB * prepared.BaseWeightB) +
+               (leftC * prepared.BaseWeightC);
+        right = (rightA * prepared.BaseWeightA) +
+                (rightB * prepared.BaseWeightB) +
+                (rightC * prepared.BaseWeightC);
+    }
+
+    private void SampleAnimationCurvesNormalized(
+        int animationId,
+        float phaseNormalized,
+        out float left,
+        out float right)
+    {
+        var timeSeconds = (uint)animationId < (uint)_animationPlayLengths.Length
+            ? phaseNormalized * _animationPlayLengths[animationId]
+            : 0f;
+        SampleAnimationCurves(animationId, timeSeconds, out left, out right);
+    }
+
+    private void SampleAnimationCurves(
+        int animationId,
+        float timeSeconds,
+        out float left,
+        out float right)
+    {
+        left = 0f;
+        right = 0f;
+        if ((uint)animationId >= (uint)_hasFootCurveBinding.Length ||
+            _hasFootCurveBinding[animationId] == 0)
+        {
+            return;
+        }
+        var binding = _footCurveBindingsByAnimation[animationId];
+        var sampler = _footCurveSamplersByAnimation[animationId]!;
+        left = binding.LeftLockCurveId >= 0 &&
+               sampler.TrySample(binding.LeftLockCurveId, timeSeconds, out var sampledLeft)
+            ? Math.Clamp(sampledLeft, 0f, 1f)
+            : binding.LeftLockDefault;
+        right = binding.RightLockCurveId >= 0 &&
+                sampler.TrySample(binding.RightLockCurveId, timeSeconds, out var sampledRight)
+            ? Math.Clamp(sampledRight, 0f, 1f)
+            : binding.RightLockDefault;
     }
 
     public ulong ComputePoseDigest(long frameId)
@@ -873,6 +1217,160 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         Vector2 Lean,
         float LeanAmount,
         float Phase);
+
+    private readonly record struct BaseCurveDecision(
+        int AnimationIdA,
+        int AnimationIdB,
+        int AnimationIdC,
+        float WeightA,
+        float WeightB,
+        float WeightC,
+        float PhaseNormalized)
+    {
+        public static BaseCurveDecision Empty(float phase) =>
+            new(-1, -1, -1, 0f, 0f, 0f, phase);
+    }
+
+    private sealed class BaseCurveBlendResolver
+    {
+        private const float CoordinateEpsilon = 1e-5f;
+        private readonly AlsLocomotionAnimationSample[] _samples;
+        private readonly int[] _triangles;
+
+        public BaseCurveBlendResolver(AlsLocomotionAnimationSample[] samples)
+        {
+            _samples = samples?.ToArray() ?? throw new ArgumentNullException(nameof(samples));
+            var points = new Vector2[_samples.Length];
+            for (var index = 0; index < _samples.Length; index++)
+            {
+                points[index] = new Vector2(_samples[index].X, _samples[index].Y);
+            }
+            _triangles = Geometry2D.TriangulateDelaunay(points);
+            if (_triangles.Length < 3)
+            {
+                throw new ArgumentException(
+                    "Base animation curve samples do not form a blend-space triangle.",
+                    nameof(samples));
+            }
+        }
+
+        public BaseCurveDecision Resolve(Vector2 point, float phase)
+        {
+            for (var index = 0; index < _samples.Length; index++)
+            {
+                var deltaX = point.X - _samples[index].X;
+                var deltaY = point.Y - _samples[index].Y;
+                if ((deltaX * deltaX) + (deltaY * deltaY) <=
+                    CoordinateEpsilon * CoordinateEpsilon)
+                {
+                    return Single(index, phase);
+                }
+            }
+
+            for (var triangle = 0; triangle < _triangles.Length; triangle += 3)
+            {
+                var a = _triangles[triangle];
+                var b = _triangles[triangle + 1];
+                var c = _triangles[triangle + 2];
+                if (TryBarycentric(point, a, b, c, out var wa, out var wb, out var wc) &&
+                    wa >= -CoordinateEpsilon &&
+                    wb >= -CoordinateEpsilon &&
+                    wc >= -CoordinateEpsilon)
+                {
+                    wa = MathF.Max(0f, wa);
+                    wb = MathF.Max(0f, wb);
+                    wc = MathF.Max(0f, wc);
+                    var total = wa + wb + wc;
+                    return Triangle(a, b, c, wa / total, wb / total, wc / total, phase);
+                }
+            }
+
+            var closestDistance = float.PositiveInfinity;
+            var closestA = 0;
+            var closestB = 0;
+            var closestAmount = 0f;
+            for (var triangle = 0; triangle < _triangles.Length; triangle += 3)
+            {
+                CheckEdge(_triangles[triangle], _triangles[triangle + 1]);
+                CheckEdge(_triangles[triangle + 1], _triangles[triangle + 2]);
+                CheckEdge(_triangles[triangle + 2], _triangles[triangle]);
+            }
+            return new BaseCurveDecision(
+                _samples[closestA].AnimationId,
+                _samples[closestB].AnimationId,
+                -1,
+                1f - closestAmount,
+                closestAmount,
+                0f,
+                phase);
+
+            void CheckEdge(int a, int b)
+            {
+                var start = new Vector2(_samples[a].X, _samples[a].Y);
+                var end = new Vector2(_samples[b].X, _samples[b].Y);
+                var edge = end - start;
+                var lengthSquared = edge.LengthSquared();
+                var amount = lengthSquared > 0f
+                    ? Math.Clamp((point - start).Dot(edge) / lengthSquared, 0f, 1f)
+                    : 0f;
+                var projected = start + (edge * amount);
+                var distance = point.DistanceSquaredTo(projected);
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    closestA = a;
+                    closestB = b;
+                    closestAmount = amount;
+                }
+            }
+        }
+
+        private BaseCurveDecision Single(int index, float phase) => new(
+            _samples[index].AnimationId, -1, -1, 1f, 0f, 0f, phase);
+
+        private BaseCurveDecision Triangle(
+            int a,
+            int b,
+            int c,
+            float wa,
+            float wb,
+            float wc,
+            float phase) => new(
+                _samples[a].AnimationId,
+                _samples[b].AnimationId,
+                _samples[c].AnimationId,
+                wa,
+                wb,
+                wc,
+                phase);
+
+        private bool TryBarycentric(
+            Vector2 point,
+            int a,
+            int b,
+            int c,
+            out float wa,
+            out float wb,
+            out float wc)
+        {
+            var pa = new Vector2(_samples[a].X, _samples[a].Y);
+            var pb = new Vector2(_samples[b].X, _samples[b].Y);
+            var pc = new Vector2(_samples[c].X, _samples[c].Y);
+            var denominator = ((pb.Y - pc.Y) * (pa.X - pc.X)) +
+                              ((pc.X - pb.X) * (pa.Y - pc.Y));
+            if (MathF.Abs(denominator) <= CoordinateEpsilon)
+            {
+                wa = wb = wc = 0f;
+                return false;
+            }
+            wa = (((pb.Y - pc.Y) * (point.X - pc.X)) +
+                  ((pc.X - pb.X) * (point.Y - pc.Y))) / denominator;
+            wb = (((pc.Y - pa.Y) * (point.X - pc.X)) +
+                  ((pa.X - pc.X) * (point.Y - pc.Y))) / denominator;
+            wc = 1f - wa - wb;
+            return true;
+        }
+    }
 
     private readonly record struct PreparedP4(
         bool TurnActive,
