@@ -100,11 +100,33 @@
     "animationMetadata": {
       "type": "object",
       "required": ["curves"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "curves": {
+                "contains": {
+                  "properties": { "canonicalKind": { "const": "RotationYawSpeedRadiansPerSecond" } }
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["canonicalRotationYawSourceConvention", "canonicalRotationYawProfileSignProvenance"],
+            "properties": {
+              "canonicalRotationYawSourceConvention": { "const": "ue_root_bone_rotator_yaw_degrees_z_up" },
+              "canonicalRotationYawProfileSignProvenance": { "const": "runtime_profile_sign_pending" }
+            }
+          }
+        }
+      ],
       "properties": {
         "curves": {
           "type": "array",
           "items": { "$ref": "#/$defs/floatCurve" }
-        }
+        },
+        "canonicalRotationYawSourceConvention": { "type": "string" },
+        "canonicalRotationYawProfileSignProvenance": { "type": "string" }
       }
     },
     "floatCurveKey": {
@@ -123,11 +145,26 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["stableCurveId", "canonicalKind", "sourceName", "sourceProvenance", "preInfinity", "postInfinity", "keys"],
+      "allOf": [
+        {
+          "if": { "properties": { "canonicalKind": { "const": "None" } } },
+          "then": { "properties": { "sourceProvenance": { "const": "source_curve" } } }
+        },
+        {
+          "if": { "properties": { "canonicalKind": { "const": "RotationYawSpeedRadiansPerSecond" } } },
+          "then": {
+            "properties": {
+              "sourceName": { "const": "RotationYawSpeedRadiansPerSecond" },
+              "sourceProvenance": { "const": "derived_root_track" }
+            }
+          }
+        }
+      ],
       "properties": {
         "stableCurveId": { "type": "integer", "minimum": 0 },
-        "canonicalKind": { "const": "None" },
+        "canonicalKind": { "enum": ["None", "RotationYawSpeedRadiansPerSecond"] },
         "sourceName": { "type": "string", "minLength": 1 },
-        "sourceProvenance": { "const": "source_curve" },
+        "sourceProvenance": { "enum": ["source_curve", "derived_root_track"] },
         "preInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
         "postInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
         "keys": {

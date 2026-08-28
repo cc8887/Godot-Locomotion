@@ -99,3 +99,16 @@ Describe 'Godot verifier error-line handling' {
         }
     }
 }
+
+Describe 'Native canonical rotation yaw ready gate' {
+    It 'requires the expanded native curve self-test marker before publishing readiness' {
+        $buildScript = [System.IO.File]::ReadAllText((Join-Path $script:RepositoryRoot 'scripts\build-als-exporter.ps1'))
+        $selfTestMarker = 'GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=8'
+        $selfTestIndex = $buildScript.IndexOf($selfTestMarker, [StringComparison]::Ordinal)
+        $readyMarkerIndex = $buildScript.IndexOf('GODOT_ALS_EXPORTER_READY', [StringComparison]::Ordinal)
+
+        $selfTestIndex | Should BeGreaterThan -1
+        $readyMarkerIndex | Should BeGreaterThan $selfTestIndex
+        $buildScript | Should Match 'Native curve export self-test marker was not found'
+    }
+}

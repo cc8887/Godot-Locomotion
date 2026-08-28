@@ -26,14 +26,34 @@ public sealed record AlsAnimationMetadata(
     string SkeletonObjectPath,
     AlsAnimationCurves Curves,
     AlsAnimationNotifyMetadata[] Notifies,
-    AlsAnimationSyncMarkerMetadata[] SyncMarkers)
+    AlsAnimationSyncMarkerMetadata[] SyncMarkers,
+    string? CanonicalRotationYawSourceConvention = null,
+    string? CanonicalRotationYawProfileSignProvenance = null)
 {
     public static AlsAnimationMetadata Read(JsonElement element)
     {
         var metadata = element.Deserialize<AlsAnimationMetadata>(AlsManifestSerializer.JsonOptions)
             ?? throw new JsonException("Animation metadata deserialized to null.");
         ValidateFloatCurves(metadata.Curves);
+        ValidateCanonicalRotationYawProvenance(metadata);
         return metadata;
+    }
+
+    private static void ValidateCanonicalRotationYawProvenance(AlsAnimationMetadata metadata)
+    {
+        if (!metadata.Curves.IsStructured || !metadata.Curves.RequireStructuredPayload().Any(curve =>
+            curve.CanonicalKind is "RotationYawSpeedRadiansPerSecond"))
+        {
+            return;
+        }
+        if (metadata.CanonicalRotationYawSourceConvention is not "ue_root_bone_rotator_yaw_degrees_z_up")
+        {
+            throw new JsonException("Animation canonicalRotationYawSourceConvention must record UE root-bone positive Z yaw.");
+        }
+        if (metadata.CanonicalRotationYawProfileSignProvenance is not "runtime_profile_sign_pending")
+        {
+            throw new JsonException("Animation canonicalRotationYawProfileSignProvenance must record deferred runtime profile sign conversion.");
+        }
     }
 
     private static void ValidateFloatCurves(AlsAnimationCurves? curves)
@@ -60,9 +80,19 @@ public sealed record AlsAnimationMetadata(
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].stableCurveId must equal {curveIndex}.");
             }
-            if (curve.CanonicalKind is not "None")
+            if (curve.CanonicalKind is "None" && curve.SourceProvenance is "source_curve")
             {
-                throw new JsonException($"Animation float curves[{curveIndex}].canonicalKind must be None.");
+                // Ordinary authored curves carry no exporter-defined semantic kind.
+            }
+            else if (curve.CanonicalKind is "RotationYawSpeedRadiansPerSecond" &&
+                curve.SourceName is "RotationYawSpeedRadiansPerSecond" &&
+                curve.SourceProvenance is "derived_root_track")
+            {
+                // UE root-track yaw is unwrapped and differentiated by the exporter in radians per second.
+            }
+            else
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}] has an unsupported canonical kind/source provenance contract.");
             }
             if (string.IsNullOrEmpty(curve.SourceName))
             {
@@ -81,10 +111,6 @@ public sealed record AlsAnimationMetadata(
                 }
             }
             previousSourceName = curve.SourceName;
-            if (curve.SourceProvenance is not "source_curve")
-            {
-                throw new JsonException($"Animation float curves[{curveIndex}].sourceProvenance must be source_curve.");
-            }
             if (!IsInfinityMode(curve.PreInfinity))
             {
                 throw new JsonException($"Animation float curves[{curveIndex}].preInfinity is invalid.");

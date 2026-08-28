@@ -76,6 +76,56 @@ public sealed class AlsManifestSerializerTests
     }
 
     [Fact]
+    public void AcceptsTheDerivedCanonicalRotationYawSpeedCurveContract()
+    {
+        var json = WithFirstCurve(File.ReadAllText(FixturePath()), curve =>
+        {
+            curve["canonicalKind"] = "RotationYawSpeedRadiansPerSecond";
+            curve["sourceName"] = "RotationYawSpeedRadiansPerSecond";
+            curve["sourceProvenance"] = "derived_root_track";
+        });
+        var root = JsonNode.Parse(json)!.AsObject();
+        var metadata = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+        metadata["canonicalRotationYawSourceConvention"] = "ue_root_bone_rotator_yaw_degrees_z_up";
+        metadata["canonicalRotationYawProfileSignProvenance"] = "runtime_profile_sign_pending";
+        json = root.ToJsonString();
+
+        Assert.True(IsSchemaValid(json));
+        var manifest = AlsManifestSerializer.Deserialize(json);
+        var parsedMetadata = AlsAnimationMetadata.Read(manifest.Animations[0].Metadata);
+        var curve = Assert.Single(parsedMetadata.Curves.RequireStructuredPayload());
+        Assert.Equal("RotationYawSpeedRadiansPerSecond", curve.CanonicalKind);
+        Assert.Equal("derived_root_track", curve.SourceProvenance);
+        Assert.Equal("ue_root_bone_rotator_yaw_degrees_z_up", parsedMetadata.CanonicalRotationYawSourceConvention);
+        Assert.Equal("runtime_profile_sign_pending", parsedMetadata.CanonicalRotationYawProfileSignProvenance);
+    }
+
+    [Fact]
+    public void SchemaRejectsMismatchedCanonicalCurveContract()
+    {
+        var json = WithFirstCurve(File.ReadAllText(FixturePath()), curve =>
+            curve["canonicalKind"] = "RotationYawSpeedRadiansPerSecond");
+
+        Assert.False(IsSchemaValid(json));
+    }
+
+    [Fact]
+    public void RejectsCanonicalRotationYawCurveWithoutItsConventionProvenance()
+    {
+        var json = WithFirstCurve(File.ReadAllText(FixturePath()), curve =>
+        {
+            curve["canonicalKind"] = "RotationYawSpeedRadiansPerSecond";
+            curve["sourceName"] = "RotationYawSpeedRadiansPerSecond";
+            curve["sourceProvenance"] = "derived_root_track";
+        });
+
+        Assert.False(IsSchemaValid(json));
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("canonicalRotationYawSourceConvention", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DuplicateCurveKeyTimeIsRejected()
     {
         var json = WithCurveKeyTimes(
