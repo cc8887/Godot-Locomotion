@@ -40,14 +40,16 @@ public readonly record struct AlsTurnInPlaceState(
     float RemainingYaw,
     short NominalDegrees,
     sbyte Direction,
-    byte Active);
+    byte Active,
+    AlsStance Stance);
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsRotateInPlaceState(
     float Phase,
     float PlayRate,
     sbyte Direction,
-    byte Active);
+    byte Active,
+    AlsStance Stance);
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsFootLockState(
@@ -100,6 +102,7 @@ public struct AlsRuntimeState
     public float LandingRecoveryTime;
     public float SmoothedTargetYaw;
     public float TargetYaw;
+    public AlsYawSource YawSource;
     public byte JumpStartActive;
     public byte Initialized;
     public AlsViewPoseState ViewPose;
