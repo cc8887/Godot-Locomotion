@@ -55,7 +55,10 @@ public static class AlsPoseProfileCompiler
 
     public static AlsPoseAnimationProfile Compile(
         string json,
-        AlsAnimationSetDefinition animationSet) => Compile(json, animationSet, null);
+        AlsAnimationSetDefinition animationSet) => throw Failure(
+            "ALSPOSE051",
+            "$.locomotionProfile",
+            "Runtime pose compilation requires the three-parameter overload with a locomotion profile.");
 
     public static AlsPoseAnimationProfile Compile(
         string json,
