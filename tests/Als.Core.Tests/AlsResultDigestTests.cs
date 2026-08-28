@@ -140,19 +140,132 @@ public sealed class AlsResultDigestTests
             result.AimRelativeYaw = BitConverter.Int32BitsToSingle(unchecked((int)0x80000000)));
     }
 
+    [Fact]
+    public void DigestIncludesEveryP4FootRotationComponentByRawBits()
+    {
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with { Rotation = result.LeftFootPose.Rotation with { X = RawFloat(0x3F000001) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with { Rotation = result.LeftFootPose.Rotation with { Y = RawFloat(0x3F000002) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with { Rotation = result.LeftFootPose.Rotation with { Z = RawFloat(0x3F000003) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with { Rotation = result.LeftFootPose.Rotation with { W = RawFloat(0x3F000004) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with { Rotation = result.RightFootPose.Rotation with { X = RawFloat(0x3E800001) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with { Rotation = result.RightFootPose.Rotation with { Y = RawFloat(0x3E800002) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with { Rotation = result.RightFootPose.Rotation with { Z = RawFloat(0x3E800003) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with { Rotation = result.RightFootPose.Rotation with { W = RawFloat(0x3E800004) } });
+    }
+
+    [Fact]
+    public void DigestIncludesEveryP4NestedVectorComponentByRawBits()
+    {
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.PelvisOffset = result.PelvisOffset with { X = RawFloat(0x3F100001) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.PelvisOffset = result.PelvisOffset with { Y = RawFloat(0x3F100002) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.PelvisOffset = result.PelvisOffset with { Z = RawFloat(0x3F100003) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with { Position = result.LeftFootPose.Position with { X = RawFloat(0x3F200001) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with { Position = result.LeftFootPose.Position with { Y = RawFloat(0x3F200002) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with { Position = result.LeftFootPose.Position with { Z = RawFloat(0x3F200003) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with { Position = result.RightFootPose.Position with { X = RawFloat(0x3F300001) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with { Position = result.RightFootPose.Position with { Y = RawFloat(0x3F300002) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with { Position = result.RightFootPose.Position with { Z = RawFloat(0x3F300003) } });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.NextLeftFootProbeOrigin = result.NextLeftFootProbeOrigin with { X = RawFloat(0x3F400001) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.NextLeftFootProbeOrigin = result.NextLeftFootProbeOrigin with { Y = RawFloat(0x3F400002) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.NextLeftFootProbeOrigin = result.NextLeftFootProbeOrigin with { Z = RawFloat(0x3F400003) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.NextRightFootProbeOrigin = result.NextRightFootProbeOrigin with { X = RawFloat(0x3F500001) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.NextRightFootProbeOrigin = result.NextRightFootProbeOrigin with { Y = RawFloat(0x3F500002) });
+        AssertActiveP4MutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.NextRightFootProbeOrigin = result.NextRightFootProbeOrigin with { Z = RawFloat(0x3F500003) });
+    }
+
+    [Fact]
+    public void DigestDistinguishesQuietNanPayloadsWithinOneP4Component()
+    {
+        var first = CreateActiveP4Result();
+        first.LeftFootPose = first.LeftFootPose with
+        {
+            Rotation = first.LeftFootPose.Rotation with { X = RawFloat(0x7FC00001) },
+        };
+        var second = first;
+        second.LeftFootPose = second.LeftFootPose with
+        {
+            Rotation = second.LeftFootPose.Rotation with { X = RawFloat(0x7FC00002) },
+        };
+
+        AssertResultsHaveDifferentDigests(first, second);
+    }
+
+    [Fact]
+    public void NestedSignedZeroP4ComponentsAreBitDistinct()
+    {
+        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.LeftFootPose = result.LeftFootPose with
+            {
+                Rotation = result.LeftFootPose.Rotation with { X = RawFloat(0x80000000) },
+            });
+        AssertMutationChangesDigest(static (ref AlsFrameResult result) =>
+            result.RightFootPose = result.RightFootPose with
+            {
+                Position = result.RightFootPose.Position with { Y = RawFloat(0x80000000) },
+            });
+    }
+
     private static void AssertMutationChangesDigest(ResultMutation mutate)
     {
         var baseline = AlsFrameResult.CreateDefault(new AlsFrameIdentity(1, 0, 1));
         var changed = baseline;
         mutate(ref changed);
+        AssertResultsHaveDifferentDigests(baseline, changed);
+    }
+
+    private static void AssertActiveP4MutationChangesDigest(ResultMutation mutate)
+    {
+        var baseline = CreateActiveP4Result();
+        var changed = baseline;
+        mutate(ref changed);
+        AssertResultsHaveDifferentDigests(baseline, changed);
+    }
+
+    private static AlsFrameResult CreateActiveP4Result()
+    {
+        var result = AlsFrameResult.CreateDefault(new AlsFrameIdentity(1, 0, 1));
+        result.P4ReasonCode = (AlsP4ReasonCode)1;
+        return result;
+    }
+
+    private static void AssertResultsHaveDifferentDigests(
+        in AlsFrameResult first,
+        in AlsFrameResult second)
+    {
         var baselineDigest = AlsResultDigest.OffsetBasis;
         var changedDigest = AlsResultDigest.OffsetBasis;
 
-        AlsResultDigest.Append(ref baselineDigest, baseline);
-        AlsResultDigest.Append(ref changedDigest, changed);
+        AlsResultDigest.Append(ref baselineDigest, first);
+        AlsResultDigest.Append(ref changedDigest, second);
 
         Assert.NotEqual(baselineDigest, changedDigest);
     }
+
+    private static float RawFloat(uint bits) =>
+        BitConverter.Int32BitsToSingle(unchecked((int)bits));
 
     private static ulong EvaluateDigest(int frames)
     {
