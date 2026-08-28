@@ -4,6 +4,9 @@ $script:P2bFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p2b-verific
 $script:P1VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p1.ps1'
 $script:P0VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p0.ps1'
 $script:GodotOutputFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\godot-output-functions.ps1'
+$script:AssetLockFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\asset-lock-functions.ps1'
+$script:P2aVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1'
+$script:TrackedAssetLockPath = Join-Path $script:RepositoryRoot 'reference\als-v4-export.lock.json'
 
 if (Test-Path -LiteralPath $script:P2bFunctionsPath) {
     . $script:P2bFunctionsPath
@@ -11,40 +14,84 @@ if (Test-Path -LiteralPath $script:P2bFunctionsPath) {
 if (Test-Path -LiteralPath $script:GodotOutputFunctionsPath) {
     . $script:GodotOutputFunctionsPath
 }
+if (Test-Path -LiteralPath $script:AssetLockFunctionsPath) {
+    . $script:AssetLockFunctionsPath
+}
 
 Describe 'P2B formal manifest lock' {
-    It 'locks the regenerated formal manifest SHA before parsing JSON' {
+    It 'reads the tracked asset lock and validates it before parsing manifest JSON' {
         $source = [System.IO.File]::ReadAllText($script:P2bVerifierPath)
-        $expectedHash = '369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327'
-        $hashIndex = $source.IndexOf('Assert-P2bManifestHash')
+        $lockIndex = $source.IndexOf('Assert-AlsExportLock')
         $jsonIndex = $source.IndexOf('ConvertFrom-Json')
 
-        $source | Should Match $expectedHash
-        $hashIndex | Should BeGreaterThan -1
-        $jsonIndex | Should BeGreaterThan $hashIndex
+        $source | Should Match 'reference\\als-v4-export\.lock\.json'
+        $source | Should Not Match '369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327'
+        $lockIndex | Should BeGreaterThan -1
+        $jsonIndex | Should BeGreaterThan $lockIndex
     }
 
-    It 'rejects a wrong manifest hash without touching the formal asset' {
-        (Get-Command Assert-P2bManifestHash -ErrorAction SilentlyContinue) |
+    It 'rejects a tampered lock and manifest without changing either file' {
+        (Get-Command Assert-AlsExportLock -ErrorAction SilentlyContinue) |
             Should Not BeNullOrEmpty
-        if (-not (Get-Command Assert-P2bManifestHash -ErrorAction SilentlyContinue)) {
+        if (-not (Get-Command Assert-AlsExportLock -ErrorAction SilentlyContinue)) {
             return
         }
-
-        $fixture = Join-Path $TestDrive 'als_manifest.json'
-        [System.IO.File]::WriteAllText($fixture, '{"status":"wrong"}')
-
+        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
+        $manifest = Join-Path $assetRoot 'als_manifest.json'
+        $tamperedLock = Join-Path $TestDrive 'tampered-lock.json'
+        $lock = Get-Content -Raw $script:TrackedAssetLockPath | ConvertFrom-Json
+        $lock.manifestSha256 = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+        [IO.File]::WriteAllText($tamperedLock, ($lock | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+        $lockHash = (Get-FileHash $tamperedLock -Algorithm SHA256).Hash
         $rejected = $false
-        try {
-            Assert-P2bManifestHash `
-                -ManifestPath $fixture `
-                -ExpectedSha256 '369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327'
-        }
-        catch {
-            $rejected = $true
-        }
-
+        try { Assert-AlsExportLock -ManifestPath $manifest -AssetRoot $assetRoot -LockPath $tamperedLock | Out-Null }
+        catch { $rejected = $true }
         $rejected | Should Be $true
+        (Get-FileHash $tamperedLock -Algorithm SHA256).Hash | Should Be $lockHash
+
+        $tamperedManifest = Join-Path $TestDrive 'tampered-manifest.json'
+        [IO.File]::WriteAllBytes($tamperedManifest, [IO.File]::ReadAllBytes($manifest))
+        [IO.File]::AppendAllText($tamperedManifest, ' ')
+        $manifestHash = (Get-FileHash $tamperedManifest -Algorithm SHA256).Hash
+        $rejected = $false
+        try { Assert-AlsExportLock -ManifestPath $tamperedManifest -AssetRoot $assetRoot -LockPath $script:TrackedAssetLockPath | Out-Null }
+        catch { $rejected = $true }
+        $rejected | Should Be $true
+        (Get-FileHash $tamperedManifest -Algorithm SHA256).Hash | Should Be $manifestHash
+    }
+
+    It 'publishes exact lock fields durably and preserves old bytes on replacement failure' {
+        (Get-Command Publish-AlsExportLock -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
+        if (-not (Get-Command Publish-AlsExportLock -ErrorAction SilentlyContinue)) { return }
+        $manifest = Join-Path $script:RepositoryRoot 'assets\generated\als_v4\als_manifest.json'
+        $output = Join-Path $TestDrive 'asset.lock.json'
+        Publish-AlsExportLock -ManifestPath $manifest -LockPath $output
+        $value = Get-Content -Raw $output | ConvertFrom-Json
+        (@($value.PSObject.Properties.Name) -join ',') | Should Be 'schemaVersion,manifestSha256,assetCount,fileCount,animationCount,exporterVersion,sourceProjectId'
+        $value.schemaVersion | Should Be 1
+        $value.assetCount | Should Be 267
+        $value.fileCount | Should Be 141
+        $value.animationCount | Should Be 126
+        $value.manifestSha256 | Should Match '^[0-9a-f]{64}$'
+
+        $beforeHash = (Get-FileHash $output -Algorithm SHA256).Hash
+        $handle = [IO.FileStream]::new($output, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+        $rejected = $false
+        try { Publish-AlsExportLock -ManifestPath $manifest -LockPath $output }
+        catch { $rejected = $true }
+        finally { $handle.Dispose() }
+        $rejected | Should Be $true
+        (Get-FileHash $output -Algorithm SHA256).Hash | Should Be $beforeHash
+        @(Get-ChildItem $TestDrive -Filter '.asset.lock.json.*.tmp').Count | Should Be 0
+    }
+
+    It 'updates the asset lock only after byte-identical double export comparison' {
+        $source = [IO.File]::ReadAllText($script:P2aVerifierPath)
+        $compare = $source.LastIndexOf('compare-p2a-exports.ps1')
+        $publish = $source.LastIndexOf('Publish-AlsExportLock')
+        $source | Should Match '\[switch\]\$UpdateAssetLock'
+        $compare | Should BeGreaterThan -1
+        $publish | Should BeGreaterThan $compare
     }
 }
 
