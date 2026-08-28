@@ -35,7 +35,6 @@ public static class AlsFootPlacementModel
     private const float NormalLengthTolerance = 1e-3f;
     private const float QuaternionLengthTolerance = 1e-3f;
     private const float Epsilon = 1e-6f;
-    private const float ThresholdTolerance = 1e-6f;
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static bool TryEvaluate(
@@ -279,6 +278,7 @@ public static class AlsFootPlacementModel
         var footTarget = probeOrigin;
         var targetRotation = characterRotation;
         var contactNormal = characterUp;
+        var surfaceNormal = characterUp;
         if (usableHit &&
             (!TryBuildFootRotation(
                  characterRotation,
@@ -286,7 +286,8 @@ public static class AlsFootPlacementModel
                  hit.Normal,
                  settings.MaximumFootAngleRadians,
                  out targetRotation,
-                 out contactNormal) ||
+                 out contactNormal,
+                 out surfaceNormal) ||
              !TryBuildFootTarget(
                  hit.Position,
                  characterUp,
@@ -422,16 +423,6 @@ public static class AlsFootPlacementModel
                 targetRotation,
                 settings.MaximumFootAngleRadians,
                 ref lockRotation);
-            if (usableHit &&
-                !TryRestoreFootClearance(
-                    hit.Position,
-                    characterUp,
-                    contactNormal,
-                    settings.FootHeightMeters,
-                    ref lockPosition))
-            {
-                return false;
-            }
 
             var blend = System.Math.Clamp(next.Amount, 0f, 1f);
             worldPosition = Vector3.Lerp(footTarget, lockPosition, blend);
@@ -443,6 +434,44 @@ public static class AlsFootPlacementModel
         if (!IsFinite(worldPosition) || !TryNormalizeQuaternion(worldRotation, out worldRotation))
         {
             return false;
+        }
+
+        if (usableHit &&
+            (!TryNormalize(Vector3.Transform(Vector3.UnitY, worldRotation), out var finalFootUp) ||
+             !TryRestoreFootClearance(
+                 hit.Position,
+                 finalFootUp,
+                 surfaceNormal,
+                 settings.FootHeightMeters,
+                 ref worldPosition)))
+        {
+            return false;
+        }
+
+        if (usableHit)
+        {
+            var constrainedPosition = worldPosition;
+            var ignoredRotation = worldRotation;
+            ConstrainThighDirection(
+                characterPosition,
+                characterRotation,
+                characterUp,
+                settings.MaximumThighAngleRadians,
+                ref constrainedPosition,
+                ref ignoredRotation);
+            if (constrainedPosition != worldPosition)
+            {
+                worldPosition = constrainedPosition;
+                if (!TryRestoreFootClearance(
+                        hit.Position,
+                        characterUp,
+                        surfaceNormal,
+                        settings.FootHeightMeters,
+                        ref worldPosition))
+                {
+                    return false;
+                }
+            }
         }
 
         next = next with
@@ -533,7 +562,9 @@ public static class AlsFootPlacementModel
 
             if (floorPlatformId < 0)
             {
-                return AlsFootReleaseReason.PlatformRemoved;
+                return hit.Valid == 1 && hit.Walkable == 1
+                    ? AlsFootReleaseReason.BaseChanged
+                    : AlsFootReleaseReason.PlatformRemoved;
             }
 
             if (hit.Valid == 0 || hit.Walkable == 0)
@@ -689,17 +720,21 @@ public static class AlsFootPlacementModel
     private static bool TryBuildFootRotation(
         in Quaternion characterRotation,
         in Vector3 characterUp,
-        in Vector3 surfaceNormal,
+        in Vector3 rawSurfaceNormal,
         float maximumAngle,
         out Quaternion rotation,
-        out Vector3 contactNormal)
+        out Vector3 contactNormal,
+        out Vector3 normalizedSurfaceNormal)
     {
         rotation = default;
         contactNormal = default;
-        if (!TryNormalize(surfaceNormal, out var normal))
+        normalizedSurfaceNormal = default;
+        if (!TryNormalize(rawSurfaceNormal, out var normal))
         {
             return false;
         }
+
+        normalizedSurfaceNormal = normal;
 
         var dot = System.Math.Clamp(Vector3.Dot(characterUp, normal), -1f, 1f);
         if (dot <= Epsilon)
@@ -1020,15 +1055,14 @@ public static class AlsFootPlacementModel
     {
         var distanceSquared = DistanceSquared(current, previous);
         var thresholdSquared = (double)threshold * threshold;
-        var tolerance = ThresholdTolerance * System.Math.Max(1d, thresholdSquared);
-        return distanceSquared - thresholdSquared > tolerance;
+        return distanceSquared > thresholdSquared;
     }
 
     private static bool ExceedsAngleThreshold(
         in Quaternion current,
         in Quaternion previous,
         float threshold) =>
-        (double)QuaternionAngle(current, previous) - threshold > ThresholdTolerance;
+        QuaternionAngle(current, previous) > threshold;
 
     private static float QuaternionAngle(in Quaternion left, in Quaternion right)
     {

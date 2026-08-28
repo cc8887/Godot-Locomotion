@@ -197,6 +197,15 @@ public sealed class AlsFootPlacementModelTests
         AssertRelease(removed, locked,
             AlsFootReleaseReason.PlatformRemoved, AlsFootReleaseReason.PlatformRemoved);
 
+        var staticBaseChange = Input(
+            left with { PlatformId = -1 },
+            right with { PlatformId = -1 }) with
+        {
+            Floor = Floor(1, -1),
+        };
+        AssertRelease(staticBaseChange, locked,
+            AlsFootReleaseReason.BaseChanged, AlsFootReleaseReason.BaseChanged);
+
         var incompatibleHit = Input(
             left with { PlatformId = 8 },
             right with { PlatformId = 8 }) with
@@ -226,6 +235,70 @@ public sealed class AlsFootPlacementModelTests
             out _, out var held, out _));
         Assert.Equal(settings.FootHeightMeters,
             Vector3.Dot(normal, held.LeftFoot.Position - hit.Position), Tolerance);
+    }
+
+    [Theory]
+    [InlineData(0f, 55f, 1f, false)]
+    [InlineData(55f, 0f, 1f, false)]
+    [InlineData(55f, 0f, 0.5f, false)]
+    [InlineData(0f, 55f, 0.5f, true)]
+    public void HeldNormalChangesApplyClearanceAlongFinalFootUp(
+        float initialSlopeDegrees,
+        float currentSlopeDegrees,
+        float lockAmount,
+        bool constrainThigh)
+    {
+        var settings = AlsFootPlacementSettings.CreateReference() with
+        {
+            MaximumFootAngleRadians = Degrees(30f),
+            MaximumThighAngleRadians = Degrees(20f),
+        };
+        var hitPosition = constrainThigh
+            ? new Vector3(0.8f, 0f, -0.3f)
+            : new Vector3(0f, 0f, -0.3f);
+        var initialNormal = SlopeNormal(initialSlopeDegrees);
+        var currentNormal = SlopeNormal(currentSlopeDegrees);
+        var state = State();
+        state.LeftFootProbeOrigin = hitPosition + (Vector3.UnitY * settings.FootHeightMeters);
+
+        Assert.True(Evaluate(settings,
+            Input(Hit(position: hitPosition, normal: initialNormal)),
+            1f, 0f, lockAmount, 0f, state, out var locked, out _, out _));
+        Assert.True(Evaluate(settings,
+            Input(Hit(position: hitPosition, normal: currentNormal)),
+            1f, 0f, lockAmount, 0f, locked, out _, out var output, out _));
+
+        var finalFootUp = Vector3.Normalize(
+            Vector3.Transform(Vector3.UnitY, output.LeftFoot.Rotation));
+        Assert.Equal(settings.FootHeightMeters,
+            Vector3.Dot(currentNormal, output.LeftFoot.Position - hitPosition), Tolerance);
+        Assert.InRange(Angle(Vector3.UnitY, finalFootUp),
+            0f, settings.MaximumFootAngleRadians + Tolerance);
+
+        if (!constrainThigh)
+        {
+            var clampedCurrentAngle = MathF.Min(
+                Degrees(currentSlopeDegrees), settings.MaximumFootAngleRadians);
+            var currentContactNormal = SlopeNormalRadians(clampedCurrentAngle);
+            var currentTarget = hitPosition +
+                                (Vector3.UnitY *
+                                 (settings.FootHeightMeters /
+                                  Vector3.Dot(Vector3.UnitY, currentContactNormal)));
+            var preliminary = Vector3.Lerp(
+                currentTarget, locked.LeftFootLock.LocalPosition, lockAmount);
+            var correction =
+                (settings.FootHeightMeters -
+                 Vector3.Dot(currentNormal, preliminary - hitPosition)) /
+                Vector3.Dot(finalFootUp, currentNormal);
+            AssertVector(preliminary + (finalFootUp * correction), output.LeftFoot.Position);
+        }
+        else
+        {
+            var horizontal = output.LeftFoot.Position;
+            horizontal.Y = 0f;
+            Assert.InRange(Angle(-Vector3.UnitZ, horizontal),
+                0f, settings.MaximumThighAngleRadians + Tolerance);
+        }
     }
 
     [Fact]
@@ -282,12 +355,16 @@ public sealed class AlsFootPlacementModelTests
     [Fact]
     public void ExactTeleportThresholdsHoldAndWorldRotationBeyondThresholdReleases()
     {
-        var settings = AlsFootPlacementSettings.CreateReference();
+        var reference = AlsFootPlacementSettings.CreateReference();
+        var exactRotation = Quaternion.CreateFromAxisAngle(
+            Vector3.UnitY, reference.PlatformTeleportAngleRadians);
+        var settings = reference with
+        {
+            PlatformTeleportAngleRadians = QuaternionAngle(Quaternion.Identity, exactRotation),
+        };
         var platformHit = Hit(platformId: 7);
         Assert.True(Evaluate(settings, Input(platformHit), 1f, 0f, 1f, 0f, State(),
             out var platformLock, out _, out _));
-        var exactRotation = Quaternion.CreateFromAxisAngle(
-            Vector3.UnitY, settings.PlatformTeleportAngleRadians);
         var exactHit = platformHit with
         {
             PlatformPosition = new Vector3(settings.PlatformTeleportDistanceMeters, 0f, 0f),
@@ -317,6 +394,48 @@ public sealed class AlsFootPlacementModelTests
             out var released, out var releasedOutput, out _));
         Assert.Equal((byte)2, released.LeftFootLock.Locked);
         Assert.Equal(AlsFootReleaseReason.Teleported, releasedOutput.LeftReleaseReason);
+    }
+
+    [Fact]
+    public void PlatformTeleportDistanceUsesStrictFloatBoundary()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference() with
+        {
+            MaximumLegReachMeters = 3f,
+        };
+        var platformHit = Hit(platformId: 7);
+        Assert.True(Evaluate(settings, Input(platformHit), 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+
+        var below = MathF.BitDecrement(settings.PlatformTeleportDistanceMeters);
+        var equal = settings.PlatformTeleportDistanceMeters;
+        var above = MathF.BitIncrement(settings.PlatformTeleportDistanceMeters);
+
+        AssertTeleportDistance(locked, platformHit, settings, below, false);
+        AssertTeleportDistance(locked, platformHit, settings, equal, false);
+        AssertTeleportDistance(locked, platformHit, settings, above, true);
+    }
+
+    [Fact]
+    public void PlatformTeleportRotationUsesStrictCanonicalAngularBoundary()
+    {
+        var reference = AlsFootPlacementSettings.CreateReference();
+        var equalRotation = Quaternion.CreateFromAxisAngle(
+            Vector3.UnitY, reference.PlatformTeleportAngleRadians);
+        var equalMetric = QuaternionAngle(Quaternion.Identity, equalRotation);
+        var settings = reference with { PlatformTeleportAngleRadians = equalMetric };
+        var belowRotation = FindRotationBelow(equalMetric);
+        var aboveRotation = FindRotationAbove(equalMetric);
+        var platformHit = Hit(platformId: 7);
+        Assert.True(Evaluate(settings, Input(platformHit), 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+
+        Assert.True(QuaternionAngle(Quaternion.Identity, belowRotation) < equalMetric);
+        Assert.Equal(equalMetric, QuaternionAngle(Quaternion.Identity, equalRotation));
+        Assert.True(QuaternionAngle(Quaternion.Identity, aboveRotation) > equalMetric);
+        AssertTeleportRotation(locked, platformHit, settings, belowRotation, false);
+        AssertTeleportRotation(locked, platformHit, settings, equalRotation, false);
+        AssertTeleportRotation(locked, platformHit, settings, aboveRotation, true);
     }
 
     [Fact]
@@ -548,9 +667,8 @@ public sealed class AlsFootPlacementModelTests
             0f,
             output.LeftFoot.Position.Z));
         Assert.InRange(Angle(-Vector3.UnitZ, horizontal), 0f, Degrees(20f) + Tolerance);
-        var effectiveNormal = Vector3.Transform(Vector3.UnitY, output.LeftFoot.Rotation);
         Assert.Equal(settings.FootHeightMeters,
-            Vector3.Dot(effectiveNormal, output.LeftFoot.Position - hitPosition), Tolerance);
+            Vector3.Dot(steepNormal, output.LeftFoot.Position - hitPosition), Tolerance);
     }
 
     [Fact]
@@ -811,6 +929,82 @@ public sealed class AlsFootPlacementModelTests
             platformRotation ?? Quaternion.Identity,
             valid == 1 ? 100 : -1,
             Vector3.Zero);
+
+    private static Vector3 SlopeNormal(float degrees) =>
+        SlopeNormalRadians(Degrees(degrees));
+
+    private static Vector3 SlopeNormalRadians(float radians) =>
+        Vector3.Normalize(new Vector3(MathF.Sin(radians), MathF.Cos(radians), 0f));
+
+    private static Quaternion FindRotationBelow(float metric)
+    {
+        var angle = metric;
+        for (var index = 0; index < 128; index++)
+        {
+            angle = MathF.BitDecrement(angle);
+            var rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle);
+            if (QuaternionAngle(Quaternion.Identity, rotation) < metric)
+            {
+                return rotation;
+            }
+        }
+
+        throw new InvalidOperationException("Could not represent an angular metric below the threshold.");
+    }
+
+    private static Quaternion FindRotationAbove(float metric)
+    {
+        var angle = metric;
+        for (var index = 0; index < 128; index++)
+        {
+            angle = MathF.BitIncrement(angle);
+            var rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle);
+            if (QuaternionAngle(Quaternion.Identity, rotation) > metric)
+            {
+                return rotation;
+            }
+        }
+
+        throw new InvalidOperationException("Could not represent an angular metric above the threshold.");
+    }
+
+    private static void AssertTeleportDistance(
+        in AlsRuntimeState locked,
+        in AlsFootHit platformHit,
+        in AlsFootPlacementSettings settings,
+        float distance,
+        bool expectedRelease)
+    {
+        var movedHit = platformHit with
+        {
+            Position = new Vector3(distance, 0f, 0f),
+            PlatformPosition = new Vector3(distance, 0f, 0f),
+        };
+        Assert.True(Evaluate(settings, Input(movedHit), 1f, 0f, 1f, 0f, locked,
+            out var next, out var output, out _));
+        Assert.Equal(expectedRelease ? (byte)2 : (byte)1, next.LeftFootLock.Locked);
+        Assert.Equal(expectedRelease
+                ? AlsFootReleaseReason.Teleported
+                : AlsFootReleaseReason.None,
+            output.LeftReleaseReason);
+    }
+
+    private static void AssertTeleportRotation(
+        in AlsRuntimeState locked,
+        in AlsFootHit platformHit,
+        in AlsFootPlacementSettings settings,
+        in Quaternion rotation,
+        bool expectedRelease)
+    {
+        var movedHit = platformHit with { PlatformRotation = rotation };
+        Assert.True(Evaluate(settings, Input(movedHit), 1f, 0f, 1f, 0f, locked,
+            out var next, out var output, out _));
+        Assert.Equal(expectedRelease ? (byte)2 : (byte)1, next.LeftFootLock.Locked);
+        Assert.Equal(expectedRelease
+                ? AlsFootReleaseReason.Teleported
+                : AlsFootReleaseReason.None,
+            output.LeftReleaseReason);
+    }
 
     private static float Angle(in Vector3 left, in Vector3 right) =>
         MathF.Acos(System.Math.Clamp(
