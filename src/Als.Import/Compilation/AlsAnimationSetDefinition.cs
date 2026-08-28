@@ -45,11 +45,70 @@ public sealed record AlsAnimationDefinition(
     int AdditiveBasePoseType,
     int AdditiveBasePoseFrame,
     int AdditiveBasePoseAnimationId,
-    string[] Curves,
+    AlsFloatCurveDefinition[] Curves,
+    string[] LegacyCurveNames,
     AlsAnimationNotifyDefinition[] Notifies,
     AlsAnimationSyncMarkerDefinition[] SyncMarkers,
     bool Overlay,
-    bool Prop);
+    bool Prop)
+{
+    private AlsFloatCurveDefinition[] _curves = Curves.ToArray();
+    private string[] _legacyCurveNames = LegacyCurveNames.ToArray();
+
+    public AlsFloatCurveDefinition[] Curves
+    {
+        get => _curves;
+        init => _curves = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public string[] LegacyCurveNames
+    {
+        get => _legacyCurveNames;
+        init => _legacyCurveNames = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
+}
+
+public enum AlsCurveInterpolation : byte
+{
+    Constant,
+    Linear,
+    Cubic,
+}
+
+public enum AlsCurveProvenance : byte
+{
+    SourceCurve,
+    DerivedRootTrack,
+}
+
+public enum AlsCanonicalCurveKind : byte
+{
+    None,
+    RotationYawSpeedRadiansPerSecond,
+}
+
+public readonly record struct AlsFloatCurveKeyDefinition(
+    float TimeSeconds,
+    float Value,
+    float ArriveTangent,
+    float LeaveTangent,
+    AlsCurveInterpolation Interpolation);
+
+public sealed record AlsFloatCurveDefinition(
+    int CurveId,
+    AlsCanonicalCurveKind CanonicalKind,
+    string SourceName,
+    AlsCurveProvenance Provenance,
+    AlsFloatCurveKeyDefinition[] Keys)
+{
+    private AlsFloatCurveKeyDefinition[] _keys = Keys.ToArray();
+
+    public AlsFloatCurveKeyDefinition[] Keys
+    {
+        get => _keys;
+        init => _keys = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
+}
 
 public sealed record AlsAnimationNotifyDefinition(string Name, float Time, float Duration, int SourceIndex);
 
