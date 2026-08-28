@@ -12,6 +12,18 @@ public static class AlsPoseProfileCompiler
     private const string AimForwardObjectPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep.ALS_N_Look_F_Sweep";
     private const string AimUpObjectPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep.ALS_N_Look_U_Sweep";
     private const string TurnInPlaceRoot = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/";
+    private static readonly AlsBlendParameterDefinition[] AimParameters =
+    [
+        new("Pitch", -90f, 90f, 4),
+        new("None", 0f, 100f, 4),
+        new("None", 0f, 100f, 4),
+    ];
+    private static readonly float[][] AimSampleCoordinates =
+    [
+        [-90f, 0f, 0f],
+        [0f, 0f, 0f],
+        [90f, 0f, 0f],
+    ];
     private static readonly IReadOnlyDictionary<(AlsPoseStance Stance, sbyte Direction, short Degrees), string> TurnObjectPaths =
         new Dictionary<(AlsPoseStance, sbyte, short), string>
         {
@@ -89,6 +101,7 @@ public static class AlsPoseProfileCompiler
         var up = ResolveAnimation(set, source["up"], "$.aim.up", skeletonId);
         var aimOffset = set.AimOffsets[aimOffsetId];
         RequireExactObjectPath(aimOffset.StableId, aimOffset.ObjectPath, AimOffsetObjectPath, "$.aim.aimOffset", "aim offset");
+        RequireAimOffsetContract(aimOffset);
 
         var sweepIds = new HashSet<int>();
         RequireUniqueAnimation(sweepIds, set.Animations[down], "$.aim.down", "aim sweep");
@@ -322,8 +335,65 @@ public static class AlsPoseProfileCompiler
     private static void RequireExactObjectPath(string stableId, string objectPath, string expectedPath, string profilePath, string role)
     {
         if (!string.Equals(objectPath, expectedPath, StringComparison.Ordinal))
-            throw Failure("ALSPOSE043", profilePath, $"The {role} slot must resolve to its exact ALS v4 object path.", expectedPath, stableId, stableId);
+            throw Failure("ALSPOSE043", profilePath, $"The {role} slot must resolve to its exact ALS v4 object path.", expectedPath, objectPath, stableId);
     }
+
+    private static void RequireAimOffsetContract(AlsBlendDefinition aimOffset)
+    {
+        if (aimOffset.Parameters.Length != AimParameters.Length)
+        {
+            var index = Math.Min(aimOffset.Parameters.Length, AimParameters.Length);
+            throw Failure("ALSPOSE046", $"$.aim.aimOffset.parameters[{index}]",
+                "AimOffset must contain exactly three parameter axes.", AimParameters.Length.ToString(),
+                aimOffset.Parameters.Length.ToString(), aimOffset.StableId);
+        }
+
+        for (var index = 0; index < AimParameters.Length; index++)
+        {
+            var expected = AimParameters[index];
+            var actual = aimOffset.Parameters[index];
+            RequireAimParameterField(index, "name", expected.Name, actual.Name, aimOffset.StableId);
+            RequireAimParameterField(index, "minimum", expected.Minimum, actual.Minimum, aimOffset.StableId);
+            RequireAimParameterField(index, "maximum", expected.Maximum, actual.Maximum, aimOffset.StableId);
+            RequireAimParameterField(index, "gridDivisions", expected.GridDivisions, actual.GridDivisions, aimOffset.StableId);
+        }
+
+        if (aimOffset.Samples.Length != AimSampleCoordinates.Length)
+        {
+            var index = Math.Min(aimOffset.Samples.Length, AimSampleCoordinates.Length);
+            throw Failure("ALSPOSE047", $"$.aim.aimOffset.samples[{index}].sampleValue",
+                "AimOffset must contain exactly the down, forward and up samples.", AimSampleCoordinates.Length.ToString(),
+                aimOffset.Samples.Length.ToString(), aimOffset.StableId);
+        }
+
+        var coordinateRoles = new HashSet<int>();
+        for (var index = 0; index < aimOffset.Samples.Length; index++)
+        {
+            var sample = aimOffset.Samples[index];
+            var coordinateRole = System.Array.FindIndex(AimSampleCoordinates, expected =>
+                sample.SampleValue is { Length: 3 } && sample.SampleValue.All(float.IsFinite) &&
+                sample.SampleValue.SequenceEqual(expected));
+            if (coordinateRole < 0 || !coordinateRoles.Add(coordinateRole))
+                throw Failure("ALSPOSE048", $"$.aim.aimOffset.samples[{index}].sampleValue",
+                    "AimOffset sample coordinates must be the unique down, forward and up values.",
+                    "[-90,0,0], [0,0,0] or [90,0,0]", FormatCoordinate(sample.SampleValue), aimOffset.StableId);
+            if (!float.IsFinite(sample.RateScale) || sample.RateScale != 1f)
+                throw Failure("ALSPOSE049", $"$.aim.aimOffset.samples[{index}].rateScale",
+                    "AimOffset sample rateScale must be finite and exactly 1.", "1", sample.RateScale.ToString(System.Globalization.CultureInfo.InvariantCulture), aimOffset.StableId);
+        }
+    }
+
+    private static void RequireAimParameterField<T>(int index, string field, T expected, T actual, string assetId)
+        where T : IEquatable<T>
+    {
+        if (!actual.Equals(expected))
+            throw Failure("ALSPOSE050", $"$.aim.aimOffset.parameters[{index}].{field}",
+                "AimOffset parameter axis differs from the ALS v4 contract.", expected.ToString(), actual.ToString(), assetId);
+    }
+
+    private static string FormatCoordinate(float[]? coordinate) => coordinate is null
+        ? "null"
+        : $"[{string.Join(',', coordinate.Select(value => value.ToString(System.Globalization.CultureInfo.InvariantCulture)))}]";
 
     private static void RequireAimSampleRole(
         AlsAnimationSetDefinition set,

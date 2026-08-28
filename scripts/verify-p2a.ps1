@@ -236,13 +236,17 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $compareScript = Join-Path $PSScriptRoot 'compare-p2a-exports.ps1'
-& $compareScript -ReferenceRoot $outputPath -CandidateRoot $determinismPath
-if ($LASTEXITCODE -ne 0) {
-    throw "P2A determinism comparison failed with exit code $LASTEXITCODE."
+$compareAction = {
+    & $compareScript -ReferenceRoot $outputPath -CandidateRoot $determinismPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "P2A determinism comparison failed with exit code $LASTEXITCODE."
+    }
 }
-if ($UpdateAssetLock) {
+$publishAction = {
     $assetLockPath = Join-Path $repositoryRoot 'reference\als-v4-export.lock.json'
     Publish-AlsExportLock -ManifestPath $formalManifestPath -LockPath $assetLockPath
     Write-Host 'GODOT_ALS_P2A_ASSET_LOCK_OK'
 }
+Invoke-AlsP2aCompareAndPublish -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
+    -CompareAction $compareAction -PublishAction $publishAction -UpdateAssetLock:$UpdateAssetLock
 Write-Host 'P2A_VERIFICATION_OK'
