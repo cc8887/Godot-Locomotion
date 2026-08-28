@@ -118,7 +118,7 @@ public partial class AlsP3CommitStage : Node
         var details =
             $"code={failure.Code} frame={failure.Identity.FrameId} " +
             $"character={failure.Identity.CharacterId} generation={failure.Identity.SlotGeneration} " +
-            $"exception={failure.ExceptionType}";
+            $"exception={failure.ExceptionType} reason={failure.ReasonCode}";
         if (_context.HeadlessOrDebug)
         {
             GD.PushError($"GODOT_ALS_P3B_FAIL {details}");
