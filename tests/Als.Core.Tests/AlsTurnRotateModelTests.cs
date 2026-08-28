@@ -116,6 +116,53 @@ public sealed class AlsTurnRotateModelTests
         Assert.Equal(AlsYawSource.TurnInPlace, after.YawSource);
     }
 
+    [Fact]
+    public void TurnDelayCrossingConsumesOnlyTheFrameOverrun()
+    {
+        var settings = AlsTurnRotateSettings.CreateReference();
+        var yaw = Degrees(90f);
+
+        Assert.True(Evaluate(settings, Input(0.30f), View(yaw), State(yaw),
+            out _, out var whole, out _));
+
+        var splitState = State(yaw);
+        Assert.True(Evaluate(settings, Input(0.25f), View(yaw), splitState,
+            out splitState, out var waiting, out _));
+        AssertRawEqual(default(AlsTurnRotateSelection), waiting);
+        Assert.True(Evaluate(settings, Input(0.05f), View(yaw), splitState,
+            out _, out var split, out _));
+
+        Assert.Equal(0.06f, whole.CurrentPhase, Tolerance);
+        Assert.Equal(0.06f, split.CurrentPhase, Tolerance);
+        Assert.Equal(0.05f, whole.EffectiveDeltaTime, Tolerance);
+        Assert.Equal(0.05f, split.EffectiveDeltaTime, Tolerance);
+        Assert.True(AlsTurnRotateModel.TryFinalizeYaw(whole, 1f, 1f,
+            out var wholeYaw, out _));
+        Assert.True(AlsTurnRotateModel.TryFinalizeYaw(split, 1f, 1f,
+            out var splitYaw, out _));
+        Assert.Equal(0.06f, wholeYaw.YawDelta, Tolerance);
+        Assert.Equal(wholeYaw.YawDelta, splitYaw.YawDelta, Tolerance);
+    }
+
+    [Fact]
+    public void TurnDelayDecreaseClampsPlaybackOverrunToCurrentFrame()
+    {
+        var settings = AlsTurnRotateSettings.CreateReference();
+        var state = State(MathF.PI);
+
+        Assert.True(Evaluate(settings, Input(0.2f), View(MathF.PI), state,
+            out state, out var waiting, out _));
+        AssertRawEqual(default(AlsTurnRotateSelection), waiting);
+
+        var reducedDelayYaw = Degrees(72f);
+        state.ViewPose = state.ViewPose with { RelativeYaw = reducedDelayYaw };
+        Assert.True(Evaluate(settings, Input(0.05f), View(reducedDelayYaw), state,
+            out _, out var selection, out _));
+
+        Assert.Equal(0.06f, selection.CurrentPhase, Tolerance);
+        Assert.Equal(0.05f, selection.EffectiveDeltaTime, Tolerance);
+    }
+
     [Theory]
     [InlineData(129.999f, 90)]
     [InlineData(130f, 180)]
@@ -437,6 +484,43 @@ public sealed class AlsTurnRotateModelTests
         Assert.Equal(selection.CurrentPhase, next.RotateInPlace.Phase, Tolerance);
     }
 
+    [Fact]
+    public void RotateRejectsMultiCycleTravelButAcceptsEquivalentLegalSplit()
+    {
+        var settings = AlsTurnRotateSettings.CreateReference() with
+        {
+            RotatePlayRateHalfLife = 0f,
+        };
+        var yaw = Degrees(80f);
+        var state = State(yaw, Degrees(460f));
+        var largeDeltaTime = 2.3f / 3f;
+
+        Assert.False(Evaluate(settings, Input(largeDeltaTime, mode: AlsRotationMode.Aiming),
+            View(yaw), state, out var rejectedState, out var rejectedSelection, out var reason));
+        AssertRawEqual(state, rejectedState);
+        AssertRawEqual(default(AlsTurnRotateSelection), rejectedSelection);
+        Assert.Equal(AlsP4ReasonCode.InvalidSelection, reason);
+
+        var splitState = state;
+        var splitDeltaTime = largeDeltaTime / 10f;
+        var accumulatedYaw = 0f;
+        for (var index = 0; index < 10; index++)
+        {
+            Assert.True(Evaluate(settings, Input(splitDeltaTime, mode: AlsRotationMode.Aiming),
+                View(yaw), splitState, out splitState, out var selection, out _));
+            Assert.True(AlsTurnRotateModel.TryFinalizeYaw(
+                selection,
+                PeriodicCurve(selection.PreviousPhase),
+                PeriodicCurve(selection.CurrentPhase),
+                out var output,
+                out _));
+            accumulatedYaw += output.YawDelta;
+        }
+
+        Assert.Equal(0.3f, splitState.RotateInPlace.Phase, Tolerance);
+        Assert.True(float.IsFinite(accumulatedYaw));
+    }
+
     [Theory]
     [InlineData(0.10001f, 0f, true, AlsStance.Standing, AlsRotationMode.Aiming, 80f)]
     [InlineData(0f, 0.10001f, true, AlsStance.Standing, AlsRotationMode.Aiming, 80f)]
@@ -537,6 +621,8 @@ public sealed class AlsTurnRotateModelTests
         Assert.Equal(1.2f, selection.PhasePlayRate, Tolerance);
         Assert.Equal(1.2f, selection.YawScale, Tolerance);
         Assert.Equal(0.1f, selection.EffectiveDeltaTime, Tolerance);
+        Assert.Equal(0.12f, selection.PhaseTravel, Tolerance);
+        Assert.Equal(1f, selection.Duration, Tolerance);
         Assert.Equal(0.2f, selection.BlendSeconds);
         Assert.Equal(-1, selection.Direction);
         Assert.Equal(90, selection.NominalDegrees);
@@ -634,6 +720,52 @@ public sealed class AlsTurnRotateModelTests
         }
     }
 
+    [Fact]
+    public void SelectionRejectsBrokenTurnCrossFieldInvariantsTransactionally()
+    {
+        var valid = ValidSelection(AlsYawSource.TurnInPlace, 0.1f);
+        var invalidSelections = new[]
+        {
+            valid with { CurrentPhase = MathF.BitDecrement(valid.PreviousPhase) },
+            valid with { PhaseTravel = valid.PhaseTravel * 0.5f },
+            valid with { YawScale = 10f },
+            valid with { RemainingYaw = -valid.RemainingYaw },
+            valid with { Duration = valid.CurrentPhase - 0.01f },
+        };
+
+        foreach (var selection in invalidSelections)
+        {
+            Assert.False(AlsTurnRotateModel.TryFinalizeYaw(
+                selection, 1f, 1f, out var output, out var reason));
+            AssertRawEqual(default(AlsTurnRotateOutput), output);
+            Assert.Equal(AlsP4ReasonCode.InvalidSelection, reason);
+        }
+    }
+
+    [Fact]
+    public void SelectionRejectsBrokenRotateCrossFieldInvariantsTransactionally()
+    {
+        var valid = ValidSelection(AlsYawSource.RotateInPlace, 0.1f);
+        var invalidSelections = new[]
+        {
+            valid with { CurrentPhase = valid.PreviousPhase },
+            valid with { PhaseTravel = 0f },
+            valid with { PhaseTravel = MathF.BitIncrement(valid.Duration) },
+            valid with { YawScale = 10f },
+            valid with { RemainingYaw = -valid.RemainingYaw },
+            valid with { Duration = 0f },
+            valid with { DeltaTime = 0.2f },
+        };
+
+        foreach (var selection in invalidSelections)
+        {
+            Assert.False(AlsTurnRotateModel.TryFinalizeYaw(
+                selection, 1f, 1f, out var output, out var reason));
+            AssertRawEqual(default(AlsTurnRotateOutput), output);
+            Assert.Equal(AlsP4ReasonCode.InvalidSelection, reason);
+        }
+    }
+
     [Theory]
     [InlineData(float.NaN, 1f)]
     [InlineData(1f, float.PositiveInfinity)]
@@ -647,6 +779,30 @@ public sealed class AlsTurnRotateModelTests
             out var reason));
         Assert.Equal(default, output);
         Assert.Equal(AlsP4ReasonCode.NonFiniteCurve, reason);
+    }
+
+    [Fact]
+    public void SelectRejectsGeneratedSelectionThatCannotBeFinalizedTransactionally()
+    {
+        var reference = AlsTurnRotateSettings.CreateReference();
+        var settings = reference with
+        {
+            TurnDelayAtThreshold = 0f,
+            TurnDelayAtPi = 0f,
+            StandingTurn90Right = reference.StandingTurn90Right with
+            {
+                DurationSeconds = float.Epsilon,
+                BasePlayRate = float.MaxValue,
+            },
+        };
+        var yaw = Degrees(90f);
+        var state = State(yaw);
+
+        Assert.False(Evaluate(settings, Input(float.Epsilon), View(yaw), state,
+            out var next, out var selection, out var reason));
+        AssertRawEqual(state, next);
+        AssertRawEqual(default(AlsTurnRotateSelection), selection);
+        Assert.Equal(AlsP4ReasonCode.InvalidSelection, reason);
     }
 
     [Fact]
@@ -854,16 +1010,18 @@ public sealed class AlsTurnRotateModelTests
         100,
         200,
         0.1f,
-        0.2f,
+        0.1f + deltaTime,
         deltaTime,
-        1.2f,
+        1f,
         1f,
         deltaTime,
+        deltaTime,
+        1f,
         source == AlsYawSource.TurnInPlace ? 0.2f : 0f,
         Degrees(90f),
         source == AlsYawSource.TurnInPlace ? (short)90 : (short)0,
         1,
-        source == AlsYawSource.TurnInPlace ? (byte)1 : (byte)0,
+        0,
         1);
 
     private static AlsRuntimeState SentinelState()
@@ -886,4 +1044,6 @@ public sealed class AlsTurnRotateModelTests
     }
 
     private static float Degrees(float value) => value * MathF.PI / 180f;
+
+    private static float PeriodicCurve(float phase) => 1f + MathF.Sin(phase * 2f * MathF.PI);
 }

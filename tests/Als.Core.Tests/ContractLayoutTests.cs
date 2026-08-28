@@ -66,8 +66,8 @@ public sealed class ContractLayoutTests
         AssertFieldOrder<AlsRotateInPlaceState>("Phase", "PlayRate", "Direction", "Active", "Stance");
         AssertFieldOrder<AlsTurnRotateSelection>(
             "YawSource", "AnimationId", "CurveId", "PreviousPhase", "CurrentPhase", "DeltaTime",
-            "PhasePlayRate", "YawScale", "EffectiveDeltaTime", "BlendSeconds", "RemainingYaw",
-            "NominalDegrees", "Direction", "ScaleAngle", "Active");
+            "PhasePlayRate", "YawScale", "EffectiveDeltaTime", "PhaseTravel", "Duration",
+            "BlendSeconds", "RemainingYaw", "NominalDegrees", "Direction", "ScaleAngle", "Active");
         AssertFieldOrder<AlsFootLockState>(
             "LocalPosition", "LocalRotation", "Offset", "Rotation", "PlatformId", "Amount", "Locked");
         AssertFieldOrder<AlsPelvisCorrectionState>(
