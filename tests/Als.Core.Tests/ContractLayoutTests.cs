@@ -74,6 +74,50 @@ public sealed class ContractLayoutTests
     }
 
     [Fact]
+    public void TopLevelFrameContractsKeepTheirStorageFieldOrder()
+    {
+        AssertStorageFieldOrder<AlsFrameInput>(
+            "Identity", "DeltaTime", "CharacterTransform", "ActualVelocity", "ActualAcceleration",
+            "InputDirection", "DesiredSpeed", "ViewRotation", "AimRotation", "Floor",
+            "LeftFootHit", "RightFootHit", "MantleProbe", "RequestedGait", "Stance",
+            "RotationMode", "RequestedAction", "CurrentDriveMode", "RagdollState",
+            "AnimationQualityTier", "Command", "CharacterYaw", "MaxAcceleration",
+            "MaxBrakingDeceleration", "JumpAccepted");
+        AssertStorageFieldOrder<AlsRuntimeState>(
+            "LocomotionState", "SmoothedVelocity", "SmoothedAcceleration", "Lean",
+            "LeftFootLocked", "RightFootLocked", "TurnInPlaceTime", "RotateInPlaceTime",
+            "ActionPlaybackTime", "AnimationPhase", "PreviousCurveValue", "PendingRecoveryState",
+            "LastCommittedRootMotionFeedback", "ActualGait", "PreviousLocomotionState",
+            "GroundedEntrySpeed", "SmoothedLocalVelocity", "SmoothedLocalAcceleration",
+            "SmoothedLean", "LandingRecoveryTime", "SmoothedTargetYaw", "TargetYaw",
+            "JumpStartActive", "Initialized", "ViewPose", "TurnInPlace", "RotateInPlace",
+            "LeftFootLock", "RightFootLock", "PelvisCorrection", "LeftFootProbeOrigin",
+            "RightFootProbeOrigin");
+        AssertStorageFieldOrder<AlsFrameResult>(
+            "Identity", "ResolvedLocomotionState", "RequestedDriveMode", "ProposedRootMotionDelta",
+            "PelvisTarget", "LeftFootTarget", "RightFootTarget", "MovementIntent",
+            "RotationIntent", "TypedEvents", "WorkerElapsedTicks", "ErrorCode", "ActualGait",
+            "ActualStance", "ActualRotationMode", "AnimationState", "BlendCoordinates", "Stride",
+            "PlayRate", "Lean", "AnimationPhase", "TargetYaw", "AimRelativeYaw",
+            "AimRelativePitch", "HeadWeight", "SpineWeight", "UpperBodyWeight",
+            "SpineResidualYaw", "TurnAnimationId", "TurnCurveId", "TurnPhase", "TurnPlayRate",
+            "TurnNominalDegrees", "TurnDirection", "TurnActive", "TurnYawDelta",
+            "RotateAnimationId", "RotateCurveId", "RotatePhase", "RotatePlayRate",
+            "RotateDirection", "RotateActive", "RotateYawDelta", "PelvisOffset", "LeftFootPose",
+            "RightFootPose", "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
+            "P4ModifierElapsedTicks", "P4ReasonCode");
+    }
+
+    [Fact]
+    public void P4ReasonAndTimingStorageWidthsAreStable()
+    {
+        Assert.Equal(typeof(ushort), Enum.GetUnderlyingType(typeof(AlsP4ReasonCode)));
+        Assert.Equal(
+            typeof(long),
+            typeof(AlsFrameResult).GetField(nameof(AlsFrameResult.P4ModifierElapsedTicks))?.FieldType);
+    }
+
+    [Fact]
     public void DefaultCommandIsStandingRunningLookingDirection()
     {
         var command = AlsLocomotionCommand.CreateDefault();
@@ -172,5 +216,25 @@ public sealed class ContractLayoutTests
             .Select(static property => property.Name);
 
         Assert.Equal(expected, actual);
+    }
+
+    private static void AssertStorageFieldOrder<T>(params string[] expected)
+    {
+        var actual = typeof(T)
+            .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .OrderBy(static field => field.MetadataToken)
+            .Select(static field => NormalizeStorageFieldName(field.Name));
+
+        Assert.Equal(expected, actual);
+    }
+
+    private static string NormalizeStorageFieldName(string name)
+    {
+        const string backingFieldSuffix = ">k__BackingField";
+        return name.Length > backingFieldSuffix.Length + 1 &&
+            name[0] == '<' &&
+            name.EndsWith(backingFieldSuffix, StringComparison.Ordinal)
+                ? name[1..^backingFieldSuffix.Length]
+                : name;
     }
 }
