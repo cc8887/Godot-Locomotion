@@ -11,12 +11,13 @@ public partial class AlsVisualWorkerRoot : Node
     private AlsHarnessContext _context = null!;
     private AlsHarnessEntry _entry = null!;
     private Skeleton3D _skeleton = null!;
-    private AlsRuntimeState _runtimeState;
+    private AlsRuntimeState _runtimeState = AlsRuntimeState.CreateDefault();
     private AlsFrameResult _result;
     private int _pelvisBone;
 
     public void Configure(AlsHarnessContext context, AlsHarnessEntry entry)
     {
+        AlsRuntimeState.ValidateP4Defaults(in _runtimeState);
         _context = context;
         _entry = entry;
         ProcessThreadGroup = context.Mode == AlsHarnessMode.Parallel
