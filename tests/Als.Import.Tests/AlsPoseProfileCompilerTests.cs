@@ -6,6 +6,19 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsPoseProfileCompilerTests
 {
     [Fact]
+    public void TwoParameterCompileRejectsAnIncompleteRuntimeProfile()
+    {
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(
+                ReadProfile(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        var issue = Assert.Single(exception.Issues);
+        Assert.Equal("ALSPOSE051", issue.Code);
+        Assert.Equal("$.locomotionProfile", issue.FieldPath);
+        Assert.Contains("three-parameter", issue.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RepositoryProfileCompilesExactAimTurnRotateMasksAndFeet()
     {
         var set = P3RepositoryFixtures.LoadAnimationSet();
@@ -104,7 +117,7 @@ public sealed class AlsPoseProfileCompilerTests
     [Fact]
     public void RuntimeArraysAreDefensivelyCopied()
     {
-        var profile = AlsPoseProfileCompiler.Compile(ReadProfile(), P3RepositoryFixtures.LoadAnimationSet());
+        var profile = CompileRuntime(ReadProfile(), P3RepositoryFixtures.LoadAnimationSet());
         var turns = profile.Turns;
         var masks = profile.Masks.Entries;
         var bones = masks[0].BoneIds;
@@ -148,7 +161,7 @@ public sealed class AlsPoseProfileCompilerTests
         });
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(json, P3RepositoryFixtures.LoadAnimationSet()));
+            CompileRuntime(json, P3RepositoryFixtures.LoadAnimationSet()));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath.StartsWith(expectedPath, StringComparison.Ordinal));
     }
@@ -162,7 +175,7 @@ public sealed class AlsPoseProfileCompilerTests
             StringComparison.Ordinal);
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(json, P3RepositoryFixtures.LoadAnimationSet()));
+            CompileRuntime(json, P3RepositoryFixtures.LoadAnimationSet()));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.schemaVersion" && issue.Message.Contains("Duplicate", StringComparison.Ordinal));
     }
@@ -176,7 +189,7 @@ public sealed class AlsPoseProfileCompilerTests
         animations[downId] = animations[downId] with { SkeletonId = 0 };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { Animations = animations }));
+            CompileRuntime(ReadProfile(), set with { Animations = animations }));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.aim.down" && issue.AssetId == animations[downId].StableId);
     }
@@ -190,7 +203,7 @@ public sealed class AlsPoseProfileCompilerTests
         animations[downId] = animations[downId] with { AdditiveBasePoseAnimationId = downId };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { Animations = animations }));
+            CompileRuntime(ReadProfile(), set with { Animations = animations }));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.aim.down" && issue.AssetId == animations[downId].StableId);
     }
@@ -205,7 +218,7 @@ public sealed class AlsPoseProfileCompilerTests
         animations[animationId] = animations[animationId] with { Curves = [] };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { Animations = animations }));
+            CompileRuntime(ReadProfile(), set with { Animations = animations }));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.turns[0].animation" && issue.AssetId == turnStableId);
     }
@@ -220,7 +233,7 @@ public sealed class AlsPoseProfileCompilerTests
         root["aim"]!["up"] = down;
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            CompileRuntime(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
 
         AssertObjectPathFailure(exception, "$.aim.down", AimDownPath, AimUpPath, up);
     }
@@ -233,7 +246,7 @@ public sealed class AlsPoseProfileCompilerTests
         root["aim"]!["up"] = down;
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            CompileRuntime(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
 
         Assert.Contains(exception.Issues, issue =>
             issue.FieldPath == "$.aim.up" && issue.AssetId == down && issue.Message.Contains("Duplicate", StringComparison.Ordinal));
@@ -248,7 +261,7 @@ public sealed class AlsPoseProfileCompilerTests
         aims[aimId] = aims[aimId] with { ObjectPath = "/Game/Wrong/Aim.Aim" };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+            CompileRuntime(ReadProfile(), set with { AimOffsets = aims }));
 
         AssertObjectPathFailure(exception, "$.aim.aimOffset", AimOffsetPath, "/Game/Wrong/Aim.Aim", aims[aimId].StableId);
     }
@@ -268,7 +281,7 @@ public sealed class AlsPoseProfileCompilerTests
 
         var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
+            CompileRuntime(root.ToJsonString(), set));
 
         var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
         AssertObjectPathFailure(exception, $"$.aim.{role}", expectedPath, actualPath, wrongId);
@@ -296,7 +309,7 @@ public sealed class AlsPoseProfileCompilerTests
         aims[aimId] = aims[aimId] with { Samples = samples };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+            CompileRuntime(ReadProfile(), set with { AimOffsets = aims }));
 
         AssertSlotFailure(exception, $"$.aim.{role}", expectedPath, set.Animations[actualAnimationId].StableId);
         Assert.Contains(exception.Issues, issue => issue.Message.Contains("sample", StringComparison.OrdinalIgnoreCase));
@@ -312,7 +325,7 @@ public sealed class AlsPoseProfileCompilerTests
         aims[aimId] = aims[aimId] with { Samples = [.. aims[aimId].Samples, extra] };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+            CompileRuntime(ReadProfile(), set with { AimOffsets = aims }));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.aim.aimOffset.samples[3].sampleValue");
     }
@@ -331,7 +344,7 @@ public sealed class AlsPoseProfileCompilerTests
         aims[aimId] = aims[aimId] with { Samples = samples };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+            CompileRuntime(ReadProfile(), set with { AimOffsets = aims }));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == $"$.aim.aimOffset.samples[{sampleIndex}].rateScale");
     }
@@ -367,7 +380,7 @@ public sealed class AlsPoseProfileCompilerTests
         aims[aimId] = aims[aimId] with { Parameters = parameters };
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+            CompileRuntime(ReadProfile(), set with { AimOffsets = aims }));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == $"$.aim.aimOffset.parameters[{parameterIndex}].{field}");
     }
@@ -390,7 +403,7 @@ public sealed class AlsPoseProfileCompilerTests
 
         var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
+            CompileRuntime(root.ToJsonString(), set));
 
         var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
         AssertObjectPathFailure(exception, $"$.turns[{index}].animation", expectedPath, actualPath, wrongId);
@@ -404,7 +417,7 @@ public sealed class AlsPoseProfileCompilerTests
         var actualId = root["turns"]![0]!["animation"]!.GetValue<string>();
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            CompileRuntime(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
 
         AssertObjectPathFailure(exception, "$.turns[0].animation", TurnStandingLeft90Path,
             "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.ALS_N_TurnIP_R90", actualId);
@@ -418,7 +431,7 @@ public sealed class AlsPoseProfileCompilerTests
         root["turns"]![1]!["animation"] = duplicateId;
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            CompileRuntime(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.turns[1].animation" &&
             issue.AssetId == duplicateId && issue.Message.Contains("Duplicate", StringComparison.Ordinal));
@@ -437,7 +450,7 @@ public sealed class AlsPoseProfileCompilerTests
 
         var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
+            CompileRuntime(root.ToJsonString(), set));
 
         var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
         AssertObjectPathFailure(exception, $"$.rotates[{index}].animation", expectedPath, actualPath, wrongId);
@@ -454,7 +467,7 @@ public sealed class AlsPoseProfileCompilerTests
 
         var set = P3RepositoryFixtures.LoadAnimationSet();
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), set));
+            CompileRuntime(root.ToJsonString(), set));
         var actualPath = set.Animations[set.AssetIndex.GetAnimationId(wrongId)].ObjectPath;
         AssertObjectPathFailure(exception, "$.rotates[0].animation",
             "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90",
@@ -469,7 +482,7 @@ public sealed class AlsPoseProfileCompilerTests
         root["rotates"]![1]!["animation"] = duplicateId;
 
         var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+            CompileRuntime(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
 
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.rotates[1].animation" &&
             issue.AssetId == duplicateId && issue.Message.Contains("Duplicate", StringComparison.Ordinal));
@@ -477,6 +490,15 @@ public sealed class AlsPoseProfileCompilerTests
 
     private static string ReadProfile() => File.ReadAllText(Path.Combine(
         RepositoryRoot.Find(), "assets", "config", "p4_pose_profile.json"));
+
+    private static AlsPoseAnimationProfile CompileRuntime(
+        string json,
+        AlsAnimationSetDefinition set)
+    {
+        var locomotion = AlsLocomotionProfileCompiler.Compile(
+            P3RepositoryFixtures.ReadProfile(), set);
+        return AlsPoseProfileCompiler.Compile(json, set, locomotion);
+    }
 
     private static string Mutate(Action<JsonObject> mutation)
     {

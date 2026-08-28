@@ -70,7 +70,17 @@ public readonly record struct AlsPreparedAnimationFrame(
     float RotatePhaseB,
     float RotateBlendAmount,
     float ActionModeBlendAmount,
-    float ActionBlendAmount);
+    float ActionBlendAmount)
+{
+    public int PreviousBaseAnimationIdA { get; init; } = -1;
+    public int PreviousBaseAnimationIdB { get; init; } = -1;
+    public int PreviousBaseAnimationIdC { get; init; } = -1;
+    public float PreviousBaseWeightA { get; init; }
+    public float PreviousBaseWeightB { get; init; }
+    public float PreviousBaseWeightC { get; init; }
+    public float PreviousBasePhaseNormalized { get; init; }
+    public float BaseTransitionAlpha { get; init; } = 1f;
+}
 
 public readonly record struct AlsFootCurveSample(
     float LeftIkWeight,
@@ -136,8 +146,29 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private float _pendingActionModeBlendAmount;
     private float _pendingActionModeBlendTarget;
     private AlsPreparedAnimationFrame _pendingDecision;
+    private byte _preparedTransactionState;
+    private BaseCurveDecision _committedBaseDecision;
+    private BaseCurveDecision _baseTransitionPrevious;
+    private BaseCurveDecision _pendingBasePrevious;
+    private BaseCurveDecision _pendingBaseDecision;
+    private double _baseTransitionElapsed;
+    private double _pendingBaseTransitionElapsed;
+    private byte _baseTransitionActive;
+    private byte _pendingBaseTransitionActive;
+    private AlsAnimationState _baseTransitionTargetState;
+    private AlsStance _baseTransitionTargetStance;
+    private AlsAnimationState _pendingBaseTransitionTargetState;
+    private AlsStance _pendingBaseTransitionTargetStance;
+    private AlsAnimationState _baseTransitionPreviousState;
+    private AlsStance _baseTransitionPreviousStance;
+    private AlsAnimationState _pendingBaseTransitionPreviousState;
+    private AlsStance _pendingBaseTransitionPreviousStance;
+    private PreparedApply _baseTransitionPreviousPrepared;
+    private PreparedApply _pendingBaseTransitionPreviousPrepared;
     private double _baseStateElapsed;
     private double _pendingBaseStateElapsed;
+    private PreparedApply _committedPrepared;
+    private PreparedP4 _committedPreparedP4;
 
     public AlsLocomotionAnimationController(
         AlsLocomotionGraphBuildResult graph,
@@ -257,6 +288,17 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                 Vector2.Zero,
                 0f,
                 0f);
+            _committedPrepared = new PreparedApply(
+                _graph.Handles.GroundedStanding,
+                Vector2.Zero,
+                1f,
+                Vector2.Zero,
+                0f,
+                0f);
+            _committedPreparedP4 = PreparedP4.Disabled;
+            _committedBaseDecision = _standingBaseCurves is null
+                ? BaseCurveDecision.Empty(0f)
+                : _standingBaseCurves.Resolve(Vector2.Zero, 0f);
             if (_graph.Handles.P4 is not null)
             {
                 _turnChannel = P4BlendChannelState.Initial(
@@ -305,7 +347,23 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         double deltaTime)
     {
         var prepared = PrepareFrame(in result, in p4Input, deltaTime);
-        ApplyPrepared(in prepared);
+        try
+        {
+            ApplyPrepared(in prepared);
+            CommitPrepared(in prepared);
+        }
+        catch
+        {
+            if (_preparedTransactionState == 2)
+            {
+                RollbackPrepared(in prepared);
+            }
+            else if (_preparedTransactionState == 1)
+            {
+                DiscardPrepared(in prepared);
+            }
+            throw;
+        }
     }
 
     public AlsPreparedAnimationFrame PrepareFrame(
@@ -318,6 +376,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             throw new InvalidOperationException(
                 "P3 locomotion animation controller must be warmed before PrepareFrame().");
+        }
+        if (_preparedTransactionState == 2)
+        {
+            throw new InvalidOperationException(
+                "Applied animation frame must be committed or rolled back before preparing another frame.");
         }
         var prepared = Prepare(result, deltaTime);
         var preparedP4 = PrepareP4(in p4Input);
@@ -375,6 +438,14 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             prepared.Phase,
             deltaTime,
             out var nextBaseStateElapsed);
+        PrepareBaseTransition(
+            result.AnimationState,
+            result.ActualStance,
+            in baseDecision,
+            deltaTime,
+            out var previousBaseDecision,
+            out var baseTransitionAlpha);
+        prepared = prepared with { Phase = baseDecision.PhaseNormalized };
 
         var revision = checked(_preparedRevision + 1);
         var decision = new AlsPreparedAnimationFrame(
@@ -400,7 +471,17 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             rotateUpdate.State.BankBPhase,
             rotateUpdate.State.BlendAmount,
             nextActionModeBlendAmount,
-            nextActionBlendAmount);
+            nextActionBlendAmount)
+        {
+            PreviousBaseAnimationIdA = previousBaseDecision.AnimationIdA,
+            PreviousBaseAnimationIdB = previousBaseDecision.AnimationIdB,
+            PreviousBaseAnimationIdC = previousBaseDecision.AnimationIdC,
+            PreviousBaseWeightA = previousBaseDecision.WeightA,
+            PreviousBaseWeightB = previousBaseDecision.WeightB,
+            PreviousBaseWeightC = previousBaseDecision.WeightC,
+            PreviousBasePhaseNormalized = previousBaseDecision.PhaseNormalized,
+            BaseTransitionAlpha = baseTransitionAlpha,
+        };
         _pendingPrepared = prepared;
         _pendingPreparedP4 = preparedP4;
         _pendingTurnUpdate = turnUpdate;
@@ -414,9 +495,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _pendingActionModeBlendAmount = nextActionModeBlendAmount;
         _pendingActionModeBlendTarget = nextActionModeBlendTarget;
         _pendingDecision = decision;
+        _pendingBaseDecision = baseDecision;
         _pendingBaseStateElapsed = nextBaseStateElapsed;
         _preparedRevision = revision;
         _hasPreparedFrame = 1;
+        _preparedTransactionState = 1;
         return decision;
     }
 
@@ -465,41 +548,56 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     {
         ThrowIfDisposed();
         ValidatePrepared(in prepared);
-        _hasPreparedFrame = 0;
         var stateChanged = prepared.AnimationState != ActiveAnimationState;
-        if (stateChanged)
+        try
         {
-            _topPlayback!.Travel(
-                _graph.Handles.StateNames[(int)prepared.AnimationState], true);
-        }
+            if (stateChanged)
+            {
+                _topPlayback!.Travel(
+                    _graph.Handles.StateNames[(int)prepared.AnimationState], true);
+            }
 
-        var stanceChanged = prepared.Stance != ActiveStance;
-        if (prepared.AnimationState == AlsAnimationState.Grounded &&
-            (stateChanged || stanceChanged))
+            var stanceChanged = prepared.Stance != ActiveStance;
+            if (prepared.AnimationState == AlsAnimationState.Grounded &&
+                (stateChanged || stanceChanged))
+            {
+                _groundedPlayback!.Travel(
+                    _graph.Handles.StanceNames[(int)prepared.Stance], true);
+            }
+
+            SetPreparedParameters(in _pendingPrepared);
+            if (_graph.Handles.P4 is not null)
+            {
+                SetP4Parameters(
+                    _graph.Handles.P4,
+                    _pendingPreparedP4,
+                    _pendingTurnUpdate,
+                    _pendingRotateUpdate,
+                    _pendingActionModeBlendAmount,
+                    _pendingActionBlendAmount);
+            }
+
+            _graph.Tree.Advance(_pendingDeltaTime);
+            _preparedTransactionState = 2;
+        }
+        catch
         {
-            _groundedPlayback!.Travel(
-                _graph.Handles.StanceNames[(int)prepared.Stance], true);
+            try
+            {
+                RestoreCommittedGraph();
+            }
+            finally
+            {
+                ClearPreparedTransaction();
+            }
+            throw;
         }
+    }
 
-        SetParameters(
-            _pendingPrepared.Parameters,
-            _pendingPrepared.Blend,
-            _pendingPrepared.EffectivePlayRate,
-            _pendingPrepared.Lean,
-            _pendingPrepared.LeanAmount,
-            _pendingPrepared.Phase);
-        if (_graph.Handles.P4 is not null)
-        {
-            SetP4Parameters(
-                _graph.Handles.P4,
-                _pendingPreparedP4,
-                _pendingTurnUpdate,
-                _pendingRotateUpdate,
-                _pendingActionModeBlendAmount,
-                _pendingActionBlendAmount);
-        }
-
-        _graph.Tree.Advance(_pendingDeltaTime);
+    public void CommitPrepared(in AlsPreparedAnimationFrame prepared)
+    {
+        ThrowIfDisposed();
+        ValidateAppliedPrepared(in prepared);
         ManualAdvanceCount++;
         ActiveAnimationState = prepared.AnimationState;
         ActiveStance = prepared.Stance;
@@ -514,21 +612,149 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _actionModeBlendAmount = _pendingActionModeBlendAmount;
         _actionModeBlendTarget = _pendingActionModeBlendTarget;
         _baseStateElapsed = _pendingBaseStateElapsed;
+        _committedPrepared = _pendingPrepared;
+        _committedPreparedP4 = _pendingPreparedP4;
+        _committedBaseDecision = _pendingBaseDecision;
+        _baseTransitionPrevious = _pendingBasePrevious;
+        _baseTransitionElapsed = _pendingBaseTransitionElapsed;
+        _baseTransitionActive = _pendingBaseTransitionActive;
+        _baseTransitionTargetState = _pendingBaseTransitionTargetState;
+        _baseTransitionTargetStance = _pendingBaseTransitionTargetStance;
+        _baseTransitionPreviousState = _pendingBaseTransitionPreviousState;
+        _baseTransitionPreviousStance = _pendingBaseTransitionPreviousStance;
+        _baseTransitionPreviousPrepared = _pendingBaseTransitionPreviousPrepared;
         if (_pendingPreparedP4.TurnActive)
         {
             _activeTurnBlendSeconds = _pendingPreparedP4.TurnBinding.BlendSeconds;
         }
+        ClearPreparedTransaction();
+    }
+
+    public void RollbackPrepared(in AlsPreparedAnimationFrame prepared)
+    {
+        ThrowIfDisposed();
+        ValidateAppliedPrepared(in prepared);
+        try
+        {
+            RestoreCommittedGraph();
+        }
+        finally
+        {
+            ClearPreparedTransaction();
+        }
+    }
+
+    public void DiscardPrepared(in AlsPreparedAnimationFrame prepared)
+    {
+        ThrowIfDisposed();
+        ValidatePrepared(in prepared);
+        ClearPreparedTransaction();
+    }
+
+    private void ClearPreparedTransaction()
+    {
+        _hasPreparedFrame = 0;
+        _preparedTransactionState = 0;
     }
 
     private void ValidatePrepared(in AlsPreparedAnimationFrame prepared)
     {
         if (prepared.OwnerId != _ownerId ||
             _hasPreparedFrame != 1 ||
+            _preparedTransactionState != 1 ||
             prepared != _pendingDecision)
         {
             throw new InvalidOperationException(
                 "Prepared animation frame is stale, foreign or already applied.");
         }
+    }
+
+    private void ValidateAppliedPrepared(in AlsPreparedAnimationFrame prepared)
+    {
+        if (prepared.OwnerId != _ownerId ||
+            _hasPreparedFrame != 1 ||
+            _preparedTransactionState != 2 ||
+            prepared != _pendingDecision)
+        {
+            throw new InvalidOperationException(
+                "Prepared animation frame is stale, foreign or not awaiting commit.");
+        }
+    }
+
+    private void PrepareBaseTransition(
+        AlsAnimationState state,
+        AlsStance stance,
+        in BaseCurveDecision target,
+        double deltaTime,
+        out BaseCurveDecision previous,
+        out float alpha)
+    {
+        var changed = state != ActiveAnimationState ||
+            (state == AlsAnimationState.Grounded && stance != ActiveStance);
+        var continuing = _baseTransitionActive != 0 &&
+            state == _baseTransitionTargetState &&
+            (state != AlsAnimationState.Grounded || stance == _baseTransitionTargetStance);
+
+        if (continuing)
+        {
+            previous = AdvanceBaseDecision(
+                in _baseTransitionPrevious,
+                _baseTransitionPreviousState,
+                _baseTransitionPreviousPrepared.EffectivePlayRate,
+                deltaTime);
+            _pendingBaseTransitionPreviousState = _baseTransitionPreviousState;
+            _pendingBaseTransitionPreviousStance = _baseTransitionPreviousStance;
+            _pendingBaseTransitionPreviousPrepared = _baseTransitionPreviousPrepared;
+            _pendingBaseTransitionElapsed = _baseTransitionElapsed + deltaTime;
+        }
+        else if (changed)
+        {
+            previous = AdvanceBaseDecision(
+                in _committedBaseDecision,
+                ActiveAnimationState,
+                _committedPrepared.EffectivePlayRate,
+                deltaTime);
+            _pendingBaseTransitionPreviousState = ActiveAnimationState;
+            _pendingBaseTransitionPreviousStance = ActiveStance;
+            _pendingBaseTransitionPreviousPrepared = _committedPrepared;
+            _pendingBaseTransitionElapsed = deltaTime;
+        }
+        else
+        {
+            previous = target;
+            _pendingBaseTransitionPreviousState = state;
+            _pendingBaseTransitionPreviousStance = stance;
+            _pendingBaseTransitionPreviousPrepared = _pendingPrepared;
+            _pendingBaseTransitionElapsed = AlsLocomotionGraphHandles.StateTransitionSeconds;
+        }
+
+        alpha = changed || continuing
+            ? Math.Clamp(
+                (float)(_pendingBaseTransitionElapsed /
+                    AlsLocomotionGraphHandles.StateTransitionSeconds),
+                0f,
+                1f)
+            : 1f;
+        _pendingBasePrevious = previous;
+        _pendingBaseTransitionActive = alpha < 1f ? (byte)1 : (byte)0;
+        _pendingBaseTransitionTargetState = state;
+        _pendingBaseTransitionTargetStance = stance;
+    }
+
+    private static BaseCurveDecision AdvanceBaseDecision(
+        in BaseCurveDecision decision,
+        AlsAnimationState state,
+        float effectivePlayRate,
+        double deltaTime)
+    {
+        var phaseDelta = (float)(
+            deltaTime * effectivePlayRate /
+            AlsLocomotionGraphHandles.BaseTimelineSeconds);
+        var phase = decision.PhaseNormalized + phaseDelta;
+        phase = state is AlsAnimationState.Grounded or AlsAnimationState.FallLoop
+            ? phase - MathF.Floor(phase)
+            : Math.Clamp(phase, 0f, 1f);
+        return decision with { PhaseNormalized = phase };
     }
 
     private BaseCurveDecision PrepareBaseCurveDecision(
@@ -560,17 +786,10 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             AlsAnimationState.LandRecovery => _graph.Handles.BaseCurves.LandRecoveryAnimationId,
             _ => -1,
         };
-        var playLength = (uint)animationId < (uint)_animationPlayLengths.Length
-            ? _animationPlayLengths[animationId]
-            : 0f;
-        var phase = 0f;
-        if (playLength > 0f)
-        {
-            var elapsed = state == AlsAnimationState.FallLoop
-                ? nextStateElapsed % playLength
-                : Math.Min(nextStateElapsed, playLength);
-            phase = (float)(elapsed / playLength);
-        }
+        var elapsed = state == AlsAnimationState.FallLoop
+            ? nextStateElapsed % AlsLocomotionGraphHandles.BaseTimelineSeconds
+            : Math.Min(nextStateElapsed, AlsLocomotionGraphHandles.BaseTimelineSeconds);
+        var phase = (float)(elapsed / AlsLocomotionGraphHandles.BaseTimelineSeconds);
         return new BaseCurveDecision(animationId, -1, -1, 1f, 0f, 0f, phase);
     }
 
@@ -591,21 +810,58 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         out float left,
         out float right)
     {
+        SampleBaseCurves(
+            prepared.BaseAnimationIdA,
+            prepared.BaseAnimationIdB,
+            prepared.BaseAnimationIdC,
+            prepared.BaseWeightA,
+            prepared.BaseWeightB,
+            prepared.BaseWeightC,
+            prepared.BasePhaseNormalized,
+            out var targetLeft,
+            out var targetRight);
+        if (prepared.BaseTransitionAlpha >= 1f)
+        {
+            left = targetLeft;
+            right = targetRight;
+            return;
+        }
+        SampleBaseCurves(
+            prepared.PreviousBaseAnimationIdA,
+            prepared.PreviousBaseAnimationIdB,
+            prepared.PreviousBaseAnimationIdC,
+            prepared.PreviousBaseWeightA,
+            prepared.PreviousBaseWeightB,
+            prepared.PreviousBaseWeightC,
+            prepared.PreviousBasePhaseNormalized,
+            out var previousLeft,
+            out var previousRight);
+        left = Lerp(previousLeft, targetLeft, prepared.BaseTransitionAlpha);
+        right = Lerp(previousRight, targetRight, prepared.BaseTransitionAlpha);
+    }
+
+    private void SampleBaseCurves(
+        int animationIdA,
+        int animationIdB,
+        int animationIdC,
+        float weightA,
+        float weightB,
+        float weightC,
+        float phase,
+        out float left,
+        out float right)
+    {
         SampleAnimationCurvesNormalized(
-            prepared.BaseAnimationIdA, prepared.BasePhaseNormalized,
+            animationIdA, phase,
             out var leftA, out var rightA);
         SampleAnimationCurvesNormalized(
-            prepared.BaseAnimationIdB, prepared.BasePhaseNormalized,
+            animationIdB, phase,
             out var leftB, out var rightB);
         SampleAnimationCurvesNormalized(
-            prepared.BaseAnimationIdC, prepared.BasePhaseNormalized,
+            animationIdC, phase,
             out var leftC, out var rightC);
-        left = (leftA * prepared.BaseWeightA) +
-               (leftB * prepared.BaseWeightB) +
-               (leftC * prepared.BaseWeightC);
-        right = (rightA * prepared.BaseWeightA) +
-                (rightB * prepared.BaseWeightB) +
-                (rightC * prepared.BaseWeightC);
+        left = (leftA * weightA) + (leftB * weightB) + (leftC * weightC);
+        right = (rightA * weightA) + (rightB * weightB) + (rightC * weightC);
     }
 
     private void SampleAnimationCurvesNormalized(
@@ -900,6 +1156,79 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             _graph.Tree.Set(parameters.PhasePath, Math.Clamp(phase, 0f, 1f));
         }
+    }
+
+    private void SetPreparedParameters(in PreparedApply prepared) => SetParameters(
+        prepared.Parameters,
+        prepared.Blend,
+        prepared.EffectivePlayRate,
+        prepared.Lean,
+        prepared.LeanAmount,
+        prepared.Phase);
+
+    private void RestoreCommittedGraph()
+    {
+        if (_baseTransitionActive != 0)
+        {
+            _topPlayback!.Start(
+                _graph.Handles.StateNames[(int)_baseTransitionPreviousState], true);
+            _groundedPlayback!.Start(
+                _graph.Handles.StanceNames[(int)_baseTransitionPreviousStance], true);
+            SetPreparedParameters(in _baseTransitionPreviousPrepared);
+            RestoreCommittedP4Parameters();
+            _graph.Tree.Advance(0.0);
+
+            if (_baseTransitionTargetState != _baseTransitionPreviousState)
+            {
+                _topPlayback.Travel(
+                    _graph.Handles.StateNames[(int)_baseTransitionTargetState], true);
+            }
+            if (_baseTransitionTargetState == AlsAnimationState.Grounded &&
+                _baseTransitionTargetStance != _baseTransitionPreviousStance)
+            {
+                _groundedPlayback.Travel(
+                    _graph.Handles.StanceNames[(int)_baseTransitionTargetStance], true);
+            }
+            SetPreparedParameters(in _committedPrepared);
+            RestoreCommittedP4Parameters();
+            _graph.Tree.Advance(_baseTransitionElapsed);
+            return;
+        }
+
+        _topPlayback!.Start(
+            _graph.Handles.StateNames[(int)ActiveAnimationState], true);
+        _groundedPlayback!.Start(
+            _graph.Handles.StanceNames[(int)ActiveStance], true);
+        SetPreparedParameters(in _committedPrepared);
+        RestoreCommittedP4Parameters();
+        _graph.Tree.Advance(0.0);
+    }
+
+    private void RestoreCommittedP4Parameters()
+    {
+        var handles = _graph.Handles.P4;
+        if (handles is null)
+        {
+            return;
+        }
+        for (byte bank = 0; bank < 2; bank++)
+        {
+            _graph.Tree.Set(
+                handles.GetTurnRequestPath(bank),
+                _turnChannel.GetBinding(bank).StateName);
+            _graph.Tree.Set(
+                handles.GetRotateRequestPath(bank),
+                _rotateChannel.GetBinding(bank).StateName);
+        }
+        var turn = P4BlendChannelUpdate.Idle(_turnChannel);
+        var rotate = P4BlendChannelUpdate.Idle(_rotateChannel);
+        SetP4Parameters(
+            handles,
+            _committedPreparedP4,
+            turn,
+            rotate,
+            _actionModeBlendAmount,
+            _actionBlendAmount);
     }
 
     private void SetP4Parameters(

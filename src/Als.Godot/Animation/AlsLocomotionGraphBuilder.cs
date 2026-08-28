@@ -66,6 +66,8 @@ public sealed class AlsLocomotionGraphBuildResult : IDisposable
 
 public sealed class AlsLocomotionGraphHandles : IDisposable
 {
+    public const float BaseTimelineSeconds = 1f;
+    public const float StateTransitionSeconds = 0.08f;
     private readonly IDisposable[] _ownedHandles;
     private int _disposed;
 
@@ -400,7 +402,7 @@ public sealed class AlsLocomotionGraphParameterSet
 public static class AlsLocomotionGraphBuilder
 {
     private const string LibraryName = "als";
-    private const float TransitionTime = 0.08f;
+    private const float TransitionTime = AlsLocomotionGraphHandles.StateTransitionSeconds;
     private const float CoordinateTolerance = 1e-5f;
     private const float RingTolerance = 1e-4f;
 
@@ -672,11 +674,11 @@ public static class AlsLocomotionGraphBuilder
                 layout.LeanBounds,
                 allocated);
             var jumpStart = CreateParameterSet(
-                $"{basePrefix}JumpStart", false, false, default, layout.LeanBounds, allocated);
+                $"{basePrefix}JumpStart", false, true, default, layout.LeanBounds, allocated);
             var fallLoop = CreateParameterSet(
-                $"{basePrefix}FallLoop", false, false, default, layout.LeanBounds, allocated);
+                $"{basePrefix}FallLoop", false, true, default, layout.LeanBounds, allocated);
             var landRecovery = CreateParameterSet(
-                $"{basePrefix}LandRecovery", false, false, default, layout.LeanBounds, allocated);
+                $"{basePrefix}LandRecovery", false, true, default, layout.LeanBounds, allocated);
             var p4 = poseProfile is null
                 ? null
                 : CreateP4Handles(poseProfile, animationSet, allocated);
@@ -1145,7 +1147,7 @@ public static class AlsLocomotionGraphBuilder
         var node = Own(ownedResources, new AnimationNodeAnimation
         {
             UseCustomTimeline = true,
-            TimelineLength = 1.0,
+            TimelineLength = AlsLocomotionGraphHandles.BaseTimelineSeconds,
             StretchTimeScale = true,
             LoopMode = loop ? Godot.Animation.LoopModeEnum.Linear : Godot.Animation.LoopModeEnum.None,
         });

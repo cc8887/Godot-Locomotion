@@ -179,6 +179,11 @@ public partial class AlsP3WorkerRoot : Node3D
             }
 
             var poseCaptured = false;
+            var controllerPrepared = false;
+            var controllerApplied = false;
+            var preparedAnimation = default(AlsPreparedAnimationFrame);
+            var runtimeCheckpoint = _runtimeState;
+            var resultCheckpoint = _result;
             try
             {
                 PublishVisualRootVisibility(frameId);
@@ -233,14 +238,17 @@ public partial class AlsP3WorkerRoot : Node3D
                     ? Stopwatch.GetTimestamp()
                     : 0L;
                 var p4AnimationInput = CreateP4AnimationInput(in _result);
-                var preparedAnimation = _controller!.PrepareFrame(
+                preparedAnimation = _controller!.PrepareFrame(
                     in _result, in p4AnimationInput, input.DeltaTime);
+                controllerPrepared = true;
                 var footCurves = _controller.SampleFootCurves(in preparedAnimation);
                 _result.LeftFootIkWeight = footCurves.LeftIkWeight;
                 _result.RightFootIkWeight = footCurves.RightIkWeight;
                 _result.LeftFootLockCurve = footCurves.LeftLockCurve;
                 _result.RightFootLockCurve = footCurves.RightLockCurve;
+                controllerPrepared = false;
                 _controller.ApplyPrepared(in preparedAnimation);
+                controllerApplied = true;
                 if (!TryCaptureFootProbeOrigins(
                         input.Identity,
                         input.CharacterTransform,
@@ -321,10 +329,40 @@ public partial class AlsP3WorkerRoot : Node3D
                         measurementIndex,
                         productionElapsedTicks);
                 }
+                _controller.CommitPrepared(in preparedAnimation);
+                controllerPrepared = false;
+                controllerApplied = false;
             }
             catch (Exception exception)
             {
+                var failureReason = exception is AlsP4EvaluationException p4Failure
+                    ? p4Failure.ReasonCode
+                    : _result.P4ReasonCode;
                 Exception? restoreException = null;
+                if (controllerApplied)
+                {
+                    try
+                    {
+                        _controller!.RollbackPrepared(in preparedAnimation);
+                    }
+                    catch (Exception controllerRestoreException)
+                    {
+                        restoreException = controllerRestoreException;
+                    }
+                }
+                else if (controllerPrepared)
+                {
+                    try
+                    {
+                        _controller!.DiscardPrepared(in preparedAnimation);
+                    }
+                    catch (Exception controllerDiscardException)
+                    {
+                        restoreException = controllerDiscardException;
+                    }
+                }
+                _runtimeState = runtimeCheckpoint;
+                _result = resultCheckpoint;
                 try
                 {
                     if (poseCaptured)
@@ -342,13 +380,15 @@ public partial class AlsP3WorkerRoot : Node3D
                 }
                 catch (Exception secondaryException)
                 {
-                    restoreException = secondaryException;
+                    restoreException = restoreException is null
+                        ? secondaryException
+                        : new AggregateException(
+                            "Controller and pose restoration both failed.",
+                            restoreException,
+                            secondaryException);
                 }
                 finally
                 {
-                    var failureReason = exception is AlsP4EvaluationException p4Failure
-                        ? p4Failure.ReasonCode
-                        : _result.P4ReasonCode;
                     _state.RecordFailure(
                         "worker_evaluate",
                         identity,
