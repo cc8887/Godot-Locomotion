@@ -52,6 +52,9 @@ public sealed class AlsAnimationSetCompilerTests
         var restored = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(definition));
         Assert.Empty(restored.Animations[0].Curves);
         Assert.Equal(["RotationAmount", "YawOffset"], restored.Animations[0].LegacyCurveNames);
+        var exposedRestoredNames = restored.Animations[0].LegacyCurveNames;
+        exposedRestoredNames[0] = "Mutated";
+        Assert.Equal(["RotationAmount", "YawOffset"], restored.Animations[0].LegacyCurveNames);
     }
 
     [Fact]
@@ -66,6 +69,25 @@ public sealed class AlsAnimationSetCompilerTests
         AssertCompilationIssuePath(
             manifest,
             "$.animations[0].metadata.canonicalRotationYawSourceConvention");
+    }
+
+    [Theory]
+    [InlineData(true, "canonicalRotationYawSourceConvention")]
+    [InlineData(true, "canonicalRotationYawProfileSignProvenance")]
+    [InlineData(false, "canonicalRotationYawSourceConvention")]
+    [InlineData(false, "canonicalRotationYawProfileSignProvenance")]
+    public void NonCanonicalCurvesRejectExplicitNullCanonicalFields(bool legacy, string fieldName)
+    {
+        var manifest = MutateAnimationMetadata(root =>
+        {
+            if (legacy)
+            {
+                root["curves"] = new JsonArray("RotationAmount");
+            }
+            root[fieldName] = null;
+        });
+
+        AssertCompilationIssuePath(manifest, $"$.animations[0].metadata.{fieldName}");
     }
 
     [Fact]
@@ -95,6 +117,77 @@ public sealed class AlsAnimationSetCompilerTests
 
         Assert.Equal(0, clip.Curves[0].CurveId);
         Assert.Equal("RotationAmount", clip.Curves[0].SourceName);
+    }
+
+    [Fact]
+    public void PublicCurveArraysCannotMutateDefinitionsOrSerializedPayloads()
+    {
+        var definition = AlsAnimationSetCompiler.Compile(ManifestWithTwoStructuredCurves());
+        var payloadBefore = AlsAnimationSetPayload.Serialize(definition);
+        var digestBefore = definition.DefinitionDigest;
+        var clip = definition.Animations[0];
+
+        var exposedCurves = clip.Curves;
+        exposedCurves[0] = exposedCurves[1];
+        var exposedKeys = clip.Curves[0].Keys;
+        exposedKeys[0] = exposedKeys[0] with { Value = 999f };
+
+        Assert.Equal("RotationAmount", clip.Curves[0].SourceName);
+        Assert.NotEqual(999f, clip.Curves[0].Keys[0].Value);
+        Assert.Equal(digestBefore, definition.DefinitionDigest);
+        Assert.Equal(payloadBefore, AlsAnimationSetPayload.Serialize(definition));
+    }
+
+    [Fact]
+    public void LegacyCurveNameGettersAndRecordWithRemainImmutable()
+    {
+        var manifest = MutateAnimationMetadata(root =>
+            root["curves"] = new JsonArray("RotationAmount", "YawOffset"));
+        var original = AlsAnimationSetCompiler.Compile(manifest).Animations[0];
+        var callerOwnedNames = new[] { "First", "Second" };
+        var clip = original with { LegacyCurveNames = callerOwnedNames };
+
+        callerOwnedNames[0] = "MutatedInput";
+        var exposedNames = clip.LegacyCurveNames;
+        exposedNames[1] = "MutatedOutput";
+
+        Assert.Equal(["First", "Second"], clip.LegacyCurveNames);
+    }
+
+    [Fact]
+    public void RecordWithCurveInputsAndOutputsRemainImmutable()
+    {
+        var original = AlsAnimationSetCompiler.Compile(ManifestWithTwoStructuredCurves()).Animations[0];
+        var callerOwnedCurves = original.Curves;
+        var clip = original with { Curves = callerOwnedCurves };
+
+        callerOwnedCurves[0] = callerOwnedCurves[1];
+        var exposedCurves = clip.Curves;
+        exposedCurves[0] = exposedCurves[1];
+        var exposedKeys = clip.Curves[0].Keys;
+        exposedKeys[0] = exposedKeys[0] with { LeaveTangent = 777f };
+
+        Assert.Equal("RotationAmount", clip.Curves[0].SourceName);
+        Assert.NotEqual(777f, clip.Curves[0].Keys[0].LeaveTangent);
+    }
+
+    [Fact]
+    public void DeserializedPayloadCurveArraysRemainImmutable()
+    {
+        var definition = AlsAnimationSetCompiler.Compile(ManifestWithTwoStructuredCurves());
+        var restored = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(definition));
+        var payloadBeforeMutation = AlsAnimationSetPayload.Serialize(restored);
+        var digestBeforeMutation = restored.DefinitionDigest;
+
+        var curves = restored.Animations[0].Curves;
+        curves[0] = curves[1];
+        var keys = restored.Animations[0].Curves[0].Keys;
+        keys[0] = keys[0] with { ArriveTangent = 456f };
+
+        Assert.Equal("RotationAmount", restored.Animations[0].Curves[0].SourceName);
+        Assert.NotEqual(456f, restored.Animations[0].Curves[0].Keys[0].ArriveTangent);
+        Assert.Equal(digestBeforeMutation, restored.DefinitionDigest);
+        Assert.Equal(payloadBeforeMutation, AlsAnimationSetPayload.Serialize(restored));
     }
 
     [Theory]
@@ -181,9 +274,12 @@ public sealed class AlsAnimationSetCompilerTests
     [Fact]
     public void PayloadAndDefinitionDigestsCoverAllCurveSemanticsButEventDigestDoesNot()
     {
-        var original = AlsAnimationSetCompiler.Compile(ManifestWithTwoStructuredCurves());
+        var original = AlsAnimationSetCompiler.Compile(MutateAnimationMetadata(AddEvents));
         var changed = AlsAnimationSetCompiler.Compile(MutateAnimationMetadata(root =>
-            root["curves"]![0]!["keys"]![0]!["arriveTangent"] = 42.0));
+        {
+            AddEvents(root);
+            root["curves"]![0]!["keys"]![0]!["arriveTangent"] = 42.0;
+        }));
 
         var originalPayload = AlsAnimationSetPayload.Serialize(original);
         var changedPayload = AlsAnimationSetPayload.Serialize(changed);
@@ -193,24 +289,54 @@ public sealed class AlsAnimationSetCompilerTests
             AlsAnimationSetPayload.ComputeSha256(changedPayload));
 
         using var payloadDocument = JsonDocument.Parse(originalPayload);
-        var curve = payloadDocument.RootElement.GetProperty("animations")[0].GetProperty("curves")[1];
-        Assert.Equal(1, curve.GetProperty("curveId").GetInt32());
-        Assert.Equal((int)AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond,
+        var curve = payloadDocument.RootElement.GetProperty("animations")[0].GetProperty("curves")[0];
+        Assert.Equal(0, curve.GetProperty("curveId").GetInt32());
+        Assert.Equal((int)AlsCanonicalCurveKind.None,
             curve.GetProperty("canonicalKind").GetInt32());
-        Assert.Equal("RotationYawSpeedRadiansPerSecond", curve.GetProperty("sourceName").GetString());
-        Assert.Equal((int)AlsCurveProvenance.DerivedRootTrack, curve.GetProperty("provenance").GetInt32());
-        var key = curve.GetProperty("keys")[0];
-        Assert.True(key.TryGetProperty("timeSeconds", out _));
-        Assert.True(key.TryGetProperty("value", out _));
-        Assert.True(key.TryGetProperty("arriveTangent", out _));
-        Assert.True(key.TryGetProperty("leaveTangent", out _));
-        Assert.Equal((int)AlsCurveInterpolation.Linear, key.GetProperty("interpolation").GetInt32());
+        Assert.Equal("RotationAmount", curve.GetProperty("sourceName").GetString());
+        Assert.Equal((int)AlsCurveProvenance.SourceCurve, curve.GetProperty("provenance").GetInt32());
+        Assert.Equal(2, curve.GetProperty("keys").GetArrayLength());
+
+        var restored = AlsAnimationSetPayload.Deserialize(originalPayload);
+        var restoredCurve = Assert.Single(restored.Animations[0].Curves);
+        Assert.Equal(original.Animations[0].Curves[0].CurveId, restoredCurve.CurveId);
+        Assert.Equal(original.Animations[0].Curves[0].CanonicalKind, restoredCurve.CanonicalKind);
+        Assert.Equal(original.Animations[0].Curves[0].SourceName, restoredCurve.SourceName);
+        Assert.Equal(original.Animations[0].Curves[0].Provenance, restoredCurve.Provenance);
+        Assert.Equal(original.Animations[0].Curves[0].Keys, restoredCurve.Keys);
 
         var originalEventDigest = AlsAnimationEventDigest.OffsetBasis;
         var changedEventDigest = AlsAnimationEventDigest.OffsetBasis;
-        AlsAnimationEventDigest.Advance(original.Animations[0], 0.0, 1.0, ref originalEventDigest);
-        AlsAnimationEventDigest.Advance(changed.Animations[0], 0.0, 1.0, ref changedEventDigest);
+        var originalEventCount = AlsAnimationEventDigest.Advance(
+            original.Animations[0], 0.0, 1.0, ref originalEventDigest);
+        var changedEventCount = AlsAnimationEventDigest.Advance(
+            changed.Animations[0], 0.0, 1.0, ref changedEventDigest);
+        Assert.Equal(2, originalEventCount);
+        Assert.Equal(originalEventCount, changedEventCount);
+        Assert.NotEqual(AlsAnimationEventDigest.OffsetBasis, originalEventDigest);
         Assert.Equal(originalEventDigest, changedEventDigest);
+    }
+
+    [Fact]
+    public void DefinitionDigestUsesCompiledSemanticsRatherThanUncompiledInfinityModes()
+    {
+        var original = AlsAnimationSetCompiler.Compile(
+            AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath()));
+        var changed = AlsAnimationSetCompiler.Compile(MutateAnimationMetadata(root =>
+        {
+            root["curves"]![0]!["preInfinity"] = "Linear";
+            root["curves"]![0]!["postInfinity"] = "Cycle";
+        }));
+
+        Assert.Equal(original.Animations[0].Curves[0].CurveId, changed.Animations[0].Curves[0].CurveId);
+        Assert.Equal(original.Animations[0].Curves[0].CanonicalKind, changed.Animations[0].Curves[0].CanonicalKind);
+        Assert.Equal(original.Animations[0].Curves[0].SourceName, changed.Animations[0].Curves[0].SourceName);
+        Assert.Equal(original.Animations[0].Curves[0].Provenance, changed.Animations[0].Curves[0].Provenance);
+        Assert.Equal(original.Animations[0].Curves[0].Keys, changed.Animations[0].Curves[0].Keys);
+        Assert.Equal(original.DefinitionDigest, changed.DefinitionDigest);
+        Assert.Equal(
+            AlsAnimationSetPayload.ComputeSha256(AlsAnimationSetPayload.Serialize(original)),
+            AlsAnimationSetPayload.ComputeSha256(AlsAnimationSetPayload.Serialize(changed)));
     }
 
     [Fact]
@@ -238,6 +364,54 @@ public sealed class AlsAnimationSetCompilerTests
             Assert.NotEqual(originalPayloadDigest, AlsAnimationSetPayload.ComputeSha256(
                 AlsAnimationSetPayload.Serialize(changed)));
         }
+    }
+
+    [Fact]
+    public void CompiledDefinitionDigestIndependentlyCoversEveryTypedCurveField()
+    {
+        var definition = AlsAnimationSetCompiler.Compile(
+            AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath()));
+        var clip = definition.Animations[0];
+        var curve = clip.Curves[0];
+        var key = curve.Keys[0];
+        var originalDigest = AlsAnimationSetPayload.ComputeDefinitionDigest(definition);
+        AlsFloatCurveDefinition[] mutations =
+        [
+            curve with { CurveId = curve.CurveId + 1 },
+            curve with { CanonicalKind = AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond },
+            curve with { SourceName = curve.SourceName + "Changed" },
+            curve with { Provenance = AlsCurveProvenance.DerivedRootTrack },
+            curve with { Keys = ReplaceFirstKey(curve.Keys, key with { TimeSeconds = key.TimeSeconds + 0.01f }) },
+            curve with { Keys = ReplaceFirstKey(curve.Keys, key with { Value = key.Value == 0f ? 1f : 0f }) },
+            curve with { Keys = ReplaceFirstKey(curve.Keys, key with { ArriveTangent = key.ArriveTangent + 1f }) },
+            curve with { Keys = ReplaceFirstKey(curve.Keys, key with { LeaveTangent = key.LeaveTangent + 1f }) },
+            curve with { Keys = ReplaceFirstKey(curve.Keys, key with { Interpolation = AlsCurveInterpolation.Constant }) },
+        ];
+
+        for (var mutationIndex = 0; mutationIndex < mutations.Length; mutationIndex++)
+        {
+            var changedCurve = mutations[mutationIndex];
+            var changed = definition with
+            {
+                Animations = [clip with { Curves = [changedCurve] }],
+            };
+            Assert.False(
+                string.Equals(originalDigest, AlsAnimationSetPayload.ComputeDefinitionDigest(changed), StringComparison.Ordinal),
+                $"Curve digest mutation {mutationIndex} was not observed.");
+        }
+
+        Assert.Equal(definition.DefinitionDigest, originalDigest);
+
+        var legacyDefinition = AlsAnimationSetCompiler.Compile(MutateAnimationMetadata(root =>
+            root["curves"] = new JsonArray("RotationAmount")));
+        var legacyClip = legacyDefinition.Animations[0];
+        var changedLegacyDefinition = legacyDefinition with
+        {
+            Animations = [legacyClip with { LegacyCurveNames = ["RotationAmountChanged"] }],
+        };
+        Assert.NotEqual(
+            AlsAnimationSetPayload.ComputeDefinitionDigest(legacyDefinition),
+            AlsAnimationSetPayload.ComputeDefinitionDigest(changedLegacyDefinition));
     }
 
     [Fact]
@@ -521,6 +695,25 @@ public sealed class AlsAnimationSetCompilerTests
         curve["keys"]![1]!["interpolation"] = "Linear";
         root["canonicalRotationYawSourceConvention"] = "ue_root_bone_rotator_yaw_degrees_z_up";
         root["canonicalRotationYawProfileSignProvenance"] = "runtime_profile_sign_pending";
+    }
+
+    private static void AddEvents(JsonObject root)
+    {
+        root["notifies"] = JsonNode.Parse("""
+            [{ "name": "Footstep", "time": 0.25, "duration": 0.0, "sourceIndex": 0 }]
+            """);
+        root["syncMarkers"] = JsonNode.Parse("""
+            [{ "name": "Left", "time": 0.5 }]
+            """);
+    }
+
+    private static AlsFloatCurveKeyDefinition[] ReplaceFirstKey(
+        AlsFloatCurveKeyDefinition[] keys,
+        AlsFloatCurveKeyDefinition replacement)
+    {
+        var changed = keys.ToArray();
+        changed[0] = replacement;
+        return changed;
     }
 
     private static AlsManifest MutateAnimationMetadata(Action<JsonObject> mutation)
