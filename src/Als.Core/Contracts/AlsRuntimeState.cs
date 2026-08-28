@@ -61,7 +61,8 @@ public readonly record struct AlsFootLockState(
     Quaternion ProvenanceRotation,
     int PlatformId,
     float Amount,
-    byte Locked)
+    byte Locked,
+    AlsFootReleaseReason ReleaseReason)
 {
     public static AlsFootLockState CreateDefault() => new(
         Vector3.Zero,
@@ -72,7 +73,8 @@ public readonly record struct AlsFootLockState(
         Quaternion.Identity,
         -1,
         0f,
-        0);
+        0,
+        AlsFootReleaseReason.None);
 }
 
 [StructLayout(LayoutKind.Sequential)]

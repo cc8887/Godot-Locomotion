@@ -75,7 +75,7 @@ public sealed class ContractLayoutTests
             "BlendSeconds", "RemainingYaw", "NominalDegrees", "Direction", "ScaleAngle", "Active");
         AssertFieldOrder<AlsFootLockState>(
             "LocalPosition", "LocalRotation", "Offset", "Rotation", "ProvenancePosition",
-            "ProvenanceRotation", "PlatformId", "Amount", "Locked");
+            "ProvenanceRotation", "PlatformId", "Amount", "Locked", "ReleaseReason");
         AssertFieldOrder<AlsPelvisCorrectionState>(
             "CurrentOffset", "TargetOffset", "VerticalVelocity");
         AssertFieldOrder<AlsFootHit>(
@@ -152,6 +152,16 @@ public sealed class ContractLayoutTests
         Assert.Equal(
             typeof(long),
             typeof(AlsFrameResult).GetField(nameof(AlsFrameResult.P4ModifierOperationTicks))?.FieldType);
+    }
+
+    [Fact]
+    public void FootReleaseReasonIsAByteContractsEnumStoredByFootLockState()
+    {
+        Assert.Equal("GodotAls.Core.Contracts", typeof(AlsFootReleaseReason).Namespace);
+        Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(AlsFootReleaseReason)));
+        Assert.Equal(
+            typeof(AlsFootReleaseReason),
+            typeof(AlsFootLockState).GetProperty("ReleaseReason")?.PropertyType);
     }
 
     [Fact]
