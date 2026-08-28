@@ -187,6 +187,7 @@ public partial class P4PoseSmoke : Node
             Require(modifier.TryApply(in zeroInput, ref zeroOutput, out _),
                 "modifier allocation warmup failed");
         }
+        var nameValidationsBeforeSteady = modifier.NameValidationCount;
         var allocationBefore = GC.GetAllocatedBytesForCurrentThread();
         var steadyStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         for (var index = 0; index < 10_000; index++)
@@ -199,6 +200,8 @@ public partial class P4PoseSmoke : Node
         var steadyElapsed = System.Diagnostics.Stopwatch.GetElapsedTime(steadyStartedAt);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocationBefore;
         Require(allocated == 0, $"steady modifier path allocated {allocated} B");
+        Require(modifier.NameValidationCount == nameValidationsBeforeSteady,
+            "steady modifier path entered the name-validation cold path");
         GD.Print(
             $"P4_POSE_TOPOLOGY_PERF iterations=10000 elapsed_ms={steadyElapsed.TotalMilliseconds:F3} " +
             $"bones={graph.TargetSkeleton.GetBoneCount()} alloc={allocated}B");
@@ -460,6 +463,7 @@ public partial class P4PoseSmoke : Node
         var beforeName = PoseSnapshot.Capture(skeleton, visualRoot);
         var expected = SentinelOutput();
         var output = expected;
+        var nameValidationsBeforeMutation = modifier.NameValidationCount;
         try
         {
             skeleton.SetBoneName(boneId, mutatedName);
@@ -469,6 +473,8 @@ public partial class P4PoseSmoke : Node
                 $"name mutation returned unstable reason: {reason}");
             RequireOutputExact(output, expected, "name mutation");
             beforeName.RequireExact(skeleton, visualRoot, "name mutation");
+            Require(modifier.NameValidationCount == nameValidationsBeforeMutation + 1,
+                "name mutation did not trigger exactly one cold validation");
         }
         finally
         {
@@ -478,9 +484,12 @@ public partial class P4PoseSmoke : Node
         output = default;
         Require(modifier.TryApply(in input, ref output, out var recoveredNameReason),
             $"modifier did not recover after name restoration: {recoveredNameReason}");
+        Require(modifier.NameValidationCount == nameValidationsBeforeMutation + 2,
+            "name restoration did not trigger exactly one recovery validation");
 
         basePose.Restore(skeleton, visualRoot);
         var originalRest = skeleton.GetBoneRest(boneId);
+        var versionBeforeRestMutation = skeleton.GetVersion();
         var mutatedRest = originalRest;
         mutatedRest.Origin += new Vector3(0.000001f, 0f, 0f);
         var beforeRest = PoseSnapshot.Capture(skeleton, visualRoot);
@@ -489,12 +498,15 @@ public partial class P4PoseSmoke : Node
         try
         {
             skeleton.SetBoneRest(boneId, mutatedRest);
+            var restMutationChangedVersion = skeleton.GetVersion() != versionBeforeRestMutation;
             Require(!modifier.TryApply(in input, ref output, out var reason),
                 "same-count Skeleton rest mutation unexpectedly succeeded");
             Require(reason == AlsP4ReasonCode.InvalidRuntimeState,
                 $"rest mutation returned unstable reason: {reason}");
             RequireOutputExact(output, expected, "rest mutation");
             beforeRest.RequireExact(skeleton, visualRoot, "rest mutation");
+            GD.Print(
+                $"P4_POSE_REST_VERSION changed={(restMutationChangedVersion ? 1 : 0)}");
         }
         finally
         {

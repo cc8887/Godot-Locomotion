@@ -85,6 +85,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
     private readonly double _baseTime;
     private readonly int _baseAnimationId;
     private readonly IAlsSkeletonPoseWriter? _testWriter;
+    private ulong _skeletonVersion;
+    private int _nameValidationCount;
     private int _disposed;
 
     public AlsComponentPoseModifier(
@@ -159,7 +161,10 @@ public sealed class AlsComponentPoseModifier : IDisposable
         _down = BindClip(library, profile.Aim.DownAnimationId);
         _forward = BindClip(library, profile.Aim.ForwardAnimationId);
         _up = BindClip(library, profile.Aim.UpAnimationId);
+        _skeletonVersion = skeleton.GetVersion();
     }
+
+    internal int NameValidationCount => Volatile.Read(ref _nameValidationCount);
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public bool TryApply(
@@ -255,6 +260,20 @@ public sealed class AlsComponentPoseModifier : IDisposable
             return false;
         }
 
+        var currentVersion = _skeleton.GetVersion();
+        if (currentVersion != _skeletonVersion)
+        {
+            Interlocked.Increment(ref _nameValidationCount);
+            for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
+            {
+                if (_skeleton.FindBone(_boneNames[boneId]) != boneId)
+                {
+                    return false;
+                }
+            }
+            _skeletonVersion = currentVersion;
+        }
+
         Array.Clear(_scratch.ValidationVisited);
         for (var index = 0; index < _scratch.Order.Length; index++)
         {
@@ -265,8 +284,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 return false;
             }
             var parent = _scratch.Parents[boneId];
-            if (_skeleton.FindBone(_boneNames[boneId]) != boneId ||
-                _skeleton.GetBoneRest(boneId) != _rests[boneId] ||
+            if (_skeleton.GetBoneRest(boneId) != _rests[boneId] ||
                 _skeleton.GetBoneParent(boneId) != parent ||
                 (parent >= 0 && !_scratch.ValidationVisited[parent]))
             {
