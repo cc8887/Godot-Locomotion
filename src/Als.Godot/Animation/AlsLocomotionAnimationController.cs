@@ -4,6 +4,48 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Animation;
 
+public readonly record struct AlsP4AnimationInput(
+    int ActiveTurnAnimationId,
+    int ActiveRotateAnimationId,
+    float TurnPlayRate,
+    float RotatePlayRate,
+    float TurnPhase,
+    float RotatePhase,
+    float AimDownPhase,
+    float AimForwardPhase,
+    float AimUpPhase,
+    float AimDownWeight,
+    float AimForwardWeight,
+    float AimUpWeight)
+{
+    public static readonly AlsP4AnimationInput Disabled = new(
+        -1, -1, 1f, 1f, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 0f);
+
+    public static AlsP4AnimationInput Turn(
+        int animationId,
+        float playRate,
+        float phase,
+        float aimPhase,
+        float aimDownWeight,
+        float aimForwardWeight,
+        float aimUpWeight) => new(
+            animationId, -1, playRate, 1f, phase, 0f,
+            aimPhase, aimPhase, aimPhase,
+            aimDownWeight, aimForwardWeight, aimUpWeight);
+
+    public static AlsP4AnimationInput Rotate(
+        int animationId,
+        float playRate,
+        float phase,
+        float aimPhase,
+        float aimDownWeight,
+        float aimForwardWeight,
+        float aimUpWeight) => new(
+            -1, animationId, 1f, playRate, 0f, phase,
+            aimPhase, aimPhase, aimPhase,
+            aimDownWeight, aimForwardWeight, aimUpWeight);
+}
+
 public sealed class AlsLocomotionAnimationController : IDisposable
 {
     private const int WarmupUninitialized = 0;
@@ -26,6 +68,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private AnimationNodeStateMachinePlayback? _groundedPlayback;
     private int _warmupState;
     private int _disposed;
+    private byte _activeP4Mode;
 
     public AlsLocomotionAnimationController(
         AlsLocomotionGraphBuildResult graph,
@@ -42,6 +85,10 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     public AlsStance ActiveStance { get; private set; } = AlsStance.Standing;
 
     public long ManualAdvanceCount { get; private set; }
+
+    public int ActiveTurnAnimationId { get; private set; } = -1;
+
+    public int ActiveRotateAnimationId { get; private set; } = -1;
 
     public void Warmup()
     {
@@ -93,6 +140,10 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                 Vector2.Zero,
                 0f,
                 0f);
+            if (_graph.Handles.P4 is not null)
+            {
+                SetP4Parameters(_graph.Handles.P4, PreparedP4.Disabled);
+            }
             _graph.Tree.Advance(0.0);
 
             _topPlayback = topPlayback;
@@ -115,23 +166,41 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
     public void Apply(in AlsFrameResult result, double deltaTime)
     {
+        var p4 = AlsP4AnimationInput.Disabled;
+        Apply(in result, in p4, deltaTime);
+    }
+
+    public void Apply(
+        in AlsFrameResult result,
+        in AlsP4AnimationInput p4Input,
+        double deltaTime)
+    {
         ThrowIfDisposed();
         if (Volatile.Read(ref _warmupState) != WarmupReady)
         {
             throw new InvalidOperationException("P3 locomotion animation controller must be warmed before Apply().");
         }
         var prepared = Prepare(result, deltaTime);
+        var preparedP4 = PrepareP4(in p4Input);
 
+        var requestedP4Mode = preparedP4.TurnActive ? (byte)1 :
+            preparedP4.RotateActive ? (byte)2 : (byte)0;
         var stateChanged = result.AnimationState != ActiveAnimationState;
-        if (stateChanged)
+        if (requestedP4Mode != _activeP4Mode ||
+            (requestedP4Mode == 0 && stateChanged))
         {
-            _topPlayback!.Travel(
-                _graph.Handles.StateNames[(int)result.AnimationState], true);
+            var stateName = requestedP4Mode switch
+            {
+                1 => _graph.Handles.P4!.TurnStateName,
+                2 => _graph.Handles.P4!.RotateStateName,
+                _ => _graph.Handles.StateNames[(int)result.AnimationState],
+            };
+            _topPlayback!.Travel(stateName, true);
         }
 
         var stanceChanged = result.ActualStance != ActiveStance;
         if (result.AnimationState == AlsAnimationState.Grounded &&
-            (stateChanged || stanceChanged))
+            ((requestedP4Mode == 0 && stateChanged) || stanceChanged))
         {
             _groundedPlayback!.Travel(
                 _graph.Handles.StanceNames[(int)result.ActualStance], true);
@@ -144,11 +213,18 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             prepared.Lean,
             prepared.LeanAmount,
             prepared.Phase);
+        if (_graph.Handles.P4 is not null)
+        {
+            SetP4Parameters(_graph.Handles.P4, preparedP4);
+        }
 
         _graph.Tree.Advance(deltaTime);
         ManualAdvanceCount++;
         ActiveAnimationState = result.AnimationState;
         ActiveStance = result.ActualStance;
+        ActiveTurnAnimationId = p4Input.ActiveTurnAnimationId;
+        ActiveRotateAnimationId = p4Input.ActiveRotateAnimationId;
+        _activeP4Mode = requestedP4Mode;
     }
 
     public ulong ComputePoseDigest(long frameId)
@@ -228,6 +304,22 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             _graph.Tree.Set(parameters.PhasePath, Math.Clamp(phase, 0f, 1f));
         }
+    }
+
+    private void SetP4Parameters(AlsP4GraphHandles handles, in PreparedP4 prepared)
+    {
+        _graph.Tree.Set(handles.TurnSelectionPath, prepared.TurnSelection);
+        _graph.Tree.Set(handles.TurnPlayRatePath, prepared.TurnPlayRate);
+        _graph.Tree.Set(handles.TurnPhasePath, prepared.TurnPhase);
+        _graph.Tree.Set(handles.RotateSelectionPath, prepared.RotateSelection);
+        _graph.Tree.Set(handles.RotatePlayRatePath, prepared.RotatePlayRate);
+        _graph.Tree.Set(handles.RotatePhasePath, prepared.RotatePhase);
+        _graph.Tree.Set(handles.AimDownPhasePath, prepared.AimDownPhase);
+        _graph.Tree.Set(handles.AimDownWeightPath, prepared.AimDownWeight);
+        _graph.Tree.Set(handles.AimForwardPhasePath, prepared.AimForwardPhase);
+        _graph.Tree.Set(handles.AimForwardWeightPath, prepared.AimForwardWeight);
+        _graph.Tree.Set(handles.AimUpPhasePath, prepared.AimUpPhase);
+        _graph.Tree.Set(handles.AimUpWeightPath, prepared.AimUpWeight);
     }
 
     private Vector2 MapBlendPosition(in AlsFrameResult result)
@@ -336,6 +428,75 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             phase);
     }
 
+    private PreparedP4 PrepareP4(in AlsP4AnimationInput input)
+    {
+        var turnActive = input.ActiveTurnAnimationId >= 0;
+        var rotateActive = input.ActiveRotateAnimationId >= 0;
+        if (turnActive && rotateActive)
+        {
+            throw new ArgumentException("P4 Turn and Rotate inputs are mutually exclusive.", nameof(input));
+        }
+        if (input.ActiveTurnAnimationId < -1 || input.ActiveRotateAnimationId < -1 ||
+            !IsPositiveRate(input.TurnPlayRate) ||
+            !IsPositiveRate(input.RotatePlayRate) ||
+            !IsUnit(input.TurnPhase) ||
+            !IsUnit(input.RotatePhase) ||
+            !IsUnit(input.AimDownPhase) ||
+            !IsUnit(input.AimForwardPhase) ||
+            !IsUnit(input.AimUpPhase) ||
+            !IsUnit(input.AimDownWeight) ||
+            !IsUnit(input.AimForwardWeight) ||
+            !IsUnit(input.AimUpWeight))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(input), "P4 rates, phases, weights and inactive IDs are outside their fixed range.");
+        }
+
+        var handles = _graph.Handles.P4;
+        if (handles is null)
+        {
+            if (turnActive || rotateActive)
+            {
+                throw new InvalidOperationException("This animation graph was built without a P4 profile.");
+            }
+            return PreparedP4.Disabled;
+        }
+
+        var turnSelection = 0f;
+        if (turnActive && !handles.TryGetTurnSelection(input.ActiveTurnAnimationId, out turnSelection))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(input), $"Unknown P4 Turn animation ID: {input.ActiveTurnAnimationId}");
+        }
+        var rotateSelection = 0f;
+        if (rotateActive && !handles.TryGetRotateSelection(input.ActiveRotateAnimationId, out rotateSelection))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(input), $"Unknown P4 Rotate animation ID: {input.ActiveRotateAnimationId}");
+        }
+
+        return new PreparedP4(
+            turnActive,
+            rotateActive,
+            turnSelection,
+            rotateSelection,
+            input.TurnPlayRate,
+            input.RotatePlayRate,
+            input.TurnPhase,
+            input.RotatePhase,
+            input.AimDownPhase,
+            input.AimForwardPhase,
+            input.AimUpPhase,
+            input.AimDownWeight,
+            input.AimForwardWeight,
+            input.AimUpWeight);
+
+        bool IsPositiveRate(float value) =>
+            float.IsFinite(value) && value > 0f && value <= _playRateMaximum;
+        static bool IsUnit(float value) =>
+            float.IsFinite(value) && value >= 0f && value <= 1f;
+    }
+
     private static void Append(ref ulong digest, Vector3 value)
     {
         Append(ref digest, Quantize(value.X));
@@ -377,4 +538,24 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         Vector2 Lean,
         float LeanAmount,
         float Phase);
+
+    private readonly record struct PreparedP4(
+        bool TurnActive,
+        bool RotateActive,
+        float TurnSelection,
+        float RotateSelection,
+        float TurnPlayRate,
+        float RotatePlayRate,
+        float TurnPhase,
+        float RotatePhase,
+        float AimDownPhase,
+        float AimForwardPhase,
+        float AimUpPhase,
+        float AimDownWeight,
+        float AimForwardWeight,
+        float AimUpWeight)
+    {
+        public static readonly PreparedP4 Disabled = new(
+            false, false, 0f, 0f, 1f, 1f, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 0f);
+    }
 }
