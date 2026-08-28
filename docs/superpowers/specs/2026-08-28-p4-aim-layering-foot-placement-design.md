@@ -539,6 +539,8 @@ P4 短时门禁沿用总性能合同的阶段阈值：
 4. 减少无效 clip/parameter 更新；
 5. 只有 Profiler 证明 modifier 是热点时才评估 GDExtension。
 
+Task 9 的受控短时证据显示，非零 Aim modifier 为 `47/68` 个 affected bones，约 `0.58-0.64 ms/角色`、`0 B`。setter 只占分段样本约 `0.7%`，主要成本在 clip sampling 和 component/local rebuild。按 10 角色线性估算仍超过 Worker 阶段预算；该风险进入 Task 16 的多角色 profiler/budget 闭环，不得通过关闭 Aim、减少 mask 或降低更新频率规避。
+
 P4 的 120/600 frame 结果是阶段证据。P7 才执行 i7-10700、30 秒热身和 10 分钟 Release 最终认证。
 
 ## 十三、可操作 Demo

@@ -24,10 +24,23 @@ public partial class P4PoseSmoke : Node
         try
         {
             var evidence = RunSmoke();
+            var allocationMode = IsControlledAllocationEnvironment()
+                ? "controlled"
+                : "uncontrolled";
+            var allocationEvidence = allocationMode == "controlled"
+                ? "alloc=0B "
+                : string.Empty;
             GD.Print(
                 $"P4_POSE_OK aim={evidence.AimDigest:X16} turn={evidence.TurnDigest:X16} " +
                 $"rotate={evidence.RotateDigest:X16} rollback={evidence.RollbackCount} " +
-                $"alloc={evidence.AllocatedBytes}B");
+                $"{allocationEvidence}allocation_mode={allocationMode}");
+            if (allocationMode == "uncontrolled")
+            {
+                GD.Print(
+                    $"P4_POSE_ALLOCATION_UNCONTROLLED zero={evidence.AllocatedBytes}B " +
+                    $"active={evidence.ActiveAllocatedBytes}B " +
+                    "set_DOTNET_TieredCompilation_and_COMPlus_TieredCompilation_to_0_for_evidence=1");
+            }
             GetTree().Quit();
         }
         catch (Exception exception)
@@ -200,7 +213,10 @@ public partial class P4PoseSmoke : Node
         }
         var steadyElapsed = System.Diagnostics.Stopwatch.GetElapsedTime(steadyStartedAt);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocationBefore;
-        Require(allocated == 0, $"steady modifier path allocated {allocated} B");
+        if (IsControlledAllocationEnvironment())
+        {
+            Require(allocated == 0, $"steady modifier path allocated {allocated} B");
+        }
         Require(modifier.NameValidationCount == nameValidationsBeforeSteady,
             "steady modifier path entered the name-validation cold path");
         GD.Print(
@@ -227,7 +243,10 @@ public partial class P4PoseSmoke : Node
         }
         var activeElapsed = System.Diagnostics.Stopwatch.GetElapsedTime(activeStartedAt);
         var activeAllocated = GC.GetAllocatedBytesForCurrentThread() - activeAllocationBefore;
-        Require(activeAllocated == 0, $"active Aim path allocated {activeAllocated} B");
+        if (IsControlledAllocationEnvironment())
+        {
+            Require(activeAllocated == 0, $"active Aim path allocated {activeAllocated} B");
+        }
         Require(modifier.NameValidationCount == activeNameValidations,
             "active Aim path entered the name-validation cold path");
         Require(activeOutput.PoseDigest != 0 && activeOutput.OperationTicks > 0 &&
@@ -261,8 +280,24 @@ public partial class P4PoseSmoke : Node
         {
             Append(ref aimDigest, digest);
         }
-        return new Evidence(aimDigest, turnDigest, rotateDigest, 1, allocated);
+        return new Evidence(
+            aimDigest,
+            turnDigest,
+            rotateDigest,
+            1,
+            allocated,
+            activeAllocated);
     }
+
+    private static bool IsControlledAllocationEnvironment() =>
+        string.Equals(
+            System.Environment.GetEnvironmentVariable("DOTNET_TieredCompilation"),
+            "0",
+            StringComparison.Ordinal) &&
+        string.Equals(
+            System.Environment.GetEnvironmentVariable("COMPlus_TieredCompilation"),
+            "0",
+            StringComparison.Ordinal);
 
     private static ulong RunAction(
         AlsLocomotionAnimationController controller,
@@ -1003,7 +1038,8 @@ public partial class P4PoseSmoke : Node
         ulong TurnDigest,
         ulong RotateDigest,
         int RollbackCount,
-        long AllocatedBytes);
+        long AllocatedBytes,
+        long ActiveAllocatedBytes);
 
     private sealed class PoseSnapshot
     {
