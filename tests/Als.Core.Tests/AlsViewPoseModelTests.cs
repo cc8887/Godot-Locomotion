@@ -635,27 +635,118 @@ public sealed class AlsViewPoseModelTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void NearVerticalQuaternionMustMatchCanonicalYaw(bool aim)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void OneUlpFromVerticalTreatsQuaternionYawAsUnobservable(
+        bool down,
+        bool aim)
     {
-        var pitch = MathF.BitDecrement(MathF.PI / 2f);
+        const float canonicalYaw = -0.4045673f;
+        var pitch = down
+            ? MathF.BitIncrement(-MathF.PI / 2f)
+            : MathF.BitDecrement(MathF.PI / 2f);
         var input = Input(
-            viewYaw: 1f,
+            viewYaw: canonicalYaw,
             viewPitch: pitch,
-            aimYaw: 1f,
+            aimYaw: canonicalYaw,
             aimPitch: pitch,
             rotationMode: AlsRotationMode.Aiming);
-        var mismatched = Quaternion.CreateFromYawPitchRoll(0f, pitch, 0f);
+        var physicallyUnobservableConflict = Quaternion.CreateFromYawPitchRoll(
+            canonicalYaw + 1f,
+            pitch,
+            0f);
         input = aim
-            ? input with { AimRotation = mismatched }
-            : input with { ViewRotation = mismatched };
+            ? input with { AimRotation = physicallyUnobservableConflict }
+            : input with { ViewRotation = physicallyUnobservableConflict };
 
-        AssertTransactionalFailure(
-            input,
-            AlsViewPoseSettings.CreateDefault(),
-            SentinelState(),
-            AlsP4ReasonCode.InvalidRotation);
+        Assert.True(Evaluate(input, InitializedState(), out var next, out var output, out _));
+        Assert.Equal(canonicalYaw, next.ViewPose.RelativeYaw, Tolerance);
+        Assert.Equal(canonicalYaw, output.AimRelativeYaw, Tolerance);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CanonicalYawSweepIsStableOneUlpFromVertical(bool down)
+    {
+        const int sampleCount = 36_000;
+        var pitch = down
+            ? MathF.BitIncrement(-MathF.PI / 2f)
+            : MathF.BitDecrement(MathF.PI / 2f);
+
+        for (var index = 0; index < sampleCount; index++)
+        {
+            var yaw = -MathF.PI + (MathF.Tau * index / sampleCount);
+            var input = Input(
+                viewYaw: yaw,
+                viewPitch: pitch,
+                aimYaw: yaw,
+                aimPitch: pitch,
+                rotationMode: AlsRotationMode.Aiming);
+
+            Assert.True(Evaluate(
+                input,
+                InitializedState(),
+                out var next,
+                out var output,
+                out var reason));
+            Assert.Equal(AlsP4ReasonCode.None, reason);
+            Assert.InRange(
+                MathF.Abs(NormalizeOracle(next.ViewPose.RelativeYaw - yaw)),
+                0f,
+                Tolerance);
+            Assert.InRange(
+                MathF.Abs(NormalizeOracle(output.AimRelativeYaw - yaw)),
+                0f,
+                Tolerance);
+            Assert.True(float.IsFinite(next.ViewPose.RelativeYaw));
+            Assert.True(float.IsFinite(next.ViewPose.RelativePitch));
+            Assert.True(float.IsFinite(next.ViewPose.YawSpeed));
+            Assert.True(float.IsFinite(output.AimRelativeYaw));
+            Assert.True(float.IsFinite(output.AimRelativePitch));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ObservablePitchSweepRejectsOneRadianYawConflicts(bool aim)
+    {
+        const int yawSampleCount = 3_600;
+        var pitches = new[]
+        {
+            0f,
+            0.5f,
+            -0.5f,
+            MathF.PI / 2f - 0.01f,
+            -MathF.PI / 2f + 0.01f,
+        };
+
+        foreach (var pitch in pitches)
+        {
+            for (var index = 0; index < yawSampleCount; index++)
+            {
+                var yaw = -MathF.PI + (MathF.Tau * index / yawSampleCount);
+                var input = Input(
+                    viewYaw: yaw,
+                    viewPitch: pitch,
+                    aimYaw: yaw,
+                    aimPitch: pitch,
+                    rotationMode: AlsRotationMode.Aiming);
+                var conflict = Quaternion.CreateFromYawPitchRoll(yaw + 1f, pitch, 0f);
+                input = aim
+                    ? input with { AimRotation = conflict }
+                    : input with { ViewRotation = conflict };
+
+                AssertTransactionalFailure(
+                    input,
+                    AlsViewPoseSettings.CreateDefault(),
+                    SentinelState(),
+                    AlsP4ReasonCode.InvalidRotation);
+            }
+        }
     }
 
     [Theory]
