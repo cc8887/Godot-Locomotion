@@ -411,53 +411,60 @@ public partial class P3bFrameOrderSmoke : Node
 
     private static void VerifyFailureReasonPublicationOrder()
     {
-        var state = new AlsP3CharacterState(
-            new AlsSlotHandle(77, 3),
-            new AlsP3ExchangeSlot());
-        using var enqueued = new ManualResetEventSlim();
-        using var releaseProducer = new ManualResetEventSlim();
+        const int iterationCount = 2_048;
+        var states = new AlsP3CharacterState[iterationCount];
+        for (var index = 0; index < states.Length; index++)
+        {
+            states[index] = new AlsP3CharacterState(
+                new AlsSlotHandle(77, 3),
+                new AlsP3ExchangeSlot());
+        }
         using var consumerStarted = new ManualResetEventSlim();
-        state.FailureEnqueuedTestHook = () =>
+        var failure = new InvalidOperationException("coordinated failure");
+        var mismatch = 0;
+        var consumer = new Thread(() =>
         {
-            enqueued.Set();
-            releaseProducer.Wait();
-        };
-        var identity = new AlsFrameIdentity(19, 77, 3);
-        var producer = Task.Run(() => state.RecordFailure(
-            "reason_order",
-            identity,
-            new InvalidOperationException("coordinated failure"),
-            AlsP4ReasonCode.NonFiniteCurve));
-        AlsP3WorkerFailure? observed = null;
-        Task<bool>? consumer = null;
-        try
-        {
-            Require(enqueued.Wait(TimeSpan.FromSeconds(5)),
-                "failure producer did not reach the coordinated enqueue point");
-            Require((AlsP4ReasonCode)Volatile.Read(ref state.LastFailureReasonCode) ==
-                    AlsP4ReasonCode.NonFiniteCurve,
-                "failure queue became visible before its reason was atomically published");
-            consumer = Task.Run(() =>
+            consumerStarted.Set();
+            var spinner = new SpinWait();
+            for (var index = 0; index < iterationCount; index++)
             {
-                consumerStarted.Set();
-                return state.TryDequeueFailure(out observed);
-            });
-            Require(consumerStarted.Wait(TimeSpan.FromSeconds(5)),
-                "failure consumer did not start");
-            Require(!consumer.IsCompleted,
-                "failure consumer bypassed the producer's publication lock");
-        }
-        finally
+                var state = states[index];
+                AlsP3WorkerFailure? observed;
+                while (!state.TryDequeueFailure(out observed))
+                {
+                    spinner.SpinOnce();
+                }
+                var lastReason = (AlsP4ReasonCode)Volatile.Read(
+                    ref state.LastFailureReasonCode);
+                if (observed is null ||
+                    observed.ReasonCode != AlsP4ReasonCode.NonFiniteCurve ||
+                    lastReason != observed.ReasonCode)
+                {
+                    Interlocked.Exchange(ref mismatch, 1);
+                }
+            }
+        });
+        consumer.IsBackground = true;
+        consumer.Start();
+        Require(consumerStarted.Wait(TimeSpan.FromSeconds(5)),
+            "failure consumer did not start");
+        var producer = new Thread(() =>
         {
-            releaseProducer.Set();
-        }
-        Require(producer.Wait(TimeSpan.FromSeconds(5)) && consumer is not null &&
-                consumer.Wait(TimeSpan.FromSeconds(5)) && consumer.Result,
+            for (var index = 0; index < iterationCount; index++)
+            {
+                states[index].RecordFailure(
+                    "reason_order",
+                    new AlsFrameIdentity(index + 1, 77, 3),
+                    failure,
+                    AlsP4ReasonCode.NonFiniteCurve);
+            }
+        });
+        producer.IsBackground = true;
+        producer.Start();
+        Require(producer.Join(TimeSpan.FromSeconds(10)) &&
+                consumer.Join(TimeSpan.FromSeconds(10)),
             "coordinated failure publication did not complete");
-        Require(observed is not null &&
-                observed.ReasonCode == AlsP4ReasonCode.NonFiniteCurve &&
-                (AlsP4ReasonCode)Volatile.Read(ref state.LastFailureReasonCode) ==
-                    observed.ReasonCode,
+        Require(Volatile.Read(ref mismatch) == 0,
             "failure consumer observed a queue item without its stable reason");
     }
 

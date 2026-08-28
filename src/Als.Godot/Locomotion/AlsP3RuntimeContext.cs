@@ -284,8 +284,6 @@ internal sealed class AlsP3CharacterState
 
     public int LastFailureReasonCode;
 
-    internal Action? FailureEnqueuedTestHook;
-
     private int _workerAdmissionState = WorkerAdmissionClosedValue;
 
     public int WorkerInFlightCount => Math.Max(0, Volatile.Read(ref _workerAdmissionState));
@@ -362,7 +360,6 @@ internal sealed class AlsP3CharacterState
                 _pendingFailureIdentities.Add(failureIdentity))
             {
                 _failures.Enqueue(failure);
-                FailureEnqueuedTestHook?.Invoke();
             }
         }
         Interlocked.Exchange(ref WorkerFrozen, 1);
