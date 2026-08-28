@@ -866,7 +866,9 @@ public partial class P3bAnimationGraphSmoke : Node
         AlsRotationMode rotationMode) => new(
         movementAxes,
         viewYaw,
+        0f,
         aimYaw,
+        0f,
         AlsGait.Running,
         AlsStance.Standing,
         rotationMode,
@@ -1161,6 +1163,8 @@ public partial class P3bAnimationGraphSmoke : Node
     {
         var command = new AlsLocomotionCommand(
             System.Numerics.Vector2.UnitY,
+            0f,
+            0f,
             0f,
             0f,
             AlsGait.Sprinting,

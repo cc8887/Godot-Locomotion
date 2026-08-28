@@ -4,6 +4,59 @@ using System.Runtime.InteropServices;
 namespace GodotAls.Core.Contracts;
 
 [StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsViewPoseState(
+    float RelativeYaw,
+    float RelativePitch,
+    float YawSpeed,
+    float HeadWeight,
+    float SpineWeight,
+    float SpineResidualYaw,
+    float LastWorldYaw);
+
+[StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsTurnInPlaceState(
+    float ActivationSeconds,
+    float Phase,
+    float PlayRate,
+    float RemainingYaw,
+    short NominalDegrees,
+    sbyte Direction,
+    byte Active);
+
+[StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsRotateInPlaceState(
+    float Phase,
+    float PlayRate,
+    sbyte Direction,
+    byte Active);
+
+[StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsFootLockState(
+    Vector3 LocalPosition,
+    Quaternion LocalRotation,
+    Vector3 Offset,
+    Quaternion Rotation,
+    int PlatformId,
+    float Amount,
+    byte Locked)
+{
+    public static AlsFootLockState CreateDefault() => new(
+        Vector3.Zero,
+        Quaternion.Identity,
+        Vector3.Zero,
+        Quaternion.Identity,
+        -1,
+        0f,
+        0);
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsPelvisCorrectionState(
+    Vector3 CurrentOffset,
+    Vector3 TargetOffset,
+    float VerticalVelocity);
+
+[StructLayout(LayoutKind.Sequential)]
 public struct AlsRuntimeState
 {
     public AlsLocomotionState LocomotionState;
@@ -30,4 +83,18 @@ public struct AlsRuntimeState
     public float TargetYaw;
     public byte JumpStartActive;
     public byte Initialized;
+    public AlsViewPoseState ViewPose;
+    public AlsTurnInPlaceState TurnInPlace;
+    public AlsRotateInPlaceState RotateInPlace;
+    public AlsFootLockState LeftFootLock;
+    public AlsFootLockState RightFootLock;
+    public AlsPelvisCorrectionState PelvisCorrection;
+    public Vector3 LeftFootProbeOrigin;
+    public Vector3 RightFootProbeOrigin;
+
+    public static AlsRuntimeState CreateDefault() => new()
+    {
+        LeftFootLock = AlsFootLockState.CreateDefault(),
+        RightFootLock = AlsFootLockState.CreateDefault(),
+    };
 }

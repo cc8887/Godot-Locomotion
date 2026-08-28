@@ -343,7 +343,9 @@ public partial class P3aMotorSmoke : Node
         var command = new AlsLocomotionCommand(
             velocity == NumericsVector3.Zero ? NumericsVector2.Zero : NumericsVector2.UnitY,
             ViewYaw: MathF.PI / 3f,
+            ViewPitch: 0f,
             AimYaw: -MathF.PI / 2f,
+            AimPitch: 0f,
             RequestedGait: AlsGait.Running,
             RequestedStance: AlsStance.Standing,
             RequestedRotationMode: mode,
@@ -695,7 +697,9 @@ public partial class P3aMotorSmoke : Node
     private static AlsLocomotionCommand CreateResponseCommand(NumericsVector2 axes, AlsGait gait) => new(
         axes,
         ViewYaw: 0f,
+        ViewPitch: 0f,
         AimYaw: 0f,
+        AimPitch: 0f,
         RequestedGait: gait,
         RequestedStance: AlsStance.Standing,
         RequestedRotationMode: AlsRotationMode.LookingDirection,
@@ -717,7 +721,9 @@ public partial class P3aMotorSmoke : Node
         var command = new AlsLocomotionCommand(
             System.Numerics.Vector2.Zero,
             ViewYaw: 0f,
+            ViewPitch: 0f,
             AimYaw: 0f,
+            AimPitch: 0f,
             RequestedGait: AlsGait.Running,
             RequestedStance: AlsStance.Standing,
             RequestedRotationMode: AlsRotationMode.LookingDirection,

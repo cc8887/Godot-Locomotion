@@ -22,13 +22,14 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
 
     public long CapturedFrameId => _capturedFrameId;
 
-    public void CaptureGodotFrame(long frameId, float viewYaw) =>
-        CaptureFrame(frameId, ReadGodotSnapshot(), viewYaw);
+    public void CaptureGodotFrame(long frameId, float viewYaw, float viewPitch) =>
+        CaptureFrame(frameId, ReadGodotSnapshot(), viewYaw, viewPitch);
 
     public void CaptureFrame(
         long frameId,
         in AlsPlayerInputSnapshot snapshot,
-        float viewYaw)
+        float viewYaw,
+        float viewPitch)
     {
         if (frameId != _capturedFrameId + 1)
         {
@@ -37,11 +38,12 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
                 $"{_capturedFrameId}, received {frameId}.");
         }
         if (!float.IsFinite(viewYaw) ||
+            !float.IsFinite(viewPitch) ||
             !float.IsFinite(snapshot.MovementAxes.X) ||
             !float.IsFinite(snapshot.MovementAxes.Y))
         {
             throw new ArgumentOutOfRangeException(nameof(snapshot),
-                "Player input axes and view yaw must be finite.");
+                "Player input axes and view yaw/pitch must be finite.");
         }
 
         if (snapshot.CrouchTogglePressed)
@@ -72,7 +74,9 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
         _command = new AlsLocomotionCommand(
             axes,
             viewYaw,
+            viewPitch,
             viewYaw,
+            viewPitch,
             gait,
             _stance,
             snapshot.AimHeld ? AlsRotationMode.Aiming : _rotationMode,
