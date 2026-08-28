@@ -164,6 +164,10 @@ public sealed class ContractLayoutTests
         Assert.Equal(Vector3.Zero, state.LeftFootProbeOrigin);
         Assert.Equal(Vector3.Zero, state.RightFootProbeOrigin);
         Assert.Equal(default, state.ViewPose);
+        Assert.Equal(0f, state.ViewPose.LastWorldYaw);
+        Assert.Equal(
+            unchecked((int)0x80000000),
+            BitConverter.SingleToInt32Bits(state.ViewPose.LastWorldYaw));
         Assert.Equal(default, state.TurnInPlace);
         Assert.Equal(default, state.RotateInPlace);
         Assert.Equal(default, state.PelvisCorrection);
@@ -178,6 +182,16 @@ public sealed class ContractLayoutTests
         AlsRuntimeState.ValidateP4Defaults(in initialized);
         Assert.Throws<InvalidOperationException>(() =>
             AlsRuntimeState.ValidateP4Defaults(in clrZero));
+    }
+
+    [Fact]
+    public void ProductionEntryValidationRejectsPositiveZeroViewPoseMarker()
+    {
+        var state = AlsRuntimeState.CreateDefault();
+        state.ViewPose = default;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            AlsRuntimeState.ValidateP4Defaults(in state));
     }
 
     [Fact]

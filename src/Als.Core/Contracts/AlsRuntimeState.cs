@@ -11,7 +11,26 @@ public readonly record struct AlsViewPoseState(
     float HeadWeight,
     float SpineWeight,
     float SpineResidualYaw,
-    float LastWorldYaw);
+    float LastWorldYaw)
+{
+    public static AlsViewPoseState CreateUninitialized() => new(
+        0f,
+        0f,
+        0f,
+        0f,
+        0f,
+        0f,
+        -0.0f);
+
+    public static bool IsUninitialized(in AlsViewPoseState state) =>
+        BitConverter.SingleToInt32Bits(state.RelativeYaw) == 0 &&
+        BitConverter.SingleToInt32Bits(state.RelativePitch) == 0 &&
+        BitConverter.SingleToInt32Bits(state.YawSpeed) == 0 &&
+        BitConverter.SingleToInt32Bits(state.HeadWeight) == 0 &&
+        BitConverter.SingleToInt32Bits(state.SpineWeight) == 0 &&
+        BitConverter.SingleToInt32Bits(state.SpineResidualYaw) == 0 &&
+        BitConverter.SingleToInt32Bits(state.LastWorldYaw) == int.MinValue;
+}
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsTurnInPlaceState(
@@ -94,13 +113,14 @@ public struct AlsRuntimeState
 
     public static AlsRuntimeState CreateDefault() => new()
     {
+        ViewPose = AlsViewPoseState.CreateUninitialized(),
         LeftFootLock = AlsFootLockState.CreateDefault(),
         RightFootLock = AlsFootLockState.CreateDefault(),
     };
 
     public static void ValidateP4Defaults(in AlsRuntimeState state)
     {
-        if (state.ViewPose != default ||
+        if (!AlsViewPoseState.IsUninitialized(state.ViewPose) ||
             state.TurnInPlace != default ||
             state.RotateInPlace != default ||
             state.LeftFootLock != AlsFootLockState.CreateDefault() ||
