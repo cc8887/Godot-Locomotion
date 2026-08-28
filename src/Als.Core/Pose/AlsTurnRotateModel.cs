@@ -16,6 +16,8 @@ public readonly record struct AlsTurnRotateSelection(
     float PhasePlayRate,
     float YawScale,
     float EffectiveDeltaTime,
+    float PhaseTravel,
+    float Duration,
     float BlendSeconds,
     float RemainingYaw,
     short NominalDegrees,
@@ -95,6 +97,13 @@ public static class AlsTurnRotateModel
             ClearTurnRotate(ref next);
         }
 
+        if (selection.Active == 1 && !ValidateSelection(selection))
+        {
+            selection = default;
+            reason = AlsP4ReasonCode.InvalidSelection;
+            return false;
+        }
+
         nextState = next;
         reason = AlsP4ReasonCode.None;
         return true;
@@ -165,7 +174,7 @@ public static class AlsTurnRotateModel
         if (turn.Active == 1)
         {
             var clip = SelectTurnClip(settings, turn.Stance, turn.Direction, turn.NominalDegrees);
-            AdvanceTurn(input.DeltaTime, clip, turn, ref next, out selection);
+            AdvanceTurn(input.DeltaTime, input.DeltaTime, clip, turn, ref next, out selection);
             return;
         }
 
@@ -199,21 +208,27 @@ public static class AlsTurnRotateModel
         var selectedClip = SelectTurnClip(settings, input.Stance, direction, nominal);
         var started = new AlsTurnInPlaceState(
             0f, 0f, selectedClip.BasePlayRate, relativeYaw, nominal, direction, 1, input.Stance);
-        AdvanceTurn(input.DeltaTime, selectedClip, started, ref next, out selection);
+        var playbackDeltaTime = (float)System.Math.Clamp(
+            activationValue - delay,
+            0d,
+            input.DeltaTime);
+        AdvanceTurn(input.DeltaTime, playbackDeltaTime, selectedClip, started, ref next, out selection);
     }
 
     private static void AdvanceTurn(
-        float deltaTime,
+        float frameDeltaTime,
+        float playbackDeltaTime,
         in AlsTurnClipSettings clip,
         in AlsTurnInPlaceState turn,
         ref AlsRuntimeState next,
         out AlsTurnRotateSelection selection)
     {
         var previous = turn.Phase;
-        var requestedPhaseDelta = (double)deltaTime * turn.PlayRate;
+        var requestedPhaseDelta = (double)playbackDeltaTime * turn.PlayRate;
         var remainingPhase = (double)clip.DurationSeconds - previous;
         var consumedPhase = System.Math.Min(requestedPhaseDelta, remainingPhase);
         var effectiveDeltaTime = (float)(consumedPhase / turn.PlayRate);
+        var phaseTravel = (float)consumedPhase;
         // Turn clips are one-shot and clamp at their terminal sample.
         var current = (float)((double)previous + consumedPhase);
         var yawScale = turn.PlayRate;
@@ -229,10 +244,12 @@ public static class AlsTurnRotateModel
             clip.CurveId,
             previous,
             current,
-            deltaTime,
+            frameDeltaTime,
             turn.PlayRate,
             yawScale,
             effectiveDeltaTime,
+            phaseTravel,
+            clip.DurationSeconds,
             clip.BlendSeconds,
             turn.RemainingYaw,
             turn.NominalDegrees,
@@ -306,10 +323,11 @@ public static class AlsTurnRotateModel
         }
 
         var playRate = (float)playRateValue;
+        var phaseTravel = (float)phaseDelta;
         var previousPhase = rotate.Active == 1 ? rotate.Phase : 0f;
         // Rotate clips loop continuously; phase stays in [0, duration).
         var currentPhase = WrapPhase(
-            (double)previousPhase + phaseDelta,
+            (double)previousPhase + phaseTravel,
             clip.DurationSeconds);
         var active = new AlsRotateInPlaceState(
             currentPhase, playRate, direction, 1, input.Stance);
@@ -323,8 +341,10 @@ public static class AlsTurnRotateModel
             currentPhase,
             input.DeltaTime,
             playRate,
-            (float)(phaseDelta / input.DeltaTime),
+            phaseTravel / input.DeltaTime,
             input.DeltaTime,
+            phaseTravel,
+            clip.DurationSeconds,
             0f,
             relativeYaw,
             0,
@@ -404,27 +424,101 @@ public static class AlsTurnRotateModel
         return true;
     }
 
-    private static bool ValidateSelection(in AlsTurnRotateSelection selection) =>
-        ((selection.YawSource == AlsYawSource.TurnInPlace &&
-          (selection.NominalDegrees == 90 || selection.NominalDegrees == 180) &&
-          selection.ScaleAngle <= 1) ||
-         (selection.YawSource == AlsYawSource.RotateInPlace &&
-          selection.NominalDegrees == 0 &&
-          selection.ScaleAngle == 0 &&
-          selection.BlendSeconds == 0f)) &&
-        selection.Active == 1 &&
-        selection.AnimationId >= 0 &&
-        selection.CurveId >= 0 &&
-        float.IsFinite(selection.PreviousPhase) && selection.PreviousPhase >= 0f &&
-        float.IsFinite(selection.CurrentPhase) && selection.CurrentPhase >= 0f &&
-        float.IsFinite(selection.DeltaTime) && selection.DeltaTime > 0f &&
-        float.IsFinite(selection.PhasePlayRate) && selection.PhasePlayRate > 0f &&
-        float.IsFinite(selection.YawScale) && selection.YawScale > 0f &&
-        float.IsFinite(selection.EffectiveDeltaTime) && selection.EffectiveDeltaTime > 0f &&
-        selection.EffectiveDeltaTime <= selection.DeltaTime &&
-        float.IsFinite(selection.BlendSeconds) && selection.BlendSeconds >= 0f &&
-        float.IsFinite(selection.RemainingYaw) &&
-        (selection.Direction == -1 || selection.Direction == 1);
+    private static bool ValidateSelection(in AlsTurnRotateSelection selection)
+    {
+        if (selection.Active != 1 ||
+            selection.AnimationId < 0 ||
+            selection.CurveId < 0 ||
+            !float.IsFinite(selection.PreviousPhase) || selection.PreviousPhase < 0f ||
+            !float.IsFinite(selection.CurrentPhase) || selection.CurrentPhase < 0f ||
+            !float.IsFinite(selection.DeltaTime) || selection.DeltaTime <= 0f ||
+            !float.IsFinite(selection.PhasePlayRate) || selection.PhasePlayRate <= 0f ||
+            !float.IsFinite(selection.YawScale) || selection.YawScale <= 0f ||
+            !float.IsFinite(selection.EffectiveDeltaTime) || selection.EffectiveDeltaTime <= 0f ||
+            selection.EffectiveDeltaTime > selection.DeltaTime ||
+            !float.IsFinite(selection.PhaseTravel) || selection.PhaseTravel <= 0f ||
+            !float.IsFinite(selection.Duration) || selection.Duration <= 0f ||
+            !float.IsFinite(selection.BlendSeconds) || selection.BlendSeconds < 0f ||
+            !float.IsFinite(selection.RemainingYaw) ||
+            !HasMatchingDirection(selection.RemainingYaw, selection.Direction))
+        {
+            return false;
+        }
+
+        if (selection.YawSource == AlsYawSource.TurnInPlace)
+        {
+            if ((selection.NominalDegrees != 90 && selection.NominalDegrees != 180) ||
+                selection.ScaleAngle > 1 ||
+                selection.PreviousPhase >= selection.Duration ||
+                selection.CurrentPhase <= selection.PreviousPhase ||
+                selection.CurrentPhase > selection.Duration ||
+                !NearlyEqual(
+                    selection.PhaseTravel,
+                    (double)selection.CurrentPhase - selection.PreviousPhase) ||
+                !NearlyEqual(
+                    selection.PhaseTravel,
+                    (double)selection.PhasePlayRate * selection.EffectiveDeltaTime))
+            {
+                return false;
+            }
+
+            var expectedYawScale = (double)selection.PhasePlayRate;
+            if (selection.ScaleAngle == 1)
+            {
+                var nominalRadians = selection.NominalDegrees * (System.Math.PI / 180d);
+                expectedYawScale *= System.Math.Abs(selection.RemainingYaw) / nominalRadians;
+                expectedYawScale = System.Math.Clamp(
+                    expectedYawScale,
+                    MinimumTurnPlayRate,
+                    MaximumTurnPlayRate);
+            }
+
+            return NearlyEqual(selection.YawScale, expectedYawScale);
+        }
+
+        if (selection.YawSource != AlsYawSource.RotateInPlace ||
+            selection.NominalDegrees != 0 ||
+            selection.ScaleAngle != 0 ||
+            selection.BlendSeconds != 0f ||
+            selection.EffectiveDeltaTime != selection.DeltaTime ||
+            selection.PreviousPhase >= selection.Duration ||
+            selection.CurrentPhase >= selection.Duration ||
+            selection.PhaseTravel > selection.Duration)
+        {
+            return false;
+        }
+
+        var expectedCurrentPhase = WrapPhase(
+            (double)selection.PreviousPhase + selection.PhaseTravel,
+            selection.Duration);
+        return NearlyEqual(selection.CurrentPhase, expectedCurrentPhase) &&
+               NearlyEqual(
+                   selection.YawScale,
+                   (double)selection.PhaseTravel / selection.EffectiveDeltaTime);
+    }
+
+    private static bool HasMatchingDirection(float remainingYaw, sbyte direction) =>
+        (direction == -1 && remainingYaw < 0f) ||
+        (direction == 1 && remainingYaw > 0f);
+
+    private static bool NearlyEqual(float actual, double expected)
+    {
+        if (!double.IsFinite(expected) || expected < 0d || expected > float.MaxValue)
+        {
+            return false;
+        }
+
+        var roundedExpected = (float)expected;
+        if (actual == roundedExpected)
+        {
+            return true;
+        }
+
+        var actualBits = BitConverter.SingleToInt32Bits(actual);
+        var expectedBits = BitConverter.SingleToInt32Bits(roundedExpected);
+        return actualBits >= 0 && expectedBits >= 0 &&
+               System.Math.Abs((long)actualBits - expectedBits) <= 16L;
+    }
 
     private static AlsTurnClipSettings SelectTurnClip(
         in AlsTurnRotateSettings settings,
