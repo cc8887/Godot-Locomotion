@@ -3,6 +3,7 @@ using GodotAls.Core.Contracts;
 using GodotAls.Core.Events;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Pose;
 
 namespace GodotAls.Core.Tests;
 
@@ -47,6 +48,20 @@ public sealed class HotPathAllocationTests
         var resolved = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
 
         var allocated = MeasureExplicitEvaluate(input, resolved);
+
+        Assert.Equal(0, allocated);
+    }
+
+    [Fact]
+    public void ViewPoseEvaluateDoesNotAllocateAfterWarmup()
+    {
+        var input = P3TestInput.Grounded(
+            rotationMode: AlsRotationMode.Aiming,
+            characterYaw: 0.25f,
+            viewYaw: 0.4f,
+            aimYaw: 0.5f);
+
+        var allocated = MeasureViewPoseEvaluate(input);
 
         Assert.Equal(0, allocated);
     }
@@ -139,6 +154,34 @@ public sealed class HotPathAllocationTests
                 ref state,
                 ref result,
                 P3TestSettings.Reference);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static long MeasureViewPoseEvaluate(AlsFrameInput input)
+    {
+        var state = new AlsRuntimeState { Initialized = 1 };
+        var settings = AlsViewPoseSettings.CreateDefault();
+
+        for (var index = 0; index < 10_000; index++)
+        {
+            if (!AlsViewPoseModel.TryEvaluate(
+                    settings, input, state, out state, out _, out _))
+            {
+                throw new InvalidOperationException("View pose warmup failed.");
+            }
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 10_000; index++)
+        {
+            if (!AlsViewPoseModel.TryEvaluate(
+                    settings, input, state, out state, out _, out _))
+            {
+                throw new InvalidOperationException("View pose measurement failed.");
+            }
         }
 
         return GC.GetAllocatedBytesForCurrentThread() - before;

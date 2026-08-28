@@ -7,6 +7,10 @@ namespace GodotAls.Core.Contracts;
 public enum AlsP4ReasonCode : ushort
 {
     None = 0,
+    InvalidDeltaTime = 1,
+    NonFiniteInput = 2,
+    InvalidSettings = 3,
+    InvalidRotation = 4,
 }
 
 [StructLayout(LayoutKind.Sequential)]
