@@ -53,6 +53,8 @@ public partial class P4AnimationGraphSmoke : Node
 
         VerifyLibraryContract(definition, locomotionProfile, poseProfile);
         VerifyAuthoritativeActionPhase(definition, locomotionProfile, poseProfile, settings);
+        VerifyTurnBlend(definition, locomotionProfile, poseProfile, settings);
+        VerifyAimEndpoints(definition, locomotionProfile, poseProfile, settings);
         VerifyControllerAllocation(definition, locomotionProfile, poseProfile, settings);
 
         using var library = AlsAnimationLibraryBuilder.Build(
@@ -129,26 +131,31 @@ public partial class P4AnimationGraphSmoke : Node
 
             result.Identity = new AlsFrameIdentity(frame + 1, 0, 1);
             controller.Apply(in result, in p4, DeltaTime);
-            var actionPlayback = graph.Tree.Get(
+            var actionStateA = graph.Tree.Get(
                 slot < poseProfile.Turns.Length
-                    ? p4Handles.TurnPlaybackPath
-                    : p4Handles.RotatePlaybackPath).As<AnimationNodeStateMachinePlayback>()!;
+                    ? p4Handles.TurnBankACurrentStatePath
+                    : p4Handles.RotateBankACurrentStatePath).AsString();
+            var actionStateB = graph.Tree.Get(
+                slot < poseProfile.Turns.Length
+                    ? p4Handles.TurnBankBCurrentStatePath
+                    : p4Handles.RotateBankBCurrentStatePath).AsString();
             var hasBinding = slot < poseProfile.Turns.Length
                 ? p4Handles.TryGetTurnBinding(p4.ActiveTurnAnimationId, out var actionBinding)
                 : p4Handles.TryGetRotateBinding(p4.ActiveRotateAnimationId, out actionBinding);
             if (!hasBinding ||
-                actionPlayback.GetCurrentNode() != actionBinding.StateName ||
+                (!string.Equals(actionStateA, actionBinding.StateName.ToString(), StringComparison.Ordinal) &&
+                 !string.Equals(actionStateB, actionBinding.StateName.ToString(), StringComparison.Ordinal)) ||
                 controller.ActiveTurnAnimationId != p4.ActiveTurnAnimationId ||
                 controller.ActiveRotateAnimationId != p4.ActiveRotateAnimationId)
             {
                 throw new InvalidOperationException(
                     $"P4 controller did not select the requested exact ID: frame={frame} slot={slot} " +
-                    $"expectedState={actionBinding.StateName} actualState={actionPlayback.GetCurrentNode()} " +
+                    $"expectedState={actionBinding.StateName} actualStates={actionStateA}/{actionStateB} " +
                     $"expectedTurn={p4.ActiveTurnAnimationId} actualTurn={controller.ActiveTurnAnimationId} " +
                     $"expectedRotate={p4.ActiveRotateAnimationId} actualRotate={controller.ActiveRotateAnimationId} " +
                     $"baseState={basePlayback.GetCurrentNode()}");
             }
-            var expectedBaseState = slot < poseProfile.Turns.Length ? "P4Turn" : "P4Rotate";
+            const string expectedBaseState = "Grounded";
             if (!string.Equals(
                     basePlayback.GetCurrentNode().ToString(), expectedBaseState, StringComparison.Ordinal))
             {
@@ -253,6 +260,9 @@ public partial class P4AnimationGraphSmoke : Node
             turn.AnimationId, 1.7f, phaseSeconds, 0.5f, 0f, 0f, 0f);
 
         controller.Apply(in result, in p4, 0.0);
+        controller.Apply(in result, in p4, turn.BlendSeconds * 0.5);
+        controller.Apply(in result, in p4, turn.BlendSeconds * 0.5);
+        controller.Apply(in result, in p4, 0.0);
         var zeroDeltaPose = AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
 
         using var directLibrary = AlsAnimationLibraryBuilder.Build(
@@ -271,14 +281,14 @@ public partial class P4AnimationGraphSmoke : Node
         {
             var playback = graph.Tree.Get(
                 graph.Handles.TopPlaybackPath).As<AnimationNodeStateMachinePlayback>();
-            var actionPlayback = graph.Tree.Get(
-                graph.Handles.P4!.TurnPlaybackPath).As<AnimationNodeStateMachinePlayback>();
+            var actionState = $"{graph.Tree.Get(graph.Handles.P4!.TurnBankACurrentStatePath).AsString()}/" +
+                graph.Tree.Get(graph.Handles.P4.TurnBankBCurrentStatePath).AsString();
             throw new InvalidOperationException(
                 $"P4 TimeSeek phase differs from direct animation sampling at delta=0: " +
                 $"phase={phaseSeconds:R} duration={duration:R} rate=1.7 " +
                 $"graphPosition={playback?.GetCurrentPlayPosition():R} " +
                 $"directPosition={directLibrary.Player.CurrentAnimationPosition:R} " +
-                $"inner={actionPlayback?.GetCurrentNode()} " +
+                $"inner={actionState} " +
                 $"delta={DescribeFirstPoseDelta(directPose, zeroDeltaPose)}");
         }
 
@@ -318,25 +328,319 @@ public partial class P4AnimationGraphSmoke : Node
         using var controller = new AlsLocomotionAnimationController(graph, settings);
         controller.Warmup();
         var result = ValidResult();
-        var turn = poseProfile.Turns[0];
-        var phase = definition.Animations[turn.AnimationId].PlayLength * 0.5f;
-        var p4 = AlsP4AnimationInput.Turn(
-            turn.AnimationId, turn.BasePlayRate, phase, 0.5f, 0f, 1f, 0f);
+        var firstTurn = poseProfile.Turns[0];
+        var secondTurn = poseProfile.Turns[1];
+        var firstInput = AlsP4AnimationInput.Turn(
+            firstTurn.AnimationId,
+            firstTurn.BasePlayRate,
+            definition.Animations[firstTurn.AnimationId].PlayLength * 0.5f,
+            0.5f,
+            0f,
+            1f,
+            0f);
+        var secondInput = AlsP4AnimationInput.Turn(
+            secondTurn.AnimationId,
+            secondTurn.BasePlayRate,
+            definition.Animations[secondTurn.AnimationId].PlayLength * 0.5f,
+            0.5f,
+            0f,
+            1f,
+            0f);
         for (var index = 0; index < 64; index++)
         {
-            controller.Apply(in result, in p4, 0.0);
+            controller.Apply(in result, in firstInput, 0.0);
         }
+        controller.Apply(in result, in secondInput, 0.0);
 
         var allocationBefore = GC.GetAllocatedBytesForCurrentThread();
         for (var index = 0; index < 10_000; index++)
         {
-            controller.Apply(in result, in p4, 0.0);
+            controller.Apply(in result, in secondInput, 0.0);
         }
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocationBefore;
         if (allocated != 0)
         {
             throw new InvalidOperationException(
                 $"Steady P4 controller Apply allocated managed memory: {allocated} B");
+        }
+    }
+
+    private void VerifyTurnBlend(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionSettings settings)
+    {
+        using var graphLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(graphLibrary.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(
+            graphLibrary, locomotionProfile, poseProfile, definition);
+        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        controller.Warmup();
+        var result = ValidResult();
+        var disabled = AlsP4AnimationInput.Disabled;
+        controller.Apply(in result, in disabled, 0.0);
+        var basePose = AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
+        var first = poseProfile.Turns[3];
+        var second = poseProfile.Turns[6];
+        var firstPhase = definition.Animations[first.AnimationId].PlayLength * 0.75f;
+        var secondPhase = definition.Animations[second.AnimationId].PlayLength * 0.6f;
+        var firstInput = AlsP4AnimationInput.Turn(
+            first.AnimationId, 1.7f, firstPhase, 0.5f, 0f, 0f, 0f);
+        var secondInput = AlsP4AnimationInput.Turn(
+            second.AnimationId, 0.8f, secondPhase, 0.5f, 0f, 0f, 0f);
+
+        using var directLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(directLibrary.Root);
+        var firstDirect = SampleDirect(first.AnimationId, firstPhase);
+        var secondDirect = SampleDirect(second.AnimationId, secondPhase);
+
+        controller.Apply(in result, in firstInput, 0.0);
+        AssertSame(basePose, Capture(), "Turn entry t=0 did not preserve the base pose");
+        controller.Apply(in result, in firstInput, 0.1);
+        AssertIntermediate(basePose, firstDirect, Capture(), "Turn entry t=0.1");
+        controller.Apply(in result, in firstInput, 0.1);
+        AssertSame(firstDirect, Capture(), "Turn entry t=0.2 did not reach the direct target");
+
+        controller.Apply(in result, in secondInput, 0.0);
+        AssertSame(firstDirect, Capture(), "Turn switch t=0 did not preserve the source clip");
+        controller.Apply(in result, in secondInput, 0.1);
+        AssertIntermediate(firstDirect, secondDirect, Capture(), "Turn switch t=0.1");
+        controller.Apply(in result, in secondInput, 0.1);
+        AssertSame(secondDirect, Capture(), "Turn switch t=0.2 did not reach the direct target");
+
+        var rotate = poseProfile.Rotates[0];
+        var rotatePhase = definition.Animations[rotate.AnimationId].PlayLength * 0.4f;
+        var rotateInput = AlsP4AnimationInput.Rotate(
+            rotate.AnimationId, 1.1f, rotatePhase, 0.5f, 0f, 0f, 0f);
+        var rotateDirect = SampleDirect(rotate.AnimationId, rotatePhase);
+        controller.Apply(in result, in rotateInput, 0.0);
+        AssertSame(secondDirect, Capture(), "Turn to Rotate t=0 passed through base or popped");
+        controller.Apply(in result, in rotateInput, 0.04);
+        AssertIntermediate(secondDirect, rotateDirect, Capture(), "Turn to Rotate t=0.04");
+        controller.Apply(in result, in rotateInput, 0.04);
+        AssertSame(rotateDirect, Capture(), "Turn to Rotate t=0.08 did not reach Rotate");
+        controller.Apply(in result, in secondInput, 0.0);
+        AssertSame(rotateDirect, Capture(), "Rotate to Turn t=0 passed through base or popped");
+        controller.Apply(in result, in secondInput, 0.04);
+        AssertIntermediate(rotateDirect, secondDirect, Capture(), "Rotate to Turn t=0.04");
+        controller.Apply(in result, in secondInput, 0.04);
+        AssertSame(secondDirect, Capture(), "Rotate to Turn t=0.08 did not reach Turn");
+
+        controller.Apply(in result, in disabled, 0.0);
+        AssertSame(
+            secondDirect,
+            Capture(),
+            $"Turn exit t=0 did not preserve the source clip " +
+            $"actionBlend={graph.Tree.Get(graph.Handles.P4!.ActionBlendPath).AsSingle():R} " +
+            $"turnBlend={graph.Tree.Get(graph.Handles.P4.TurnBlendPath).AsSingle():R}");
+        controller.Apply(in result, in disabled, 0.1);
+        AssertIntermediate(secondDirect, basePose, Capture(), "Turn exit t=0.1");
+        controller.Apply(in result, in disabled, 0.1);
+        AssertSame(basePose, Capture(), "Turn exit t=0.2 did not reach the base pose");
+        if (controller.ManualAdvanceCount != 16)
+        {
+            throw new InvalidOperationException(
+                $"Turn blend gate advance mismatch: {controller.ManualAdvanceCount}");
+        }
+
+        AlsBonePose[] SampleDirect(int animationId, float phase)
+        {
+            if (!directLibrary.ClipNames.TryGetValue(animationId, out var clipName))
+            {
+                throw new InvalidOperationException(
+                    $"Turn blend direct fixture has no exact clip: {animationId}");
+            }
+            using var qualifiedName = new StringName($"als/{clipName}");
+            directLibrary.Player.Play(qualifiedName);
+            directLibrary.Player.Seek(phase, true);
+            directLibrary.Player.Advance(0.0);
+            return AlsPoseDigest.CapturePoses(directLibrary.Skeleton, PoseBoneNames);
+        }
+
+        AlsBonePose[] Capture() => AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
+        static void AssertSame(AlsBonePose[] expected, AlsBonePose[] actual, string message)
+        {
+            if (AlsPoseDigest.HasChanged(expected, actual))
+            {
+                for (var index = 0; index < expected.Length; index++)
+                {
+                    if (expected[index] != actual[index])
+                    {
+                        throw new InvalidOperationException(
+                            $"{message}: bone={PoseBoneNames[index]} " +
+                            $"expected={expected[index]} actual={actual[index]}");
+                    }
+                }
+                throw new InvalidOperationException(message);
+            }
+        }
+        static void AssertIntermediate(
+            AlsBonePose[] source,
+            AlsBonePose[] target,
+            AlsBonePose[] actual,
+            string label)
+        {
+            if (!AlsPoseDigest.HasChanged(source, actual) ||
+                !AlsPoseDigest.HasChanged(target, actual))
+            {
+                throw new InvalidOperationException($"{label} did not produce an intermediate pose.");
+            }
+        }
+    }
+
+    private void VerifyAimEndpoints(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionSettings settings)
+    {
+        using var graphLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(graphLibrary.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(
+            graphLibrary, locomotionProfile, poseProfile, definition);
+        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        controller.Warmup();
+        var result = ValidResult();
+        var turn = poseProfile.Turns[2];
+        var turnPhase = definition.Animations[turn.AnimationId].PlayLength * 0.5f;
+        var baseInput = AlsP4AnimationInput.Turn(
+            turn.AnimationId, 1f, turnPhase, 0f, 0f, 0f, 0f);
+        controller.Apply(in result, in baseInput, 0.0);
+        controller.Apply(in result, in baseInput, turn.BlendSeconds * 0.5);
+        controller.Apply(in result, in baseInput, turn.BlendSeconds * 0.5);
+
+        using var directLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(directLibrary.Root);
+        var directions = new[]
+        {
+            ("Down", poseProfile.Aim.DownAnimationId, 1f, 0f, 0f),
+            ("Forward", poseProfile.Aim.ForwardAnimationId, 0f, 1f, 0f),
+            ("Up", poseProfile.Aim.UpAnimationId, 0f, 0f, 1f),
+        };
+        foreach (var direction in directions)
+        {
+            var graphZero = SampleGraph(0f);
+            var graphHalf = SampleGraph(0.5f);
+            var graphNearOne = SampleGraph(MathF.BitDecrement(1f));
+            var graphOne = SampleGraph(1f);
+            var directZero = SampleDirect(0f);
+            var directHalf = SampleDirect(0.5f);
+            var directOne = SampleDirect(1f);
+            if (!AlsPoseDigest.HasChanged(graphZero, graphHalf) ||
+                !AlsPoseDigest.HasChanged(graphHalf, graphOne) ||
+                !AlsPoseDigest.HasChanged(graphZero, graphOne) ||
+                !AlsPoseDigest.HasChanged(directZero, directHalf) ||
+                !AlsPoseDigest.HasChanged(directHalf, directOne) ||
+                !AlsPoseDigest.HasChanged(directZero, directOne))
+            {
+                throw new InvalidOperationException(
+                    $"P4 Aim {direction.Item1} normalized 0/0.5/1 samples were not distinct.");
+            }
+            AssertDirectMotion(
+                direction.Item1, "0->0.5", graphZero, graphHalf, directZero, directHalf);
+            AssertDirectMotion(
+                direction.Item1, "0.5->1", graphHalf, graphOne, directHalf, directOne);
+            var endpointDistance = PoseDistance(graphNearOne, graphOne);
+            var halfDistance = PoseDistance(graphHalf, graphOne);
+            if (!double.IsFinite(endpointDistance) ||
+                endpointDistance > Math.Max(1e-5, halfDistance * 0.001))
+            {
+                throw new InvalidOperationException(
+                    $"P4 Aim {direction.Item1} was discontinuous at 1-epsilon/1: " +
+                    $"endpoint={endpointDistance:R} half={halfDistance:R}");
+            }
+
+            AlsBonePose[] SampleGraph(float phase)
+            {
+                var input = AlsP4AnimationInput.Turn(
+                    turn.AnimationId,
+                    1f,
+                    turnPhase,
+                    phase,
+                    direction.Item3,
+                    direction.Item4,
+                    direction.Item5);
+                controller.Apply(in result, in input, 0.0);
+                return AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
+            }
+
+            AlsBonePose[] SampleDirect(float phase)
+            {
+                if (!directLibrary.ClipNames.TryGetValue(direction.Item2, out var clipName))
+                {
+                    throw new InvalidOperationException(
+                        $"P4 Aim direct fixture is missing: {direction.Item2}");
+                }
+                using var qualifiedName = new StringName($"als/{clipName}");
+                directLibrary.Player.Play(qualifiedName);
+                directLibrary.Player.Seek(
+                    definition.Animations[direction.Item2].PlayLength * phase,
+                    true);
+                directLibrary.Player.Advance(0.0);
+                return AlsPoseDigest.CapturePoses(directLibrary.Skeleton, PoseBoneNames);
+            }
+        }
+
+        static double PoseDistance(AlsBonePose[] left, AlsBonePose[] right)
+        {
+            var distance = 0.0;
+            for (var index = 0; index < left.Length; index++)
+            {
+                distance += (left[index].Position - right[index].Position).Length();
+                distance += (left[index].Scale - right[index].Scale).Length();
+                distance += Math.Abs(left[index].Rotation.X - right[index].Rotation.X);
+                distance += Math.Abs(left[index].Rotation.Y - right[index].Rotation.Y);
+                distance += Math.Abs(left[index].Rotation.Z - right[index].Rotation.Z);
+                distance += Math.Abs(left[index].Rotation.W - right[index].Rotation.W);
+            }
+            return distance;
+        }
+
+        static void AssertDirectMotion(
+            string direction,
+            string interval,
+            AlsBonePose[] graphFrom,
+            AlsBonePose[] graphTo,
+            AlsBonePose[] directFrom,
+            AlsBonePose[] directTo)
+        {
+            for (var index = 0; index < graphFrom.Length; index++)
+            {
+                var graphPosition = (graphTo[index].Position - graphFrom[index].Position).Length();
+                var directPosition = (directTo[index].Position - directFrom[index].Position).Length();
+                var graphScale = (graphTo[index].Scale - graphFrom[index].Scale).Length();
+                var directScale = (directTo[index].Scale - directFrom[index].Scale).Length();
+                var graphRotation = RotationAngle(graphFrom[index].Rotation, graphTo[index].Rotation);
+                var directRotation = RotationAngle(directFrom[index].Rotation, directTo[index].Rotation);
+                if (!Near(graphPosition, directPosition) ||
+                    !Near(graphScale, directScale) ||
+                    !NearRotation(graphRotation, directRotation))
+                {
+                    throw new InvalidOperationException(
+                        $"P4 Aim {direction} {interval} did not match direct clip motion: " +
+                        $"bone={PoseBoneNames[index]} " +
+                        $"position={graphPosition:R}/{directPosition:R} " +
+                        $"scale={graphScale:R}/{directScale:R} " +
+                        $"rotation={graphRotation:R}/{directRotation:R}");
+                }
+            }
+
+            static bool Near(double left, double right) =>
+                Math.Abs(left - right) <= Math.Max(1e-5, Math.Max(left, right) * 1e-4);
+
+            static bool NearRotation(double left, double right) =>
+                Math.Abs(left - right) <= Math.Max(1e-3, Math.Max(left, right) * 1e-4);
+
+            static double RotationAngle(Quaternion left, Quaternion right)
+            {
+                var dot = Math.Clamp(Math.Abs(left.Dot(right)), 0f, 1f);
+                return 2.0 * Math.Acos(dot);
+            }
         }
     }
 
@@ -482,23 +786,12 @@ public partial class P4AnimationGraphSmoke : Node
     {
         var root = graph.Tree.TreeRoot as AnimationNodeBlendTree
             ?? throw new InvalidOperationException("P4 graph root is not the required layered BlendTree.");
-        foreach (var name in new[] { "Base", "P4AimDown", "P4AimForward", "P4AimUp" })
+        foreach (var name in new[] { "Base", "P4Turn", "P4Rotate", "P4AimDown", "P4AimForward", "P4AimUp" })
         {
             using var nodeName = new StringName(name);
             if (!root.HasNode(nodeName))
             {
                 throw new InvalidOperationException($"P4 graph node is missing: {name}");
-            }
-        }
-        using var baseName = new StringName("Base");
-        var baseStateMachine = root.GetNode(baseName) as AnimationNodeStateMachine
-            ?? throw new InvalidOperationException("P4 Base state machine is missing.");
-        foreach (var name in new[] { "P4Turn", "P4Rotate" })
-        {
-            using var nodeName = new StringName(name);
-            if (!baseStateMachine.HasNode(nodeName))
-            {
-                throw new InvalidOperationException($"P4 Base action node is missing: {name}");
             }
         }
     }
@@ -510,8 +803,6 @@ public partial class P4AnimationGraphSmoke : Node
         AlsAnimationSetDefinition definition)
     {
         var root = (AnimationNodeBlendTree)graph.Tree.TreeRoot;
-        using var baseName = new StringName("Base");
-        var baseStateMachine = (AnimationNodeStateMachine)root.GetNode(baseName);
         VerifyBank(graph.Handles.P4!.TurnStateName, profile.Turns.Select(value => value.AnimationId).ToArray());
         VerifyBank(graph.Handles.P4.RotateStateName, profile.Rotates.Select(value => value.AnimationId).ToArray());
         VerifyAim(graph.Handles.P4.AimDownStateName, profile.Aim.DownAnimationId);
@@ -541,28 +832,44 @@ public partial class P4AnimationGraphSmoke : Node
 
         void VerifyBank(StringName stateName, int[] animationIds)
         {
-            var branch = baseStateMachine.GetNode(stateName) as AnimationNodeStateMachine
+            var actionRoot = root.GetNode(stateName) as AnimationNodeBlendTree
                 ?? throw new InvalidOperationException($"P4 action branch is invalid: {stateName}");
-            for (var index = 0; index < animationIds.Length; index++)
+            foreach (var bankLabel in new[] { "BankA", "BankB" })
             {
-                var isTurn = stateName == graph.Handles.P4!.TurnStateName;
-                var found = isTurn
-                    ? graph.Handles.P4.TryGetTurnBinding(animationIds[index], out var binding)
-                    : graph.Handles.P4.TryGetRotateBinding(animationIds[index], out binding);
-                var clipBranch = found
-                    ? branch.GetNode(binding.StateName) as AnimationNodeBlendTree
-                    : null;
-                using var clipNodeName = new StringName("Clip");
-                var clip = clipBranch?.GetNode(clipNodeName) as AnimationNodeAnimation;
-                var animation = definition.Animations[animationIds[index]];
-                if (!found || clip is null || binding.Selection != index ||
-                    binding.DurationSeconds != animation.PlayLength ||
-                    clip.UseCustomTimeline || clip.StretchTimeScale ||
-                    !library.ClipNames.TryGetValue(animationIds[index], out var clipName) ||
-                    !string.Equals(clip.Animation.ToString(), $"als/{clipName}", StringComparison.Ordinal))
+                using var bankName = new StringName(bankLabel);
+                var branch = actionRoot.GetNode(bankName) as AnimationNodeBlendTree
+                    ?? throw new InvalidOperationException($"P4 action bank is missing: {stateName}/{bankLabel}");
+                using var selectorName = new StringName("Select");
+                var selector = branch.GetNode(selectorName) as AnimationNodeTransition
+                    ?? throw new InvalidOperationException($"P4 action selector is missing: {stateName}/{bankLabel}");
+                if (selector.InputCount != animationIds.Length || selector.XfadeTime != 0.0)
                 {
                     throw new InvalidOperationException(
-                        $"P4 selector is not exactly bound: {stateName}/{animationIds[index]}");
+                        $"P4 action selector contract mismatch: {stateName}/{bankLabel}");
+                }
+                for (var index = 0; index < animationIds.Length; index++)
+                {
+                    var isTurn = stateName == graph.Handles.P4!.TurnStateName;
+                    var found = isTurn
+                        ? graph.Handles.P4.TryGetTurnBinding(animationIds[index], out var binding)
+                        : graph.Handles.P4.TryGetRotateBinding(animationIds[index], out binding);
+                    var clipBranch = found
+                        ? branch.GetNode(binding.StateName) as AnimationNodeBlendTree
+                        : null;
+                    using var clipNodeName = new StringName("Clip");
+                    var clip = clipBranch?.GetNode(clipNodeName) as AnimationNodeAnimation;
+                    var animation = definition.Animations[animationIds[index]];
+                    if (!found || clip is null || binding.Selection != index ||
+                        !string.Equals(selector.GetInputName(index), binding.StateName.ToString(), StringComparison.Ordinal) ||
+                        binding.DurationSeconds != animation.PlayLength ||
+                        (isTurn && binding.BlendSeconds != profile.Turns[index].BlendSeconds) ||
+                        clip.UseCustomTimeline || clip.StretchTimeScale ||
+                        !library.ClipNames.TryGetValue(animationIds[index], out var clipName) ||
+                        !string.Equals(clip.Animation.ToString(), $"als/{clipName}", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException(
+                            $"P4 selector is not exactly bound: {stateName}/{bankLabel}/{animationIds[index]}");
+                    }
                 }
             }
         }
@@ -587,7 +894,9 @@ public partial class P4AnimationGraphSmoke : Node
                 !string.Equals(clip.Animation.ToString(), $"als/{clipName}", StringComparison.Ordinal) ||
                 !string.Equals(baseClip.Animation.ToString(), $"als/{baseClipName}", StringComparison.Ordinal) ||
                 !clip.UseCustomTimeline || clip.TimelineLength != 1.0 || !clip.StretchTimeScale ||
-                !baseClip.UseCustomTimeline || baseClip.TimelineLength != 1.0 || !baseClip.StretchTimeScale)
+                !baseClip.UseCustomTimeline || baseClip.TimelineLength != 1.0 || !baseClip.StretchTimeScale ||
+                clip.LoopMode != Godot.Animation.LoopModeEnum.None ||
+                baseClip.LoopMode != Godot.Animation.LoopModeEnum.None)
             {
                 throw new InvalidOperationException($"P4 Aim clip is not exactly bound: {stateName}");
             }
@@ -648,8 +957,10 @@ public partial class P4AnimationGraphSmoke : Node
         var previousTurnId = controller.ActiveTurnAnimationId;
         var previousRotateId = controller.ActiveRotateAnimationId;
         var p4Handles = graph.Handles.P4!;
-        var previousRotateState = graph.Tree.Get(
-            p4Handles.RotatePlaybackPath).As<AnimationNodeStateMachinePlayback>()!.GetCurrentNode();
+        var previousRotateStateA = graph.Tree.Get(
+            p4Handles.RotateBankACurrentStatePath).AsString();
+        var previousRotateStateB = graph.Tree.Get(
+            p4Handles.RotateBankBCurrentStatePath).AsString();
         var previousAimWeight = GetTreeValue(p4Handles.AimForwardWeightPath);
         p4Handles.TryGetTurnBinding(poseProfile.Turns[0].AnimationId, out var turnBinding);
         p4Handles.TryGetRotateBinding(poseProfile.Rotates[0].AnimationId, out var rotateBinding);
@@ -690,8 +1001,14 @@ public partial class P4AnimationGraphSmoke : Node
             if (controller.ManualAdvanceCount != before ||
                 controller.ActiveTurnAnimationId != previousTurnId ||
                 controller.ActiveRotateAnimationId != previousRotateId ||
-                graph.Tree.Get(p4Handles.RotatePlaybackPath)
-                    .As<AnimationNodeStateMachinePlayback>()!.GetCurrentNode() != previousRotateState ||
+                !string.Equals(
+                    graph.Tree.Get(p4Handles.RotateBankACurrentStatePath).AsString(),
+                    previousRotateStateA,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    graph.Tree.Get(p4Handles.RotateBankBCurrentStatePath).AsString(),
+                    previousRotateStateB,
+                    StringComparison.Ordinal) ||
                 GetTreeValue(p4Handles.AimForwardWeightPath) != previousAimWeight)
             {
                 throw new InvalidOperationException("Malformed P4 input partially changed controller state.");
