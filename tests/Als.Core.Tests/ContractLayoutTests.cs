@@ -81,7 +81,40 @@ public sealed class ContractLayoutTests
         AssertFieldOrder<AlsFootHit>(
             "Valid", "Walkable", "Position", "Normal", "PlatformId", "PlatformPosition",
             "PlatformRotation", "ColliderId", "PointVelocity");
+        AssertFieldOrder<AlsFloorSample>(
+            "IsGrounded", "Normal", "PlatformId", "PlatformTransform",
+            "PlatformAngularVelocity", "ColliderId");
         AssertFieldOrder<AlsFootPoseOutput>("Position", "Rotation", "LockAmount", "PlatformId");
+    }
+
+    [Fact]
+    public void FloorSamplePreservesLegacyArityAndExposesFullColliderIdentity()
+    {
+        var legacy = new AlsFloorSample(
+            1,
+            Vector3.UnitY,
+            7,
+            Matrix4x4.Identity,
+            new Vector3(0f, 0.5f, 0f));
+        var (grounded, normal, platformId, platformTransform, angularVelocity) = legacy;
+
+        Assert.Equal((byte)1, grounded);
+        Assert.Equal(Vector3.UnitY, normal);
+        Assert.Equal(7, platformId);
+        Assert.Equal(Matrix4x4.Identity, platformTransform);
+        Assert.Equal(new Vector3(0f, 0.5f, 0f), angularVelocity);
+        Assert.Equal(-1L, legacy.ColliderId);
+
+        var current = new AlsFloorSample(
+            1,
+            Vector3.UnitY,
+            7,
+            Matrix4x4.Identity,
+            new Vector3(0f, 0.5f, 0f),
+            0x00000001_00000002L);
+        var (_, _, _, _, _, colliderId) = current;
+
+        Assert.Equal(0x00000001_00000002L, colliderId);
     }
 
     [Fact]
@@ -185,6 +218,7 @@ public sealed class ContractLayoutTests
     {
         var input = AlsFrameInput.CreateDefault(new AlsFrameIdentity(0, 0, 1), 1f / 60f);
 
+        Assert.Equal(-1L, input.Floor.ColliderId);
         Assert.Equal((byte)0, input.LeftFootHit.Valid);
         Assert.Equal((byte)0, input.LeftFootHit.Walkable);
         Assert.Equal(-1, input.LeftFootHit.PlatformId);

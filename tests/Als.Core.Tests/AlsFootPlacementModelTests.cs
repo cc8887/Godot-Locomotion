@@ -174,6 +174,78 @@ public sealed class AlsFootPlacementModelTests
         Assert.Equal((byte)2, released.LeftFootLock.Locked);
     }
 
+    [Theory]
+    [InlineData(42)]
+    [InlineData(-1)]
+    public void FloorFullColliderIdentityMustMatchBeforeLockAcquisition(int platformId)
+    {
+        const long hitColliderId = 0x00000001_00000002L;
+        const long floorColliderId = 0x00000002_00000001L;
+        var hit = Hit(platformId: platformId, colliderId: hitColliderId);
+        var input = Input(hit) with
+        {
+            Floor = Floor(1, platformId, floorColliderId),
+        };
+
+        Assert.True(Evaluate(input, 1f, 0f, 1f, 0f, State(),
+            out var next, out _, out var reason));
+
+        Assert.Equal(AlsP4ReasonCode.None, reason);
+        Assert.Equal((byte)0, next.LeftFootLock.Locked);
+    }
+
+    [Theory]
+    [InlineData(42)]
+    [InlineData(-1)]
+    public void FloorFullColliderIdentityChangeReleasesHeldLock(int platformId)
+    {
+        const long initialColliderId = 0x00000001_00000002L;
+        const long replacementColliderId = 0x00000002_00000001L;
+        var hit = Hit(platformId: platformId, colliderId: initialColliderId);
+        var initialInput = Input(hit) with
+        {
+            Floor = Floor(1, platformId, initialColliderId),
+        };
+        Assert.True(Evaluate(initialInput, 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+        var replacementInput = initialInput with
+        {
+            Floor = Floor(1, platformId, replacementColliderId),
+        };
+
+        Assert.True(Evaluate(replacementInput, 1f, 0f, 1f, 0f, locked,
+            out var released, out var output, out var reason));
+
+        Assert.Equal(AlsP4ReasonCode.None, reason);
+        Assert.Equal(AlsFootReleaseReason.BaseChanged, output.LeftReleaseReason);
+        Assert.Equal((byte)2, released.LeftFootLock.Locked);
+    }
+
+    [Theory]
+    [InlineData(42)]
+    [InlineData(-1)]
+    public void LegacyFloorWithoutFullIdentityPreservesCompactAcquireAndHold(int platformId)
+    {
+        var hit = Hit(platformId: platformId, colliderId: 100);
+        var legacyFloor = new AlsFloorSample(
+            1,
+            Vector3.UnitY,
+            platformId,
+            Matrix4x4.Identity,
+            Vector3.Zero);
+        var input = Input(hit) with { Floor = legacyFloor };
+
+        Assert.True(Evaluate(input, 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+        Assert.Equal((byte)1, locked.LeftFootLock.Locked);
+        Assert.True(Evaluate(input, 1f, 0f, 1f, 0f, locked,
+            out var held, out var output, out var reason));
+
+        Assert.Equal(AlsP4ReasonCode.None, reason);
+        Assert.Equal(AlsFootReleaseReason.None, output.LeftReleaseReason);
+        Assert.Equal((byte)1, held.LeftFootLock.Locked);
+    }
+
     [Fact]
     public void WorldLockReleasesWhenCharacterProvenanceTeleports()
     {
@@ -1269,18 +1341,25 @@ public sealed class AlsFootPlacementModelTests
             new AlsFrameIdentity(1, 0, 1), deltaTime) with
         {
             CharacterTransform = Matrix4x4.Identity,
-            Floor = Floor(1, left.PlatformId),
+            Floor = Floor(
+                1,
+                left.PlatformId,
+                left.ColliderId >= 0 ? left.ColliderId : 100),
             LeftFootHit = left,
             RightFootHit = right ?? AlsFootHit.Invalid,
             CurrentDriveMode = AlsDriveMode.MotorDriven,
         };
 
-    private static AlsFloorSample Floor(byte grounded, int platformId) => new(
+    private static AlsFloorSample Floor(
+        byte grounded,
+        int platformId,
+        long colliderId = 100) => new(
         grounded,
         Vector3.UnitY,
         platformId,
         Matrix4x4.Identity,
-        Vector3.Zero);
+        Vector3.Zero,
+        colliderId);
 
     private static AlsFootHit Hit(
         byte valid = 1,

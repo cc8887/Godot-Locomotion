@@ -20,8 +20,11 @@ public partial class P4FootGatherSmoke : Node
     private StaticBody3D _seamStatic = null!;
     private AnimatableBody3D _seamPlatform = null!;
     private static readonly Vector3 SeamPlatformVelocity = new(0.7f, 0f, 0.15f);
+    private AlsCharacterMotor _manyContactMotor = null!;
+    private AnimatableBody3D _manyContactPlatform = null!;
     private AlsCharacterMotor _stationaryTransitionMotor = null!;
     private AnimatableBody3D _stationaryPlatform = null!;
+    private RightCommandSource _stationaryTransitionSource = null!;
     private int _stage;
     private bool _finished;
 
@@ -94,6 +97,30 @@ public partial class P4FootGatherSmoke : Node
             AddChild(_seamMotor);
             _seamMotor.Configure(CreateMotorSettings(), new IdleCommandSource());
 
+            var manyContactStatic = CreateSeamBody<StaticBody3D>(
+                "ManyContactStatic",
+                new Vector3(29f, -0.1f, 0f));
+            for (var index = 0; index < 5; index++)
+            {
+                manyContactStatic.AddChild(new CollisionShape3D
+                {
+                    Name = $"ManyContactStaticShape{index}",
+                    Shape = new BoxShape3D { Size = new Vector3(2.4f, 0.2f, 4f) },
+                });
+            }
+            AddChild(manyContactStatic);
+            _manyContactPlatform = CreateSeamBody<AnimatableBody3D>(
+                "ManyContactPlatform",
+                new Vector3(31f, -0.1f, 0f));
+            AddChild(_manyContactPlatform);
+            _manyContactMotor = new AlsCharacterMotor
+            {
+                Name = "ManyContactMotor",
+                Position = new Vector3(30f, 0.9f, 0f),
+            };
+            AddChild(_manyContactMotor);
+            _manyContactMotor.Configure(CreateMotorSettings(), new IdleCommandSource());
+
             var transitionStatic = CreateSeamBody<StaticBody3D>(
                 "TransitionStatic",
                 new Vector3(19f, -0.1f, 0f));
@@ -108,9 +135,10 @@ public partial class P4FootGatherSmoke : Node
                 Position = new Vector3(19.3f, 0.9f, 0f),
             };
             AddChild(_stationaryTransitionMotor);
+            _stationaryTransitionSource = new RightCommandSource();
             _stationaryTransitionMotor.Configure(
                 CreateMotorSettings(),
-                new RightCommandSource());
+                _stationaryTransitionSource);
 
             _motor = new AlsCharacterMotor
             {
@@ -207,7 +235,8 @@ public partial class P4FootGatherSmoke : Node
             "motor/input frame N+1 was delayed by environment feedback");
         ValidateHit(input.LeftFootHit, LeftLocalOrigin, expectedPlatformTransform);
         ValidateHit(input.RightFootHit, RightLocalOrigin, expectedPlatformTransform);
-        Require(input.Floor.PlatformId == input.LeftFootHit.PlatformId,
+        Require(input.Floor.PlatformId == input.LeftFootHit.PlatformId &&
+                input.Floor.ColliderId == checked((long)_platform.GetInstanceId()),
             "Gather did not publish current foot-platform identity into the floor evidence");
         Require(_motor.LastFootGatherManagedAllocations > 0,
             "Godot IntersectRay Dictionary allocation was incorrectly reported as zero bytes");
@@ -240,7 +269,8 @@ public partial class P4FootGatherSmoke : Node
                 splitEvidence.RightFootHit.ColliderId == checked((long)_staticWorld.GetInstanceId()),
             "ordinary static world was misclassified as a moving platform");
         Require(splitEvidence.Floor.PlatformId ==
-                AlsCharacterMotor.CreatePlatformId(_platform.GetInstanceId()),
+                AlsCharacterMotor.CreatePlatformId(_platform.GetInstanceId()) &&
+                splitEvidence.Floor.ColliderId == checked((long)_platform.GetInstanceId()),
             "floor evidence followed foot probes instead of the authoritative movement base");
 
         var rigidProbe = AlsFrameResult.CreateDefault(new AlsFrameIdentity(3, 0, 1));
@@ -327,17 +357,29 @@ public partial class P4FootGatherSmoke : Node
                 input.Floor.IsGrounded == 1,
             "stationary platform transition fixture did not cross the static/platform boundary");
         Require(input.Floor.PlatformId ==
-                AlsCharacterMotor.CreatePlatformId(_stationaryPlatform.GetInstanceId()),
+                AlsCharacterMotor.CreatePlatformId(_stationaryPlatform.GetInstanceId()) &&
+                input.Floor.ColliderId == checked((long)_stationaryPlatform.GetInstanceId()),
             "stationary Animatable platform was hidden by stale static-floor evidence");
+        _stationaryTransitionSource.Enabled = false;
+        input = _stationaryTransitionMotor.Step(61, 2, 1, checked((float)delta));
+        Require(input.Floor.PlatformId ==
+                AlsCharacterMotor.CreatePlatformId(_stationaryPlatform.GetInstanceId()) &&
+                input.Floor.ColliderId == checked((long)_stationaryPlatform.GetInstanceId()),
+            "stationary Animatable platform identity was lost after entering steady state");
+        Require(_stationaryTransitionMotor.LastFootGatherManagedAllocations > 0,
+            "Godot GetSlideCollision wrapper allocation was incorrectly reported as zero bytes");
+        GD.Print(
+            "P4_FOOT_GATHER_SLIDE_ALLOC bytes=" +
+            _stationaryTransitionMotor.LastFootGatherManagedAllocations);
     }
 
     private void ValidateSeamMovementBase(double delta)
     {
         var input = _seamMotor.Step(1, 1, 1, checked((float)delta));
-        Require(_seamMotor.GetPlatformVelocity().DistanceTo(SeamPlatformVelocity) < 0.0001f,
-            "seam fixture did not make the moving body CharacterBody's actual platform");
         var sawStatic = false;
         var sawMoving = false;
+        var slideContactCount = 0;
+        var movingContactIndex = -1;
         for (var slideIndex = 0; slideIndex < _seamMotor.GetSlideCollisionCount(); slideIndex++)
         {
             var collision = _seamMotor.GetSlideCollision(slideIndex);
@@ -347,14 +389,90 @@ public partial class P4FootGatherSmoke : Node
             {
                 var collider = collision.GetCollider(collisionIndex);
                 sawStatic |= collider == _seamStatic;
-                sawMoving |= collider == _seamPlatform;
+                if (collider == _seamPlatform)
+                {
+                    sawMoving = true;
+                    movingContactIndex = slideContactCount;
+                }
+                slideContactCount++;
             }
         }
-        Require(sawStatic && sawMoving,
-            "seam fixture did not expose both equal-normal floor candidates");
+        using var supportProbe = new KinematicCollision3D();
+        Require(_manyContactMotor.TestMove(
+                _manyContactMotor.GlobalTransform,
+                Vector3.Down * _manyContactMotor.FloorSnapLength,
+                supportProbe,
+                _manyContactMotor.SafeMargin,
+                recoveryAsCollision: true,
+                maxCollisions: 4),
+            "four-contact control probe did not find floor support candidates");
+        var limitedProbeCount = supportProbe.GetCollisionCount();
+        var limitedPlatformIndex = FindColliderIndex(supportProbe, _manyContactPlatform);
+        Require(limitedProbeCount == 4 && limitedPlatformIndex < 0,
+            "old four-contact production limit did not reproduce candidate truncation: " +
+            $"count={limitedProbeCount} platform_index={limitedPlatformIndex}");
+
+        Require(AlsCharacterMotor.MaximumFloorSupportCollisions >= 7,
+            "production floor support capacity cannot observe the seventh candidate");
+        Require(_manyContactMotor.TestMove(
+                _manyContactMotor.GlobalTransform,
+                Vector3.Down * _manyContactMotor.FloorSnapLength,
+                supportProbe,
+                _manyContactMotor.SafeMargin,
+                recoveryAsCollision: true,
+                maxCollisions: AlsCharacterMotor.MaximumFloorSupportCollisions),
+            "many-contact seam probe did not find floor support candidates");
+        var platformCandidateIndex = FindColliderIndex(supportProbe, _manyContactPlatform);
+        Require(supportProbe.GetCollisionCount() > 4 && platformCandidateIndex >= 4,
+            "many-contact seam did not place the actual platform beyond the first four " +
+            $"candidates: count={supportProbe.GetCollisionCount()} " +
+            $"platform_index={platformCandidateIndex}");
+        Require(_manyContactMotor.TryFindFloorColliderInSupportProbe(
+                supportProbe,
+                Vector3.Up,
+                Vector3.Zero,
+                Vector3.Zero,
+                out var selectedSupport) && selectedSupport == _manyContactPlatform,
+            "production TestMove candidate selection did not consume the platform beyond " +
+            $"the first four candidates: count={supportProbe.GetCollisionCount()} " +
+            $"platform_index={platformCandidateIndex}");
+        Require(sawStatic && sawMoving && movingContactIndex >= 0,
+            "seam fixture did not expose both actual floor collisions: " +
+            $"static={sawStatic} moving={sawMoving} count={supportProbe.GetCollisionCount()} " +
+            $"platform_index={platformCandidateIndex}");
+        Require(_seamMotor.GetPlatformVelocity().DistanceTo(SeamPlatformVelocity) < 0.0001f,
+            "seam fixture did not make the moving body CharacterBody's actual platform: " +
+            $"actual={_seamMotor.GetPlatformVelocity()} count={supportProbe.GetCollisionCount()} " +
+            $"platform_index={platformCandidateIndex}");
         Require(input.Floor.PlatformId ==
-                AlsCharacterMotor.CreatePlatformId(_seamPlatform.GetInstanceId()),
+                AlsCharacterMotor.CreatePlatformId(_seamPlatform.GetInstanceId()) &&
+                input.Floor.ColliderId == checked((long)_seamPlatform.GetInstanceId()),
             "floor seam selection did not follow CharacterBody's actual moving platform");
+        Require(_seamMotor.LastFloorSelectionUsedSlideEvidence,
+            "floor seam selection ignored this frame's MoveAndSlide collision evidence");
+        GD.Print(
+            $"P4_FOOT_GATHER_MANY_CONTACT_OK slide_count={slideContactCount} " +
+            $"actual_moving_index={movingContactIndex} " +
+            $"limited_probe_count={limitedProbeCount} " +
+            $"limited_platform_index={limitedPlatformIndex} " +
+            $"probe_count={supportProbe.GetCollisionCount()} " +
+            $"probe_platform_index={platformCandidateIndex}");
+    }
+
+    private static int FindColliderIndex(
+        KinematicCollision3D collision,
+        CollisionObject3D expectedCollider)
+    {
+        for (var collisionIndex = 0;
+             collisionIndex < collision.GetCollisionCount();
+             collisionIndex++)
+        {
+            if (collision.GetCollider(collisionIndex) == expectedCollider)
+            {
+                return collisionIndex;
+            }
+        }
+        return -1;
     }
 
     private static T CreateSeamBody<T>(string name, in Vector3 position)
@@ -481,6 +599,13 @@ public partial class P4FootGatherSmoke : Node
                     $"Main Gather/Commit source accessed Worker-owned token {token}");
             }
         }
+
+        var motorSource = File.ReadAllText(ProjectSettings.GlobalizePath(mainOnlyFiles[0]));
+        Require(!motorSource.Contains("maxCollisions: 4", StringComparison.Ordinal) &&
+                motorSource.Split(
+                    "maxCollisions: MaximumFloorSupportCollisions",
+                    StringSplitOptions.None).Length - 1 == 2,
+            "floor support and initial-floor probes do not share the 32-contact capacity");
     }
 
     private void Fail(string code, Exception exception)
@@ -510,8 +635,12 @@ public partial class P4FootGatherSmoke : Node
 
     private sealed class RightCommandSource : IAlsLocomotionCommandSource
     {
+        public bool Enabled { get; set; } = true;
+
         public AlsLocomotionCommand GetCommand(long frameId) =>
-            AlsLocomotionCommand.CreateDefault() with
+            !Enabled
+                ? AlsLocomotionCommand.CreateDefault()
+                : AlsLocomotionCommand.CreateDefault() with
             {
                 MovementAxes = NumericsVector2.UnitX,
                 RequestedGait = AlsGait.Walking,

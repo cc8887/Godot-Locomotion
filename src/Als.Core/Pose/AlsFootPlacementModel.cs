@@ -67,6 +67,7 @@ public static class AlsFootPlacementModel
             !IsCurve(rightLockCurve) ||
             input.Floor.IsGrounded > 1 ||
             input.Floor.PlatformId < -1 ||
+            input.Floor.ColliderId < -1 ||
             (uint)input.CurrentDriveMode > (uint)AlsDriveMode.RecoveryBlend ||
             (uint)currentState.LocomotionState > (uint)AlsLocomotionState.Recovering)
         {
@@ -231,6 +232,7 @@ public static class AlsFootPlacementModel
                 grounded,
                 motorDriven,
                 input.Floor.PlatformId,
+                input.Floor.ColliderId,
                 leftIkWeight,
                 leftLockCurve,
                 input.DeltaTime,
@@ -251,6 +253,7 @@ public static class AlsFootPlacementModel
                 grounded,
                 motorDriven,
                 input.Floor.PlatformId,
+                input.Floor.ColliderId,
                 rightIkWeight,
                 rightLockCurve,
                 input.DeltaTime,
@@ -393,6 +396,7 @@ public static class AlsFootPlacementModel
         bool grounded,
         bool motorDriven,
         int floorPlatformId,
+        long floorColliderId,
         float ikWeight,
         float lockCurve,
         float deltaTime,
@@ -431,6 +435,7 @@ public static class AlsFootPlacementModel
         {
             if (grounded && motorDriven && usableHit &&
                 hit.PlatformId == floorPlatformId &&
+                (floorColliderId < 0 || hit.ColliderId == floorColliderId) &&
                 ikWeight > settings.LockWeightEpsilon &&
                 lockCurve > settings.LockWeightEpsilon &&
                 !forceOverextended)
@@ -459,6 +464,7 @@ public static class AlsFootPlacementModel
                 grounded,
                 motorDriven,
                 floorPlatformId,
+                floorColliderId,
                 ikWeight,
                 lockCurve,
                 forceOverextended);
@@ -643,6 +649,7 @@ public static class AlsFootPlacementModel
         bool grounded,
         bool motorDriven,
         int floorPlatformId,
+        long floorColliderId,
         float ikWeight,
         float lockCurve,
         bool overextendedHit)
@@ -665,7 +672,9 @@ public static class AlsFootPlacementModel
 
         if (current.PlatformId >= 0)
         {
-            if (floorPlatformId >= 0 && floorPlatformId != current.PlatformId)
+            if (floorPlatformId >= 0 &&
+                (floorPlatformId != current.PlatformId ||
+                 (floorColliderId >= 0 && floorColliderId != current.ColliderId)))
             {
                 return AlsFootReleaseReason.BaseChanged;
             }
@@ -703,6 +712,11 @@ public static class AlsFootPlacementModel
         else
         {
             if (floorPlatformId >= 0)
+            {
+                return AlsFootReleaseReason.BaseChanged;
+            }
+
+            if (floorColliderId >= 0 && floorColliderId != current.ColliderId)
             {
                 return AlsFootReleaseReason.BaseChanged;
             }

@@ -9,7 +9,39 @@ public readonly record struct AlsFloorSample(
     Vector3 Normal,
     int PlatformId,
     Matrix4x4 PlatformTransform,
-    Vector3 PlatformAngularVelocity);
+    Vector3 PlatformAngularVelocity,
+    long ColliderId)
+{
+    public AlsFloorSample(
+        byte IsGrounded,
+        Vector3 Normal,
+        int PlatformId,
+        Matrix4x4 PlatformTransform,
+        Vector3 PlatformAngularVelocity)
+        : this(
+            IsGrounded,
+            Normal,
+            PlatformId,
+            PlatformTransform,
+            PlatformAngularVelocity,
+            -1)
+    {
+    }
+
+    public void Deconstruct(
+        out byte IsGrounded,
+        out Vector3 Normal,
+        out int PlatformId,
+        out Matrix4x4 PlatformTransform,
+        out Vector3 PlatformAngularVelocity)
+    {
+        IsGrounded = this.IsGrounded;
+        Normal = this.Normal;
+        PlatformId = this.PlatformId;
+        PlatformTransform = this.PlatformTransform;
+        PlatformAngularVelocity = this.PlatformAngularVelocity;
+    }
+}
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsFootHit(

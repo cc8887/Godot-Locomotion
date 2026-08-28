@@ -77,6 +77,10 @@ public sealed class AlsP3aHarnessContext
 
     public long GatherMotorAllocations;
 
+    public long FootGatherAllocations;
+
+    public long RawGatherMotorAllocations;
+
     public long FirstGatherAllocationFrame;
 
     public long ModelAllocations;

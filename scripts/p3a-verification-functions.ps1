@@ -113,7 +113,7 @@ function ConvertFrom-P3aHarnessOutput
         throw "Expected exactly one P3A marker line; observed $($markerLines.Count)."
     }
 
-    $pattern = '\AGODOT_ALS_P3A_OK mode=(single|parallel) characters=(1|10) warmup=120 frames=600 digest=([0-9A-F]{16}) missing=(\d+) stale=(\d+) generation=(\d+) off_main=(\d+) lag=(\d+) allocations=(\d+)\z'
+    $pattern = '\AGODOT_ALS_P3A_OK mode=(single|parallel) characters=(1|10) warmup=120 frames=600 digest=([0-9A-F]{16}) missing=(\d+) stale=(\d+) generation=(\d+) off_main=(\d+) lag=(\d+) allocations=(\d+) foot_gather=(\d+) total_managed_allocations=(\d+)\z'
     $match = [regex]::Match($markerLines[0], $pattern)
     if (-not $match.Success)
     {
@@ -134,6 +134,15 @@ function ConvertFrom-P3aHarnessOutput
         throw "P3A digest baseline mismatch for characters=${ExpectedCharacterCount}: expected=$expectedDigest, observed=$digest."
     }
 
+    $allocations = [long]$match.Groups[9].Value
+    $footGather = [long]$match.Groups[10].Value
+    $totalManagedAllocations = [long]$match.Groups[11].Value
+    if ($allocations -ne 0 -or $footGather -le 0 -or
+        $totalManagedAllocations -ne $allocations + $footGather)
+    {
+        throw "P3A allocation accounting is invalid: allocations=$allocations foot_gather=$footGather total_managed_allocations=$totalManagedAllocations."
+    }
+
     [pscustomobject]@{
         Mode = $mode
         Characters = $characters
@@ -143,7 +152,9 @@ function ConvertFrom-P3aHarnessOutput
         Generation = [long]$match.Groups[6].Value
         OffMain = [long]$match.Groups[7].Value
         Lag = [long]$match.Groups[8].Value
-        Allocations = [long]$match.Groups[9].Value
+        Allocations = $allocations
+        FootGather = $footGather
+        TotalManagedAllocations = $totalManagedAllocations
     }
 }
 

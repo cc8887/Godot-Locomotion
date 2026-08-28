@@ -9,6 +9,8 @@ namespace GodotAls.Locomotion;
 
 public partial class AlsCharacterMotor : CharacterBody3D
 {
+    internal const int MaximumFloorSupportCollisions = 32;
+
     private const float ClearanceMargin = 0.002f;
     private static readonly StringName ColliderKey = "collider";
     private static readonly StringName NormalKey = "normal";
@@ -41,6 +43,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
     internal Vector3 LastRightFootQueryWorldOrigin { get; private set; }
 
     internal bool LastFootGatherConsumed { get; private set; }
+
+    internal bool LastFloorSelectionUsedSlideEvidence { get; private set; }
 
     public AlsCharacterMotor()
     {
@@ -760,6 +764,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     private AlsFloorSample CreateFloorSample(bool grounded)
     {
+        LastFloorSelectionUsedSlideEvidence = false;
         if (!grounded)
         {
             return new AlsFloorSample(
@@ -771,16 +776,35 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
 
         var floorNormal = GetFloorNormal();
-        if (TryFindFloorCollider(floorNormal, out var floorCollider) &&
-            IsMovingPlatform(floorCollider))
+        if (TryFindFloorCollider(floorNormal, out var floorCollider))
         {
+            var colliderId = floorCollider.GetInstanceId();
+            if (colliderId > long.MaxValue)
+            {
+                return new AlsFloorSample(
+                    1,
+                    ToNumerics(floorNormal),
+                    -1,
+                    NumericsMatrix4x4.Identity,
+                    NumericsVector3.Zero);
+            }
+            var fullColliderId = checked((long)colliderId);
+            if (!IsMovingPlatform(floorCollider))
+            {
+                return new AlsFloorSample(
+                    1,
+                    ToNumerics(floorNormal),
+                    -1,
+                    NumericsMatrix4x4.Identity,
+                    NumericsVector3.Zero,
+                    fullColliderId);
+            }
+
             var platformTransform = floorCollider.GlobalTransform;
             var platformBasis = platformTransform.Basis.Orthonormalized();
             var platformRotation = platformBasis.GetRotationQuaternion().Normalized();
             var angularVelocity = ToNumerics(GetPlatformAngularVelocity());
-            var colliderId = floorCollider.GetInstanceId();
-            if (colliderId <= long.MaxValue &&
-                IsFinite(platformTransform.Origin) &&
+            if (IsFinite(platformTransform.Origin) &&
                 IsFinite(platformBasis) && IsFinite(platformRotation) &&
                 IsFinite(angularVelocity))
             {
@@ -796,7 +820,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
                     ToNumerics(floorNormal),
                     CreatePlatformId(colliderId),
                     transform,
-                    angularVelocity);
+                    angularVelocity,
+                    fullColliderId);
             }
         }
 
@@ -826,68 +851,190 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var bestMovingEligibility = false;
         var bestAlignment = -1f;
         var bestColliderId = ulong.MaxValue;
+        CollisionObject3D? bestCollider = null;
+        for (var slideIndex = 0; slideIndex < GetSlideCollisionCount(); slideIndex++)
+        {
+            var slide = GetSlideCollision(slideIndex);
+            TryAccumulateFloorCandidates(
+                slide,
+                floorNormal,
+                platformVelocity,
+                platformAngularVelocity,
+                ref bestVelocityError,
+                ref bestAngularError,
+                ref bestMovingEligibility,
+                ref bestAlignment,
+                ref bestColliderId,
+                ref bestCollider);
+        }
+        if (bestCollider is not null)
+        {
+            collider = bestCollider;
+            LastFloorSelectionUsedSlideEvidence = true;
+            return true;
+        }
+
         var collision = _initialFloorProbe!;
-        if (!TestMove(
+        if (TestMove(
                 GlobalTransform,
                 -UpDirection * FloorSnapLength,
                 collision,
                 SafeMargin,
                 recoveryAsCollision: true,
-                maxCollisions: 4))
+                maxCollisions: MaximumFloorSupportCollisions))
+        {
+            TryAccumulateFloorCandidates(
+                collision,
+                floorNormal,
+                platformVelocity,
+                platformAngularVelocity,
+                ref bestVelocityError,
+                ref bestAngularError,
+                ref bestMovingEligibility,
+                ref bestAlignment,
+                ref bestColliderId,
+                ref bestCollider);
+        }
+        if (bestCollider is null)
         {
             return false;
         }
+        collider = bestCollider;
+        return true;
+    }
+
+    internal bool TryFindFloorColliderInSupportProbe(
+        KinematicCollision3D collision,
+        in Vector3 floorNormal,
+        in Vector3 platformVelocity,
+        in Vector3 platformAngularVelocity,
+        out CollisionObject3D collider)
+    {
+        ArgumentNullException.ThrowIfNull(collision);
+        collider = null!;
+        if (!IsFinite(floorNormal) || !IsFinite(platformVelocity) ||
+            !IsFinite(platformAngularVelocity))
+        {
+            return false;
+        }
+
+        var bestVelocityError = float.PositiveInfinity;
+        var bestAngularError = float.PositiveInfinity;
+        var bestMovingEligibility = false;
+        var bestAlignment = -1f;
+        var bestColliderId = ulong.MaxValue;
+        CollisionObject3D? bestCollider = null;
+        TryAccumulateFloorCandidates(
+            collision,
+            floorNormal,
+            platformVelocity,
+            platformAngularVelocity,
+            ref bestVelocityError,
+            ref bestAngularError,
+            ref bestMovingEligibility,
+            ref bestAlignment,
+            ref bestColliderId,
+            ref bestCollider);
+        if (bestCollider is null)
+        {
+            return false;
+        }
+        collider = bestCollider;
+        return true;
+    }
+
+    private bool TryAccumulateFloorCandidates(
+        KinematicCollision3D collision,
+        in Vector3 floorNormal,
+        in Vector3 platformVelocity,
+        in Vector3 platformAngularVelocity,
+        ref float bestVelocityError,
+        ref float bestAngularError,
+        ref bool bestMovingEligibility,
+        ref float bestAlignment,
+        ref ulong bestColliderId,
+        ref CollisionObject3D? collider)
+    {
+        var selected = false;
         for (var collisionIndex = 0;
              collisionIndex < collision.GetCollisionCount();
              collisionIndex++)
         {
-            var normal = collision.GetNormal(collisionIndex);
-            if (!IsFinite(normal) ||
-                !IsFloorCollision(normal, UpDirection, FloorMaxAngle))
-            {
-                continue;
-            }
-            var alignment = normal.Normalized().Dot(floorNormal);
-            var candidate = collision.GetCollider(collisionIndex) as CollisionObject3D;
-            var candidateVelocity = collision.GetColliderVelocity(collisionIndex);
-            if (candidate is null || !GodotObject.IsInstanceValid(candidate) ||
-                !IsFinite(candidateVelocity) ||
-                !TryGetAngularVelocity(candidate, out var candidateAngularVelocity))
-            {
-                continue;
-            }
-            var velocityError = (candidateVelocity - platformVelocity).LengthSquared();
-            var angularError =
-                (candidateAngularVelocity - platformAngularVelocity).LengthSquared();
-            if (!float.IsFinite(velocityError) || !float.IsFinite(angularError) ||
-                !float.IsFinite(alignment))
-            {
-                continue;
-            }
-            var movingEligibility = IsMovingPlatform(candidate);
-            var colliderId = candidate.GetInstanceId();
-            if (!IsBetterFloorCandidate(
-                    velocityError,
-                    angularError,
-                    movingEligibility,
-                    alignment,
-                    colliderId,
-                    bestVelocityError,
-                    bestAngularError,
-                    bestMovingEligibility,
-                    bestAlignment,
-                    bestColliderId))
-            {
-                continue;
-            }
-            bestVelocityError = velocityError;
-            bestAngularError = angularError;
-            bestMovingEligibility = movingEligibility;
-            bestAlignment = alignment;
-            bestColliderId = colliderId;
-            collider = candidate;
+            selected |= TrySelectFloorCandidate(
+                collision,
+                collisionIndex,
+                floorNormal,
+                platformVelocity,
+                platformAngularVelocity,
+                ref bestVelocityError,
+                ref bestAngularError,
+                ref bestMovingEligibility,
+                ref bestAlignment,
+                ref bestColliderId,
+                ref collider);
         }
-        return collider is not null;
+        return selected;
+    }
+
+    private bool TrySelectFloorCandidate(
+        KinematicCollision3D collision,
+        int collisionIndex,
+        in Vector3 floorNormal,
+        in Vector3 platformVelocity,
+        in Vector3 platformAngularVelocity,
+        ref float bestVelocityError,
+        ref float bestAngularError,
+        ref bool bestMovingEligibility,
+        ref float bestAlignment,
+        ref ulong bestColliderId,
+        ref CollisionObject3D? collider)
+    {
+        var normal = collision.GetNormal(collisionIndex);
+        if (!IsFinite(normal) ||
+            !IsFloorCollision(normal, UpDirection, FloorMaxAngle))
+        {
+            return false;
+        }
+        var alignment = normal.Normalized().Dot(floorNormal);
+        var candidate = collision.GetCollider(collisionIndex) as CollisionObject3D;
+        var candidateVelocity = collision.GetColliderVelocity(collisionIndex);
+        if (candidate is null || !GodotObject.IsInstanceValid(candidate) ||
+            !IsFinite(candidateVelocity) ||
+            !TryGetAngularVelocity(candidate, out var candidateAngularVelocity))
+        {
+            return false;
+        }
+        var velocityError = (candidateVelocity - platformVelocity).LengthSquared();
+        var angularError =
+            (candidateAngularVelocity - platformAngularVelocity).LengthSquared();
+        if (!float.IsFinite(velocityError) || !float.IsFinite(angularError) ||
+            !float.IsFinite(alignment))
+        {
+            return false;
+        }
+        var movingEligibility = IsMovingPlatform(candidate);
+        var colliderId = candidate.GetInstanceId();
+        if (!IsBetterFloorCandidate(
+                velocityError,
+                angularError,
+                movingEligibility,
+                alignment,
+                colliderId,
+                bestVelocityError,
+                bestAngularError,
+                bestMovingEligibility,
+                bestAlignment,
+                bestColliderId))
+        {
+            return false;
+        }
+        bestVelocityError = velocityError;
+        bestAngularError = angularError;
+        bestMovingEligibility = movingEligibility;
+        bestAlignment = alignment;
+        bestColliderId = colliderId;
+        collider = candidate;
+        return true;
     }
 
     private static bool TryGetAngularVelocity(
@@ -967,7 +1114,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 collision,
                 SafeMargin,
                 recoveryAsCollision: true,
-                maxCollisions: 4))
+                maxCollisions: MaximumFloorSupportCollisions))
         {
             return false;
         }
