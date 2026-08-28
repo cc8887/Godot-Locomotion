@@ -122,15 +122,21 @@ public partial class P4PoseSmoke : Node
         Require(digests.Distinct().Count() == cases.Length,
             "center/up/down/left/right did not produce five distinct pose digests");
 
-        basePose.Restore(graph.TargetSkeleton, (Node3D)library.Root);
-        var fullLocal = cases[0].ToInput() with { ArmLocalWeight = 1f };
-        var fullLocalOutput = default(AlsPoseModifierOutput);
-        Require(modifier.TryApply(in fullLocal, ref fullLocalOutput, out var localReason) &&
-                localReason == AlsP4ReasonCode.None &&
-                fullLocalOutput.ArmLocalWeight == 1f &&
-                fullLocalOutput.ArmMeshWeight == 0f,
-            "full local Arm weighting did not close the mesh-space channel complementarily");
-
+        VerifyArmLocalMeshEndpoints(
+            modifier,
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            library,
+            definition,
+            poseProfile,
+            cases[3].ToInput() with { UpperBodyWeight = 0.5f });
+        VerifyTopologyMutationRejected(
+            modifier,
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            cases[0].ToInput());
         var turnDigest = RunAction(
             controller, modifier, graph.TargetSkeleton, (Node3D)library.Root, result,
             AlsP4AnimationInput.Turn(
@@ -192,6 +198,15 @@ public partial class P4PoseSmoke : Node
         }
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocationBefore;
         Require(allocated == 0, $"steady modifier path allocated {allocated} B");
+
+        VerifyWriteFailureTransactions(
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            library,
+            definition,
+            poseProfile,
+            cases[0].ToInput());
 
         ulong aimDigest = 14695981039346656037UL;
         foreach (var digest in digests)
@@ -270,6 +285,162 @@ public partial class P4PoseSmoke : Node
             "mesh-space Aim delta was not relative to the validated additive base frame");
     }
 
+    private static void VerifyArmLocalMeshEndpoints(
+        AlsComponentPoseModifier modifier,
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition definition,
+        AlsPoseAnimationProfile profile,
+        in AlsPoseModifierInput input)
+    {
+        var skeletonDefinition = definition.Skeletons[profile.SkeletonId];
+        var armMask = profile.Masks.Entries.Single(
+            entry => entry.Kind == AlsPoseMaskKind.LeftArm);
+        var forwardDefinition = definition.Animations[profile.Aim.ForwardAnimationId];
+        var downDefinition = definition.Animations[profile.Aim.DownAnimationId];
+        var baseDefinition = definition.Animations[profile.Aim.AdditiveBasePoseAnimationId];
+        var baseTime = (double)downDefinition.AdditiveBasePoseFrame *
+            baseDefinition.FrameRateDenominator / baseDefinition.FrameRateNumerator;
+        var armBoneId = skeletonDefinition.LogicalToPhysical[armMask.RootBoneId];
+        Require(armBoneId >= 0, "LeftArm root has no physical bone");
+        var armParentId = skeleton.GetBoneParent(armBoneId);
+        Require(armParentId >= 0, "LeftArm root has no physical parent");
+        var baseLocal = SampleLocal(
+            library, skeleton, profile.Aim.AdditiveBasePoseAnimationId, armBoneId, baseTime);
+        var forwardLocal = SampleLocal(
+            library, skeleton, profile.Aim.ForwardAnimationId, armBoneId,
+            forwardDefinition.PlayLength * input.AimPhase);
+
+        basePose.Restore(skeleton, visualRoot);
+        var perturbedRotation = (new Quaternion(Vector3.Up, 0.23f) *
+            skeleton.GetBonePoseRotation(armParentId)).Normalized();
+        skeleton.SetBonePoseRotation(armParentId, perturbedRotation);
+        var underlyingPose = PoseSnapshot.Capture(skeleton, visualRoot);
+        var originalLocal = skeleton.GetBoneRest(armBoneId) *
+            underlyingPose.GetBonePose(armBoneId);
+        var localDelta = forwardLocal * baseLocal.AffineInverse();
+        var expectedFullLocal = Transform3D.Identity.InterpolateWith(
+            localDelta, input.UpperBodyWeight) * originalLocal;
+
+        underlyingPose.Restore(skeleton, visualRoot);
+        var fullLocal = input with { ArmLocalWeight = 1f };
+        var localOutput = default(AlsPoseModifierOutput);
+        Require(modifier.TryApply(in fullLocal, ref localOutput, out var reason) &&
+                reason == AlsP4ReasonCode.None,
+            $"full-local Arm modifier failed: {reason}");
+        var actualFullLocal = skeleton.GetBoneRest(armBoneId) * CurrentBonePose(skeleton, armBoneId);
+        RequireTransformNear(actualFullLocal, expectedFullLocal, 1e-5f,
+            "full-local Arm did not match the independent local-delta oracle");
+        var fullLocalComponent = BuildCurrentComponent(skeleton, armBoneId);
+
+        underlyingPose.Restore(skeleton, visualRoot);
+        var fullMesh = input with { ArmLocalWeight = 0f };
+        var meshOutput = default(AlsPoseModifierOutput);
+        Require(modifier.TryApply(in fullMesh, ref meshOutput, out reason) &&
+                reason == AlsP4ReasonCode.None,
+            $"full-mesh Arm modifier failed: {reason}");
+        var originalComponent = BuildSnapshotComponent(underlyingPose, skeleton, armBoneId);
+        var baseComponent = SampleComponent(
+            library, skeleton, profile.Aim.AdditiveBasePoseAnimationId, armBoneId, baseTime);
+        var forwardComponent = SampleComponent(
+            library, skeleton, profile.Aim.ForwardAnimationId, armBoneId,
+            forwardDefinition.PlayLength * input.AimPhase);
+        var componentDelta = forwardComponent * baseComponent.AffineInverse();
+        var expectedFullMesh = Transform3D.Identity.InterpolateWith(
+            componentDelta, input.UpperBodyWeight) * originalComponent;
+        var actualFullMesh = BuildCurrentComponent(skeleton, armBoneId);
+        RequireTransformNear(actualFullMesh, expectedFullMesh, 1e-5f,
+            "full-mesh Arm did not match the independent component-delta oracle");
+        Require(!TransformNear(fullLocalComponent, actualFullMesh, 1e-5f),
+            $"full-local and full-mesh Arm endpoints were not distinct: " +
+            $"bone={skeletonDefinition.PhysicalBones[armBoneId].Name} " +
+            $"local={fullLocalComponent} mesh={actualFullMesh}");
+    }
+
+    private static void VerifyTopologyMutationRejected(
+        AlsComponentPoseModifier modifier,
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        in AlsPoseModifierInput input)
+    {
+        basePose.Restore(skeleton, visualRoot);
+        var before = PoseSnapshot.Capture(skeleton, visualRoot);
+        var boneId = skeleton.FindBone("hand_l");
+        var replacementParent = skeleton.FindBone("root");
+        Require(boneId >= 0 && replacementParent >= 0, "topology mutation fixture bones are missing");
+        var originalParent = skeleton.GetBoneParent(boneId);
+        var output = SentinelOutput();
+        try
+        {
+            skeleton.SetBoneParent(boneId, replacementParent);
+            Require(!modifier.TryApply(in input, ref output, out var reason),
+                "same-count Skeleton topology mutation unexpectedly succeeded");
+            Require(reason == AlsP4ReasonCode.InvalidRuntimeState,
+                $"topology mutation returned unstable reason: {reason}");
+            RequireOutputExact(output, SentinelOutput(), "topology mutation");
+            before.RequireExact(skeleton, visualRoot, "topology mutation");
+        }
+        finally
+        {
+            skeleton.SetBoneParent(boneId, originalParent);
+        }
+    }
+
+    private static void VerifyWriteFailureTransactions(
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition definition,
+        AlsPoseAnimationProfile profile,
+        in AlsPoseModifierInput input)
+    {
+        var writer = new FaultingSkeletonPoseWriter(skeleton);
+        using var modifier = new AlsComponentPoseModifier(
+            skeleton, visualRoot, library, definition, profile, writer);
+        for (var setter = 1; setter <= 3; setter++)
+        {
+            basePose.Restore(skeleton, visualRoot);
+            var before = PoseSnapshot.Capture(skeleton, visualRoot);
+            writer.Configure(setter, persistent: false);
+            var expected = SentinelOutput();
+            var output = expected;
+            Require(!modifier.TryApply(in input, ref output, out var reason),
+                $"one-shot setter {setter} failure unexpectedly succeeded");
+            Require(reason == AlsP4ReasonCode.InvalidRuntimeState,
+                $"one-shot setter {setter} returned unstable reason: {reason}");
+            RequireOutputExact(output, expected, $"one-shot setter {setter}");
+            before.RequireExact(skeleton, visualRoot, $"one-shot setter {setter} rollback");
+        }
+
+        basePose.Restore(skeleton, visualRoot);
+        var frozenBefore = PoseSnapshot.Capture(skeleton, visualRoot);
+        writer.Configure(2, persistent: true);
+        var frozenExpected = SentinelOutput();
+        var frozenOutput = frozenExpected;
+        var escaped = false;
+        var success = false;
+        var frozenReason = AlsP4ReasonCode.None;
+        try
+        {
+            success = modifier.TryApply(in input, ref frozenOutput, out frozenReason);
+        }
+        catch
+        {
+            escaped = true;
+        }
+        Require(!escaped, "persistent setter failure escaped TryApply");
+        Require(!success && frozenReason == AlsP4ReasonCode.PoseRestoreFailed,
+            $"persistent setter failure did not publish frozen reason: {frozenReason}");
+        RequireOutputExact(frozenOutput, frozenExpected, "persistent setter failure");
+        Require(!frozenBefore.IsExact(skeleton, visualRoot),
+            "persistent setter failure did not leave an observable frozen partial pose");
+        basePose.Restore(skeleton, visualRoot);
+    }
+
     private static Transform3D SampleComponent(
         AlsAnimationLibraryBuildResult library,
         Skeleton3D skeleton,
@@ -317,6 +488,51 @@ public partial class P4PoseSmoke : Node
         }
         return component;
     }
+
+    private static Transform3D SampleLocal(
+        AlsAnimationLibraryBuildResult library,
+        Skeleton3D skeleton,
+        int animationId,
+        int boneId,
+        double time)
+    {
+        Require(library.ClipNames.TryGetValue(animationId, out var clipName),
+            $"local oracle clip is missing: {animationId}");
+        var animation = library.Library.GetAnimation(clipName)
+            ?? throw new InvalidOperationException($"local oracle animation is missing: {animationId}");
+        var position = Vector3.Zero;
+        var rotation = Quaternion.Identity;
+        var scale = Vector3.One;
+        for (var track = 0; track < animation.GetTrackCount(); track++)
+        {
+            using var path = animation.TrackGetPath(track);
+            var text = path.ToString();
+            var separator = text.LastIndexOf(':');
+            if (separator < 0 || skeleton.FindBone(text[(separator + 1)..]) != boneId)
+            {
+                continue;
+            }
+            switch (animation.TrackGetType(track))
+            {
+                case Godot.Animation.TrackType.Position3D:
+                    position = animation.PositionTrackInterpolate(track, time);
+                    break;
+                case Godot.Animation.TrackType.Rotation3D:
+                    rotation = animation.RotationTrackInterpolate(track, time);
+                    break;
+                case Godot.Animation.TrackType.Scale3D:
+                    scale = animation.ScaleTrackInterpolate(track, time);
+                    break;
+            }
+        }
+        return skeleton.GetBoneRest(boneId) * new Transform3D(
+            new Basis(rotation.Normalized()).Scaled(scale), position);
+    }
+
+    private static Transform3D CurrentBonePose(Skeleton3D skeleton, int boneId) => new(
+        new Basis(skeleton.GetBonePoseRotation(boneId).Normalized()).Scaled(
+            skeleton.GetBonePoseScale(boneId)),
+        skeleton.GetBonePosePosition(boneId));
 
     private static Transform3D BuildSnapshotComponent(
         PoseSnapshot snapshot,
@@ -387,6 +603,15 @@ public partial class P4PoseSmoke : Node
                 $"{message}: actual={actual} expected={expected}");
         }
     }
+
+    private static bool TransformNear(
+        in Transform3D left,
+        in Transform3D right,
+        float tolerance) =>
+        left.Origin.DistanceTo(right.Origin) <= tolerance &&
+        left.Basis.X.DistanceTo(right.Basis.X) <= tolerance &&
+        left.Basis.Y.DistanceTo(right.Basis.Y) <= tolerance &&
+        left.Basis.Z.DistanceTo(right.Basis.Z) <= tolerance;
 
     private static void VerifyOnlyCompiledAimMasksChanged(
         PoseSnapshot before,
@@ -489,6 +714,34 @@ public partial class P4PoseSmoke : Node
         }
     }
 
+    private static AlsPoseModifierOutput SentinelOutput() => new()
+    {
+        PoseDigest = 0x1122334455667788UL,
+        DeterministicElapsedTicks = 31337,
+        WriteTransactionCount = 17,
+        AffectedBoneCount = 19,
+        ArmLocalWeight = 0.25f,
+        ArmMeshWeight = 0.75f,
+        AdditiveBaseAnimationId = 911,
+    };
+
+    private static void RequireOutputExact(
+        in AlsPoseModifierOutput actual,
+        in AlsPoseModifierOutput expected,
+        string label)
+    {
+        Require(actual.PoseDigest == expected.PoseDigest &&
+                actual.DeterministicElapsedTicks == expected.DeterministicElapsedTicks &&
+                actual.WriteTransactionCount == expected.WriteTransactionCount &&
+                actual.AffectedBoneCount == expected.AffectedBoneCount &&
+                BitConverter.SingleToInt32Bits(actual.ArmLocalWeight) ==
+                BitConverter.SingleToInt32Bits(expected.ArmLocalWeight) &&
+                BitConverter.SingleToInt32Bits(actual.ArmMeshWeight) ==
+                BitConverter.SingleToInt32Bits(expected.ArmMeshWeight) &&
+                actual.AdditiveBaseAnimationId == expected.AdditiveBaseAnimationId,
+            $"{label} changed failed-transaction output");
+    }
+
     private readonly record struct PoseCase(
         string Name,
         float Phase,
@@ -559,6 +812,22 @@ public partial class P4PoseSmoke : Node
             skeleton.GetBonePoseRotation(boneId) == _rotations[boneId] &&
             skeleton.GetBonePoseScale(boneId) == _scales[boneId];
 
+        public bool IsExact(Skeleton3D skeleton, Node3D root)
+        {
+            if (root.GlobalTransform != _root)
+            {
+                return false;
+            }
+            for (var index = 0; index < _positions.Length; index++)
+            {
+                if (!IsBoneExact(skeleton, index))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public Transform3D GetBonePose(int boneId) => new(
             new Basis(_rotations[boneId].Normalized()).Scaled(_scales[boneId]),
             _positions[boneId]);
@@ -573,6 +842,65 @@ public partial class P4PoseSmoke : Node
             {
                 RequireBoneExact(skeleton, index, label);
             }
+        }
+    }
+
+    private sealed class FaultingSkeletonPoseWriter : IAlsSkeletonPoseWriter
+    {
+        private readonly Skeleton3D _skeleton;
+        private int _throwAt;
+        private int _writeCount;
+        private bool _persistent;
+        private bool _triggered;
+
+        public FaultingSkeletonPoseWriter(Skeleton3D skeleton) => _skeleton = skeleton;
+
+        public void Configure(int throwAt, bool persistent)
+        {
+            _throwAt = throwAt;
+            _writeCount = 0;
+            _persistent = persistent;
+            _triggered = false;
+        }
+
+        public void SetBonePosePosition(int boneId, in Vector3 value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePosePosition(boneId, value);
+            AfterWrite();
+        }
+
+        public void SetBonePoseRotation(int boneId, in Quaternion value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePoseRotation(boneId, value);
+            AfterWrite();
+        }
+
+        public void SetBonePoseScale(int boneId, in Vector3 value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePoseScale(boneId, value);
+            AfterWrite();
+        }
+
+        private void BeforeWrite()
+        {
+            if (_persistent && _triggered)
+            {
+                throw new InvalidOperationException("injected persistent Skeleton setter failure");
+            }
+        }
+
+        private void AfterWrite()
+        {
+            _writeCount++;
+            if (_writeCount != _throwAt)
+            {
+                return;
+            }
+            _triggered = true;
+            throw new InvalidOperationException("injected Skeleton setter interruption");
         }
     }
 }

@@ -1,6 +1,7 @@
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Import.Compilation;
+using System.Runtime.CompilerServices;
 
 namespace GodotAls.Animation;
 
@@ -53,6 +54,15 @@ public struct AlsPoseModifierOutput
     public int AdditiveBaseAnimationId;
 }
 
+internal interface IAlsSkeletonPoseWriter
+{
+    void SetBonePosePosition(int boneId, in Vector3 value);
+
+    void SetBonePoseRotation(int boneId, in Quaternion value);
+
+    void SetBonePoseScale(int boneId, in Vector3 value);
+}
+
 public sealed class AlsComponentPoseModifier : IDisposable
 {
     private const ulong DigestOffsetBasis = 14695981039346656037UL;
@@ -73,6 +83,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
     private readonly ClipBinding _up;
     private readonly double _baseTime;
     private readonly int _baseAnimationId;
+    private readonly IAlsSkeletonPoseWriter? _testWriter;
     private int _disposed;
 
     public AlsComponentPoseModifier(
@@ -81,12 +92,24 @@ public sealed class AlsComponentPoseModifier : IDisposable
         AlsAnimationLibraryBuildResult library,
         AlsAnimationSetDefinition animationSet,
         AlsPoseAnimationProfile profile)
+        : this(skeleton, visualRoot, library, animationSet, profile, null)
+    {
+    }
+
+    internal AlsComponentPoseModifier(
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition animationSet,
+        AlsPoseAnimationProfile profile,
+        IAlsSkeletonPoseWriter? testWriter)
     {
         _skeleton = skeleton ?? throw new ArgumentNullException(nameof(skeleton));
         _visualRoot = visualRoot ?? throw new ArgumentNullException(nameof(visualRoot));
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
+        _testWriter = testWriter;
         if (!GodotObject.IsInstanceValid(skeleton) || !GodotObject.IsInstanceValid(visualRoot) ||
             profile.SkeletonId < 0 || profile.SkeletonId >= animationSet.Skeletons.Length)
         {
@@ -133,6 +156,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         _up = BindClip(library, profile.Aim.UpAnimationId);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public bool TryApply(
         in AlsPoseModifierInput input,
         ref AlsPoseModifierOutput output,
@@ -141,7 +165,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         if (Volatile.Read(ref _disposed) != 0 ||
             !GodotObject.IsInstanceValid(_skeleton) ||
             !GodotObject.IsInstanceValid(_visualRoot) ||
-            _skeleton.GetBoneCount() != _scratch.BoneCount)
+            !ValidateCachedTopology())
         {
             reason = AlsP4ReasonCode.InvalidRuntimeState;
             return false;
@@ -167,9 +191,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
             {
                 if (!SampleAimPoses(in input) || !ApplyAim(in input))
                 {
-                    RestoreOriginalPose(capturedRoot);
-                    reason = AlsP4ReasonCode.NonFiniteInput;
-                    return false;
+                    return FailAfterCapture(
+                        capturedRoot, AlsP4ReasonCode.NonFiniteInput, out reason);
                 }
                 deterministicTicks += _scratch.BoneCount * 20L;
                 deterministicTicks += _scratch.AffectedCount * 8L;
@@ -177,9 +200,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
 
             if (input.InjectFailure == AlsPoseModifierFailureStage.AfterAim)
             {
-                RestoreOriginalPose(capturedRoot);
-                reason = AlsP4ReasonCode.InvalidRuntimeState;
-                return false;
+                return FailAfterCapture(
+                    capturedRoot, AlsP4ReasonCode.InvalidRuntimeState, out reason);
             }
 
             var writeTransactions = 0;
@@ -187,9 +209,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
             {
                 if (!WriteAffectedPose())
                 {
-                    RestoreOriginalPose(capturedRoot);
-                    reason = AlsP4ReasonCode.NonFiniteInput;
-                    return false;
+                    return FailAfterCapture(
+                        capturedRoot, AlsP4ReasonCode.NonFiniteInput, out reason);
                 }
                 writeTransactions = 1;
                 deterministicTicks += _scratch.AffectedCount * 4L;
@@ -213,10 +234,61 @@ public sealed class AlsComponentPoseModifier : IDisposable
         }
         catch
         {
-            RestoreOriginalPose(capturedRoot);
-            reason = AlsP4ReasonCode.InvalidRuntimeState;
+            return FailAfterCapture(
+                capturedRoot, AlsP4ReasonCode.InvalidRuntimeState, out reason);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private bool ValidateCachedTopology()
+    {
+        if (_skeleton.GetBoneCount() != _scratch.BoneCount ||
+            _scratch.Order.Length != _scratch.BoneCount ||
+            _scratch.AffectedCount <= 0 ||
+            _scratch.AffectedCount > _scratch.AffectedOrder.Length)
+        {
             return false;
         }
+
+        Array.Clear(_scratch.ValidationVisited);
+        for (var index = 0; index < _scratch.Order.Length; index++)
+        {
+            var boneId = _scratch.Order[index];
+            if ((uint)boneId >= (uint)_scratch.BoneCount ||
+                _scratch.ValidationVisited[boneId])
+            {
+                return false;
+            }
+            var parent = _scratch.Parents[boneId];
+            if (_skeleton.GetBoneParent(boneId) != parent ||
+                (parent >= 0 && !_scratch.ValidationVisited[parent]))
+            {
+                return false;
+            }
+            _scratch.ValidationVisited[boneId] = true;
+        }
+
+        Array.Clear(_scratch.ValidationVisited);
+        for (var index = 0; index < _scratch.AffectedCount; index++)
+        {
+            var boneId = _scratch.AffectedOrder[index];
+            if ((uint)boneId >= (uint)_scratch.BoneCount ||
+                _scratch.ValidationVisited[boneId] ||
+                !_scratch.Affected[boneId] ||
+                _weightKinds[boneId] == 0)
+            {
+                return false;
+            }
+            _scratch.ValidationVisited[boneId] = true;
+        }
+        for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
+        {
+            if (_scratch.Affected[boneId] != _scratch.ValidationVisited[boneId])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void Dispose()
@@ -310,6 +382,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool CaptureCurrentPose()
     {
         for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
@@ -344,6 +417,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool SampleAimPoses(in AlsPoseModifierInput input)
     {
         var downTime = _down.Animation.Length * input.AimPhase;
@@ -355,6 +429,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             SampleClip(_up, upTime, _scratch.UpLocalPose, _scratch.UpComponentPose);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool SampleClip(
         ClipBinding clip,
         double time,
@@ -392,6 +467,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         return BuildComponents(locals, components);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool BuildComponents(Transform3D[] locals, Transform3D[] components)
     {
         for (var index = 0; index < _scratch.Order.Length; index++)
@@ -409,6 +485,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool ApplyAim(in AlsPoseModifierInput input)
     {
         var armMeshWeight = 1f - input.ArmLocalWeight;
@@ -484,6 +561,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool WriteAffectedPose()
     {
         for (var orderIndex = 0; orderIndex < _scratch.AffectedCount; orderIndex++)
@@ -506,24 +584,122 @@ public sealed class AlsComponentPoseModifier : IDisposable
         for (var orderIndex = 0; orderIndex < _scratch.AffectedCount; orderIndex++)
         {
             var boneId = _scratch.AffectedOrder[orderIndex];
-            _skeleton.SetBonePosePosition(boneId, _scratch.ResultPositions[boneId]);
-            _skeleton.SetBonePoseRotation(boneId, _scratch.ResultRotations[boneId]);
-            _skeleton.SetBonePoseScale(boneId, _scratch.ResultScales[boneId]);
+            SetBonePosePosition(boneId, _scratch.ResultPositions[boneId]);
+            SetBonePoseRotation(boneId, _scratch.ResultRotations[boneId]);
+            SetBonePoseScale(boneId, _scratch.ResultScales[boneId]);
         }
         return true;
     }
 
-    private void RestoreOriginalPose(in Transform3D root)
+    private bool FailAfterCapture(
+        in Transform3D root,
+        AlsP4ReasonCode failureReason,
+        out AlsP4ReasonCode reason)
     {
-        _visualRoot.GlobalTransform = root;
+        reason = TryRestoreOriginalPose(root)
+            ? failureReason
+            : AlsP4ReasonCode.PoseRestoreFailed;
+        return false;
+    }
+
+    private bool TryRestoreOriginalPose(in Transform3D root)
+    {
+        var restored = true;
+        try
+        {
+            _visualRoot.GlobalTransform = root;
+        }
+        catch
+        {
+            restored = false;
+        }
         for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
         {
-            _skeleton.SetBonePosePosition(boneId, _scratch.OriginalPositions[boneId]);
-            _skeleton.SetBonePoseRotation(boneId, _scratch.OriginalRotations[boneId]);
-            _skeleton.SetBonePoseScale(boneId, _scratch.OriginalScales[boneId]);
+            try
+            {
+                SetBonePosePosition(boneId, _scratch.OriginalPositions[boneId]);
+            }
+            catch
+            {
+                restored = false;
+            }
+            try
+            {
+                SetBonePoseRotation(boneId, _scratch.OriginalRotations[boneId]);
+            }
+            catch
+            {
+                restored = false;
+            }
+            try
+            {
+                SetBonePoseScale(boneId, _scratch.OriginalScales[boneId]);
+            }
+            catch
+            {
+                restored = false;
+            }
+        }
+        try
+        {
+            restored &= _visualRoot.GlobalTransform == root;
+            for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
+            {
+                restored &= _skeleton.GetBonePosePosition(boneId) ==
+                    _scratch.OriginalPositions[boneId];
+                restored &= _skeleton.GetBonePoseRotation(boneId) ==
+                    _scratch.OriginalRotations[boneId];
+                restored &= _skeleton.GetBonePoseScale(boneId) ==
+                    _scratch.OriginalScales[boneId];
+            }
+        }
+        catch
+        {
+            restored = false;
+        }
+        return restored;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void SetBonePosePosition(int boneId, in Vector3 value)
+    {
+        if (_testWriter is null)
+        {
+            _skeleton.SetBonePosePosition(boneId, value);
+        }
+        else
+        {
+            _testWriter.SetBonePosePosition(boneId, value);
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void SetBonePoseRotation(int boneId, in Quaternion value)
+    {
+        if (_testWriter is null)
+        {
+            _skeleton.SetBonePoseRotation(boneId, value);
+        }
+        else
+        {
+            _testWriter.SetBonePoseRotation(boneId, value);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void SetBonePoseScale(int boneId, in Vector3 value)
+    {
+        if (_testWriter is null)
+        {
+            _skeleton.SetBonePoseScale(boneId, value);
+        }
+        else
+        {
+            _testWriter.SetBonePoseScale(boneId, value);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private ulong ComputePoseDigest()
     {
         var digest = DigestOffsetBasis;
