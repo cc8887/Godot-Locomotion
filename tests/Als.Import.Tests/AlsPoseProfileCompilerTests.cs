@@ -145,6 +145,193 @@ public sealed class AlsPoseProfileCompilerTests
         Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.turns[0].animation" && issue.AssetId == turnStableId);
     }
 
+    [Fact]
+    public void SwappedAimDownAndUpSlotsAreRejectedAtTheFirstWrongField()
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        var down = root["aim"]!["down"]!.GetValue<string>();
+        var up = root["aim"]!["up"]!.GetValue<string>();
+        root["aim"]!["down"] = up;
+        root["aim"]!["up"] = down;
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        AssertSlotFailure(exception, "$.aim.down", AimDownPath, up);
+    }
+
+    [Fact]
+    public void DuplicateAimSweepIdIsRejectedExplicitly()
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        var down = root["aim"]!["down"]!.GetValue<string>();
+        root["aim"]!["up"] = down;
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.FieldPath == "$.aim.up" && issue.AssetId == down && issue.Message.Contains("Duplicate", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AimOffsetObjectPathIsBoundToTheLookAsset()
+    {
+        var set = P3RepositoryFixtures.LoadAnimationSet();
+        var aimId = set.AssetIndex.GetAimOffsetId("b4bf2befd979de45f53f300dc0e60c702fc3a686");
+        var aims = set.AimOffsets.ToArray();
+        aims[aimId] = aims[aimId] with { ObjectPath = "/Game/Wrong/Aim.Aim" };
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+
+        AssertSlotFailure(exception, "$.aim.aimOffset", AimOffsetPath, aims[aimId].StableId);
+    }
+
+    [Theory]
+    [InlineData("down", 0, AimDownPath)]
+    [InlineData("forward", 1, AimForwardPath)]
+    [InlineData("up", 2, AimUpPath)]
+    public void EveryAimSweepRoleIsBoundToItsExactObjectPath(
+        string role,
+        int wrongRotateIndex,
+        string expectedPath)
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        var wrongId = root["rotates"]![wrongRotateIndex]!["animation"]!.GetValue<string>();
+        root["aim"]![role] = wrongId;
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        AssertSlotFailure(exception, $"$.aim.{role}", expectedPath, wrongId);
+    }
+
+    [Theory]
+    [InlineData("down", 0, 1, AimDownPath)]
+    [InlineData("forward", 1, 2, AimForwardPath)]
+    [InlineData("up", 2, 0, AimUpPath)]
+    public void AimOffsetSampleCoordinatesBindDownForwardAndUpAnimationIds(
+        string role,
+        int targetCoordinateIndex,
+        int replacementCoordinateIndex,
+        string expectedPath)
+    {
+        var set = P3RepositoryFixtures.LoadAnimationSet();
+        var aimId = set.AssetIndex.GetAimOffsetId("b4bf2befd979de45f53f300dc0e60c702fc3a686");
+        var aims = set.AimOffsets.ToArray();
+        var samples = aims[aimId].Samples.ToArray();
+        var coordinates = new[] { new[] { -90f, 0f, 0f }, new[] { 0f, 0f, 0f }, new[] { 90f, 0f, 0f } };
+        var targetIndex = Array.FindIndex(samples, value => value.SampleValue.SequenceEqual(coordinates[targetCoordinateIndex]));
+        var replacementIndex = Array.FindIndex(samples, value => value.SampleValue.SequenceEqual(coordinates[replacementCoordinateIndex]));
+        var actualAnimationId = samples[replacementIndex].AnimationId;
+        samples[targetIndex] = samples[targetIndex] with { AnimationId = actualAnimationId };
+        aims[aimId] = aims[aimId] with { Samples = samples };
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(ReadProfile(), set with { AimOffsets = aims }));
+
+        AssertSlotFailure(exception, $"$.aim.{role}", expectedPath, set.Animations[actualAnimationId].StableId);
+        Assert.Contains(exception.Issues, issue => issue.Message.Contains("sample", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData(0, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.ALS_N_TurnIP_L90")]
+    [InlineData(1, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.ALS_N_TurnIP_R90")]
+    [InlineData(2, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L180.ALS_N_TurnIP_L180")]
+    [InlineData(3, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R180.ALS_N_TurnIP_R180")]
+    [InlineData(4, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L90.ALS_CLF_TurnIP_L90")]
+    [InlineData(5, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R90.ALS_CLF_TurnIP_R90")]
+    [InlineData(6, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L180.ALS_CLF_TurnIP_L180")]
+    [InlineData(7, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R180.ALS_CLF_TurnIP_R180")]
+    public void EveryTurnRoleIsBoundToItsExactObjectPath(int index, string expectedPath)
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        var turns = root["turns"]!.AsArray();
+        var wrongId = root["rotates"]![index % 4]!["animation"]!.GetValue<string>();
+        turns[index]!["animation"] = wrongId;
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        AssertSlotFailure(exception, $"$.turns[{index}].animation", expectedPath, wrongId);
+    }
+
+    [Fact]
+    public void SwappedStandingTurnLeftAndRightAreRejected()
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        SwapAnimationIds(root["turns"]!.AsArray(), 0, 1);
+        var actualId = root["turns"]![0]!["animation"]!.GetValue<string>();
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        AssertSlotFailure(exception, "$.turns[0].animation", TurnStandingLeft90Path, actualId);
+    }
+
+    [Fact]
+    public void DuplicateTurnAnimationIdIsRejectedExplicitly()
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        var duplicateId = root["turns"]![0]!["animation"]!.GetValue<string>();
+        root["turns"]![1]!["animation"] = duplicateId;
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.turns[1].animation" &&
+            issue.AssetId == duplicateId && issue.Message.Contains("Duplicate", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(0, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90")]
+    [InlineData(1, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_R90.ALS_N_Rotate_R90")]
+    [InlineData(2, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_L90.ALS_CLF_Rotate_L90")]
+    [InlineData(3, "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_R90.ALS_CLF_Rotate_R90")]
+    public void EveryRotateRoleIsBoundToItsExactObjectPath(int index, string expectedPath)
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        var wrongId = root["turns"]![index]!["animation"]!.GetValue<string>();
+        root["rotates"]![index]!["animation"] = wrongId;
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        AssertSlotFailure(exception, $"$.rotates[{index}].animation", expectedPath, wrongId);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void SwappedRotateDirectionAndStanceSlotsAreRejected(int secondIndex)
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        SwapAnimationIds(root["rotates"]!.AsArray(), 0, secondIndex);
+        var wrongId = root["rotates"]![0]!["animation"]!.GetValue<string>();
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        AssertSlotFailure(exception, "$.rotates[0].animation",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90",
+            wrongId);
+    }
+
+    [Fact]
+    public void DuplicateRotateAnimationIdIsRejectedExplicitly()
+    {
+        var root = JsonNode.Parse(ReadProfile())!.AsObject();
+        var duplicateId = root["rotates"]![0]!["animation"]!.GetValue<string>();
+        root["rotates"]![1]!["animation"] = duplicateId;
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            AlsPoseProfileCompiler.Compile(root.ToJsonString(), P3RepositoryFixtures.LoadAnimationSet()));
+
+        Assert.Contains(exception.Issues, issue => issue.FieldPath == "$.rotates[1].animation" &&
+            issue.AssetId == duplicateId && issue.Message.Contains("Duplicate", StringComparison.Ordinal));
+    }
+
     private static string ReadProfile() => File.ReadAllText(Path.Combine(
         RepositoryRoot.Find(), "assets", "config", "p4_pose_profile.json"));
 
@@ -154,4 +341,26 @@ public sealed class AlsPoseProfileCompilerTests
         mutation(root);
         return root.ToJsonString();
     }
+
+    private static void SwapAnimationIds(JsonArray values, int first, int second)
+    {
+        var firstId = values[first]!["animation"]!.GetValue<string>();
+        var secondId = values[second]!["animation"]!.GetValue<string>();
+        values[first]!["animation"] = secondId;
+        values[second]!["animation"] = firstId;
+    }
+
+    private static void AssertSlotFailure(
+        AlsCompilationException exception,
+        string path,
+        string expectedObjectPath,
+        string actualStableId) =>
+        Assert.Contains(exception.Issues, issue =>
+            issue.FieldPath == path && issue.Expected == expectedObjectPath && issue.Actual == actualStableId);
+
+    private const string AimOffsetPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look.ALS_N_Look";
+    private const string AimDownPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep.ALS_N_Look_D_Sweep";
+    private const string AimForwardPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep.ALS_N_Look_F_Sweep";
+    private const string AimUpPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep.ALS_N_Look_U_Sweep";
+    private const string TurnStandingLeft90Path = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.ALS_N_TurnIP_L90";
 }

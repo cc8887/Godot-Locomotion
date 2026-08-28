@@ -7,6 +7,31 @@ public static class AlsPoseProfileCompiler
 {
     private const int SchemaVersion = 1;
     private const int AimAdditiveType = 2;
+    private const string AimOffsetObjectPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look.ALS_N_Look";
+    private const string AimDownObjectPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep.ALS_N_Look_D_Sweep";
+    private const string AimForwardObjectPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep.ALS_N_Look_F_Sweep";
+    private const string AimUpObjectPath = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep.ALS_N_Look_U_Sweep";
+    private const string TurnInPlaceRoot = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/";
+    private static readonly IReadOnlyDictionary<(AlsPoseStance Stance, sbyte Direction, short Degrees), string> TurnObjectPaths =
+        new Dictionary<(AlsPoseStance, sbyte, short), string>
+        {
+            [(AlsPoseStance.Standing, -1, 90)] = TurnInPlaceRoot + "ALS_N_TurnIP_L90.ALS_N_TurnIP_L90",
+            [(AlsPoseStance.Standing, 1, 90)] = TurnInPlaceRoot + "ALS_N_TurnIP_R90.ALS_N_TurnIP_R90",
+            [(AlsPoseStance.Standing, -1, 180)] = TurnInPlaceRoot + "ALS_N_TurnIP_L180.ALS_N_TurnIP_L180",
+            [(AlsPoseStance.Standing, 1, 180)] = TurnInPlaceRoot + "ALS_N_TurnIP_R180.ALS_N_TurnIP_R180",
+            [(AlsPoseStance.Crouching, -1, 90)] = TurnInPlaceRoot + "ALS_CLF_TurnIP_L90.ALS_CLF_TurnIP_L90",
+            [(AlsPoseStance.Crouching, 1, 90)] = TurnInPlaceRoot + "ALS_CLF_TurnIP_R90.ALS_CLF_TurnIP_R90",
+            [(AlsPoseStance.Crouching, -1, 180)] = TurnInPlaceRoot + "ALS_CLF_TurnIP_L180.ALS_CLF_TurnIP_L180",
+            [(AlsPoseStance.Crouching, 1, 180)] = TurnInPlaceRoot + "ALS_CLF_TurnIP_R180.ALS_CLF_TurnIP_R180",
+        };
+    private static readonly IReadOnlyDictionary<(AlsPoseStance Stance, sbyte Direction), string> RotateObjectPaths =
+        new Dictionary<(AlsPoseStance, sbyte), string>
+        {
+            [(AlsPoseStance.Standing, -1)] = TurnInPlaceRoot + "ALS_N_Rotate_L90.ALS_N_Rotate_L90",
+            [(AlsPoseStance.Standing, 1)] = TurnInPlaceRoot + "ALS_N_Rotate_R90.ALS_N_Rotate_R90",
+            [(AlsPoseStance.Crouching, -1)] = TurnInPlaceRoot + "ALS_CLF_Rotate_L90.ALS_CLF_Rotate_L90",
+            [(AlsPoseStance.Crouching, 1)] = TurnInPlaceRoot + "ALS_CLF_Rotate_R90.ALS_CLF_Rotate_R90",
+        };
     private static readonly string[] RootProperties = ["schemaVersion", "skeleton", "aim", "turns", "rotates", "masks", "feet"];
     private static readonly string[] AimProperties = ["aimOffset", "down", "forward", "up"];
     private static readonly string[] TurnProperties = ["animation", "stance", "direction", "nominalDegrees", "basePlayRate", "blendSeconds", "scaleAngle"];
@@ -62,13 +87,19 @@ public static class AlsPoseProfileCompiler
         var down = ResolveAnimation(set, source["down"], "$.aim.down", skeletonId);
         var forward = ResolveAnimation(set, source["forward"], "$.aim.forward", skeletonId);
         var up = ResolveAnimation(set, source["up"], "$.aim.up", skeletonId);
-        var ids = new[] { down, forward, up };
         var aimOffset = set.AimOffsets[aimOffsetId];
-        var sampleIds = aimOffset.Samples.Select(value => value.AnimationId).OrderBy(value => value).ToArray();
-        if (!sampleIds.SequenceEqual(ids.OrderBy(value => value)))
-        {
-            throw Failure("ALSPOSE005", "$.aim.aimOffset", "Aim offset samples do not exactly match down, forward and up sweeps.", assetId: aimStableId);
-        }
+        RequireExactObjectPath(aimOffset.StableId, aimOffset.ObjectPath, AimOffsetObjectPath, "$.aim.aimOffset", "aim offset");
+
+        var sweepIds = new HashSet<int>();
+        RequireUniqueAnimation(sweepIds, set.Animations[down], "$.aim.down", "aim sweep");
+        RequireUniqueAnimation(sweepIds, set.Animations[forward], "$.aim.forward", "aim sweep");
+        RequireUniqueAnimation(sweepIds, set.Animations[up], "$.aim.up", "aim sweep");
+        RequireExactObjectPath(set.Animations[down], AimDownObjectPath, "$.aim.down", "aim sweep");
+        RequireExactObjectPath(set.Animations[forward], AimForwardObjectPath, "$.aim.forward", "aim sweep");
+        RequireExactObjectPath(set.Animations[up], AimUpObjectPath, "$.aim.up", "aim sweep");
+        RequireAimSampleRole(set, aimOffset, [-90f, 0f, 0f], down, "$.aim.down", AimDownObjectPath);
+        RequireAimSampleRole(set, aimOffset, [0f, 0f, 0f], forward, "$.aim.forward", AimForwardObjectPath);
+        RequireAimSampleRole(set, aimOffset, [90f, 0f, 0f], up, "$.aim.up", AimUpObjectPath);
 
         var first = set.Animations[down];
         if (first.AdditiveType != AimAdditiveType ||
@@ -98,6 +129,7 @@ public static class AlsPoseProfileCompiler
         if (values.Length != 8) throw Failure("ALSPOSE007", "$.turns", "Exactly eight turn profiles are required.", "8", values.Length.ToString());
         var result = new AlsTurnProfile[values.Length];
         var combinations = new HashSet<(AlsPoseStance, sbyte, short)>();
+        var animationIds = new HashSet<int>();
         for (var index = 0; index < values.Length; index++)
         {
             var path = $"$.turns[{index}]";
@@ -111,8 +143,11 @@ public static class AlsPoseProfileCompiler
             var blend = Finite(source["blendSeconds"], $"{path}.blendSeconds");
             var scale = Boolean(source["scaleAngle"], $"{path}.scaleAngle");
             if (rate != 1.2f || blend != 0.2f || !scale) throw Failure("ALSPOSE009", path, "Turn settings must use basePlayRate 1.2, blendSeconds 0.2 and scaleAngle true.");
+            var animation = set.Animations[animationId];
+            RequireUniqueAnimation(animationIds, animation, $"{path}.animation", "turn");
+            RequireExactObjectPath(animation, TurnObjectPaths[(stance, direction, (short)nominal)], $"{path}.animation", "turn");
             if (!combinations.Add((stance, direction, (short)nominal))) throw Failure("ALSPOSE010", path, "Duplicate turn stance, direction and angle combination.");
-            result[index] = new AlsTurnProfile(animationId, CanonicalCurveId(set.Animations[animationId], $"{path}.animation"), stance, direction, (short)nominal, rate, blend, 1);
+            result[index] = new AlsTurnProfile(animationId, CanonicalCurveId(animation, $"{path}.animation"), stance, direction, (short)nominal, rate, blend, 1);
         }
         RequireCompleteTurns(combinations);
         return result;
@@ -124,6 +159,7 @@ public static class AlsPoseProfileCompiler
         if (values.Length != 4) throw Failure("ALSPOSE011", "$.rotates", "Exactly four rotate profiles are required.", "4", values.Length.ToString());
         var result = new AlsRotateProfile[values.Length];
         var combinations = new HashSet<(AlsPoseStance, sbyte)>();
+        var animationIds = new HashSet<int>();
         for (var index = 0; index < values.Length; index++)
         {
             var path = $"$.rotates[{index}]";
@@ -131,8 +167,11 @@ public static class AlsPoseProfileCompiler
             var animationId = ResolveAnimation(set, source["animation"], $"{path}.animation", skeletonId);
             var stance = Stance(source["stance"], $"{path}.stance");
             var direction = Direction(source["direction"], $"{path}.direction");
+            var animation = set.Animations[animationId];
+            RequireUniqueAnimation(animationIds, animation, $"{path}.animation", "rotate");
+            RequireExactObjectPath(animation, RotateObjectPaths[(stance, direction)], $"{path}.animation", "rotate");
             if (!combinations.Add((stance, direction))) throw Failure("ALSPOSE012", path, "Duplicate rotate stance and direction combination.");
-            result[index] = new AlsRotateProfile(animationId, CanonicalCurveId(set.Animations[animationId], $"{path}.animation"), stance, direction);
+            result[index] = new AlsRotateProfile(animationId, CanonicalCurveId(animation, $"{path}.animation"), stance, direction);
         }
         foreach (var stance in Enum.GetValues<AlsPoseStance>()) foreach (var direction in new sbyte[] { -1, 1 })
             if (!combinations.Contains((stance, direction))) throw Failure("ALSPOSE013", "$.rotates", "Rotate profiles do not cover every stance and direction.");
@@ -269,6 +308,48 @@ public static class AlsPoseProfileCompiler
     private static void RequireSkeleton(AlsAnimationDefinition animation, int skeletonId, string path)
     {
         if (animation.SkeletonId != skeletonId) throw Failure("ALSPOSE032", path, "Pose animation targets the wrong skeleton.", skeletonId.ToString(), animation.SkeletonId.ToString(), animation.StableId);
+    }
+
+    private static void RequireUniqueAnimation(HashSet<int> ids, AlsAnimationDefinition animation, string path, string role)
+    {
+        if (!ids.Add(animation.Id))
+            throw Failure("ALSPOSE042", path, $"Duplicate animation ID is not allowed across {role} slots.", "unique animation stable ID", animation.StableId, animation.StableId);
+    }
+
+    private static void RequireExactObjectPath(AlsAnimationDefinition animation, string expectedPath, string profilePath, string role) =>
+        RequireExactObjectPath(animation.StableId, animation.ObjectPath, expectedPath, profilePath, role);
+
+    private static void RequireExactObjectPath(string stableId, string objectPath, string expectedPath, string profilePath, string role)
+    {
+        if (!string.Equals(objectPath, expectedPath, StringComparison.Ordinal))
+            throw Failure("ALSPOSE043", profilePath, $"The {role} slot must resolve to its exact ALS v4 object path.", expectedPath, stableId, stableId);
+    }
+
+    private static void RequireAimSampleRole(
+        AlsAnimationSetDefinition set,
+        AlsBlendDefinition aimOffset,
+        float[] coordinate,
+        int expectedAnimationId,
+        string profilePath,
+        string expectedObjectPath)
+    {
+        var matches = aimOffset.Samples.Where(sample =>
+            sample.SampleValue is { Length: 3 } && sample.SampleValue.SequenceEqual(coordinate)).ToArray();
+        if (matches.Length != 1)
+            throw Failure("ALSPOSE044", profilePath,
+                "AimOffset must contain exactly one three-dimensional sample at the slot coordinate.",
+                expectedObjectPath, set.Animations[expectedAnimationId].StableId, aimOffset.StableId);
+
+        var actualAnimationId = matches[0].AnimationId;
+        if (actualAnimationId != expectedAnimationId)
+        {
+            var actualStableId = (uint)actualAnimationId < (uint)set.Animations.Length
+                ? set.Animations[actualAnimationId].StableId
+                : actualAnimationId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            throw Failure("ALSPOSE045", profilePath,
+                "AimOffset sample coordinate references the wrong animation for this semantic slot.",
+                expectedObjectPath, actualStableId, actualStableId);
+        }
     }
 
     private static int CanonicalCurveId(AlsAnimationDefinition animation, string path)
