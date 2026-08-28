@@ -8,10 +8,10 @@ function Get-P3aExpectedDigest
 
     if ($CharacterCount -eq 1)
     {
-        return '12CD6393BA75A1F9'
+        return 'B79EDC1516A133F9'
     }
 
-    return '7BE3F9467CC4EB63'
+    return 'D81D16BAA88519DC'
 }
 
 function Get-P3aCompletionMarker

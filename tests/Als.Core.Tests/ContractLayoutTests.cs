@@ -61,8 +61,8 @@ public sealed class ContractLayoutTests
             "SpineResidualYaw", "LastWorldYaw");
         AssertFieldOrder<AlsTurnInPlaceState>(
             "ActivationSeconds", "Phase", "PlayRate", "RemainingYaw", "NominalDegrees",
-            "Direction", "Active");
-        AssertFieldOrder<AlsRotateInPlaceState>("Phase", "PlayRate", "Direction", "Active");
+            "Direction", "Active", "Stance");
+        AssertFieldOrder<AlsRotateInPlaceState>("Phase", "PlayRate", "Direction", "Active", "Stance");
         AssertFieldOrder<AlsFootLockState>(
             "LocalPosition", "LocalRotation", "Offset", "Rotation", "PlatformId", "Amount", "Locked");
         AssertFieldOrder<AlsPelvisCorrectionState>(
@@ -90,7 +90,7 @@ public sealed class ContractLayoutTests
             "LastCommittedRootMotionFeedback", "ActualGait", "PreviousLocomotionState",
             "GroundedEntrySpeed", "SmoothedLocalVelocity", "SmoothedLocalAcceleration",
             "SmoothedLean", "LandingRecoveryTime", "SmoothedTargetYaw", "TargetYaw",
-            "JumpStartActive", "Initialized", "ViewPose", "TurnInPlace", "RotateInPlace",
+            "YawSource", "JumpStartActive", "Initialized", "ViewPose", "TurnInPlace", "RotateInPlace",
             "LeftFootLock", "RightFootLock", "PelvisCorrection", "LeftFootProbeOrigin",
             "RightFootProbeOrigin");
         AssertStorageFieldOrder<AlsFrameResult>(

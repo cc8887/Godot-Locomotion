@@ -69,6 +69,34 @@ public sealed class HotPathAllocationTests
         Assert.Equal(0, allocated);
     }
 
+    [Fact]
+    public void TurnRotateSelectAndFinalizeDoesNotAllocateAfterWarmup()
+    {
+        var input = P3TestInput.Grounded(
+            rotationMode: AlsRotationMode.Aiming,
+            characterYaw: 0f,
+            aimYaw: 1.4f);
+        var state = AlsRuntimeState.CreateDefault();
+        state.Initialized = 1;
+        state.LocomotionState = AlsLocomotionState.Grounded;
+        state.ViewPose = new AlsViewPoseState(1.4f, 0f, 8f, 0.25f, 0.5f, 0f, 0f);
+        var view = new AlsViewPoseOutput(1.4f, 0f, 0.25f, 0.5f, 0.75f, 0f);
+        var settings = AlsTurnRotateSettings.CreateReference();
+
+        for (var index = 0; index < 10_000; index++)
+        {
+            RunTurnRotate(settings, input, view, ref state);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 10_000; index++)
+        {
+            RunTurnRotate(settings, input, view, ref state);
+        }
+
+        Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+    }
+
     private static void Run(AlsFrameExchange exchange, int iterations)
     {
         var buffer = new AlsEventBuffer();
@@ -188,5 +216,20 @@ public sealed class HotPathAllocationTests
         }
 
         return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static void RunTurnRotate(
+        in AlsTurnRotateSettings settings,
+        in AlsFrameInput input,
+        in AlsViewPoseOutput view,
+        ref AlsRuntimeState state)
+    {
+        if (!AlsTurnRotateModel.TrySelectAndAdvance(
+                settings, input, view, state, out state, out var selection, out _) ||
+            !AlsTurnRotateModel.TryFinalizeYaw(selection, -1f, -0.5f, out _, out _))
+        {
+            throw new InvalidOperationException("Turn/rotate hot path failed.");
+        }
     }
 }

@@ -12,6 +12,8 @@ public static class AlsLocomotionModel
     private const float RecoveryTimeBoundaryTolerance = 1e-6f;
     private const float VelocityTargetYawSpeed = 800f * MathF.PI / 180f;
     private const float LookingTargetYawSpeed = 500f * MathF.PI / 180f;
+    private const float P4StationarySpeedThreshold = 0.1f;
+    private const float P4StationaryAccelerationThreshold = 0.1f;
 
     public static AlsGait CalculateActualGait(
         float speed,
@@ -355,12 +357,24 @@ public static class AlsLocomotionModel
         AlsLocomotionSettings settings,
         ref AlsRuntimeState nextState)
     {
-        if (speed <= settings.MovingSpeedThreshold &&
-            input.RotationMode != AlsRotationMode.Aiming)
+        var p4OwnsStationaryYaw =
+            input.RotationMode is AlsRotationMode.LookingDirection or AlsRotationMode.Aiming &&
+            input.Floor.IsGrounded == 1 &&
+            speed <= P4StationarySpeedThreshold &&
+            Hypot(input.ActualAcceleration.X, input.ActualAcceleration.Z) <=
+                P4StationaryAccelerationThreshold;
+        if (p4OwnsStationaryYaw ||
+            (speed <= settings.MovingSpeedThreshold &&
+             input.RotationMode == AlsRotationMode.VelocityDirection))
         {
             nextState.SmoothedTargetYaw = AlsMath.NormalizeAngleRadians(input.CharacterYaw);
+            nextState.YawSource = p4OwnsStationaryYaw
+                ? AlsYawSource.None
+                : AlsYawSource.Locomotion;
             return nextState.SmoothedTargetYaw;
         }
+
+        nextState.YawSource = AlsYawSource.Locomotion;
 
         var velocityYaw = speed > SmallNumber
             ? MathF.Atan2(-input.ActualVelocity.X, -input.ActualVelocity.Z)

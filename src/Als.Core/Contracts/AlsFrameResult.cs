@@ -11,6 +11,9 @@ public enum AlsP4ReasonCode : ushort
     NonFiniteInput = 2,
     InvalidSettings = 3,
     InvalidRotation = 4,
+    InvalidSelection = 5,
+    NonFiniteCurve = 6,
+    InvalidRuntimeState = 7,
 }
 
 [StructLayout(LayoutKind.Sequential)]
