@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Pose;
 
@@ -68,6 +69,10 @@ public sealed class ContractLayoutTests
             "YawSource", "AnimationId", "CurveId", "PreviousPhase", "CurrentPhase", "DeltaTime",
             "PhasePlayRate", "YawScale", "EffectiveDeltaTime", "PhaseTravel", "Duration",
             "BlendSeconds", "RemainingYaw", "NominalDegrees", "Direction", "ScaleAngle", "Active");
+        AssertStorageFieldOrder<AlsTurnRotateSelection>(
+            "YawSource", "AnimationId", "CurveId", "PreviousPhase", "CurrentPhase", "DeltaTime",
+            "PhasePlayRate", "YawScale", "EffectiveDeltaTime", "PhaseTravel", "Duration",
+            "BlendSeconds", "RemainingYaw", "NominalDegrees", "Direction", "ScaleAngle", "Active");
         AssertFieldOrder<AlsFootLockState>(
             "LocalPosition", "LocalRotation", "Offset", "Rotation", "PlatformId", "Amount", "Locked");
         AssertFieldOrder<AlsPelvisCorrectionState>(
@@ -111,6 +116,32 @@ public sealed class ContractLayoutTests
             "RotateDirection", "RotateActive", "RotateYawDelta", "PelvisOffset", "LeftFootPose",
             "RightFootPose", "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
             "P4ModifierElapsedTicks", "P4ReasonCode");
+    }
+
+    [Fact]
+    public void TurnRotateSelectionHasReadOnlyPublicSurface()
+    {
+        var type = typeof(AlsTurnRotateSelection);
+
+        Assert.Empty(type.GetConstructors(BindingFlags.Instance | BindingFlags.Public));
+        Assert.Empty(type.GetFields(BindingFlags.Instance | BindingFlags.Public));
+        Assert.All(
+            type.GetProperties(BindingFlags.Instance | BindingFlags.Public),
+            property => Assert.False(property.SetMethod?.IsPublic == true));
+        Assert.True(type.IsDefined(typeof(IsReadOnlyAttribute), inherit: false));
+        Assert.Equal(LayoutKind.Sequential, type.StructLayoutAttribute?.Value);
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsTurnRotateSelection>());
+    }
+
+    [Fact]
+    public void CoreInternalsAreVisibleOnlyToCoreTests()
+    {
+        var friendAssemblies = typeof(AlsTurnRotateSelection).Assembly
+            .GetCustomAttributes<InternalsVisibleToAttribute>()
+            .Select(attribute => attribute.AssemblyName)
+            .ToArray();
+
+        Assert.Equal(new[] { "Als.Core.Tests" }, friendAssemblies);
     }
 
     [Fact]

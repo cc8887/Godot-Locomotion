@@ -521,6 +521,28 @@ public sealed class AlsTurnRotateModelTests
         Assert.True(float.IsFinite(accumulatedYaw));
     }
 
+    [Fact]
+    public void RotateRejectsExactlyOneCycleTravelTransactionally()
+    {
+        var settings = AlsTurnRotateSettings.CreateReference() with
+        {
+            RotatePlayRateHalfLife = 0f,
+        };
+        var yaw = Degrees(80f);
+        var state = State(yaw, Degrees(460f));
+        state.RotateInPlace = new AlsRotateInPlaceState(
+            0.25f, 3f, 1, 1, AlsStance.Standing);
+        var deltaTime = 1f / 3f;
+        Assert.Equal(1f, (float)(3d * deltaTime));
+
+        Assert.False(Evaluate(settings, Input(deltaTime, mode: AlsRotationMode.Aiming),
+            View(yaw), state, out var next, out var selection, out var reason));
+
+        AssertRawEqual(state, next);
+        AssertRawEqual(default(AlsTurnRotateSelection), selection);
+        Assert.Equal(AlsP4ReasonCode.InvalidSelection, reason);
+    }
+
     [Theory]
     [InlineData(0.10001f, 0f, true, AlsStance.Standing, AlsRotationMode.Aiming, 80f)]
     [InlineData(0f, 0.10001f, true, AlsStance.Standing, AlsRotationMode.Aiming, 80f)]
@@ -681,10 +703,10 @@ public sealed class AlsTurnRotateModelTests
     {
         var invalidSelections = new[]
         {
-            ValidSelection(AlsYawSource.TurnInPlace, 0.1f) with { NominalDegrees = 0 },
-            ValidSelection(AlsYawSource.RotateInPlace, 0.1f) with { NominalDegrees = 90 },
-            ValidSelection(AlsYawSource.RotateInPlace, 0.1f) with { ScaleAngle = 1 },
-            ValidSelection(AlsYawSource.RotateInPlace, 0.1f) with { BlendSeconds = 0.2f },
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, nominalDegrees: 0),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, nominalDegrees: 90),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, scaleAngle: 1),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, blendSeconds: 0.2f),
         };
 
         foreach (var selection in invalidSelections)
@@ -701,14 +723,13 @@ public sealed class AlsTurnRotateModelTests
     {
         var invalidSelections = new[]
         {
-            ValidSelection(AlsYawSource.TurnInPlace, 0.1f) with
-                { PhasePlayRate = float.NaN },
-            ValidSelection(AlsYawSource.TurnInPlace, 0.1f) with
-                { YawScale = float.PositiveInfinity },
-            ValidSelection(AlsYawSource.TurnInPlace, 0.1f) with
-                { EffectiveDeltaTime = 0f },
-            ValidSelection(AlsYawSource.TurnInPlace, 0.1f) with
-                { EffectiveDeltaTime = MathF.BitIncrement(0.1f) },
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, phasePlayRate: float.NaN),
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, yawScale: float.PositiveInfinity),
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, effectiveDeltaTime: 0f),
+            TestSelection(
+                AlsYawSource.TurnInPlace,
+                0.1f,
+                effectiveDeltaTime: MathF.BitIncrement(0.1f)),
         };
 
         foreach (var selection in invalidSelections)
@@ -723,14 +744,16 @@ public sealed class AlsTurnRotateModelTests
     [Fact]
     public void SelectionRejectsBrokenTurnCrossFieldInvariantsTransactionally()
     {
-        var valid = ValidSelection(AlsYawSource.TurnInPlace, 0.1f);
         var invalidSelections = new[]
         {
-            valid with { CurrentPhase = MathF.BitDecrement(valid.PreviousPhase) },
-            valid with { PhaseTravel = valid.PhaseTravel * 0.5f },
-            valid with { YawScale = 10f },
-            valid with { RemainingYaw = -valid.RemainingYaw },
-            valid with { Duration = valid.CurrentPhase - 0.01f },
+            TestSelection(
+                AlsYawSource.TurnInPlace,
+                0.1f,
+                currentPhase: MathF.BitDecrement(0.1f)),
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, phaseTravel: 0.05f),
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, yawScale: 10f),
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, remainingYaw: -Degrees(90f)),
+            TestSelection(AlsYawSource.TurnInPlace, 0.1f, duration: 0.19f),
         };
 
         foreach (var selection in invalidSelections)
@@ -745,16 +768,18 @@ public sealed class AlsTurnRotateModelTests
     [Fact]
     public void SelectionRejectsBrokenRotateCrossFieldInvariantsTransactionally()
     {
-        var valid = ValidSelection(AlsYawSource.RotateInPlace, 0.1f);
         var invalidSelections = new[]
         {
-            valid with { CurrentPhase = valid.PreviousPhase },
-            valid with { PhaseTravel = 0f },
-            valid with { PhaseTravel = MathF.BitIncrement(valid.Duration) },
-            valid with { YawScale = 10f },
-            valid with { RemainingYaw = -valid.RemainingYaw },
-            valid with { Duration = 0f },
-            valid with { DeltaTime = 0.2f },
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, currentPhase: 0.1f),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, phaseTravel: 0f),
+            TestSelection(
+                AlsYawSource.RotateInPlace,
+                0.1f,
+                phaseTravel: MathF.BitIncrement(1f)),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, yawScale: 10f),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, remainingYaw: -Degrees(90f)),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, duration: 0f),
+            TestSelection(AlsYawSource.RotateInPlace, 0.1f, publishedDeltaTime: 0.2f),
         };
 
         foreach (var selection in invalidSelections)
@@ -1023,6 +1048,38 @@ public sealed class AlsTurnRotateModelTests
         1,
         0,
         1);
+
+    private static AlsTurnRotateSelection TestSelection(
+        AlsYawSource source,
+        float deltaTime,
+        float? currentPhase = null,
+        float? publishedDeltaTime = null,
+        float? phasePlayRate = null,
+        float? yawScale = null,
+        float? effectiveDeltaTime = null,
+        float? phaseTravel = null,
+        float? duration = null,
+        float? blendSeconds = null,
+        float? remainingYaw = null,
+        short? nominalDegrees = null,
+        byte? scaleAngle = null) => new(
+            source,
+            100,
+            200,
+            0.1f,
+            currentPhase ?? 0.1f + deltaTime,
+            publishedDeltaTime ?? deltaTime,
+            phasePlayRate ?? 1f,
+            yawScale ?? 1f,
+            effectiveDeltaTime ?? deltaTime,
+            phaseTravel ?? deltaTime,
+            duration ?? 1f,
+            blendSeconds ?? (source == AlsYawSource.TurnInPlace ? 0.2f : 0f),
+            remainingYaw ?? Degrees(90f),
+            nominalDegrees ?? (source == AlsYawSource.TurnInPlace ? (short)90 : (short)0),
+            1,
+            scaleAngle ?? 0,
+            1);
 
     private static AlsRuntimeState SentinelState()
     {

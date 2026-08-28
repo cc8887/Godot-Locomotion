@@ -6,24 +6,80 @@ using GodotAls.Core.Contracts;
 namespace GodotAls.Core.Pose;
 
 [StructLayout(LayoutKind.Sequential)]
-public readonly record struct AlsTurnRotateSelection(
-    AlsYawSource YawSource,
-    int AnimationId,
-    int CurveId,
-    float PreviousPhase,
-    float CurrentPhase,
-    float DeltaTime,
-    float PhasePlayRate,
-    float YawScale,
-    float EffectiveDeltaTime,
-    float PhaseTravel,
-    float Duration,
-    float BlendSeconds,
-    float RemainingYaw,
-    short NominalDegrees,
-    sbyte Direction,
-    byte ScaleAngle,
-    byte Active);
+public readonly record struct AlsTurnRotateSelection
+{
+    public AlsYawSource YawSource { get; }
+
+    public int AnimationId { get; }
+
+    public int CurveId { get; }
+
+    public float PreviousPhase { get; }
+
+    public float CurrentPhase { get; }
+
+    public float DeltaTime { get; }
+
+    public float PhasePlayRate { get; }
+
+    public float YawScale { get; }
+
+    public float EffectiveDeltaTime { get; }
+
+    public float PhaseTravel { get; }
+
+    public float Duration { get; }
+
+    public float BlendSeconds { get; }
+
+    public float RemainingYaw { get; }
+
+    public short NominalDegrees { get; }
+
+    public sbyte Direction { get; }
+
+    public byte ScaleAngle { get; }
+
+    public byte Active { get; }
+
+    internal AlsTurnRotateSelection(
+        AlsYawSource yawSource,
+        int animationId,
+        int curveId,
+        float previousPhase,
+        float currentPhase,
+        float deltaTime,
+        float phasePlayRate,
+        float yawScale,
+        float effectiveDeltaTime,
+        float phaseTravel,
+        float duration,
+        float blendSeconds,
+        float remainingYaw,
+        short nominalDegrees,
+        sbyte direction,
+        byte scaleAngle,
+        byte active)
+    {
+        YawSource = yawSource;
+        AnimationId = animationId;
+        CurveId = curveId;
+        PreviousPhase = previousPhase;
+        CurrentPhase = currentPhase;
+        DeltaTime = deltaTime;
+        PhasePlayRate = phasePlayRate;
+        YawScale = yawScale;
+        EffectiveDeltaTime = effectiveDeltaTime;
+        PhaseTravel = phaseTravel;
+        Duration = duration;
+        BlendSeconds = blendSeconds;
+        RemainingYaw = remainingYaw;
+        NominalDegrees = nominalDegrees;
+        Direction = direction;
+        ScaleAngle = scaleAngle;
+        Active = active;
+    }
+}
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsTurnRotateOutput(
@@ -483,7 +539,7 @@ public static class AlsTurnRotateModel
             selection.EffectiveDeltaTime != selection.DeltaTime ||
             selection.PreviousPhase >= selection.Duration ||
             selection.CurrentPhase >= selection.Duration ||
-            selection.PhaseTravel > selection.Duration)
+            selection.PhaseTravel >= selection.Duration)
         {
             return false;
         }
