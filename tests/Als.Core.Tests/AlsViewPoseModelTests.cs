@@ -74,12 +74,19 @@ public sealed class AlsViewPoseModelTests
     }
 
     [Fact]
-    public void SettingsRequireEveryModeToPublishANonDefaultViewPoseState()
+    public void AllZeroLayerWeightsRemainAValidConfiguration()
     {
-        var settings = AlsViewPoseSettings.CreateDefault();
+        var settings = AlsViewPoseSettings.CreateDefault() with
+        {
+            AimingHeadWeight = 0f,
+            NonAimingHeadWeight = 0f,
+            AimingSpineWeight = 0f,
+            NonAimingSpineWeight = 0f,
+            AimingUpperBodyWeight = 0f,
+            NonAimingUpperBodyWeight = 0f,
+        };
 
-        Assert.False((settings with { NonAimingHeadWeight = 0f }).Validate());
-        Assert.False((settings with { AimingSpineWeight = 0f }).Validate());
+        Assert.True(settings.Validate());
     }
 
     [Fact]
@@ -145,6 +152,71 @@ public sealed class AlsViewPoseModelTests
             out _));
 
         Assert.Equal(1f, next.ViewPose.YawSpeed, Tolerance);
+    }
+
+    [Theory]
+    [InlineData((byte)0, 0f)]
+    [InlineData((byte)0, 1f)]
+    [InlineData((byte)1, 0f)]
+    [InlineData((byte)1, 1f)]
+    public void RawMarkerSeedsAllZeroWeightSettingsExactlyOnce(
+        byte p3Initialized,
+        float firstYaw)
+    {
+        var settings = AlsViewPoseSettings.CreateDefault() with
+        {
+            AimingHeadWeight = 0f,
+            NonAimingHeadWeight = 0f,
+            AimingSpineWeight = 0f,
+            NonAimingSpineWeight = 0f,
+            AimingUpperBodyWeight = 0f,
+            NonAimingUpperBodyWeight = 0f,
+        };
+        var state = AlsRuntimeState.CreateDefault();
+        state.Initialized = p3Initialized;
+
+        Assert.True(AlsViewPoseModel.TryEvaluate(
+            settings,
+            Input(viewYaw: firstYaw, deltaTime: 0.1f),
+            state,
+            out state,
+            out var firstOutput,
+            out _));
+        Assert.Equal(0f, state.ViewPose.YawSpeed);
+        Assert.Equal(0f, state.ViewPose.HeadWeight);
+        Assert.Equal(0f, state.ViewPose.SpineWeight);
+        Assert.Equal(0f, firstOutput.UpperBodyWeight);
+        var storedWorldYawBits = BitConverter.SingleToInt32Bits(state.ViewPose.LastWorldYaw);
+        Assert.NotEqual(int.MinValue, storedWorldYawBits);
+        Assert.Equal(
+            BitConverter.SingleToInt32Bits(firstYaw),
+            storedWorldYawBits);
+
+        Assert.True(AlsViewPoseModel.TryEvaluate(
+            settings,
+            Input(viewYaw: firstYaw + 0.1f, deltaTime: 0.1f),
+            state,
+            out var second,
+            out _,
+            out _));
+        Assert.Equal(1f, second.ViewPose.YawSpeed, Tolerance);
+        Assert.Equal(p3Initialized, second.Initialized);
+    }
+
+    [Fact]
+    public void ClrDefaultViewPoseIsNotTheFactoryInitializationMarker()
+    {
+        var state = default(AlsRuntimeState);
+        state.Initialized = 1;
+
+        Assert.True(Evaluate(
+            Input(viewYaw: 1f, deltaTime: 0.1f),
+            state,
+            out var next,
+            out _,
+            out _));
+
+        Assert.Equal(10f, next.ViewPose.YawSpeed, Tolerance);
     }
 
     [Fact]
@@ -344,7 +416,7 @@ public sealed class AlsViewPoseModelTests
     }
 
     [Fact]
-    public void OnlyWorldUpPlatformAngularVelocityIsRelevant()
+    public void EveryActivePlatformAngularVelocityComponentMustBeFinite()
     {
         var input = Input(viewYaw: 0.4f) with
         {
@@ -356,8 +428,40 @@ public sealed class AlsViewPoseModelTests
                 new Vector3(float.NaN, 0f, float.PositiveInfinity)),
         };
 
-        Assert.True(Evaluate(input, InitializedState(), out _, out _, out var reason));
-        Assert.Equal(AlsP4ReasonCode.None, reason);
+        AssertTransactionalFailure(
+            input,
+            AlsViewPoseSettings.CreateDefault(),
+            SentinelState(),
+            AlsP4ReasonCode.NonFiniteInput);
+    }
+
+    [Fact]
+    public void FinitePlatformAngularVelocityUsesOnlyWorldUpForYawCorrection()
+    {
+        var state = InitializedState(lastWorldYaw: 0.5f, relativeYaw: 0.2f);
+        var baseInput = Input(viewYaw: 0.6f, deltaTime: 0.2f);
+        var first = baseInput with
+        {
+            Floor = new AlsFloorSample(
+                1,
+                Vector3.UnitY,
+                7,
+                Matrix4x4.Identity,
+                new Vector3(10f, 0.5f, -20f)),
+        };
+        var second = first with
+        {
+            Floor = first.Floor with
+            {
+                PlatformAngularVelocity = new Vector3(-30f, 0.5f, 40f),
+            },
+        };
+
+        Assert.True(Evaluate(first, state, out var firstState, out var firstOutput, out _));
+        Assert.True(Evaluate(second, state, out var secondState, out var secondOutput, out _));
+
+        AssertRawEqual(firstState, secondState);
+        AssertRawEqual(firstOutput, secondOutput);
     }
 
     [Fact]
@@ -531,7 +635,7 @@ public sealed class AlsViewPoseModelTests
     }
 
     [Fact]
-    public void AdjacentSpineEndpointsStillRecoverUpperBodyPhase()
+    public void AdjacentSpineEndpointsCannotEncodeDistinctUpperBodyPhase()
     {
         var nonAimingSpine = 0.5f;
         var aimingSpine = MathF.BitIncrement(nonAimingSpine);
@@ -542,25 +646,38 @@ public sealed class AlsViewPoseModelTests
             AimingUpperBodyWeight = 0.9f,
             NonAimingUpperBodyWeight = 0.1f,
         };
-        var initial = InitializedState(
+        Assert.False(settings.Validate());
+    }
+
+    [Fact]
+    public void RepresentableSpineMidpointProducesTheoreticalHalfUpperBodyWeight()
+    {
+        var settings = AlsViewPoseSettings.CreateDefault() with
+        {
+            AimingSpineWeight = 0.8f,
+            NonAimingSpineWeight = 0.2f,
+            AimingUpperBodyWeight = 0.9f,
+            NonAimingUpperBodyWeight = 0.1f,
+        };
+        var state = InitializedState(
             lastWorldYaw: 0.4f,
             relativeYaw: 0.4f,
-            spineWeight: nonAimingSpine);
-        var input = Input(
-            viewYaw: 0.4f,
-            aimYaw: 0.4f,
-            deltaTime: 0.1f,
-            rotationMode: AlsRotationMode.Aiming);
+            spineWeight: 0.2f);
 
         Assert.True(AlsViewPoseModel.TryEvaluate(
-            settings, input, initial, out _, out var whole, out _));
-        var halfInput = input with { DeltaTime = 0.05f };
-        Assert.True(AlsViewPoseModel.TryEvaluate(
-            settings, halfInput, initial, out var half, out _, out _));
-        Assert.True(AlsViewPoseModel.TryEvaluate(
-            settings, halfInput, half, out _, out var split, out _));
+            settings,
+            Input(
+                viewYaw: 0.4f,
+                aimYaw: 0.4f,
+                deltaTime: 0.1f,
+                rotationMode: AlsRotationMode.Aiming),
+            state,
+            out _,
+            out var output,
+            out _));
 
-        Assert.Equal(whole.UpperBodyWeight, split.UpperBodyWeight, Tolerance);
+        Assert.Equal(0.5f, output.SpineWeight, Tolerance);
+        Assert.Equal(0.5f, output.UpperBodyWeight, Tolerance);
     }
 
     [Fact]

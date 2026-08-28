@@ -39,10 +39,19 @@ public readonly record struct AlsViewPoseSettings(
         IsWeight(NonAimingSpineWeight) &&
         IsWeight(AimingUpperBodyWeight) &&
         IsWeight(NonAimingUpperBodyWeight) &&
-        (AimingHeadWeight > 0f || AimingSpineWeight > 0f) &&
-        (NonAimingHeadWeight > 0f || NonAimingSpineWeight > 0f) &&
-        (AimingSpineWeight != NonAimingSpineWeight ||
-         AimingUpperBodyWeight == NonAimingUpperBodyWeight);
+        HasRecoverableUpperBodyPhase();
+
+    private bool HasRecoverableUpperBodyPhase()
+    {
+        if (AimingUpperBodyWeight == NonAimingUpperBodyWeight)
+        {
+            return true;
+        }
+
+        var minimumSpineWeight = MathF.Min(AimingSpineWeight, NonAimingSpineWeight);
+        var maximumSpineWeight = MathF.Max(AimingSpineWeight, NonAimingSpineWeight);
+        return MathF.BitIncrement(minimumSpineWeight) < maximumSpineWeight;
+    }
 
     private static bool IsWeight(float value) =>
         float.IsFinite(value) && value >= 0f && value <= 1f;

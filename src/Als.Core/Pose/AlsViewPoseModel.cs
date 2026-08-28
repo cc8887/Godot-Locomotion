@@ -70,7 +70,7 @@ public static class AlsViewPoseModel
 
         var onRotatingPlatform = input.Floor.IsGrounded == 1 && input.Floor.PlatformId >= 0;
         if (onRotatingPlatform &&
-            (!IsFinite(input.Floor.PlatformAngularVelocity.Y) ||
+            (!IsFinite(input.Floor.PlatformAngularVelocity) ||
              !TryExtractTransformYawPitch(input.Floor.PlatformTransform, out _, out _)))
         {
             reason = AlsP4ReasonCode.NonFiniteInput;
@@ -96,7 +96,7 @@ public static class AlsViewPoseModel
             -settings.PitchClamp,
             settings.PitchClamp);
 
-        var firstFrame = currentState.ViewPose == default;
+        var firstFrame = AlsViewPoseState.IsUninitialized(currentState.ViewPose);
         var platformYawDelta = onRotatingPlatform
             ? (double)input.Floor.PlatformAngularVelocity.Y * input.DeltaTime
             : 0d;
@@ -170,6 +170,7 @@ public static class AlsViewPoseModel
             -settings.SpineResidualYawClamp,
             settings.SpineResidualYawClamp);
 
+        var storedViewYaw = viewYaw == 0f ? 0f : viewYaw;
         var nextViewPose = new AlsViewPoseState(
             relativeViewYaw,
             relativeViewPitch,
@@ -177,7 +178,7 @@ public static class AlsViewPoseModel
             headWeight,
             spineWeight,
             spineResidualYaw,
-            viewYaw);
+            storedViewYaw);
         var next = currentState;
         next.ViewPose = nextViewPose;
         var nextOutput = new AlsViewPoseOutput(
@@ -291,6 +292,9 @@ public static class AlsViewPoseModel
 
     private static bool IsFinite(in Quaternion value) =>
         IsFinite(value.X) && IsFinite(value.Y) && IsFinite(value.Z) && IsFinite(value.W);
+
+    private static bool IsFinite(in Vector3 value) =>
+        IsFinite(value.X) && IsFinite(value.Y) && IsFinite(value.Z);
 
     private static bool IsFinite(in Matrix4x4 value) =>
         IsFinite(value.M11) && IsFinite(value.M12) && IsFinite(value.M13) && IsFinite(value.M14) &&
