@@ -137,6 +137,12 @@ public partial class P4PoseSmoke : Node
             graph.TargetSkeleton,
             (Node3D)library.Root,
             cases[0].ToInput());
+        VerifySkeletonIdentityMutationsRejected(
+            modifier,
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            cases[0].ToInput());
         var turnDigest = RunAction(
             controller, modifier, graph.TargetSkeleton, (Node3D)library.Root, result,
             AlsP4AnimationInput.Turn(
@@ -156,12 +162,8 @@ public partial class P4PoseSmoke : Node
 
         basePose.Restore(graph.TargetSkeleton, (Node3D)library.Root);
         var rollbackPose = PoseSnapshot.Capture(graph.TargetSkeleton, (Node3D)library.Root);
-        var rollbackOutput = new AlsPoseModifierOutput
-        {
-            PoseDigest = 0x1122334455667788UL,
-            DeterministicElapsedTicks = 31337,
-            WriteTransactionCount = 17,
-        };
+        var rollbackExpected = SentinelOutput();
+        var rollbackOutput = rollbackExpected;
         var rollbackInput = cases[0].ToInput() with
         {
             InjectFailure = AlsPoseModifierFailureStage.AfterAim,
@@ -170,10 +172,7 @@ public partial class P4PoseSmoke : Node
             "injected post-Aim failure unexpectedly succeeded");
         Require(rollbackReason == AlsP4ReasonCode.InvalidRuntimeState,
             "injected post-Aim failure returned the wrong bounded reason");
-        Require(rollbackOutput.PoseDigest == 0x1122334455667788UL &&
-                rollbackOutput.DeterministicElapsedTicks == 31337 &&
-                rollbackOutput.WriteTransactionCount == 17,
-            "failed modifier transaction published a new output");
+        RequireOutputExact(rollbackOutput, rollbackExpected, "post-Aim rollback");
         rollbackPose.RequireExact(graph.TargetSkeleton, (Node3D)library.Root, "post-Aim rollback");
 
         var zeroInput = cases[0].ToInput() with
@@ -189,6 +188,7 @@ public partial class P4PoseSmoke : Node
                 "modifier allocation warmup failed");
         }
         var allocationBefore = GC.GetAllocatedBytesForCurrentThread();
+        var steadyStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         for (var index = 0; index < 10_000; index++)
         {
             if (!modifier.TryApply(in zeroInput, ref zeroOutput, out _))
@@ -196,8 +196,12 @@ public partial class P4PoseSmoke : Node
                 throw new InvalidOperationException("steady modifier evaluation failed");
             }
         }
+        var steadyElapsed = System.Diagnostics.Stopwatch.GetElapsedTime(steadyStartedAt);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocationBefore;
         Require(allocated == 0, $"steady modifier path allocated {allocated} B");
+        GD.Print(
+            $"P4_POSE_TOPOLOGY_PERF iterations=10000 elapsed_ms={steadyElapsed.TotalMilliseconds:F3} " +
+            $"bones={graph.TargetSkeleton.GetBoneCount()} alloc={allocated}B");
 
         VerifyWriteFailureTransactions(
             basePose,
@@ -438,6 +442,68 @@ public partial class P4PoseSmoke : Node
         RequireOutputExact(frozenOutput, frozenExpected, "persistent setter failure");
         Require(!frozenBefore.IsExact(skeleton, visualRoot),
             "persistent setter failure did not leave an observable frozen partial pose");
+        basePose.Restore(skeleton, visualRoot);
+    }
+
+    private static void VerifySkeletonIdentityMutationsRejected(
+        AlsComponentPoseModifier modifier,
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        in AlsPoseModifierInput input)
+    {
+        var boneId = skeleton.FindBone("hand_l");
+        Require(boneId >= 0, "identity mutation fixture bone is missing");
+        var originalName = skeleton.GetBoneName(boneId);
+        const string mutatedName = "hand_l_task9_mutated";
+        basePose.Restore(skeleton, visualRoot);
+        var beforeName = PoseSnapshot.Capture(skeleton, visualRoot);
+        var expected = SentinelOutput();
+        var output = expected;
+        try
+        {
+            skeleton.SetBoneName(boneId, mutatedName);
+            Require(!modifier.TryApply(in input, ref output, out var reason),
+                "same-count Skeleton name mutation unexpectedly succeeded");
+            Require(reason == AlsP4ReasonCode.InvalidRuntimeState,
+                $"name mutation returned unstable reason: {reason}");
+            RequireOutputExact(output, expected, "name mutation");
+            beforeName.RequireExact(skeleton, visualRoot, "name mutation");
+        }
+        finally
+        {
+            skeleton.SetBoneName(boneId, originalName);
+        }
+        basePose.Restore(skeleton, visualRoot);
+        output = default;
+        Require(modifier.TryApply(in input, ref output, out var recoveredNameReason),
+            $"modifier did not recover after name restoration: {recoveredNameReason}");
+
+        basePose.Restore(skeleton, visualRoot);
+        var originalRest = skeleton.GetBoneRest(boneId);
+        var mutatedRest = originalRest;
+        mutatedRest.Origin += new Vector3(0.000001f, 0f, 0f);
+        var beforeRest = PoseSnapshot.Capture(skeleton, visualRoot);
+        expected = SentinelOutput();
+        output = expected;
+        try
+        {
+            skeleton.SetBoneRest(boneId, mutatedRest);
+            Require(!modifier.TryApply(in input, ref output, out var reason),
+                "same-count Skeleton rest mutation unexpectedly succeeded");
+            Require(reason == AlsP4ReasonCode.InvalidRuntimeState,
+                $"rest mutation returned unstable reason: {reason}");
+            RequireOutputExact(output, expected, "rest mutation");
+            beforeRest.RequireExact(skeleton, visualRoot, "rest mutation");
+        }
+        finally
+        {
+            skeleton.SetBoneRest(boneId, originalRest);
+        }
+        basePose.Restore(skeleton, visualRoot);
+        output = default;
+        Require(modifier.TryApply(in input, ref output, out var recoveredRestReason),
+            $"modifier did not recover after rest restoration: {recoveredRestReason}");
         basePose.Restore(skeleton, visualRoot);
     }
 

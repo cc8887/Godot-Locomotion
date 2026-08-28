@@ -76,6 +76,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
     private readonly Node3D _visualRoot;
     private readonly AlsPoseScratch _scratch;
     private readonly Transform3D[] _rests;
+    private readonly string[] _boneNames;
     private readonly byte[] _weightKinds;
     private readonly ClipBinding _base;
     private readonly ClipBinding _down;
@@ -120,10 +121,14 @@ public sealed class AlsComponentPoseModifier : IDisposable
         AlsAnimationBinder.ValidateTargetSkeleton(skeleton, skeletonDefinition, "P4 component pose modifier");
         _scratch = new AlsPoseScratch(skeleton);
         _rests = new Transform3D[_scratch.BoneCount];
+        _boneNames = new string[_scratch.BoneCount];
         _weightKinds = new byte[_scratch.BoneCount];
         for (var boneId = 0; boneId < _rests.Length; boneId++)
         {
             _rests[boneId] = skeleton.GetBoneRest(boneId);
+            // Binder has already established the source identity case-insensitively.
+            // Cache the validated runtime spelling so the hot check is exact and allocation-free.
+            _boneNames[boneId] = skeleton.GetBoneName(boneId);
             var expectedParent = skeletonDefinition.PhysicalBones[boneId].ParentPhysicalId;
             if (_scratch.Parents[boneId] != expectedParent || !IsFinite(_rests[boneId]))
             {
@@ -260,7 +265,9 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 return false;
             }
             var parent = _scratch.Parents[boneId];
-            if (_skeleton.GetBoneParent(boneId) != parent ||
+            if (_skeleton.FindBone(_boneNames[boneId]) != boneId ||
+                _skeleton.GetBoneRest(boneId) != _rests[boneId] ||
+                _skeleton.GetBoneParent(boneId) != parent ||
                 (parent >= 0 && !_scratch.ValidationVisited[parent]))
             {
                 return false;

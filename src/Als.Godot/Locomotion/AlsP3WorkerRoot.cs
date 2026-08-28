@@ -71,12 +71,21 @@ public partial class AlsP3WorkerRoot : Node3D
             _controller = new AlsLocomotionAnimationController(_graph, context.Settings);
             _controller.Warmup();
             _skeleton = _graph.TargetSkeleton;
-            _poseModifier = new AlsComponentPoseModifier(
-                _skeleton,
-                _visualRoot,
-                _library,
-                context.AnimationSet,
-                _poseProfile);
+            var poseWriter = context.PoseWriterFactory?.Invoke(_skeleton);
+            _poseModifier = poseWriter is null
+                ? new AlsComponentPoseModifier(
+                    _skeleton,
+                    _visualRoot,
+                    _library,
+                    context.AnimationSet,
+                    _poseProfile)
+                : new AlsComponentPoseModifier(
+                    _skeleton,
+                    _visualRoot,
+                    _library,
+                    context.AnimationSet,
+                    _poseProfile,
+                    poseWriter);
             var boneCount = _skeleton.GetBoneCount();
             _posePositions = new Vector3[boneCount];
             _poseRotations = new Quaternion[boneCount];
@@ -310,7 +319,8 @@ public partial class AlsP3WorkerRoot : Node3D
                             : new AggregateException(
                                 "Worker evaluation and pose restoration both failed.",
                                 exception,
-                                restoreException));
+                                restoreException),
+                        _result.P4ReasonCode);
                 }
             }
         }

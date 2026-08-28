@@ -34,6 +34,11 @@ public partial class AlsP3Character : Node3D
     public int FailureDiagnosticCount =>
         Volatile.Read(ref _state.FailureDiagnosticCount);
 
+    internal long ResultPublishedFrameId => _state.ResultPublishedFrameId;
+
+    internal AlsP4ReasonCode LastFailureReasonCode =>
+        (AlsP4ReasonCode)Volatile.Read(ref _state.LastFailureReasonCode);
+
     public Node3D MovementAnchor
     {
         get

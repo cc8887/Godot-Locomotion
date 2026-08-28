@@ -1,5 +1,6 @@
 using Godot;
 using GodotAls.Assets;
+using GodotAls.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Exchange;
@@ -53,6 +54,12 @@ public partial class P3bFrameOrderSmoke : Node
     private ulong _workerFailureRootDigest;
     private bool _quitting;
     private string? _failurePolicy;
+    private PoseRestoreFailureWriter? _poseRestoreWriter;
+    private bool _poseRestoreFailureInjected;
+    private long _poseRestoreCommittedFrame;
+    private long _poseRestoreResultPublishedFrame;
+    private long _poseRestoreObservedMotorFrame;
+    private int _poseRestoreAttemptsAtFreeze;
 
     public override void _Ready()
     {
@@ -91,6 +98,15 @@ public partial class P3bFrameOrderSmoke : Node
                 profile,
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: _failurePolicy is null or "headless");
+            if (_failurePolicy == "pose_restore")
+            {
+                _context.PoseWriterFactory = skeleton =>
+                {
+                    var writer = new PoseRestoreFailureWriter(skeleton);
+                    _poseRestoreWriter ??= writer;
+                    return writer;
+                };
+            }
             AddChild(CreateFloor());
             _slot = new AlsP3CharacterSlot { Name = "CharacterSlot" };
             AddChild(_slot);
@@ -327,6 +343,11 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void ValidateFailurePolicy()
     {
+        if (_failurePolicy == "pose_restore")
+        {
+            ValidatePoseRestoreFailure();
+            return;
+        }
         if (_failurePolicy is "worker" or "headless")
         {
             ValidateWorkerFailure();
@@ -379,11 +400,65 @@ public partial class P3bFrameOrderSmoke : Node
                 "--als-failure-policy=interactive" => "interactive",
                 "--als-failure-policy=worker" => "worker",
                 "--als-failure-policy=bounded" => "bounded",
+                "--als-failure-policy=pose_restore" => "pose_restore",
                 var value => throw new InvalidOperationException(
                     $"Unsupported P3B failure policy fixture: {value}"),
             };
         }
         return (mode, failurePolicy);
+    }
+
+    private void ValidatePoseRestoreFailure()
+    {
+        if (!_poseRestoreFailureInjected)
+        {
+            var committed = _active.Diagnostics;
+            if (committed.CommittedFrameId < 12 || _active.WorkerInFlight != 0)
+            {
+                return;
+            }
+            Require(_poseRestoreWriter is not null,
+                "P4 pose restore writer was not injected into the real Worker");
+            _poseRestoreCommittedFrame = committed.CommittedFrameId;
+            _poseRestoreResultPublishedFrame = _active.ResultPublishedFrameId;
+            _poseRestoreWriter!.ArmPersistentFailure(afterWriteCount: 2);
+            _poseRestoreFailureInjected = true;
+            return;
+        }
+
+        if (_active.FailureDiagnosticCount == 0)
+        {
+            return;
+        }
+        if (_poseRestoreObservedMotorFrame == 0)
+        {
+            _poseRestoreObservedMotorFrame = _active.PublishedFrameId;
+            _poseRestoreAttemptsAtFreeze = _poseRestoreWriter!.WriteAttempts;
+            return;
+        }
+        if (_active.PublishedFrameId < _poseRestoreObservedMotorFrame + 4)
+        {
+            return;
+        }
+
+        Require(_active.IsPoseFrozen, "P4 pose restore failure did not freeze Worker");
+        Require(_active.LastFailureReasonCode == AlsP4ReasonCode.PoseRestoreFailed,
+            $"P4 pose restore reason was lost at Worker boundary: {_active.LastFailureReasonCode}");
+        Require(_active.Diagnostics.CommittedFrameId == _poseRestoreCommittedFrame,
+            "P4 pose restore failure published a new commit");
+        Require(_active.ResultPublishedFrameId == _poseRestoreResultPublishedFrame,
+            "P4 pose restore failure published a new Worker result");
+        Require(_active.FailureDiagnosticCount == 1,
+            "P4 pose restore failure emitted duplicate diagnostics");
+        Require(_poseRestoreWriter!.WriteAttempts == _poseRestoreAttemptsAtFreeze,
+            "frozen Worker continued evaluating on the next frame");
+
+        GD.Print(
+            $"GODOT_ALS_P4_POSE_RESTORE_FAILURE_OK mode={_mode.ToString().ToLowerInvariant()} " +
+            $"worker_frozen=1 reason={_active.LastFailureReasonCode} diagnostics=1 publish=0");
+        _slot.DisposeRuntime();
+        _quitting = true;
+        GetTree().Quit();
     }
 
     private static IAlsLocomotionCommandSource CreateCommandSource(string? failurePolicy) =>
@@ -812,6 +887,70 @@ public partial class P3bFrameOrderSmoke : Node
         if (!condition)
         {
             throw new InvalidOperationException(message);
+        }
+    }
+
+    private sealed class PoseRestoreFailureWriter : IAlsSkeletonPoseWriter
+    {
+        private readonly Skeleton3D _skeleton;
+        private int _armed;
+        private int _triggered;
+        private int _armedWriteCount;
+        private int _throwAfter;
+        private int _writeAttempts;
+
+        public PoseRestoreFailureWriter(Skeleton3D skeleton) => _skeleton = skeleton;
+
+        public int WriteAttempts => Volatile.Read(ref _writeAttempts);
+
+        public void ArmPersistentFailure(int afterWriteCount)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(afterWriteCount);
+            _throwAfter = afterWriteCount;
+            Volatile.Write(ref _armedWriteCount, 0);
+            Volatile.Write(ref _triggered, 0);
+            Volatile.Write(ref _armed, 1);
+        }
+
+        public void SetBonePosePosition(int boneId, in Vector3 value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePosePosition(boneId, value);
+            AfterWrite();
+        }
+
+        public void SetBonePoseRotation(int boneId, in Quaternion value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePoseRotation(boneId, value);
+            AfterWrite();
+        }
+
+        public void SetBonePoseScale(int boneId, in Vector3 value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePoseScale(boneId, value);
+            AfterWrite();
+        }
+
+        private void BeforeWrite()
+        {
+            Interlocked.Increment(ref _writeAttempts);
+            if (Volatile.Read(ref _triggered) != 0)
+            {
+                throw new InvalidOperationException("injected persistent Worker Skeleton failure");
+            }
+        }
+
+        private void AfterWrite()
+        {
+            if (Volatile.Read(ref _armed) == 0 ||
+                Interlocked.Increment(ref _armedWriteCount) != _throwAfter)
+            {
+                return;
+            }
+            Volatile.Write(ref _triggered, 1);
+            throw new InvalidOperationException("injected Worker Skeleton commit interruption");
         }
     }
 

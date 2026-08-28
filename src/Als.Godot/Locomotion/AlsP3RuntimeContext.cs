@@ -1,4 +1,6 @@
 using System.Threading;
+using Godot;
+using GodotAls.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
@@ -148,6 +150,8 @@ public sealed class AlsP3RuntimeContext
 
     public AlsP3bHarnessContext? Measurement { get; }
 
+    internal Func<Skeleton3D, IAlsSkeletonPoseWriter>? PoseWriterFactory { get; set; }
+
     public long MissingResults;
 
     public long StaleResults;
@@ -278,6 +282,8 @@ internal sealed class AlsP3CharacterState
 
     public int FailureDiagnosticCount;
 
+    public int LastFailureReasonCode;
+
     private int _workerAdmissionState = WorkerAdmissionClosedValue;
 
     public int WorkerInFlightCount => Math.Max(0, Volatile.Read(ref _workerAdmissionState));
@@ -329,10 +335,14 @@ internal sealed class AlsP3CharacterState
         }
     }
 
-    public void RecordFailure(string code, AlsFrameIdentity identity, Exception exception)
+    public void RecordFailure(
+        string code,
+        AlsFrameIdentity identity,
+        Exception exception,
+        AlsP4ReasonCode reasonCode = AlsP4ReasonCode.None)
     {
         var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
-        var failure = new AlsP3WorkerFailure(code, identity, exceptionType);
+        var failure = new AlsP3WorkerFailure(code, identity, exceptionType, reasonCode);
         var failureIdentity = new AlsP3FailureIdentity(code, identity);
         lock (_failureGate)
         {
@@ -344,6 +354,13 @@ internal sealed class AlsP3CharacterState
             {
                 _failures.Enqueue(failure);
             }
+        }
+        if (reasonCode != AlsP4ReasonCode.None)
+        {
+            Interlocked.CompareExchange(
+                ref LastFailureReasonCode,
+                (int)reasonCode,
+                (int)AlsP4ReasonCode.None);
         }
         Interlocked.Exchange(ref WorkerFrozen, 1);
     }
@@ -451,4 +468,5 @@ internal readonly record struct AlsP3FailureIdentity(
 internal sealed record AlsP3WorkerFailure(
     string Code,
     AlsFrameIdentity Identity,
-    string ExceptionType);
+    string ExceptionType,
+    AlsP4ReasonCode ReasonCode);
