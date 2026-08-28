@@ -2,6 +2,7 @@ using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using NumericsVector3 = System.Numerics.Vector3;
+using NumericsVector2 = System.Numerics.Vector2;
 
 namespace GodotAls.Locomotion;
 
@@ -14,6 +15,13 @@ public partial class P4FootGatherSmoke : Node
     private AlsCharacterMotor _motor = null!;
     private AnimatableBody3D _platform = null!;
     private StaticBody3D _staticWorld = null!;
+    private RigidBody3D _rigidPlatform = null!;
+    private AlsCharacterMotor _seamMotor = null!;
+    private StaticBody3D _seamStatic = null!;
+    private AnimatableBody3D _seamPlatform = null!;
+    private static readonly Vector3 SeamPlatformVelocity = new(0.7f, 0f, 0.15f);
+    private AlsCharacterMotor _stationaryTransitionMotor = null!;
+    private AnimatableBody3D _stationaryPlatform = null!;
     private int _stage;
     private bool _finished;
 
@@ -49,6 +57,60 @@ public partial class P4FootGatherSmoke : Node
                 Shape = new BoxShape3D { Size = new Vector3(20f, 0.2f, 20f) },
             });
             AddChild(_staticWorld);
+
+            _rigidPlatform = new RigidBody3D
+            {
+                Name = "OffsetComRigidPlatform",
+                Position = new Vector3(6f, -0.1f, 0f),
+                CollisionLayer = 1,
+                CollisionMask = 1,
+                GravityScale = 0f,
+                CanSleep = false,
+                CenterOfMassMode = RigidBody3D.CenterOfMassModeEnum.Custom,
+                CenterOfMass = new Vector3(0.65f, 0f, 0f),
+                LinearVelocity = new Vector3(0.2f, 0f, 0.1f),
+                AngularVelocity = new Vector3(0f, 1.25f, 0f),
+            };
+            _rigidPlatform.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(2f, 0.2f, 2f) },
+            });
+            AddChild(_rigidPlatform);
+
+            _seamStatic = CreateSeamBody<StaticBody3D>(
+                "SeamStatic",
+                new Vector3(9f, -0.1f, 0f));
+            AddChild(_seamStatic);
+            _seamPlatform = CreateSeamBody<AnimatableBody3D>(
+                "SeamPlatform",
+                new Vector3(11f, -0.1f, 0f));
+            _seamPlatform.ConstantLinearVelocity = SeamPlatformVelocity;
+            AddChild(_seamPlatform);
+            _seamMotor = new AlsCharacterMotor
+            {
+                Name = "SeamMotor",
+                Position = new Vector3(10f, 0.9f, 0f),
+            };
+            AddChild(_seamMotor);
+            _seamMotor.Configure(CreateMotorSettings(), new IdleCommandSource());
+
+            var transitionStatic = CreateSeamBody<StaticBody3D>(
+                "TransitionStatic",
+                new Vector3(19f, -0.1f, 0f));
+            AddChild(transitionStatic);
+            _stationaryPlatform = CreateSeamBody<AnimatableBody3D>(
+                "StationaryPlatform",
+                new Vector3(21f, -0.1f, 0f));
+            AddChild(_stationaryPlatform);
+            _stationaryTransitionMotor = new AlsCharacterMotor
+            {
+                Name = "StationaryTransitionMotor",
+                Position = new Vector3(19.3f, 0.9f, 0f),
+            };
+            AddChild(_stationaryTransitionMotor);
+            _stationaryTransitionMotor.Configure(
+                CreateMotorSettings(),
+                new RightCommandSource());
 
             _motor = new AlsCharacterMotor
             {
@@ -181,14 +243,28 @@ public partial class P4FootGatherSmoke : Node
                 AlsCharacterMotor.CreatePlatformId(_platform.GetInstanceId()),
             "floor evidence followed foot probes instead of the authoritative movement base");
 
-        var missing = _motor.Step(4, 0, 1, checked((float)delta));
-        Require(missing.Identity.FrameId == 4 &&
+        var rigidProbe = AlsFrameResult.CreateDefault(new AlsFrameIdentity(3, 0, 1));
+        rigidProbe.NextLeftFootProbeOrigin = new NumericsVector3(5.8f, -0.77f, 0f);
+        rigidProbe.NextRightFootProbeOrigin = new NumericsVector3(6.2f, -0.77f, 0f);
+        Require(AlsP3CommitStage.TryCopyFootProbeRequests(
+                _exchange,
+                rigidProbe.Identity,
+                rigidProbe),
+            "offset-COM rigid probe setup failed");
+        var rigidEvidence = _motor.Step(4, 0, 1, checked((float)delta));
+        ValidateRigidPointVelocity(rigidEvidence.LeftFootHit);
+        ValidateRigidPointVelocity(rigidEvidence.RightFootHit);
+        ValidateSeamMovementBase(delta);
+        ValidateStationaryPlatformTransition(delta);
+
+        var missing = _motor.Step(5, 0, 1, checked((float)delta));
+        Require(missing.Identity.FrameId == 5 &&
                 missing.LeftFootHit == AlsFootHit.Invalid &&
                 missing.RightFootHit == AlsFootHit.Invalid &&
                 !_exchange.HasRequests,
             "missing Commit leaked a stale foot request into a later Gather");
 
-        var generationOne = AlsFrameResult.CreateDefault(new AlsFrameIdentity(4, 0, 1));
+        var generationOne = AlsFrameResult.CreateDefault(new AlsFrameIdentity(5, 0, 1));
         generationOne.NextLeftFootProbeOrigin = LeftLocalOrigin;
         generationOne.NextRightFootProbeOrigin = RightLocalOrigin;
         Require(AlsP3CommitStage.TryCopyFootProbeRequests(
@@ -196,13 +272,13 @@ public partial class P4FootGatherSmoke : Node
                 generationOne.Identity,
                 generationOne),
             "generation-one request setup failed");
-        var replacement = _motor.Step(5, 0, 2, checked((float)delta));
+        var replacement = _motor.Step(6, 0, 2, checked((float)delta));
         Require(replacement.LeftFootHit == AlsFootHit.Invalid &&
                 replacement.RightFootHit == AlsFootHit.Invalid &&
                 !_exchange.HasRequests,
             "replacement generation consumed an old probe request");
 
-        var generationTwo = AlsFrameResult.CreateDefault(new AlsFrameIdentity(5, 0, 2));
+        var generationTwo = AlsFrameResult.CreateDefault(new AlsFrameIdentity(6, 0, 2));
         generationTwo.NextLeftFootProbeOrigin = LeftLocalOrigin;
         generationTwo.NextRightFootProbeOrigin = RightLocalOrigin;
         Require(AlsP3CommitStage.TryCopyFootProbeRequests(
@@ -211,12 +287,12 @@ public partial class P4FootGatherSmoke : Node
                 generationTwo),
             "generation-two request setup failed");
         _exchange.Clear();
-        var deactivated = _motor.Step(6, 0, 2, checked((float)delta));
+        var deactivated = _motor.Step(7, 0, 2, checked((float)delta));
         Require(deactivated.LeftFootHit == AlsFootHit.Invalid &&
                 deactivated.RightFootHit == AlsFootHit.Invalid,
             "deactivation clear leaked a cached probe request");
 
-        var beforeTeleport = AlsFrameResult.CreateDefault(new AlsFrameIdentity(6, 0, 2));
+        var beforeTeleport = AlsFrameResult.CreateDefault(new AlsFrameIdentity(7, 0, 2));
         beforeTeleport.NextLeftFootProbeOrigin = LeftLocalOrigin;
         beforeTeleport.NextRightFootProbeOrigin = RightLocalOrigin;
         Require(AlsP3CommitStage.TryCopyFootProbeRequests(
@@ -225,7 +301,7 @@ public partial class P4FootGatherSmoke : Node
                 beforeTeleport),
             "teleport request setup failed");
         _motor.GlobalPosition += new Vector3(2f, 0f, 0f);
-        var teleported = _motor.Step(7, 0, 2, checked((float)delta));
+        var teleported = _motor.Step(8, 0, 2, checked((float)delta));
         Require(teleported.LeftFootHit == AlsFootHit.Invalid &&
                 teleported.RightFootHit == AlsFootHit.Invalid &&
                 !_exchange.HasRequests,
@@ -234,6 +310,89 @@ public partial class P4FootGatherSmoke : Node
         GD.Print("P4_FOOT_GATHER_OK latency=1");
         _finished = true;
         GetTree().Quit();
+    }
+
+    private void ValidateStationaryPlatformTransition(double delta)
+    {
+        var input = default(AlsFrameInput);
+        for (var frame = 1; frame <= 60; frame++)
+        {
+            input = _stationaryTransitionMotor.Step(
+                frame,
+                2,
+                1,
+                checked((float)delta));
+        }
+        Require(_stationaryTransitionMotor.GlobalPosition.X > 20.3f &&
+                input.Floor.IsGrounded == 1,
+            "stationary platform transition fixture did not cross the static/platform boundary");
+        Require(input.Floor.PlatformId ==
+                AlsCharacterMotor.CreatePlatformId(_stationaryPlatform.GetInstanceId()),
+            "stationary Animatable platform was hidden by stale static-floor evidence");
+    }
+
+    private void ValidateSeamMovementBase(double delta)
+    {
+        var input = _seamMotor.Step(1, 1, 1, checked((float)delta));
+        Require(_seamMotor.GetPlatformVelocity().DistanceTo(SeamPlatformVelocity) < 0.0001f,
+            "seam fixture did not make the moving body CharacterBody's actual platform");
+        var sawStatic = false;
+        var sawMoving = false;
+        for (var slideIndex = 0; slideIndex < _seamMotor.GetSlideCollisionCount(); slideIndex++)
+        {
+            var collision = _seamMotor.GetSlideCollision(slideIndex);
+            for (var collisionIndex = 0;
+                 collisionIndex < collision.GetCollisionCount();
+                 collisionIndex++)
+            {
+                var collider = collision.GetCollider(collisionIndex);
+                sawStatic |= collider == _seamStatic;
+                sawMoving |= collider == _seamPlatform;
+            }
+        }
+        Require(sawStatic && sawMoving,
+            "seam fixture did not expose both equal-normal floor candidates");
+        Require(input.Floor.PlatformId ==
+                AlsCharacterMotor.CreatePlatformId(_seamPlatform.GetInstanceId()),
+            "floor seam selection did not follow CharacterBody's actual moving platform");
+    }
+
+    private static T CreateSeamBody<T>(string name, in Vector3 position)
+        where T : StaticBody3D, new()
+    {
+        var body = new T
+        {
+            Name = name,
+            Position = position,
+            CollisionLayer = 1,
+            CollisionMask = 1,
+        };
+        body.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(2.4f, 0.2f, 4f) },
+        });
+        return body;
+    }
+
+    private void ValidateRigidPointVelocity(in AlsFootHit hit)
+    {
+        Require(hit.Valid == 1 &&
+                hit.ColliderId == checked((long)_rigidPlatform.GetInstanceId()),
+            "offset-COM rigid probe did not hit the RigidBody platform");
+        var directState = PhysicsServer3D.BodyGetDirectState(_rigidPlatform.GetRid());
+        Require(directState is not null,
+            "RigidBody direct state was unavailable in the Main physics callback");
+        var worldPoint = new Vector3(hit.Position.X, hit.Position.Y, hit.Position.Z);
+        var worldCenterOfMass = directState!.Transform * directState.CenterOfMassLocal;
+        var expected = directState.LinearVelocity +
+                       directState.AngularVelocity.Cross(worldPoint - worldCenterOfMass);
+        var oldGlobalOrigin = _rigidPlatform.LinearVelocity +
+                              _rigidPlatform.AngularVelocity.Cross(
+                                  worldPoint - _rigidPlatform.GlobalPosition);
+        Require(expected.DistanceTo(oldGlobalOrigin) > 0.1f,
+            "offset-COM fixture did not distinguish world COM from GlobalPosition");
+        Require(IsApprox(hit.PointVelocity, expected),
+            "RigidBody point velocity did not rotate around the physics world COM");
     }
 
     private void ValidateHit(
@@ -347,5 +506,15 @@ public partial class P4FootGatherSmoke : Node
     {
         public AlsLocomotionCommand GetCommand(long frameId) =>
             AlsLocomotionCommand.CreateDefault();
+    }
+
+    private sealed class RightCommandSource : IAlsLocomotionCommandSource
+    {
+        public AlsLocomotionCommand GetCommand(long frameId) =>
+            AlsLocomotionCommand.CreateDefault() with
+            {
+                MovementAxes = NumericsVector2.UnitX,
+                RequestedGait = AlsGait.Walking,
+            };
     }
 }

@@ -16,6 +16,15 @@ public readonly record struct AlsP3VisualTransformSnapshot(
     NumericsVector3 BasisZ,
     NumericsVector3 Origin);
 
+public readonly record struct AlsP4FootProbeSourceSnapshot(
+    AlsFrameIdentity Identity,
+    int LeftPhysicalBoneId,
+    int RightPhysicalBoneId,
+    AlsP3VisualTransformSnapshot CharacterTransform,
+    AlsP3VisualTransformSnapshot SkeletonTransform,
+    NumericsVector3 LeftComponentOrigin,
+    NumericsVector3 RightComponentOrigin);
+
 internal readonly record struct AlsP4FootGatherSettings(
     float TraceUpMeters,
     float TraceDownMeters,
@@ -115,7 +124,8 @@ internal readonly record struct AlsP3VisualCommitCandidate(
     AlsP3VisualTransformSnapshot RootTransform,
     ulong PoseDigest,
     ulong FullPoseDigest,
-    ulong RootDigest);
+    ulong RootDigest,
+    AlsP4FootProbeSourceSnapshot FootProbeSource);
 
 public readonly record struct AlsP3FrameDiagnostics(
     AlsFrameIdentity Identity,
@@ -129,7 +139,8 @@ public readonly record struct AlsP3FrameDiagnostics(
     ulong PoseDigest,
     ulong FullPoseDigest,
     AlsP3VisualTransformSnapshot VisualRootTransform,
-    ulong RootDigest)
+    ulong RootDigest,
+    AlsP4FootProbeSourceSnapshot FootProbeSource)
 {
     public AlsP3FrameDiagnostics(
         AlsFrameIdentity Identity,
@@ -154,7 +165,8 @@ public readonly record struct AlsP3FrameDiagnostics(
             PoseDigest,
             FullPoseDigest,
             default,
-            0)
+            0,
+            default)
     {
     }
 }
@@ -376,6 +388,8 @@ internal sealed class AlsP3CharacterState
     public long MotorSnapshotFrameId;
 
     public NumericsVector3 MotorActualVelocity;
+
+    public AlsFrameInput MotorInput;
 
     public long ModelResultFrameId;
 
