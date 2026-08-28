@@ -190,6 +190,23 @@ public sealed class AlsManifestSerializerTests
     }
 
     [Theory]
+    [InlineData(0.00005)]
+    [InlineData(-0.00005)]
+    public void RejectsCanonicalRotationYawCurveWhoseFirstKeyIsNotExactlyZero(double firstKeyTime)
+    {
+        var root = CreateCanonicalRotationYawManifest();
+        var curve = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!
+            .AsArray()[0]!.AsObject();
+        curve["keys"]!.AsArray()[0]!.AsObject()["timeSeconds"] = firstKeyTime;
+        var json = root.ToJsonString();
+
+        Assert.False(IsSchemaValid(json));
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("curves[0].keys[0].timeSeconds", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("canonicalRotationYawSourceConvention")]
     [InlineData("canonicalRotationYawProfileSignProvenance")]
     public void RejectsCanonicalProvenanceFieldsOnRawAnimation(string field)
