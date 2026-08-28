@@ -155,7 +155,14 @@
           "then": {
             "properties": {
               "sourceName": { "const": "RotationYawSpeedRadiansPerSecond" },
-              "sourceProvenance": { "const": "derived_root_track" }
+              "sourceProvenance": { "const": "derived_root_track" },
+              "preInfinity": { "const": "Constant" },
+              "postInfinity": { "const": "Constant" },
+              "keys": {
+                "items": {
+                  "properties": { "interpolation": { "const": "Linear" } }
+                }
+              }
             }
           }
         }
