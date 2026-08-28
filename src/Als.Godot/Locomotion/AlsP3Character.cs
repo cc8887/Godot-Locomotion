@@ -102,20 +102,39 @@ public partial class AlsP3Character : Node3D
     {
         EnsureMainThread();
         ThrowIfDisposed();
-        Configure(context, handle, commandSource, new AlsP3ExchangeSlot());
+        Configure(
+            context,
+            handle,
+            commandSource,
+            new AlsP3ExchangeSlot(),
+            new AlsP4FootProbeExchange());
     }
 
     internal void Configure(
         AlsP3RuntimeContext context,
         AlsSlotHandle handle,
         IAlsLocomotionCommandSource commandSource,
-        AlsP3ExchangeSlot exchangeSlot)
+        AlsP3ExchangeSlot exchangeSlot) =>
+        Configure(
+            context,
+            handle,
+            commandSource,
+            exchangeSlot,
+            new AlsP4FootProbeExchange());
+
+    internal void Configure(
+        AlsP3RuntimeContext context,
+        AlsSlotHandle handle,
+        IAlsLocomotionCommandSource commandSource,
+        AlsP3ExchangeSlot exchangeSlot,
+        AlsP4FootProbeExchange footProbeExchange)
     {
         EnsureMainThread();
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(commandSource);
         ArgumentNullException.ThrowIfNull(exchangeSlot);
+        ArgumentNullException.ThrowIfNull(footProbeExchange);
         if (!IsInsideTree())
         {
             throw new InvalidOperationException("P3 character must be in the scene tree before Configure().");
@@ -130,12 +149,17 @@ public partial class AlsP3Character : Node3D
         }
 
         _context = context;
-        _state = new AlsP3CharacterState(handle, exchangeSlot);
+        _state = new AlsP3CharacterState(handle, exchangeSlot, footProbeExchange);
         try
         {
             _motor = new AlsCharacterMotor { Name = "Motor" };
             AddChild(_motor);
-            _motor.Configure(context.MotorSettings, commandSource);
+            _motor.Configure(
+                context.MotorSettings,
+                commandSource,
+                footProbeExchange,
+                context.FootGatherSettings,
+                context);
 
             _worker = new AlsP3WorkerRoot { Name = "VisualWorker" };
             AddChild(_worker);
@@ -236,6 +260,7 @@ public partial class AlsP3Character : Node3D
         Volatile.Write(ref _state.ProcessingEnabled, active ? 1 : 0);
         if (!active)
         {
+            _state.FootProbeExchange.Clear();
             ResetVisualReadyCore();
         }
         else
@@ -322,6 +347,7 @@ public partial class AlsP3Character : Node3D
         }
         Volatile.Write(ref _state.PublishedFrameId, completedFrameId);
         Volatile.Write(ref _state.CommittedFrameId, completedFrameId);
+        _state.FootProbeExchange.Clear();
     }
 
     public AlsFrameIdentity HandleIdentity(long frameId)
@@ -425,6 +451,7 @@ public partial class AlsP3Character : Node3D
         }
 
         ResetVisualReadyCore();
+        _state.FootProbeExchange.Clear();
         Volatile.Write(ref _state.ProcessingEnabled, 0);
         if (_worker is not null && !_worker.TryDisposeRuntime())
         {

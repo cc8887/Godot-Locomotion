@@ -75,7 +75,7 @@ public sealed class ContractLayoutTests
             "BlendSeconds", "RemainingYaw", "NominalDegrees", "Direction", "ScaleAngle", "Active");
         AssertFieldOrder<AlsFootLockState>(
             "LocalPosition", "LocalRotation", "Offset", "Rotation", "ProvenancePosition",
-            "ProvenanceRotation", "PlatformId", "Amount", "Locked", "ReleaseReason");
+            "ProvenanceRotation", "PlatformId", "ColliderId", "Amount", "Locked", "ReleaseReason");
         AssertFieldOrder<AlsPelvisCorrectionState>(
             "CurrentOffset", "TargetOffset", "VerticalVelocity");
         AssertFieldOrder<AlsFootHit>(
@@ -203,9 +203,11 @@ public sealed class ContractLayoutTests
         var state = AlsRuntimeState.CreateDefault();
 
         Assert.Equal(-1, state.LeftFootLock.PlatformId);
+        Assert.Equal(-1L, state.LeftFootLock.ColliderId);
         Assert.Equal(Quaternion.Identity, state.LeftFootLock.LocalRotation);
         Assert.Equal(Quaternion.Identity, state.LeftFootLock.Rotation);
         Assert.Equal(-1, state.RightFootLock.PlatformId);
+        Assert.Equal(-1L, state.RightFootLock.ColliderId);
         Assert.Equal(Quaternion.Identity, state.RightFootLock.LocalRotation);
         Assert.Equal(Quaternion.Identity, state.RightFootLock.Rotation);
         Assert.Equal(Vector3.Zero, state.LeftFootProbeOrigin);

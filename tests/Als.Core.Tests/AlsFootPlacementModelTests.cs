@@ -130,6 +130,7 @@ public sealed class AlsFootPlacementModelTests
         AssertVector(localTarget, locked.LeftFootLock.LocalPosition);
         AssertVector(platformPosition, locked.LeftFootLock.ProvenancePosition);
         AssertQuaternion(platformRotation, locked.LeftFootLock.ProvenanceRotation);
+        Assert.Equal(initialHit.ColliderId, locked.LeftFootLock.ColliderId);
 
         var movedPosition = platformPosition + new Vector3(0.12f, 0.05f, -0.08f);
         var movedRotation = Quaternion.Normalize(
@@ -155,6 +156,22 @@ public sealed class AlsFootPlacementModelTests
         AssertVector(expectedWorld, output.LeftFoot.Position);
         var expectedRotation = Quaternion.Normalize(movedRotation * locked.LeftFootLock.LocalRotation);
         AssertQuaternion(expectedRotation, output.LeftFoot.Rotation);
+    }
+
+    [Fact]
+    public void EqualCompactPlatformIdsWithDifferentFullColliderIdsReleaseAsBaseChange()
+    {
+        var initial = Hit(platformId: 42, colliderId: 0x00000001_00000002L);
+        Assert.True(Evaluate(Input(initial), 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+        var collidingCompactId = initial with { ColliderId = 0x00000002_00000001L };
+
+        Assert.True(Evaluate(Input(collidingCompactId), 1f, 0f, 1f, 0f, locked,
+            out var released, out var output, out var reason));
+
+        Assert.Equal(AlsP4ReasonCode.None, reason);
+        Assert.Equal(AlsFootReleaseReason.BaseChanged, output.LeftReleaseReason);
+        Assert.Equal((byte)2, released.LeftFootLock.Locked);
     }
 
     [Fact]
@@ -1238,6 +1255,7 @@ public sealed class AlsFootPlacementModelTests
             Vector3.Zero,
             Quaternion.Identity,
             -1,
+            100,
             0.75f,
             1,
             AlsFootReleaseReason.None);
@@ -1271,7 +1289,8 @@ public sealed class AlsFootPlacementModelTests
         Vector3? normal = null,
         int platformId = -1,
         Vector3? platformPosition = null,
-        Quaternion? platformRotation = null) => new(
+        Quaternion? platformRotation = null,
+        long colliderId = 100) => new(
             valid,
             walkable,
             position ?? Vector3.Zero,
@@ -1279,7 +1298,7 @@ public sealed class AlsFootPlacementModelTests
             platformId,
             platformPosition ?? Vector3.Zero,
             platformRotation ?? Quaternion.Identity,
-            valid == 1 ? 100 : -1,
+            valid == 1 ? colliderId : -1,
             Vector3.Zero);
 
     private static Vector3 SlopeNormal(float degrees) =>

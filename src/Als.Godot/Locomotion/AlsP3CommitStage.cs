@@ -37,6 +37,7 @@ public partial class AlsP3CommitStage : Node
         }
         if (Volatile.Read(ref _state.WorkerFrozen) != 0)
         {
+            _state.FootProbeExchange.Clear();
             return;
         }
 
@@ -71,6 +72,7 @@ public partial class AlsP3CommitStage : Node
         if (candidate.Identity != identity || result.Identity != candidate.Identity)
         {
             Interlocked.Increment(ref _context.LaggedResults);
+            _state.FootProbeExchange.Clear();
             return;
         }
 
@@ -85,6 +87,12 @@ public partial class AlsP3CommitStage : Node
             modelFrame != frameId || poseFrame != frameId)
         {
             Interlocked.Increment(ref _context.LaggedResults);
+            _state.FootProbeExchange.Clear();
+            return;
+        }
+        if (!TryCopyFootProbeRequests(_state.FootProbeExchange, identity, result))
+        {
+            Interlocked.Increment(ref _context.InvalidFootProbeRequests);
             return;
         }
 
@@ -115,6 +123,7 @@ public partial class AlsP3CommitStage : Node
 
     private void PublishFailure(AlsP3WorkerFailure failure)
     {
+        _state.FootProbeExchange.Clear();
         var details =
             $"code={failure.Code} frame={failure.Identity.FrameId} " +
             $"character={failure.Identity.CharacterId} generation={failure.Identity.SlotGeneration} " +
@@ -131,8 +140,26 @@ public partial class AlsP3CommitStage : Node
         Interlocked.Increment(ref _state.FailureDiagnosticCount);
     }
 
+    internal static bool TryCopyFootProbeRequests(
+        AlsP4FootProbeExchange exchange,
+        in AlsFrameIdentity expectedIdentity,
+        in AlsFrameResult result)
+    {
+        ArgumentNullException.ThrowIfNull(exchange);
+        if (result.Identity != expectedIdentity)
+        {
+            exchange.Clear();
+            return false;
+        }
+        return exchange.TryCopyFromWorker(
+            expectedIdentity,
+            result.NextLeftFootProbeOrigin,
+            result.NextRightFootProbeOrigin);
+    }
+
     private void ClassifyMissing(long expectedFrameId)
     {
+        _state.FootProbeExchange.Clear();
         var failure = AlsP3aResultClassifier.Classify(
             _state.HasPublishedResult,
             expectedFrameId,
