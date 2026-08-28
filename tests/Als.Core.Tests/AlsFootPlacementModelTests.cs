@@ -34,6 +34,11 @@ public sealed class AlsFootPlacementModelTests
         Assert.Equal(0.12f, settings.LockReleaseHalfLifeSeconds);
         Assert.Equal(Degrees(90f), settings.MaximumThighAngleRadians, Tolerance);
         Assert.Equal(Degrees(40f), settings.MaximumFootAngleRadians, Tolerance);
+        Assert.Equal(1e-4f, settings.LockWeightEpsilon);
+
+        var defaults = AlsFootLockState.CreateDefault();
+        AssertVector(Vector3.Zero, defaults.ProvenancePosition);
+        AssertQuaternion(Quaternion.Identity, defaults.ProvenanceRotation);
     }
 
     [Theory]
@@ -168,6 +173,264 @@ public sealed class AlsFootPlacementModelTests
         Assert.Equal((byte)2, released.LeftFootLock.Locked);
     }
 
+    [Fact]
+    public void HeldPlatformLocksUseFloorBaseEvidenceForBothFeet()
+    {
+        var left = Hit(position: new Vector3(-0.2f, 0f, 0f), platformId: 7);
+        var right = Hit(position: new Vector3(0.2f, 0f, 0f), platformId: 7);
+        var captureInput = Input(left, right) with { Floor = Floor(1, 7) };
+        Assert.True(Evaluate(captureInput, 1f, 1f, 1f, 1f, State(),
+            out var locked, out _, out _));
+
+        var sameBaseMiss = Input(AlsFootHit.Invalid, AlsFootHit.Invalid) with
+        {
+            Floor = Floor(1, 7),
+        };
+        AssertRelease(sameBaseMiss, locked,
+            AlsFootReleaseReason.RayMiss, AlsFootReleaseReason.RayMiss);
+
+        var floorOnlyBaseChange = captureInput with { Floor = Floor(1, 8) };
+        AssertRelease(floorOnlyBaseChange, locked,
+            AlsFootReleaseReason.BaseChanged, AlsFootReleaseReason.BaseChanged);
+
+        var removed = sameBaseMiss with { Floor = Floor(1, -1) };
+        AssertRelease(removed, locked,
+            AlsFootReleaseReason.PlatformRemoved, AlsFootReleaseReason.PlatformRemoved);
+
+        var incompatibleHit = Input(
+            left with { PlatformId = 8 },
+            right with { PlatformId = 8 }) with
+        {
+            Floor = Floor(1, 7),
+        };
+        AssertRelease(incompatibleHit, locked,
+            AlsFootReleaseReason.BaseChanged, AlsFootReleaseReason.BaseChanged);
+    }
+
+    [Fact]
+    public void NearLimitSlopeKeepsNormalFootClearanceWhenAcquiredAndHeld()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference();
+        var slopeAngle = settings.MaximumFootAngleRadians - Degrees(0.1f);
+        var normal = Vector3.Normalize(new Vector3(MathF.Sin(slopeAngle), MathF.Cos(slopeAngle), 0f));
+        var hit = Hit(position: new Vector3(-0.2f, 0f, 0f), normal: normal);
+        var state = State();
+        state.LeftFootProbeOrigin = hit.Position + (Vector3.UnitY * settings.FootHeightMeters);
+
+        Assert.True(Evaluate(settings, Input(hit), 1f, 0f, 1f, 0f, state,
+            out var locked, out var acquired, out _));
+        Assert.Equal(settings.FootHeightMeters,
+            Vector3.Dot(normal, acquired.LeftFoot.Position - hit.Position), Tolerance);
+
+        Assert.True(Evaluate(settings, Input(hit), 1f, 0f, 1f, 0f, locked,
+            out _, out var held, out _));
+        Assert.Equal(settings.FootHeightMeters,
+            Vector3.Dot(normal, held.LeftFoot.Position - hit.Position), Tolerance);
+    }
+
+    [Fact]
+    public void ToleratedPlatformQuaternionAndNegativeSignCanonicalizeToOneState()
+    {
+        var unit = Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.4f);
+        var shortRotation = new Quaternion(
+            unit.X * 0.9995f,
+            unit.Y * 0.9995f,
+            unit.Z * 0.9995f,
+            unit.W * 0.9995f);
+        var hit = Hit(platformId: 9, platformRotation: shortRotation);
+
+        Assert.True(Evaluate(Input(hit), 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+        AssertCanonical(locked.LeftFootLock.LocalRotation);
+        AssertCanonical(locked.LeftFootLock.ProvenanceRotation);
+
+        var negative = new Quaternion(-unit.X, -unit.Y, -unit.Z, -unit.W);
+        var equivalentInput = Input(hit with { PlatformRotation = negative });
+        Assert.True(Evaluate(equivalentInput, 1f, 0f, 1f, 0f, locked,
+            out var held, out var output, out _));
+        AssertCanonical(held.LeftFootLock.ProvenanceRotation);
+        Assert.True(held.LeftFootLock.ProvenanceRotation.W >= 0f);
+        AssertCanonical(output.LeftFoot.Rotation);
+    }
+
+    [Fact]
+    public void ToleratedCharacterBasisUsesCanonicalNormalizedRotation()
+    {
+        var expected = Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.3f);
+        var transform = Matrix4x4.CreateFromQuaternion(expected);
+        transform.M11 *= 0.9995f;
+        transform.M12 *= 0.9995f;
+        transform.M13 *= 0.9995f;
+        transform.M21 *= 0.9995f;
+        transform.M22 *= 0.9995f;
+        transform.M23 *= 0.9995f;
+        transform.M31 *= 0.9995f;
+        transform.M32 *= 0.9995f;
+        transform.M33 *= 0.9995f;
+        var forward = Vector3.Transform(-Vector3.UnitZ, expected);
+        var input = Input(Hit(position: forward * 0.3f)) with
+        {
+            CharacterTransform = transform,
+        };
+
+        Assert.True(Evaluate(input, 1f, 0f, 0f, 0f, State(),
+            out _, out var output, out _));
+        AssertQuaternion(expected, output.LeftFoot.Rotation);
+        AssertCanonical(output.LeftFoot.Rotation);
+    }
+
+    [Fact]
+    public void ExactTeleportThresholdsHoldAndWorldRotationBeyondThresholdReleases()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference();
+        var platformHit = Hit(platformId: 7);
+        Assert.True(Evaluate(settings, Input(platformHit), 1f, 0f, 1f, 0f, State(),
+            out var platformLock, out _, out _));
+        var exactRotation = Quaternion.CreateFromAxisAngle(
+            Vector3.UnitY, settings.PlatformTeleportAngleRadians);
+        var exactHit = platformHit with
+        {
+            PlatformPosition = new Vector3(settings.PlatformTeleportDistanceMeters, 0f, 0f),
+            PlatformRotation = exactRotation,
+            Position = new Vector3(settings.PlatformTeleportDistanceMeters, 0f, 0f),
+        };
+        var exactInput = Input(exactHit) with
+        {
+            Floor = Floor(1, 7),
+            CharacterTransform = Matrix4x4.CreateTranslation(
+                settings.PlatformTeleportDistanceMeters, 0f, 0f),
+        };
+        Assert.True(Evaluate(settings, exactInput, 1f, 0f, 1f, 0f, platformLock,
+            out var exactState, out var exactOutput, out _));
+        Assert.Equal((byte)1, exactState.LeftFootLock.Locked);
+        Assert.Equal(AlsFootReleaseReason.None, exactOutput.LeftReleaseReason);
+
+        Assert.True(Evaluate(settings, Input(Hit()), 1f, 0f, 1f, 0f, State(),
+            out var worldLock, out _, out _));
+        var beyond = Quaternion.CreateFromAxisAngle(
+            Vector3.UnitY, settings.PlatformTeleportAngleRadians + 0.01f);
+        var beyondInput = Input(Hit()) with
+        {
+            CharacterTransform = Matrix4x4.CreateFromQuaternion(beyond),
+        };
+        Assert.True(Evaluate(settings, beyondInput, 1f, 0f, 1f, 0f, worldLock,
+            out var released, out var releasedOutput, out _));
+        Assert.Equal((byte)2, released.LeftFootLock.Locked);
+        Assert.Equal(AlsFootReleaseReason.Teleported, releasedOutput.LeftReleaseReason);
+    }
+
+    [Fact]
+    public void ZeroHalfLifeAndTinyDeltaPublishFiniteSnapState()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference() with
+        {
+            PelvisUpHalfLifeSeconds = 0f,
+            PelvisDownHalfLifeSeconds = 0f,
+        };
+        var state = State();
+        state.PelvisCorrection = new AlsPelvisCorrectionState(
+            new Vector3(0f, -0.2f, 0f),
+            new Vector3(0f, -0.2f, 0f),
+            0f);
+        var input = Input(Hit(), deltaTime: float.Epsilon);
+
+        Assert.True(Evaluate(settings, input, 1f, 0f, 0f, 0f, state,
+            out var next, out var output, out _));
+        Assert.True(float.IsFinite(next.PelvisCorrection.VerticalVelocity));
+        Assert.Equal(0f, next.PelvisCorrection.VerticalVelocity);
+        Assert.True(float.IsFinite(output.PelvisOffset.Y));
+    }
+
+    [Fact]
+    public void LargeFiniteDeltaKeepsEveryDerivedFieldFinite()
+    {
+        var input = Input(Hit(), Hit(position: new Vector3(0.2f, 0f, 0f)), deltaTime: 1e20f);
+
+        Assert.True(Evaluate(input, 1f, 1f, 1f, 1f, State(),
+            out var next, out var output, out _));
+        Assert.True(float.IsFinite(next.PelvisCorrection.VerticalVelocity));
+        AssertCanonical(next.LeftFootLock.LocalRotation);
+        AssertCanonical(next.RightFootLock.LocalRotation);
+        AssertCanonical(output.LeftFoot.Rotation);
+        AssertCanonical(output.RightFoot.Rotation);
+    }
+
+    [Fact]
+    public void ReferenceLockEpsilonBlocksNearZeroCaptureAndStartsRelease()
+    {
+        const float referenceEpsilon = 1e-4f;
+        var input = Input(Hit());
+
+        Assert.True(Evaluate(input, 1f, 0f, referenceEpsilon, 0f, State(),
+            out var blocked, out _, out _));
+        Assert.Equal((byte)0, blocked.LeftFootLock.Locked);
+
+        Assert.True(Evaluate(input, 1f, 0f, MathF.BitIncrement(referenceEpsilon), 0f, State(),
+            out var acquired, out _, out _));
+        Assert.Equal((byte)1, acquired.LeftFootLock.Locked);
+
+        Assert.True(Evaluate(input, 1f, 0f, referenceEpsilon, 0f, acquired,
+            out var releasing, out var output, out _));
+        Assert.Equal((byte)2, releasing.LeftFootLock.Locked);
+        Assert.Equal(AlsFootReleaseReason.WeightLost, output.LeftReleaseReason);
+    }
+
+    [Fact]
+    public void RightFootMirrorsLeftFootLockAndSlopeClearance()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference();
+        var slopeAngle = Degrees(20f);
+        var leftNormal = Vector3.Normalize(
+            new Vector3(MathF.Sin(slopeAngle), MathF.Cos(slopeAngle), 0f));
+        var rightNormal = new Vector3(-leftNormal.X, leftNormal.Y, leftNormal.Z);
+        var left = Hit(
+            position: new Vector3(-0.25f, -0.05f, -0.2f),
+            normal: leftNormal,
+            platformId: 4);
+        var right = Hit(
+            position: new Vector3(0.25f, -0.05f, -0.2f),
+            normal: rightNormal,
+            platformId: 4);
+        var state = State();
+        state.LeftFootProbeOrigin = new Vector3(-0.25f, 0.1f, -0.2f);
+        state.RightFootProbeOrigin = new Vector3(0.25f, 0.1f, -0.2f);
+
+        Assert.True(Evaluate(settings, Input(left, right), 1f, 1f, 1f, 1f, state,
+            out var next, out var output, out _));
+
+        Assert.Equal((byte)1, next.LeftFootLock.Locked);
+        Assert.Equal((byte)1, next.RightFootLock.Locked);
+        Assert.Equal(4, output.LeftFoot.PlatformId);
+        Assert.Equal(4, output.RightFoot.PlatformId);
+        Assert.Equal(-output.LeftFoot.Position.X, output.RightFoot.Position.X, Tolerance);
+        Assert.Equal(output.LeftFoot.Position.Y, output.RightFoot.Position.Y, Tolerance);
+        Assert.Equal(settings.FootHeightMeters,
+            Vector3.Dot(leftNormal, output.LeftFoot.Position - left.Position), Tolerance);
+        Assert.Equal(settings.FootHeightMeters,
+            Vector3.Dot(rightNormal, output.RightFoot.Position - right.Position), Tolerance);
+    }
+
+    [Fact]
+    public void DerivedVelocityOverflowFailsTransactionally()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference() with
+        {
+            PelvisUpHalfLifeSeconds = float.Epsilon,
+        };
+        var state = SentinelState();
+        state.PelvisCorrection = new AlsPelvisCorrectionState(
+            new Vector3(0f, -0.2f, 0f),
+            new Vector3(0f, -0.2f, 0f),
+            0f);
+        var input = Input(Hit(), deltaTime: float.Epsilon);
+
+        Assert.False(Evaluate(settings, input, 1f, 0f, 0f, 0f, state,
+            out var next, out var output, out var reason));
+        AssertRawEqual(state, next);
+        AssertRawEqual(default(AlsFootPlacementOutput), output);
+        Assert.Equal(AlsP4ReasonCode.NonFiniteInput, reason);
+    }
+
     [Theory]
     [InlineData("miss", AlsFootReleaseReason.RayMiss)]
     [InlineData("air", AlsFootReleaseReason.NotGrounded)]
@@ -272,9 +535,10 @@ public sealed class AlsFootPlacementModelTests
         var steepNormal = Vector3.Normalize(new Vector3(0.9f, 0.1f, 0f));
         var state = State();
         state.LeftFootProbeOrigin = new Vector3(0f, 0.2f, -0.3f);
+        var hitPosition = new Vector3(0.8f, 0f, -0.3f);
 
         Assert.True(Evaluate(settings,
-            Input(Hit(position: new Vector3(0.8f, 0f, -0.3f), normal: steepNormal)),
+            Input(Hit(position: hitPosition, normal: steepNormal)),
             1f, 0f, 1f, 0f, state, out _, out var output, out _));
 
         var rotatedUp = Vector3.Transform(Vector3.UnitY, output.LeftFoot.Rotation);
@@ -284,6 +548,9 @@ public sealed class AlsFootPlacementModelTests
             0f,
             output.LeftFoot.Position.Z));
         Assert.InRange(Angle(-Vector3.UnitZ, horizontal), 0f, Degrees(20f) + Tolerance);
+        var effectiveNormal = Vector3.Transform(Vector3.UnitY, output.LeftFoot.Rotation);
+        Assert.Equal(settings.FootHeightMeters,
+            Vector3.Dot(effectiveNormal, output.LeftFoot.Position - hitPosition), Tolerance);
     }
 
     [Fact]
@@ -553,6 +820,28 @@ public sealed class AlsFootPlacementModelTests
     {
         var dot = MathF.Abs(Quaternion.Dot(Quaternion.Normalize(left), Quaternion.Normalize(right)));
         return 2f * MathF.Acos(System.Math.Clamp(dot, -1f, 1f));
+    }
+
+    private static void AssertCanonical(in Quaternion value)
+    {
+        Assert.True(float.IsFinite(value.X));
+        Assert.Equal(1f, value.Length(), Tolerance);
+        Assert.True(value.W >= 0f);
+    }
+
+    private static void AssertRelease(
+        in AlsFrameInput input,
+        in AlsRuntimeState locked,
+        AlsFootReleaseReason leftReason,
+        AlsFootReleaseReason rightReason)
+    {
+        Assert.True(Evaluate(input, 1f, 1f, 1f, 1f, locked,
+            out var released, out var output, out var failure));
+        Assert.Equal(AlsP4ReasonCode.None, failure);
+        Assert.Equal(leftReason, output.LeftReleaseReason);
+        Assert.Equal(rightReason, output.RightReleaseReason);
+        Assert.Equal((byte)2, released.LeftFootLock.Locked);
+        Assert.Equal((byte)2, released.RightFootLock.Locked);
     }
 
     private static float Degrees(float value) => value * MathF.PI / 180f;

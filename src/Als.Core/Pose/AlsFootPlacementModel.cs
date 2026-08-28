@@ -35,6 +35,7 @@ public static class AlsFootPlacementModel
     private const float NormalLengthTolerance = 1e-3f;
     private const float QuaternionLengthTolerance = 1e-3f;
     private const float Epsilon = 1e-6f;
+    private const float ThresholdTolerance = 1e-6f;
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static bool TryEvaluate(
@@ -102,14 +103,17 @@ public static class AlsFootPlacementModel
             return false;
         }
 
-        if (!ValidateHit(input.LeftFootHit, out reason) ||
-            !ValidateHit(input.RightFootHit, out reason))
+        if (!ValidateHit(input.LeftFootHit, out var leftPlatformRotation, out reason) ||
+            !ValidateHit(input.RightFootHit, out var rightPlatformRotation, out reason))
         {
             return false;
         }
 
-        if (!ValidateFootState(currentState.LeftFootLock) ||
-            !ValidateFootState(currentState.RightFootLock) ||
+        var leftHit = input.LeftFootHit with { PlatformRotation = leftPlatformRotation };
+        var rightHit = input.RightFootHit with { PlatformRotation = rightPlatformRotation };
+
+        if (!TryCanonicalizeFootState(currentState.LeftFootLock, out var currentLeft) ||
+            !TryCanonicalizeFootState(currentState.RightFootLock, out var currentRight) ||
             !IsFinite(currentState.PelvisCorrection.CurrentOffset) ||
             !IsFinite(currentState.PelvisCorrection.TargetOffset) ||
             !float.IsFinite(currentState.PelvisCorrection.VerticalVelocity) ||
@@ -127,14 +131,15 @@ public static class AlsFootPlacementModel
 
         if (!TryEvaluateFoot(
                 settings,
-                input.LeftFootHit,
-                currentState.LeftFootLock,
+                leftHit,
+                currentLeft,
                 currentState.LeftFootProbeOrigin,
                 characterPosition,
                 characterRotation,
                 characterUp,
                 grounded,
                 motorDriven,
+                input.Floor.PlatformId,
                 leftIkWeight,
                 leftLockCurve,
                 input.DeltaTime,
@@ -150,14 +155,15 @@ public static class AlsFootPlacementModel
 
         if (!TryEvaluateFoot(
                 settings,
-                input.RightFootHit,
-                currentState.RightFootLock,
+                rightHit,
+                currentRight,
                 currentState.RightFootProbeOrigin,
                 characterPosition,
                 characterRotation,
                 characterUp,
                 grounded,
                 motorDriven,
+                input.Floor.PlatformId,
                 rightIkWeight,
                 rightLockCurve,
                 input.DeltaTime,
@@ -202,7 +208,20 @@ public static class AlsFootPlacementModel
         var nextPelvisY = Lerp(currentPelvisY, pelvisTargetY, pelvisAlpha);
         var pelvisOffset = characterUp * nextPelvisY;
         var pelvisTarget = characterUp * pelvisTargetY;
-        if (!IsFinite(pelvisOffset) || !IsFinite(pelvisTarget))
+        if (!TryComputePelvisVelocity(
+                currentPelvisY,
+                nextPelvisY,
+                input.DeltaTime,
+                pelvisHalfLife,
+                out var pelvisVelocity) ||
+            !IsFinite(pelvisOffset) ||
+            !IsFinite(pelvisTarget) ||
+            !TryCanonicalizeFootState(nextLeft, out nextLeft) ||
+            !TryCanonicalizeFootState(nextRight, out nextRight) ||
+            !ValidateFootOutput(leftOutput) ||
+            !ValidateFootOutput(rightOutput) ||
+            (uint)leftReason > (uint)AlsFootReleaseReason.Overextended ||
+            (uint)rightReason > (uint)AlsFootReleaseReason.Overextended)
         {
             reason = AlsP4ReasonCode.NonFiniteInput;
             return false;
@@ -216,7 +235,7 @@ public static class AlsFootPlacementModel
         next.PelvisCorrection = new AlsPelvisCorrectionState(
             pelvisOffset,
             pelvisTarget,
-            input.DeltaTime > 0f ? (nextPelvisY - currentPelvisY) / input.DeltaTime : 0f);
+            pelvisVelocity);
         var nextOutput = new AlsFootPlacementOutput(
             pelvisOffset,
             leftOutput,
@@ -240,6 +259,7 @@ public static class AlsFootPlacementModel
         in Vector3 characterUp,
         bool grounded,
         bool motorDriven,
+        int floorPlatformId,
         float ikWeight,
         float lockCurve,
         float deltaTime,
@@ -256,29 +276,46 @@ public static class AlsFootPlacementModel
         hasPelvisTarget = false;
 
         var usableHit = hit.Valid == 1 && hit.Walkable == 1;
-        var footTarget = usableHit
-            ? hit.Position + (characterUp * settings.FootHeightMeters)
-            : probeOrigin;
+        var footTarget = probeOrigin;
         var targetRotation = characterRotation;
-        if (usableHit && !TryBuildFootRotation(
-                characterRotation,
-                characterUp,
-                hit.Normal,
-                settings.MaximumFootAngleRadians,
-                out targetRotation))
+        var contactNormal = characterUp;
+        if (usableHit &&
+            (!TryBuildFootRotation(
+                 characterRotation,
+                 characterUp,
+                 hit.Normal,
+                 settings.MaximumFootAngleRadians,
+                 out targetRotation,
+                 out contactNormal) ||
+             !TryBuildFootTarget(
+                 hit.Position,
+                 characterUp,
+                 contactNormal,
+                 settings.FootHeightMeters,
+                 out footTarget)))
         {
             return false;
         }
 
         if (usableHit)
         {
+            var ignoredRotation = targetRotation;
             ConstrainThighDirection(
                 characterPosition,
                 characterRotation,
                 characterUp,
                 settings.MaximumThighAngleRadians,
                 ref footTarget,
-                ref targetRotation);
+                ref ignoredRotation);
+            if (!TryRestoreFootClearance(
+                    hit.Position,
+                    characterUp,
+                    contactNormal,
+                    settings.FootHeightMeters,
+                    ref footTarget))
+            {
+                return false;
+            }
         }
 
         var hipPosition = characterPosition + (characterUp * settings.CapsuleHalfHeightMeters);
@@ -286,7 +323,8 @@ public static class AlsFootPlacementModel
                               DistanceSquared(hipPosition, footTarget) >
                               (double)settings.MaximumLegReachMeters *
                               settings.MaximumLegReachMeters;
-        hasPelvisTarget = grounded && motorDriven && usableHit && ikWeight > 0f;
+        hasPelvisTarget = grounded && motorDriven && usableHit &&
+                          ikWeight > settings.LockWeightEpsilon;
         if (hasPelvisTarget)
         {
             pelvisRequirement = Vector3.Dot(footTarget - probeOrigin, characterUp);
@@ -294,7 +332,11 @@ public static class AlsFootPlacementModel
 
         if (current.Locked == 0)
         {
-            if (grounded && motorDriven && usableHit && ikWeight > 0f && lockCurve > 0f && !overextendedHit)
+            if (grounded && motorDriven && usableHit &&
+                hit.PlatformId == floorPlatformId &&
+                ikWeight > settings.LockWeightEpsilon &&
+                lockCurve > settings.LockWeightEpsilon &&
+                !overextendedHit)
             {
                 next = CaptureLock(
                     hit,
@@ -319,6 +361,7 @@ public static class AlsFootPlacementModel
                 characterRotation,
                 grounded,
                 motorDriven,
+                floorPlatformId,
                 ikWeight,
                 lockCurve,
                 overextendedHit);
@@ -344,7 +387,7 @@ public static class AlsFootPlacementModel
         else
         {
             releaseReason = AlsFootReleaseReason.WeightLost;
-            if (lockCurve <= 0f && current.Amount <= Epsilon)
+            if (lockCurve <= settings.LockWeightEpsilon && current.Amount <= Epsilon)
             {
                 next = AlsFootLockState.CreateDefault();
                 releaseReason = AlsFootReleaseReason.None;
@@ -379,10 +422,21 @@ public static class AlsFootPlacementModel
                 targetRotation,
                 settings.MaximumFootAngleRadians,
                 ref lockRotation);
+            if (usableHit &&
+                !TryRestoreFootClearance(
+                    hit.Position,
+                    characterUp,
+                    contactNormal,
+                    settings.FootHeightMeters,
+                    ref lockPosition))
+            {
+                return false;
+            }
 
             var blend = System.Math.Clamp(next.Amount, 0f, 1f);
             worldPosition = Vector3.Lerp(footTarget, lockPosition, blend);
-            worldRotation = Quaternion.Normalize(Quaternion.Slerp(targetRotation, lockRotation, blend));
+            worldRotation = NormalizeCanonicalUnchecked(
+                Quaternion.Slerp(targetRotation, lockRotation, blend));
             outputPlatformId = next.PlatformId;
         }
 
@@ -394,7 +448,8 @@ public static class AlsFootPlacementModel
         next = next with
         {
             Offset = worldPosition - footTarget,
-            Rotation = Quaternion.Normalize(worldRotation * Quaternion.Conjugate(targetRotation)),
+            Rotation = NormalizeCanonicalUnchecked(
+                worldRotation * Quaternion.Conjugate(targetRotation)),
         };
 
         output = new AlsFootPoseOutput(
@@ -418,7 +473,7 @@ public static class AlsFootPlacementModel
             var platformInverse = Quaternion.Conjugate(hit.PlatformRotation);
             return new AlsFootLockState(
                 Vector3.Transform(targetPosition - hit.PlatformPosition, platformInverse),
-                Quaternion.Normalize(platformInverse * targetRotation),
+                NormalizeCanonicalUnchecked(platformInverse * targetRotation),
                 Vector3.Zero,
                 Quaternion.Identity,
                 hit.PlatformPosition,
@@ -448,6 +503,7 @@ public static class AlsFootPlacementModel
         in Quaternion characterRotation,
         bool grounded,
         bool motorDriven,
+        int floorPlatformId,
         float ikWeight,
         float lockCurve,
         bool overextendedHit)
@@ -462,16 +518,27 @@ public static class AlsFootPlacementModel
             return AlsFootReleaseReason.NotMotorDriven;
         }
 
-        if (ikWeight <= 0f || lockCurve <= 0f)
+        if (ikWeight <= settings.LockWeightEpsilon ||
+            lockCurve <= settings.LockWeightEpsilon)
         {
             return AlsFootReleaseReason.WeightLost;
         }
 
         if (current.PlatformId >= 0)
         {
-            if (hit.Valid == 0 || hit.Walkable == 0)
+            if (floorPlatformId >= 0 && floorPlatformId != current.PlatformId)
+            {
+                return AlsFootReleaseReason.BaseChanged;
+            }
+
+            if (floorPlatformId < 0)
             {
                 return AlsFootReleaseReason.PlatformRemoved;
+            }
+
+            if (hit.Valid == 0 || hit.Walkable == 0)
+            {
+                return AlsFootReleaseReason.RayMiss;
             }
 
             if (hit.PlatformId != current.PlatformId)
@@ -479,17 +546,25 @@ public static class AlsFootPlacementModel
                 return AlsFootReleaseReason.BaseChanged;
             }
 
-            if (DistanceSquared(hit.PlatformPosition, current.ProvenancePosition) >
-                    (double)settings.PlatformTeleportDistanceMeters *
-                    settings.PlatformTeleportDistanceMeters ||
-                QuaternionAngle(hit.PlatformRotation, current.ProvenanceRotation) >
-                    settings.PlatformTeleportAngleRadians)
+            if (ExceedsDistanceThreshold(
+                    hit.PlatformPosition,
+                    current.ProvenancePosition,
+                    settings.PlatformTeleportDistanceMeters) ||
+                ExceedsAngleThreshold(
+                    hit.PlatformRotation,
+                    current.ProvenanceRotation,
+                    settings.PlatformTeleportAngleRadians))
             {
                 return AlsFootReleaseReason.Teleported;
             }
         }
         else
         {
+            if (floorPlatformId >= 0)
+            {
+                return AlsFootReleaseReason.BaseChanged;
+            }
+
             if (hit.Valid == 0 || hit.Walkable == 0)
             {
                 return AlsFootReleaseReason.RayMiss;
@@ -500,11 +575,14 @@ public static class AlsFootPlacementModel
                 return AlsFootReleaseReason.BaseChanged;
             }
 
-            if (DistanceSquared(characterPosition, current.ProvenancePosition) >
-                    (double)settings.PlatformTeleportDistanceMeters *
-                    settings.PlatformTeleportDistanceMeters ||
-                QuaternionAngle(characterRotation, current.ProvenanceRotation) >
-                    settings.PlatformTeleportAngleRadians)
+            if (ExceedsDistanceThreshold(
+                    characterPosition,
+                    current.ProvenancePosition,
+                    settings.PlatformTeleportDistanceMeters) ||
+                ExceedsAngleThreshold(
+                    characterRotation,
+                    current.ProvenanceRotation,
+                    settings.PlatformTeleportAngleRadians))
             {
                 return AlsFootReleaseReason.Teleported;
             }
@@ -556,7 +634,7 @@ public static class AlsFootPlacementModel
 
             position = state.ProvenancePosition +
                        Vector3.Transform(state.LocalPosition, platformRotation);
-            rotation = Quaternion.Normalize(platformRotation * state.LocalRotation);
+            rotation = NormalizeCanonicalUnchecked(platformRotation * state.LocalRotation);
             return IsFinite(position) && TryNormalizeQuaternion(rotation, out rotation);
         }
 
@@ -605,7 +683,7 @@ public static class AlsFootPlacementModel
 
         var correction = Quaternion.CreateFromAxisAngle(characterUp, clampedAngle - signedAngle);
         targetPosition = characterPosition + vertical + Vector3.Transform(horizontal, correction);
-        targetRotation = Quaternion.Normalize(correction * targetRotation);
+        targetRotation = NormalizeCanonicalUnchecked(correction * targetRotation);
     }
 
     private static bool TryBuildFootRotation(
@@ -613,33 +691,92 @@ public static class AlsFootPlacementModel
         in Vector3 characterUp,
         in Vector3 surfaceNormal,
         float maximumAngle,
-        out Quaternion rotation)
+        out Quaternion rotation,
+        out Vector3 contactNormal)
     {
         rotation = default;
+        contactNormal = default;
         if (!TryNormalize(surfaceNormal, out var normal))
         {
             return false;
         }
 
         var dot = System.Math.Clamp(Vector3.Dot(characterUp, normal), -1f, 1f);
+        if (dot <= Epsilon)
+        {
+            return false;
+        }
+
         var angle = MathF.Acos(dot);
         if (angle <= Epsilon)
         {
             rotation = characterRotation;
+            contactNormal = characterUp;
             return true;
         }
 
         var axis = Vector3.Cross(characterUp, normal);
         if (!TryNormalize(axis, out axis))
         {
-            rotation = characterRotation;
-            return true;
+            return false;
         }
 
         var clampedAngle = MathF.Min(angle, maximumAngle);
-        rotation = Quaternion.Normalize(
-            Quaternion.CreateFromAxisAngle(axis, clampedAngle) * characterRotation);
-        return TryNormalizeQuaternion(rotation, out rotation);
+        var correction = Quaternion.CreateFromAxisAngle(axis, clampedAngle);
+        rotation = correction * characterRotation;
+        contactNormal = Vector3.Transform(characterUp, correction);
+        return TryNormalizeQuaternion(rotation, out rotation) &&
+               TryNormalize(contactNormal, out contactNormal);
+    }
+
+    private static bool TryBuildFootTarget(
+        in Vector3 hitPosition,
+        in Vector3 characterUp,
+        in Vector3 contactNormal,
+        float footHeight,
+        out Vector3 target)
+    {
+        target = default;
+        var upDot = (double)Vector3.Dot(characterUp, contactNormal);
+        if (!double.IsFinite(upDot) || upDot <= Epsilon)
+        {
+            return false;
+        }
+
+        var clearance = (double)footHeight / upDot;
+        if (!double.IsFinite(clearance) || clearance > float.MaxValue)
+        {
+            return false;
+        }
+
+        target = hitPosition + (characterUp * (float)clearance);
+        return IsFinite(target);
+    }
+
+    private static bool TryRestoreFootClearance(
+        in Vector3 hitPosition,
+        in Vector3 characterUp,
+        in Vector3 contactNormal,
+        float footHeight,
+        ref Vector3 target)
+    {
+        var upDot = (double)Vector3.Dot(characterUp, contactNormal);
+        var currentClearance = (double)Vector3.Dot(contactNormal, target - hitPosition);
+        if (!double.IsFinite(upDot) || upDot <= Epsilon ||
+            !double.IsFinite(currentClearance))
+        {
+            return false;
+        }
+
+        var correction = ((double)footHeight - currentClearance) / upDot;
+        if (!double.IsFinite(correction) ||
+            correction < -float.MaxValue || correction > float.MaxValue)
+        {
+            return false;
+        }
+
+        target += characterUp * (float)correction;
+        return IsFinite(target);
     }
 
     private static void ClampRotationDelta(
@@ -647,11 +784,8 @@ public static class AlsFootPlacementModel
         float maximumAngle,
         ref Quaternion rotation)
     {
-        var delta = Quaternion.Normalize(rotation * Quaternion.Conjugate(targetRotation));
-        if (delta.W < 0f)
-        {
-            delta = new Quaternion(-delta.X, -delta.Y, -delta.Z, -delta.W);
-        }
+        var delta = NormalizeCanonicalUnchecked(
+            rotation * Quaternion.Conjugate(targetRotation));
 
         var angle = 2f * MathF.Acos(System.Math.Clamp(delta.W, -1f, 1f));
         if (angle <= maximumAngle + Epsilon)
@@ -666,12 +800,16 @@ public static class AlsFootPlacementModel
             return;
         }
 
-        rotation = Quaternion.Normalize(
+        rotation = NormalizeCanonicalUnchecked(
             Quaternion.CreateFromAxisAngle(axis, maximumAngle) * targetRotation);
     }
 
-    private static bool ValidateHit(in AlsFootHit hit, out AlsP4ReasonCode reason)
+    private static bool ValidateHit(
+        in AlsFootHit hit,
+        out Quaternion platformRotation,
+        out AlsP4ReasonCode reason)
     {
+        platformRotation = default;
         reason = AlsP4ReasonCode.None;
         if (hit.Valid > 1 || hit.Walkable > 1 || hit.PlatformId < -1 || hit.ColliderId < -1 ||
             !IsFinite(hit.Position) || !IsFinite(hit.Normal) ||
@@ -681,7 +819,7 @@ public static class AlsFootPlacementModel
             return false;
         }
 
-        if (!TryNormalizeQuaternion(hit.PlatformRotation, out _) ||
+        if (!TryNormalizeQuaternion(hit.PlatformRotation, out platformRotation) ||
             (hit.Valid == 1 && !IsUnitVector(hit.Normal)))
         {
             reason = AlsP4ReasonCode.InvalidRotation;
@@ -705,22 +843,38 @@ public static class AlsFootPlacementModel
         return true;
     }
 
-    private static bool ValidateFootState(in AlsFootLockState state) =>
-        state.Locked <= 2 &&
-        state.PlatformId >= -1 &&
-        IsWeight(state.Amount) &&
-        IsFinite(state.LocalPosition) &&
-        IsFinite(state.Offset) &&
-        IsFinite(state.ProvenancePosition) &&
-        TryNormalizeQuaternion(state.LocalRotation, out _) &&
-        TryNormalizeQuaternion(state.Rotation, out _) &&
-        TryNormalizeQuaternion(state.ProvenanceRotation, out _) &&
-        (state.Locked != 0 ||
-         (state.PlatformId == -1 && state.Amount == 0f &&
-          state.LocalPosition == Vector3.Zero &&
-          state.LocalRotation == Quaternion.Identity &&
-          state.ProvenancePosition == Vector3.Zero &&
-          state.ProvenanceRotation == Quaternion.Identity));
+    private static bool TryCanonicalizeFootState(
+        in AlsFootLockState state,
+        out AlsFootLockState canonical)
+    {
+        var source = state;
+        canonical = default;
+        if (source.Locked > 2 ||
+            source.PlatformId < -1 ||
+            !IsWeight(source.Amount) ||
+            !IsFinite(source.LocalPosition) ||
+            !IsFinite(source.Offset) ||
+            !IsFinite(source.ProvenancePosition) ||
+            !TryNormalizeQuaternion(source.LocalRotation, out var localRotation) ||
+            !TryNormalizeQuaternion(source.Rotation, out var rotation) ||
+            !TryNormalizeQuaternion(source.ProvenanceRotation, out var provenanceRotation))
+        {
+            return false;
+        }
+
+        canonical = source with
+        {
+            LocalRotation = localRotation,
+            Rotation = rotation,
+            ProvenanceRotation = provenanceRotation,
+        };
+        return canonical.Locked != 0 ||
+               (canonical.PlatformId == -1 && canonical.Amount == 0f &&
+                canonical.LocalPosition == Vector3.Zero &&
+                canonical.LocalRotation == Quaternion.Identity &&
+                canonical.ProvenancePosition == Vector3.Zero &&
+                canonical.ProvenanceRotation == Quaternion.Identity);
+    }
 
     private static bool TryValidateRigidTransform(
         in Matrix4x4 transform,
@@ -748,11 +902,16 @@ public static class AlsFootPlacementModel
         }
 
         position = transform.Translation;
-        rotation = Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(transform));
-        up = Vector3.Transform(Vector3.UnitY, rotation);
+        var canonicalTransform = new Matrix4x4(
+            x.X, x.Y, x.Z, 0f,
+            y.X, y.Y, y.Z, 0f,
+            z.X, z.Y, z.Z, 0f,
+            position.X, position.Y, position.Z, 1f);
+        rotation = Quaternion.CreateFromRotationMatrix(canonicalTransform);
+        up = y;
         return IsFinite(position) &&
                TryNormalizeQuaternion(rotation, out rotation) &&
-               TryNormalize(up, out up);
+               IsFinite(up);
     }
 
     private static bool TryNormalizeBasis(in Vector3 value, out Vector3 normalized)
@@ -817,8 +976,29 @@ public static class AlsFootPlacementModel
             (float)(source.Y / length),
             (float)(source.Z / length),
             (float)(source.W / length));
+        if (ShouldNegate(normalized))
+        {
+            normalized = new Quaternion(
+                -normalized.X,
+                -normalized.Y,
+                -normalized.Z,
+                -normalized.W);
+        }
+
         return true;
     }
+
+    private static bool ShouldNegate(in Quaternion value) =>
+        value.W < 0f ||
+        (value.W == 0f &&
+         (value.X < 0f ||
+          (value.X == 0f &&
+           (value.Y < 0f || (value.Y == 0f && value.Z < 0f)))));
+
+    private static Quaternion NormalizeCanonicalUnchecked(in Quaternion value) =>
+        TryNormalizeQuaternion(value, out var normalized)
+            ? normalized
+            : default;
 
     private static double Length(in Vector3 value) => System.Math.Sqrt(
         ((double)value.X * value.X) +
@@ -833,10 +1013,69 @@ public static class AlsFootPlacementModel
         return (x * x) + (y * y) + (z * z);
     }
 
+    private static bool ExceedsDistanceThreshold(
+        in Vector3 current,
+        in Vector3 previous,
+        float threshold)
+    {
+        var distanceSquared = DistanceSquared(current, previous);
+        var thresholdSquared = (double)threshold * threshold;
+        var tolerance = ThresholdTolerance * System.Math.Max(1d, thresholdSquared);
+        return distanceSquared - thresholdSquared > tolerance;
+    }
+
+    private static bool ExceedsAngleThreshold(
+        in Quaternion current,
+        in Quaternion previous,
+        float threshold) =>
+        (double)QuaternionAngle(current, previous) - threshold > ThresholdTolerance;
+
     private static float QuaternionAngle(in Quaternion left, in Quaternion right)
     {
         var dot = MathF.Abs(Quaternion.Dot(left, right));
         return 2f * MathF.Acos(System.Math.Clamp(dot, -1f, 1f));
+    }
+
+    private static bool TryComputePelvisVelocity(
+        float current,
+        float next,
+        float deltaTime,
+        float halfLife,
+        out float velocity)
+    {
+        velocity = 0f;
+        if (halfLife == 0f || next == current)
+        {
+            return true;
+        }
+
+        var value = ((double)next - current) / deltaTime;
+        if (!double.IsFinite(value) || value < -float.MaxValue || value > float.MaxValue)
+        {
+            return false;
+        }
+
+        velocity = (float)value;
+        return float.IsFinite(velocity);
+    }
+
+    private static bool ValidateFootOutput(in AlsFootPoseOutput output) =>
+        IsFinite(output.Position) &&
+        IsWeight(output.LockAmount) &&
+        output.PlatformId >= -1 &&
+        IsCanonicalQuaternion(output.Rotation);
+
+    private static bool IsCanonicalQuaternion(in Quaternion value)
+    {
+        if (!TryNormalizeQuaternion(value, out var canonical) || canonical.W < 0f)
+        {
+            return false;
+        }
+
+        return MathF.Abs(value.X - canonical.X) <= Epsilon &&
+               MathF.Abs(value.Y - canonical.Y) <= Epsilon &&
+               MathF.Abs(value.Z - canonical.Z) <= Epsilon &&
+               MathF.Abs(value.W - canonical.W) <= Epsilon;
     }
 
     private static bool IsWeight(float value) =>

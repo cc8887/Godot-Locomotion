@@ -15,7 +15,8 @@ public readonly record struct AlsFootPlacementSettings(
     float MaximumThighAngleRadians,
     float MaximumFootAngleRadians,
     float PlatformTeleportDistanceMeters,
-    float PlatformTeleportAngleRadians)
+    float PlatformTeleportAngleRadians,
+    float LockWeightEpsilon)
 {
     public static AlsFootPlacementSettings CreateReference() => new(
         1,
@@ -29,7 +30,8 @@ public readonly record struct AlsFootPlacementSettings(
         90f * MathF.PI / 180f,
         40f * MathF.PI / 180f,
         1f,
-        45f * MathF.PI / 180f);
+        45f * MathF.PI / 180f,
+        1e-4f);
 
     internal bool Validate() =>
         Enabled <= 1 &&
@@ -44,7 +46,9 @@ public readonly record struct AlsFootPlacementSettings(
         IsAngle(MaximumThighAngleRadians) &&
         IsAngle(MaximumFootAngleRadians) &&
         IsPositiveFinite(PlatformTeleportDistanceMeters) &&
-        IsAngle(PlatformTeleportAngleRadians);
+        IsAngle(PlatformTeleportAngleRadians) &&
+        IsPositiveFinite(LockWeightEpsilon) &&
+        LockWeightEpsilon < 1f;
 
     private static bool IsAngle(float value) =>
         float.IsFinite(value) && value >= 0f && value <= MathF.PI;
