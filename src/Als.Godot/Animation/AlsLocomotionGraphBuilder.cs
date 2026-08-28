@@ -81,7 +81,8 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         AlsLocomotionGraphParameterSet groundedCrouching,
         AlsLocomotionGraphParameterSet jumpStart,
         AlsLocomotionGraphParameterSet fallLoop,
-        AlsLocomotionGraphParameterSet landRecovery)
+        AlsLocomotionGraphParameterSet landRecovery,
+        AlsP4GraphHandles? p4)
     {
         AnimationPlayerPath = animationPlayerPath;
         TopPlaybackPath = topPlaybackPath;
@@ -95,6 +96,7 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         JumpStart = jumpStart;
         FallLoop = fallLoop;
         LandRecovery = landRecovery;
+        P4 = p4;
 
         _ownedHandles =
         [
@@ -108,6 +110,7 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
             .. jumpStart.OwnedHandles,
             .. fallLoop.OwnedHandles,
             .. landRecovery.OwnedHandles,
+            .. (p4?.OwnedHandles ?? []),
         ];
     }
 
@@ -135,6 +138,20 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
 
     public AlsLocomotionGraphParameterSet LandRecovery { get; }
 
+    public AlsP4GraphHandles? P4 { get; }
+
+    public bool TryGetP4TurnSelection(int animationId, out float selection)
+    {
+        selection = 0f;
+        return P4 is not null && P4.TryGetTurnSelection(animationId, out selection);
+    }
+
+    public bool TryGetP4RotateSelection(int animationId, out float selection)
+    {
+        selection = 0f;
+        return P4 is not null && P4.TryGetRotateSelection(animationId, out selection);
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -147,6 +164,88 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
             handle.Dispose();
         }
     }
+}
+
+public sealed class AlsP4GraphHandles
+{
+    private readonly Dictionary<int, float> _turnSelections;
+    private readonly Dictionary<int, float> _rotateSelections;
+
+    internal AlsP4GraphHandles(
+        StringName turnStateName,
+        StringName rotateStateName,
+        StringName aimDownStateName,
+        StringName aimForwardStateName,
+        StringName aimUpStateName,
+        StringName turnSelectionPath,
+        StringName turnPlayRatePath,
+        StringName turnPhasePath,
+        StringName rotateSelectionPath,
+        StringName rotatePlayRatePath,
+        StringName rotatePhasePath,
+        StringName aimDownPhasePath,
+        StringName aimDownWeightPath,
+        StringName aimForwardPhasePath,
+        StringName aimForwardWeightPath,
+        StringName aimUpPhasePath,
+        StringName aimUpWeightPath,
+        Dictionary<int, float> turnSelections,
+        Dictionary<int, float> rotateSelections)
+    {
+        TurnStateName = turnStateName;
+        RotateStateName = rotateStateName;
+        AimDownStateName = aimDownStateName;
+        AimForwardStateName = aimForwardStateName;
+        AimUpStateName = aimUpStateName;
+        TurnSelectionPath = turnSelectionPath;
+        TurnPlayRatePath = turnPlayRatePath;
+        TurnPhasePath = turnPhasePath;
+        RotateSelectionPath = rotateSelectionPath;
+        RotatePlayRatePath = rotatePlayRatePath;
+        RotatePhasePath = rotatePhasePath;
+        AimDownPhasePath = aimDownPhasePath;
+        AimDownWeightPath = aimDownWeightPath;
+        AimForwardPhasePath = aimForwardPhasePath;
+        AimForwardWeightPath = aimForwardWeightPath;
+        AimUpPhasePath = aimUpPhasePath;
+        AimUpWeightPath = aimUpWeightPath;
+        _turnSelections = turnSelections;
+        _rotateSelections = rotateSelections;
+        OwnedHandles =
+        [
+            turnStateName, rotateStateName, aimDownStateName, aimForwardStateName, aimUpStateName,
+            turnSelectionPath, turnPlayRatePath, turnPhasePath,
+            rotateSelectionPath, rotatePlayRatePath, rotatePhasePath,
+            aimDownPhasePath, aimDownWeightPath,
+            aimForwardPhasePath, aimForwardWeightPath,
+            aimUpPhasePath, aimUpWeightPath,
+        ];
+    }
+
+    public StringName TurnStateName { get; }
+    public StringName RotateStateName { get; }
+    public StringName AimDownStateName { get; }
+    public StringName AimForwardStateName { get; }
+    public StringName AimUpStateName { get; }
+    public StringName TurnSelectionPath { get; }
+    public StringName TurnPlayRatePath { get; }
+    public StringName TurnPhasePath { get; }
+    public StringName RotateSelectionPath { get; }
+    public StringName RotatePlayRatePath { get; }
+    public StringName RotatePhasePath { get; }
+    public StringName AimDownPhasePath { get; }
+    public StringName AimDownWeightPath { get; }
+    public StringName AimForwardPhasePath { get; }
+    public StringName AimForwardWeightPath { get; }
+    public StringName AimUpPhasePath { get; }
+    public StringName AimUpWeightPath { get; }
+    internal IDisposable[] OwnedHandles { get; }
+
+    public bool TryGetTurnSelection(int animationId, out float selection) =>
+        _turnSelections.TryGetValue(animationId, out selection);
+
+    public bool TryGetRotateSelection(int animationId, out float selection) =>
+        _rotateSelections.TryGetValue(animationId, out selection);
 }
 
 public sealed class AlsLocomotionGraphParameterSet
@@ -217,12 +316,30 @@ public static class AlsLocomotionGraphBuilder
     public static AlsLocomotionGraphBuildResult Build(
         AlsAnimationLibraryBuildResult library,
         AlsLocomotionAnimationProfile profile,
+        AlsAnimationSetDefinition animationSet) =>
+        BuildInternal(library, profile, null, animationSet);
+
+    public static AlsLocomotionGraphBuildResult Build(
+        AlsAnimationLibraryBuildResult library,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsAnimationSetDefinition animationSet) =>
+        BuildInternal(library, profile, poseProfile, animationSet);
+
+    private static AlsLocomotionGraphBuildResult BuildInternal(
+        AlsAnimationLibraryBuildResult library,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile? poseProfile,
         AlsAnimationSetDefinition animationSet)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(animationSet);
         ValidateInputs(library, profile, animationSet);
+        if (poseProfile is not null)
+        {
+            ValidateP4Inputs(library, profile, poseProfile, animationSet);
+        }
         var layout = ValidateProfileLayout(profile);
 
         var ownedResources = new List<IDisposable>();
@@ -230,7 +347,7 @@ public static class AlsLocomotionGraphBuilder
         AnimationTree? tree = null;
         try
         {
-            handles = CreateHandles(layout);
+            handles = CreateHandles(layout, poseProfile);
             var top = Own(ownedResources, new AnimationNodeStateMachine
             {
                 StateMachineType = AnimationNodeStateMachine.StateMachineTypeEnum.Root,
@@ -276,7 +393,58 @@ public static class AlsLocomotionGraphBuilder
             top.AddNode(handles.StateNames[(int)AlsAnimationState.JumpStart], jumpStart);
             top.AddNode(handles.StateNames[(int)AlsAnimationState.FallLoop], fallLoop);
             top.AddNode(handles.StateNames[(int)AlsAnimationState.LandRecovery], landRecovery);
-            AddAllStateTransitions(top, handles.StateNames, ownedResources);
+            if (poseProfile is not null)
+            {
+                var p4 = handles.P4!;
+                top.AddNode(
+                    p4.TurnStateName,
+                    BuildP4ActionBranch(
+                        library,
+                        poseProfile.Turns.Select(value => value.AnimationId).ToArray(),
+                        ownedResources));
+                top.AddNode(
+                    p4.RotateStateName,
+                    BuildP4ActionBranch(
+                        library,
+                        poseProfile.Rotates.Select(value => value.AnimationId).ToArray(),
+                        ownedResources));
+                top.AddNode(
+                    p4.AimDownStateName,
+                    BuildP4AimBranch(
+                        library,
+                        poseProfile.Aim.AdditiveBasePoseAnimationId,
+                        poseProfile.Aim.DownAnimationId,
+                        ownedResources));
+                top.AddNode(
+                    p4.AimForwardStateName,
+                    BuildP4AimBranch(
+                        library,
+                        poseProfile.Aim.AdditiveBasePoseAnimationId,
+                        poseProfile.Aim.ForwardAnimationId,
+                        ownedResources));
+                top.AddNode(
+                    p4.AimUpStateName,
+                    BuildP4AimBranch(
+                        library,
+                        poseProfile.Aim.AdditiveBasePoseAnimationId,
+                        poseProfile.Aim.UpAnimationId,
+                        ownedResources));
+                AddAllStateTransitions(
+                    top,
+                    [
+                        .. handles.StateNames,
+                        p4.TurnStateName,
+                        p4.RotateStateName,
+                        p4.AimDownStateName,
+                        p4.AimForwardStateName,
+                        p4.AimUpStateName,
+                    ],
+                    ownedResources);
+            }
+            else
+            {
+                AddAllStateTransitions(top, handles.StateNames, ownedResources);
+            }
 
             tree = new AnimationTree
             {
@@ -319,6 +487,45 @@ public static class AlsLocomotionGraphBuilder
         }
     }
 
+    private static void ValidateP4Inputs(
+        AlsAnimationLibraryBuildResult library,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsAnimationSetDefinition animationSet)
+    {
+        if (poseProfile.SkeletonId != profile.SkeletonId)
+        {
+            throw new InvalidOperationException(
+                $"P4 graph skeleton mismatch: expected={profile.SkeletonId} actual={poseProfile.SkeletonId}");
+        }
+        if (poseProfile.Turns.Length != 8 || poseProfile.Rotates.Length != 4)
+        {
+            throw new InvalidOperationException(
+                $"P4 graph requires exactly eight Turn and four Rotate clips: " +
+                $"turns={poseProfile.Turns.Length} rotates={poseProfile.Rotates.Length}");
+        }
+
+        var animationIds = poseProfile.Turns.Select(value => value.AnimationId)
+            .Concat(poseProfile.Rotates.Select(value => value.AnimationId))
+            .Concat([
+                poseProfile.Aim.DownAnimationId,
+                poseProfile.Aim.ForwardAnimationId,
+                poseProfile.Aim.UpAnimationId,
+                poseProfile.Aim.AdditiveBasePoseAnimationId,
+            ]);
+        foreach (var animationId in animationIds)
+        {
+            if ((uint)animationId >= (uint)animationSet.Animations.Length ||
+                animationSet.Animations[animationId].SkeletonId != poseProfile.SkeletonId ||
+                !library.ClipNames.TryGetValue(animationId, out var clipName) ||
+                !library.Library.HasAnimation(clipName))
+            {
+                throw new InvalidOperationException(
+                    $"P4 graph library is missing exact animation ID: {animationId}");
+            }
+        }
+    }
+
     private static void ValidateInputs(
         AlsAnimationLibraryBuildResult library,
         AlsLocomotionAnimationProfile profile,
@@ -347,7 +554,9 @@ public static class AlsLocomotionGraphBuilder
         }
     }
 
-    private static AlsLocomotionGraphHandles CreateHandles(GraphProfileLayout layout)
+    private static AlsLocomotionGraphHandles CreateHandles(
+        GraphProfileLayout layout,
+        AlsPoseAnimationProfile? poseProfile)
     {
         var allocated = new List<IDisposable>();
         try
@@ -390,6 +599,7 @@ public static class AlsLocomotionGraphBuilder
                 "FallLoop", false, false, default, layout.LeanBounds, allocated);
             var landRecovery = CreateParameterSet(
                 "LandRecovery", false, false, default, layout.LeanBounds, allocated);
+            var p4 = poseProfile is null ? null : CreateP4Handles(poseProfile, allocated);
             return new AlsLocomotionGraphHandles(
                 animationPlayerPath,
                 topPlaybackPath,
@@ -402,7 +612,8 @@ public static class AlsLocomotionGraphBuilder
                 groundedCrouching,
                 jumpStart,
                 fallLoop,
-                landRecovery);
+                landRecovery,
+                p4);
         }
         catch
         {
@@ -439,6 +650,54 @@ public static class AlsLocomotionGraphBuilder
             leanBounds.Minimum,
             leanBounds.Maximum);
 
+    private static AlsP4GraphHandles CreateP4Handles(
+        AlsPoseAnimationProfile profile,
+        List<IDisposable> allocated)
+    {
+        var turnSelections = new Dictionary<int, float>(profile.Turns.Length);
+        for (var index = 0; index < profile.Turns.Length; index++)
+        {
+            if (!turnSelections.TryAdd(profile.Turns[index].AnimationId, index))
+            {
+                throw new InvalidOperationException(
+                    $"P4 graph contains duplicate Turn animation ID: {profile.Turns[index].AnimationId}");
+            }
+        }
+        var rotateSelections = new Dictionary<int, float>(profile.Rotates.Length);
+        for (var index = 0; index < profile.Rotates.Length; index++)
+        {
+            if (!rotateSelections.TryAdd(profile.Rotates[index].AnimationId, index))
+            {
+                throw new InvalidOperationException(
+                    $"P4 graph contains duplicate Rotate animation ID: {profile.Rotates[index].AnimationId}");
+            }
+        }
+
+        return new AlsP4GraphHandles(
+            Handle("P4Turn"),
+            Handle("P4Rotate"),
+            Handle("P4AimDown"),
+            Handle("P4AimForward"),
+            Handle("P4AimUp"),
+            Handle("parameters/P4Turn/Select/blend_position"),
+            Handle("parameters/P4Turn/Scale/scale"),
+            Handle("parameters/P4Turn/Seek/seek_request"),
+            Handle("parameters/P4Rotate/Select/blend_position"),
+            Handle("parameters/P4Rotate/Scale/scale"),
+            Handle("parameters/P4Rotate/Seek/seek_request"),
+            Handle("parameters/P4AimDown/Seek/seek_request"),
+            Handle("parameters/P4AimDown/Blend/blend_amount"),
+            Handle("parameters/P4AimForward/Seek/seek_request"),
+            Handle("parameters/P4AimForward/Blend/blend_amount"),
+            Handle("parameters/P4AimUp/Seek/seek_request"),
+            Handle("parameters/P4AimUp/Blend/blend_amount"),
+            turnSelections,
+            rotateSelections);
+
+        StringName Handle(string value) =>
+            AllocateHandle(allocated, new StringName(value));
+    }
+
     private static AnimationNodeBlendTree BuildGroundedBranch(
         AlsAnimationLibraryBuildResult library,
         int idleAnimationId,
@@ -474,6 +733,76 @@ public static class AlsLocomotionGraphBuilder
         var tree = Own(ownedResources, new AnimationNodeBlendTree());
         var clip = CreateAnimationNode(library, animationId, loop, ownedResources);
         AddLayerAndTimingNodes(tree, clip, library, leanSamples, ownedResources);
+        return tree;
+    }
+
+    private static AnimationNodeBlendTree BuildP4ActionBranch(
+        AlsAnimationLibraryBuildResult library,
+        IReadOnlyList<int> animationIds,
+        List<IDisposable> ownedResources)
+    {
+        if (animationIds.Count < 2)
+        {
+            throw new InvalidOperationException("P4 action bank requires at least two clips.");
+        }
+
+        var tree = Own(ownedResources, new AnimationNodeBlendTree());
+        var select = Own(ownedResources, new AnimationNodeBlendSpace1D
+        {
+            MinSpace = 0f,
+            MaxSpace = animationIds.Count - 1,
+            Snap = 1f,
+            BlendMode = AnimationNodeBlendSpace1D.BlendModeEnum.Discrete,
+            SyncMode = AnimationNodeBlendSpace1D.SyncModeEnum.None,
+            ValueLabel = "AnimationId",
+        });
+        for (var index = 0; index < animationIds.Count; index++)
+        {
+            var animationId = animationIds[index];
+            var clip = CreateAnimationNode(library, animationId, false, ownedResources);
+            using var pointName = new StringName($"id_{animationId}");
+            select.AddBlendPoint(clip, index, -1, pointName);
+        }
+
+        var scale = Own(ownedResources, new AnimationNodeTimeScale());
+        var seek = Own(ownedResources, new AnimationNodeTimeSeek());
+        using var selectName = new StringName("Select");
+        using var scaleName = new StringName("Scale");
+        using var seekName = new StringName("Seek");
+        using var outputName = new StringName("output");
+        tree.AddNode(selectName, select);
+        tree.AddNode(scaleName, scale);
+        tree.AddNode(seekName, seek);
+        tree.ConnectNode(scaleName, 0, selectName);
+        tree.ConnectNode(seekName, 0, scaleName);
+        tree.ConnectNode(outputName, 0, seekName);
+        return tree;
+    }
+
+    private static AnimationNodeBlendTree BuildP4AimBranch(
+        AlsAnimationLibraryBuildResult library,
+        int baseAnimationId,
+        int aimAnimationId,
+        List<IDisposable> ownedResources)
+    {
+        var tree = Own(ownedResources, new AnimationNodeBlendTree());
+        var basePose = CreateAnimationNode(library, baseAnimationId, true, ownedResources);
+        var aim = CreateAnimationNode(library, aimAnimationId, true, ownedResources);
+        var blend = Own(ownedResources, new AnimationNodeBlend2());
+        var seek = Own(ownedResources, new AnimationNodeTimeSeek());
+        using var baseName = new StringName("Base");
+        using var aimName = new StringName("Aim");
+        using var blendName = new StringName("Blend");
+        using var seekName = new StringName("Seek");
+        using var outputName = new StringName("output");
+        tree.AddNode(baseName, basePose);
+        tree.AddNode(aimName, aim);
+        tree.AddNode(blendName, blend);
+        tree.AddNode(seekName, seek);
+        tree.ConnectNode(blendName, 0, baseName);
+        tree.ConnectNode(blendName, 1, aimName);
+        tree.ConnectNode(seekName, 0, blendName);
+        tree.ConnectNode(outputName, 0, seekName);
         return tree;
     }
 
