@@ -54,6 +54,8 @@ public partial class P4AnimationGraphSmoke : Node
         VerifyLibraryContract(definition, locomotionProfile, poseProfile);
         VerifyAuthoritativeActionPhase(definition, locomotionProfile, poseProfile, settings);
         VerifyTurnBlend(definition, locomotionProfile, poseProfile, settings);
+        VerifyInterruptedActionBlend(definition, locomotionProfile, poseProfile, settings);
+        VerifyZeroDurationTurnBlend(definition, locomotionProfile, poseProfile, settings);
         VerifyAimEndpoints(definition, locomotionProfile, poseProfile, settings);
         VerifyControllerAllocation(definition, locomotionProfile, poseProfile, settings);
 
@@ -488,6 +490,228 @@ public partial class P4AnimationGraphSmoke : Node
             {
                 throw new InvalidOperationException($"{label} did not produce an intermediate pose.");
             }
+        }
+    }
+
+    private void VerifyInterruptedActionBlend(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionSettings settings)
+    {
+        using var graphLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(graphLibrary.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(
+            graphLibrary, locomotionProfile, poseProfile, definition);
+        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        controller.Warmup();
+        using var directLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(directLibrary.Root);
+        var result = ValidResult();
+        var disabled = AlsP4AnimationInput.Disabled;
+        controller.Apply(in result, in disabled, 0.0);
+        var basePose = Capture();
+
+        var a = TurnInput(0, 0.35f);
+        var b = TurnInput(1, 0.65f);
+        var c = TurnInput(2, 0.45f);
+        var d = TurnInput(4, 0.55f);
+        var aDirect = SampleDirect(poseProfile.Turns[0].AnimationId, a.TurnPhase);
+        var bDirect = SampleDirect(poseProfile.Turns[1].AnimationId, b.TurnPhase);
+        var cDirect = SampleDirect(poseProfile.Turns[2].AnimationId, c.TurnPhase);
+        var dDirect = SampleDirect(poseProfile.Turns[4].AnimationId, d.TurnPhase);
+
+        EnterTurn(in a, aDirect);
+        controller.Apply(in result, in b, 0.0);
+        controller.Apply(in result, in b, 0.05);
+        var quarterPose = Capture();
+        AssertIntermediate(aDirect, bDirect, quarterPose, "Turn A->B 25%");
+        controller.Apply(in result, in c, 0.0);
+        AssertSame(quarterPose, Capture(), "Turn A->B 25% retarget C changed the delta=0 pose");
+        controller.Apply(in result, in d, 0.0);
+        AssertSame(quarterPose, Capture(), "Turn A->B 25% latest retarget D changed the delta=0 pose");
+        controller.Apply(in result, in d, 0.15);
+        AssertSame(bDirect, Capture(), "Turn delayed retarget did not first complete B");
+        controller.Apply(in result, in d, 0.1);
+        AssertIntermediate(bDirect, dDirect, Capture(), "Turn B->latest D 50%");
+        controller.Apply(in result, in d, 0.1);
+        AssertSame(dDirect, Capture(), "Turn delayed retarget did not select the latest D");
+
+        ExitTurn(in disabled, dDirect, basePose);
+        EnterTurn(in a, aDirect);
+        controller.Apply(in result, in b, 0.0);
+        controller.Apply(in result, in b, 0.1);
+        var halfPose = Capture();
+        AssertIntermediate(aDirect, bDirect, halfPose, "Turn A->B 50%");
+        controller.Apply(in result, in disabled, 0.0);
+        AssertSame(halfPose, Capture(), "Turn A->B 50% exit changed the delta=0 pose");
+        controller.Apply(in result, in disabled, 0.1);
+        AssertIntermediate(halfPose, basePose, Capture(), "Interrupted Turn exit 50%");
+        controller.Apply(in result, in disabled, 0.1);
+        AssertSame(basePose, Capture(), "Interrupted Turn exit did not reach Base");
+        controller.Apply(in result, in c, 0.0);
+        AssertSame(basePose, Capture(), "Turn re-entry after exit changed the delta=0 base pose");
+        controller.Apply(in result, in c, poseProfile.Turns[2].BlendSeconds);
+        AssertSame(cDirect, Capture(), "Turn re-entry retained a stale interrupted blend");
+
+        controller.Apply(in result, in b, 0.0);
+        controller.Apply(in result, in b, 0.05);
+        quarterPose = Capture();
+        AssertIntermediate(cDirect, bDirect, quarterPose, "Turn C->B 25%");
+        var rotateA = RotateInput(0, 0.4f);
+        var rotateB = RotateInput(1, 0.6f);
+        var rotateADirect = SampleDirect(
+            poseProfile.Rotates[0].AnimationId, rotateA.RotatePhase);
+        var rotateBDirect = SampleDirect(
+            poseProfile.Rotates[1].AnimationId, rotateB.RotatePhase);
+        controller.Apply(in result, in rotateA, 0.0);
+        AssertSame(quarterPose, Capture(), "Turn->Rotate interrupted blend changed the delta=0 pose");
+        controller.Apply(in result, in rotateA, 0.04);
+        AssertIntermediate(quarterPose, rotateADirect, Capture(), "Turn composite->Rotate 50%");
+        controller.Apply(in result, in rotateA, 0.04);
+        AssertSame(rotateADirect, Capture(), "Turn composite->Rotate did not reach Rotate");
+
+        controller.Apply(in result, in rotateB, 0.0);
+        controller.Apply(in result, in rotateB, 0.04);
+        var rotateHalfPose = Capture();
+        AssertIntermediate(rotateADirect, rotateBDirect, rotateHalfPose, "Rotate A->B 50%");
+        controller.Apply(in result, in c, 0.0);
+        AssertSame(rotateHalfPose, Capture(), "Rotate->Turn interrupted blend changed the delta=0 pose");
+        controller.Apply(in result, in c, 0.04);
+        AssertIntermediate(rotateHalfPose, cDirect, Capture(), "Rotate composite->Turn 50%");
+        controller.Apply(in result, in c, 0.04);
+        AssertSame(cDirect, Capture(), "Rotate composite->Turn did not reach authoritative Turn phase");
+
+        AlsP4AnimationInput TurnInput(int index, float normalizedPhase)
+        {
+            var turn = poseProfile.Turns[index];
+            return AlsP4AnimationInput.Turn(
+                turn.AnimationId,
+                turn.BasePlayRate,
+                definition.Animations[turn.AnimationId].PlayLength * normalizedPhase,
+                0f,
+                0f,
+                0f,
+                0f);
+        }
+
+        AlsP4AnimationInput RotateInput(int index, float normalizedPhase)
+        {
+            var rotate = poseProfile.Rotates[index];
+            return AlsP4AnimationInput.Rotate(
+                rotate.AnimationId,
+                1f,
+                definition.Animations[rotate.AnimationId].PlayLength * normalizedPhase,
+                0f,
+                0f,
+                0f,
+                0f);
+        }
+
+        void EnterTurn(in AlsP4AnimationInput input, AlsBonePose[] direct)
+        {
+            controller.Apply(in result, in input, 0.0);
+            AssertSame(basePose, Capture(), "Turn entry changed the delta=0 base pose");
+            controller.Apply(in result, in input, 0.2);
+            AssertSame(direct, Capture(), "Turn entry did not reach the direct pose");
+        }
+
+        void ExitTurn(
+            in AlsP4AnimationInput input,
+            AlsBonePose[] direct,
+            AlsBonePose[] targetBase)
+        {
+            controller.Apply(in result, in input, 0.0);
+            AssertSame(direct, Capture(), "Turn exit changed the delta=0 action pose");
+            controller.Apply(in result, in input, 0.2);
+            AssertSame(targetBase, Capture(), "Turn exit did not reach Base");
+        }
+
+        AlsBonePose[] SampleDirect(int animationId, float phase)
+        {
+            if (!directLibrary.ClipNames.TryGetValue(animationId, out var clipName))
+            {
+                throw new InvalidOperationException(
+                    $"Interrupted blend direct fixture has no exact clip: {animationId}");
+            }
+            using var qualifiedName = new StringName($"als/{clipName}");
+            directLibrary.Player.Play(qualifiedName);
+            directLibrary.Player.Seek(phase, true);
+            directLibrary.Player.Advance(0.0);
+            return AlsPoseDigest.CapturePoses(directLibrary.Skeleton, PoseBoneNames);
+        }
+
+        AlsBonePose[] Capture() => AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
+        static void AssertSame(AlsBonePose[] expected, AlsBonePose[] actual, string message)
+        {
+            if (AlsPoseDigest.HasChanged(expected, actual))
+            {
+                throw new InvalidOperationException(message);
+            }
+        }
+        static void AssertIntermediate(
+            AlsBonePose[] source,
+            AlsBonePose[] target,
+            AlsBonePose[] actual,
+            string label)
+        {
+            if (!AlsPoseDigest.HasChanged(source, actual) ||
+                !AlsPoseDigest.HasChanged(target, actual))
+            {
+                throw new InvalidOperationException($"{label} did not produce an intermediate pose.");
+            }
+        }
+    }
+
+    private void VerifyZeroDurationTurnBlend(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionSettings settings)
+    {
+        var zeroTurns = poseProfile.Turns;
+        zeroTurns[1] = zeroTurns[1] with { BlendSeconds = 0f };
+        var zeroProfile = poseProfile with { Turns = zeroTurns };
+        using var graphLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, zeroProfile);
+        AddChild(graphLibrary.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(
+            graphLibrary, locomotionProfile, zeroProfile, definition);
+        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        controller.Warmup();
+        using var directLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, zeroProfile);
+        AddChild(directLibrary.Root);
+        var result = ValidResult();
+        var first = zeroProfile.Turns[0];
+        var second = zeroProfile.Turns[1];
+        var firstPhase = definition.Animations[first.AnimationId].PlayLength * 0.4f;
+        var secondPhase = definition.Animations[second.AnimationId].PlayLength * 0.7f;
+        var firstInput = AlsP4AnimationInput.Turn(
+            first.AnimationId, first.BasePlayRate, firstPhase, 0f, 0f, 0f, 0f);
+        var secondInput = AlsP4AnimationInput.Turn(
+            second.AnimationId, second.BasePlayRate, secondPhase, 0f, 0f, 0f, 0f);
+        controller.Apply(in result, in firstInput, 0.0);
+        controller.Apply(in result, in firstInput, first.BlendSeconds);
+        controller.Apply(in result, in secondInput, 0.0);
+
+        if (!directLibrary.ClipNames.TryGetValue(second.AnimationId, out var clipName))
+        {
+            throw new InvalidOperationException(
+                $"Zero-duration Turn direct fixture has no exact clip: {second.AnimationId}");
+        }
+        using var qualifiedName = new StringName($"als/{clipName}");
+        directLibrary.Player.Play(qualifiedName);
+        directLibrary.Player.Seek(secondPhase, true);
+        directLibrary.Player.Advance(0.0);
+        var directPose = AlsPoseDigest.CapturePoses(directLibrary.Skeleton, PoseBoneNames);
+        var graphPose = AlsPoseDigest.CapturePoses(graph.TargetSkeleton, PoseBoneNames);
+        if (AlsPoseDigest.HasChanged(directPose, graphPose))
+        {
+            throw new InvalidOperationException(
+                "Turn BlendSeconds=0 did not display and commit the target bank at delta=0.");
         }
     }
 
