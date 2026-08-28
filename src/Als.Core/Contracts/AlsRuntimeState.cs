@@ -119,6 +119,7 @@ public struct AlsRuntimeState
     public AlsFootLockState LeftFootLock;
     public AlsFootLockState RightFootLock;
     public AlsPelvisCorrectionState PelvisCorrection;
+    // Last committed uncorrected probe origins in character-local space.
     public Vector3 LeftFootProbeOrigin;
     public Vector3 RightFootProbeOrigin;
 

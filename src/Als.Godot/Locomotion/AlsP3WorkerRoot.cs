@@ -59,7 +59,8 @@ public partial class AlsP3WorkerRoot : Node3D
         {
             _poseProfile = AlsPoseProfileCompiler.Compile(
                 File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)),
-                context.AnimationSet);
+                context.AnimationSet,
+                context.Profile);
             _turnRotateSettings = CompileTurnRotateSettings(
                 context.AnimationSet,
                 _poseProfile);
@@ -76,7 +77,11 @@ public partial class AlsP3WorkerRoot : Node3D
                 context.Profile,
                 _poseProfile,
                 context.AnimationSet);
-            _controller = new AlsLocomotionAnimationController(_graph, context.Settings);
+            _controller = new AlsLocomotionAnimationController(
+                _graph,
+                context.Settings,
+                _poseProfile,
+                context.AnimationSet);
             _controller.Warmup();
             _skeleton = _graph.TargetSkeleton;
             ConfigureFootProbeSource(context.AnimationSet, _poseProfile);
@@ -228,7 +233,14 @@ public partial class AlsP3WorkerRoot : Node3D
                     ? Stopwatch.GetTimestamp()
                     : 0L;
                 var p4AnimationInput = CreateP4AnimationInput(in _result);
-                _controller!.Apply(in _result, in p4AnimationInput, input.DeltaTime);
+                var preparedAnimation = _controller!.PrepareFrame(
+                    in _result, in p4AnimationInput, input.DeltaTime);
+                var footCurves = _controller.SampleFootCurves(in preparedAnimation);
+                _result.LeftFootIkWeight = footCurves.LeftIkWeight;
+                _result.RightFootIkWeight = footCurves.RightIkWeight;
+                _result.LeftFootLockCurve = footCurves.LeftLockCurve;
+                _result.RightFootLockCurve = footCurves.RightLockCurve;
+                _controller.ApplyPrepared(in preparedAnimation);
                 if (!TryCaptureFootProbeOrigins(
                         input.Identity,
                         input.CharacterTransform,

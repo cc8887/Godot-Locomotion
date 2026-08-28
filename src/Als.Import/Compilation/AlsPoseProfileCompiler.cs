@@ -49,9 +49,18 @@ public static class AlsPoseProfileCompiler
     private static readonly string[] TurnProperties = ["animation", "stance", "direction", "nominalDegrees", "basePlayRate", "blendSeconds", "scaleAngle"];
     private static readonly string[] RotateProperties = ["animation", "stance", "direction"];
     private static readonly string[] MaskProperties = ["kind", "root", "boundaries"];
-    private static readonly string[] FeetProperties = ["leftLegRoot", "rightLegRoot", "leftFootRoot", "rightFootRoot", "traceUpMeters", "traceDownMeters", "footHeightMeters", "maxPelvisCorrectionMeters", "positionHalfLifeSeconds", "rotationHalfLifeSeconds", "lockReleaseHalfLifeSeconds"];
+    private static readonly string[] FeetProperties = ["leftLegRoot", "rightLegRoot", "leftFootRoot", "rightFootRoot", "traceUpMeters", "traceDownMeters", "footHeightMeters", "maxPelvisCorrectionMeters", "pelvisUpHalfLifeSeconds", "pelvisDownHalfLifeSeconds", "positionHalfLifeSeconds", "rotationHalfLifeSeconds", "lockReleaseHalfLifeSeconds", "maxLegReachMeters", "capsuleHalfHeightSource", "maxThighAngleDegrees", "maxFootAngleDegrees", "platformTeleportDistanceMeters", "platformTeleportAngleDegrees", "lockWeightEpsilon", "curves", "ikStateDefaults"];
+    private static readonly string[] FootCurveProperties = ["leftLock", "rightLock", "missingLockDefault"];
+    private static readonly string[] FootIkDefaultProperties = ["grounded", "jumpStart", "fallLoop", "landRecovery"];
 
-    public static AlsPoseAnimationProfile Compile(string json, AlsAnimationSetDefinition animationSet)
+    public static AlsPoseAnimationProfile Compile(
+        string json,
+        AlsAnimationSetDefinition animationSet) => Compile(json, animationSet, null);
+
+    public static AlsPoseAnimationProfile Compile(
+        string json,
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile? locomotionProfile)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         ArgumentNullException.ThrowIfNull(animationSet);
@@ -83,8 +92,19 @@ public static class AlsPoseProfileCompiler
             var turns = CompileTurns(root["turns"], animationSet, skeletonId);
             var rotates = CompileRotates(root["rotates"], animationSet, skeletonId);
             var masks = CompileMasks(root["masks"], skeleton);
-            var feet = CompileFeet(root["feet"], skeleton, masks);
-            return new AlsPoseAnimationProfile(version, skeletonId, aim, turns, rotates, masks, feet);
+            if (locomotionProfile is not null && locomotionProfile.SkeletonId != skeletonId)
+            {
+                throw Failure("ALSPOSE043", "$.skeleton",
+                    "Locomotion and pose profiles must target the same skeleton.",
+                    skeletonId.ToString(), locomotionProfile.SkeletonId.ToString(), skeletonStableId);
+            }
+            var (feet, footCurves) = CompileFeet(
+                root["feet"], animationSet, skeleton, masks,
+                locomotionProfile, turns, rotates);
+            return new AlsPoseAnimationProfile(version, skeletonId, aim, turns, rotates, masks, feet)
+            {
+                FootCurves = footCurves,
+            };
         }
     }
 
@@ -236,7 +256,14 @@ public static class AlsPoseProfileCompiler
         return new AlsLayerMaskProfile(entries);
     }
 
-    private static AlsFootPlacementSettings CompileFeet(JsonElement element, AlsSkeletonDefinition skeleton, AlsLayerMaskProfile masks)
+    private static (AlsFootPlacementSettings Settings, AlsFootCurveProfile Curves) CompileFeet(
+        JsonElement element,
+        AlsAnimationSetDefinition set,
+        AlsSkeletonDefinition skeleton,
+        AlsLayerMaskProfile masks,
+        AlsLocomotionAnimationProfile? locomotion,
+        AlsTurnProfile[] turns,
+        AlsRotateProfile[] rotates)
     {
         var source = Object(element, "$.feet", FeetProperties);
         var leftLeg = ExactBoneId(skeleton, String(source["leftLegRoot"], "$.feet.leftLegRoot"), "$.feet.leftLegRoot");
@@ -249,15 +276,129 @@ public static class AlsPoseProfileCompiler
         RequireFootMask(masks, AlsPoseMaskKind.RightLeg, rightLeg, "$.feet.rightLegRoot");
         RequireFootMask(masks, AlsPoseMaskKind.LeftFoot, leftFoot, "$.feet.leftFootRoot");
         RequireFootMask(masks, AlsPoseMaskKind.RightFoot, rightFoot, "$.feet.rightFootRoot");
-        return new AlsFootPlacementSettings(leftLeg, rightLeg, leftFoot, rightFoot,
+        var capsuleSource = String(
+            source["capsuleHalfHeightSource"], "$.feet.capsuleHalfHeightSource");
+        if (!string.Equals(capsuleSource, "characterController", StringComparison.Ordinal))
+        {
+            throw Failure("ALSPOSE044", "$.feet.capsuleHalfHeightSource",
+                "Capsule half-height must be supplied by the character controller.",
+                "characterController", capsuleSource);
+        }
+        var settings = new AlsFootPlacementSettings(leftLeg, rightLeg, leftFoot, rightFoot,
             Ranged(source["traceUpMeters"], "$.feet.traceUpMeters", 0f, 5f),
             Ranged(source["traceDownMeters"], "$.feet.traceDownMeters", 0f, 5f),
             Ranged(source["footHeightMeters"], "$.feet.footHeightMeters", 0f, 1f, allowZero: true),
             Ranged(source["maxPelvisCorrectionMeters"], "$.feet.maxPelvisCorrectionMeters", 0f, 2f),
             Ranged(source["positionHalfLifeSeconds"], "$.feet.positionHalfLifeSeconds", 0f, 5f),
             Ranged(source["rotationHalfLifeSeconds"], "$.feet.rotationHalfLifeSeconds", 0f, 5f),
-            Ranged(source["lockReleaseHalfLifeSeconds"], "$.feet.lockReleaseHalfLifeSeconds", 0f, 5f));
+            Ranged(source["lockReleaseHalfLifeSeconds"], "$.feet.lockReleaseHalfLifeSeconds", 0f, 5f))
+        {
+            PelvisUpHalfLifeSeconds = Ranged(source["pelvisUpHalfLifeSeconds"], "$.feet.pelvisUpHalfLifeSeconds", 0f, 5f, allowZero: true),
+            PelvisDownHalfLifeSeconds = Ranged(source["pelvisDownHalfLifeSeconds"], "$.feet.pelvisDownHalfLifeSeconds", 0f, 5f, allowZero: true),
+            MaximumLegReachMeters = Ranged(source["maxLegReachMeters"], "$.feet.maxLegReachMeters", 0f, 5f),
+            CapsuleHalfHeightSource = AlsCapsuleHalfHeightSource.CharacterController,
+            MaximumThighAngleRadians = DegreesToRadians(
+                Ranged(source["maxThighAngleDegrees"], "$.feet.maxThighAngleDegrees", 0f, 180f, allowZero: true)),
+            MaximumFootAngleRadians = DegreesToRadians(
+                Ranged(source["maxFootAngleDegrees"], "$.feet.maxFootAngleDegrees", 0f, 180f, allowZero: true)),
+            PlatformTeleportDistanceMeters = Ranged(source["platformTeleportDistanceMeters"], "$.feet.platformTeleportDistanceMeters", 0f, 100f),
+            PlatformTeleportAngleRadians = DegreesToRadians(
+                Ranged(source["platformTeleportAngleDegrees"], "$.feet.platformTeleportAngleDegrees", 0f, 180f, allowZero: true)),
+            LockWeightEpsilon = Ranged(source["lockWeightEpsilon"], "$.feet.lockWeightEpsilon", 0f, 1f),
+        };
+
+        var curves = Object(source["curves"], "$.feet.curves", FootCurveProperties);
+        var leftCurveName = String(curves["leftLock"], "$.feet.curves.leftLock");
+        var rightCurveName = String(curves["rightLock"], "$.feet.curves.rightLock");
+        var missingLockDefault = Unit(curves["missingLockDefault"], "$.feet.curves.missingLockDefault");
+        var ikDefaults = Object(
+            source["ikStateDefaults"], "$.feet.ikStateDefaults", FootIkDefaultProperties);
+
+        var reachable = new List<int>(34);
+        var unique = new HashSet<int>();
+        if (locomotion is not null)
+        {
+            Add(locomotion.StandingIdleAnimationId);
+            Add(locomotion.CrouchingIdleAnimationId);
+            foreach (var sample in locomotion.StandingSamples) Add(sample.AnimationId);
+            foreach (var sample in locomotion.CrouchingSamples) Add(sample.AnimationId);
+            Add(locomotion.JumpStartAnimationId);
+            Add(locomotion.FallLoopAnimationId);
+            Add(locomotion.LandAnimationId);
+        }
+        foreach (var turn in turns) Add(turn.AnimationId);
+        foreach (var rotate in rotates) Add(rotate.AnimationId);
+
+        var bindings = new AlsFootCurveBinding[reachable.Count];
+        var foundLeft = false;
+        var foundRight = false;
+        for (var index = 0; index < reachable.Count; index++)
+        {
+            var animation = set.Animations[reachable[index]];
+            var leftCurveId = SourceCurveId(animation, leftCurveName, out var hasLeft);
+            var rightCurveId = SourceCurveId(animation, rightCurveName, out var hasRight);
+            foundLeft |= hasLeft;
+            foundRight |= hasRight;
+            bindings[index] = new AlsFootCurveBinding(
+                animation.Id,
+                leftCurveId,
+                rightCurveId,
+                hasLeft ? 0f : missingLockDefault,
+                hasRight ? 0f : missingLockDefault);
+        }
+        if (!foundLeft)
+        {
+            throw Failure("ALSPOSE045", "$.feet.curves.leftLock",
+                "Foot lock curve name is absent from every production-reachable animation.",
+                actual: leftCurveName);
+        }
+        if (!foundRight)
+        {
+            throw Failure("ALSPOSE045", "$.feet.curves.rightLock",
+                "Foot lock curve name is absent from every production-reachable animation.",
+                actual: rightCurveName);
+        }
+
+        var footCurves = new AlsFootCurveProfile(
+            Unit(ikDefaults["grounded"], "$.feet.ikStateDefaults.grounded"),
+            Unit(ikDefaults["jumpStart"], "$.feet.ikStateDefaults.jumpStart"),
+            Unit(ikDefaults["fallLoop"], "$.feet.ikStateDefaults.fallLoop"),
+            Unit(ikDefaults["landRecovery"], "$.feet.ikStateDefaults.landRecovery"),
+            bindings);
+        return (settings, footCurves);
+
+        void Add(int animationId)
+        {
+            if (unique.Add(animationId)) reachable.Add(animationId);
+        }
     }
+
+    private static int SourceCurveId(
+        AlsAnimationDefinition animation,
+        string sourceName,
+        out bool found)
+    {
+        var id = -1;
+        found = false;
+        foreach (var curve in animation.Curves)
+        {
+            if (!string.Equals(curve.SourceName, sourceName, StringComparison.Ordinal)) continue;
+            if (found)
+            {
+                throw Failure("ALSPOSE046", "$.feet.curves",
+                    "A production animation contains duplicate source foot curves.",
+                    assetId: animation.StableId);
+            }
+            found = true;
+            id = curve.CurveId;
+        }
+        return id;
+    }
+
+    private static float Unit(JsonElement element, string path) =>
+        Ranged(element, path, 0f, 1f, allowZero: true);
+
+    private static float DegreesToRadians(float value) => value * MathF.PI / 180f;
 
     private static Dictionary<string, JsonElement> Object(JsonElement element, string path, string[] required)
     {

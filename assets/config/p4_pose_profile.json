@@ -185,8 +185,28 @@
     "traceDownMeters": 0.75,
     "footHeightMeters": 0.13,
     "maxPelvisCorrectionMeters": 0.4,
+    "pelvisUpHalfLifeSeconds": 0.08,
+    "pelvisDownHalfLifeSeconds": 0.1,
     "positionHalfLifeSeconds": 0.08,
     "rotationHalfLifeSeconds": 0.1,
-    "lockReleaseHalfLifeSeconds": 0.12
+    "lockReleaseHalfLifeSeconds": 0.12,
+    "maxLegReachMeters": 1.2,
+    "capsuleHalfHeightSource": "characterController",
+    "maxThighAngleDegrees": 90.0,
+    "maxFootAngleDegrees": 40.0,
+    "platformTeleportDistanceMeters": 1.0,
+    "platformTeleportAngleDegrees": 45.0,
+    "lockWeightEpsilon": 0.0001,
+    "curves": {
+      "leftLock": "FootLock_L",
+      "rightLock": "FootLock_R",
+      "missingLockDefault": 0.0
+    },
+    "ikStateDefaults": {
+      "grounded": 1.0,
+      "jumpStart": 0.0,
+      "fallLoop": 0.0,
+      "landRecovery": 1.0
+    }
   }
 }

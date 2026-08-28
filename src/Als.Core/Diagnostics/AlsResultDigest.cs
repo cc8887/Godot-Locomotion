@@ -49,7 +49,7 @@ public static class AlsResultDigest
         {
             Append(ref digest, (byte)'P');
             Append(ref digest, (byte)'4');
-            Append(ref digest, (byte)1);
+            Append(ref digest, (byte)2);
             Append(ref digest, result.AimRelativeYaw);
             Append(ref digest, result.AimRelativePitch);
             Append(ref digest, result.HeadWeight);
@@ -80,6 +80,12 @@ public static class AlsResultDigest
             Append(ref digest, result.RightFootPose.Rotation);
             Append(ref digest, result.RightFootPose.LockAmount);
             Append(ref digest, result.RightFootPose.PlatformId);
+            Append(ref digest, (byte)result.LeftFootReleaseReason);
+            Append(ref digest, (byte)result.RightFootReleaseReason);
+            Append(ref digest, result.LeftFootIkWeight);
+            Append(ref digest, result.RightFootIkWeight);
+            Append(ref digest, result.LeftFootLockCurve);
+            Append(ref digest, result.RightFootLockCurve);
             Append(ref digest, result.NextLeftFootProbeOrigin);
             Append(ref digest, result.NextRightFootProbeOrigin);
             Append(ref digest, result.P4ModifierOperationTicks);
@@ -112,6 +118,12 @@ public static class AlsResultDigest
         !IsPositiveZero(result.PelvisOffset) ||
         !IsDefault(result.LeftFootPose) ||
         !IsDefault(result.RightFootPose) ||
+        result.LeftFootReleaseReason != AlsFootReleaseReason.None ||
+        result.RightFootReleaseReason != AlsFootReleaseReason.None ||
+        !IsPositiveZero(result.LeftFootIkWeight) ||
+        !IsPositiveZero(result.RightFootIkWeight) ||
+        !IsPositiveZero(result.LeftFootLockCurve) ||
+        !IsPositiveZero(result.RightFootLockCurve) ||
         !IsPositiveZero(result.NextLeftFootProbeOrigin) ||
         !IsPositiveZero(result.NextRightFootProbeOrigin) ||
         result.P4ModifierOperationTicks != 0 ||

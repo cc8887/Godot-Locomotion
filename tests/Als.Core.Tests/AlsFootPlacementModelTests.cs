@@ -15,6 +15,7 @@ public sealed class AlsFootPlacementModelTests
     {
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFootPlacementSettings>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFootPlacementOutput>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFootProbeWorldOrigins>());
         Assert.Equal("GodotAls.Core.Contracts", typeof(AlsFootReleaseReason).Namespace);
         Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(AlsFootReleaseReason)));
         Assert.Equal((byte)0, (byte)AlsFootReleaseReason.None);
@@ -41,6 +42,75 @@ public sealed class AlsFootPlacementModelTests
         AssertVector(Vector3.Zero, defaults.ProvenancePosition);
         AssertQuaternion(Quaternion.Identity, defaults.ProvenanceRotation);
         Assert.Equal(AlsFootReleaseReason.None, defaults.ReleaseReason);
+    }
+
+    [Fact]
+    public void ExplicitWorldProbeOriginsDoNotReuseCommittedCharacterLocalHistory()
+    {
+        const float yaw = 0.65f;
+        var translation = new Vector3(4.25f, 0f, -2.5f);
+        var characterTransform = Matrix4x4.CreateRotationY(yaw) *
+                                 Matrix4x4.CreateTranslation(translation);
+        var localLeft = new Vector3(0.3f, 0.13f, -0.2f);
+        var localRight = new Vector3(-0.3f, 0.13f, -0.2f);
+        var worldLeft = Vector3.Transform(localLeft, characterTransform);
+        var worldRight = Vector3.Transform(localRight, characterTransform);
+        var origins = new AlsFootProbeWorldOrigins(worldLeft, worldRight);
+        var state = State();
+        state.LeftFootProbeOrigin = localLeft;
+        state.RightFootProbeOrigin = localRight;
+        var input = Input(
+            Hit(position: worldLeft - (Vector3.UnitY * 0.13f)),
+            Hit(position: worldRight - (Vector3.UnitY * 0.13f))) with
+        {
+            CharacterTransform = characterTransform,
+        };
+
+        Assert.NotEqual(localLeft, worldLeft);
+        Assert.True(AlsFootPlacementModel.TryEvaluate(
+            AlsFootPlacementSettings.CreateReference(), input,
+            1f, 1f, 1f, 1f, origins, state,
+            out var next, out var output, out var reason), reason.ToString());
+
+        AssertVector(worldLeft, output.LeftFoot.Position);
+        AssertVector(worldRight, output.RightFoot.Position);
+        AssertVector(localLeft, next.LeftFootProbeOrigin);
+        AssertVector(localRight, next.RightFootProbeOrigin);
+    }
+
+    [Fact]
+    public void NonFiniteExplicitWorldOriginsAreInputFailuresNotRuntimeHistoryFailures()
+    {
+        var state = State();
+        var origins = new AlsFootProbeWorldOrigins(
+            new Vector3(float.NaN, 0f, 0f),
+            Vector3.Zero);
+
+        Assert.False(AlsFootPlacementModel.TryEvaluate(
+            AlsFootPlacementSettings.CreateReference(), Input(Hit()),
+            1f, 1f, 1f, 1f, origins, state,
+            out var next, out var output, out var reason));
+
+        AssertRawEqual(state, next);
+        AssertRawEqual(default(AlsFootPlacementOutput), output);
+        Assert.Equal(AlsP4ReasonCode.NonFiniteInput, reason);
+    }
+
+    [Fact]
+    public void NonFiniteCommittedLocalProbeHistoryIsAnInvalidRuntimeState()
+    {
+        var state = State();
+        state.LeftFootProbeOrigin = new Vector3(float.NaN, 0f, 0f);
+        var origins = new AlsFootProbeWorldOrigins(Vector3.Zero, Vector3.Zero);
+
+        Assert.False(AlsFootPlacementModel.TryEvaluate(
+            AlsFootPlacementSettings.CreateReference(), Input(Hit()),
+            1f, 1f, 1f, 1f, origins, state,
+            out var next, out var output, out var reason));
+
+        AssertRawEqual(state, next);
+        AssertRawEqual(default(AlsFootPlacementOutput), output);
+        Assert.Equal(AlsP4ReasonCode.InvalidRuntimeState, reason);
     }
 
     [Theory]

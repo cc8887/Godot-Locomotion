@@ -47,7 +47,8 @@ public partial class P4AnimationGraphSmoke : Node
         var locomotionProfile = AlsLocomotionProfileCompiler.Compile(
             File.ReadAllText(ProjectSettings.GlobalizePath(P3ProfilePath)), definition);
         var poseProfile = AlsPoseProfileCompiler.Compile(
-            File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)), definition);
+            File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)), definition,
+            locomotionProfile);
         var settings = AlsLocomotionSettings.Load(
             Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
 
@@ -58,13 +59,15 @@ public partial class P4AnimationGraphSmoke : Node
         VerifyZeroDurationTurnBlend(definition, locomotionProfile, poseProfile, settings);
         VerifyAimEndpoints(definition, locomotionProfile, poseProfile, settings);
         VerifyControllerAllocation(definition, locomotionProfile, poseProfile, settings);
+        VerifyPreparedFootCurves(definition, locomotionProfile, poseProfile, settings);
 
         using var library = AlsAnimationLibraryBuilder.Build(
             definition, locomotionProfile, poseProfile);
         AddChild(library.Root);
         using var graph = AlsLocomotionGraphBuilder.Build(
             library, locomotionProfile, poseProfile, definition);
-        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, settings, poseProfile, definition);
         controller.Warmup();
 
         VerifyNamedNodes(graph);
@@ -201,6 +204,255 @@ public partial class P4AnimationGraphSmoke : Node
         return digest;
     }
 
+    private void VerifyPreparedFootCurves(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionSettings settings)
+    {
+        if (System.Runtime.CompilerServices.RuntimeHelpers
+                .IsReferenceOrContainsReferences<AlsPreparedAnimationFrame>() ||
+            System.Runtime.CompilerServices.RuntimeHelpers
+                .IsReferenceOrContainsReferences<AlsFootCurveSample>())
+        {
+            throw new InvalidOperationException(
+                "Prepared animation and foot-curve contracts must remain value-only.");
+        }
+        using var library = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(library.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(
+            library, locomotionProfile, poseProfile, definition);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, settings, poseProfile, definition);
+        controller.Warmup();
+
+        var result = ValidResult();
+        var disabled = AlsP4AnimationInput.Disabled;
+        result.AnimationState = AlsAnimationState.JumpStart;
+        var prepared = controller.PrepareFrame(in result, in disabled, DeltaTime);
+        var sample = controller.SampleFootCurves(in prepared);
+        if (sample.LeftIkWeight != 0f || sample.RightIkWeight != 0f)
+        {
+            throw new InvalidOperationException("Prepared JumpStart foot IK default was not zero.");
+        }
+        controller.ApplyPrepared(in prepared);
+
+        result.AnimationState = AlsAnimationState.LandRecovery;
+        result.ResolvedLocomotionState = AlsLocomotionState.Grounded;
+        prepared = controller.PrepareFrame(in result, in disabled, DeltaTime);
+        sample = controller.SampleFootCurves(in prepared);
+        if (sample.LeftIkWeight != 1f || sample.RightIkWeight != 1f)
+        {
+            throw new InvalidOperationException("Prepared LandRecovery foot IK default was not one.");
+        }
+        controller.ApplyPrepared(in prepared);
+
+        result.AnimationState = AlsAnimationState.Grounded;
+        var partialProfile = poseProfile with
+        {
+            FootCurves = poseProfile.FootCurves with { GroundedIkWeight = 0.5f },
+        };
+        using var partialController = new AlsLocomotionAnimationController(
+            graph, settings, partialProfile, definition);
+        partialController.Warmup();
+        prepared = partialController.PrepareFrame(in result, in disabled, 0.0);
+        sample = partialController.SampleFootCurves(in prepared);
+        if (sample.LeftIkWeight != 0.5f || sample.RightIkWeight != 0.5f)
+        {
+            throw new InvalidOperationException("Prepared custom grounded foot IK default was not partial.");
+        }
+
+        var turn = poseProfile.Turns.First(value =>
+        {
+            var binding = poseProfile.FootCurves.Bindings.Single(item =>
+                item.AnimationId == value.AnimationId);
+            return binding.LeftLockCurveId >= 0 && binding.RightLockCurveId >= 0;
+        });
+        var curveBinding = poseProfile.FootCurves.Bindings.Single(value =>
+            value.AnimationId == turn.AnimationId);
+        var animation = definition.Animations[turn.AnimationId];
+        var sampler = new AlsCurveSampler(animation.Curves);
+        var leftCurve = animation.Curves.Single(value =>
+            value.CurveId == curveBinding.LeftLockCurveId);
+        var zeroKey = leftCurve.Keys.First(value => value.Value == 0f);
+        var oneKey = leftCurve.Keys.First(value => value.Value >= 1f);
+        var before = partialController.ManualAdvanceCount;
+        var action = AlsP4AnimationInput.Turn(
+            turn.AnimationId, turn.BasePlayRate, oneKey.TimeSeconds,
+            0f, 0f, 0f, 0f);
+        prepared = partialController.PrepareFrame(in result, in action, turn.BlendSeconds * 0.5);
+        sample = partialController.SampleFootCurves(in prepared);
+        if (!sampler.TrySample(curveBinding.LeftLockCurveId, oneKey.TimeSeconds, out var rawOne) ||
+            MathF.Abs(sample.LeftLockCurve - (Math.Clamp(rawOne, 0f, 1f) * 0.5f)) > 1e-5f)
+        {
+            throw new InvalidOperationException("Prepared action lock did not reuse the half-blended graph decision.");
+        }
+        partialController.ApplyPrepared(in prepared);
+        prepared = partialController.PrepareFrame(in result, in action, turn.BlendSeconds * 0.5);
+        partialController.ApplyPrepared(in prepared);
+
+        action = action with { TurnPhase = zeroKey.TimeSeconds };
+        prepared = partialController.PrepareFrame(in result, in action, 0.0);
+        sample = partialController.SampleFootCurves(in prepared);
+        if (sample.LeftLockCurve != 0f)
+        {
+            throw new InvalidOperationException("Prepared lock curve did not sample the zero key at the selected phase.");
+        }
+        partialController.ApplyPrepared(in prepared);
+
+        action = action with { TurnPhase = oneKey.TimeSeconds };
+        prepared = partialController.PrepareFrame(in result, in action, 0.0);
+        sample = partialController.SampleFootCurves(in prepared);
+        if (sample.LeftLockCurve != Math.Clamp(rawOne, 0f, 1f))
+        {
+            throw new InvalidOperationException("Prepared lock curve did not sample the full key at the selected phase.");
+        }
+        partialController.ApplyPrepared(in prepared);
+        if (partialController.ManualAdvanceCount - before != 4)
+        {
+            throw new InvalidOperationException("Prepared frames did not advance exactly once each.");
+        }
+
+        VerifyPreparedOwnership(partialController, controller, in result, in disabled);
+        VerifyPreparedBaseCurves(definition, locomotionProfile, poseProfile, settings);
+    }
+
+    private static void VerifyPreparedOwnership(
+        AlsLocomotionAnimationController owner,
+        AlsLocomotionAnimationController foreign,
+        in AlsFrameResult result,
+        in AlsP4AnimationInput input)
+    {
+        var first = owner.PrepareFrame(in result, in input, 0.0);
+        ExpectRejected(() => foreign.SampleFootCurves(in first), "foreign");
+        var second = owner.PrepareFrame(in result, in input, 0.0);
+        ExpectRejected(() => owner.SampleFootCurves(in first), "stale");
+        owner.ApplyPrepared(in second);
+        ExpectRejected(() => owner.ApplyPrepared(in second), "already applied");
+
+        static void ExpectRejected(Action action, string label)
+        {
+            var rejected = false;
+            try
+            {
+                action();
+            }
+            catch (InvalidOperationException exception)
+                when (exception.Message.Contains(
+                    "stale, foreign or already applied", StringComparison.Ordinal))
+            {
+                rejected = true;
+            }
+            if (!rejected)
+            {
+                throw new InvalidOperationException($"Prepared {label} token was accepted.");
+            }
+        }
+    }
+
+    private void VerifyPreparedBaseCurves(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionSettings settings)
+    {
+        var baseSample = locomotionProfile.StandingSamples[0];
+        var animations = definition.Animations.ToArray();
+        var source = animations[baseSample.AnimationId];
+        var curveId = source.Curves.Length == 0
+            ? 0
+            : source.Curves.Max(value => value.CurveId) + 1;
+        var curve = new AlsFloatCurveDefinition(
+            curveId,
+            AlsCanonicalCurveKind.None,
+            "FootLock_L",
+            AlsCurveProvenance.SourceCurve,
+            [
+                new(0f, 0f, 0f, 0f, AlsCurveInterpolation.Linear),
+                new(source.PlayLength * 0.5f, 0.5f, 0f, 0f, AlsCurveInterpolation.Linear),
+                new(source.PlayLength, 1f, 0f, 0f, AlsCurveInterpolation.Linear),
+            ]);
+        animations[baseSample.AnimationId] = source with
+        {
+            Curves = [.. source.Curves, curve],
+        };
+        var bindings = poseProfile.FootCurves.Bindings;
+        var bindingIndex = Array.FindIndex(
+            bindings, value => value.AnimationId == baseSample.AnimationId);
+        bindings[bindingIndex] = bindings[bindingIndex] with { LeftLockCurveId = curveId };
+        var fixtureProfile = poseProfile with
+        {
+            FootCurves = poseProfile.FootCurves with { Bindings = bindings },
+        };
+        var fixtureDefinition = definition with { Animations = animations };
+        using var library = AlsAnimationLibraryBuilder.Build(
+            fixtureDefinition, locomotionProfile, fixtureProfile);
+        AddChild(library.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(
+            library, locomotionProfile, fixtureProfile, fixtureDefinition);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, settings, fixtureProfile, fixtureDefinition);
+        controller.Warmup();
+
+        var result = ValidResult();
+        result.AnimationState = AlsAnimationState.Grounded;
+        result.ActualStance = AlsStance.Standing;
+        result.ActualGait = AlsGait.Walking;
+        result.BlendCoordinates = new System.Numerics.Vector2(baseSample.X, baseSample.Y);
+        var disabled = AlsP4AnimationInput.Disabled;
+        var expected = new[] { 0f, 0.5f, 1f };
+        for (var index = 0; index < expected.Length; index++)
+        {
+            result.AnimationPhase = expected[index];
+            var prepared = controller.PrepareFrame(in result, in disabled, 0.0);
+            if (prepared.BaseAnimationIdA != baseSample.AnimationId ||
+                prepared.BaseWeightA != 1f)
+            {
+                throw new InvalidOperationException(
+                    "Prepared base curve decision did not reuse the active blend-space sample.");
+            }
+            var sample = controller.SampleFootCurves(in prepared);
+            if (MathF.Abs(sample.LeftLockCurve - expected[index]) > 1e-5f)
+            {
+                throw new InvalidOperationException(
+                    "Prepared base curve did not sample 0/partial/1 across normalized phase keys.");
+            }
+            controller.ApplyPrepared(in prepared);
+        }
+
+        var neighbor = locomotionProfile.StandingSamples[1];
+        result.AnimationPhase = 1f;
+        result.BlendCoordinates = new System.Numerics.Vector2(
+            baseSample.X + neighbor.X,
+            baseSample.Y + neighbor.Y);
+        var blended = controller.PrepareFrame(in result, in disabled, 0.0);
+        var totalWeight = blended.BaseWeightA + blended.BaseWeightB + blended.BaseWeightC;
+        var baseSampleWeight = 0f;
+        if (blended.BaseAnimationIdA == baseSample.AnimationId)
+        {
+            baseSampleWeight += blended.BaseWeightA;
+        }
+        if (blended.BaseAnimationIdB == baseSample.AnimationId)
+        {
+            baseSampleWeight += blended.BaseWeightB;
+        }
+        if (blended.BaseAnimationIdC == baseSample.AnimationId)
+        {
+            baseSampleWeight += blended.BaseWeightC;
+        }
+        var blendedSample = controller.SampleFootCurves(in blended);
+        if (MathF.Abs(totalWeight - 1f) > 1e-5f ||
+            baseSampleWeight <= 0f ||
+            baseSampleWeight >= 1f ||
+            MathF.Abs(blendedSample.LeftLockCurve - baseSampleWeight) > 1e-5f)
+        {
+            throw new InvalidOperationException(
+                "Prepared base curve did not use normalized barycentric curve weights.");
+        }
+        controller.ApplyPrepared(in blended);
+    }
+
     private void VerifyLibraryContract(
         AlsAnimationSetDefinition definition,
         AlsLocomotionAnimationProfile locomotionProfile,
@@ -327,7 +579,8 @@ public partial class P4AnimationGraphSmoke : Node
         AddChild(library.Root);
         using var graph = AlsLocomotionGraphBuilder.Build(
             library, locomotionProfile, poseProfile, definition);
-        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, settings, poseProfile, definition);
         controller.Warmup();
         var result = ValidResult();
         var firstTurn = poseProfile.Turns[0];
@@ -350,17 +603,25 @@ public partial class P4AnimationGraphSmoke : Node
             0f);
         for (var index = 0; index < 64; index++)
         {
-            controller.Apply(in result, in firstInput, 0.0);
+            var prepared = controller.PrepareFrame(in result, in firstInput, 0.0);
+            controller.SampleFootCurves(in prepared);
+            controller.ApplyPrepared(in prepared);
         }
-        controller.Apply(in result, in secondInput, 0.0);
+        var switchPrepared = controller.PrepareFrame(in result, in secondInput, 0.0);
+        controller.SampleFootCurves(in switchPrepared);
+        controller.ApplyPrepared(in switchPrepared);
 
+        var curveAccumulator = 0f;
         var allocationBefore = GC.GetAllocatedBytesForCurrentThread();
         for (var index = 0; index < 10_000; index++)
         {
-            controller.Apply(in result, in secondInput, 0.0);
+            var prepared = controller.PrepareFrame(in result, in secondInput, 0.0);
+            var curves = controller.SampleFootCurves(in prepared);
+            curveAccumulator += curves.LeftLockCurve + curves.RightLockCurve;
+            controller.ApplyPrepared(in prepared);
         }
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocationBefore;
-        if (allocated != 0)
+        if (allocated != 0 || !float.IsFinite(curveAccumulator))
         {
             throw new InvalidOperationException(
                 $"Steady P4 controller Apply allocated managed memory: {allocated} B");

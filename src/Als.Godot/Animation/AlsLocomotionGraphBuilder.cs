@@ -82,6 +82,7 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         AlsLocomotionGraphParameterSet jumpStart,
         AlsLocomotionGraphParameterSet fallLoop,
         AlsLocomotionGraphParameterSet landRecovery,
+        AlsBaseAnimationCurveLayout baseCurves,
         AlsP4GraphHandles? p4)
     {
         AnimationPlayerPath = animationPlayerPath;
@@ -96,6 +97,7 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         JumpStart = jumpStart;
         FallLoop = fallLoop;
         LandRecovery = landRecovery;
+        BaseCurves = baseCurves;
         P4 = p4;
 
         _ownedHandles =
@@ -138,6 +140,8 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
 
     public AlsLocomotionGraphParameterSet LandRecovery { get; }
 
+    internal AlsBaseAnimationCurveLayout BaseCurves { get; }
+
     public AlsP4GraphHandles? P4 { get; }
 
     public bool TryGetP4TurnSelection(int animationId, out float selection)
@@ -165,6 +169,13 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         }
     }
 }
+
+internal sealed record AlsBaseAnimationCurveLayout(
+    AlsLocomotionAnimationSample[] StandingSamples,
+    AlsLocomotionAnimationSample[] CrouchingSamples,
+    int JumpStartAnimationId,
+    int FallLoopAnimationId,
+    int LandRecoveryAnimationId);
 
 public sealed class AlsP4GraphHandles
 {
@@ -318,6 +329,8 @@ public readonly record struct AlsP4ClipBinding(
     StringName PlayRatePathB,
     StringName PhasePathB)
 {
+    public int AnimationId { get; init; } = -1;
+
     internal IDisposable[] OwnedHandles =>
         [StateName, PlayRatePathA, PhasePathA, PlayRatePathB, PhasePathB];
 
@@ -425,7 +438,7 @@ public static class AlsLocomotionGraphBuilder
         AnimationTree? tree = null;
         try
         {
-            handles = CreateHandles(layout, poseProfile, animationSet);
+            handles = CreateHandles(layout, profile, poseProfile, animationSet);
             var baseStateMachine = Own(ownedResources, new AnimationNodeStateMachine
             {
                 StateMachineType = AnimationNodeStateMachine.StateMachineTypeEnum.Root,
@@ -612,6 +625,7 @@ public static class AlsLocomotionGraphBuilder
 
     private static AlsLocomotionGraphHandles CreateHandles(
         GraphProfileLayout layout,
+        AlsLocomotionAnimationProfile locomotionProfile,
         AlsPoseAnimationProfile? poseProfile,
         AlsAnimationSetDefinition animationSet)
     {
@@ -666,6 +680,22 @@ public static class AlsLocomotionGraphBuilder
             var p4 = poseProfile is null
                 ? null
                 : CreateP4Handles(poseProfile, animationSet, allocated);
+            var standingCurveSamples = new AlsLocomotionAnimationSample[
+                locomotionProfile.StandingSamples.Length + 1];
+            standingCurveSamples[0] = new AlsLocomotionAnimationSample(
+                locomotionProfile.StandingIdleAnimationId, 0f, 0f, 1f);
+            locomotionProfile.StandingSamples.CopyTo(standingCurveSamples, 1);
+            var crouchingCurveSamples = new AlsLocomotionAnimationSample[
+                locomotionProfile.CrouchingSamples.Length + 1];
+            crouchingCurveSamples[0] = new AlsLocomotionAnimationSample(
+                locomotionProfile.CrouchingIdleAnimationId, 0f, 0f, 1f);
+            locomotionProfile.CrouchingSamples.CopyTo(crouchingCurveSamples, 1);
+            var baseCurves = new AlsBaseAnimationCurveLayout(
+                standingCurveSamples,
+                crouchingCurveSamples,
+                locomotionProfile.JumpStartAnimationId,
+                locomotionProfile.FallLoopAnimationId,
+                locomotionProfile.LandAnimationId);
             return new AlsLocomotionGraphHandles(
                 animationPlayerPath,
                 topPlaybackPath,
@@ -679,6 +709,7 @@ public static class AlsLocomotionGraphBuilder
                 jumpStart,
                 fallLoop,
                 landRecovery,
+                baseCurves,
                 p4);
         }
         catch
@@ -736,7 +767,10 @@ public static class AlsLocomotionGraphBuilder
                         Handle($"parameters/P4Turn/BankA/{stateName}/Scale/scale"),
                         Handle($"parameters/P4Turn/BankA/{stateName}/Seek/seek_request"),
                         Handle($"parameters/P4Turn/BankB/{stateName}/Scale/scale"),
-                        Handle($"parameters/P4Turn/BankB/{stateName}/Seek/seek_request"))))
+                        Handle($"parameters/P4Turn/BankB/{stateName}/Seek/seek_request"))
+                    {
+                        AnimationId = animationId,
+                    }))
             {
                 throw new InvalidOperationException(
                     $"P4 graph contains duplicate Turn animation ID: {profile.Turns[index].AnimationId}");
@@ -757,7 +791,10 @@ public static class AlsLocomotionGraphBuilder
                         Handle($"parameters/P4Rotate/BankA/{stateName}/Scale/scale"),
                         Handle($"parameters/P4Rotate/BankA/{stateName}/Seek/seek_request"),
                         Handle($"parameters/P4Rotate/BankB/{stateName}/Scale/scale"),
-                        Handle($"parameters/P4Rotate/BankB/{stateName}/Seek/seek_request"))))
+                        Handle($"parameters/P4Rotate/BankB/{stateName}/Seek/seek_request"))
+                    {
+                        AnimationId = animationId,
+                    }))
             {
                 throw new InvalidOperationException(
                     $"P4 graph contains duplicate Rotate animation ID: {profile.Rotates[index].AnimationId}");

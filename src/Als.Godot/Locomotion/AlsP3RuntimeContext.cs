@@ -283,7 +283,7 @@ public sealed class AlsP3RuntimeContext
         AnimationSet = animationSet ?? throw new ArgumentNullException(nameof(animationSet));
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
         PresentationTransform = AlsP3Presentation.Create(profile.Presentation);
-        FootGatherSettings = LoadFootGatherSettings(animationSet);
+        FootGatherSettings = LoadFootGatherSettings(animationSet, profile);
         motorSettings.Validate();
         if (mainManagedThreadId <= 0)
         {
@@ -336,19 +336,19 @@ public sealed class AlsP3RuntimeContext
     public long InvalidFootProbeRequests;
 
     private static AlsP4FootGatherSettings LoadFootGatherSettings(
-        AlsAnimationSetDefinition animationSet)
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile locomotionProfile)
     {
         const string profilePath = "res://assets/config/p4_pose_profile.json";
         var profile = AlsPoseProfileCompiler.Compile(
             File.ReadAllText(ProjectSettings.GlobalizePath(profilePath)),
-            animationSet);
+            animationSet,
+            locomotionProfile);
         var settings = new AlsP4FootGatherSettings(
             profile.Feet.TraceUpMeters,
             profile.Feet.TraceDownMeters,
-            GodotAls.Core.Pose.AlsFootPlacementSettings.CreateReference()
-                .PlatformTeleportDistanceMeters,
-            GodotAls.Core.Pose.AlsFootPlacementSettings.CreateReference()
-                .PlatformTeleportAngleRadians);
+            profile.Feet.PlatformTeleportDistanceMeters,
+            profile.Feet.PlatformTeleportAngleRadians);
         if (!settings.IsValid)
         {
             throw new InvalidOperationException("P4 foot Gather settings are invalid.");
