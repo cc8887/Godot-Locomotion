@@ -165,6 +165,10 @@ public sealed class AlsAnimationCurvesJsonConverter : JsonConverter<AlsAnimation
         }
 
         var entries = curves.EnumerateArray().ToArray();
+        if (entries.Length == 0)
+        {
+            return AlsAnimationCurves.Structured(Array.Empty<AlsExportedFloatCurveMetadata>());
+        }
         if (entries.All(entry => entry.ValueKind == JsonValueKind.String))
         {
             return AlsAnimationCurves.Legacy(entries.Select(entry => entry.GetString()
