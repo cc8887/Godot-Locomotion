@@ -13,7 +13,7 @@ public sealed class AlsCurveExporterSourceContractTests
     public void ReadyCheckRunsTheNativeCurveExportSelfTestBeforePublishingItsReadyMarker()
     {
         var selfTestIndex = CommandletSource.IndexOf("RunCurveKeySelfTest", StringComparison.Ordinal);
-        var markerIndex = CommandletSource.IndexOf("GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=4", StringComparison.Ordinal);
+        var markerIndex = CommandletSource.IndexOf("GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=8", StringComparison.Ordinal);
         var readyIndex = CommandletSource.IndexOf("GODOT_ALS_EXPORTER_READY", StringComparison.Ordinal);
 
         Assert.True(selfTestIndex >= 0);
@@ -24,7 +24,7 @@ public sealed class AlsCurveExporterSourceContractTests
     [Fact]
     public void BuildScriptRequiresTheNativeCurveExportSelfTestMarker()
     {
-        var selfTestMarkerIndex = BuildScript.IndexOf("GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=4", StringComparison.Ordinal);
+        var selfTestMarkerIndex = BuildScript.IndexOf("GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=8", StringComparison.Ordinal);
         var selfTestCheckIndex = BuildScript.IndexOf("Contains($curveSelfTestMarker", StringComparison.Ordinal);
         var readyMarkerIndex = BuildScript.IndexOf("GODOT_ALS_EXPORTER_READY", StringComparison.Ordinal);
         var readyCheckIndex = BuildScript.IndexOf("Contains($marker", StringComparison.Ordinal);
