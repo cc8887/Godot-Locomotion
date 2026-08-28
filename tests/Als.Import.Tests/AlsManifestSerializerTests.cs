@@ -50,7 +50,7 @@ public sealed class AlsManifestSerializerTests
         using var document = JsonDocument.Parse(serialized);
         var restored = AlsAnimationMetadata.Read(document.RootElement);
 
-        var curve = Assert.Single(restored.Curves);
+        var curve = Assert.Single(restored.Curves.RequireStructuredPayload());
         Assert.Equal(0, curve.StableCurveId);
         Assert.Equal("None", curve.CanonicalKind);
         Assert.Equal("RotationAmount", curve.SourceName);
@@ -166,6 +166,120 @@ public sealed class AlsManifestSerializerTests
         Assert.True(IsSchemaValid(json));
     }
 
+    [Fact]
+    public void FloatCurveStableCurveIdMustMatchItsArrayIndex()
+    {
+        var json = WithFirstCurve(File.ReadAllText(FixturePath()), curve => curve["stableCurveId"] = 1);
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("curves[0].stableCurveId", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DuplicateFloatCurveStableCurveIdIsRejected()
+    {
+        var json = WithAdditionalCurve(File.ReadAllText(FixturePath()), curve =>
+        {
+            curve["stableCurveId"] = 0;
+            curve["sourceName"] = "ZZCurve";
+        });
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("curves[1].stableCurveId", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EmptyFloatCurveSourceNameIsRejected()
+    {
+        var json = WithFirstCurve(File.ReadAllText(FixturePath()), curve => curve["sourceName"] = string.Empty);
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("curves[0].sourceName", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NullFloatCurveIsRejectedWithItsJsonPath()
+    {
+        var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
+        root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!.AsArray()[0] = null;
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(root.ToJsonString()));
+
+        Assert.Contains("curves[0]", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NullFloatCurveKeyIsRejectedWithItsJsonPath()
+    {
+        var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
+        root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!.AsArray()[0]!
+            .AsObject()["keys"]!.AsArray()[0] = null;
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(root.ToJsonString()));
+
+        Assert.Contains("curves[0].keys[0]", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FloatCurvesMustBeOrdinallySortedByUniqueSourceName()
+    {
+        var json = WithAdditionalCurve(File.ReadAllText(FixturePath()), curve =>
+        {
+            curve["stableCurveId"] = 1;
+            curve["sourceName"] = "AARotationAmount";
+        });
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("curves[1].sourceName", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("ordinal", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DuplicateFloatCurveSourceNameIsRejected()
+    {
+        var json = WithAdditionalCurve(File.ReadAllText(FixturePath()), curve => curve["stableCurveId"] = 1);
+
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+
+        Assert.Contains("curves[1].sourceName", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("duplicate", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LegacyCurveNamesReserializeAsNamesRatherThanInventedStructuredCurves()
+    {
+        var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
+        root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"] = new JsonArray("RotationAmount");
+        using var metadataDocument = JsonDocument.Parse(root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.ToJsonString());
+        var metadata = AlsAnimationMetadata.Read(metadataDocument.RootElement);
+
+        Assert.False(metadata.Curves.IsStructured);
+        Assert.Equal(["RotationAmount"], Assert.IsType<string[]>(metadata.Curves.LegacyNames));
+        Assert.Throws<JsonException>(() => metadata.Curves.RequireStructuredPayload());
+
+        var serialized = JsonSerializer.Serialize(metadata, AlsManifestSerializer.JsonOptions);
+        using var document = JsonDocument.Parse(serialized);
+
+        Assert.Equal(JsonValueKind.String, document.RootElement.GetProperty("curves")[0].ValueKind);
+    }
+
+    [Fact]
+    public void StructuredZeroKeyCurveRemainsAStructuredPayload()
+    {
+        var json = WithFirstCurve(File.ReadAllText(FixturePath()), curve => curve["keys"] = new JsonArray());
+        var manifest = AlsManifestSerializer.Deserialize(json);
+        var metadata = AlsAnimationMetadata.Read(manifest.Animations[0].Metadata);
+
+        Assert.True(metadata.Curves.IsStructured);
+        var curve = Assert.Single(metadata.Curves.RequireStructuredPayload());
+        Assert.Empty(curve.Keys);
+        Assert.Null(metadata.Curves.LegacyNames);
+    }
+
     private static void AssertCurveKey(
         AlsExportedFloatCurveKeyMetadata actual,
         double timeSeconds,
@@ -194,6 +308,25 @@ public sealed class AlsManifestSerializerTests
             .AsArray()[0]!.AsObject()["keys"]!.AsArray();
         keys[0]!.AsObject()["timeSeconds"] = firstTime;
         keys[1]!.AsObject()["timeSeconds"] = secondTime;
+        return root.ToJsonString();
+    }
+
+    private static string WithFirstCurve(string json, Action<JsonObject> update)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        var curve = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!
+            .AsArray()[0]!.AsObject();
+        update(curve);
+        return root.ToJsonString();
+    }
+
+    private static string WithAdditionalCurve(string json, Action<JsonObject> update)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        var curves = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!.AsArray();
+        var additionalCurve = curves[0]!.DeepClone().AsObject();
+        update(additionalCurve);
+        curves.Add(additionalCurve);
         return root.ToJsonString();
     }
 

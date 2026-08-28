@@ -1,5 +1,5 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using GodotAls.Import.Manifest;
 
 namespace GodotAls.Import.Metadata;
@@ -24,83 +24,101 @@ public sealed record AlsAnimationMetadata(
     string AdditiveBasePoseId,
     string SkeletonId,
     string SkeletonObjectPath,
-    AlsExportedFloatCurveMetadata[] Curves,
+    AlsAnimationCurves Curves,
     AlsAnimationNotifyMetadata[] Notifies,
     AlsAnimationSyncMarkerMetadata[] SyncMarkers)
 {
     public static AlsAnimationMetadata Read(JsonElement element)
     {
-        var normalized = NormalizeLegacyCurveNames(element);
-        var metadata = normalized.Deserialize<AlsAnimationMetadata>(AlsManifestSerializer.JsonOptions)
+        var metadata = element.Deserialize<AlsAnimationMetadata>(AlsManifestSerializer.JsonOptions)
             ?? throw new JsonException("Animation metadata deserialized to null.");
         ValidateFloatCurves(metadata.Curves);
         return metadata;
     }
 
-    private static JsonElement NormalizeLegacyCurveNames(JsonElement element)
-    {
-        if (!element.TryGetProperty("curves", out var curves) || curves.ValueKind != JsonValueKind.Array ||
-            !curves.EnumerateArray().All(value => value.ValueKind == JsonValueKind.String))
-        {
-            return element;
-        }
-
-        var metadata = JsonNode.Parse(element.GetRawText())?.AsObject()
-            ?? throw new JsonException("Animation metadata must be an object.");
-        var normalizedCurves = new JsonArray();
-        var curveIndex = 0;
-        foreach (var sourceName in curves.EnumerateArray())
-        {
-            normalizedCurves.Add(new JsonObject
-            {
-                ["stableCurveId"] = curveIndex++,
-                ["canonicalKind"] = "None",
-                ["sourceName"] = sourceName.GetString(),
-                ["sourceProvenance"] = "source_curve",
-                ["preInfinity"] = "Constant",
-                ["postInfinity"] = "Constant",
-                ["keys"] = new JsonArray(),
-            });
-        }
-        metadata["curves"] = normalizedCurves;
-        using var document = JsonDocument.Parse(metadata.ToJsonString());
-        return document.RootElement.Clone();
-    }
-
-    private static void ValidateFloatCurves(AlsExportedFloatCurveMetadata[]? curves)
+    private static void ValidateFloatCurves(AlsAnimationCurves? curves)
     {
         if (curves is null)
         {
             throw new JsonException("Animation metadata curves are required.");
         }
-
-        for (var curveIndex = 0; curveIndex < curves.Length; curveIndex++)
+        if (!curves.IsStructured)
         {
-            var curve = curves[curveIndex];
-            if (curve.StableCurveId < 0 || curve.CanonicalKind is not "None" ||
-                curve.SourceName is null || curve.SourceProvenance is not "source_curve" ||
-                !IsInfinityMode(curve.PreInfinity) || !IsInfinityMode(curve.PostInfinity) || curve.Keys is null)
+            return;
+        }
+
+        var structuredCurves = curves.RequireStructuredPayload();
+        string? previousSourceName = null;
+        for (var curveIndex = 0; curveIndex < structuredCurves.Length; curveIndex++)
+        {
+            var curve = structuredCurves[curveIndex];
+            if (curve is null)
             {
-                throw new JsonException($"Animation float curve at index {curveIndex} violates the export contract.");
+                throw new JsonException($"Animation float curves[{curveIndex}] cannot be null.");
+            }
+            if (curve.StableCurveId != curveIndex)
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].stableCurveId must equal {curveIndex}.");
+            }
+            if (curve.CanonicalKind is not "None")
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].canonicalKind must be None.");
+            }
+            if (string.IsNullOrEmpty(curve.SourceName))
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].sourceName is required.");
+            }
+            if (previousSourceName is not null)
+            {
+                var comparison = string.CompareOrdinal(previousSourceName, curve.SourceName);
+                if (comparison == 0)
+                {
+                    throw new JsonException($"Animation float curves[{curveIndex}].sourceName is duplicate.");
+                }
+                if (comparison > 0)
+                {
+                    throw new JsonException($"Animation float curves[{curveIndex}].sourceName must be ordinal strictly increasing.");
+                }
+            }
+            previousSourceName = curve.SourceName;
+            if (curve.SourceProvenance is not "source_curve")
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].sourceProvenance must be source_curve.");
+            }
+            if (!IsInfinityMode(curve.PreInfinity))
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].preInfinity is invalid.");
+            }
+            if (!IsInfinityMode(curve.PostInfinity))
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].postInfinity is invalid.");
+            }
+            if (curve.Keys is null)
+            {
+                throw new JsonException($"Animation float curves[{curveIndex}].keys are required.");
             }
 
             double? previousTime = null;
             for (var keyIndex = 0; keyIndex < curve.Keys.Length; keyIndex++)
             {
                 var key = curve.Keys[keyIndex];
+                if (key is null)
+                {
+                    throw new JsonException($"Animation float curves[{curveIndex}].keys[{keyIndex}] cannot be null.");
+                }
                 if (!double.IsFinite(key.TimeSeconds) || !double.IsFinite(key.Value) ||
                     !double.IsFinite(key.ArriveTangent) || !double.IsFinite(key.LeaveTangent) ||
                     key.Interpolation is not ("Constant" or "Linear" or "Cubic"))
                 {
-                    throw new JsonException($"Animation float curve key at index {curveIndex}:{keyIndex} violates the export contract.");
+                    throw new JsonException($"Animation float curves[{curveIndex}].keys[{keyIndex}] violates the export contract.");
                 }
                 if (previousTime is not null && key.TimeSeconds == previousTime.Value)
                 {
-                    throw new JsonException($"Animation float curve keys contain a duplicate time at index {curveIndex}:{keyIndex}.");
+                    throw new JsonException($"Animation float curves[{curveIndex}].keys[{keyIndex}] contain a duplicate time.");
                 }
                 if (previousTime is not null && key.TimeSeconds < previousTime.Value)
                 {
-                    throw new JsonException($"Animation float curve keys must be strictly increasing at index {curveIndex}:{keyIndex}.");
+                    throw new JsonException($"Animation float curves[{curveIndex}].keys[{keyIndex}] must be strictly increasing.");
                 }
                 previousTime = key.TimeSeconds;
             }
@@ -109,6 +127,70 @@ public sealed record AlsAnimationMetadata(
 
     private static bool IsInfinityMode(string? value) =>
         value is "Constant" or "Linear" or "Cycle" or "CycleWithOffset" or "Oscillate";
+}
+
+[JsonConverter(typeof(AlsAnimationCurvesJsonConverter))]
+public sealed class AlsAnimationCurves
+{
+    private AlsAnimationCurves(string[]? legacyNames, AlsExportedFloatCurveMetadata[]? structuredCurves)
+    {
+        LegacyNames = legacyNames;
+        StructuredCurves = structuredCurves;
+    }
+
+    public string[]? LegacyNames { get; }
+    public AlsExportedFloatCurveMetadata[]? StructuredCurves { get; }
+    public bool IsStructured => StructuredCurves is not null;
+
+    public static AlsAnimationCurves Legacy(string[] names) => new(names, null);
+    public static AlsAnimationCurves Structured(AlsExportedFloatCurveMetadata[] curves) => new(null, curves);
+
+    public string[] GetSourceNames() => IsStructured
+        ? RequireStructuredPayload().Select(curve => curve.SourceName).ToArray()
+        : LegacyNames ?? throw new JsonException("Animation metadata legacy curve names are required.");
+
+    public AlsExportedFloatCurveMetadata[] RequireStructuredPayload() => StructuredCurves
+        ?? throw new JsonException("Animation metadata curves use legacy names and do not provide structured curve keys.");
+}
+
+public sealed class AlsAnimationCurvesJsonConverter : JsonConverter<AlsAnimationCurves>
+{
+    public override AlsAnimationCurves Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        using var document = JsonDocument.ParseValue(ref reader);
+        var curves = document.RootElement;
+        if (curves.ValueKind != JsonValueKind.Array)
+        {
+            throw new JsonException("Animation metadata curves must be an array.");
+        }
+
+        var entries = curves.EnumerateArray().ToArray();
+        if (entries.All(entry => entry.ValueKind == JsonValueKind.String))
+        {
+            return AlsAnimationCurves.Legacy(entries.Select(entry => entry.GetString()
+                ?? throw new JsonException("Animation metadata legacy curve name cannot be null.")).ToArray());
+        }
+        if (entries.All(entry => entry.ValueKind == JsonValueKind.Object || entry.ValueKind == JsonValueKind.Null))
+        {
+            var structuredCurves = JsonSerializer.Deserialize<AlsExportedFloatCurveMetadata[]>(curves.GetRawText(), options)
+                ?? throw new JsonException("Animation metadata structured curves are required.");
+            return AlsAnimationCurves.Structured(structuredCurves);
+        }
+
+        throw new JsonException("Animation metadata curves must contain either legacy names or structured curves.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, AlsAnimationCurves value, JsonSerializerOptions options)
+    {
+        if (value.IsStructured)
+        {
+            JsonSerializer.Serialize(writer, value.RequireStructuredPayload(), options);
+            return;
+        }
+
+        JsonSerializer.Serialize(writer, value.LegacyNames
+            ?? throw new JsonException("Animation metadata legacy curve names are required."), options);
+    }
 }
 
 public sealed record AlsExportedFloatCurveMetadata(

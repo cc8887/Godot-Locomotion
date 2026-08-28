@@ -104,7 +104,7 @@ public static class AlsAnimationSetCompiler
             var path = $"$.animations[{index}].metadata";
             var metadata = Read(asset, path, AlsAnimationMetadata.Read);
             RequireOutputPath(asset, "animations", index);
-            RequireArrays(asset, path, metadata.Curves, metadata.Notifies, metadata.SyncMarkers);
+            RequireArrays(asset, path, metadata.Notifies, metadata.SyncMarkers);
             if (metadata.PlayLength < 0 || metadata.FrameRateNumerator <= 0 ||
                 metadata.FrameRateDenominator <= 0 || metadata.SampledKeyCount < 0)
             {
@@ -119,7 +119,7 @@ public static class AlsAnimationSetCompiler
                 metadata.RootMotionRootLock, metadata.ForceRootLock, metadata.UseNormalizedRootMotionScale,
                 metadata.AdditiveType, metadata.AdditiveBasePoseType, metadata.AdditiveBasePoseFrame,
                 string.IsNullOrEmpty(metadata.AdditiveBasePoseId) ? -1 : animationIds[metadata.AdditiveBasePoseId],
-                metadata.Curves.Select(value => value.SourceName).ToArray(),
+                metadata.Curves.GetSourceNames(),
                 metadata.Notifies.Select(value => new AlsAnimationNotifyDefinition(
                     value.Name, value.Time, value.Duration, value.SourceIndex)).ToArray(),
                 metadata.SyncMarkers.Select(value => new AlsAnimationSyncMarkerDefinition(value.Name, value.Time)).ToArray(),
