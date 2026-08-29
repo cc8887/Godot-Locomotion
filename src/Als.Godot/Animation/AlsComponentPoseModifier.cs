@@ -151,6 +151,25 @@ public sealed class AlsComponentPoseModifier : IDisposable
     {
     }
 
+    public AlsComponentPoseModifier(
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition animationSet,
+        AlsPoseAnimationProfile profile,
+        Transform3D logicalCharacterTransform)
+        : this(
+            skeleton,
+            visualRoot,
+            library,
+            animationSet,
+            profile,
+            null,
+            AlsPoseAffineTestFixture.None,
+            logicalCharacterTransform)
+    {
+    }
+
     internal AlsComponentPoseModifier(
         Skeleton3D skeleton,
         Node3D visualRoot,
