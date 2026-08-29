@@ -340,7 +340,17 @@ public partial class P4AnimationGraphSmoke : Node
         ExpectRejected(() => owner.SampleFootCurves(in first), "stale");
         owner.ApplyPrepared(in second);
         ExpectRejected(() => owner.ApplyPrepared(in second), "already applied");
-        owner.CommitPrepared(in second);
+        var commit = owner.PrepareCommit(in second);
+        if (owner.TryFinalizePreparedCommit(default) ||
+            owner.TryFinalizePreparedCommit(commit with { OwnerId = commit.OwnerId + 1L }))
+        {
+            throw new InvalidOperationException("Prepared default or foreign commit token was accepted.");
+        }
+        if (!owner.TryFinalizePreparedCommit(in commit) ||
+            owner.TryFinalizePreparedCommit(in commit))
+        {
+            throw new InvalidOperationException("Prepared valid or stale commit token state was incorrect.");
+        }
         ExpectRejected(() => owner.ApplyPrepared(in second), "reused");
         var discarded = owner.PrepareFrame(in result, in input, 0.0);
         owner.DiscardPrepared(in discarded);

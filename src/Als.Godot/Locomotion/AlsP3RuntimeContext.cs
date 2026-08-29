@@ -739,30 +739,49 @@ internal sealed class AlsP3ExchangeSlot
 
     public int HasPublishedResult;
 
+    private long _publicationSequence;
+
     public void PublishPreparedResult(
         in AlsFrameResult result,
         int characterId,
         int generation)
     {
+        var writingSequence = Interlocked.Increment(ref _publicationSequence);
+        if ((writingSequence & 1L) == 0L)
+        {
+            writingSequence = Interlocked.Increment(ref _publicationSequence);
+        }
         ResultPublishedCharacterId = characterId;
         ResultPublishedGeneration = generation;
         ResultPublishedFrameId = result.Identity.FrameId;
         Exchange.PublishResult(result);
         Volatile.Write(ref HasPublishedResult, 1);
+        Volatile.Write(ref _publicationSequence, writingSequence + 1L);
     }
 
     public bool TryGetPublishedIdentity(out AlsFrameIdentity identity)
     {
-        if (Volatile.Read(ref HasPublishedResult) == 0)
+        var sequence = Volatile.Read(ref _publicationSequence);
+        if (sequence == 0L || (sequence & 1L) != 0L ||
+            Volatile.Read(ref HasPublishedResult) == 0)
         {
             identity = default;
             return false;
         }
 
+        var frameId = ResultPublishedFrameId;
+        var characterId = ResultPublishedCharacterId;
+        var generation = ResultPublishedGeneration;
+        if (Volatile.Read(ref _publicationSequence) != sequence ||
+            characterId < 0 || generation < 0)
+        {
+            identity = default;
+            return false;
+        }
         identity = new AlsFrameIdentity(
-            ResultPublishedFrameId,
-            checked((uint)ResultPublishedCharacterId),
-            checked((uint)ResultPublishedGeneration));
+            frameId,
+            (uint)characterId,
+            (uint)generation);
         return true;
     }
 }

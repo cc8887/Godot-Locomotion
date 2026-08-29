@@ -6,16 +6,14 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsPoseProfileCompilerTests
 {
     [Fact]
-    public void TwoParameterCompileRejectsAnIncompleteRuntimeProfile()
+    public void TwoParameterCompilePreservesToolingCompatibilityButMarksProfileIncomplete()
     {
-        var exception = Assert.Throws<AlsCompilationException>(() =>
-            AlsPoseProfileCompiler.Compile(
-                ReadProfile(), P3RepositoryFixtures.LoadAnimationSet()));
+        var profile = AlsPoseProfileCompiler.Compile(
+            ReadProfile(), P3RepositoryFixtures.LoadAnimationSet());
 
-        var issue = Assert.Single(exception.Issues);
-        Assert.Equal("ALSPOSE051", issue.Code);
-        Assert.Equal("$.locomotionProfile", issue.FieldPath);
-        Assert.Contains("three-parameter", issue.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(profile.IsRuntimeComplete);
+        Assert.Equal(12, profile.FootCurves.Bindings.Length);
+        Assert.NotEqual(default, profile.FootRig);
     }
 
     [Fact]
@@ -40,6 +38,7 @@ public sealed class AlsPoseProfileCompilerTests
         var profile = AlsPoseProfileCompiler.Compile(ReadProfile(), set, locomotion);
 
         Assert.Equal(1, profile.SchemaVersion);
+        Assert.True(profile.IsRuntimeComplete);
         Assert.Equal(set.AssetIndex.GetSkeletonId("b5b52715012cad50bf7a625ddf01e4335bb4fcf0"), profile.SkeletonId);
         Assert.Equal(set.AssetIndex.GetAimOffsetId("b4bf2befd979de45f53f300dc0e60c702fc3a686"), profile.Aim.AimOffsetId);
         Assert.Collection(set.AimOffsets[profile.Aim.AimOffsetId].Parameters,

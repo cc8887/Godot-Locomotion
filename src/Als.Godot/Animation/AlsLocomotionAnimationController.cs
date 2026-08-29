@@ -229,6 +229,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         : this(graph, settings)
     {
         ArgumentNullException.ThrowIfNull(poseProfile);
+        if (!poseProfile.IsRuntimeComplete)
+        {
+            throw new InvalidOperationException(
+                "Runtime animation controller requires a complete three-parameter pose profile.");
+        }
         ArgumentNullException.ThrowIfNull(animationSet);
         var curveProfile = poseProfile.FootCurves;
         _groundedIkWeight = curveProfile.GroundedIkWeight;
@@ -651,7 +656,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     public void CommitPrepared(in AlsPreparedAnimationFrame prepared)
     {
         var commit = PrepareCommit(in prepared);
-        FinalizePreparedCommit(in commit);
+        if (!TryFinalizePreparedCommit(in commit))
+        {
+            throw new InvalidOperationException(
+                "Prepared animation commit is stale, foreign or not awaiting commit.");
+        }
     }
 
     internal AlsPreparedAnimationCommit PrepareCommit(
@@ -684,8 +693,16 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             playback.GetFadingPosition());
     }
 
-    internal void FinalizePreparedCommit(in AlsPreparedAnimationCommit commit)
+    internal bool TryFinalizePreparedCommit(in AlsPreparedAnimationCommit commit)
     {
+        if (commit.OwnerId != _ownerId ||
+            _hasPreparedFrame != 1 ||
+            _preparedTransactionState != 2 ||
+            commit.OwnerId != _pendingDecision.OwnerId ||
+            commit.Revision != _pendingDecision.Revision)
+        {
+            return false;
+        }
         ManualAdvanceCount++;
         ActiveAnimationState = _pendingDecision.AnimationState;
         ActiveStance = _pendingDecision.Stance;
@@ -722,6 +739,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             _activeTurnBlendSeconds = _pendingPreparedP4.TurnBinding.BlendSeconds;
         }
         ClearPreparedTransaction();
+        return true;
     }
 
     public void RollbackPrepared(in AlsPreparedAnimationFrame prepared)

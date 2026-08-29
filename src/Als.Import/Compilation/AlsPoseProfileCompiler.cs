@@ -55,19 +55,25 @@ public static class AlsPoseProfileCompiler
 
     public static AlsPoseAnimationProfile Compile(
         string json,
-        AlsAnimationSetDefinition animationSet) => throw Failure(
-            "ALSPOSE051",
-            "$.locomotionProfile",
-            "Runtime pose compilation requires the three-parameter overload with a locomotion profile.");
+        AlsAnimationSetDefinition animationSet) =>
+        CompileCore(json, animationSet, null);
 
     public static AlsPoseAnimationProfile Compile(
         string json,
         AlsAnimationSetDefinition animationSet,
         AlsLocomotionAnimationProfile locomotionProfile)
     {
+        ArgumentNullException.ThrowIfNull(locomotionProfile);
+        return CompileCore(json, animationSet, locomotionProfile);
+    }
+
+    private static AlsPoseAnimationProfile CompileCore(
+        string json,
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile? locomotionProfile)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         ArgumentNullException.ThrowIfNull(animationSet);
-        ArgumentNullException.ThrowIfNull(locomotionProfile);
         JsonDocument document;
         try
         {
@@ -96,7 +102,8 @@ public static class AlsPoseProfileCompiler
             var turns = CompileTurns(root["turns"], animationSet, skeletonId);
             var rotates = CompileRotates(root["rotates"], animationSet, skeletonId);
             var masks = CompileMasks(root["masks"], skeleton);
-            if (locomotionProfile.SkeletonId != skeletonId)
+            if (locomotionProfile is not null &&
+                locomotionProfile.SkeletonId != skeletonId)
             {
                 throw Failure("ALSPOSE043", "$.skeleton",
                     "Locomotion and pose profiles must target the same skeleton.",
@@ -110,6 +117,7 @@ public static class AlsPoseProfileCompiler
             {
                 FootCurves = footCurves,
                 FootRig = footRig,
+                IsRuntimeComplete = locomotionProfile is not null,
             };
         }
     }

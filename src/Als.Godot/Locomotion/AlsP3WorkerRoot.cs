@@ -344,7 +344,11 @@ public partial class AlsP3WorkerRoot : Node3D
                 _context.ThrowIfWorkerFailureInjected(
                     in identity,
                     AlsP3WorkerFailureInjectionStage.BeforePublish);
-                _controller.FinalizePreparedCommit(in preparedCommit);
+                if (!_controller.TryFinalizePreparedCommit(in preparedCommit))
+                {
+                    throw new InvalidOperationException(
+                        "Prepared animation commit token was rejected.");
+                }
                 controllerPrepared = false;
                 controllerApplied = false;
                 _state.PublishPreparedResult(in publication);
