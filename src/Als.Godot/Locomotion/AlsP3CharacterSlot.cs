@@ -17,12 +17,14 @@ public partial class AlsP3CharacterSlot : Node
     private AlsP3ReplacementPhase _replacementPhase;
     private long _replacementCompletedFrameId;
     private long _generationMismatchBaseline;
+    private long _staleResultBaseline;
     private AlsFrameIdentity _retiredResultIdentity;
     private bool _retiredResultObserved;
     private bool _retiredNodeReleased;
     private bool _generationMismatchObserved;
     private long _committedFrameAtClassification;
     private bool _recoveryCommitted;
+    private bool _failureRecoveryRequested;
     private bool _configured;
     private int _disposed;
 
@@ -126,6 +128,33 @@ public partial class AlsP3CharacterSlot : Node
         ValidateVisibilityInvariants();
     }
 
+    public void RequestFailureRecovery()
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
+        if (_replacementPhase is not (AlsP3ReplacementPhase.None or
+            AlsP3ReplacementPhase.Complete))
+        {
+            throw new InvalidOperationException(
+                "P3 slot replacement is already in progress.");
+        }
+        if (!_active.IsPoseFrozen || _active.WorkerInFlight != 0)
+        {
+            throw new InvalidOperationException(
+                "P3 failure recovery requires a frozen idle generation.");
+        }
+        PrepareFailureRecoverySpare();
+
+        _replacementCompletedFrameId = _active.RuntimeCommittedFrameId;
+        _staleResultBaseline = Volatile.Read(ref _context.StaleResults);
+        _recoveryCommitted = false;
+        _failureRecoveryRequested = true;
+        ReplaceActiveCharacter();
+        _replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
+        ValidateVisibilityInvariants();
+    }
+
     public override void _PhysicsProcess(double delta)
     {
         if (!_configured || Volatile.Read(ref _disposed) != 0)
@@ -226,6 +255,13 @@ public partial class AlsP3CharacterSlot : Node
 
         _retiredResultIdentity = publishedIdentity;
         _retiredResultObserved = true;
+        _failureRecoveryRequested = false;
+        ReplaceActiveCharacter();
+        _replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
+    }
+
+    private void ReplaceActiveCharacter()
+    {
         var retired = _active;
         retired.RetireForReplacement();
         if (retired.Visible)
@@ -264,17 +300,21 @@ public partial class AlsP3CharacterSlot : Node
         {
             throw new InvalidOperationException("P3 retired character remained valid after Free().");
         }
-        _replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
     }
 
     private void TryStartRecovery()
     {
-        var mismatchCount = Volatile.Read(ref _context.GenerationMismatches);
-        if (mismatchCount == _generationMismatchBaseline)
+        var classificationCount = _failureRecoveryRequested
+            ? Volatile.Read(ref _context.StaleResults)
+            : Volatile.Read(ref _context.GenerationMismatches);
+        var classificationBaseline = _failureRecoveryRequested
+            ? _staleResultBaseline
+            : _generationMismatchBaseline;
+        if (classificationCount == classificationBaseline)
         {
             return;
         }
-        if (mismatchCount != _generationMismatchBaseline + 1)
+        if (classificationCount != classificationBaseline + 1)
         {
             throw new InvalidOperationException(
                 "P3 slot replacement classified its retired generation more than once.");
@@ -293,7 +333,7 @@ public partial class AlsP3CharacterSlot : Node
                 "P3 replacement revealed stale visual state during generation recovery.");
         }
         _committedFrameAtClassification = _active.RuntimeCommittedFrameId;
-        _generationMismatchObserved = true;
+        _generationMismatchObserved |= !_failureRecoveryRequested;
         _replacementPhase = AlsP3ReplacementPhase.AwaitingRecoveryCommit;
     }
 
@@ -307,6 +347,22 @@ public partial class AlsP3CharacterSlot : Node
         _active.CompleteReplacementRecovery();
         _recoveryCommitted = true;
         _replacementPhase = AlsP3ReplacementPhase.Complete;
+        _failureRecoveryRequested = false;
+    }
+
+    private void PrepareFailureRecoverySpare()
+    {
+        if (_spare is not null)
+        {
+            return;
+        }
+        var handle = new AlsSlotHandle(
+            _active.Handle.CharacterId,
+            NextGeneration(_active.Handle.Generation));
+        _spare = CreateCharacter(
+            handle,
+            _active.MovementAnchor.GlobalPosition,
+            active: false);
     }
 
     private void DisposeRuntimeCore(bool freeNodes)
