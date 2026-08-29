@@ -1,0 +1,4790 @@
+{
+  "schemaVersion": 1,
+  "kind": "p4_pose_trace",
+  "name": "turn",
+  "fixedDeltaSeconds": 0.016666666666666666,
+  "reference": {
+    "repository": "https://github.com/Sixze/ALS-Refactored.git",
+    "commit": "b754d6f0f2bb03741d301f8fb88077ebfe561e17",
+    "targetEngine": "5.9.0",
+    "patchHashes": [
+      "3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f"
+    ]
+  },
+  "coordinateSystem": {
+    "source": "UE5_XForward_YRight_ZUp",
+    "target": "Godot_XRight_YUp_ZBack",
+    "distanceUnit": "meter",
+    "angleUnit": "radian",
+    "quaternionSign": "canonical_nonnegative_w"
+  },
+  "sources": {
+    "characterSettings": "/ALS/ALS/Data/Character/CS_Als_Default.CS_Als_Default",
+    "movementSettings": "/ALS/ALS/Data/Character/Movement/MS_Als_Normal.MS_Als_Normal",
+    "animationSettings": "/ALS/ALS/Data/AnimationInstance/AIS_Als_Default.AIS_Als_Default",
+    "animationBlueprint": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+    "aimOverlayAnimationBlueprint": "/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_Rifle.AB_Als_Rifle_C",
+    "skeletalMesh": "/ALS/ALS/Character/SKM_Als.SKM_Als",
+    "controlRig": "/ALS/ALS/Character/CR_Als.CR_Als_C"
+  },
+  "tolerances": {
+    "positionMeters": 0.001,
+    "rotationRadians": 0.0017453292519943296
+  },
+  "nativeProvenance": "als_runtime",
+  "portProvenance": "port_oracle_v1",
+  "cases": [
+    {
+      "caseId": "turn_standing_left_90",
+      "category": "Turn",
+      "stance": "Standing",
+      "direction": "Left",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Left.A_Als_Turn_90_Left",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Left.A_Als_Turn_90_Left",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": 0.00022118171909824014,
+        "viewYaw": 1.5707963705062866,
+        "viewPitch": 0,
+        "aimYaw": 1.5707963705062866,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Standing",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.18996660716667862,
+          "y": 0.13449464697445437,
+          "z": 0.016035747188099411
+        },
+        "rightFootOrigin": {
+          "x": 0.17295879277748596,
+          "y": 0.1344947429751806,
+          "z": 0.081591774265587363
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.18996660716667862,
+            "y": 0,
+            "z": 0.016035747188099411
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17295879277748596,
+            "y": 0,
+            "z": 0.081591774265587363
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 1,
+        "rightLockCurve": 1,
+        "previousYawCurve": -1.5702546834945679,
+        "currentYawCurve": -2.5284276008605957,
+        "previousYawPhase": 0.040000002831220627,
+        "yawPhasePlayRate": 0.60000008344650269,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": 1.5705751180648804,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 101,
+        "turnCurveId": 201,
+        "turnNominalDegrees": 90,
+        "turnActive": 1,
+        "turnDirection": 1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.2000000476837158,
+        "turnPhase": 0.050000004470348358,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": 0.00022118171909824014,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Left.A_Als_Turn_90_Left",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.37615743279457092,
+        "runtimeSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousSourceTimeSeconds": 0.080000005662441254,
+        "runtimePreviousYawCurve": -1.5702546834945679,
+        "runtimeCurrentYawCurve": -2.5284276008605957,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": -1.1997224092483521,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 1,
+        "rightFootLockAmount": 1,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.18996660716667862,
+            "y": 0,
+            "z": 0.016035747188099411
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17295879277748596,
+            "y": 0,
+            "z": 0.081591774265587363
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.17076301574707031,
+          "y": 0.13465351104736328,
+          "z": 0.050721697807312012
+        },
+        "rightLockWorldPosition": {
+          "x": 0.17076314926147462,
+          "y": 0.13465192794799805,
+          "z": 0.050721888542175297
+        },
+        "leftLockBasePosition": {
+          "x": -0.17076301574707031,
+          "y": 0.23465351104736329,
+          "z": 0.050721697807312012
+        },
+        "rightLockBasePosition": {
+          "x": 0.17076314926147462,
+          "y": 0.23465192794799805,
+          "z": 0.050721888542175297
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.027999409632039764,
+            "y": 0.96032931897975404,
+            "z": 0.0053072822486440923
+          },
+          "rotation": {
+            "x": 0.70662921105809295,
+            "y": -0.017991029452217863,
+            "z": 0.015465600193003854,
+            "w": 0.70718618209728679
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": -2.8865811705576692e-17,
+            "y": -7.1054263385147727e-17,
+            "z": 0.40196704426622248
+          },
+          "rotation": {
+            "x": -0.050807122435765358,
+            "y": 0.089801159003392195,
+            "z": 0.067216580658302785,
+            "w": 0.99238919756114374
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": 3.5527140162902123e-17,
+            "y": 0,
+            "z": -0.40196819309215465
+          },
+          "rotation": {
+            "x": -0.035361567251027334,
+            "y": 0.086548615703565604,
+            "z": 0.14667346829457983,
+            "w": 0.98475671634154716
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.027999408745439366,
+            "y": 0.96032928857095723,
+            "z": 0.0053072820805891716
+          },
+          "rotation": {
+            "x": 0.70662921105809295,
+            "y": -0.017991029452217863,
+            "z": 0.015465600193003854,
+            "w": 0.70718618209728679
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": -0.050683927536010746,
+            "y": 0.13465351104736292,
+            "z": -0.1707742309570314
+          },
+          "rotation": {
+            "x": 0.70324164449680415,
+            "y": 0.073840617945277048,
+            "z": -0.073828264882678893,
+            "w": 0.70324116765964673
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.050759658813476619,
+            "y": 0.13465192794799749,
+            "z": 0.17075193405151406
+          },
+          "rotation": {
+            "x": -0.073996154239923256,
+            "y": 0.70322529357477381,
+            "z": 0.70322481673763015,
+            "w": 0.073983868232886621
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686050305734,
+            "y": 4.9471804750811525e-17,
+            "z": -0.092836129109907448
+          },
+          "rotation": {
+            "x": -0.068913608306617719,
+            "y": 0.082767077029249389,
+            "z": -0.29502018216120973,
+            "w": 0.949401715643996
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0041472440977000516,
+            "y": -0.00079698003828525548,
+            "z": -0.1341232251659171
+          },
+          "rotation": {
+            "x": -0.0058632120563771161,
+            "y": 0.05627503627218073,
+            "z": -0.048243986949905095,
+            "w": 0.99723179891142866
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513035808195,
+            "y": -6.0670986711210429e-15,
+            "z": -0.1080887760268352
+          },
+          "rotation": {
+            "x": 0.0023034075638307715,
+            "y": -0.096618239263931274,
+            "z": -0.048494251410505819,
+            "w": 0.99413677013541113
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.0085663302355289406,
+            "y": 1.649066140291267,
+            "z": 0.0007964344328490969
+          },
+          "rotation": {
+            "x": 0.59957569857486115,
+            "y": 0.35019994790004633,
+            "z": -0.4353203100636398,
+            "w": 0.57303159233620671
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.014715073472740094,
+            "y": 1.3948806116525385,
+            "z": 0.0045209303870917738
+          },
+          "rotation": {
+            "x": 0.7040989802486558,
+            "y": 0.10190840875793476,
+            "z": -0.068476152698753859,
+            "w": 0.69940711945819201
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.019106898445465984,
+            "y": 1.0683870938130284,
+            "z": 0.0056340438577228867
+          },
+          "rotation": {
+            "x": 0.70648174013070331,
+            "y": -0.051909549461538369,
+            "z": -0.087151372196155583,
+            "w": 0.70042386300076953
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": 1.5705752,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": -4.769334E-08,
+        "turnAnimationId": 101,
+        "turnCurveId": 201,
+        "turnPhase": 0.050000004,
+        "turnPlayRate": 0.6000001,
+        "turnNominalDegrees": 90,
+        "turnDirection": 1,
+        "turnActive": 1,
+        "turnYawDelta": -0.02049053,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.00049038214,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.19064221,
+            "y": 0.13,
+            "z": 4.2178668E-05
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0.00011059086,
+            "z": 0,
+            "w": 1
+          },
+          "lockAmount": 1,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.19123796,
+            "y": 0.13,
+            "z": -4.2308122E-05
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0.00011059086,
+            "z": 0,
+            "w": 1
+          },
+          "lockAmount": 1,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    },
+    {
+      "caseId": "turn_standing_right_90",
+      "category": "Turn",
+      "stance": "Standing",
+      "direction": "Right",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Right.A_Als_Turn_90_Right",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Right.A_Als_Turn_90_Right",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": -0.00022117984190117568,
+        "viewYaw": -1.5707963705062866,
+        "viewPitch": 0,
+        "aimYaw": -1.5707963705062866,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Standing",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.18988304975127232,
+          "y": 0.13465343362675733,
+          "z": 0.016242373978718777
+        },
+        "rightFootOrigin": {
+          "x": 0.17299656653575884,
+          "y": 0.13465180181904052,
+          "z": 0.081399561186009065
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.18988304975127232,
+            "y": 0,
+            "z": 0.016242373978718777
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17299656653575884,
+            "y": 0,
+            "z": 0.081399561186009065
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 1,
+        "rightLockCurve": 1,
+        "previousYawCurve": 1.5702440738677979,
+        "currentYawCurve": 2.5284173488616943,
+        "previousYawPhase": 0.040000002831220627,
+        "yawPhasePlayRate": 0.60000008344650269,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": -1.5705751180648804,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 100,
+        "turnCurveId": 200,
+        "turnNominalDegrees": 90,
+        "turnActive": 1,
+        "turnDirection": -1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.2000000476837158,
+        "turnPhase": 0.050000004470348358,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": -0.00022117984190117568,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Right.A_Als_Turn_90_Right",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.37615743279457092,
+        "runtimeSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousSourceTimeSeconds": 0.080000005662441254,
+        "runtimePreviousYawCurve": 1.5702440738677979,
+        "runtimeCurrentYawCurve": 2.5284173488616943,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": 1.19971764087677,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 1,
+        "rightFootLockAmount": 1,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.18988304975127232,
+            "y": 0,
+            "z": 0.016242373978718777
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17299656653575884,
+            "y": 0,
+            "z": 0.081399561186009065
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.17076301574707031,
+          "y": 0.13465351104736328,
+          "z": 0.050721697807312012
+        },
+        "rightLockWorldPosition": {
+          "x": 0.17076314926147462,
+          "y": 0.13465192794799805,
+          "z": 0.050721888542175297
+        },
+        "leftLockBasePosition": {
+          "x": -0.17076301574707031,
+          "y": 0.23465351104736329,
+          "z": 0.050721697807312012
+        },
+        "rightLockBasePosition": {
+          "x": 0.17076314926147462,
+          "y": 0.23465192794799805,
+          "z": 0.050721888542175297
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.027999339248871016,
+            "y": 0.96032931897975404,
+            "z": -0.0053072909344440977
+          },
+          "rotation": {
+            "x": 0.70606766960673917,
+            "y": -0.046234540378575995,
+            "z": 0.043656894391390151,
+            "w": 0.70528355204427506
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": 2.6645364651301563e-17,
+            "y": -7.1054263385147727e-17,
+            "z": 0.40196704426622243
+          },
+          "rotation": {
+            "x": -0.046205979692378336,
+            "y": 0.097412602064783221,
+            "z": 0.067250373842105513,
+            "w": 0.99189373403491821
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0,
+            "y": 1.4210856065160849e-16,
+            "z": -0.40196819309215492
+          },
+          "rotation": {
+            "x": -0.040211458232544982,
+            "y": 0.077284731794762279,
+            "z": 0.14919737139643618,
+            "w": 0.98496205674463311
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.027999338362272846,
+            "y": 0.96032928857095723,
+            "z": -0.0053072907663889021
+          },
+          "rotation": {
+            "x": 0.70606766960673917,
+            "y": -0.046234540378575995,
+            "z": 0.043656894391390151,
+            "w": 0.70528355204427506
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": -0.050759468078613319,
+            "y": 0.13465351104736273,
+            "z": -0.17075180053710981
+          },
+          "rotation": {
+            "x": 0.70322529667584333,
+            "y": 0.073996154566230085,
+            "z": -0.07398380895449598,
+            "w": 0.70322481983869678
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.050684118270874143,
+            "y": 0.13465192794799755,
+            "z": 0.17077436447143626
+          },
+          "rotation": {
+            "x": -0.073840610210383878,
+            "y": 0.703241641789075,
+            "z": 0.70324116495191946,
+            "w": 0.073828324203058251
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686050305734,
+            "y": 4.9471804750811525e-17,
+            "z": -0.092836129109907448
+          },
+          "rotation": {
+            "x": 0.056555599281447752,
+            "y": 0.084674328624979214,
+            "z": 0.2462105782463519,
+            "w": 0.96385272392696109
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0041472744495027582,
+            "y": 0.00060216076672077185,
+            "z": -0.13412322103724772
+          },
+          "rotation": {
+            "x": 0.0044094210367184791,
+            "y": 0.055860519906389829,
+            "z": 0.036480679162683168,
+            "w": 0.99776215571133897
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513035808195,
+            "y": -6.0670986711210429e-15,
+            "z": -0.1080887760268352
+          },
+          "rotation": {
+            "x": -0.0015051887987573324,
+            "y": -0.095581798355521552,
+            "z": 0.036936793539785601,
+            "w": 0.99473490313389712
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.0061662636160781069,
+            "y": 1.6493918338673508,
+            "z": 0.003418423544094825
+          },
+          "rotation": {
+            "x": 0.57345453493187737,
+            "y": -0.43500426713270196,
+            "z": 0.35035346365600417,
+            "w": 0.59931096639945292
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.015509086940429058,
+            "y": 1.3948685448783811,
+            "z": -0.002475146667598981
+          },
+          "rotation": {
+            "x": 0.69357715973204825,
+            "y": -0.10513269110177455,
+            "z": 0.13844891870662474,
+            "w": 0.69909208096551212
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.019168438163278928,
+            "y": 1.0683856988292906,
+            "z": -0.0040824682544801085
+          },
+          "rotation": {
+            "x": 0.70375361883392717,
+            "y": -0.13954896890569304,
+            "z": 0.0019211402284143905,
+            "w": 0.69660120476190124
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": -1.5705752,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": 4.584687E-08,
+        "turnAnimationId": 100,
+        "turnCurveId": 200,
+        "turnPhase": 0.050000004,
+        "turnPlayRate": 0.6000001,
+        "turnNominalDegrees": 90,
+        "turnDirection": -1,
+        "turnActive": 1,
+        "turnYawDelta": 0.020490427,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.00050769624,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.19057645,
+            "y": 0.13,
+            "z": -4.213769E-05
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.00011058992,
+            "z": 0,
+            "w": 1
+          },
+          "lockAmount": 1,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.19119021,
+            "y": 0.13,
+            "z": 4.229322E-05
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.00011058992,
+            "z": 0,
+            "w": 1
+          },
+          "lockAmount": 1,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    },
+    {
+      "caseId": "turn_standing_left_180",
+      "category": "Turn",
+      "stance": "Standing",
+      "direction": "Left",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_180_Left.A_Als_Turn_180_Left",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_180_Left.A_Als_Turn_180_Left",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": 0.00087422796059399843,
+        "viewYaw": 2.9670593738555908,
+        "viewPitch": 0,
+        "aimYaw": 2.9670593738555908,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Standing",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.19008869269424938,
+          "y": 0.13452079494033226,
+          "z": 0.015724968710461747
+        },
+        "rightFootOrigin": {
+          "x": 0.17286248393803993,
+          "y": 0.13448359798005705,
+          "z": 0.081943158838315017
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.19008869269424938,
+            "y": 0,
+            "z": 0.015724968710461747
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17286248393803993,
+            "y": 0,
+            "z": 0.081943158838315017
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 0.99999988079071045,
+        "rightLockCurve": 0.99999988079071045,
+        "previousYawCurve": -6.5557107925415039,
+        "currentYawCurve": -10.555147171020508,
+        "previousYawPhase": 0.040000002831220627,
+        "yawPhasePlayRate": 0.60000008344650269,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": 2.9661850929260254,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 103,
+        "turnCurveId": 203,
+        "turnNominalDegrees": 180,
+        "turnActive": 1,
+        "turnDirection": 1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.1333333253860474,
+        "turnPhase": 0.050000004470348358,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": 0.00087422796059399843,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_180_Left.A_Als_Turn_180_Left",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.37615743279457092,
+        "runtimeSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousSourceTimeSeconds": 0.080000005662441254,
+        "runtimePreviousYawCurve": -6.5557107925415039,
+        "runtimeCurrentYawCurve": -10.555147171020508,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": -4.7300829887390137,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 1,
+        "rightFootLockAmount": 1,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.19008869269424938,
+            "y": 0,
+            "z": 0.015724968710461747
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17286248393803993,
+            "y": 0,
+            "z": 0.081943158838315017
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.17076301574707031,
+          "y": 0.13465351104736328,
+          "z": 0.050721697807312012
+        },
+        "rightLockWorldPosition": {
+          "x": 0.17076314926147462,
+          "y": 0.13465192794799805,
+          "z": 0.050721888542175297
+        },
+        "leftLockBasePosition": {
+          "x": -0.17076301574707031,
+          "y": 0.23465351104736329,
+          "z": 0.050721697807312012
+        },
+        "rightLockBasePosition": {
+          "x": 0.17076314926147462,
+          "y": 0.23465192794799805,
+          "z": 0.050721888542175297
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.024077115719657156,
+            "y": 0.95704881286470622,
+            "z": 0.011357336771083254
+          },
+          "rotation": {
+            "x": 0.70698977675738628,
+            "y": -0.0052088687791609582,
+            "z": 0.0026480528516382483,
+            "w": 0.70719962603403408
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": -6.6613411628253907e-18,
+            "y": 1.4210852677029545e-16,
+            "z": 0.40196704426622254
+          },
+          "rotation": {
+            "x": -0.054983149048280451,
+            "y": 0.099066079239792035,
+            "z": 0.055858602988582869,
+            "w": 0.9919892044457711
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": -0.40196819309215465
+          },
+          "rotation": {
+            "x": -0.033023461044525776,
+            "y": 0.10457519184823984,
+            "z": 0.13560591148795562,
+            "w": 0.98467482807273243
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.024077114957256066,
+            "y": 0.95704878255978676,
+            "z": 0.011357336411453554
+          },
+          "rotation": {
+            "x": 0.70698977675738628,
+            "y": -0.0052088687791609582,
+            "z": 0.0026480528516382483,
+            "w": 0.70719962603403408
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": -0.050572390556335486,
+            "y": 0.13465351104736273,
+            "z": -0.17080728530883782
+          },
+          "rotation": {
+            "x": 0.70326571597677345,
+            "y": 0.073610982680557407,
+            "z": -0.073598637068694253,
+            "w": 0.70326523913962191
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.050871152877807684,
+            "y": 0.13465192794799749,
+            "z": 0.17071874618530308
+          },
+          "rotation": {
+            "x": -0.074225766528306966,
+            "y": 0.70320109695477329,
+            "z": 0.7032006201176273,
+            "w": 0.074213480521220232
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686050305734,
+            "y": 4.9471804750811525e-17,
+            "z": -0.092836129109907448
+          },
+          "rotation": {
+            "x": -0.13718988930720771,
+            "y": 0.028569767578133509,
+            "z": -0.42930984912349257,
+            "w": 0.89221956720191453
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0040338645661600744,
+            "y": -0.0012882993370294572,
+            "z": -0.13412197528620207
+          },
+          "rotation": {
+            "x": -0.013831885691698517,
+            "y": 0.048645095302184957,
+            "z": -0.077711199106533263,
+            "w": 0.99569237376545061
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513035808195,
+            "y": -6.0670986711210429e-15,
+            "z": -0.1080887760268352
+          },
+          "rotation": {
+            "x": 0.0027196452895823708,
+            "y": -0.1038530265529214,
+            "z": -0.080303000505858271,
+            "w": 0.99134180811416073
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.038634722505479085,
+            "y": 1.6415802513118631,
+            "z": -0.014797314702599087
+          },
+          "rotation": {
+            "x": 0.3862049802126053,
+            "y": 0.49283806808914032,
+            "z": -0.65743142121483422,
+            "w": 0.41921388133098403
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.00052445322394119699,
+            "y": 1.3910211136347399,
+            "z": 0.0067575392553778334
+          },
+          "rotation": {
+            "x": 0.68759706167670942,
+            "y": 0.15364956568408838,
+            "z": -0.17053814558921618,
+            "w": 0.6888532736640206
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.015171926221832104,
+            "y": 1.0651060183811434,
+            "z": 0.011422040829631806
+          },
+          "rotation": {
+            "x": 0.7034851518359545,
+            "y": -0.021827988769441954,
+            "z": -0.12757398820801846,
+            "w": 0.69882548435594827
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": 2.966185,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": 5.210197E-08,
+        "turnAnimationId": 103,
+        "turnCurveId": 203,
+        "turnPhase": 0.050000004,
+        "turnPlayRate": 0.6000001,
+        "turnNominalDegrees": 180,
+        "turnDirection": 1,
+        "turnActive": 1,
+        "turnYawDelta": -0.080777474,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.0004932255,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.19073793,
+            "y": 0.13,
+            "z": 0.0001667561
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0.00043711398,
+            "z": 0,
+            "w": 0.9999999
+          },
+          "lockAmount": 0.9999999,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.19130105,
+            "y": 0.13,
+            "z": -0.00016721338
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0.00043711398,
+            "z": 0,
+            "w": 0.9999999
+          },
+          "lockAmount": 0.9999999,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    },
+    {
+      "caseId": "turn_standing_right_180",
+      "category": "Turn",
+      "stance": "Standing",
+      "direction": "Right",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_180_Right.A_Als_Turn_180_Right",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_180_Right.A_Als_Turn_180_Right",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": -0.00087422708747908473,
+        "viewYaw": -2.9670593738555908,
+        "viewPitch": 0,
+        "aimYaw": -2.9670593738555908,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Standing",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.18976230910929168,
+          "y": 0.13465340769611786,
+          "z": 0.016581575806057406
+        },
+        "rightFootOrigin": {
+          "x": 0.17306868258869426,
+          "y": 0.13465183515843412,
+          "z": 0.081076158303577658
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.18976230910929168,
+            "y": 0,
+            "z": 0.016581575806057406
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17306868258869426,
+            "y": 0,
+            "z": 0.081076158303577658
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 0.99999988079071045,
+        "rightLockCurve": 0.99999988079071045,
+        "previousYawCurve": 6.5557060241699219,
+        "currentYawCurve": 10.555141448974609,
+        "previousYawPhase": 0.040000002831220627,
+        "yawPhasePlayRate": 0.60000008344650269,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": -2.9661850929260254,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 102,
+        "turnCurveId": 202,
+        "turnNominalDegrees": 180,
+        "turnActive": 1,
+        "turnDirection": -1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.1333333253860474,
+        "turnPhase": 0.050000004470348358,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": -0.00087422708747908473,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_180_Right.A_Als_Turn_180_Right",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.37615743279457092,
+        "runtimeSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousSourceTimeSeconds": 0.080000005662441254,
+        "runtimePreviousYawCurve": 6.5557060241699219,
+        "runtimeCurrentYawCurve": 10.555141448974609,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": 4.7300801277160645,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 1,
+        "rightFootLockAmount": 1,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.18976230910929168,
+            "y": 0,
+            "z": 0.016581575806057406
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.17306868258869426,
+            "y": 0,
+            "z": 0.081076158303577658
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.17076301574707031,
+          "y": 0.13465351104736328,
+          "z": 0.050721697807312012
+        },
+        "rightLockWorldPosition": {
+          "x": 0.17076314926147462,
+          "y": 0.13465192794799805,
+          "z": 0.050721888542175297
+        },
+        "leftLockBasePosition": {
+          "x": -0.17076301574707031,
+          "y": 0.23465351104736329,
+          "z": 0.050721697807312012
+        },
+        "rightLockBasePosition": {
+          "x": 0.17076314926147462,
+          "y": 0.23465192794799805,
+          "z": 0.050721888542175297
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.024079207298023372,
+            "y": 0.95704877480133355,
+            "z": -0.011355282634763047
+          },
+          "rotation": {
+            "x": 0.70496199295458462,
+            "y": -0.058994876815449807,
+            "z": 0.056434152626911219,
+            "w": 0.70453060928274269
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": -2.2204470542751301e-18,
+            "y": -7.1054263385147727e-17,
+            "z": 0.40196704426622254
+          },
+          "rotation": {
+            "x": -0.044507965461372367,
+            "y": 0.1149081157186098,
+            "z": 0.057077684668831598,
+            "w": 0.9907357386636122
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": 3.5527140162902123e-17,
+            "y": 1.4210856065160849e-16,
+            "z": -0.40196819309215481
+          },
+          "rotation": {
+            "x": -0.043917852299857937,
+            "y": 0.085599816913717028,
+            "z": 0.13988415903660964,
+            "w": 0.98548278302785508
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.024079206535556057,
+            "y": 0.95704874449641508,
+            "z": -0.011355282275198391
+          },
+          "rotation": {
+            "x": 0.70496199295458462,
+            "y": -0.058994876815449807,
+            "z": 0.056434152626911219,
+            "w": 0.70453060928274269
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": -0.050870962142944301,
+            "y": 0.13465351104736273,
+            "z": -0.17071861267089852
+          },
+          "rotation": {
+            "x": 0.70320109967647182,
+            "y": 0.0742257742661738,
+            "z": -0.074213421203815647,
+            "w": 0.70320062283932372
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.050572581291198918,
+            "y": 0.13465192794799755,
+            "z": 0.17080741882324277
+          },
+          "rotation": {
+            "x": -0.073610982357639035,
+            "y": 0.70326571289167161,
+            "z": 0.70326523605452251,
+            "w": 0.073598696350473711
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686050305734,
+            "y": 4.9471804750811525e-17,
+            "z": -0.092836129109907448
+          },
+          "rotation": {
+            "x": 0.12217718367154998,
+            "y": 0.03543820752696681,
+            "z": 0.3859009801655246,
+            "w": 0.91372714895895002
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0040338423820563477,
+            "y": 0.0010937301069498062,
+            "z": -0.13412196727144371
+          },
+          "rotation": {
+            "x": 0.012324589904690503,
+            "y": 0.048159169412669053,
+            "z": 0.065997661155151252,
+            "w": 0.9965807080248007
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513035808195,
+            "y": -6.0670986711210429e-15,
+            "z": -0.1080887760268352
+          },
+          "rotation": {
+            "x": -0.0018170200051433013,
+            "y": -0.10212266198844654,
+            "z": 0.068787947579242531,
+            "w": 0.99238897545999061
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.03238699100203226,
+            "y": 1.6423343960716015,
+            "z": 0.021894244793954333
+          },
+          "rotation": {
+            "x": 0.42223783613261129,
+            "y": -0.65387189528713963,
+            "z": 0.49682791488905731,
+            "w": 0.38383430966843712
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.002452455741023023,
+            "y": 1.3910294878288547,
+            "z": -0.0032500156954612682
+          },
+          "rotation": {
+            "x": 0.6814533823494977,
+            "y": -0.20575655084411409,
+            "z": 0.18999709804473056,
+            "w": 0.67615577510196867
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.015293808003705158,
+            "y": 1.0651056305268858,
+            "z": -0.0098723997910150699
+          },
+          "rotation": {
+            "x": 0.70002143311462806,
+            "y": -0.17908983723358313,
+            "z": 0.03236805533310895,
+            "w": 0.69054263617371503
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": -2.966185,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": -5.2960793E-08,
+        "turnAnimationId": 102,
+        "turnCurveId": 202,
+        "turnPhase": 0.050000004,
+        "turnPlayRate": 0.6000001,
+        "turnNominalDegrees": 180,
+        "turnDirection": -1,
+        "turnActive": 1,
+        "turnYawDelta": 0.08077742,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.000507693,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.19048531,
+            "y": 0.13,
+            "z": -0.00016651582
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.00043711354,
+            "z": 0,
+            "w": 0.9999999
+          },
+          "lockAmount": 0.9999999,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.19111799,
+            "y": 0.13,
+            "z": 0.00016709417
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.00043711354,
+            "z": 0,
+            "w": 0.9999999
+          },
+          "lockAmount": 0.9999999,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    },
+    {
+      "caseId": "turn_crouching_left_90",
+      "category": "Turn",
+      "stance": "Crouching",
+      "direction": "Left",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_90_Left.A_Als_Crouch_Turn_90_Left",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_90_Left.A_Als_Crouch_Turn_90_Left",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": 0.00018992734840139747,
+        "viewYaw": 1.5707963705062866,
+        "viewPitch": 0,
+        "aimYaw": 1.5707963705062866,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Crouching",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.14064535372974937,
+          "y": 0.13465225082727578,
+          "z": -0.21935676515004549
+        },
+        "rightFootOrigin": {
+          "x": 0.01228735315772995,
+          "y": 0.20054665518928766,
+          "z": 0.35928862093379371
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.14064535372974937,
+            "y": 0,
+            "z": -0.21935676515004549
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.01228735315772995,
+            "y": 0,
+            "z": 0.35928862093379371
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 0.61156785488128662,
+        "rightLockCurve": 0.22313573956489563,
+        "previousYawCurve": -1.3483766317367554,
+        "currentYawCurve": -2.1706852912902832,
+        "previousYawPhase": 0.040000002831220627,
+        "yawPhasePlayRate": 0.60000008344650269,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": 1.5706064701080322,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 105,
+        "turnCurveId": 205,
+        "turnNominalDegrees": 90,
+        "turnActive": 1,
+        "turnDirection": 1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.2000000476837158,
+        "turnPhase": 0.050000004470348358,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": 0.00018992734840139747,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_90_Left.A_Als_Crouch_Turn_90_Left",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.37615743279457092,
+        "runtimeSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousSourceTimeSeconds": 0.080000005662441254,
+        "runtimePreviousYawCurve": -1.3483766317367554,
+        "runtimeCurrentYawCurve": -2.1706852912902832,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": -1.0299807786941528,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 0.72616595029830933,
+        "rightFootLockAmount": 0.45233190059661865,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.14064535372974937,
+            "y": 0,
+            "z": -0.21935676515004549
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.01228735315772995,
+            "y": 0,
+            "z": 0.35928862093379371
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.1509198760986328,
+          "y": 0.13564491271972656,
+          "z": -0.2382014846801758
+        },
+        "rightLockWorldPosition": {
+          "x": 0.012791459560394288,
+          "y": 0.19881330490112306,
+          "z": 0.35501758575439452
+        },
+        "leftLockBasePosition": {
+          "x": -0.1509198760986328,
+          "y": 0.23564491271972657,
+          "z": -0.2382014846801758
+        },
+        "rightLockBasePosition": {
+          "x": 0.012791459560394288,
+          "y": 0.29881330490112307,
+          "z": 0.35501758575439452
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.15733192102383106,
+            "y": 0.41558412182537807,
+            "z": -0.016332593664999187
+          },
+          "rotation": {
+            "x": 0.69886505974900948,
+            "y": -0.10862171354529704,
+            "z": 0.11104674145296994,
+            "w": 0.69818161879354446
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": 9.5479223333830592e-17,
+            "y": 7.1054263385147727e-17,
+            "z": 0.40196704426622254
+          },
+          "rotation": {
+            "x": -0.026920766886661038,
+            "y": 0.054386004873899982,
+            "z": 0.066790786939816604,
+            "w": 0.99591988912966811
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": -3.641531866697468e-16,
+            "y": 0,
+            "z": -0.40196819309215465
+          },
+          "rotation": {
+            "x": -0.11087822963960349,
+            "y": 0.20341911786549213,
+            "z": 0.11377318727740469,
+            "w": 0.96611714741823773
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.1573319160419209,
+            "y": 0.41558410866592033,
+            "z": -0.016332593147828138
+          },
+          "rotation": {
+            "x": 0.69886505974900948,
+            "y": -0.10862171354529704,
+            "z": 0.11104674145296994,
+            "w": 0.69818161879354446
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": 0.23305162429809584,
+            "y": 0.13537318229675271,
+            "z": -0.14808844566345239
+          },
+          "rotation": {
+            "x": 0.7068933224740116,
+            "y": -0.01680409343848252,
+            "z": 0.013719158200962223,
+            "w": 0.70698743820779508
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.35620513916015639,
+            "y": 0.19930830001831049,
+            "z": 0.0125012814998626
+          },
+          "rotation": {
+            "x": 0.18301224611981168,
+            "y": 0.24430480470483201,
+            "z": 0.63069969082843103,
+            "w": 0.7134700975915087
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686050305734,
+            "y": 4.9471804750811525e-17,
+            "z": -0.092836129109907448
+          },
+          "rotation": {
+            "x": -0.16509324855968635,
+            "y": 0.27192284616719986,
+            "z": -0.20811383089240457,
+            "w": 0.9249274665635282
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0039912671431408218,
+            "y": -0.0018495133462131878,
+            "z": -0.13412148707781141
+          },
+          "rotation": {
+            "x": -0.046567228575794595,
+            "y": -0.02330768323039651,
+            "z": -0.09909234566918583,
+            "w": 0.99371472372858594
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513035808195,
+            "y": -6.0670986711210429e-15,
+            "z": -0.1080887760268352
+          },
+          "rotation": {
+            "x": -0.021139990503454369,
+            "y": -0.24143438588464133,
+            "z": -0.10841753011034187,
+            "w": 0.96411004417483026
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.13099597118373724,
+            "y": 1.0162366782436296,
+            "z": -0.081876243186557215
+          },
+          "rotation": {
+            "x": 0.56098310641856908,
+            "y": 0.3134971695209462,
+            "z": -0.49813232720176059,
+            "w": 0.58213543408032276
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.02539725244899577,
+            "y": 0.82259153427243858,
+            "z": -0.022047177976732151
+          },
+          "rotation": {
+            "x": 0.64860922864807846,
+            "y": -0.088717335396147817,
+            "z": -0.33669675260788606,
+            "w": 0.67680913091953487
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.14961107802460663,
+            "y": 0.52369975838009675,
+            "z": -0.013674072201998975
+          },
+          "rotation": {
+            "x": 0.69761027056200375,
+            "y": -0.19986663881521755,
+            "z": -0.13966016637989437,
+            "w": 0.67371230879497501
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": 1.5706065,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": -2.6509024E-08,
+        "turnAnimationId": 105,
+        "turnCurveId": 205,
+        "turnPhase": 0.050000004,
+        "turnPlayRate": 0.6000001,
+        "turnNominalDegrees": 90,
+        "turnDirection": 1,
+        "turnActive": 1,
+        "turnYawDelta": -0.017593186,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.0076967315,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.14064535,
+            "y": 0.13,
+            "z": -0.21935676
+          },
+          "rotation": {
+            "x": 0,
+            "y": 9.4963674E-05,
+            "z": 0,
+            "w": 1
+          },
+          "lockAmount": 0.61156785,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.35949868,
+            "y": 0.13,
+            "z": -6.829202E-05
+          },
+          "rotation": {
+            "x": 0,
+            "y": 9.4963674E-05,
+            "z": 0,
+            "w": 1
+          },
+          "lockAmount": 0.22313574,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    },
+    {
+      "caseId": "turn_crouching_right_90",
+      "category": "Turn",
+      "stance": "Crouching",
+      "direction": "Right",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_90_Right.A_Als_Crouch_Turn_90_Right",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_90_Right.A_Als_Crouch_Turn_90_Right",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": -0.00057583313900977373,
+        "viewYaw": -1.5707963705062866,
+        "viewPitch": 0,
+        "aimYaw": -1.5707963705062866,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Crouching",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.14109845125450673,
+          "y": 0.13465252495117883,
+          "z": -0.21907000540633292
+        },
+        "rightFootOrigin": {
+          "x": 0.012978486839590424,
+          "y": 0.20007907662532148,
+          "z": 0.35800679903325039
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.14109845125450673,
+            "y": 0,
+            "z": -0.21907000540633292
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.012978486839590424,
+            "y": 0,
+            "z": 0.35800679903325039
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 0.6115679144859314,
+        "rightLockCurve": 0.22313573956489563,
+        "previousYawCurve": 3.8456313610076904,
+        "currentYawCurve": 5.6432633399963379,
+        "previousYawPhase": 0.040000002831220627,
+        "yawPhasePlayRate": 0.60000008344650269,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": -1.5702205896377563,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 104,
+        "turnCurveId": 204,
+        "turnNominalDegrees": 90,
+        "turnActive": 1,
+        "turnDirection": -1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.2000000476837158,
+        "turnPhase": 0.050000004470348358,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": -0.00057583313900977373,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_90_Right.A_Als_Crouch_Turn_90_Right",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.37615743279457092,
+        "runtimeSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousSourceTimeSeconds": 0.080000005662441254,
+        "runtimePreviousYawCurve": 3.8456313610076904,
+        "runtimeCurrentYawCurve": 5.6432633399963379,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": 2.6658048629760742,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 0.7261660099029541,
+        "rightFootLockAmount": 0.45233190059661865,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.14109845125450673,
+            "y": 0,
+            "z": -0.21907000540633292
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.012978486839590424,
+            "y": 0,
+            "z": 0.35800679903325039
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.1509198760986328,
+          "y": 0.13564491271972656,
+          "z": -0.2382014846801758
+        },
+        "rightLockWorldPosition": {
+          "x": 0.012791459560394288,
+          "y": 0.19881330490112306,
+          "z": 0.35501758575439452
+        },
+        "leftLockBasePosition": {
+          "x": -0.1509198760986328,
+          "y": 0.23564491271972657,
+          "z": -0.2382014846801758
+        },
+        "rightLockBasePosition": {
+          "x": 0.012791459560394288,
+          "y": 0.29881330490112307,
+          "z": 0.35501758575439452
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.15770892196454295,
+            "y": 0.41453684323380707,
+            "z": -0.027069536271803658
+          },
+          "rotation": {
+            "x": 0.69460808592221701,
+            "y": -0.1351045741408799,
+            "z": 0.1380815828879178,
+            "w": 0.69296452830202837
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": -2.6645364651301563e-17,
+            "y": 0,
+            "z": 0.40196704426622248
+          },
+          "rotation": {
+            "x": -0.014297679461213001,
+            "y": 0.06189378644166927,
+            "z": 0.064836976766120213,
+            "w": 0.99587193052408463
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": 1.5987213073305953e-16,
+            "y": 0,
+            "z": -0.40196819309215487
+          },
+          "rotation": {
+            "x": -0.11712657050603201,
+            "y": 0.18815180651618746,
+            "z": 0.1201129657931113,
+            "w": 0.96770508918501275
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.15770891697069506,
+            "y": 0.41453683010751136,
+            "z": -0.027069535414647673
+          },
+          "rotation": {
+            "x": 0.69460808592221701,
+            "y": -0.1351045741408799,
+            "z": 0.1380815828879178,
+            "w": 0.69296452830202837
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": 0.23292127609252938,
+            "y": 0.1353732395172117,
+            "z": -0.14829355239868164
+          },
+          "rotation": {
+            "x": 0.70689938219413051,
+            "y": -0.016490742043243068,
+            "z": 0.013403678820785123,
+            "w": 0.70699480922740099
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.35585548400878914,
+            "y": 0.19917778015136711,
+            "z": 0.012860839366913126
+          },
+          "rotation": {
+            "x": 0.18397186134646565,
+            "y": 0.24475405362764222,
+            "z": 0.63000069124602209,
+            "w": 0.71368686165228556
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686050305734,
+            "y": 4.9471804750811525e-17,
+            "z": -0.092836129109907448
+          },
+          "rotation": {
+            "x": 0.15527291268635274,
+            "y": 0.29155561710186445,
+            "z": 0.27095058485397328,
+            "w": 0.90414126401217698
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0039917902723909165,
+            "y": -0.000376787111980237,
+            "z": -0.13412150819402718
+          },
+          "rotation": {
+            "x": 0.01159913153180641,
+            "y": -0.018152106474961426,
+            "z": -0.031708361129732333,
+            "w": 0.99926500039413779
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513035808195,
+            "y": -6.0670986711210429e-15,
+            "z": -0.1080887760268352
+          },
+          "rotation": {
+            "x": -0.011100147585777324,
+            "y": -0.23909625856016972,
+            "z": -0.017880986447866374,
+            "w": 0.97076775605175203
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.11780448042628734,
+            "y": 1.0166595504264888,
+            "z": 0.084498012741090728
+          },
+          "rotation": {
+            "x": 0.59742857223094248,
+            "y": -0.4883827918794042,
+            "z": 0.32404199889440172,
+            "w": 0.54731904099044171
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.033363687905499775,
+            "y": 0.82202175002476652,
+            "z": 0.013317391316771317
+          },
+          "rotation": {
+            "x": 0.7214736918181871,
+            "y": -0.28615916586779749,
+            "z": -0.12451883274990987,
+            "w": 0.61812919692786072
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.1503252848443459,
+            "y": 0.52265569692421621,
+            "z": -0.02368347556256364
+          },
+          "rotation": {
+            "x": 0.70204171727407683,
+            "y": -0.28595283848097736,
+            "z": -0.04592361618936304,
+            "w": 0.65058390915210107
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": -1.5702206,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": 5.141491E-08,
+        "turnAnimationId": 104,
+        "turnCurveId": 204,
+        "turnPhase": 0.050000004,
+        "turnPlayRate": 0.6000001,
+        "turnNominalDegrees": 90,
+        "turnDirection": -1,
+        "turnActive": 1,
+        "turnYawDelta": 0.04742709,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.007645719,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.14109845,
+            "y": 0.13,
+            "z": -0.21907
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.0002879166,
+            "z": 0,
+            "w": 0.99999994
+          },
+          "lockAmount": 0.6115679,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.35824192,
+            "y": 0.13,
+            "z": 0.00020629168
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.00028791657,
+            "z": 0,
+            "w": 0.99999994
+          },
+          "lockAmount": 0.22313574,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    },
+    {
+      "caseId": "turn_crouching_left_180",
+      "category": "Turn",
+      "stance": "Crouching",
+      "direction": "Left",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_180_Left.A_Als_Crouch_Turn_180_Left",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_180_Left.A_Als_Crouch_Turn_180_Left",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": 0.0037173635791987181,
+        "viewYaw": 2.9670593738555908,
+        "viewPitch": 0,
+        "aimYaw": 2.9670593738555908,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Crouching",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.13902292225999788,
+          "y": 0.13465483726268801,
+          "z": -0.22037201793521571
+        },
+        "rightFootOrigin": {
+          "x": 0.0095737292892440398,
+          "y": 0.19890639018120418,
+          "z": 0.35525766630155436
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.13902292225999788,
+            "y": 0,
+            "z": -0.22037201793521571
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.0095737292892440398,
+            "y": 0,
+            "z": 0.35525766630155436
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 1,
+        "rightLockCurve": 1,
+        "previousYawCurve": -14.727405548095703,
+        "currentYawCurve": -19.015670776367188,
+        "previousYawPhase": 0.042857147753238678,
+        "yawPhasePlayRate": 0.51428580284118652,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": 2.9633421897888184,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 107,
+        "turnCurveId": 207,
+        "turnNominalDegrees": 180,
+        "turnActive": 1,
+        "turnDirection": 1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.2000000476837158,
+        "turnPhase": 0.051428578794002533,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": 0.0037173635791987181,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_180_Left.A_Als_Crouch_Turn_180_Left",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.5,
+        "runtimeSourceTimeSeconds": 0.12000001221895218,
+        "runtimePreviousSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousYawCurve": -14.727405548095703,
+        "runtimeCurrentYawCurve": -19.015670776367188,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": -11.686227798461914,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 1,
+        "rightFootLockAmount": 1,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.13902292225999788,
+            "y": 0,
+            "z": -0.22037201793521571
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.0095737292892440398,
+            "y": 0,
+            "z": 0.35525766630155436
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.1509198760986328,
+          "y": 0.13564491271972656,
+          "z": -0.2382014846801758
+        },
+        "rightLockWorldPosition": {
+          "x": 0.012791459560394288,
+          "y": 0.19881330490112306,
+          "z": 0.35501758575439452
+        },
+        "leftLockBasePosition": {
+          "x": -0.1509198760986328,
+          "y": 0.23564491271972657,
+          "z": -0.2382014846801758
+        },
+        "rightLockBasePosition": {
+          "x": 0.012791459560394288,
+          "y": 0.29881330490112307,
+          "z": 0.35501758575439452
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.16006337971551529,
+            "y": 0.4169226894554881,
+            "z": -0.012912813585417956
+          },
+          "rotation": {
+            "x": 0.70054598894053066,
+            "y": -0.090076631587149084,
+            "z": 0.096101915250871819,
+            "w": 0.70134580608025399
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": 1.629252976001492e-16,
+            "y": 1.4210852240278241e-16,
+            "z": 0.40196707005929183
+          },
+          "rotation": {
+            "x": -0.03260561973693054,
+            "y": 0.038341865709334372,
+            "z": 0.076466650283884094,
+            "w": 0.99580099733323246
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": -1.4210855628409441e-16,
+            "y": -3.5527139071023604e-17,
+            "z": -0.40196818073820689
+          },
+          "rotation": {
+            "x": -0.10682910539083672,
+            "y": 0.20294986603465762,
+            "z": 0.10574836736850268,
+            "w": 0.96758264603950217
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.16006337628689057,
+            "y": 0.41692268052482934,
+            "z": -0.012912813308820076
+          },
+          "rotation": {
+            "x": 0.70054598894053066,
+            "y": -0.090076631587149084,
+            "z": 0.096101915250871819,
+            "w": 0.70134580608025399
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": 0.23876085281372092,
+            "y": 0.13564491271972634,
+            "z": -0.15003334999084503
+          },
+          "rotation": {
+            "x": 0.70669341496005911,
+            "y": -0.024348724774258524,
+            "z": 0.02009387139674907,
+            "w": 0.70681524685468411
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.35506267547607434,
+            "y": 0.19881330490112284,
+            "z": 0.011471644639969157
+          },
+          "rotation": {
+            "x": 0.1833778753838754,
+            "y": 0.24224769871772375,
+            "z": 0.62859636033087851,
+            "w": 0.71592962158611317
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686423368,
+            "y": 4.9471805257627835e-17,
+            "z": -0.092836130060971675
+          },
+          "rotation": {
+            "x": -0.25477035193236058,
+            "y": 0.19269357512165133,
+            "z": -0.31605415070160581,
+            "w": 0.89334821190137514
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0038861091145074634,
+            "y": -0.0023013233547524389,
+            "z": -0.13412034427899688
+          },
+          "rotation": {
+            "x": -0.065644441967793413,
+            "y": -0.041092770123950441,
+            "z": -0.11971090401677974,
+            "w": 0.9897835576234647
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513908044558,
+            "y": -6.0670987332757305e-15,
+            "z": -0.10808877713415592
+          },
+          "rotation": {
+            "x": -0.021116214618419567,
+            "y": -0.23872063561484624,
+            "z": -0.13146088200705439,
+            "w": 0.96191714825849739
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.10593903825102213,
+            "y": 1.0125274962106696,
+            "z": -0.1367340874979365
+          },
+          "rotation": {
+            "x": 0.34390428915894339,
+            "y": 0.45843682693009508,
+            "z": -0.68740271193104985,
+            "w": 0.44614238449421734
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.03277705097140772,
+            "y": 0.82471099557021321,
+            "z": -0.035331094204569438
+          },
+          "rotation": {
+            "x": 0.60435241814338936,
+            "y": -0.028908922438004421,
+            "z": -0.41012129072015852,
+            "w": 0.68243897586944913
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.15274156411777476,
+            "y": 0.52508064495019791,
+            "z": -0.010933089353875365
+          },
+          "rotation": {
+            "x": 0.69384049507184842,
+            "y": -0.16400688826937895,
+            "z": -0.16889431924097345,
+            "w": 0.68055992897523421
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": 2.963342,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": 5.794197E-08,
+        "turnAnimationId": 107,
+        "turnCurveId": 207,
+        "turnPhase": 0.05142858,
+        "turnPlayRate": 0.5142858,
+        "turnNominalDegrees": 180,
+        "turnDirection": 1,
+        "turnActive": 1,
+        "turnYawDelta": -0.13640802,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.007517777,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.13902292,
+            "y": 0.13,
+            "z": -0.22037202
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0.0018586809,
+            "z": 0,
+            "w": 0.9999983
+          },
+          "lockAmount": 1,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.35538417,
+            "y": 0.13,
+            "z": -0.0013211071
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0.0018586809,
+            "z": 0,
+            "w": 0.9999983
+          },
+          "lockAmount": 1,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    },
+    {
+      "caseId": "turn_crouching_right_180",
+      "category": "Turn",
+      "stance": "Crouching",
+      "direction": "Right",
+      "phase": "playing",
+      "provenance": "port_oracle_v1",
+      "source": {
+        "animationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_180_Right.A_Als_Crouch_Turn_180_Right",
+        "curveSourceObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_180_Right.A_Als_Crouch_Turn_180_Right",
+        "curveNames": [
+          "RotationYawSpeed"
+        ]
+      },
+      "stimulus": {
+        "characterPosition": {
+          "x": 0,
+          "y": 0.02,
+          "z": -0
+        },
+        "characterYaw": -0.013266367837786674,
+        "viewYaw": -2.9670593738555908,
+        "viewPitch": 0,
+        "aimYaw": -2.9670593738555908,
+        "aimPitch": 0,
+        "rotationMode": "LookingDirection",
+        "stance": "Crouching",
+        "grounded": 1,
+        "speed": 0,
+        "acceleration": 0,
+        "floorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "platformId": -1,
+        "platformColliderId": 100,
+        "platformPosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "platformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "platformAngularVelocity": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "previousPlatformId": -1,
+        "previousPlatformColliderId": -1,
+        "previousPlatformPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousPlatformRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "initialLeftLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "initialRightLock": {
+          "localPosition": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "localRotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "amount": 0,
+          "locked": 0
+        },
+        "leftFootOrigin": {
+          "x": -0.14651050847859673,
+          "y": 0.13465115583134074,
+          "z": -0.21520762738877278
+        },
+        "rightFootOrigin": {
+          "x": 0.020499013850979343,
+          "y": 0.19909931244982784,
+          "z": 0.35376369804180746
+        },
+        "leftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.14651050847859673,
+            "y": 0,
+            "z": -0.21520762738877278
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "rightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.020499013850979343,
+            "y": 0,
+            "z": 0.35376369804180746
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "leftIkWeight": 1,
+        "rightIkWeight": 1,
+        "leftLockCurve": 1,
+        "rightLockCurve": 0.99876421689987183,
+        "previousYawCurve": 51.088275909423828,
+        "currentYawCurve": 62.104988098144531,
+        "previousYawPhase": 0.042857147753238678,
+        "yawPhasePlayRate": 0.51428580284118652,
+        "transitionFrameDelta": 0,
+        "platformRemovalSignals": {
+          "leftRemoved": 0,
+          "leftPlatformId": -1,
+          "leftColliderId": -1,
+          "rightRemoved": 0,
+          "rightPlatformId": -1,
+          "rightColliderId": -1
+        }
+      },
+      "nativeActual": {
+        "viewYaw": -2.9537932872772217,
+        "viewPitch": 0,
+        "spineYaw": -0,
+        "headBlendAmount": 1,
+        "turnUpdated": 1,
+        "turnAnimationId": 106,
+        "turnCurveId": 206,
+        "turnNominalDegrees": 180,
+        "turnActive": 1,
+        "turnDirection": -1,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateLeft": 0,
+        "rotateRight": 0,
+        "playRate": 1.2000000476837158,
+        "turnPhase": 0.051428578794002533,
+        "rotatePhase": 0,
+        "turnAccumulatedYaw": -0.013266367837786674,
+        "rotateAccumulatedYaw": 0,
+        "runtimeSourceAnimationObjectPath": "/ALS/ALS/Animations/TurnInPlace/A_Als_Crouch_Turn_180_Right.A_Als_Crouch_Turn_180_Right",
+        "runtimeInstanceClassPath": "/ALS/ALS/Character/AB_Als.AB_Als_C",
+        "runtimeNodePropertyName": "ActiveTurnMontageSlot0Segment0",
+        "runtimeNodePropertyOrdinal": 0,
+        "runtimeSourceWeight": 0.5,
+        "runtimeSourceTimeSeconds": 0.12000001221895218,
+        "runtimePreviousSourceTimeSeconds": 0.10000000894069672,
+        "runtimePreviousYawCurve": 51.088275909423828,
+        "runtimeCurrentYawCurve": 62.104988098144531,
+        "sourceSelectionVerified": 1,
+        "rotationYawSpeed": 38.1234130859375,
+        "feetValid": 1,
+        "movementBaseChanged": 0,
+        "hasRelativeBaseLocation": 1,
+        "hasRelativeBaseRotation": 0,
+        "movementBaseDeltaYaw": -0,
+        "previousLeftFootLockAmount": 0,
+        "previousRightFootLockAmount": 0,
+        "leftFootLockAmount": 1,
+        "rightFootLockAmount": 0.99997115135192871,
+        "leftFootPlatformId": -1,
+        "rightFootPlatformId": -1,
+        "leftFootReleaseReason": "None",
+        "rightFootReleaseReason": "None",
+        "transitionFrameDelta": 0,
+        "animationUpdateCount": 1,
+        "animationEvaluationCount": 1,
+        "animationPostUpdateCount": 1,
+        "publicAnimationTickCount": 1,
+        "footHitProvenance": "derived_transition",
+        "releaseReasonProvenance": "derived_transition",
+        "movementBaseId": -1,
+        "movementBaseColliderId": 100,
+        "movementBasePosition": {
+          "x": 0,
+          "y": -0.10000000000000001,
+          "z": -0
+        },
+        "movementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "previousMovementBaseId": -1,
+        "previousMovementBaseColliderId": -1,
+        "previousMovementBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousMovementBaseRotation": {
+          "x": -0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "actualFloorNormal": {
+          "x": 0,
+          "y": 1,
+          "z": -0
+        },
+        "actualLeftFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": -0.14651050847859673,
+            "y": 0,
+            "z": -0.21520762738877278
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "actualRightFootHit": {
+          "valid": 1,
+          "walkable": 1,
+          "position": {
+            "x": 0.020499013850979343,
+            "y": 0,
+            "z": 0.35376369804180746
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": -0
+          },
+          "platformId": -1,
+          "platformPosition": {
+            "x": 0,
+            "y": -0.10000000000000001,
+            "z": -0
+          },
+          "platformRotation": {
+            "x": -0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "colliderId": 100,
+          "pointVelocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "previousLeftLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockWorldPosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousLeftLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "previousRightLockBasePosition": {
+          "x": 0,
+          "y": 0,
+          "z": -0
+        },
+        "leftLockWorldPosition": {
+          "x": -0.1509198760986328,
+          "y": 0.13564491271972656,
+          "z": -0.2382014846801758
+        },
+        "rightLockWorldPosition": {
+          "x": 0.012791459560394288,
+          "y": 0.19881330490112306,
+          "z": 0.35501758575439452
+        },
+        "leftLockBasePosition": {
+          "x": -0.1509198760986328,
+          "y": 0.23564491271972657,
+          "z": -0.2382014846801758
+        },
+        "rightLockBasePosition": {
+          "x": 0.012791459560394288,
+          "y": 0.29881330490112307,
+          "z": 0.35501758575439452
+        },
+        "pelvis": {
+          "position": {
+            "x": -0.16178574688127892,
+            "y": 0.42375255437886356,
+            "z": -0.026527815187374411
+          },
+          "rotation": {
+            "x": 0.69264004367901566,
+            "y": -0.14223369103527478,
+            "z": 0.14941198720644949,
+            "w": 0.69115512376443622
+          }
+        },
+        "leftFoot": {
+          "position": {
+            "x": 2.5535140339376027e-17,
+            "y": 1.4210852240278241e-16,
+            "z": 0.401967070059292
+          },
+          "rotation": {
+            "x": -0.018888976985768427,
+            "y": 0.057681093023211422,
+            "z": 0.072373474361840676,
+            "w": 0.99552909463504624
+          }
+        },
+        "rightFoot": {
+          "position": {
+            "x": -1.7763569535511802e-17,
+            "y": -7.1054278142047207e-17,
+            "z": -0.40196818073820695
+          },
+          "rotation": {
+            "x": -0.11819348732848907,
+            "y": 0.1655288082555387,
+            "z": 0.10509218726631878,
+            "w": 0.97344036559319469
+          }
+        },
+        "pelvisComponent": {
+          "position": {
+            "x": -0.16178574341576038,
+            "y": 0.4237525453019062,
+            "z": -0.026527814619137488
+          },
+          "rotation": {
+            "x": 0.69264004367901566,
+            "y": -0.14223369103527478,
+            "z": 0.14941198720644949,
+            "w": 0.69115512376443622
+          }
+        },
+        "leftFootComponent": {
+          "position": {
+            "x": 0.23617841720581062,
+            "y": 0.13564491271972656,
+            "z": -0.1540665721893309
+          },
+          "rotation": {
+            "x": 0.70683857025590091,
+            "y": -0.018345738402686995,
+            "z": 0.014092074215881366,
+            "w": 0.70699652256948764
+          }
+        },
+        "rightFootComponent": {
+          "position": {
+            "x": -0.35481662750244142,
+            "y": 0.19881330490112306,
+            "z": 0.017500041723251768
+          },
+          "rotation": {
+            "x": 0.18870916549992256,
+            "y": 0.24831860714579793,
+            "z": 0.62701647102705815,
+            "w": 0.71384666789323059
+          }
+        },
+        "head": {
+          "position": {
+            "x": -0.0036415686423368,
+            "y": 4.9471805257627835e-17,
+            "z": -0.092836130060971675
+          },
+          "rotation": {
+            "x": 0.24266781795219078,
+            "y": 0.22436663431256632,
+            "z": 0.36368922998684611,
+            "w": 0.87092025325465283
+          }
+        },
+        "spine": {
+          "position": {
+            "x": -0.0039008295144641438,
+            "y": 0.00014296853321152438,
+            "z": -0.13412050464599673
+          },
+          "rotation": {
+            "x": 0.035903177481094894,
+            "y": -0.036096045560236795,
+            "z": -0.0061195576347949374,
+            "w": 0.99868442881424191
+          }
+        },
+        "upperBody": {
+          "position": {
+            "x": 0.0085141513908044558,
+            "y": -6.0670987332757305e-15,
+            "z": -0.10808877713415592
+          },
+          "rotation": {
+            "x": -0.010520992710335863,
+            "y": -0.23202952247124284,
+            "z": 0.02129764456737571,
+            "w": 0.97241864428343727
+          }
+        },
+        "headComponent": {
+          "position": {
+            "x": 0.07977779717980997,
+            "y": 1.0223191353863426,
+            "z": 0.14056740727454828
+          },
+          "rotation": {
+            "x": 0.45994869868511368,
+            "y": -0.67246939681383733,
+            "z": 0.47209805847831809,
+            "w": 0.3366831271503028
+          }
+        },
+        "spineComponent": {
+          "position": {
+            "x": -0.04838787623182568,
+            "y": 0.8329229428932432,
+            "z": 0.02662244093596677
+          },
+          "rotation": {
+            "x": 0.73032060382593755,
+            "y": -0.3667113218346153,
+            "z": -0.047355481326040581,
+            "w": 0.57437973541378207
+          }
+        },
+        "upperBodyComponent": {
+          "position": {
+            "x": -0.15511670831383584,
+            "y": 0.53191639619677678,
+            "z": -0.023095783235479794
+          },
+          "rotation": {
+            "x": 0.69790320367774916,
+            "y": -0.31500265022020918,
+            "z": -0.0021984000000036018,
+            "w": 0.6431948504831323
+          }
+        }
+      },
+      "portExpected": {
+        "aimRelativeYaw": -2.953793,
+        "aimRelativePitch": 0,
+        "headWeight": 1,
+        "spineWeight": 0,
+        "upperBodyWeight": 0,
+        "spineResidualYaw": 4.2139614E-08,
+        "turnAnimationId": 106,
+        "turnCurveId": 206,
+        "turnPhase": 0.05142858,
+        "turnPlayRate": 0.5142858,
+        "turnNominalDegrees": 180,
+        "turnDirection": -1,
+        "turnActive": 1,
+        "turnYawDelta": 0.4561147,
+        "rotateAnimationId": -1,
+        "rotateCurveId": -1,
+        "rotatePhase": 0,
+        "rotatePlayRate": 0,
+        "rotateDirection": 0,
+        "rotateActive": 0,
+        "rotateYawDelta": 0,
+        "pelvisOffset": {
+          "x": -0,
+          "y": -0.0075388257,
+          "z": -0
+        },
+        "leftFoot": {
+          "position": {
+            "x": -0.14651051,
+            "y": 0.13,
+            "z": -0.21520762
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.0066331355,
+            "z": 0,
+            "w": 0.999978
+          },
+          "lockAmount": 1,
+          "platformId": -1
+        },
+        "rightFoot": {
+          "position": {
+            "x": 0.35432595,
+            "y": 0.13,
+            "z": 0.004700899
+          },
+          "rotation": {
+            "x": 0,
+            "y": -0.0066331355,
+            "z": 0,
+            "w": 0.999978
+          },
+          "lockAmount": 0.9987642,
+          "platformId": -1
+        },
+        "leftReleaseReason": "None",
+        "rightReleaseReason": "None"
+      }
+    }
+  ]
+}

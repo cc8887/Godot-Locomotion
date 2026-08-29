@@ -31,6 +31,8 @@ public readonly record struct AlsFrameInput(
     float MaxBrakingDeceleration,
     byte JumpAccepted)
 {
+    public AlsFootPlacementReleaseSignals FootPlacementReleaseSignals { get; init; }
+
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(deltaTime);
@@ -60,6 +62,9 @@ public readonly record struct AlsFrameInput(
             CharacterYaw: 0f,
             MaxAcceleration: 0f,
             MaxBrakingDeceleration: 0f,
-            JumpAccepted: 0);
+            JumpAccepted: 0)
+        {
+            FootPlacementReleaseSignals = AlsFootPlacementReleaseSignals.CreateDefault(),
+        };
     }
 }

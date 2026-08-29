@@ -77,6 +77,29 @@ public static class AlsFootPlacementModel
         out AlsFootPlacementOutput output,
         out AlsP4ReasonCode reason)
     {
+        var releaseSignals = AlsFootPlacementReleaseSignals.CreateDefault();
+        return TryEvaluate(
+            settings, input,
+            leftIkWeight, rightIkWeight, leftLockCurve, rightLockCurve,
+            worldOrigins, releaseSignals, currentState,
+            out nextState, out output, out reason);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    public static bool TryEvaluate(
+        in AlsFootPlacementSettings settings,
+        in AlsFrameInput input,
+        float leftIkWeight,
+        float rightIkWeight,
+        float leftLockCurve,
+        float rightLockCurve,
+        in AlsFootProbeWorldOrigins worldOrigins,
+        in AlsFootPlacementReleaseSignals releaseSignals,
+        in AlsRuntimeState currentState,
+        out AlsRuntimeState nextState,
+        out AlsFootPlacementOutput output,
+        out AlsP4ReasonCode reason)
+    {
         nextState = currentState;
         output = default;
 
@@ -99,6 +122,7 @@ public static class AlsFootPlacementModel
             input.Floor.IsGrounded > 1 ||
             input.Floor.PlatformId < -1 ||
             input.Floor.ColliderId < -1 ||
+            !AreValidReleaseSignals(in releaseSignals) ||
             (uint)input.CurrentDriveMode > (uint)AlsDriveMode.RecoveryBlend ||
             (uint)currentState.LocomotionState > (uint)AlsLocomotionState.Recovering)
         {
@@ -273,6 +297,9 @@ public static class AlsFootPlacementModel
                 leftIkWeight,
                 leftLockCurve,
                 input.DeltaTime,
+                releaseSignals.LeftPlatformRemoved,
+                releaseSignals.LeftPlatformId,
+                releaseSignals.LeftColliderId,
                 leftOverextended,
                 correctedHipPosition,
                 out var nextLeft,
@@ -294,6 +321,9 @@ public static class AlsFootPlacementModel
                 rightIkWeight,
                 rightLockCurve,
                 input.DeltaTime,
+                releaseSignals.RightPlatformRemoved,
+                releaseSignals.RightPlatformId,
+                releaseSignals.RightColliderId,
                 rightOverextended,
                 correctedHipPosition,
                 out var nextRight,
@@ -437,6 +467,9 @@ public static class AlsFootPlacementModel
         float ikWeight,
         float lockCurve,
         float deltaTime,
+        byte platformRemoved,
+        int removedPlatformId,
+        long removedColliderId,
         bool forceOverextended,
         in Vector3 reachHipPosition,
         out AlsFootLockState next,
@@ -504,6 +537,9 @@ public static class AlsFootPlacementModel
                 floorColliderId,
                 ikWeight,
                 lockCurve,
+                platformRemoved,
+                removedPlatformId,
+                removedColliderId,
                 forceOverextended);
             if (releaseReason == AlsFootReleaseReason.None)
             {
@@ -691,6 +727,9 @@ public static class AlsFootPlacementModel
         long floorColliderId,
         float ikWeight,
         float lockCurve,
+        byte platformRemoved,
+        int removedPlatformId,
+        long removedColliderId,
         bool overextendedHit)
     {
         if (!grounded)
@@ -703,14 +742,15 @@ public static class AlsFootPlacementModel
             return AlsFootReleaseReason.NotMotorDriven;
         }
 
-        if (ikWeight <= settings.LockWeightEpsilon ||
-            lockCurve <= settings.LockWeightEpsilon)
-        {
-            return AlsFootReleaseReason.WeightLost;
-        }
-
         if (current.PlatformId >= 0)
         {
+            if (platformRemoved == 1 &&
+                removedPlatformId == current.PlatformId &&
+                removedColliderId == current.ColliderId)
+            {
+                return AlsFootReleaseReason.PlatformRemoved;
+            }
+
             if (floorPlatformId >= 0 &&
                 (floorPlatformId != current.PlatformId ||
                  (floorColliderId >= 0 && floorColliderId != current.ColliderId)))
@@ -720,9 +760,9 @@ public static class AlsFootPlacementModel
 
             if (floorPlatformId < 0)
             {
-                return hit.Valid == 1 && hit.Walkable == 1
-                    ? AlsFootReleaseReason.BaseChanged
-                    : AlsFootReleaseReason.PlatformRemoved;
+                return hit.Valid == 0 || hit.Walkable == 0
+                    ? AlsFootReleaseReason.RayMiss
+                    : AlsFootReleaseReason.BaseChanged;
             }
 
             if (hit.Valid == 0 || hit.Walkable == 0)
@@ -788,6 +828,12 @@ public static class AlsFootPlacementModel
             }
         }
 
+        if (ikWeight <= settings.LockWeightEpsilon ||
+            lockCurve <= settings.LockWeightEpsilon)
+        {
+            return AlsFootReleaseReason.WeightLost;
+        }
+
         if (overextendedHit)
         {
             return AlsFootReleaseReason.Overextended;
@@ -795,6 +841,15 @@ public static class AlsFootPlacementModel
 
         return AlsFootReleaseReason.None;
     }
+
+    private static bool AreValidReleaseSignals(
+        in AlsFootPlacementReleaseSignals signals) =>
+        signals.LeftPlatformRemoved <= 1 &&
+        signals.RightPlatformRemoved <= 1 &&
+        (signals.LeftPlatformRemoved == 0 ||
+         (signals.LeftPlatformId >= 0 && signals.LeftColliderId >= 0)) &&
+        (signals.RightPlatformRemoved == 0 ||
+         (signals.RightPlatformId >= 0 && signals.RightColliderId >= 0));
 
     private static AlsFootLockState BeginOrContinueRelease(
         in AlsFootPlacementSettings settings,

@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="JsonSchema.Net" Version="9.4.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
@@ -21,6 +22,8 @@
           Link="Fixtures/P3/p3_locomotion_settings.json"
           CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures/P3/*.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/P4/*.json"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
