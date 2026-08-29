@@ -505,8 +505,6 @@ public partial class P4PoseSmoke : Node
             library,
             definition,
             poseProfile,
-            null,
-            AlsPoseAffineTestFixture.None,
             Transform3D.Identity);
         var input = zeroAim with
         {
