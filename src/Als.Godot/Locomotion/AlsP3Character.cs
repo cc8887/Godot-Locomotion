@@ -58,6 +58,9 @@ public partial class AlsP3Character : Node3D
     internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
         _state.CaptureRuntimeDiagnostics();
 
+    internal AlsP3WorkerTransactionRollbackDiagnostics WorkerTransactionRollbackDiagnostics =>
+        _state.WorkerTransactionRollbackDiagnostics;
+
     internal AlsFrameInput LatestMotorInput => _state.MotorInput;
 
     internal int FailurePendingIdentityCount =>

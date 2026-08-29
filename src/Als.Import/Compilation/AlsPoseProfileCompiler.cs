@@ -63,10 +63,11 @@ public static class AlsPoseProfileCompiler
     public static AlsPoseAnimationProfile Compile(
         string json,
         AlsAnimationSetDefinition animationSet,
-        AlsLocomotionAnimationProfile? locomotionProfile)
+        AlsLocomotionAnimationProfile locomotionProfile)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         ArgumentNullException.ThrowIfNull(animationSet);
+        ArgumentNullException.ThrowIfNull(locomotionProfile);
         JsonDocument document;
         try
         {
@@ -95,7 +96,7 @@ public static class AlsPoseProfileCompiler
             var turns = CompileTurns(root["turns"], animationSet, skeletonId);
             var rotates = CompileRotates(root["rotates"], animationSet, skeletonId);
             var masks = CompileMasks(root["masks"], skeleton);
-            if (locomotionProfile is not null && locomotionProfile.SkeletonId != skeletonId)
+            if (locomotionProfile.SkeletonId != skeletonId)
             {
                 throw Failure("ALSPOSE043", "$.skeleton",
                     "Locomotion and pose profiles must target the same skeleton.",

@@ -22,10 +22,17 @@ function Invoke-P4PoseScene
         [Parameter(Mandatory)]
         [string]$PhaseName,
         [Parameter(Mandatory)]
-        [string]$ScenePath
+        [string]$ScenePath,
+        [string[]]$SceneArguments = @()
     )
 
-    $output = @(& $GodotExecutable --headless --path $projectRootPath $ScenePath *>&1)
+    $godotArguments = @('--headless', '--path', $projectRootPath, $ScenePath)
+    if ($SceneArguments.Count -ne 0)
+    {
+        $godotArguments += '--'
+        $godotArguments += $SceneArguments
+    }
+    $output = @(& $GodotExecutable @godotArguments *>&1)
     $exitCode = $LASTEXITCODE
     $output | ForEach-Object { Write-Host $_ }
     $lines = @($output | ForEach-Object { "$_" })
@@ -99,6 +106,18 @@ try
         -MarkerName 'P4_ANIMATION_GRAPH_OK' `
         -Pattern '\AP4_ANIMATION_GRAPH_OK frames=240 advances=240 digest=(?!0000000000000000)[0-9A-F]{16}\z'
 
+    foreach ($mode in @('single', 'parallel'))
+    {
+        $transactionLines = @(Invoke-P4PoseScene `
+            -PhaseName "P4 late transaction rollback ($mode)" `
+            -ScenePath 'res://scenes/tests/p3b_frame_order_smoke.tscn' `
+            -SceneArguments @("--als-mode=$mode", '--als-failure-policy=late_transaction'))
+        Assert-P4PoseMarker `
+            -Lines $transactionLines `
+            -MarkerName 'GODOT_ALS_P3B_LATE_TRANSACTION_ROLLBACK_OK' `
+            -Pattern "\AGODOT_ALS_P3B_LATE_TRANSACTION_ROLLBACK_OK mode=$mode exchange=0 runtime=1 result=1 controller=1 pose=1 p4_banks=1\z"
+    }
+
     $poseLines = @(Invoke-P4PoseScene `
         -PhaseName 'P4 component pose' `
         -ScenePath 'res://scenes/tests/p4_pose_smoke.tscn')
@@ -121,7 +140,7 @@ try
         throw 'Controlled P4 Pose gate emitted an uncontrolled-allocation marker.'
     }
 
-    Write-Host 'P4_POSE_VERIFICATION_OK graph=1 pose=1 zero_alloc=0B active_alloc=0B'
+    Write-Host 'P4_POSE_VERIFICATION_OK graph=1 pose=1 late_transaction=2 zero_alloc=0B active_alloc=0B'
 }
 finally
 {

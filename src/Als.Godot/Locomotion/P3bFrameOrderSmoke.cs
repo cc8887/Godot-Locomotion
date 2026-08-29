@@ -66,6 +66,9 @@ public partial class P3bFrameOrderSmoke : Node
     private long _poseRestoreResultPublishedFrame;
     private long _poseRestoreObservedMotorFrame;
     private int _poseRestoreAttemptsAtFreeze;
+    private bool _lateTransactionFailureArmed;
+    private long _lateTransactionCommittedFrame;
+    private long _lateTransactionResultPublishedFrame;
 
     public override void _Ready()
     {
@@ -365,6 +368,11 @@ public partial class P3bFrameOrderSmoke : Node
             ValidatePoseRestoreFailure();
             return;
         }
+        if (_failurePolicy == "late_transaction")
+        {
+            ValidateLateTransactionFailure();
+            return;
+        }
         if (_failurePolicy is "worker" or "headless")
         {
             ValidateWorkerFailure();
@@ -418,6 +426,7 @@ public partial class P3bFrameOrderSmoke : Node
                 "--als-failure-policy=worker" => "worker",
                 "--als-failure-policy=bounded" => "bounded",
                 "--als-failure-policy=pose_restore" => "pose_restore",
+                "--als-failure-policy=late_transaction" => "late_transaction",
                 var value => throw new InvalidOperationException(
                     $"Unsupported P3B failure policy fixture: {value}"),
             };
@@ -618,6 +627,54 @@ public partial class P3bFrameOrderSmoke : Node
         GD.Print(
             $"GODOT_ALS_P4_POSE_RESTORE_FAILURE_OK mode={_mode.ToString().ToLowerInvariant()} " +
             $"worker_frozen=1 reason={_active.LastFailureReasonCode} diagnostics=1 publish=0");
+        _slot.DisposeRuntime();
+        _quitting = true;
+        GetTree().Quit();
+    }
+
+    private void ValidateLateTransactionFailure()
+    {
+        if (!_lateTransactionFailureArmed)
+        {
+            var committed = _active.Diagnostics;
+            if (committed.CommittedFrameId < 12 || _active.WorkerInFlight != 0)
+            {
+                return;
+            }
+            _lateTransactionCommittedFrame = committed.CommittedFrameId;
+            _lateTransactionResultPublishedFrame = _active.ResultPublishedFrameId;
+            _context.ArmWorkerFailureInjection(
+                AlsP3WorkerFailureInjectionStage.BeforePublish,
+                _active.PublishedFrameId + 1);
+            _lateTransactionFailureArmed = true;
+            return;
+        }
+
+        if (_active.FailureDiagnosticCount == 0)
+        {
+            return;
+        }
+        var rollback = _active.WorkerTransactionRollbackDiagnostics;
+        var poseRollback = _active.RuntimeDiagnostics;
+        Require(_active.IsPoseFrozen,
+            "late transaction failure did not freeze the Worker");
+        Require(_active.Diagnostics.CommittedFrameId == _lateTransactionCommittedFrame,
+            "late transaction failure published a visual commit");
+        Require(_active.ResultPublishedFrameId == _lateTransactionResultPublishedFrame,
+            "late transaction failure leaked its result into the exchange");
+        Require(rollback.Identity.FrameId > _lateTransactionCommittedFrame &&
+                rollback.RuntimeStateRestored &&
+                rollback.FrameResultRestored &&
+                rollback.ControllerRestored &&
+                rollback.P4BanksRestored,
+            "late transaction rollback leaked runtime, result, controller or P4 bank state");
+        Require(poseRollback.RollbackVerified,
+            "late transaction rollback did not restore the captured pose/root");
+
+        GD.Print(
+            $"GODOT_ALS_P3B_LATE_TRANSACTION_ROLLBACK_OK " +
+            $"mode={_mode.ToString().ToLowerInvariant()} exchange=0 runtime=1 result=1 " +
+            "controller=1 pose=1 p4_banks=1");
         _slot.DisposeRuntime();
         _quitting = true;
         GetTree().Quit();

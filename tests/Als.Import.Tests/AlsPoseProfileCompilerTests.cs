@@ -19,6 +19,18 @@ public sealed class AlsPoseProfileCompilerTests
     }
 
     [Fact]
+    public void ThreeParameterCompileRejectsANullLocomotionProfile()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            AlsPoseProfileCompiler.Compile(
+                ReadProfile(),
+                P3RepositoryFixtures.LoadAnimationSet(),
+                null!));
+
+        Assert.Equal("locomotionProfile", exception.ParamName);
+    }
+
+    [Fact]
     public void RepositoryProfileCompilesExactAimTurnRotateMasksAndFeet()
     {
         var set = P3RepositoryFixtures.LoadAnimationSet();

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Threading;
 using Godot;
 using GodotAls.Animation;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Math;
 using GodotAls.Core.Pose;
 using GodotAls.Core.Contracts;
@@ -182,8 +183,18 @@ public partial class AlsP3WorkerRoot : Node3D
             var controllerPrepared = false;
             var controllerApplied = false;
             var preparedAnimation = default(AlsPreparedAnimationFrame);
+            var preparedCommit = default(AlsPreparedAnimationCommit);
             var runtimeCheckpoint = _runtimeState;
             var resultCheckpoint = _result;
+            var trackTransactionRollback = _context.IsWorkerFailureInjectionArmed(
+                in identity,
+                AlsP3WorkerFailureInjectionStage.BeforePublish);
+            var resultCheckpointDigest = trackTransactionRollback
+                ? ComputeResultDigest(in resultCheckpoint)
+                : 0UL;
+            var controllerCheckpoint = trackTransactionRollback
+                ? _controller!.CaptureTransactionDiagnostics()
+                : default;
             try
             {
                 PublishVisualRootVisibility(frameId);
@@ -315,11 +326,12 @@ public partial class AlsP3WorkerRoot : Node3D
                     fullPoseDigest,
                     rootDigest,
                     footProbeSource);
-                _state.PublishResult(
-                    _result,
-                    candidate,
+                var publication = _state.PrepareResultPublication(
+                    in _result,
+                    in candidate,
                     _result.Identity.FrameId,
                     frameId);
+                preparedCommit = _controller.PrepareCommit(in preparedAnimation);
                 if (measure)
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
@@ -329,9 +341,13 @@ public partial class AlsP3WorkerRoot : Node3D
                         measurementIndex,
                         productionElapsedTicks);
                 }
-                _controller.CommitPrepared(in preparedAnimation);
+                _context.ThrowIfWorkerFailureInjected(
+                    in identity,
+                    AlsP3WorkerFailureInjectionStage.BeforePublish);
+                _controller.FinalizePreparedCommit(in preparedCommit);
                 controllerPrepared = false;
                 controllerApplied = false;
+                _state.PublishPreparedResult(in publication);
             }
             catch (Exception exception)
             {
@@ -339,6 +355,8 @@ public partial class AlsP3WorkerRoot : Node3D
                     ? p4Failure.ReasonCode
                     : _result.P4ReasonCode;
                 Exception? restoreException = null;
+                var controllerRestored = false;
+                var p4BanksRestored = false;
                 if (controllerApplied)
                 {
                     try
@@ -363,6 +381,14 @@ public partial class AlsP3WorkerRoot : Node3D
                 }
                 _runtimeState = runtimeCheckpoint;
                 _result = resultCheckpoint;
+                if (trackTransactionRollback)
+                {
+                    var restoredController = _controller!.CaptureTransactionDiagnostics();
+                    controllerRestored = restoredController == controllerCheckpoint;
+                    p4BanksRestored =
+                        restoredController.TurnBank == controllerCheckpoint.TurnBank &&
+                        restoredController.RotateBank == controllerCheckpoint.RotateBank;
+                }
                 try
                 {
                     if (poseCaptured)
@@ -389,6 +415,15 @@ public partial class AlsP3WorkerRoot : Node3D
                 }
                 finally
                 {
+                    if (trackTransactionRollback)
+                    {
+                        _state.WorkerTransactionRollbackDiagnostics = new(
+                            identity,
+                            RuntimeStatesEqual(in _runtimeState, in runtimeCheckpoint),
+                            ComputeResultDigest(in _result) == resultCheckpointDigest,
+                            controllerRestored,
+                            p4BanksRestored);
+                    }
                     _state.RecordFailure(
                         "worker_evaluate",
                         identity,
@@ -407,6 +442,50 @@ public partial class AlsP3WorkerRoot : Node3D
             _state.ExitWorker();
         }
     }
+
+    private static ulong ComputeResultDigest(in AlsFrameResult result)
+    {
+        var digest = AlsResultDigest.OffsetBasis;
+        AlsResultDigest.Append(ref digest, in result);
+        return digest;
+    }
+
+    private static bool RuntimeStatesEqual(
+        in AlsRuntimeState left,
+        in AlsRuntimeState right) =>
+        left.LocomotionState == right.LocomotionState &&
+        left.SmoothedVelocity == right.SmoothedVelocity &&
+        left.SmoothedAcceleration == right.SmoothedAcceleration &&
+        left.Lean == right.Lean &&
+        left.LeftFootLocked == right.LeftFootLocked &&
+        left.RightFootLocked == right.RightFootLocked &&
+        left.TurnInPlaceTime == right.TurnInPlaceTime &&
+        left.RotateInPlaceTime == right.RotateInPlaceTime &&
+        left.ActionPlaybackTime == right.ActionPlaybackTime &&
+        left.AnimationPhase == right.AnimationPhase &&
+        left.PreviousCurveValue == right.PreviousCurveValue &&
+        left.PendingRecoveryState == right.PendingRecoveryState &&
+        left.LastCommittedRootMotionFeedback == right.LastCommittedRootMotionFeedback &&
+        left.ActualGait == right.ActualGait &&
+        left.PreviousLocomotionState == right.PreviousLocomotionState &&
+        left.GroundedEntrySpeed == right.GroundedEntrySpeed &&
+        left.SmoothedLocalVelocity == right.SmoothedLocalVelocity &&
+        left.SmoothedLocalAcceleration == right.SmoothedLocalAcceleration &&
+        left.SmoothedLean == right.SmoothedLean &&
+        left.LandingRecoveryTime == right.LandingRecoveryTime &&
+        left.SmoothedTargetYaw == right.SmoothedTargetYaw &&
+        left.TargetYaw == right.TargetYaw &&
+        left.YawSource == right.YawSource &&
+        left.JumpStartActive == right.JumpStartActive &&
+        left.Initialized == right.Initialized &&
+        left.ViewPose == right.ViewPose &&
+        left.TurnInPlace == right.TurnInPlace &&
+        left.RotateInPlace == right.RotateInPlace &&
+        left.LeftFootLock == right.LeftFootLock &&
+        left.RightFootLock == right.RightFootLock &&
+        left.PelvisCorrection == right.PelvisCorrection &&
+        left.LeftFootProbeOrigin == right.LeftFootProbeOrigin &&
+        left.RightFootProbeOrigin == right.RightFootProbeOrigin;
 
     internal bool TryDisposeRuntime()
     {
