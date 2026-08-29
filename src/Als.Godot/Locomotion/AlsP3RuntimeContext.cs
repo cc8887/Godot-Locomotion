@@ -133,31 +133,47 @@ internal readonly record struct AlsP3VisualCommitCandidate(
 public readonly record struct AlsP4FootPlacementPoseSnapshot(
     AlsFrameIdentity Identity,
     NumericsVector3 PelvisLocalPosition,
-    NumericsVector3 UncorrectedPelvisWorldPosition,
-    NumericsVector3 PelvisWorldPosition,
-    NumericsVector3 UncorrectedLeftFootWorldPosition,
-    NumericsVector3 UncorrectedRightFootWorldPosition,
     NumericsVector3 LeftFootWorldPosition,
     NumericsVector3 RightFootWorldPosition,
-    System.Numerics.Quaternion UncorrectedLeftFootWorldRotation,
-    System.Numerics.Quaternion UncorrectedRightFootWorldRotation,
     System.Numerics.Quaternion LeftFootWorldRotation,
     System.Numerics.Quaternion RightFootWorldRotation,
-    NumericsVector3 LeftPhysicalTargetWorldPosition,
-    NumericsVector3 RightPhysicalTargetWorldPosition,
-    System.Numerics.Quaternion LeftPhysicalTargetWorldRotation,
-    System.Numerics.Quaternion RightPhysicalTargetWorldRotation,
     AlsFootHit LeftGatherHit,
     AlsFootHit RightGatherHit,
     NumericsVector3 LeftProbeWorldOrigin,
     NumericsVector3 RightProbeWorldOrigin,
     AlsFootLockState LeftFootLock,
-    AlsFootLockState RightFootLock,
-    int AnimationAdvanceCount,
-    int ModifierWriteTransactionCount,
-    int ModifierFootChainRebuildCount,
-    int ModifierFootFullSkeletonRebuildCount,
-    int ModifierFootComponentPropagationCount);
+    AlsFootLockState RightFootLock)
+{
+    public NumericsVector3 UncorrectedPelvisWorldPosition { get; init; }
+
+    public NumericsVector3 PelvisWorldPosition { get; init; }
+
+    public NumericsVector3 UncorrectedLeftFootWorldPosition { get; init; }
+
+    public NumericsVector3 UncorrectedRightFootWorldPosition { get; init; }
+
+    public System.Numerics.Quaternion UncorrectedLeftFootWorldRotation { get; init; }
+
+    public System.Numerics.Quaternion UncorrectedRightFootWorldRotation { get; init; }
+
+    public NumericsVector3 LeftPhysicalTargetWorldPosition { get; init; }
+
+    public NumericsVector3 RightPhysicalTargetWorldPosition { get; init; }
+
+    public System.Numerics.Quaternion LeftPhysicalTargetWorldRotation { get; init; }
+
+    public System.Numerics.Quaternion RightPhysicalTargetWorldRotation { get; init; }
+
+    public int AnimationAdvanceCount { get; init; }
+
+    public int ModifierWriteTransactionCount { get; init; }
+
+    public int ModifierFootChainRebuildCount { get; init; }
+
+    public int ModifierFootFullSkeletonRebuildCount { get; init; }
+
+    public int ModifierFootComponentPropagationCount { get; init; }
+}
 
 internal readonly record struct AlsP3PreparedResultPublication(
     AlsFrameResult Result,

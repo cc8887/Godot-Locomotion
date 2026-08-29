@@ -64,6 +64,7 @@ public partial class P4FootPlacementSmoke : Node
     {
         try
         {
+            VerifySnapshotCompatibilityShape();
             _mode = ReadMode();
             ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
             ProcessThreadGroupOrder = 4;
@@ -119,6 +120,7 @@ public partial class P4FootPlacementSmoke : Node
                 character.SetActive(true);
                 _characters[lane] = character;
             }
+            VerifyDiagnosticsMainThreadContract();
         }
         catch (Exception exception)
         {
@@ -347,6 +349,23 @@ public partial class P4FootPlacementSmoke : Node
                     $"probe_l={frame.FootPose.LeftProbeWorldOrigin} " +
                     $"physical_r={frame.FootPose.RightFootWorldPosition} target_r={frame.FootPose.RightPhysicalTargetWorldPosition} " +
                     $"probe_r={frame.FootPose.RightProbeWorldOrigin}");
+                Require(PhysicalFootTracksSurface(
+                            frame.FootPose.LeftPhysicalTargetWorldPosition,
+                            in leftHit) &&
+                        PhysicalFootTracksSurface(
+                            frame.FootPose.RightPhysicalTargetWorldPosition,
+                            in rightHit) &&
+                        PhysicalFootTracksSurface(
+                            frame.FootPose.LeftFootWorldPosition,
+                            in leftHit) &&
+                        PhysicalFootTracksSurface(
+                            frame.FootPose.RightFootWorldPosition,
+                            in rightHit),
+                    $"lane {lane} physical targets or bones lost surface contact geometry: " +
+                    $"target_l={DescribeFootSurface(frame.FootPose.LeftPhysicalTargetWorldPosition, in leftHit)} " +
+                    $"actual_l={DescribeFootSurface(frame.FootPose.LeftFootWorldPosition, in leftHit)} " +
+                    $"target_r={DescribeFootSurface(frame.FootPose.RightPhysicalTargetWorldPosition, in rightHit)} " +
+                    $"actual_r={DescribeFootSurface(frame.FootPose.RightFootWorldPosition, in rightHit)}");
                 var leftUpError = DirectionAngle(
                     NumericsVector3.Transform(
                         NumericsVector3.UnitY,
@@ -646,6 +665,32 @@ public partial class P4FootPlacementSmoke : Node
         return AlsHarnessMode.Single;
     }
 
+    private static void VerifySnapshotCompatibilityShape()
+    {
+        var snapshot = default(AlsP4FootPlacementPoseSnapshot);
+        snapshot.Deconstruct(
+            out _, out _, out _, out _, out _, out _,
+            out _, out _, out _, out _, out _, out _);
+    }
+
+    private void VerifyDiagnosticsMainThreadContract()
+    {
+        var rejected = Task.Run(() =>
+        {
+            try
+            {
+                _ = _characters[0].Diagnostics;
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return true;
+            }
+        }).GetAwaiter().GetResult();
+        Require(rejected,
+            "P4 diagnostics allowed a torn value-type snapshot off the main thread");
+    }
+
     private void Fail(string code, Exception exception)
     {
         if (_finished) return;
@@ -666,6 +711,28 @@ public partial class P4FootPlacementSmoke : Node
         var delta = target - hit.Position;
         return delta.Length() <= 0.5f &&
                MathF.Abs(NumericsVector3.Dot(delta, hit.Normal)) <= 0.2f;
+    }
+
+    private static bool PhysicalFootTracksSurface(
+        in NumericsVector3 foot,
+        in AlsFootHit hit)
+    {
+        var delta = foot - hit.Position;
+        var normalDistance = NumericsVector3.Dot(delta, hit.Normal);
+        // A locked point on a moving platform intentionally separates tangentially
+        // from the next probe ray. TargetTracksSurface already bounds the Core target
+        // to the fixture; physical contact is the independent plane-normal contract.
+        return normalDistance >= 0.07f && normalDistance <= 0.2f;
+    }
+
+    private static string DescribeFootSurface(
+        in NumericsVector3 foot,
+        in AlsFootHit hit)
+    {
+        var delta = foot - hit.Position;
+        var normalDistance = NumericsVector3.Dot(delta, hit.Normal);
+        var tangentDistance = (delta - hit.Normal * normalDistance).Length();
+        return $"normal={normalDistance} tangent={tangentDistance}";
     }
 
     private static float QuaternionAngle(

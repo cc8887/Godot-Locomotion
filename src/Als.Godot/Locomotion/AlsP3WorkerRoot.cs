@@ -98,6 +98,12 @@ public partial class AlsP3WorkerRoot : Node3D
             _controller.Warmup();
             _skeleton = _graph.TargetSkeleton;
             ConfigureFootProbeSource(context.AnimationSet, _poseProfile);
+            var correctedRoot = AlsP3Presentation.Compose(
+                initialLogicalTransform,
+                context.PresentationTransform);
+            AlsP3Presentation.ThrowIfNonFinite(correctedRoot);
+            _visualRoot.GlobalTransform = correctedRoot;
+            AlsP3Presentation.ThrowIfNonFinite(_visualRoot.GlobalTransform);
             var poseWriter = context.PoseWriterFactory?.Invoke(_skeleton);
             _poseModifier = poseWriter is null
                 ? new AlsComponentPoseModifier(
@@ -105,25 +111,24 @@ public partial class AlsP3WorkerRoot : Node3D
                     _visualRoot,
                     _library,
                     context.AnimationSet,
-                    _poseProfile)
+                    _poseProfile,
+                    null,
+                    AlsPoseAffineTestFixture.None,
+                    initialLogicalTransform)
                 : new AlsComponentPoseModifier(
                     _skeleton,
                     _visualRoot,
                     _library,
                     context.AnimationSet,
                     _poseProfile,
-                    poseWriter);
+                    poseWriter,
+                    AlsPoseAffineTestFixture.None,
+                    initialLogicalTransform);
             var boneCount = _skeleton.GetBoneCount();
             _posePositions = new Vector3[boneCount];
             _poseRotations = new Quaternion[boneCount];
             _poseScales = new Vector3[boneCount];
 
-            var correctedRoot = AlsP3Presentation.Compose(
-                initialLogicalTransform,
-                context.PresentationTransform);
-            AlsP3Presentation.ThrowIfNonFinite(correctedRoot);
-            _visualRoot.GlobalTransform = correctedRoot;
-            AlsP3Presentation.ThrowIfNonFinite(_visualRoot.GlobalTransform);
             InitializeFootProbeOrigins(initialLogicalTransform);
             CapturePose();
             PublishVisualRootVisibility(0);
@@ -765,35 +770,48 @@ public partial class AlsP3WorkerRoot : Node3D
         return new AlsP4FootPlacementPoseSnapshot(
             identity,
             ToNumerics(_skeleton.GetBonePosePosition(rig.PelvisBoneId)),
-            ToNumerics(uncorrectedPelvisWorld.Origin),
-            ToNumerics(pelvisWorld.Origin),
-            ToNumerics(uncorrectedLeftFootWorld.Origin),
-            ToNumerics(uncorrectedRightFootWorld.Origin),
             ToNumerics(leftWorld.Origin),
             ToNumerics(rightWorld.Origin),
-            ToNumerics(uncorrectedLeftFootWorld.Basis.Orthonormalized()
-                .GetRotationQuaternion().Normalized()),
-            ToNumerics(uncorrectedRightFootWorld.Basis.Orthonormalized()
-                .GetRotationQuaternion().Normalized()),
             ToNumerics(leftWorld.Basis.Orthonormalized()
                 .GetRotationQuaternion().Normalized()),
             ToNumerics(rightWorld.Basis.Orthonormalized()
                 .GetRotationQuaternion().Normalized()),
-            modifierOutput.LeftPhysicalTargetWorldPosition,
-            modifierOutput.RightPhysicalTargetWorldPosition,
-            modifierOutput.LeftPhysicalTargetWorldRotation,
-            modifierOutput.RightPhysicalTargetWorldRotation,
             input.LeftFootHit,
             input.RightFootHit,
             worldOrigins.Left,
             worldOrigins.Right,
             runtimeState.LeftFootLock,
-            runtimeState.RightFootLock,
-            animationAdvanceCount,
-            modifierOutput.WriteTransactionCount,
-            modifierOutput.FootChainRebuildCount,
-            modifierOutput.FootFullSkeletonRebuildCount,
-            modifierOutput.FootComponentPropagationCount);
+            runtimeState.RightFootLock)
+        {
+            UncorrectedPelvisWorldPosition = ToNumerics(
+                uncorrectedPelvisWorld.Origin),
+            PelvisWorldPosition = ToNumerics(pelvisWorld.Origin),
+            UncorrectedLeftFootWorldPosition = ToNumerics(
+                uncorrectedLeftFootWorld.Origin),
+            UncorrectedRightFootWorldPosition = ToNumerics(
+                uncorrectedRightFootWorld.Origin),
+            UncorrectedLeftFootWorldRotation = ToNumerics(
+                uncorrectedLeftFootWorld.Basis.Orthonormalized()
+                    .GetRotationQuaternion().Normalized()),
+            UncorrectedRightFootWorldRotation = ToNumerics(
+                uncorrectedRightFootWorld.Basis.Orthonormalized()
+                    .GetRotationQuaternion().Normalized()),
+            LeftPhysicalTargetWorldPosition =
+                modifierOutput.LeftPhysicalTargetWorldPosition,
+            RightPhysicalTargetWorldPosition =
+                modifierOutput.RightPhysicalTargetWorldPosition,
+            LeftPhysicalTargetWorldRotation =
+                modifierOutput.LeftPhysicalTargetWorldRotation,
+            RightPhysicalTargetWorldRotation =
+                modifierOutput.RightPhysicalTargetWorldRotation,
+            AnimationAdvanceCount = animationAdvanceCount,
+            ModifierWriteTransactionCount = modifierOutput.WriteTransactionCount,
+            ModifierFootChainRebuildCount = modifierOutput.FootChainRebuildCount,
+            ModifierFootFullSkeletonRebuildCount =
+                modifierOutput.FootFullSkeletonRebuildCount,
+            ModifierFootComponentPropagationCount =
+                modifierOutput.FootComponentPropagationCount,
+        };
     }
 
     private AlsPoseModifierFailureStage ResolveModifierFailureInjection(

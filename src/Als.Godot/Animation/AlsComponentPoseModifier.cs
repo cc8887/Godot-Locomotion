@@ -158,7 +158,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
         AlsAnimationSetDefinition animationSet,
         AlsPoseAnimationProfile profile,
         IAlsSkeletonPoseWriter? testWriter,
-        AlsPoseAffineTestFixture testAffineFixture = AlsPoseAffineTestFixture.None)
+        AlsPoseAffineTestFixture testAffineFixture = AlsPoseAffineTestFixture.None,
+        Transform3D? logicalCharacterTransform = null)
     {
         _skeleton = skeleton ?? throw new ArgumentNullException(nameof(skeleton));
         _visualRoot = visualRoot ?? throw new ArgumentNullException(nameof(visualRoot));
@@ -198,15 +199,20 @@ public sealed class AlsComponentPoseModifier : IDisposable
 
         _footRig = profile.FootRig;
         _footSettings = profile.Feet;
+        var logicalCharacterWorldRotation =
+            (logicalCharacterTransform ?? visualRoot.GlobalTransform).Basis
+                .Orthonormalized().GetRotationQuaternion().Normalized();
         CompileAimMasks(profile, skeletonDefinition);
         CompileFootAffectedSet();
         if (!BuildComponents(_rests, _scratch.BindComponentPose) ||
             !TryCompileFootCalibration(
                 _footRig.Left,
+                logicalCharacterWorldRotation,
                 out var leftTargetToFootBind,
                 out var leftBindPoleInPelvis) ||
             !TryCompileFootCalibration(
                 _footRig.Right,
+                logicalCharacterWorldRotation,
                 out var rightTargetToFootBind,
                 out var rightBindPoleInPelvis))
         {
@@ -322,6 +328,12 @@ public sealed class AlsComponentPoseModifier : IDisposable
             var rightPhysicalTargetWorld = Transform3D.Identity;
             if (hasFootInfluence)
             {
+                var fullSkeletonBuildCountBefore =
+                    _scratch.TotalFullSkeletonBuildCount;
+                var footChainRebuildCountBefore =
+                    _scratch.TotalFootChainRebuildCount;
+                var componentPropagationCountBefore =
+                    _scratch.TotalComponentPropagationCount;
                 if (!ApplyPelvis(input.PelvisOffset))
                 {
                     reason = AlsP4ReasonCode.NonFiniteInput;
@@ -332,9 +344,6 @@ public sealed class AlsComponentPoseModifier : IDisposable
                     reason = AlsP4ReasonCode.NonFiniteInput;
                     return false;
                 }
-                var footChainRebuildCount = 1;
-                var footComponentPropagationCount = 7;
-                operationTicks += footComponentPropagationCount;
                 if (input.InjectFailure == AlsPoseModifierFailureStage.AfterPelvis)
                 {
                     reason = AlsP4ReasonCode.InvalidRuntimeState;
@@ -349,8 +358,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
                         _leftTargetToFootBind,
                         _leftBindPoleInPelvis,
                         input.CharacterWorldRotation,
-                        out leftPhysicalTargetWorld,
-                        ref footComponentPropagationCount))
+                        out leftPhysicalTargetWorld))
                 {
                     reason = AlsP4ReasonCode.NonFiniteInput;
                     return false;
@@ -369,19 +377,26 @@ public sealed class AlsComponentPoseModifier : IDisposable
                         _rightTargetToFootBind,
                         _rightBindPoleInPelvis,
                         input.CharacterWorldRotation,
-                        out rightPhysicalTargetWorld,
-                        ref footComponentPropagationCount))
+                        out rightPhysicalTargetWorld))
                 {
                     reason = AlsP4ReasonCode.NonFiniteInput;
                     return false;
                 }
-                _scratch.FootChainRebuildCount = footChainRebuildCount;
-                _scratch.FootComponentPropagationCount = footComponentPropagationCount;
-                operationTicks += footComponentPropagationCount - 7L;
+                _scratch.FootChainRebuildCount = checked((int)(
+                    _scratch.TotalFootChainRebuildCount -
+                    footChainRebuildCountBefore));
+                _scratch.FootFullSkeletonRebuildCount = checked((int)(
+                    _scratch.TotalFullSkeletonBuildCount -
+                    fullSkeletonBuildCountBefore));
+                _scratch.FootComponentPropagationCount = checked((int)(
+                    _scratch.TotalComponentPropagationCount -
+                    componentPropagationCountBefore));
+                operationTicks += _scratch.FootComponentPropagationCount;
             }
             else
             {
                 _scratch.FootChainRebuildCount = 0;
+                _scratch.FootFullSkeletonRebuildCount = 0;
                 _scratch.FootComponentPropagationCount = 0;
             }
 
@@ -414,7 +429,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 ArmMeshWeight = 1f - input.ArmLocalWeight,
                 AdditiveBaseAnimationId = _baseAnimationId,
                 FootChainRebuildCount = _scratch.FootChainRebuildCount,
-                FootFullSkeletonRebuildCount = 0,
+                FootFullSkeletonRebuildCount =
+                    _scratch.FootFullSkeletonRebuildCount,
                 FootComponentPropagationCount = _scratch.FootComponentPropagationCount,
                 LeftPhysicalTargetWorldPosition = ToNumerics(
                     leftPhysicalTargetWorld.Origin),
@@ -642,6 +658,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
 
     private bool TryCompileFootCalibration(
         in AlsCompiledLegChain leg,
+        in Quaternion logicalCharacterWorldRotation,
         out Transform3D targetToFootBind,
         out Vector3 bindPoleInPelvis)
     {
@@ -652,11 +669,10 @@ public sealed class AlsComponentPoseModifier : IDisposable
             return false;
         }
 
-        var characterWorldRotation = _visualRoot.GlobalTransform.Basis
-            .Orthonormalized().GetRotationQuaternion().Normalized();
         var skeletonWorldRotation = _skeleton.GlobalTransform.Basis
             .Orthonormalized().GetRotationQuaternion().Normalized();
-        var targetBindRotation = skeletonWorldRotation.Inverse() * characterWorldRotation;
+        var targetBindRotation = skeletonWorldRotation.Inverse() *
+            logicalCharacterWorldRotation;
         var footBind = _scratch.BindComponentPose[leg.FootBoneId];
         var targetBind = new Transform3D(
             new Basis(targetBindRotation.Normalized()),
@@ -825,6 +841,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool BuildComponents(Transform3D[] locals, Transform3D[] components)
     {
+        _scratch.TotalFullSkeletonBuildCount++;
         for (var index = 0; index < _scratch.Order.Length; index++)
         {
             var boneId = _scratch.Order[index];
@@ -957,10 +974,13 @@ public sealed class AlsComponentPoseModifier : IDisposable
         return TrySetPosePositionFromComponent(pelvisBoneId, desiredComponent);
     }
 
-    private bool RebuildFootChains() =>
-        RebuildComponent(_footRig.PelvisBoneId) &&
-        RebuildLegChain(_footRig.Left, 0) &&
-        RebuildLegChain(_footRig.Right, 0);
+    private bool RebuildFootChains()
+    {
+        _scratch.TotalFootChainRebuildCount++;
+        return RebuildComponent(_footRig.PelvisBoneId) &&
+               RebuildLegChain(_footRig.Left, 0) &&
+               RebuildLegChain(_footRig.Right, 0);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private bool ApplyLeg(
@@ -970,8 +990,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         in Transform3D targetToFootBind,
         in Vector3 bindPoleInPelvis,
         in System.Numerics.Quaternion characterWorldRotationValue,
-        out Transform3D physicalTargetWorld,
-        ref int propagatedBoneCount)
+        out Transform3D physicalTargetWorld)
     {
         physicalTargetWorld = default;
         if (!TryAffineInverse(_skeleton.GlobalTransform, out var worldToSkeleton))
@@ -1062,7 +1081,6 @@ public sealed class AlsComponentPoseModifier : IDisposable
         {
             return false;
         }
-        propagatedBoneCount += 3;
 
         knee = _scratch.ComponentPose[leg.KneeBoneId].Origin;
         foot = _scratch.ComponentPose[leg.FootBoneId].Origin;
@@ -1081,7 +1099,6 @@ public sealed class AlsComponentPoseModifier : IDisposable
         {
             return false;
         }
-        propagatedBoneCount += 2;
 
         var currentFootRotation = _scratch.ComponentPose[leg.FootBoneId]
             .Basis.Orthonormalized().GetRotationQuaternion().Normalized();
@@ -1101,14 +1118,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             return false;
         }
         return TrySetPoseRotationFromComponent(leg.FootBoneId, footRotation) &&
-               RebuildLegChain(leg, 2) &&
-               AddPropagatedBone(ref propagatedBoneCount);
-    }
-
-    private static bool AddPropagatedBone(ref int propagatedBoneCount)
-    {
-        propagatedBoneCount++;
-        return true;
+               RebuildLegChain(leg, 2);
     }
 
     private bool RebuildLegChain(in AlsCompiledLegChain leg, int startIndex)
@@ -1126,6 +1136,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
 
     private bool RebuildComponent(int boneId)
     {
+        _scratch.TotalComponentPropagationCount++;
         var parent = _scratch.Parents[boneId];
         _scratch.ComponentPose[boneId] = parent < 0
             ? _scratch.LocalPose[boneId]

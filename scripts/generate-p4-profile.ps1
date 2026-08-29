@@ -82,9 +82,29 @@ $profile = [ordered]@{
         traceDownMeters = [double]0.75
         footHeightMeters = [double]0.13
         maxPelvisCorrectionMeters = [double]0.4
+        pelvisUpHalfLifeSeconds = [double]0.08
+        pelvisDownHalfLifeSeconds = [double]0.1
         positionHalfLifeSeconds = [double]0.08
         rotationHalfLifeSeconds = [double]0.1
         lockReleaseHalfLifeSeconds = [double]0.12
+        maxLegReachMeters = [double]1.2
+        capsuleHalfHeightSource = 'characterController'
+        maxThighAngleDegrees = [double]90.0
+        maxFootAngleDegrees = [double]40.0
+        platformTeleportDistanceMeters = [double]1.0
+        platformTeleportAngleDegrees = [double]45.0
+        lockWeightEpsilon = [double]0.0001
+        curves = [ordered]@{
+            leftLock = 'FootLock_L'
+            rightLock = 'FootLock_R'
+            missingLockDefault = [double]0.0
+        }
+        ikStateDefaults = [ordered]@{
+            grounded = [double]1.0
+            jumpStart = [double]0.0
+            fallLoop = [double]0.0
+            landRecovery = [double]1.0
+        }
     }
 }
 

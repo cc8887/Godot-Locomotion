@@ -112,7 +112,15 @@ public sealed class AlsPoseScratch
 
     public int FootChainRebuildCount { get; internal set; }
 
+    public int FootFullSkeletonRebuildCount { get; internal set; }
+
     public int FootComponentPropagationCount { get; internal set; }
+
+    public long TotalFullSkeletonBuildCount { get; internal set; }
+
+    public long TotalFootChainRebuildCount { get; internal set; }
+
+    public long TotalComponentPropagationCount { get; internal set; }
 
     private void BuildParentOrder(Skeleton3D skeleton)
     {
