@@ -25,6 +25,8 @@ public sealed record AlsPoseAnimationProfile(
     }
 
     public AlsFootCurveProfile FootCurves { get; init; } = AlsFootCurveProfile.Empty;
+
+    public AlsCompiledFootRig FootRig { get; init; }
 }
 
 public enum AlsPoseStance : byte
@@ -124,6 +126,16 @@ public enum AlsCapsuleHalfHeightSource : byte
 {
     CharacterController,
 }
+
+public readonly record struct AlsCompiledLegChain(
+    int ThighBoneId,
+    int KneeBoneId,
+    int FootBoneId);
+
+public readonly record struct AlsCompiledFootRig(
+    int PelvisBoneId,
+    AlsCompiledLegChain Left,
+    AlsCompiledLegChain Right);
 
 public readonly record struct AlsFootCurveBinding(
     int AnimationId,

@@ -74,6 +74,9 @@ public sealed class AlsPoseProfileCompilerTests
         Assert.Equal(45f * MathF.PI / 180f, profile.Feet.PlatformTeleportAngleRadians, 5);
         Assert.Equal(1e-4f, profile.Feet.LockWeightEpsilon);
         Assert.Equal(AlsCapsuleHalfHeightSource.CharacterController, profile.Feet.CapsuleHalfHeightSource);
+        Assert.Equal(1, profile.FootRig.PelvisBoneId);
+        Assert.Equal(new AlsCompiledLegChain(49, 50, 52), profile.FootRig.Left);
+        Assert.Equal(new AlsCompiledLegChain(55, 56, 58), profile.FootRig.Right);
 
         Assert.Equal(34, profile.FootCurves.Bindings.Length);
         Assert.Equal(34, profile.FootCurves.Bindings.Select(value => value.AnimationId).Distinct().Count());
@@ -107,6 +110,27 @@ public sealed class AlsPoseProfileCompilerTests
             value => value.LeftLockCurveId >= 0 || value.RightLockCurveId >= 0);
         Assert.Contains(profile.FootCurves.Bindings,
             value => value.LeftLockCurveId < 0 && value.RightLockCurveId < 0);
+    }
+
+    [Fact]
+    public void FootRigCompilerRejectsANonContiguousPhysicalLegChain()
+    {
+        var set = P3RepositoryFixtures.LoadAnimationSet();
+        var skeletonId = set.AssetIndex.GetSkeletonId(
+            "b5b52715012cad50bf7a625ddf01e4335bb4fcf0");
+        var skeletons = set.Skeletons.ToArray();
+        var physicalBones = skeletons[skeletonId].PhysicalBones.ToArray();
+        physicalBones[52] = physicalBones[52] with { ParentPhysicalId = 49 };
+        skeletons[skeletonId] = skeletons[skeletonId] with
+        {
+            PhysicalBones = physicalBones,
+        };
+
+        var exception = Assert.Throws<AlsCompilationException>(() =>
+            CompileRuntime(ReadProfile(), set with { Skeletons = skeletons }));
+
+        Assert.Contains(exception.Issues, issue =>
+            issue.Code == "ALSPOSE052" && issue.FieldPath == "$.feet.leftFootRoot");
     }
 
     [Fact]

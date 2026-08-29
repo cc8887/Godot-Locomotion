@@ -105,9 +105,11 @@ public static class AlsPoseProfileCompiler
             var (feet, footCurves) = CompileFeet(
                 root["feet"], animationSet, skeleton, masks,
                 locomotionProfile, turns, rotates);
+            var footRig = CompileFootRig(skeleton, in feet);
             return new AlsPoseAnimationProfile(version, skeletonId, aim, turns, rotates, masks, feet)
             {
                 FootCurves = footCurves,
+                FootRig = footRig,
             };
         }
     }
@@ -375,6 +377,78 @@ public static class AlsPoseProfileCompiler
         {
             if (unique.Add(animationId)) reachable.Add(animationId);
         }
+    }
+
+    private static AlsCompiledFootRig CompileFootRig(
+        AlsSkeletonDefinition skeleton,
+        in AlsFootPlacementSettings settings)
+    {
+        var pelvis = PhysicalBoneId(skeleton, skeleton.RequiredBones.Pelvis, "$.feet");
+        var left = CompileLeg(
+            skeleton,
+            pelvis,
+            settings.LeftLegRootBoneId,
+            settings.LeftFootRootBoneId,
+            "$.feet.leftFootRoot");
+        var right = CompileLeg(
+            skeleton,
+            pelvis,
+            settings.RightLegRootBoneId,
+            settings.RightFootRootBoneId,
+            "$.feet.rightFootRoot");
+
+        if (left.ThighBoneId == right.ThighBoneId ||
+            left.KneeBoneId == right.KneeBoneId ||
+            left.FootBoneId == right.FootBoneId)
+        {
+            throw Failure("ALSPOSE052", "$.feet",
+                "Left and right physical leg chains must be distinct.");
+        }
+
+        return new AlsCompiledFootRig(pelvis, left, right);
+    }
+
+    private static AlsCompiledLegChain CompileLeg(
+        AlsSkeletonDefinition skeleton,
+        int pelvisBoneId,
+        int thighLogicalId,
+        int footLogicalId,
+        string path)
+    {
+        var thighBoneId = PhysicalBoneId(skeleton, thighLogicalId, path);
+        var footBoneId = PhysicalBoneId(skeleton, footLogicalId, path);
+        var physicalBones = skeleton.PhysicalBones;
+        var kneeBoneId = physicalBones[footBoneId].ParentPhysicalId;
+        if ((uint)kneeBoneId >= (uint)physicalBones.Length ||
+            physicalBones[kneeBoneId].ParentPhysicalId != thighBoneId ||
+            physicalBones[thighBoneId].ParentPhysicalId != pelvisBoneId ||
+            pelvisBoneId == thighBoneId || thighBoneId == kneeBoneId ||
+            kneeBoneId == footBoneId || pelvisBoneId == footBoneId)
+        {
+            throw Failure("ALSPOSE052", path,
+                "Foot IK requires one contiguous physical pelvis -> thigh -> knee -> foot chain.");
+        }
+
+        return new AlsCompiledLegChain(thighBoneId, kneeBoneId, footBoneId);
+    }
+
+    private static int PhysicalBoneId(
+        AlsSkeletonDefinition skeleton,
+        int logicalBoneId,
+        string path)
+    {
+        if ((uint)logicalBoneId >= (uint)skeleton.LogicalToPhysical.Length)
+        {
+            throw Failure("ALSPOSE052", path,
+                "Foot IK logical bone is outside the compiled skeleton.");
+        }
+        var physicalBoneId = skeleton.LogicalToPhysical[logicalBoneId];
+        if ((uint)physicalBoneId >= (uint)skeleton.PhysicalBones.Length)
+        {
+            throw Failure("ALSPOSE052", path,
+                "Foot IK bones must map to physical Skeleton3D channels.");
+        }
+        return physicalBoneId;
     }
 
     private static int SourceCurveId(
