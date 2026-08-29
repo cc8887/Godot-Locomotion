@@ -16,15 +16,16 @@ public partial class AlsP3CharacterSlot : Node
     private AlsP3Character? _spare;
     private AlsP3ReplacementPhase _replacementPhase;
     private long _replacementCompletedFrameId;
-    private long _generationMismatchBaseline;
-    private long _staleResultBaseline;
     private AlsFrameIdentity _retiredResultIdentity;
+    private AlsFrameInput _retiredMotorInput;
     private bool _retiredResultObserved;
     private bool _retiredNodeReleased;
     private bool _generationMismatchObserved;
     private long _committedFrameAtClassification;
     private bool _recoveryCommitted;
     private bool _failureRecoveryRequested;
+    private long _classificationSequenceBaseline;
+    private AlsFrameIdentity _expectedClassificationIdentity;
     private bool _configured;
     private int _disposed;
 
@@ -58,7 +59,10 @@ public partial class AlsP3CharacterSlot : Node
                 _committedFrameAtClassification,
                 _recoveryCommitted,
                 _replacementPhase,
-                CountVisibleCharacters());
+                CountVisibleCharacters())
+            {
+                RetiredMotorInput = _retiredMotorInput,
+            };
         }
     }
 
@@ -123,7 +127,6 @@ public partial class AlsP3CharacterSlot : Node
 
         _active.BeginReplacementRequest(completedFrameId);
         _replacementCompletedFrameId = completedFrameId;
-        _generationMismatchBaseline = Volatile.Read(ref _context.GenerationMismatches);
         _replacementPhase = AlsP3ReplacementPhase.AwaitingRetiredResult;
         ValidateVisibilityInvariants();
     }
@@ -147,7 +150,6 @@ public partial class AlsP3CharacterSlot : Node
         PrepareFailureRecoverySpare();
 
         _replacementCompletedFrameId = _active.RuntimeCommittedFrameId;
-        _staleResultBaseline = Volatile.Read(ref _context.StaleResults);
         _recoveryCommitted = false;
         _failureRecoveryRequested = true;
         ReplaceActiveCharacter();
@@ -263,6 +265,9 @@ public partial class AlsP3CharacterSlot : Node
     private void ReplaceActiveCharacter()
     {
         var retired = _active;
+        _retiredMotorInput = retired.LatestMotorInput;
+        var motorCheckpoint = retired.CaptureCommittedMotorLifecycle(
+            _replacementCompletedFrameId);
         retired.RetireForReplacement();
         if (retired.Visible)
         {
@@ -281,6 +286,9 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         var replacement = _spare;
+        replacement.RestoreCommittedMotorLifecycle(
+            in motorCheckpoint,
+            _replacementCompletedFrameId);
         replacement.ResetVisualReady();
         _spare = null;
         if (retired.Visible)
@@ -290,6 +298,10 @@ public partial class AlsP3CharacterSlot : Node
         }
         _active = replacement;
         _active.StartReplacementClassification(_replacementCompletedFrameId);
+        var classification = _active.ResultClassificationDiagnostics;
+        _classificationSequenceBaseline = classification.Sequence;
+        _expectedClassificationIdentity = _active.HandleIdentity(
+            _replacementCompletedFrameId + 1);
 
         retired.DisposeRuntime();
         retired.DisposeRuntime();
@@ -304,20 +316,20 @@ public partial class AlsP3CharacterSlot : Node
 
     private void TryStartRecovery()
     {
-        var classificationCount = _failureRecoveryRequested
-            ? Volatile.Read(ref _context.StaleResults)
-            : Volatile.Read(ref _context.GenerationMismatches);
-        var classificationBaseline = _failureRecoveryRequested
-            ? _staleResultBaseline
-            : _generationMismatchBaseline;
-        if (classificationCount == classificationBaseline)
+        var classification = _active.ResultClassificationDiagnostics;
+        if (classification.Sequence == _classificationSequenceBaseline)
         {
             return;
         }
-        if (classificationCount != classificationBaseline + 1)
+        var expectedFailure = _failureRecoveryRequested
+            ? AlsP3aResultFailure.Stale
+            : AlsP3aResultFailure.GenerationMismatch;
+        if (classification.Sequence != _classificationSequenceBaseline + 1 ||
+            classification.Identity != _expectedClassificationIdentity ||
+            classification.Failure != expectedFailure)
         {
             throw new InvalidOperationException(
-                "P3 slot replacement classified its retired generation more than once.");
+                "P3 slot replacement did not receive its expected local classification.");
         }
         if (_active.RuntimeCommittedFrameId != _replacementCompletedFrameId)
         {

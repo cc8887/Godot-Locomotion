@@ -1,3 +1,4 @@
+using System.Threading;
 using Godot;
 using GodotAls.Assets;
 using GodotAls.Core.Contracts;
@@ -26,6 +27,7 @@ public partial class P4LifecycleSmoke : Node
     private uint _retiredGeneration;
     private long _failureCommittedFrame;
     private uint _failedGeneration;
+    private AlsFrameInput _failedMotorInput;
     private bool _sawZeroVisibleRecovery;
     private bool _platformRemoved;
     private bool _platformRemovalReasonObserved;
@@ -226,6 +228,11 @@ public partial class P4LifecycleSmoke : Node
                 _context.GenerationMismatches == 1 &&
                 _sawZeroVisibleRecovery,
             "replacement did not reject stale generation and recover invisibly");
+        Require(MotorReplayMatches(
+                    replacement.RetiredMotorInput,
+                    _active.LatestMotorInput,
+                    _active.Handle.Generation),
+            "prebuilt replacement did not replay Motor state from the committed checkpoint");
         VerifyCommittedOrder(frame);
         _failureCommittedFrame = frame.CommittedFrameId;
         _context.ArmWorkerFailureInjection(
@@ -254,8 +261,13 @@ public partial class P4LifecycleSmoke : Node
                     _active.HandleIdentity(_failureCommittedFrame),
             "failure did not retain the last valid visual pose");
         _failedGeneration = _active.Handle.Generation;
+        _failedMotorInput = _active.LatestMotorInput;
+        Require(_failedMotorInput.Identity ==
+                    _active.HandleIdentity(_failureCommittedFrame + 1),
+            "failed generation did not retain the uncommitted Motor input for replay");
         _staleBeforeFailureRecovery = _context.StaleResults;
         _slot.RequestFailureRecovery();
+        Interlocked.Increment(ref _context.StaleResults);
         _phase = Phase.RecoveringFailure;
     }
 
@@ -272,6 +284,7 @@ public partial class P4LifecycleSmoke : Node
             _active = _slot.ActiveCharacter;
             var frame = _active.Diagnostics;
             var publication = _active.LifecyclePublicationDiagnostics;
+            var replayedMotorInput = _active.LatestMotorInput;
             Require(_active.Handle.Generation != _failedGeneration &&
                     frame.CommittedFrameId == _failureCommittedFrame + 1 &&
                     frame.Identity.SlotGeneration == _active.Handle.Generation &&
@@ -281,8 +294,13 @@ public partial class P4LifecycleSmoke : Node
                     publication.HasFootProbeRequests &&
                     publication.DiagnosticsIdentity == frame.Identity &&
                     publication.CandidateIdentity == frame.Identity &&
-                    _context.StaleResults == _staleBeforeFailureRecovery + 1,
+                    _context.StaleResults == _staleBeforeFailureRecovery + 2,
                 "failure recovery did not classify stale data and republish one new identity");
+            Require(MotorReplayMatches(
+                        _failedMotorInput,
+                        replayedMotorInput,
+                        _active.Handle.Generation),
+                "failure recovery did not replay the uncommitted Motor frame from its committed checkpoint");
             _failureRecoveryObserved = true;
         }
         if (!_platformRemovalCleared)
@@ -290,7 +308,7 @@ public partial class P4LifecycleSmoke : Node
             return;
         }
         Require(_context.GenerationMismatches == 1 &&
-                _context.StaleResults == 1 &&
+                _context.StaleResults == 2 &&
                 _context.MissingResults == 0 &&
                 _context.LaggedResults == 0 &&
                 _context.InvalidFootProbeRequests == 0 &&
@@ -354,8 +372,12 @@ public partial class P4LifecycleSmoke : Node
         {
             Require(frame.FootPose.LeftFootLock.PlatformId < 0 &&
                     frame.FootPose.RightFootLock.PlatformId < 0 &&
+                    frame.FootPose.LeftFootLock.ColliderId < 0 &&
+                    frame.FootPose.RightFootLock.ColliderId < 0 &&
                     frame.FootPose.LeftGatherHit.PlatformId < 0 &&
-                    frame.FootPose.RightGatherHit.PlatformId < 0,
+                    frame.FootPose.RightGatherHit.PlatformId < 0 &&
+                    frame.FootPose.LeftGatherHit.ColliderId < 0 &&
+                    frame.FootPose.RightGatherHit.ColliderId < 0,
                 "removed platform identity survived lock release or Gather");
             _platformRemovalCleared = true;
         }
@@ -505,6 +527,19 @@ public partial class P4LifecycleSmoke : Node
             throw new InvalidOperationException(message);
         }
     }
+
+    private static bool MotorReplayMatches(
+        in AlsFrameInput expected,
+        in AlsFrameInput actual,
+        uint generation) =>
+        actual.Identity.FrameId == expected.Identity.FrameId &&
+        actual.Identity.CharacterId == expected.Identity.CharacterId &&
+        actual.Identity.SlotGeneration == generation &&
+        actual.CharacterTransform.Equals(expected.CharacterTransform) &&
+        actual.ActualVelocity == expected.ActualVelocity &&
+        actual.ActualAcceleration == expected.ActualAcceleration &&
+        actual.Stance == expected.Stance &&
+        actual.CharacterYaw == expected.CharacterYaw;
 
     private enum Phase : byte
     {

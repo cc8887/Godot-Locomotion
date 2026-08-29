@@ -185,6 +185,11 @@ internal readonly record struct AlsP3PreparedResultPublication(
     int CharacterId,
     int Generation);
 
+internal readonly record struct AlsP3ResultClassificationDiagnostics(
+    long Sequence,
+    AlsFrameIdentity Identity,
+    AlsP3aResultFailure Failure);
+
 public readonly record struct AlsP3FrameDiagnostics(
     AlsFrameIdentity Identity,
     long CommandFrameId,
@@ -330,7 +335,10 @@ public readonly record struct AlsP3SlotReplacementDiagnostics(
     long CommittedFrameAtClassification,
     bool RecoveryCommitted,
     AlsP3ReplacementPhase Phase,
-    int VisibleCharacterCount);
+    int VisibleCharacterCount)
+{
+    internal AlsFrameInput RetiredMotorInput { get; init; }
+}
 
 internal readonly record struct AlsP3RuntimeDiagnostics(
     ulong LastPublishedPoseDigest,
@@ -580,6 +588,9 @@ internal sealed class AlsP3CharacterState
     private readonly HashSet<AlsP3FailureIdentity> _pendingFailureIdentities = new();
     private AlsP3FailureIdentity _lastPublishedFailureIdentity;
     private bool _hasLastPublishedFailureIdentity;
+    private long _resultClassificationSequence;
+    private AlsFrameIdentity _resultClassificationIdentity;
+    private AlsP3aResultFailure _resultClassificationFailure;
 
     public AlsP3CharacterState(AlsSlotHandle handle, AlsP3ExchangeSlot exchangeSlot)
         : this(handle, exchangeSlot, new AlsP4FootProbeExchange())
@@ -634,6 +645,20 @@ internal sealed class AlsP3CharacterState
     public int ResultPublishedGeneration => ExchangeSlot.ResultPublishedGeneration;
 
     public int HasPublishedResult => Volatile.Read(ref ExchangeSlot.HasPublishedResult);
+
+    public AlsP3ResultClassificationDiagnostics CaptureResultClassification() => new(
+        Volatile.Read(ref _resultClassificationSequence),
+        _resultClassificationIdentity,
+        _resultClassificationFailure);
+
+    public void RecordResultClassification(
+        in AlsFrameIdentity identity,
+        AlsP3aResultFailure failure)
+    {
+        _resultClassificationIdentity = identity;
+        _resultClassificationFailure = failure;
+        Interlocked.Increment(ref _resultClassificationSequence);
+    }
 
     public AlsP3WorkerTransactionRollbackDiagnostics WorkerTransactionRollbackDiagnostics;
 
