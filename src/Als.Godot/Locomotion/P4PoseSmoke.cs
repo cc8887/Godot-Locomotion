@@ -192,6 +192,19 @@ public partial class P4PoseSmoke : Node
         RequireOutputExact(rollbackOutput, rollbackExpected, "post-Aim rollback");
         rollbackPose.RequireExact(graph.TargetSkeleton, (Node3D)library.Root, "post-Aim rollback");
 
+        VerifyFootPlacementTransaction(
+            modifier,
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            poseProfile,
+            zeroAim: cases[0].ToInput() with
+            {
+                HeadWeight = 0f,
+                SpineWeight = 0f,
+                UpperBodyWeight = 0f,
+            });
+
         var zeroInput = cases[0].ToInput() with
         {
             HeadWeight = 0f,
@@ -231,8 +244,8 @@ public partial class P4PoseSmoke : Node
         var activeOutput = default(AlsPoseModifierOutput);
         for (var index = 0; index < 100; index++)
         {
-            Require(modifier.TryApply(in activeInput, ref activeOutput, out _),
-                "active Aim allocation warmup failed");
+            Require(modifier.TryApply(in activeInput, ref activeOutput, out var activeReason),
+                $"active Aim allocation warmup failed: {activeReason}");
         }
         var activeNameValidations = modifier.NameValidationCount;
         var activeAllocationBefore = GC.GetAllocatedBytesForCurrentThread();
@@ -269,6 +282,14 @@ public partial class P4PoseSmoke : Node
             definition,
             poseProfile,
             cases[0].ToInput());
+        VerifyFootWriteFailureTransactions(
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            library,
+            definition,
+            poseProfile,
+            zeroInput);
         VerifyNonInvertibleTransactions(
             basePose,
             graph.TargetSkeleton,
@@ -287,10 +308,110 @@ public partial class P4PoseSmoke : Node
             aimDigest,
             turnDigest,
             rotateDigest,
-            1,
+            3,
             allocated,
             activeAllocated);
     }
+
+    private static void VerifyFootPlacementTransaction(
+        AlsComponentPoseModifier modifier,
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsPoseAnimationProfile profile,
+        AlsPoseModifierInput zeroAim)
+    {
+        basePose.Restore(skeleton, visualRoot);
+        var before = PoseSnapshot.Capture(skeleton, visualRoot);
+        var leftWorld = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Left.FootBoneId);
+        var rightWorld = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Right.FootBoneId);
+        var characterRotation = visualRoot.GlobalTransform.Basis.Orthonormalized()
+            .GetRotationQuaternion();
+        var leftTargetPosition = leftWorld.Origin + Vector3.Down * 0.08f;
+        var rightTargetPosition = rightWorld.Origin + Vector3.Down * 0.08f;
+        var input = zeroAim with
+        {
+            PelvisOffset = new System.Numerics.Vector3(0f, -0.04f, 0f),
+            LeftFootPose = new AlsFootPoseOutput(
+                ToNumerics(leftTargetPosition),
+                ToNumerics(characterRotation), 0f, -1),
+            RightFootPose = new AlsFootPoseOutput(
+                ToNumerics(rightTargetPosition),
+                ToNumerics(characterRotation), 0f, -1),
+            LeftFootIkWeight = 1f,
+            RightFootIkWeight = 1f,
+        };
+        var output = default(AlsPoseModifierOutput);
+        Require(modifier.TryApply(in input, ref output, out var reason),
+            $"foot placement modifier failed: {reason}");
+        Require(output.WriteTransactionCount == 1,
+            "foot placement used more than one Skeleton write transaction");
+        Require(!before.IsBoneExact(skeleton, profile.FootRig.PelvisBoneId),
+            "pelvis correction did not change pelvis pose");
+        Require(skeleton.GetBonePoseRotation(profile.FootRig.PelvisBoneId) ==
+                before.GetBoneRotation(profile.FootRig.PelvisBoneId) &&
+                skeleton.GetBonePoseScale(profile.FootRig.PelvisBoneId) ==
+                before.GetBoneScale(profile.FootRig.PelvisBoneId),
+            "pelvis correction changed pelvis rotation or scale");
+        RequireLegChannelsPreserved(before, skeleton, profile.FootRig.Left, "left");
+        RequireLegChannelsPreserved(before, skeleton, profile.FootRig.Right, "right");
+        foreach (var untouchedBoneId in new[] { 51, 54, 57, 60 })
+        {
+            before.RequireBoneExact(skeleton, untouchedBoneId, "foot twist/ball branch");
+        }
+        var solvedLeft = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Left.FootBoneId);
+        var solvedRight = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Right.FootBoneId);
+        Require(solvedLeft.Origin.DistanceTo(leftTargetPosition) <= 0.015f,
+            $"left foot missed calibrated target: distance={solvedLeft.Origin.DistanceTo(leftTargetPosition)} " +
+            $"before={leftWorld.Origin} target={leftTargetPosition} solved={solvedLeft.Origin}");
+        Require(solvedRight.Origin.DistanceTo(rightTargetPosition) <= 0.015f,
+            $"right foot missed calibrated target: {solvedRight.Origin.DistanceTo(rightTargetPosition)}");
+
+        foreach (var stage in new[]
+                 {
+                     AlsPoseModifierFailureStage.AfterPelvis,
+                     AlsPoseModifierFailureStage.AfterLeftFoot,
+                 })
+        {
+            basePose.Restore(skeleton, visualRoot);
+            var expectedPose = PoseSnapshot.Capture(skeleton, visualRoot);
+            var expectedOutput = SentinelOutput();
+            var failedOutput = expectedOutput;
+            var failedInput = input with { InjectFailure = stage };
+            Require(!modifier.TryApply(in failedInput, ref failedOutput, out reason) &&
+                    reason == AlsP4ReasonCode.InvalidRuntimeState,
+                $"{stage} injection did not fail with the bounded reason");
+            RequireOutputExact(failedOutput, expectedOutput, stage.ToString());
+            expectedPose.RequireExact(skeleton, visualRoot, stage.ToString());
+        }
+
+        basePose.Restore(skeleton, visualRoot);
+    }
+
+    private static void RequireLegChannelsPreserved(
+        PoseSnapshot before,
+        Skeleton3D skeleton,
+        AlsCompiledLegChain leg,
+        string label)
+    {
+        foreach (var boneId in new[] { leg.ThighBoneId, leg.KneeBoneId, leg.FootBoneId })
+        {
+            Require(skeleton.GetBonePosePosition(boneId) == before.GetBonePosition(boneId),
+                $"{label} leg changed local translation: {boneId}");
+            Require(skeleton.GetBonePoseScale(boneId) == before.GetBoneScale(boneId),
+                $"{label} leg changed local scale: {boneId}");
+        }
+    }
+
+    private static System.Numerics.Vector3 ToNumerics(in Vector3 value) =>
+        new(value.X, value.Y, value.Z);
+
+    private static System.Numerics.Quaternion ToNumerics(in Quaternion value) =>
+        new(value.X, value.Y, value.Z, value.W);
 
     private static bool IsControlledAllocationEnvironment() =>
         string.Equals(
@@ -556,6 +677,54 @@ public partial class P4PoseSmoke : Node
         RequireOutputExact(frozenOutput, frozenExpected, "persistent setter failure");
         Require(!frozenBefore.IsExact(skeleton, visualRoot),
             "persistent setter failure did not leave an observable frozen partial pose");
+        basePose.Restore(skeleton, visualRoot);
+    }
+
+    private static void VerifyFootWriteFailureTransactions(
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition definition,
+        AlsPoseAnimationProfile profile,
+        in AlsPoseModifierInput zeroAim)
+    {
+        basePose.Restore(skeleton, visualRoot);
+        var leftWorld = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Left.FootBoneId);
+        var rightWorld = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Right.FootBoneId);
+        var characterRotation = visualRoot.GlobalTransform.Basis.Orthonormalized()
+            .GetRotationQuaternion();
+        var input = zeroAim with
+        {
+            PelvisOffset = new System.Numerics.Vector3(0f, -0.04f, 0f),
+            LeftFootPose = new AlsFootPoseOutput(
+                ToNumerics(leftWorld.Origin + Vector3.Down * 0.08f),
+                ToNumerics(characterRotation), 0f, -1),
+            RightFootPose = new AlsFootPoseOutput(
+                ToNumerics(rightWorld.Origin + Vector3.Down * 0.08f),
+                ToNumerics(characterRotation), 0f, -1),
+            LeftFootIkWeight = 1f,
+            RightFootIkWeight = 1f,
+        };
+        var writer = new FaultingSkeletonPoseWriter(skeleton);
+        using var modifier = new AlsComponentPoseModifier(
+            skeleton, visualRoot, library, definition, profile, writer);
+        foreach (var setter in new[] { 1, 4, 13 })
+        {
+            basePose.Restore(skeleton, visualRoot);
+            var before = PoseSnapshot.Capture(skeleton, visualRoot);
+            writer.Configure(setter, persistent: false);
+            var expected = SentinelOutput();
+            var output = expected;
+            Require(!modifier.TryApply(in input, ref output, out var reason),
+                $"foot setter {setter} failure unexpectedly succeeded");
+            Require(reason == AlsP4ReasonCode.InvalidRuntimeState,
+                $"foot setter {setter} returned unstable reason: {reason}");
+            RequireOutputExact(output, expected, $"foot setter {setter}");
+            before.RequireExact(skeleton, visualRoot, $"foot setter {setter} rollback");
+        }
         basePose.Restore(skeleton, visualRoot);
     }
 
@@ -1113,6 +1282,12 @@ public partial class P4PoseSmoke : Node
         public Transform3D GetBonePose(int boneId) => new(
             new Basis(_rotations[boneId].Normalized()).Scaled(_scales[boneId]),
             _positions[boneId]);
+
+        public Vector3 GetBonePosition(int boneId) => _positions[boneId];
+
+        public Vector3 GetBoneScale(int boneId) => _scales[boneId];
+
+        public Quaternion GetBoneRotation(int boneId) => _rotations[boneId];
 
         public void RequireBoneExact(Skeleton3D skeleton, int boneId, string label) =>
             Require(IsBoneExact(skeleton, boneId), $"{label} changed: {boneId}");
