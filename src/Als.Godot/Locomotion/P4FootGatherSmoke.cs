@@ -25,6 +25,14 @@ public partial class P4FootGatherSmoke : Node
     private AlsCharacterMotor _stationaryTransitionMotor = null!;
     private AnimatableBody3D _stationaryPlatform = null!;
     private RightCommandSource _stationaryTransitionSource = null!;
+    private readonly AlsP4FootProbeExchange _removalExchange = new();
+    private AlsCharacterMotor _removalMotor = null!;
+    private AnimatableBody3D _removalLeftPlatform = null!;
+    private AnimatableBody3D _removalRightPlatform = null!;
+    private long _removedLeftColliderId;
+    private int _removedLeftPlatformId;
+    private long _retainedRightColliderId;
+    private int _retainedRightPlatformId;
     private int _stage;
     private bool _finished;
 
@@ -152,6 +160,7 @@ public partial class P4FootGatherSmoke : Node
                 _exchange,
                 AlsP4FootGatherSettings.CreateReference(),
                 runtimeContext: null);
+            ConfigureRemovalFixture();
             ValidateMainOwnershipSource();
         }
         catch (Exception exception)
@@ -175,7 +184,14 @@ public partial class P4FootGatherSmoke : Node
                 _stage = 1;
                 return;
             }
-            GatherFrameTwoAndValidateLifecycle(delta);
+            if (_stage == 1)
+            {
+                GatherFrameTwoAndValidateLifecycle(delta);
+                PrepareRealPlatformRemoval(delta);
+                _stage = 2;
+                return;
+            }
+            ValidateRealPlatformRemoval(delta);
         }
         catch (Exception exception)
         {
@@ -337,7 +353,98 @@ public partial class P4FootGatherSmoke : Node
                 !_exchange.HasRequests,
             "character teleport leaked a pre-discontinuity probe request");
 
-        GD.Print("P4_FOOT_GATHER_OK latency=1");
+    }
+
+    private void ConfigureRemovalFixture()
+    {
+        var staticFloor = CreateSeamBody<StaticBody3D>(
+            "RemovalStaticFloor",
+            new Vector3(40f, -0.3f, 0f));
+        staticFloor.GetChild<CollisionShape3D>(0).Shape =
+            new BoxShape3D { Size = new Vector3(8f, 0.2f, 8f) };
+        AddChild(staticFloor);
+
+        _removalLeftPlatform = CreateSeamBody<AnimatableBody3D>(
+            "RemovalLeftPlatform",
+            new Vector3(39f, -0.1f, 0f));
+        _removalLeftPlatform.GetChild<CollisionShape3D>(0).Shape =
+            new BoxShape3D { Size = new Vector3(0.6f, 0.2f, 1f) };
+        AddChild(_removalLeftPlatform);
+        _removalRightPlatform = CreateSeamBody<AnimatableBody3D>(
+            "RemovalRightPlatform",
+            new Vector3(41f, -0.1f, 0f));
+        _removalRightPlatform.GetChild<CollisionShape3D>(0).Shape =
+            new BoxShape3D { Size = new Vector3(0.6f, 0.2f, 1f) };
+        AddChild(_removalRightPlatform);
+
+        _removalMotor = new AlsCharacterMotor
+        {
+            Name = "RemovalMotor",
+            Position = new Vector3(40f, 0.9f, 0f),
+        };
+        AddChild(_removalMotor);
+        _removalMotor.Configure(
+            CreateMotorSettings(),
+            new IdleCommandSource(),
+            _removalExchange,
+            AlsP4FootGatherSettings.CreateReference(),
+            runtimeContext: null);
+    }
+
+    private void PrepareRealPlatformRemoval(double delta)
+    {
+        var first = _removalMotor.Step(1, 4, 1, checked((float)delta));
+        var request = AlsFrameResult.CreateDefault(first.Identity);
+        request.NextLeftFootProbeOrigin = new NumericsVector3(-1f, -0.77f, 0f);
+        request.NextRightFootProbeOrigin = new NumericsVector3(1f, -0.77f, 0f);
+        Require(AlsP3CommitStage.TryCopyFootProbeRequests(
+                _removalExchange, first.Identity, request),
+            "removal fixture failed to stage separate foot probes");
+
+        var captured = _removalMotor.Step(2, 4, 1, checked((float)delta));
+        Require(captured.LeftFootHit.PlatformId >= 0 &&
+                captured.RightFootHit.PlatformId >= 0 &&
+                captured.LeftFootHit.ColliderId != captured.RightFootHit.ColliderId,
+            "removal fixture did not capture two independent platform identities");
+        _removedLeftPlatformId = captured.LeftFootHit.PlatformId;
+        _removedLeftColliderId = captured.LeftFootHit.ColliderId;
+        _retainedRightPlatformId = captured.RightFootHit.PlatformId;
+        _retainedRightColliderId = captured.RightFootHit.ColliderId;
+
+        var nextRequest = AlsFrameResult.CreateDefault(captured.Identity);
+        nextRequest.NextLeftFootProbeOrigin = new NumericsVector3(-1f, -0.77f, 0f);
+        nextRequest.NextRightFootProbeOrigin = new NumericsVector3(0f, -0.77f, 0f);
+        Require(AlsP3CommitStage.TryCopyFootProbeRequests(
+                _removalExchange, captured.Identity, nextRequest),
+            "removal fixture failed to stage N+1 probes");
+        _removalLeftPlatform.QueueFree();
+    }
+
+    private void ValidateRealPlatformRemoval(double delta)
+    {
+        Require(!GodotObject.IsInstanceValid(_removalLeftPlatform),
+            "queued platform was still valid at removal Gather N+1");
+        Require(GodotObject.IsInstanceValid(_removalRightPlatform),
+            "normal step-off control platform was unexpectedly removed");
+
+        var input = _removalMotor.Step(3, 4, 1, checked((float)delta));
+        var signals = input.FootPlacementReleaseSignals;
+        Require(signals.LeftPlatformRemoved == 1 &&
+                signals.LeftPlatformId == _removedLeftPlatformId &&
+                signals.LeftColliderId == _removedLeftColliderId,
+            "Main Gather did not publish the removed left platform identity");
+        Require(signals.RightPlatformRemoved == 0 &&
+                signals.RightPlatformId == -1 &&
+                signals.RightColliderId == -1,
+            "normal right-foot step-off was misclassified as platform removal");
+        Require(input.RightFootHit.Valid == 1 &&
+                input.RightFootHit.PlatformId == -1 &&
+                input.RightFootHit.ColliderId >= 0 &&
+                _retainedRightPlatformId >= 0 &&
+                _retainedRightColliderId >= 0,
+            "normal step-off control did not retain a live old platform and hit static ground");
+
+        GD.Print("P4_FOOT_GATHER_OK latency=1 removal_identity=1 step_off=1");
         _finished = true;
         GetTree().Quit();
     }

@@ -15,7 +15,13 @@ internal readonly record struct AlsCharacterMotorLifecycleSnapshot(
     long LastFrameId,
     Transform3D PreviousGatherTransform,
     bool HasPreviousGatherTransform,
-    bool WasGrounded);
+    bool WasGrounded,
+    CollisionObject3D? PreviousLeftFootPlatform,
+    int PreviousLeftFootPlatformId,
+    long PreviousLeftFootColliderId,
+    CollisionObject3D? PreviousRightFootPlatform,
+    int PreviousRightFootPlatformId,
+    long PreviousRightFootColliderId);
 
 public partial class AlsCharacterMotor : CharacterBody3D
 {
@@ -50,6 +56,12 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private bool _restoredGroundedBeforeMove;
     private bool _releasePlatformOnNextStep;
     private bool _publishedVelocityCheckpointPending;
+    private CollisionObject3D? _previousLeftFootPlatform;
+    private int _previousLeftFootPlatformId = -1;
+    private long _previousLeftFootColliderId = -1;
+    private CollisionObject3D? _previousRightFootPlatform;
+    private int _previousRightFootPlatformId = -1;
+    private long _previousRightFootColliderId = -1;
     private bool _configured;
 
     internal long LastFootGatherManagedAllocations { get; private set; }
@@ -168,6 +180,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _restoredGroundedBeforeMove = false;
         _releasePlatformOnNextStep = false;
         _publishedVelocityCheckpointPending = false;
+        ClearPreviousFootPlatforms();
         Velocity = Vector3.Zero;
         CollisionMask = settings.CollisionMask;
         MotionMode = MotionModeEnum.Grounded;
@@ -283,11 +296,20 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
         var identity = new AlsFrameIdentity(frameId, (uint)characterId, (uint)generation);
         var allocatedBeforeFootGather = GC.GetAllocatedBytesForCurrentThread();
+        var releaseSignals = CapturePlatformRemovalSignals();
         GatherFootHits(
             identity,
             characterTransform,
             out var leftFootHit,
-            out var rightFootHit);
+            out var rightFootHit,
+            out var leftFootPlatform,
+            out var rightFootPlatform);
+        UpdatePreviousFootPlatforms(
+            in releaseSignals,
+            in leftFootHit,
+            leftFootPlatform,
+            in rightFootHit,
+            rightFootPlatform);
         var actualVelocity = ToNumerics(GetRealVelocity());
         var actualAcceleration = (actualVelocity - _previousActualVelocity) / deltaTime;
         var grounded = IsOnFloor();
@@ -344,7 +366,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
             CharacterYaw: characterYaw,
             MaxAcceleration: _settings.MaxAcceleration,
             MaxBrakingDeceleration: _settings.MaxBrakingDeceleration,
-            JumpAccepted: jumpAccepted);
+            JumpAccepted: jumpAccepted)
+        {
+            FootPlacementReleaseSignals = releaseSignals,
+        };
 
         _previousActualVelocity = actualVelocity;
         _lastFrameId = frameId;
@@ -417,6 +442,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _lastFrameId = snapshot.LastFrameId;
         _previousGatherTransform = snapshot.PreviousGatherTransform;
         _hasPreviousGatherTransform = snapshot.HasPreviousGatherTransform;
+        RestorePreviousFootPlatforms(in snapshot);
         _candidateLifecycleSnapshot = snapshot;
         _candidateLifecycleFrameId = publishedFrameId;
         _restoredGroundedBeforeMove = snapshot.WasGrounded;
@@ -455,6 +481,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _lastFrameId = snapshot.LastFrameId;
         _previousGatherTransform = snapshot.PreviousGatherTransform;
         _hasPreviousGatherTransform = snapshot.HasPreviousGatherTransform;
+        RestorePreviousFootPlatforms(in snapshot);
         _candidateLifecycleFrameId = -1;
         _committedLifecycleSnapshot = snapshot;
         _committedLifecycleFrameId = completedFrameId;
@@ -470,16 +497,26 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _lastFrameId,
         _previousGatherTransform,
         _hasPreviousGatherTransform,
-        wasGrounded);
+        wasGrounded,
+        _previousLeftFootPlatform,
+        _previousLeftFootPlatformId,
+        _previousLeftFootColliderId,
+        _previousRightFootPlatform,
+        _previousRightFootPlatformId,
+        _previousRightFootColliderId);
 
     private void GatherFootHits(
         in AlsFrameIdentity identity,
         in Transform3D characterTransform,
         out AlsFootHit left,
-        out AlsFootHit right)
+        out AlsFootHit right,
+        out CollisionObject3D? leftPlatform,
+        out CollisionObject3D? rightPlatform)
     {
         left = AlsFootHit.Invalid;
         right = AlsFootHit.Invalid;
+        leftPlatform = null;
+        rightPlatform = null;
         LastFootGatherConsumed = false;
         LastFootGatherRequestIdentity = default;
         LastLeftFootQueryWorldOrigin = default;
@@ -504,8 +541,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
         LastRightFootQueryWorldOrigin = characterTransform * ToGodot(
             rightRequest.CharacterLocalOrigin);
 
-        left = GatherFootHit(leftRequest, characterTransform, _footQueries[0]);
-        right = GatherFootHit(rightRequest, characterTransform, _footQueries[1]);
+        left = GatherFootHit(
+            leftRequest, characterTransform, _footQueries[0], out leftPlatform);
+        right = GatherFootHit(
+            rightRequest, characterTransform, _footQueries[1], out rightPlatform);
         if (_runtimeContext is not null)
         {
             Interlocked.Add(ref _runtimeContext.FootGatherQueries, 2);
@@ -515,8 +554,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private AlsFootHit GatherFootHit(
         in AlsP4FootProbeRequest request,
         in Transform3D characterTransform,
-        PhysicsRayQueryParameters3D query)
+        PhysicsRayQueryParameters3D query,
+        out CollisionObject3D? platform)
     {
+        platform = null;
         var localOrigin = ToGodot(request.CharacterLocalOrigin);
         var worldOrigin = characterTransform * localOrigin;
         var up = characterTransform.Basis.Y.Normalized();
@@ -558,6 +599,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var colliderId = (long)rawColliderId;
         var movingPlatform = IsMovingPlatform(collider);
         var platformId = movingPlatform ? CreatePlatformId(rawColliderId) : -1;
+        platform = movingPlatform ? collider : null;
         var platformTransform = collider.GlobalTransform;
         var platformBasis = platformTransform.Basis.Orthonormalized();
         var platformRotation = platformBasis.GetRotationQuaternion().Normalized();
@@ -588,6 +630,93 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 : NumericsQuaternion.Identity,
             colliderId,
             ToNumerics(pointVelocity));
+    }
+
+    private AlsFootPlacementReleaseSignals CapturePlatformRemovalSignals()
+    {
+        var leftRemoved = _previousLeftFootPlatform is not null &&
+                          !GodotObject.IsInstanceValid(_previousLeftFootPlatform);
+        var rightRemoved = _previousRightFootPlatform is not null &&
+                           !GodotObject.IsInstanceValid(_previousRightFootPlatform);
+        return new AlsFootPlacementReleaseSignals(
+            leftRemoved ? (byte)1 : (byte)0,
+            leftRemoved ? _previousLeftFootPlatformId : -1,
+            leftRemoved ? _previousLeftFootColliderId : -1,
+            rightRemoved ? (byte)1 : (byte)0,
+            rightRemoved ? _previousRightFootPlatformId : -1,
+            rightRemoved ? _previousRightFootColliderId : -1);
+    }
+
+    private void UpdatePreviousFootPlatforms(
+        in AlsFootPlacementReleaseSignals releaseSignals,
+        in AlsFootHit leftHit,
+        CollisionObject3D? leftPlatform,
+        in AlsFootHit rightHit,
+        CollisionObject3D? rightPlatform)
+    {
+        if (releaseSignals.LeftPlatformRemoved == 1 || LastFootGatherConsumed)
+        {
+            SetPreviousFootPlatform(
+                leftPlatform,
+                leftHit.PlatformId,
+                leftHit.ColliderId,
+                left: true);
+        }
+        if (releaseSignals.RightPlatformRemoved == 1 || LastFootGatherConsumed)
+        {
+            SetPreviousFootPlatform(
+                rightPlatform,
+                rightHit.PlatformId,
+                rightHit.ColliderId,
+                left: false);
+        }
+    }
+
+    private void SetPreviousFootPlatform(
+        CollisionObject3D? platform,
+        int platformId,
+        long colliderId,
+        bool left)
+    {
+        if (platform is null || !GodotObject.IsInstanceValid(platform) || platformId < 0)
+        {
+            platform = null;
+            platformId = -1;
+            colliderId = -1;
+        }
+        if (left)
+        {
+            _previousLeftFootPlatform = platform;
+            _previousLeftFootPlatformId = platformId;
+            _previousLeftFootColliderId = colliderId;
+        }
+        else
+        {
+            _previousRightFootPlatform = platform;
+            _previousRightFootPlatformId = platformId;
+            _previousRightFootColliderId = colliderId;
+        }
+    }
+
+    private void ClearPreviousFootPlatforms()
+    {
+        _previousLeftFootPlatform = null;
+        _previousLeftFootPlatformId = -1;
+        _previousLeftFootColliderId = -1;
+        _previousRightFootPlatform = null;
+        _previousRightFootPlatformId = -1;
+        _previousRightFootColliderId = -1;
+    }
+
+    private void RestorePreviousFootPlatforms(
+        in AlsCharacterMotorLifecycleSnapshot snapshot)
+    {
+        _previousLeftFootPlatform = snapshot.PreviousLeftFootPlatform;
+        _previousLeftFootPlatformId = snapshot.PreviousLeftFootPlatformId;
+        _previousLeftFootColliderId = snapshot.PreviousLeftFootColliderId;
+        _previousRightFootPlatform = snapshot.PreviousRightFootPlatform;
+        _previousRightFootPlatformId = snapshot.PreviousRightFootPlatformId;
+        _previousRightFootColliderId = snapshot.PreviousRightFootColliderId;
     }
 
     private bool HasCharacterDiscontinuity(in Transform3D current)

@@ -126,7 +126,7 @@ public sealed class ContractLayoutTests
             "LeftFootHit", "RightFootHit", "MantleProbe", "RequestedGait", "Stance",
             "RotationMode", "RequestedAction", "CurrentDriveMode", "RagdollState",
             "AnimationQualityTier", "Command", "CharacterYaw", "MaxAcceleration",
-            "MaxBrakingDeceleration", "JumpAccepted");
+            "MaxBrakingDeceleration", "JumpAccepted", "FootPlacementReleaseSignals");
         AssertStorageFieldOrder<AlsRuntimeState>(
             "LocomotionState", "SmoothedVelocity", "SmoothedAcceleration", "Lean",
             "LeftFootLocked", "RightFootLocked", "TurnInPlaceTime", "RotateInPlaceTime",

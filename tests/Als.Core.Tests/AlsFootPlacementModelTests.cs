@@ -16,6 +16,15 @@ public sealed class AlsFootPlacementModelTests
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFootPlacementSettings>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFootPlacementOutput>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFootProbeWorldOrigins>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFootPlacementReleaseSignals>());
+        Assert.Equal(26, Marshal.SizeOf<AlsFootPlacementReleaseSignals>());
+        var releaseDefaults = AlsFootPlacementReleaseSignals.CreateDefault();
+        Assert.Equal((byte)0, releaseDefaults.LeftPlatformRemoved);
+        Assert.Equal(-1, releaseDefaults.LeftPlatformId);
+        Assert.Equal(-1, releaseDefaults.LeftColliderId);
+        Assert.Equal((byte)0, releaseDefaults.RightPlatformRemoved);
+        Assert.Equal(-1, releaseDefaults.RightPlatformId);
+        Assert.Equal(-1, releaseDefaults.RightColliderId);
         Assert.Equal("GodotAls.Core.Contracts", typeof(AlsFootReleaseReason).Namespace);
         Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(AlsFootReleaseReason)));
         Assert.Equal((byte)0, (byte)AlsFootReleaseReason.None);
@@ -419,7 +428,7 @@ public sealed class AlsFootPlacementModelTests
 
         var removed = sameBaseMiss with { Floor = Floor(1, -1) };
         AssertRelease(removed, locked,
-            AlsFootReleaseReason.PlatformRemoved, AlsFootReleaseReason.PlatformRemoved);
+            AlsFootReleaseReason.RayMiss, AlsFootReleaseReason.RayMiss);
 
         var staticBaseChange = Input(
             left with { PlatformId = -1 },
@@ -719,6 +728,82 @@ public sealed class AlsFootPlacementModelTests
     }
 
     [Fact]
+    public void PlatformRemovalWinsOverSameFrameWeightLossAtReleaseOnset()
+    {
+        var platformHit = Hit(platformId: 7, platformPosition: Vector3.Zero, colliderId: 10);
+        Assert.True(Evaluate(Input(platformHit), 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+
+        var staticFloorHit = Hit(platformId: -1, colliderId: 100);
+        var releaseSignals = new AlsFootPlacementReleaseSignals(
+            1, 7, 10,
+            0, -1, -1);
+        Assert.True(Evaluate(Input(staticFloorHit), 0f, 0f, 0f, 0f, releaseSignals, locked,
+            out var releasing, out var output, out var failure));
+
+        Assert.Equal(AlsP4ReasonCode.None, failure);
+        Assert.Equal(AlsFootReleaseReason.PlatformRemoved, output.LeftReleaseReason);
+        Assert.Equal(AlsFootReleaseReason.PlatformRemoved, releasing.LeftFootLock.ReleaseReason);
+    }
+
+    [Fact]
+    public void PlatformRemovalRequiresMatchingPerFootIdentity()
+    {
+        var leftHit = Hit(
+            position: new Vector3(-0.2f, 0f, 0f),
+            platformId: 7,
+            colliderId: 10);
+        var rightHit = Hit(
+            position: new Vector3(0.2f, 0f, 0f),
+            platformId: 7,
+            colliderId: 10);
+        Assert.True(Evaluate(
+            Input(leftHit, rightHit) with { Floor = Floor(1, 7, colliderId: 10) },
+            1f, 1f, 1f, 1f, State(),
+            out var locked, out _, out _));
+        locked.RightFootLock = locked.RightFootLock with
+        {
+            PlatformId = 8,
+            ColliderId = 20,
+        };
+
+        var staticLeft = leftHit with { PlatformId = -1, ColliderId = 100 };
+        var staticRight = rightHit with { PlatformId = -1, ColliderId = 100 };
+        var releaseSignals = new AlsFootPlacementReleaseSignals(
+            1, 7, 10,
+            1, 7, 10);
+        Assert.True(Evaluate(
+            Input(staticLeft, staticRight) with { Floor = Floor(1, -1, colliderId: 100) },
+            1f, 1f, 1f, 1f, releaseSignals, locked,
+            out _, out var output, out var failure));
+
+        Assert.Equal(AlsP4ReasonCode.None, failure);
+        Assert.Equal(AlsFootReleaseReason.PlatformRemoved, output.LeftReleaseReason);
+        Assert.Equal(AlsFootReleaseReason.BaseChanged, output.RightReleaseReason);
+    }
+
+    [Fact]
+    public void MissingPlatformRemovalSignalClassifiesInvalidHitAsRayMiss()
+    {
+        var platformHit = Hit(platformId: 7, platformPosition: Vector3.Zero, colliderId: 10);
+        Assert.True(Evaluate(
+            Input(platformHit) with { Floor = Floor(1, 7, colliderId: 10) },
+            1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+
+        var missingPlatform = Input(AlsFootHit.Invalid) with
+        {
+            Floor = Floor(1, -1),
+        };
+        Assert.True(Evaluate(missingPlatform, 1f, 0f, 1f, 0f, locked,
+            out var releasing, out var output, out var failure));
+
+        Assert.Equal(AlsP4ReasonCode.None, failure);
+        Assert.Equal(AlsFootReleaseReason.RayMiss, output.LeftReleaseReason);
+        Assert.Equal(AlsFootReleaseReason.RayMiss, releasing.LeftFootLock.ReleaseReason);
+    }
+
+    [Fact]
     public void RightFootMirrorsLeftFootLockAndSlopeClearance()
     {
         var settings = AlsFootPlacementSettings.CreateReference();
@@ -793,6 +878,7 @@ public sealed class AlsFootPlacementModelTests
 
         var input = Input(platformHit);
         var ikWeight = 1f;
+        var releaseSignals = AlsFootPlacementReleaseSignals.CreateDefault();
         switch (release)
         {
             case "miss":
@@ -812,6 +898,9 @@ public sealed class AlsFootPlacementModelTests
                 break;
             case "removed":
                 input = Input(AlsFootHit.Invalid);
+                releaseSignals = new AlsFootPlacementReleaseSignals(
+                    1, platformHit.PlatformId, platformHit.ColliderId,
+                    0, -1, -1);
                 break;
             case "base":
                 input = Input(platformHit with { PlatformId = 8 });
@@ -828,7 +917,7 @@ public sealed class AlsFootPlacementModelTests
                 break;
         }
 
-        Assert.True(Evaluate(input, ikWeight, 0f, 1f, 0f, locked,
+        Assert.True(Evaluate(input, ikWeight, 0f, 1f, 0f, releaseSignals, locked,
             out var released, out var output, out var failure));
 
         Assert.Equal(AlsP4ReasonCode.None, failure);
@@ -855,13 +944,18 @@ public sealed class AlsFootPlacementModelTests
         Assert.True(Evaluate(settings, Input(platformHit), 1f, 0f, 1f, 0f, State(),
             out var locked, out _, out _));
 
-        Assert.True(Evaluate(settings, Input(AlsFootHit.Invalid), 1f, 0f, 1f, 0f, locked,
+        var releaseSignals = new AlsFootPlacementReleaseSignals(
+            1, platformHit.PlatformId, platformHit.ColliderId,
+            0, -1, -1);
+        Assert.True(Evaluate(settings, Input(AlsFootHit.Invalid),
+            1f, 0f, 1f, 0f, releaseSignals, locked,
             out var releasing, out var released, out _));
         Assert.Equal((byte)2, releasing.LeftFootLock.Locked);
         Assert.Equal(0f, releasing.LeftFootLock.Amount);
         Assert.Equal(AlsFootReleaseReason.PlatformRemoved, released.LeftReleaseReason);
 
-        Assert.True(Evaluate(settings, Input(AlsFootHit.Invalid), 1f, 0f, 1f, 0f, releasing,
+        Assert.True(Evaluate(settings, Input(AlsFootHit.Invalid),
+            1f, 0f, 1f, 0f, releasing,
             out var cleared, out var completed, out _));
         Assert.Equal(AlsFootLockState.CreateDefault(), cleared.LeftFootLock);
         Assert.Equal(AlsFootReleaseReason.None, completed.LeftReleaseReason);
@@ -1348,6 +1442,28 @@ public sealed class AlsFootPlacementModelTests
             out next, out output, out reason);
 
     private static bool Evaluate(
+        in AlsFrameInput input,
+        float leftIk,
+        float rightIk,
+        float leftCurve,
+        float rightCurve,
+        in AlsFootPlacementReleaseSignals releaseSignals,
+        in AlsRuntimeState state,
+        out AlsRuntimeState next,
+        out AlsFootPlacementOutput output,
+        out AlsP4ReasonCode reason)
+    {
+        var origins = new AlsFootProbeWorldOrigins(
+            state.LeftFootProbeOrigin,
+            state.RightFootProbeOrigin);
+        return AlsFootPlacementModel.TryEvaluate(
+            AlsFootPlacementSettings.CreateReference(), input,
+            leftIk, rightIk, leftCurve, rightCurve,
+            origins, releaseSignals, state,
+            out next, out output, out reason);
+    }
+
+    private static bool Evaluate(
         in AlsFootPlacementSettings settings,
         in AlsFrameInput input,
         float leftIk,
@@ -1360,6 +1476,28 @@ public sealed class AlsFootPlacementModelTests
         out AlsP4ReasonCode reason) => AlsFootPlacementModel.TryEvaluate(
             settings, input, leftIk, rightIk, leftCurve, rightCurve, state,
             out next, out output, out reason);
+
+    private static bool Evaluate(
+        in AlsFootPlacementSettings settings,
+        in AlsFrameInput input,
+        float leftIk,
+        float rightIk,
+        float leftCurve,
+        float rightCurve,
+        in AlsFootPlacementReleaseSignals releaseSignals,
+        in AlsRuntimeState state,
+        out AlsRuntimeState next,
+        out AlsFootPlacementOutput output,
+        out AlsP4ReasonCode reason)
+    {
+        var origins = new AlsFootProbeWorldOrigins(
+            state.LeftFootProbeOrigin,
+            state.RightFootProbeOrigin);
+        return AlsFootPlacementModel.TryEvaluate(
+            settings, input, leftIk, rightIk, leftCurve, rightCurve,
+            origins, releaseSignals, state,
+            out next, out output, out reason);
+    }
 
     private static AlsRuntimeState State(
         AlsLocomotionState locomotionState = AlsLocomotionState.Grounded)

@@ -361,6 +361,12 @@ public partial class AlsP3WorkerRoot : Node3D
                 var footPlacementInput = CreateFootPlacementInput(
                     in input,
                     footSettings.CapsuleHalfHeightMeters);
+                var forcePlatformRelease =
+                    identity.FrameId == _forcedPlatformReleaseFrameId;
+                var releaseSignals = ResolveFootPlacementReleaseSignals(
+                    in input,
+                    forcePlatformRelease,
+                    in candidateRuntimeState);
                 if (!AlsFootPlacementModel.TryEvaluate(
                         in footSettings,
                         in footPlacementInput,
@@ -369,6 +375,7 @@ public partial class AlsP3WorkerRoot : Node3D
                         footCurves.LeftLockCurve,
                         footCurves.RightLockCurve,
                         in worldOrigins,
+                        in releaseSignals,
                         in candidateRuntimeState,
                         out candidateRuntimeState,
                         out var footPlacement,
@@ -384,8 +391,6 @@ public partial class AlsP3WorkerRoot : Node3D
                 candidateResult.RightFootPose = footPlacement.RightFoot;
                 candidateResult.LeftFootReleaseReason = footPlacement.LeftReleaseReason;
                 candidateResult.RightFootReleaseReason = footPlacement.RightReleaseReason;
-                var forcePlatformRelease =
-                    identity.FrameId == _forcedPlatformReleaseFrameId;
                 if (forcePlatformRelease)
                 {
                     candidateRuntimeState.LeftFootLock = AlsFootLockState.CreateDefault();
@@ -409,10 +414,6 @@ public partial class AlsP3WorkerRoot : Node3D
                         -1);
                     candidateResult.LeftFootIkWeight = 0f;
                     candidateResult.RightFootIkWeight = 0f;
-                    candidateResult.LeftFootReleaseReason =
-                        AlsFootReleaseReason.PlatformRemoved;
-                    candidateResult.RightFootReleaseReason =
-                        AlsFootReleaseReason.PlatformRemoved;
                 }
                 candidateResult.PelvisTarget = candidateResult.PelvisOffset;
                 candidateResult.LeftFootTarget = candidateResult.LeftFootPose.Position;
@@ -647,6 +648,24 @@ public partial class AlsP3WorkerRoot : Node3D
         {
             _state.ExitWorker();
         }
+    }
+
+    internal static AlsFootPlacementReleaseSignals ResolveFootPlacementReleaseSignals(
+        in AlsFrameInput input,
+        bool forcePlatformRelease,
+        in AlsRuntimeState runtimeState)
+    {
+        if (!forcePlatformRelease)
+        {
+            return input.FootPlacementReleaseSignals;
+        }
+        return new AlsFootPlacementReleaseSignals(
+            runtimeState.LeftFootLock.PlatformId >= 0 ? (byte)1 : (byte)0,
+            runtimeState.LeftFootLock.PlatformId,
+            runtimeState.LeftFootLock.ColliderId,
+            runtimeState.RightFootLock.PlatformId >= 0 ? (byte)1 : (byte)0,
+            runtimeState.RightFootLock.PlatformId,
+            runtimeState.RightFootLock.ColliderId);
     }
 
     private static ulong ComputeResultDigest(in AlsFrameResult result)

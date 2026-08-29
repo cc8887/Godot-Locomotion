@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://godotals.local/schemas/als_pose_trace.schema.json",
+  "title": "Godot ALS P4 pose trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "kind", "name", "fixedDeltaSeconds", "reference",
+    "coordinateSystem", "sources", "tolerances", "nativeProvenance",
+    "portProvenance", "cases"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "p4_pose_trace" },
+    "name": { "enum": ["aim", "turn", "rotate", "feet", "platform"] },
+    "fixedDeltaSeconds": { "const": 0.016666666666666666 },
+    "reference": { "$ref": "#/$defs/reference" },
+    "coordinateSystem": { "$ref": "#/$defs/coordinateSystem" },
+    "sources": { "$ref": "#/$defs/sources" },
+    "tolerances": { "$ref": "#/$defs/tolerances" },
+    "nativeProvenance": { "const": "als_runtime" },
+    "portProvenance": { "const": "port_oracle_v1" },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "finite": { "type": "number" },
+    "unit": { "type": "number", "minimum": 0, "maximum": 1 },
+    "vector3": {
+      "type": "object", "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": { "x": { "$ref": "#/$defs/finite" }, "y": { "$ref": "#/$defs/finite" }, "z": { "$ref": "#/$defs/finite" } }
+    },
+    "quaternion": {
+      "type": "object", "additionalProperties": false,
+      "required": ["x", "y", "z", "w"],
+      "properties": { "x": { "$ref": "#/$defs/finite" }, "y": { "$ref": "#/$defs/finite" }, "z": { "$ref": "#/$defs/finite" }, "w": { "$ref": "#/$defs/finite" } }
+    },
+    "transform": {
+      "type": "object", "additionalProperties": false,
+      "required": ["position", "rotation"],
+      "properties": { "position": { "$ref": "#/$defs/vector3" }, "rotation": { "$ref": "#/$defs/quaternion" } }
+    },
+    "reference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "commit", "targetEngine", "patchHashes"],
+      "properties": {
+        "repository": { "const": "https://github.com/Sixze/ALS-Refactored.git" },
+        "commit": { "const": "b754d6f0f2bb03741d301f8fb88077ebfe561e17" },
+        "targetEngine": { "const": "5.9.0" },
+        "patchHashes": { "type": "array", "prefixItems": [{ "const": "3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f" }], "items": false, "minItems": 1, "maxItems": 1 }
+      }
+    },
+    "coordinateSystem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "target", "distanceUnit", "angleUnit", "quaternionSign"],
+      "properties": {
+        "source": { "const": "UE5_XForward_YRight_ZUp" },
+        "target": { "const": "Godot_XRight_YUp_ZBack" },
+        "distanceUnit": { "const": "meter" },
+        "angleUnit": { "const": "radian" },
+        "quaternionSign": { "const": "canonical_nonnegative_w" }
+      }
+    },
+    "sources": {
+      "type": "object", "additionalProperties": false,
+      "required": ["characterSettings", "movementSettings", "animationSettings", "animationBlueprint", "aimOverlayAnimationBlueprint", "skeletalMesh", "controlRig"],
+      "properties": {
+        "characterSettings": { "const": "/ALS/ALS/Data/Character/CS_Als_Default.CS_Als_Default" },
+        "movementSettings": { "const": "/ALS/ALS/Data/Character/Movement/MS_Als_Normal.MS_Als_Normal" },
+        "animationSettings": { "const": "/ALS/ALS/Data/AnimationInstance/AIS_Als_Default.AIS_Als_Default" },
+        "animationBlueprint": { "const": "/ALS/ALS/Character/AB_Als.AB_Als_C" },
+        "aimOverlayAnimationBlueprint": { "const": "/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_Rifle.AB_Als_Rifle_C" },
+        "skeletalMesh": { "const": "/ALS/ALS/Character/SKM_Als.SKM_Als" },
+        "controlRig": { "const": "/ALS/ALS/Character/CR_Als.CR_Als_C" }
+      }
+    },
+    "tolerances": {
+      "type": "object", "additionalProperties": false,
+      "required": ["positionMeters", "rotationRadians"],
+      "properties": {
+        "positionMeters": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.01 },
+        "rotationRadians": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.02 }
+      }
+    },
+    "footHit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["valid", "walkable", "position", "normal", "platformId", "platformPosition", "platformRotation", "colliderId", "pointVelocity"],
+      "properties": {
+        "valid": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "walkable": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "position": { "$ref": "#/$defs/vector3" }, "normal": { "$ref": "#/$defs/vector3" },
+        "platformId": { "type": "integer", "minimum": -1 },
+        "platformPosition": { "$ref": "#/$defs/vector3" }, "platformRotation": { "$ref": "#/$defs/quaternion" },
+        "colliderId": { "type": "integer", "minimum": -1 }, "pointVelocity": { "$ref": "#/$defs/vector3" }
+      },
+      "allOf": [
+        { "if": { "properties": { "valid": { "const": 1 } }, "required": ["valid"] }, "then": { "properties": { "colliderId": { "minimum": 0 } } } },
+        { "if": { "properties": { "valid": { "const": 0 } }, "required": ["valid"] }, "then": { "properties": { "walkable": { "const": 0 }, "colliderId": { "const": -1 }, "platformId": { "const": -1 } } } }
+      ]
+    },
+    "initialLock": {
+      "type": "object", "additionalProperties": false,
+      "required": ["localPosition", "localRotation", "amount", "locked"],
+      "properties": {
+        "localPosition": { "$ref": "#/$defs/vector3" },
+        "localRotation": { "$ref": "#/$defs/quaternion" },
+        "amount": { "$ref": "#/$defs/unit" },
+        "locked": { "type": "integer", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "platformRemovalSignals": {
+      "type": "object", "additionalProperties": false,
+      "required": ["leftRemoved", "leftPlatformId", "leftColliderId", "rightRemoved", "rightPlatformId", "rightColliderId"],
+      "properties": {
+        "leftRemoved": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "leftPlatformId": { "type": "integer", "minimum": -1 },
+        "leftColliderId": { "type": "integer", "minimum": -1 },
+        "rightRemoved": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "rightPlatformId": { "type": "integer", "minimum": -1 },
+        "rightColliderId": { "type": "integer", "minimum": -1 }
+      }
+    },
+    "stimulus": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "characterPosition", "characterYaw", "viewYaw", "viewPitch", "aimYaw", "aimPitch",
+        "rotationMode", "stance", "grounded", "speed", "acceleration", "floorNormal",
+        "platformId", "platformColliderId", "platformPosition", "platformRotation", "platformAngularVelocity",
+        "previousPlatformId", "previousPlatformColliderId", "previousPlatformPosition", "previousPlatformRotation",
+        "initialLeftLock", "initialRightLock",
+        "leftFootOrigin", "rightFootOrigin", "leftFootHit", "rightFootHit", "leftIkWeight",
+        "rightIkWeight", "leftLockCurve", "rightLockCurve", "previousYawCurve", "currentYawCurve",
+        "previousYawPhase", "yawPhasePlayRate", "transitionFrameDelta", "platformRemovalSignals"
+      ],
+      "properties": {
+        "characterPosition": { "$ref": "#/$defs/vector3" }, "characterYaw": { "$ref": "#/$defs/finite" },
+        "viewYaw": { "$ref": "#/$defs/finite" }, "viewPitch": { "$ref": "#/$defs/finite" },
+        "aimYaw": { "$ref": "#/$defs/finite" }, "aimPitch": { "$ref": "#/$defs/finite" },
+        "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
+        "stance": { "enum": ["Standing", "Crouching"] }, "grounded": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "speed": { "type": "number", "minimum": 0 }, "acceleration": { "type": "number", "minimum": 0 },
+        "floorNormal": { "$ref": "#/$defs/vector3" }, "platformId": { "type": "integer", "minimum": -1 },
+        "platformColliderId": { "type": "integer", "minimum": -1 },
+        "platformPosition": { "$ref": "#/$defs/vector3" }, "platformRotation": { "$ref": "#/$defs/quaternion" },
+        "platformAngularVelocity": { "$ref": "#/$defs/vector3" },
+        "previousPlatformId": { "type": "integer", "minimum": -1 },
+        "previousPlatformColliderId": { "type": "integer", "minimum": -1 },
+        "previousPlatformPosition": { "$ref": "#/$defs/vector3" },
+        "previousPlatformRotation": { "$ref": "#/$defs/quaternion" },
+        "initialLeftLock": { "$ref": "#/$defs/initialLock" },
+        "initialRightLock": { "$ref": "#/$defs/initialLock" },
+        "leftFootOrigin": { "$ref": "#/$defs/vector3" }, "rightFootOrigin": { "$ref": "#/$defs/vector3" },
+        "leftFootHit": { "$ref": "#/$defs/footHit" }, "rightFootHit": { "$ref": "#/$defs/footHit" },
+        "leftIkWeight": { "$ref": "#/$defs/unit" }, "rightIkWeight": { "$ref": "#/$defs/unit" },
+        "leftLockCurve": { "$ref": "#/$defs/unit" }, "rightLockCurve": { "$ref": "#/$defs/unit" },
+        "previousYawCurve": { "$ref": "#/$defs/finite" }, "currentYawCurve": { "$ref": "#/$defs/finite" },
+        "previousYawPhase": { "$ref": "#/$defs/unit" },
+        "yawPhasePlayRate": { "type": "number", "minimum": 0 },
+        "transitionFrameDelta": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "platformRemovalSignals": { "$ref": "#/$defs/platformRemovalSignals" }
+      }
+    },
+    "nativeActual": {
+      "type": "object", "additionalProperties": false,
+      "required": ["viewYaw", "viewPitch", "spineYaw", "headBlendAmount", "turnUpdated", "turnAnimationId", "turnCurveId", "turnNominalDegrees", "turnActive", "turnDirection", "rotateAnimationId", "rotateCurveId", "rotateDirection", "rotateActive", "rotateLeft", "rotateRight", "playRate", "turnPhase", "rotatePhase", "turnAccumulatedYaw", "rotateAccumulatedYaw", "runtimeSourceAnimationObjectPath", "runtimeInstanceClassPath", "runtimeNodePropertyName", "runtimeNodePropertyOrdinal", "runtimeSourceWeight", "runtimeSourceTimeSeconds", "runtimePreviousSourceTimeSeconds", "runtimePreviousYawCurve", "runtimeCurrentYawCurve", "sourceSelectionVerified", "rotationYawSpeed", "feetValid", "movementBaseChanged", "hasRelativeBaseLocation", "hasRelativeBaseRotation", "movementBaseDeltaYaw", "previousLeftFootLockAmount", "previousRightFootLockAmount", "leftFootLockAmount", "rightFootLockAmount", "leftFootPlatformId", "rightFootPlatformId", "leftFootReleaseReason", "rightFootReleaseReason", "footHitProvenance", "releaseReasonProvenance", "transitionFrameDelta", "animationUpdateCount", "animationEvaluationCount", "animationPostUpdateCount", "publicAnimationTickCount", "movementBaseId", "movementBaseColliderId", "movementBasePosition", "movementBaseRotation", "previousMovementBaseId", "previousMovementBaseColliderId", "previousMovementBasePosition", "previousMovementBaseRotation", "actualFloorNormal", "actualLeftFootHit", "actualRightFootHit", "previousLeftLockWorldPosition", "previousRightLockWorldPosition", "previousLeftLockBasePosition", "previousRightLockBasePosition", "leftLockWorldPosition", "rightLockWorldPosition", "leftLockBasePosition", "rightLockBasePosition", "pelvis", "leftFoot", "rightFoot", "pelvisComponent", "leftFootComponent", "rightFootComponent", "head", "spine", "upperBody", "headComponent", "spineComponent", "upperBodyComponent"],
+      "properties": {
+        "viewYaw": { "$ref": "#/$defs/finite" }, "viewPitch": { "$ref": "#/$defs/finite" },
+        "spineYaw": { "$ref": "#/$defs/finite" }, "headBlendAmount": { "$ref": "#/$defs/finite" },
+        "turnUpdated": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "turnAnimationId": { "type": "integer", "minimum": -1 }, "turnCurveId": { "type": "integer", "minimum": -1 },
+        "turnNominalDegrees": { "enum": [0, 90, 180] },
+        "turnActive": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "turnDirection": { "enum": [-1, 0, 1] },
+        "rotateAnimationId": { "type": "integer", "minimum": -1 }, "rotateCurveId": { "type": "integer", "minimum": -1 },
+        "rotateDirection": { "enum": [-1, 0, 1] }, "rotateActive": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "rotateLeft": { "type": "integer", "minimum": 0, "maximum": 1 }, "rotateRight": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "playRate": { "$ref": "#/$defs/finite" },
+        "turnPhase": { "$ref": "#/$defs/unit" }, "rotatePhase": { "$ref": "#/$defs/unit" },
+        "turnAccumulatedYaw": { "$ref": "#/$defs/finite" }, "rotateAccumulatedYaw": { "$ref": "#/$defs/finite" },
+        "runtimeSourceAnimationObjectPath": { "type": "string", "pattern": "^$|^/ALS/ALS/Animations/[A-Za-z0-9_/]+\\.[A-Za-z0-9_]+$" },
+        "runtimeInstanceClassPath": { "type": "string" },
+        "runtimeNodePropertyName": { "type": "string" },
+        "runtimeNodePropertyOrdinal": { "type": "integer", "minimum": -1 },
+        "runtimeSourceWeight": { "$ref": "#/$defs/unit" },
+        "runtimeSourceTimeSeconds": { "type": "number", "minimum": 0 },
+        "runtimePreviousSourceTimeSeconds": { "type": "number", "minimum": 0 },
+        "runtimePreviousYawCurve": { "$ref": "#/$defs/finite" }, "runtimeCurrentYawCurve": { "$ref": "#/$defs/finite" },
+        "sourceSelectionVerified": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "rotationYawSpeed": { "$ref": "#/$defs/finite" },
+        "feetValid": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "movementBaseChanged": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "hasRelativeBaseLocation": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "hasRelativeBaseRotation": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "movementBaseDeltaYaw": { "$ref": "#/$defs/finite" },
+        "previousLeftFootLockAmount": { "$ref": "#/$defs/finite" }, "previousRightFootLockAmount": { "$ref": "#/$defs/finite" },
+        "leftFootLockAmount": { "$ref": "#/$defs/finite" }, "rightFootLockAmount": { "$ref": "#/$defs/finite" },
+        "leftFootPlatformId": { "type": "integer", "minimum": -1 }, "rightFootPlatformId": { "type": "integer", "minimum": -1 },
+        "leftFootReleaseReason": { "enum": ["None", "WeightLost", "PlatformRemoved", "BaseChanged", "Teleported"] },
+        "rightFootReleaseReason": { "enum": ["None", "WeightLost", "PlatformRemoved", "BaseChanged", "Teleported"] },
+        "footHitProvenance": { "const": "derived_transition" },
+        "releaseReasonProvenance": { "const": "derived_transition" },
+        "transitionFrameDelta": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "animationUpdateCount": { "const": 1 }, "animationEvaluationCount": { "const": 1 },
+        "animationPostUpdateCount": { "const": 1 }, "publicAnimationTickCount": { "const": 1 },
+        "movementBaseId": { "type": "integer", "minimum": -1 },
+        "movementBaseColliderId": { "type": "integer", "minimum": -1 },
+        "movementBasePosition": { "$ref": "#/$defs/vector3" }, "movementBaseRotation": { "$ref": "#/$defs/quaternion" },
+        "previousMovementBaseId": { "type": "integer", "minimum": -1 },
+        "previousMovementBaseColliderId": { "type": "integer", "minimum": -1 },
+        "previousMovementBasePosition": { "$ref": "#/$defs/vector3" },
+        "previousMovementBaseRotation": { "$ref": "#/$defs/quaternion" },
+        "actualFloorNormal": { "$ref": "#/$defs/vector3" },
+        "actualLeftFootHit": { "$ref": "#/$defs/footHit" }, "actualRightFootHit": { "$ref": "#/$defs/footHit" },
+        "previousLeftLockWorldPosition": { "$ref": "#/$defs/vector3" }, "previousRightLockWorldPosition": { "$ref": "#/$defs/vector3" },
+        "previousLeftLockBasePosition": { "$ref": "#/$defs/vector3" }, "previousRightLockBasePosition": { "$ref": "#/$defs/vector3" },
+        "leftLockWorldPosition": { "$ref": "#/$defs/vector3" }, "rightLockWorldPosition": { "$ref": "#/$defs/vector3" },
+        "leftLockBasePosition": { "$ref": "#/$defs/vector3" }, "rightLockBasePosition": { "$ref": "#/$defs/vector3" },
+        "pelvis": { "$ref": "#/$defs/transform" }, "leftFoot": { "$ref": "#/$defs/transform" }, "rightFoot": { "$ref": "#/$defs/transform" },
+        "pelvisComponent": { "$ref": "#/$defs/transform" }, "leftFootComponent": { "$ref": "#/$defs/transform" }, "rightFootComponent": { "$ref": "#/$defs/transform" },
+        "head": { "$ref": "#/$defs/transform" }, "spine": { "$ref": "#/$defs/transform" }, "upperBody": { "$ref": "#/$defs/transform" },
+        "headComponent": { "$ref": "#/$defs/transform" }, "spineComponent": { "$ref": "#/$defs/transform" }, "upperBodyComponent": { "$ref": "#/$defs/transform" }
+      },
+      "allOf": [
+        { "if": { "properties": { "leftFootReleaseReason": { "const": "WeightLost" } }, "required": ["leftFootReleaseReason"] }, "then": { "properties": { "leftFootLockAmount": { "const": 0 } } } },
+        { "if": { "properties": { "rightFootReleaseReason": { "const": "WeightLost" } }, "required": ["rightFootReleaseReason"] }, "then": { "properties": { "rightFootLockAmount": { "const": 0 } } } }
+      ]
+    },
+    "caseSource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["animationObjectPath", "curveSourceObjectPath", "curveNames"],
+      "properties": {
+        "animationObjectPath": { "type": "string", "pattern": "^/ALS/ALS/Animations/[A-Za-z0-9_/]+\\.[A-Za-z0-9_]+$" },
+        "curveSourceObjectPath": { "type": "string", "pattern": "^/ALS/ALS/Animations/[A-Za-z0-9_/]+\\.[A-Za-z0-9_]+$" },
+        "curveNames": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["Layering_Head", "RotationYawSpeed", "FootLock_L", "FootLock_R"] } }
+      }
+    },
+    "footOutput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["position", "rotation", "lockAmount", "platformId"],
+      "properties": {
+        "position": { "$ref": "#/$defs/vector3" }, "rotation": { "$ref": "#/$defs/quaternion" },
+        "lockAmount": { "$ref": "#/$defs/unit" }, "platformId": { "type": "integer", "minimum": -1 }
+      }
+    },
+    "portExpected": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "aimRelativeYaw", "aimRelativePitch", "headWeight", "spineWeight", "upperBodyWeight", "spineResidualYaw",
+        "turnAnimationId", "turnCurveId", "turnPhase", "turnPlayRate", "turnNominalDegrees", "turnDirection", "turnActive", "turnYawDelta",
+        "rotateAnimationId", "rotateCurveId", "rotatePhase", "rotatePlayRate", "rotateDirection", "rotateActive", "rotateYawDelta",
+        "pelvisOffset", "leftFoot", "rightFoot", "leftReleaseReason", "rightReleaseReason"
+      ],
+      "properties": {
+        "aimRelativeYaw": { "$ref": "#/$defs/finite" }, "aimRelativePitch": { "$ref": "#/$defs/finite" },
+        "headWeight": { "$ref": "#/$defs/unit" }, "spineWeight": { "$ref": "#/$defs/unit" }, "upperBodyWeight": { "$ref": "#/$defs/unit" },
+        "spineResidualYaw": { "$ref": "#/$defs/finite" },
+        "turnAnimationId": { "type": "integer", "minimum": -1 }, "turnCurveId": { "type": "integer", "minimum": -1 },
+        "turnPhase": { "type": "number", "minimum": 0, "maximum": 1 }, "turnPlayRate": { "type": "number", "minimum": 0 },
+        "turnNominalDegrees": { "enum": [0, 90, 180] }, "turnDirection": { "enum": [-1, 0, 1] }, "turnActive": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "turnYawDelta": { "$ref": "#/$defs/finite" },
+        "rotateAnimationId": { "type": "integer", "minimum": -1 }, "rotateCurveId": { "type": "integer", "minimum": -1 },
+        "rotatePhase": { "type": "number", "minimum": 0, "maximum": 1 }, "rotatePlayRate": { "type": "number", "minimum": 0 },
+        "rotateDirection": { "enum": [-1, 0, 1] }, "rotateActive": { "type": "integer", "minimum": 0, "maximum": 1 }, "rotateYawDelta": { "$ref": "#/$defs/finite" },
+        "pelvisOffset": { "$ref": "#/$defs/vector3" }, "leftFoot": { "$ref": "#/$defs/footOutput" }, "rightFoot": { "$ref": "#/$defs/footOutput" },
+        "leftReleaseReason": { "enum": ["None", "RayMiss", "NotGrounded", "NotMotorDriven", "WeightLost", "PlatformRemoved", "BaseChanged", "Teleported", "Overextended"] },
+        "rightReleaseReason": { "enum": ["None", "RayMiss", "NotGrounded", "NotMotorDriven", "WeightLost", "PlatformRemoved", "BaseChanged", "Teleported", "Overextended"] }
+      }
+    },
+    "case": {
+      "type": "object", "additionalProperties": false,
+      "required": ["caseId", "category", "stance", "direction", "phase", "provenance", "source", "stimulus", "nativeActual", "portExpected"],
+      "properties": {
+        "caseId": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "category": { "enum": ["Aim", "Turn", "Rotate", "Feet", "Platform"] },
+        "stance": { "enum": ["Standing", "Crouching"] }, "direction": { "enum": ["Center", "Up", "Down", "Left", "Right", "None"] },
+        "phase": { "enum": ["steady", "playing", "hold", "release"] }, "provenance": { "const": "port_oracle_v1" },
+        "source": { "$ref": "#/$defs/caseSource" }, "stimulus": { "$ref": "#/$defs/stimulus" }, "nativeActual": { "$ref": "#/$defs/nativeActual" }, "portExpected": { "$ref": "#/$defs/portExpected" }
+      },
+      "allOf": [
+        { "if": { "properties": { "category": { "enum": ["Aim", "Turn", "Rotate"] } }, "required": ["category"] }, "then": { "properties": { "nativeActual": { "properties": { "sourceSelectionVerified": { "const": 1 } } } } } },
+        { "if": { "properties": { "caseId": { "const": "platform_release" } }, "required": ["caseId"] }, "then": { "properties": { "stimulus": { "properties": { "platformRemovalSignals": { "properties": { "leftRemoved": { "const": 1 }, "leftPlatformId": { "minimum": 0 }, "leftColliderId": { "minimum": 0 }, "rightRemoved": { "const": 1 }, "rightPlatformId": { "minimum": 0 }, "rightColliderId": { "minimum": 0 } } } }, "required": ["platformRemovalSignals"] } }, "required": ["stimulus"] }, "else": { "properties": { "stimulus": { "properties": { "platformRemovalSignals": { "properties": { "leftRemoved": { "const": 0 }, "leftPlatformId": { "const": -1 }, "leftColliderId": { "const": -1 }, "rightRemoved": { "const": 0 }, "rightPlatformId": { "const": -1 }, "rightColliderId": { "const": -1 } } } }, "required": ["platformRemovalSignals"] } }, "required": ["stimulus"] } }
+      ]
+    }
+  }
+}

@@ -678,6 +678,13 @@ public partial class P4LifecycleSmoke : Node
                 locked.LeftFootLock.Locked == 1 &&
                 locked.RightFootLock.Locked == 1,
             "platform-removal fixture did not acquire two platform-local locks");
+        var staticHit = hit with
+        {
+            PlatformId = -1,
+            ColliderId = 200,
+            PlatformPosition = NumericsVector3.Zero,
+            PlatformRotation = NumericsQuaternion.Identity,
+        };
         var removed = capture with
         {
             Identity = new AlsFrameIdentity(2, 0, 1),
@@ -688,9 +695,20 @@ public partial class P4LifecycleSmoke : Node
                 NumericsMatrix4x4.Identity,
                 NumericsVector3.Zero,
                 colliderId),
-            LeftFootHit = AlsFootHit.Invalid,
-            RightFootHit = AlsFootHit.Invalid,
+            LeftFootHit = staticHit,
+            RightFootHit = staticHit,
+            FootPlacementReleaseSignals = new AlsFootPlacementReleaseSignals(
+                1,
+                platformId,
+                colliderId,
+                0,
+                -1,
+                -1),
         };
+        var workerSignals = AlsP3WorkerRoot.ResolveFootPlacementReleaseSignals(
+            in removed,
+            false,
+            in locked);
         Require(AlsFootPlacementModel.TryEvaluate(
                     GodotAls.Core.Pose.AlsFootPlacementSettings.CreateReference(),
                     removed,
@@ -698,14 +716,18 @@ public partial class P4LifecycleSmoke : Node
                     1f,
                     1f,
                     1f,
+                    new AlsFootProbeWorldOrigins(
+                        state.LeftFootProbeOrigin,
+                        state.RightFootProbeOrigin),
+                    workerSignals,
                     locked,
                     out _,
                     out var output,
                     out var removalReason) &&
                 removalReason == AlsP4ReasonCode.None &&
                 output.LeftReleaseReason == AlsFootReleaseReason.PlatformRemoved &&
-                output.RightReleaseReason == AlsFootReleaseReason.PlatformRemoved,
-            "removed platform did not publish stable bilateral release reasons");
+                output.RightReleaseReason == AlsFootReleaseReason.BaseChanged,
+            "worker release-signal path did not distinguish platform deletion from a normal step-off");
     }
 
     private static StaticBody3D CreateFloor()
