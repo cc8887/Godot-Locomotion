@@ -201,9 +201,8 @@ public partial class AlsP3WorkerRoot : Node3D
             var resultCheckpoint = _result;
             var candidateRuntimeState = runtimeCheckpoint;
             var candidateResult = resultCheckpoint;
-            var trackTransactionRollback = _context.IsWorkerFailureInjectionArmed(
-                in identity,
-                AlsP3WorkerFailureInjectionStage.BeforePublish);
+            var trackTransactionRollback =
+                _context.IsAnyWorkerFailureInjectionArmed(in identity);
             var resultCheckpointDigest = trackTransactionRollback
                 ? ComputeResultDigest(in resultCheckpoint)
                 : 0UL;
@@ -316,7 +315,10 @@ public partial class AlsP3WorkerRoot : Node3D
                 candidateResult.LeftFootTarget = footPlacement.LeftFoot.Position;
                 candidateResult.RightFootTarget = footPlacement.RightFoot.Position;
                 controllerPrepared = false;
+                var advanceCountBefore = _controller!.GraphAdvanceCount;
                 _controller.ApplyPrepared(in preparedAnimation);
+                var animationAdvanceCount = checked((int)(
+                    _controller.GraphAdvanceCount - advanceCountBefore));
                 controllerApplied = true;
                 if (!TryCaptureFootProbeOrigins(
                         input.Identity,
@@ -330,11 +332,22 @@ public partial class AlsP3WorkerRoot : Node3D
                         AlsP4ReasonCode.InvalidRuntimeState,
                         "P4 foot probe source pose or transform was invalid.");
                 }
+                var uncorrectedPelvisWorld = CaptureBoneWorldTransform(
+                    _poseProfile!.FootRig.PelvisBoneId);
+                var uncorrectedLeftFootWorld = CaptureBoneWorldTransform(
+                    _poseProfile.FootRig.Left.FootBoneId);
+                var uncorrectedRightFootWorld = CaptureBoneWorldTransform(
+                    _poseProfile.FootRig.Right.FootBoneId);
                 candidateRuntimeState.LeftFootProbeOrigin =
                     candidateResult.NextLeftFootProbeOrigin;
                 candidateRuntimeState.RightFootProbeOrigin =
                     candidateResult.NextRightFootProbeOrigin;
-                var modifierInput = AlsPoseModifierInput.FromResult(in candidateResult);
+                var modifierInput = AlsPoseModifierInput.FromResult(in candidateResult) with
+                {
+                    CharacterWorldRotation = System.Numerics.Quaternion
+                        .CreateFromRotationMatrix(input.CharacterTransform),
+                    InjectFailure = ResolveModifierFailureInjection(in identity),
+                };
                 var modifierOutput = default(AlsPoseModifierOutput);
                 if (!_poseModifier!.TryApply(
                         in modifierInput,
@@ -385,7 +398,12 @@ public partial class AlsP3WorkerRoot : Node3D
                     in candidateResult.Identity,
                     in input,
                     in worldOrigins,
-                    in candidateRuntimeState);
+                    in candidateRuntimeState,
+                    in uncorrectedPelvisWorld,
+                    in uncorrectedLeftFootWorld,
+                    in uncorrectedRightFootWorld,
+                    animationAdvanceCount,
+                    in modifierOutput);
                 var candidate = new AlsP3VisualCommitCandidate(
                     candidateResult.Identity,
                     AlsP3Presentation.Capture(appliedRoot),
@@ -726,9 +744,15 @@ public partial class AlsP3WorkerRoot : Node3D
         in AlsFrameIdentity identity,
         in AlsFrameInput input,
         in AlsFootProbeWorldOrigins worldOrigins,
-        in AlsRuntimeState runtimeState)
+        in AlsRuntimeState runtimeState,
+        in Transform3D uncorrectedPelvisWorld,
+        in Transform3D uncorrectedLeftFootWorld,
+        in Transform3D uncorrectedRightFootWorld,
+        int animationAdvanceCount,
+        in AlsPoseModifierOutput modifierOutput)
     {
         var rig = _poseProfile!.FootRig;
+        var pelvisWorld = CaptureBoneWorldTransform(rig.PelvisBoneId);
         var leftWorld = _skeleton!.GlobalTransform *
                         _skeleton.GetBoneGlobalPose(rig.Left.FootBoneId);
         var rightWorld = _skeleton.GlobalTransform *
@@ -741,18 +765,64 @@ public partial class AlsP3WorkerRoot : Node3D
         return new AlsP4FootPlacementPoseSnapshot(
             identity,
             ToNumerics(_skeleton.GetBonePosePosition(rig.PelvisBoneId)),
+            ToNumerics(uncorrectedPelvisWorld.Origin),
+            ToNumerics(pelvisWorld.Origin),
+            ToNumerics(uncorrectedLeftFootWorld.Origin),
+            ToNumerics(uncorrectedRightFootWorld.Origin),
             ToNumerics(leftWorld.Origin),
             ToNumerics(rightWorld.Origin),
+            ToNumerics(uncorrectedLeftFootWorld.Basis.Orthonormalized()
+                .GetRotationQuaternion().Normalized()),
+            ToNumerics(uncorrectedRightFootWorld.Basis.Orthonormalized()
+                .GetRotationQuaternion().Normalized()),
             ToNumerics(leftWorld.Basis.Orthonormalized()
                 .GetRotationQuaternion().Normalized()),
             ToNumerics(rightWorld.Basis.Orthonormalized()
                 .GetRotationQuaternion().Normalized()),
+            modifierOutput.LeftPhysicalTargetWorldPosition,
+            modifierOutput.RightPhysicalTargetWorldPosition,
+            modifierOutput.LeftPhysicalTargetWorldRotation,
+            modifierOutput.RightPhysicalTargetWorldRotation,
             input.LeftFootHit,
             input.RightFootHit,
             worldOrigins.Left,
             worldOrigins.Right,
             runtimeState.LeftFootLock,
-            runtimeState.RightFootLock);
+            runtimeState.RightFootLock,
+            animationAdvanceCount,
+            modifierOutput.WriteTransactionCount,
+            modifierOutput.FootChainRebuildCount,
+            modifierOutput.FootFullSkeletonRebuildCount,
+            modifierOutput.FootComponentPropagationCount);
+    }
+
+    private AlsPoseModifierFailureStage ResolveModifierFailureInjection(
+        in AlsFrameIdentity identity)
+    {
+        if (_context.TryConsumeWorkerFailureInjection(
+                in identity,
+                AlsP3WorkerFailureInjectionStage.ModifierAfterPelvis))
+        {
+            return AlsPoseModifierFailureStage.AfterPelvis;
+        }
+        if (_context.TryConsumeWorkerFailureInjection(
+                in identity,
+                AlsP3WorkerFailureInjectionStage.ModifierAfterLeftFoot))
+        {
+            return AlsPoseModifierFailureStage.AfterLeftFoot;
+        }
+        return AlsPoseModifierFailureStage.None;
+    }
+
+    private Transform3D CaptureBoneWorldTransform(int boneId)
+    {
+        var world = _skeleton!.GlobalTransform * _skeleton.GetBoneGlobalPose(boneId);
+        if (!IsAffineInvertible(world))
+        {
+            throw new InvalidOperationException(
+                $"P4 physical bone world transform is invalid: bone={boneId}");
+        }
+        return world;
     }
 
     private static bool TryAffineInverse(

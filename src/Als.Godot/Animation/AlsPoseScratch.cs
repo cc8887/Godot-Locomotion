@@ -110,6 +110,10 @@ public sealed class AlsPoseScratch
 
     public int AimAffectedCount { get; internal set; }
 
+    public int FootChainRebuildCount { get; internal set; }
+
+    public int FootComponentPropagationCount { get; internal set; }
+
     private void BuildParentOrder(Skeleton3D skeleton)
     {
         for (var boneId = 0; boneId < Parents.Length; boneId++)

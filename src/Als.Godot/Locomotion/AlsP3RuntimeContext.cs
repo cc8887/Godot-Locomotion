@@ -133,16 +133,31 @@ internal readonly record struct AlsP3VisualCommitCandidate(
 public readonly record struct AlsP4FootPlacementPoseSnapshot(
     AlsFrameIdentity Identity,
     NumericsVector3 PelvisLocalPosition,
+    NumericsVector3 UncorrectedPelvisWorldPosition,
+    NumericsVector3 PelvisWorldPosition,
+    NumericsVector3 UncorrectedLeftFootWorldPosition,
+    NumericsVector3 UncorrectedRightFootWorldPosition,
     NumericsVector3 LeftFootWorldPosition,
     NumericsVector3 RightFootWorldPosition,
+    System.Numerics.Quaternion UncorrectedLeftFootWorldRotation,
+    System.Numerics.Quaternion UncorrectedRightFootWorldRotation,
     System.Numerics.Quaternion LeftFootWorldRotation,
     System.Numerics.Quaternion RightFootWorldRotation,
+    NumericsVector3 LeftPhysicalTargetWorldPosition,
+    NumericsVector3 RightPhysicalTargetWorldPosition,
+    System.Numerics.Quaternion LeftPhysicalTargetWorldRotation,
+    System.Numerics.Quaternion RightPhysicalTargetWorldRotation,
     AlsFootHit LeftGatherHit,
     AlsFootHit RightGatherHit,
     NumericsVector3 LeftProbeWorldOrigin,
     NumericsVector3 RightProbeWorldOrigin,
     AlsFootLockState LeftFootLock,
-    AlsFootLockState RightFootLock);
+    AlsFootLockState RightFootLock,
+    int AnimationAdvanceCount,
+    int ModifierWriteTransactionCount,
+    int ModifierFootChainRebuildCount,
+    int ModifierFootFullSkeletonRebuildCount,
+    int ModifierFootComponentPropagationCount);
 
 internal readonly record struct AlsP3PreparedResultPublication(
     AlsFrameResult Result,
@@ -277,6 +292,8 @@ internal enum AlsP3WorkerFailureInjectionStage : byte
 {
     None,
     BeforePublish,
+    ModifierAfterPelvis,
+    ModifierAfterLeftFoot,
 }
 
 internal readonly record struct AlsP3WorkerTransactionRollbackDiagnostics(
@@ -309,8 +326,11 @@ internal readonly record struct AlsP3RuntimeDiagnostics(
 
 public sealed class AlsP3RuntimeContext
 {
+    private readonly object _workerFailureInjectionGate = new();
     private int _workerFailureInjectionStage;
     private long _workerFailureInjectionFrameId;
+    private int _workerFailureInjectionCharacterId = -1;
+    private int _workerFailureInjectionGeneration = -1;
 
     public AlsP3RuntimeContext(
         AlsHarnessMode mode,
@@ -366,19 +386,43 @@ public sealed class AlsP3RuntimeContext
         AlsP3WorkerFailureInjectionStage stage,
         long frameId)
     {
+        ArmWorkerFailureInjection(stage, frameId, -1, -1);
+    }
+
+    internal void ArmWorkerFailureInjection(
+        AlsP3WorkerFailureInjectionStage stage,
+        in AlsFrameIdentity identity)
+    {
+        ArmWorkerFailureInjection(
+            stage,
+            identity.FrameId,
+            checked((int)identity.CharacterId),
+            checked((int)identity.SlotGeneration));
+    }
+
+    private void ArmWorkerFailureInjection(
+        AlsP3WorkerFailureInjectionStage stage,
+        long frameId,
+        int characterId,
+        int generation)
+    {
         if (stage == AlsP3WorkerFailureInjectionStage.None)
         {
             throw new ArgumentOutOfRangeException(nameof(stage));
         }
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(frameId);
-        Volatile.Write(ref _workerFailureInjectionFrameId, frameId);
-        if (Interlocked.CompareExchange(
-                ref _workerFailureInjectionStage,
-                (int)stage,
-                (int)AlsP3WorkerFailureInjectionStage.None) !=
-            (int)AlsP3WorkerFailureInjectionStage.None)
+        lock (_workerFailureInjectionGate)
         {
-            throw new InvalidOperationException("Worker failure injection is already armed.");
+            if (Volatile.Read(ref _workerFailureInjectionStage) !=
+                (int)AlsP3WorkerFailureInjectionStage.None)
+            {
+                throw new InvalidOperationException(
+                    "Worker failure injection is already armed.");
+            }
+            Volatile.Write(ref _workerFailureInjectionFrameId, frameId);
+            Volatile.Write(ref _workerFailureInjectionCharacterId, characterId);
+            Volatile.Write(ref _workerFailureInjectionGeneration, generation);
+            Volatile.Write(ref _workerFailureInjectionStage, (int)stage);
         }
     }
 
@@ -386,17 +430,36 @@ public sealed class AlsP3RuntimeContext
         in AlsFrameIdentity identity,
         AlsP3WorkerFailureInjectionStage stage) =>
         Volatile.Read(ref _workerFailureInjectionStage) == (int)stage &&
-        Volatile.Read(ref _workerFailureInjectionFrameId) == identity.FrameId;
+        Volatile.Read(ref _workerFailureInjectionFrameId) == identity.FrameId &&
+        (Volatile.Read(ref _workerFailureInjectionCharacterId) < 0 ||
+         Volatile.Read(ref _workerFailureInjectionCharacterId) ==
+         checked((int)identity.CharacterId)) &&
+        (Volatile.Read(ref _workerFailureInjectionGeneration) < 0 ||
+         Volatile.Read(ref _workerFailureInjectionGeneration) ==
+         checked((int)identity.SlotGeneration));
+
+    internal bool IsAnyWorkerFailureInjectionArmed(in AlsFrameIdentity identity) =>
+        IsWorkerFailureInjectionArmed(
+            in identity, AlsP3WorkerFailureInjectionStage.BeforePublish) ||
+        IsWorkerFailureInjectionArmed(
+            in identity, AlsP3WorkerFailureInjectionStage.ModifierAfterPelvis) ||
+        IsWorkerFailureInjectionArmed(
+            in identity, AlsP3WorkerFailureInjectionStage.ModifierAfterLeftFoot);
+
+    internal bool TryConsumeWorkerFailureInjection(
+        in AlsFrameIdentity identity,
+        AlsP3WorkerFailureInjectionStage stage) =>
+        IsWorkerFailureInjectionArmed(in identity, stage) &&
+        Interlocked.CompareExchange(
+            ref _workerFailureInjectionStage,
+            (int)AlsP3WorkerFailureInjectionStage.None,
+            (int)stage) == (int)stage;
 
     internal void ThrowIfWorkerFailureInjected(
         in AlsFrameIdentity identity,
         AlsP3WorkerFailureInjectionStage stage)
     {
-        if (!IsWorkerFailureInjectionArmed(in identity, stage) ||
-            Interlocked.CompareExchange(
-                ref _workerFailureInjectionStage,
-                (int)AlsP3WorkerFailureInjectionStage.None,
-                (int)stage) != (int)stage)
+        if (!TryConsumeWorkerFailureInjection(in identity, stage))
         {
             return;
         }
