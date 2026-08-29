@@ -48,9 +48,15 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private long _committedLifecycleFrameId = -1;
     private bool _hasRestoredGroundedState;
     private bool _restoredGroundedBeforeMove;
+    private bool _releasePlatformOnNextStep;
+    private bool _publishedVelocityCheckpointPending;
     private bool _configured;
 
     internal long LastFootGatherManagedAllocations { get; private set; }
+
+    internal NumericsVector3 LifecycleActualVelocity => _previousActualVelocity;
+
+    internal bool HasPublishedVelocityCheckpoint => _publishedVelocityCheckpointPending;
 
     internal AlsFrameIdentity LastFootGatherRequestIdentity { get; private set; }
 
@@ -160,6 +166,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _committedLifecycleFrameId = 0;
         _hasRestoredGroundedState = false;
         _restoredGroundedBeforeMove = false;
+        _releasePlatformOnNextStep = false;
+        _publishedVelocityCheckpointPending = false;
         Velocity = Vector3.Zero;
         CollisionMask = settings.CollisionMask;
         MotionMode = MotionModeEnum.Grounded;
@@ -179,6 +187,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         float targetYaw = 0f)
     {
         ValidateStep(frameId, characterId, generation, deltaTime, hasTargetYaw, targetYaw);
+        _publishedVelocityCheckpointPending = false;
         var source = _source!;
         var command = source.GetCommand(frameId);
         if (command.JumpPressed > 1)
@@ -283,6 +292,19 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var actualAcceleration = (actualVelocity - _previousActualVelocity) / deltaTime;
         var grounded = IsOnFloor();
         var floor = CreateFloorSample(grounded);
+        if (_releasePlatformOnNextStep)
+        {
+            leftFootHit = AlsFootHit.Invalid;
+            rightFootHit = AlsFootHit.Invalid;
+            floor = new AlsFloorSample(
+                floor.IsGrounded,
+                floor.Normal,
+                -1,
+                NumericsMatrix4x4.Identity,
+                NumericsVector3.Zero,
+                -1);
+            _releasePlatformOnNextStep = false;
+        }
         LastFootGatherManagedAllocations =
             GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeFootGather;
         if (_runtimeContext is not null)
@@ -353,6 +375,54 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 "Motor does not own the requested committed lifecycle checkpoint.");
         }
         return _committedLifecycleSnapshot;
+    }
+
+    internal AlsCharacterMotorLifecycleSnapshot CapturePublishedLifecycleSnapshot(
+        long publishedFrameId)
+    {
+        EnsureMainThread();
+        if (!_configured || _candidateLifecycleFrameId != publishedFrameId)
+        {
+            throw new InvalidOperationException(
+                "Motor does not own the requested published lifecycle checkpoint.");
+        }
+        return _candidateLifecycleSnapshot;
+    }
+
+    internal void RestorePublishedLifecycleSnapshot(
+        in AlsCharacterMotorLifecycleSnapshot snapshot,
+        long publishedFrameId,
+        bool releasePlatformOnNextStep)
+    {
+        EnsureMainThread();
+        if (!_configured || ProcessMode != ProcessModeEnum.Disabled ||
+            CollisionLayer != 0 || CollisionMask != 0)
+        {
+            throw new InvalidOperationException(
+                "Only an inactive Motor can restore a published lifecycle checkpoint.");
+        }
+        if (publishedFrameId <= 0 || snapshot.LastFrameId != publishedFrameId)
+        {
+            throw new InvalidOperationException(
+                "Motor lifecycle checkpoint does not match the published frame.");
+        }
+
+        GlobalTransform = snapshot.GlobalTransform;
+        Velocity = snapshot.Velocity;
+        _actualStance = snapshot.ActualStance;
+        _capsuleShape!.Height = snapshot.ActualStance == AlsStance.Standing
+            ? _settings.StandingHeight
+            : _settings.CrouchingHeight;
+        _previousActualVelocity = snapshot.PreviousActualVelocity;
+        _lastFrameId = snapshot.LastFrameId;
+        _previousGatherTransform = snapshot.PreviousGatherTransform;
+        _hasPreviousGatherTransform = snapshot.HasPreviousGatherTransform;
+        _candidateLifecycleSnapshot = snapshot;
+        _candidateLifecycleFrameId = publishedFrameId;
+        _restoredGroundedBeforeMove = snapshot.WasGrounded;
+        _hasRestoredGroundedState = true;
+        _releasePlatformOnNextStep = releasePlatformOnNextStep;
+        _publishedVelocityCheckpointPending = true;
     }
 
     internal void RestoreCommittedLifecycleSnapshot(

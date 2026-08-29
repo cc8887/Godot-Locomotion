@@ -12,6 +12,8 @@ public partial class AlsP3Character : Node3D
     private AlsCharacterMotor _motor = null!;
     private AlsP3WorkerRoot _worker = null!;
     private AlsP3CommitStage _commit = null!;
+    private AlsFrameInput _stagedReplacementMotorInput;
+    private bool _hasStagedReplacementMotorInput;
     private bool _configured;
     private int _disposed;
 
@@ -87,6 +89,44 @@ public partial class AlsP3Character : Node3D
         in AlsCharacterMotorLifecycleSnapshot snapshot,
         long completedFrameId) =>
         _motor.RestoreCommittedLifecycleSnapshot(in snapshot, completedFrameId);
+
+    internal AlsCharacterMotorLifecycleSnapshot CapturePublishedMotorLifecycle(
+        long publishedFrameId) =>
+        _motor.CapturePublishedLifecycleSnapshot(publishedFrameId);
+
+    internal void RestorePublishedMotorLifecycle(
+        in AlsCharacterMotorLifecycleSnapshot snapshot,
+        long publishedFrameId,
+        bool releasePlatformOnNextStep) =>
+        _motor.RestorePublishedLifecycleSnapshot(
+            in snapshot,
+            publishedFrameId,
+            releasePlatformOnNextStep);
+
+    internal void StageReplacementMotorInput(in AlsFrameInput input)
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
+        if (Volatile.Read(ref _state.Active) != 0 || _hasStagedReplacementMotorInput)
+        {
+            throw new InvalidOperationException(
+                "Replacement Motor input can only be staged on an unused inactive character.");
+        }
+        _stagedReplacementMotorInput = input;
+        _hasStagedReplacementMotorInput = true;
+    }
+
+    internal AlsP3WorkerLifecycleSnapshot CaptureFailureWorkerLifecycle(
+        long committedFrameId) =>
+        _worker.CaptureFailureLifecycleSnapshot(committedFrameId);
+
+    internal void RestoreFailureWorkerLifecycle(
+        in AlsP3WorkerLifecycleSnapshot snapshot,
+        long forcedPlatformReleaseFrameId) =>
+        _worker.RestoreFailureLifecycleSnapshot(
+            in snapshot,
+            forcedPlatformReleaseFrameId);
 
     internal int FailurePendingIdentityCount =>
         _state.CaptureRuntimeDiagnostics().PendingFailureIdentityCount;
@@ -226,13 +266,28 @@ public partial class AlsP3Character : Node3D
                 throw new InvalidOperationException("P3 frame sequence reached its supported limit.");
             }
             var frameId = completedFrameId + 1;
-            var input = _motor.Step(
-                frameId,
-                checked((int)_state.Handle.CharacterId),
-                checked((int)_state.Handle.Generation),
-                checked((float)delta),
-                _state.HasCommittedTargetYaw,
-                _state.CommittedTargetYaw);
+            AlsFrameInput input;
+            if (_hasStagedReplacementMotorInput)
+            {
+                input = _stagedReplacementMotorInput;
+                if (input.Identity != HandleIdentity(frameId))
+                {
+                    throw new InvalidOperationException(
+                        "Staged replacement Motor input does not match the next frame identity.");
+                }
+                _stagedReplacementMotorInput = default;
+                _hasStagedReplacementMotorInput = false;
+            }
+            else
+            {
+                input = _motor.Step(
+                    frameId,
+                    checked((int)_state.Handle.CharacterId),
+                    checked((int)_state.Handle.Generation),
+                    checked((float)delta),
+                    _state.HasCommittedTargetYaw,
+                    _state.CommittedTargetYaw);
+            }
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
             _state.MotorActualVelocity = input.ActualVelocity;

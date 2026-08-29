@@ -266,8 +266,19 @@ public partial class AlsP3CharacterSlot : Node
     {
         var retired = _active;
         _retiredMotorInput = retired.LatestMotorInput;
-        var motorCheckpoint = retired.CaptureCommittedMotorLifecycle(
-            _replacementCompletedFrameId);
+        var publishedMotorFrameId = retired.PublishedFrameId;
+        if (publishedMotorFrameId <= _replacementCompletedFrameId ||
+            _retiredMotorInput.Identity != retired.HandleIdentity(publishedMotorFrameId))
+        {
+            throw new InvalidOperationException(
+                "P3 retired character did not expose one latest published Motor input.");
+        }
+        var motorCheckpoint = retired.CapturePublishedMotorLifecycle(
+            publishedMotorFrameId);
+        var workerCheckpoint = _failureRecoveryRequested
+            ? retired.CaptureFailureWorkerLifecycle(_replacementCompletedFrameId)
+            : default;
+        _replacementCompletedFrameId = publishedMotorFrameId - 1;
         retired.RetireForReplacement();
         if (retired.Visible)
         {
@@ -286,9 +297,25 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         var replacement = _spare;
-        replacement.RestoreCommittedMotorLifecycle(
+        var stagedMotorInput = _retiredMotorInput with
+        {
+            Identity = replacement.HandleIdentity(publishedMotorFrameId),
+        };
+        var releasePlatformOnNextStep =
+            stagedMotorInput.Floor.PlatformId >= 0 ||
+            stagedMotorInput.LeftFootHit.PlatformId >= 0 ||
+            stagedMotorInput.RightFootHit.PlatformId >= 0;
+        replacement.RestorePublishedMotorLifecycle(
             in motorCheckpoint,
-            _replacementCompletedFrameId);
+            publishedMotorFrameId,
+            releasePlatformOnNextStep);
+        if (_failureRecoveryRequested)
+        {
+            replacement.RestoreFailureWorkerLifecycle(
+                in workerCheckpoint,
+                releasePlatformOnNextStep ? publishedMotorFrameId + 1 : -1);
+        }
+        replacement.StageReplacementMotorInput(in stagedMotorInput);
         replacement.ResetVisualReady();
         _spare = null;
         if (retired.Visible)

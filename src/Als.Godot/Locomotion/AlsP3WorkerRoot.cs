@@ -13,6 +13,11 @@ using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
 
+internal readonly record struct AlsP3WorkerLifecycleSnapshot(
+    long CommittedFrameId,
+    AlsRuntimeState RuntimeState,
+    AlsFrameResult Result);
+
 public partial class AlsP3WorkerRoot : Node3D
 {
     private const string P4ProfilePath = "res://assets/config/p4_pose_profile.json";
@@ -46,7 +51,63 @@ public partial class AlsP3WorkerRoot : Node3D
     private ulong _capturedRootDigest;
     private AlsRuntimeState _runtimeState = AlsRuntimeState.CreateDefault();
     private AlsFrameResult _result;
+    private long _forcedPlatformReleaseFrameId = -1;
     private int _disposed;
+
+    internal AlsP3WorkerLifecycleSnapshot CaptureFailureLifecycleSnapshot(
+        long committedFrameId)
+    {
+        if (!GodotThread.IsMainThread() ||
+            Volatile.Read(ref _state.WorkerFrozen) == 0 ||
+            _state.WorkerInFlightCount != 0 ||
+            Volatile.Read(ref _state.CommittedFrameId) != committedFrameId ||
+            _result.Identity != new AlsFrameIdentity(
+                committedFrameId,
+                _state.Handle.CharacterId,
+                _state.Handle.Generation))
+        {
+            throw new InvalidOperationException(
+                "Worker failure checkpoint requires one frozen idle committed identity.");
+        }
+
+        return new AlsP3WorkerLifecycleSnapshot(
+            committedFrameId,
+            _runtimeState,
+            _result);
+    }
+
+    internal void RestoreFailureLifecycleSnapshot(
+        in AlsP3WorkerLifecycleSnapshot snapshot,
+        long forcedPlatformReleaseFrameId)
+    {
+        if (!GodotThread.IsMainThread() ||
+            Volatile.Read(ref _state.Active) != 0 ||
+            _state.WorkerInFlightCount != 0 ||
+            !_state.IsWorkerAdmissionClosed ||
+            Volatile.Read(ref _state.PublishedFrameId) != 0)
+        {
+            throw new InvalidOperationException(
+                "Worker failure checkpoint can only restore into an unused inactive generation.");
+        }
+        if (snapshot.CommittedFrameId < 0 ||
+            snapshot.Result.Identity.FrameId != snapshot.CommittedFrameId ||
+            (forcedPlatformReleaseFrameId >= 0 &&
+             forcedPlatformReleaseFrameId <= snapshot.CommittedFrameId))
+        {
+            throw new ArgumentException(
+                "Worker failure checkpoint did not retain its committed frame.",
+                nameof(snapshot));
+        }
+
+        var result = snapshot.Result;
+        result.Identity = new AlsFrameIdentity(
+            snapshot.CommittedFrameId,
+            _state.Handle.CharacterId,
+            _state.Handle.Generation);
+        _runtimeState = snapshot.RuntimeState;
+        _result = result;
+        _forcedPlatformReleaseFrameId = forcedPlatformReleaseFrameId;
+    }
 
     internal void Configure(
         AlsP3RuntimeContext context,
@@ -320,6 +381,29 @@ public partial class AlsP3WorkerRoot : Node3D
                 candidateResult.RightFootPose = footPlacement.RightFoot;
                 candidateResult.LeftFootReleaseReason = footPlacement.LeftReleaseReason;
                 candidateResult.RightFootReleaseReason = footPlacement.RightReleaseReason;
+                var forcePlatformRelease =
+                    identity.FrameId == _forcedPlatformReleaseFrameId;
+                if (forcePlatformRelease)
+                {
+                    candidateRuntimeState.LeftFootLock = AlsFootLockState.CreateDefault();
+                    candidateRuntimeState.RightFootLock = AlsFootLockState.CreateDefault();
+                    candidateRuntimeState.LeftFootLocked = 0;
+                    candidateRuntimeState.RightFootLocked = 0;
+                    candidateResult.LeftFootPose = candidateResult.LeftFootPose with
+                    {
+                        LockAmount = 0f,
+                        PlatformId = -1,
+                    };
+                    candidateResult.RightFootPose = candidateResult.RightFootPose with
+                    {
+                        LockAmount = 0f,
+                        PlatformId = -1,
+                    };
+                    candidateResult.LeftFootReleaseReason =
+                        AlsFootReleaseReason.PlatformRemoved;
+                    candidateResult.RightFootReleaseReason =
+                        AlsFootReleaseReason.PlatformRemoved;
+                }
                 candidateResult.PelvisTarget = footPlacement.PelvisOffset;
                 candidateResult.LeftFootTarget = footPlacement.LeftFoot.Position;
                 candidateResult.RightFootTarget = footPlacement.RightFoot.Position;
@@ -456,6 +540,10 @@ public partial class AlsP3WorkerRoot : Node3D
                 _runtimeState = candidateRuntimeState;
                 _result = candidateResult;
                 _state.PublishPreparedResult(in publication);
+                if (forcePlatformRelease)
+                {
+                    _forcedPlatformReleaseFrameId = -1;
+                }
             }
             catch (Exception exception)
             {
