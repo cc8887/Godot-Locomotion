@@ -72,7 +72,7 @@ public partial class AlsP3CommitStage : Node
         if (candidate.Identity != identity || result.Identity != candidate.Identity)
         {
             Interlocked.Increment(ref _context.LaggedResults);
-            _state.FootProbeExchange.Clear();
+            _state.ReleaseYawAndFootProbes();
             return;
         }
 
@@ -87,12 +87,13 @@ public partial class AlsP3CommitStage : Node
             modelFrame != frameId || poseFrame != frameId)
         {
             Interlocked.Increment(ref _context.LaggedResults);
-            _state.FootProbeExchange.Clear();
+            _state.ReleaseYawAndFootProbes();
             return;
         }
         if (!TryCopyFootProbeRequests(_state.FootProbeExchange, identity, result))
         {
             Interlocked.Increment(ref _context.InvalidFootProbeRequests);
+            _state.ReleaseYawAndFootProbes();
             return;
         }
 
@@ -127,7 +128,7 @@ public partial class AlsP3CommitStage : Node
 
     private void PublishFailure(AlsP3WorkerFailure failure)
     {
-        _state.FootProbeExchange.Clear();
+        _state.ReleaseYawAndFootProbes();
         var details =
             $"code={failure.Code} frame={failure.Identity.FrameId} " +
             $"character={failure.Identity.CharacterId} generation={failure.Identity.SlotGeneration} " +
@@ -163,7 +164,7 @@ public partial class AlsP3CommitStage : Node
 
     private void ClassifyMissing(long expectedFrameId)
     {
-        _state.FootProbeExchange.Clear();
+        _state.ReleaseYawAndFootProbes();
         var failure = AlsP3aResultClassifier.Classify(
             _state.HasPublishedResult,
             expectedFrameId,
