@@ -19,11 +19,19 @@ public partial class P4LifecycleSmoke : Node
     private AlsP3RuntimeContext _context = null!;
     private AlsP3CharacterSlot _slot = null!;
     private AlsP3Character _active = null!;
+    private AlsP3Character _platformCharacter = null!;
+    private AnimatableBody3D? _removablePlatform;
     private Phase _phase;
     private long _deactivatedFrame;
     private uint _retiredGeneration;
     private long _failureCommittedFrame;
+    private uint _failedGeneration;
     private bool _sawZeroVisibleRecovery;
+    private bool _platformRemoved;
+    private bool _platformRemovalReasonObserved;
+    private bool _platformRemovalCleared;
+    private bool _failureRecoveryObserved;
+    private long _staleBeforeFailureRecovery;
     private bool _finished;
 
     public override void _Ready()
@@ -64,6 +72,11 @@ public partial class P4LifecycleSmoke : Node
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: false);
             AddChild(CreateFloor());
+            _removablePlatform = CreateBox<AnimatableBody3D>(
+                "RemovablePlatform",
+                new Vector3(10f, -0.15f, 0f),
+                new Vector3(4f, 0.3f, 4f));
+            AddChild(_removablePlatform);
             _slot = new AlsP3CharacterSlot { Name = "LifecycleSlot" };
             AddChild(_slot);
             _slot.Configure(
@@ -71,6 +84,20 @@ public partial class P4LifecycleSmoke : Node
                 () => AlsMotorReplay.CreateHarnessSequence(),
                 new Vector3(0f, motorSettings.StandingHeight * 0.5f, 0f));
             _active = _slot.ActiveCharacter;
+            _platformCharacter = new AlsP3Character
+            {
+                Name = "PlatformRemovalCharacter",
+                Position = new Vector3(
+                    10f,
+                    motorSettings.StandingHeight * 0.5f,
+                    0f),
+            };
+            AddChild(_platformCharacter);
+            _platformCharacter.Configure(
+                _context,
+                new AlsSlotHandle(1, 1),
+                new TurnCommandSource());
+            _platformCharacter.SetActive(true);
         }
         catch (Exception exception)
         {
@@ -87,6 +114,7 @@ public partial class P4LifecycleSmoke : Node
         try
         {
             _active = _slot.ActiveCharacter;
+            ObservePlatformRemoval();
             _sawZeroVisibleRecovery |=
                 _slot.ReplacementDiagnostics.VisibleCharacterCount == 0 &&
                 _slot.ReplacementDiagnostics.Phase is
@@ -104,7 +132,10 @@ public partial class P4LifecycleSmoke : Node
                     TryArmFailureAfterRecovery();
                     break;
                 case Phase.Failing:
-                    TryFinishFailure();
+                    TryStartFailureRecovery();
+                    break;
+                case Phase.RecoveringFailure:
+                    TryFinishFailureRecovery();
                     break;
             }
         }
@@ -203,7 +234,7 @@ public partial class P4LifecycleSmoke : Node
         _phase = Phase.Failing;
     }
 
-    private void TryFinishFailure()
+    private void TryStartFailureRecovery()
     {
         if (!_active.IsPoseFrozen || _active.FailureDiagnosticCount == 0)
         {
@@ -222,12 +253,105 @@ public partial class P4LifecycleSmoke : Node
                 publication.CandidateIdentity ==
                     _active.HandleIdentity(_failureCommittedFrame),
             "failure did not retain the last valid visual pose");
+        _failedGeneration = _active.Handle.Generation;
+        _staleBeforeFailureRecovery = _context.StaleResults;
+        _slot.RequestFailureRecovery();
+        _phase = Phase.RecoveringFailure;
+    }
+
+    private void TryFinishFailureRecovery()
+    {
+        var replacement = _slot.ReplacementDiagnostics;
+        if (!replacement.RecoveryCommitted ||
+            replacement.Phase != AlsP3ReplacementPhase.Complete)
+        {
+            return;
+        }
+        if (!_failureRecoveryObserved)
+        {
+            _active = _slot.ActiveCharacter;
+            var frame = _active.Diagnostics;
+            var publication = _active.LifecyclePublicationDiagnostics;
+            Require(_active.Handle.Generation != _failedGeneration &&
+                    frame.CommittedFrameId == _failureCommittedFrame + 1 &&
+                    frame.Identity.SlotGeneration == _active.Handle.Generation &&
+                    !_active.IsPoseFrozen,
+                "failed generation did not recover on the next frame in a new generation");
+            Require(publication.HasCommittedTargetYaw == 1 &&
+                    publication.HasFootProbeRequests &&
+                    publication.DiagnosticsIdentity == frame.Identity &&
+                    publication.CandidateIdentity == frame.Identity &&
+                    _context.StaleResults == _staleBeforeFailureRecovery + 1,
+                "failure recovery did not classify stale data and republish one new identity");
+            _failureRecoveryObserved = true;
+        }
+        if (!_platformRemovalCleared)
+        {
+            return;
+        }
         GD.Print(
             "P4_LIFECYCLE_OK order=1 yaw=1 deactivate=1 replace=1 stale=1 " +
             "generation=1 failure=1 recovery=1 platform_removal=1 probe=1");
         _slot.DisposeRuntime();
+        _platformCharacter.SetActive(false);
+        _platformCharacter.DisposeRuntime();
         _finished = true;
         GetTree().Quit();
+    }
+
+    private void ObservePlatformRemoval()
+    {
+        if (_platformCharacter is null ||
+            !GodotObject.IsInstanceValid(_platformCharacter))
+        {
+            return;
+        }
+        var frame = _platformCharacter.Diagnostics;
+        if (frame.CommittedFrameId <= 0)
+        {
+            return;
+        }
+        if (!_platformRemoved)
+        {
+            if (frame.FootPose.LeftFootLock.Locked == 0 ||
+                frame.FootPose.RightFootLock.Locked == 0 ||
+                frame.FootPose.LeftFootLock.PlatformId < 0 ||
+                frame.FootPose.RightFootLock.PlatformId < 0 ||
+                _platformCharacter.WorkerInFlight != 0)
+            {
+                return;
+            }
+            var platform = _removablePlatform ?? throw new InvalidOperationException(
+                "platform lock was acquired without a platform node");
+            Require(GodotObject.IsInstanceValid(platform),
+                "platform lock was acquired without a live platform node");
+            RemoveChild(platform);
+            platform.Free();
+            _removablePlatform = null;
+            AddChild(CreateBox<StaticBody3D>(
+                "CapsulePedestal",
+                new Vector3(10f, -0.15f, 0f),
+                new Vector3(0.12f, 0.3f, 0.12f)));
+            _platformRemoved = true;
+            return;
+        }
+
+        _platformRemovalReasonObserved |=
+            frame.Result.LeftFootReleaseReason ==
+                AlsFootReleaseReason.PlatformRemoved &&
+            frame.Result.RightFootReleaseReason ==
+                AlsFootReleaseReason.PlatformRemoved;
+        if (_platformRemovalReasonObserved &&
+            frame.FootPose.LeftFootLock.Locked == 0 &&
+            frame.FootPose.RightFootLock.Locked == 0)
+        {
+            Require(frame.FootPose.LeftFootLock.PlatformId < 0 &&
+                    frame.FootPose.RightFootLock.PlatformId < 0 &&
+                    frame.FootPose.LeftGatherHit.PlatformId < 0 &&
+                    frame.FootPose.RightGatherHit.PlatformId < 0,
+                "removed platform identity survived lock release or Gather");
+            _platformRemovalCleared = true;
+        }
     }
 
     private static void VerifyCommittedOrder(in AlsP3FrameDiagnostics frame)
@@ -237,7 +361,8 @@ public partial class P4LifecycleSmoke : Node
                 frame.ModelResultFrameId == frame.CommittedFrameId &&
                 frame.PoseAdvanceFrameId == frame.CommittedFrameId &&
                 frame.FootPose.AnimationAdvanceCount == 1 &&
-                frame.FootPose.ModifierWriteTransactionCount == 1,
+                frame.FootPose.ModifierWriteTransactionCount == 1 &&
+                frame.FootPose.WorkerStageSequence == 0x1234567u,
             "P4 Worker/Commit stage order or one-advance/one-write contract drifted");
     }
 
@@ -330,9 +455,29 @@ public partial class P4LifecycleSmoke : Node
         };
         floor.AddChild(new CollisionShape3D
         {
-            Shape = new BoxShape3D { Size = new Vector3(100f, 1f, 100f) },
+            Shape = new BoxShape3D { Size = new Vector3(6f, 1f, 6f) },
         });
         return floor;
+    }
+
+    private static T CreateBox<T>(
+        string name,
+        in Vector3 position,
+        in Vector3 size)
+        where T : StaticBody3D, new()
+    {
+        var body = new T
+        {
+            Name = name,
+            Position = position,
+            CollisionLayer = 1,
+            CollisionMask = 1,
+        };
+        body.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = size },
+        });
+        return body;
     }
 
     private void Fail(string code, Exception exception)
@@ -360,5 +505,16 @@ public partial class P4LifecycleSmoke : Node
         Reactivated,
         Replacing,
         Failing,
+        RecoveringFailure,
+    }
+
+    private sealed class TurnCommandSource : IAlsLocomotionCommandSource
+    {
+        public AlsLocomotionCommand GetCommand(long frameId) =>
+            AlsLocomotionCommand.CreateDefault() with
+            {
+                ViewYaw = MathF.PI * 0.5f,
+                AimYaw = MathF.PI * 0.5f,
+            };
     }
 }

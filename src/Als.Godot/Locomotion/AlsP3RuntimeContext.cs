@@ -173,6 +173,8 @@ public readonly record struct AlsP4FootPlacementPoseSnapshot(
     public int ModifierFootFullSkeletonRebuildCount { get; init; }
 
     public int ModifierFootComponentPropagationCount { get; init; }
+
+    public uint WorkerStageSequence { get; init; }
 }
 
 internal readonly record struct AlsP3PreparedResultPublication(

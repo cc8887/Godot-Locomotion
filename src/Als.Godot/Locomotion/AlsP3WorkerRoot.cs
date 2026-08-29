@@ -214,6 +214,7 @@ public partial class AlsP3WorkerRoot : Node3D
             var controllerCheckpoint = trackTransactionRollback
                 ? _controller!.CaptureTransactionDiagnostics()
                 : default;
+            var workerStageSequence = 0u;
             try
             {
                 PublishVisualRootVisibility(frameId);
@@ -237,6 +238,7 @@ public partial class AlsP3WorkerRoot : Node3D
                     in input,
                     out candidateRuntimeState,
                     out candidateResult);
+                AdvanceWorkerStage(ref workerStageSequence, 0u, 1u);
                 if (measure)
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
@@ -274,7 +276,9 @@ public partial class AlsP3WorkerRoot : Node3D
                 preparedAnimation = _controller!.PrepareFrame(
                     in candidateResult, in p4AnimationInput, input.DeltaTime);
                 controllerPrepared = true;
+                AdvanceWorkerStage(ref workerStageSequence, 0x1u, 2u);
                 var footCurves = _controller.SampleFootCurves(in preparedAnimation);
+                AdvanceWorkerStage(ref workerStageSequence, 0x12u, 3u);
                 candidateResult.LeftFootIkWeight = footCurves.LeftIkWeight;
                 candidateResult.RightFootIkWeight = footCurves.RightIkWeight;
                 candidateResult.LeftFootLockCurve = footCurves.LeftLockCurve;
@@ -319,12 +323,14 @@ public partial class AlsP3WorkerRoot : Node3D
                 candidateResult.PelvisTarget = footPlacement.PelvisOffset;
                 candidateResult.LeftFootTarget = footPlacement.LeftFoot.Position;
                 candidateResult.RightFootTarget = footPlacement.RightFoot.Position;
+                AdvanceWorkerStage(ref workerStageSequence, 0x123u, 4u);
                 controllerPrepared = false;
                 var advanceCountBefore = _controller!.GraphAdvanceCount;
                 _controller.ApplyPrepared(in preparedAnimation);
                 var animationAdvanceCount = checked((int)(
                     _controller.GraphAdvanceCount - advanceCountBefore));
                 controllerApplied = true;
+                AdvanceWorkerStage(ref workerStageSequence, 0x1234u, 5u);
                 if (!TryCaptureFootProbeOrigins(
                         input.Identity,
                         input.CharacterTransform,
@@ -368,6 +374,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 // exact single/parallel digests. Wall-clock evidence stays in Measurement.
                 candidateResult.P4ModifierOperationTicks = modifierOutput.OperationTicks;
                 candidateResult.P4ReasonCode = AlsP4ReasonCode.None;
+                AdvanceWorkerStage(ref workerStageSequence, 0x12345u, 6u);
                 var appliedRoot = _visualRoot.GlobalTransform;
                 AlsP3Presentation.ThrowIfNonFinite(appliedRoot);
                 if (measure)
@@ -399,6 +406,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 productionSegmentStartedAt = measure
                     ? Stopwatch.GetTimestamp()
                     : 0L;
+                AdvanceWorkerStage(ref workerStageSequence, 0x123456u, 7u);
                 var footPoseSnapshot = CaptureFootPlacementPose(
                     in candidateResult.Identity,
                     in input,
@@ -408,6 +416,7 @@ public partial class AlsP3WorkerRoot : Node3D
                     in uncorrectedLeftFootWorld,
                     in uncorrectedRightFootWorld,
                     animationAdvanceCount,
+                    workerStageSequence,
                     in modifierOutput);
                 var candidate = new AlsP3VisualCommitCandidate(
                     candidateResult.Identity,
@@ -754,6 +763,7 @@ public partial class AlsP3WorkerRoot : Node3D
         in Transform3D uncorrectedLeftFootWorld,
         in Transform3D uncorrectedRightFootWorld,
         int animationAdvanceCount,
+        uint workerStageSequence,
         in AlsPoseModifierOutput modifierOutput)
     {
         var rig = _poseProfile!.FootRig;
@@ -811,7 +821,21 @@ public partial class AlsP3WorkerRoot : Node3D
                 modifierOutput.FootFullSkeletonRebuildCount,
             ModifierFootComponentPropagationCount =
                 modifierOutput.FootComponentPropagationCount,
+            WorkerStageSequence = workerStageSequence,
         };
+    }
+
+    private static void AdvanceWorkerStage(
+        ref uint sequence,
+        uint expected,
+        uint stage)
+    {
+        if (sequence != expected || stage is 0 or > 0xFu)
+        {
+            throw new InvalidOperationException(
+                "P4 Worker stage sequence violated its transactional order.");
+        }
+        sequence = (sequence << 4) | stage;
     }
 
     private AlsPoseModifierFailureStage ResolveModifierFailureInjection(
