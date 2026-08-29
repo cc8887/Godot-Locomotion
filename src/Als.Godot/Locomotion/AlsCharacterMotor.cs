@@ -7,6 +7,16 @@ using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
 
+internal readonly record struct AlsCharacterMotorLifecycleSnapshot(
+    Transform3D GlobalTransform,
+    Vector3 Velocity,
+    AlsStance ActualStance,
+    NumericsVector3 PreviousActualVelocity,
+    long LastFrameId,
+    Transform3D PreviousGatherTransform,
+    bool HasPreviousGatherTransform,
+    bool WasGrounded);
+
 public partial class AlsCharacterMotor : CharacterBody3D
 {
     internal const int MaximumFloorSupportCollisions = 32;
@@ -32,6 +42,12 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private long _lastFrameId = -1;
     private Transform3D _previousGatherTransform;
     private bool _hasPreviousGatherTransform;
+    private AlsCharacterMotorLifecycleSnapshot _candidateLifecycleSnapshot;
+    private AlsCharacterMotorLifecycleSnapshot _committedLifecycleSnapshot;
+    private long _candidateLifecycleFrameId = -1;
+    private long _committedLifecycleFrameId = -1;
+    private bool _hasRestoredGroundedState;
+    private bool _restoredGroundedBeforeMove;
     private bool _configured;
 
     internal long LastFootGatherManagedAllocations { get; private set; }
@@ -140,6 +156,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _lastFrameId = -1;
         _previousGatherTransform = GlobalTransform;
         _hasPreviousGatherTransform = false;
+        _candidateLifecycleFrameId = -1;
+        _committedLifecycleFrameId = 0;
+        _hasRestoredGroundedState = false;
+        _restoredGroundedBeforeMove = false;
         Velocity = Vector3.Zero;
         CollisionMask = settings.CollisionMask;
         MotionMode = MotionModeEnum.Grounded;
@@ -147,6 +167,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         FloorSnapLength = 0.1f;
         FloorStopOnSlope = true;
         _configured = true;
+        _committedLifecycleSnapshot = CaptureLifecycleSnapshot(ProbeInitialFloor());
     }
 
     public AlsFrameInput Step(
@@ -219,7 +240,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
         var verticalVelocity = currentVelocity.Y;
         byte jumpAccepted = 0;
-        var groundedBeforeMove = IsOnFloor() || (_lastFrameId < 0 && ProbeInitialFloor());
+        var groundedBeforeMove = _hasRestoredGroundedState
+            ? _restoredGroundedBeforeMove
+            : IsOnFloor() || (_lastFrameId < 0 && ProbeInitialFloor());
+        _hasRestoredGroundedState = false;
         if (groundedBeforeMove)
         {
             if (resolvedCommand.JumpPressed == 1 && !standingRequestBlocked)
@@ -302,8 +326,81 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
         _previousActualVelocity = actualVelocity;
         _lastFrameId = frameId;
+        _candidateLifecycleSnapshot = CaptureLifecycleSnapshot(grounded);
+        _candidateLifecycleFrameId = frameId;
         return input;
     }
+
+    internal void CommitLifecycleFrame(long frameId)
+    {
+        EnsureMainThread();
+        if (!_configured || _candidateLifecycleFrameId != frameId)
+        {
+            throw new InvalidOperationException(
+                "Motor lifecycle checkpoint does not match the committed frame.");
+        }
+        _committedLifecycleSnapshot = _candidateLifecycleSnapshot;
+        _committedLifecycleFrameId = frameId;
+    }
+
+    internal AlsCharacterMotorLifecycleSnapshot CaptureCommittedLifecycleSnapshot(
+        long completedFrameId)
+    {
+        EnsureMainThread();
+        if (!_configured || _committedLifecycleFrameId != completedFrameId)
+        {
+            throw new InvalidOperationException(
+                "Motor does not own the requested committed lifecycle checkpoint.");
+        }
+        return _committedLifecycleSnapshot;
+    }
+
+    internal void RestoreCommittedLifecycleSnapshot(
+        in AlsCharacterMotorLifecycleSnapshot snapshot,
+        long completedFrameId)
+    {
+        EnsureMainThread();
+        if (!_configured || ProcessMode != ProcessModeEnum.Disabled ||
+            CollisionLayer != 0 || CollisionMask != 0)
+        {
+            throw new InvalidOperationException(
+                "Only an inactive Motor can restore a lifecycle checkpoint.");
+        }
+        var snapshotMatchesFrame = completedFrameId == 0
+            ? snapshot.LastFrameId is -1 or 0
+            : snapshot.LastFrameId == completedFrameId;
+        if (completedFrameId < 0 || !snapshotMatchesFrame)
+        {
+            throw new InvalidOperationException(
+                "Motor lifecycle checkpoint does not match the completed frame.");
+        }
+
+        GlobalTransform = snapshot.GlobalTransform;
+        Velocity = snapshot.Velocity;
+        _actualStance = snapshot.ActualStance;
+        _capsuleShape!.Height = snapshot.ActualStance == AlsStance.Standing
+            ? _settings.StandingHeight
+            : _settings.CrouchingHeight;
+        _previousActualVelocity = snapshot.PreviousActualVelocity;
+        _lastFrameId = snapshot.LastFrameId;
+        _previousGatherTransform = snapshot.PreviousGatherTransform;
+        _hasPreviousGatherTransform = snapshot.HasPreviousGatherTransform;
+        _candidateLifecycleFrameId = -1;
+        _committedLifecycleSnapshot = snapshot;
+        _committedLifecycleFrameId = completedFrameId;
+        _restoredGroundedBeforeMove = snapshot.WasGrounded;
+        _hasRestoredGroundedState = true;
+    }
+
+    private AlsCharacterMotorLifecycleSnapshot CaptureLifecycleSnapshot(bool wasGrounded) => new(
+        GlobalTransform,
+        Velocity,
+        _actualStance,
+        _previousActualVelocity,
+        _lastFrameId,
+        _previousGatherTransform,
+        _hasPreviousGatherTransform,
+        wasGrounded);
 
     private void GatherFootHits(
         in AlsFrameIdentity identity,

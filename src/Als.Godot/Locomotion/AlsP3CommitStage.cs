@@ -97,6 +97,7 @@ public partial class AlsP3CommitStage : Node
             return;
         }
 
+        _owner.CommitMotorLifecycleFrame(frameId);
         _state.HasCommittedTargetYaw = 1;
         _state.CommittedTargetYaw = result.TargetYaw;
         _state.Diagnostics = new AlsP3FrameDiagnostics(
@@ -173,6 +174,11 @@ public partial class AlsP3CommitStage : Node
             checked((int)_state.Handle.Generation),
             _state.ResultPublishedCharacterId,
             _state.ResultPublishedGeneration);
+        var expectedIdentity = new AlsFrameIdentity(
+            expectedFrameId,
+            _state.Handle.CharacterId,
+            _state.Handle.Generation);
+        _state.RecordResultClassification(in expectedIdentity, failure);
         switch (failure)
         {
             case AlsP3aResultFailure.Missing:

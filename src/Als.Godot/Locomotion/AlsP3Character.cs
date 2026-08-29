@@ -73,6 +73,21 @@ public partial class AlsP3Character : Node3D
 
     internal AlsFrameInput LatestMotorInput => _state.MotorInput;
 
+    internal AlsP3ResultClassificationDiagnostics ResultClassificationDiagnostics =>
+        _state.CaptureResultClassification();
+
+    internal void CommitMotorLifecycleFrame(long frameId) =>
+        _motor.CommitLifecycleFrame(frameId);
+
+    internal AlsCharacterMotorLifecycleSnapshot CaptureCommittedMotorLifecycle(
+        long completedFrameId) =>
+        _motor.CaptureCommittedLifecycleSnapshot(completedFrameId);
+
+    internal void RestoreCommittedMotorLifecycle(
+        in AlsCharacterMotorLifecycleSnapshot snapshot,
+        long completedFrameId) =>
+        _motor.RestoreCommittedLifecycleSnapshot(in snapshot, completedFrameId);
+
     internal int FailurePendingIdentityCount =>
         _state.CaptureRuntimeDiagnostics().PendingFailureIdentityCount;
 
