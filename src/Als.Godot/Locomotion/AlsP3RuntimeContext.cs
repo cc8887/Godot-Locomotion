@@ -340,6 +340,14 @@ internal readonly record struct AlsP3RuntimeDiagnostics(
     int PendingFailureIdentityCount,
     int RetainedFailureIdentityCount);
 
+internal readonly record struct AlsP4LifecyclePublicationDiagnostics(
+    byte HasCommittedTargetYaw,
+    float CommittedTargetYaw,
+    AlsFrameIdentity DiagnosticsIdentity,
+    AlsFrameIdentity CandidateIdentity,
+    bool HasFootProbeRequests,
+    bool WorkerFrozen);
+
 public sealed class AlsP3RuntimeContext
 {
     private readonly object _workerFailureInjectionGate = new();
@@ -810,6 +818,33 @@ internal sealed class AlsP3CharacterState
             poseFrameId,
             checked((int)result.Identity.CharacterId),
             checked((int)result.Identity.SlotGeneration));
+    }
+
+    public AlsP4LifecyclePublicationDiagnostics CaptureLifecyclePublicationDiagnostics()
+    {
+        var diagnostics = Diagnostics;
+        var candidate = VisualCommitCandidate;
+        return new AlsP4LifecyclePublicationDiagnostics(
+            HasCommittedTargetYaw,
+            CommittedTargetYaw,
+            diagnostics.Identity,
+            candidate.Identity,
+            FootProbeExchange.HasRequests,
+            Volatile.Read(ref WorkerFrozen) != 0);
+    }
+
+    public void ResetLifecyclePublication()
+    {
+        ReleaseYawAndFootProbes();
+        VisualCommitCandidate = default;
+        Diagnostics = default;
+    }
+
+    public void ReleaseYawAndFootProbes()
+    {
+        HasCommittedTargetYaw = 0;
+        CommittedTargetYaw = 0f;
+        FootProbeExchange.Clear();
     }
 
     public void PublishPreparedResult(in AlsP3PreparedResultPublication publication)

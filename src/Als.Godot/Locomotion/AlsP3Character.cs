@@ -58,6 +58,16 @@ public partial class AlsP3Character : Node3D
     internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
         _state.CaptureRuntimeDiagnostics();
 
+    internal AlsP4LifecyclePublicationDiagnostics LifecyclePublicationDiagnostics
+    {
+        get
+        {
+            EnsureMainThread();
+            EnsureConfigured();
+            return _state.CaptureLifecyclePublicationDiagnostics();
+        }
+    }
+
     internal AlsP3WorkerTransactionRollbackDiagnostics WorkerTransactionRollbackDiagnostics =>
         _state.WorkerTransactionRollbackDiagnostics;
 
@@ -310,6 +320,7 @@ public partial class AlsP3Character : Node3D
     private void ResetVisualReadyCore()
     {
         Visible = false;
+        _state.ResetLifecyclePublication();
         Volatile.Write(ref _state.VisualReady, 0);
         Volatile.Write(
             ref _state.VisualRootVisibilitySnapshot,
