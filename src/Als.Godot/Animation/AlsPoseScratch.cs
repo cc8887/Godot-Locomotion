@@ -27,6 +27,7 @@ public sealed class AlsPoseScratch
         ComponentInverseValid = new bool[count];
         BaseLocalPose = new Transform3D[count];
         BaseComponentPose = new Transform3D[count];
+        BindComponentPose = new Transform3D[count];
         DownLocalPose = new Transform3D[count];
         DownComponentPose = new Transform3D[count];
         ForwardLocalPose = new Transform3D[count];
@@ -35,9 +36,12 @@ public sealed class AlsPoseScratch
         UpComponentPose = new Transform3D[count];
         Parents = new int[count];
         Affected = new bool[count];
+        AimAffected = new bool[count];
+        Modified = new bool[count];
         ValidationVisited = new bool[count];
         Order = new int[count];
         AffectedOrder = new int[count];
+        AimAffectedOrder = new int[count];
 
         BuildParentOrder(skeleton);
     }
@@ -72,6 +76,8 @@ public sealed class AlsPoseScratch
 
     public Transform3D[] BaseComponentPose { get; }
 
+    public Transform3D[] BindComponentPose { get; }
+
     public Transform3D[] DownLocalPose { get; }
 
     public Transform3D[] DownComponentPose { get; }
@@ -88,13 +94,21 @@ public sealed class AlsPoseScratch
 
     public bool[] Affected { get; }
 
+    public bool[] AimAffected { get; }
+
+    public bool[] Modified { get; }
+
     public bool[] ValidationVisited { get; }
 
     public int[] Order { get; }
 
     public int[] AffectedOrder { get; }
 
+    public int[] AimAffectedOrder { get; }
+
     public int AffectedCount { get; internal set; }
+
+    public int AimAffectedCount { get; internal set; }
 
     private void BuildParentOrder(Skeleton3D skeleton)
     {

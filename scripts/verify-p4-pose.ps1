@@ -132,7 +132,7 @@ try
     Assert-P4PoseMarker `
         -Lines $poseLines `
         -MarkerName 'P4_POSE_OK' `
-        -Pattern '\AP4_POSE_OK aim=(?!0000000000000000)[0-9A-F]{16} turn=(?!0000000000000000)[0-9A-F]{16} rotate=(?!0000000000000000)[0-9A-F]{16} rollback=1 alloc=0B allocation_mode=controlled\z'
+        -Pattern '\AP4_POSE_OK aim=(?!0000000000000000)[0-9A-F]{16} turn=(?!0000000000000000)[0-9A-F]{16} rotate=(?!0000000000000000)[0-9A-F]{16} rollback=3 alloc=0B allocation_mode=controlled\z'
     if (@($poseLines | Where-Object {
         $_.StartsWith('P4_POSE_ALLOCATION_UNCONTROLLED', [StringComparison]::Ordinal)
     }).Count -ne 0)
