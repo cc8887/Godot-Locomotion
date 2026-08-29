@@ -329,7 +329,8 @@ public partial class P4PoseSmoke : Node
             BuildCurrentComponent(skeleton, profile.FootRig.Right.FootBoneId);
         var characterRotation = visualRoot.GlobalTransform.Basis.Orthonormalized()
             .GetRotationQuaternion();
-        var reachableTargetDelta = Vector3.Right * 0.03f + Vector3.Down * 0.02f;
+        var reachableTargetDelta = Vector3.Right * 0.03f +
+            Vector3.Forward * 0.08f + Vector3.Down * 0.02f;
         var leftTargetPosition = leftWorld.Origin + reachableTargetDelta;
         var rightTargetPosition = rightWorld.Origin + reachableTargetDelta;
         var input = zeroAim with
@@ -349,6 +350,11 @@ public partial class P4PoseSmoke : Node
             $"foot placement modifier failed: {reason}");
         Require(output.WriteTransactionCount == 1,
             "foot placement used more than one Skeleton write transaction");
+        Require(output.FootChainRebuildCount == 1 &&
+                output.FootFullSkeletonRebuildCount == 0 &&
+                output.FootComponentPropagationCount == 19,
+            $"foot placement traversal contract failed: chain={output.FootChainRebuildCount} " +
+            $"full={output.FootFullSkeletonRebuildCount} propagated={output.FootComponentPropagationCount}");
         Require(!before.IsBoneExact(skeleton, profile.FootRig.PelvisBoneId),
             "pelvis correction did not change pelvis pose");
         Require(skeleton.GetBonePoseRotation(profile.FootRig.PelvisBoneId) ==
@@ -372,6 +378,24 @@ public partial class P4PoseSmoke : Node
         Require(solvedRight.Origin.DistanceTo(rightTargetPosition) <= 0.015f,
             $"right foot missed calibrated target: {solvedRight.Origin.DistanceTo(rightTargetPosition)}");
 
+        VerifyPhysicalThighAngleLimit(
+            modifier, basePose, skeleton, visualRoot, profile, zeroAim);
+
+        basePose.Restore(skeleton, visualRoot);
+        var pelvisOnlyInput = zeroAim with
+        {
+            PelvisOffset = new System.Numerics.Vector3(0f, -0.02f, 0f),
+        };
+        output = default;
+        Require(modifier.TryApply(in pelvisOnlyInput, ref output, out reason) &&
+                output.FootChainRebuildCount == 1 &&
+                output.FootFullSkeletonRebuildCount == 0 &&
+                output.FootComponentPropagationCount == 7,
+            $"pelvis-only propagation contract failed: reason={reason} " +
+            $"chain={output.FootChainRebuildCount} " +
+            $"full={output.FootFullSkeletonRebuildCount} " +
+            $"propagated={output.FootComponentPropagationCount}");
+
         foreach (var stage in new[]
                  {
                      AlsPoseModifierFailureStage.AfterPelvis,
@@ -390,6 +414,62 @@ public partial class P4PoseSmoke : Node
             expectedPose.RequireExact(skeleton, visualRoot, stage.ToString());
         }
 
+        basePose.Restore(skeleton, visualRoot);
+    }
+
+    private static void VerifyPhysicalThighAngleLimit(
+        AlsComponentPoseModifier modifier,
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsPoseAnimationProfile profile,
+        AlsPoseModifierInput zeroAim)
+    {
+        basePose.Restore(skeleton, visualRoot);
+        var hipWorld = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Left.ThighBoneId);
+        var footWorld = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Left.FootBoneId);
+        var characterRotation = new Quaternion(Vector3.Up, 0.65f).Normalized();
+        var characterForward = characterRotation * Vector3.Forward;
+        var overLimitTarget = new Vector3(
+            hipWorld.Origin.X - characterForward.X * 0.35f,
+            footWorld.Origin.Y,
+            hipWorld.Origin.Z - characterForward.Z * 0.35f);
+        var input = zeroAim with
+        {
+            LeftFootPose = new AlsFootPoseOutput(
+                ToNumerics(overLimitTarget),
+                ToNumerics(Quaternion.Identity), 0f, -1),
+            LeftFootIkWeight = 1f,
+            RightFootIkWeight = 0f,
+            CharacterWorldRotation = ToNumerics(characterRotation),
+        };
+        var output = default(AlsPoseModifierOutput);
+        Require(modifier.TryApply(in input, ref output, out var reason),
+            $"physical thigh-angle fixture failed: {reason}");
+        Require(output.FootChainRebuildCount == 1 &&
+                output.FootFullSkeletonRebuildCount == 0 &&
+                output.FootComponentPropagationCount == 13,
+            $"single-leg propagation contract failed: " +
+            $"chain={output.FootChainRebuildCount} " +
+            $"full={output.FootFullSkeletonRebuildCount} " +
+            $"propagated={output.FootComponentPropagationCount}");
+        var solvedHip = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Left.ThighBoneId);
+        var solvedFoot = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, profile.FootRig.Left.FootBoneId);
+        var horizontal = solvedFoot.Origin - solvedHip.Origin;
+        horizontal.Y = 0f;
+        Require(horizontal.LengthSquared() > 1e-8f,
+            "physical thigh-angle fixture collapsed horizontally");
+        var direction = horizontal.Normalized();
+        var angle = MathF.Abs(MathF.Atan2(
+            characterForward.Cross(direction).Dot(Vector3.Up),
+            Math.Clamp(characterForward.Dot(direction), -1f, 1f)));
+        Require(angle <= profile.Feet.MaximumThighAngleRadians + 0.03f,
+            $"physical thigh target exceeded profile limit: angle={angle} " +
+            $"limit={profile.Feet.MaximumThighAngleRadians}");
         basePose.Restore(skeleton, visualRoot);
     }
 
@@ -1177,6 +1257,13 @@ public partial class P4PoseSmoke : Node
         ArmLocalWeight = 0.25f,
         ArmMeshWeight = 0.75f,
         AdditiveBaseAnimationId = 911,
+        FootChainRebuildCount = 23,
+        FootFullSkeletonRebuildCount = 29,
+        FootComponentPropagationCount = 31,
+        LeftPhysicalTargetWorldPosition = new System.Numerics.Vector3(1f, 2f, 3f),
+        RightPhysicalTargetWorldPosition = new System.Numerics.Vector3(4f, 5f, 6f),
+        LeftPhysicalTargetWorldRotation = new System.Numerics.Quaternion(0f, 0f, 0f, 1f),
+        RightPhysicalTargetWorldRotation = new System.Numerics.Quaternion(0f, 1f, 0f, 0f),
     };
 
     private static void RequireOutputExact(
@@ -1192,7 +1279,14 @@ public partial class P4PoseSmoke : Node
                 BitConverter.SingleToInt32Bits(expected.ArmLocalWeight) &&
                 BitConverter.SingleToInt32Bits(actual.ArmMeshWeight) ==
                 BitConverter.SingleToInt32Bits(expected.ArmMeshWeight) &&
-                actual.AdditiveBaseAnimationId == expected.AdditiveBaseAnimationId,
+                actual.AdditiveBaseAnimationId == expected.AdditiveBaseAnimationId &&
+                actual.FootChainRebuildCount == expected.FootChainRebuildCount &&
+                actual.FootFullSkeletonRebuildCount == expected.FootFullSkeletonRebuildCount &&
+                actual.FootComponentPropagationCount == expected.FootComponentPropagationCount &&
+                actual.LeftPhysicalTargetWorldPosition == expected.LeftPhysicalTargetWorldPosition &&
+                actual.RightPhysicalTargetWorldPosition == expected.RightPhysicalTargetWorldPosition &&
+                actual.LeftPhysicalTargetWorldRotation == expected.LeftPhysicalTargetWorldRotation &&
+                actual.RightPhysicalTargetWorldRotation == expected.RightPhysicalTargetWorldRotation,
             $"{label} changed failed-transaction output");
     }
 

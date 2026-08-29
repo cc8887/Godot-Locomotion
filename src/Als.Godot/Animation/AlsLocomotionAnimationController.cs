@@ -280,6 +280,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
     public long ManualAdvanceCount { get; private set; }
 
+    internal long GraphAdvanceCount { get; private set; }
+
     public int ActiveTurnAnimationId { get; private set; } = -1;
 
     public int ActiveRotateAnimationId { get; private set; } = -1;
@@ -637,6 +639,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             }
 
             _graph.Tree.Advance(_pendingDeltaTime);
+            GraphAdvanceCount++;
             _preparedTransactionState = 2;
         }
         catch
