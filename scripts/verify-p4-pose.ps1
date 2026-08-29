@@ -116,6 +116,15 @@ try
             -Lines $transactionLines `
             -MarkerName 'GODOT_ALS_P3B_LATE_TRANSACTION_ROLLBACK_OK' `
             -Pattern "\AGODOT_ALS_P3B_LATE_TRANSACTION_ROLLBACK_OK mode=$mode exchange=0 runtime=1 result=1 controller=1 pose=1 p4_banks=1\z"
+
+        $footPlacementLines = @(Invoke-P4PoseScene `
+            -PhaseName "P4 foot placement ($mode)" `
+            -ScenePath 'res://scenes/tests/p4_foot_placement_smoke.tscn' `
+            -SceneArguments @("--als-mode=$mode"))
+        Assert-P4PoseMarker `
+            -Lines $footPlacementLines `
+            -MarkerName 'P4_FOOT_PLACEMENT_OK' `
+            -Pattern "\AP4_FOOT_PLACEMENT_OK mode=$mode flat=1 slope=1 stairs=1 translate=1 rotate=1 jump=1 base=1 teleport=1 rollback=2\z"
     }
 
     $poseLines = @(Invoke-P4PoseScene `
@@ -140,7 +149,7 @@ try
         throw 'Controlled P4 Pose gate emitted an uncontrolled-allocation marker.'
     }
 
-    Write-Host 'P4_POSE_VERIFICATION_OK graph=1 pose=1 late_transaction=2 zero_alloc=0B active_alloc=0B'
+    Write-Host 'P4_POSE_VERIFICATION_OK graph=1 pose=1 foot_placement=2 late_transaction=2 zero_alloc=0B active_alloc=0B'
 }
 finally
 {

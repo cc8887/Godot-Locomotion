@@ -329,8 +329,9 @@ public partial class P4PoseSmoke : Node
             BuildCurrentComponent(skeleton, profile.FootRig.Right.FootBoneId);
         var characterRotation = visualRoot.GlobalTransform.Basis.Orthonormalized()
             .GetRotationQuaternion();
-        var leftTargetPosition = leftWorld.Origin + Vector3.Down * 0.08f;
-        var rightTargetPosition = rightWorld.Origin + Vector3.Down * 0.08f;
+        var reachableTargetDelta = Vector3.Right * 0.03f + Vector3.Down * 0.02f;
+        var leftTargetPosition = leftWorld.Origin + reachableTargetDelta;
+        var rightTargetPosition = rightWorld.Origin + reachableTargetDelta;
         var input = zeroAim with
         {
             PelvisOffset = new System.Numerics.Vector3(0f, -0.04f, 0f),
@@ -531,8 +532,7 @@ public partial class P4PoseSmoke : Node
             armBoneId,
             skeleton.GetBonePosePosition(armBoneId) + new Vector3(0.013f, -0.009f, 0.017f));
         var underlyingPose = PoseSnapshot.Capture(skeleton, visualRoot);
-        var originalLocal = skeleton.GetBoneRest(armBoneId) *
-            underlyingPose.GetBonePose(armBoneId);
+        var originalLocal = underlyingPose.GetBonePose(armBoneId);
         var localDelta = baseLocal.AffineInverse() * forwardLocal;
         var weightedLocalDelta = Transform3D.Identity.InterpolateWith(
             localDelta, input.UpperBodyWeight);
@@ -544,7 +544,7 @@ public partial class P4PoseSmoke : Node
         Require(modifier.TryApply(in fullLocal, ref localOutput, out var reason) &&
                 reason == AlsP4ReasonCode.None,
             $"full-local Arm modifier failed: {reason}");
-        var actualFullLocal = skeleton.GetBoneRest(armBoneId) * CurrentBonePose(skeleton, armBoneId);
+        var actualFullLocal = CurrentBonePose(skeleton, armBoneId);
         RequireTransformNear(actualFullLocal, expectedFullLocal, 1e-5f,
             "full-local Arm did not match the independent local-delta oracle");
         var fullLocalComponent = BuildCurrentComponent(skeleton, armBoneId);
@@ -906,9 +906,11 @@ public partial class P4PoseSmoke : Node
         var component = Transform3D.Identity;
         foreach (var current in chain)
         {
-            var position = Vector3.Zero;
-            var rotation = Quaternion.Identity;
-            var scale = Vector3.One;
+            var rest = skeleton.GetBoneRest(current);
+            var position = rest.Origin;
+            var rotation = rest.Basis.Orthonormalized()
+                .GetRotationQuaternion().Normalized();
+            var scale = rest.Basis.Scale;
             for (var track = 0; track < animation.GetTrackCount(); track++)
             {
                 using var path = animation.TrackGetPath(track);
@@ -934,7 +936,7 @@ public partial class P4PoseSmoke : Node
             var pose = new Transform3D(
                 new Basis(rotation.Normalized()).Scaled(scale),
                 position);
-            component *= skeleton.GetBoneRest(current) * pose;
+            component *= pose;
         }
         return component;
     }
@@ -950,9 +952,11 @@ public partial class P4PoseSmoke : Node
             $"local oracle clip is missing: {animationId}");
         var animation = library.Library.GetAnimation(clipName)
             ?? throw new InvalidOperationException($"local oracle animation is missing: {animationId}");
-        var position = Vector3.Zero;
-        var rotation = Quaternion.Identity;
-        var scale = Vector3.One;
+        var rest = skeleton.GetBoneRest(boneId);
+        var position = rest.Origin;
+        var rotation = rest.Basis.Orthonormalized()
+            .GetRotationQuaternion().Normalized();
+        var scale = rest.Basis.Scale;
         for (var track = 0; track < animation.GetTrackCount(); track++)
         {
             using var path = animation.TrackGetPath(track);
@@ -975,7 +979,7 @@ public partial class P4PoseSmoke : Node
                     break;
             }
         }
-        return skeleton.GetBoneRest(boneId) * new Transform3D(
+        return new Transform3D(
             new Basis(rotation.Normalized()).Scaled(scale), position);
     }
 
@@ -993,7 +997,7 @@ public partial class P4PoseSmoke : Node
         foreach (var current in BuildChain(skeleton, boneId))
         {
             var pose = snapshot.GetBonePose(current);
-            component *= skeleton.GetBoneRest(current) * pose;
+            component *= pose;
         }
         return component;
     }
@@ -1007,7 +1011,7 @@ public partial class P4PoseSmoke : Node
                 new Basis(skeleton.GetBonePoseRotation(current).Normalized()).Scaled(
                     skeleton.GetBonePoseScale(current)),
                 skeleton.GetBonePosePosition(current));
-            component *= skeleton.GetBoneRest(current) * pose;
+            component *= pose;
         }
         return component;
     }

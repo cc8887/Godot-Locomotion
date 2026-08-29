@@ -125,7 +125,24 @@ internal readonly record struct AlsP3VisualCommitCandidate(
     ulong PoseDigest,
     ulong FullPoseDigest,
     ulong RootDigest,
-    AlsP4FootProbeSourceSnapshot FootProbeSource);
+    AlsP4FootProbeSourceSnapshot FootProbeSource)
+{
+    public AlsP4FootPlacementPoseSnapshot FootPose { get; init; }
+}
+
+public readonly record struct AlsP4FootPlacementPoseSnapshot(
+    AlsFrameIdentity Identity,
+    NumericsVector3 PelvisLocalPosition,
+    NumericsVector3 LeftFootWorldPosition,
+    NumericsVector3 RightFootWorldPosition,
+    System.Numerics.Quaternion LeftFootWorldRotation,
+    System.Numerics.Quaternion RightFootWorldRotation,
+    AlsFootHit LeftGatherHit,
+    AlsFootHit RightGatherHit,
+    NumericsVector3 LeftProbeWorldOrigin,
+    NumericsVector3 RightProbeWorldOrigin,
+    AlsFootLockState LeftFootLock,
+    AlsFootLockState RightFootLock);
 
 internal readonly record struct AlsP3PreparedResultPublication(
     AlsFrameResult Result,
@@ -150,6 +167,8 @@ public readonly record struct AlsP3FrameDiagnostics(
     ulong RootDigest,
     AlsP4FootProbeSourceSnapshot FootProbeSource)
 {
+    public AlsP4FootPlacementPoseSnapshot FootPose { get; init; }
+
     public AlsP3FrameDiagnostics(
         AlsFrameIdentity Identity,
         long CommandFrameId,

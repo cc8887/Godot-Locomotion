@@ -111,7 +111,10 @@ public partial class AlsP3CommitStage : Node
             candidate.FullPoseDigest,
             candidate.RootTransform,
             candidate.RootDigest,
-            candidate.FootProbeSource);
+            candidate.FootProbeSource)
+        {
+            FootPose = candidate.FootPose,
+        };
         Volatile.Write(ref _state.VisualReady, 1);
         Volatile.Write(ref _state.CommittedFrameId, frameId);
         _owner.ShowCommittedVisual(identity);

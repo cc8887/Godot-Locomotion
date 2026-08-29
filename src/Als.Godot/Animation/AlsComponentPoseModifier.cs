@@ -108,7 +108,6 @@ public sealed class AlsComponentPoseModifier : IDisposable
     private readonly Node3D _visualRoot;
     private readonly AlsPoseScratch _scratch;
     private readonly Transform3D[] _rests;
-    private readonly Transform3D[] _restInverses;
     private readonly Transform3D[] _baseLocalInverses;
     private readonly Transform3D[] _baseComponentInverses;
     private readonly string[] _boneNames;
@@ -167,7 +166,6 @@ public sealed class AlsComponentPoseModifier : IDisposable
         AlsAnimationBinder.ValidateTargetSkeleton(skeleton, skeletonDefinition, "P4 component pose modifier");
         _scratch = new AlsPoseScratch(skeleton);
         _rests = new Transform3D[_scratch.BoneCount];
-        _restInverses = new Transform3D[_scratch.BoneCount];
         _baseLocalInverses = new Transform3D[_scratch.BoneCount];
         _baseComponentInverses = new Transform3D[_scratch.BoneCount];
         _boneNames = new string[_scratch.BoneCount];
@@ -180,7 +178,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             _boneNames[boneId] = skeleton.GetBoneName(boneId);
             var expectedParent = skeletonDefinition.PhysicalBones[boneId].ParentPhysicalId;
             if (_scratch.Parents[boneId] != expectedParent ||
-                !TryAffineInverse(_rests[boneId], out _restInverses[boneId]))
+                !IsAffineInvertible(_rests[boneId]))
             {
                 throw new InvalidOperationException(
                     $"P4 modifier skeleton parent/rest mismatch: bone={boneId}");
@@ -689,7 +687,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 return false;
             }
             _scratch.OriginalPose[boneId] = pose;
-            _scratch.LocalPose[boneId] = _rests[boneId] * pose;
+            _scratch.LocalPose[boneId] = pose;
         }
         if (!BuildComponents(_scratch.LocalPose, _scratch.OriginalComponentPose))
         {
@@ -756,20 +754,21 @@ public sealed class AlsComponentPoseModifier : IDisposable
         {
             var position = clip.PositionTracks[boneId] >= 0
                 ? clip.Animation.PositionTrackInterpolate(clip.PositionTracks[boneId], time)
-                : Vector3.Zero;
+                : _rests[boneId].Origin;
             var rotation = clip.RotationTracks[boneId] >= 0
                 ? clip.Animation.RotationTrackInterpolate(clip.RotationTracks[boneId], time)
-                : Quaternion.Identity;
+                : _rests[boneId].Basis.Orthonormalized()
+                    .GetRotationQuaternion().Normalized();
             var scale = clip.ScaleTracks[boneId] >= 0
                 ? clip.Animation.ScaleTrackInterpolate(clip.ScaleTracks[boneId], time)
-                : Vector3.One;
+                : _rests[boneId].Basis.Scale;
             if (!IsFinite(position) || !IsFinite(rotation) || !IsFinite(scale) ||
                 rotation.LengthSquared() <= 1e-12f)
             {
                 return false;
             }
             var pose = PoseTransform(position, rotation, scale);
-            locals[boneId] = _rests[boneId] * pose;
+            locals[boneId] = pose;
             if (!IsAffineInvertible(locals[boneId]))
             {
                 return false;
@@ -987,7 +986,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         if (!TrySwing(
                 knee - hip,
                 desiredKnee - hip,
-                _footSettings.MaximumThighAngleRadians,
+                MathF.PI,
                 out var thighSwing))
         {
             return false;
@@ -1046,13 +1045,12 @@ public sealed class AlsComponentPoseModifier : IDisposable
             return false;
         }
         var desiredLocal = parentInverse * desiredComponent;
-        var desiredPose = _restInverses[boneId] * desiredLocal;
-        var position = desiredPose.Origin;
+        var position = desiredLocal.Origin;
         if (!IsFinite(position))
         {
             return false;
         }
-        _scratch.LocalPose[boneId] = _rests[boneId] * PoseTransform(
+        _scratch.LocalPose[boneId] = PoseTransform(
             position,
             _scratch.OriginalRotations[boneId],
             _scratch.OriginalScales[boneId]);
@@ -1075,14 +1073,14 @@ public sealed class AlsComponentPoseModifier : IDisposable
         {
             return false;
         }
-        var desiredPose = _restInverses[boneId] * (parentInverse * desiredComponent);
-        var rotation = desiredPose.Basis.Orthonormalized()
+        var desiredLocal = parentInverse * desiredComponent;
+        var rotation = desiredLocal.Basis.Orthonormalized()
             .GetRotationQuaternion().Normalized();
         if (!IsFinite(rotation) || rotation.LengthSquared() <= 1e-12f)
         {
             return false;
         }
-        _scratch.LocalPose[boneId] = _rests[boneId] * PoseTransform(
+        _scratch.LocalPose[boneId] = PoseTransform(
             _scratch.OriginalPositions[boneId],
             rotation,
             _scratch.OriginalScales[boneId]);
@@ -1154,7 +1152,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             {
                 continue;
             }
-            var pose = _restInverses[boneId] * _scratch.LocalPose[boneId];
+            var pose = _scratch.LocalPose[boneId];
             var position = pose.Origin;
             var rotation = pose.Basis.GetRotationQuaternion();
             var scale = pose.Basis.Scale;
