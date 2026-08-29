@@ -492,12 +492,23 @@ public partial class AlsP3Character : Node3D
         SetActive(true);
     }
 
+    internal void StartReplacementWithoutClassification(long completedFrameId)
+    {
+        ResumeAt(completedFrameId);
+        Volatile.Write(ref _state.GatherSuspended, 0);
+        Volatile.Write(ref _state.WorkerSuspended, 1);
+        Volatile.Write(ref _state.CommitSuspended, 1);
+        ResetVisualReady();
+        SetActive(true);
+    }
+
     internal void StartReplacementRecovery()
     {
         EnsureMainThread();
         ThrowIfDisposed();
         Volatile.Write(ref _state.GatherSuspended, 1);
         Volatile.Write(ref _state.WorkerSuspended, 0);
+        Volatile.Write(ref _state.CommitSuspended, 0);
     }
 
     internal void CompleteReplacementRecovery()
