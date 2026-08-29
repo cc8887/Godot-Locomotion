@@ -204,7 +204,6 @@ public partial class P4PoseSmoke : Node
                 SpineWeight = 0f,
                 UpperBodyWeight = 0f,
             });
-
         var zeroInput = cases[0].ToInput() with
         {
             HeadWeight = 0f,
@@ -298,6 +297,15 @@ public partial class P4PoseSmoke : Node
             definition,
             poseProfile,
             cases[0].ToInput());
+        VerifyPresentationAwareFootCalibration(
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            library,
+            definition,
+            locomotionProfile,
+            poseProfile,
+            zeroInput);
 
         ulong aimDigest = 14695981039346656037UL;
         foreach (var digest in digests)
@@ -473,6 +481,62 @@ public partial class P4PoseSmoke : Node
         basePose.Restore(skeleton, visualRoot);
     }
 
+    private static void VerifyPresentationAwareFootCalibration(
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsPoseModifierInput zeroAim)
+    {
+        basePose.Restore(skeleton, visualRoot);
+        visualRoot.GlobalTransform = AlsP3Presentation.Create(
+            locomotionProfile.Presentation);
+        var expectedPhysicalBind = skeleton.GlobalTransform *
+            BuildRestComponent(skeleton, poseProfile.FootRig.Left.FootBoneId);
+        var currentPhysicalFoot = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, poseProfile.FootRig.Left.FootBoneId);
+
+        using var presentedModifier = new AlsComponentPoseModifier(
+            skeleton,
+            visualRoot,
+            library,
+            definition,
+            poseProfile,
+            null,
+            AlsPoseAffineTestFixture.None,
+            Transform3D.Identity);
+        var input = zeroAim with
+        {
+            LeftFootPose = new AlsFootPoseOutput(
+                ToNumerics(currentPhysicalFoot.Origin),
+                ToNumerics(Quaternion.Identity),
+                0f,
+                -1),
+            LeftFootIkWeight = 1f,
+            RightFootIkWeight = 0f,
+            CharacterWorldRotation = ToNumerics(Quaternion.Identity),
+        };
+        var output = default(AlsPoseModifierOutput);
+        Require(presentedModifier.TryApply(in input, ref output, out var reason),
+            $"presentation-aware foot calibration failed: {reason}");
+        var actualPhysicalFoot = skeleton.GlobalTransform *
+            BuildCurrentComponent(skeleton, poseProfile.FootRig.Left.FootBoneId);
+        var expectedRotation = expectedPhysicalBind.Basis.Orthonormalized()
+            .GetRotationQuaternion().Normalized();
+        Require(QuaternionAngle(
+                    ToGodot(output.LeftPhysicalTargetWorldRotation),
+                    expectedRotation) <= 0.03f &&
+                QuaternionAngle(
+                    actualPhysicalFoot.Basis.Orthonormalized()
+                        .GetRotationQuaternion().Normalized(),
+                    expectedRotation) <= 0.03f,
+            "presentation-aware target-to-foot bind lost the authored visual rotation");
+        basePose.Restore(skeleton, visualRoot);
+    }
+
     private static void RequireLegChannelsPreserved(
         PoseSnapshot before,
         Skeleton3D skeleton,
@@ -493,6 +557,12 @@ public partial class P4PoseSmoke : Node
 
     private static System.Numerics.Quaternion ToNumerics(in Quaternion value) =>
         new(value.X, value.Y, value.Z, value.W);
+
+    private static Quaternion ToGodot(in System.Numerics.Quaternion value) =>
+        new(value.X, value.Y, value.Z, value.W);
+
+    private static float QuaternionAngle(in Quaternion left, in Quaternion right) =>
+        2f * MathF.Acos(Math.Clamp(MathF.Abs(left.Dot(right)), 0f, 1f));
 
     private static bool IsControlledAllocationEnvironment() =>
         string.Equals(
@@ -1092,6 +1162,16 @@ public partial class P4PoseSmoke : Node
                     skeleton.GetBonePoseScale(current)),
                 skeleton.GetBonePosePosition(current));
             component *= pose;
+        }
+        return component;
+    }
+
+    private static Transform3D BuildRestComponent(Skeleton3D skeleton, int boneId)
+    {
+        var component = Transform3D.Identity;
+        foreach (var current in BuildChain(skeleton, boneId))
+        {
+            component *= skeleton.GetBoneRest(current);
         }
         return component;
     }

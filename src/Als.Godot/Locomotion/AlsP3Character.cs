@@ -93,6 +93,7 @@ public partial class AlsP3Character : Node3D
     {
         get
         {
+            EnsureMainThread();
             EnsureConfigured();
             var frameId = Volatile.Read(ref _state.CommittedFrameId);
             var diagnostics = _state.Diagnostics;
