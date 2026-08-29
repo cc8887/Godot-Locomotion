@@ -26,6 +26,7 @@ public partial class AlsP3CharacterSlot : Node
     private bool _failureRecoveryRequested;
     private long _classificationSequenceBaseline;
     private AlsFrameIdentity _expectedClassificationIdentity;
+    private bool _classificationRequired;
     private bool _configured;
     private int _disposed;
 
@@ -275,6 +276,8 @@ public partial class AlsP3CharacterSlot : Node
         }
         var motorCheckpoint = retired.CapturePublishedMotorLifecycle(
             publishedMotorFrameId);
+        _classificationRequired = !_failureRecoveryRequested ||
+            _exchangeSlot.TryGetPublishedIdentity(out _);
         var workerCheckpoint = _failureRecoveryRequested
             ? retired.CaptureFailureWorkerLifecycle(_replacementCompletedFrameId)
             : default;
@@ -324,7 +327,14 @@ public partial class AlsP3CharacterSlot : Node
                 "P3 retired character became visible before replacement activation.");
         }
         _active = replacement;
-        _active.StartReplacementClassification(_replacementCompletedFrameId);
+        if (_classificationRequired)
+        {
+            _active.StartReplacementClassification(_replacementCompletedFrameId);
+        }
+        else
+        {
+            _active.StartReplacementWithoutClassification(_replacementCompletedFrameId);
+        }
         var classification = _active.ResultClassificationDiagnostics;
         _classificationSequenceBaseline = classification.Sequence;
         _expectedClassificationIdentity = _active.HandleIdentity(
@@ -344,6 +354,21 @@ public partial class AlsP3CharacterSlot : Node
     private void TryStartRecovery()
     {
         var classification = _active.ResultClassificationDiagnostics;
+        if (!_classificationRequired)
+        {
+            if (_active.PublishedFrameId != _replacementCompletedFrameId + 1)
+            {
+                return;
+            }
+            if (classification.Sequence != _classificationSequenceBaseline ||
+                _active.RuntimeCommittedFrameId != _replacementCompletedFrameId)
+            {
+                throw new InvalidOperationException(
+                    "P3 initial replacement observed an unexpected result classification.");
+            }
+            StartRecoveryAfterClassification();
+            return;
+        }
         if (classification.Sequence == _classificationSequenceBaseline)
         {
             return;
@@ -364,6 +389,11 @@ public partial class AlsP3CharacterSlot : Node
                 "P3 slot replacement advanced commit while classifying its retired generation.");
         }
 
+        StartRecoveryAfterClassification();
+    }
+
+    private void StartRecoveryAfterClassification()
+    {
         _active.StartReplacementRecovery();
         var lifecycle = _active.LifecycleDiagnostics;
         if (lifecycle.IsVisible || lifecycle.IsVisualReady)
@@ -372,7 +402,7 @@ public partial class AlsP3CharacterSlot : Node
                 "P3 replacement revealed stale visual state during generation recovery.");
         }
         _committedFrameAtClassification = _active.RuntimeCommittedFrameId;
-        _generationMismatchObserved |= !_failureRecoveryRequested;
+        _generationMismatchObserved |= _classificationRequired && !_failureRecoveryRequested;
         _replacementPhase = AlsP3ReplacementPhase.AwaitingRecoveryCommit;
     }
 

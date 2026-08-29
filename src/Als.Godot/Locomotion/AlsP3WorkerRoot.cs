@@ -57,14 +57,17 @@ public partial class AlsP3WorkerRoot : Node3D
     internal AlsP3WorkerLifecycleSnapshot CaptureFailureLifecycleSnapshot(
         long committedFrameId)
     {
+        var expectedIdentity = new AlsFrameIdentity(
+            committedFrameId,
+            _state.Handle.CharacterId,
+            _state.Handle.Generation);
+        var ownsCommittedResult = _result.Identity == expectedIdentity ||
+            (committedFrameId == 0 && _result.Identity == default);
         if (!GodotThread.IsMainThread() ||
             Volatile.Read(ref _state.WorkerFrozen) == 0 ||
             _state.WorkerInFlightCount != 0 ||
             Volatile.Read(ref _state.CommittedFrameId) != committedFrameId ||
-            _result.Identity != new AlsFrameIdentity(
-                committedFrameId,
-                _state.Handle.CharacterId,
-                _state.Handle.Generation))
+            !ownsCommittedResult)
         {
             throw new InvalidOperationException(
                 "Worker failure checkpoint requires one frozen idle committed identity.");
@@ -389,24 +392,31 @@ public partial class AlsP3WorkerRoot : Node3D
                     candidateRuntimeState.RightFootLock = AlsFootLockState.CreateDefault();
                     candidateRuntimeState.LeftFootLocked = 0;
                     candidateRuntimeState.RightFootLocked = 0;
-                    candidateResult.LeftFootPose = candidateResult.LeftFootPose with
-                    {
-                        LockAmount = 0f,
-                        PlatformId = -1,
-                    };
-                    candidateResult.RightFootPose = candidateResult.RightFootPose with
-                    {
-                        LockAmount = 0f,
-                        PlatformId = -1,
-                    };
+                    candidateRuntimeState.PelvisCorrection = default;
+                    var releaseRotation = System.Numerics.Quaternion.Normalize(
+                        System.Numerics.Quaternion.CreateFromRotationMatrix(
+                            input.CharacterTransform));
+                    candidateResult.PelvisOffset = System.Numerics.Vector3.Zero;
+                    candidateResult.LeftFootPose = new AlsFootPoseOutput(
+                        worldOrigins.Left,
+                        releaseRotation,
+                        0f,
+                        -1);
+                    candidateResult.RightFootPose = new AlsFootPoseOutput(
+                        worldOrigins.Right,
+                        releaseRotation,
+                        0f,
+                        -1);
+                    candidateResult.LeftFootIkWeight = 0f;
+                    candidateResult.RightFootIkWeight = 0f;
                     candidateResult.LeftFootReleaseReason =
                         AlsFootReleaseReason.PlatformRemoved;
                     candidateResult.RightFootReleaseReason =
                         AlsFootReleaseReason.PlatformRemoved;
                 }
-                candidateResult.PelvisTarget = footPlacement.PelvisOffset;
-                candidateResult.LeftFootTarget = footPlacement.LeftFoot.Position;
-                candidateResult.RightFootTarget = footPlacement.RightFoot.Position;
+                candidateResult.PelvisTarget = candidateResult.PelvisOffset;
+                candidateResult.LeftFootTarget = candidateResult.LeftFootPose.Position;
+                candidateResult.RightFootTarget = candidateResult.RightFootPose.Position;
                 AdvanceWorkerStage(ref workerStageSequence, 0x123u, 4u);
                 controllerPrepared = false;
                 var advanceCountBefore = _controller!.GraphAdvanceCount;
