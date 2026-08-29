@@ -63,6 +63,7 @@ public partial class P4AnimationGraphSmoke : Node
         VerifyPreparedAirborneTimeline(definition, locomotionProfile, poseProfile, settings);
         VerifyPreparedBaseCrossfades(definition, locomotionProfile, poseProfile, settings);
         VerifyPreparedRollback(definition, locomotionProfile, poseProfile, settings);
+        VerifyAirborneTransitionRollback(definition, locomotionProfile, poseProfile, settings);
 
         using var library = AlsAnimationLibraryBuilder.Build(
             definition, locomotionProfile, poseProfile);
@@ -499,6 +500,7 @@ public partial class P4AnimationGraphSmoke : Node
             controller.Apply(in result, in disabled, 0.0);
             result.AnimationState = AlsAnimationState.JumpStart;
             result.ResolvedLocomotionState = AlsLocomotionState.InAir;
+            controller.Apply(in result, in disabled, 0.0);
             var prepared = controller.PrepareFrame(
                 in result, in disabled, halfTransition);
             var curves = controller.SampleFootCurves(in prepared);
@@ -535,6 +537,7 @@ public partial class P4AnimationGraphSmoke : Node
             controller.Apply(in result, in disabled, 0.0);
             result.AnimationState = AlsAnimationState.JumpStart;
             result.ResolvedLocomotionState = AlsLocomotionState.InAir;
+            controller.Apply(in result, in disabled, 0.0);
             var prepared = controller.PrepareFrame(
                 in result, in disabled, halfTransition);
             var curves = controller.SampleFootCurves(in prepared);
@@ -547,6 +550,15 @@ public partial class P4AnimationGraphSmoke : Node
                     "Prepared base curve froze the fading-from branch phase.");
             }
             controller.ApplyPrepared(in prepared);
+            var playback = graph.Tree.Get(graph.Handles.TopPlaybackPath)
+                .As<AnimationNodeStateMachinePlayback>();
+            var fadingFromPosition = playback?.GetFadingFromPlayPosition() ?? -1.0;
+            if (Math.Abs(fadingFromPosition - expectedPreviousPhase) > 1e-5)
+            {
+                throw new InvalidOperationException(
+                    "Godot fading-from playback phase diverged from the prepared source curve phase: " +
+                    $"expected={expectedPreviousPhase:R} actual={fadingFromPosition:R}");
+            }
             controller.CommitPrepared(in prepared);
         }
 
@@ -569,6 +581,7 @@ public partial class P4AnimationGraphSmoke : Node
             var disabled = AlsP4AnimationInput.Disabled;
             controller.Apply(in result, in disabled, 0.0);
             result.ActualStance = AlsStance.Crouching;
+            controller.Apply(in result, in disabled, 0.0);
             var prepared = controller.PrepareFrame(
                 in result, in disabled, halfTransition);
             var curves = controller.SampleFootCurves(in prepared);
@@ -658,6 +671,7 @@ public partial class P4AnimationGraphSmoke : Node
             result.ResolvedLocomotionState = state == AlsAnimationState.LandRecovery
                 ? AlsLocomotionState.Grounded
                 : AlsLocomotionState.InAir;
+            controller.Apply(in result, in disabled, 0.0);
             var prepared = controller.PrepareFrame(in result, in disabled, deltaTime);
             var curves = controller.SampleFootCurves(in prepared);
             if (MathF.Abs(prepared.BasePhaseNormalized - expected) > 1e-5f ||
@@ -866,6 +880,104 @@ public partial class P4AnimationGraphSmoke : Node
         {
             throw new InvalidOperationException(
                 "Prepared rollback did not restore the committed P4 action bank.");
+        }
+    }
+
+    private void VerifyAirborneTransitionRollback(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionSettings settings)
+    {
+        using var library = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(library.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(
+            library, locomotionProfile, poseProfile, definition);
+        using var controller = new AlsLocomotionAnimationController(
+            graph, settings, poseProfile, definition);
+        controller.Warmup();
+        var result = ValidResult();
+        var disabled = AlsP4AnimationInput.Disabled;
+        ApplySequence(controller, ref result, in disabled);
+        var expectedPose = controller.ComputePoseDigest(905);
+        var expectedPlayback = CapturePlayback(graph);
+        var expectedAdvances = controller.ManualAdvanceCount;
+
+        var failed = controller.PrepareFrame(in result, in disabled, 0.02);
+        controller.ApplyPrepared(in failed);
+        controller.RollbackPrepared(in failed);
+        var actualPlayback = CapturePlayback(graph);
+        if (controller.ComputePoseDigest(905) != expectedPose ||
+            controller.ManualAdvanceCount != expectedAdvances ||
+            Math.Abs(actualPlayback.Current - expectedPlayback.Current) > 1e-5 ||
+            Math.Abs(actualPlayback.FadingFrom - expectedPlayback.FadingFrom) > 1e-5 ||
+            Math.Abs(actualPlayback.FadingPosition - expectedPlayback.FadingPosition) > 1e-5 ||
+            actualPlayback.CurrentNode != expectedPlayback.CurrentNode ||
+            actualPlayback.FadingFromNode != expectedPlayback.FadingFromNode)
+        {
+            throw new InvalidOperationException(
+                "Jump-to-Fall late rollback did not restore the committed airborne crossfade: " +
+                $"poseExpected={expectedPose:X16} poseActual={controller.ComputePoseDigest(905):X16} " +
+                $"currentExpected={expectedPlayback.Current:R} currentActual={actualPlayback.Current:R} " +
+                $"fadingExpected={expectedPlayback.FadingFrom:R} " +
+                $"fadingActual={actualPlayback.FadingFrom:R} " +
+                $"fadePosExpected={expectedPlayback.FadingPosition:R} " +
+                $"fadePosActual={actualPlayback.FadingPosition:R} " +
+                $"nodesExpected={expectedPlayback.FadingFromNode}->{expectedPlayback.CurrentNode} " +
+                $"nodesActual={actualPlayback.FadingFromNode}->{actualPlayback.CurrentNode}.");
+        }
+
+        using var referenceLibrary = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile, poseProfile);
+        AddChild(referenceLibrary.Root);
+        using var referenceGraph = AlsLocomotionGraphBuilder.Build(
+            referenceLibrary, locomotionProfile, poseProfile, definition);
+        using var referenceController = new AlsLocomotionAnimationController(
+            referenceGraph, settings, poseProfile, definition);
+        referenceController.Warmup();
+        var referenceResult = ValidResult();
+        ApplySequence(referenceController, ref referenceResult, in disabled);
+        var referencePlayback = CapturePlayback(referenceGraph);
+        if (referenceController.ComputePoseDigest(906) != controller.ComputePoseDigest(906) ||
+            Math.Abs(referencePlayback.Current - actualPlayback.Current) > 1e-5 ||
+            Math.Abs(referencePlayback.FadingFrom - actualPlayback.FadingFrom) > 1e-5 ||
+            Math.Abs(referencePlayback.FadingPosition - actualPlayback.FadingPosition) > 1e-5 ||
+            referencePlayback.CurrentNode != actualPlayback.CurrentNode ||
+            referencePlayback.FadingFromNode != actualPlayback.FadingFromNode)
+        {
+            throw new InvalidOperationException(
+                "Jump-to-Fall rollback differed from a never-failed reference controller.");
+        }
+
+        static void ApplySequence(
+            AlsLocomotionAnimationController target,
+            ref AlsFrameResult frame,
+            in AlsP4AnimationInput input)
+        {
+            target.Apply(in frame, in input, 0.0);
+            frame.AnimationState = AlsAnimationState.JumpStart;
+            frame.ResolvedLocomotionState = AlsLocomotionState.InAir;
+            target.Apply(in frame, in input, 0.0);
+            target.Apply(in frame, in input, 0.1);
+            frame.AnimationState = AlsAnimationState.FallLoop;
+            target.Apply(in frame, in input, 0.0);
+            target.Apply(in frame, in input, 0.04);
+        }
+
+        static (double Current, double FadingFrom, double FadingPosition,
+            StringName CurrentNode, StringName FadingFromNode) CapturePlayback(
+            AlsLocomotionGraphBuildResult target)
+        {
+            var playback = target.Tree.Get(target.Handles.TopPlaybackPath)
+                .As<AnimationNodeStateMachinePlayback>()
+                ?? throw new InvalidOperationException("Top playback is missing.");
+            return (
+                playback.GetCurrentPlayPosition(),
+                playback.GetFadingFromPlayPosition(),
+                playback.GetFadingPosition(),
+                playback.GetCurrentNode(),
+                playback.GetFadingFromNode());
         }
     }
 

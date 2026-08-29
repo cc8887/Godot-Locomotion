@@ -127,6 +127,14 @@ internal readonly record struct AlsP3VisualCommitCandidate(
     ulong RootDigest,
     AlsP4FootProbeSourceSnapshot FootProbeSource);
 
+internal readonly record struct AlsP3PreparedResultPublication(
+    AlsFrameResult Result,
+    AlsP3VisualCommitCandidate Candidate,
+    long ModelFrameId,
+    long PoseFrameId,
+    int CharacterId,
+    int Generation);
+
 public readonly record struct AlsP3FrameDiagnostics(
     AlsFrameIdentity Identity,
     long CommandFrameId,
@@ -246,6 +254,19 @@ public enum AlsP3ReplacementPhase : byte
     Complete,
 }
 
+internal enum AlsP3WorkerFailureInjectionStage : byte
+{
+    None,
+    BeforePublish,
+}
+
+internal readonly record struct AlsP3WorkerTransactionRollbackDiagnostics(
+    AlsFrameIdentity Identity,
+    bool RuntimeStateRestored,
+    bool FrameResultRestored,
+    bool ControllerRestored,
+    bool P4BanksRestored);
+
 public readonly record struct AlsP3SlotReplacementDiagnostics(
     bool Requested,
     bool RetiredResultObserved,
@@ -269,6 +290,9 @@ internal readonly record struct AlsP3RuntimeDiagnostics(
 
 public sealed class AlsP3RuntimeContext
 {
+    private int _workerFailureInjectionStage;
+    private long _workerFailureInjectionFrameId;
+
     public AlsP3RuntimeContext(
         AlsHarnessMode mode,
         AlsLocomotionSettings settings,
@@ -318,6 +342,48 @@ public sealed class AlsP3RuntimeContext
     public AlsP3bHarnessContext? Measurement { get; }
 
     internal Func<Skeleton3D, IAlsSkeletonPoseWriter>? PoseWriterFactory { get; set; }
+
+    internal void ArmWorkerFailureInjection(
+        AlsP3WorkerFailureInjectionStage stage,
+        long frameId)
+    {
+        if (stage == AlsP3WorkerFailureInjectionStage.None)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage));
+        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(frameId);
+        Volatile.Write(ref _workerFailureInjectionFrameId, frameId);
+        if (Interlocked.CompareExchange(
+                ref _workerFailureInjectionStage,
+                (int)stage,
+                (int)AlsP3WorkerFailureInjectionStage.None) !=
+            (int)AlsP3WorkerFailureInjectionStage.None)
+        {
+            throw new InvalidOperationException("Worker failure injection is already armed.");
+        }
+    }
+
+    internal bool IsWorkerFailureInjectionArmed(
+        in AlsFrameIdentity identity,
+        AlsP3WorkerFailureInjectionStage stage) =>
+        Volatile.Read(ref _workerFailureInjectionStage) == (int)stage &&
+        Volatile.Read(ref _workerFailureInjectionFrameId) == identity.FrameId;
+
+    internal void ThrowIfWorkerFailureInjected(
+        in AlsFrameIdentity identity,
+        AlsP3WorkerFailureInjectionStage stage)
+    {
+        if (!IsWorkerFailureInjectionArmed(in identity, stage) ||
+            Interlocked.CompareExchange(
+                ref _workerFailureInjectionStage,
+                (int)AlsP3WorkerFailureInjectionStage.None,
+                (int)stage) != (int)stage)
+        {
+            return;
+        }
+        throw new InvalidOperationException(
+            $"Injected Worker failure at {stage} for frame {identity.FrameId}.");
+    }
 
     public long MissingResults;
 
@@ -460,6 +526,8 @@ internal sealed class AlsP3CharacterState
     public int ResultPublishedGeneration => ExchangeSlot.ResultPublishedGeneration;
 
     public int HasPublishedResult => Volatile.Read(ref ExchangeSlot.HasPublishedResult);
+
+    public AlsP3WorkerTransactionRollbackDiagnostics WorkerTransactionRollbackDiagnostics;
 
     public byte HasCommittedTargetYaw;
 
@@ -619,16 +687,43 @@ internal sealed class AlsP3CharacterState
         Volatile.Write(ref RollbackVerified, verified ? 1 : 0);
     }
 
-    public void PublishResult(
+    public AlsP3PreparedResultPublication PrepareResultPublication(
         in AlsFrameResult result,
         in AlsP3VisualCommitCandidate candidate,
         long modelFrameId,
         long poseFrameId)
     {
-        ModelResultFrameId = modelFrameId;
-        PoseAdvanceFrameId = poseFrameId;
-        VisualCommitCandidate = candidate;
-        ExchangeSlot.PublishResult(result);
+        if (candidate.Identity != result.Identity)
+        {
+            throw new InvalidOperationException(
+                "P3 visual commit candidate identity does not match its frame result.");
+        }
+        if (modelFrameId != result.Identity.FrameId ||
+            poseFrameId != result.Identity.FrameId)
+        {
+            throw new InvalidOperationException(
+                "P3 result publication frame ownership is inconsistent.");
+        }
+
+        return new AlsP3PreparedResultPublication(
+            result,
+            candidate,
+            modelFrameId,
+            poseFrameId,
+            checked((int)result.Identity.CharacterId),
+            checked((int)result.Identity.SlotGeneration));
+    }
+
+    public void PublishPreparedResult(in AlsP3PreparedResultPublication publication)
+    {
+        var result = publication.Result;
+        ModelResultFrameId = publication.ModelFrameId;
+        PoseAdvanceFrameId = publication.PoseFrameId;
+        VisualCommitCandidate = publication.Candidate;
+        ExchangeSlot.PublishPreparedResult(
+            in result,
+            publication.CharacterId,
+            publication.Generation);
     }
 }
 
@@ -644,10 +739,13 @@ internal sealed class AlsP3ExchangeSlot
 
     public int HasPublishedResult;
 
-    public void PublishResult(in AlsFrameResult result)
+    public void PublishPreparedResult(
+        in AlsFrameResult result,
+        int characterId,
+        int generation)
     {
-        ResultPublishedCharacterId = checked((int)result.Identity.CharacterId);
-        ResultPublishedGeneration = checked((int)result.Identity.SlotGeneration);
+        ResultPublishedCharacterId = characterId;
+        ResultPublishedGeneration = generation;
         ResultPublishedFrameId = result.Identity.FrameId;
         Exchange.PublishResult(result);
         Volatile.Write(ref HasPublishedResult, 1);

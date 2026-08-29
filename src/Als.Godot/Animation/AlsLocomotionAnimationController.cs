@@ -88,6 +88,44 @@ public readonly record struct AlsFootCurveSample(
     float LeftLockCurve,
     float RightLockCurve);
 
+internal readonly record struct AlsP4BankTransactionDiagnostics(
+    byte Bank,
+    byte TargetBank,
+    bool BlendActive,
+    double BlendElapsed,
+    float BlendAmount,
+    int BankAAnimationId,
+    int BankBAnimationId,
+    float BankAPlayRate,
+    float BankAPhase,
+    float BankBPlayRate,
+    float BankBPhase,
+    bool Pending,
+    int PendingAnimationId,
+    float PendingPlayRate,
+    float PendingPhase);
+
+internal readonly record struct AlsAnimationTransactionDiagnostics(
+    AlsAnimationState AnimationState,
+    AlsStance Stance,
+    long ManualAdvanceCount,
+    int ActiveTurnAnimationId,
+    int ActiveRotateAnimationId,
+    byte ActiveP4Mode,
+    float ActionBlendAmount,
+    float ActionModeBlendAmount,
+    double BaseStateElapsed,
+    AlsP4BankTransactionDiagnostics TurnBank,
+    AlsP4BankTransactionDiagnostics RotateBank);
+
+internal readonly record struct AlsPreparedAnimationCommit(
+    long OwnerId,
+    long Revision,
+    byte HasBaseTransitionPlayback,
+    double CurrentPlayPosition,
+    double FadingPlayPosition,
+    double FadePosition);
+
 public sealed class AlsLocomotionAnimationController : IDisposable
 {
     private const int WarmupUninitialized = 0;
@@ -165,6 +203,9 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private AlsStance _pendingBaseTransitionPreviousStance;
     private PreparedApply _baseTransitionPreviousPrepared;
     private PreparedApply _pendingBaseTransitionPreviousPrepared;
+    private double _baseTransitionCurrentPlayPosition;
+    private double _baseTransitionFadingPlayPosition;
+    private double _baseTransitionFadePosition;
     private double _baseStateElapsed;
     private double _pendingBaseStateElapsed;
     private PreparedApply _committedPrepared;
@@ -237,6 +278,19 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     public int ActiveTurnAnimationId { get; private set; } = -1;
 
     public int ActiveRotateAnimationId { get; private set; } = -1;
+
+    internal AlsAnimationTransactionDiagnostics CaptureTransactionDiagnostics() => new(
+        ActiveAnimationState,
+        ActiveStance,
+        ManualAdvanceCount,
+        ActiveTurnAnimationId,
+        ActiveRotateAnimationId,
+        _activeP4Mode,
+        _actionBlendAmount,
+        _actionModeBlendAmount,
+        _baseStateElapsed,
+        CaptureBankDiagnostics(in _turnChannel),
+        CaptureBankDiagnostics(in _rotateChannel));
 
     public void Warmup()
     {
@@ -596,11 +650,45 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
     public void CommitPrepared(in AlsPreparedAnimationFrame prepared)
     {
+        var commit = PrepareCommit(in prepared);
+        FinalizePreparedCommit(in commit);
+    }
+
+    internal AlsPreparedAnimationCommit PrepareCommit(
+        in AlsPreparedAnimationFrame prepared)
+    {
         ThrowIfDisposed();
         ValidateAppliedPrepared(in prepared);
+
+        if (_pendingBaseTransitionActive == 0)
+        {
+            return new AlsPreparedAnimationCommit(
+                prepared.OwnerId,
+                prepared.Revision,
+                0,
+                0.0,
+                0.0,
+                0.0);
+        }
+
+        var playback = _pendingBaseTransitionPreviousState == AlsAnimationState.Grounded &&
+            _pendingBaseTransitionTargetState == AlsAnimationState.Grounded
+            ? _groundedPlayback!
+            : _topPlayback!;
+        return new AlsPreparedAnimationCommit(
+            prepared.OwnerId,
+            prepared.Revision,
+            1,
+            playback.GetCurrentPlayPosition(),
+            playback.GetFadingFromPlayPosition(),
+            playback.GetFadingPosition());
+    }
+
+    internal void FinalizePreparedCommit(in AlsPreparedAnimationCommit commit)
+    {
         ManualAdvanceCount++;
-        ActiveAnimationState = prepared.AnimationState;
-        ActiveStance = prepared.Stance;
+        ActiveAnimationState = _pendingDecision.AnimationState;
+        ActiveStance = _pendingDecision.Stance;
         ActiveTurnAnimationId = _pendingP4Input.ActiveTurnAnimationId;
         ActiveRotateAnimationId = _pendingP4Input.ActiveRotateAnimationId;
         _activeP4Mode = _pendingRequestedP4Mode;
@@ -623,6 +711,12 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _baseTransitionPreviousState = _pendingBaseTransitionPreviousState;
         _baseTransitionPreviousStance = _pendingBaseTransitionPreviousStance;
         _baseTransitionPreviousPrepared = _pendingBaseTransitionPreviousPrepared;
+        if (commit.HasBaseTransitionPlayback != 0)
+        {
+            _baseTransitionCurrentPlayPosition = commit.CurrentPlayPosition;
+            _baseTransitionFadingPlayPosition = commit.FadingPlayPosition;
+            _baseTransitionFadePosition = commit.FadePosition;
+        }
         if (_pendingPreparedP4.TurnActive)
         {
             _activeTurnBlendSeconds = _pendingPreparedP4.TurnBinding.BlendSeconds;
@@ -1122,6 +1216,24 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         in AlsP4ClipBinding left,
         in AlsP4ClipBinding right) => left.StateName == right.StateName;
 
+    private static AlsP4BankTransactionDiagnostics CaptureBankDiagnostics(
+        in P4BlendChannelState state) => new(
+            state.Bank,
+            state.TargetBank,
+            state.BlendActive,
+            state.BlendElapsed,
+            state.BlendAmount,
+            state.BankA.AnimationId,
+            state.BankB.AnimationId,
+            state.BankAPlayRate,
+            state.BankAPhase,
+            state.BankBPlayRate,
+            state.BankBPhase,
+            state.Pending,
+            state.PendingBinding.AnimationId,
+            state.PendingPlayRate,
+            state.PendingPhase);
+
     private AlsLocomotionGraphParameterSet GetParameters(
         AlsAnimationState state,
         AlsStance stance) => state switch
@@ -1170,11 +1282,20 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     {
         if (_baseTransitionActive != 0)
         {
+            var transitionElapsed = _baseTransitionFadePosition;
             _topPlayback!.Start(
                 _graph.Handles.StateNames[(int)_baseTransitionPreviousState], true);
             _groundedPlayback!.Start(
                 _graph.Handles.StanceNames[(int)_baseTransitionPreviousStance], true);
-            SetPreparedParameters(in _baseTransitionPreviousPrepared);
+            var sourcePrepared = _baseTransitionPreviousPrepared with
+            {
+                Phase = RewindBasePhase(
+                    _baseTransitionFadingPlayPosition,
+                    _baseTransitionPreviousState,
+                    _baseTransitionPreviousPrepared.EffectivePlayRate,
+                    transitionElapsed),
+            };
+            SetPreparedParameters(in sourcePrepared);
             RestoreCommittedP4Parameters();
             _graph.Tree.Advance(0.0);
 
@@ -1189,9 +1310,25 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                 _groundedPlayback.Travel(
                     _graph.Handles.StanceNames[(int)_baseTransitionTargetStance], true);
             }
-            SetPreparedParameters(in _committedPrepared);
+            var targetStartPrepared = _committedPrepared with
+            {
+                Phase = RewindBasePhase(
+                    _baseTransitionCurrentPlayPosition,
+                    _baseTransitionTargetState,
+                    _committedPrepared.EffectivePlayRate,
+                    transitionElapsed),
+            };
+            SetPreparedParameters(in targetStartPrepared);
             RestoreCommittedP4Parameters();
-            _graph.Tree.Advance(_baseTransitionElapsed);
+            _graph.Tree.Advance(0.0);
+
+            var targetPrepared = _committedPrepared with
+            {
+                Phase = (float)_baseTransitionCurrentPlayPosition,
+            };
+            SetPreparedParameters(in targetPrepared);
+            RestoreCommittedP4Parameters();
+            _graph.Tree.Advance(transitionElapsed);
             return;
         }
 
@@ -1202,6 +1339,22 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         SetPreparedParameters(in _committedPrepared);
         RestoreCommittedP4Parameters();
         _graph.Tree.Advance(0.0);
+    }
+
+    private static float RewindBasePhase(
+        double phase,
+        AlsAnimationState state,
+        float effectivePlayRate,
+        double elapsed)
+    {
+        var value = (float)(phase -
+            (elapsed * effectivePlayRate /
+             AlsLocomotionGraphHandles.BaseTimelineSeconds));
+        if (state is AlsAnimationState.Grounded or AlsAnimationState.FallLoop)
+        {
+            return value - MathF.Floor(value);
+        }
+        return Math.Clamp(value, 0f, 1f);
     }
 
     private void RestoreCommittedP4Parameters()
