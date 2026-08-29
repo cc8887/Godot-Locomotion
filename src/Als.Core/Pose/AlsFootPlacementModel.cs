@@ -528,7 +528,9 @@ public static class AlsFootPlacementModel
         else
         {
             releaseReason = current.ReleaseReason;
-            if (lockCurve <= settings.LockWeightEpsilon && current.Amount <= Epsilon)
+            if (current.Amount <= Epsilon &&
+                (lockCurve <= settings.LockWeightEpsilon ||
+                 current.ReleaseReason == AlsFootReleaseReason.PlatformRemoved))
             {
                 next = AlsFootLockState.CreateDefault();
                 releaseReason = AlsFootReleaseReason.None;

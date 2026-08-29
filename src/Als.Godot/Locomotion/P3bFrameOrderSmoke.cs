@@ -238,11 +238,20 @@ public partial class P3bFrameOrderSmoke : Node
         Require(visualRootObservation.IsWorkerObservation &&
             visualRootObservation.FrameId == frame.CommittedFrameId,
             "real visual-root visibility was not observed by the same Worker frame");
-        var motorVelocity = ((CharacterBody3D)_active.MovementAnchor).GetRealVelocity();
+        var motor = (AlsCharacterMotor)_active.MovementAnchor;
+        var motorVelocity = motor.LifecycleActualVelocity;
         Require(MathF.Abs(frame.ActualVelocity.X - motorVelocity.X) < 0.00001f &&
-            MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
-            MathF.Abs(frame.ActualVelocity.Z - motorVelocity.Z) < 0.00001f,
-            "committed diagnostics did not carry the same-frame motor actual velocity");
+                MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
+                MathF.Abs(frame.ActualVelocity.Z - motorVelocity.Z) < 0.00001f,
+            "committed diagnostics did not carry the same-frame logical motor velocity");
+        if (!motor.HasPublishedVelocityCheckpoint)
+        {
+            var engineVelocity = motor.GetRealVelocity();
+            Require(MathF.Abs(frame.ActualVelocity.X - engineVelocity.X) < 0.00001f &&
+                    MathF.Abs(frame.ActualVelocity.Y - engineVelocity.Y) < 0.00001f &&
+                    MathF.Abs(frame.ActualVelocity.Z - engineVelocity.Z) < 0.00001f,
+                "committed diagnostics did not carry the same-frame engine motor velocity");
+        }
         ValidateProductionFootProbeOrigins(frame);
 
         if (_firstJumpFrame == 0 && frame.Result.ResolvedLocomotionState == AlsLocomotionState.InAir)

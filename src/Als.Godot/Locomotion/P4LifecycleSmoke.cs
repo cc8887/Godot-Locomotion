@@ -19,9 +19,13 @@ public partial class P4LifecycleSmoke : Node
     private const string ProfilePath = "res://assets/config/p3_locomotion_profile.json";
     private AlsP3RuntimeContext _context = null!;
     private AlsP3CharacterSlot _slot = null!;
+    private AlsP3CharacterSlot _platformSlot = null!;
     private AlsP3Character _active = null!;
     private AlsP3Character _platformCharacter = null!;
+    private PlatformCommandSource _platformCommandSource = null!;
     private AnimatableBody3D? _removablePlatform;
+    private Transform3D _platformInitialTransform;
+    private int _platformMotionSteps;
     private Phase _phase;
     private long _deactivatedFrame;
     private uint _retiredGeneration;
@@ -30,6 +34,14 @@ public partial class P4LifecycleSmoke : Node
     private AlsFrameInput _failedMotorInput;
     private bool _sawZeroVisibleRecovery;
     private bool _platformRemoved;
+    private bool _platformFailureArmed;
+    private bool _platformFailureRecoveryRequested;
+    private bool _platformFailureRecovered;
+    private bool _platformRecoveryReleasedBase;
+    private bool _platformRecoveryReleaseReasonObserved;
+    private long _platformFailureCommittedFrame;
+    private uint _platformFailedGeneration;
+    private AlsFrameInput _platformFailedMotorInput;
     private bool _platformRemovalReasonObserved;
     private bool _platformRemovalCleared;
     private bool _failureRecoveryObserved;
@@ -78,28 +90,31 @@ public partial class P4LifecycleSmoke : Node
                 "RemovablePlatform",
                 new Vector3(10f, -0.15f, 0f),
                 new Vector3(4f, 0.3f, 4f));
+            _removablePlatform.SyncToPhysics = false;
             AddChild(_removablePlatform);
+            _platformInitialTransform = _removablePlatform.GlobalTransform;
             _slot = new AlsP3CharacterSlot { Name = "LifecycleSlot" };
             AddChild(_slot);
+            var commandSource = new MonotonicReplayCommandSource();
             _slot.Configure(
                 _context,
-                () => AlsMotorReplay.CreateHarnessSequence(),
+                () => commandSource,
                 new Vector3(0f, motorSettings.StandingHeight * 0.5f, 0f));
             _active = _slot.ActiveCharacter;
-            _platformCharacter = new AlsP3Character
+            _platformSlot = new AlsP3CharacterSlot
             {
-                Name = "PlatformRemovalCharacter",
-                Position = new Vector3(
+                Name = "PlatformLifecycleSlot",
+            };
+            AddChild(_platformSlot);
+            _platformCommandSource = new PlatformCommandSource();
+            _platformSlot.Configure(
+                _context,
+                () => _platformCommandSource,
+                new Vector3(
                     10f,
                     motorSettings.StandingHeight * 0.5f,
-                    0f),
-            };
-            AddChild(_platformCharacter);
-            _platformCharacter.Configure(
-                _context,
-                new AlsSlotHandle(1, 1),
-                new TurnCommandSource());
-            _platformCharacter.SetActive(true);
+                    0f));
+            _platformCharacter = _platformSlot.ActiveCharacter;
         }
         catch (Exception exception)
         {
@@ -247,6 +262,10 @@ public partial class P4LifecycleSmoke : Node
         {
             return;
         }
+        if (_active.PublishedFrameId < _failureCommittedFrame + 3)
+        {
+            return;
+        }
         var publication = _active.LifecyclePublicationDiagnostics;
         Require(_active.Diagnostics.CommittedFrameId == _failureCommittedFrame &&
                 _active.ResultPublishedFrameId == _failureCommittedFrame,
@@ -263,8 +282,9 @@ public partial class P4LifecycleSmoke : Node
         _failedGeneration = _active.Handle.Generation;
         _failedMotorInput = _active.LatestMotorInput;
         Require(_failedMotorInput.Identity ==
-                    _active.HandleIdentity(_failureCommittedFrame + 1),
-            "failed generation did not retain the uncommitted Motor input for replay");
+                    _active.HandleIdentity(_active.PublishedFrameId) &&
+                _failedMotorInput.Identity.FrameId >= _failureCommittedFrame + 3,
+            "failed generation did not retain the latest delayed Motor input for transfer");
         _staleBeforeFailureRecovery = _context.StaleResults;
         _slot.RequestFailureRecovery();
         Interlocked.Increment(ref _context.StaleResults);
@@ -286,7 +306,7 @@ public partial class P4LifecycleSmoke : Node
             var publication = _active.LifecyclePublicationDiagnostics;
             var replayedMotorInput = _active.LatestMotorInput;
             Require(_active.Handle.Generation != _failedGeneration &&
-                    frame.CommittedFrameId == _failureCommittedFrame + 1 &&
+                    frame.CommittedFrameId == _failedMotorInput.Identity.FrameId &&
                     frame.Identity.SlotGeneration == _active.Handle.Generation &&
                     !_active.IsPoseFrozen,
                 "failed generation did not recover on the next frame in a new generation");
@@ -308,7 +328,7 @@ public partial class P4LifecycleSmoke : Node
             return;
         }
         Require(_context.GenerationMismatches == 1 &&
-                _context.StaleResults == 2 &&
+                _context.StaleResults == 3 &&
                 _context.MissingResults == 0 &&
                 _context.LaggedResults == 0 &&
                 _context.InvalidFootProbeRequests == 0 &&
@@ -316,16 +336,22 @@ public partial class P4LifecycleSmoke : Node
             "lifecycle scenario retained unexpected mismatch, result, probe, or affinity counters");
         GD.Print(
             "P4_LIFECYCLE_OK order=1 yaw=1 deactivate=1 replace=1 stale=1 " +
-            "generation=1 failure=1 recovery=1 platform_removal=1 probe=1");
+            "generation=1 failure=1 recovery=1 platform_recovery=1 " +
+            "platform_motion=1 platform_removal=1 probe=1");
         _slot.DisposeRuntime();
-        _platformCharacter.SetActive(false);
-        _platformCharacter.DisposeRuntime();
+        _platformSlot.DisposeRuntime();
         _finished = true;
         GetTree().Quit();
     }
 
     private void ObservePlatformRemoval()
     {
+        var platformSlot = _platformSlot;
+        if (platformSlot is null || !GodotObject.IsInstanceValid(platformSlot))
+        {
+            return;
+        }
+        _platformCharacter = platformSlot.ActiveCharacter;
         if (_platformCharacter is null ||
             !GodotObject.IsInstanceValid(_platformCharacter))
         {
@@ -336,16 +362,111 @@ public partial class P4LifecycleSmoke : Node
         {
             return;
         }
-        if (!_platformRemoved)
+        if (!_platformFailureRecoveryRequested && _platformMotionSteps < 4)
         {
-            if (frame.FootPose.LeftFootLock.Locked == 0 ||
-                frame.FootPose.RightFootLock.Locked == 0 ||
+            MovePlatformFixture();
+        }
+        if (!_failureRecoveryObserved)
+        {
+            return;
+        }
+        if (!_platformFailureArmed)
+        {
+            if (_platformMotionSteps < 4 ||
+                frame.FootPose.LeftFootLock.Locked != 1 ||
+                frame.FootPose.RightFootLock.Locked != 1 ||
+                frame.Result.LeftFootReleaseReason != AlsFootReleaseReason.None ||
+                frame.Result.RightFootReleaseReason != AlsFootReleaseReason.None ||
                 frame.FootPose.LeftFootLock.PlatformId < 0 ||
                 frame.FootPose.RightFootLock.PlatformId < 0 ||
                 _platformCharacter.WorkerInFlight != 0)
             {
                 return;
             }
+            _platformFailureCommittedFrame = frame.CommittedFrameId;
+            _platformFailedGeneration = _platformCharacter.Handle.Generation;
+            _context.ArmWorkerFailureInjection(
+                AlsP3WorkerFailureInjectionStage.BeforePublish,
+                _platformCharacter.HandleIdentity(_platformFailureCommittedFrame + 1));
+            _platformFailureArmed = true;
+            return;
+        }
+        if (!_platformFailureRecoveryRequested)
+        {
+            if (!_platformCharacter.IsPoseFrozen ||
+                _platformCharacter.FailureDiagnosticCount == 0)
+            {
+                return;
+            }
+            _platformFailedMotorInput = _platformCharacter.LatestMotorInput;
+            Require(_platformFailedMotorInput.Identity ==
+                        _platformCharacter.HandleIdentity(
+                            _platformFailureCommittedFrame + 1) &&
+                    _platformFailedMotorInput.Floor.PlatformId >= 0,
+                "moving-platform failure did not retain its authoritative Motor identity");
+            Require(
+                _platformFailedMotorInput.LeftFootHit.PlatformPosition !=
+                    ToNumerics(_platformInitialTransform.Origin),
+                $"moving-platform Gather did not observe translation: " +
+                $"{_platformFailedMotorInput.LeftFootHit.PlatformPosition}");
+            Require(
+                _platformFailedMotorInput.LeftFootHit.PlatformRotation !=
+                    ToNumerics(_platformInitialTransform.Basis.GetRotationQuaternion()),
+                $"moving-platform Gather did not observe rotation: " +
+                $"{_platformFailedMotorInput.LeftFootHit.PlatformRotation}");
+            platformSlot.RequestFailureRecovery();
+            _platformFailureRecoveryRequested = true;
+            return;
+        }
+        if (!_platformFailureRecovered)
+        {
+            var replacement = platformSlot.ReplacementDiagnostics;
+            if (!replacement.RecoveryCommitted ||
+                replacement.Phase != AlsP3ReplacementPhase.Complete)
+            {
+                return;
+            }
+            _platformCharacter = _platformSlot.ActiveCharacter;
+            frame = _platformCharacter.Diagnostics;
+            Require(_platformCharacter.Handle.Generation != _platformFailedGeneration &&
+                    frame.CommittedFrameId == _platformFailedMotorInput.Identity.FrameId &&
+                    MotorReplayMatches(
+                        _platformFailedMotorInput,
+                        _platformCharacter.LatestMotorInput,
+                        _platformCharacter.Handle.Generation),
+                "moving-platform failure recovery did not transfer the full published Motor frame");
+            _platformFailureRecovered = true;
+            return;
+        }
+        if (!_platformRecoveryReleasedBase)
+        {
+            if (frame.CommittedFrameId <= _platformFailedMotorInput.Identity.FrameId)
+            {
+                return;
+            }
+            _platformRecoveryReleaseReasonObserved |=
+                frame.Result.LeftFootReleaseReason ==
+                    AlsFootReleaseReason.PlatformRemoved &&
+                frame.Result.RightFootReleaseReason ==
+                    AlsFootReleaseReason.PlatformRemoved;
+            if (!_platformRecoveryReleaseReasonObserved ||
+                frame.FootPose.LeftFootLock.Locked != 0 ||
+                frame.FootPose.RightFootLock.Locked != 0)
+            {
+                return;
+            }
+            Require(frame.FootPose.LeftGatherHit.PlatformId < 0 &&
+                    frame.FootPose.RightGatherHit.PlatformId < 0 &&
+                    frame.FootPose.LeftGatherHit.ColliderId < 0 &&
+                    frame.FootPose.RightGatherHit.ColliderId < 0 &&
+                    frame.FootPose.LeftFootLock.PlatformId < 0 &&
+                    frame.FootPose.RightFootLock.PlatformId < 0 &&
+                    frame.Result.LeftFootPose.PlatformId < 0 &&
+                    frame.Result.RightFootPose.PlatformId < 0,
+                "moving-platform recovery did not publish a safe base discontinuity");
+            _platformRecoveryReleasedBase = true;
+            Require(_platformCharacter.WorkerInFlight == 0,
+                "moving-platform recovery removed its base while Worker was in flight");
             var platform = _removablePlatform ?? throw new InvalidOperationException(
                 "platform lock was acquired without a platform node");
             Require(GodotObject.IsInstanceValid(platform),
@@ -358,6 +479,7 @@ public partial class P4LifecycleSmoke : Node
                 new Vector3(10f, -0.15f, 0f),
                 new Vector3(0.12f, 0.3f, 0.12f)));
             _platformRemoved = true;
+            _platformRemovalReasonObserved = true;
             return;
         }
 
@@ -381,6 +503,19 @@ public partial class P4LifecycleSmoke : Node
                 "removed platform identity survived lock release or Gather");
             _platformRemovalCleared = true;
         }
+    }
+
+    private void MovePlatformFixture()
+    {
+        var platform = _removablePlatform;
+        if (platform is null || !GodotObject.IsInstanceValid(platform))
+        {
+            return;
+        }
+
+        platform.GlobalPosition += new Vector3(0.002f, 0f, 0f);
+        platform.RotateY(0.002f);
+        _platformMotionSteps++;
     }
 
     private static void VerifyCommittedOrder(in AlsP3FrameDiagnostics frame)
@@ -528,18 +663,22 @@ public partial class P4LifecycleSmoke : Node
         }
     }
 
+    private static NumericsVector3 ToNumerics(in Vector3 value) =>
+        new(value.X, value.Y, value.Z);
+
+    private static NumericsQuaternion ToNumerics(in Quaternion value) =>
+        new(value.X, value.Y, value.Z, value.W);
+
     private static bool MotorReplayMatches(
         in AlsFrameInput expected,
         in AlsFrameInput actual,
-        uint generation) =>
-        actual.Identity.FrameId == expected.Identity.FrameId &&
-        actual.Identity.CharacterId == expected.Identity.CharacterId &&
-        actual.Identity.SlotGeneration == generation &&
-        actual.CharacterTransform.Equals(expected.CharacterTransform) &&
-        actual.ActualVelocity == expected.ActualVelocity &&
-        actual.ActualAcceleration == expected.ActualAcceleration &&
-        actual.Stance == expected.Stance &&
-        actual.CharacterYaw == expected.CharacterYaw;
+        uint generation) => actual == expected with
+        {
+            Identity = new AlsFrameIdentity(
+                expected.Identity.FrameId,
+                expected.Identity.CharacterId,
+                generation),
+        };
 
     private enum Phase : byte
     {
@@ -550,13 +689,34 @@ public partial class P4LifecycleSmoke : Node
         RecoveringFailure,
     }
 
-    private sealed class TurnCommandSource : IAlsLocomotionCommandSource
+    private sealed class PlatformCommandSource : IAlsLocomotionCommandSource
     {
+        private float _viewYaw = MathF.PI * 0.5f;
+
         public AlsLocomotionCommand GetCommand(long frameId) =>
             AlsLocomotionCommand.CreateDefault() with
             {
-                ViewYaw = MathF.PI * 0.5f,
-                AimYaw = MathF.PI * 0.5f,
+                ViewYaw = _viewYaw,
+                AimYaw = _viewYaw,
             };
+
+    }
+
+    private sealed class MonotonicReplayCommandSource : IAlsLocomotionCommandSource
+    {
+        private readonly AlsReplayInputAdapter _inner =
+            AlsMotorReplay.CreateHarnessSequence();
+        private long _lastFrameId;
+
+        public AlsLocomotionCommand GetCommand(long frameId)
+        {
+            if (frameId != _lastFrameId + 1)
+            {
+                throw new InvalidOperationException(
+                    $"replacement requested non-current Motor command {frameId} after {_lastFrameId}");
+            }
+            _lastFrameId = frameId;
+            return _inner.GetCommand(frameId);
+        }
     }
 }

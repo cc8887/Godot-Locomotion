@@ -845,6 +845,29 @@ public sealed class AlsFootPlacementModelTests
     }
 
     [Fact]
+    public void CompletedPlatformRemovalReleaseClearsWithoutWaitingForLockCurve()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference() with
+        {
+            LockReleaseHalfLifeSeconds = 0f,
+        };
+        var platformHit = Hit(platformId: 7, platformPosition: Vector3.Zero);
+        Assert.True(Evaluate(settings, Input(platformHit), 1f, 0f, 1f, 0f, State(),
+            out var locked, out _, out _));
+
+        Assert.True(Evaluate(settings, Input(AlsFootHit.Invalid), 1f, 0f, 1f, 0f, locked,
+            out var releasing, out var released, out _));
+        Assert.Equal((byte)2, releasing.LeftFootLock.Locked);
+        Assert.Equal(0f, releasing.LeftFootLock.Amount);
+        Assert.Equal(AlsFootReleaseReason.PlatformRemoved, released.LeftReleaseReason);
+
+        Assert.True(Evaluate(settings, Input(AlsFootHit.Invalid), 1f, 0f, 1f, 0f, releasing,
+            out var cleared, out var completed, out _));
+        Assert.Equal(AlsFootLockState.CreateDefault(), cleared.LeftFootLock);
+        Assert.Equal(AlsFootReleaseReason.None, completed.LeftReleaseReason);
+    }
+
+    [Fact]
     public void LeftAndRightReleaseLatchesPersistTheirOwnFirstReasonUntilRearmed()
     {
         var settings = AlsFootPlacementSettings.CreateReference() with
