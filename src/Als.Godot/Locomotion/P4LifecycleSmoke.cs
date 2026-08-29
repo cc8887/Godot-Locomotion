@@ -424,6 +424,7 @@ public partial class P4LifecycleSmoke : Node
                     recovered.LatestMotorInput,
                     recovered.Handle.Generation),
             "initial Worker failure did not recover frame 1 in a new generation");
+        VerifyCommittedOrder(frame);
         _initialFailureRecovered = true;
     }
 
@@ -550,6 +551,9 @@ public partial class P4LifecycleSmoke : Node
             Require(frame.Result.LeftFootIkWeight == 0f &&
                     frame.Result.RightFootIkWeight == 0f &&
                     frame.Result.PelvisOffset == NumericsVector3.Zero &&
+                    frame.Result.PelvisTarget == NumericsVector3.Zero &&
+                    frame.Result.LeftFootTarget == frame.Result.LeftFootPose.Position &&
+                    frame.Result.RightFootTarget == frame.Result.RightFootPose.Position &&
                     frame.FootPose.ModifierFootChainRebuildCount == 0 &&
                     frame.FootPose.ModifierFootFullSkeletonRebuildCount == 0 &&
                     frame.FootPose.ModifierFootComponentPropagationCount == 0 &&
