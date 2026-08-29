@@ -27,6 +27,8 @@ public sealed record AlsPoseAnimationProfile(
     public AlsFootCurveProfile FootCurves { get; init; } = AlsFootCurveProfile.Empty;
 
     public AlsCompiledFootRig FootRig { get; init; }
+
+    public bool IsRuntimeComplete { get; init; }
 }
 
 public enum AlsPoseStance : byte
