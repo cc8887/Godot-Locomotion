@@ -289,6 +289,13 @@ public partial class P4LifecycleSmoke : Node
         {
             return;
         }
+        Require(_context.GenerationMismatches == 1 &&
+                _context.StaleResults == 1 &&
+                _context.MissingResults == 0 &&
+                _context.LaggedResults == 0 &&
+                _context.InvalidFootProbeRequests == 0 &&
+                _context.AffinityViolations == 0,
+            "lifecycle scenario retained unexpected mismatch, result, probe, or affinity counters");
         GD.Print(
             "P4_LIFECYCLE_OK order=1 yaw=1 deactivate=1 replace=1 stale=1 " +
             "generation=1 failure=1 recovery=1 platform_removal=1 probe=1");
