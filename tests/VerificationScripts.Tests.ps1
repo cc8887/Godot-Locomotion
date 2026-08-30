@@ -7,6 +7,7 @@ $script:GodotOutputFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\god
 $script:AssetLockFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\asset-lock-functions.ps1'
 $script:P2aVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1'
 $script:TrackedAssetLockPath = Join-Path $script:RepositoryRoot 'reference\als-v4-export.lock.json'
+$script:P4VerificationFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p4-verification-functions.ps1'
 
 if (Test-Path -LiteralPath $script:P2bFunctionsPath) {
     . $script:P2bFunctionsPath
@@ -16,6 +17,9 @@ if (Test-Path -LiteralPath $script:GodotOutputFunctionsPath) {
 }
 if (Test-Path -LiteralPath $script:AssetLockFunctionsPath) {
     . $script:AssetLockFunctionsPath
+}
+if (Test-Path -LiteralPath $script:P4VerificationFunctionsPath) {
+    . $script:P4VerificationFunctionsPath
 }
 
 function Write-SynchronizedManifestAndLock([object]$Manifest, [string]$ManifestPath, [string]$LockPath) {
@@ -320,5 +324,212 @@ Describe 'Native canonical rotation yaw ready gate' {
         $selfTestIndex | Should BeGreaterThan -1
         $readyMarkerIndex | Should BeGreaterThan $selfTestIndex
         $buildScript | Should Match 'Native curve export self-test marker was not found'
+    }
+}
+
+Describe 'P4 four-cell matrix output contract' {
+    BeforeAll {
+        $script:ValidP4MatrixLine = 'P4_MATRIX_OK mode=single characters=10 warmup=120 frames=600 result=0123456789ABCDEF pose=1123456789ABCDEF full_pose=2123456789ABCDEF root=3123456789ABCDEF aim=4123456789ABCDEF turn_rotate=5123456789ABCDEF feet=6123456789ABCDEF missing=0 stale=0 generation=0 lag=0 thread=0 model=0 curve=0 controller=0 modifier=0 skeleton=0 exchange=0 commit=0 foot_gather=408 advances=6000 modifiers=6000 commits=6000 per_character_advances=600 per_character_modifiers=600 per_character_commits=600 replacement=1 old_generation_rejected=1 lanes=10 gather_commit_p95_us=1400 worker_p95_us=2400 total_p99_us=3900'
+    }
+
+    It 'requires the strict parser and accepts exactly one complete finite result line' {
+        (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue) |
+            Should Not BeNullOrEmpty
+        if (-not (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $result = ConvertFrom-P4MatrixOutput -OutputLines @('Godot Engine', $script:ValidP4MatrixLine) `
+            -ExpectedMode single -ExpectedCharacterCount 10
+
+        $result.Mode | Should Be 'single'
+        $result.Characters | Should Be 10
+        $result.GatherCommitP95Microseconds | Should Be 1400
+        $result.WorkerP95Microseconds | Should Be 2400
+        $result.TotalP99Microseconds | Should Be 3900
+        $result.FootGatherAllocations | Should Be 408
+    }
+
+    It 'accepts over-budget timing for the 10-character single reference cell' {
+        if (-not (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $timedOutSingleLine = $script:ValidP4MatrixLine.Replace(
+            ' gather_commit_p95_us=1400', ' gather_commit_p95_us=1501').Replace(
+            ' worker_p95_us=2400', ' worker_p95_us=2501').Replace(
+            ' total_p99_us=3900', ' total_p99_us=4001')
+
+        $result = ConvertFrom-P4MatrixOutput -OutputLines @($timedOutSingleLine) `
+            -ExpectedMode single -ExpectedCharacterCount 10
+
+        $result.GatherCommitP95Microseconds | Should Be 1501
+        $result.WorkerP95Microseconds | Should Be 2501
+        $result.TotalP99Microseconds | Should Be 4001
+    }
+
+    It 'rejects over-budget timing for the 10-character parallel cell' {
+        if (-not (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $parallelLine = $script:ValidP4MatrixLine.Replace('mode=single', 'mode=parallel')
+        foreach ($timedOut in @(
+            $parallelLine.Replace(' gather_commit_p95_us=1400', ' gather_commit_p95_us=1501'),
+            $parallelLine.Replace(' worker_p95_us=2400', ' worker_p95_us=2501'),
+            $parallelLine.Replace(' total_p99_us=3900', ' total_p99_us=4001'))) {
+            $rejected = $false
+            try {
+                ConvertFrom-P4MatrixOutput -OutputLines @($timedOut) `
+                    -ExpectedMode parallel -ExpectedCharacterCount 10 | Out-Null
+            }
+            catch { $rejected = $true }
+            $rejected | Should Be $true
+        }
+    }
+
+    It 'requires non-negative finite timing in every matrix cell even when performance is not gated' {
+        if (-not (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        foreach ($mode in @('single', 'parallel')) {
+            foreach ($characterCount in @(1, 10)) {
+                $line = $script:ValidP4MatrixLine
+                if ($mode -eq 'parallel') {
+                    $line = $line.Replace('mode=single', 'mode=parallel')
+                }
+                if ($characterCount -eq 1) {
+                    $line = $line.Replace('characters=10', 'characters=1').Replace(
+                        'advances=6000', 'advances=600').Replace(
+                        'modifiers=6000', 'modifiers=600').Replace(
+                        'commits=6000', 'commits=600').Replace(
+                        'lanes=10', 'lanes=1')
+                }
+
+                ConvertFrom-P4MatrixOutput -OutputLines @($line) `
+                    -ExpectedMode $mode -ExpectedCharacterCount $characterCount | Out-Null
+
+                foreach ($field in @('gather_commit_p95_us', 'worker_p95_us', 'total_p99_us')) {
+                    $negative = $line -replace "${field}=[0-9]+", "${field}=-1"
+                    $rejected = $false
+                    try {
+                        ConvertFrom-P4MatrixOutput -OutputLines @($negative) `
+                            -ExpectedMode $mode -ExpectedCharacterCount $characterCount | Out-Null
+                    }
+                    catch { $rejected = $true }
+                    $rejected | Should Be $true
+                }
+            }
+        }
+    }
+
+    It 'rejects duplicate, missing, malformed, non-finite and nonzero fields' {
+        if (-not (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $cases = @(
+            @($script:ValidP4MatrixLine, $script:ValidP4MatrixLine),
+            @($script:ValidP4MatrixLine.Replace(' result=', ' result=0123456789ABCDEF result=')),
+            @($script:ValidP4MatrixLine + ' unknown=0'),
+            @($script:ValidP4MatrixLine.Replace(' feet=6123456789ABCDEF', '')),
+            @($script:ValidP4MatrixLine.Replace(' result=0123456789ABCDEF', ' result=not-a-digest')),
+            @($script:ValidP4MatrixLine.Replace(' worker_p95_us=2400', ' worker_p95_us=NaN')),
+            @($script:ValidP4MatrixLine.Replace(' stale=0', ' stale=1')),
+            @($script:ValidP4MatrixLine.Replace(' modifier=0', ' modifier=8')),
+            @($script:ValidP4MatrixLine.Replace(' advances=6000', ' advances=5999'))
+        )
+
+        foreach ($candidateLines in $cases) {
+            $rejected = $false
+            try {
+                ConvertFrom-P4MatrixOutput -OutputLines $candidateLines `
+                    -ExpectedMode single -ExpectedCharacterCount 10 | Out-Null
+            }
+            catch { $rejected = $true }
+            $rejected | Should Be $true
+        }
+    }
+
+    It 'requires transparent Foot Gather reporting without putting it in the zero-byte gate' {
+        if (-not (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $result = ConvertFrom-P4MatrixOutput -OutputLines @($script:ValidP4MatrixLine) `
+            -ExpectedMode single -ExpectedCharacterCount 10
+        $result.FootGatherAllocations | Should Be 408
+        (ConvertFrom-P4MatrixOutput `
+            -OutputLines @($script:ValidP4MatrixLine.Replace(' foot_gather=408', ' foot_gather=0')) `
+            -ExpectedMode single -ExpectedCharacterCount 10).FootGatherAllocations | Should Be 0
+        foreach ($invalid in @('-1', 'NaN')) {
+            $rejected = $false
+            try {
+                ConvertFrom-P4MatrixOutput `
+                    -OutputLines @($script:ValidP4MatrixLine.Replace(' foot_gather=408', " foot_gather=$invalid")) `
+                    -ExpectedMode single -ExpectedCharacterCount 10 | Out-Null
+            }
+            catch { $rejected = $true }
+            $rejected | Should Be $true
+        }
+    }
+
+    It 'requires exact seven-digest equality for each single and parallel pair' {
+        (Get-Command Assert-P4MatrixPair -ErrorAction SilentlyContinue) |
+            Should Not BeNullOrEmpty
+        if (-not (Get-Command Assert-P4MatrixPair -ErrorAction SilentlyContinue) -or
+            -not (Get-Command ConvertFrom-P4MatrixOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $single = ConvertFrom-P4MatrixOutput -OutputLines @($script:ValidP4MatrixLine) `
+            -ExpectedMode single -ExpectedCharacterCount 10
+        $parallelLine = $script:ValidP4MatrixLine.Replace('mode=single', 'mode=parallel')
+        $parallel = ConvertFrom-P4MatrixOutput -OutputLines @($parallelLine) `
+            -ExpectedMode parallel -ExpectedCharacterCount 10
+        { Assert-P4MatrixPair -Single $single -Parallel $parallel -CharacterCount 10 } |
+            Should Not Throw
+
+        foreach ($field in @('result', 'pose', 'full_pose', 'root', 'aim', 'turn_rotate', 'feet')) {
+            $mismatch = $parallelLine -replace "${field}=[0-9A-F]{16}", "${field}=FEDCBA9876543210"
+            $rejected = $false
+            try {
+                $candidate = ConvertFrom-P4MatrixOutput -OutputLines @($mismatch) `
+                    -ExpectedMode parallel -ExpectedCharacterCount 10
+                Assert-P4MatrixPair -Single $single -Parallel $candidate -CharacterCount 10
+            }
+            catch { $rejected = $true }
+            $rejected | Should Be $true
+        }
+    }
+
+    It 'requires the exact four command-line cells and whole-frame timing instrumentation in source' {
+        $harnessPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P4AnimationHarness.cs'
+        $contextPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\AlsP4HarnessContext.cs'
+        $scenePath = Join-Path $script:RepositoryRoot 'scenes\tests\p4_animation_harness.tscn'
+
+        Test-Path -LiteralPath $harnessPath -PathType Leaf | Should Be $true
+        Test-Path -LiteralPath $contextPath -PathType Leaf | Should Be $true
+        Test-Path -LiteralPath $scenePath -PathType Leaf | Should Be $true
+        if (-not (Test-Path -LiteralPath $harnessPath -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $contextPath -PathType Leaf)) {
+            return
+        }
+
+        $harness = [IO.File]::ReadAllText($harnessPath)
+        $context = [IO.File]::ReadAllText($contextPath)
+        $harness | Should Match '--mode='
+        $harness | Should Match '--characters='
+        $harness | Should Match '--warmup='
+        $harness | Should Match '--frames='
+        $harness | Should Match 'ProcessThreadGroupOrder\s*=\s*3'
+        $harness | Should Match "_mode == AlsHarnessMode.Parallel && _characterCount == 10"
+        $context | Should Match 'RecordGatherStart'
+        $context | Should Match 'RecordWorker(Start|Window)'
+        $context | Should Match 'RecordCommitEnd'
+        $context | Should Match 'GatherCommitP95'
+        $context | Should Match 'WorkerP95'
+        $context | Should Match 'TotalP99'
     }
 }

@@ -79,6 +79,10 @@ public partial class P4PoseSmoke : Node
             library,
             definition,
             poseProfile);
+        Require(modifier.AimSampleBoneCount > 0 &&
+                modifier.AimSampleBoneCount < graph.TargetSkeleton.GetBoneCount(),
+            $"Aim sampling did not compile a strict affected-bone ancestor closure: " +
+            $"sampled={modifier.AimSampleBoneCount} bones={graph.TargetSkeleton.GetBoneCount()}");
 
         var result = ValidResult();
         var disabled = AlsP4AnimationInput.Disabled;
@@ -105,7 +109,8 @@ public partial class P4PoseSmoke : Node
             var output = default(AlsPoseModifierOutput);
             Require(modifier.TryApply(in input, ref output, out var reason),
                 $"{cases[index].Name} pose failed: {reason}");
-            Require(reason == AlsP4ReasonCode.None && output.PoseDigest != 0,
+            Require(reason == AlsP4ReasonCode.None && output.PoseDigest != 0 &&
+                output.FullPoseDigest != 0,
                 $"{cases[index].Name} pose did not publish a valid digest");
             Require(output.AdditiveBaseAnimationId == poseProfile.Aim.AdditiveBasePoseAnimationId,
                 "modifier did not use the validated additive base animation");
@@ -132,6 +137,7 @@ public partial class P4PoseSmoke : Node
             var repeated = default(AlsPoseModifierOutput);
             Require(modifier.TryApply(in input, ref repeated, out reason) &&
                     repeated.PoseDigest == digests[index] &&
+                    repeated.FullPoseDigest == output.FullPoseDigest &&
                     repeated.OperationTicks == output.OperationTicks,
                 $"{cases[index].Name} pose digest was not stable: " +
                 $"first={digests[index]:X16} repeated={repeated.PoseDigest:X16} reason={reason}");
@@ -1350,6 +1356,7 @@ public partial class P4PoseSmoke : Node
         string label)
     {
         Require(actual.PoseDigest == expected.PoseDigest &&
+            actual.FullPoseDigest == expected.FullPoseDigest &&
                 actual.OperationTicks == expected.OperationTicks &&
                 actual.WriteTransactionCount == expected.WriteTransactionCount &&
                 actual.AffectedBoneCount == expected.AffectedBoneCount &&

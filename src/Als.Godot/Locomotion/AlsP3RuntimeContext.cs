@@ -374,7 +374,7 @@ public sealed class AlsP3RuntimeContext
         AlsLocomotionAnimationProfile profile,
         int mainManagedThreadId,
         bool headlessOrDebug,
-        AlsP3bHarnessContext? measurement = null)
+        IAlsP3RuntimeMeasurement? measurement = null)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         AnimationSet = animationSet ?? throw new ArgumentNullException(nameof(animationSet));
@@ -412,7 +412,7 @@ public sealed class AlsP3RuntimeContext
 
     public bool HeadlessOrDebug { get; }
 
-    public AlsP3bHarnessContext? Measurement { get; }
+    public IAlsP3RuntimeMeasurement? Measurement { get; }
 
     internal Func<Skeleton3D, IAlsSkeletonPoseWriter>? PoseWriterFactory { get; set; }
 

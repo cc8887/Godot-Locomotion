@@ -239,6 +239,10 @@ public partial class AlsP3WorkerRoot : Node3D
             var measurementIndex = -1;
             var measure = measurement is not null &&
                 measurement.TryGetMeasurementIndex(identity, out measurementIndex);
+            if (measure)
+            {
+                measurement!.RecordWorkerStart(measurementIndex, Stopwatch.GetTimestamp());
+            }
             var productionElapsedTicks = 0L;
             var allocatedBeforeExchange = measure
                 ? GC.GetAllocatedBytesForCurrentThread()
@@ -258,6 +262,7 @@ public partial class AlsP3WorkerRoot : Node3D
             if (measure)
             {
                 measurement!.AddExchangeAllocations(
+                    measurementIndex,
                     GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
             }
 
@@ -307,6 +312,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddModelAllocations(
+                        measurementIndex,
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeModel);
                 }
 
@@ -327,6 +333,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddSkeletonAllocations(
+                        measurementIndex,
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeSkeleton);
                 }
 
@@ -341,13 +348,32 @@ public partial class AlsP3WorkerRoot : Node3D
                     in candidateResult, in p4AnimationInput, input.DeltaTime);
                 controllerPrepared = true;
                 AdvanceWorkerStage(ref workerStageSequence, 0x1u, 2u);
+                if (measure)
+                {
+                    measurement!.AddControllerAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeController);
+                }
+
+                var allocatedBeforeCurve = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 var footCurves = _controller.SampleFootCurves(in preparedAnimation);
                 AdvanceWorkerStage(ref workerStageSequence, 0x12u, 3u);
                 candidateResult.LeftFootIkWeight = footCurves.LeftIkWeight;
                 candidateResult.RightFootIkWeight = footCurves.RightIkWeight;
                 candidateResult.LeftFootLockCurve = footCurves.LeftLockCurve;
                 candidateResult.RightFootLockCurve = footCurves.RightLockCurve;
+                if (measure)
+                {
+                    measurement!.AddCurveAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeCurve);
+                }
 
+                allocatedBeforeModel = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 var footSettings = input.Stance == AlsStance.Crouching
                     ? _crouchingFootSettings
                     : _standingFootSettings;
@@ -419,6 +445,16 @@ public partial class AlsP3WorkerRoot : Node3D
                 candidateResult.LeftFootTarget = candidateResult.LeftFootPose.Position;
                 candidateResult.RightFootTarget = candidateResult.RightFootPose.Position;
                 AdvanceWorkerStage(ref workerStageSequence, 0x123u, 4u);
+                if (measure)
+                {
+                    measurement!.AddModelAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeModel);
+                }
+
+                allocatedBeforeController = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 controllerPrepared = false;
                 var advanceCountBefore = _controller!.GraphAdvanceCount;
                 _controller.ApplyPrepared(in preparedAnimation);
@@ -426,6 +462,16 @@ public partial class AlsP3WorkerRoot : Node3D
                     _controller.GraphAdvanceCount - advanceCountBefore));
                 controllerApplied = true;
                 AdvanceWorkerStage(ref workerStageSequence, 0x1234u, 5u);
+                if (measure)
+                {
+                    measurement!.AddControllerAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeController);
+                }
+
+                allocatedBeforeSkeleton = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 if (!TryCaptureFootProbeOrigins(
                         input.Identity,
                         input.CharacterTransform,
@@ -448,6 +494,16 @@ public partial class AlsP3WorkerRoot : Node3D
                     candidateResult.NextLeftFootProbeOrigin;
                 candidateRuntimeState.RightFootProbeOrigin =
                     candidateResult.NextRightFootProbeOrigin;
+                if (measure)
+                {
+                    measurement!.AddSkeletonAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeSkeleton);
+                }
+
+                var allocatedBeforeModifier = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 var modifierInput = AlsPoseModifierInput.FromResult(in candidateResult) with
                 {
                     CharacterWorldRotation = System.Numerics.Quaternion
@@ -465,6 +521,12 @@ public partial class AlsP3WorkerRoot : Node3D
                         modifierReason,
                         $"P4 component pose modifier failed: {modifierReason}");
                 }
+                if (measure)
+                {
+                    measurement!.RecordModifierAdvance(
+                        measurementIndex,
+                        modifierOutput.WriteTransactionCount);
+                }
                 // Frame-result ticks are deterministic work units so they can participate in
                 // exact single/parallel digests. Wall-clock evidence stays in Measurement.
                 candidateResult.P4ModifierOperationTicks = modifierOutput.OperationTicks;
@@ -475,8 +537,9 @@ public partial class AlsP3WorkerRoot : Node3D
                 if (measure)
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
-                    measurement!.AddControllerAllocations(
-                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeController);
+                    measurement!.AddModifierAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeModifier);
                 }
 
                 allocatedBeforeSkeleton = measure
@@ -486,12 +549,13 @@ public partial class AlsP3WorkerRoot : Node3D
                     ? Stopwatch.GetTimestamp()
                     : 0L;
                 var poseDigest = _controller.ComputePoseDigest(frameId);
-                var fullPoseDigest = ComputeFullPoseDigest();
+                var fullPoseDigest = modifierOutput.FullPoseDigest;
                 var rootDigest = AlsP3Presentation.ComputeDigest(appliedRoot);
                 if (measure)
                 {
                     productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddSkeletonAllocations(
+                        measurementIndex,
                         GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeSkeleton);
                 }
 
@@ -528,16 +592,17 @@ public partial class AlsP3WorkerRoot : Node3D
                     in candidate,
                     candidateResult.Identity.FrameId,
                     frameId);
-                preparedCommit = _controller.PrepareCommit(in preparedAnimation);
                 if (measure)
                 {
-                    productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
                     measurement!.AddExchangeAllocations(
-                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
-                    measurement.RecordWorkerAdvance(
                         measurementIndex,
-                        productionElapsedTicks);
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
                 }
+
+                allocatedBeforeController = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
+                preparedCommit = _controller.PrepareCommit(in preparedAnimation);
                 _context.ThrowIfWorkerFailureInjected(
                     in identity,
                     AlsP3WorkerFailureInjectionStage.BeforePublish);
@@ -548,9 +613,32 @@ public partial class AlsP3WorkerRoot : Node3D
                 }
                 controllerPrepared = false;
                 controllerApplied = false;
+                if (measure)
+                {
+                    productionElapsedTicks += Stopwatch.GetTimestamp() - productionSegmentStartedAt;
+                    measurement!.AddControllerAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeController);
+                }
+
+                allocatedBeforeExchange = measure
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
                 _runtimeState = candidateRuntimeState;
                 _result = candidateResult;
                 _state.PublishPreparedResult(in publication);
+                if (measure)
+                {
+                    measurement!.AddExchangeAllocations(
+                        measurementIndex,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
+                    measurement!.RecordWorkerAdvance(
+                        measurementIndex,
+                        productionElapsedTicks);
+                    measurement.RecordWorkerEnd(
+                        measurementIndex,
+                        Stopwatch.GetTimestamp());
+                }
                 if (forcePlatformRelease)
                 {
                     _forcedPlatformReleaseFrameId = -1;
@@ -1027,7 +1115,7 @@ public partial class AlsP3WorkerRoot : Node3D
             _poseRotations[index] = _skeleton.GetBonePoseRotation(index);
             _poseScales[index] = _skeleton.GetBonePoseScale(index);
         }
-        _capturedFullPoseDigest = ComputeFullPoseDigest();
+        _capturedFullPoseDigest = ComputeCapturedPoseDigest();
         _capturedRootDigest = AlsP3Presentation.ComputeDigest(_capturedRootTransform);
     }
 
@@ -1305,6 +1393,18 @@ public partial class AlsP3WorkerRoot : Node3D
             Append(ref digest, _skeleton!.GetBonePosePosition(index));
             Append(ref digest, _skeleton.GetBonePoseRotation(index));
             Append(ref digest, _skeleton.GetBonePoseScale(index));
+        }
+        return digest;
+    }
+
+    private ulong ComputeCapturedPoseDigest()
+    {
+        var digest = 14695981039346656037UL;
+        for (var index = 0; index < _posePositions.Length; index++)
+        {
+            Append(ref digest, _posePositions[index]);
+            Append(ref digest, _poseRotations[index]);
+            Append(ref digest, _poseScales[index]);
         }
         return digest;
     }

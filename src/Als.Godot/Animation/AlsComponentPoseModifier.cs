@@ -78,6 +78,7 @@ public readonly record struct AlsPoseModifierInput(
 public struct AlsPoseModifierOutput
 {
     public ulong PoseDigest;
+    public ulong FullPoseDigest;
     public long OperationTicks;
     public int WriteTransactionCount;
     public int AffectedBoneCount;
@@ -222,6 +223,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
             (logicalCharacterTransform ?? visualRoot.GlobalTransform).Basis
                 .Orthonormalized().GetRotationQuaternion().Normalized();
         CompileAimMasks(profile, skeletonDefinition);
+        CompileAimSampleClosure();
         CompileFootAffectedSet();
         if (!BuildComponents(_rests, _scratch.BindComponentPose) ||
             !TryCompileFootCalibration(
@@ -283,6 +285,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
     }
 
     internal int NameValidationCount => Volatile.Read(ref _nameValidationCount);
+
+    internal int AimSampleBoneCount => _scratch.AimSampleCount;
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public bool TryApply(
@@ -436,11 +440,12 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 operationTicks += _scratch.AffectedCount * 4L;
             }
 
-            var poseDigest = ComputePoseDigest();
+            ComputePoseDigests(out var poseDigest, out var fullPoseDigest);
             operationTicks += _scratch.BoneCount * 4L;
             var candidate = new AlsPoseModifierOutput
             {
                 PoseDigest = poseDigest,
+                FullPoseDigest = fullPoseDigest,
                 OperationTicks = operationTicks,
                 WriteTransactionCount = writeTransactions,
                 AffectedBoneCount = _scratch.AffectedCount,
@@ -675,6 +680,34 @@ public sealed class AlsComponentPoseModifier : IDisposable
         }
     }
 
+    private void CompileAimSampleClosure()
+    {
+        for (var index = 0; index < _scratch.AimAffectedCount; index++)
+        {
+            var boneId = _scratch.AimAffectedOrder[index];
+            while (boneId >= 0 && !_scratch.AimSampled[boneId])
+            {
+                _scratch.AimSampled[boneId] = true;
+                boneId = _scratch.Parents[boneId];
+            }
+        }
+
+        var count = 0;
+        for (var index = 0; index < _scratch.Order.Length; index++)
+        {
+            var boneId = _scratch.Order[index];
+            if (_scratch.AimSampled[boneId])
+            {
+                _scratch.AimSampleOrder[count++] = boneId;
+            }
+        }
+        if (count < _scratch.AimAffectedCount || count > _scratch.BoneCount)
+        {
+            throw new InvalidOperationException("P4 Aim sample ancestor closure is invalid.");
+        }
+        _scratch.AimSampleCount = count;
+    }
+
     private bool TryCompileFootCalibration(
         in AlsCompiledLegChain leg,
         in Quaternion logicalCharacterWorldRotation,
@@ -790,7 +823,11 @@ public sealed class AlsComponentPoseModifier : IDisposable
         if (input.AimDownWeight > 0f)
         {
             sampledClipCount++;
-            if (!SampleClip(_down, downTime, _scratch.DownLocalPose, _scratch.DownComponentPose))
+            if (!SampleAimClip(
+                    _down,
+                    downTime,
+                    _scratch.DownLocalPose,
+                    _scratch.DownComponentPose))
             {
                 return false;
             }
@@ -798,7 +835,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         if (input.AimForwardWeight > 0f)
         {
             sampledClipCount++;
-            if (!SampleClip(
+            if (!SampleAimClip(
                     _forward,
                     forwardTime,
                     _scratch.ForwardLocalPose,
@@ -810,7 +847,11 @@ public sealed class AlsComponentPoseModifier : IDisposable
         if (input.AimUpWeight > 0f)
         {
             sampledClipCount++;
-            if (!SampleClip(_up, upTime, _scratch.UpLocalPose, _scratch.UpComponentPose))
+            if (!SampleAimClip(
+                    _up,
+                    upTime,
+                    _scratch.UpLocalPose,
+                    _scratch.UpComponentPose))
             {
                 return false;
             }
@@ -855,6 +896,54 @@ public sealed class AlsComponentPoseModifier : IDisposable
             }
         }
         return BuildComponents(locals, components);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private bool SampleAimClip(
+        ClipBinding clip,
+        double time,
+        Transform3D[] locals,
+        Transform3D[] components)
+    {
+        if (!double.IsFinite(time) || time < 0.0 || time > clip.Animation.Length + 1e-8)
+        {
+            return false;
+        }
+        time = Math.Min(time, clip.Animation.Length);
+        for (var index = 0; index < _scratch.AimSampleCount; index++)
+        {
+            var boneId = _scratch.AimSampleOrder[index];
+            var position = clip.PositionTracks[boneId] >= 0
+                ? clip.Animation.PositionTrackInterpolate(clip.PositionTracks[boneId], time)
+                : _rests[boneId].Origin;
+            var rotation = clip.RotationTracks[boneId] >= 0
+                ? clip.Animation.RotationTrackInterpolate(clip.RotationTracks[boneId], time)
+                : _rests[boneId].Basis.Orthonormalized()
+                    .GetRotationQuaternion().Normalized();
+            var scale = clip.ScaleTracks[boneId] >= 0
+                ? clip.Animation.ScaleTrackInterpolate(clip.ScaleTracks[boneId], time)
+                : _rests[boneId].Basis.Scale;
+            if (!IsFinite(position) || !IsFinite(rotation) || !IsFinite(scale) ||
+                rotation.LengthSquared() <= 1e-12f)
+            {
+                return false;
+            }
+            var local = PoseTransform(position, rotation, scale);
+            if (!IsAffineInvertible(local))
+            {
+                return false;
+            }
+            locals[boneId] = local;
+            var parent = _scratch.Parents[boneId];
+            components[boneId] = parent < 0
+                ? local
+                : components[parent] * local;
+            if (!IsAffineInvertible(components[boneId]))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -1516,17 +1605,57 @@ public sealed class AlsComponentPoseModifier : IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private ulong ComputePoseDigest()
+    private void ComputePoseDigests(out ulong poseDigest, out ulong fullPoseDigest)
     {
-        var digest = DigestOffsetBasis;
+        poseDigest = DigestOffsetBasis;
+        fullPoseDigest = DigestOffsetBasis;
         for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
         {
-            Append(ref digest, _skeleton.GetBonePosePosition(boneId));
-            Append(ref digest, _skeleton.GetBonePoseRotation(boneId));
-            Append(ref digest, _skeleton.GetBonePoseScale(boneId));
+            var modified = _scratch.Modified[boneId];
+            var position = modified
+                ? _scratch.ResultPositions[boneId]
+                : _scratch.OriginalPositions[boneId];
+            var rotation = modified
+                ? _scratch.ResultRotations[boneId]
+                : _scratch.OriginalRotations[boneId];
+            var scale = modified
+                ? _scratch.ResultScales[boneId]
+                : _scratch.OriginalScales[boneId];
+            Append(ref poseDigest, position);
+            Append(ref poseDigest, rotation);
+            Append(ref poseDigest, scale);
+            AppendQuantized(ref fullPoseDigest, position);
+            AppendQuantized(ref fullPoseDigest, rotation);
+            AppendQuantized(ref fullPoseDigest, scale);
         }
-        Append(ref digest, _visualRoot.GlobalTransform.Origin);
-        return digest;
+        Append(ref poseDigest, _visualRoot.GlobalTransform.Origin);
+    }
+
+    private static void AppendQuantized(ref ulong digest, in Vector3 value)
+    {
+        AppendQuantized(ref digest, value.X);
+        AppendQuantized(ref digest, value.Y);
+        AppendQuantized(ref digest, value.Z);
+    }
+
+    private static void AppendQuantized(ref ulong digest, in Quaternion value)
+    {
+        AppendQuantized(ref digest, value.X);
+        AppendQuantized(ref digest, value.Y);
+        AppendQuantized(ref digest, value.Z);
+        AppendQuantized(ref digest, value.W);
+    }
+
+    private static void AppendQuantized(ref ulong digest, float value)
+    {
+        var quantized = checked((int)MathF.Round(
+            value * 100_000f,
+            MidpointRounding.AwayFromZero));
+        for (var shift = 0; shift < 32; shift += 8)
+        {
+            digest ^= (byte)(quantized >> shift);
+            digest *= DigestPrime;
+        }
     }
 
     private static bool Validate(

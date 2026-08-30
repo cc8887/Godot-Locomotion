@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
@@ -266,6 +267,18 @@ public partial class AlsP3Character : Node3D
                 throw new InvalidOperationException("P3 frame sequence reached its supported limit.");
             }
             var frameId = completedFrameId + 1;
+            var measurement = _context.Measurement;
+            var measurementIndex = -1;
+            var measure = measurement is not null &&
+                measurement.TryGetMeasurementIndex(
+                    HandleIdentity(frameId),
+                    out measurementIndex);
+            if (measure)
+            {
+                measurement!.RecordGatherStart(
+                    measurementIndex,
+                    Stopwatch.GetTimestamp());
+            }
             AlsFrameInput input;
             if (_hasStagedReplacementMotorInput)
             {
@@ -292,9 +305,6 @@ public partial class AlsP3Character : Node3D
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
             _state.MotorActualVelocity = input.ActualVelocity;
             _state.MotorInput = input;
-            var measurement = _context.Measurement;
-            var measure = measurement is not null &&
-                measurement.TryGetMeasurementIndex(input.Identity, out _);
             var allocatedBeforeExchange = measure
                 ? GC.GetAllocatedBytesForCurrentThread()
                 : 0L;
@@ -302,9 +312,16 @@ public partial class AlsP3Character : Node3D
             if (measure)
             {
                 measurement!.AddExchangeAllocations(
+                    measurementIndex,
                     GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
             }
             Volatile.Write(ref _state.PublishedFrameId, frameId);
+            if (measure)
+            {
+                measurement!.RecordGatherEnd(
+                    measurementIndex,
+                    Stopwatch.GetTimestamp());
+            }
         }
         catch (Exception exception)
         {
