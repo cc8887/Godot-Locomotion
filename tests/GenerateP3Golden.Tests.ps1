@@ -35,6 +35,7 @@ Describe 'generate-p3-golden.ps1 semantic validation' {
         $attributes = [System.IO.File]::ReadAllText(
             (Join-Path $script:RepositoryRoot '.gitattributes'))
 
+        $attributes | Should Match '(?m)^\.gitattributes text eol=lf$'
         $attributes | Should Match `
             '(?m)^reference/patches/\*\.patch text eol=lf whitespace=-space-before-tab$'
     }
