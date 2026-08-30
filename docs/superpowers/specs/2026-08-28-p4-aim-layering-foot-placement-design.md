@@ -1,6 +1,6 @@
 # P4 Aim、分层姿态和 Foot IK 设计
 
-**状态：** 已批准设计，待实施
+**状态：** P4 Task 15 已实现；Task 16/17 待实施
 
 **日期：** 2026-08-28
 
@@ -519,17 +519,23 @@ Debug 下 worker exception、线程错误、非有限合同、stale/generation m
 
 ## 十二、性能门禁
 
-P4 短时门禁沿用总性能合同的阶段阈值：
+P4 短时门禁沿用总性能合同的阶段阈值。矩阵同时运行 `1/10` 角色的
+`single` 和 `parallel`，但两种模式的性能语义不同：`parallel` 是实际
+多角色 Worker 临界路径，承担阶段性能硬门禁；`single` 是确定性参考路径，
+用于证明与 `parallel` 的行为等价，不把十个串行 Worker 的总 CPU 时间误当
+成并行临界路径。`single` 仍必须通过完整功能、摘要、错误计数、代际和稳态
+零分配门禁，并且必须报告真实 timing；其 timing 不作为 P4 性能硬门禁的通过
+条件。
 
 | 指标 | P4 要求 |
 | --- | ---: |
-| 10 角色 Gather + Commit 主线程 p95 | `<= 1.5 ms` |
-| 10 角色 Worker 动画关键路径 p95 | `<= 2.5 ms` |
-| ALS 整体关键路径 p99 | `<= 4.0 ms` |
+| 10 角色 `parallel` Gather + Commit 主线程 p95 | `<= 1.5 ms` |
+| 10 角色 `parallel` Worker 动画关键路径 p95 | `<= 2.5 ms` |
+| 10 角色 `parallel` ALS 整体关键路径 p99 | `<= 4.0 ms` |
 | 热身后每帧托管分配 | `0 B` |
 | stale / duplicate / missing / generation error | `0` |
 
-前 10 个角色必须保持 60 Hz 完整 AimOffset、Layering、Turn/Rotate 和 Foot IK。不得关闭 IK、简化图、降低频率或使用不同功能路径换取通过。
+前 10 个角色在 `parallel` 运行时必须保持 60 Hz 完整 AimOffset、Layering、Turn/Rotate 和 Foot IK。`single` 使用同一完整功能路径，仅改变 Worker 所属线程组，不能关闭 IK、简化图、降低频率或使用不同功能路径换取摘要等价。
 
 若未达标，优化顺序固定为：
 
@@ -614,7 +620,7 @@ focused 或 `-SkipRegression` 模式只能输出不能冒充完整成功的 focu
 12. 1/10 single/parallel 所有摘要一致；
 13. 前 10 个角色保持 60 Hz 全质量 P4 路径；
 14. 稳态托管分配和线程/帧/generation 错误为 `0`；
-15. P4 阶段 p95/p99 满足第十二节阈值；
+15. `10/parallel` 的 P4 阶段 p95/p99 满足第十二节阈值；`10/single` 报告真实 timing，并通过功能、等价、错误和零分配门禁；
 16. P0-P3、Debug/Release 和资产导入回归全部通过；
 17. 未修改 Godot Core，未维护引擎 fork，未无证据引入 GDExtension；
 18. 文档记录 profile、曲线、mask、线程所有权、golden、性能和验收结果。

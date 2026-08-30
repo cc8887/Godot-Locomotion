@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
@@ -52,8 +53,15 @@ public partial class AlsP3CommitStage : Node
             _state.Handle.CharacterId,
             _state.Handle.Generation);
         var measurement = _context.Measurement;
+        var measurementIndex = -1;
         var measure = measurement is not null &&
-            measurement.TryGetMeasurementIndex(identity, out _);
+            measurement.TryGetMeasurementIndex(identity, out measurementIndex);
+        if (measure)
+        {
+            measurement!.RecordCommitStart(
+                measurementIndex,
+                Stopwatch.GetTimestamp());
+        }
         var allocatedBeforeExchange = measure
             ? GC.GetAllocatedBytesForCurrentThread()
             : 0L;
@@ -61,6 +69,7 @@ public partial class AlsP3CommitStage : Node
         if (measure)
         {
             measurement!.AddExchangeAllocations(
+                measurementIndex,
                 GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
         }
         if (!consumed)
@@ -123,7 +132,11 @@ public partial class AlsP3CommitStage : Node
         if (measure)
         {
             measurement!.AddCommitAllocations(
+                measurementIndex,
                 GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeCommit);
+            measurement.RecordCommitEnd(
+                measurementIndex,
+                Stopwatch.GetTimestamp());
         }
     }
 

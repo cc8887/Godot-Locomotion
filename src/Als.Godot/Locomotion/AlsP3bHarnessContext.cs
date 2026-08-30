@@ -4,7 +4,7 @@ using GodotAls.Core.Contracts;
 
 namespace GodotAls.Locomotion;
 
-public sealed class AlsP3bHarnessContext
+public sealed class AlsP3bHarnessContext : IAlsP3RuntimeMeasurement
 {
     public const int WarmupFrames = 120;
     public const int MeasurementFrames = 600;
@@ -102,22 +102,42 @@ public sealed class AlsP3bHarnessContext
         Interlocked.Increment(ref _advanceCounts[characterIndex]);
     }
 
+    public void RecordGatherStart(int measurementIndex, long timestamp) { }
+
+    public void RecordGatherEnd(int measurementIndex, long timestamp) { }
+
+    public void RecordWorkerStart(int measurementIndex, long timestamp) { }
+
+    public void RecordWorkerEnd(int measurementIndex, long timestamp) { }
+
+    public void RecordModifierAdvance(int measurementIndex, int transactionCount) { }
+
+    public void RecordCommitStart(int measurementIndex, long timestamp) { }
+
+    public void RecordCommitEnd(int measurementIndex, long timestamp) { }
+
     public long GetAdvanceCount(int characterIndex) =>
         Interlocked.Read(ref _advanceCounts[characterIndex]);
 
-    public void AddModelAllocations(long value) =>
+    public void AddModelAllocations(int measurementIndex, long value) =>
         Interlocked.Add(ref ModelAllocations, value);
 
-    public void AddControllerAllocations(long value) =>
+    public void AddCurveAllocations(int measurementIndex, long value) =>
         Interlocked.Add(ref ControllerAllocations, value);
 
-    public void AddSkeletonAllocations(long value) =>
+    public void AddControllerAllocations(int measurementIndex, long value) =>
+        Interlocked.Add(ref ControllerAllocations, value);
+
+    public void AddModifierAllocations(int measurementIndex, long value) =>
+        Interlocked.Add(ref ControllerAllocations, value);
+
+    public void AddSkeletonAllocations(int measurementIndex, long value) =>
         Interlocked.Add(ref SkeletonAllocations, value);
 
-    public void AddExchangeAllocations(long value) =>
+    public void AddExchangeAllocations(int measurementIndex, long value) =>
         Interlocked.Add(ref ExchangeAllocations, value);
 
-    public void AddCommitAllocations(long value) =>
+    public void AddCommitAllocations(int measurementIndex, long value) =>
         Interlocked.Add(ref CommitAllocations, value);
 
     public (long P95Microseconds, long P99Microseconds) StopAndCalculatePercentiles()

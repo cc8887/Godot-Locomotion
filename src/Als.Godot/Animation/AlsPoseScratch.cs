@@ -37,11 +37,13 @@ public sealed class AlsPoseScratch
         Parents = new int[count];
         Affected = new bool[count];
         AimAffected = new bool[count];
+        AimSampled = new bool[count];
         Modified = new bool[count];
         ValidationVisited = new bool[count];
         Order = new int[count];
         AffectedOrder = new int[count];
         AimAffectedOrder = new int[count];
+        AimSampleOrder = new int[count];
 
         BuildParentOrder(skeleton);
     }
@@ -96,6 +98,8 @@ public sealed class AlsPoseScratch
 
     public bool[] AimAffected { get; }
 
+    public bool[] AimSampled { get; }
+
     public bool[] Modified { get; }
 
     public bool[] ValidationVisited { get; }
@@ -106,9 +110,13 @@ public sealed class AlsPoseScratch
 
     public int[] AimAffectedOrder { get; }
 
+    public int[] AimSampleOrder { get; }
+
     public int AffectedCount { get; internal set; }
 
     public int AimAffectedCount { get; internal set; }
+
+    public int AimSampleCount { get; internal set; }
 
     public int FootChainRebuildCount { get; internal set; }
 
