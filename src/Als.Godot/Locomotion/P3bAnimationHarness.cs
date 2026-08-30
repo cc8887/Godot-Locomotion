@@ -238,6 +238,7 @@ public partial class P3bAnimationHarness : Node
         {
             _firstMeasurementFrames[index] = _lastObservedFrames[index] + 1L;
         }
+        Interlocked.Exchange(ref _runtime.FootGatherManagedAllocations, 0);
         _measurement.Start(_firstMeasurementFrames);
         _measurementStarted = true;
     }
@@ -294,6 +295,8 @@ public partial class P3bAnimationHarness : Node
         var commitAllocations = Interlocked.Read(ref _measurement.CommitAllocations);
         var allocations = modelAllocations + controllerAllocations + skeletonAllocations +
             exchangeAllocations + commitAllocations;
+        var footGatherAllocations = Interlocked.Read(ref _runtime.FootGatherManagedAllocations);
+        var totalManagedAllocations = allocations + footGatherAllocations;
         var missing = Interlocked.Read(ref _runtime.MissingResults);
         var stale = Interlocked.Read(ref _runtime.StaleResults);
         var lag = Interlocked.Read(ref _runtime.LaggedResults);
@@ -310,6 +313,8 @@ public partial class P3bAnimationHarness : Node
         Require(offMain == expectedOffMain,
             "worker off-main execution did not match the selected mode");
         Require(allocations == 0, "steady-state managed allocations were observed");
+        Require(footGatherAllocations > 0,
+            "Foot Gather managed allocations were not reported");
 
         var mode = _mode == AlsHarnessMode.Single ? "single" : "parallel";
         var marker =
@@ -318,12 +323,15 @@ public partial class P3bAnimationHarness : Node
             $"digest={_resultDigest:X16} pose={_poseDigest:X16} " +
             $"full_pose={_fullPoseDigest:X16} root={_rootDigest:X16} missing={missing} stale={stale} " +
             $"generation={generationErrors} off_main={offMain} lag={lag} allocations={allocations} " +
+            $"foot_gather={footGatherAllocations} " +
+            $"total_managed_allocations={totalManagedAllocations} " +
             $"p95_us={timing.P95Microseconds} p99_us={timing.P99Microseconds}";
 
         CleanupRuntime();
         GD.Print(
             $"GODOT_ALS_P3B_ALLOC model={modelAllocations} controller={controllerAllocations} " +
-            $"skeleton={skeletonAllocations} exchange={exchangeAllocations} commit={commitAllocations}");
+            $"skeleton={skeletonAllocations} exchange={exchangeAllocations} commit={commitAllocations} " +
+            $"foot_gather={footGatherAllocations} total_managed_allocations={totalManagedAllocations}");
         for (var index = 0; index < _characterCount; index++)
         {
             GD.Print(

@@ -67,3 +67,11 @@ public enum AlsAnimationState : byte
     FallLoop,
     LandRecovery,
 }
+
+public enum AlsYawSource : byte
+{
+    None = 0,
+    Locomotion = 1,
+    TurnInPlace = 2,
+    RotateInPlace = 3,
+}

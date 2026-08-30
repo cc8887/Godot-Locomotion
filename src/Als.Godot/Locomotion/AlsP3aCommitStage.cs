@@ -127,6 +127,9 @@ public partial class AlsP3aCommitStage : Node
             _context.ModelAllocations +
             _context.ExchangeAllocations +
             _context.CommitAllocations;
+        var totalManagedAllocations = allocations + _context.FootGatherAllocations;
+        var gatherAccountingClosed = _context.RawGatherMotorAllocations ==
+            _context.GatherMotorAllocations + _context.FootGatherAllocations;
         var expectedOffMain = _context.Mode == GodotAls.Dispatch.AlsHarnessMode.Single
             ? 0
             : _context.Entries.Length;
@@ -135,6 +138,8 @@ public partial class AlsP3aCommitStage : Node
             _context.GenerationMismatches == 0 &&
             _context.LaggedResults == 0 &&
             allocations == 0 &&
+            _context.FootGatherAllocations > 0 &&
+            gatherAccountingClosed &&
             _context.ReplacementCount == 1 &&
             _context.OldGenerationRejected &&
             _context.ReplacementFrameCommitted &&
@@ -147,7 +152,10 @@ public partial class AlsP3aCommitStage : Node
         if (!valid)
         {
             GD.Print(
-                $"GODOT_ALS_P3A_DIAGNOSTIC gather_motor={_context.GatherMotorAllocations} " +
+                $"GODOT_ALS_P3A_DIAGNOSTIC gather_motor_excluding_foot={_context.GatherMotorAllocations} " +
+                $"foot_gather={_context.FootGatherAllocations} " +
+                $"raw_gather={_context.RawGatherMotorAllocations} " +
+                $"hot_allocations={allocations} total_managed_allocations={totalManagedAllocations} " +
                 $"model={_context.ModelAllocations} exchange={_context.ExchangeAllocations} " +
                 $"commit={_context.CommitAllocations} replacements={_context.ReplacementCount} " +
                 $"old_generation_rejected={_context.OldGenerationRejected} " +
@@ -164,7 +172,9 @@ public partial class AlsP3aCommitStage : Node
             $"warmup={AlsP3aHarnessContext.WarmupFrames} frames={AlsP3aHarnessContext.MeasurementFrames} " +
             $"digest={_context.Digest:X16} missing={_context.MissingResults} " +
             $"stale={_context.StaleResults} generation={_context.GenerationMismatches} " +
-            $"off_main={offMainWorkers} lag={_context.LaggedResults} allocations={allocations}");
+            $"off_main={offMainWorkers} lag={_context.LaggedResults} allocations={allocations} " +
+            $"foot_gather={_context.FootGatherAllocations} " +
+            $"total_managed_allocations={totalManagedAllocations}");
         GetTree().Quit(valid ? 0 : 1);
     }
 

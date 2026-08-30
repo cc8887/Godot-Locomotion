@@ -11,7 +11,36 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsTraceCharacter)
 
-AAlsTraceCharacter::AAlsTraceCharacter(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+void UAlsTraceSkeletalMeshComponent::TickComponent(
+    const float DeltaTime,
+    const ELevelTick TickType,
+    FActorComponentTickFunction* ThisTickFunction)
+{
+    ++TracePublicTickCount;
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+}
+
+void UAlsTraceSkeletalMeshComponent::RefreshBoneTransforms(FActorComponentTickFunction* TickFunction)
+{
+    ++TraceEvaluationCount;
+    Super::RefreshBoneTransforms(TickFunction);
+}
+
+void UAlsTraceSkeletalMeshComponent::FinalizeBoneTransform()
+{
+    ++TracePostUpdateCount;
+    Super::FinalizeBoneTransform();
+}
+
+void UAlsTraceSkeletalMeshComponent::ResetTracePipelineCounts()
+{
+    TracePublicTickCount = 0;
+    TraceEvaluationCount = 0;
+    TracePostUpdateCount = 0;
+}
+
+AAlsTraceCharacter::AAlsTraceCharacter(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UAlsTraceSkeletalMeshComponent>(ACharacter::MeshComponentName))
 {
     static ConstructorHelpers::FObjectFinder<UAlsCharacterSettings> CharacterSettingsAsset{
 	TEXT("/ALS/ALS/Data/Character/CS_Als_Default.CS_Als_Default")};
@@ -51,6 +80,16 @@ const UAlsAnimationInstance* AAlsTraceCharacter::GetTraceAnimationInstance() con
     return AnimationInstance.Get();
 }
 
+UAlsAnimationInstance* AAlsTraceCharacter::GetTraceAnimationInstanceMutable()
+{
+    return AnimationInstance.Get();
+}
+
+UAlsTraceSkeletalMeshComponent* AAlsTraceCharacter::GetTraceMesh() const
+{
+    return CastChecked<UAlsTraceSkeletalMeshComponent>(GetMesh());
+}
+
 const UAlsMovementSettings* AAlsTraceCharacter::GetTraceMovementSettings() const
 {
     return MovementSettings;
@@ -59,4 +98,28 @@ const UAlsMovementSettings* AAlsTraceCharacter::GetTraceMovementSettings() const
 const UAlsAnimationInstanceSettings* AAlsTraceCharacter::GetTraceAnimationSettings() const
 {
     return TraceAnimationSettings;
+}
+
+void AAlsTraceCharacter::SetTraceViewRotation(const FRotator& Rotation)
+{
+    const FRotator NormalizedRotation{Rotation.GetNormalized()};
+    ReplicatedViewRotation = NormalizedRotation;
+    ViewState.NetworkSmoothing.InitialRotation = NormalizedRotation;
+    ViewState.NetworkSmoothing.TargetRotation = NormalizedRotation;
+    ViewState.NetworkSmoothing.FinalRotation = NormalizedRotation;
+    ViewState.Rotation = NormalizedRotation;
+    ViewState.PreviousYawAngle = UE_REAL_TO_FLOAT(NormalizedRotation.Yaw);
+    ViewState.YawSpeed = 0.0f;
+}
+
+void AAlsTraceCharacter::ApplyTraceDesiredState(const FGameplayTag NewRotationMode, const bool bNewAiming,
+                                                const FGameplayTag NewStance, const FGameplayTag NewOverlayMode)
+{
+    bDesiredAiming = bNewAiming;
+    DesiredRotationMode = NewRotationMode;
+    DesiredStance = NewStance;
+    OverlayMode = NewOverlayMode;
+    ApplyDesiredStance();
+    SetStance(NewStance);
+    RefreshRotationMode();
 }

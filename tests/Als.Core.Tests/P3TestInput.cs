@@ -34,7 +34,9 @@ internal static class P3TestInput
             Command = new AlsLocomotionCommand(
                 velocity == Vector3.Zero ? Vector2.Zero : Vector2.UnitY,
                 viewYaw,
+                0f,
                 aimYaw,
+                0f,
                 gait,
                 stance,
                 rotationMode,

@@ -9,19 +9,24 @@ public partial class AlsP3CharacterSlot : Node
 {
     private readonly AlsSlotRegistry _registry = new(1);
     private readonly AlsP3ExchangeSlot _exchangeSlot = new();
+    private readonly AlsP4FootProbeExchange _footProbeExchange = new();
     private AlsP3RuntimeContext _context = null!;
     private Func<IAlsLocomotionCommandSource> _commandSourceFactory = null!;
     private AlsP3Character _active = null!;
     private AlsP3Character? _spare;
     private AlsP3ReplacementPhase _replacementPhase;
     private long _replacementCompletedFrameId;
-    private long _generationMismatchBaseline;
     private AlsFrameIdentity _retiredResultIdentity;
+    private AlsFrameInput _retiredMotorInput;
     private bool _retiredResultObserved;
     private bool _retiredNodeReleased;
     private bool _generationMismatchObserved;
     private long _committedFrameAtClassification;
     private bool _recoveryCommitted;
+    private bool _failureRecoveryRequested;
+    private long _classificationSequenceBaseline;
+    private AlsFrameIdentity _expectedClassificationIdentity;
+    private bool _classificationRequired;
     private bool _configured;
     private int _disposed;
 
@@ -55,7 +60,10 @@ public partial class AlsP3CharacterSlot : Node
                 _committedFrameAtClassification,
                 _recoveryCommitted,
                 _replacementPhase,
-                CountVisibleCharacters());
+                CountVisibleCharacters())
+            {
+                RetiredMotorInput = _retiredMotorInput,
+            };
         }
     }
 
@@ -120,8 +128,33 @@ public partial class AlsP3CharacterSlot : Node
 
         _active.BeginReplacementRequest(completedFrameId);
         _replacementCompletedFrameId = completedFrameId;
-        _generationMismatchBaseline = Volatile.Read(ref _context.GenerationMismatches);
         _replacementPhase = AlsP3ReplacementPhase.AwaitingRetiredResult;
+        ValidateVisibilityInvariants();
+    }
+
+    public void RequestFailureRecovery()
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
+        if (_replacementPhase is not (AlsP3ReplacementPhase.None or
+            AlsP3ReplacementPhase.Complete))
+        {
+            throw new InvalidOperationException(
+                "P3 slot replacement is already in progress.");
+        }
+        if (!_active.IsPoseFrozen || _active.WorkerInFlight != 0)
+        {
+            throw new InvalidOperationException(
+                "P3 failure recovery requires a frozen idle generation.");
+        }
+        PrepareFailureRecoverySpare();
+
+        _replacementCompletedFrameId = _active.RuntimeCommittedFrameId;
+        _recoveryCommitted = false;
+        _failureRecoveryRequested = true;
+        ReplaceActiveCharacter();
+        _replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
         ValidateVisibilityInvariants();
     }
 
@@ -191,7 +224,12 @@ public partial class AlsP3CharacterSlot : Node
         AddChild(character);
         try
         {
-            character.Configure(_context, handle, commandSource, _exchangeSlot);
+            character.Configure(
+                _context,
+                handle,
+                commandSource,
+                _exchangeSlot,
+                _footProbeExchange);
             character.SetActive(active);
             return character;
         }
@@ -220,7 +258,30 @@ public partial class AlsP3CharacterSlot : Node
 
         _retiredResultIdentity = publishedIdentity;
         _retiredResultObserved = true;
+        _failureRecoveryRequested = false;
+        ReplaceActiveCharacter();
+        _replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
+    }
+
+    private void ReplaceActiveCharacter()
+    {
         var retired = _active;
+        _retiredMotorInput = retired.LatestMotorInput;
+        var publishedMotorFrameId = retired.PublishedFrameId;
+        if (publishedMotorFrameId <= _replacementCompletedFrameId ||
+            _retiredMotorInput.Identity != retired.HandleIdentity(publishedMotorFrameId))
+        {
+            throw new InvalidOperationException(
+                "P3 retired character did not expose one latest published Motor input.");
+        }
+        var motorCheckpoint = retired.CapturePublishedMotorLifecycle(
+            publishedMotorFrameId);
+        _classificationRequired = !_failureRecoveryRequested ||
+            _exchangeSlot.TryGetPublishedIdentity(out _);
+        var workerCheckpoint = _failureRecoveryRequested
+            ? retired.CaptureFailureWorkerLifecycle(_replacementCompletedFrameId)
+            : default;
+        _replacementCompletedFrameId = publishedMotorFrameId - 1;
         retired.RetireForReplacement();
         if (retired.Visible)
         {
@@ -239,6 +300,25 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         var replacement = _spare;
+        var stagedMotorInput = _retiredMotorInput with
+        {
+            Identity = replacement.HandleIdentity(publishedMotorFrameId),
+        };
+        var releasePlatformOnNextStep =
+            stagedMotorInput.Floor.PlatformId >= 0 ||
+            stagedMotorInput.LeftFootHit.PlatformId >= 0 ||
+            stagedMotorInput.RightFootHit.PlatformId >= 0;
+        replacement.RestorePublishedMotorLifecycle(
+            in motorCheckpoint,
+            publishedMotorFrameId,
+            releasePlatformOnNextStep);
+        if (_failureRecoveryRequested)
+        {
+            replacement.RestoreFailureWorkerLifecycle(
+                in workerCheckpoint,
+                releasePlatformOnNextStep ? publishedMotorFrameId + 1 : -1);
+        }
+        replacement.StageReplacementMotorInput(in stagedMotorInput);
         replacement.ResetVisualReady();
         _spare = null;
         if (retired.Visible)
@@ -247,7 +327,18 @@ public partial class AlsP3CharacterSlot : Node
                 "P3 retired character became visible before replacement activation.");
         }
         _active = replacement;
-        _active.StartReplacementClassification(_replacementCompletedFrameId);
+        if (_classificationRequired)
+        {
+            _active.StartReplacementClassification(_replacementCompletedFrameId);
+        }
+        else
+        {
+            _active.StartReplacementWithoutClassification(_replacementCompletedFrameId);
+        }
+        var classification = _active.ResultClassificationDiagnostics;
+        _classificationSequenceBaseline = classification.Sequence;
+        _expectedClassificationIdentity = _active.HandleIdentity(
+            _replacementCompletedFrameId + 1);
 
         retired.DisposeRuntime();
         retired.DisposeRuntime();
@@ -258,20 +349,39 @@ public partial class AlsP3CharacterSlot : Node
         {
             throw new InvalidOperationException("P3 retired character remained valid after Free().");
         }
-        _replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
     }
 
     private void TryStartRecovery()
     {
-        var mismatchCount = Volatile.Read(ref _context.GenerationMismatches);
-        if (mismatchCount == _generationMismatchBaseline)
+        var classification = _active.ResultClassificationDiagnostics;
+        if (!_classificationRequired)
+        {
+            if (_active.PublishedFrameId != _replacementCompletedFrameId + 1)
+            {
+                return;
+            }
+            if (classification.Sequence != _classificationSequenceBaseline ||
+                _active.RuntimeCommittedFrameId != _replacementCompletedFrameId)
+            {
+                throw new InvalidOperationException(
+                    "P3 initial replacement observed an unexpected result classification.");
+            }
+            StartRecoveryAfterClassification();
+            return;
+        }
+        if (classification.Sequence == _classificationSequenceBaseline)
         {
             return;
         }
-        if (mismatchCount != _generationMismatchBaseline + 1)
+        var expectedFailure = _failureRecoveryRequested
+            ? AlsP3aResultFailure.Stale
+            : AlsP3aResultFailure.GenerationMismatch;
+        if (classification.Sequence != _classificationSequenceBaseline + 1 ||
+            classification.Identity != _expectedClassificationIdentity ||
+            classification.Failure != expectedFailure)
         {
             throw new InvalidOperationException(
-                "P3 slot replacement classified its retired generation more than once.");
+                "P3 slot replacement did not receive its expected local classification.");
         }
         if (_active.RuntimeCommittedFrameId != _replacementCompletedFrameId)
         {
@@ -279,6 +389,11 @@ public partial class AlsP3CharacterSlot : Node
                 "P3 slot replacement advanced commit while classifying its retired generation.");
         }
 
+        StartRecoveryAfterClassification();
+    }
+
+    private void StartRecoveryAfterClassification()
+    {
         _active.StartReplacementRecovery();
         var lifecycle = _active.LifecycleDiagnostics;
         if (lifecycle.IsVisible || lifecycle.IsVisualReady)
@@ -287,7 +402,7 @@ public partial class AlsP3CharacterSlot : Node
                 "P3 replacement revealed stale visual state during generation recovery.");
         }
         _committedFrameAtClassification = _active.RuntimeCommittedFrameId;
-        _generationMismatchObserved = true;
+        _generationMismatchObserved |= _classificationRequired && !_failureRecoveryRequested;
         _replacementPhase = AlsP3ReplacementPhase.AwaitingRecoveryCommit;
     }
 
@@ -301,6 +416,22 @@ public partial class AlsP3CharacterSlot : Node
         _active.CompleteReplacementRecovery();
         _recoveryCommitted = true;
         _replacementPhase = AlsP3ReplacementPhase.Complete;
+        _failureRecoveryRequested = false;
+    }
+
+    private void PrepareFailureRecoverySpare()
+    {
+        if (_spare is not null)
+        {
+            return;
+        }
+        var handle = new AlsSlotHandle(
+            _active.Handle.CharacterId,
+            NextGeneration(_active.Handle.Generation));
+        _spare = CreateCharacter(
+            handle,
+            _active.MovementAnchor.GlobalPosition,
+            active: false);
     }
 
     private void DisposeRuntimeCore(bool freeNodes)

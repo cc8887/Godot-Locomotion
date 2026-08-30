@@ -97,13 +97,13 @@ LookingDirection、VelocityDirection、Aiming、AppliedYawVariation；最后一�
 完整固定格式与基线为：
 
 ```text
-GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=12CD6393BA75A1F9 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=parallel characters=1 warmup=120 frames=600 digest=12CD6393BA75A1F9 missing=0 stale=0 generation=0 off_main=1 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=single characters=10 warmup=120 frames=600 digest=7BE3F9467CC4EB63 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
-GODOT_ALS_P3A_OK mode=parallel characters=10 warmup=120 frames=600 digest=7BE3F9467CC4EB63 missing=0 stale=0 generation=0 off_main=10 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=single characters=1 warmup=120 frames=600 digest=B79EDC1516A133F9 missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=parallel characters=1 warmup=120 frames=600 digest=B79EDC1516A133F9 missing=0 stale=0 generation=0 off_main=1 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=single characters=10 warmup=120 frames=600 digest=D81D16BAA88519DC missing=0 stale=0 generation=0 off_main=0 lag=0 allocations=0
+GODOT_ALS_P3A_OK mode=parallel characters=10 warmup=120 frames=600 digest=D81D16BAA88519DC missing=0 stale=0 generation=0 off_main=10 lag=0 allocations=0
 ```
 
-1/10 角色的 fixed digest 分别为 `12CD6393BA75A1F9` 与 `7BE3F9467CC4EB63`；single/parallel 必须命中各自
+1/10 角色的 fixed digest 分别为 `B79EDC1516A133F9` 与 `D81D16BAA88519DC`；single/parallel 必须命中各自
 基线且相互相等。motor smoke 的成功 marker 为 `GODOT_ALS_P3A_MOTOR_OK cases=7`。
 
 Core 热路径对 gait、stance、rotation mode 和 locomotion history 的合法性检查使用连续 byte enum 的显式
