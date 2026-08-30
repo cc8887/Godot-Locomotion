@@ -66,6 +66,8 @@ public sealed class AlsLocomotionGraphBuildResult : IDisposable
 
 public sealed class AlsLocomotionGraphHandles : IDisposable
 {
+    public const float BaseTimelineSeconds = 1f;
+    public const float StateTransitionSeconds = 0.08f;
     private readonly IDisposable[] _ownedHandles;
     private int _disposed;
 
@@ -81,7 +83,9 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         AlsLocomotionGraphParameterSet groundedCrouching,
         AlsLocomotionGraphParameterSet jumpStart,
         AlsLocomotionGraphParameterSet fallLoop,
-        AlsLocomotionGraphParameterSet landRecovery)
+        AlsLocomotionGraphParameterSet landRecovery,
+        AlsBaseAnimationCurveLayout baseCurves,
+        AlsP4GraphHandles? p4)
     {
         AnimationPlayerPath = animationPlayerPath;
         TopPlaybackPath = topPlaybackPath;
@@ -95,6 +99,8 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
         JumpStart = jumpStart;
         FallLoop = fallLoop;
         LandRecovery = landRecovery;
+        BaseCurves = baseCurves;
+        P4 = p4;
 
         _ownedHandles =
         [
@@ -108,6 +114,7 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
             .. jumpStart.OwnedHandles,
             .. fallLoop.OwnedHandles,
             .. landRecovery.OwnedHandles,
+            .. (p4?.OwnedHandles ?? []),
         ];
     }
 
@@ -135,6 +142,22 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
 
     public AlsLocomotionGraphParameterSet LandRecovery { get; }
 
+    internal AlsBaseAnimationCurveLayout BaseCurves { get; }
+
+    public AlsP4GraphHandles? P4 { get; }
+
+    public bool TryGetP4TurnSelection(int animationId, out float selection)
+    {
+        selection = 0f;
+        return P4 is not null && P4.TryGetTurnSelection(animationId, out selection);
+    }
+
+    public bool TryGetP4RotateSelection(int animationId, out float selection)
+    {
+        selection = 0f;
+        return P4 is not null && P4.TryGetRotateSelection(animationId, out selection);
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -147,6 +170,175 @@ public sealed class AlsLocomotionGraphHandles : IDisposable
             handle.Dispose();
         }
     }
+}
+
+internal sealed record AlsBaseAnimationCurveLayout(
+    AlsLocomotionAnimationSample[] StandingSamples,
+    AlsLocomotionAnimationSample[] CrouchingSamples,
+    int JumpStartAnimationId,
+    int FallLoopAnimationId,
+    int LandRecoveryAnimationId);
+
+public sealed class AlsP4GraphHandles
+{
+    private readonly Dictionary<int, AlsP4ClipBinding> _turnBindings;
+    private readonly Dictionary<int, AlsP4ClipBinding> _rotateBindings;
+    internal AlsP4GraphHandles(
+        StringName turnStateName,
+        StringName rotateStateName,
+        StringName aimDownStateName,
+        StringName aimForwardStateName,
+        StringName aimUpStateName,
+        StringName turnBankARequestPath,
+        StringName turnBankACurrentStatePath,
+        StringName turnBankBRequestPath,
+        StringName turnBankBCurrentStatePath,
+        StringName turnBlendPath,
+        StringName rotateBankARequestPath,
+        StringName rotateBankACurrentStatePath,
+        StringName rotateBankBRequestPath,
+        StringName rotateBankBCurrentStatePath,
+        StringName rotateBlendPath,
+        StringName actionModeBlendPath,
+        StringName actionBlendPath,
+        StringName aimDownPhasePath,
+        StringName aimDownWeightPath,
+        StringName aimForwardPhasePath,
+        StringName aimForwardWeightPath,
+        StringName aimUpPhasePath,
+        StringName aimUpWeightPath,
+        Dictionary<int, AlsP4ClipBinding> turnBindings,
+        Dictionary<int, AlsP4ClipBinding> rotateBindings)
+    {
+        TurnStateName = turnStateName;
+        RotateStateName = rotateStateName;
+        AimDownStateName = aimDownStateName;
+        AimForwardStateName = aimForwardStateName;
+        AimUpStateName = aimUpStateName;
+        TurnBankARequestPath = turnBankARequestPath;
+        TurnBankACurrentStatePath = turnBankACurrentStatePath;
+        TurnBankBRequestPath = turnBankBRequestPath;
+        TurnBankBCurrentStatePath = turnBankBCurrentStatePath;
+        TurnBlendPath = turnBlendPath;
+        RotateBankARequestPath = rotateBankARequestPath;
+        RotateBankACurrentStatePath = rotateBankACurrentStatePath;
+        RotateBankBRequestPath = rotateBankBRequestPath;
+        RotateBankBCurrentStatePath = rotateBankBCurrentStatePath;
+        RotateBlendPath = rotateBlendPath;
+        ActionModeBlendPath = actionModeBlendPath;
+        ActionBlendPath = actionBlendPath;
+        AimDownPhasePath = aimDownPhasePath;
+        AimDownWeightPath = aimDownWeightPath;
+        AimForwardPhasePath = aimForwardPhasePath;
+        AimForwardWeightPath = aimForwardWeightPath;
+        AimUpPhasePath = aimUpPhasePath;
+        AimUpWeightPath = aimUpWeightPath;
+        _turnBindings = turnBindings;
+        _rotateBindings = rotateBindings;
+        InitialTurnBinding = turnBindings.Values.MinBy(value => value.Selection);
+        InitialRotateBinding = rotateBindings.Values.MinBy(value => value.Selection);
+        OwnedHandles =
+        [
+            turnStateName, rotateStateName, aimDownStateName, aimForwardStateName, aimUpStateName,
+            turnBankARequestPath, turnBankACurrentStatePath,
+            turnBankBRequestPath, turnBankBCurrentStatePath, turnBlendPath,
+            rotateBankARequestPath, rotateBankACurrentStatePath,
+            rotateBankBRequestPath, rotateBankBCurrentStatePath, rotateBlendPath,
+            actionModeBlendPath, actionBlendPath,
+            aimDownPhasePath, aimDownWeightPath,
+            aimForwardPhasePath, aimForwardWeightPath,
+            aimUpPhasePath, aimUpWeightPath,
+            .. turnBindings.Values.SelectMany(value => value.OwnedHandles),
+            .. rotateBindings.Values.SelectMany(value => value.OwnedHandles),
+        ];
+    }
+
+    public StringName TurnStateName { get; }
+    public StringName RotateStateName { get; }
+    public StringName AimDownStateName { get; }
+    public StringName AimForwardStateName { get; }
+    public StringName AimUpStateName { get; }
+    public StringName TurnBankARequestPath { get; }
+    public StringName TurnBankACurrentStatePath { get; }
+    public StringName TurnBankBRequestPath { get; }
+    public StringName TurnBankBCurrentStatePath { get; }
+    public StringName TurnBlendPath { get; }
+    public StringName RotateBankARequestPath { get; }
+    public StringName RotateBankACurrentStatePath { get; }
+    public StringName RotateBankBRequestPath { get; }
+    public StringName RotateBankBCurrentStatePath { get; }
+    public StringName RotateBlendPath { get; }
+    public StringName ActionModeBlendPath { get; }
+    public StringName ActionBlendPath { get; }
+    public StringName AimDownPhasePath { get; }
+    public StringName AimDownWeightPath { get; }
+    public StringName AimForwardPhasePath { get; }
+    public StringName AimForwardWeightPath { get; }
+    public StringName AimUpPhasePath { get; }
+    public StringName AimUpWeightPath { get; }
+    public AlsP4ClipBinding InitialTurnBinding { get; }
+    public AlsP4ClipBinding InitialRotateBinding { get; }
+    internal IDisposable[] OwnedHandles { get; }
+
+    public bool TryGetTurnSelection(int animationId, out float selection)
+    {
+        if (_turnBindings.TryGetValue(animationId, out var binding))
+        {
+            selection = binding.Selection;
+            return true;
+        }
+        selection = 0f;
+        return false;
+    }
+
+    public bool TryGetRotateSelection(int animationId, out float selection)
+    {
+        if (_rotateBindings.TryGetValue(animationId, out var binding))
+        {
+            selection = binding.Selection;
+            return true;
+        }
+        selection = 0f;
+        return false;
+    }
+
+    public bool TryGetTurnBinding(int animationId, out AlsP4ClipBinding binding) =>
+        _turnBindings.TryGetValue(animationId, out binding);
+
+    public bool TryGetRotateBinding(int animationId, out AlsP4ClipBinding binding) =>
+        _rotateBindings.TryGetValue(animationId, out binding);
+
+    public StringName GetTurnRequestPath(byte bank) =>
+        bank == 0 ? TurnBankARequestPath : TurnBankBRequestPath;
+
+    public StringName GetTurnCurrentStatePath(byte bank) =>
+        bank == 0 ? TurnBankACurrentStatePath : TurnBankBCurrentStatePath;
+
+    public StringName GetRotateRequestPath(byte bank) =>
+        bank == 0 ? RotateBankARequestPath : RotateBankBRequestPath;
+
+    public StringName GetRotateCurrentStatePath(byte bank) =>
+        bank == 0 ? RotateBankACurrentStatePath : RotateBankBCurrentStatePath;
+}
+
+public readonly record struct AlsP4ClipBinding(
+    float Selection,
+    float DurationSeconds,
+    float BlendSeconds,
+    StringName StateName,
+    StringName PlayRatePathA,
+    StringName PhasePathA,
+    StringName PlayRatePathB,
+    StringName PhasePathB)
+{
+    public int AnimationId { get; init; } = -1;
+
+    internal IDisposable[] OwnedHandles =>
+        [StateName, PlayRatePathA, PhasePathA, PlayRatePathB, PhasePathB];
+
+    public StringName GetPlayRatePath(byte bank) => bank == 0 ? PlayRatePathA : PlayRatePathB;
+
+    public StringName GetPhasePath(byte bank) => bank == 0 ? PhasePathA : PhasePathB;
 }
 
 public sealed class AlsLocomotionGraphParameterSet
@@ -210,19 +402,37 @@ public sealed class AlsLocomotionGraphParameterSet
 public static class AlsLocomotionGraphBuilder
 {
     private const string LibraryName = "als";
-    private const float TransitionTime = 0.08f;
+    private const float TransitionTime = AlsLocomotionGraphHandles.StateTransitionSeconds;
     private const float CoordinateTolerance = 1e-5f;
     private const float RingTolerance = 1e-4f;
 
     public static AlsLocomotionGraphBuildResult Build(
         AlsAnimationLibraryBuildResult library,
         AlsLocomotionAnimationProfile profile,
+        AlsAnimationSetDefinition animationSet) =>
+        BuildInternal(library, profile, null, animationSet);
+
+    public static AlsLocomotionGraphBuildResult Build(
+        AlsAnimationLibraryBuildResult library,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsAnimationSetDefinition animationSet) =>
+        BuildInternal(library, profile, poseProfile, animationSet);
+
+    private static AlsLocomotionGraphBuildResult BuildInternal(
+        AlsAnimationLibraryBuildResult library,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile? poseProfile,
         AlsAnimationSetDefinition animationSet)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(animationSet);
         ValidateInputs(library, profile, animationSet);
+        if (poseProfile is not null)
+        {
+            ValidateP4Inputs(library, profile, poseProfile, animationSet);
+        }
         var layout = ValidateProfileLayout(profile);
 
         var ownedResources = new List<IDisposable>();
@@ -230,8 +440,8 @@ public static class AlsLocomotionGraphBuilder
         AnimationTree? tree = null;
         try
         {
-            handles = CreateHandles(layout);
-            var top = Own(ownedResources, new AnimationNodeStateMachine
+            handles = CreateHandles(layout, profile, poseProfile, animationSet);
+            var baseStateMachine = Own(ownedResources, new AnimationNodeStateMachine
             {
                 StateMachineType = AnimationNodeStateMachine.StateMachineTypeEnum.Root,
             });
@@ -272,16 +482,45 @@ public static class AlsLocomotionGraphBuilder
             var landRecovery = BuildActionBranch(
                 library, profile.LandAnimationId, profile.LeanAdditiveSamples, false, ownedResources);
 
-            top.AddNode(handles.StateNames[(int)AlsAnimationState.Grounded], grounded);
-            top.AddNode(handles.StateNames[(int)AlsAnimationState.JumpStart], jumpStart);
-            top.AddNode(handles.StateNames[(int)AlsAnimationState.FallLoop], fallLoop);
-            top.AddNode(handles.StateNames[(int)AlsAnimationState.LandRecovery], landRecovery);
-            AddAllStateTransitions(top, handles.StateNames, ownedResources);
+            baseStateMachine.AddNode(handles.StateNames[(int)AlsAnimationState.Grounded], grounded);
+            baseStateMachine.AddNode(handles.StateNames[(int)AlsAnimationState.JumpStart], jumpStart);
+            baseStateMachine.AddNode(handles.StateNames[(int)AlsAnimationState.FallLoop], fallLoop);
+            baseStateMachine.AddNode(handles.StateNames[(int)AlsAnimationState.LandRecovery], landRecovery);
+            AnimationRootNode graphRoot = baseStateMachine;
+            if (poseProfile is not null)
+            {
+                var p4 = handles.P4!;
+                var turnBranch = BuildP4ActionBranch(
+                    library,
+                    poseProfile.Turns.Select(value => value.AnimationId).ToArray(),
+                    p4,
+                    true,
+                    ownedResources);
+                var rotateBranch = BuildP4ActionBranch(
+                    library,
+                    poseProfile.Rotates.Select(value => value.AnimationId).ToArray(),
+                    p4,
+                    false,
+                    ownedResources);
+                AddAllStateTransitions(baseStateMachine, handles.StateNames, ownedResources);
+                graphRoot = BuildP4LayeredRoot(
+                    library,
+                    baseStateMachine,
+                    turnBranch,
+                    rotateBranch,
+                    poseProfile,
+                    p4,
+                    ownedResources);
+            }
+            else
+            {
+                AddAllStateTransitions(baseStateMachine, handles.StateNames, ownedResources);
+            }
 
             tree = new AnimationTree
             {
                 Name = "AlsLocomotionAnimationTree",
-                TreeRoot = top,
+                TreeRoot = graphRoot,
                 CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual,
                 Deterministic = true,
                 Active = false,
@@ -319,6 +558,45 @@ public static class AlsLocomotionGraphBuilder
         }
     }
 
+    private static void ValidateP4Inputs(
+        AlsAnimationLibraryBuildResult library,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsAnimationSetDefinition animationSet)
+    {
+        if (poseProfile.SkeletonId != profile.SkeletonId)
+        {
+            throw new InvalidOperationException(
+                $"P4 graph skeleton mismatch: expected={profile.SkeletonId} actual={poseProfile.SkeletonId}");
+        }
+        if (poseProfile.Turns.Length != 8 || poseProfile.Rotates.Length != 4)
+        {
+            throw new InvalidOperationException(
+                $"P4 graph requires exactly eight Turn and four Rotate clips: " +
+                $"turns={poseProfile.Turns.Length} rotates={poseProfile.Rotates.Length}");
+        }
+
+        var animationIds = poseProfile.Turns.Select(value => value.AnimationId)
+            .Concat(poseProfile.Rotates.Select(value => value.AnimationId))
+            .Concat([
+                poseProfile.Aim.DownAnimationId,
+                poseProfile.Aim.ForwardAnimationId,
+                poseProfile.Aim.UpAnimationId,
+                poseProfile.Aim.AdditiveBasePoseAnimationId,
+            ]);
+        foreach (var animationId in animationIds)
+        {
+            if ((uint)animationId >= (uint)animationSet.Animations.Length ||
+                animationSet.Animations[animationId].SkeletonId != poseProfile.SkeletonId ||
+                !library.ClipNames.TryGetValue(animationId, out var clipName) ||
+                !library.Library.HasAnimation(clipName))
+            {
+                throw new InvalidOperationException(
+                    $"P4 graph library is missing exact animation ID: {animationId}");
+            }
+        }
+    }
+
     private static void ValidateInputs(
         AlsAnimationLibraryBuildResult library,
         AlsLocomotionAnimationProfile profile,
@@ -347,7 +625,11 @@ public static class AlsLocomotionGraphBuilder
         }
     }
 
-    private static AlsLocomotionGraphHandles CreateHandles(GraphProfileLayout layout)
+    private static AlsLocomotionGraphHandles CreateHandles(
+        GraphProfileLayout layout,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile? poseProfile,
+        AlsAnimationSetDefinition animationSet)
     {
         var allocated = new List<IDisposable>();
         try
@@ -367,29 +649,55 @@ public static class AlsLocomotionGraphBuilder
             var animationPlayerPath = AllocateHandle(
                 allocated, new NodePath("../AlsAnimationPlayer"));
             var topPlaybackPath = AllocateHandle(
-                allocated, new StringName("parameters/playback"));
+                allocated,
+                new StringName(poseProfile is null
+                    ? "parameters/playback"
+                    : "parameters/Base/playback"));
             var groundedPlaybackPath = AllocateHandle(
-                allocated, new StringName("parameters/Grounded/playback"));
+                allocated,
+                new StringName(poseProfile is null
+                    ? "parameters/Grounded/playback"
+                    : "parameters/Base/Grounded/playback"));
+            var basePrefix = poseProfile is null ? "" : "Base/";
             var groundedStanding = CreateParameterSet(
-                "Grounded/Standing",
+                $"{basePrefix}Grounded/Standing",
                 true,
                 true,
                 layout.StandingBounds,
                 layout.LeanBounds,
                 allocated);
             var groundedCrouching = CreateParameterSet(
-                "Grounded/Crouching",
+                $"{basePrefix}Grounded/Crouching",
                 true,
                 true,
                 layout.CrouchingBounds,
                 layout.LeanBounds,
                 allocated);
             var jumpStart = CreateParameterSet(
-                "JumpStart", false, false, default, layout.LeanBounds, allocated);
+                $"{basePrefix}JumpStart", false, true, default, layout.LeanBounds, allocated);
             var fallLoop = CreateParameterSet(
-                "FallLoop", false, false, default, layout.LeanBounds, allocated);
+                $"{basePrefix}FallLoop", false, true, default, layout.LeanBounds, allocated);
             var landRecovery = CreateParameterSet(
-                "LandRecovery", false, false, default, layout.LeanBounds, allocated);
+                $"{basePrefix}LandRecovery", false, true, default, layout.LeanBounds, allocated);
+            var p4 = poseProfile is null
+                ? null
+                : CreateP4Handles(poseProfile, animationSet, allocated);
+            var standingCurveSamples = new AlsLocomotionAnimationSample[
+                locomotionProfile.StandingSamples.Length + 1];
+            standingCurveSamples[0] = new AlsLocomotionAnimationSample(
+                locomotionProfile.StandingIdleAnimationId, 0f, 0f, 1f);
+            locomotionProfile.StandingSamples.CopyTo(standingCurveSamples, 1);
+            var crouchingCurveSamples = new AlsLocomotionAnimationSample[
+                locomotionProfile.CrouchingSamples.Length + 1];
+            crouchingCurveSamples[0] = new AlsLocomotionAnimationSample(
+                locomotionProfile.CrouchingIdleAnimationId, 0f, 0f, 1f);
+            locomotionProfile.CrouchingSamples.CopyTo(crouchingCurveSamples, 1);
+            var baseCurves = new AlsBaseAnimationCurveLayout(
+                standingCurveSamples,
+                crouchingCurveSamples,
+                locomotionProfile.JumpStartAnimationId,
+                locomotionProfile.FallLoopAnimationId,
+                locomotionProfile.LandAnimationId);
             return new AlsLocomotionGraphHandles(
                 animationPlayerPath,
                 topPlaybackPath,
@@ -402,7 +710,9 @@ public static class AlsLocomotionGraphBuilder
                 groundedCrouching,
                 jumpStart,
                 fallLoop,
-                landRecovery);
+                landRecovery,
+                baseCurves,
+                p4);
         }
         catch
         {
@@ -439,6 +749,91 @@ public static class AlsLocomotionGraphBuilder
             leanBounds.Minimum,
             leanBounds.Maximum);
 
+    private static AlsP4GraphHandles CreateP4Handles(
+        AlsPoseAnimationProfile profile,
+        AlsAnimationSetDefinition animationSet,
+        List<IDisposable> allocated)
+    {
+        var turnSelections = new Dictionary<int, AlsP4ClipBinding>(profile.Turns.Length);
+        for (var index = 0; index < profile.Turns.Length; index++)
+        {
+            var animationId = profile.Turns[index].AnimationId;
+            var stateName = Handle($"Clip_{animationId}");
+            if (!turnSelections.TryAdd(
+                    animationId,
+                    new AlsP4ClipBinding(
+                        index,
+                        animationSet.Animations[animationId].PlayLength,
+                        profile.Turns[index].BlendSeconds,
+                        stateName,
+                        Handle($"parameters/P4Turn/BankA/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Turn/BankA/{stateName}/Seek/seek_request"),
+                        Handle($"parameters/P4Turn/BankB/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Turn/BankB/{stateName}/Seek/seek_request"))
+                    {
+                        AnimationId = animationId,
+                    }))
+            {
+                throw new InvalidOperationException(
+                    $"P4 graph contains duplicate Turn animation ID: {profile.Turns[index].AnimationId}");
+            }
+        }
+        var rotateSelections = new Dictionary<int, AlsP4ClipBinding>(profile.Rotates.Length);
+        for (var index = 0; index < profile.Rotates.Length; index++)
+        {
+            var animationId = profile.Rotates[index].AnimationId;
+            var stateName = Handle($"Clip_{animationId}");
+            if (!rotateSelections.TryAdd(
+                    animationId,
+                    new AlsP4ClipBinding(
+                        index,
+                        animationSet.Animations[animationId].PlayLength,
+                        TransitionTime,
+                        stateName,
+                        Handle($"parameters/P4Rotate/BankA/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Rotate/BankA/{stateName}/Seek/seek_request"),
+                        Handle($"parameters/P4Rotate/BankB/{stateName}/Scale/scale"),
+                        Handle($"parameters/P4Rotate/BankB/{stateName}/Seek/seek_request"))
+                    {
+                        AnimationId = animationId,
+                    }))
+            {
+                throw new InvalidOperationException(
+                    $"P4 graph contains duplicate Rotate animation ID: {profile.Rotates[index].AnimationId}");
+            }
+        }
+
+        return new AlsP4GraphHandles(
+            Handle("P4Turn"),
+            Handle("P4Rotate"),
+            Handle("P4AimDown"),
+            Handle("P4AimForward"),
+            Handle("P4AimUp"),
+            Handle("parameters/P4Turn/BankA/Select/transition_request"),
+            Handle("parameters/P4Turn/BankA/Select/current_state"),
+            Handle("parameters/P4Turn/BankB/Select/transition_request"),
+            Handle("parameters/P4Turn/BankB/Select/current_state"),
+            Handle("parameters/P4Turn/Blend/blend_amount"),
+            Handle("parameters/P4Rotate/BankA/Select/transition_request"),
+            Handle("parameters/P4Rotate/BankA/Select/current_state"),
+            Handle("parameters/P4Rotate/BankB/Select/transition_request"),
+            Handle("parameters/P4Rotate/BankB/Select/current_state"),
+            Handle("parameters/P4Rotate/Blend/blend_amount"),
+            Handle("parameters/ActionMode/blend_amount"),
+            Handle("parameters/ActionBlend/blend_amount"),
+            Handle("parameters/P4AimDown/Seek/seek_request"),
+            Handle("parameters/AimDownAdd/add_amount"),
+            Handle("parameters/P4AimForward/Seek/seek_request"),
+            Handle("parameters/AimForwardAdd/add_amount"),
+            Handle("parameters/P4AimUp/Seek/seek_request"),
+            Handle("parameters/AimUpAdd/add_amount"),
+            turnSelections,
+            rotateSelections);
+
+        StringName Handle(string value) =>
+            AllocateHandle(allocated, new StringName(value));
+    }
+
     private static AnimationNodeBlendTree BuildGroundedBranch(
         AlsAnimationLibraryBuildResult library,
         int idleAnimationId,
@@ -474,6 +869,187 @@ public static class AlsLocomotionGraphBuilder
         var tree = Own(ownedResources, new AnimationNodeBlendTree());
         var clip = CreateAnimationNode(library, animationId, loop, ownedResources);
         AddLayerAndTimingNodes(tree, clip, library, leanSamples, ownedResources);
+        return tree;
+    }
+
+    private static AnimationNodeBlendTree BuildP4ActionBranch(
+        AlsAnimationLibraryBuildResult library,
+        IReadOnlyList<int> animationIds,
+        AlsP4GraphHandles handles,
+        bool turn,
+        List<IDisposable> ownedResources)
+    {
+        if (animationIds.Count < 2)
+        {
+            throw new InvalidOperationException("P4 action bank requires at least two clips.");
+        }
+
+        var root = Own(ownedResources, new AnimationNodeBlendTree());
+        var bankA = BuildP4ActionBank(
+            library, animationIds, handles, turn, ownedResources);
+        var bankB = BuildP4ActionBank(
+            library, animationIds, handles, turn, ownedResources);
+        var blend = Own(ownedResources, new AnimationNodeBlend2());
+        using var bankAName = new StringName("BankA");
+        using var bankBName = new StringName("BankB");
+        using var blendName = new StringName("Blend");
+        using var outputName = new StringName("output");
+        root.AddNode(bankAName, bankA);
+        root.AddNode(bankBName, bankB);
+        root.AddNode(blendName, blend);
+        root.ConnectNode(blendName, 0, bankAName);
+        root.ConnectNode(blendName, 1, bankBName);
+        root.ConnectNode(outputName, 0, blendName);
+        return root;
+    }
+
+    private static AnimationNodeBlendTree BuildP4ActionBank(
+        AlsAnimationLibraryBuildResult library,
+        IReadOnlyList<int> animationIds,
+        AlsP4GraphHandles handles,
+        bool turn,
+        List<IDisposable> ownedResources)
+    {
+        var tree = Own(ownedResources, new AnimationNodeBlendTree());
+        var selector = Own(ownedResources, new AnimationNodeTransition
+        {
+            InputCount = animationIds.Count,
+            XfadeTime = 0.0,
+            AllowTransitionToSelf = true,
+        });
+        using var selectorName = new StringName("Select");
+        using var outputName = new StringName("output");
+        tree.AddNode(selectorName, selector);
+        for (var index = 0; index < animationIds.Count; index++)
+        {
+            var animationId = animationIds[index];
+            var found = turn
+                ? handles.TryGetTurnBinding(animationId, out var binding)
+                : handles.TryGetRotateBinding(animationId, out binding);
+            if (!found)
+            {
+                throw new InvalidOperationException(
+                    $"P4 action graph has no exact binding for animation ID: {animationId}");
+            }
+            selector.SetInputName(index, binding.StateName.ToString());
+            selector.SetInputReset(index, true);
+            tree.AddNode(
+                binding.StateName,
+                BuildP4ClipBranch(library, animationId, ownedResources));
+            tree.ConnectNode(selectorName, index, binding.StateName);
+        }
+        tree.ConnectNode(outputName, 0, selectorName);
+        return tree;
+    }
+
+    private static AnimationNodeBlendTree BuildP4ClipBranch(
+        AlsAnimationLibraryBuildResult library,
+        int animationId,
+        List<IDisposable> ownedResources)
+    {
+        var tree = Own(ownedResources, new AnimationNodeBlendTree());
+        var clip = CreateP4AnimationNode(library, animationId, ownedResources);
+        var scale = Own(ownedResources, new AnimationNodeTimeScale());
+        var seek = Own(ownedResources, new AnimationNodeTimeSeek());
+        using var clipName = new StringName("Clip");
+        using var scaleName = new StringName("Scale");
+        using var seekName = new StringName("Seek");
+        using var outputName = new StringName("output");
+        tree.AddNode(clipName, clip);
+        tree.AddNode(scaleName, scale);
+        tree.AddNode(seekName, seek);
+        tree.ConnectNode(scaleName, 0, clipName);
+        tree.ConnectNode(seekName, 0, scaleName);
+        tree.ConnectNode(outputName, 0, seekName);
+        return tree;
+    }
+
+    private static AnimationNodeBlendTree BuildP4LayeredRoot(
+        AlsAnimationLibraryBuildResult library,
+        AnimationNodeStateMachine baseStateMachine,
+        AnimationNodeBlendTree turnBranch,
+        AnimationNodeBlendTree rotateBranch,
+        AlsPoseAnimationProfile profile,
+        AlsP4GraphHandles handles,
+        List<IDisposable> ownedResources)
+    {
+        var root = Own(ownedResources, new AnimationNodeBlendTree());
+        var down = BuildP4AimBranch(
+            library,
+            profile.Aim.AdditiveBasePoseAnimationId,
+            profile.Aim.DownAnimationId,
+            ownedResources);
+        var forward = BuildP4AimBranch(
+            library,
+            profile.Aim.AdditiveBasePoseAnimationId,
+            profile.Aim.ForwardAnimationId,
+            ownedResources);
+        var up = BuildP4AimBranch(
+            library,
+            profile.Aim.AdditiveBasePoseAnimationId,
+            profile.Aim.UpAnimationId,
+            ownedResources);
+        var downAdd = Own(ownedResources, new AnimationNodeAdd2());
+        var forwardAdd = Own(ownedResources, new AnimationNodeAdd2());
+        var upAdd = Own(ownedResources, new AnimationNodeAdd2());
+        var actionMode = Own(ownedResources, new AnimationNodeBlend2());
+        var actionBlend = Own(ownedResources, new AnimationNodeBlend2());
+        using var baseName = new StringName("Base");
+        using var actionModeName = new StringName("ActionMode");
+        using var actionBlendName = new StringName("ActionBlend");
+        using var downAddName = new StringName("AimDownAdd");
+        using var forwardAddName = new StringName("AimForwardAdd");
+        using var upAddName = new StringName("AimUpAdd");
+        using var outputName = new StringName("output");
+        root.AddNode(baseName, baseStateMachine);
+        root.AddNode(handles.TurnStateName, turnBranch);
+        root.AddNode(handles.RotateStateName, rotateBranch);
+        root.AddNode(actionModeName, actionMode);
+        root.AddNode(actionBlendName, actionBlend);
+        root.AddNode(handles.AimDownStateName, down);
+        root.AddNode(handles.AimForwardStateName, forward);
+        root.AddNode(handles.AimUpStateName, up);
+        root.AddNode(downAddName, downAdd);
+        root.AddNode(forwardAddName, forwardAdd);
+        root.AddNode(upAddName, upAdd);
+        root.ConnectNode(actionModeName, 0, handles.TurnStateName);
+        root.ConnectNode(actionModeName, 1, handles.RotateStateName);
+        root.ConnectNode(actionBlendName, 0, baseName);
+        root.ConnectNode(actionBlendName, 1, actionModeName);
+        root.ConnectNode(downAddName, 0, actionBlendName);
+        root.ConnectNode(downAddName, 1, handles.AimDownStateName);
+        root.ConnectNode(forwardAddName, 0, downAddName);
+        root.ConnectNode(forwardAddName, 1, handles.AimForwardStateName);
+        root.ConnectNode(upAddName, 0, forwardAddName);
+        root.ConnectNode(upAddName, 1, handles.AimUpStateName);
+        root.ConnectNode(outputName, 0, upAddName);
+        return root;
+    }
+
+    private static AnimationNodeBlendTree BuildP4AimBranch(
+        AlsAnimationLibraryBuildResult library,
+        int baseAnimationId,
+        int aimAnimationId,
+        List<IDisposable> ownedResources)
+    {
+        var tree = Own(ownedResources, new AnimationNodeBlendTree());
+        var basePose = CreateAnimationNode(library, baseAnimationId, false, ownedResources);
+        var aim = CreateAnimationNode(library, aimAnimationId, false, ownedResources);
+        var delta = Own(ownedResources, new AnimationNodeSub2());
+        var seek = Own(ownedResources, new AnimationNodeTimeSeek());
+        using var baseName = new StringName("AdditiveBase");
+        using var aimName = new StringName("Aim");
+        using var deltaName = new StringName("Delta");
+        using var seekName = new StringName("Seek");
+        using var outputName = new StringName("output");
+        tree.AddNode(baseName, basePose);
+        tree.AddNode(aimName, aim);
+        tree.AddNode(deltaName, delta);
+        tree.AddNode(seekName, seek);
+        tree.ConnectNode(deltaName, 0, aimName);
+        tree.ConnectNode(deltaName, 1, baseName);
+        tree.ConnectNode(seekName, 0, deltaName);
+        tree.ConnectNode(outputName, 0, seekName);
         return tree;
     }
 
@@ -571,9 +1147,31 @@ public static class AlsLocomotionGraphBuilder
         var node = Own(ownedResources, new AnimationNodeAnimation
         {
             UseCustomTimeline = true,
-            TimelineLength = 1.0,
+            TimelineLength = AlsLocomotionGraphHandles.BaseTimelineSeconds,
             StretchTimeScale = true,
             LoopMode = loop ? Godot.Animation.LoopModeEnum.Linear : Godot.Animation.LoopModeEnum.None,
+        });
+        using var qualifiedName = new StringName($"{LibraryName}/{clipName}");
+        node.Animation = qualifiedName;
+        return node;
+    }
+
+    private static AnimationNodeAnimation CreateP4AnimationNode(
+        AlsAnimationLibraryBuildResult library,
+        int animationId,
+        List<IDisposable> ownedResources)
+    {
+        if (!library.ClipNames.TryGetValue(animationId, out var clipName))
+        {
+            throw new InvalidOperationException(
+                $"P4 graph library has no exact clip for animation ID: {animationId}");
+        }
+
+        var node = Own(ownedResources, new AnimationNodeAnimation
+        {
+            UseCustomTimeline = false,
+            StretchTimeScale = false,
+            LoopMode = Godot.Animation.LoopModeEnum.None,
         });
         using var qualifiedName = new StringName($"{LibraryName}/{clipName}");
         node.Animation = qualifiedName;

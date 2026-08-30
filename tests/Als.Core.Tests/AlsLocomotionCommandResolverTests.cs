@@ -289,6 +289,8 @@ public sealed class AlsLocomotionCommandResolverTests
             movementAxes,
             viewYaw,
             0f,
+            0f,
+            0f,
             gait,
             AlsStance.Standing,
             rotationMode,

@@ -7,7 +7,9 @@ namespace GodotAls.Core.Contracts;
 public readonly record struct AlsLocomotionCommand(
     Vector2 MovementAxes,
     float ViewYaw,
+    float ViewPitch,
     float AimYaw,
+    float AimPitch,
     AlsGait RequestedGait,
     AlsStance RequestedStance,
     AlsRotationMode RequestedRotationMode,
@@ -15,6 +17,8 @@ public readonly record struct AlsLocomotionCommand(
 {
     public static AlsLocomotionCommand CreateDefault() => new(
         Vector2.Zero,
+        0f,
+        0f,
         0f,
         0f,
         AlsGait.Running,

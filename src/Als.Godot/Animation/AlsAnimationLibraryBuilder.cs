@@ -87,10 +87,45 @@ public static class AlsAnimationLibraryBuilder
     {
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
+        return BuildInternal(
+            animationSet,
+            profile,
+            profile.AllAnimationIds,
+            normalizedTrackDomainAnimationIds: null);
+    }
 
+    public static AlsAnimationLibraryBuildResult Build(
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile)
+    {
+        ArgumentNullException.ThrowIfNull(animationSet);
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(poseProfile);
+        var animationIds = BuildP4AnimationClosure(animationSet, profile, poseProfile);
+        HashSet<int> normalizedTrackDomainAnimationIds =
+        [
+            poseProfile.Aim.AdditiveBasePoseAnimationId,
+            poseProfile.Aim.DownAnimationId,
+            poseProfile.Aim.ForwardAnimationId,
+            poseProfile.Aim.UpAnimationId,
+        ];
+        return BuildInternal(
+            animationSet,
+            profile,
+            animationIds,
+            normalizedTrackDomainAnimationIds);
+    }
+
+    private static AlsAnimationLibraryBuildResult BuildInternal(
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile profile,
+        IReadOnlyList<int> animationIds,
+        IReadOnlySet<int>? normalizedTrackDomainAnimationIds)
+    {
         using var importedAnimationName = new StringName(ImportedAnimationName);
         var mannequin = GetMannequin(animationSet, profile);
-        var targetScene = LoadScene(mannequin.ResourcePath, mannequin.Name, "target");
+        using var targetScene = LoadScene(mannequin.ResourcePath, mannequin.Name, "target");
         var targetRoot = targetScene.Instantiate();
         AnimationLibrary? library = null;
         StringName? libraryName = null;
@@ -106,11 +141,11 @@ public static class AlsAnimationLibraryBuilder
 
             library = new AnimationLibrary();
             libraryName = new StringName(LibraryName);
-            names = new OwnedStringNameTable(profile.AllAnimationIds.Length);
-            foreach (var animationId in profile.AllAnimationIds)
+            names = new OwnedStringNameTable(animationIds.Count);
+            foreach (var animationId in animationIds)
             {
                 var clip = GetClip(animationSet, animationId, profile.SkeletonId);
-                var sourceScene = LoadScene(clip.ResourcePath, clip.Name, "animation");
+                using var sourceScene = LoadScene(clip.ResourcePath, clip.Name, "animation");
                 using var sourceRoot = new OwnedNode(sourceScene.Instantiate());
                 var sourcePlayer = AlsImportedResourceAuditor.FindFirst<AnimationPlayer>(sourceRoot.Value)
                     ?? throw new InvalidOperationException(
@@ -135,6 +170,10 @@ public static class AlsAnimationLibraryBuilder
                 }
 
                 using var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
+                if (normalizedTrackDomainAnimationIds?.Contains(animationId) == true)
+                {
+                    NormalizeTrackDomains(boundAnimation);
+                }
                 AlsAnimationBinder.RewriteTrackPaths(
                     targetRoot, targetSkeleton, boundAnimation, clip.Name);
                 StringName? animationName = new($"clip_{animationId}");
@@ -184,6 +223,130 @@ public static class AlsAnimationLibraryBuilder
         {
             ReleasePartialBuild(targetRoot, library, libraryName, names);
             throw;
+        }
+    }
+
+    private static void NormalizeTrackDomains(Godot.Animation animation)
+    {
+        for (var trackIndex = 0; trackIndex < animation.GetTrackCount(); trackIndex++)
+        {
+            var keyCount = animation.TrackGetKeyCount(trackIndex);
+            if (keyCount == 0 ||
+                animation.TrackGetKeyTime(trackIndex, keyCount - 1) <= animation.Length)
+            {
+                continue;
+            }
+
+            var trackType = animation.TrackGetType(trackIndex);
+            var endpointPosition = trackType == Godot.Animation.TrackType.Position3D
+                ? animation.PositionTrackInterpolate(trackIndex, animation.Length)
+                : default;
+            var endpointRotation = trackType == Godot.Animation.TrackType.Rotation3D
+                ? animation.RotationTrackInterpolate(trackIndex, animation.Length)
+                : default;
+            var endpointScale = trackType == Godot.Animation.TrackType.Scale3D
+                ? animation.ScaleTrackInterpolate(trackIndex, animation.Length)
+                : default;
+            while (animation.TrackGetKeyCount(trackIndex) > 0 &&
+                animation.TrackGetKeyTime(
+                    trackIndex,
+                    animation.TrackGetKeyCount(trackIndex) - 1) > animation.Length)
+            {
+                animation.TrackRemoveKey(
+                    trackIndex,
+                    animation.TrackGetKeyCount(trackIndex) - 1);
+            }
+            var remainingKeyCount = animation.TrackGetKeyCount(trackIndex);
+            if (remainingKeyCount > 0 &&
+                animation.TrackGetKeyTime(trackIndex, remainingKeyCount - 1) == animation.Length)
+            {
+                continue;
+            }
+            switch (trackType)
+            {
+                case Godot.Animation.TrackType.Position3D:
+                    animation.PositionTrackInsertKey(
+                        trackIndex, animation.Length, endpointPosition);
+                    break;
+                case Godot.Animation.TrackType.Rotation3D:
+                    animation.RotationTrackInsertKey(
+                        trackIndex, animation.Length, endpointRotation);
+                    break;
+                case Godot.Animation.TrackType.Scale3D:
+                    animation.ScaleTrackInsertKey(
+                        trackIndex, animation.Length, endpointScale);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Cannot normalize unsupported animation track type: {trackType}");
+            }
+        }
+    }
+
+    private static int[] BuildP4AnimationClosure(
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile profile,
+        AlsPoseAnimationProfile poseProfile)
+    {
+        if ((uint)profile.SkeletonId >= (uint)animationSet.Skeletons.Length ||
+            poseProfile.SkeletonId != profile.SkeletonId ||
+            poseProfile.Turns.Length != 8 ||
+            poseProfile.Rotates.Length != 4)
+        {
+            throw new InvalidOperationException(
+                "P4 animation library profile skeleton or fixed slot count is invalid.");
+        }
+
+        var closure = new HashSet<int>();
+        foreach (var animationId in profile.AllAnimationIds)
+        {
+            ValidateClosureAnimation(animationSet, animationId, profile.SkeletonId, "P3");
+            if (!closure.Add(animationId))
+            {
+                throw new InvalidOperationException(
+                    $"P3 animation library profile contains duplicate animation ID: {animationId}");
+            }
+        }
+
+        var p4Ids = poseProfile.Turns.Select(value => value.AnimationId)
+            .Concat(poseProfile.Rotates.Select(value => value.AnimationId))
+            .Concat([
+                poseProfile.Aim.DownAnimationId,
+                poseProfile.Aim.ForwardAnimationId,
+                poseProfile.Aim.UpAnimationId,
+                poseProfile.Aim.AdditiveBasePoseAnimationId,
+            ])
+            .ToArray();
+        var uniqueP4 = new HashSet<int>();
+        foreach (var animationId in p4Ids)
+        {
+            ValidateClosureAnimation(animationSet, animationId, profile.SkeletonId, "P4");
+            if (!uniqueP4.Add(animationId))
+            {
+                throw new InvalidOperationException(
+                    $"P4 animation library profile contains duplicate semantic animation ID: {animationId}");
+            }
+            closure.Add(animationId);
+        }
+
+        return closure.OrderBy(value => value).ToArray();
+    }
+
+    private static void ValidateClosureAnimation(
+        AlsAnimationSetDefinition animationSet,
+        int animationId,
+        int skeletonId,
+        string label)
+    {
+        if ((uint)animationId >= (uint)animationSet.Animations.Length)
+        {
+            throw new InvalidOperationException(
+                $"{label} animation library profile ID is out of range: {animationId}");
+        }
+        if (animationSet.Animations[animationId].SkeletonId != skeletonId)
+        {
+            throw new InvalidOperationException(
+                $"{label} animation library profile targets another skeleton: {animationId}");
         }
     }
 

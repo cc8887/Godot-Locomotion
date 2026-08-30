@@ -1,4 +1,6 @@
 using System.Threading;
+using Godot;
+using GodotAls.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
@@ -14,12 +16,179 @@ public readonly record struct AlsP3VisualTransformSnapshot(
     NumericsVector3 BasisZ,
     NumericsVector3 Origin);
 
+public readonly record struct AlsP4FootProbeSourceSnapshot(
+    AlsFrameIdentity Identity,
+    int LeftPhysicalBoneId,
+    int RightPhysicalBoneId,
+    AlsP3VisualTransformSnapshot CharacterTransform,
+    AlsP3VisualTransformSnapshot SkeletonTransform,
+    NumericsVector3 LeftComponentOrigin,
+    NumericsVector3 RightComponentOrigin);
+
+internal readonly record struct AlsP4FootGatherSettings(
+    float TraceUpMeters,
+    float TraceDownMeters,
+    float CharacterTeleportDistanceMeters,
+    float CharacterTeleportAngleRadians)
+{
+    public static AlsP4FootGatherSettings CreateReference() => new(
+        0.5f,
+        0.75f,
+        1f,
+        MathF.PI / 4f);
+
+    public bool IsValid =>
+        float.IsFinite(TraceUpMeters) && TraceUpMeters >= 0f &&
+        float.IsFinite(TraceDownMeters) && TraceDownMeters > 0f &&
+        float.IsFinite(CharacterTeleportDistanceMeters) &&
+        CharacterTeleportDistanceMeters > 0f &&
+        float.IsFinite(CharacterTeleportAngleRadians) &&
+        CharacterTeleportAngleRadians > 0f && CharacterTeleportAngleRadians <= MathF.PI;
+}
+
+internal readonly record struct AlsP4FootProbeRequest(
+    AlsFrameIdentity Identity,
+    NumericsVector3 CharacterLocalOrigin);
+
+internal sealed class AlsP4FootProbeExchange
+{
+    public const int FootCount = 2;
+    public const int LeftFootIndex = 0;
+    public const int RightFootIndex = 1;
+
+    private readonly AlsP4FootProbeRequest[] _requests = new AlsP4FootProbeRequest[FootCount];
+    private bool _hasRequests;
+
+    public bool TryCopyFromWorker(
+        in AlsFrameIdentity identity,
+        in NumericsVector3 leftOrigin,
+        in NumericsVector3 rightOrigin)
+    {
+        if (identity.FrameId < 0 || identity.SlotGeneration == 0 ||
+            !IsFinite(leftOrigin) || !IsFinite(rightOrigin))
+        {
+            Clear();
+            return false;
+        }
+
+        _requests[LeftFootIndex] = new AlsP4FootProbeRequest(identity, leftOrigin);
+        _requests[RightFootIndex] = new AlsP4FootProbeRequest(identity, rightOrigin);
+        _hasRequests = true;
+        return true;
+    }
+
+    public bool TryReadForGather(
+        in AlsFrameIdentity gatherIdentity,
+        out AlsP4FootProbeRequest left,
+        out AlsP4FootProbeRequest right)
+    {
+        left = default;
+        right = default;
+        if (!_hasRequests)
+        {
+            return false;
+        }
+
+        var candidateLeft = _requests[LeftFootIndex];
+        var candidateRight = _requests[RightFootIndex];
+        if (candidateLeft.Identity != candidateRight.Identity ||
+            candidateLeft.Identity.CharacterId != gatherIdentity.CharacterId ||
+            candidateLeft.Identity.SlotGeneration != gatherIdentity.SlotGeneration ||
+            candidateLeft.Identity.FrameId == long.MaxValue ||
+            candidateLeft.Identity.FrameId + 1 != gatherIdentity.FrameId)
+        {
+            Clear();
+            return false;
+        }
+
+        left = candidateLeft;
+        right = candidateRight;
+        return true;
+    }
+
+    public void Clear()
+    {
+        _requests[LeftFootIndex] = default;
+        _requests[RightFootIndex] = default;
+        _hasRequests = false;
+    }
+
+    internal bool HasRequests => _hasRequests;
+
+    private static bool IsFinite(in NumericsVector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+}
+
 internal readonly record struct AlsP3VisualCommitCandidate(
     AlsFrameIdentity Identity,
     AlsP3VisualTransformSnapshot RootTransform,
     ulong PoseDigest,
     ulong FullPoseDigest,
-    ulong RootDigest);
+    ulong RootDigest,
+    AlsP4FootProbeSourceSnapshot FootProbeSource)
+{
+    public AlsP4FootPlacementPoseSnapshot FootPose { get; init; }
+}
+
+public readonly record struct AlsP4FootPlacementPoseSnapshot(
+    AlsFrameIdentity Identity,
+    NumericsVector3 PelvisLocalPosition,
+    NumericsVector3 LeftFootWorldPosition,
+    NumericsVector3 RightFootWorldPosition,
+    System.Numerics.Quaternion LeftFootWorldRotation,
+    System.Numerics.Quaternion RightFootWorldRotation,
+    AlsFootHit LeftGatherHit,
+    AlsFootHit RightGatherHit,
+    NumericsVector3 LeftProbeWorldOrigin,
+    NumericsVector3 RightProbeWorldOrigin,
+    AlsFootLockState LeftFootLock,
+    AlsFootLockState RightFootLock)
+{
+    public NumericsVector3 UncorrectedPelvisWorldPosition { get; init; }
+
+    public NumericsVector3 PelvisWorldPosition { get; init; }
+
+    public NumericsVector3 UncorrectedLeftFootWorldPosition { get; init; }
+
+    public NumericsVector3 UncorrectedRightFootWorldPosition { get; init; }
+
+    public System.Numerics.Quaternion UncorrectedLeftFootWorldRotation { get; init; }
+
+    public System.Numerics.Quaternion UncorrectedRightFootWorldRotation { get; init; }
+
+    public NumericsVector3 LeftPhysicalTargetWorldPosition { get; init; }
+
+    public NumericsVector3 RightPhysicalTargetWorldPosition { get; init; }
+
+    public System.Numerics.Quaternion LeftPhysicalTargetWorldRotation { get; init; }
+
+    public System.Numerics.Quaternion RightPhysicalTargetWorldRotation { get; init; }
+
+    public int AnimationAdvanceCount { get; init; }
+
+    public int ModifierWriteTransactionCount { get; init; }
+
+    public int ModifierFootChainRebuildCount { get; init; }
+
+    public int ModifierFootFullSkeletonRebuildCount { get; init; }
+
+    public int ModifierFootComponentPropagationCount { get; init; }
+
+    public uint WorkerStageSequence { get; init; }
+}
+
+internal readonly record struct AlsP3PreparedResultPublication(
+    AlsFrameResult Result,
+    AlsP3VisualCommitCandidate Candidate,
+    long ModelFrameId,
+    long PoseFrameId,
+    int CharacterId,
+    int Generation);
+
+internal readonly record struct AlsP3ResultClassificationDiagnostics(
+    long Sequence,
+    AlsFrameIdentity Identity,
+    AlsP3aResultFailure Failure);
 
 public readonly record struct AlsP3FrameDiagnostics(
     AlsFrameIdentity Identity,
@@ -33,8 +202,41 @@ public readonly record struct AlsP3FrameDiagnostics(
     ulong PoseDigest,
     ulong FullPoseDigest,
     AlsP3VisualTransformSnapshot VisualRootTransform,
-    ulong RootDigest)
+    ulong RootDigest,
+    AlsP4FootProbeSourceSnapshot FootProbeSource)
 {
+    public AlsP4FootPlacementPoseSnapshot FootPose { get; init; }
+
+    public AlsP3FrameDiagnostics(
+        AlsFrameIdentity Identity,
+        long CommandFrameId,
+        long MotorSnapshotFrameId,
+        long ModelResultFrameId,
+        long PoseAdvanceFrameId,
+        long CommittedFrameId,
+        NumericsVector3 ActualVelocity,
+        AlsFrameResult Result,
+        ulong PoseDigest,
+        ulong FullPoseDigest,
+        AlsP3VisualTransformSnapshot VisualRootTransform,
+        ulong RootDigest)
+        : this(
+            Identity,
+            CommandFrameId,
+            MotorSnapshotFrameId,
+            ModelResultFrameId,
+            PoseAdvanceFrameId,
+            CommittedFrameId,
+            ActualVelocity,
+            Result,
+            PoseDigest,
+            FullPoseDigest,
+            VisualRootTransform,
+            RootDigest,
+            default)
+    {
+    }
+
     public AlsP3FrameDiagnostics(
         AlsFrameIdentity Identity,
         long CommandFrameId,
@@ -58,8 +260,37 @@ public readonly record struct AlsP3FrameDiagnostics(
             PoseDigest,
             FullPoseDigest,
             default,
-            0)
+            0,
+            default)
     {
+    }
+
+    public void Deconstruct(
+        out AlsFrameIdentity Identity,
+        out long CommandFrameId,
+        out long MotorSnapshotFrameId,
+        out long ModelResultFrameId,
+        out long PoseAdvanceFrameId,
+        out long CommittedFrameId,
+        out NumericsVector3 ActualVelocity,
+        out AlsFrameResult Result,
+        out ulong PoseDigest,
+        out ulong FullPoseDigest,
+        out AlsP3VisualTransformSnapshot VisualRootTransform,
+        out ulong RootDigest)
+    {
+        Identity = this.Identity;
+        CommandFrameId = this.CommandFrameId;
+        MotorSnapshotFrameId = this.MotorSnapshotFrameId;
+        ModelResultFrameId = this.ModelResultFrameId;
+        PoseAdvanceFrameId = this.PoseAdvanceFrameId;
+        CommittedFrameId = this.CommittedFrameId;
+        ActualVelocity = this.ActualVelocity;
+        Result = this.Result;
+        PoseDigest = this.PoseDigest;
+        FullPoseDigest = this.FullPoseDigest;
+        VisualRootTransform = this.VisualRootTransform;
+        RootDigest = this.RootDigest;
     }
 }
 
@@ -80,6 +311,21 @@ public enum AlsP3ReplacementPhase : byte
     Complete,
 }
 
+internal enum AlsP3WorkerFailureInjectionStage : byte
+{
+    None,
+    BeforePublish,
+    ModifierAfterPelvis,
+    ModifierAfterLeftFoot,
+}
+
+internal readonly record struct AlsP3WorkerTransactionRollbackDiagnostics(
+    AlsFrameIdentity Identity,
+    bool RuntimeStateRestored,
+    bool FrameResultRestored,
+    bool ControllerRestored,
+    bool P4BanksRestored);
+
 public readonly record struct AlsP3SlotReplacementDiagnostics(
     bool Requested,
     bool RetiredResultObserved,
@@ -89,7 +335,10 @@ public readonly record struct AlsP3SlotReplacementDiagnostics(
     long CommittedFrameAtClassification,
     bool RecoveryCommitted,
     AlsP3ReplacementPhase Phase,
-    int VisibleCharacterCount);
+    int VisibleCharacterCount)
+{
+    internal AlsFrameInput RetiredMotorInput { get; init; }
+}
 
 internal readonly record struct AlsP3RuntimeDiagnostics(
     ulong LastPublishedPoseDigest,
@@ -101,8 +350,22 @@ internal readonly record struct AlsP3RuntimeDiagnostics(
     int PendingFailureIdentityCount,
     int RetainedFailureIdentityCount);
 
+internal readonly record struct AlsP4LifecyclePublicationDiagnostics(
+    byte HasCommittedTargetYaw,
+    float CommittedTargetYaw,
+    AlsFrameIdentity DiagnosticsIdentity,
+    AlsFrameIdentity CandidateIdentity,
+    bool HasFootProbeRequests,
+    bool WorkerFrozen);
+
 public sealed class AlsP3RuntimeContext
 {
+    private readonly object _workerFailureInjectionGate = new();
+    private int _workerFailureInjectionStage;
+    private long _workerFailureInjectionFrameId;
+    private int _workerFailureInjectionCharacterId = -1;
+    private int _workerFailureInjectionGeneration = -1;
+
     public AlsP3RuntimeContext(
         AlsHarnessMode mode,
         AlsLocomotionSettings settings,
@@ -111,12 +374,13 @@ public sealed class AlsP3RuntimeContext
         AlsLocomotionAnimationProfile profile,
         int mainManagedThreadId,
         bool headlessOrDebug,
-        AlsP3bHarnessContext? measurement = null)
+        IAlsP3RuntimeMeasurement? measurement = null)
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         AnimationSet = animationSet ?? throw new ArgumentNullException(nameof(animationSet));
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
         PresentationTransform = AlsP3Presentation.Create(profile.Presentation);
+        FootGatherSettings = LoadFootGatherSettings(animationSet, profile);
         motorSettings.Validate();
         if (mainManagedThreadId <= 0)
         {
@@ -142,11 +406,100 @@ public sealed class AlsP3RuntimeContext
 
     public Godot.Transform3D PresentationTransform { get; }
 
+    internal AlsP4FootGatherSettings FootGatherSettings { get; }
+
     public int MainManagedThreadId { get; }
 
     public bool HeadlessOrDebug { get; }
 
-    public AlsP3bHarnessContext? Measurement { get; }
+    public IAlsP3RuntimeMeasurement? Measurement { get; }
+
+    internal Func<Skeleton3D, IAlsSkeletonPoseWriter>? PoseWriterFactory { get; set; }
+
+    internal void ArmWorkerFailureInjection(
+        AlsP3WorkerFailureInjectionStage stage,
+        long frameId)
+    {
+        ArmWorkerFailureInjection(stage, frameId, -1, -1);
+    }
+
+    internal void ArmWorkerFailureInjection(
+        AlsP3WorkerFailureInjectionStage stage,
+        in AlsFrameIdentity identity)
+    {
+        ArmWorkerFailureInjection(
+            stage,
+            identity.FrameId,
+            checked((int)identity.CharacterId),
+            checked((int)identity.SlotGeneration));
+    }
+
+    private void ArmWorkerFailureInjection(
+        AlsP3WorkerFailureInjectionStage stage,
+        long frameId,
+        int characterId,
+        int generation)
+    {
+        if (stage == AlsP3WorkerFailureInjectionStage.None)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage));
+        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(frameId);
+        lock (_workerFailureInjectionGate)
+        {
+            if (Volatile.Read(ref _workerFailureInjectionStage) !=
+                (int)AlsP3WorkerFailureInjectionStage.None)
+            {
+                throw new InvalidOperationException(
+                    "Worker failure injection is already armed.");
+            }
+            Volatile.Write(ref _workerFailureInjectionFrameId, frameId);
+            Volatile.Write(ref _workerFailureInjectionCharacterId, characterId);
+            Volatile.Write(ref _workerFailureInjectionGeneration, generation);
+            Volatile.Write(ref _workerFailureInjectionStage, (int)stage);
+        }
+    }
+
+    internal bool IsWorkerFailureInjectionArmed(
+        in AlsFrameIdentity identity,
+        AlsP3WorkerFailureInjectionStage stage) =>
+        Volatile.Read(ref _workerFailureInjectionStage) == (int)stage &&
+        Volatile.Read(ref _workerFailureInjectionFrameId) == identity.FrameId &&
+        (Volatile.Read(ref _workerFailureInjectionCharacterId) < 0 ||
+         Volatile.Read(ref _workerFailureInjectionCharacterId) ==
+         checked((int)identity.CharacterId)) &&
+        (Volatile.Read(ref _workerFailureInjectionGeneration) < 0 ||
+         Volatile.Read(ref _workerFailureInjectionGeneration) ==
+         checked((int)identity.SlotGeneration));
+
+    internal bool IsAnyWorkerFailureInjectionArmed(in AlsFrameIdentity identity) =>
+        IsWorkerFailureInjectionArmed(
+            in identity, AlsP3WorkerFailureInjectionStage.BeforePublish) ||
+        IsWorkerFailureInjectionArmed(
+            in identity, AlsP3WorkerFailureInjectionStage.ModifierAfterPelvis) ||
+        IsWorkerFailureInjectionArmed(
+            in identity, AlsP3WorkerFailureInjectionStage.ModifierAfterLeftFoot);
+
+    internal bool TryConsumeWorkerFailureInjection(
+        in AlsFrameIdentity identity,
+        AlsP3WorkerFailureInjectionStage stage) =>
+        IsWorkerFailureInjectionArmed(in identity, stage) &&
+        Interlocked.CompareExchange(
+            ref _workerFailureInjectionStage,
+            (int)AlsP3WorkerFailureInjectionStage.None,
+            (int)stage) == (int)stage;
+
+    internal void ThrowIfWorkerFailureInjected(
+        in AlsFrameIdentity identity,
+        AlsP3WorkerFailureInjectionStage stage)
+    {
+        if (!TryConsumeWorkerFailureInjection(in identity, stage))
+        {
+            return;
+        }
+        throw new InvalidOperationException(
+            $"Injected Worker failure at {stage} for frame {identity.FrameId}.");
+    }
 
     public long MissingResults;
 
@@ -157,6 +510,33 @@ public sealed class AlsP3RuntimeContext
     public long GenerationMismatches;
 
     public long AffinityViolations;
+
+    public long FootGatherManagedAllocations;
+
+    public long FootGatherQueries;
+
+    public long InvalidFootProbeRequests;
+
+    private static AlsP4FootGatherSettings LoadFootGatherSettings(
+        AlsAnimationSetDefinition animationSet,
+        AlsLocomotionAnimationProfile locomotionProfile)
+    {
+        const string profilePath = "res://assets/config/p4_pose_profile.json";
+        var profile = AlsPoseProfileCompiler.Compile(
+            File.ReadAllText(ProjectSettings.GlobalizePath(profilePath)),
+            animationSet,
+            locomotionProfile);
+        var settings = new AlsP4FootGatherSettings(
+            profile.Feet.TraceUpMeters,
+            profile.Feet.TraceDownMeters,
+            profile.Feet.PlatformTeleportDistanceMeters,
+            profile.Feet.PlatformTeleportAngleRadians);
+        if (!settings.IsValid)
+        {
+            throw new InvalidOperationException("P4 foot Gather settings are invalid.");
+        }
+        return settings;
+    }
 }
 
 internal readonly record struct AlsP3VisualRootVisibilityObservation(
@@ -208,11 +588,24 @@ internal sealed class AlsP3CharacterState
     private readonly HashSet<AlsP3FailureIdentity> _pendingFailureIdentities = new();
     private AlsP3FailureIdentity _lastPublishedFailureIdentity;
     private bool _hasLastPublishedFailureIdentity;
+    private long _resultClassificationSequence;
+    private AlsFrameIdentity _resultClassificationIdentity;
+    private AlsP3aResultFailure _resultClassificationFailure;
 
     public AlsP3CharacterState(AlsSlotHandle handle, AlsP3ExchangeSlot exchangeSlot)
+        : this(handle, exchangeSlot, new AlsP4FootProbeExchange())
+    {
+    }
+
+    public AlsP3CharacterState(
+        AlsSlotHandle handle,
+        AlsP3ExchangeSlot exchangeSlot,
+        AlsP4FootProbeExchange footProbeExchange)
     {
         Handle = handle;
         ExchangeSlot = exchangeSlot ?? throw new ArgumentNullException(nameof(exchangeSlot));
+        FootProbeExchange = footProbeExchange ??
+            throw new ArgumentNullException(nameof(footProbeExchange));
     }
 
     public AlsSlotHandle Handle { get; }
@@ -220,6 +613,8 @@ internal sealed class AlsP3CharacterState
     public AlsP3ExchangeSlot ExchangeSlot { get; }
 
     public AlsFrameExchange Exchange => ExchangeSlot.Exchange;
+
+    public AlsP4FootProbeExchange FootProbeExchange { get; }
 
     public AlsP3VisualCommitCandidate VisualCommitCandidate;
 
@@ -237,6 +632,8 @@ internal sealed class AlsP3CharacterState
 
     public NumericsVector3 MotorActualVelocity;
 
+    public AlsFrameInput MotorInput;
+
     public long ModelResultFrameId;
 
     public long PoseAdvanceFrameId;
@@ -248,6 +645,22 @@ internal sealed class AlsP3CharacterState
     public int ResultPublishedGeneration => ExchangeSlot.ResultPublishedGeneration;
 
     public int HasPublishedResult => Volatile.Read(ref ExchangeSlot.HasPublishedResult);
+
+    public AlsP3ResultClassificationDiagnostics CaptureResultClassification() => new(
+        Volatile.Read(ref _resultClassificationSequence),
+        _resultClassificationIdentity,
+        _resultClassificationFailure);
+
+    public void RecordResultClassification(
+        in AlsFrameIdentity identity,
+        AlsP3aResultFailure failure)
+    {
+        _resultClassificationIdentity = identity;
+        _resultClassificationFailure = failure;
+        Interlocked.Increment(ref _resultClassificationSequence);
+    }
+
+    public AlsP3WorkerTransactionRollbackDiagnostics WorkerTransactionRollbackDiagnostics;
 
     public byte HasCommittedTargetYaw;
 
@@ -277,6 +690,8 @@ internal sealed class AlsP3CharacterState
     public int ObservedOffMainThread;
 
     public int FailureDiagnosticCount;
+
+    public int LastFailureReasonCode;
 
     private int _workerAdmissionState = WorkerAdmissionClosedValue;
 
@@ -329,13 +744,24 @@ internal sealed class AlsP3CharacterState
         }
     }
 
-    public void RecordFailure(string code, AlsFrameIdentity identity, Exception exception)
+    public void RecordFailure(
+        string code,
+        AlsFrameIdentity identity,
+        Exception exception,
+        AlsP4ReasonCode reasonCode = AlsP4ReasonCode.None)
     {
         var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
-        var failure = new AlsP3WorkerFailure(code, identity, exceptionType);
+        var failure = new AlsP3WorkerFailure(code, identity, exceptionType, reasonCode);
         var failureIdentity = new AlsP3FailureIdentity(code, identity);
         lock (_failureGate)
         {
+            if (reasonCode != AlsP4ReasonCode.None)
+            {
+                Interlocked.CompareExchange(
+                    ref LastFailureReasonCode,
+                    (int)reasonCode,
+                    (int)AlsP4ReasonCode.None);
+            }
             // Frame identities are monotonic. Pending identities plus the last published
             // identity suppress retries without retaining an unbounded frame history.
             if ((!_hasLastPublishedFailureIdentity ||
@@ -394,16 +820,70 @@ internal sealed class AlsP3CharacterState
         Volatile.Write(ref RollbackVerified, verified ? 1 : 0);
     }
 
-    public void PublishResult(
+    public AlsP3PreparedResultPublication PrepareResultPublication(
         in AlsFrameResult result,
         in AlsP3VisualCommitCandidate candidate,
         long modelFrameId,
         long poseFrameId)
     {
-        ModelResultFrameId = modelFrameId;
-        PoseAdvanceFrameId = poseFrameId;
-        VisualCommitCandidate = candidate;
-        ExchangeSlot.PublishResult(result);
+        if (candidate.Identity != result.Identity)
+        {
+            throw new InvalidOperationException(
+                "P3 visual commit candidate identity does not match its frame result.");
+        }
+        if (modelFrameId != result.Identity.FrameId ||
+            poseFrameId != result.Identity.FrameId)
+        {
+            throw new InvalidOperationException(
+                "P3 result publication frame ownership is inconsistent.");
+        }
+
+        return new AlsP3PreparedResultPublication(
+            result,
+            candidate,
+            modelFrameId,
+            poseFrameId,
+            checked((int)result.Identity.CharacterId),
+            checked((int)result.Identity.SlotGeneration));
+    }
+
+    public AlsP4LifecyclePublicationDiagnostics CaptureLifecyclePublicationDiagnostics()
+    {
+        var diagnostics = Diagnostics;
+        var candidate = VisualCommitCandidate;
+        return new AlsP4LifecyclePublicationDiagnostics(
+            HasCommittedTargetYaw,
+            CommittedTargetYaw,
+            diagnostics.Identity,
+            candidate.Identity,
+            FootProbeExchange.HasRequests,
+            Volatile.Read(ref WorkerFrozen) != 0);
+    }
+
+    public void ResetLifecyclePublication()
+    {
+        ReleaseYawAndFootProbes();
+        VisualCommitCandidate = default;
+        Diagnostics = default;
+    }
+
+    public void ReleaseYawAndFootProbes()
+    {
+        HasCommittedTargetYaw = 0;
+        CommittedTargetYaw = 0f;
+        FootProbeExchange.Clear();
+    }
+
+    public void PublishPreparedResult(in AlsP3PreparedResultPublication publication)
+    {
+        var result = publication.Result;
+        ModelResultFrameId = publication.ModelFrameId;
+        PoseAdvanceFrameId = publication.PoseFrameId;
+        VisualCommitCandidate = publication.Candidate;
+        ExchangeSlot.PublishPreparedResult(
+            in result,
+            publication.CharacterId,
+            publication.Generation);
     }
 }
 
@@ -419,27 +899,49 @@ internal sealed class AlsP3ExchangeSlot
 
     public int HasPublishedResult;
 
-    public void PublishResult(in AlsFrameResult result)
+    private long _publicationSequence;
+
+    public void PublishPreparedResult(
+        in AlsFrameResult result,
+        int characterId,
+        int generation)
     {
-        ResultPublishedCharacterId = checked((int)result.Identity.CharacterId);
-        ResultPublishedGeneration = checked((int)result.Identity.SlotGeneration);
+        var writingSequence = Interlocked.Increment(ref _publicationSequence);
+        if ((writingSequence & 1L) == 0L)
+        {
+            writingSequence = Interlocked.Increment(ref _publicationSequence);
+        }
+        ResultPublishedCharacterId = characterId;
+        ResultPublishedGeneration = generation;
         ResultPublishedFrameId = result.Identity.FrameId;
         Exchange.PublishResult(result);
         Volatile.Write(ref HasPublishedResult, 1);
+        Volatile.Write(ref _publicationSequence, writingSequence + 1L);
     }
 
     public bool TryGetPublishedIdentity(out AlsFrameIdentity identity)
     {
-        if (Volatile.Read(ref HasPublishedResult) == 0)
+        var sequence = Volatile.Read(ref _publicationSequence);
+        if (sequence == 0L || (sequence & 1L) != 0L ||
+            Volatile.Read(ref HasPublishedResult) == 0)
         {
             identity = default;
             return false;
         }
 
+        var frameId = ResultPublishedFrameId;
+        var characterId = ResultPublishedCharacterId;
+        var generation = ResultPublishedGeneration;
+        if (Volatile.Read(ref _publicationSequence) != sequence ||
+            characterId < 0 || generation < 0)
+        {
+            identity = default;
+            return false;
+        }
         identity = new AlsFrameIdentity(
-            ResultPublishedFrameId,
-            checked((uint)ResultPublishedCharacterId),
-            checked((uint)ResultPublishedGeneration));
+            frameId,
+            (uint)characterId,
+            (uint)generation);
         return true;
     }
 }
@@ -451,4 +953,5 @@ internal readonly record struct AlsP3FailureIdentity(
 internal sealed record AlsP3WorkerFailure(
     string Code,
     AlsFrameIdentity Identity,
-    string ExceptionType);
+    string ExceptionType,
+    AlsP4ReasonCode ReasonCode);

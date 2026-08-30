@@ -1,5 +1,6 @@
 using Godot;
 using GodotAls.Assets;
+using GodotAls.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Exchange;
@@ -13,6 +14,7 @@ namespace GodotAls.Locomotion;
 public partial class P3bFrameOrderSmoke : Node
 {
     private const string ProfilePath = "res://assets/config/p3_locomotion_profile.json";
+    private const string PoseProfilePath = "res://assets/config/p4_pose_profile.json";
     private const long LastFrame = 180;
     private const long ReplacementFrame = 120;
 
@@ -37,6 +39,11 @@ public partial class P3bFrameOrderSmoke : Node
     private bool _replacementRequested;
     private int _maximumVisibleCharacterCount;
     private Vector3 _initialMovementAnchorPosition;
+    private int _leftFootBoneId;
+    private int _rightFootBoneId;
+    private AlsFrameIdentity _previousFootProbeIdentity;
+    private System.Numerics.Vector3 _previousLeftFootProbeOrigin;
+    private System.Numerics.Vector3 _previousRightFootProbeOrigin;
     private bool _inactiveRigHiddenAfterSeparation;
     private bool _recoveryZeroVisible;
     private bool _disposeGuardsChecked;
@@ -53,12 +60,22 @@ public partial class P3bFrameOrderSmoke : Node
     private ulong _workerFailureRootDigest;
     private bool _quitting;
     private string? _failurePolicy;
+    private PoseRestoreFailureWriter? _poseRestoreWriter;
+    private bool _poseRestoreFailureInjected;
+    private long _poseRestoreCommittedFrame;
+    private long _poseRestoreResultPublishedFrame;
+    private long _poseRestoreObservedMotorFrame;
+    private int _poseRestoreAttemptsAtFreeze;
+    private bool _lateTransactionFailureArmed;
+    private long _lateTransactionCommittedFrame;
+    private long _lateTransactionResultPublishedFrame;
 
     public override void _Ready()
     {
         try
         {
             (_mode, _failurePolicy) = ReadOptions();
+            VerifyFailureReasonPublicationOrder();
             ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
             ProcessThreadGroupOrder = 4;
 
@@ -91,6 +108,15 @@ public partial class P3bFrameOrderSmoke : Node
                 profile,
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: _failurePolicy is null or "headless");
+            if (_failurePolicy == "pose_restore")
+            {
+                _context.PoseWriterFactory = skeleton =>
+                {
+                    var writer = new PoseRestoreFailureWriter(skeleton);
+                    _poseRestoreWriter ??= writer;
+                    return writer;
+                };
+            }
             AddChild(CreateFloor());
             _slot = new AlsP3CharacterSlot { Name = "CharacterSlot" };
             AddChild(_slot);
@@ -100,6 +126,15 @@ public partial class P3bFrameOrderSmoke : Node
                 new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f));
             _active = _slot.ActiveCharacter;
             _initialMovementAnchorPosition = _active.MovementAnchor.GlobalPosition;
+            var poseProfile = AlsPoseProfileCompiler.Compile(
+                Godot.FileAccess.GetFileAsString(PoseProfilePath),
+                animationSet,
+                _context.Profile);
+            var skeletonDefinition = animationSet.Skeletons[poseProfile.SkeletonId];
+            _leftFootBoneId = skeletonDefinition.LogicalToPhysical[
+                poseProfile.Feet.LeftFootRootBoneId];
+            _rightFootBoneId = skeletonDefinition.LogicalToPhysical[
+                poseProfile.Feet.RightFootRootBoneId];
             ValidateLifecycleThreadAndSchedulingContracts();
             var lifecycle = _active.LifecycleDiagnostics;
             Require(!lifecycle.IsVisible && !lifecycle.IsVisualReady,
@@ -203,11 +238,21 @@ public partial class P3bFrameOrderSmoke : Node
         Require(visualRootObservation.IsWorkerObservation &&
             visualRootObservation.FrameId == frame.CommittedFrameId,
             "real visual-root visibility was not observed by the same Worker frame");
-        var motorVelocity = ((CharacterBody3D)_active.MovementAnchor).GetRealVelocity();
+        var motor = (AlsCharacterMotor)_active.MovementAnchor;
+        var motorVelocity = motor.LifecycleActualVelocity;
         Require(MathF.Abs(frame.ActualVelocity.X - motorVelocity.X) < 0.00001f &&
-            MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
-            MathF.Abs(frame.ActualVelocity.Z - motorVelocity.Z) < 0.00001f,
-            "committed diagnostics did not carry the same-frame motor actual velocity");
+                MathF.Abs(frame.ActualVelocity.Y - motorVelocity.Y) < 0.00001f &&
+                MathF.Abs(frame.ActualVelocity.Z - motorVelocity.Z) < 0.00001f,
+            "committed diagnostics did not carry the same-frame logical motor velocity");
+        if (!motor.HasPublishedVelocityCheckpoint)
+        {
+            var engineVelocity = motor.GetRealVelocity();
+            Require(MathF.Abs(frame.ActualVelocity.X - engineVelocity.X) < 0.00001f &&
+                    MathF.Abs(frame.ActualVelocity.Y - engineVelocity.Y) < 0.00001f &&
+                    MathF.Abs(frame.ActualVelocity.Z - engineVelocity.Z) < 0.00001f,
+                "committed diagnostics did not carry the same-frame engine motor velocity");
+        }
+        ValidateProductionFootProbeOrigins(frame);
 
         if (_firstJumpFrame == 0 && frame.Result.ResolvedLocomotionState == AlsLocomotionState.InAir)
         {
@@ -327,6 +372,16 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void ValidateFailurePolicy()
     {
+        if (_failurePolicy == "pose_restore")
+        {
+            ValidatePoseRestoreFailure();
+            return;
+        }
+        if (_failurePolicy == "late_transaction")
+        {
+            ValidateLateTransactionFailure();
+            return;
+        }
         if (_failurePolicy is "worker" or "headless")
         {
             ValidateWorkerFailure();
@@ -379,11 +434,259 @@ public partial class P3bFrameOrderSmoke : Node
                 "--als-failure-policy=interactive" => "interactive",
                 "--als-failure-policy=worker" => "worker",
                 "--als-failure-policy=bounded" => "bounded",
+                "--als-failure-policy=pose_restore" => "pose_restore",
+                "--als-failure-policy=late_transaction" => "late_transaction",
                 var value => throw new InvalidOperationException(
                     $"Unsupported P3B failure policy fixture: {value}"),
             };
         }
         return (mode, failurePolicy);
+    }
+
+    private void ValidateProductionFootProbeOrigins(in AlsP3FrameDiagnostics frame)
+    {
+        var source = frame.FootProbeSource;
+        Require(source.Identity == frame.Identity &&
+                source.LeftPhysicalBoneId == _leftFootBoneId &&
+                source.RightPhysicalBoneId == _rightFootBoneId &&
+                source.LeftPhysicalBoneId != source.RightPhysicalBoneId,
+            "production Worker foot probe source snapshot had invalid identity or bone IDs");
+        var characterTransform = ToGodot(source.CharacterTransform);
+        var skeletonTransform = ToGodot(source.SkeletonTransform);
+        var inverseCharacter = characterTransform.AffineInverse();
+        var leftWorld = skeletonTransform * new Vector3(
+            source.LeftComponentOrigin.X,
+            source.LeftComponentOrigin.Y,
+            source.LeftComponentOrigin.Z);
+        var rightWorld = skeletonTransform * new Vector3(
+            source.RightComponentOrigin.X,
+            source.RightComponentOrigin.Y,
+            source.RightComponentOrigin.Z);
+        var expectedLeft = inverseCharacter * leftWorld;
+        var expectedRight = inverseCharacter * rightWorld;
+        Require(frame.Result.NextLeftFootProbeOrigin.LengthSquared() > 1e-8f &&
+                frame.Result.NextRightFootProbeOrigin.LengthSquared() > 1e-8f,
+            "production Worker published zero foot probe origins");
+        Require(IsApprox(frame.Result.NextLeftFootProbeOrigin, expectedLeft) &&
+                IsApprox(frame.Result.NextRightFootProbeOrigin, expectedRight),
+            "production Worker foot probe origins did not come from the uncorrected foot bones");
+
+        var motorInput = _active.LatestMotorInput;
+        var motor = (AlsCharacterMotor)_active.MovementAnchor;
+        if (_previousFootProbeIdentity.CharacterId == motorInput.Identity.CharacterId &&
+            _previousFootProbeIdentity.SlotGeneration == motorInput.Identity.SlotGeneration &&
+            _previousFootProbeIdentity.FrameId + 1 == motorInput.Identity.FrameId)
+        {
+            var gatherCharacterTransform = AlsP3Presentation.ToGodot(motorInput.CharacterTransform);
+            var expectedLeftRay = gatherCharacterTransform * new Vector3(
+                _previousLeftFootProbeOrigin.X,
+                _previousLeftFootProbeOrigin.Y,
+                _previousLeftFootProbeOrigin.Z);
+            var expectedRightRay = gatherCharacterTransform * new Vector3(
+                _previousRightFootProbeOrigin.X,
+                _previousRightFootProbeOrigin.Y,
+                _previousRightFootProbeOrigin.Z);
+            Require(motor.LastFootGatherConsumed &&
+                    motor.LastFootGatherRequestIdentity == _previousFootProbeIdentity &&
+                    motor.LastLeftFootQueryWorldOrigin.DistanceSquaredTo(expectedLeftRay) < 1e-8f &&
+                    motor.LastRightFootQueryWorldOrigin.DistanceSquaredTo(expectedRightRay) < 1e-8f &&
+                    (motorInput.LeftFootHit.Valid == 0 ||
+                     (MathF.Abs(motorInput.LeftFootHit.Position.X - expectedLeftRay.X) < 0.0001f &&
+                      MathF.Abs(motorInput.LeftFootHit.Position.Z - expectedLeftRay.Z) < 0.0001f)) &&
+                    (motorInput.RightFootHit.Valid == 0 ||
+                     (MathF.Abs(motorInput.RightFootHit.Position.X - expectedRightRay.X) < 0.0001f &&
+                      MathF.Abs(motorInput.RightFootHit.Position.Z - expectedRightRay.Z) < 0.0001f)),
+                "Commit/Gather N+1 did not consume the previous production foot-bone origins: " +
+                $"frame={motorInput.Identity.FrameId} " +
+                $"left={motorInput.LeftFootHit.Valid}/" +
+                $"{motorInput.LeftFootHit.Position.X:F4},{motorInput.LeftFootHit.Position.Z:F4} " +
+                $"expected={expectedLeftRay.X:F4},{expectedLeftRay.Z:F4} " +
+                $"right={motorInput.RightFootHit.Valid}/" +
+                $"{motorInput.RightFootHit.Position.X:F4},{motorInput.RightFootHit.Position.Z:F4} " +
+                $"expected={expectedRightRay.X:F4},{expectedRightRay.Z:F4}");
+        }
+        else if (_previousFootProbeIdentity.CharacterId == motorInput.Identity.CharacterId &&
+                 _previousFootProbeIdentity.SlotGeneration != 0 &&
+                 _previousFootProbeIdentity.SlotGeneration != motorInput.Identity.SlotGeneration)
+        {
+            Require(!motor.LastFootGatherConsumed,
+                "replacement lifecycle consumed a retired-generation foot probe request");
+        }
+        _previousFootProbeIdentity = frame.Identity;
+        _previousLeftFootProbeOrigin = frame.Result.NextLeftFootProbeOrigin;
+        _previousRightFootProbeOrigin = frame.Result.NextRightFootProbeOrigin;
+    }
+
+    private static bool IsApprox(in System.Numerics.Vector3 actual, in Vector3 expected) =>
+        MathF.Abs(actual.X - expected.X) < 0.0001f &&
+        MathF.Abs(actual.Y - expected.Y) < 0.0001f &&
+        MathF.Abs(actual.Z - expected.Z) < 0.0001f;
+
+    private static Transform3D ToGodot(in AlsP3VisualTransformSnapshot snapshot) => new(
+        new Basis(
+            new Vector3(snapshot.BasisX.X, snapshot.BasisX.Y, snapshot.BasisX.Z),
+            new Vector3(snapshot.BasisY.X, snapshot.BasisY.Y, snapshot.BasisY.Z),
+            new Vector3(snapshot.BasisZ.X, snapshot.BasisZ.Y, snapshot.BasisZ.Z)),
+        new Vector3(snapshot.Origin.X, snapshot.Origin.Y, snapshot.Origin.Z));
+
+    private static void VerifyFailureReasonPublicationOrder()
+    {
+        const int iterationCount = 2_048;
+        var states = new AlsP3CharacterState[iterationCount];
+        for (var index = 0; index < states.Length; index++)
+        {
+            states[index] = new AlsP3CharacterState(
+                new AlsSlotHandle(77, 3),
+                new AlsP3ExchangeSlot());
+        }
+        using var consumerStarted = new ManualResetEventSlim();
+        var failure = new InvalidOperationException("coordinated failure");
+        var mismatch = 0;
+        var consumer = new Thread(() =>
+        {
+            consumerStarted.Set();
+            var spinner = new SpinWait();
+            for (var index = 0; index < iterationCount; index++)
+            {
+                var state = states[index];
+                AlsP3WorkerFailure? observed;
+                while (!state.TryDequeueFailure(out observed))
+                {
+                    spinner.SpinOnce();
+                }
+                var lastReason = (AlsP4ReasonCode)Volatile.Read(
+                    ref state.LastFailureReasonCode);
+                if (observed is null ||
+                    observed.ReasonCode != AlsP4ReasonCode.NonFiniteCurve ||
+                    lastReason != observed.ReasonCode)
+                {
+                    Interlocked.Exchange(ref mismatch, 1);
+                }
+            }
+        });
+        consumer.IsBackground = true;
+        consumer.Start();
+        Require(consumerStarted.Wait(TimeSpan.FromSeconds(5)),
+            "failure consumer did not start");
+        var producer = new Thread(() =>
+        {
+            for (var index = 0; index < iterationCount; index++)
+            {
+                states[index].RecordFailure(
+                    "reason_order",
+                    new AlsFrameIdentity(index + 1, 77, 3),
+                    failure,
+                    AlsP4ReasonCode.NonFiniteCurve);
+            }
+        });
+        producer.IsBackground = true;
+        producer.Start();
+        Require(producer.Join(TimeSpan.FromSeconds(10)) &&
+                consumer.Join(TimeSpan.FromSeconds(10)),
+            "coordinated failure publication did not complete");
+        Require(Volatile.Read(ref mismatch) == 0,
+            "failure consumer observed a queue item without its stable reason");
+    }
+
+    private void ValidatePoseRestoreFailure()
+    {
+        if (!_poseRestoreFailureInjected)
+        {
+            var committed = _active.Diagnostics;
+            if (committed.CommittedFrameId < 12 || _active.WorkerInFlight != 0)
+            {
+                return;
+            }
+            Require(_poseRestoreWriter is not null,
+                "P4 pose restore writer was not injected into the real Worker");
+            _poseRestoreCommittedFrame = committed.CommittedFrameId;
+            _poseRestoreResultPublishedFrame = _active.ResultPublishedFrameId;
+            _poseRestoreWriter!.ArmPersistentFailure(afterWriteCount: 2);
+            _poseRestoreFailureInjected = true;
+            return;
+        }
+
+        if (_active.FailureDiagnosticCount == 0)
+        {
+            return;
+        }
+        if (_poseRestoreObservedMotorFrame == 0)
+        {
+            _poseRestoreObservedMotorFrame = _active.PublishedFrameId;
+            _poseRestoreAttemptsAtFreeze = _poseRestoreWriter!.WriteAttempts;
+            return;
+        }
+        if (_active.PublishedFrameId < _poseRestoreObservedMotorFrame + 4)
+        {
+            return;
+        }
+
+        Require(_active.IsPoseFrozen, "P4 pose restore failure did not freeze Worker");
+        Require(_active.LastFailureReasonCode == AlsP4ReasonCode.PoseRestoreFailed,
+            $"P4 pose restore reason was lost at Worker boundary: {_active.LastFailureReasonCode}");
+        Require(_active.Diagnostics.CommittedFrameId == _poseRestoreCommittedFrame,
+            "P4 pose restore failure published a new commit");
+        Require(_active.ResultPublishedFrameId == _poseRestoreResultPublishedFrame,
+            "P4 pose restore failure published a new Worker result");
+        Require(_active.FailureDiagnosticCount == 1,
+            "P4 pose restore failure emitted duplicate diagnostics");
+        Require(_poseRestoreWriter!.WriteAttempts == _poseRestoreAttemptsAtFreeze,
+            "frozen Worker continued evaluating on the next frame");
+
+        GD.Print(
+            $"GODOT_ALS_P4_POSE_RESTORE_FAILURE_OK mode={_mode.ToString().ToLowerInvariant()} " +
+            $"worker_frozen=1 reason={_active.LastFailureReasonCode} diagnostics=1 publish=0");
+        _slot.DisposeRuntime();
+        _quitting = true;
+        GetTree().Quit();
+    }
+
+    private void ValidateLateTransactionFailure()
+    {
+        if (!_lateTransactionFailureArmed)
+        {
+            var committed = _active.Diagnostics;
+            if (committed.CommittedFrameId < 12 || _active.WorkerInFlight != 0)
+            {
+                return;
+            }
+            _lateTransactionCommittedFrame = committed.CommittedFrameId;
+            _lateTransactionResultPublishedFrame = _active.ResultPublishedFrameId;
+            _context.ArmWorkerFailureInjection(
+                AlsP3WorkerFailureInjectionStage.BeforePublish,
+                _active.PublishedFrameId + 1);
+            _lateTransactionFailureArmed = true;
+            return;
+        }
+
+        if (_active.FailureDiagnosticCount == 0)
+        {
+            return;
+        }
+        var rollback = _active.WorkerTransactionRollbackDiagnostics;
+        var poseRollback = _active.RuntimeDiagnostics;
+        Require(_active.IsPoseFrozen,
+            "late transaction failure did not freeze the Worker");
+        Require(_active.Diagnostics.CommittedFrameId == _lateTransactionCommittedFrame,
+            "late transaction failure published a visual commit");
+        Require(_active.ResultPublishedFrameId == _lateTransactionResultPublishedFrame,
+            "late transaction failure leaked its result into the exchange");
+        Require(rollback.Identity.FrameId > _lateTransactionCommittedFrame &&
+                rollback.RuntimeStateRestored &&
+                rollback.FrameResultRestored &&
+                rollback.ControllerRestored &&
+                rollback.P4BanksRestored,
+            "late transaction rollback leaked runtime, result, controller or P4 bank state");
+        Require(poseRollback.RollbackVerified,
+            "late transaction rollback did not restore the captured pose/root");
+
+        GD.Print(
+            $"GODOT_ALS_P3B_LATE_TRANSACTION_ROLLBACK_OK " +
+            $"mode={_mode.ToString().ToLowerInvariant()} exchange=0 runtime=1 result=1 " +
+            "controller=1 pose=1 p4_banks=1");
+        _slot.DisposeRuntime();
+        _quitting = true;
+        GetTree().Quit();
     }
 
     private static IAlsLocomotionCommandSource CreateCommandSource(string? failurePolicy) =>
@@ -812,6 +1115,70 @@ public partial class P3bFrameOrderSmoke : Node
         if (!condition)
         {
             throw new InvalidOperationException(message);
+        }
+    }
+
+    private sealed class PoseRestoreFailureWriter : IAlsSkeletonPoseWriter
+    {
+        private readonly Skeleton3D _skeleton;
+        private int _armed;
+        private int _triggered;
+        private int _armedWriteCount;
+        private int _throwAfter;
+        private int _writeAttempts;
+
+        public PoseRestoreFailureWriter(Skeleton3D skeleton) => _skeleton = skeleton;
+
+        public int WriteAttempts => Volatile.Read(ref _writeAttempts);
+
+        public void ArmPersistentFailure(int afterWriteCount)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(afterWriteCount);
+            _throwAfter = afterWriteCount;
+            Volatile.Write(ref _armedWriteCount, 0);
+            Volatile.Write(ref _triggered, 0);
+            Volatile.Write(ref _armed, 1);
+        }
+
+        public void SetBonePosePosition(int boneId, in Vector3 value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePosePosition(boneId, value);
+            AfterWrite();
+        }
+
+        public void SetBonePoseRotation(int boneId, in Quaternion value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePoseRotation(boneId, value);
+            AfterWrite();
+        }
+
+        public void SetBonePoseScale(int boneId, in Vector3 value)
+        {
+            BeforeWrite();
+            _skeleton.SetBonePoseScale(boneId, value);
+            AfterWrite();
+        }
+
+        private void BeforeWrite()
+        {
+            Interlocked.Increment(ref _writeAttempts);
+            if (Volatile.Read(ref _triggered) != 0)
+            {
+                throw new InvalidOperationException("injected persistent Worker Skeleton failure");
+            }
+        }
+
+        private void AfterWrite()
+        {
+            if (Volatile.Read(ref _armed) == 0 ||
+                Interlocked.Increment(ref _armedWriteCount) != _throwAfter)
+            {
+                return;
+            }
+            Volatile.Write(ref _triggered, 1);
+            throw new InvalidOperationException("injected Worker Skeleton commit interruption");
         }
     }
 

@@ -31,6 +31,8 @@ public readonly record struct AlsFrameInput(
     float MaxBrakingDeceleration,
     byte JumpAccepted)
 {
+    public AlsFootPlacementReleaseSignals FootPlacementReleaseSignals { get; init; }
+
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(deltaTime);
@@ -46,8 +48,8 @@ public readonly record struct AlsFrameInput(
             ViewRotation: Quaternion.Identity,
             AimRotation: Quaternion.Identity,
             Floor: new AlsFloorSample(0, Vector3.UnitY, -1, Matrix4x4.Identity, Vector3.Zero),
-            LeftFootHit: new AlsFootHit(0, Vector3.Zero, Vector3.UnitY),
-            RightFootHit: new AlsFootHit(0, Vector3.Zero, Vector3.UnitY),
+            LeftFootHit: AlsFootHit.Invalid,
+            RightFootHit: AlsFootHit.Invalid,
             MantleProbe: new AlsMantleProbeResult(0, Matrix4x4.Identity, -1),
             RequestedGait: AlsGait.Walking,
             Stance: AlsStance.Standing,
@@ -60,6 +62,9 @@ public readonly record struct AlsFrameInput(
             CharacterYaw: 0f,
             MaxAcceleration: 0f,
             MaxBrakingDeceleration: 0f,
-            JumpAccepted: 0);
+            JumpAccepted: 0)
+        {
+            FootPlacementReleaseSignals = AlsFootPlacementReleaseSignals.CreateDefault(),
+        };
     }
 }

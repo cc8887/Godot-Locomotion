@@ -1,12 +1,14 @@
 # P4 Aim、分层姿态和 Foot IK 设计
 
-**状态：** 已批准设计，待实施
+**状态：** P4 Task 1-17 自动实现闭环已通过；Godot Editor 八项手工观感验收待签收，P7 长时认证不属于本阶段
 
 **日期：** 2026-08-28
 
 **目标引擎：** Godot 4.7.2 .NET
 
-**基线提交：** `b7ab2e94029b5394891fa30628cad210116ffd3f`
+**设计编写前代码基线：** `b7ab2e94029b5394891fa30628cad210116ffd3f`
+
+**Task 17 closure locked base：** `1d941ee0611ca2f6af710deab7a6d63f07e2105c`
 
 **参考实现：** `Sixze/ALS-Refactored` commit `b754d6f0f2bb03741d301f8fb88077ebfe561e17`
 
@@ -47,7 +49,7 @@ P4 可以读取自身必需的 canonical 曲线，但不能借此提前实现 P5
 1. 扩展 UE 离线导出合同，补齐浮点曲线键值、root yaw 派生、AimOffset additive base 和 P4 profile 所需元数据；
 2. 在 `Als.Core` 中实现不引用 Godot 的 View/Aim、Turn/Rotate、Foot Lock 和 pelvis 纯数据状态；
 3. 在角色 Worker 中用生产 AnimationTree 求基础动画，再执行统一 component-space 姿态修正；
-4. Main Gather 继续独占输入和物理查询，Main Commit 继续独占 actor yaw 和生命周期提交；
+4. Main Gather 继续独占输入、物理查询和 SceneTree transform 写入；Worker 求解 actor yaw，Main Commit 只验证并锁存 target-yaw 和生命周期结果；
 5. 先用 C# 实现并测量，只有 Profiler 明确证明姿态修改器是热点时才引入 GDExtension。
 
 未采用的方案：
@@ -129,12 +131,12 @@ Worker 不执行物理查询，不访问其他角色，不启动嵌套线程池�
 Commit 只负责：
 
 - identity、frame、generation 和完成状态验证；
-- 提交曲线驱动的 actor yaw；
+- 验证并锁存曲线驱动的 target-yaw，供下一帧 Order 0 motor 消费；
 - 缓存下一帧 foot probe request；
 - 角色可见性、替换、停用和错误生命周期；
 - 有界诊断和性能计数。
 
-Commit 不写 Skeleton、AnimationTree 或 Modifier。Turn/Rotate 的 actor yaw 必须来自 Worker 与动画 phase 同步计算的结果，不能在 Commit 中重新推导。
+Commit 不写 Skeleton、AnimationTree、Modifier 或 SceneTree transform。Turn/Rotate 的 actor yaw 必须来自 Worker 与动画 phase 同步计算的结果，不能在 Commit 中重新推导；下一帧 Order 0 motor 在移动前消费锁存值并成为角色 transform 的唯一写入者。
 
 ## 五、资产与曲线合同
 
@@ -246,7 +248,7 @@ Turn 和 Rotate 是 Grounded 内的并行姿态状态，不扩展 `AlsAnimationS
 - pelvis offset；
 - left/right foot target、rotation、lock amount 和 platform ID；
 - 下一帧 left/right foot probe origin；
-- P4 modifier elapsed ticks 和稳定 reason code。
+- P4 modifier deterministic operation ticks（不是 wall-clock elapsed time）和稳定 reason code。
 
 所有字段必须进入 `AlsResultDigest`、single/parallel pair comparison、回滚验证、默认值和非法值测试。
 
@@ -515,21 +517,28 @@ Debug 下 worker exception、线程错误、非有限合同、stale/generation m
 - result、pose、full-pose、root、Aim、Turn/Rotate、Feet digest 配对一致；
 - missing、stale、generation、lag、thread error 均为 `0`；
 - model、curve、controller、modifier、skeleton、exchange、commit 分配均为 `0`；
+- `foot_gather` 分配必须透明报告，但不属于 P4 七桶零分配门禁；
 - 每个 measured frame 有且只有一次 animation advance 和一次完成提交。
 
 ## 十二、性能门禁
 
-P4 短时门禁沿用总性能合同的阶段阈值：
+P4 短时门禁沿用总性能合同的阶段阈值。矩阵同时运行 `1/10` 角色的
+`single` 和 `parallel`，但两种模式的性能语义不同：`parallel` 是实际
+多角色 Worker 临界路径，承担阶段性能硬门禁；`single` 是确定性参考路径，
+用于证明与 `parallel` 的行为等价，不把十个串行 Worker 的总 CPU 时间误当
+成并行临界路径。`single` 仍必须通过完整功能、摘要、错误计数、代际和稳态
+七桶零分配门禁，并且必须报告真实 timing；其 timing 不作为 P4 性能硬门禁的通过
+条件。
 
 | 指标 | P4 要求 |
 | --- | ---: |
-| 10 角色 Gather + Commit 主线程 p95 | `<= 1.5 ms` |
-| 10 角色 Worker 动画关键路径 p95 | `<= 2.5 ms` |
-| ALS 整体关键路径 p99 | `<= 4.0 ms` |
-| 热身后每帧托管分配 | `0 B` |
+| 10 角色 `parallel` Gather + Commit 主线程 p95 | `<= 1.5 ms` |
+| 10 角色 `parallel` Worker 动画关键路径 p95 | `<= 2.5 ms` |
+| 10 角色 `parallel` ALS 整体关键路径 p99 | `<= 4.0 ms` |
+| 热身后七个受控托管分配桶 | `0 B` |
 | stale / duplicate / missing / generation error | `0` |
 
-前 10 个角色必须保持 60 Hz 完整 AimOffset、Layering、Turn/Rotate 和 Foot IK。不得关闭 IK、简化图、降低频率或使用不同功能路径换取通过。
+前 10 个角色在 `parallel` 运行时必须保持 60 Hz 完整 AimOffset、Layering、Turn/Rotate 和 Foot IK。`single` 使用同一完整功能路径，仅改变 Worker 所属线程组，不能关闭 IK、简化图、降低频率或使用不同功能路径换取摘要等价。
 
 若未达标，优化顺序固定为：
 
@@ -538,6 +547,8 @@ P4 短时门禁沿用总性能合同的阶段阈值：
 3. 合并 Aim、pelvis、feet 的 component-space 遍历；
 4. 减少无效 clip/parameter 更新；
 5. 只有 Profiler 证明 modifier 是热点时才评估 GDExtension。
+
+Task 9 的受控短时证据显示，非零 Aim modifier 为 `47/68` 个 affected bones，约 `0.58-0.64 ms/角色`、七个受控桶 `0 B`。setter 只占分段样本约 `0.7%`，主要成本在 clip sampling 和 component/local rebuild。Task 15 随后用正式四格矩阵关闭了多角色短时预算风险；clean-worktree full 证书中 `10/parallel` 的 Gather+Commit p95、Worker p95、整体 p99 分别为 `998 us`、`2036 us`、`3937 us`。该证据不得通过关闭 Aim、减少 mask 或降低更新频率取得，也不能冒充 P7 长时 Release 证书。
 
 P4 的 120/600 frame 结果是阶段证据。P7 才执行 i7-10700、30 秒热身和 10 分钟 Release 最终认证。
 
@@ -592,7 +603,7 @@ P4 的 120/600 frame 结果是阶段证据。P7 才执行 i7-10700、30 秒热�
 11. locked-base repository closure、`git diff --check` 和 clean worktree；
 12. 唯一 `P4_VERIFICATION_OK` 标记。
 
-focused 或 `-SkipRegression` 模式只能输出不能冒充完整成功的 focused marker。所有子进程输出必须捕获全部 PowerShell streams，并拒绝非零退出码、`SCRIPT ERROR:`、`ERROR:` 和显式 ALS failure marker。
+`-Focused` 允许输出诊断和各子门禁证据，但唯一顶层/终态成功标记必须精确为 `P4_FOCUSED_VERIFICATION_OK regression=skipped`，绝不能输出 full marker `P4_VERIFICATION_OK`。所有子进程输出必须捕获全部 PowerShell streams，并拒绝非零退出码、`SCRIPT ERROR:`、`ERROR:` 和显式 ALS failure marker。
 
 ## 十五、完成定义
 
@@ -611,8 +622,8 @@ focused 或 `-SkipRegression` 模式只能输出不能冒充完整成功的 focu
 11. 可操作 P4 Demo 通过手工观感验收；
 12. 1/10 single/parallel 所有摘要一致；
 13. 前 10 个角色保持 60 Hz 全质量 P4 路径；
-14. 稳态托管分配和线程/帧/generation 错误为 `0`；
-15. P4 阶段 p95/p99 满足第十二节阈值；
+14. 稳态 model、curve、controller、modifier、skeleton、exchange、commit 七个托管分配桶和线程/帧/generation 错误为 `0`；`foot_gather` 分配透明报告但不进入 P4 零分配门禁；
+15. `10/parallel` 的 P4 阶段 p95/p99 满足第十二节阈值；`10/single` 报告真实 timing，并通过功能、等价、错误和七桶零分配门禁；
 16. P0-P3、Debug/Release 和资产导入回归全部通过；
 17. 未修改 Godot Core，未维护引擎 fork，未无证据引入 GDExtension；
 18. 文档记录 profile、曲线、mask、线程所有权、golden、性能和验收结果。

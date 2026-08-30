@@ -31,7 +31,10 @@
     "skeletons": { "$ref": "#/$defs/assets" },
     "skeletalMeshes": { "$ref": "#/$defs/assets" },
     "staticMeshes": { "$ref": "#/$defs/assets" },
-    "animations": { "$ref": "#/$defs/assets" },
+    "animations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/animationAsset" }
+    },
     "montages": { "$ref": "#/$defs/assets" },
     "blendSpaces": { "$ref": "#/$defs/assets" },
     "aimOffsets": { "$ref": "#/$defs/assets" },
@@ -81,6 +84,117 @@
         },
         "dependencies": { "type": "array", "items": { "$ref": "#/$defs/stableId" }, "uniqueItems": true },
         "metadata": { "type": "object" }
+      }
+    },
+    "animationAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/asset" },
+        {
+          "properties": {
+            "classPath": { "const": "/Script/Engine.AnimSequence" },
+            "metadata": { "$ref": "#/$defs/animationMetadata" }
+          }
+        }
+      ]
+    },
+    "animationMetadata": {
+      "type": "object",
+      "required": ["curves"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "curves": {
+                "contains": {
+                  "properties": { "canonicalKind": { "const": "RotationYawSpeedRadiansPerSecond" } }
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["canonicalRotationYawSourceConvention", "canonicalRotationYawProfileSignProvenance"],
+            "properties": {
+              "canonicalRotationYawSourceConvention": { "const": "ue_root_bone_rotator_yaw_degrees_z_up" },
+              "canonicalRotationYawProfileSignProvenance": { "const": "runtime_profile_sign_pending" }
+            }
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["canonicalRotationYawSourceConvention"] },
+                { "required": ["canonicalRotationYawProfileSignProvenance"] }
+              ]
+            }
+          }
+        }
+      ],
+      "properties": {
+        "curves": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/floatCurve" }
+        },
+        "canonicalRotationYawSourceConvention": { "type": "string" },
+        "canonicalRotationYawProfileSignProvenance": { "type": "string" }
+      }
+    },
+    "floatCurveKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeSeconds", "value", "interpolation", "arriveTangent", "leaveTangent"],
+      "properties": {
+        "timeSeconds": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
+        "value": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
+        "interpolation": { "enum": ["Constant", "Linear", "Cubic"] },
+        "arriveTangent": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
+        "leaveTangent": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 }
+      }
+    },
+    "floatCurve": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableCurveId", "canonicalKind", "sourceName", "sourceProvenance", "preInfinity", "postInfinity", "keys"],
+      "allOf": [
+        {
+          "if": { "properties": { "canonicalKind": { "const": "None" } } },
+          "then": { "properties": { "sourceProvenance": { "const": "source_curve" } } }
+        },
+        {
+          "if": { "properties": { "canonicalKind": { "const": "RotationYawSpeedRadiansPerSecond" } } },
+          "then": {
+            "properties": {
+              "sourceName": { "const": "RotationYawSpeedRadiansPerSecond" },
+              "sourceProvenance": { "const": "derived_root_track" },
+              "preInfinity": { "const": "Constant" },
+              "postInfinity": { "const": "Constant" },
+              "keys": {
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "allOf": [
+                      { "properties": { "timeSeconds": { "const": 0 } } },
+                      { "properties": { "interpolation": { "const": "Linear" } } }
+                    ]
+                  }
+                ],
+                "items": {
+                  "properties": { "interpolation": { "const": "Linear" } }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "stableCurveId": { "type": "integer", "minimum": 0 },
+        "canonicalKind": { "enum": ["None", "RotationYawSpeedRadiansPerSecond"] },
+        "sourceName": { "type": "string", "minLength": 1 },
+        "sourceProvenance": { "enum": ["source_curve", "derived_root_track"] },
+        "preInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
+        "postInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
+        "keys": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/floatCurveKey" }
+        }
       }
     },
     "file": {

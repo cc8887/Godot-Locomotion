@@ -82,7 +82,7 @@ public partial class P3DemoInputSmoke : Node
             CrouchTogglePressed: false,
             JumpPressed: false,
             RotationModeTogglePressed: false,
-            AimHeld: false), 0.25f);
+            AimHeld: false), 0.25f, -0.125f);
         var first = adapter.GetCommand(1);
         Require(first == adapter.GetCommand(1), "same-frame command was not stable");
         Require(first.RequestedGait == AlsGait.Walking, "Alt did not request walking");
@@ -94,6 +94,8 @@ public partial class P3DemoInputSmoke : Node
             "diagonal WASD axes were not normalized");
         Require(first.ViewYaw == 0.25f && first.AimYaw == 0.25f,
             "camera yaw was not captured into view and aim yaw");
+        Require(first.ViewPitch == -0.125f && first.AimPitch == -0.125f,
+            "camera pitch was not captured into view and aim pitch");
 
         adapter.CaptureFrame(2, new AlsPlayerInputSnapshot(
             -NumericsVector2.UnitY,
@@ -102,7 +104,7 @@ public partial class P3DemoInputSmoke : Node
             CrouchTogglePressed: true,
             JumpPressed: true,
             RotationModeTogglePressed: true,
-            AimHeld: false), -0.5f);
+            AimHeld: false), -0.5f, 0f);
         var toggled = adapter.GetCommand(2);
         Require(toggled.RequestedGait == AlsGait.Sprinting, "Shift did not request sprinting");
         Require(toggled.RequestedStance == AlsStance.Crouching, "Ctrl did not toggle crouch");
@@ -117,7 +119,7 @@ public partial class P3DemoInputSmoke : Node
             CrouchTogglePressed: false,
             JumpPressed: false,
             RotationModeTogglePressed: false,
-            AimHeld: false), -0.5f);
+            AimHeld: false), -0.5f, 0f);
         var persisted = adapter.GetCommand(3);
         Require(persisted.RequestedGait == AlsGait.Running, "default gait was not running");
         Require(persisted.RequestedStance == AlsStance.Crouching,
@@ -133,7 +135,7 @@ public partial class P3DemoInputSmoke : Node
             CrouchTogglePressed: false,
             JumpPressed: false,
             RotationModeTogglePressed: false,
-            AimHeld: true), 1f);
+            AimHeld: true), 1f, 0f);
         Require(adapter.GetCommand(4).RequestedRotationMode == AlsRotationMode.Aiming,
             "RMB did not enter aiming");
 
@@ -144,7 +146,7 @@ public partial class P3DemoInputSmoke : Node
             CrouchTogglePressed: false,
             JumpPressed: false,
             RotationModeTogglePressed: true,
-            AimHeld: true), 1f);
+            AimHeld: true), 1f, 0f);
         Require(adapter.GetCommand(5).RequestedRotationMode == AlsRotationMode.Aiming,
             "V changed rotation mode while aiming");
 
@@ -155,7 +157,7 @@ public partial class P3DemoInputSmoke : Node
             CrouchTogglePressed: false,
             JumpPressed: false,
             RotationModeTogglePressed: false,
-            AimHeld: false), 1f);
+            AimHeld: false), 1f, 0f);
         Require(adapter.GetCommand(6).RequestedRotationMode == AlsRotationMode.VelocityDirection,
             "RMB release did not restore the prior rotation mode");
 
@@ -166,7 +168,7 @@ public partial class P3DemoInputSmoke : Node
             CrouchTogglePressed: true,
             JumpPressed: false,
             RotationModeTogglePressed: true,
-            AimHeld: false), 1f);
+            AimHeld: false), 1f, 0f);
         var bothModifiers = adapter.GetCommand(7);
         Require(bothModifiers.RequestedGait == AlsGait.Walking,
             "walk did not take precedence over sprint");
@@ -176,16 +178,16 @@ public partial class P3DemoInputSmoke : Node
             "second V edge did not restore looking direction");
 
         RequireThrows<InvalidOperationException>(
-            () => adapter.CaptureFrame(7, default, 0f),
+            () => adapter.CaptureFrame(7, default, 0f, 0f),
             "duplicate frame capture was accepted");
         RequireThrows<InvalidOperationException>(
-            () => adapter.CaptureFrame(9, default, 0f),
+            () => adapter.CaptureFrame(9, default, 0f, 0f),
             "skipped frame capture was accepted");
         RequireThrows<InvalidOperationException>(
             () => adapter.GetCommand(8),
             "uncaptured command frame was accepted");
 
-        adapter.CaptureFrame(8, default, 0f);
+        adapter.CaptureFrame(8, default, 0f, 0f);
         Require(adapter.GetCommand(8).JumpPressed == 0, "default snapshot emitted a jump edge");
     }
 
@@ -290,7 +292,7 @@ public partial class P3DemoInputSmoke : Node
                     try
                     {
                         frameId++;
-                        adapter.CaptureGodotFrame(frameId, orbit.Yaw);
+                        adapter.CaptureGodotFrame(frameId, orbit.Yaw, orbit.Pitch);
                         var command = adapter.GetCommand(frameId);
                         var resolved = AlsLocomotionCommandResolver.Resolve(
                             command,
@@ -323,7 +325,7 @@ public partial class P3DemoInputSmoke : Node
             cameraBasisChecks = 1;
 
             frameId++;
-            adapter.CaptureGodotFrame(frameId, orbit.Yaw);
+            adapter.CaptureGodotFrame(frameId, orbit.Yaw, orbit.Pitch);
             var cleared = adapter.GetCommand(frameId);
             var resolvedCleared = AlsLocomotionCommandResolver.Resolve(
                 cleared,
@@ -342,7 +344,7 @@ public partial class P3DemoInputSmoke : Node
             try
             {
                 frameId++;
-                adapter.CaptureGodotFrame(frameId, orbit.Yaw);
+                adapter.CaptureGodotFrame(frameId, orbit.Yaw, orbit.Pitch);
                 var aiming = adapter.GetCommand(frameId);
                 var resolvedAiming = AlsLocomotionCommandResolver.Resolve(
                     aiming,
@@ -456,6 +458,7 @@ public partial class P3DemoInputSmoke : Node
             result,
             PoseDigest: 0,
             FullPoseDigest: 0);
+        ValidateFrameDiagnosticsCompatibility(result);
         hud.Refresh(diagnostics, framesPerSecond: 60d, errors: 0);
         Require(hud.StateText.Contains("Grounded", StringComparison.Ordinal),
             "HUD did not expose locomotion state");
@@ -494,6 +497,66 @@ public partial class P3DemoInputSmoke : Node
         Require(!successPublished, "demo success was published before cleanup completed");
         RemoveChild(hud);
         hud.Free();
+    }
+
+    private static void ValidateFrameDiagnosticsCompatibility(in AlsFrameResult result)
+    {
+        var visualRoot = new AlsP3VisualTransformSnapshot(
+            NumericsVector3.UnitX,
+            NumericsVector3.UnitY,
+            NumericsVector3.UnitZ,
+            new NumericsVector3(1f, 2f, 3f));
+        var legacy = new AlsP3FrameDiagnostics(
+            result.Identity,
+            40,
+            41,
+            42,
+            43,
+            44,
+            new NumericsVector3(3f, 0f, 4f),
+            result,
+            45,
+            46,
+            visualRoot,
+            47);
+        var (
+            identity,
+            commandFrame,
+            motorFrame,
+            modelFrame,
+            poseFrame,
+            committedFrame,
+            actualVelocity,
+            legacyResult,
+            poseDigest,
+            fullPoseDigest,
+            deconstructedVisualRoot,
+            rootDigest) = legacy;
+        Require(identity == result.Identity &&
+                commandFrame == 40 && motorFrame == 41 && modelFrame == 42 &&
+                poseFrame == 43 && committedFrame == 44 &&
+                actualVelocity == new NumericsVector3(3f, 0f, 4f) &&
+                legacyResult.Identity == result.Identity && poseDigest == 45 &&
+                fullPoseDigest == 46 && deconstructedVisualRoot == visualRoot &&
+                rootDigest == 47 && legacy.FootProbeSource == default,
+            "legacy 12-field frame diagnostics contract did not round-trip");
+
+        var current = legacy with
+        {
+            FootProbeSource = new AlsP4FootProbeSourceSnapshot(
+                result.Identity,
+                1,
+                2,
+                visualRoot,
+                visualRoot,
+                NumericsVector3.UnitX,
+                NumericsVector3.UnitY),
+        };
+        var (
+            _, _, _, _, _, _, _, _, _, _, _, _,
+            footProbeSource) = current;
+        Require(footProbeSource == current.FootProbeSource,
+            "current 13-field frame diagnostics deconstruction was unavailable");
     }
 
     private static void RequireKey(string action, Key physicalKey)

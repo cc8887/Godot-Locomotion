@@ -355,8 +355,16 @@ public static class AlsLocomotionModel
         AlsLocomotionSettings settings,
         ref AlsRuntimeState nextState)
     {
-        if (speed <= settings.MovingSpeedThreshold &&
-            input.RotationMode != AlsRotationMode.Aiming)
+        nextState.YawSource = AlsYawSource.Locomotion;
+        var p4OwnsStationaryYaw =
+            input.RotationMode is AlsRotationMode.LookingDirection or AlsRotationMode.Aiming &&
+            input.Floor.IsGrounded == 1 &&
+            speed <= AlsYawOwnershipThresholds.StationarySpeed &&
+            Hypot(input.ActualAcceleration.X, input.ActualAcceleration.Z) <=
+                AlsYawOwnershipThresholds.StationaryAcceleration;
+        if (p4OwnsStationaryYaw ||
+            (speed <= settings.MovingSpeedThreshold &&
+             input.RotationMode == AlsRotationMode.VelocityDirection))
         {
             nextState.SmoothedTargetYaw = AlsMath.NormalizeAngleRadians(input.CharacterYaw);
             return nextState.SmoothedTargetYaw;

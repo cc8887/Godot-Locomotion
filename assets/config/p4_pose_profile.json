@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "skeleton": "b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+  "aim": {
+    "aimOffset": "b4bf2befd979de45f53f300dc0e60c702fc3a686",
+    "down": "c4bba06be47ce74153c2048d0de7b30a6465a84f",
+    "forward": "fcbab94ebb8eb39744f1973e98311c413660b9bc",
+    "up": "552198b373c14b6ef38b20c53ab08e9060cc55b7"
+  },
+  "turns": [
+    {
+      "animation": "a73b6e3c8aac55396058a7cb7c65b1afe6a539fa",
+      "stance": "standing",
+      "direction": -1,
+      "nominalDegrees": 90,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    },
+    {
+      "animation": "f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b",
+      "stance": "standing",
+      "direction": 1,
+      "nominalDegrees": 90,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    },
+    {
+      "animation": "a3c722afa7c416d15d8c61ed614d4def5b5b758c",
+      "stance": "standing",
+      "direction": -1,
+      "nominalDegrees": 180,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    },
+    {
+      "animation": "59f469970639c759780278d7ffc8ea717e715207",
+      "stance": "standing",
+      "direction": 1,
+      "nominalDegrees": 180,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    },
+    {
+      "animation": "ddfa1a6737182bddb3134e78d0460c3ef49f93e1",
+      "stance": "crouching",
+      "direction": -1,
+      "nominalDegrees": 90,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    },
+    {
+      "animation": "c13f1b18a24a33a01827ee93b9b1bdcd64295a0d",
+      "stance": "crouching",
+      "direction": 1,
+      "nominalDegrees": 90,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    },
+    {
+      "animation": "a20c9d988632a569157541f0d6fd8c309ac8ae09",
+      "stance": "crouching",
+      "direction": -1,
+      "nominalDegrees": 180,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    },
+    {
+      "animation": "92e0d292db977093c0ad02b5490c241609032e38",
+      "stance": "crouching",
+      "direction": 1,
+      "nominalDegrees": 180,
+      "basePlayRate": 1.2,
+      "blendSeconds": 0.2,
+      "scaleAngle": true
+    }
+  ],
+  "rotates": [
+    {
+      "animation": "4677f1239a2057a65a5daeaf6ebbbf4f6a997060",
+      "stance": "standing",
+      "direction": -1
+    },
+    {
+      "animation": "9a04c94cbdf6a02f426768f49c789cb8341e253a",
+      "stance": "standing",
+      "direction": 1
+    },
+    {
+      "animation": "310b992c1a30d10675842924f95353905f659382",
+      "stance": "crouching",
+      "direction": -1
+    },
+    {
+      "animation": "3c285f6df704e8e73cdfd0fd9bb147c1e5338ef1",
+      "stance": "crouching",
+      "direction": 1
+    }
+  ],
+  "masks": [
+    {
+      "kind": "upperBody",
+      "root": "spine_01",
+      "boundaries": [
+        "neck_01",
+        "clavicle_l",
+        "clavicle_r"
+      ]
+    },
+    {
+      "kind": "head",
+      "root": "neck_01",
+      "boundaries": []
+    },
+    {
+      "kind": "leftArm",
+      "root": "clavicle_l",
+      "boundaries": [
+        "Hand_L"
+      ]
+    },
+    {
+      "kind": "rightArm",
+      "root": "clavicle_r",
+      "boundaries": [
+        "hand_r"
+      ]
+    },
+    {
+      "kind": "leftHand",
+      "root": "Hand_L",
+      "boundaries": []
+    },
+    {
+      "kind": "rightHand",
+      "root": "hand_r",
+      "boundaries": []
+    },
+    {
+      "kind": "pelvis",
+      "root": "Pelvis",
+      "boundaries": [
+        "spine_01",
+        "Thigh_L",
+        "Thigh_R"
+      ]
+    },
+    {
+      "kind": "leftLeg",
+      "root": "Thigh_L",
+      "boundaries": [
+        "Foot_L"
+      ]
+    },
+    {
+      "kind": "rightLeg",
+      "root": "Thigh_R",
+      "boundaries": [
+        "Foot_R"
+      ]
+    },
+    {
+      "kind": "leftFoot",
+      "root": "Foot_L",
+      "boundaries": []
+    },
+    {
+      "kind": "rightFoot",
+      "root": "Foot_R",
+      "boundaries": []
+    }
+  ],
+  "feet": {
+    "leftLegRoot": "Thigh_L",
+    "rightLegRoot": "Thigh_R",
+    "leftFootRoot": "Foot_L",
+    "rightFootRoot": "Foot_R",
+    "traceUpMeters": 0.5,
+    "traceDownMeters": 0.75,
+    "footHeightMeters": 0.13,
+    "maxPelvisCorrectionMeters": 0.4,
+    "pelvisUpHalfLifeSeconds": 0.08,
+    "pelvisDownHalfLifeSeconds": 0.1,
+    "positionHalfLifeSeconds": 0.08,
+    "rotationHalfLifeSeconds": 0.1,
+    "lockReleaseHalfLifeSeconds": 0.12,
+    "maxLegReachMeters": 1.2,
+    "capsuleHalfHeightSource": "characterController",
+    "maxThighAngleDegrees": 90.0,
+    "maxFootAngleDegrees": 40.0,
+    "platformTeleportDistanceMeters": 1.0,
+    "platformTeleportAngleDegrees": 45.0,
+    "lockWeightEpsilon": 0.0001,
+    "curves": {
+      "leftLock": "FootLock_L",
+      "rightLock": "FootLock_R",
+      "missingLockDefault": 0.0
+    },
+    "ikStateDefaults": {
+      "grounded": 1.0,
+      "jumpStart": 0.0,
+      "fallLoop": 0.0,
+      "landRecovery": 1.0
+    }
+  }
+}

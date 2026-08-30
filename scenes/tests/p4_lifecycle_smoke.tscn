@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Als.Godot/Locomotion/P4LifecycleSmoke.cs" id="1_smoke"]
+
+[node name="P4LifecycleSmoke" type="Node"]
+script = ExtResource("1_smoke")

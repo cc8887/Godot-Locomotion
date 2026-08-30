@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
@@ -37,6 +38,7 @@ public partial class AlsP3CommitStage : Node
         }
         if (Volatile.Read(ref _state.WorkerFrozen) != 0)
         {
+            _state.FootProbeExchange.Clear();
             return;
         }
 
@@ -51,8 +53,15 @@ public partial class AlsP3CommitStage : Node
             _state.Handle.CharacterId,
             _state.Handle.Generation);
         var measurement = _context.Measurement;
+        var measurementIndex = -1;
         var measure = measurement is not null &&
-            measurement.TryGetMeasurementIndex(identity, out _);
+            measurement.TryGetMeasurementIndex(identity, out measurementIndex);
+        if (measure)
+        {
+            measurement!.RecordCommitStart(
+                measurementIndex,
+                Stopwatch.GetTimestamp());
+        }
         var allocatedBeforeExchange = measure
             ? GC.GetAllocatedBytesForCurrentThread()
             : 0L;
@@ -60,6 +69,7 @@ public partial class AlsP3CommitStage : Node
         if (measure)
         {
             measurement!.AddExchangeAllocations(
+                measurementIndex,
                 GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
         }
         if (!consumed)
@@ -71,6 +81,7 @@ public partial class AlsP3CommitStage : Node
         if (candidate.Identity != identity || result.Identity != candidate.Identity)
         {
             Interlocked.Increment(ref _context.LaggedResults);
+            _state.ReleaseYawAndFootProbes();
             return;
         }
 
@@ -85,9 +96,17 @@ public partial class AlsP3CommitStage : Node
             modelFrame != frameId || poseFrame != frameId)
         {
             Interlocked.Increment(ref _context.LaggedResults);
+            _state.ReleaseYawAndFootProbes();
+            return;
+        }
+        if (!TryCopyFootProbeRequests(_state.FootProbeExchange, identity, result))
+        {
+            Interlocked.Increment(ref _context.InvalidFootProbeRequests);
+            _state.ReleaseYawAndFootProbes();
             return;
         }
 
+        _owner.CommitMotorLifecycleFrame(frameId);
         _state.HasCommittedTargetYaw = 1;
         _state.CommittedTargetYaw = result.TargetYaw;
         _state.Diagnostics = new AlsP3FrameDiagnostics(
@@ -102,23 +121,32 @@ public partial class AlsP3CommitStage : Node
             candidate.PoseDigest,
             candidate.FullPoseDigest,
             candidate.RootTransform,
-            candidate.RootDigest);
+            candidate.RootDigest,
+            candidate.FootProbeSource)
+        {
+            FootPose = candidate.FootPose,
+        };
         Volatile.Write(ref _state.VisualReady, 1);
         Volatile.Write(ref _state.CommittedFrameId, frameId);
         _owner.ShowCommittedVisual(identity);
         if (measure)
         {
             measurement!.AddCommitAllocations(
+                measurementIndex,
                 GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeCommit);
+            measurement.RecordCommitEnd(
+                measurementIndex,
+                Stopwatch.GetTimestamp());
         }
     }
 
     private void PublishFailure(AlsP3WorkerFailure failure)
     {
+        _state.ReleaseYawAndFootProbes();
         var details =
             $"code={failure.Code} frame={failure.Identity.FrameId} " +
             $"character={failure.Identity.CharacterId} generation={failure.Identity.SlotGeneration} " +
-            $"exception={failure.ExceptionType}";
+            $"exception={failure.ExceptionType} reason={failure.ReasonCode}";
         if (_context.HeadlessOrDebug)
         {
             GD.PushError($"GODOT_ALS_P3B_FAIL {details}");
@@ -131,8 +159,26 @@ public partial class AlsP3CommitStage : Node
         Interlocked.Increment(ref _state.FailureDiagnosticCount);
     }
 
+    internal static bool TryCopyFootProbeRequests(
+        AlsP4FootProbeExchange exchange,
+        in AlsFrameIdentity expectedIdentity,
+        in AlsFrameResult result)
+    {
+        ArgumentNullException.ThrowIfNull(exchange);
+        if (result.Identity != expectedIdentity)
+        {
+            exchange.Clear();
+            return false;
+        }
+        return exchange.TryCopyFromWorker(
+            expectedIdentity,
+            result.NextLeftFootProbeOrigin,
+            result.NextRightFootProbeOrigin);
+    }
+
     private void ClassifyMissing(long expectedFrameId)
     {
+        _state.ReleaseYawAndFootProbes();
         var failure = AlsP3aResultClassifier.Classify(
             _state.HasPublishedResult,
             expectedFrameId,
@@ -141,6 +187,11 @@ public partial class AlsP3CommitStage : Node
             checked((int)_state.Handle.Generation),
             _state.ResultPublishedCharacterId,
             _state.ResultPublishedGeneration);
+        var expectedIdentity = new AlsFrameIdentity(
+            expectedFrameId,
+            _state.Handle.CharacterId,
+            _state.Handle.Generation);
+        _state.RecordResultClassification(in expectedIdentity, failure);
         switch (failure)
         {
             case AlsP3aResultFailure.Missing:

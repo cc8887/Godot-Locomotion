@@ -95,6 +95,7 @@ public partial class P3aLocomotionHarness : Node
 
             var measure = frameId > AlsP3aHarnessContext.WarmupFrames;
             var allocatedBefore = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            var footGatherAllocations = 0L;
             if (frameId == AlsP3aHarnessContext.ReplacementFrame)
             {
                 ReplaceCharacterZero(frameId);
@@ -109,11 +110,18 @@ public partial class P3aLocomotionHarness : Node
                     AlsP3aHarnessContext.DeltaTime,
                     entry.HasCommittedTargetYaw,
                     entry.CommittedTargetYaw);
+                footGatherAllocations += entry.Motor.LastFootGatherManagedAllocations;
                 entry.LastMotorFrameId = entry.PendingInput.Identity.FrameId;
             }
             if (measure)
             {
-                var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                var rawAllocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                var allocated = rawAllocated - footGatherAllocations;
+                if (allocated < 0)
+                {
+                    throw new InvalidOperationException(
+                        "Foot Gather allocation accounting exceeded the enclosing motor segment.");
+                }
                 if (allocated != 0 && _context.FirstGatherAllocationFrame == 0)
                 {
                     _context.FirstGatherAllocationFrame = frameId;
@@ -121,6 +129,12 @@ public partial class P3aLocomotionHarness : Node
                 Interlocked.Add(
                     ref _context.GatherMotorAllocations,
                     allocated);
+                Interlocked.Add(
+                    ref _context.FootGatherAllocations,
+                    footGatherAllocations);
+                Interlocked.Add(
+                    ref _context.RawGatherMotorAllocations,
+                    rawAllocated);
             }
 
             var exchangeBefore = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;

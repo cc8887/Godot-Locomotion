@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
@@ -12,6 +13,8 @@ public partial class AlsP3Character : Node3D
     private AlsCharacterMotor _motor = null!;
     private AlsP3WorkerRoot _worker = null!;
     private AlsP3CommitStage _commit = null!;
+    private AlsFrameInput _stagedReplacementMotorInput;
+    private bool _hasStagedReplacementMotorInput;
     private bool _configured;
     private int _disposed;
 
@@ -34,6 +37,11 @@ public partial class AlsP3Character : Node3D
     public int FailureDiagnosticCount =>
         Volatile.Read(ref _state.FailureDiagnosticCount);
 
+    internal long ResultPublishedFrameId => _state.ResultPublishedFrameId;
+
+    internal AlsP4ReasonCode LastFailureReasonCode =>
+        (AlsP4ReasonCode)Volatile.Read(ref _state.LastFailureReasonCode);
+
     public Node3D MovementAnchor
     {
         get
@@ -52,6 +60,74 @@ public partial class AlsP3Character : Node3D
 
     internal AlsP3RuntimeDiagnostics RuntimeDiagnostics =>
         _state.CaptureRuntimeDiagnostics();
+
+    internal AlsP4LifecyclePublicationDiagnostics LifecyclePublicationDiagnostics
+    {
+        get
+        {
+            EnsureMainThread();
+            EnsureConfigured();
+            return _state.CaptureLifecyclePublicationDiagnostics();
+        }
+    }
+
+    internal AlsP3WorkerTransactionRollbackDiagnostics WorkerTransactionRollbackDiagnostics =>
+        _state.WorkerTransactionRollbackDiagnostics;
+
+    internal AlsFrameInput LatestMotorInput => _state.MotorInput;
+
+    internal AlsP3ResultClassificationDiagnostics ResultClassificationDiagnostics =>
+        _state.CaptureResultClassification();
+
+    internal void CommitMotorLifecycleFrame(long frameId) =>
+        _motor.CommitLifecycleFrame(frameId);
+
+    internal AlsCharacterMotorLifecycleSnapshot CaptureCommittedMotorLifecycle(
+        long completedFrameId) =>
+        _motor.CaptureCommittedLifecycleSnapshot(completedFrameId);
+
+    internal void RestoreCommittedMotorLifecycle(
+        in AlsCharacterMotorLifecycleSnapshot snapshot,
+        long completedFrameId) =>
+        _motor.RestoreCommittedLifecycleSnapshot(in snapshot, completedFrameId);
+
+    internal AlsCharacterMotorLifecycleSnapshot CapturePublishedMotorLifecycle(
+        long publishedFrameId) =>
+        _motor.CapturePublishedLifecycleSnapshot(publishedFrameId);
+
+    internal void RestorePublishedMotorLifecycle(
+        in AlsCharacterMotorLifecycleSnapshot snapshot,
+        long publishedFrameId,
+        bool releasePlatformOnNextStep) =>
+        _motor.RestorePublishedLifecycleSnapshot(
+            in snapshot,
+            publishedFrameId,
+            releasePlatformOnNextStep);
+
+    internal void StageReplacementMotorInput(in AlsFrameInput input)
+    {
+        EnsureMainThread();
+        ThrowIfDisposed();
+        EnsureConfigured();
+        if (Volatile.Read(ref _state.Active) != 0 || _hasStagedReplacementMotorInput)
+        {
+            throw new InvalidOperationException(
+                "Replacement Motor input can only be staged on an unused inactive character.");
+        }
+        _stagedReplacementMotorInput = input;
+        _hasStagedReplacementMotorInput = true;
+    }
+
+    internal AlsP3WorkerLifecycleSnapshot CaptureFailureWorkerLifecycle(
+        long committedFrameId) =>
+        _worker.CaptureFailureLifecycleSnapshot(committedFrameId);
+
+    internal void RestoreFailureWorkerLifecycle(
+        in AlsP3WorkerLifecycleSnapshot snapshot,
+        long forcedPlatformReleaseFrameId) =>
+        _worker.RestoreFailureLifecycleSnapshot(
+            in snapshot,
+            forcedPlatformReleaseFrameId);
 
     internal int FailurePendingIdentityCount =>
         _state.CaptureRuntimeDiagnostics().PendingFailureIdentityCount;
@@ -83,6 +159,7 @@ public partial class AlsP3Character : Node3D
     {
         get
         {
+            EnsureMainThread();
             EnsureConfigured();
             var frameId = Volatile.Read(ref _state.CommittedFrameId);
             var diagnostics = _state.Diagnostics;
@@ -97,20 +174,39 @@ public partial class AlsP3Character : Node3D
     {
         EnsureMainThread();
         ThrowIfDisposed();
-        Configure(context, handle, commandSource, new AlsP3ExchangeSlot());
+        Configure(
+            context,
+            handle,
+            commandSource,
+            new AlsP3ExchangeSlot(),
+            new AlsP4FootProbeExchange());
     }
 
     internal void Configure(
         AlsP3RuntimeContext context,
         AlsSlotHandle handle,
         IAlsLocomotionCommandSource commandSource,
-        AlsP3ExchangeSlot exchangeSlot)
+        AlsP3ExchangeSlot exchangeSlot) =>
+        Configure(
+            context,
+            handle,
+            commandSource,
+            exchangeSlot,
+            new AlsP4FootProbeExchange());
+
+    internal void Configure(
+        AlsP3RuntimeContext context,
+        AlsSlotHandle handle,
+        IAlsLocomotionCommandSource commandSource,
+        AlsP3ExchangeSlot exchangeSlot,
+        AlsP4FootProbeExchange footProbeExchange)
     {
         EnsureMainThread();
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(commandSource);
         ArgumentNullException.ThrowIfNull(exchangeSlot);
+        ArgumentNullException.ThrowIfNull(footProbeExchange);
         if (!IsInsideTree())
         {
             throw new InvalidOperationException("P3 character must be in the scene tree before Configure().");
@@ -125,12 +221,17 @@ public partial class AlsP3Character : Node3D
         }
 
         _context = context;
-        _state = new AlsP3CharacterState(handle, exchangeSlot);
+        _state = new AlsP3CharacterState(handle, exchangeSlot, footProbeExchange);
         try
         {
             _motor = new AlsCharacterMotor { Name = "Motor" };
             AddChild(_motor);
-            _motor.Configure(context.MotorSettings, commandSource);
+            _motor.Configure(
+                context.MotorSettings,
+                commandSource,
+                footProbeExchange,
+                context.FootGatherSettings,
+                context);
 
             _worker = new AlsP3WorkerRoot { Name = "VisualWorker" };
             AddChild(_worker);
@@ -166,19 +267,44 @@ public partial class AlsP3Character : Node3D
                 throw new InvalidOperationException("P3 frame sequence reached its supported limit.");
             }
             var frameId = completedFrameId + 1;
-            var input = _motor.Step(
-                frameId,
-                checked((int)_state.Handle.CharacterId),
-                checked((int)_state.Handle.Generation),
-                checked((float)delta),
-                _state.HasCommittedTargetYaw,
-                _state.CommittedTargetYaw);
+            var measurement = _context.Measurement;
+            var measurementIndex = -1;
+            var measure = measurement is not null &&
+                measurement.TryGetMeasurementIndex(
+                    HandleIdentity(frameId),
+                    out measurementIndex);
+            if (measure)
+            {
+                measurement!.RecordGatherStart(
+                    measurementIndex,
+                    Stopwatch.GetTimestamp());
+            }
+            AlsFrameInput input;
+            if (_hasStagedReplacementMotorInput)
+            {
+                input = _stagedReplacementMotorInput;
+                if (input.Identity != HandleIdentity(frameId))
+                {
+                    throw new InvalidOperationException(
+                        "Staged replacement Motor input does not match the next frame identity.");
+                }
+                _stagedReplacementMotorInput = default;
+                _hasStagedReplacementMotorInput = false;
+            }
+            else
+            {
+                input = _motor.Step(
+                    frameId,
+                    checked((int)_state.Handle.CharacterId),
+                    checked((int)_state.Handle.Generation),
+                    checked((float)delta),
+                    _state.HasCommittedTargetYaw,
+                    _state.CommittedTargetYaw);
+            }
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
             _state.MotorActualVelocity = input.ActualVelocity;
-            var measurement = _context.Measurement;
-            var measure = measurement is not null &&
-                measurement.TryGetMeasurementIndex(input.Identity, out _);
+            _state.MotorInput = input;
             var allocatedBeforeExchange = measure
                 ? GC.GetAllocatedBytesForCurrentThread()
                 : 0L;
@@ -186,9 +312,16 @@ public partial class AlsP3Character : Node3D
             if (measure)
             {
                 measurement!.AddExchangeAllocations(
+                    measurementIndex,
                     GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
             }
             Volatile.Write(ref _state.PublishedFrameId, frameId);
+            if (measure)
+            {
+                measurement!.RecordGatherEnd(
+                    measurementIndex,
+                    Stopwatch.GetTimestamp());
+            }
         }
         catch (Exception exception)
         {
@@ -231,6 +364,7 @@ public partial class AlsP3Character : Node3D
         Volatile.Write(ref _state.ProcessingEnabled, active ? 1 : 0);
         if (!active)
         {
+            _state.FootProbeExchange.Clear();
             ResetVisualReadyCore();
         }
         else
@@ -273,6 +407,7 @@ public partial class AlsP3Character : Node3D
     private void ResetVisualReadyCore()
     {
         Visible = false;
+        _state.ResetLifecyclePublication();
         Volatile.Write(ref _state.VisualReady, 0);
         Volatile.Write(
             ref _state.VisualRootVisibilitySnapshot,
@@ -317,6 +452,7 @@ public partial class AlsP3Character : Node3D
         }
         Volatile.Write(ref _state.PublishedFrameId, completedFrameId);
         Volatile.Write(ref _state.CommittedFrameId, completedFrameId);
+        _state.FootProbeExchange.Clear();
     }
 
     public AlsFrameIdentity HandleIdentity(long frameId)
@@ -373,12 +509,23 @@ public partial class AlsP3Character : Node3D
         SetActive(true);
     }
 
+    internal void StartReplacementWithoutClassification(long completedFrameId)
+    {
+        ResumeAt(completedFrameId);
+        Volatile.Write(ref _state.GatherSuspended, 0);
+        Volatile.Write(ref _state.WorkerSuspended, 1);
+        Volatile.Write(ref _state.CommitSuspended, 1);
+        ResetVisualReady();
+        SetActive(true);
+    }
+
     internal void StartReplacementRecovery()
     {
         EnsureMainThread();
         ThrowIfDisposed();
         Volatile.Write(ref _state.GatherSuspended, 1);
         Volatile.Write(ref _state.WorkerSuspended, 0);
+        Volatile.Write(ref _state.CommitSuspended, 0);
     }
 
     internal void CompleteReplacementRecovery()
@@ -420,6 +567,7 @@ public partial class AlsP3Character : Node3D
         }
 
         ResetVisualReadyCore();
+        _state.FootProbeExchange.Clear();
         Volatile.Write(ref _state.ProcessingEnabled, 0);
         if (_worker is not null && !_worker.TryDisposeRuntime())
         {
