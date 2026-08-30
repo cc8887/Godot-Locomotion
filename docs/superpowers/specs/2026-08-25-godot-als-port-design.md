@@ -599,6 +599,11 @@ Godot 导入完成后生成只读运行时数据 `AlsAnimationSet`，包含：
 
 ### P4：Aim、分层姿态和 Foot IK
 
+状态（2026-08-30）：功能实现和 Task 17 clean-worktree 自动闭环已完成。正式
+`10/parallel` 短时证据为 Gather+Commit p95 `998 us`、Worker p95 `2036 us`、
+整体 p99 `3937 us`，完整 verifier 唯一输出 `P4_VERIFICATION_OK`。Godot Editor
+八项手工观感仍待签收，P7 的 30 秒热身/10 分钟 Release 认证保持独立未完成。
+
 任务：
 
 - Looking Direction 和 Aiming；

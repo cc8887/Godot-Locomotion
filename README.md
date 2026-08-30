@@ -5,9 +5,9 @@
 locomotion、AimOffset、上半身分层、Turn/Rotate In Place、Foot IK、Foot Lock、
 pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 
-P4 功能和 focused 短时自动门禁已经通过，但 P4 尚未正式关闭：Task 17 的
-clean-worktree 完整门禁和 Godot Editor 手工观感验收仍需执行，P7 的 10 分钟
-Release 性能认证也不属于当前阶段证书。
+P4 功能、focused 短时门禁和 Task 17 clean-worktree 完整自动门禁已经通过，
+P4 自动实现闭环已完成。Godot Editor 八项手工观感验收仍未签收，P7 的 10 分钟
+Release 性能认证也不属于当前阶段证书，不能用本次自动闭环替代。
 
 ## 运行
 
@@ -56,7 +56,7 @@ schema 为 1，manifest SHA-256 为
 
 ## 验证
 
-开发中的 focused 门禁：
+日常开发使用的 focused 门禁：
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-p4.ps1 `
@@ -77,6 +77,8 @@ pwsh -NoProfile -File scripts/verify-p4.ps1 `
 
 只有完整命令在 clean worktree 上完成全部 P0-P4、P3B 子链、Release 测试和
 locked-base closure，并唯一输出整行 `P4_VERIFICATION_OK`，才构成 P4 自动闭环。
+当前 Task 17 已取得该完整证书；复跑仍必须使用同一默认命令，不能用 focused
+marker 冒充 full 成功。
 
 ## 文档
 
