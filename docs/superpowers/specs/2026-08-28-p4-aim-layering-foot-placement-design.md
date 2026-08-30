@@ -1,6 +1,6 @@
 # P4 Aim、分层姿态和 Foot IK 设计
 
-**状态：** P4 Task 1-16 已实现，Task 17 focused 已通过；clean-worktree 完整门禁和 Godot Editor 八项手工观感验收待执行
+**状态：** P4 Task 1-17 自动实现闭环已通过；Godot Editor 八项手工观感验收待签收，P7 长时认证不属于本阶段
 
 **日期：** 2026-08-28
 
@@ -548,7 +548,7 @@ P4 短时门禁沿用总性能合同的阶段阈值。矩阵同时运行 `1/10` 
 4. 减少无效 clip/parameter 更新；
 5. 只有 Profiler 证明 modifier 是热点时才评估 GDExtension。
 
-Task 9 的受控短时证据显示，非零 Aim modifier 为 `47/68` 个 affected bones，约 `0.58-0.64 ms/角色`、七个受控桶 `0 B`。setter 只占分段样本约 `0.7%`，主要成本在 clip sampling 和 component/local rebuild。Task 15 随后用正式四格矩阵关闭了多角色短时预算风险；本轮 `10/parallel` 的 Gather+Commit p95、Worker p95、整体 p99 分别为 `997 us`、`1883 us`、`3242 us`。该证据不得通过关闭 Aim、减少 mask 或降低更新频率取得，也不能冒充 P7 长时 Release 证书。
+Task 9 的受控短时证据显示，非零 Aim modifier 为 `47/68` 个 affected bones，约 `0.58-0.64 ms/角色`、七个受控桶 `0 B`。setter 只占分段样本约 `0.7%`，主要成本在 clip sampling 和 component/local rebuild。Task 15 随后用正式四格矩阵关闭了多角色短时预算风险；clean-worktree full 证书中 `10/parallel` 的 Gather+Commit p95、Worker p95、整体 p99 分别为 `998 us`、`2036 us`、`3937 us`。该证据不得通过关闭 Aim、减少 mask 或降低更新频率取得，也不能冒充 P7 长时 Release 证书。
 
 P4 的 120/600 frame 结果是阶段证据。P7 才执行 i7-10700、30 秒热身和 10 分钟 Release 最终认证。
 

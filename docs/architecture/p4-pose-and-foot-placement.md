@@ -12,10 +12,10 @@ P4 在 P3 真实 Mannequin locomotion 与 Gather/Worker/Commit 线程合同上�
 - 1/10 角色 single/parallel 的生产路径矩阵和可操作 P4 Demo。
 
 本文只记录已经冻结的合同与已有自动证据，不把尚未执行的验收写成通过项。
-Task 17 focused 门禁已经通过，覆盖四格短时矩阵、自动 Demo、focused Import/Core
-和全部 P4 场景；clean-worktree 完整 `verify-p4.ps1`、Godot Editor 八项手工观感
-验收和 P7 长时 Release 性能认证尚未执行。因此 P4 仍不能仅凭本文标记为正式
-closed。
+Task 17 focused 与 clean-worktree 完整 `verify-p4.ps1` 均已通过，覆盖四格短时矩阵、
+自动 Demo、focused Import/Core、全部 P4 场景、P0-P3B 回归、Release 测试和仓库
+closure，P4 自动实现闭环已经完成。Godot Editor 八项手工观感验收和 P7 长时
+Release 性能认证尚未执行，本文不把二者写成已签收。
 
 Task 17 计划要求根目录 README，但此前仓库没有该文件。本轮按已记录的实施裁定
 创建简洁项目/验证索引，没有用其他文档冒充 README，也没有因此扩大 P4 完成范围。
@@ -193,10 +193,10 @@ platform/collider identity、Foot Lock 状态和提交结果均未改写。
 
 | Cell | Gather+Commit p95 | Worker p95 | Total p99 | 性能语义 |
 | --- | ---: | ---: | ---: | --- |
-| `1/single` | `165 us` | `893 us` | `1184 us` | 非门禁真实参考 |
-| `1/parallel` | `167 us` | `913 us` | `1368 us` | 非门禁真实参考 |
-| `10/single` | `981 us` | `8891 us` | `10951 us` | 串行确定性参考，不作为 parallel wall-clock 预算 |
-| `10/parallel` | `997 us` | `1883 us` | `3242 us` | 硬门禁 `<=1500 / <=2500 / <=4000 us` |
+| `1/single` | `166 us` | `899 us` | `1332 us` | 非门禁真实参考 |
+| `1/parallel` | `168 us` | `903 us` | `1285 us` | 非门禁真实参考 |
+| `10/single` | `962 us` | `8981 us` | `10560 us` | 串行确定性参考，不作为 parallel wall-clock 预算 |
+| `10/parallel` | `998 us` | `2036 us` | `3937 us` | 硬门禁 `<=1500 / <=2500 / <=4000 us` |
 
 只有 `10/parallel` 承担 P4 短时性能硬门禁；其他三格仍必须报告真实 timing，
 且通过完整功能、摘要、线程、代际、帧计数和分配合同。每格要求
@@ -207,7 +207,7 @@ platform/collider identity、Foot Lock 状态和提交结果均未改写。
 稳态硬门禁的七个托管分配桶是 `model`、`curve`、`controller`、`modifier`、
 `skeleton`、`exchange`、`commit`，四格均为 `0 B`。Godot 物理查询 wrapper 的
 `foot_gather` 分配透明地单列但当前不作为 P4 零分配门禁；本次四格观察值依次为
-`1519416 B`、`1519416 B`、`10298752 B`、`13734368 B`。因此本文只声称七个
+`1519416 B`、`1519416 B`、`13734368 B`、`13734368 B`。因此本文只声称七个
 Worker/交换/提交桶为 `0 B`，不声称包含 Foot Gather 的整条 Godot 物理路径为
 `0 B`。
 
@@ -290,10 +290,13 @@ Debug build。最终 solution Release 及独立 Core/Import TRX 证明 ExportRel
 编译/测试边界，但不等于已经执行 Godot exported Release runtime；两种证据不能
 互相替代。
 
-本轮 focused 命令已经真实输出
-`P4_FOCUSED_VERIFICATION_OK regression=skipped`；完整 Task 17 命令仍未在 clean
-worktree 上执行，因而还没有正式 `P4_VERIFICATION_OK` closure evidence。更新总
-路线中的 P4 状态必须发生在该完整命令真实通过之后。
+本轮 focused 命令真实输出了
+`P4_FOCUSED_VERIFICATION_OK regression=skipped`。随后 clean-worktree 完整命令
+通过 repository Pester `235/235`、非 Skip `P3B_VERIFICATION_OK`、Release Core
+`539` 项和 Import `249` 项独立 TRX，并输出
+`P4_REPOSITORY_CLOSURE_OK p4_base=1d941ee0611ca2f6af710deab7a6d63f07e2105c`
+及唯一终态 `P4_VERIFICATION_OK`。首次完整运行发现并补交了三个 Godot C# script
+UID；上述证据来自 UID 已跟踪后的 clean HEAD，不是失败轮次的拼接结果。
 
 ## 8. 后续范围
 
