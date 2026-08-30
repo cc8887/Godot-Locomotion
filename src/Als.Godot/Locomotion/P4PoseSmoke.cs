@@ -932,7 +932,7 @@ public partial class P4PoseSmoke : Node
     {
         WithSourceAnimation(definition, source =>
         {
-            var bound = GetBoundAnimation(library, definition.Id);
+            using var bound = GetBoundAnimation(library, definition.Id);
             Require(source.Length == bound.Length &&
                     source.GetTrackCount() == bound.GetTrackCount(),
                 $"Aim normalization changed clip identity: {definition.Name}");
@@ -965,7 +965,7 @@ public partial class P4PoseSmoke : Node
     {
         WithSourceAnimation(definition, source =>
         {
-            var bound = GetBoundAnimation(library, definition.Id);
+            using var bound = GetBoundAnimation(library, definition.Id);
             Require(source.Length == bound.Length &&
                     source.GetTrackCount() == bound.GetTrackCount(),
                 $"{label} changed clip identity");
