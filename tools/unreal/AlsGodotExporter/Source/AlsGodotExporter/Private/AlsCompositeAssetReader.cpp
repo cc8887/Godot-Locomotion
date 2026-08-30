@@ -1,5 +1,6 @@
 #include "AlsCompositeAssetReader.h"
 
+#include "AlsAnimationMetadataReader.h"
 #include "AlsStableAssetId.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/BlendSpace.h"
@@ -38,7 +39,8 @@ bool FAlsCompositeAssetReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJs
         {
             const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
             Value->SetStringField(TEXT("name"), Section.SectionName.ToString());
-            Value->SetStringField(TEXT("nextSection"), Section.NextSectionName.ToString());
+            Value->SetStringField(TEXT("nextSection"),
+                Section.NextSectionName.IsNone() ? FString() : Section.NextSectionName.ToString());
             Value->SetNumberField(TEXT("startTime"), Section.GetTime());
             Sections.Add(MakeShared<FJsonValueObject>(Value));
         }
@@ -72,7 +74,7 @@ bool FAlsCompositeAssetReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJs
         OutMetadata->SetNumberField(TEXT("blendOutOption"), static_cast<uint8>(Montage->BlendOut.GetBlendOption()));
         OutMetadata->SetNumberField(TEXT("blendOutTriggerTime"), Montage->BlendOutTriggerTime);
         OutMetadata->SetBoolField(TEXT("enableAutoBlendOut"), Montage->bEnableAutoBlendOut);
-        return true;
+        return FAlsAnimationMetadataReader::ReadTimeline(*Montage, Asset.Id, OutMetadata, OutError);
     }
 
     if (const UBlendSpace* BlendSpace = Cast<UBlendSpace>(Object))
