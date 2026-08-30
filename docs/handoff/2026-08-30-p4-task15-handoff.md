@@ -61,6 +61,7 @@ P4 Task 15 的代码和测试已完成，当前提交包含本文件、规范口
 - Aim sampling 使用受影响骨骼及祖先闭包，避免无关 68 骨骼遍历；
 - modifier full-pose digest 复用，避免重复读取整套骨骼；
 - P4 10 角色矩阵的严格命名字段解析、重复/未知/缺失字段拒绝、finite/non-negative timing 校验和七项 digest pair 校验。
+- Task 15 短时性能证书统一通过 `scripts/verify-p4-matrix.ps1` 执行：optimized non-incremental Debug build，四个 cell 固定顺序，child matrix 禁用 .NET tiering，并在成功或失败后恢复调用者环境。
 
 ## 4. Task 15 变更清单
 
@@ -153,13 +154,13 @@ dotnet build .\GodotALS.sln --no-restore
 dotnet test .\GodotALS.sln --no-build --no-restore
 Invoke-Pester -Path .\tests\VerificationScripts.Tests.ps1
 pwsh -NoProfile -File .\scripts\verify-p3b.ps1 -GodotExecutable <Godot-4.7.2-console.exe>
-& <Godot-4.7.2-console.exe> --headless --path . res://scenes/tests/p4_animation_harness.tscn --mode=single --characters=10 --warmup=120 --frames=600
-& <Godot-4.7.2-console.exe> --headless --path . res://scenes/tests/p4_animation_harness.tscn --mode=parallel --characters=10 --warmup=120 --frames=600
+pwsh -NoProfile -File .\scripts\verify-p4-matrix.ps1 -GodotExecutable <Godot-4.7.2-console.exe>
 git diff --check
 git status --short --branch
 ```
 
 Godot harness 必须只接受四个用户参数：`--mode`、`--characters`、`--warmup`、`--frames`；缺失、重复或未知参数应失败。
+裸 Godot matrix 命令仅用于诊断，不构成 Task 15 的受控短时证书。P7 仍负责默认 Release、30 秒热身和十分钟长时认证。
 
 ## 8. 维护规则
 

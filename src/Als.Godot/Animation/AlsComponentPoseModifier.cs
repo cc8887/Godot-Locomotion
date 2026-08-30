@@ -2191,11 +2191,15 @@ public sealed class AlsComponentPoseModifier : IDisposable
         double time,
         bool valueIsValid)
     {
-        if (!double.IsFinite(time) || !valueIsValid ||
+        if (!double.IsFinite(time) ||
+            time < 0.0 ||
+            time > animation.Length ||
+            !valueIsValid ||
             (keyIndex > 0 && time <= animation.TrackGetKeyTime(trackIndex, keyIndex - 1)))
         {
             throw new InvalidOperationException(
-                $"P4 Aim managed sampler received an invalid key: track={trackIndex} key={keyIndex}");
+                $"P4 Aim managed sampler received an invalid key: track={trackIndex} key={keyIndex} " +
+                $"time={time:R} length={animation.Length:R}");
         }
     }
 
