@@ -7,6 +7,8 @@ struct FAnimNotifyEvent;
 class FAlsNotifyClassRegistry
 {
 public:
+    static bool RunSelfTest(int32& OutCaseCount, FString& OutError);
+
     static bool Export(
         const FAnimNotifyEvent& NotifyEvent,
         const FString& AssetStableId,

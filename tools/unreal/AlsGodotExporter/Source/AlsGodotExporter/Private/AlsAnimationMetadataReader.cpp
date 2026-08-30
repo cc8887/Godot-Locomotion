@@ -63,6 +63,43 @@ namespace
         return Left.StableMarkerId.Compare(Right.StableMarkerId, ESearchCase::CaseSensitive) < 0;
     }
 
+    bool ValidateTimelineBounds(const double SourceLength, const TArray<FAlsExportedTimelineEntry>& Entries,
+        const TArray<FAlsExportedSyncMarker>& Markers, FString& OutError)
+    {
+        if (!FMath::IsFinite(SourceLength) || SourceLength < 0.0)
+        {
+            OutError = FString::Printf(TEXT("Invalid timeline source length: %.17g."), SourceLength);
+            return false;
+        }
+        for (const FAlsExportedTimelineEntry& Entry : Entries)
+        {
+            if (!FMath::IsFinite(Entry.TimeSeconds) || Entry.TimeSeconds < 0.0 || Entry.TimeSeconds > SourceLength ||
+                !FMath::IsFinite(Entry.DurationSeconds) || Entry.DurationSeconds < 0.0 ||
+                Entry.DurationSeconds > SourceLength - Entry.TimeSeconds)
+            {
+                OutError = FString::Printf(TEXT("Timeline entry is outside source length: id=%s time=%.17g duration=%.17g length=%.17g."),
+                    *Entry.StableEventId, Entry.TimeSeconds, Entry.DurationSeconds, SourceLength);
+                return false;
+            }
+        }
+        for (const FAlsExportedSyncMarker& Marker : Markers)
+        {
+            if (!FMath::IsFinite(Marker.TimeSeconds) || Marker.TimeSeconds < 0.0 || Marker.TimeSeconds > SourceLength)
+            {
+                OutError = FString::Printf(TEXT("Sync marker is outside source length: id=%s time=%.17g length=%.17g."),
+                    *Marker.StableMarkerId, Marker.TimeSeconds, SourceLength);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void SortTimeline(TArray<FAlsExportedTimelineEntry>& Entries, TArray<FAlsExportedSyncMarker>& Markers)
+    {
+        Entries.Sort(TimelineEntryLess);
+        Markers.Sort(SyncMarkerLess);
+    }
+
     TSharedRef<FJsonObject> TimelineEntryToJson(const FAlsExportedTimelineEntry& Entry)
     {
         const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
@@ -530,6 +567,7 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
 bool FAlsAnimationMetadataReader::ReadTimeline(const UAnimSequenceBase& Sequence, const FString& AssetStableId,
     TSharedRef<FJsonObject>& OutMetadata, FString& OutError)
 {
+    const double SourceLength = Sequence.GetPlayLength();
     TArray<FAlsExportedTimelineEntry> Entries;
     TSet<int32> SourceIndices;
     TSet<FString> StableEventIds;
@@ -557,15 +595,6 @@ bool FAlsAnimationMetadataReader::ReadTimeline(const UAnimSequenceBase& Sequence
         StableEventIds.Add(Entry.StableEventId);
         Entries.Add(MoveTemp(Entry));
     }
-    Entries.Sort(TimelineEntryLess);
-    TArray<TSharedPtr<FJsonValue>> Timeline;
-    Timeline.Reserve(Entries.Num());
-    for (const FAlsExportedTimelineEntry& Entry : Entries)
-    {
-        Timeline.Add(MakeShared<FJsonValueObject>(TimelineEntryToJson(Entry)));
-    }
-    OutMetadata->SetArrayField(TEXT("timeline"), Timeline);
-
     TArray<FAnimSyncMarker> AuthoredMarkers;
     if (const UAnimSequence* AnimationSequence = Cast<UAnimSequence>(&Sequence))
     {
@@ -610,7 +639,19 @@ bool FAlsAnimationMetadataReader::ReadTimeline(const UAnimSequenceBase& Sequence
         StableMarkerIds.Add(Marker.StableMarkerId);
         Markers.Add(MoveTemp(Marker));
     }
-    Markers.Sort(SyncMarkerLess);
+    if (!ValidateTimelineBounds(SourceLength, Entries, Markers, OutError))
+    {
+        OutError = FString::Printf(TEXT("Invalid timeline bounds for asset %s: %s"), *AssetStableId, *OutError);
+        return false;
+    }
+    SortTimeline(Entries, Markers);
+    TArray<TSharedPtr<FJsonValue>> Timeline;
+    Timeline.Reserve(Entries.Num());
+    for (const FAlsExportedTimelineEntry& Entry : Entries)
+    {
+        Timeline.Add(MakeShared<FJsonValueObject>(TimelineEntryToJson(Entry)));
+    }
+    OutMetadata->SetArrayField(TEXT("timeline"), Timeline);
     TArray<TSharedPtr<FJsonValue>> SyncMarkers;
     SyncMarkers.Reserve(Markers.Num());
     for (const FAlsExportedSyncMarker& Marker : Markers)
@@ -623,8 +664,17 @@ bool FAlsAnimationMetadataReader::ReadTimeline(const UAnimSequenceBase& Sequence
 
 bool FAlsAnimationMetadataReader::RunTimelineSelfTest(int32& OutCaseCount, FString& OutError)
 {
+    constexpr int32 ExpectedCaseCount = 22;
     OutCaseCount = 0;
     OutError.Reset();
+
+    int32 RegistryCaseCount = 0;
+    if (!FAlsNotifyClassRegistry::RunSelfTest(RegistryCaseCount, OutError))
+    {
+        return false;
+    }
+    OutCaseCount += RegistryCaseCount;
+
     UAnimNotify_ResetDynamics* NotifyObject = NewObject<UAnimNotify_ResetDynamics>();
     if (!NotifyObject)
     {
@@ -660,6 +710,129 @@ bool FAlsAnimationMetadataReader::RunTimelineSelfTest(int32& OutCaseCount, FStri
             return false;
         }
         ++OutCaseCount;
+    }
+
+    FAlsExportedTimelineEntry BoundaryEntry;
+    BoundaryEntry.StableEventId = TEXT("boundary-event");
+    BoundaryEntry.TimeSeconds = 1.0;
+    BoundaryEntry.DurationSeconds = 0.0;
+    FAlsExportedSyncMarker BoundaryMarker;
+    BoundaryMarker.StableMarkerId = TEXT("boundary-marker");
+    BoundaryMarker.TimeSeconds = 1.0;
+    TArray<FAlsExportedTimelineEntry> Entries = {BoundaryEntry};
+    TArray<FAlsExportedSyncMarker> Markers = {BoundaryMarker};
+    FString CaseError;
+    if (!ValidateTimelineBounds(1.0, Entries, Markers, CaseError) || !CaseError.IsEmpty())
+    {
+        OutError = FString::Printf(TEXT("Timeline self-test rejected an exact end boundary: %s"), *CaseError);
+        return false;
+    }
+    ++OutCaseCount;
+
+    Entries[0].TimeSeconds = 1.0001;
+    CaseError.Reset();
+    if (ValidateTimelineBounds(1.0, Entries, Markers, CaseError) || CaseError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test accepted an event time beyond the source length.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    Entries[0].TimeSeconds = 0.75;
+    Entries[0].DurationSeconds = 0.2501;
+    CaseError.Reset();
+    if (ValidateTimelineBounds(1.0, Entries, Markers, CaseError) || CaseError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test accepted an event end beyond the source length.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    Entries[0] = BoundaryEntry;
+    Markers[0].TimeSeconds = 1.0001;
+    CaseError.Reset();
+    if (ValidateTimelineBounds(1.0, Entries, Markers, CaseError) || CaseError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test accepted a sync marker beyond the source length.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    Markers[0] = BoundaryMarker;
+    FString NaNError;
+    FString NegativeError;
+    if (ValidateTimelineBounds(std::numeric_limits<double>::quiet_NaN(), Entries, Markers, NaNError) ||
+        ValidateTimelineBounds(-1.0, Entries, Markers, NegativeError) || NaNError.IsEmpty() || NegativeError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test accepted a non-finite or negative source length.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    TArray<FAlsExportedTimelineEntry> UnsortedEntries;
+    FAlsExportedTimelineEntry& EntryStableZ = UnsortedEntries.AddDefaulted_GetRef();
+    EntryStableZ.StableEventId = TEXT("z");
+    EntryStableZ.TimeSeconds = 0.5;
+    EntryStableZ.SourceIndex = 1;
+    EntryStableZ.TrackIndex = 0;
+    FAlsExportedTimelineEntry& EntryFirst = UnsortedEntries.AddDefaulted_GetRef();
+    EntryFirst.StableEventId = TEXT("first");
+    EntryFirst.TimeSeconds = 0.25;
+    EntryFirst.SourceIndex = 9;
+    EntryFirst.TrackIndex = 9;
+    FAlsExportedTimelineEntry& EntryStableA = UnsortedEntries.AddDefaulted_GetRef();
+    EntryStableA.StableEventId = TEXT("a");
+    EntryStableA.TimeSeconds = 0.5;
+    EntryStableA.SourceIndex = 1;
+    EntryStableA.TrackIndex = 0;
+    FAlsExportedTimelineEntry& EntrySource = UnsortedEntries.AddDefaulted_GetRef();
+    EntrySource.StableEventId = TEXT("source");
+    EntrySource.TimeSeconds = 0.5;
+    EntrySource.SourceIndex = 0;
+    EntrySource.TrackIndex = 9;
+
+    TArray<FAlsExportedSyncMarker> UnsortedMarkers;
+    FAlsExportedSyncMarker& MarkerStableZ = UnsortedMarkers.AddDefaulted_GetRef();
+    MarkerStableZ.StableMarkerId = TEXT("z");
+    MarkerStableZ.TimeSeconds = 0.5;
+    MarkerStableZ.SourceIndex = 1;
+    MarkerStableZ.TrackIndex = 0;
+    FAlsExportedSyncMarker& MarkerFirst = UnsortedMarkers.AddDefaulted_GetRef();
+    MarkerFirst.StableMarkerId = TEXT("first");
+    MarkerFirst.TimeSeconds = 0.25;
+    MarkerFirst.SourceIndex = 9;
+    MarkerFirst.TrackIndex = 9;
+    FAlsExportedSyncMarker& MarkerStableA = UnsortedMarkers.AddDefaulted_GetRef();
+    MarkerStableA.StableMarkerId = TEXT("a");
+    MarkerStableA.TimeSeconds = 0.5;
+    MarkerStableA.SourceIndex = 1;
+    MarkerStableA.TrackIndex = 0;
+    FAlsExportedSyncMarker& MarkerSource = UnsortedMarkers.AddDefaulted_GetRef();
+    MarkerSource.StableMarkerId = TEXT("source");
+    MarkerSource.TimeSeconds = 0.5;
+    MarkerSource.SourceIndex = 0;
+    MarkerSource.TrackIndex = 9;
+
+    SortTimeline(UnsortedEntries, UnsortedMarkers);
+    if (UnsortedEntries[0].StableEventId != TEXT("first") ||
+        UnsortedEntries[1].StableEventId != TEXT("source") ||
+        UnsortedEntries[2].StableEventId != TEXT("a") ||
+        UnsortedEntries[3].StableEventId != TEXT("z") ||
+        UnsortedMarkers[0].StableMarkerId != TEXT("first") ||
+        UnsortedMarkers[1].StableMarkerId != TEXT("source") ||
+        UnsortedMarkers[2].StableMarkerId != TEXT("a") ||
+        UnsortedMarkers[3].StableMarkerId != TEXT("z"))
+    {
+        OutError = TEXT("Timeline self-test deterministic ordering mismatch.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    if (OutCaseCount != ExpectedCaseCount)
+    {
+        OutError = FString::Printf(TEXT("Timeline self-test case count mismatch: expected=%d actual=%d."),
+            ExpectedCaseCount, OutCaseCount);
+        return false;
     }
     return true;
 }
