@@ -1,5 +1,144 @@
 Set-StrictMode -Version Latest
 
+if ([Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+        [Runtime.InteropServices.OSPlatform]::Windows) -and
+    $null -eq ('GodotAls.Verification.P4KillOnCloseJob' -as [type]))
+{
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+namespace GodotAls.Verification
+{
+    public sealed class P4KillOnCloseJob : IDisposable
+    {
+        private const uint KillOnJobClose = 0x00002000;
+        private IntPtr handle;
+
+        public P4KillOnCloseJob()
+        {
+            handle = CreateJobObject(IntPtr.Zero, null);
+            if (handle == IntPtr.Zero)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+
+            var information = new JobObjectExtendedLimitInformation();
+            information.BasicLimitInformation.LimitFlags = KillOnJobClose;
+            var size = Marshal.SizeOf<JobObjectExtendedLimitInformation>();
+            var pointer = IntPtr.Zero;
+            try
+            {
+                pointer = Marshal.AllocHGlobal(size);
+                Marshal.StructureToPtr(information, pointer, false);
+                if (!SetInformationJobObject(handle, 9, pointer, (uint)size))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+            }
+            catch
+            {
+                CloseHandle(handle);
+                handle = IntPtr.Zero;
+                throw;
+            }
+            finally
+            {
+                if (pointer != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(pointer);
+                }
+            }
+        }
+
+        public void AssignProcess(IntPtr processHandle)
+        {
+            if (handle == IntPtr.Zero)
+            {
+                throw new ObjectDisposedException(nameof(P4KillOnCloseJob));
+            }
+            if (!AssignProcessToJobObject(handle, processHandle))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+        }
+
+        public void Dispose()
+        {
+            var current = Interlocked.Exchange(ref handle, IntPtr.Zero);
+            if (current != IntPtr.Zero)
+            {
+                CloseHandle(current);
+            }
+            GC.SuppressFinalize(this);
+        }
+
+        ~P4KillOnCloseJob()
+        {
+            Dispose();
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateJobObject(IntPtr attributes, string name);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetInformationJobObject(
+            IntPtr job,
+            int informationClass,
+            IntPtr information,
+            uint informationLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JobObjectBasicLimitInformation
+        {
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public uint LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct IoCounters
+        {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JobObjectExtendedLimitInformation
+        {
+            public JobObjectBasicLimitInformation BasicLimitInformation;
+            public IoCounters IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
+    }
+}
+'@
+}
+
 function ConvertFrom-P4MatrixOutput
 {
     param(
@@ -218,7 +357,7 @@ function Invoke-P4VerificationProcess
         [AllowEmptyCollection()]
         [string[]]$Arguments,
         [Parameter(Mandatory)]
-        [ValidateRange(1, 3600)]
+        [ValidateRange(1, 10830)]
         [int]$TimeoutSeconds,
         [Parameter(Mandatory)]
         [string]$Stage
@@ -228,6 +367,9 @@ function Invoke-P4VerificationProcess
         Select-Object -First 1
     $process = [Diagnostics.Process]::new()
     $started = $false
+    $cancellation = $null
+    $jobObject = $null
+    $startGate = $null
     try
     {
         $process.StartInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -239,9 +381,26 @@ function Invoke-P4VerificationProcess
         [void]$process.StartInfo.ArgumentList.Add('-NoProfile')
         [void]$process.StartInfo.ArgumentList.Add('-NonInteractive')
         [void]$process.StartInfo.ArgumentList.Add('-CommandWithArgs')
-        [void]$process.StartInfo.ArgumentList.Add(
-            '$decoded = @($args | ForEach-Object { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_)) }); & $decoded[0] @($decoded[1..($decoded.Count - 1)]); $code = $LASTEXITCODE; if ($null -eq $code) { if ($?) { exit 0 } else { exit 1 } }; exit $code')
-        foreach ($argument in @($command.Source) + $Arguments)
+        $useJobObject = [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+            [Runtime.InteropServices.OSPlatform]::Windows)
+        if ($useJobObject)
+        {
+            $jobObject = [GodotAls.Verification.P4KillOnCloseJob]::new()
+            $startGateName = 'Local\GodotALS-P4-' + [Guid]::NewGuid().ToString('N')
+            $startGate = [Threading.EventWaitHandle]::new(
+                $false,
+                [Threading.EventResetMode]::ManualReset,
+                $startGateName)
+            $wrapperCommand = '$ErrorActionPreference = ''Stop''; $decoded = @($args | ForEach-Object { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_)) }); $gate = [Threading.EventWaitHandle]::OpenExisting($decoded[0]); try { [void]$gate.WaitOne() } finally { $gate.Dispose() }; $file = $decoded[1]; $commandArguments = if ($decoded.Count -gt 2) { @($decoded[2..($decoded.Count - 1)]) } else { @() }; & $file @commandArguments; $code = $LASTEXITCODE; if ($null -eq $code) { if ($?) { exit 0 } else { exit 1 } }; exit $code'
+            $encodedValues = @($startGateName, $command.Source) + $Arguments
+        }
+        else
+        {
+            $wrapperCommand = '$ErrorActionPreference = ''Stop''; $decoded = @($args | ForEach-Object { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_)) }); $file = $decoded[0]; $commandArguments = if ($decoded.Count -gt 1) { @($decoded[1..($decoded.Count - 1)]) } else { @() }; & $file @commandArguments; $code = $LASTEXITCODE; if ($null -eq $code) { if ($?) { exit 0 } else { exit 1 } }; exit $code'
+            $encodedValues = @($command.Source) + $Arguments
+        }
+        [void]$process.StartInfo.ArgumentList.Add($wrapperCommand)
+        foreach ($argument in $encodedValues)
         {
             $encodedArgument = [Convert]::ToBase64String(
                 [Text.Encoding]::UTF8.GetBytes($argument))
@@ -253,27 +412,96 @@ function Invoke-P4VerificationProcess
             throw "Could not start ${Stage}: $FilePath"
         }
         $started = $true
-        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
-        $standardErrorTask = $process.StandardError.ReadToEndAsync()
-        $timeoutMilliseconds = $TimeoutSeconds * 1000
-        if (-not $process.WaitForExit($timeoutMilliseconds))
+        if ($useJobObject)
         {
             try
             {
-                $process.Kill($true)
+                $jobObject.AssignProcess($process.Handle)
+                [void]$startGate.Set()
             }
             catch
             {
+                $containmentError = $_.Exception.Message
+                try { $process.Kill($true) } catch { }
+                try { [void]$process.WaitForExit(1000) } catch { }
+                throw "Could not contain ${Stage} in a Windows Job Object: $containmentError"
+            }
+        }
+        $cancellation = [Threading.CancellationTokenSource]::new()
+        $standardOutputTask = $process.StandardOutput.ReadToEndAsync($cancellation.Token)
+        $standardErrorTask = $process.StandardError.ReadToEndAsync($cancellation.Token)
+        $streamTasks = [Threading.Tasks.Task]::WhenAll(
+            [Threading.Tasks.Task[]]@($standardOutputTask, $standardErrorTask))
+        $timeoutMilliseconds = $TimeoutSeconds * 1000
+        $watch = [Diagnostics.Stopwatch]::StartNew()
+        $processExited = $process.WaitForExit($timeoutMilliseconds)
+        $remainingMilliseconds = [Math]::Max(
+            0,
+            $timeoutMilliseconds - [int][Math]::Min(
+                [int]::MaxValue,
+                $watch.ElapsedMilliseconds))
+        $streamsCompleted = $false
+        if ($processExited)
+        {
+            try
+            {
+                $streamsCompleted = $streamTasks.IsCompleted -or
+                    ($remainingMilliseconds -gt 0 -and
+                     $streamTasks.Wait($remainingMilliseconds))
+            }
+            catch
+            {
+                throw "${Stage} output capture failed: $($_.Exception.Message)"
+            }
+        }
+
+        if (-not $processExited -or -not $streamsCompleted)
+        {
+            $terminationFailed = $false
+            if ($null -ne $jobObject)
+            {
+                $jobObject.Dispose()
+                $jobObject = $null
+            }
+            try
+            {
+                if (-not $process.HasExited)
+                {
+                    $process.Kill($true)
+                }
+            }
+            catch
+            {
+                if (-not $process.HasExited)
+                {
+                    $terminationFailed = $true
+                }
+            }
+            $cancellation.Cancel()
+            try { $process.StandardOutput.Dispose() } catch { }
+            try { $process.StandardError.Dispose() } catch { }
+            if (-not $process.HasExited)
+            {
+                try
+                {
+                    if (-not $process.WaitForExit(1000))
+                    {
+                        $terminationFailed = $true
+                    }
+                }
+                catch
+                {
+                    $terminationFailed = $true
+                }
+            }
+            if ($terminationFailed)
+            {
                 throw "${Stage} timed out and its process tree could not be terminated."
             }
-            $process.WaitForExit()
-            [void]$standardOutputTask.GetAwaiter().GetResult()
-            [void]$standardErrorTask.GetAwaiter().GetResult()
             $unit = if ($TimeoutSeconds -eq 1) { 'second' } else { 'seconds' }
             throw "${Stage} timed out after $TimeoutSeconds $unit."
         }
 
-        $process.WaitForExit()
         $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
         $standardError = $standardErrorTask.GetAwaiter().GetResult()
         $lines = @(
@@ -288,10 +516,23 @@ function Invoke-P4VerificationProcess
     }
     finally
     {
+        if ($null -ne $startGate)
+        {
+            $startGate.Dispose()
+        }
+        if ($null -ne $jobObject)
+        {
+            $jobObject.Dispose()
+        }
         if ($started -and -not $process.HasExited)
         {
-            $process.Kill($true)
-            $process.WaitForExit()
+            try { $process.Kill($true) } catch { }
+            try { [void]$process.WaitForExit(1000) } catch { }
+        }
+        if ($null -ne $cancellation)
+        {
+            try { $cancellation.Cancel() } catch { }
+            $cancellation.Dispose()
         }
         $process.Dispose()
     }
@@ -398,4 +639,463 @@ function ConvertTo-P4Integer
         throw "P4 matrix field $FieldName must be a finite non-negative integer: $Text"
     }
     return $value
+}
+
+function Test-P4EngineErrorLine
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string]$Line
+    )
+
+    if ([regex]::IsMatch(
+        $Line,
+        '\A\s*\[\+\]\s',
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant))
+    {
+        return $false
+    }
+
+    return [regex]::IsMatch(
+        $Line,
+        '(?<![A-Z0-9_])(?:SCRIPT ERROR:|ERROR:)(?=\s|\z)',
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+}
+
+function Test-P4FailureMarkerLine
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string]$Line
+    )
+
+    if ([regex]::IsMatch(
+        $Line,
+        '\A\s*\[\+\]\s',
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant))
+    {
+        return $false
+    }
+
+    return [regex]::IsMatch(
+        $Line,
+        '(?<![A-Z0-9_])(?:GODOT_ALS_[A-Z0-9_]*FAIL|P4_[A-Z0-9_]*FAIL)(?=\s|\z)',
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+}
+
+function Test-P4ReservedTopLevelMarkerLine
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string]$Line
+    )
+
+    if ([regex]::IsMatch(
+        $Line,
+        '\A\s*\[\+\]\s',
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant))
+    {
+        return $false
+    }
+
+    return [regex]::IsMatch(
+        $Line,
+        '(?<![A-Z0-9_])P4_(?:FOCUSED_)?VERIFICATION_OK(?=\s|\z)',
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+}
+
+function Format-P4CapturedOutputTail
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]$Lines,
+        [ValidateRange(1, 200)]
+        [int]$MaximumLines = 40
+    )
+
+    $count = $Lines.Count
+    if ($count -eq 0)
+    {
+        return "captured output tail: 0/0 lines$([Environment]::NewLine)<no output>"
+    }
+
+    $start = [Math]::Max(0, $count - $MaximumLines)
+    $tail = @($Lines[$start..($count - 1)] | ForEach-Object {
+        $_ -replace '(?<![A-Z0-9_])P4_(?:FOCUSED_)?VERIFICATION_OK(?=\s|$)',
+            '[reserved-top-level-marker]'
+    })
+    return "captured output tail: $($tail.Count)/$count lines$([Environment]::NewLine)" +
+        ($tail -join [Environment]::NewLine)
+}
+
+function Assert-P4ChildGateOutput
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$PhaseName,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$OutputLines,
+        [Parameter(Mandatory)]
+        [int]$ExitCode,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]$ExpectedMarkers
+    )
+
+    $lines = @($OutputLines | ForEach-Object { "$_" })
+    $capturedOutput = Format-P4CapturedOutputTail -Lines $lines
+    if ($ExitCode -ne 0)
+    {
+        throw "$PhaseName exited with code $ExitCode.$([Environment]::NewLine)$capturedOutput"
+    }
+
+    $errorLines = @($lines | Where-Object { Test-P4EngineErrorLine -Line $_ })
+    if ($errorLines.Count -ne 0)
+    {
+        throw "$PhaseName emitted an engine error.$([Environment]::NewLine)$capturedOutput"
+    }
+
+    $failureLines = @($lines | Where-Object { Test-P4FailureMarkerLine -Line $_ })
+    if ($failureLines.Count -ne 0)
+    {
+        throw "$PhaseName emitted an ALS failure marker.$([Environment]::NewLine)$capturedOutput"
+    }
+
+    $reservedLines = @($lines | Where-Object {
+        Test-P4ReservedTopLevelMarkerLine -Line $_
+    })
+    if ($reservedLines.Count -ne 0)
+    {
+        throw "$PhaseName emitted a reserved top-level marker.$([Environment]::NewLine)$capturedOutput"
+    }
+
+    $markerNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($expectedMarker in $ExpectedMarkers)
+    {
+        $name = $expectedMarker.Split(' ', 2)[0]
+        if (-not $markerNames.Add($name))
+        {
+            throw "$PhaseName contains duplicate expected marker name '$name'.$([Environment]::NewLine)$capturedOutput"
+        }
+        $candidates = @($lines | Where-Object {
+            $_ -ceq $name -or $_.StartsWith("$name ", [StringComparison]::Ordinal)
+        })
+        $matches = @($candidates | Where-Object { $_ -ceq $expectedMarker })
+        if ($candidates.Count -ne 1 -or $matches.Count -ne 1)
+        {
+            throw "$PhaseName expected exactly one '$expectedMarker' marker; candidates=$($candidates.Count) matches=$($matches.Count).$([Environment]::NewLine)$capturedOutput"
+        }
+    }
+
+    return $lines
+}
+
+function Assert-P4SceneGateOutput
+{
+    param(
+        [Parameter(Mandatory)][string]$PhaseName,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$OutputLines,
+        [Parameter(Mandatory)][int]$ExitCode,
+        [AllowEmptyCollection()][string[]]$ExpectedExactMarkers = @(),
+        [AllowEmptyCollection()][string[]]$ExpectedRegexMarkers = @()
+    )
+
+    $lines = @(Assert-P4ChildGateOutput `
+        -PhaseName $PhaseName `
+        -OutputLines $OutputLines `
+        -ExitCode $ExitCode `
+        -ExpectedMarkers $ExpectedExactMarkers)
+    $markerNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($exactMarker in $ExpectedExactMarkers)
+    {
+        $name = $exactMarker.Split(' ', 2)[0]
+        if (-not $markerNames.Add($name))
+        {
+            throw "$PhaseName contains duplicate marker name '$name'."
+        }
+    }
+    if (@($ExpectedRegexMarkers | Select-Object -Unique).Count -ne
+        $ExpectedRegexMarkers.Count)
+    {
+        throw "$PhaseName contains duplicate regex marker expectations."
+    }
+    foreach ($pattern in $ExpectedRegexMarkers)
+    {
+        $nameMatch = [regex]::Match(
+            $pattern,
+            '\A\\A(?<name>[A-Z0-9_]+)',
+            [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+        if (-not $nameMatch.Success -or
+            -not $pattern.EndsWith('\z', [StringComparison]::Ordinal))
+        {
+            throw "$PhaseName regex markers must be anchored: $pattern"
+        }
+        $name = $nameMatch.Groups['name'].Value
+        if (-not $markerNames.Add($name))
+        {
+            throw "$PhaseName contains duplicate marker name '$name'."
+        }
+        $candidates = @($lines | Where-Object {
+            $_ -ceq $name -or $_.StartsWith("$name ", [StringComparison]::Ordinal)
+        })
+        $matches = @($candidates | Where-Object {
+            [regex]::IsMatch(
+                $_,
+                $pattern,
+                [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+        })
+        if ($candidates.Count -ne 1 -or $matches.Count -ne 1)
+        {
+            throw "$PhaseName expected exactly one '$pattern' regex marker; candidates=$($candidates.Count) matches=$($matches.Count)."
+        }
+    }
+    return $lines
+}
+
+function Assert-P4MatrixCertificateOutput
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$OutputLines,
+        [Parameter(Mandatory)]
+        [int]$ExitCode
+    )
+
+    $certificate = 'P4_MATRIX_VERIFICATION_OK cells=4 pairs=2'
+    $lines = @(Assert-P4ChildGateOutput `
+        -PhaseName 'P4 matrix certificate' `
+        -OutputLines $OutputLines `
+        -ExitCode $ExitCode `
+        -ExpectedMarkers @($certificate))
+    $candidates = @($lines | Where-Object {
+        $_.IndexOf('P4_MATRIX_OK', [StringComparison]::Ordinal) -ge 0
+    })
+    if ($candidates.Count -ne 4)
+    {
+        throw "P4 matrix certificate requires exactly four matrix cells; observed $($candidates.Count)."
+    }
+
+    $expected = @(
+        [pscustomobject]@{ Mode = 'single'; Characters = 1 },
+        [pscustomobject]@{ Mode = 'parallel'; Characters = 1 },
+        [pscustomobject]@{ Mode = 'single'; Characters = 10 },
+        [pscustomobject]@{ Mode = 'parallel'; Characters = 10 }
+    )
+    $cells = @()
+    for ($index = 0; $index -lt $expected.Count; $index++)
+    {
+        $cells += ConvertFrom-P4MatrixOutput `
+            -OutputLines @($candidates[$index]) `
+            -ExpectedMode $expected[$index].Mode `
+            -ExpectedCharacterCount $expected[$index].Characters
+    }
+    Assert-P4MatrixPair -Single $cells[0] -Parallel $cells[1] -CharacterCount 1
+    Assert-P4MatrixPair -Single $cells[2] -Parallel $cells[3] -CharacterCount 10
+
+    [pscustomobject]@{
+        Cells = $cells
+        OutputLines = $lines
+        Marker = $certificate
+    }
+}
+
+function Assert-P4RepositoryClosure
+{
+    param(
+        [Parameter(Mandatory)][string]$RepositoryRoot,
+        [Parameter(Mandatory)][string]$BaseCommit
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+    $resolvedBaseOutput = @(& git -C $resolvedRoot rev-parse --verify "${BaseCommit}^{commit}" 2>&1)
+    if ($LASTEXITCODE -ne 0 -or $resolvedBaseOutput.Count -ne 1 -or
+        "$($resolvedBaseOutput[0])" -notmatch '\A[0-9a-fA-F]{40}\z')
+    {
+        throw "P4 base commit does not exist: $BaseCommit"
+    }
+    $resolvedBase = "$($resolvedBaseOutput[0])"
+
+    $ancestorOutput = @(& git -C $resolvedRoot merge-base --is-ancestor $resolvedBase HEAD 2>&1)
+    $ancestorExitCode = $LASTEXITCODE
+    if ($ancestorExitCode -eq 1)
+    {
+        throw "P4 base commit is not an ancestor of HEAD: $resolvedBase"
+    }
+    if ($ancestorExitCode -ne 0)
+    {
+        throw "Could not verify P4 base ancestry:$([Environment]::NewLine)$($ancestorOutput -join [Environment]::NewLine)"
+    }
+
+    $committed = @(& git -C $resolvedRoot diff "${resolvedBase}..HEAD" --check -- 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Committed P4 range whitespace check failed:$([Environment]::NewLine)$($committed -join [Environment]::NewLine)"
+    }
+    $cached = @(& git -C $resolvedRoot diff --cached --check -- 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "P4 index whitespace check failed:$([Environment]::NewLine)$($cached -join [Environment]::NewLine)"
+    }
+    $worktree = @(& git -C $resolvedRoot diff --check -- 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "P4 worktree whitespace check failed:$([Environment]::NewLine)$($worktree -join [Environment]::NewLine)"
+    }
+
+    $trackedFiles = @(& git -C $resolvedRoot ls-files 2>&1)
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Could not enumerate tracked P4 files:$([Environment]::NewLine)$($trackedFiles -join [Environment]::NewLine)"
+    }
+    $forbiddenPattern = '(?i)(^|/)(\.godot|\.mono|bin|obj|Binaries|Intermediate|Saved|DerivedDataCache|StagedBuilds|Cooked)(/|$)|^(assets/generated|artifacts/(?!\.gdignore$)|benchmark-results/(?!\.gdignore$))|\.(dll|pdb|modules|target|ubulk|uexp|pak|ucas|utoc|sav|log)$'
+    $forbidden = @($trackedFiles | ForEach-Object { "$_".Replace('\', '/') } |
+        Where-Object { $_ -match $forbiddenPattern })
+    if ($forbidden.Count -ne 0)
+    {
+        throw "Tracked generated/build output is forbidden:$([Environment]::NewLine)$($forbidden -join [Environment]::NewLine)"
+    }
+
+    return $resolvedBase
+}
+
+function Assert-P4CleanWorktree
+{
+    param([Parameter(Mandatory)][string]$RepositoryRoot)
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+    $status = @(& git -C $resolvedRoot status --porcelain --untracked-files=all *>&1)
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0)
+    {
+        throw "Could not inspect P4 repository status (exit $exitCode):$([Environment]::NewLine)$($status -join [Environment]::NewLine)"
+    }
+    if ($status.Count -ne 0)
+    {
+        throw "P4 full verification requires a clean worktree:$([Environment]::NewLine)$($status -join [Environment]::NewLine)"
+    }
+}
+
+function Assert-P4TrxTestRun
+{
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$PhaseName,
+        [AllowEmptyCollection()][string[]]$ExpectedTestClasses = @()
+    )
+
+    $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
+    $settings = [Xml.XmlReaderSettings]::new()
+    $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
+    $settings.XmlResolver = $null
+    $document = [Xml.XmlDocument]::new()
+    $document.XmlResolver = $null
+    $reader = [Xml.XmlReader]::Create($resolvedPath, $settings)
+    try
+    {
+        $document.Load($reader)
+    }
+    finally
+    {
+        $reader.Dispose()
+    }
+
+    $counters = @($document.SelectNodes("//*[local-name()='Counters']"))
+    if ($counters.Count -ne 1)
+    {
+        throw "$PhaseName TRX must contain exactly one Counters element; observed $($counters.Count)."
+    }
+    $values = @{}
+    foreach ($name in @('executed', 'passed', 'failed'))
+    {
+        $attribute = $counters[0].Attributes[$name]
+        if ($null -eq $attribute)
+        {
+            throw "$PhaseName TRX counter is missing: $name"
+        }
+        $value = 0
+        if (-not [int]::TryParse(
+            $attribute.Value,
+            [Globalization.NumberStyles]::None,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [ref]$value) -or $value -lt 0)
+        {
+            throw "$PhaseName TRX counter is invalid: $name=$($attribute.Value)"
+        }
+        $values[$name] = $value
+    }
+    if ($values['executed'] -le 0)
+    {
+        throw "$PhaseName executed zero tests."
+    }
+    if ($values['failed'] -ne 0)
+    {
+        throw "$PhaseName reported $($values['failed']) failed tests."
+    }
+    if ($values['passed'] -ne $values['executed'])
+    {
+        throw "$PhaseName requires every executed test to pass; executed=$($values['executed']) passed=$($values['passed'])."
+    }
+
+    if ($ExpectedTestClasses.Count -ne 0)
+    {
+        $passedTestIds = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
+        foreach ($result in @($document.SelectNodes("//*[local-name()='UnitTestResult']")))
+        {
+            $testId = $result.Attributes['testId']
+            $outcome = $result.Attributes['outcome']
+            if ($null -ne $testId -and $null -ne $outcome -and
+                $outcome.Value -ceq 'Passed')
+            {
+                [void]$passedTestIds.Add($testId.Value)
+            }
+        }
+
+        $passedClasses = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($definition in @($document.SelectNodes("//*[local-name()='UnitTest']")))
+        {
+            $testId = $definition.Attributes['id']
+            $method = $definition.SelectSingleNode("./*[local-name()='TestMethod']")
+            $className = if ($null -ne $method) { $method.Attributes['className'] } else { $null }
+            if ($null -eq $testId -or $null -eq $className -or
+                -not $passedTestIds.Contains($testId.Value))
+            {
+                continue
+            }
+            $separator = $className.Value.LastIndexOf('.')
+            $simpleName = if ($separator -ge 0)
+            {
+                $className.Value.Substring($separator + 1)
+            }
+            else
+            {
+                $className.Value
+            }
+            [void]$passedClasses.Add($simpleName)
+        }
+
+        $expectedClasses = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($expectedClass in $ExpectedTestClasses)
+        {
+            if ([string]::IsNullOrWhiteSpace($expectedClass) -or
+                -not $expectedClasses.Add($expectedClass))
+            {
+                throw "$PhaseName contains an invalid or duplicate expected test class: '$expectedClass'."
+            }
+            if (-not $passedClasses.Contains($expectedClass))
+            {
+                throw "$PhaseName did not execute expected test class '$expectedClass'."
+            }
+        }
+    }
+
+    return $values['executed']
 }
