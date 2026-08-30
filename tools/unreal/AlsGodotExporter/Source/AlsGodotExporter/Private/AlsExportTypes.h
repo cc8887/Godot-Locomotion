@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AssetRegistry/AssetData.h"
+#include "Dom/JsonObject.h"
 
 enum class EAlsAssetKind : uint8
 {
@@ -56,6 +57,30 @@ struct FAlsExportedFloatCurve
     FString PreInfinity = TEXT("Constant");
     FString PostInfinity = TEXT("Constant");
     TArray<FAlsExportedFloatCurveKey> Keys;
+};
+
+struct FAlsExportedTimelineEntry
+{
+    FString StableEventId;
+    FString Kind;
+    FString SourceClassPath;
+    FString DisplayName;
+    double TimeSeconds{0.0};
+    double DurationSeconds{0.0};
+    double TriggerWeightThreshold{0.0};
+    FString TickMode;
+    int32 SourceIndex{INDEX_NONE};
+    int32 TrackIndex{INDEX_NONE};
+    TSharedPtr<FJsonObject> Payload;
+};
+
+struct FAlsExportedSyncMarker
+{
+    FString StableMarkerId;
+    FString Name;
+    double TimeSeconds{0.0};
+    int32 SourceIndex{INDEX_NONE};
+    int32 TrackIndex{INDEX_NONE};
 };
 
 const TCHAR* AlsAssetKindToString(EAlsAssetKind Kind);

@@ -34,8 +34,17 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
             return 7;
         }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=%d"), SelfTestCaseCount);
+        int32 TimelineSelfTestCaseCount = 0;
+        FString TimelineSelfTestError;
+        if (!FAlsAnimationMetadataReader::RunTimelineSelfTest(TimelineSelfTestCaseCount, TimelineSelfTestError))
+        {
+            UE_LOG(LogAlsGodotExporter, Error, TEXT("Timeline export self-test failed: %s"), *TimelineSelfTestError);
+            return 8;
+        }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=%d"),
+            TimelineSelfTestCaseCount);
         const FEngineVersion EngineVersion = FEngineVersion::Current();
-        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_EXPORTER_READY engine=%d.%d.%d plugin=1.0.0"),
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_EXPORTER_READY engine=%d.%d.%d plugin=2.0.0"),
             EngineVersion.GetMajor(), EngineVersion.GetMinor(), EngineVersion.GetPatch());
         return 0;
     }

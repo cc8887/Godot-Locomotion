@@ -15,6 +15,12 @@
 
 namespace
 {
+    bool IsAssetReferenceField(const FString& FieldName)
+    {
+        return (FieldName == TEXT("id") || FieldName.EndsWith(TEXT("Id"), ESearchCase::CaseSensitive)) &&
+            FieldName != TEXT("stableEventId") && FieldName != TEXT("stableMarkerId");
+    }
+
     bool ValidateMetadataValue(const FString& OwnerId, const FString& FieldPath,
         const TSharedPtr<FJsonValue>& Value, const TSet<FString>& AssetIds, FString& OutError)
     {
@@ -28,7 +34,7 @@ namespace
             for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : Value->AsObject()->Values)
             {
                 const FString ChildPath = FieldPath + TEXT(".") + Field.Key;
-                if (Field.Key == TEXT("id") || Field.Key.EndsWith(TEXT("Id"), ESearchCase::CaseSensitive))
+                if (IsAssetReferenceField(Field.Key))
                 {
                     if (!Field.Value.IsValid() || Field.Value->Type != EJson::String)
                     {
@@ -240,8 +246,8 @@ bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>
     FString Json;
     const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Json);
     Writer->WriteObjectStart();
-    Writer->WriteValue(TEXT("schemaVersion"), 1);
-    Writer->WriteValue(TEXT("exporterVersion"), TEXT("1.0.0"));
+    Writer->WriteValue(TEXT("schemaVersion"), 2);
+    Writer->WriteValue(TEXT("exporterVersion"), TEXT("2.0.0"));
     Writer->WriteValue(TEXT("sourceEngineVersion"), FEngineVersion::Current().ToString());
     Writer->WriteValue(TEXT("sourceProjectId"), FApp::GetProjectName());
     Writer->WriteValue(TEXT("sourceContentRoot"), TEXT("/Game/AdvancedLocomotionV4"));

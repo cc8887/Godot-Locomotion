@@ -1,10 +1,14 @@
 #include "AlsAnimationMetadataReader.h"
 
+#include "AlsNotifyClassRegistry.h"
 #include "AlsStableAssetId.h"
 #include "Animation/AnimData/IAnimationDataModel.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimNotifies/AnimNotify_ResetDynamics.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimCurveTypes.h"
 #include "Animation/Skeleton.h"
+#include "Misc/SecureHash.h"
 #include "ReferenceSkeleton.h"
 
 #include <limits>
@@ -14,6 +18,78 @@ namespace
     constexpr TCHAR CanonicalRotationYawCurveName[] = TEXT("RotationYawSpeedRadiansPerSecond");
     constexpr TCHAR CanonicalRotationYawKind[] = TEXT("RotationYawSpeedRadiansPerSecond");
     constexpr double CanonicalYawDurationToleranceSeconds = 1e-4;
+
+    FString CreateTimelineSha1(const FString& Value)
+    {
+        const FTCHARToUTF8 Utf8(*Value);
+        uint8 Hash[FSHA1::DigestSize];
+        FSHA1::HashBuffer(Utf8.Get(), Utf8.Length(), Hash);
+        FString Result = BytesToHex(Hash, UE_ARRAY_COUNT(Hash));
+        Result.ToLowerInline();
+        return Result;
+    }
+
+    bool TimelineEntryLess(const FAlsExportedTimelineEntry& Left, const FAlsExportedTimelineEntry& Right)
+    {
+        if (Left.TimeSeconds != Right.TimeSeconds)
+        {
+            return Left.TimeSeconds < Right.TimeSeconds;
+        }
+        if (Left.SourceIndex != Right.SourceIndex)
+        {
+            return Left.SourceIndex < Right.SourceIndex;
+        }
+        if (Left.TrackIndex != Right.TrackIndex)
+        {
+            return Left.TrackIndex < Right.TrackIndex;
+        }
+        return Left.StableEventId.Compare(Right.StableEventId, ESearchCase::CaseSensitive) < 0;
+    }
+
+    bool SyncMarkerLess(const FAlsExportedSyncMarker& Left, const FAlsExportedSyncMarker& Right)
+    {
+        if (Left.TimeSeconds != Right.TimeSeconds)
+        {
+            return Left.TimeSeconds < Right.TimeSeconds;
+        }
+        if (Left.SourceIndex != Right.SourceIndex)
+        {
+            return Left.SourceIndex < Right.SourceIndex;
+        }
+        if (Left.TrackIndex != Right.TrackIndex)
+        {
+            return Left.TrackIndex < Right.TrackIndex;
+        }
+        return Left.StableMarkerId.Compare(Right.StableMarkerId, ESearchCase::CaseSensitive) < 0;
+    }
+
+    TSharedRef<FJsonObject> TimelineEntryToJson(const FAlsExportedTimelineEntry& Entry)
+    {
+        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        Value->SetStringField(TEXT("stableEventId"), Entry.StableEventId);
+        Value->SetStringField(TEXT("kind"), Entry.Kind);
+        Value->SetStringField(TEXT("sourceClassPath"), Entry.SourceClassPath);
+        Value->SetStringField(TEXT("displayName"), Entry.DisplayName);
+        Value->SetNumberField(TEXT("timeSeconds"), Entry.TimeSeconds);
+        Value->SetNumberField(TEXT("durationSeconds"), Entry.DurationSeconds);
+        Value->SetNumberField(TEXT("triggerWeightThreshold"), Entry.TriggerWeightThreshold);
+        Value->SetStringField(TEXT("tickMode"), Entry.TickMode);
+        Value->SetNumberField(TEXT("sourceIndex"), Entry.SourceIndex);
+        Value->SetNumberField(TEXT("trackIndex"), Entry.TrackIndex);
+        Value->SetObjectField(TEXT("payload"), Entry.Payload);
+        return Value;
+    }
+
+    TSharedRef<FJsonObject> SyncMarkerToJson(const FAlsExportedSyncMarker& Marker)
+    {
+        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        Value->SetStringField(TEXT("stableMarkerId"), Marker.StableMarkerId);
+        Value->SetStringField(TEXT("name"), Marker.Name);
+        Value->SetNumberField(TEXT("timeSeconds"), Marker.TimeSeconds);
+        Value->SetNumberField(TEXT("sourceIndex"), Marker.SourceIndex);
+        Value->SetNumberField(TEXT("trackIndex"), Marker.TrackIndex);
+        return Value;
+    }
 
     bool FailCanonicalYawDuration(const FString& SequencePath, const FFrameRate& FrameRate, const int32 KeyCount,
         const double SequenceDuration, const double DataModelDuration, const double ComputedLastTime,
@@ -448,33 +524,143 @@ bool FAlsAnimationMetadataReader::Read(const FAlsExportAsset& Asset, TSharedRef<
         OutMetadata->SetStringField(TEXT("canonicalRotationYawProfileSignProvenance"), TEXT("runtime_profile_sign_pending"));
     }
 
-    TArray<TSharedPtr<FJsonValue>> Notifies;
-    for (int32 NotifyIndex = 0; NotifyIndex < Sequence->Notifies.Num(); ++NotifyIndex)
-    {
-        const FAnimNotifyEvent& Notify = Sequence->Notifies[NotifyIndex];
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
-        Value->SetStringField(TEXT("name"), Notify.GetNotifyEventName().ToString());
-        Value->SetNumberField(TEXT("time"), Notify.GetTime());
-        Value->SetNumberField(TEXT("duration"), Notify.GetDuration());
-        Value->SetNumberField(TEXT("sourceIndex"), NotifyIndex);
-        Notifies.Add(MakeShared<FJsonValueObject>(Value));
-    }
-    OutMetadata->SetArrayField(TEXT("notifies"), Notifies);
+    return ReadTimeline(*Sequence, Asset.Id, OutMetadata, OutError);
+}
 
-    TArray<FAnimSyncMarker> Markers = Sequence->AuthoredSyncMarkers;
-    Markers.Sort([](const FAnimSyncMarker& Left, const FAnimSyncMarker& Right)
+bool FAlsAnimationMetadataReader::ReadTimeline(const UAnimSequenceBase& Sequence, const FString& AssetStableId,
+    TSharedRef<FJsonObject>& OutMetadata, FString& OutError)
+{
+    TArray<FAlsExportedTimelineEntry> Entries;
+    TSet<int32> SourceIndices;
+    TSet<FString> StableEventIds;
+    for (int32 SourceIndex = 0; SourceIndex < Sequence.Notifies.Num(); ++SourceIndex)
     {
-        return Left.Time == Right.Time ? Left.MarkerName.LexicalLess(Right.MarkerName) : Left.Time < Right.Time;
-    });
+        if (SourceIndices.Contains(SourceIndex))
+        {
+            OutError = FString::Printf(TEXT("Duplicate notify source index: asset=%s sourceIndex=%d."),
+                *AssetStableId, SourceIndex);
+            return false;
+        }
+        SourceIndices.Add(SourceIndex);
+        FAlsExportedTimelineEntry Entry;
+        if (!FAlsNotifyClassRegistry::Export(Sequence.Notifies[SourceIndex], AssetStableId,
+            SourceIndex, Entry, OutError))
+        {
+            return false;
+        }
+        if (StableEventIds.Contains(Entry.StableEventId))
+        {
+            OutError = FString::Printf(TEXT("Duplicate notify stable ID: asset=%s sourceIndex=%d id=%s."),
+                *AssetStableId, SourceIndex, *Entry.StableEventId);
+            return false;
+        }
+        StableEventIds.Add(Entry.StableEventId);
+        Entries.Add(MoveTemp(Entry));
+    }
+    Entries.Sort(TimelineEntryLess);
+    TArray<TSharedPtr<FJsonValue>> Timeline;
+    Timeline.Reserve(Entries.Num());
+    for (const FAlsExportedTimelineEntry& Entry : Entries)
+    {
+        Timeline.Add(MakeShared<FJsonValueObject>(TimelineEntryToJson(Entry)));
+    }
+    OutMetadata->SetArrayField(TEXT("timeline"), Timeline);
+
+    TArray<FAnimSyncMarker> AuthoredMarkers;
+    if (const UAnimSequence* AnimationSequence = Cast<UAnimSequence>(&Sequence))
+    {
+        AuthoredMarkers = AnimationSequence->AuthoredSyncMarkers;
+    }
+    else if (const UAnimMontage* Montage = Cast<UAnimMontage>(&Sequence))
+    {
+        AuthoredMarkers = Montage->MarkerData.AuthoredSyncMarkers;
+    }
+
+    TArray<FAlsExportedSyncMarker> Markers;
+    TSet<int32> MarkerSourceIndices;
+    TSet<FString> StableMarkerIds;
+    for (int32 SourceIndex = 0; SourceIndex < AuthoredMarkers.Num(); ++SourceIndex)
+    {
+        const FAnimSyncMarker& AuthoredMarker = AuthoredMarkers[SourceIndex];
+        FAlsExportedSyncMarker Marker;
+        Marker.Name = AuthoredMarker.MarkerName.ToString();
+        Marker.TimeSeconds = AuthoredMarker.Time;
+        Marker.SourceIndex = SourceIndex;
+#if WITH_EDITORONLY_DATA
+        Marker.TrackIndex = AuthoredMarker.TrackIndex;
+#else
+        Marker.TrackIndex = 0;
+#endif
+        if (MarkerSourceIndices.Contains(SourceIndex) || Marker.Name.IsEmpty() || Marker.Name == TEXT("None") ||
+            !FMath::IsFinite(Marker.TimeSeconds) || Marker.TimeSeconds < 0.0 || Marker.TrackIndex < 0)
+        {
+            OutError = FString::Printf(TEXT("Invalid sync marker: asset=%s sourceIndex=%d name=%s time=%.17g track=%d."),
+                *AssetStableId, SourceIndex, *Marker.Name, Marker.TimeSeconds, Marker.TrackIndex);
+            return false;
+        }
+        MarkerSourceIndices.Add(SourceIndex);
+        Marker.StableMarkerId = CreateTimelineSha1(FString::Printf(TEXT("%s|marker|%d|%s"),
+            *AssetStableId, SourceIndex, *Marker.Name));
+        if (StableMarkerIds.Contains(Marker.StableMarkerId))
+        {
+            OutError = FString::Printf(TEXT("Duplicate sync marker stable ID: asset=%s sourceIndex=%d id=%s."),
+                *AssetStableId, SourceIndex, *Marker.StableMarkerId);
+            return false;
+        }
+        StableMarkerIds.Add(Marker.StableMarkerId);
+        Markers.Add(MoveTemp(Marker));
+    }
+    Markers.Sort(SyncMarkerLess);
     TArray<TSharedPtr<FJsonValue>> SyncMarkers;
-    for (const FAnimSyncMarker& Marker : Markers)
+    SyncMarkers.Reserve(Markers.Num());
+    for (const FAlsExportedSyncMarker& Marker : Markers)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
-        Value->SetStringField(TEXT("name"), Marker.MarkerName.ToString());
-        Value->SetNumberField(TEXT("time"), Marker.Time);
-        SyncMarkers.Add(MakeShared<FJsonValueObject>(Value));
+        SyncMarkers.Add(MakeShared<FJsonValueObject>(SyncMarkerToJson(Marker)));
     }
     OutMetadata->SetArrayField(TEXT("syncMarkers"), SyncMarkers);
+    return true;
+}
+
+bool FAlsAnimationMetadataReader::RunTimelineSelfTest(int32& OutCaseCount, FString& OutError)
+{
+    OutCaseCount = 0;
+    OutError.Reset();
+    UAnimNotify_ResetDynamics* NotifyObject = NewObject<UAnimNotify_ResetDynamics>();
+    if (!NotifyObject)
+    {
+        OutError = TEXT("Unable to construct timeline self-test notify.");
+        return false;
+    }
+
+    FAnimNotifyEvent NotifyEvent;
+    NotifyEvent.Notify = NotifyObject;
+    NotifyEvent.NotifyName = TEXT("TimelineSelfTest");
+    NotifyEvent.SetTime(0.25f);
+    NotifyEvent.TriggerWeightThreshold = 0.5f;
+    NotifyEvent.TrackIndex = 2;
+    const FString AssetStableId = TEXT("timeline-self-test-asset");
+    for (const EMontageNotifyTickType::Type TickMode :
+        {EMontageNotifyTickType::Queued, EMontageNotifyTickType::BranchingPoint})
+    {
+        NotifyEvent.MontageTickType = TickMode;
+        FAlsExportedTimelineEntry Entry;
+        if (!FAlsNotifyClassRegistry::Export(NotifyEvent, AssetStableId, OutCaseCount, Entry, OutError))
+        {
+            return false;
+        }
+        const FString ExpectedTickMode = TickMode == EMontageNotifyTickType::Queued
+            ? TEXT("Queued")
+            : TEXT("BranchingPoint");
+        if (Entry.TickMode != ExpectedTickMode || Entry.Kind != TEXT("Generic") ||
+            Entry.StableEventId.Len() != FSHA1::DigestSize * 2 || !Entry.Payload.IsValid() || Entry.Payload->Values.Num() != 0)
+        {
+            OutError = FString::Printf(TEXT("Timeline self-test mismatch: case=%d tick=%s kind=%s id=%s payloadFields=%d."),
+                OutCaseCount, *Entry.TickMode, *Entry.Kind, *Entry.StableEventId,
+                Entry.Payload.IsValid() ? Entry.Payload->Values.Num() : INDEX_NONE);
+            return false;
+        }
+        ++OutCaseCount;
+    }
     return true;
 }
 
