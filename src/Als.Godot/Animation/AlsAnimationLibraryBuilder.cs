@@ -87,7 +87,11 @@ public static class AlsAnimationLibraryBuilder
     {
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
-        return BuildInternal(animationSet, profile, profile.AllAnimationIds);
+        return BuildInternal(
+            animationSet,
+            profile,
+            profile.AllAnimationIds,
+            normalizedTrackDomainAnimationIds: null);
     }
 
     public static AlsAnimationLibraryBuildResult Build(
@@ -98,16 +102,26 @@ public static class AlsAnimationLibraryBuilder
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(poseProfile);
+        var animationIds = BuildP4AnimationClosure(animationSet, profile, poseProfile);
+        HashSet<int> normalizedTrackDomainAnimationIds =
+        [
+            poseProfile.Aim.AdditiveBasePoseAnimationId,
+            poseProfile.Aim.DownAnimationId,
+            poseProfile.Aim.ForwardAnimationId,
+            poseProfile.Aim.UpAnimationId,
+        ];
         return BuildInternal(
             animationSet,
             profile,
-            BuildP4AnimationClosure(animationSet, profile, poseProfile));
+            animationIds,
+            normalizedTrackDomainAnimationIds);
     }
 
     private static AlsAnimationLibraryBuildResult BuildInternal(
         AlsAnimationSetDefinition animationSet,
         AlsLocomotionAnimationProfile profile,
-        IReadOnlyList<int> animationIds)
+        IReadOnlyList<int> animationIds,
+        IReadOnlySet<int>? normalizedTrackDomainAnimationIds)
     {
         using var importedAnimationName = new StringName(ImportedAnimationName);
         var mannequin = GetMannequin(animationSet, profile);
@@ -156,7 +170,10 @@ public static class AlsAnimationLibraryBuilder
                 }
 
                 using var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
-                NormalizeTrackDomains(boundAnimation);
+                if (normalizedTrackDomainAnimationIds?.Contains(animationId) == true)
+                {
+                    NormalizeTrackDomains(boundAnimation);
+                }
                 AlsAnimationBinder.RewriteTrackPaths(
                     targetRoot, targetSkeleton, boundAnimation, clip.Name);
                 StringName? animationName = new($"clip_{animationId}");
