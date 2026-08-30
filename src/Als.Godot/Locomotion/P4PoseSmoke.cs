@@ -12,6 +12,7 @@ public partial class P4PoseSmoke : Node
 {
     private const string P3ProfilePath = "res://assets/config/p3_locomotion_profile.json";
     private const string P4ProfilePath = "res://assets/config/p4_pose_profile.json";
+    private const string ImportedAnimationName = "Unreal Take";
     private const double DeltaTime = 1.0 / 60.0;
 
     private static readonly string[] ProtectedBoneNames =
@@ -67,6 +68,8 @@ public partial class P4PoseSmoke : Node
 
         using var library = AlsAnimationLibraryBuilder.Build(
             definition, locomotionProfile, poseProfile);
+        VerifyAnimationLibraryNormalizationScope(
+            definition, locomotionProfile, poseProfile, library);
         AddChild(library.Root);
         using var graph = AlsLocomotionGraphBuilder.Build(
             library, locomotionProfile, poseProfile, definition);
@@ -883,6 +886,199 @@ public partial class P4PoseSmoke : Node
             $"length={overLength.Length:R}");
         RequireManagedTrackRejected(
             overLength, overLengthTrack, "key time beyond clip length", "received an invalid key");
+    }
+
+    private static void VerifyAnimationLibraryNormalizationScope(
+        AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile,
+        AlsPoseAnimationProfile poseProfile,
+        AlsAnimationLibraryBuildResult p4Library)
+    {
+        foreach (var animationId in new[]
+        {
+            poseProfile.Aim.AdditiveBasePoseAnimationId,
+            poseProfile.Aim.DownAnimationId,
+            poseProfile.Aim.ForwardAnimationId,
+            poseProfile.Aim.UpAnimationId,
+        })
+        {
+            VerifyAimGuardNormalizationPreservesSamples(
+                definition.Animations[animationId], p4Library);
+        }
+
+        using var p3Library = AlsAnimationLibraryBuilder.Build(
+            definition, locomotionProfile);
+        VerifyNonAimClipUnchanged(
+            definition.Animations[locomotionProfile.StandingIdleAnimationId],
+            p3Library,
+            "ordinary P3 build StandingIdle");
+        VerifyNonAimClipUnchanged(
+            definition.Animations[locomotionProfile.CrouchingIdleAnimationId],
+            p4Library,
+            "P4 build P3 CrouchingIdle");
+        VerifyNonAimClipUnchanged(
+            definition.Animations[poseProfile.Turns[0].AnimationId],
+            p4Library,
+            "P4 build Turn");
+        VerifyNonAimClipUnchanged(
+            definition.Animations[poseProfile.Rotates[0].AnimationId],
+            p4Library,
+            "P4 build Rotate");
+    }
+
+    private static void VerifyAimGuardNormalizationPreservesSamples(
+        AlsAnimationDefinition definition,
+        AlsAnimationLibraryBuildResult library)
+    {
+        WithSourceAnimation(definition, source =>
+        {
+            var bound = GetBoundAnimation(library, definition.Id);
+            Require(source.Length == bound.Length &&
+                    source.GetTrackCount() == bound.GetTrackCount(),
+                $"Aim normalization changed clip identity: {definition.Name}");
+            var sourceGuardTracks = 0;
+            for (var trackIndex = 0; trackIndex < source.GetTrackCount(); trackIndex++)
+            {
+                var sourceKeyCount = source.TrackGetKeyCount(trackIndex);
+                if (sourceKeyCount > 0 &&
+                    source.TrackGetKeyTime(trackIndex, sourceKeyCount - 1) > source.Length)
+                {
+                    sourceGuardTracks++;
+                }
+                var boundKeyCount = bound.TrackGetKeyCount(trackIndex);
+                Require(boundKeyCount > 0 &&
+                        bound.TrackGetKeyTime(trackIndex, boundKeyCount - 1) <= bound.Length,
+                    $"Aim normalized track exceeds the clip domain: " +
+                    $"clip={definition.Name} track={trackIndex}");
+                VerifyTrackSamplesNear(
+                    source, bound, trackIndex, definition.Name, "Aim normalization");
+            }
+            Require(sourceGuardTracks > 0,
+                $"Aim normalization fixture has no imported guard key: {definition.Name}");
+        });
+    }
+
+    private static void VerifyNonAimClipUnchanged(
+        AlsAnimationDefinition definition,
+        AlsAnimationLibraryBuildResult library,
+        string label)
+    {
+        WithSourceAnimation(definition, source =>
+        {
+            var bound = GetBoundAnimation(library, definition.Id);
+            Require(source.Length == bound.Length &&
+                    source.GetTrackCount() == bound.GetTrackCount(),
+                $"{label} changed clip identity");
+            var sourceGuardTracks = 0;
+            for (var trackIndex = 0; trackIndex < source.GetTrackCount(); trackIndex++)
+            {
+                Require(source.TrackGetType(trackIndex) == bound.TrackGetType(trackIndex) &&
+                        source.TrackGetInterpolationType(trackIndex) ==
+                            bound.TrackGetInterpolationType(trackIndex) &&
+                        source.TrackGetInterpolationLoopWrap(trackIndex) ==
+                            bound.TrackGetInterpolationLoopWrap(trackIndex),
+                    $"{label} changed track contract: track={trackIndex}");
+                var sourceKeyCount = source.TrackGetKeyCount(trackIndex);
+                var boundKeyCount = bound.TrackGetKeyCount(trackIndex);
+                Require(sourceKeyCount == boundKeyCount,
+                    $"{label} changed guard-key topology: track={trackIndex} " +
+                    $"source={sourceKeyCount} bound={boundKeyCount}");
+                for (var keyIndex = 0; keyIndex < sourceKeyCount; keyIndex++)
+                {
+                    Require(source.TrackGetKeyTime(trackIndex, keyIndex) ==
+                            bound.TrackGetKeyTime(trackIndex, keyIndex) &&
+                            source.TrackGetKeyTransition(trackIndex, keyIndex) ==
+                            bound.TrackGetKeyTransition(trackIndex, keyIndex),
+                        $"{label} changed key topology: track={trackIndex} key={keyIndex}");
+                }
+                if (sourceKeyCount > 0 &&
+                    source.TrackGetKeyTime(trackIndex, sourceKeyCount - 1) > source.Length)
+                {
+                    sourceGuardTracks++;
+                }
+                VerifyTrackSamplesNear(source, bound, trackIndex, definition.Name, label);
+            }
+            Require(sourceGuardTracks > 0,
+                $"{label} fixture has no imported guard key");
+        });
+    }
+
+    private static void VerifyTrackSamplesNear(
+        Godot.Animation source,
+        Godot.Animation bound,
+        int trackIndex,
+        string clipName,
+        string label)
+    {
+        Require(source.TrackGetType(trackIndex) == bound.TrackGetType(trackIndex),
+            $"{label} changed track type: clip={clipName} track={trackIndex}");
+        foreach (var phase in new[] { 0.0, 0.137, 0.5, 0.999, 1.0 })
+        {
+            var time = source.Length * phase;
+            switch (source.TrackGetType(trackIndex))
+            {
+                case Godot.Animation.TrackType.Position3D:
+                    Require(source.PositionTrackInterpolate(trackIndex, time).DistanceTo(
+                            bound.PositionTrackInterpolate(trackIndex, time)) <= 1e-5f,
+                        $"{label} changed position sampling: " +
+                        $"clip={clipName} track={trackIndex} phase={phase:R}");
+                    break;
+                case Godot.Animation.TrackType.Rotation3D:
+                    var sourceRotation = source.RotationTrackInterpolate(trackIndex, time).Normalized();
+                    var boundRotation = bound.RotationTrackInterpolate(trackIndex, time).Normalized();
+                    Require(1f - MathF.Abs(sourceRotation.Dot(boundRotation)) <= 1e-5f,
+                        $"{label} changed rotation sampling: " +
+                        $"clip={clipName} track={trackIndex} phase={phase:R}");
+                    break;
+                case Godot.Animation.TrackType.Scale3D:
+                    Require(source.ScaleTrackInterpolate(trackIndex, time).DistanceTo(
+                            bound.ScaleTrackInterpolate(trackIndex, time)) <= 1e-5f,
+                        $"{label} changed scale sampling: " +
+                        $"clip={clipName} track={trackIndex} phase={phase:R}");
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"{label} fixture contains unsupported track type: " +
+                        $"clip={clipName} track={trackIndex}");
+            }
+        }
+    }
+
+    private static Godot.Animation GetBoundAnimation(
+        AlsAnimationLibraryBuildResult library,
+        int animationId)
+    {
+        Require(library.ClipNames.TryGetValue(animationId, out var clipName),
+            $"normalization-scope clip is missing: {animationId}");
+        return library.Library.GetAnimation(clipName)
+            ?? throw new InvalidOperationException(
+                $"normalization-scope animation is missing: {animationId}");
+    }
+
+    private static void WithSourceAnimation(
+        AlsAnimationDefinition definition,
+        Action<Godot.Animation> action)
+    {
+        using var scene = ResourceLoader.Load<PackedScene>(
+                AlsImportedResourceAuditor.ToResourcePath(definition.ResourcePath))
+            ?? throw new InvalidOperationException(
+                $"normalization-scope source scene is missing: {definition.Name}");
+        var root = scene.Instantiate();
+        try
+        {
+            var player = AlsImportedResourceAuditor.FindFirst<AnimationPlayer>(root)
+                ?? throw new InvalidOperationException(
+                    $"normalization-scope source player is missing: {definition.Name}");
+            using var importedName = new StringName(ImportedAnimationName);
+            using var animation = player.GetAnimation(importedName)
+                ?? throw new InvalidOperationException(
+                    $"normalization-scope source animation is missing: {definition.Name}");
+            action(animation);
+        }
+        finally
+        {
+            root.Free();
+        }
     }
 
     private static void RequireManagedTrackRejected(
