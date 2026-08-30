@@ -19,6 +19,8 @@ public partial class P4AnimationHarness : Node
 {
     private const string ProfilePath = "res://assets/config/p3_locomotion_profile.json";
     private const int MaximumPhysicsTicks = 1_800;
+    private const int StableTranslatingPlatformId = 1;
+    private const int StableRotatingPlatformId = 2;
     private const float LaneSpacing = 20f;
     private const float RegionSpacing = 16f;
 
@@ -32,6 +34,10 @@ public partial class P4AnimationHarness : Node
     private AlsP3Character[] _characters = [];
     private StaticBody3D[] _translatingPlatforms = [];
     private StaticBody3D[] _rotatingPlatforms = [];
+    private int[] _translatingPlatformIds = [];
+    private int[] _rotatingPlatformIds = [];
+    private long[] _translatingColliderIds = [];
+    private long[] _rotatingColliderIds = [];
     private long[] _lastObservedFrames = [];
     private long[] _warmupAdvances = [];
     private long[] _firstMeasurementFrames = [];
@@ -68,6 +74,10 @@ public partial class P4AnimationHarness : Node
             _characters = new AlsP3Character[_characterCount];
             _translatingPlatforms = new StaticBody3D[_characterCount];
             _rotatingPlatforms = new StaticBody3D[_characterCount];
+            _translatingPlatformIds = new int[_characterCount];
+            _rotatingPlatformIds = new int[_characterCount];
+            _translatingColliderIds = new long[_characterCount];
+            _rotatingColliderIds = new long[_characterCount];
             _lastObservedFrames = new long[_characterCount];
             _warmupAdvances = new long[_characterCount];
             _firstMeasurementFrames = new long[_characterCount];
@@ -278,13 +288,17 @@ public partial class P4AnimationHarness : Node
                     $"P4 character {index} measured commit order drifted at local frame {localFrame}.");
             }
 
-            AlsResultDigest.Append(ref _resultDigest, diagnostics.Result);
+            var digestResult = NormalizeResultForDigest(
+                diagnostics.Result,
+                diagnostics.FootPose,
+                index);
+            AlsResultDigest.Append(ref _resultDigest, digestResult);
             Append(ref _poseDigest, diagnostics.PoseDigest);
             Append(ref _fullPoseDigest, diagnostics.FullPoseDigest);
             Append(ref _rootDigest, diagnostics.RootDigest);
-            AppendAim(ref _aimDigest, diagnostics.Result);
-            AppendTurnRotate(ref _turnRotateDigest, diagnostics.Result);
-            AppendFeet(ref _feetDigest, diagnostics.Result, diagnostics.FootPose);
+            AppendAim(ref _aimDigest, digestResult);
+            AppendTurnRotate(ref _turnRotateDigest, digestResult);
+            AppendFeet(ref _feetDigest, digestResult, diagnostics.FootPose);
             _measuredCommits[index]++;
         }
     }
@@ -465,6 +479,17 @@ public partial class P4AnimationHarness : Node
                 new Vector3(laneX, 0f, -4f * RegionSpacing),
                 new Vector3(8f, 0.5f, 8f),
                 moving: true);
+            var translatingObjectId = _translatingPlatforms[index].GetInstanceId();
+            var rotatingObjectId = _rotatingPlatforms[index].GetInstanceId();
+            Require(translatingObjectId <= long.MaxValue && rotatingObjectId <= long.MaxValue,
+                $"P4 lane {index} moving platform object ID exceeded Int64.");
+            _translatingPlatformIds[index] = AlsCharacterMotor.CreatePlatformId(
+                translatingObjectId);
+            _rotatingPlatformIds[index] = AlsCharacterMotor.CreatePlatformId(
+                rotatingObjectId);
+            _translatingColliderIds[index] = (long)translatingObjectId;
+            _rotatingColliderIds[index] = (long)rotatingObjectId;
+            ValidateDigestPlatformCanonicalization(index);
             AddSurface($"BaseChangeStatic_{index}",
                 new Vector3(laneX, 0f, -5f * RegionSpacing),
                 new Vector3(8f, 0.5f, 8f));
@@ -645,6 +670,158 @@ public partial class P4AnimationHarness : Node
         Append(ref digest, result.SpineWeight);
         Append(ref digest, result.UpperBodyWeight);
         Append(ref digest, result.SpineResidualYaw);
+    }
+
+    private AlsFrameResult NormalizeResultForDigest(
+        in AlsFrameResult result,
+        in AlsP4FootPlacementPoseSnapshot pose,
+        int characterIndex)
+    {
+        var normalized = result;
+        var leftColliderId = ResolveFootColliderIdForDigest(
+            result.LeftFootPose,
+            pose.LeftGatherHit,
+            pose.LeftFootLock,
+            "left");
+        var rightColliderId = ResolveFootColliderIdForDigest(
+            result.RightFootPose,
+            pose.RightGatherHit,
+            pose.RightFootLock,
+            "right");
+        normalized.LeftFootPose = result.LeftFootPose with
+        {
+            PlatformId = CanonicalizePlatformIdForDigest(
+                result.LeftFootPose.PlatformId,
+                leftColliderId,
+                characterIndex),
+        };
+        normalized.RightFootPose = result.RightFootPose with
+        {
+            PlatformId = CanonicalizePlatformIdForDigest(
+                result.RightFootPose.PlatformId,
+                rightColliderId,
+                characterIndex),
+        };
+        return normalized;
+    }
+
+    private static long ResolveFootColliderIdForDigest(
+        in AlsFootPoseOutput output,
+        in AlsFootHit gatherHit,
+        in AlsFootLockState footLock,
+        string footName)
+    {
+        if (output.PlatformId == -1)
+        {
+            return -1;
+        }
+        if (footLock.Locked != 0 && footLock.Amount > 0f &&
+            footLock.PlatformId == output.PlatformId && footLock.ColliderId >= 0)
+        {
+            return footLock.ColliderId;
+        }
+        if (gatherHit.Valid == 1 && gatherHit.Walkable == 1 &&
+            gatherHit.PlatformId == output.PlatformId &&
+            gatherHit.ColliderId >= 0)
+        {
+            return gatherHit.ColliderId;
+        }
+
+        throw new InvalidOperationException(
+            $"Unknown P4 matrix {footName} foot platform provenance for ID {output.PlatformId}.");
+    }
+
+    private int CanonicalizePlatformIdForDigest(
+        int platformId,
+        long colliderId,
+        int characterIndex)
+    {
+        if (TryCanonicalizePlatformIdForDigest(
+                platformId,
+                colliderId,
+                characterIndex,
+                out var canonicalPlatformId))
+        {
+            return canonicalPlatformId;
+        }
+
+        throw new InvalidOperationException(
+            $"Unknown P4 matrix platform ID {platformId} / collider ID {colliderId} " +
+            $"for character {characterIndex}.");
+    }
+
+    private bool TryCanonicalizePlatformIdForDigest(
+        int platformId,
+        long colliderId,
+        int characterIndex,
+        out int canonicalPlatformId)
+    {
+        canonicalPlatformId = -1;
+        if ((uint)characterIndex >= (uint)_characterCount)
+        {
+            return false;
+        }
+        if (platformId == -1 && colliderId == -1)
+        {
+            return true;
+        }
+        if (platformId < 0 || colliderId < 0)
+        {
+            return false;
+        }
+
+        var laneOffset = checked(characterIndex * 2);
+        if (platformId == _translatingPlatformIds[characterIndex] &&
+            colliderId == _translatingColliderIds[characterIndex])
+        {
+            canonicalPlatformId = checked(laneOffset + StableTranslatingPlatformId);
+            return true;
+        }
+        if (platformId == _rotatingPlatformIds[characterIndex] &&
+            colliderId == _rotatingColliderIds[characterIndex])
+        {
+            canonicalPlatformId = checked(laneOffset + StableRotatingPlatformId);
+            return true;
+        }
+        return false;
+    }
+
+    private void ValidateDigestPlatformCanonicalization(int characterIndex)
+    {
+        Require(TryCanonicalizePlatformIdForDigest(
+                    -1, -1, characterIndex, out var noPlatformId) &&
+                noPlatformId == -1,
+            $"P4 lane {characterIndex} rejected the no-platform digest identity.");
+        Require(TryCanonicalizePlatformIdForDigest(
+                    _translatingPlatformIds[characterIndex],
+                    _translatingColliderIds[characterIndex],
+                    characterIndex,
+                    out var translatingId) &&
+                translatingId == checked(characterIndex * 2 + StableTranslatingPlatformId),
+            $"P4 lane {characterIndex} rejected translating platform digest identity.");
+        Require(TryCanonicalizePlatformIdForDigest(
+                    _rotatingPlatformIds[characterIndex],
+                    _rotatingColliderIds[characterIndex],
+                    characterIndex,
+                    out var rotatingId) &&
+                rotatingId == checked(characterIndex * 2 + StableRotatingPlatformId),
+            $"P4 lane {characterIndex} rejected rotating platform digest identity.");
+
+        var unknownColliderId = long.MaxValue;
+        while (unknownColliderId == _translatingColliderIds[characterIndex] ||
+               unknownColliderId == _rotatingColliderIds[characterIndex])
+        {
+            unknownColliderId--;
+        }
+        Require(!TryCanonicalizePlatformIdForDigest(
+                _translatingPlatformIds[characterIndex],
+                unknownColliderId,
+                characterIndex,
+                out _),
+            $"P4 lane {characterIndex} accepted mismatched platform provenance.");
+        Require(!TryCanonicalizePlatformIdForDigest(
+                -2, -1, characterIndex, out _),
+            $"P4 lane {characterIndex} accepted an invalid platform identity.");
     }
 
     private static void AppendTurnRotate(ref ulong digest, in AlsFrameResult result)

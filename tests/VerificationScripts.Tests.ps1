@@ -535,6 +535,27 @@ Describe 'P4 four-cell matrix output contract' {
         $context | Should Match 'WorkerP95'
         $context | Should Match 'TotalP99'
     }
+
+    It 'canonicalizes process-local platform ids before producing cross-process digests' {
+        $harnessPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P4AnimationHarness.cs'
+        $harness = [IO.File]::ReadAllText($harnessPath)
+
+        $harness | Should Match 'NormalizeResultForDigest'
+        $harness | Should Match 'CanonicalizePlatformIdForDigest'
+        $harness | Should Match 'TryCanonicalizePlatformIdForDigest'
+        $harness | Should Match 'ResolveFootColliderIdForDigest'
+        $harness | Should Match 'ValidateDigestPlatformCanonicalization'
+        $harness | Should Match 'Unknown P4 matrix platform ID'
+        $harness | Should Match 'StableTranslatingPlatformId'
+        $harness | Should Match 'StableRotatingPlatformId'
+        $harness | Should Match '_translatingColliderIds'
+        $harness | Should Match '_rotatingColliderIds'
+        $harness | Should Match 'accepted mismatched platform provenance'
+        $harness | Should Match '(?s)gatherHit\.Valid\s*==\s*1.*gatherHit\.Walkable\s*==\s*1'
+        $harness | Should Match '(?s)digestResult\s*=\s*NormalizeResultForDigest\(\s*diagnostics\.Result,\s*diagnostics\.FootPose,\s*index\).*AlsResultDigest\.Append\(ref _resultDigest, digestResult\).*AppendFeet\(ref _feetDigest, digestResult'
+        $harness | Should Match '(?s)platformId\s*==\s*_translatingPlatformIds\[characterIndex\].*colliderId\s*==\s*_translatingColliderIds\[characterIndex\]'
+        $harness | Should Match '(?s)platformId\s*==\s*_rotatingPlatformIds\[characterIndex\].*colliderId\s*==\s*_rotatingColliderIds\[characterIndex\]'
+    }
 }
 
 Describe 'P4 controlled matrix runner boundary' {
@@ -1033,12 +1054,12 @@ $lines | ForEach-Object { Write-Output $_ }
         $failureMessage = ''
         try {
             & $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot `
-                -P3InputTimeoutSeconds 1 | Out-Null
+                -P3InputTimeoutSeconds 3 | Out-Null
         }
         catch { $failed = $true; $failureMessage = $_.Exception.Message }
 
         $failed | Should Be $true
-        $failureMessage | Should Match 'P3 input smoke timed out after 1 second'
+        $failureMessage | Should Match 'P3 input smoke timed out after 3 seconds'
         @(Get-Content $script:DemoChildLog).Count | Should Be 1
     }
 
