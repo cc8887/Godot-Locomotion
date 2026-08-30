@@ -288,6 +288,26 @@ public sealed class AlsComponentPoseModifier : IDisposable
 
     internal int AimSampleBoneCount => _scratch.AimSampleCount;
 
+    internal static void ValidateManagedAimTrack(
+        Godot.Animation animation,
+        int trackIndex)
+    {
+        ArgumentNullException.ThrowIfNull(animation);
+        switch (animation.TrackGetType(trackIndex))
+        {
+            case Godot.Animation.TrackType.Position3D:
+            case Godot.Animation.TrackType.Scale3D:
+                _ = VectorTrack.Compile(animation, trackIndex);
+                break;
+            case Godot.Animation.TrackType.Rotation3D:
+                _ = RotationTrack.Compile(animation, trackIndex);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"P4 Aim track type is unsupported: {animation.TrackGetType(trackIndex)}");
+        }
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public bool TryApply(
         in AlsPoseModifierInput input,
@@ -873,15 +893,15 @@ public sealed class AlsComponentPoseModifier : IDisposable
         time = Math.Min(time, clip.Animation.Length);
         for (var boneId = 0; boneId < _scratch.BoneCount; boneId++)
         {
-            var position = clip.PositionTracks[boneId] >= 0
-                ? clip.Animation.PositionTrackInterpolate(clip.PositionTracks[boneId], time)
+            var position = clip.PositionTrackIds[boneId] >= 0
+                ? clip.Animation.PositionTrackInterpolate(clip.PositionTrackIds[boneId], time)
                 : _rests[boneId].Origin;
-            var rotation = clip.RotationTracks[boneId] >= 0
-                ? clip.Animation.RotationTrackInterpolate(clip.RotationTracks[boneId], time)
+            var rotation = clip.RotationTrackIds[boneId] >= 0
+                ? clip.Animation.RotationTrackInterpolate(clip.RotationTrackIds[boneId], time)
                 : _rests[boneId].Basis.Orthonormalized()
                     .GetRotationQuaternion().Normalized();
-            var scale = clip.ScaleTracks[boneId] >= 0
-                ? clip.Animation.ScaleTrackInterpolate(clip.ScaleTracks[boneId], time)
+            var scale = clip.ScaleTrackIds[boneId] >= 0
+                ? clip.Animation.ScaleTrackInterpolate(clip.ScaleTrackIds[boneId], time)
                 : _rests[boneId].Basis.Scale;
             if (!IsFinite(position) || !IsFinite(rotation) || !IsFinite(scale) ||
                 rotation.LengthSquared() <= 1e-12f)
@@ -913,15 +933,15 @@ public sealed class AlsComponentPoseModifier : IDisposable
         for (var index = 0; index < _scratch.AimSampleCount; index++)
         {
             var boneId = _scratch.AimSampleOrder[index];
-            var position = clip.PositionTracks[boneId] >= 0
-                ? clip.Animation.PositionTrackInterpolate(clip.PositionTracks[boneId], time)
+            var position = clip.PositionTracks[boneId].IsBound
+                ? clip.PositionTracks[boneId].Sample(time)
                 : _rests[boneId].Origin;
-            var rotation = clip.RotationTracks[boneId] >= 0
-                ? clip.Animation.RotationTrackInterpolate(clip.RotationTracks[boneId], time)
+            var rotation = clip.RotationTracks[boneId].IsBound
+                ? clip.RotationTracks[boneId].Sample(time)
                 : _rests[boneId].Basis.Orthonormalized()
                     .GetRotationQuaternion().Normalized();
-            var scale = clip.ScaleTracks[boneId] >= 0
-                ? clip.Animation.ScaleTrackInterpolate(clip.ScaleTracks[boneId], time)
+            var scale = clip.ScaleTracks[boneId].IsBound
+                ? clip.ScaleTracks[boneId].Sample(time)
                 : _rests[boneId].Basis.Scale;
             if (!IsFinite(position) || !IsFinite(rotation) || !IsFinite(scale) ||
                 rotation.LengthSquared() <= 1e-12f)
@@ -984,18 +1004,6 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 input.AimDownWeight,
                 input.AimForwardWeight,
                 input.AimUpWeight);
-            var aimLocal = BlendAim(
-                _scratch.DownLocalPose[boneId],
-                _scratch.ForwardLocalPose[boneId],
-                _scratch.UpLocalPose[boneId],
-                input.AimDownWeight,
-                input.AimForwardWeight,
-                input.AimUpWeight);
-            if (!IsAffineInvertible(aimComponent) || !IsAffineInvertible(aimLocal))
-            {
-                return false;
-            }
-
             var weight = _weightKinds[boneId] switch
             {
                 WeightHead => input.HeadWeight,
@@ -1003,34 +1011,54 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 WeightArm or WeightHand => input.UpperBodyWeight,
                 _ => 0f,
             };
-            if (!TryComposeLocalResultFromInverse(
-                    in _scratch.LocalPose[boneId],
-                    in _baseLocalInverses[boneId],
-                    in aimLocal,
-                    weight,
-                    out var localResult))
+            var componentDelta = aimComponent * _baseComponentInverses[boneId];
+            if (!IsAffineInvertible(componentDelta))
             {
                 return false;
             }
-            var componentDelta = aimComponent * _baseComponentInverses[boneId];
             Transform3D resultComponent;
             if (_weightKinds[boneId] is WeightArm or WeightHand)
             {
-                var fullLocalComponent = parentComponent * localResult;
                 var fullMeshComponent = Transform3D.Identity.InterpolateWith(
                         componentDelta,
                         weight) *
                     _scratch.OriginalComponentPose[boneId];
-                resultComponent = fullLocalComponent.InterpolateWith(
-                    fullMeshComponent,
-                    armMeshWeight);
+                if (armMeshWeight >= 1f)
+                {
+                    resultComponent = fullMeshComponent;
+                }
+                else
+                {
+                    var aimLocal = BlendAim(
+                        _scratch.DownLocalPose[boneId],
+                        _scratch.ForwardLocalPose[boneId],
+                        _scratch.UpLocalPose[boneId],
+                        input.AimDownWeight,
+                        input.AimForwardWeight,
+                        input.AimUpWeight);
+                    if (!TryComposeLocalResultFromInverse(
+                            in _scratch.LocalPose[boneId],
+                            in _baseLocalInverses[boneId],
+                            in aimLocal,
+                            weight,
+                            out var localResult))
+                    {
+                        return false;
+                    }
+                    var fullLocalComponent = parentComponent * localResult;
+                    resultComponent = armMeshWeight <= 0f
+                        ? fullLocalComponent
+                        : fullLocalComponent.InterpolateWith(
+                            fullMeshComponent,
+                            armMeshWeight);
+                }
             }
             else
             {
                 resultComponent = Transform3D.Identity.InterpolateWith(componentDelta, weight) *
                     _scratch.OriginalComponentPose[boneId];
             }
-            if (!IsAffineInvertible(componentDelta) || !IsAffineInvertible(resultComponent))
+            if (!IsAffineInvertible(resultComponent))
             {
                 return false;
             }
@@ -1874,12 +1902,15 @@ public sealed class AlsComponentPoseModifier : IDisposable
         public ClipBinding(Godot.Animation animation, Skeleton3D skeleton, int boneCount)
         {
             Animation = animation;
-            PositionTracks = new int[boneCount];
-            RotationTracks = new int[boneCount];
-            ScaleTracks = new int[boneCount];
-            Array.Fill(PositionTracks, -1);
-            Array.Fill(RotationTracks, -1);
-            Array.Fill(ScaleTracks, -1);
+            PositionTrackIds = new int[boneCount];
+            RotationTrackIds = new int[boneCount];
+            ScaleTrackIds = new int[boneCount];
+            PositionTracks = new VectorTrack[boneCount];
+            RotationTracks = new RotationTrack[boneCount];
+            ScaleTracks = new VectorTrack[boneCount];
+            Array.Fill(PositionTrackIds, -1);
+            Array.Fill(RotationTrackIds, -1);
+            Array.Fill(ScaleTrackIds, -1);
             for (var trackIndex = 0; trackIndex < animation.GetTrackCount(); trackIndex++)
             {
                 using var path = animation.TrackGetPath(trackIndex);
@@ -1894,11 +1925,12 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 {
                     throw new InvalidOperationException($"P4 Aim track bone is absent: {pathText}");
                 }
-                var destination = animation.TrackGetType(trackIndex) switch
+                var trackType = animation.TrackGetType(trackIndex);
+                var destination = trackType switch
                 {
-                    Godot.Animation.TrackType.Position3D => PositionTracks,
-                    Godot.Animation.TrackType.Rotation3D => RotationTracks,
-                    Godot.Animation.TrackType.Scale3D => ScaleTracks,
+                    Godot.Animation.TrackType.Position3D => PositionTrackIds,
+                    Godot.Animation.TrackType.Rotation3D => RotationTrackIds,
+                    Godot.Animation.TrackType.Scale3D => ScaleTrackIds,
                     var type => throw new InvalidOperationException(
                         $"P4 Aim track type is unsupported: {type}"),
                 };
@@ -1908,17 +1940,294 @@ public sealed class AlsComponentPoseModifier : IDisposable
                         $"P4 Aim clip duplicates a bone track: bone={boneId} type={animation.TrackGetType(trackIndex)}");
                 }
                 destination[boneId] = trackIndex;
+                switch (trackType)
+                {
+                    case Godot.Animation.TrackType.Position3D:
+                        PositionTracks[boneId] = VectorTrack.Compile(animation, trackIndex);
+                        break;
+                    case Godot.Animation.TrackType.Rotation3D:
+                        RotationTracks[boneId] = RotationTrack.Compile(animation, trackIndex);
+                        break;
+                    case Godot.Animation.TrackType.Scale3D:
+                        ScaleTracks[boneId] = VectorTrack.Compile(animation, trackIndex);
+                        break;
+                }
             }
         }
 
         public Godot.Animation Animation { get; }
 
-        public int[] PositionTracks { get; }
+        public int[] PositionTrackIds { get; }
 
-        public int[] RotationTracks { get; }
+        public int[] RotationTrackIds { get; }
 
-        public int[] ScaleTracks { get; }
+        public int[] ScaleTrackIds { get; }
+
+        public VectorTrack[] PositionTracks { get; }
+
+        public RotationTrack[] RotationTracks { get; }
+
+        public VectorTrack[] ScaleTracks { get; }
 
         public void Dispose() => Animation.Dispose();
+    }
+
+    private readonly struct VectorTrack
+    {
+        private readonly double[]? _times;
+        private readonly Vector3[]? _values;
+
+        private VectorTrack(double[] times, Vector3[] values)
+        {
+            _times = times;
+            _values = values;
+        }
+
+        public bool IsBound => _times is not null;
+
+        public static VectorTrack Compile(Godot.Animation animation, int trackIndex)
+        {
+            ValidateTrack(animation, trackIndex);
+            var count = animation.TrackGetKeyCount(trackIndex);
+            var times = new double[count];
+            var values = new Vector3[count];
+            for (var index = 0; index < count; index++)
+            {
+                times[index] = animation.TrackGetKeyTime(trackIndex, index);
+                using var value = animation.TrackGetKeyValue(trackIndex, index);
+                values[index] = value.AsVector3();
+                ValidateKey(animation, trackIndex, index, times[index], IsFinite(values[index]));
+            }
+            ValidateCoverage(animation, trackIndex, times);
+            var compiled = new VectorTrack(times, values);
+            compiled.ValidateParity(animation, trackIndex);
+            return compiled;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Vector3 Sample(double time)
+        {
+            var times = _times!;
+            var values = _values!;
+            var upper = FindUpperBound(times, time);
+            if (upper <= 0)
+            {
+                return values[0];
+            }
+            if (upper >= times.Length)
+            {
+                return values[^1];
+            }
+            var lower = upper - 1;
+            var alpha = (float)((time - times[lower]) /
+                (times[upper] - times[lower]));
+            return values[lower].Lerp(values[upper], alpha);
+        }
+
+        private void ValidateParity(Godot.Animation animation, int trackIndex)
+        {
+            var compiledTrack = this;
+            var times = _times!;
+            for (var index = 0; index < times.Length; index++)
+            {
+                ValidateSample(times[index]);
+                if (index > 0)
+                {
+                    ValidateSample(Math.Max(
+                        times[index - 1],
+                        times[index] - Math.Min(1e-7, (times[index] - times[index - 1]) * 0.25)));
+                }
+                if (index + 1 < times.Length)
+                {
+                    ValidateSample(Math.Min(
+                        times[index + 1],
+                        times[index] + Math.Min(1e-7, (times[index + 1] - times[index]) * 0.25)));
+                }
+            }
+            ValidateSample(0.0);
+            ValidateSample(animation.Length);
+
+            void ValidateSample(double time)
+            {
+                var expected = animation.TrackGetType(trackIndex) ==
+                        Godot.Animation.TrackType.Position3D
+                    ? animation.PositionTrackInterpolate(trackIndex, time)
+                    : animation.ScaleTrackInterpolate(trackIndex, time);
+                var actual = compiledTrack.Sample(time);
+                if (!IsFinite(expected) || !IsFinite(actual) ||
+                    expected.DistanceTo(actual) > 1e-5f)
+                {
+                    throw new InvalidOperationException(
+                        $"P4 Aim managed vector sampler diverged from Godot: " +
+                        $"track={trackIndex} time={time:R}");
+                }
+            }
+        }
+    }
+
+    private readonly struct RotationTrack
+    {
+        private readonly double[]? _times;
+        private readonly Quaternion[]? _values;
+
+        private RotationTrack(double[] times, Quaternion[] values)
+        {
+            _times = times;
+            _values = values;
+        }
+
+        public bool IsBound => _times is not null;
+
+        public static RotationTrack Compile(Godot.Animation animation, int trackIndex)
+        {
+            ValidateTrack(animation, trackIndex);
+            var count = animation.TrackGetKeyCount(trackIndex);
+            var times = new double[count];
+            var values = new Quaternion[count];
+            for (var index = 0; index < count; index++)
+            {
+                times[index] = animation.TrackGetKeyTime(trackIndex, index);
+                using var value = animation.TrackGetKeyValue(trackIndex, index);
+                values[index] = value.AsQuaternion();
+                ValidateKey(
+                    animation,
+                    trackIndex,
+                    index,
+                    times[index],
+                    IsFinite(values[index]) && values[index].LengthSquared() > 1e-12f);
+            }
+            ValidateCoverage(animation, trackIndex, times);
+            var compiled = new RotationTrack(times, values);
+            compiled.ValidateParity(animation, trackIndex);
+            return compiled;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Quaternion Sample(double time)
+        {
+            var times = _times!;
+            var values = _values!;
+            var upper = FindUpperBound(times, time);
+            if (upper <= 0)
+            {
+                return values[0];
+            }
+            if (upper >= times.Length)
+            {
+                return values[^1];
+            }
+            var lower = upper - 1;
+            var alpha = (float)((time - times[lower]) /
+                (times[upper] - times[lower]));
+            return values[lower].Slerp(values[upper], alpha);
+        }
+
+        private void ValidateParity(Godot.Animation animation, int trackIndex)
+        {
+            var compiledTrack = this;
+            var times = _times!;
+            for (var index = 0; index < times.Length; index++)
+            {
+                ValidateSample(times[index]);
+                if (index > 0)
+                {
+                    ValidateSample(Math.Max(
+                        times[index - 1],
+                        times[index] - Math.Min(1e-7, (times[index] - times[index - 1]) * 0.25)));
+                }
+                if (index + 1 < times.Length)
+                {
+                    ValidateSample(Math.Min(
+                        times[index + 1],
+                        times[index] + Math.Min(1e-7, (times[index + 1] - times[index]) * 0.25)));
+                }
+            }
+            ValidateSample(0.0);
+            ValidateSample(animation.Length);
+
+            void ValidateSample(double time)
+            {
+                var expected = animation.RotationTrackInterpolate(trackIndex, time).Normalized();
+                var actual = compiledTrack.Sample(time).Normalized();
+                var dot = expected.Dot(actual);
+                if (dot < 0f)
+                {
+                    actual = new Quaternion(-actual.X, -actual.Y, -actual.Z, -actual.W);
+                }
+                var difference = new Vector4(
+                    expected.X - actual.X,
+                    expected.Y - actual.Y,
+                    expected.Z - actual.Z,
+                    expected.W - actual.W);
+                if (!IsFinite(expected) || !IsFinite(actual) ||
+                    difference.Length() > 1e-5f)
+                {
+                    throw new InvalidOperationException(
+                        $"P4 Aim managed rotation sampler diverged from Godot: " +
+                        $"track={trackIndex} time={time:R}");
+                }
+            }
+        }
+    }
+
+    private static void ValidateTrack(Godot.Animation animation, int trackIndex)
+    {
+        if (animation.TrackGetInterpolationType(trackIndex) !=
+                Godot.Animation.InterpolationType.Linear ||
+            !animation.TrackGetInterpolationLoopWrap(trackIndex) ||
+            animation.TrackGetKeyCount(trackIndex) <= 0 ||
+            !double.IsFinite(animation.Length) ||
+            animation.Length <= 0.0)
+        {
+            throw new InvalidOperationException(
+                $"P4 Aim managed sampler requires a linear, loop-wrapped, non-empty track: {trackIndex}");
+        }
+    }
+
+    private static void ValidateKey(
+        Godot.Animation animation,
+        int trackIndex,
+        int keyIndex,
+        double time,
+        bool valueIsValid)
+    {
+        if (!double.IsFinite(time) || !valueIsValid ||
+            (keyIndex > 0 && time <= animation.TrackGetKeyTime(trackIndex, keyIndex - 1)))
+        {
+            throw new InvalidOperationException(
+                $"P4 Aim managed sampler received an invalid key: track={trackIndex} key={keyIndex}");
+        }
+    }
+
+    private static void ValidateCoverage(
+        Godot.Animation animation,
+        int trackIndex,
+        double[] times)
+    {
+        if (times[0] > 1e-8 || times[^1] < animation.Length - 1e-8)
+        {
+            throw new InvalidOperationException(
+                $"P4 Aim managed sampler track does not cover the clip domain: track={trackIndex}");
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int FindUpperBound(double[] times, double time)
+    {
+        var low = 0;
+        var high = times.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low) >> 1);
+            if (times[middle] <= time)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+        return low;
     }
 }

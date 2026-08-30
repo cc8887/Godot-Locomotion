@@ -477,6 +477,8 @@ public partial class AlsP3WorkerRoot : Node3D
                         input.CharacterTransform,
                         out candidateResult.NextLeftFootProbeOrigin,
                         out candidateResult.NextRightFootProbeOrigin,
+                        out var uncorrectedLeftFootWorld,
+                        out var uncorrectedRightFootWorld,
                         out var footProbeSource))
                 {
                     candidateResult.P4ReasonCode = AlsP4ReasonCode.InvalidRuntimeState;
@@ -486,10 +488,6 @@ public partial class AlsP3WorkerRoot : Node3D
                 }
                 var uncorrectedPelvisWorld = CaptureBoneWorldTransform(
                     _poseProfile!.FootRig.PelvisBoneId);
-                var uncorrectedLeftFootWorld = CaptureBoneWorldTransform(
-                    _poseProfile.FootRig.Left.FootBoneId);
-                var uncorrectedRightFootWorld = CaptureBoneWorldTransform(
-                    _poseProfile.FootRig.Right.FootBoneId);
                 candidateRuntimeState.LeftFootProbeOrigin =
                     candidateResult.NextLeftFootProbeOrigin;
                 candidateRuntimeState.RightFootProbeOrigin =
@@ -886,10 +884,14 @@ public partial class AlsP3WorkerRoot : Node3D
         in System.Numerics.Matrix4x4 characterTransform,
         out NumericsVector3 leftOrigin,
         out NumericsVector3 rightOrigin,
+        out Transform3D leftWorld,
+        out Transform3D rightWorld,
         out AlsP4FootProbeSourceSnapshot source)
     {
         leftOrigin = default;
         rightOrigin = default;
+        leftWorld = default;
+        rightWorld = default;
         source = default;
         if (_skeleton is null || !GodotObject.IsInstanceValid(_skeleton) ||
             _skeleton.GetBoneCount() != _footSkeletonBoneCount ||
@@ -907,10 +909,14 @@ public partial class AlsP3WorkerRoot : Node3D
         var skeleton = _skeleton.GlobalTransform;
         var leftComponent = _skeleton.GetBoneGlobalPose(_leftFootBoneId);
         var rightComponent = _skeleton.GetBoneGlobalPose(_rightFootBoneId);
+        leftWorld = skeleton * leftComponent;
+        rightWorld = skeleton * rightComponent;
         if (!TryAffineInverse(character, out var inverseCharacter) ||
             !IsAffineInvertible(skeleton) ||
             !IsAffineInvertible(leftComponent) ||
-            !IsAffineInvertible(rightComponent))
+            !IsAffineInvertible(rightComponent) ||
+            !IsAffineInvertible(leftWorld) ||
+            !IsAffineInvertible(rightWorld))
         {
             return false;
         }

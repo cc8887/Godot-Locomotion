@@ -1150,7 +1150,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         CollisionObject3D? bestCollider = null;
         for (var slideIndex = 0; slideIndex < GetSlideCollisionCount(); slideIndex++)
         {
-            var slide = GetSlideCollision(slideIndex);
+            using var slide = GetSlideCollision(slideIndex);
             TryAccumulateFloorCandidates(
                 slide,
                 floorNormal,
