@@ -20,6 +20,8 @@ public partial class AlsLocomotionHud : VBoxContainer
 
     public long PerformanceFormatCount { get; private set; }
 
+    public long LastStateFrame => _lastStateFrame;
+
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;
@@ -43,27 +45,34 @@ public partial class AlsLocomotionHud : VBoxContainer
         if (diagnostics.CommittedFrameId != _lastStateFrame)
         {
             var speed = diagnostics.ActualVelocity.Length();
-            _stateLabel.Text =
-                $"Frame {diagnostics.CommittedFrameId} | " +
-                $"{result.ResolvedLocomotionState}/{result.AnimationState}\n" +
-                $"{result.ActualGait} | {result.ActualStance} | {result.ActualRotationMode}\n" +
-                $"Speed {speed:0.00} | Blend ({result.BlendCoordinates.X:0.00}, " +
-                $"{result.BlendCoordinates.Y:0.00})\n" +
-                $"Stride {result.Stride:0.00} | Rate {result.PlayRate:0.00} | " +
-                $"Lean ({result.Lean.X:0.00}, {result.Lean.Y:0.00}) | " +
-                $"Phase {result.AnimationPhase:0.00}";
+            var turn = result.TurnActive == 0
+                ? "off"
+                : FormattableString.Invariant(
+                    $"{(result.TurnDirection < 0 ? 'L' : 'R')}{Math.Abs(result.TurnNominalDegrees)}@{result.TurnPhase:0.00}");
+            var rotate = result.RotateActive == 0
+                ? "off"
+                : FormattableString.Invariant(
+                    $"{(result.RotateDirection < 0 ? 'L' : 'R')}@{result.RotatePhase:0.00}");
+            _stateLabel.Text = string.Join('\n',
+                FormattableString.Invariant(
+                    $"Frame {diagnostics.CommittedFrameId} | {result.ResolvedLocomotionState} | Mode {result.ActualRotationMode} | Speed {speed:0.00}"),
+                FormattableString.Invariant(
+                    $"Aim ({result.AimRelativeYaw:+0.00;-0.00;+0.00},{result.AimRelativePitch:+0.00;-0.00;+0.00}) | Turn {turn} | Rotate {rotate} | Phase {result.AnimationPhase:0.00}"),
+                FormattableString.Invariant(
+                    $"leftLock {result.LeftFootPose.LockAmount:0.00} | rightLock {result.RightFootPose.LockAmount:0.00} | Pelvis {result.PelvisOffset.Y:+0.000;-0.000;+0.000}"),
+                FormattableString.Invariant(
+                    $"Blend ({result.BlendCoordinates.X:0.00}, {result.BlendCoordinates.Y:0.00}) | Stride {result.Stride:0.00} | Rate {result.PlayRate:0.00} | Lean ({result.Lean.X:0.00}, {result.Lean.Y:0.00})"));
             _lastStateFrame = diagnostics.CommittedFrameId;
             StateFormatCount++;
         }
 
         if (RefreshCallCount == 1 || RefreshCallCount % PerformanceRefreshInterval == 0)
         {
-            var workerMicroseconds = result.WorkerElapsedTicks <= 0
+            var workerMilliseconds = result.WorkerElapsedTicks <= 0
                 ? 0d
-                : result.WorkerElapsedTicks * 1_000_000d / Stopwatch.Frequency;
-            _performanceLabel.Text =
-                $"FPS {Math.Round(framesPerSecond):0} | Worker {workerMicroseconds:0.0} us | " +
-                $"Errors {errors}";
+                : result.WorkerElapsedTicks * 1_000d / Stopwatch.Frequency;
+            _performanceLabel.Text = FormattableString.Invariant(
+                $"FPS {Math.Round(framesPerSecond):0} | Errors {errors} | workerMs {workerMilliseconds:0.000}");
             PerformanceFormatCount++;
         }
     }
