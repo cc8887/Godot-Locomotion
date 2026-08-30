@@ -8,6 +8,7 @@ $script:AssetLockFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\asset
 $script:P2aVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1'
 $script:TrackedAssetLockPath = Join-Path $script:RepositoryRoot 'reference\als-v4-export.lock.json'
 $script:P4VerificationFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p4-verification-functions.ps1'
+$script:P4MatrixVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p4-matrix.ps1'
 
 if (Test-Path -LiteralPath $script:P2bFunctionsPath) {
     . $script:P2bFunctionsPath
@@ -531,5 +532,176 @@ Describe 'P4 four-cell matrix output contract' {
         $context | Should Match 'GatherCommitP95'
         $context | Should Match 'WorkerP95'
         $context | Should Match 'TotalP99'
+    }
+}
+
+Describe 'P4 controlled matrix runner boundary' {
+    BeforeEach {
+        $script:OriginalPath = $env:PATH
+        $script:HadDotnetTiering = Test-Path Env:DOTNET_TieredCompilation
+        $script:HadComPlusTiering = Test-Path Env:COMPlus_TieredCompilation
+        $script:OriginalDotnetTiering = $env:DOTNET_TieredCompilation
+        $script:OriginalComPlusTiering = $env:COMPlus_TieredCompilation
+        $script:FakeToolRoot = Join-Path $TestDrive ([Guid]::NewGuid().ToString('N'))
+        [void][IO.Directory]::CreateDirectory($script:FakeToolRoot)
+        $script:BuildLog = Join-Path $script:FakeToolRoot 'build.log'
+        $script:ChildLog = Join-Path $script:FakeToolRoot 'children.log'
+        $script:FakeGodot = Join-Path $script:FakeToolRoot 'fake-godot.cmd'
+        $fakeGodotScript = Join-Path $script:FakeToolRoot 'fake-godot.ps1'
+
+        [IO.File]::WriteAllText(
+            (Join-Path $script:FakeToolRoot 'dotnet.cmd'),
+@'
+@echo off
+echo %DOTNET_TieredCompilation%^|%COMPlus_TieredCompilation%^|%*>>"%P4_FAKE_BUILD_LOG%"
+if "%P4_FAKE_BUILD_FAIL%"=="1" exit /b 23
+exit /b 0
+'@.Replace("`n", "`r`n"),
+            [Text.Encoding]::ASCII)
+        [IO.File]::WriteAllText(
+            $script:FakeGodot,
+(@'
+@echo off
+set "P4_FAKE_ARGS=%*"
+pwsh -NoProfile -File "{0}"
+exit /b %ERRORLEVEL%
+'@ -f $fakeGodotScript).Replace("`n", "`r`n"),
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText(
+            $fakeGodotScript,
+@'
+$arguments = @($env:P4_FAKE_ARGS -split ' ')
+$mode = ($arguments | Where-Object { $_ -like '--mode=*' }) -replace '^--mode=', ''
+$characters = ($arguments | Where-Object { $_ -like '--characters=*' }) -replace '^--characters=', ''
+$cell = "$characters/$mode"
+[IO.File]::AppendAllText(
+    $env:P4_FAKE_CHILD_LOG,
+    "$cell|$env:DOTNET_TieredCompilation|$env:COMPlus_TieredCompilation|$env:P4_FAKE_ARGS`r`n")
+if ($env:P4_FAKE_CHILD_FAIL_CELL -eq $cell) { exit 17 }
+$count = if ($characters -eq '10') { '6000' } else { '600' }
+$lanes = $characters
+$prefix = if ($characters -eq '10') { 'A' } else { '1' }
+$result = $prefix * 16
+if ($env:P4_FAKE_PAIR_MISMATCH -eq $characters -and $mode -eq 'parallel') {
+    $result = 'FEDCBA9876543210'
+}
+Write-Output "P4_MATRIX_OK mode=$mode characters=$characters warmup=120 frames=600 result=$result pose=$($prefix * 15)2 full_pose=$($prefix * 15)3 root=$($prefix * 15)4 aim=$($prefix * 15)5 turn_rotate=$($prefix * 15)6 feet=$($prefix * 15)7 missing=0 stale=0 generation=0 lag=0 thread=0 model=0 curve=0 controller=0 modifier=0 skeleton=0 exchange=0 commit=0 foot_gather=0 advances=$count modifiers=$count commits=$count per_character_advances=600 per_character_modifiers=600 per_character_commits=600 replacement=1 old_generation_rejected=1 lanes=$lanes gather_commit_p95_us=100 worker_p95_us=200 total_p99_us=300"
+'@,
+            [Text.UTF8Encoding]::new($false))
+
+        $env:PATH = "$($script:FakeToolRoot);$($script:OriginalPath)"
+        $env:P4_FAKE_BUILD_LOG = $script:BuildLog
+        $env:P4_FAKE_CHILD_LOG = $script:ChildLog
+        Remove-Item Env:P4_FAKE_BUILD_FAIL -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_FAKE_CHILD_FAIL_CELL -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_FAKE_PAIR_MISMATCH -ErrorAction SilentlyContinue
+    }
+
+    AfterEach {
+        $env:PATH = $script:OriginalPath
+        foreach ($name in @(
+            'P4_FAKE_BUILD_LOG', 'P4_FAKE_CHILD_LOG', 'P4_FAKE_BUILD_FAIL',
+            'P4_FAKE_CHILD_FAIL_CELL', 'P4_FAKE_PAIR_MISMATCH')) {
+            Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+        }
+        if ($script:HadDotnetTiering) {
+            $env:DOTNET_TieredCompilation = $script:OriginalDotnetTiering
+        }
+        else { Remove-Item Env:DOTNET_TieredCompilation -ErrorAction SilentlyContinue }
+        if ($script:HadComPlusTiering) {
+            $env:COMPlus_TieredCompilation = $script:OriginalComPlusTiering
+        }
+        else { Remove-Item Env:COMPlus_TieredCompilation -ErrorAction SilentlyContinue }
+    }
+
+    It 'builds optimized non-incremental Debug and runs the exact four cells under disabled tiering' {
+        $env:DOTNET_TieredCompilation = 'caller-dotnet'
+        $env:COMPlus_TieredCompilation = 'caller-complus'
+
+        $output = @(& $script:P4MatrixVerifierPath -GodotExecutable $script:FakeGodot)
+
+        $env:DOTNET_TieredCompilation | Should Be 'caller-dotnet'
+        $env:COMPlus_TieredCompilation | Should Be 'caller-complus'
+        (Get-Content -Raw $script:BuildLog).Trim() | Should Be (
+            "caller-dotnet|caller-complus|build $($script:RepositoryRoot)\GodotALS.csproj -c Debug -p:Optimize=true --no-incremental")
+        $cells = @(Get-Content $script:ChildLog)
+        @($cells | ForEach-Object { ($_ -split '\|')[0] }) -join ',' |
+            Should Be '1/single,1/parallel,10/single,10/parallel'
+        @($cells | Where-Object { $_ -notmatch '^[^|]+\|0\|0\|' }).Count | Should Be 0
+        foreach ($line in $cells) {
+            $line | Should Match ('--headless --path ' + [regex]::Escape($script:RepositoryRoot) +
+                ' res://scenes/tests/p4_animation_harness\.tscn -- --mode=(single|parallel) ' +
+                '--characters=(1|10) --warmup=120 --frames=600$')
+        }
+        @($output | Where-Object { $_ -match '^P4_MATRIX_OK ' }).Count | Should Be 4
+        @($output | Where-Object { $_ -eq 'P4_MATRIX_VERIFICATION_OK cells=4 pairs=2' }).Count |
+            Should Be 1
+    }
+
+    It 'restores absent tiering variables after successful execution' {
+        Remove-Item Env:DOTNET_TieredCompilation -ErrorAction SilentlyContinue
+        Remove-Item Env:COMPlus_TieredCompilation -ErrorAction SilentlyContinue
+
+        & $script:P4MatrixVerifierPath -GodotExecutable $script:FakeGodot | Out-Null
+
+        (Test-Path Env:DOTNET_TieredCompilation) | Should Be $false
+        (Test-Path Env:COMPlus_TieredCompilation) | Should Be $false
+    }
+
+    It 'restores caller tiering and returns failure when the build fails' {
+        $env:DOTNET_TieredCompilation = 'build-dotnet'
+        $env:COMPlus_TieredCompilation = 'build-complus'
+        $env:P4_FAKE_BUILD_FAIL = '1'
+        $failed = $false
+        $failureMessage = ''
+        try { & $script:P4MatrixVerifierPath -GodotExecutable $script:FakeGodot | Out-Null }
+        catch { $failed = $true; $failureMessage = $_.Exception.Message }
+
+        $failed | Should Be $true
+        $failureMessage | Should Match 'optimized build failed with code 23'
+        $env:DOTNET_TieredCompilation | Should Be 'build-dotnet'
+        $env:COMPlus_TieredCompilation | Should Be 'build-complus'
+        (Test-Path $script:BuildLog) | Should Be $true
+        (Test-Path $script:ChildLog) | Should Be $false
+
+        & pwsh -NoProfile -File $script:P4MatrixVerifierPath `
+            -GodotExecutable $script:FakeGodot *>&1 | Out-Null
+        $LASTEXITCODE | Should Not Be 0
+    }
+
+    It 'restores caller tiering and returns failure when a child fails' {
+        $env:DOTNET_TieredCompilation = 'child-dotnet'
+        $env:COMPlus_TieredCompilation = 'child-complus'
+        $env:P4_FAKE_CHILD_FAIL_CELL = '10/parallel'
+        $failed = $false
+        $failureMessage = ''
+        try { & $script:P4MatrixVerifierPath -GodotExecutable $script:FakeGodot | Out-Null }
+        catch { $failed = $true; $failureMessage = $_.Exception.Message }
+
+        $failed | Should Be $true
+        $failureMessage | Should Match 'cell 10/parallel exited with code 17'
+        $env:DOTNET_TieredCompilation | Should Be 'child-dotnet'
+        $env:COMPlus_TieredCompilation | Should Be 'child-complus'
+        @(Get-Content $script:ChildLog).Count | Should Be 4
+
+        & pwsh -NoProfile -File $script:P4MatrixVerifierPath `
+            -GodotExecutable $script:FakeGodot *>&1 | Out-Null
+        $LASTEXITCODE | Should Not Be 0
+    }
+
+    It 'uses the strict parser and rejects a digest mismatch in a completed pair' {
+        $env:DOTNET_TieredCompilation = 'pair-dotnet'
+        $env:COMPlus_TieredCompilation = 'pair-complus'
+        $env:P4_FAKE_PAIR_MISMATCH = '10'
+        $failed = $false
+        $failureMessage = ''
+        try { & $script:P4MatrixVerifierPath -GodotExecutable $script:FakeGodot | Out-Null }
+        catch { $failed = $true; $failureMessage = $_.Exception.Message }
+
+        $failed | Should Be $true
+        $failureMessage | Should Match 'ResultDigest mismatch for characters=10'
+        @(Get-Content $script:ChildLog).Count | Should Be 4
+        $env:DOTNET_TieredCompilation | Should Be 'pair-dotnet'
+        $env:COMPlus_TieredCompilation | Should Be 'pair-complus'
     }
 }

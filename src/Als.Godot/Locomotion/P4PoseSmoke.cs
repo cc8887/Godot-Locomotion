@@ -842,7 +842,8 @@ public partial class P4PoseSmoke : Node
         cubic.TrackSetInterpolationLoopWrap(cubicTrack, true);
         cubic.PositionTrackInsertKey(cubicTrack, 0.0, Vector3.Zero);
         cubic.PositionTrackInsertKey(cubicTrack, 1.0, Vector3.One);
-        RequireManagedTrackRejected(cubic, cubicTrack, "cubic interpolation");
+        RequireManagedTrackRejected(
+            cubic, cubicTrack, "cubic interpolation", "requires a linear");
 
         using var incomplete = new Godot.Animation { Length = 1.0 };
         var incompleteTrack = incomplete.AddTrack(Godot.Animation.TrackType.Position3D);
@@ -852,21 +853,57 @@ public partial class P4PoseSmoke : Node
         incomplete.TrackSetInterpolationLoopWrap(incompleteTrack, true);
         incomplete.PositionTrackInsertKey(incompleteTrack, 0.25, Vector3.Zero);
         incomplete.PositionTrackInsertKey(incompleteTrack, 0.75, Vector3.One);
-        RequireManagedTrackRejected(incomplete, incompleteTrack, "incomplete time domain");
+        RequireManagedTrackRejected(
+            incomplete, incompleteTrack, "incomplete time domain", "does not cover");
+
+        using var negativeTime = new Godot.Animation { Length = 1.0 };
+        var negativeTimeTrack = negativeTime.AddTrack(Godot.Animation.TrackType.Position3D);
+        negativeTime.TrackSetInterpolationType(
+            negativeTimeTrack,
+            Godot.Animation.InterpolationType.Linear);
+        negativeTime.TrackSetInterpolationLoopWrap(negativeTimeTrack, true);
+        negativeTime.PositionTrackInsertKey(negativeTimeTrack, -0.1, Vector3.Zero);
+        negativeTime.PositionTrackInsertKey(negativeTimeTrack, 1.0, Vector3.One);
+        RequireManagedTrackRejected(
+            negativeTime, negativeTimeTrack, "negative key time", "received an invalid key");
+
+        using var overLength = new Godot.Animation { Length = 1.0 };
+        var overLengthTrack = overLength.AddTrack(Godot.Animation.TrackType.Position3D);
+        overLength.TrackSetInterpolationType(
+            overLengthTrack,
+            Godot.Animation.InterpolationType.Linear);
+        overLength.TrackSetInterpolationLoopWrap(overLengthTrack, true);
+        overLength.PositionTrackInsertKey(overLengthTrack, 0.0, Vector3.Zero);
+        overLength.PositionTrackInsertKey(overLengthTrack, 1.1, Vector3.One);
+        overLength.Length = 1.0;
+        Require(overLength.TrackGetKeyCount(overLengthTrack) == 2 &&
+            overLength.TrackGetKeyTime(overLengthTrack, 1) > overLength.Length,
+            $"over-length fixture was normalized by Godot: keys={overLength.TrackGetKeyCount(overLengthTrack)} " +
+            $"last={overLength.TrackGetKeyTime(overLengthTrack, overLength.TrackGetKeyCount(overLengthTrack) - 1):R} " +
+            $"length={overLength.Length:R}");
+        RequireManagedTrackRejected(
+            overLength, overLengthTrack, "key time beyond clip length", "received an invalid key");
     }
 
     private static void RequireManagedTrackRejected(
         Godot.Animation animation,
         int trackIndex,
-        string label)
+        string label,
+        string expectedMessageFragment)
     {
         try
         {
             AlsComponentPoseModifier.ValidateManagedAimTrack(animation, trackIndex);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException exception)
         {
-            return;
+            if (exception.Message.Contains(expectedMessageFragment, StringComparison.Ordinal))
+            {
+                return;
+            }
+            throw new InvalidOperationException(
+                $"managed Aim sampler rejected {label} for the wrong reason: {exception.Message}",
+                exception);
         }
         throw new InvalidOperationException(
             $"managed Aim sampler accepted unsupported {label}");

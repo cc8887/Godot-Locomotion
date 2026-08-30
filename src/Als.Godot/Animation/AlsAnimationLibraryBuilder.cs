@@ -156,6 +156,7 @@ public static class AlsAnimationLibraryBuilder
                 }
 
                 using var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
+                NormalizeTrackDomains(boundAnimation);
                 AlsAnimationBinder.RewriteTrackPaths(
                     targetRoot, targetSkeleton, boundAnimation, clip.Name);
                 StringName? animationName = new($"clip_{animationId}");
@@ -205,6 +206,63 @@ public static class AlsAnimationLibraryBuilder
         {
             ReleasePartialBuild(targetRoot, library, libraryName, names);
             throw;
+        }
+    }
+
+    private static void NormalizeTrackDomains(Godot.Animation animation)
+    {
+        for (var trackIndex = 0; trackIndex < animation.GetTrackCount(); trackIndex++)
+        {
+            var keyCount = animation.TrackGetKeyCount(trackIndex);
+            if (keyCount == 0 ||
+                animation.TrackGetKeyTime(trackIndex, keyCount - 1) <= animation.Length)
+            {
+                continue;
+            }
+
+            var trackType = animation.TrackGetType(trackIndex);
+            var endpointPosition = trackType == Godot.Animation.TrackType.Position3D
+                ? animation.PositionTrackInterpolate(trackIndex, animation.Length)
+                : default;
+            var endpointRotation = trackType == Godot.Animation.TrackType.Rotation3D
+                ? animation.RotationTrackInterpolate(trackIndex, animation.Length)
+                : default;
+            var endpointScale = trackType == Godot.Animation.TrackType.Scale3D
+                ? animation.ScaleTrackInterpolate(trackIndex, animation.Length)
+                : default;
+            while (animation.TrackGetKeyCount(trackIndex) > 0 &&
+                animation.TrackGetKeyTime(
+                    trackIndex,
+                    animation.TrackGetKeyCount(trackIndex) - 1) > animation.Length)
+            {
+                animation.TrackRemoveKey(
+                    trackIndex,
+                    animation.TrackGetKeyCount(trackIndex) - 1);
+            }
+            var remainingKeyCount = animation.TrackGetKeyCount(trackIndex);
+            if (remainingKeyCount > 0 &&
+                animation.TrackGetKeyTime(trackIndex, remainingKeyCount - 1) == animation.Length)
+            {
+                continue;
+            }
+            switch (trackType)
+            {
+                case Godot.Animation.TrackType.Position3D:
+                    animation.PositionTrackInsertKey(
+                        trackIndex, animation.Length, endpointPosition);
+                    break;
+                case Godot.Animation.TrackType.Rotation3D:
+                    animation.RotationTrackInsertKey(
+                        trackIndex, animation.Length, endpointRotation);
+                    break;
+                case Godot.Animation.TrackType.Scale3D:
+                    animation.ScaleTrackInsertKey(
+                        trackIndex, animation.Length, endpointScale);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Cannot normalize unsupported animation track type: {trackType}");
+            }
         }
     }
 
