@@ -209,6 +209,178 @@ function Assert-P4MatrixPair
     }
 }
 
+function Invoke-P4VerificationProcess
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$FilePath,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]$Arguments,
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 3600)]
+        [int]$TimeoutSeconds,
+        [Parameter(Mandatory)]
+        [string]$Stage
+    )
+
+    $command = Get-Command -Name $FilePath -CommandType Application -ErrorAction Stop |
+        Select-Object -First 1
+    $process = [Diagnostics.Process]::new()
+    $started = $false
+    try
+    {
+        $process.StartInfo = [Diagnostics.ProcessStartInfo]::new()
+        $process.StartInfo.FileName = [Environment]::ProcessPath
+        $process.StartInfo.UseShellExecute = $false
+        $process.StartInfo.CreateNoWindow = $true
+        $process.StartInfo.RedirectStandardOutput = $true
+        $process.StartInfo.RedirectStandardError = $true
+        [void]$process.StartInfo.ArgumentList.Add('-NoProfile')
+        [void]$process.StartInfo.ArgumentList.Add('-NonInteractive')
+        [void]$process.StartInfo.ArgumentList.Add('-CommandWithArgs')
+        [void]$process.StartInfo.ArgumentList.Add(
+            '$decoded = @($args | ForEach-Object { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_)) }); & $decoded[0] @($decoded[1..($decoded.Count - 1)]); $code = $LASTEXITCODE; if ($null -eq $code) { if ($?) { exit 0 } else { exit 1 } }; exit $code')
+        foreach ($argument in @($command.Source) + $Arguments)
+        {
+            $encodedArgument = [Convert]::ToBase64String(
+                [Text.Encoding]::UTF8.GetBytes($argument))
+            [void]$process.StartInfo.ArgumentList.Add($encodedArgument)
+        }
+
+        if (-not $process.Start())
+        {
+            throw "Could not start ${Stage}: $FilePath"
+        }
+        $started = $true
+        $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+        $standardErrorTask = $process.StandardError.ReadToEndAsync()
+        $timeoutMilliseconds = $TimeoutSeconds * 1000
+        if (-not $process.WaitForExit($timeoutMilliseconds))
+        {
+            try
+            {
+                $process.Kill($true)
+            }
+            catch
+            {
+                throw "${Stage} timed out and its process tree could not be terminated."
+            }
+            $process.WaitForExit()
+            [void]$standardOutputTask.GetAwaiter().GetResult()
+            [void]$standardErrorTask.GetAwaiter().GetResult()
+            $unit = if ($TimeoutSeconds -eq 1) { 'second' } else { 'seconds' }
+            throw "${Stage} timed out after $TimeoutSeconds $unit."
+        }
+
+        $process.WaitForExit()
+        $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
+        $standardError = $standardErrorTask.GetAwaiter().GetResult()
+        $lines = @(
+            @($standardOutput, $standardError) |
+                ForEach-Object { [regex]::Split("$_", '\r\n|\n|\r') } |
+                Where-Object { $_.Length -ne 0 }
+        )
+        [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            OutputLines = $lines
+        }
+    }
+    finally
+    {
+        if ($started -and -not $process.HasExited)
+        {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        $process.Dispose()
+    }
+}
+
+function ConvertFrom-P3DemoInputOutput
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$OutputLines,
+        [Parameter(Mandatory)]
+        [int]$ExitCode
+    )
+
+    $expected =
+        'GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1'
+    $token = 'GODOT_ALS_P3_DEMO_INPUT_OK'
+    $lines = @($OutputLines | ForEach-Object { "$_" })
+    if ($ExitCode -ne 0)
+    {
+        throw "P3 input smoke exited with code $ExitCode."
+    }
+
+    $errorLines = @($lines | Where-Object {
+        $_ -match 'SCRIPT ERROR:|ERROR:|GODOT_ALS_P3_DEMO_INPUT_FAIL'
+    })
+    if ($errorLines.Count -ne 0)
+    {
+        throw "P3 input smoke emitted an error:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
+    }
+
+    $candidates = @($lines | Where-Object {
+        $_.IndexOf($token, [StringComparison]::Ordinal) -ge 0
+    })
+    $exactMatches = @($candidates | Where-Object { $_ -ceq $expected })
+    if ($candidates.Count -ne 1 -or $exactMatches.Count -ne 1)
+    {
+        throw "Expected exactly one complete P3 input marker; candidates=$($candidates.Count) matches=$($exactMatches.Count)."
+    }
+
+    [pscustomobject]@{ Marker = $expected }
+}
+
+function ConvertFrom-P4DemoOutput
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$OutputLines,
+        [Parameter(Mandatory)]
+        [int]$ExitCode
+    )
+
+    $lines = @($OutputLines | ForEach-Object { "$_" })
+    if ($ExitCode -ne 0)
+    {
+        throw "P4 demo exited with code $ExitCode."
+    }
+
+    $errorLines = @($lines | Where-Object { $_ -match 'SCRIPT ERROR:|ERROR:' })
+    if ($errorLines.Count -ne 0)
+    {
+        throw "P4 demo emitted an engine error:$([Environment]::NewLine)$($errorLines -join [Environment]::NewLine)"
+    }
+
+    $failureLines = @($lines | Where-Object { $_ -match 'P4_DEMO_FAIL' })
+    if ($failureLines.Count -ne 0)
+    {
+        throw "P4 demo emitted a failure marker:$([Environment]::NewLine)$($failureLines -join [Environment]::NewLine)"
+    }
+
+    $expected = 'P4_DEMO_OK frames=300 rigs=1'
+    $candidates = @($lines | Where-Object {
+        $_.IndexOf('P4_DEMO_OK', [StringComparison]::Ordinal) -ge 0
+    })
+    $exactMatches = @($candidates | Where-Object { $_ -ceq $expected })
+    if ($candidates.Count -ne 1 -or $exactMatches.Count -ne 1)
+    {
+        throw "Expected exactly one P4_DEMO_OK frames=300 rigs=1 marker; candidates=$($candidates.Count) matches=$($exactMatches.Count)."
+    }
+
+    [pscustomobject]@{
+        Frames = 300
+        Rigs = 1
+        Marker = $expected
+    }
+}
+
 function ConvertTo-P4Integer
 {
     param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][string]$FieldName)

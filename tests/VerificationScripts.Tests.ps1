@@ -9,6 +9,8 @@ $script:P2aVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p2a.p
 $script:TrackedAssetLockPath = Join-Path $script:RepositoryRoot 'reference\als-v4-export.lock.json'
 $script:P4VerificationFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p4-verification-functions.ps1'
 $script:P4MatrixVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p4-matrix.ps1'
+$script:P4DemoVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p4-demo.ps1'
+$script:P4DemoControllerPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P4LocomotionDemo.cs'
 
 if (Test-Path -LiteralPath $script:P2bFunctionsPath) {
     . $script:P2bFunctionsPath
@@ -703,5 +705,359 @@ Write-Output "P4_MATRIX_OK mode=$mode characters=$characters warmup=120 frames=6
         @(Get-Content $script:ChildLog).Count | Should Be 4
         $env:DOTNET_TieredCompilation | Should Be 'pair-dotnet'
         $env:COMPlus_TieredCompilation | Should Be 'pair-complus'
+    }
+}
+
+Describe 'P4 production demo output contract' {
+    BeforeAll {
+        $script:ValidP4DemoMarker = 'P4_DEMO_OK frames=300 rigs=1'
+    }
+
+    It 'accepts exactly one complete production demo marker' {
+        (Get-Command ConvertFrom-P4DemoOutput -ErrorAction SilentlyContinue) |
+            Should Not BeNullOrEmpty
+        if (-not (Get-Command ConvertFrom-P4DemoOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $result = ConvertFrom-P4DemoOutput `
+            -OutputLines @('Godot Engine', $script:ValidP4DemoMarker) `
+            -ExitCode 0
+
+        $result.Frames | Should Be 300
+        $result.Rigs | Should Be 1
+    }
+
+    It 'rejects missing duplicate malformed wrong-count engine and failure output' {
+        if (-not (Get-Command ConvertFrom-P4DemoOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $cases = @(
+            @{ Lines = @('Godot Engine'); ExitCode = 0 },
+            @{ Lines = @($script:ValidP4DemoMarker, $script:ValidP4DemoMarker); ExitCode = 0 },
+            @{ Lines = @('P4_DEMO_OK frames=300'); ExitCode = 0 },
+            @{ Lines = @('P4_DEMO_OK frames=299 rigs=1'); ExitCode = 0 },
+            @{ Lines = @('P4_DEMO_OK frames=300 rigs=2'); ExitCode = 0 },
+            @{ Lines = @($script:ValidP4DemoMarker + ' extra=1'); ExitCode = 0 },
+            @{ Lines = @($script:ValidP4DemoMarker, ' prefix P4_DEMO_OK frames=299 rigs=9'); ExitCode = 0 },
+            @{ Lines = @($script:ValidP4DemoMarker, "`tP4_DEMO_OK frames=300 rigs=1"); ExitCode = 0 },
+            @{ Lines = @($script:ValidP4DemoMarker, 'diagnostic[P4_DEMO_OK frames=300 rigs=1]'); ExitCode = 0 },
+            @{ Lines = @('P4_DEMO_FAIL code=runtime failed'); ExitCode = 0 },
+            @{ Lines = @('SCRIPT ERROR: failed', $script:ValidP4DemoMarker); ExitCode = 0 },
+            @{ Lines = @('ERROR: failed', $script:ValidP4DemoMarker); ExitCode = 0 },
+            @{ Lines = @($script:ValidP4DemoMarker); ExitCode = 17 }
+        )
+
+        foreach ($candidate in $cases) {
+            $rejected = $false
+            try {
+                ConvertFrom-P4DemoOutput `
+                    -OutputLines $candidate.Lines `
+                    -ExitCode $candidate.ExitCode | Out-Null
+            }
+            catch { $rejected = $true }
+            $rejected | Should Be $true
+        }
+    }
+
+    It 'disposes a configured slot even when initialization fails before runtime readiness' {
+        $source = [System.IO.File]::ReadAllText($script:P4DemoControllerPath)
+        $disposeStart = $source.IndexOf('internal void DisposeRuntime()')
+        $exitTreeStart = $source.IndexOf('public override void _ExitTree()', $disposeStart)
+        $disposeSource = $source.Substring($disposeStart, $exitTreeStart - $disposeStart)
+
+        $disposeStart | Should BeGreaterThan -1
+        $exitTreeStart | Should BeGreaterThan $disposeStart
+        $disposeSource | Should Match '_slot is not null && GodotObject\.IsInstanceValid\(_slot\)'
+        $disposeSource | Should Not Match '_runtimeConfigured\s*&&'
+        $disposeSource | Should Match '_slot\.DisposeRuntime\(\)'
+    }
+}
+
+Describe 'P3 demo input output contract for the P4 runner' {
+    BeforeAll {
+        $script:ValidP3DemoInputMarker =
+            'GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1'
+    }
+
+    It 'accepts exactly one complete P3 input marker' {
+        (Get-Command ConvertFrom-P3DemoInputOutput -ErrorAction SilentlyContinue) |
+            Should Not BeNullOrEmpty
+        if (-not (Get-Command ConvertFrom-P3DemoInputOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $result = ConvertFrom-P3DemoInputOutput `
+            -OutputLines @('Godot Engine', $script:ValidP3DemoInputMarker) `
+            -ExitCode 0
+
+        $result.Marker | Should Be $script:ValidP3DemoInputMarker
+    }
+
+    It 'rejects missing duplicate malformed embedded error failure and nonzero output' {
+        if (-not (Get-Command ConvertFrom-P3DemoInputOutput -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $cases = @(
+            @{ Lines = @('Godot Engine'); ExitCode = 0 },
+            @{ Lines = @($script:ValidP3DemoInputMarker, $script:ValidP3DemoInputMarker); ExitCode = 0 },
+            @{ Lines = @('GODOT_ALS_P3_DEMO_INPUT_OK actions=10 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1'); ExitCode = 0 },
+            @{ Lines = @($script:ValidP3DemoInputMarker, 'prefix GODOT_ALS_P3_DEMO_INPUT_OK actions=11'); ExitCode = 0 },
+            @{ Lines = @('GODOT_ALS_P3_DEMO_INPUT_FAIL code=input'); ExitCode = 0 },
+            @{ Lines = @('SCRIPT ERROR: failed', $script:ValidP3DemoInputMarker); ExitCode = 0 },
+            @{ Lines = @('ERROR: failed', $script:ValidP3DemoInputMarker); ExitCode = 0 },
+            @{ Lines = @($script:ValidP3DemoInputMarker); ExitCode = 17 }
+        )
+
+        foreach ($candidate in $cases) {
+            $rejected = $false
+            try {
+                ConvertFrom-P3DemoInputOutput `
+                    -OutputLines $candidate.Lines `
+                    -ExitCode $candidate.ExitCode | Out-Null
+            }
+            catch { $rejected = $true }
+            $rejected | Should Be $true
+        }
+    }
+}
+
+Describe 'P4 production demo runner boundary' {
+    BeforeEach {
+        $script:OriginalPath = $env:PATH
+        $script:FakeToolRoot = Join-Path $TestDrive ([Guid]::NewGuid().ToString('N'))
+        [void][IO.Directory]::CreateDirectory($script:FakeToolRoot)
+        $script:DemoBuildLog = Join-Path $script:FakeToolRoot 'build.log'
+        $script:DemoChildLog = Join-Path $script:FakeToolRoot 'child.log'
+        $script:DemoDescendantLog = Join-Path $script:FakeToolRoot 'descendant.log'
+        $script:FakeDemoGodot = Join-Path $script:FakeToolRoot 'fake-godot.cmd'
+        $fakeGodotScript = Join-Path $script:FakeToolRoot 'fake-godot.ps1'
+
+        [IO.File]::WriteAllText(
+            (Join-Path $script:FakeToolRoot 'dotnet.cmd'),
+@'
+@echo off
+echo %*>>"%P4_DEMO_FAKE_BUILD_LOG%"
+if "%P4_DEMO_FAKE_BUILD_SLEEP%"=="1" ping 127.0.0.1 -n 6 >nul
+if "%P4_DEMO_FAKE_BUILD_FAIL%"=="1" exit /b 23
+exit /b 0
+'@.Replace("`n", "`r`n"),
+            [Text.Encoding]::ASCII)
+        [IO.File]::WriteAllText(
+            $script:FakeDemoGodot,
+(@'
+@echo off
+set "P4_DEMO_FAKE_ARGS=%*"
+echo %*>>"%P4_DEMO_FAKE_CHILD_LOG%"
+pwsh -NoProfile -File "{0}"
+exit /b %ERRORLEVEL%
+'@ -f $fakeGodotScript).Replace("`n", "`r`n"),
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText(
+            $fakeGodotScript,
+@'
+$isP3Input = $env:P4_DEMO_FAKE_ARGS.Contains('res://scenes/tests/p3_demo_input_smoke.tscn')
+$sleep = if ($isP3Input) { $env:P4_DEMO_FAKE_P3_SLEEP } else { $env:P4_DEMO_FAKE_P4_SLEEP }
+if ($sleep -eq '1') {
+    $descendant = Start-Process pwsh -WindowStyle Hidden -PassThru -ArgumentList @(
+        '-NoProfile', '-Command', 'Start-Sleep -Seconds 30')
+    if (-not [string]::IsNullOrEmpty($env:P4_DEMO_FAKE_DESCENDANT_LOG)) {
+        [IO.File]::WriteAllText($env:P4_DEMO_FAKE_DESCENDANT_LOG, "$($descendant.Id)")
+    }
+    Start-Sleep -Seconds 30
+}
+if ($isP3Input -and $env:P4_DEMO_FAKE_P3_FAIL -eq '1') { exit 19 }
+if (-not $isP3Input -and $env:P4_DEMO_FAKE_CHILD_FAIL -eq '1') { exit 17 }
+$configuredOutput = if ($isP3Input) {
+    $env:P4_DEMO_FAKE_P3_OUTPUT
+}
+else {
+    $env:P4_DEMO_FAKE_OUTPUT
+}
+$defaultOutput = if ($isP3Input) {
+    'GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1'
+}
+else {
+    'P4_DEMO_OK frames=300 rigs=1'
+}
+$lines = if ([string]::IsNullOrEmpty($configuredOutput)) {
+    @($defaultOutput)
+}
+else {
+    @($configuredOutput -split ';;')
+}
+$lines | ForEach-Object { Write-Output $_ }
+'@,
+            [Text.UTF8Encoding]::new($false))
+
+        $env:PATH = "$($script:FakeToolRoot);$($script:OriginalPath)"
+        $env:P4_DEMO_FAKE_BUILD_LOG = $script:DemoBuildLog
+        $env:P4_DEMO_FAKE_CHILD_LOG = $script:DemoChildLog
+        $env:P4_DEMO_FAKE_DESCENDANT_LOG = $script:DemoDescendantLog
+        Remove-Item Env:P4_DEMO_FAKE_BUILD_FAIL -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_DEMO_FAKE_BUILD_SLEEP -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_DEMO_FAKE_P3_FAIL -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_DEMO_FAKE_P3_SLEEP -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_DEMO_FAKE_P3_OUTPUT -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_DEMO_FAKE_CHILD_FAIL -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_DEMO_FAKE_P4_SLEEP -ErrorAction SilentlyContinue
+        Remove-Item Env:P4_DEMO_FAKE_OUTPUT -ErrorAction SilentlyContinue
+    }
+
+    AfterEach {
+        $env:PATH = $script:OriginalPath
+        foreach ($name in @(
+            'P4_DEMO_FAKE_BUILD_LOG', 'P4_DEMO_FAKE_CHILD_LOG',
+            'P4_DEMO_FAKE_DESCENDANT_LOG', 'P4_DEMO_FAKE_BUILD_FAIL',
+            'P4_DEMO_FAKE_BUILD_SLEEP', 'P4_DEMO_FAKE_P3_FAIL',
+            'P4_DEMO_FAKE_P3_SLEEP', 'P4_DEMO_FAKE_P3_OUTPUT',
+            'P4_DEMO_FAKE_CHILD_FAIL', 'P4_DEMO_FAKE_P4_SLEEP',
+            'P4_DEMO_FAKE_OUTPUT')) {
+            Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'builds then gates P3 input before invoking the actual P4 scene exactly once' {
+        Test-Path -LiteralPath $script:P4DemoVerifierPath -PathType Leaf | Should Be $true
+        if (-not (Test-Path -LiteralPath $script:P4DemoVerifierPath -PathType Leaf)) {
+            return
+        }
+
+        $output = @(& $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot)
+
+        (Get-Content -Raw $script:DemoBuildLog).Trim() | Should Be (
+            "build $($script:RepositoryRoot)\GodotALS.csproj -c Debug -p:Optimize=true --no-restore --no-incremental")
+        $calls = @(Get-Content $script:DemoChildLog)
+        $calls.Count | Should Be 2
+        $calls[0] | Should Be (
+            "--headless --path $($script:RepositoryRoot) res://scenes/tests/p3_demo_input_smoke.tscn")
+        $calls[1] | Should Be (
+            "--headless --path $($script:RepositoryRoot) res://scenes/tests/p4_demo_smoke.tscn -- --als-smoke-frames=300")
+        $output -join "`n" | Should Be (
+            "GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1`n" +
+            "P4_DEMO_OK frames=300 rigs=1`n" +
+            'P4_DEMO_VERIFICATION_OK frames=300 rigs=1')
+    }
+
+    It 'does not invoke Godot or publish readiness after a failed build' {
+        if (-not (Test-Path -LiteralPath $script:P4DemoVerifierPath -PathType Leaf)) {
+            return
+        }
+        $env:P4_DEMO_FAKE_BUILD_FAIL = '1'
+        $failed = $false
+        try { & $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot | Out-Null }
+        catch { $failed = $true }
+
+        $failed | Should Be $true
+        (Test-Path -LiteralPath $script:DemoChildLog) | Should Be $false
+    }
+
+    It 'rejects a nonzero or engine-error child without a readiness marker' {
+        if (-not (Test-Path -LiteralPath $script:P4DemoVerifierPath -PathType Leaf)) {
+            return
+        }
+
+        $env:P4_DEMO_FAKE_CHILD_FAIL = '1'
+        $failed = $false
+        $output = @()
+        try { $output = @(& $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot) }
+        catch { $failed = $true }
+        $failed | Should Be $true
+        @($output | Where-Object { $_ -eq 'P4_DEMO_OK frames=300 rigs=1' }).Count |
+            Should Be 0
+        @($output | Where-Object { $_ -eq 'P4_DEMO_VERIFICATION_OK frames=300 rigs=1' }).Count |
+            Should Be 0
+
+        Remove-Item Env:P4_DEMO_FAKE_CHILD_FAIL
+        $env:P4_DEMO_FAKE_OUTPUT = 'ERROR: failed;;P4_DEMO_OK frames=300 rigs=1'
+        $failed = $false
+        $output = @()
+        try { $output = @(& $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot) }
+        catch { $failed = $true }
+        $failed | Should Be $true
+        @($output | Where-Object { $_ -eq 'P4_DEMO_OK frames=300 rigs=1' }).Count |
+            Should Be 0
+        @($output | Where-Object { $_ -eq 'P4_DEMO_VERIFICATION_OK frames=300 rigs=1' }).Count |
+            Should Be 0
+    }
+
+    It 'fails closed at the P3 input gate and never invokes P4' {
+        $env:P4_DEMO_FAKE_P3_OUTPUT =
+            'ERROR: p3 input failed;;GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1'
+
+        $output = @(& pwsh -NoProfile -File $script:P4DemoVerifierPath `
+            -GodotExecutable $script:FakeDemoGodot *>&1)
+
+        $LASTEXITCODE | Should Not Be 0
+        @(Get-Content $script:DemoChildLog).Count | Should Be 1
+        @($output | Where-Object {
+            "$_" -ceq 'GODOT_ALS_P3_DEMO_INPUT_OK actions=11 directions=12 camera_basis=1 pitch=1 aiming=1 cleared=1 hud=1'
+        }).Count | Should Be 0
+        @($output | Where-Object { "$_" -ceq 'P4_DEMO_OK frames=300 rigs=1' }).Count |
+            Should Be 0
+    }
+
+    It 'does not forward a raw P4 success marker before rejecting later engine errors' {
+        $env:P4_DEMO_FAKE_OUTPUT = 'P4_DEMO_OK frames=300 rigs=1;;ERROR: failed after marker'
+
+        $output = @(& pwsh -NoProfile -File $script:P4DemoVerifierPath `
+            -GodotExecutable $script:FakeDemoGodot *>&1)
+
+        $LASTEXITCODE | Should Not Be 0
+        @($output | Where-Object { "$_" -ceq 'P4_DEMO_OK frames=300 rigs=1' }).Count |
+            Should Be 0
+        @($output | Where-Object { "$_" -ceq 'P4_DEMO_VERIFICATION_OK frames=300 rigs=1' }).Count |
+            Should Be 0
+    }
+
+    It 'times out a stalled build and never invokes Godot' {
+        $env:P4_DEMO_FAKE_BUILD_SLEEP = '1'
+        $failed = $false
+        $failureMessage = ''
+        try {
+            & $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot `
+                -BuildTimeoutSeconds 1 | Out-Null
+        }
+        catch { $failed = $true; $failureMessage = $_.Exception.Message }
+
+        $failed | Should Be $true
+        $failureMessage | Should Match 'build timed out after 1 second'
+        (Test-Path -LiteralPath $script:DemoChildLog) | Should Be $false
+    }
+
+    It 'times out a stalled P3 input gate before invoking P4' {
+        $env:P4_DEMO_FAKE_P3_SLEEP = '1'
+        $failed = $false
+        $failureMessage = ''
+        try {
+            & $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot `
+                -P3InputTimeoutSeconds 1 | Out-Null
+        }
+        catch { $failed = $true; $failureMessage = $_.Exception.Message }
+
+        $failed | Should Be $true
+        $failureMessage | Should Match 'P3 input smoke timed out after 1 second'
+        @(Get-Content $script:DemoChildLog).Count | Should Be 1
+    }
+
+    It 'times out a stalled P4 smoke and kills its descendant process tree' {
+        $env:P4_DEMO_FAKE_P4_SLEEP = '1'
+        $failed = $false
+        $failureMessage = ''
+        try {
+            & $script:P4DemoVerifierPath -GodotExecutable $script:FakeDemoGodot `
+                -P4DemoTimeoutSeconds 3 | Out-Null
+        }
+        catch { $failed = $true; $failureMessage = $_.Exception.Message }
+
+        $failed | Should Be $true
+        $failureMessage | Should Match 'P4 demo smoke timed out after 3 seconds'
+        @(Get-Content $script:DemoChildLog).Count | Should Be 2
+        (Test-Path -LiteralPath $script:DemoDescendantLog -PathType Leaf) | Should Be $true
+        $descendantId = [int](Get-Content -Raw $script:DemoDescendantLog)
+        (Get-Process -Id $descendantId -ErrorAction SilentlyContinue) |
+            Should BeNullOrEmpty
     }
 }
