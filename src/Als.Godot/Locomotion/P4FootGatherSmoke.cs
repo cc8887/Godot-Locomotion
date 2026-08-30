@@ -489,7 +489,7 @@ public partial class P4FootGatherSmoke : Node
         var movingContactIndex = -1;
         for (var slideIndex = 0; slideIndex < _seamMotor.GetSlideCollisionCount(); slideIndex++)
         {
-            var collision = _seamMotor.GetSlideCollision(slideIndex);
+            using var collision = _seamMotor.GetSlideCollision(slideIndex);
             for (var collisionIndex = 0;
                  collisionIndex < collision.GetCollisionCount();
                  collisionIndex++)

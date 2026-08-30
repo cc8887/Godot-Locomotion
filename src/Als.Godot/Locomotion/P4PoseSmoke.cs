@@ -91,6 +91,7 @@ public partial class P4PoseSmoke : Node
         var protectedIds = ProtectedBoneNames.Select(graph.TargetSkeleton.FindBone).ToArray();
         Require(protectedIds.All(id => id >= 0), "protected Mannequin bones are missing");
         VerifyNonCommutingLocalDeltaOracle();
+        VerifyManagedAimTrackContract();
 
         var cases = new[]
         {
@@ -145,6 +146,14 @@ public partial class P4PoseSmoke : Node
         Require(digests.Distinct().Count() == cases.Length,
             "center/up/down/left/right did not produce five distinct pose digests");
 
+        VerifyAimSamplerParity(
+            modifier,
+            basePose,
+            graph.TargetSkeleton,
+            (Node3D)library.Root,
+            library,
+            definition,
+            poseProfile);
         VerifyArmLocalMeshEndpoints(
             modifier,
             basePose,
@@ -647,6 +656,77 @@ public partial class P4PoseSmoke : Node
             "mesh-space Aim delta was not relative to the validated additive base frame");
     }
 
+    private static void VerifyAimSamplerParity(
+        AlsComponentPoseModifier modifier,
+        PoseSnapshot basePose,
+        Skeleton3D skeleton,
+        Node3D visualRoot,
+        AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition definition,
+        AlsPoseAnimationProfile profile)
+    {
+        var upperBody = profile.Masks.Entries.Single(
+            entry => entry.Kind == AlsPoseMaskKind.UpperBody);
+        var skeletonDefinition = definition.Skeletons[profile.SkeletonId];
+        var boneId = upperBody.BoneIds
+            .Select(logicalId => skeletonDefinition.LogicalToPhysical[logicalId])
+            .Where(id => id >= 0)
+            .OrderByDescending(id => BoneDepth(skeleton, id))
+            .First();
+        var downDefinition = definition.Animations[profile.Aim.DownAnimationId];
+        var baseDefinition = definition.Animations[profile.Aim.AdditiveBasePoseAnimationId];
+        var baseTime = (double)downDefinition.AdditiveBasePoseFrame *
+            baseDefinition.FrameRateDenominator / baseDefinition.FrameRateNumerator;
+        var baseComponent = SampleComponent(
+            library,
+            skeleton,
+            profile.Aim.AdditiveBasePoseAnimationId,
+            boneId,
+            baseTime);
+        var currentComponent = BuildSnapshotComponent(basePose, skeleton, boneId);
+        var clips = new[]
+        {
+            (profile.Aim.DownAnimationId, 1f, 0f, 0f, "down"),
+            (profile.Aim.ForwardAnimationId, 0f, 1f, 0f, "forward"),
+            (profile.Aim.UpAnimationId, 0f, 0f, 1f, "up"),
+        };
+        var phases = new[] { 0f, 0.001f, 0.137f, 0.333f, 0.5f, 0.731f, 0.999f, 1f };
+        foreach (var clip in clips)
+        {
+            var clipDefinition = definition.Animations[clip.Item1];
+            foreach (var phase in phases)
+            {
+                basePose.Restore(skeleton, visualRoot);
+                var input = new AlsPoseModifierInput(
+                    phase,
+                    clip.Item2,
+                    clip.Item3,
+                    clip.Item4,
+                    1f,
+                    1f,
+                    1f,
+                    0f,
+                    AlsPoseModifierFailureStage.None);
+                var output = default(AlsPoseModifierOutput);
+                Require(modifier.TryApply(in input, ref output, out var reason),
+                    $"managed Aim sampler parity apply failed: clip={clip.Item5} " +
+                    $"phase={phase} reason={reason}");
+                var sampledComponent = SampleComponent(
+                    library,
+                    skeleton,
+                    clip.Item1,
+                    boneId,
+                    clipDefinition.PlayLength * phase);
+                var expected = sampledComponent * baseComponent.AffineInverse() * currentComponent;
+                var actual = BuildCurrentComponent(skeleton, boneId);
+                RequireTransformNear(actual, expected, 1e-5f,
+                    $"managed Aim sampler diverged from Godot interpolation: " +
+                    $"clip={clip.Item5} phase={phase}");
+            }
+        }
+        basePose.Restore(skeleton, visualRoot);
+    }
+
     private static void VerifyArmLocalMeshEndpoints(
         AlsComponentPoseModifier modifier,
         PoseSnapshot basePose,
@@ -750,6 +830,46 @@ public partial class P4PoseSmoke : Node
             "synthetic local composition unexpectedly failed");
         RequireTransformNear(actual, expected, 1e-5f,
             "local-space delta composition did not match the independent B^-1*A oracle");
+    }
+
+    private static void VerifyManagedAimTrackContract()
+    {
+        using var cubic = new Godot.Animation { Length = 1.0 };
+        var cubicTrack = cubic.AddTrack(Godot.Animation.TrackType.Position3D);
+        cubic.TrackSetInterpolationType(
+            cubicTrack,
+            Godot.Animation.InterpolationType.Cubic);
+        cubic.TrackSetInterpolationLoopWrap(cubicTrack, true);
+        cubic.PositionTrackInsertKey(cubicTrack, 0.0, Vector3.Zero);
+        cubic.PositionTrackInsertKey(cubicTrack, 1.0, Vector3.One);
+        RequireManagedTrackRejected(cubic, cubicTrack, "cubic interpolation");
+
+        using var incomplete = new Godot.Animation { Length = 1.0 };
+        var incompleteTrack = incomplete.AddTrack(Godot.Animation.TrackType.Position3D);
+        incomplete.TrackSetInterpolationType(
+            incompleteTrack,
+            Godot.Animation.InterpolationType.Linear);
+        incomplete.TrackSetInterpolationLoopWrap(incompleteTrack, true);
+        incomplete.PositionTrackInsertKey(incompleteTrack, 0.25, Vector3.Zero);
+        incomplete.PositionTrackInsertKey(incompleteTrack, 0.75, Vector3.One);
+        RequireManagedTrackRejected(incomplete, incompleteTrack, "incomplete time domain");
+    }
+
+    private static void RequireManagedTrackRejected(
+        Godot.Animation animation,
+        int trackIndex,
+        string label)
+    {
+        try
+        {
+            AlsComponentPoseModifier.ValidateManagedAimTrack(animation, trackIndex);
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        throw new InvalidOperationException(
+            $"managed Aim sampler accepted unsupported {label}");
     }
 
     private static void VerifyTopologyMutationRejected(
