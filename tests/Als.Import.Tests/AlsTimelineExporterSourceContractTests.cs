@@ -16,6 +16,8 @@ public sealed class AlsTimelineExporterSourceContractTests
     private static readonly string CommandletSource = ReadPrivateSource("AlsGodotExportCommandlet.cpp");
     private static readonly string BuildScript = File.ReadAllText(Path.Combine(
         Repository, "scripts", "build-als-exporter.ps1"));
+    private static readonly string VerifyP2A = File.ReadAllText(Path.Combine(
+        Repository, "scripts", "verify-p2a.ps1"));
 
     [Fact]
     public void ExporterDeclaresEveryTypedTimelineField()
@@ -102,12 +104,12 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.DoesNotContain("/Script/ALS.AlsAnimNotifyState_RootMotionScale", RegistrySource, StringComparison.Ordinal);
         Assert.DoesNotContain("CameraShake_Notify.CameraShake_Notify_C", RegistrySource, StringComparison.Ordinal);
         Assert.DoesNotContain("OverlayOverride_NotifyState.OverlayOverride_NotifyState_C", RegistrySource, StringComparison.Ordinal);
-        Assert.Contains("GetDisplayNameTextByValue", RegistrySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetDisplayNameTextByValue", RegistrySource, StringComparison.Ordinal);
         Assert.DoesNotContain("IsOneOf(", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("FStructProperty", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("FNameProperty", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("/Script/GameplayTags.GameplayTag", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("TEXT(\"LocomotionAction\")", RegistrySource, StringComparison.Ordinal);
-        Assert.Contains("Action.StartsWith(TEXT(\"NewEnumerator\"))", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("Action == TEXT(\"HighMantle\")", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("Action == TEXT(\"LowMantle\")", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("Action = TEXT(\"Mantling\")", RegistrySource, StringComparison.Ordinal);
@@ -119,6 +121,10 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("FAlsExportedTimelineEntry& OutEntry", RegistryHeader, StringComparison.Ordinal);
         Assert.DoesNotContain("NotifyName", RegistrySource, StringComparison.Ordinal);
         Assert.DoesNotContain("SourceClassPath.Contains", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("TEXT(\"Unspecified\")", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("TEXT(\"ViewDirection\")", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("TEXT(\"LookingDirection\")", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("TEXT(\"Recovering\")", RegistrySource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -128,6 +134,8 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("ReadTimeline(*Montage, Asset.Id, OutMetadata, OutError)", CompositeReader, StringComparison.Ordinal);
         Assert.Contains("SetArrayField(TEXT(\"timeline\")", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("SetArrayField(TEXT(\"syncMarkers\")", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("Sequence.GetPlayLength()", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("ValidateTimelineBounds", AnimationReader, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -153,7 +161,35 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("TEXT(\"BranchingPoint\")", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("RunTimelineSelfTest", CommandletSource, StringComparison.Ordinal);
         Assert.Contains("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=%d", CommandletSource, StringComparison.Ordinal);
-        Assert.Contains("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=", BuildScript, StringComparison.Ordinal);
+        Assert.Contains("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=22", BuildScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BlueprintEnumsUseExactPathAndRawTokens()
+    {
+        const string movementActionEnum =
+            "/Game/AdvancedLocomotionV4/Data/Enums/ALS_MovementAction.ALS_MovementAction";
+
+        Assert.Contains(movementActionEnum, RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("{TEXT(\"NewEnumerator0\"), TEXT(\"Mantling\")}", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("{TEXT(\"NewEnumerator1\"), TEXT(\"Mantling\")}", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("{TEXT(\"NewEnumerator2\"), TEXT(\"Rolling\")}", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("{TEXT(\"NewEnumerator3\"), TEXT(\"GettingUp\")}", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("{TEXT(\"NewEnumerator4\"), TEXT(\"None\")}", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("TEXT(\"NewEnumerator5\")", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("/Script/ALS.EAlsFootBone", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("/Script/Unknown.Future", RegistrySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetDisplayNameTextByValue", RegistrySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NativeSelfTestCoversReviewBoundaries()
+    {
+        Assert.Contains("ExpectedCaseCount = 22", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("6c352ece91861e5a728baae0272834d99aad0a42", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("ValidateTimelineBounds", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("TimelineEntryLess", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("SyncMarkerLess", AnimationReader, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -184,8 +220,10 @@ public sealed class AlsTimelineExporterSourceContractTests
 
         Assert.Contains("plugin=2.0.0", CommandletSource, StringComparison.Ordinal);
         Assert.Contains(marker, BuildScript, StringComparison.Ordinal);
+        Assert.Contains(marker, VerifyP2A, StringComparison.Ordinal);
         Assert.DoesNotContain("plugin=1.0.0", CommandletSource, StringComparison.Ordinal);
         Assert.DoesNotContain("plugin=1.0.0", BuildScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("plugin=1.0.0", VerifyP2A, StringComparison.Ordinal);
     }
 
     private static string ReadPrivateSource(string fileName)

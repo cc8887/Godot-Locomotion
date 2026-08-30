@@ -26,7 +26,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "P2A build gate failed with exit code $LASTEXITCODE."
 }
 
-$marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=1.0.0'
+$marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'
 if (-not (($outputLines | Out-String).Contains($marker, [StringComparison]::Ordinal))) {
     throw "P2A ready marker was not found: $marker"
 }
@@ -123,10 +123,10 @@ foreach ($skeleton in @($manifest.skeletons)) {
     }
 }
 $animationsWithSemantics = @($manifest.animations | Where-Object {
-    @($_.metadata.curves).Count -gt 0 -or @($_.metadata.notifies).Count -gt 0
+    @($_.metadata.curves).Count -gt 0 -or @($_.metadata.timeline).Count -gt 0
 })
 if ($animationsWithSemantics.Count -eq 0) {
-    throw 'Partial manifest contains no animation with curves or notifies.'
+    throw 'Partial manifest contains no animation with curves or timeline entries.'
 }
 foreach ($animation in @($manifest.animations)) {
     foreach ($field in @('loop', 'interpolation', 'forceRootLock', 'useNormalizedRootMotionScale',

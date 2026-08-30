@@ -6,6 +6,9 @@
 #include "Dom/JsonObject.h"
 #include "Misc/SecureHash.h"
 #include "UObject/UnrealType.h"
+#include "UObject/UObjectGlobals.h"
+
+#include <initializer_list>
 
 namespace
 {
@@ -20,6 +23,24 @@ namespace
     {
         const TCHAR* ClassPath;
         const TCHAR* Kind;
+    };
+
+    struct FAlsEnumValueAlias
+    {
+        const TCHAR* RawToken;
+        const TCHAR* CanonicalValue;
+    };
+
+    constexpr TCHAR MovementActionEnumPath[] =
+        TEXT("/Game/AdvancedLocomotionV4/Data/Enums/ALS_MovementAction.ALS_MovementAction");
+    constexpr TCHAR NativeFootBoneEnumPath[] = TEXT("/Script/ALS.EAlsFootBone");
+    constexpr TCHAR GameplayTagStructPath[] = TEXT("/Script/GameplayTags.GameplayTag");
+    constexpr FAlsEnumValueAlias MovementActionAliases[] = {
+        {TEXT("NewEnumerator0"), TEXT("Mantling")},
+        {TEXT("NewEnumerator1"), TEXT("Mantling")},
+        {TEXT("NewEnumerator2"), TEXT("Rolling")},
+        {TEXT("NewEnumerator3"), TEXT("GettingUp")},
+        {TEXT("NewEnumerator4"), TEXT("None")},
     };
 
     constexpr FAlsNotifyClassAlias ClassAliases[] = {
@@ -53,93 +74,154 @@ namespace
         return NotifyEvent.NotifyStateClass;
     }
 
-    FString GetEnumToken(const UEnum& Enum, const int64 Value)
+    EAlsPayloadResult NormalizeEnumToken(const FString& EnumPath, FString RawToken, FString& OutValue)
     {
-        FString Name = Enum.GetNameStringByValue(Value);
         int32 Separator = INDEX_NONE;
-        if (Name.FindLastChar(TEXT(':'), Separator))
+        if (RawToken.FindLastChar(TEXT(':'), Separator))
         {
-            Name.RightChopInline(Separator + 1);
+            RawToken.RightChopInline(Separator + 1);
         }
-        if (Name.StartsWith(TEXT("NewEnumerator")))
+        if (EnumPath == MovementActionEnumPath)
         {
-            const FString DisplayName = Enum.GetDisplayNameTextByValue(Value).ToString();
-            if (!DisplayName.IsEmpty())
+            for (const FAlsEnumValueAlias& Alias : MovementActionAliases)
             {
-                Name = DisplayName;
+                if (RawToken == Alias.RawToken)
+                {
+                    OutValue = Alias.CanonicalValue;
+                    return EAlsPayloadResult::Success;
+                }
             }
+            if (RawToken == TEXT("NewEnumerator5"))
+            {
+                return EAlsPayloadResult::Invalid;
+            }
+            return EAlsPayloadResult::Invalid;
         }
-        Name.ReplaceInline(TEXT(" "), TEXT(""));
-        return Name;
+        if (EnumPath == NativeFootBoneEnumPath)
+        {
+            if (RawToken == TEXT("Left") || RawToken == TEXT("Right"))
+            {
+                OutValue = MoveTemp(RawToken);
+                return EAlsPayloadResult::Success;
+            }
+            return EAlsPayloadResult::Invalid;
+        }
+        return EAlsPayloadResult::Unavailable;
     }
 
-    bool TryReadEnum(const UObject& Object, const FName PropertyName, FString& OutValue)
+    EAlsPayloadResult TryReadEnum(const UObject& Object, const std::initializer_list<FName> PropertyNames,
+        FString& OutValue)
     {
-        const FProperty* Property = Object.GetClass()->FindPropertyByName(PropertyName);
+        const FProperty* Property = nullptr;
+        for (const FName PropertyName : PropertyNames)
+        {
+            Property = Object.GetClass()->FindPropertyByName(PropertyName);
+            if (Property)
+            {
+                break;
+            }
+        }
         if (!Property)
         {
-            return false;
+            return EAlsPayloadResult::Unavailable;
         }
         const void* ValueAddress = Property->ContainerPtrToValuePtr<void>(&Object);
-        if (const FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
+        if (const FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property); EnumProperty && EnumProperty->GetEnum())
         {
             const int64 Value = EnumProperty->GetUnderlyingProperty()->GetSignedIntPropertyValue(ValueAddress);
-            OutValue = GetEnumToken(*EnumProperty->GetEnum(), Value);
-            return !OutValue.IsEmpty();
+            return NormalizeEnumToken(EnumProperty->GetEnum()->GetPathName(),
+                EnumProperty->GetEnum()->GetNameStringByValue(Value), OutValue);
         }
         if (const FByteProperty* ByteProperty = CastField<FByteProperty>(Property); ByteProperty && ByteProperty->Enum)
         {
-            OutValue = GetEnumToken(*ByteProperty->Enum, ByteProperty->GetPropertyValue(ValueAddress));
-            return !OutValue.IsEmpty();
+            return NormalizeEnumToken(ByteProperty->Enum->GetPathName(),
+                ByteProperty->Enum->GetNameStringByValue(ByteProperty->GetPropertyValue(ValueAddress)), OutValue);
         }
-        return false;
+        return EAlsPayloadResult::Invalid;
     }
 
-    bool TryReadBool(const UObject& Object, const FName PropertyName, bool& OutValue)
+    EAlsPayloadResult TryReadBool(const UObject& Object, const FName PropertyName, bool& OutValue)
     {
-        const FBoolProperty* Property = FindFProperty<FBoolProperty>(Object.GetClass(), PropertyName);
+        const FProperty* BaseProperty = Object.GetClass()->FindPropertyByName(PropertyName);
+        if (!BaseProperty)
+        {
+            return EAlsPayloadResult::Unavailable;
+        }
+        const FBoolProperty* Property = CastField<FBoolProperty>(BaseProperty);
         if (!Property)
         {
-            return false;
+            return EAlsPayloadResult::Invalid;
         }
         OutValue = Property->GetPropertyValue_InContainer(&Object);
-        return true;
+        return EAlsPayloadResult::Success;
     }
 
-    bool TryReadNumber(const UObject& Object, const FName PropertyName, double& OutValue)
+    EAlsPayloadResult TryReadNumber(const UObject& Object, const std::initializer_list<FName> PropertyNames,
+        double& OutValue)
     {
-        const FProperty* Property = Object.GetClass()->FindPropertyByName(PropertyName);
+        const FProperty* Property = nullptr;
+        for (const FName PropertyName : PropertyNames)
+        {
+            Property = Object.GetClass()->FindPropertyByName(PropertyName);
+            if (Property)
+            {
+                break;
+            }
+        }
+        if (!Property)
+        {
+            return EAlsPayloadResult::Unavailable;
+        }
         if (const FFloatProperty* FloatProperty = CastField<FFloatProperty>(Property))
         {
             OutValue = FloatProperty->GetPropertyValue_InContainer(&Object);
-            return true;
+            return EAlsPayloadResult::Success;
         }
         if (const FDoubleProperty* DoubleProperty = CastField<FDoubleProperty>(Property))
         {
             OutValue = DoubleProperty->GetPropertyValue_InContainer(&Object);
-            return true;
+            return EAlsPayloadResult::Success;
         }
-        return false;
+        return EAlsPayloadResult::Invalid;
     }
 
-    bool TryReadGameplayTag(const UObject& Object, const FName PropertyName, FString& OutValue)
+    bool IsGameplayTagStruct(const UScriptStruct* Struct)
     {
-        const FStructProperty* Property = FindFProperty<FStructProperty>(Object.GetClass(), PropertyName);
-        if (!Property || !Property->Struct)
+        return Struct && Struct->GetPathName() == GameplayTagStructPath;
+    }
+
+    EAlsPayloadResult TryReadGameplayTag(const UObject& Object,
+        const std::initializer_list<FName> PropertyNames, FString& OutValue)
+    {
+        const FProperty* BaseProperty = nullptr;
+        for (const FName PropertyName : PropertyNames)
         {
-            return false;
+            BaseProperty = Object.GetClass()->FindPropertyByName(PropertyName);
+            if (BaseProperty)
+            {
+                break;
+            }
+        }
+        if (!BaseProperty)
+        {
+            return EAlsPayloadResult::Unavailable;
+        }
+        const FStructProperty* Property = CastField<FStructProperty>(BaseProperty);
+        if (!Property || !IsGameplayTagStruct(Property->Struct))
+        {
+            return EAlsPayloadResult::Invalid;
         }
         const FNameProperty* TagNameProperty = FindFProperty<FNameProperty>(Property->Struct, TEXT("TagName"));
         if (!TagNameProperty)
         {
-            return false;
+            return EAlsPayloadResult::Invalid;
         }
         const void* ValueAddress = Property->ContainerPtrToValuePtr<void>(&Object);
         const FName TagName = TagNameProperty->GetPropertyValue_InContainer(ValueAddress);
         if (TagName.IsNone())
         {
             OutValue = TEXT("None");
-            return true;
+            return EAlsPayloadResult::Success;
         }
         OutValue = TagName.ToString();
         int32 Separator = INDEX_NONE;
@@ -147,16 +229,110 @@ namespace
         {
             OutValue.RightChopInline(Separator + 1);
         }
-        return !OutValue.IsEmpty();
+        return OutValue.IsEmpty() ? EAlsPayloadResult::Invalid : EAlsPayloadResult::Success;
+    }
+
+    EAlsPayloadResult TryReadEnumOrGameplayTag(const UObject& Object,
+        const std::initializer_list<FName> EnumPropertyNames,
+        const std::initializer_list<FName> GameplayTagPropertyNames, FString& OutValue)
+    {
+        const EAlsPayloadResult EnumResult = TryReadEnum(Object, EnumPropertyNames, OutValue);
+        return EnumResult == EAlsPayloadResult::Unavailable
+            ? TryReadGameplayTag(Object, GameplayTagPropertyNames, OutValue)
+            : EnumResult;
+    }
+
+    bool NormalizeFootstep(FString& Foot)
+    {
+        return Foot == TEXT("Unspecified") || Foot == TEXT("Left") || Foot == TEXT("Right");
+    }
+
+    bool NormalizeSetAction(FString& Action)
+    {
+        if (Action == TEXT("HighMantle") || Action == TEXT("LowMantle"))
+        {
+            Action = TEXT("Mantling");
+        }
+        return Action == TEXT("None") || Action == TEXT("Rolling") || Action == TEXT("Mantling") ||
+            Action == TEXT("Ragdolling") || Action == TEXT("GettingUp");
+    }
+
+    bool NormalizeGroundedEntry(FString& Mode)
+    {
+        return Mode == TEXT("None") || Mode == TEXT("FromRoll");
+    }
+
+    bool NormalizeEarlyBlendOutDomains(FString& LocomotionMode, FString& RotationMode, FString& Stance)
+    {
+        if (LocomotionMode == TEXT("Mantle"))
+        {
+            LocomotionMode = TEXT("Mantling");
+        }
+        else if (LocomotionMode == TEXT("Ragdolling"))
+        {
+            LocomotionMode = TEXT("Ragdoll");
+        }
+        if (RotationMode == TEXT("ViewDirection"))
+        {
+            RotationMode = TEXT("LookingDirection");
+        }
+        const bool bValidLocomotionMode = LocomotionMode == TEXT("Grounded") || LocomotionMode == TEXT("InAir") ||
+            LocomotionMode == TEXT("Mantling") || LocomotionMode == TEXT("Ragdoll") || LocomotionMode == TEXT("Recovering");
+        const bool bValidRotationMode = RotationMode == TEXT("VelocityDirection") ||
+            RotationMode == TEXT("LookingDirection") || RotationMode == TEXT("Aiming");
+        const bool bValidStance = Stance == TEXT("Standing") || Stance == TEXT("Crouching");
+        return bValidLocomotionMode && bValidRotationMode && bValidStance;
+    }
+
+    EAlsPayloadResult ReportReadFailure(const EAlsPayloadResult Result, const TCHAR* Kind,
+        const UObject& Object, FString& OutError)
+    {
+        if (Result == EAlsPayloadResult::Invalid)
+        {
+            OutError = FString::Printf(TEXT("Invalid reflected %s payload shape or value on %s."),
+                Kind, *Object.GetClass()->GetPathName());
+        }
+        return Result;
+    }
+
+    bool HasAnyProperty(const UObject& Object, const std::initializer_list<FName> PropertyNames)
+    {
+        for (const FName PropertyName : PropertyNames)
+        {
+            if (Object.GetClass()->FindPropertyByName(PropertyName))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool HasCompleteEarlyBlendOutShape(const UObject& Object)
+    {
+        return HasAnyProperty(Object, {TEXT("BlendOutSeconds"), TEXT("BlendOutTime"), TEXT("BlendOutDuration")}) &&
+            HasAnyProperty(Object, {TEXT("bCheckInput")}) &&
+            HasAnyProperty(Object, {TEXT("bCheckLocomotionMode")}) &&
+            HasAnyProperty(Object, {TEXT("bCheckRotationMode")}) &&
+            HasAnyProperty(Object, {TEXT("bCheckStance")}) &&
+            HasAnyProperty(Object, {TEXT("LocomotionMode"), TEXT("LocomotionModeEquals")}) &&
+            HasAnyProperty(Object, {TEXT("RotationMode"), TEXT("RotationModeEquals")}) &&
+            HasAnyProperty(Object, {TEXT("Stance"), TEXT("StanceEquals")});
     }
 
     EAlsPayloadResult BuildFootstepPayload(const UObject& Object, FJsonObject& Payload, FString& OutError)
     {
         FString Foot;
-        if (!TryReadEnum(Object, TEXT("Foot"), Foot) && !TryReadEnum(Object, TEXT("FootstepFoot"), Foot) &&
-            !TryReadEnum(Object, TEXT("FootBone"), Foot))
+        const EAlsPayloadResult ReadResult = TryReadEnum(Object,
+            {TEXT("Foot"), TEXT("FootstepFoot"), TEXT("FootBone")}, Foot);
+        if (ReadResult != EAlsPayloadResult::Success)
         {
-            return EAlsPayloadResult::Unavailable;
+            return ReportReadFailure(ReadResult, TEXT("Footstep"), Object, OutError);
+        }
+        if (!NormalizeFootstep(Foot))
+        {
+            OutError = FString::Printf(TEXT("Invalid Footstep foot value on %s: %s."),
+                *Object.GetClass()->GetPathName(), *Foot);
+            return EAlsPayloadResult::Invalid;
         }
         Payload.SetStringField(TEXT("foot"), Foot);
         return EAlsPayloadResult::Success;
@@ -165,18 +341,13 @@ namespace
     EAlsPayloadResult BuildSetActionPayload(const UObject& Object, FJsonObject& Payload, FString& OutError)
     {
         FString Action;
-        if (!TryReadEnum(Object, TEXT("Action"), Action) && !TryReadEnum(Object, TEXT("MovementAction"), Action) &&
-            !TryReadGameplayTag(Object, TEXT("LocomotionAction"), Action))
+        const EAlsPayloadResult ReadResult = TryReadEnumOrGameplayTag(Object,
+            {TEXT("Action"), TEXT("MovementAction")}, {TEXT("LocomotionAction")}, Action);
+        if (ReadResult != EAlsPayloadResult::Success)
         {
-            return EAlsPayloadResult::Unavailable;
+            return ReportReadFailure(ReadResult, TEXT("SetAction"), Object, OutError);
         }
-        if (Action == TEXT("HighMantle") || Action == TEXT("LowMantle"))
-        {
-            Action = TEXT("Mantling");
-        }
-        if (Action.StartsWith(TEXT("NewEnumerator")) ||
-            (Action != TEXT("None") && Action != TEXT("Rolling") && Action != TEXT("Mantling") &&
-                Action != TEXT("Ragdolling") && Action != TEXT("GettingUp")))
+        if (!NormalizeSetAction(Action))
         {
             OutError = FString::Printf(TEXT("Invalid SetAction action value on %s: %s."), *Object.GetClass()->GetPathName(), *Action);
             return EAlsPayloadResult::Invalid;
@@ -188,12 +359,13 @@ namespace
     EAlsPayloadResult BuildSetGroundedEntryPayload(const UObject& Object, FJsonObject& Payload, FString& OutError)
     {
         FString Mode;
-        if (!TryReadEnum(Object, TEXT("Mode"), Mode) && !TryReadEnum(Object, TEXT("GroundedEntryState"), Mode) &&
-            !TryReadGameplayTag(Object, TEXT("GroundedEntryMode"), Mode))
+        const EAlsPayloadResult ReadResult = TryReadEnumOrGameplayTag(Object,
+            {TEXT("Mode"), TEXT("GroundedEntryState")}, {TEXT("GroundedEntryMode")}, Mode);
+        if (ReadResult != EAlsPayloadResult::Success)
         {
-            return EAlsPayloadResult::Unavailable;
+            return ReportReadFailure(ReadResult, TEXT("SetGroundedEntry"), Object, OutError);
         }
-        if (Mode.StartsWith(TEXT("NewEnumerator")) || (Mode != TEXT("None") && Mode != TEXT("FromRoll")))
+        if (!NormalizeGroundedEntry(Mode))
         {
             OutError = FString::Printf(TEXT("Invalid SetGroundedEntry mode value on %s: %s."), *Object.GetClass()->GetPathName(), *Mode);
             return EAlsPayloadResult::Invalid;
@@ -204,6 +376,10 @@ namespace
 
     EAlsPayloadResult BuildEarlyBlendOutPayload(const UObject& Object, FJsonObject& Payload, FString& OutError)
     {
+        if (!HasCompleteEarlyBlendOutShape(Object))
+        {
+            return EAlsPayloadResult::Unavailable;
+        }
         double BlendOutSeconds = 0.0;
         bool bCheckInput = false;
         bool bCheckLocomotionMode = false;
@@ -212,23 +388,37 @@ namespace
         FString LocomotionMode;
         FString RotationMode;
         FString Stance;
-        if ((!TryReadNumber(Object, TEXT("BlendOutSeconds"), BlendOutSeconds) &&
-                !TryReadNumber(Object, TEXT("BlendOutTime"), BlendOutSeconds) &&
-                !TryReadNumber(Object, TEXT("BlendOutDuration"), BlendOutSeconds)) ||
-            !TryReadBool(Object, TEXT("bCheckInput"), bCheckInput) ||
-            !TryReadBool(Object, TEXT("bCheckLocomotionMode"), bCheckLocomotionMode) ||
-            !TryReadBool(Object, TEXT("bCheckRotationMode"), bCheckRotationMode) ||
-            !TryReadBool(Object, TEXT("bCheckStance"), bCheckStance) ||
-            (!TryReadEnum(Object, TEXT("LocomotionMode"), LocomotionMode) &&
-                !TryReadGameplayTag(Object, TEXT("LocomotionModeEquals"), LocomotionMode)) ||
-            (!TryReadEnum(Object, TEXT("RotationMode"), RotationMode) &&
-                !TryReadGameplayTag(Object, TEXT("RotationModeEquals"), RotationMode)) ||
-            (!TryReadEnum(Object, TEXT("Stance"), Stance) &&
-                !TryReadGameplayTag(Object, TEXT("StanceEquals"), Stance)))
+        const EAlsPayloadResult BlendOutResult = TryReadNumber(Object,
+            {TEXT("BlendOutSeconds"), TEXT("BlendOutTime"), TEXT("BlendOutDuration")}, BlendOutSeconds);
+        const EAlsPayloadResult CheckInputResult = TryReadBool(Object, TEXT("bCheckInput"), bCheckInput);
+        const EAlsPayloadResult CheckLocomotionResult = TryReadBool(Object,
+            TEXT("bCheckLocomotionMode"), bCheckLocomotionMode);
+        const EAlsPayloadResult CheckRotationResult = TryReadBool(Object,
+            TEXT("bCheckRotationMode"), bCheckRotationMode);
+        const EAlsPayloadResult CheckStanceResult = TryReadBool(Object, TEXT("bCheckStance"), bCheckStance);
+        const EAlsPayloadResult LocomotionResult = TryReadEnumOrGameplayTag(Object,
+            {TEXT("LocomotionMode")}, {TEXT("LocomotionModeEquals")}, LocomotionMode);
+        const EAlsPayloadResult RotationResult = TryReadEnumOrGameplayTag(Object,
+            {TEXT("RotationMode")}, {TEXT("RotationModeEquals")}, RotationMode);
+        const EAlsPayloadResult StanceResult = TryReadEnumOrGameplayTag(Object,
+            {TEXT("Stance")}, {TEXT("StanceEquals")}, Stance);
+        const EAlsPayloadResult Results[] = {BlendOutResult, CheckInputResult, CheckLocomotionResult,
+            CheckRotationResult, CheckStanceResult, LocomotionResult, RotationResult, StanceResult};
+        bool bHasUnavailableField = false;
+        for (const EAlsPayloadResult Result : Results)
+        {
+            if (Result == EAlsPayloadResult::Invalid)
+            {
+                return ReportReadFailure(Result, TEXT("EarlyBlendOut"), Object, OutError);
+            }
+            bHasUnavailableField |= Result == EAlsPayloadResult::Unavailable;
+        }
+        if (bHasUnavailableField)
         {
             return EAlsPayloadResult::Unavailable;
         }
-        if (!FMath::IsFinite(BlendOutSeconds) || BlendOutSeconds < 0.0)
+        if (!FMath::IsFinite(BlendOutSeconds) || BlendOutSeconds < 0.0 ||
+            !NormalizeEarlyBlendOutDomains(LocomotionMode, RotationMode, Stance))
         {
             OutError = FString::Printf(TEXT("Invalid EarlyBlendOut payload on %s."), *Object.GetClass()->GetPathName());
             return EAlsPayloadResult::Invalid;
@@ -247,9 +437,10 @@ namespace
     EAlsPayloadResult BuildRootMotionScalePayload(const UObject& Object, FJsonObject& Payload, FString& OutError)
     {
         double TranslationScale = 0.0;
-        if (!TryReadNumber(Object, TEXT("TranslationScale"), TranslationScale))
+        const EAlsPayloadResult ReadResult = TryReadNumber(Object, {TEXT("TranslationScale")}, TranslationScale);
+        if (ReadResult != EAlsPayloadResult::Success)
         {
-            return EAlsPayloadResult::Unavailable;
+            return ReportReadFailure(ReadResult, TEXT("RootMotionScale"), Object, OutError);
         }
         if (!FMath::IsFinite(TranslationScale) || TranslationScale < 0.0)
         {
@@ -284,6 +475,65 @@ namespace
             return BuildRootMotionScalePayload(Object, Payload, OutError);
         }
         return EAlsPayloadResult::Success;
+    }
+
+    UObject* CreateSelfTestObject(const TCHAR* ClassPath, FString& OutError)
+    {
+        UClass* Class = FindObject<UClass>(nullptr, ClassPath);
+        if (!Class)
+        {
+            Class = LoadObject<UClass>(nullptr, ClassPath);
+        }
+        if (!Class)
+        {
+            OutError = FString::Printf(TEXT("Unable to load timeline self-test class: %s."), ClassPath);
+            return nullptr;
+        }
+        UObject* Object = NewObject<UObject>(GetTransientPackage(), Class);
+        if (!Object)
+        {
+            OutError = FString::Printf(TEXT("Unable to construct timeline self-test class: %s."), ClassPath);
+        }
+        return Object;
+    }
+
+    bool SetSelfTestEnumValue(UObject& Object, const FName PropertyName, const int64 Value, FString& OutError)
+    {
+        FProperty* Property = Object.GetClass()->FindPropertyByName(PropertyName);
+        void* ValueAddress = Property ? Property->ContainerPtrToValuePtr<void>(&Object) : nullptr;
+        if (FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
+        {
+            EnumProperty->GetUnderlyingProperty()->SetIntPropertyValue(ValueAddress, Value);
+            return true;
+        }
+        if (FByteProperty* ByteProperty = CastField<FByteProperty>(Property); ByteProperty && ByteProperty->Enum)
+        {
+            ByteProperty->SetPropertyValue(ValueAddress, static_cast<uint8>(Value));
+            return true;
+        }
+        OutError = FString::Printf(TEXT("Timeline self-test enum property is unavailable: %s.%s."),
+            *Object.GetClass()->GetPathName(), *PropertyName.ToString());
+        return false;
+    }
+
+    bool SetSelfTestGameplayTag(UObject& Object, const FName PropertyName, const FName TagName, FString& OutError)
+    {
+        FStructProperty* Property = FindFProperty<FStructProperty>(Object.GetClass(), PropertyName);
+        if (!Property || !IsGameplayTagStruct(Property->Struct))
+        {
+            OutError = FString::Printf(TEXT("Timeline self-test GameplayTag property is unavailable: %s.%s."),
+                *Object.GetClass()->GetPathName(), *PropertyName.ToString());
+            return false;
+        }
+        FNameProperty* TagNameProperty = FindFProperty<FNameProperty>(Property->Struct, TEXT("TagName"));
+        if (!TagNameProperty)
+        {
+            OutError = TEXT("Timeline self-test GameplayTag has no TagName field.");
+            return false;
+        }
+        void* ValueAddress = Property->ContainerPtrToValuePtr<void>(&Object);
+        TagNameProperty->SetPropertyValue_InContainer(ValueAddress, TagName);
+        return true;
     }
 }
 
@@ -359,5 +609,145 @@ bool FAlsNotifyClassRegistry::Export(const FAnimNotifyEvent& NotifyEvent, const 
 
     OutEntry.StableEventId = CreateSha1(FString::Printf(TEXT("%s|timeline|%d|%s"),
         *AssetStableId, SourceIndex, *OutEntry.SourceClassPath));
+    return true;
+}
+
+bool FAlsNotifyClassRegistry::RunSelfTest(int32& OutCaseCount, FString& OutError)
+{
+    constexpr int32 ExpectedCaseCount = 14;
+    OutCaseCount = 0;
+    OutError.Reset();
+
+    if (CreateSha1(TEXT("\u8d44\u6e90|timeline|7|/Script/\u6d4b\u8bd5.\u7c7b")) !=
+        TEXT("6c352ece91861e5a728baae0272834d99aad0a42"))
+    {
+        OutError = TEXT("Timeline self-test UTF-8 SHA-1 mismatch.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    const FAlsEnumValueAlias ExpectedMovementActions[] = {
+        {TEXT("NewEnumerator0"), TEXT("Mantling")},
+        {TEXT("NewEnumerator1"), TEXT("Mantling")},
+        {TEXT("NewEnumerator2"), TEXT("Rolling")},
+        {TEXT("NewEnumerator3"), TEXT("GettingUp")},
+        {TEXT("NewEnumerator4"), TEXT("None")},
+    };
+    for (const FAlsEnumValueAlias& Expected : ExpectedMovementActions)
+    {
+        FString Value;
+        if (NormalizeEnumToken(MovementActionEnumPath, Expected.RawToken, Value) != EAlsPayloadResult::Success ||
+            Value != Expected.CanonicalValue)
+        {
+            OutError = FString::Printf(TEXT("Timeline self-test Blueprint enum mismatch: raw=%s value=%s."),
+                Expected.RawToken, *Value);
+            return false;
+        }
+        ++OutCaseCount;
+    }
+    FString InvalidEnumValue;
+    if (NormalizeEnumToken(MovementActionEnumPath, TEXT("NewEnumerator5"), InvalidEnumValue) !=
+        EAlsPayloadResult::Invalid)
+    {
+        OutError = TEXT("Timeline self-test accepted the Blueprint enum sentinel.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    FString UnknownEnumValue;
+    if (NormalizeEnumToken(TEXT("/Script/Unknown.Future"), TEXT("Left"), UnknownEnumValue) !=
+        EAlsPayloadResult::Unavailable)
+    {
+        OutError = TEXT("Timeline self-test typed an enum from an unknown object path.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    UScriptStruct* GameplayTagStruct = FindObject<UScriptStruct>(nullptr, GameplayTagStructPath);
+    UScriptStruct* VectorStruct = FindObject<UScriptStruct>(nullptr, TEXT("/Script/CoreUObject.Vector"));
+    if (!IsGameplayTagStruct(GameplayTagStruct) || IsGameplayTagStruct(VectorStruct))
+    {
+        OutError = TEXT("Timeline self-test GameplayTag struct identity mismatch.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    UObject* FootstepObject = CreateSelfTestObject(TEXT("/Script/ALS.AlsAnimNotify_FootstepEffects"), OutError);
+    if (!FootstepObject)
+    {
+        return false;
+    }
+    TSharedRef<FJsonObject> FootstepPayload = MakeShared<FJsonObject>();
+    if (BuildFootstepPayload(*FootstepObject, *FootstepPayload, OutError) != EAlsPayloadResult::Success ||
+        FootstepPayload->GetStringField(TEXT("foot")) != TEXT("Left"))
+    {
+        OutError = TEXT("Timeline self-test failed to export a typed Footstep payload.");
+        return false;
+    }
+    ++OutCaseCount;
+    if (!SetSelfTestEnumValue(*FootstepObject, TEXT("FootBone"), 127, OutError))
+    {
+        return false;
+    }
+    TSharedRef<FJsonObject> InvalidFootstepPayload = MakeShared<FJsonObject>();
+    FString InvalidFootstepError;
+    if (BuildFootstepPayload(*FootstepObject, *InvalidFootstepPayload, InvalidFootstepError) !=
+            EAlsPayloadResult::Invalid || InvalidFootstepError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test accepted an invalid Footstep payload.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    UObject* ActionObject = CreateSelfTestObject(TEXT("/Script/ALS.AlsAnimNotifyState_SetLocomotionAction"), OutError);
+    if (!ActionObject || !SetSelfTestGameplayTag(*ActionObject, TEXT("LocomotionAction"),
+        TEXT("Als.LocomotionAction.Ragdolling"), OutError))
+    {
+        return false;
+    }
+    TSharedRef<FJsonObject> ActionPayload = MakeShared<FJsonObject>();
+    if (BuildSetActionPayload(*ActionObject, *ActionPayload, OutError) != EAlsPayloadResult::Success ||
+        ActionPayload->GetStringField(TEXT("action")) != TEXT("Ragdolling"))
+    {
+        OutError = TEXT("Timeline self-test failed to export a typed SetAction payload.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    UObject* EarlyBlendOutObject = CreateSelfTestObject(TEXT("/Script/ALS.AlsAnimNotifyState_EarlyBlendOut"), OutError);
+    if (!EarlyBlendOutObject || !SetSelfTestGameplayTag(*EarlyBlendOutObject, TEXT("RotationModeEquals"),
+        TEXT("Als.RotationMode.ViewDirection"), OutError))
+    {
+        return false;
+    }
+    TSharedRef<FJsonObject> EarlyBlendOutPayload = MakeShared<FJsonObject>();
+    if (BuildEarlyBlendOutPayload(*EarlyBlendOutObject, *EarlyBlendOutPayload, OutError) != EAlsPayloadResult::Success ||
+        EarlyBlendOutPayload->GetStringField(TEXT("rotationMode")) != TEXT("LookingDirection"))
+    {
+        OutError = TEXT("Timeline self-test failed to normalize a typed EarlyBlendOut payload.");
+        return false;
+    }
+    ++OutCaseCount;
+    if (!SetSelfTestGameplayTag(*EarlyBlendOutObject, TEXT("RotationModeEquals"),
+        TEXT("Als.RotationMode.Future"), OutError))
+    {
+        return false;
+    }
+    TSharedRef<FJsonObject> InvalidEarlyBlendOutPayload = MakeShared<FJsonObject>();
+    FString InvalidEarlyBlendOutError;
+    if (BuildEarlyBlendOutPayload(*EarlyBlendOutObject, *InvalidEarlyBlendOutPayload, InvalidEarlyBlendOutError) !=
+            EAlsPayloadResult::Invalid || InvalidEarlyBlendOutError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test accepted an invalid EarlyBlendOut payload.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    if (OutCaseCount != ExpectedCaseCount)
+    {
+        OutError = FString::Printf(TEXT("Timeline registry self-test case count mismatch: expected=%d actual=%d."),
+            ExpectedCaseCount, OutCaseCount);
+        return false;
+    }
     return true;
 }
