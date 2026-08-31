@@ -960,6 +960,379 @@ public sealed class AlsActionPlayerTests
             AlsP5FailureCode.NonFiniteOutput);
     }
 
+    [Theory]
+    [InlineData(0.5f, 0.25f)]
+    [InlineData(0.75f, 0.5f)]
+    [InlineData(1.75f, 0.5f)]
+    [InlineData(2f, 0.5f)]
+    public void Round2_SegmentOwnedEboRangeMustStayInsideResolvedSegment(float time, float duration)
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        active.PlaybackTime = 1.5f;
+        active.SegmentBindingIndex = 1;
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 0.25d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new AlsActionOutcome(9, 8, 7, AlsActionResultCode.RejectedBusy));
+        var malformed = EarlyState(1, 10, 301, 201,
+            AlsTimelineSourceKind.MontageSegmentAnimation, 0, time, duration, 0.2f, 1);
+
+        AssertEboFailure(fixture, [malformed], advanced, slices, advancedSlices.Length, ref outcomes,
+            advancedSlices[^1].CurrentMontageTime, 1f, 0, AlsP5FailureCode.InvalidBinding,
+            segmentHandle: 201);
+    }
+
+    [Fact]
+    public void Round2_SegmentOwnedEboAllowsExactEndpointsAndValidOtherSegmentMiss()
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        active.PlaybackTime = 1.5f;
+        active.SegmentBindingIndex = 1;
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 0.25d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        var exactRange = EarlyState(1, 10, 301, 201,
+            AlsTimelineSourceKind.MontageSegmentAnimation, 0, 1f, 1f, 0.2f, 1);
+        var outcomes = new AlsActionOutcomeBuffer();
+
+        Assert.True(AlsActionPlayer.TryInterruptEarlyBlendOut(
+            fixture.Definitions, fixture.Sections, fixture.Segments, [exactRange],
+            100, 201, advancedSlices[^1].CurrentMontageTime, 1f, 1,
+            AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.VelocityDirection,
+            AlsTimelineStance.Standing, advanced, slices, advancedSlices.Length, ref outcomes,
+            out _, out var result, out var failure), failure.ToString());
+        Assert.Equal((byte)1, result.Interrupted);
+
+        slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        var otherSegment = EarlyState(2, 10, 302, 202,
+            AlsTimelineSourceKind.MontageSegmentAnimation, 0, 2f, 2f, 0.2f, 1);
+        outcomes = new AlsActionOutcomeBuffer();
+        Assert.True(AlsActionPlayer.TryInterruptEarlyBlendOut(
+            fixture.Definitions, fixture.Sections, fixture.Segments, [otherSegment],
+            100, 201, advancedSlices[^1].CurrentMontageTime, 1f, 1,
+            AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.VelocityDirection,
+            AlsTimelineStance.Standing, advanced, slices, advancedSlices.Length, ref outcomes,
+            out var unchanged, out result, out failure), failure.ToString());
+        AssertBytesEqual(advanced, unchanged);
+        Assert.Equal(AlsActionEarlyBlendOutResult.CreateDefault(), result);
+        Assert.Equal(0, outcomes.Count);
+    }
+
+    [Fact]
+    public void Round2_FinalEboSliceMustStayInsideCurrentSectionWhenSegmentSpansSections()
+    {
+        var fixture = Fixture.ThreeSections();
+        var active = StartOwner(fixture, 42, sectionId: 11);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 0.5d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        slices[0] = slices[0] with
+        {
+            PreviousMontageTime = 0.5d,
+            PreviousClipUnwrappedTime = 0.5d,
+        };
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new AlsActionOutcome(9, 8, 7, AlsActionResultCode.RejectedBusy));
+        var ebo = EarlyState(1, 10, 1400, 140, AlsTimelineSourceKind.Montage,
+            0, 1f, 1f, 0.2f, 1);
+
+        AssertEboFailure(fixture, [ebo], advanced, slices, advancedSlices.Length, ref outcomes,
+            advancedSlices[^1].CurrentMontageTime, 1f, 0, AlsP5FailureCode.InvalidTimeline,
+            actionHandle: 140, segmentHandle: 240);
+    }
+
+    [Theory]
+    [InlineData("positive-frame-point")]
+    [InlineData("zero-frame-progress")]
+    [InlineData("zero-frame-no-activation")]
+    [InlineData("action-without-segment")]
+    public void Round2_FinalEboSliceRequiresMatchingZeroOrNonzeroTemporalShape(string mutation)
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 0.5d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        var final = slices[0];
+        slices[0] = mutation switch
+        {
+            "positive-frame-point" => final with
+            {
+                PreviousMontageTime = final.CurrentMontageTime,
+                PreviousClipUnwrappedTime = final.CurrentClipUnwrappedTime,
+            },
+            "zero-frame-progress" => final with { FrameStartOffsetSeconds = final.FrameEndOffsetSeconds },
+            "zero-frame-no-activation" => final with
+            {
+                PreviousMontageTime = final.CurrentMontageTime,
+                PreviousClipUnwrappedTime = final.CurrentClipUnwrappedTime,
+                FrameStartOffsetSeconds = final.FrameEndOffsetSeconds,
+            },
+            "action-without-segment" => final with
+            {
+                ActivatesActionAtSliceStart = 1,
+                ActivatesSegmentAtSliceStart = 0,
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
+        };
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new AlsActionOutcome(9, 8, 7, AlsActionResultCode.RejectedBusy));
+        var ebo = EarlyState(1, 10, 300, 200, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 0f, 1f, 0.2f, 1);
+
+        AssertEboFailure(fixture, [ebo], advanced, slices, advancedSlices.Length, ref outcomes,
+            advancedSlices[^1].CurrentMontageTime, 1f, 0, AlsP5FailureCode.InvalidTimeline);
+    }
+
+    [Theory]
+    [InlineData("missing-activation")]
+    [InlineData("action-activation")]
+    [InlineData("missing-predecessor-close")]
+    [InlineData("predecessor-closes-action")]
+    [InlineData("offset-mismatch")]
+    [InlineData("section-mismatch")]
+    [InlineData("epoch-mismatch")]
+    public void Round2_SameSectionPointRequiresPairedSequenceOnlyHandoff(string mutation)
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 1d);
+        Assert.Equal(2, advancedSlices.Length);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        slices[1] = mutation switch
+        {
+            "missing-activation" => slices[1] with { ActivatesSegmentAtSliceStart = 0 },
+            "action-activation" => slices[1] with { ActivatesActionAtSliceStart = 1 },
+            _ => slices[1],
+        };
+        slices[0] = mutation switch
+        {
+            "missing-predecessor-close" => slices[0] with { ClosesSegmentAfterSlice = 0 },
+            "predecessor-closes-action" => slices[0] with { ClosesActionAfterSlice = 1 },
+            "offset-mismatch" => slices[0] with { FrameEndOffsetSeconds = 0.5d },
+            "section-mismatch" => slices[0] with { SectionId = 11 },
+            "epoch-mismatch" => slices[0] with { PlaybackEpoch = 2 },
+            _ => slices[0],
+        };
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new AlsActionOutcome(9, 8, 7, AlsActionResultCode.RejectedBusy));
+        var ebo = EarlyState(1, 10, 301, 201, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 1f, 1f, 0.2f, 1);
+
+        AssertEboFailure(fixture, [ebo], advanced, slices, advancedSlices.Length, ref outcomes,
+            1d, 1f, 0, AlsP5FailureCode.InvalidTimeline, segmentHandle: 201);
+    }
+
+    [Fact]
+    public void Round2_CorrectSequenceOnlyHandoffPointRemainsEboEligible()
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 1d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        var outcomes = new AlsActionOutcomeBuffer();
+        var ebo = EarlyState(1, 10, 301, 201, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 1f, 1f, 0.2f, 1);
+
+        Assert.True(AlsActionPlayer.TryInterruptEarlyBlendOut(
+            fixture.Definitions, fixture.Sections, fixture.Segments, [ebo],
+            100, 201, 1d, 1f, 1,
+            AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.VelocityDirection,
+            AlsTimelineStance.Standing, advanced, slices, advancedSlices.Length, ref outcomes,
+            out _, out var result, out var failure), failure.ToString());
+        Assert.Equal((byte)1, result.Interrupted);
+    }
+
+    [Theory]
+    [InlineData("missing-action-activation")]
+    [InlineData("missing-segment-activation")]
+    [InlineData("missing-action-close")]
+    [InlineData("missing-segment-close")]
+    [InlineData("offset-mismatch")]
+    [InlineData("next-section-mismatch")]
+    [InlineData("epoch-mismatch")]
+    public void Round2_SectionPointRequiresPairedBothDomainHandoff(string mutation)
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 2d);
+        Assert.Equal(3, advancedSlices.Length);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        slices[2] = mutation switch
+        {
+            "missing-action-activation" => slices[2] with { ActivatesActionAtSliceStart = 0 },
+            "missing-segment-activation" => slices[2] with { ActivatesSegmentAtSliceStart = 0 },
+            "next-section-mismatch" => slices[2] with { SectionId = 10 },
+            _ => slices[2],
+        };
+        slices[1] = mutation switch
+        {
+            "missing-action-close" => slices[1] with { ClosesActionAfterSlice = 0 },
+            "missing-segment-close" => slices[1] with { ClosesSegmentAfterSlice = 0 },
+            "offset-mismatch" => slices[1] with { FrameEndOffsetSeconds = 1.5d },
+            "epoch-mismatch" => slices[1] with { PlaybackEpoch = 2 },
+            _ => slices[1],
+        };
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new AlsActionOutcome(9, 8, 7, AlsActionResultCode.RejectedBusy));
+        var ebo = EarlyState(1, 10, 302, 202, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 2f, 2f, 0.2f, 1);
+
+        AssertEboFailure(fixture, [ebo], advanced, slices, advancedSlices.Length, ref outcomes,
+            2d, 1f, 0, AlsP5FailureCode.InvalidTimeline, segmentHandle: 202);
+    }
+
+    [Fact]
+    public void Round2_CorrectBothDomainSectionHandoffPointRemainsEboEligible()
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 2d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        var outcomes = new AlsActionOutcomeBuffer();
+        var ebo = EarlyState(1, 10, 302, 202, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 2f, 2f, 0.2f, 1);
+
+        Assert.True(AlsActionPlayer.TryInterruptEarlyBlendOut(
+            fixture.Definitions, fixture.Sections, fixture.Segments, [ebo],
+            100, 202, 2d, 1f, 1,
+            AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.VelocityDirection,
+            AlsTimelineStance.Standing, advanced, slices, advancedSlices.Length, ref outcomes,
+            out _, out var result, out var failure), failure.ToString());
+        Assert.Equal((byte)1, result.Interrupted);
+    }
+
+    [Theory]
+    [InlineData("start-nan")]
+    [InlineData("end-nan")]
+    [InlineData("start-negative-zero")]
+    [InlineData("end-negative-zero")]
+    [InlineData("start-negative")]
+    [InlineData("end-negative")]
+    [InlineData("reversed")]
+    [InlineData("past-final-end")]
+    public void Round2_EboRejectsEveryNonCanonicalPrefixFrameWindow(string mutation)
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 2d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        slices[0] = mutation switch
+        {
+            "start-nan" => slices[0] with { FrameStartOffsetSeconds = double.NaN },
+            "end-nan" => slices[0] with { FrameEndOffsetSeconds = double.NaN },
+            "start-negative-zero" => slices[0] with { FrameStartOffsetSeconds = -0d },
+            "end-negative-zero" => slices[0] with { FrameEndOffsetSeconds = -0d },
+            "start-negative" => slices[0] with { FrameStartOffsetSeconds = -1d },
+            "end-negative" => slices[0] with { FrameEndOffsetSeconds = -1d },
+            "reversed" => slices[0] with { FrameStartOffsetSeconds = 0.75d, FrameEndOffsetSeconds = 0.25d },
+            "past-final-end" => slices[0] with { FrameEndOffsetSeconds = 3d },
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
+        };
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new AlsActionOutcome(9, 8, 7, AlsActionResultCode.RejectedBusy));
+        var ebo = EarlyState(1, 10, 302, 202, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 2f, 2f, 0.2f, 1);
+
+        AssertEboFailure(fixture, [ebo], advanced, slices, advancedSlices.Length, ref outcomes,
+            2d, 1f, 0, AlsP5FailureCode.InvalidTimeline, segmentHandle: 202);
+    }
+
+    [Fact]
+    public void Round2_OneThirdLoopCutCannotCanonicalizeOntoPendingSectionBoundary()
+    {
+        var fixture = Fixture.OneThirdLoopCut(1f / 3f);
+        var active = StartOwner(fixture, 42);
+        var slices = NewSlices();
+        slices[0] = new AlsActionTraversalSlice(9, 8, 7, 6, 5, 4, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0);
+        var count = 1;
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new AlsActionOutcome(9, 8, 7, AlsActionResultCode.RejectedBusy));
+
+        AssertAdvanceFailure(fixture, 1d / 3d, active, slices, ref count, ref outcomes,
+            AlsP5FailureCode.NonFiniteOutput);
+
+        foreach (var adjacentBoundary in new[]
+                 {
+                     MathF.BitDecrement(1f / 3f),
+                     MathF.BitIncrement(1f / 3f),
+                 })
+        {
+            var control = Fixture.OneThirdLoopCut(adjacentBoundary);
+            var controlActive = StartOwner(control, 43);
+            var (next, _, controlSlices, _) = Advance(control, controlActive, 1d / 3d);
+            Assert.Equal((double)next.PlaybackTime, controlSlices[^1].CurrentMontageTime);
+        }
+
+        var nonbinary = Fixture.NonBinarySegmentLoop();
+        var nonbinaryActive = StartOwner(nonbinary, 44);
+        var nonbinaryCut = (double)0.2f / 3d;
+        var (nonbinaryNext, _, nonbinarySlices, _) = Advance(nonbinary, nonbinaryActive, nonbinaryCut);
+        Assert.Equal((double)nonbinaryNext.PlaybackTime, nonbinarySlices[^1].CurrentMontageTime);
+    }
+
+    [Fact]
+    public void Round2_QuantizedLegalEboDoesNotRequireMontageAndFrameDeltaEquality()
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 0.1d);
+        Assert.NotEqual(
+            advancedSlices[0].FrameEndOffsetSeconds * fixture.Definitions[0].PlayRate,
+            advancedSlices[0].CurrentMontageTime - advancedSlices[0].PreviousMontageTime);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        var outcomes = new AlsActionOutcomeBuffer();
+        var ebo = EarlyState(1, 10, 300, 200, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 0f, 1f, 0.2f, 1);
+
+        Assert.True(AlsActionPlayer.TryInterruptEarlyBlendOut(
+            fixture.Definitions, fixture.Sections, fixture.Segments, [ebo],
+            100, 200, advancedSlices[^1].CurrentMontageTime, 1f, 1,
+            AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.VelocityDirection,
+            AlsTimelineStance.Standing, advanced, slices, advancedSlices.Length, ref outcomes,
+            out _, out var result, out var failure), failure.ToString());
+        Assert.Equal((byte)1, result.Interrupted);
+    }
+
+    [Fact]
+    public void Round2_CanonicalNoneIgnoresArbitrarySlotGeneration()
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var none = AlsActionRequest.None with { SlotGeneration = uint.MaxValue };
+        var next = ApplySuccess(fixture, none, active, out var outcomes);
+
+        AssertBytesEqual(active, next);
+        Assert.Empty(outcomes);
+    }
+
+    [Fact]
+    public void Round2_DuplicateMontageReuseComparesOnlyDurationAndSlotMetadata()
+    {
+        var fixture = Fixture.DuplicateMontage(conflictSlot: false);
+        fixture.Definitions[1] = fixture.Definitions[1] with
+        {
+            Priority = 99,
+            PlayRate = 2f,
+            BlendSeconds = 0.75f,
+            Interruptible = 0,
+        };
+
+        var active = ApplySuccess(fixture, Start(42, 11, 20, 3),
+            AlsActionPlayerState.CreateDefault(), out _);
+        Assert.Equal((byte)1, active.Playing);
+    }
+
     private static bool Apply(
         in Fixture fixture,
         in AlsActionRequest request,
@@ -1071,13 +1444,15 @@ public sealed class AlsActionPlayerTests
         double candidateTime,
         float weight,
         ushort flags,
-        AlsP5FailureCode expected)
+        AlsP5FailureCode expected,
+        int actionHandle = 100,
+        int segmentHandle = 200)
     {
         var slicesBefore = Bytes(slices);
         var outcomesBefore = Bytes(outcomes);
         Assert.False(AlsActionPlayer.TryInterruptEarlyBlendOut(
             fixture.Definitions, fixture.Sections, fixture.Segments, definitions,
-            100, 200, candidateTime, weight, flags == 0 ? (byte)1 : (byte)flags,
+            actionHandle, segmentHandle, candidateTime, weight, flags == 0 ? (byte)1 : (byte)flags,
             AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.VelocityDirection,
             AlsTimelineStance.Standing, current, slices, count, ref outcomes,
             out var next, out var result, out var failure));
@@ -1339,5 +1714,13 @@ public sealed class AlsActionPlayerTests
                 new AlsActionSectionBinding(10, 11, -1, 0f, 5e-17f),
             ],
             [new AlsActionSegmentBinding(280, 10, 3, 100, 380, 0f, 1f, 0f, 1f, 1f, 1)]);
+
+        public static Fixture OneThirdLoopCut(float firstSectionEnd) => new(
+            [new AlsActionDefinition(190, 19, 20, 10, 1900, 1f, 3, 10, 5, 1f, 0.1f, 1, 0)],
+            [
+                new AlsActionSectionBinding(10, 10, 11, 0f, firstSectionEnd),
+                new AlsActionSectionBinding(10, 11, -1, firstSectionEnd, 1f),
+            ],
+            [new AlsActionSegmentBinding(290, 10, 3, 110, 390, 0f, 1f, 0f, 1f, 3f, 3)]);
     }
 }
