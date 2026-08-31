@@ -232,7 +232,197 @@ public sealed class AlsP5aManifestCompilationTests
         Assert.Equal(original.Animations[0].SyncMarkers, restored.Animations[0].SyncMarkers);
         Assert.Equal(original.Montages[0].Timeline, restored.Montages[0].Timeline);
         Assert.Equal(original.Montages[0].Sections, restored.Montages[0].Sections);
+        Assert.Equal(original.Montages[0].Slots[0].SlotId, restored.Montages[0].Slots[0].SlotId);
+        Assert.Equal(original.Montages[0].Slots[0].SlotName, restored.Montages[0].Slots[0].SlotName);
         Assert.Equal(original.Montages[0].Slots[0].Segments, restored.Montages[0].Slots[0].Segments);
+
+        var events = restored.Animations.SelectMany(value => value.Timeline)
+            .Concat(restored.Montages.SelectMany(value => value.Timeline));
+        Assert.All(events, value => Assert.Equal(value.EventId,
+            restored.AssetIndex.GetEventId(value.StableEventId)));
+        Assert.All(restored.Animations.SelectMany(value => value.SyncMarkers),
+            value => Assert.Equal(value.MarkerId, restored.AssetIndex.GetMarkerId(value.StableMarkerId)));
+    }
+
+    [Theory]
+    [InlineData("animation-count")]
+    [InlineData("animation-large")]
+    [InlineData("start-negative")]
+    [InlineData("start-past-montage")]
+    [InlineData("source-start-negative")]
+    [InlineData("source-start-past-clip")]
+    [InlineData("source-end-past-clip")]
+    [InlineData("source-reversed")]
+    [InlineData("mapped-past-montage")]
+    [InlineData("mapped-float-overflow")]
+    public void PayloadRejectsInvalidMontageSegmentReferencesAndRanges(string mutation)
+    {
+        var root = SerializedPayloadRoot();
+        var segment = root["montages"]![0]!["slots"]![0]!["segments"]![0]!.AsObject();
+        switch (mutation)
+        {
+            case "animation-count":
+                segment["animationId"] = root["animations"]!.AsArray().Count;
+                break;
+            case "animation-large":
+                segment["animationId"] = 999;
+                break;
+            case "start-negative":
+                segment["startPosition"] = -0.01f;
+                break;
+            case "start-past-montage":
+                segment["startPosition"] = 1.01f;
+                break;
+            case "source-start-negative":
+                segment["animationStartTime"] = -0.01f;
+                break;
+            case "source-start-past-clip":
+                segment["animationStartTime"] = 1.01f;
+                segment["animationEndTime"] = 1.02f;
+                break;
+            case "source-end-past-clip":
+                segment["animationEndTime"] = 1.01f;
+                break;
+            case "source-reversed":
+                segment["animationStartTime"] = 0.75f;
+                segment["animationEndTime"] = 0.25f;
+                break;
+            case "mapped-past-montage":
+                segment["startPosition"] = 0.5f;
+                break;
+            case "mapped-float-overflow":
+                segment["loopCount"] = int.MaxValue;
+                segment["playRate"] = float.Epsilon;
+                break;
+            default:
+                throw new InvalidOperationException(mutation);
+        }
+
+        AssertPayloadRejected(root, "$.montages[0].slots[0].segments[0]");
+    }
+
+    [Theory]
+    [InlineData("event-forged")]
+    [InlineData("event-uppercase")]
+    [InlineData("event-short")]
+    [InlineData("event-owner-mismatch")]
+    [InlineData("event-preimage-mismatch")]
+    [InlineData("montage-event-owner-mismatch")]
+    [InlineData("marker-forged")]
+    [InlineData("marker-uppercase")]
+    [InlineData("marker-short")]
+    [InlineData("marker-owner-mismatch")]
+    public void PayloadRejectsNonCanonicalStableTimelineAndMarkerIds(string mutation)
+    {
+        var root = SerializedPayloadRoot();
+        var animation = root["animations"]![0]!.AsObject();
+        var timelineValue = animation["timeline"]![0]!.AsObject();
+        var markerValue = animation["syncMarkers"]![0]!.AsObject();
+        switch (mutation)
+        {
+            case "event-forged":
+                timelineValue["stableEventId"] = new string('0', 40);
+                break;
+            case "event-uppercase":
+                timelineValue["stableEventId"] = timelineValue["stableEventId"]!.GetValue<string>().ToUpperInvariant();
+                break;
+            case "event-short":
+                timelineValue["stableEventId"] = new string('a', 39);
+                break;
+            case "event-owner-mismatch":
+                timelineValue["stableEventId"] = Sha1(
+                    $"{new string('0', 40)}|timeline|{timelineValue["sourceIndex"]!.GetValue<int>()}|{timelineValue["sourceClassPath"]!.GetValue<string>()}");
+                break;
+            case "event-preimage-mismatch":
+                timelineValue["sourceIndex"] = timelineValue["sourceIndex"]!.GetValue<int>() + 100;
+                break;
+            case "montage-event-owner-mismatch":
+                var montageTimelineValue = root["montages"]![0]!["timeline"]![0]!.AsObject();
+                montageTimelineValue["stableEventId"] = Sha1(
+                    $"{animation["stableId"]!.GetValue<string>()}|timeline|{montageTimelineValue["sourceIndex"]!.GetValue<int>()}|{montageTimelineValue["sourceClassPath"]!.GetValue<string>()}");
+                break;
+            case "marker-forged":
+                markerValue["stableMarkerId"] = new string('0', 40);
+                break;
+            case "marker-uppercase":
+                markerValue["stableMarkerId"] = markerValue["stableMarkerId"]!.GetValue<string>().ToUpperInvariant();
+                break;
+            case "marker-short":
+                markerValue["stableMarkerId"] = new string('a', 39);
+                break;
+            case "marker-owner-mismatch":
+                markerValue["stableMarkerId"] = Sha1(
+                    $"{new string('0', 40)}|marker|{markerValue["sourceIndex"]!.GetValue<int>()}|{markerValue["name"]!.GetValue<string>()}");
+                break;
+            default:
+                throw new InvalidOperationException(mutation);
+        }
+
+        var expectedPath = mutation switch
+        {
+            "montage-event-owner-mismatch" => "$.montages[0].timeline[0]",
+            _ when mutation.StartsWith("event", StringComparison.Ordinal) => "$.animations[0].timeline[0]",
+            _ => "$.animations[0].syncMarkers[0]",
+        };
+        AssertPayloadRejected(root, expectedPath);
+    }
+
+    [Theory]
+    [InlineData("within-sequence")]
+    [InlineData("sequence-to-montage")]
+    public void PayloadRejectsEventIdsThatAreNotGlobalStableIdOrdinals(string mutation)
+    {
+        var root = SerializedPayloadRoot();
+        var animationTimeline = root["animations"]![0]!["timeline"]!.AsArray();
+        var left = animationTimeline[0]!.AsObject();
+        var right = mutation is "within-sequence"
+            ? animationTimeline[1]!.AsObject()
+            : root["montages"]![0]!["timeline"]![0]!.AsObject();
+        SwapIntegerProperty(left, right, "eventId");
+
+        AssertPayloadRejected(root, "timeline");
+    }
+
+    [Fact]
+    public void PayloadRejectsMarkerIdsThatAreNotGlobalStableIdOrdinals()
+    {
+        var root = SerializedPayloadRoot();
+        var markers = root["animations"]![0]!["syncMarkers"]!.AsArray();
+        SwapIntegerProperty(markers[0]!.AsObject(), markers[1]!.AsObject(), "markerId");
+
+        AssertPayloadRejected(root, "syncMarkers");
+    }
+
+    [Theory]
+    [InlineData("event-id")]
+    [InlineData("event-stable")]
+    [InlineData("marker-id")]
+    [InlineData("marker-stable")]
+    public void PayloadContinuesToRejectDuplicateTimelineAndMarkerIdentities(string mutation)
+    {
+        var root = SerializedPayloadRoot();
+        var timeline = root["animations"]![0]!["timeline"]!.AsArray();
+        var markers = root["animations"]![0]!["syncMarkers"]!.AsArray();
+        switch (mutation)
+        {
+            case "event-id":
+                timeline[1]!["eventId"] = timeline[0]!["eventId"]!.GetValue<int>();
+                break;
+            case "event-stable":
+                timeline[1]!["stableEventId"] = timeline[0]!["stableEventId"]!.GetValue<string>();
+                break;
+            case "marker-id":
+                markers[1]!["markerId"] = markers[0]!["markerId"]!.GetValue<int>();
+                break;
+            case "marker-stable":
+                markers[1]!["stableMarkerId"] = markers[0]!["stableMarkerId"]!.GetValue<string>();
+                break;
+            default:
+                throw new InvalidOperationException(mutation);
+        }
+
+        AssertPayloadRejected(root, mutation.StartsWith("event", StringComparison.Ordinal)
+            ? "timeline" : "syncMarkers");
     }
 
     [Fact]
@@ -342,6 +532,30 @@ public sealed class AlsP5aManifestCompilationTests
         AssertDigestMutations(original, mutations);
     }
 
+    [Fact]
+    public void DefinitionDigestDistinguishesSignedZeroAndDistinctNanBits()
+    {
+        var original = Compile(ValidRoot());
+        var zeroEvent = original.Animations[0].Timeline.First(value => value.DurationSeconds == 0f);
+        var positiveZero = ReplaceAnyEvent(CloneDefinition(original), zeroEvent with { DurationSeconds = 0.0f });
+        var negativeZero = ReplaceAnyEvent(CloneDefinition(original), zeroEvent with { DurationSeconds = -0.0f });
+
+        Assert.NotEqual(
+            AlsAnimationSetPayload.ComputeDefinitionDigest(positiveZero),
+            AlsAnimationSetPayload.ComputeDefinitionDigest(negativeZero));
+
+        var firstNan = BitConverter.Int32BitsToSingle(unchecked((int)0x7fc00001));
+        var secondNan = BitConverter.Int32BitsToSingle(unchecked((int)0x7fc00002));
+        Assert.True(float.IsNaN(firstNan));
+        Assert.True(float.IsNaN(secondNan));
+        var firstNanDefinition = ReplaceFirstCurveKeyValue(CloneDefinition(original), firstNan);
+        var secondNanDefinition = ReplaceFirstCurveKeyValue(CloneDefinition(original), secondNan);
+
+        Assert.NotEqual(
+            AlsAnimationSetPayload.ComputeDefinitionDigest(firstNanDefinition),
+            AlsAnimationSetPayload.ComputeDefinitionDigest(secondNanDefinition));
+    }
+
     private static AlsAnimationSetDefinition ReplaceEvent(
         AlsAnimationSetDefinition definition, AlsCompiledTimelineEventDefinition replacement)
     {
@@ -363,16 +577,30 @@ public sealed class AlsP5aManifestCompilationTests
             var clip = definition.Animations[index];
             if (clip.Timeline.Any(value => value.EventId == replacement.EventId))
             {
-                var animations = definition.Animations;
+                var animations = definition.Animations.ToArray();
                 animations[index] = clip with { Timeline = clip.Timeline.Select(value =>
                     value.EventId == replacement.EventId ? replacement : value).ToArray() };
                 return definition with { Animations = animations };
             }
         }
-        var montages = definition.Montages;
+        var montages = definition.Montages.ToArray();
         montages[0] = montages[0] with { Timeline = montages[0].Timeline.Select(value =>
             value.EventId == replacement.EventId ? replacement : value).ToArray() };
         return definition with { Montages = montages };
+    }
+
+    private static AlsAnimationSetDefinition ReplaceFirstCurveKeyValue(
+        AlsAnimationSetDefinition definition, float replacement)
+    {
+        var animations = definition.Animations.ToArray();
+        var animation = animations[0];
+        var curves = animation.Curves;
+        var curve = curves[0];
+        var keys = curve.Keys;
+        keys[0] = keys[0] with { Value = replacement };
+        curves[0] = curve with { Keys = keys };
+        animations[0] = animation with { Curves = curves };
+        return definition with { Animations = animations };
     }
 
     private static AlsAnimationSetDefinition ReplaceMarker(
@@ -421,9 +649,53 @@ public sealed class AlsP5aManifestCompilationTests
         var originalDigest = AlsAnimationSetPayload.ComputeDefinitionDigest(original);
         foreach (var (name, mutate) in mutations)
         {
+            var fresh = CloneDefinition(original);
+            var before = JsonNode.Parse(AlsAnimationSetPayload.Serialize(fresh));
+            var changed = mutate(fresh);
+            var after = JsonNode.Parse(AlsAnimationSetPayload.Serialize(changed));
             Assert.False(string.Equals(originalDigest,
-                AlsAnimationSetPayload.ComputeDefinitionDigest(mutate(original)), StringComparison.Ordinal), name);
+                AlsAnimationSetPayload.ComputeDefinitionDigest(changed), StringComparison.Ordinal), name);
+            Assert.Equal(originalDigest, AlsAnimationSetPayload.ComputeDefinitionDigest(original));
+            Assert.Equal(originalDigest, AlsAnimationSetPayload.ComputeDefinitionDigest(fresh));
+            var differenceCount = CountJsonDifferences(before, after);
+            Assert.True(differenceCount == 1, $"{name} changed {differenceCount} serialized fields.");
         }
+    }
+
+    private static AlsAnimationSetDefinition CloneDefinition(AlsAnimationSetDefinition definition) =>
+        AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(definition));
+
+    private static int CountJsonDifferences(JsonNode? left, JsonNode? right)
+    {
+        if (left is JsonObject leftObject && right is JsonObject rightObject)
+        {
+            return leftObject.Select(value => value.Key).Union(rightObject.Select(value => value.Key), StringComparer.Ordinal)
+                .Sum(key => CountJsonDifferences(leftObject[key], rightObject[key]));
+        }
+        if (left is JsonArray leftArray && right is JsonArray rightArray)
+        {
+            var shared = Math.Min(leftArray.Count, rightArray.Count);
+            return Enumerable.Range(0, shared).Sum(index => CountJsonDifferences(leftArray[index], rightArray[index])) +
+                Math.Abs(leftArray.Count - rightArray.Count);
+        }
+        return JsonNode.DeepEquals(left, right) ? 0 : 1;
+    }
+
+    private static JsonObject SerializedPayloadRoot() =>
+        JsonNode.Parse(AlsAnimationSetPayload.Serialize(Compile(ValidRoot())))!.AsObject();
+
+    private static void AssertPayloadRejected(JsonObject root, string expectedPath)
+    {
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            AlsAnimationSetPayload.Deserialize(root.ToJsonString()));
+        Assert.Contains(expectedPath, exception.Message, StringComparison.Ordinal);
+    }
+
+    private static void SwapIntegerProperty(JsonObject left, JsonObject right, string propertyName)
+    {
+        var value = left[propertyName]!.GetValue<int>();
+        left[propertyName] = right[propertyName]!.GetValue<int>();
+        right[propertyName] = value;
     }
 
     private static JsonObject RootWithTwoSections()
