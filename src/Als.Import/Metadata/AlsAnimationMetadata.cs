@@ -32,13 +32,15 @@ public sealed record AlsAnimationMetadata(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? CanonicalRotationYawProfileSignProvenance = null)
 {
-    [JsonPropertyName("__legacyNotifiesCompatibility")]
-    [JsonIgnore]
     public AlsAnimationNotifyMetadata[] Notifies => Timeline.Select(value => new AlsAnimationNotifyMetadata(
         value.DisplayName, (float)value.TimeSeconds, (float)value.DurationSeconds, value.SourceIndex)).ToArray();
 
     public static AlsAnimationMetadata Read(JsonElement element)
     {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException("Animation metadata must be an object.");
+        }
         RejectExplicitNull(element, "Animation metadata");
         ValidateTimelineJson(element, "Animation metadata");
         ValidateSyncMarkerJson(element);
@@ -59,6 +61,30 @@ public sealed record AlsAnimationMetadata(
         var hasCanonicalRotationYaw = ValidateFloatCurves(metadata.Curves, metadata.PlayLength);
         ValidateCanonicalRotationYawProvenance(element, metadata, hasCanonicalRotationYaw);
         return metadata;
+    }
+
+    internal void ValidateFloatCurveRepresentability()
+    {
+        var curves = Curves.RequireStructuredPayload();
+        for (var curveIndex = 0; curveIndex < curves.Length; curveIndex++)
+        {
+            for (var keyIndex = 0; keyIndex < curves[curveIndex].Keys.Length; keyIndex++)
+            {
+                var key = curves[curveIndex].Keys[keyIndex];
+                RequireFiniteFloat(key.TimeSeconds, $"curves[{curveIndex}].keys[{keyIndex}].timeSeconds");
+                RequireFiniteFloat(key.Value, $"curves[{curveIndex}].keys[{keyIndex}].value");
+                RequireFiniteFloat(key.ArriveTangent, $"curves[{curveIndex}].keys[{keyIndex}].arriveTangent");
+                RequireFiniteFloat(key.LeaveTangent, $"curves[{curveIndex}].keys[{keyIndex}].leaveTangent");
+            }
+        }
+    }
+
+    private static void RequireFiniteFloat(double value, string path)
+    {
+        if (!double.IsFinite(value) || value < -float.MaxValue || value > float.MaxValue)
+        {
+            throw new JsonException($"Animation metadata {path} must be representable as a finite float.");
+        }
     }
 
     internal static void ValidateTimelineJson(JsonElement element, string context)
@@ -431,8 +457,6 @@ public sealed record AlsAnimationSyncMarkerMetadata(
     [property: JsonRequired] int SourceIndex,
     [property: JsonRequired] int TrackIndex)
 {
-    [JsonPropertyName("__legacyTimeCompatibility")]
-    [JsonIgnore]
     public float Time => (float)TimeSeconds;
 }
 

@@ -281,6 +281,23 @@ public sealed class AlsManifestValidatorTests
     }
 
     [Theory]
+    [InlineData("timeSeconds", 1, "$.animations[0].metadata.curves[0].keys[1].timeSeconds")]
+    [InlineData("value", 0, "$.animations[0].metadata.curves[0].keys[0].value")]
+    [InlineData("arriveTangent", 0, "$.animations[0].metadata.curves[0].keys[0].arriveTangent")]
+    [InlineData("leaveTangent", 0, "$.animations[0].metadata.curves[0].keys[0].leaveTangent")]
+    public void StructuredCurveFloatOverflowIsRejectedByValidator(
+        string field, int keyIndex, string expectedPath)
+    {
+        var manifest = AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath());
+        manifest = ReplaceMetadata(manifest, "animations", metadata =>
+            metadata["curves"]!.AsArray()[0]!.AsObject()["keys"]!.AsArray()[keyIndex]!.AsObject()[field] = 1e100);
+
+        var issues = AlsManifestValidator.Validate(manifest);
+
+        Assert.Contains(issues, issue => issue.Code == "ALSMANIFEST030" && issue.FieldPath == expectedPath);
+    }
+
+    [Theory]
     [InlineData("animations", "$.animations")]
     [InlineData("animationElement", "$.animations[0]")]
     [InlineData("timeline", "$.animations[0].metadata.timeline")]

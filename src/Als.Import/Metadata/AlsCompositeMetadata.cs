@@ -35,6 +35,10 @@ public sealed record AlsMontageMetadata(
 {
     public static AlsMontageMetadata Read(JsonElement element)
     {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException("Montage metadata must be an object.");
+        }
         AlsAnimationMetadata.RejectExplicitNull(element, "Montage metadata");
         ValidateNestedJson(element);
         AlsAnimationMetadata.ValidateTimelineJson(element, "Montage metadata");

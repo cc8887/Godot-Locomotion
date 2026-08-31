@@ -1,5 +1,7 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using GodotAls.Import.Metadata;
 
 namespace GodotAls.Import.Manifest;
@@ -32,7 +34,8 @@ public static class AlsManifestSerializer
         {
             var animation = manifest.Animations[index]
                 ?? throw new JsonException($"ALS manifest animations[{index}] cannot be null.");
-            AlsAnimationMetadata.Read(animation.Metadata);
+            var metadata = AlsAnimationMetadata.Read(animation.Metadata);
+            metadata.ValidateFloatCurveRepresentability();
         }
         for (var index = 0; index < manifest.Montages.Length; index++)
         {
@@ -43,12 +46,39 @@ public static class AlsManifestSerializer
         return manifest;
     }
 
-    private static JsonSerializerOptions CreateOptions() => new()
+    private static JsonSerializerOptions CreateOptions()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = false,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-    };
+        var resolver = new DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(RemoveCompatibilityProperties);
+        return new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = false,
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+            TypeInfoResolver = resolver,
+        };
+    }
+
+    private static void RemoveCompatibilityProperties(JsonTypeInfo typeInfo)
+    {
+        var propertyName = typeInfo.Type == typeof(AlsAnimationMetadata)
+            ? nameof(AlsAnimationMetadata.Notifies)
+            : typeInfo.Type == typeof(AlsAnimationSyncMarkerMetadata)
+                ? nameof(AlsAnimationSyncMarkerMetadata.Time)
+                : null;
+        if (propertyName is null)
+        {
+            return;
+        }
+
+        for (var index = typeInfo.Properties.Count - 1; index >= 0; index--)
+        {
+            if (typeInfo.Properties[index].AttributeProvider is PropertyInfo property && property.Name == propertyName)
+            {
+                typeInfo.Properties.RemoveAt(index);
+            }
+        }
+    }
 
     private static void EnsureRequiredMembers(AlsManifest manifest)
     {
