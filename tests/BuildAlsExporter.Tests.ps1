@@ -13,6 +13,10 @@ $animationReaderPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\
 $animationReaderSource = [System.IO.File]::ReadAllText($animationReaderPath)
 $descriptorPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\AlsGodotExporter.uplugin'
 $descriptor = Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json
+$assetLockPath = Join-Path $repositoryRoot 'reference\als-v4-export.lock.json'
+$assetLock = Get-Content -LiteralPath $assetLockPath -Raw | ConvertFrom-Json
+$canonicalManifestPath = Join-Path $repositoryRoot 'assets\generated\als_v4\als_manifest.json'
+$canonicalManifest = Get-Content -LiteralPath $canonicalManifestPath -Raw | ConvertFrom-Json
 
 Describe 'ALS exporter build readiness gating' {
     It 'requires the native curve export self-test marker before the ready marker' {
@@ -49,6 +53,8 @@ Describe 'ALS exporter build readiness gating' {
         $buildScriptSource | Should Match ([regex]::Escape($marker))
         $verifyScriptSource | Should Match ([regex]::Escape($marker))
         $verifyScriptSource | Should Not Match ([regex]::Escape('plugin=1.0.0'))
+        $assetLock.schemaVersion | Should Be 1
+        $assetLock.exporterVersion | Should Be $canonicalManifest.exporterVersion
     }
 
     It 'audits animation semantics through the v2 timeline field' {
@@ -97,7 +103,7 @@ Describe 'ALS exporter build readiness gating' {
         $registryWithoutAllowedDisplayNameAccess | Should Not Match 'NotifyName'
     }
 
-    It 'requires independent Sequence Montage marker and typed timeline evidence in both v2 manifests' {
+    It 'requires Sequence markers plus Sequence Montage typed timeline evidence in both v2 manifests' {
         $verifyScriptSource | Should Match 'function Assert-P2AV2Manifest'
         $verifyScriptSource | Should Match ([regex]::Escape('Assert-P2AV2Manifest -Manifest $manifest -Label ''Partial'''))
         $verifyScriptSource | Should Match ([regex]::Escape('Assert-P2AV2Manifest -Manifest $formalManifest -Label ''Formal'''))
@@ -105,6 +111,8 @@ Describe 'ALS exporter build readiness gating' {
         $verifyScriptSource | Should Match ([regex]::Escape('contains no Montage timeline entries'))
         $verifyScriptSource | Should Match ([regex]::Escape('contains no sync markers'))
         $verifyScriptSource | Should Match ([regex]::Escape('contains no typed timeline events or actions'))
+        $verifyScriptSource | Should Match ([regex]::Escape('foreach ($animationAsset in @($Manifest.animations) + @($Manifest.montages))'))
+        $verifyScriptSource | Should Match ([regex]::Escape('foreach ($animationAsset in @($Manifest.animations))'))
         $verifyScriptSource | Should Match ([regex]::Escape("schemaVersion -ne 2"))
         $verifyScriptSource | Should Match ([regex]::Escape("exporterVersion -cne '2.0.0'"))
         $verifyScriptSource | Should Not Match ([regex]::Escape('curves or timeline entries'))

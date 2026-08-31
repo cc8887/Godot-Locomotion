@@ -74,7 +74,13 @@ bool FAlsCompositeAssetReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJs
         OutMetadata->SetNumberField(TEXT("blendOutOption"), static_cast<uint8>(Montage->BlendOut.GetBlendOption()));
         OutMetadata->SetNumberField(TEXT("blendOutTriggerTime"), Montage->BlendOutTriggerTime);
         OutMetadata->SetBoolField(TEXT("enableAutoBlendOut"), Montage->bEnableAutoBlendOut);
-        return FAlsAnimationMetadataReader::ReadTimeline(*Montage, Asset.Id, OutMetadata, OutError);
+        if (!FAlsAnimationMetadataReader::ReadTimeline(*Montage, Asset.Id, OutMetadata, OutError))
+        {
+            return false;
+        }
+
+        OutMetadata->RemoveField(TEXT("syncMarkers"));
+        return true;
     }
 
     if (const UBlendSpace* BlendSpace = Cast<UBlendSpace>(Object))

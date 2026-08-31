@@ -198,70 +198,16 @@ Describe 'P2B formal manifest lock' {
         @(Get-ChildItem $TestDrive -Filter '.asset.lock.json.*.tmp').Count | Should Be 0
     }
 
-    It 'never publishes or changes lock bytes when the injected comparison fails' {
-        (Get-Command Invoke-AlsP2aCompareAndPublish -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        $output = Join-Path $TestDrive 'orchestration-failure.lock.json'
-        [IO.File]::WriteAllText($output, '{"sentinel":true}', [Text.UTF8Encoding]::new($false))
-        $before = [Convert]::ToBase64String([IO.File]::ReadAllBytes($output))
-        $events = [Collections.Generic.List[string]]::new()
-        $manifest = Join-Path $script:RepositoryRoot 'assets\generated\als_v4\als_manifest.json'
-        $compare = { [void]$events.Add('compare'); throw 'injected comparison failure' }
-        $publish = { [void]$events.Add('publish'); Publish-AlsExportLock -ManifestPath $manifest -LockPath $output }
-        $rejected = $false
-
-        try {
-            Invoke-AlsP2aCompareAndPublish -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
-                -CompareAction $compare -PublishAction $publish -UpdateAssetLock
-        }
-        catch { $rejected = $true }
-
-        $rejected | Should Be $true
-        ($events -join ',') | Should Be 'compare'
-        [Convert]::ToBase64String([IO.File]::ReadAllBytes($output)) | Should Be $before
-        @(Get-ChildItem $TestDrive -Filter '.orchestration-failure.lock.json.*.tmp').Count | Should Be 0
-    }
-
-    It 'publishes exactly once and only after the injected comparison succeeds' {
-        (Get-Command Invoke-AlsP2aCompareAndPublish -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        $output = Join-Path $TestDrive 'orchestration-success.lock.json'
-        $events = [Collections.Generic.List[string]]::new()
-        $manifest = Join-Path $script:RepositoryRoot 'assets\generated\als_v4\als_manifest.json'
-        $compare = { [void]$events.Add('compare') }
-        $publish = { [void]$events.Add('publish'); Publish-AlsExportLock -ManifestPath $manifest -LockPath $output }
-
-        Invoke-AlsP2aCompareAndPublish -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
-            -CompareAction $compare -PublishAction $publish -UpdateAssetLock
-
-        ($events -join ',') | Should Be 'compare,publish'
-        (Test-Path -LiteralPath $output -PathType Leaf) | Should Be $true
-    }
-
-    It 'requires the completed export gate token before compare or publish' {
-        (Get-Command Invoke-AlsP2aCompareAndPublish -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        $events = [Collections.Generic.List[string]]::new()
-        $compare = { [void]$events.Add('compare') }
-        $publish = { [void]$events.Add('publish') }
-        $rejected = $false
-
-        try {
-            Invoke-AlsP2aCompareAndPublish -GateToken 'INCOMPLETE' `
-                -CompareAction $compare -PublishAction $publish -UpdateAssetLock
-        }
-        catch { $rejected = $true }
-
-        $rejected | Should Be $true
-        $events.Count | Should Be 0
-    }
-
-    It 'routes verify-p2a through the tested orchestration after existing export gates' {
+    It 'routes verify-p2a through the one tested joint publication after existing export gates' {
         $source = [IO.File]::ReadAllText($script:P2aVerifierPath)
         $fullExportGate = $source.LastIndexOf('GODOT_ALS_P2A_FULL_EXPORT_OK')
-        $compareInvocation = $source.LastIndexOf('& $compareScript')
-        $orchestration = $source.LastIndexOf('Invoke-AlsP2aCompareAndPublish')
+        $orchestration = $source.LastIndexOf('Invoke-AlsP2aJointPublication')
+        $comparisonArgument = $source.LastIndexOf('-ComparisonScriptPath $compareScript')
         $source | Should Match '\[switch\]\$UpdateAssetLock'
-        $compareInvocation | Should BeGreaterThan $fullExportGate
         $orchestration | Should BeGreaterThan $fullExportGate
-        $orchestration | Should BeGreaterThan $compareInvocation
+        $comparisonArgument | Should BeGreaterThan $orchestration
+        $source | Should Not Match 'Invoke-AlsP2aCompareAndPublish'
+        $source | Should Not Match 'Publish-AlsExportLock -ManifestPath \$formalManifestPath -LockPath \$assetLockPath'
     }
 }
 
