@@ -213,6 +213,41 @@ public sealed class HotPathAllocationTests
         Assert.True(float.IsFinite(checksum));
     }
 
+    [Fact]
+    public void TimelineAndCommittedNotifyHotPathsAllocateZeroBytesAfterWarmup()
+    {
+        AlsTimelineEventDefinition[] definitions =
+        [
+            new(
+                1, 10, -1, 0, AlsTimelineSourceKind.Animation, 0, 0, 0,
+                0f, 0f, 0f, AlsTimelineEventKind.Generic,
+                AlsTimelineTickMode.Queued, default),
+        ];
+        AlsTimelinePlayback[] playbacks =
+        [
+            new(0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f, 1f,
+                AlsActionResultCode.None, 0, 1, 0),
+        ];
+        var cursors = new[] { AlsTimelineCursor.CreateDefault() };
+        var authorities = Array.Empty<AlsTimelineAuthorityState>();
+        var owners = new[] { AlsNotifyStateOwnership.CreateDefault() };
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var begin = new AlsAnimationEvent(
+            2, 10, -1, 0, 1, 0, 1, 0, 0, 0f, 1f,
+            AlsTimelineEventKind.Generic, AlsAnimationEventPhase.Begin, default);
+        var end = begin with { Phase = AlsAnimationEventPhase.End };
+
+        ExerciseTimelineAndMirror(
+            definitions, playbacks, cursors, authorities, owners, scratch, begin, end, 100);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        ExerciseTimelineAndMirror(
+            definitions, playbacks, cursors, authorities, owners, scratch, begin, end, 10_000);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
     private static void ExerciseCurveRuntime(
         AlsCurveKey[] keys,
@@ -249,6 +284,56 @@ public sealed class HotPathAllocationTests
 
         finalCycle = cycle;
         checksum = sum;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static void ExerciseTimelineAndMirror(
+        AlsTimelineEventDefinition[] definitions,
+        AlsTimelinePlayback[] playbacks,
+        AlsTimelineCursor[] cursors,
+        AlsTimelineAuthorityState[] authorities,
+        AlsNotifyStateOwnership[] owners,
+        AlsTimelineOccurrence[] scratch,
+        in AlsAnimationEvent begin,
+        in AlsAnimationEvent end,
+        int iterations)
+    {
+        var identity = new AlsFrameIdentity(1, 1, 1);
+        for (var index = 0; index < iterations; index++)
+        {
+            cursors[0] = AlsTimelineCursor.CreateDefault();
+            owners[0] = AlsNotifyStateOwnership.CreateDefault();
+            var nextToken = 1UL;
+            var events = new AlsEventBuffer();
+            if (!AlsTimelineRuntime.TryEvaluate(
+                    definitions, playbacks, 1, 0d, 0d,
+                    cursors, authorities, owners, ref nextToken, scratch,
+                    ref events, out var failure) ||
+                failure != AlsP5FailureCode.None ||
+                events.Count != 1)
+            {
+                throw new InvalidOperationException("Timeline allocation probe failed.");
+            }
+
+            var mirror = new AlsCommittedNotifyStateBuffer();
+            if (!mirror.TryApply(begin) || !mirror.TryApply(end))
+            {
+                throw new InvalidOperationException("Mirror apply allocation probe failed.");
+            }
+
+            if (!mirror.TryApply(begin))
+            {
+                throw new InvalidOperationException("Mirror synthetic allocation probe setup failed.");
+            }
+
+            var synthetic = new AlsEventBuffer();
+            if (!mirror.TryAppendSyntheticEnds(
+                    AlsActionResultCode.InterruptedByLifecycle, identity, ref synthetic) ||
+                synthetic.Count != 1)
+            {
+                throw new InvalidOperationException("Mirror synthetic allocation probe failed.");
+            }
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
