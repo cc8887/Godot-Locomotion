@@ -79,6 +79,11 @@ if (-not (($readyOutput | Out-String).Contains($timelineSelfTestMarker, [StringC
     throw "Native timeline export self-test marker was not found: $timelineSelfTestMarker"
 }
 
+$compositeSelfTestMarker = 'GODOT_ALS_COMPOSITE_EXPORT_SELF_TEST_OK cases=1'
+if (-not (($readyOutput | Out-String).Contains($compositeSelfTestMarker, [StringComparison]::Ordinal))) {
+    throw "Native composite export self-test marker was not found: $compositeSelfTestMarker"
+}
+
 $marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'
 if (-not (($readyOutput | Out-String).Contains($marker, [StringComparison]::Ordinal))) {
     throw "Ready marker was not found: $marker"

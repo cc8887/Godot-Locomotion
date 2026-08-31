@@ -171,6 +171,19 @@ public sealed class AlsTimelineExporterSourceContractTests
     }
 
     [Fact]
+    public void NativeCompositeSelfTestCallsTheProductionReadEntryAndRejectsMontageSyncMarkers()
+    {
+        Assert.Contains("FAlsCompositeAssetReader::RunSelfTest", CompositeReader, StringComparison.Ordinal);
+        Assert.Contains("FAssetData(MontageSelfTest)", CompositeReader, StringComparison.Ordinal);
+        Assert.Contains("Read(Asset, Metadata, ReadError)", CompositeReader, StringComparison.Ordinal);
+        Assert.Contains("Metadata->HasField(TEXT(\"syncMarkers\"))", CompositeReader, StringComparison.Ordinal);
+        Assert.Contains("GODOT_ALS_COMPOSITE_EXPORT_SELF_TEST_OK cases=%d", CommandletSource,
+            StringComparison.Ordinal);
+        Assert.Contains("GODOT_ALS_COMPOSITE_EXPORT_SELF_TEST_OK cases=1", BuildScript,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StableIdsIncludeSourceIndexAndClassPath()
     {
         Assert.Contains("TEXT(\"%s|timeline|%d|%s\")", RegistrySource, StringComparison.Ordinal);

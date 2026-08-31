@@ -118,3 +118,35 @@ bool FAlsCompositeAssetReader::Read(const FAlsExportAsset& Asset, TSharedRef<FJs
     OutError = FString::Printf(TEXT("Unsupported composite animation class: %s"), *Object->GetClass()->GetPathName());
     return false;
 }
+
+bool FAlsCompositeAssetReader::RunSelfTest(int32& OutCaseCount, FString& OutError)
+{
+    OutCaseCount = 0;
+    OutError.Reset();
+    UAnimMontage* MontageSelfTest = NewObject<UAnimMontage>();
+    if (!MontageSelfTest)
+    {
+        OutError = TEXT("Composite self-test could not create a transient Montage.");
+        return false;
+    }
+    FAnimSyncMarker& Marker = MontageSelfTest->MarkerData.AuthoredSyncMarkers.AddDefaulted_GetRef();
+    Marker.MarkerName = TEXT("CompositeMarker");
+    Marker.Time = 0.0f;
+
+    FAlsExportAsset Asset;
+    Asset.AssetData = FAssetData(MontageSelfTest);
+    Asset.Kind = EAlsAssetKind::AnimMontage;
+    Asset.Id = TEXT("transient-composite-montage-self-test");
+    TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    FString ReadError;
+    const TArray<TSharedPtr<FJsonValue>>* Timeline = nullptr;
+    if (!Read(Asset, Metadata, ReadError) || !ReadError.IsEmpty() ||
+        !Metadata->TryGetArrayField(TEXT("timeline"), Timeline) || !Timeline || Timeline->Num() != 0 ||
+        Metadata->HasField(TEXT("syncMarkers")))
+    {
+        OutError = FString::Printf(TEXT("Composite self-test production Montage metadata mismatch: %s"), *ReadError);
+        return false;
+    }
+    ++OutCaseCount;
+    return true;
+}
