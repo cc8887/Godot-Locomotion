@@ -1274,6 +1274,1780 @@ public sealed class AlsTimelineRuntimeTests
         Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
     }
 
+    [Fact]
+    public void ZeroNextOwnerTokenIsInvalidEvenWhenNoBeginIsPlanned()
+    {
+        var cursors = Array.Empty<AlsTimelineCursor>();
+        var authorities = Array.Empty<AlsTimelineAuthorityState>();
+        var owners = Array.Empty<AlsNotifyStateOwnership>();
+        var events = new AlsEventBuffer();
+        var nextToken = 0UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            [], [], 0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void NextOwnerTokenMustExceedAllCommittedOwnerTokens()
+    {
+        AlsTimelineEventDefinition[] definitions =
+        [
+            State(1, 10, 0f, 1f, requiredHandle: 0),
+            State(2, 20, 0.1f, 0.8f, requiredHandle: 1, sourceIndex: 1),
+        ];
+        var cursors = DefaultCursors(2);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.25d,
+        };
+        var authorities = Array.Empty<AlsTimelineAuthorityState>();
+        var owners = DefaultOwners(2);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 1,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = 5,
+            Active = 1,
+        };
+        var events = new AlsEventBuffer();
+        var nextToken = 5UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            definitions,
+            [
+                Playback(0, 10, -1, -1, 1, 0.25d, 0.5d, 0d, 1d, 1f),
+                Playback(1, 20, -1, -1, 1, 0d, 0.25d, 0d, 1d, 1f, activates: true),
+            ],
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void ActiveOwnerMustContainPreviousTimeInOwnedState()
+    {
+        var cursors = DefaultCursors(1);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.6d,
+        };
+        var authorities = Array.Empty<AlsTimelineAuthorityState>();
+        var owners = DefaultOwners(1);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 1,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = 1,
+            Active = 1,
+        };
+        var events = new AlsEventBuffer();
+        var nextToken = 2UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            [State(1, 10, 0.2f, 0.2f, requiredHandle: 0)],
+            [Playback(0, 10, -1, -1, 1, 0.6d, 0.7d, 0d, 1d, 1f)],
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void ActiveOwnerMustMatchCommittedAuthorityForItsGroup()
+    {
+        var cursors = DefaultCursors(2);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.6d,
+        };
+        cursors[1] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 1,
+            AnimationId = 20,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.6d,
+        };
+        var authorities = DefaultAuthorities(1);
+        authorities[0] = new AlsTimelineAuthorityState
+        {
+            GroupId = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
+        var owners = DefaultOwners(1);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 2,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 1,
+            AnimationId = 20,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = 1,
+            Active = 1,
+        };
+        var events = new AlsEventBuffer();
+        var nextToken = 2UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            [State(2, 20, 0.2f, 0.7f, requiredHandle: 1)],
+            [
+                Playback(0, 10, -1, 0, 1, 0.6d, 0.7d, 0d, 1d, 1f, 1f),
+                Playback(1, 20, -1, 0, 1, 0.6d, 0.7d, 0d, 1d, 1f, 0.5f),
+            ],
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DuplicatePointSlicesAreInvalidForEveryInputPermutation(bool reverse)
+    {
+        var activation = Playback(
+            0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f, activates: true);
+        var continuation = Playback(
+            0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f);
+        var playbacks = reverse
+            ? new[] { continuation, activation }
+            : new[] { activation, continuation };
+        var cursors = DefaultCursors(1);
+        var authorities = Array.Empty<AlsTimelineAuthorityState>();
+        var owners = DefaultOwners(1);
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            [Instant(1, 10, 0f, requiredHandle: 0)], playbacks,
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PersistedAuthorityHandoffUsesChronologicalSliceForEveryInputPermutation(bool reverse)
+    {
+        var firstSlice = Playback(
+            0, 10, -1, 0, 1, 0.4d, 0.5d, 0d, 0.5d, 1f, 0.5f);
+        var secondSlice = Playback(
+            0, 10, -1, 0, 1, 0.5d, 0.9d, 0.5d, 1d, 1f, 0.5f);
+        var incoming = Playback(
+            1, 20, -1, 0, 1, 0d, 0.1d, 0d, 1d, 1f, 1f, activates: true);
+        var playbacks = reverse
+            ? new[] { secondSlice, firstSlice, incoming }
+            : new[] { firstSlice, secondSlice, incoming };
+        var cursors = DefaultCursors(2);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.4d,
+        };
+        var authorities = DefaultAuthorities(1);
+        authorities[0] = new AlsTimelineAuthorityState
+        {
+            GroupId = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
+        var owners = DefaultOwners(1);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 1,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = 1,
+            Active = 1,
+        };
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 2UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 0.2f, 0.75f, requiredHandle: 0)],
+            playbacks, 1, 0d, 1d,
+            cursors, authorities, owners, ref nextToken, scratch, ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Single(Events(events));
+        Assert.Equal(AlsAnimationEventPhase.End, events[0].Phase);
+        Assert.Equal(0, BitConverter.SingleToInt32Bits(events[0].AnimationTime));
+        Assert.Equal(1UL, events[0].OwnerToken);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+        Assert.Equal(1, authorities[0].OccurrenceHandleId);
+    }
+
+    [Fact]
+    public void HighCycleLoopPointUsesExactFloatDurationDivRem()
+    {
+        const long expectedCycle = 6_148_914_691_236_517_205L;
+        var unwrapped = System.Math.ScaleB(1d, 64);
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [
+                Instant(1, 10, 0f, requiredHandle: 0),
+                Instant(2, 10, 1f, requiredHandle: 0, sourceIndex: 1),
+                Instant(3, 10, 2f, requiredHandle: 0, sourceIndex: 2),
+            ],
+            [Playback(0, 10, -1, -1, 1, unwrapped, unwrapped, 0d, 0d, 3f,
+                loop: true, activates: true)],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Single(Events(events));
+        Assert.Equal(2, events[0].EventId);
+        Assert.Equal(expectedCycle, events[0].PlaybackCycle);
+        Assert.Equal(0, BitConverter.SingleToInt32Bits(events[0].AnimationTime));
+        Assert.Equal(unwrapped, cursors[0].ConsumedUnwrappedTimeSeconds);
+    }
+
+    [Fact]
+    public void HighCycleActivationAtExactWrapIncludesTimeZeroNotDurationSide()
+    {
+        const long expectedCycle = 4_611_686_018_427_387_904L;
+        var unwrapped = System.Math.ScaleB(3d, 62);
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [
+                Instant(1, 10, 0f, requiredHandle: 0),
+                Instant(2, 10, 3f, requiredHandle: 0, sourceIndex: 1),
+            ],
+            [Playback(0, 10, -1, -1, 1, unwrapped, unwrapped, 0d, 0d, 3f,
+                loop: true, activates: true)],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Single(Events(events));
+        Assert.Equal(1, events[0].EventId);
+        Assert.Equal(expectedCycle, events[0].PlaybackCycle);
+        Assert.Equal(0, BitConverter.SingleToInt32Bits(events[0].AnimationTime));
+    }
+
+    [Fact]
+    public void MaximumRepresentableLegalCycleRemainsAccepted()
+    {
+        const long expectedCycle = 9_223_372_036_854_774_784L;
+        var unwrapped = System.Math.BitDecrement(System.Math.ScaleB(1d, 63));
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [Instant(1, 10, 0f, requiredHandle: 0)],
+            [Playback(0, 10, -1, -1, 1, unwrapped, unwrapped, 0d, 0d, 1f,
+                loop: true, activates: true)],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Single(Events(events));
+        Assert.Equal(expectedCycle, events[0].PlaybackCycle);
+    }
+
+    [Fact]
+    public void NonAuthorityHugeLoopDeltaIsConsumedArithmetically()
+    {
+        const double current = 1_000_000_000_000_000_000d;
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [Instant(1, 10, 0.1f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, 0d, current, 0d, 1d, 1f, 0f,
+                    loop: true, activates: true),
+                Playback(1, 10, -1, 0, 1, 0d, current, 0d, 1d, 1f, 1f,
+                    loop: true, activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(0, events.Count);
+        Assert.Equal(current, cursors[0].ConsumedUnwrappedTimeSeconds);
+        Assert.Equal(current, cursors[1].ConsumedUnwrappedTimeSeconds);
+        Assert.Equal(1, authorities[0].OccurrenceHandleId);
+        Assert.Equal(1UL, nextToken);
+    }
+
+    [Fact]
+    public void HugeSuppressedPrefixStillFindsWinningTailOverflowTransactionally()
+    {
+        const double current = 1_000_000_000_000_000_000d;
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.EventBufferOverflow,
+            [Instant(1, 10, 0.1f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, 0d, current, 0d, 1d, 1f, 0.5f,
+                    loop: true, activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, current / 2d, 0d, 0.5d, 1f, 1f,
+                    loop: true, activates: true),
+            ],
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void HugeMidpointAuthorityBoundaryClipsExactWinningTailCycles()
+    {
+        const long firstExpectedCycle = 72_057_594_037_927_944L;
+        const long lastExpectedCycle = 72_057_594_037_927_952L;
+        var previous = System.Math.ScaleB(1d, 64);
+        var current = previous + 4_096d;
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [Instant(1, 10, 0f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, previous, current, 0d, 1d, 256f, 0.5f,
+                    loop: true, activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 1d, 0d, 0.5d, 1f, 1f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(9, events.Count);
+        Assert.Equal(
+            Enumerable.Range(0, 9).Select(index => firstExpectedCycle + index),
+            Events(events).Select(static value => value.PlaybackCycle));
+        Assert.Equal(firstExpectedCycle, events[0].PlaybackCycle);
+        Assert.Equal(0.5f, events[0].AnimationTime);
+        Assert.Equal(lastExpectedCycle, events[8].PlaybackCycle);
+        Assert.All(Events(events), value => Assert.True(value.AnimationTime >= 0.5f));
+    }
+
+    [Fact]
+    public void ClosingLoopBeginAtEndpointIsExcludedBeforeCapacityPreflight()
+    {
+        var definitions = new AlsTimelineEventDefinition[17];
+        for (var index = 0; index < 16; index++)
+        {
+            definitions[index] = Instant(
+                index, 10, 0f, requiredHandle: 0, sourceIndex: index);
+        }
+
+        definitions[16] = State(
+            16, 10, 0f, 0.5f, requiredHandle: 0, sourceIndex: 16);
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        var result = AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [Playback(0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f,
+                loop: true, activates: true, closes: true)],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var failure);
+
+        Assert.True(result, failure.ToString());
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(16, events.Count);
+        Assert.All(Events(events), value => Assert.Equal(AlsAnimationEventPhase.Trigger, value.Phase));
+        Assert.Equal(AlsTimelineCursor.CreateDefault(), cursors[0]);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+        Assert.Equal(1UL, nextToken);
+    }
+
+    [Fact]
+    public void HighCycleOwnedEndMapsFromExactCycleAndRemainder()
+    {
+        var previous = System.Math.ScaleB(1d, 64);
+        var current = previous + 4_096d;
+        const long ownerCycle = 72_057_594_037_927_936L;
+        var cursors = DefaultCursors(1);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = previous,
+        };
+        var owners = DefaultOwners(1);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 1,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = ownerCycle,
+            OwnerToken = 1,
+            Active = 1,
+        };
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 2UL;
+
+        var result = AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 0f, 256f, requiredHandle: 0, threshold: 1f)],
+            [Playback(0, 10, -1, -1, 1, previous, current, 0d, 1d, 256f, 0f,
+                loop: true)],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var failure);
+
+        Assert.True(result, failure.ToString());
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Single(Events(events));
+        Assert.Equal(AlsAnimationEventPhase.End, events[0].Phase);
+        Assert.Equal(ownerCycle, events[0].PlaybackCycle);
+        Assert.Equal(0.0625f, events[0].AnimationTime);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void HugeAuthorityHandoffLateBeginUsesExactOffsetDomainCycle()
+    {
+        const long expectedCycle = 4_503_599_627_370_496L;
+        var previous = System.Math.ScaleB(1d, 64);
+        var current = previous + 4_096d;
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        var result = AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 1_024f, 2_048f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, previous, current, 0d, 1d, 4_096f, 0.5f,
+                    loop: true, activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 1d, 0d, 0.5d, 1f, 1f,
+                    activates: true, closes: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure);
+
+        Assert.True(result, failure.ToString());
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        var lateBegin = Assert.Single(
+            Events(events),
+            value => value.Phase == AlsAnimationEventPhase.Begin && value.AnimationTime == 0.5f);
+        Assert.Equal(expectedCycle, lateBegin.PlaybackCycle);
+    }
+
+    [Fact]
+    public void HugeAuthorityHandoffEndsOldStateAtExactOffsetDomainBoundary()
+    {
+        const long expectedCycle = 4_503_599_627_370_496L;
+        var previous = System.Math.ScaleB(1d, 64);
+        var current = previous + 4_096d;
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 1_024f, 2_048f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, previous, current, 0d, 1d, 4_096f, 1f,
+                    loop: true, activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0.5d, 0.5d, 1d, 1f, 2f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(2, events.Count);
+        Assert.Equal(AlsAnimationEventPhase.Begin, events[0].Phase);
+        Assert.Equal(0.25f, events[0].AnimationTime);
+        Assert.Equal(expectedCycle, events[0].PlaybackCycle);
+        Assert.Equal(AlsAnimationEventPhase.End, events[1].Phase);
+        Assert.Equal(0.5f, events[1].AnimationTime);
+        Assert.Equal(expectedCycle, events[1].PlaybackCycle);
+        Assert.DoesNotContain(
+            Events(events),
+            value => value.SourceAnimationId == 10 &&
+                     (value.AnimationTime > 0.5f || value.Phase == AlsAnimationEventPhase.Tick));
+    }
+
+    [Fact]
+    public void ClosingLoopBeginPlateauIsExcludedBeforeCapacityPreflight()
+    {
+        var frameStart = System.Math.ScaleB(1d, 54);
+        var frameEnd = frameStart + 4d;
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        var result = AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 0.5f, 0.25f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, 0d, 40d, frameStart, frameEnd, 1f, 1f,
+                    loop: true, activates: true, closes: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0d, frameStart, frameStart, 1f, 2f,
+                    activates: true, closes: true),
+            ],
+            1, 0d, frameEnd, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure);
+
+        Assert.True(result, failure.ToString());
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(0, events.Count);
+        Assert.Equal(1UL, nextToken);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void HugeClosingLoopBeginPlateauSkipsWithoutIteration()
+    {
+        var frameStart = System.Math.ScaleB(1d, 54);
+        var frameEnd = frameStart + 4d;
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 0.5f, 0.25f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, 0d, 1_000_000_000_000_000_000d,
+                    frameStart, frameEnd, 1f, 1f, loop: true, activates: true, closes: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0d, frameStart, frameStart, 1f, 2f,
+                    activates: true, closes: true),
+            ],
+            1, 0d, frameEnd, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(0, events.Count);
+        Assert.Equal(1UL, nextToken);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void AuthorityWrapHandoffUsesOldDurationSideAndNewTimeZeroSide()
+    {
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(2);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [
+                State(1, 10, 0f, 1f, requiredHandle: 0, sourceIndex: 0),
+                State(2, 20, 0f, 1f, requiredHandle: 1, sourceIndex: 1),
+            ],
+            [
+                Playback(0, 10, -1, 0, 1, 0.75d, 1.25d, 0d, 1d, 1f, 1f,
+                    loop: true, activates: true),
+                Playback(1, 20, -1, 0, 1, 1d, 1.25d, 0.5d, 1d, 1f, 2f,
+                    loop: true, activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Contains(
+            Events(events),
+            value => value.SourceAnimationId == 10 &&
+                     value.Phase == AlsAnimationEventPhase.End &&
+                     value.AnimationTime == 0.5f &&
+                     value.PlaybackCycle == 0);
+        Assert.DoesNotContain(
+            Events(events),
+            value => value.SourceAnimationId == 10 && value.PlaybackCycle == 1);
+        Assert.Contains(
+            Events(events),
+            value => value.SourceAnimationId == 20 &&
+                     value.Phase == AlsAnimationEventPhase.Begin &&
+                     value.AnimationTime == 0.5f &&
+                     value.PlaybackCycle == 1);
+    }
+
+    [Fact]
+    public void FrameStartAuthorityLossEndsCommittedWrappedOwnerCycle()
+    {
+        var definitions = new[]
+        {
+            State(1, 10, 0f, 1f, requiredHandle: 0),
+        };
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(2);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [Playback(0, 10, -1, 0, 1, 0.75d, 1d, 0d, 1d, 1f, 1f,
+                loop: true, activates: true)],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var firstFailure));
+        Assert.Equal(AlsP5FailureCode.None, firstFailure);
+        Assert.Contains(
+            owners,
+            value => value.Active == 1 && value.PlaybackCycle == 1);
+
+        events = default;
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [
+                Playback(0, 10, -1, 0, 1, 1d, 1.25d, 0d, 1d, 1f, 1f,
+                    loop: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0.25d, 0d, 1d, 1f, 2f,
+                    loop: true, activates: true),
+            ],
+            2, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var secondFailure));
+
+        Assert.Equal(AlsP5FailureCode.None, secondFailure);
+        var end = Assert.Single(
+            Events(events),
+            value => value.SourceAnimationId == 10 && value.Phase == AlsAnimationEventPhase.End);
+        Assert.Equal(0f, end.AnimationTime);
+        Assert.Equal(1L, end.PlaybackCycle);
+        Assert.DoesNotContain(
+            Events(events),
+            value => value.SourceAnimationId == 10 && value.Phase == AlsAnimationEventPhase.Tick);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void InactiveSyntheticEndDoesNotCauseScratchOverflow()
+    {
+        var definitions = new AlsTimelineEventDefinition[17];
+        definitions[0] = State(1, 10, 0.2f, 0.6f, requiredHandle: 0, threshold: 1f);
+        for (var index = 0; index < 16; index++)
+        {
+            definitions[index + 1] = Instant(
+                100 + index,
+                30,
+                (index + 1) / 20f,
+                requiredHandle: 2,
+                sourceIndex: index + 1);
+        }
+
+        var cursors = DefaultCursors(3);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+        var cursorBytes = Bytes(cursors);
+        var authorityBytes = Bytes(authorities);
+        var ownerBytes = Bytes(owners);
+        var eventBytes = Bytes(events);
+
+        var result = AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [
+                Playback(0, 10, -1, 0, 1, 0d, 1d, 0d, 1d, 1f, 0.5f,
+                    loop: true, activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0.5d, 0.5d, 1d, 1f, 1f,
+                    activates: true),
+                Playback(2, 30, -1, -1, 1, 0d, 1d, 0d, 1d, 1f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure);
+
+        if (!result)
+        {
+            Assert.Equal(AlsP5FailureCode.EventBufferOverflow, failure);
+            Assert.Equal(cursorBytes, Bytes(cursors));
+            Assert.Equal(authorityBytes, Bytes(authorities));
+            Assert.Equal(ownerBytes, Bytes(owners));
+            Assert.Equal(1UL, nextToken);
+            Assert.Equal(eventBytes, Bytes(events));
+        }
+
+        Assert.True(result, failure.ToString());
+        Assert.Equal(16, events.Count);
+        Assert.All(Events(events), value => Assert.Equal(AlsAnimationEventPhase.Trigger, value.Phase));
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void AuthorityLossReplacesFutureAuthoredEndsWithinCapacity()
+    {
+        var definitions = new AlsTimelineEventDefinition[8];
+        for (var index = 0; index < definitions.Length; index++)
+        {
+            definitions[index] = State(
+                index,
+                10,
+                0.1f,
+                0.8f,
+                requiredHandle: 0,
+                sourceIndex: index);
+        }
+
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(8);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+        var cursorBytes = Bytes(cursors);
+        var authorityBytes = Bytes(authorities);
+        var ownerBytes = Bytes(owners);
+        var eventBytes = Bytes(events);
+
+        var result = AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [
+                Playback(0, 10, -1, 0, 1, 0d, 1d, 0d, 1d, 1f, 1f,
+                    activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0.5d, 0.5d, 1d, 1f, 2f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure);
+
+        if (!result)
+        {
+            Assert.Equal(AlsP5FailureCode.EventBufferOverflow, failure);
+            Assert.Equal(cursorBytes, Bytes(cursors));
+            Assert.Equal(authorityBytes, Bytes(authorities));
+            Assert.Equal(ownerBytes, Bytes(owners));
+            Assert.Equal(1UL, nextToken);
+            Assert.Equal(eventBytes, Bytes(events));
+        }
+
+        Assert.True(result, failure.ToString());
+        Assert.Equal(16, events.Count);
+        Assert.Equal(8, Events(events).Count(static value =>
+            value.Phase == AlsAnimationEventPhase.Begin && value.AnimationTime == 0.1f));
+        Assert.Equal(8, Events(events).Count(static value =>
+            value.Phase == AlsAnimationEventPhase.End && value.AnimationTime == 0.5f));
+        Assert.DoesNotContain(Events(events), value => value.AnimationTime > 0.5f);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void InactiveClosingEndDoesNotCauseScratchOverflow()
+    {
+        var definitions = new AlsTimelineEventDefinition[17];
+        definitions[0] = State(1, 10, 0.2f, 0.6f, requiredHandle: 0, threshold: 1f);
+        for (var index = 0; index < 16; index++)
+        {
+            definitions[index + 1] = Instant(
+                100 + index,
+                30,
+                (index + 1) / 20f,
+                requiredHandle: 1,
+                sourceIndex: index + 1);
+        }
+
+        var cursors = DefaultCursors(2);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+        var cursorBytes = Bytes(cursors);
+        var ownerBytes = Bytes(owners);
+        var eventBytes = Bytes(events);
+
+        var result = AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [
+                Playback(0, 10, -1, -1, 1, 0d, 0.5d, 0d, 1d, 1f, 0.5f,
+                    loop: true, activates: true, closes: true),
+                Playback(1, 30, -1, -1, 1, 0d, 1d, 0d, 1d, 1f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var failure);
+
+        if (!result)
+        {
+            Assert.Equal(AlsP5FailureCode.EventBufferOverflow, failure);
+            Assert.Equal(cursorBytes, Bytes(cursors));
+            Assert.Equal(ownerBytes, Bytes(owners));
+            Assert.Equal(1UL, nextToken);
+            Assert.Equal(eventBytes, Bytes(events));
+        }
+
+        Assert.True(result, failure.ToString());
+        Assert.Equal(16, events.Count);
+        Assert.All(Events(events), value => Assert.Equal(AlsAnimationEventPhase.Trigger, value.Phase));
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void PointCloseEndsCommittedWrappedOwnerCycle()
+    {
+        var definitions = new[]
+        {
+            State(1, 10, 0f, 1f, requiredHandle: 0),
+        };
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [Playback(0, 10, -1, -1, 1, 0.75d, 1d, 0d, 1d, 1f, 1f,
+                loop: true, activates: true)],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var firstFailure));
+        Assert.Equal(AlsP5FailureCode.None, firstFailure);
+        Assert.Contains(owners, value => value.Active == 1 && value.PlaybackCycle == 1);
+
+        events = default;
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            definitions,
+            [Playback(0, 10, -1, -1, 1, 1d, 1d, 0d, 0d, 1f, 1f,
+                loop: true, closes: true)],
+            2, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var secondFailure));
+
+        Assert.Equal(AlsP5FailureCode.None, secondFailure);
+        var end = Assert.Single(
+            Events(events),
+            value => value.Phase == AlsAnimationEventPhase.End);
+        Assert.Equal(0f, end.AnimationTime);
+        Assert.Equal(1L, end.PlaybackCycle);
+        Assert.DoesNotContain(Events(events), value => value.Phase == AlsAnimationEventPhase.Tick);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void OwnerTokenExhaustionPrecedesSeventeenBeginOverflow()
+    {
+        var definitions = new AlsTimelineEventDefinition[17];
+        for (var index = 0; index < definitions.Length; index++)
+        {
+            definitions[index] = State(
+                index,
+                10,
+                0f,
+                1f,
+                requiredHandle: 0,
+                sourceIndex: index);
+        }
+
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(16);
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            definitions,
+            [Playback(0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f,
+                activates: true)],
+            0d, 1d,
+            cursors, [], owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void SecondOwnerTokenExhaustionPrecedesSeventeenBeginOverflow()
+    {
+        var definitions = new AlsTimelineEventDefinition[17];
+        for (var index = 0; index < definitions.Length; index++)
+        {
+            definitions[index] = State(
+                index,
+                10,
+                0f,
+                1f,
+                requiredHandle: 0,
+                sourceIndex: index);
+        }
+
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(16);
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue - 1UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            definitions,
+            [Playback(0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f,
+                activates: true)],
+            0d, 1d,
+            cursors, [], owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void OwnerTokenExhaustionPrecedesActivationLateBeginOverflow()
+    {
+        var definitions = new AlsTimelineEventDefinition[17];
+        for (var index = 0; index < 16; index++)
+        {
+            definitions[index] = Instant(
+                100 + index,
+                30,
+                (index + 1) / 20f,
+                requiredHandle: 1,
+                sourceIndex: index);
+        }
+
+        definitions[16] = State(
+            1,
+            10,
+            0.2f,
+            0.6f,
+            requiredHandle: 0,
+            sourceIndex: 16);
+        var cursors = DefaultCursors(2);
+        var owners = DefaultOwners(16);
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            definitions,
+            [
+                Playback(1, 30, -1, -1, 1, 0d, 1d, 0d, 1d, 1f,
+                    activates: true),
+                Playback(0, 10, -1, -1, 1, 0.4d, 0.5d, 0d, 1d, 1f,
+                    activates: true),
+            ],
+            0d, 1d,
+            cursors, [], owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void OwnerTokenExhaustionIsIndependentOfDefinitionOrder()
+    {
+        var definitions = new AlsTimelineEventDefinition[18];
+        for (var index = 0; index < 17; index++)
+        {
+            definitions[index] = Instant(
+                100 + index,
+                30,
+                (index + 1) / 20f,
+                requiredHandle: 1,
+                sourceIndex: index);
+        }
+
+        definitions[17] = State(
+            1,
+            10,
+            0.2f,
+            0.6f,
+            requiredHandle: 0,
+            sourceIndex: 17);
+        var cursors = DefaultCursors(2);
+        var owners = DefaultOwners(16);
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            definitions,
+            [
+                Playback(1, 30, -1, -1, 1, 0d, 1d, 0d, 1d, 1f,
+                    activates: true),
+                Playback(0, 10, -1, -1, 1, 0.4d, 0.5d, 0d, 1d, 1f,
+                    activates: true),
+            ],
+            0d, 1d,
+            cursors, [], owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void LaterAuthorityBeginTokenExhaustionPrecedesEarlierEndOverflow()
+    {
+        var definitions = new AlsTimelineEventDefinition[17];
+        for (var index = 0; index < 16; index++)
+        {
+            definitions[index] = State(
+                index,
+                10,
+                0f,
+                0.1f,
+                requiredHandle: 0,
+                sourceIndex: index);
+        }
+
+        definitions[16] = State(
+            100,
+            30,
+            0.2f,
+            0.6f,
+            requiredHandle: 2,
+            sourceIndex: 16);
+        var cursors = DefaultCursors(3);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(16);
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue - 16UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            definitions,
+            [
+                Playback(0, 10, -1, -1, 1, 0d, 0.2d, 0d, 1d, 1f,
+                    activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0.5d, 0d, 0.5d, 1f,
+                    weight: 1f, activates: true, closes: true),
+                Playback(2, 30, -1, 0, 1, 0.4d, 0.5d, 0d, 1d, 1f,
+                    weight: 0.5f, activates: true),
+            ],
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IncomingAuthorityTokenExhaustionPrecedesSyntheticEndOverflow(bool reversePlaybacks)
+    {
+        var definitions = new AlsTimelineEventDefinition[18];
+        for (var index = 0; index < 15; index++)
+        {
+            definitions[index] = State(
+                index,
+                10,
+                0f,
+                0.55f,
+                requiredHandle: 0,
+                sourceIndex: index);
+        }
+
+        definitions[15] = State(100, 20, 0.2f, 0.6f, requiredHandle: 1, sourceIndex: 15);
+        definitions[16] = State(101, 30, 0.2f, 0.6f, requiredHandle: 2, sourceIndex: 16);
+        definitions[17] = State(102, 40, 0f, 1f, requiredHandle: 3, sourceIndex: 17);
+
+        var persistent = Playback(0, 10, -1, -1, 1, 0.5d, 0.6d, 0d, 1d, 1f);
+        var outgoing = Playback(1, 20, -1, 0, 1, 0.4d, 0.5d, 0d, 0.5d, 1f,
+            1f);
+        var incoming = Playback(2, 30, -1, 0, 1, 0.4d, 0.5d, 0d, 1d, 1f, 0.5f);
+        var ordinaryBegin = Playback(3, 40, -1, -1, 1, 0d, 0d, 0d, 0d, 1f,
+            activates: true);
+        var playbacks = reversePlaybacks
+            ? new[] { ordinaryBegin, incoming, outgoing, persistent }
+            : new[] { persistent, outgoing, incoming, ordinaryBegin };
+
+        var cursors = DefaultCursors(4);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.5d,
+        };
+        cursors[1] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 1,
+            AnimationId = 20,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.4d,
+        };
+        cursors[2] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 2,
+            AnimationId = 30,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.4d,
+        };
+        var authorities = DefaultAuthorities(1);
+        authorities[0] = new AlsTimelineAuthorityState
+        {
+            GroupId = 0,
+            OccurrenceHandleId = 1,
+            AnimationId = 20,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
+        var owners = DefaultOwners(16);
+        for (var index = 0; index < 15; index++)
+        {
+            owners[index] = new AlsNotifyStateOwnership
+            {
+                EventId = index,
+                BoundaryOrdinal = 0,
+                OccurrenceHandleId = 0,
+                AnimationId = 10,
+                ActionId = -1,
+                PlaybackEpoch = 1,
+                PlaybackCycle = 0,
+                OwnerToken = (ulong)index + 1UL,
+                Active = 1,
+            };
+        }
+
+        owners[15] = new AlsNotifyStateOwnership
+        {
+            EventId = 100,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 1,
+            AnimationId = 20,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = 16,
+            Active = 1,
+        };
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue - 1UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            definitions,
+            playbacks,
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void AuthorityRegainOfSameOwnerRequiresANewToken()
+    {
+        var cursors = DefaultCursors(2);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.4d,
+        };
+        var authorities = DefaultAuthorities(1);
+        authorities[0] = new AlsTimelineAuthorityState
+        {
+            GroupId = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
+        var owners = DefaultOwners(1);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 1,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = ulong.MaxValue - 1UL,
+            Active = 1,
+        };
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidTimeline,
+            [State(1, 10, 0.2f, 0.6f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, 0.4d, 0.5d, 0d, 1d, 1f, 0.5f),
+                Playback(1, 20, -1, 0, 1, 0d, 0.25d, 0.25d, 0.5d, 1f,
+                    1f, activates: true, closes: true),
+            ],
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void ContinuingAuthorityWindowDoesNotRequireANewOwnerToken()
+    {
+        var cursors = DefaultCursors(1);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.4d,
+        };
+        var authorities = DefaultAuthorities(1);
+        authorities[0] = new AlsTimelineAuthorityState
+        {
+            GroupId = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
+        var owners = DefaultOwners(1);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 1,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = ulong.MaxValue - 1UL,
+            Active = 1,
+        };
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue;
+
+        var success = AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 0.2f, 0.6f, requiredHandle: 0)],
+            [Playback(0, 10, -1, 0, 1, 0.4d, 0.5d, 0.5d, 1d, 1f, 1f)],
+            1, 0d, 1d,
+            cursors, authorities, owners, ref nextToken, scratch, ref events, out var failure);
+
+        Assert.True(success, failure.ToString());
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(ulong.MaxValue, nextToken);
+        var tick = Assert.Single(Events(events));
+        Assert.Equal(AlsAnimationEventPhase.Tick, tick.Phase);
+        Assert.Equal(ulong.MaxValue - 1UL, tick.OwnerToken);
+    }
+
+    [Fact]
+    public void WildcardAndExactDefinitionsCannotResolveToTheSameOwnerKey()
+    {
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(2);
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue - 1UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidBinding,
+            [
+                State(1, 10, 0f, 1f, requiredHandle: -1, sourceIndex: 0),
+                State(1, 10, 0f, 1f, requiredHandle: 0, sourceIndex: 1),
+            ],
+            [Playback(0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f,
+                activates: true)],
+            0d, 1d,
+            cursors, [], owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void AuthorityInterruptionOutputIsIndependentOfPlaybackPermutation()
+    {
+        var definitions = new[] { State(1, 10, 0.2f, 0.6f, requiredHandle: 0) };
+        var a = Playback(0, 10, -1, 0, 1, 0.4d, 0.5d, 0d, 1d, 1f, 0.5f);
+        var b = Playback(1, 20, -1, 0, 1, 0.4d, 0.5d, 0.2d, 0.4d, 1f,
+            1f, activates: true, closes: true);
+        var c = Playback(2, 30, -1, 0, 1, 0.4d, 0.5d, 0.6d, 0.8d, 1f,
+            1f, activates: true, closes: true);
+
+        var chronological = Evaluate([b, a, c]);
+        var reverse = Evaluate([c, a, b]);
+
+        Assert.True(chronological.Success);
+        Assert.True(reverse.Success);
+        Assert.Equal(AlsP5FailureCode.None, chronological.Failure);
+        Assert.Equal(AlsP5FailureCode.None, reverse.Failure);
+        Assert.Equal(4UL, chronological.NextToken);
+        Assert.Equal(chronological.NextToken, reverse.NextToken);
+        Assert.Equal(chronological.Events, reverse.Events);
+        Assert.Equal(5, chronological.Events.Length);
+        Assert.Equal(
+            new[]
+            {
+                AlsAnimationEventPhase.End,
+                AlsAnimationEventPhase.Begin,
+                AlsAnimationEventPhase.End,
+                AlsAnimationEventPhase.Begin,
+                AlsAnimationEventPhase.Tick,
+            },
+            chronological.Events.Select(static value => value.Phase));
+
+        (bool Success, AlsP5FailureCode Failure, AlsAnimationEvent[] Events, ulong NextToken) Evaluate(
+            AlsTimelinePlayback[] playbacks)
+        {
+            var cursors = DefaultCursors(3);
+            cursors[0] = new AlsTimelineCursor
+            {
+                OccurrenceHandleId = 0,
+                AnimationId = 10,
+                ActionId = -1,
+                PlaybackEpoch = 1,
+                ConsumedUnwrappedTimeSeconds = 0.4d,
+            };
+            var authorities = DefaultAuthorities(1);
+            authorities[0] = new AlsTimelineAuthorityState
+            {
+                GroupId = 0,
+                OccurrenceHandleId = 0,
+                AnimationId = 10,
+                ActionId = -1,
+                PlaybackEpoch = 1,
+                Active = 1,
+            };
+            var owners = DefaultOwners(1);
+            owners[0] = new AlsNotifyStateOwnership
+            {
+                EventId = 1,
+                BoundaryOrdinal = 0,
+                OccurrenceHandleId = 0,
+                AnimationId = 10,
+                ActionId = -1,
+                PlaybackEpoch = 1,
+                PlaybackCycle = 0,
+                OwnerToken = 1,
+                Active = 1,
+            };
+            var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+            var events = new AlsEventBuffer();
+            var nextToken = 2UL;
+
+            var success = AlsTimelineRuntime.TryEvaluate(
+                definitions, playbacks, 1, 0d, 1d,
+                cursors, authorities, owners, ref nextToken, scratch, ref events, out var failure);
+            return (success, failure, Events(events), nextToken);
+        }
+    }
+
+    [Fact]
+    public void AdjacentStateSlicesConsumeOneTokenIndependentOfPlaybackPermutation()
+    {
+        var first = Playback(0, 10, -1, -1, 1, 0d, 0.5d, 0d, 0.5d, 1f,
+            activates: true);
+        var second = Playback(0, 10, -1, -1, 1, 0.5d, 0.75d, 0.5d, 1d, 1f);
+
+        var chronological = Evaluate([first, second]);
+        var reverse = Evaluate([second, first]);
+
+        Assert.True(chronological.Success, chronological.Failure.ToString());
+        Assert.True(reverse.Success, reverse.Failure.ToString());
+        Assert.Equal(ulong.MaxValue, chronological.NextToken);
+        Assert.Equal(chronological.NextToken, reverse.NextToken);
+        Assert.Equal(chronological.Events, reverse.Events);
+        Assert.Equal(
+            new[] { AlsAnimationEventPhase.Begin, AlsAnimationEventPhase.End },
+            chronological.Events.Select(static value => value.Phase));
+
+        (bool Success, AlsP5FailureCode Failure, AlsAnimationEvent[] Events, ulong NextToken) Evaluate(
+            AlsTimelinePlayback[] playbacks)
+        {
+            var cursors = DefaultCursors(1);
+            var owners = DefaultOwners(1);
+            var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+            var events = new AlsEventBuffer();
+            var nextToken = ulong.MaxValue - 1UL;
+            var success = AlsTimelineRuntime.TryEvaluate(
+                [State(1, 10, 0.25f, 0.5f, requiredHandle: 0)],
+                playbacks,
+                1, 0d, 1d,
+                cursors, [], owners, ref nextToken, scratch, ref events, out var failure);
+            return (success, failure, Events(events), nextToken);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ManyAuthorityInterruptionsOverflowIndependentOfPlaybackPermutation(bool reverse)
+    {
+        var playbacks = new AlsTimelinePlayback[9];
+        playbacks[0] = Playback(0, 10, -1, 0, 1, 0.4d, 0.5d, 0d, 1d, 1f, 0.5f);
+        for (var index = 0; index < 8; index++)
+        {
+            var playbackIndex = reverse ? 8 - index : index + 1;
+            playbacks[playbackIndex] = Playback(
+                index + 1,
+                20 + index,
+                -1,
+                0,
+                1,
+                0.4d,
+                0.5d,
+                (2 * index + 1) / 20d,
+                (index + 1) / 10d,
+                1f,
+                1f,
+                activates: true,
+                closes: true);
+        }
+
+        var cursors = DefaultCursors(9);
+        cursors[0] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = 0.4d,
+        };
+        var authorities = DefaultAuthorities(1);
+        authorities[0] = new AlsTimelineAuthorityState
+        {
+            GroupId = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
+        var owners = DefaultOwners(1);
+        owners[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 1,
+            BoundaryOrdinal = 0,
+            OccurrenceHandleId = 0,
+            AnimationId = 10,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            PlaybackCycle = 0,
+            OwnerToken = 1,
+            Active = 1,
+        };
+        var events = new AlsEventBuffer();
+        var nextToken = 2UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.EventBufferOverflow,
+            [State(1, 10, 0.2f, 0.6f, requiredHandle: 0)],
+            playbacks,
+            0d, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void OwnerTokenExhaustionPrecedesShortScratchOverflow()
+    {
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity - 1];
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue;
+        var cursorBytes = Bytes(cursors);
+        var ownerBytes = Bytes(owners);
+        var eventBytes = Bytes(events);
+
+        Assert.False(AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 0f, 1f, requiredHandle: 0)],
+            [Playback(0, 10, -1, -1, 1, 0d, 0d, 0d, 0d, 1f,
+                activates: true)],
+            1, 0d, 1d, cursors, [], owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+        Assert.Equal(cursorBytes, Bytes(cursors));
+        Assert.Equal(ownerBytes, Bytes(owners));
+        Assert.Equal(ulong.MaxValue, nextToken);
+        Assert.Equal(eventBytes, Bytes(events));
+    }
+
+    [Fact]
+    public void MaximumOwnerTokenIsAllowedWhenNoBeginIsRequired()
+    {
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = ulong.MaxValue;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [], [], 1, 0d, 1d, [], [], [], ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(ulong.MaxValue, nextToken);
+        Assert.Equal(0, events.Count);
+    }
+
+    [Fact]
+    public void LargeAdjacentPlaybackSequenceCompletesWithBoundedSelection()
+    {
+        const int sliceCount = 2_048;
+        var playbacks = new AlsTimelinePlayback[sliceCount];
+        for (var index = 0; index < playbacks.Length; index++)
+        {
+            var start = index / (double)sliceCount;
+            var end = (index + 1) / (double)sliceCount;
+            playbacks[index] = Playback(
+                0, 10, -1, -1, 1,
+                start, end, start, end, 1f,
+                activates: index == 0);
+        }
+
+        var cursors = DefaultCursors(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [], playbacks, 1, 0d, 1d, cursors, [], [], ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(0, events.Count);
+        Assert.Equal(1d, cursors[0].ConsumedUnwrappedTimeSeconds);
+        Assert.Equal(1UL, nextToken);
+    }
+
+    [Fact]
+    public void LargeResolvedOwnerValidationCompletesWithBoundedSelection()
+    {
+        const int count = 2_048;
+        var definitions = new AlsTimelineEventDefinition[count];
+        var playbacks = new AlsTimelinePlayback[count];
+        for (var index = 0; index < count; index++)
+        {
+            definitions[index] = State(
+                index,
+                10,
+                0f,
+                1f,
+                requiredHandle: 0,
+                sourceIndex: index);
+            var start = index / (double)count;
+            var end = (index + 1) / (double)count;
+            playbacks[index] = Playback(
+                0,
+                10,
+                -1,
+                -1,
+                1,
+                start,
+                end,
+                start,
+                end,
+                1f,
+                activates: index == 0);
+        }
+
+        var cursors = DefaultCursors(1);
+        var owners = DefaultOwners(16);
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.EventBufferOverflow,
+            definitions,
+            playbacks,
+            0d, 1d,
+            cursors, [], owners, ref nextToken, ref events);
+    }
+
+    [Fact]
+    public void NonLoopStateBeginAtAuthorityLossEndpointIsSuppressedAfterSide()
+    {
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [State(1, 10, 0.5f, 0.4f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, 0d, 1d, 0d, 1d, 1f, 1f,
+                    activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0.5d, 0.5d, 1d, 1f, 2f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(0, events.Count);
+        Assert.Equal(1UL, nextToken);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+    }
+
+    [Fact]
+    public void InstantAtInternalAuthorityLossEndpointIsSuppressedAfterSide()
+    {
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [Instant(1, 10, 0.5f, requiredHandle: 0)],
+            [
+                Playback(0, 10, -1, 0, 1, 0d, 1d, 0d, 1d, 1f, 1f,
+                    activates: true),
+                Playback(1, 20, -1, 0, 1, 0d, 0.5d, 0.5d, 1d, 1f, 2f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(0, events.Count);
+    }
+
+    [Fact]
+    public void LoopInstantAtInternalAuthorityGainEndpointUsesAfterSideWinner()
+    {
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [Instant(1, 20, 0.5f, requiredHandle: 0)],
+            [
+                Playback(0, 20, -1, 0, 1, 0d, 1d, 0d, 1d, 1f, 0.5f,
+                    loop: true, activates: true),
+                Playback(1, 10, -1, 0, 1, 0d, 0.5d, 0d, 0.5d, 1f, 1f,
+                    loop: true, activates: true, closes: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        var trigger = Assert.Single(Events(events));
+        Assert.Equal(AlsAnimationEventPhase.Trigger, trigger.Phase);
+        Assert.Equal(0.5f, trigger.AnimationTime);
+        Assert.Equal(0L, trigger.PlaybackCycle);
+        Assert.Equal(20, trigger.SourceAnimationId);
+    }
+
+    [Fact]
+    public void AuthorityLateBeginThatEndsLaterSameFramePublishesBeginThenEndWithoutTick()
+    {
+        var cursors = DefaultCursors(2);
+        var authorities = DefaultAuthorities(1);
+        var owners = DefaultOwners(1);
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(
+            [State(2, 20, 0.2f, 0.6f, requiredHandle: 1)],
+            [
+                Playback(0, 10, -1, 0, 1, 0d, 0.5d, 0d, 0.5d, 1f, 1f,
+                    activates: true, closes: true),
+                Playback(1, 20, -1, 0, 1, 0d, 1d, 0d, 1d, 1f, 0.5f,
+                    activates: true),
+            ],
+            1, 0d, 1d, cursors, authorities, owners, ref nextToken, scratch,
+            ref events, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(
+            [AlsAnimationEventPhase.Begin, AlsAnimationEventPhase.End],
+            Events(events).Select(static value => value.Phase));
+        Assert.Equal([0.5f, 0.8f], Events(events).Select(static value => value.AnimationTime));
+        Assert.Equal(events[0].OwnerToken, events[1].OwnerToken);
+        Assert.Equal(0, owners.Count(static value => value.Active == 1));
+        Assert.Equal(2UL, nextToken);
+    }
+
+    [Theory]
+    [InlineData("definition")]
+    [InlineData("playback-handle")]
+    [InlineData("playback-group")]
+    public void InvalidBindingPrecedesNonFiniteFrameInput(string invalidSource)
+    {
+        var definition = Instant(1, 10, 0.5f, requiredHandle: 0);
+        var playback = Playback(
+            0, 10, -1, 0, 1, 0d, 1d, 0d, 1d, 1f, activates: true);
+        var cursors = DefaultCursors(1);
+        var authorities = DefaultAuthorities(1);
+        if (invalidSource == "definition")
+        {
+            definition = definition with { EventId = -1 };
+        }
+        else if (invalidSource == "playback-handle")
+        {
+            playback = playback with { OccurrenceHandleId = 1 };
+        }
+        else
+        {
+            playback = playback with { AuthorityGroupId = 1 };
+        }
+
+        var owners = DefaultOwners(1);
+        var events = new AlsEventBuffer();
+        var nextToken = 1UL;
+
+        AssertEvaluationFailurePreservesAllBytes(
+            AlsP5FailureCode.InvalidBinding,
+            [definition], [playback], double.NaN, 1d,
+            cursors, authorities, owners, ref nextToken, ref events);
+    }
+
     private static EvaluationSnapshot EvaluateFresh(
         AlsTimelineEventDefinition[] definitions,
         AlsTimelinePlayback[] playbacks,
@@ -1310,6 +3084,37 @@ public sealed class AlsTimelineRuntimeTests
             definitions, playbacks, 1, frameStart, frameEnd,
             cursors, [], owners, ref nextToken, scratch, ref events, out var failure));
         Assert.Equal(expected, failure);
+    }
+
+    private static void AssertEvaluationFailurePreservesAllBytes(
+        AlsP5FailureCode expected,
+        AlsTimelineEventDefinition[] definitions,
+        AlsTimelinePlayback[] playbacks,
+        double frameStart,
+        double frameEnd,
+        AlsTimelineCursor[] cursors,
+        AlsTimelineAuthorityState[] authorities,
+        AlsNotifyStateOwnership[] owners,
+        ref ulong nextToken,
+        ref AlsEventBuffer events)
+    {
+        var cursorBytes = Bytes(cursors);
+        var authorityBytes = Bytes(authorities);
+        var ownerBytes = Bytes(owners);
+        var eventBytes = Bytes(events);
+        var token = nextToken;
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+
+        Assert.False(AlsTimelineRuntime.TryEvaluate(
+            definitions, playbacks, 1, frameStart, frameEnd,
+            cursors, authorities, owners, ref nextToken, scratch, ref events, out var failure));
+
+        Assert.Equal(expected, failure);
+        Assert.Equal(cursorBytes, Bytes(cursors));
+        Assert.Equal(authorityBytes, Bytes(authorities));
+        Assert.Equal(ownerBytes, Bytes(owners));
+        Assert.Equal(token, nextToken);
+        Assert.Equal(eventBytes, Bytes(events));
     }
 
     private readonly record struct EvaluationSnapshot(
