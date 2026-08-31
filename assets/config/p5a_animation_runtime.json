@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "eventSemantics": [
+    {
+      "kind": "Generic",
+      "semanticId": 0
+    },
+    {
+      "kind": "Footstep",
+      "semanticId": 1
+    },
+    {
+      "kind": "SetAction",
+      "semanticId": 2
+    },
+    {
+      "kind": "SetGroundedEntry",
+      "semanticId": 3
+    },
+    {
+      "kind": "EarlyBlendOut",
+      "semanticId": 4
+    },
+    {
+      "kind": "RootMotionScale",
+      "semanticId": 5
+    }
+  ],
+  "curveSemantics": {
+    "allowTransitions": {
+      "sourceName": "Enable_Transition",
+      "missingValue": 1.0,
+      "blendMode": "AdditiveToDefault",
+      "clampMinimum": 0.0,
+      "clampMaximum": 1.0
+    }
+  },
+  "syncGroups": [
+    {
+      "name": "Grounded",
+      "leftMarker": "Left",
+      "rightMarker": "Right",
+      "members": [
+        {
+          "animation": "21c24bd7df5192db2e2a860457f2b7b0681de41d",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "44a7f89b2c1dac832ca63753c131a037420f9d7e",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "572c3c83c9007964c233db4c7288ae38e20c3dec",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "6124eafdcbeaaf04bca366add34c821faa0e4963",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "859f8a49c55747e7382a1ae15970b23cc12f3f85",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "8ae1b9703a7d0144e570247d88629530b376885f",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "8bd6ad52ad04a2ad23b47187886c630701df5260",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "8eb8837c9f32973628b83ed2b98f7d68a0e82aa9",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "945bdda63e8a379694c792c3545fe11dd166b724",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "b07a51bbab122c81679ac30d3f2f78f45ac14dc8",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "db60b2c35ce5ef5216c782fc1f33549cbcf8278d",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "eb84a748fee4615754ce3cbcd3c259b33918b935",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "f9ec8804e251f03c57e04dde4db9bd921457bae4",
+          "loopPolicy": "Loop",
+          "canLead": true
+        },
+        {
+          "animation": "fc2d3a4142a1bd82d20877d806c783ff56dfe688",
+          "loopPolicy": "Loop",
+          "canLead": true
+        }
+      ]
+    }
+  ],
+  "dynamicTransition": {
+    "distanceMeters": 0.08,
+    "blendSeconds": 0.2,
+    "playRate": 1.5,
+    "cooldownFrames": 2,
+    "slots": [
+      {
+        "stance": "Standing",
+        "foot": "Left",
+        "animation": "3e23712571d6bbea8744fc94dad0904a6a0a0b5d"
+      },
+      {
+        "stance": "Standing",
+        "foot": "Right",
+        "animation": "97d46bf9858376893c1c34a128c27044b4467d82"
+      },
+      {
+        "stance": "Crouching",
+        "foot": "Left",
+        "animation": "3e23712571d6bbea8744fc94dad0904a6a0a0b5d"
+      },
+      {
+        "stance": "Crouching",
+        "foot": "Right",
+        "animation": "97d46bf9858376893c1c34a128c27044b4467d82"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "name": "Roll",
+      "montage": "2d9341182885d90ad666fff32c025937438b1827",
+      "slot": "BaseLayer",
+      "startSection": "Default",
+      "priority": 100,
+      "interruptible": true,
+      "playRate": 1.0,
+      "blendSeconds": 0.2,
+      "loopPolicy": "Once"
+    }
+  ],
+  "demoCases": {
+    "transitionStance": "Standing",
+    "transitionFoot": "Left",
+    "rollAction": "Roll"
+  }
+}
