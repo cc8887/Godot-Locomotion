@@ -14,6 +14,7 @@ public static partial class AlsManifestValidator
         ArgumentNullException.ThrowIfNull(manifest);
         options ??= new AlsManifestValidationOptions();
         var issues = new List<AlsValidationIssue>();
+        AddMissingTopLevelCollections(manifest, issues);
         var sections = GetSections(manifest);
 
         if (manifest.SchemaVersion != options.SupportedSchemaVersion)
@@ -28,29 +29,37 @@ public static partial class AlsManifestValidator
                 options.SupportedExporterVersion, manifest.ExporterVersion);
         }
 
-        if (options.RequireCompleteAudit && !string.Equals(manifest.AuditSummary.Status, "complete", StringComparison.Ordinal))
+        if (manifest.AuditSummary is null)
         {
-            Add(issues, "ALSMANIFEST002", null, "$.auditSummary.status", "Manifest audit is not complete.",
-                "complete", manifest.AuditSummary.Status);
+            Add(issues, "ALSMANIFEST029", null, "$.auditSummary", "Required manifest value cannot be null.");
         }
-
-        var assetCount = sections.Sum(section => section.Assets.Length);
-        if (manifest.AuditSummary.AssetCount != assetCount)
+        else
         {
-            Add(issues, "ALSMANIFEST003", null, "$.auditSummary.assetCount", "Asset count does not match manifest contents.",
-                assetCount.ToString(), manifest.AuditSummary.AssetCount.ToString());
-        }
+            if (options.RequireCompleteAudit && !string.Equals(manifest.AuditSummary.Status, "complete", StringComparison.Ordinal))
+            {
+                Add(issues, "ALSMANIFEST002", null, "$.auditSummary.status", "Manifest audit is not complete.",
+                    "complete", manifest.AuditSummary.Status);
+            }
 
-        if (manifest.AuditSummary.FileCount != manifest.Files.Length)
-        {
-            Add(issues, "ALSMANIFEST004", null, "$.auditSummary.fileCount", "File count does not match manifest contents.",
-                manifest.Files.Length.ToString(), manifest.AuditSummary.FileCount.ToString());
-        }
+            var assetCount = sections.Sum(section => section.Assets.Length);
+            if (manifest.AuditSummary.AssetCount != assetCount)
+            {
+                Add(issues, "ALSMANIFEST003", null, "$.auditSummary.assetCount", "Asset count does not match manifest contents.",
+                    assetCount.ToString(), manifest.AuditSummary.AssetCount.ToString());
+            }
 
-        if (manifest.AuditSummary.ErrorCount != 0)
-        {
-            Add(issues, "ALSMANIFEST005", null, "$.auditSummary.errorCount", "Completed manifest contains exporter errors.",
-                "0", manifest.AuditSummary.ErrorCount.ToString());
+            var fileCount = manifest.Files?.Length ?? 0;
+            if (manifest.AuditSummary.FileCount != fileCount)
+            {
+                Add(issues, "ALSMANIFEST004", null, "$.auditSummary.fileCount", "File count does not match manifest contents.",
+                    fileCount.ToString(), manifest.AuditSummary.FileCount.ToString());
+            }
+
+            if (manifest.AuditSummary.ErrorCount != 0)
+            {
+                Add(issues, "ALSMANIFEST005", null, "$.auditSummary.errorCount", "Completed manifest contains exporter errors.",
+                    "0", manifest.AuditSummary.ErrorCount.ToString());
+            }
         }
 
         ValidateCoordinateSystem(manifest, issues);
@@ -66,8 +75,13 @@ public static partial class AlsManifestValidator
         {
             for (var index = 0; index < section.Assets.Length; index++)
             {
-                ValidateAssetReferences(section.Name, index, section.Assets[index], ids, issues);
-                ValidateTypedMetadata(section.Name, index, section.Assets[index], eventIds, markerIds, issues);
+                var asset = section.Assets[index];
+                if (asset is null)
+                {
+                    continue;
+                }
+                ValidateAssetReferences(section.Name, index, asset, ids, issues);
+                ValidateTypedMetadata(section.Name, index, asset, eventIds, markerIds, issues);
             }
         }
 
@@ -77,6 +91,11 @@ public static partial class AlsManifestValidator
     private static void ValidateCoordinateSystem(AlsManifest manifest, List<AlsValidationIssue> issues)
     {
         var coordinate = manifest.CoordinateSystem;
+        if (coordinate is null)
+        {
+            Add(issues, "ALSMANIFEST029", null, "$.coordinateSystem", "Required manifest value cannot be null.");
+            return;
+        }
         if (!string.Equals(coordinate.SourceHandedness, "left", StringComparison.Ordinal) ||
             !string.Equals(coordinate.SourceUpAxis, "Z", StringComparison.Ordinal) ||
             !string.Equals(coordinate.TargetHandedness, "right", StringComparison.Ordinal) ||
@@ -100,11 +119,22 @@ public static partial class AlsManifestValidator
         {
             var asset = section.Assets[index];
             var path = $"$.{section.Name}[{index}]";
-            if (index > 0 && string.CompareOrdinal(section.Assets[index - 1].Id, asset.Id) > 0)
+            if (asset is null)
+            {
+                Add(issues, "ALSMANIFEST029", null, path, "Required manifest array element cannot be null.");
+                continue;
+            }
+            var previousAsset = index > 0 ? section.Assets[index - 1] : null;
+            if (previousAsset is not null && string.CompareOrdinal(previousAsset.Id, asset.Id) > 0)
             {
                 Add(issues, "ALSMANIFEST007", asset.Id, $"$.{section.Name}", "Assets must be sorted by stable ID.");
             }
 
+            if (string.IsNullOrWhiteSpace(asset.Id))
+            {
+                Add(issues, "ALSMANIFEST029", null, $"{path}.id", "Required asset ID cannot be null or empty.");
+                continue;
+            }
             if (!ids.TryAdd(asset.Id, new AssetLocation(section.Name, index)))
             {
                 Add(issues, "ALSMANIFEST008", asset.Id, $"{path}.id", "Duplicate stable asset ID.");
@@ -118,6 +148,10 @@ public static partial class AlsManifestValidator
             {
                 try
                 {
+                    if (string.IsNullOrWhiteSpace(asset.ObjectPath))
+                    {
+                        throw new ArgumentException("Object path is required.");
+                    }
                     var expected = AlsStableAssetId.Create(asset.ObjectPath);
                     if (!string.Equals(expected, asset.Id, StringComparison.Ordinal))
                     {
@@ -130,7 +164,8 @@ public static partial class AlsManifestValidator
                 }
             }
 
-            if (!asset.PackagePath.StartsWith("/Game/", StringComparison.Ordinal) || asset.PackagePath.Contains('\\'))
+            if (string.IsNullOrWhiteSpace(asset.PackagePath) ||
+                !asset.PackagePath.StartsWith("/Game/", StringComparison.Ordinal) || asset.PackagePath.Contains('\\'))
             {
                 Add(issues, "ALSMANIFEST009", asset.Id, $"{path}.packagePath", "Package path is not canonical.");
             }
@@ -150,6 +185,11 @@ public static partial class AlsManifestValidator
         List<AlsValidationIssue> issues)
     {
         var path = $"$.{section}[{index}]";
+        if (asset.Dependencies is null)
+        {
+            Add(issues, "ALSMANIFEST029", asset.Id, $"{path}.dependencies", "Required asset collection cannot be null.");
+            return;
+        }
         for (var dependencyIndex = 0; dependencyIndex < asset.Dependencies.Length; dependencyIndex++)
         {
             var dependency = asset.Dependencies[dependencyIndex];
@@ -160,6 +200,11 @@ public static partial class AlsManifestValidator
             }
         }
 
+        if (asset.Metadata.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            Add(issues, "ALSMANIFEST029", asset.Id, $"{path}.metadata", "Required asset metadata cannot be null.");
+            return;
+        }
         ValidateMetadataReferences(asset.Metadata, $"{path}.metadata", asset.Id, ids, issues);
     }
 
@@ -211,19 +256,172 @@ public static partial class AlsManifestValidator
         HashSet<string> markerIds,
         List<AlsValidationIssue> issues)
     {
-        if (section == "animations")
+        if (section is not ("animations" or "montages"))
         {
-            var path = $"$.animations[{index}].metadata";
-            var metadata = AlsAnimationMetadata.Read(asset.Metadata);
-            ValidateTimeline(metadata.Timeline, metadata.PlayLength, path, asset.Id, eventIds, issues);
-            ValidateMarkers(metadata.SyncMarkers, metadata.PlayLength, path, asset.Id, markerIds, issues);
+            return;
         }
-        else if (section == "montages")
+        var path = $"$.{section}[{index}].metadata";
+        if (asset.Metadata.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
         {
-            var path = $"$.montages[{index}].metadata";
-            var metadata = AlsMontageMetadata.Read(asset.Metadata);
-            ValidateTimeline(metadata.Timeline, metadata.PlayLength, path, asset.Id, eventIds, issues);
-            ValidateMontageSections(metadata, path, asset.Id, issues);
+            return;
+        }
+        if (TryFindFirstNull(asset.Metadata, path, out var nullPath))
+        {
+            Add(issues, "ALSMANIFEST029", asset.Id, nullPath, "Required metadata value cannot be null.");
+            return;
+        }
+
+        try
+        {
+            if (section == "animations")
+            {
+                var metadata = AlsAnimationMetadata.Read(asset.Metadata);
+                ValidateAnimationContract(asset, metadata, path, issues);
+                ValidateTimeline(metadata.Timeline, metadata.PlayLength, path, asset.Id, eventIds, issues);
+                ValidateMarkers(metadata.SyncMarkers, metadata.PlayLength, path, asset.Id, markerIds, issues);
+            }
+            else if (section == "montages")
+            {
+                var metadata = AlsMontageMetadata.Read(asset.Metadata);
+                ValidateMontageContract(asset, metadata, path, issues);
+                ValidateTimeline(metadata.Timeline, metadata.PlayLength, path, asset.Id, eventIds, issues);
+                ValidateMontageSections(metadata, path, asset.Id, issues);
+            }
+        }
+        catch (JsonException exception)
+        {
+            Add(issues, "ALSMANIFEST029", asset.Id, path, "Metadata violates the required runtime shape.", null, exception.Message);
+        }
+    }
+
+    private static void ValidateAnimationContract(
+        AlsManifestAsset asset,
+        AlsAnimationMetadata metadata,
+        string metadataPath,
+        List<AlsValidationIssue> issues)
+    {
+        var assetPath = metadataPath[..^".metadata".Length];
+        if (asset.ClassPath is not "/Script/Engine.AnimSequence")
+        {
+            Add(issues, "ALSMANIFEST025", asset.Id, $"{assetPath}.classPath",
+                "Animation class path must identify an AnimSequence.", "/Script/Engine.AnimSequence", asset.ClassPath);
+        }
+
+        if (!float.IsFinite(metadata.PlayLength) || metadata.PlayLength < 0f)
+        {
+            Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.playLength",
+                "Animation play length must be finite and nonnegative.");
+        }
+        if (metadata.FrameRateNumerator <= 0)
+        {
+            Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.frameRateNumerator",
+                "Animation frame-rate numerator must be positive.");
+        }
+        if (metadata.FrameRateDenominator <= 0)
+        {
+            Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.frameRateDenominator",
+                "Animation frame-rate denominator must be positive.");
+        }
+        if (metadata.SampledKeyCount < 0)
+        {
+            Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.sampledKeyCount",
+                "Animation sampled-key count must be nonnegative.");
+        }
+        if (!StableIdRegex().IsMatch(metadata.SkeletonId ?? string.Empty))
+        {
+            Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.skeletonId",
+                "Animation skeleton ID must be a lowercase SHA-1.");
+        }
+        if (string.IsNullOrWhiteSpace(metadata.SkeletonObjectPath))
+        {
+            Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.skeletonObjectPath",
+                "Animation skeleton object path is required.");
+        }
+        if (!string.IsNullOrEmpty(metadata.AdditiveBasePoseId) && !StableIdRegex().IsMatch(metadata.AdditiveBasePoseId))
+        {
+            Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.additiveBasePoseId",
+                "Animation additive base-pose ID must be empty or a lowercase SHA-1.");
+        }
+    }
+
+    private static void ValidateMontageContract(
+        AlsManifestAsset asset,
+        AlsMontageMetadata metadata,
+        string metadataPath,
+        List<AlsValidationIssue> issues)
+    {
+        var assetPath = metadataPath[..^".metadata".Length];
+        if (asset.ClassPath is not "/Script/Engine.AnimMontage")
+        {
+            Add(issues, "ALSMANIFEST025", asset.Id, $"{assetPath}.classPath",
+                "Montage class path must identify an AnimMontage.", "/Script/Engine.AnimMontage", asset.ClassPath);
+        }
+
+        ValidateMontageScalar(metadata.PlayLength, false, $"{metadataPath}.playLength", asset.Id, issues);
+        ValidateMontageScalar(metadata.BlendInTime, false, $"{metadataPath}.blendInTime", asset.Id, issues);
+        ValidateMontageScalar(metadata.BlendOutTime, false, $"{metadataPath}.blendOutTime", asset.Id, issues);
+        ValidateMontageScalar(metadata.BlendOutTriggerTime, true, $"{metadataPath}.blendOutTriggerTime", asset.Id, issues);
+
+        for (var slotIndex = 0; slotIndex < metadata.Slots.Length; slotIndex++)
+        {
+            var slot = metadata.Slots[slotIndex];
+            var slotPath = $"{metadataPath}.slots[{slotIndex}]";
+            if (string.IsNullOrWhiteSpace(slot.SlotName))
+            {
+                Add(issues, "ALSMANIFEST028", asset.Id, $"{slotPath}.slotName", "Montage slot name is required.");
+            }
+            for (var segmentIndex = 0; segmentIndex < slot.Segments.Length; segmentIndex++)
+            {
+                var segment = slot.Segments[segmentIndex];
+                var segmentPath = $"{slotPath}.segments[{segmentIndex}]";
+                if (!StableIdRegex().IsMatch(segment.AnimationId ?? string.Empty))
+                {
+                    Add(issues, "ALSMANIFEST028", asset.Id, $"{segmentPath}.animationId",
+                        "Montage segment animation ID must be a lowercase SHA-1.");
+                }
+                if (string.IsNullOrWhiteSpace(segment.AnimationObjectPath))
+                {
+                    Add(issues, "ALSMANIFEST028", asset.Id, $"{segmentPath}.animationObjectPath",
+                        "Montage segment animation object path is required.");
+                }
+                if (!float.IsFinite(segment.StartPosition) || segment.StartPosition < 0f ||
+                    segment.StartPosition > metadata.PlayLength)
+                {
+                    Add(issues, "ALSMANIFEST028", asset.Id, $"{segmentPath}.startPosition",
+                        "Montage segment start position must be finite and inside the montage.");
+                }
+                if (!float.IsFinite(segment.AnimationStartTime) || segment.AnimationStartTime < 0f)
+                {
+                    Add(issues, "ALSMANIFEST028", asset.Id, $"{segmentPath}.animationStartTime",
+                        "Montage segment animation start time must be finite and nonnegative.");
+                }
+                if (!float.IsFinite(segment.AnimationEndTime) || segment.AnimationEndTime < 0f ||
+                    segment.AnimationEndTime < segment.AnimationStartTime)
+                {
+                    Add(issues, "ALSMANIFEST028", asset.Id, $"{segmentPath}.animationEndTime",
+                        "Montage segment animation end time must be finite, nonnegative, and not precede its start.");
+                }
+                if (!float.IsFinite(segment.PlayRate) || segment.PlayRate <= 0f)
+                {
+                    Add(issues, "ALSMANIFEST028", asset.Id, $"{segmentPath}.playRate",
+                        "Montage segment play rate must be finite and positive.");
+                }
+                if (segment.LoopCount < 1)
+                {
+                    Add(issues, "ALSMANIFEST028", asset.Id, $"{segmentPath}.loopCount",
+                        "Montage segment loop count must be at least one.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateMontageScalar(
+        float value, bool allowNegative, string path, string assetId, List<AlsValidationIssue> issues)
+    {
+        if (!float.IsFinite(value) || !allowNegative && value < 0f)
+        {
+            Add(issues, "ALSMANIFEST027", assetId, path,
+                allowNegative ? "Montage scalar must be finite." : "Montage scalar must be finite and nonnegative.");
         }
     }
 
@@ -253,12 +451,12 @@ public static partial class AlsManifestValidator
             {
                 Add(issues, "ALSMANIFEST015", assetId, $"{path}.displayName", "Timeline display name is required.");
             }
-            if (!double.IsFinite(value.TimeSeconds) || value.TimeSeconds < 0.0 ||
+            if (!IsFiniteFloat(value.TimeSeconds) || value.TimeSeconds < 0.0 ||
                 !double.IsFinite(sourceLength) || value.TimeSeconds > sourceLength)
             {
                 Add(issues, "ALSMANIFEST016", assetId, $"{path}.timeSeconds", "Timeline time is outside the source length.");
             }
-            if (!double.IsFinite(value.DurationSeconds) || value.DurationSeconds < 0.0 ||
+            if (!IsFiniteFloat(value.DurationSeconds) || value.DurationSeconds < 0.0 ||
                 !double.IsFinite(value.TimeSeconds + value.DurationSeconds) ||
                 value.TimeSeconds + value.DurationSeconds > sourceLength)
             {
@@ -287,12 +485,12 @@ public static partial class AlsManifestValidator
             switch (value.Payload)
             {
             case AlsEarlyBlendOutEventPayloadMetadata payload
-                when !double.IsFinite(payload.BlendOutSeconds) || payload.BlendOutSeconds < 0.0:
+                when !IsFiniteFloat(payload.BlendOutSeconds) || payload.BlendOutSeconds < 0.0:
                 Add(issues, "ALSMANIFEST021", assetId, $"{path}.payload.blendOutSeconds",
                     "EarlyBlendOut blend duration must be finite and nonnegative.");
                 break;
             case AlsRootMotionScaleEventPayloadMetadata payload
-                when !double.IsFinite(payload.TranslationScale) || payload.TranslationScale < 0.0:
+                when !IsFiniteFloat(payload.TranslationScale) || payload.TranslationScale < 0.0:
                 Add(issues, "ALSMANIFEST021", assetId, $"{path}.payload.translationScale",
                     "RootMotionScale translation scale must be finite and nonnegative.");
                 break;
@@ -322,7 +520,7 @@ public static partial class AlsManifestValidator
             {
                 Add(issues, "ALSMANIFEST023", assetId, $"{path}.name", "Sync marker name is required.");
             }
-            if (!double.IsFinite(value.TimeSeconds) || value.TimeSeconds < 0.0 || value.TimeSeconds > sourceLength)
+            if (!IsFiniteFloat(value.TimeSeconds) || value.TimeSeconds < 0.0 || value.TimeSeconds > sourceLength)
             {
                 Add(issues, "ALSMANIFEST023", assetId, $"{path}.timeSeconds", "Sync marker time is outside the source length.");
             }
@@ -376,20 +574,83 @@ public static partial class AlsManifestValidator
         !path.Contains('\\') &&
         !path.Split('/').Any(segment => segment is "" or "." or "..");
 
+    private static bool IsFiniteFloat(double value) =>
+        double.IsFinite(value) && value >= -float.MaxValue && value <= float.MaxValue;
+
+    private static bool TryFindFirstNull(JsonElement element, string path, out string nullPath)
+    {
+        if (element.ValueKind == JsonValueKind.Null)
+        {
+            nullPath = path;
+            return true;
+        }
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (TryFindFirstNull(property.Value, $"{path}.{property.Name}", out nullPath))
+                {
+                    return true;
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            var index = 0;
+            foreach (var item in element.EnumerateArray())
+            {
+                if (TryFindFirstNull(item, $"{path}[{index}]", out nullPath))
+                {
+                    return true;
+                }
+                index++;
+            }
+        }
+
+        nullPath = string.Empty;
+        return false;
+    }
+
+    private static void AddMissingTopLevelCollections(AlsManifest manifest, List<AlsValidationIssue> issues)
+    {
+        foreach (var (path, value) in new (string Path, Array? Value)[]
+        {
+            ("$.skeletons", manifest.Skeletons),
+            ("$.skeletalMeshes", manifest.SkeletalMeshes),
+            ("$.staticMeshes", manifest.StaticMeshes),
+            ("$.animations", manifest.Animations),
+            ("$.montages", manifest.Montages),
+            ("$.blendSpaces", manifest.BlendSpaces),
+            ("$.aimOffsets", manifest.AimOffsets),
+            ("$.materials", manifest.Materials),
+            ("$.textures", manifest.Textures),
+            ("$.physicsAssets", manifest.PhysicsAssets),
+            ("$.curves", manifest.Curves),
+            ("$.configAssets", manifest.ConfigAssets),
+            ("$.files", manifest.Files),
+        })
+        {
+            if (value is null)
+            {
+                Add(issues, "ALSMANIFEST029", null, path, "Required manifest collection cannot be null.");
+            }
+        }
+    }
+
     private static AssetSection[] GetSections(AlsManifest manifest) =>
     [
-        new("skeletons", manifest.Skeletons),
-        new("skeletalMeshes", manifest.SkeletalMeshes),
-        new("staticMeshes", manifest.StaticMeshes),
-        new("animations", manifest.Animations),
-        new("montages", manifest.Montages),
-        new("blendSpaces", manifest.BlendSpaces),
-        new("aimOffsets", manifest.AimOffsets),
-        new("materials", manifest.Materials),
-        new("textures", manifest.Textures),
-        new("physicsAssets", manifest.PhysicsAssets),
-        new("curves", manifest.Curves),
-        new("configAssets", manifest.ConfigAssets),
+        new("skeletons", manifest.Skeletons ?? []),
+        new("skeletalMeshes", manifest.SkeletalMeshes ?? []),
+        new("staticMeshes", manifest.StaticMeshes ?? []),
+        new("animations", manifest.Animations ?? []),
+        new("montages", manifest.Montages ?? []),
+        new("blendSpaces", manifest.BlendSpaces ?? []),
+        new("aimOffsets", manifest.AimOffsets ?? []),
+        new("materials", manifest.Materials ?? []),
+        new("textures", manifest.Textures ?? []),
+        new("physicsAssets", manifest.PhysicsAssets ?? []),
+        new("curves", manifest.Curves ?? []),
+        new("configAssets", manifest.ConfigAssets ?? []),
     ];
 
     private static void Add(

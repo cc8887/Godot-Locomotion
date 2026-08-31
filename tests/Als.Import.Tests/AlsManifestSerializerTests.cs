@@ -604,6 +604,138 @@ public sealed class AlsManifestSerializerTests
         Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
     }
 
+    [Theory]
+    [InlineData("emptyNotifies")]
+    [InlineData("populatedNotifies")]
+    [InlineData("markerTime")]
+    public void LegacyInputPropertiesAreRejectedInsteadOfIgnored(string mutation)
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            var metadata = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+            switch (mutation)
+            {
+                case "emptyNotifies":
+                    metadata["notifies"] = new JsonArray();
+                    break;
+                case "populatedNotifies":
+                    metadata["notifies"] = new JsonArray(new JsonObject
+                    {
+                        ["name"] = "Legacy",
+                        ["time"] = 0.1,
+                        ["duration"] = 0.0,
+                        ["sourceIndex"] = 0,
+                    });
+                    break;
+                case "markerTime":
+                    metadata["syncMarkers"]!.AsArray()[0]!.AsObject()["time"] = 0.2;
+                    break;
+                default:
+                    throw new InvalidOperationException(mutation);
+            }
+        });
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Fact]
+    public void LegacyInputCompatibilityDoesNotLeakIntoWrittenJson()
+    {
+        var manifest = AlsManifestSerializer.Load(TypedTimelineFixturePath());
+        var metadata = AlsAnimationMetadata.Read(manifest.Animations[0].Metadata);
+        var json = JsonSerializer.Serialize(metadata, AlsManifestSerializer.JsonOptions);
+
+        using var document = JsonDocument.Parse(json);
+        Assert.False(document.RootElement.TryGetProperty("notifies", out _));
+        Assert.False(document.RootElement.GetProperty("syncMarkers")[0].TryGetProperty("time", out _));
+    }
+
+    [Theory]
+    [InlineData("syncMarkerElement", "syncMarkers[0]")]
+    [InlineData("timelineElement", "timeline[0]")]
+    [InlineData("sectionElement", "sections[0]")]
+    [InlineData("slotElement", "slots[0]")]
+    [InlineData("segmentsArray", "slots[0].segments")]
+    [InlineData("segmentElement", "slots[0].segments[0]")]
+    [InlineData("payload", "timeline[0].payload")]
+    [InlineData("eventString", "timeline[0].sourceClassPath")]
+    [InlineData("markerString", "syncMarkers[0].name")]
+    [InlineData("sectionString", "sections[0].name")]
+    [InlineData("slotString", "slots[0].slotName")]
+    [InlineData("segmentString", "slots[0].segments[0].animationId")]
+    public void ExplicitNullNestedMetadataIsRejectedWithAStablePath(string mutation, string expectedPath)
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            var animationMetadata = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+            var montageMetadata = root["montages"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+            switch (mutation)
+            {
+                case "syncMarkerElement": animationMetadata["syncMarkers"]!.AsArray()[0] = null; break;
+                case "timelineElement": animationMetadata["timeline"]!.AsArray()[0] = null; break;
+                case "sectionElement": montageMetadata["sections"]!.AsArray()[0] = null; break;
+                case "slotElement": montageMetadata["slots"]!.AsArray()[0] = null; break;
+                case "segmentsArray": montageMetadata["slots"]!.AsArray()[0]!.AsObject()["segments"] = null; break;
+                case "segmentElement": montageMetadata["slots"]!.AsArray()[0]!.AsObject()["segments"]!.AsArray()[0] = null; break;
+                case "payload": animationMetadata["timeline"]!.AsArray()[0]!.AsObject()["payload"] = null; break;
+                case "eventString": animationMetadata["timeline"]!.AsArray()[0]!.AsObject()["sourceClassPath"] = null; break;
+                case "markerString": animationMetadata["syncMarkers"]!.AsArray()[0]!.AsObject()["name"] = null; break;
+                case "sectionString": montageMetadata["sections"]!.AsArray()[0]!.AsObject()["name"] = null; break;
+                case "slotString": montageMetadata["slots"]!.AsArray()[0]!.AsObject()["slotName"] = null; break;
+                case "segmentString": montageMetadata["slots"]!.AsArray()[0]!.AsObject()["segments"]!.AsArray()[0]!.AsObject()["animationId"] = null; break;
+                default: throw new InvalidOperationException(mutation);
+            }
+        });
+
+        Assert.False(IsSchemaValid(json));
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+        Assert.Contains(expectedPath, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("animationPlayLength", "playLength")]
+    [InlineData("montagePlayLength", "playLength")]
+    [InlineData("montageBlendIn", "blendInTime")]
+    [InlineData("montageBlendOut", "blendOutTime")]
+    [InlineData("montageBlendTrigger", "blendOutTriggerTime")]
+    [InlineData("sectionStart", "startTime")]
+    [InlineData("segmentStart", "startPosition")]
+    [InlineData("segmentAnimationStart", "animationStartTime")]
+    [InlineData("segmentAnimationEnd", "animationEndTime")]
+    [InlineData("segmentPlayRate", "playRate")]
+    public void FloatOverflowIsRejectedDuringLoad(string mutation, string expectedField)
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            var animationMetadata = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+            var montageMetadata = root["montages"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+            var segment = montageMetadata["slots"]!.AsArray()[0]!.AsObject()["segments"]!.AsArray()[0]!.AsObject();
+            switch (mutation)
+            {
+                case "animationPlayLength":
+                    animationMetadata["timeline"] = new JsonArray();
+                    animationMetadata["syncMarkers"] = new JsonArray();
+                    animationMetadata["playLength"] = 1e100;
+                    break;
+                case "montagePlayLength": montageMetadata["playLength"] = 1e100; break;
+                case "montageBlendIn": montageMetadata["blendInTime"] = 1e100; break;
+                case "montageBlendOut": montageMetadata["blendOutTime"] = 1e100; break;
+                case "montageBlendTrigger": montageMetadata["blendOutTriggerTime"] = 1e100; break;
+                case "sectionStart": montageMetadata["sections"]!.AsArray()[0]!.AsObject()["startTime"] = 1e100; break;
+                case "segmentStart": segment["startPosition"] = 1e100; break;
+                case "segmentAnimationStart": segment["animationStartTime"] = 1e100; break;
+                case "segmentAnimationEnd": segment["animationEndTime"] = 1e100; break;
+                case "segmentPlayRate": segment["playRate"] = 1e100; break;
+                default: throw new InvalidOperationException(mutation);
+            }
+        });
+
+        Assert.False(IsSchemaValid(json));
+        var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+        Assert.Contains(expectedField, exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void StructuredZeroKeyCurveRemainsAStructuredPayload()
     {
@@ -649,7 +781,7 @@ public sealed class AlsManifestSerializerTests
         Assert.Equal(BitConverter.DoubleToInt64Bits(leaveTangent), BitConverter.DoubleToInt64Bits(actual.LeaveTangent));
     }
 
-    private static bool IsSchemaValid(string json)
+    internal static bool IsSchemaValid(string json)
     {
         using var document = JsonDocument.Parse(json);
         return ManifestSchema.Value.Evaluate(document.RootElement).IsValid;

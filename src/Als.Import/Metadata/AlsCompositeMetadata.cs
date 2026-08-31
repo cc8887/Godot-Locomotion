@@ -35,13 +35,130 @@ public sealed record AlsMontageMetadata(
 {
     public static AlsMontageMetadata Read(JsonElement element)
     {
+        AlsAnimationMetadata.RejectExplicitNull(element, "Montage metadata");
+        ValidateNestedJson(element);
+        AlsAnimationMetadata.ValidateTimelineJson(element, "Montage metadata");
         var metadata = element.Deserialize<AlsMontageMetadata>(AlsManifestSerializer.JsonOptions)
             ?? throw new JsonException("Montage metadata deserialized to null.");
         if (metadata.Sections is null || metadata.Slots is null || metadata.Timeline is null)
         {
             throw new JsonException("Montage sections, slots, and timeline are required arrays.");
         }
+        ValidateFloatBackedScalars(metadata);
         return metadata;
+    }
+
+    private static void ValidateFloatBackedScalars(AlsMontageMetadata metadata)
+    {
+        RequireFinite(metadata.PlayLength, "playLength");
+        RequireFinite(metadata.BlendInTime, "blendInTime");
+        RequireFinite(metadata.BlendOutTime, "blendOutTime");
+        RequireFinite(metadata.BlendOutTriggerTime, "blendOutTriggerTime");
+        for (var sectionIndex = 0; sectionIndex < metadata.Sections.Length; sectionIndex++)
+        {
+            RequireFinite(metadata.Sections[sectionIndex].StartTime, $"sections[{sectionIndex}].startTime");
+        }
+        for (var slotIndex = 0; slotIndex < metadata.Slots.Length; slotIndex++)
+        {
+            var slot = metadata.Slots[slotIndex];
+            for (var segmentIndex = 0; segmentIndex < slot.Segments.Length; segmentIndex++)
+            {
+                var segment = slot.Segments[segmentIndex];
+                var path = $"slots[{slotIndex}].segments[{segmentIndex}]";
+                RequireFinite(segment.StartPosition, $"{path}.startPosition");
+                RequireFinite(segment.AnimationStartTime, $"{path}.animationStartTime");
+                RequireFinite(segment.AnimationEndTime, $"{path}.animationEndTime");
+                RequireFinite(segment.PlayRate, $"{path}.playRate");
+            }
+        }
+    }
+
+    private static void RequireFinite(float value, string path)
+    {
+        if (!float.IsFinite(value))
+        {
+            throw new JsonException($"Montage metadata {path} must be finite.");
+        }
+    }
+
+    private static void ValidateNestedJson(JsonElement element)
+    {
+        ValidateObjectArray(element, "sections", ["name", "nextSection"]);
+        ValidateObjectArray(element, "slots", ["slotName"]);
+        if (!element.TryGetProperty("slots", out var slots) || slots.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var slotIndex = 0;
+        foreach (var slot in slots.EnumerateArray())
+        {
+            if (slot.ValueKind == JsonValueKind.Object)
+            {
+                var path = $"slots[{slotIndex}].segments";
+                if (!slot.TryGetProperty("segments", out var segments) || segments.ValueKind == JsonValueKind.Null)
+                {
+                    throw new JsonException($"Montage metadata {path} is required.");
+                }
+                if (segments.ValueKind == JsonValueKind.Array)
+                {
+                    var segmentIndex = 0;
+                    foreach (var segment in segments.EnumerateArray())
+                    {
+                        var segmentPath = $"{path}[{segmentIndex}]";
+                        if (segment.ValueKind == JsonValueKind.Null)
+                        {
+                            throw new JsonException($"Montage metadata {segmentPath} cannot be null.");
+                        }
+                        if (segment.ValueKind == JsonValueKind.Object)
+                        {
+                            foreach (var propertyName in new[] { "animationId", "animationObjectPath" })
+                            {
+                                if (segment.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Null)
+                                {
+                                    throw new JsonException($"Montage metadata {segmentPath}.{propertyName} cannot be null.");
+                                }
+                            }
+                        }
+                        segmentIndex++;
+                    }
+                }
+            }
+            slotIndex++;
+        }
+    }
+
+    private static void ValidateObjectArray(JsonElement element, string propertyName, string[] requiredStrings)
+    {
+        if (!element.TryGetProperty(propertyName, out var values) || values.ValueKind == JsonValueKind.Null)
+        {
+            throw new JsonException($"Montage metadata {propertyName} is required.");
+        }
+        if (values.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var index = 0;
+        foreach (var value in values.EnumerateArray())
+        {
+            var path = $"{propertyName}[{index}]";
+            if (value.ValueKind == JsonValueKind.Null)
+            {
+                throw new JsonException($"Montage metadata {path} cannot be null.");
+            }
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var requiredString in requiredStrings)
+                {
+                    if (value.TryGetProperty(requiredString, out var property) && property.ValueKind == JsonValueKind.Null)
+                    {
+                        throw new JsonException($"Montage metadata {path}.{requiredString} cannot be null.");
+                    }
+                }
+            }
+            index++;
+        }
     }
 }
 
