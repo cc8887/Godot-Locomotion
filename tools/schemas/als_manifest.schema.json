@@ -11,8 +11,8 @@
     "configAssets", "files", "auditSummary"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "exporterVersion": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 2 },
+    "exporterVersion": { "const": "2.0.0" },
     "sourceEngineVersion": { "type": "string", "minLength": 1 },
     "sourceProjectId": { "type": "string", "minLength": 1 },
     "sourceContentRoot": { "type": "string", "pattern": "^/Game/" },
@@ -31,11 +31,8 @@
     "skeletons": { "$ref": "#/$defs/assets" },
     "skeletalMeshes": { "$ref": "#/$defs/assets" },
     "staticMeshes": { "$ref": "#/$defs/assets" },
-    "animations": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/animationAsset" }
-    },
-    "montages": { "$ref": "#/$defs/assets" },
+    "animations": { "type": "array", "items": { "$ref": "#/$defs/animationAsset" } },
+    "montages": { "type": "array", "items": { "$ref": "#/$defs/montageAsset" } },
     "blendSpaces": { "$ref": "#/$defs/assets" },
     "aimOffsets": { "$ref": "#/$defs/assets" },
     "materials": { "$ref": "#/$defs/assets" },
@@ -43,10 +40,7 @@
     "physicsAssets": { "$ref": "#/$defs/assets" },
     "curves": { "$ref": "#/$defs/assets" },
     "configAssets": { "$ref": "#/$defs/assets" },
-    "files": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/file" }
-    },
+    "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
     "auditSummary": {
       "type": "object",
       "additionalProperties": false,
@@ -61,11 +55,18 @@
     }
   },
   "$defs": {
-    "stableId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "assets": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/asset" }
+    "finiteNumber": {
+      "type": "number",
+      "minimum": -1.7976931348623157e308,
+      "maximum": 1.7976931348623157e308
     },
+    "nonnegativeFiniteNumber": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1.7976931348623157e308
+    },
+    "stableId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "assets": { "type": "array", "items": { "$ref": "#/$defs/asset" } },
     "asset": {
       "type": "object",
       "additionalProperties": false,
@@ -97,17 +98,33 @@
         }
       ]
     },
+    "montageAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/asset" },
+        {
+          "properties": {
+            "classPath": { "const": "/Script/Engine.AnimMontage" },
+            "metadata": { "$ref": "#/$defs/montageMetadata" }
+          }
+        }
+      ]
+    },
     "animationMetadata": {
       "type": "object",
-      "required": ["curves"],
+      "additionalProperties": false,
+      "required": [
+        "overlay", "prop", "playLength", "frameRateNumerator", "frameRateDenominator", "sampledKeyCount",
+        "loop", "interpolation", "rootMotionEnabled", "rootMotionRootLock", "forceRootLock",
+        "useNormalizedRootMotionScale", "additiveType", "additiveBasePoseType", "additiveBasePoseFrame",
+        "additiveBasePoseObjectPath", "additiveBasePoseId", "skeletonId", "skeletonObjectPath",
+        "curves", "timeline", "syncMarkers"
+      ],
       "allOf": [
         {
           "if": {
             "properties": {
               "curves": {
-                "contains": {
-                  "properties": { "canonicalKind": { "const": "RotationYawSpeedRadiansPerSecond" } }
-                }
+                "contains": { "properties": { "canonicalKind": { "const": "RotationYawSpeedRadiansPerSecond" } } }
               }
             }
           },
@@ -129,12 +146,176 @@
         }
       ],
       "properties": {
-        "curves": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/floatCurve" }
-        },
+        "overlay": { "type": "boolean" },
+        "prop": { "type": "boolean" },
+        "playLength": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "frameRateNumerator": { "type": "integer", "minimum": 1 },
+        "frameRateDenominator": { "type": "integer", "minimum": 1 },
+        "sampledKeyCount": { "type": "integer", "minimum": 0 },
+        "loop": { "type": "boolean" },
+        "interpolation": { "type": "integer" },
+        "rootMotionEnabled": { "type": "boolean" },
+        "rootMotionRootLock": { "type": "integer" },
+        "forceRootLock": { "type": "boolean" },
+        "useNormalizedRootMotionScale": { "type": "boolean" },
+        "additiveType": { "type": "integer" },
+        "additiveBasePoseType": { "type": "integer" },
+        "additiveBasePoseFrame": { "type": "integer" },
+        "additiveBasePoseObjectPath": { "type": "string" },
+        "additiveBasePoseId": { "type": "string", "pattern": "^$|^[0-9a-f]{40}$" },
+        "skeletonId": { "$ref": "#/$defs/stableId" },
+        "skeletonObjectPath": { "type": "string", "minLength": 1 },
+        "curves": { "type": "array", "items": { "$ref": "#/$defs/floatCurve" } },
+        "timeline": { "type": "array", "items": { "$ref": "#/$defs/timelineEvent" } },
+        "syncMarkers": { "type": "array", "items": { "$ref": "#/$defs/syncMarker" } },
         "canonicalRotationYawSourceConvention": { "type": "string" },
         "canonicalRotationYawProfileSignProvenance": { "type": "string" }
+      }
+    },
+    "timelineEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stableEventId", "kind", "sourceClassPath", "displayName", "timeSeconds", "durationSeconds",
+        "triggerWeightThreshold", "tickMode", "sourceIndex", "trackIndex", "payload"
+      ],
+      "oneOf": [
+        { "properties": { "kind": { "const": "Generic" }, "payload": { "$ref": "#/$defs/genericPayload" } } },
+        { "properties": { "kind": { "const": "Footstep" }, "payload": { "$ref": "#/$defs/footstepPayload" } } },
+        { "properties": { "kind": { "const": "SetAction" }, "payload": { "$ref": "#/$defs/setActionPayload" } } },
+        { "properties": { "kind": { "const": "SetGroundedEntry" }, "payload": { "$ref": "#/$defs/setGroundedEntryPayload" } } },
+        { "properties": { "kind": { "const": "EarlyBlendOut" }, "payload": { "$ref": "#/$defs/earlyBlendOutPayload" } } },
+        { "properties": { "kind": { "const": "RootMotionScale" }, "payload": { "$ref": "#/$defs/rootMotionScalePayload" } } }
+      ],
+      "properties": {
+        "stableEventId": { "$ref": "#/$defs/stableId" },
+        "kind": { "enum": ["Generic", "Footstep", "SetAction", "SetGroundedEntry", "EarlyBlendOut", "RootMotionScale"] },
+        "sourceClassPath": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 1 },
+        "timeSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "durationSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "triggerWeightThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tickMode": { "enum": ["Queued", "BranchingPoint"] },
+        "sourceIndex": { "type": "integer", "minimum": 0 },
+        "trackIndex": { "type": "integer", "minimum": 0 },
+        "payload": { "type": "object" }
+      }
+    },
+    "genericPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 0
+    },
+    "footstepPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["foot"],
+      "properties": { "foot": { "enum": ["Unspecified", "Left", "Right"] } }
+    },
+    "setActionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": { "action": { "enum": ["None", "Rolling", "Mantling", "Ragdolling", "GettingUp"] } }
+    },
+    "setGroundedEntryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": { "mode": { "enum": ["None", "FromRoll"] } }
+    },
+    "earlyBlendOutPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blendOutSeconds", "checkInput", "checkLocomotionMode", "locomotionMode",
+        "checkRotationMode", "rotationMode", "checkStance", "stance"
+      ],
+      "properties": {
+        "blendOutSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "checkInput": { "type": "boolean" },
+        "checkLocomotionMode": { "type": "boolean" },
+        "locomotionMode": { "enum": ["Grounded", "InAir", "Mantling", "Ragdoll", "Recovering"] },
+        "checkRotationMode": { "type": "boolean" },
+        "rotationMode": { "enum": ["VelocityDirection", "LookingDirection", "Aiming"] },
+        "checkStance": { "type": "boolean" },
+        "stance": { "enum": ["Standing", "Crouching"] }
+      }
+    },
+    "rootMotionScalePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["translationScale"],
+      "properties": { "translationScale": { "$ref": "#/$defs/nonnegativeFiniteNumber" } }
+    },
+    "syncMarker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableMarkerId", "name", "timeSeconds", "sourceIndex", "trackIndex"],
+      "properties": {
+        "stableMarkerId": { "$ref": "#/$defs/stableId" },
+        "name": { "type": "string", "minLength": 1 },
+        "timeSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "sourceIndex": { "type": "integer", "minimum": 0 },
+        "trackIndex": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "montageMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overlay", "prop", "sections", "slots", "playLength", "blendInTime", "blendInOption",
+        "blendOutTime", "blendOutOption", "blendOutTriggerTime", "enableAutoBlendOut", "timeline"
+      ],
+      "properties": {
+        "overlay": { "type": "boolean" },
+        "prop": { "type": "boolean" },
+        "sections": { "type": "array", "items": { "$ref": "#/$defs/montageSection" } },
+        "slots": { "type": "array", "items": { "$ref": "#/$defs/montageSlot" } },
+        "playLength": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "blendInTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "blendInOption": { "type": "integer" },
+        "blendOutTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "blendOutOption": { "type": "integer" },
+        "blendOutTriggerTime": { "$ref": "#/$defs/finiteNumber" },
+        "enableAutoBlendOut": { "type": "boolean" },
+        "timeline": { "type": "array", "items": { "$ref": "#/$defs/timelineEvent" } }
+      }
+    },
+    "montageSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "nextSection", "startTime"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "nextSection": { "type": "string", "not": { "const": "None" } },
+        "startTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" }
+      }
+    },
+    "montageSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slotName", "segments"],
+      "properties": {
+        "slotName": { "type": "string", "minLength": 1 },
+        "segments": { "type": "array", "items": { "$ref": "#/$defs/montageSegment" } }
+      }
+    },
+    "montageSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "animationId", "animationObjectPath", "startPosition", "animationStartTime", "animationEndTime",
+        "playRate", "loopCount"
+      ],
+      "properties": {
+        "animationId": { "$ref": "#/$defs/stableId" },
+        "animationObjectPath": { "type": "string", "minLength": 1 },
+        "startPosition": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "animationStartTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "animationEndTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "playRate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1.7976931348623157e308 },
+        "loopCount": { "type": "integer", "minimum": 1 }
       }
     },
     "floatCurveKey": {
@@ -142,11 +323,11 @@
       "additionalProperties": false,
       "required": ["timeSeconds", "value", "interpolation", "arriveTangent", "leaveTangent"],
       "properties": {
-        "timeSeconds": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
-        "value": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
+        "timeSeconds": { "$ref": "#/$defs/finiteNumber" },
+        "value": { "$ref": "#/$defs/finiteNumber" },
         "interpolation": { "enum": ["Constant", "Linear", "Cubic"] },
-        "arriveTangent": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
-        "leaveTangent": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 }
+        "arriveTangent": { "$ref": "#/$defs/finiteNumber" },
+        "leaveTangent": { "$ref": "#/$defs/finiteNumber" }
       }
     },
     "floatCurve": {
@@ -176,9 +357,7 @@
                     ]
                   }
                 ],
-                "items": {
-                  "properties": { "interpolation": { "const": "Linear" } }
-                }
+                "items": { "properties": { "interpolation": { "const": "Linear" } } }
               }
             }
           }
@@ -191,10 +370,7 @@
         "sourceProvenance": { "enum": ["source_curve", "derived_root_track"] },
         "preInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
         "postInfinity": { "enum": ["Constant", "Linear", "Cycle", "CycleWithOffset", "Oscillate"] },
-        "keys": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/floatCurveKey" }
-        }
+        "keys": { "type": "array", "items": { "$ref": "#/$defs/floatCurveKey" } }
       }
     },
     "file": {

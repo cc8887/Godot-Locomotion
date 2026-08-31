@@ -5,37 +5,49 @@ using GodotAls.Import.Manifest;
 namespace GodotAls.Import.Metadata;
 
 public sealed record AlsAnimationMetadata(
-    bool Overlay,
-    bool Prop,
-    float PlayLength,
-    int FrameRateNumerator,
-    int FrameRateDenominator,
-    int SampledKeyCount,
-    bool Loop,
-    int Interpolation,
-    bool RootMotionEnabled,
-    int RootMotionRootLock,
-    bool ForceRootLock,
-    bool UseNormalizedRootMotionScale,
-    int AdditiveType,
-    int AdditiveBasePoseType,
-    int AdditiveBasePoseFrame,
-    string AdditiveBasePoseObjectPath,
-    string AdditiveBasePoseId,
-    string SkeletonId,
-    string SkeletonObjectPath,
-    AlsAnimationCurves Curves,
-    AlsAnimationNotifyMetadata[] Notifies,
-    AlsAnimationSyncMarkerMetadata[] SyncMarkers,
+    [property: JsonRequired] bool Overlay,
+    [property: JsonRequired] bool Prop,
+    [property: JsonRequired] float PlayLength,
+    [property: JsonRequired] int FrameRateNumerator,
+    [property: JsonRequired] int FrameRateDenominator,
+    [property: JsonRequired] int SampledKeyCount,
+    [property: JsonRequired] bool Loop,
+    [property: JsonRequired] int Interpolation,
+    [property: JsonRequired] bool RootMotionEnabled,
+    [property: JsonRequired] int RootMotionRootLock,
+    [property: JsonRequired] bool ForceRootLock,
+    [property: JsonRequired] bool UseNormalizedRootMotionScale,
+    [property: JsonRequired] int AdditiveType,
+    [property: JsonRequired] int AdditiveBasePoseType,
+    [property: JsonRequired] int AdditiveBasePoseFrame,
+    [property: JsonRequired] string AdditiveBasePoseObjectPath,
+    [property: JsonRequired] string AdditiveBasePoseId,
+    [property: JsonRequired] string SkeletonId,
+    [property: JsonRequired] string SkeletonObjectPath,
+    [property: JsonRequired] AlsAnimationCurves Curves,
+    [property: JsonRequired] AlsTimelineEventMetadata[] Timeline,
+    [property: JsonRequired] AlsAnimationSyncMarkerMetadata[] SyncMarkers,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? CanonicalRotationYawSourceConvention = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? CanonicalRotationYawProfileSignProvenance = null)
 {
+    [JsonIgnore]
+    public AlsAnimationNotifyMetadata[] Notifies => Timeline.Select(value => new AlsAnimationNotifyMetadata(
+        value.DisplayName, (float)value.TimeSeconds, (float)value.DurationSeconds, value.SourceIndex)).ToArray();
+
     public static AlsAnimationMetadata Read(JsonElement element)
     {
         var metadata = element.Deserialize<AlsAnimationMetadata>(AlsManifestSerializer.JsonOptions)
             ?? throw new JsonException("Animation metadata deserialized to null.");
+        if (metadata.Timeline is null)
+        {
+            throw new JsonException("Animation metadata timeline is required.");
+        }
+        if (metadata.SyncMarkers is null)
+        {
+            throw new JsonException("Animation metadata syncMarkers are required.");
+        }
         var hasCanonicalRotationYaw = ValidateFloatCurves(metadata.Curves, metadata.PlayLength);
         ValidateCanonicalRotationYawProvenance(element, metadata, hasCanonicalRotationYaw);
         return metadata;
@@ -237,11 +249,6 @@ public sealed class AlsAnimationCurvesJsonConverter : JsonConverter<AlsAnimation
         {
             return AlsAnimationCurves.Structured(Array.Empty<AlsExportedFloatCurveMetadata>());
         }
-        if (entries.All(entry => entry.ValueKind == JsonValueKind.String))
-        {
-            return AlsAnimationCurves.Legacy(entries.Select(entry => entry.GetString()
-                ?? throw new JsonException("Animation metadata legacy curve name cannot be null.")).ToArray());
-        }
         if (entries.All(entry => entry.ValueKind == JsonValueKind.Object || entry.ValueKind == JsonValueKind.Null))
         {
             var structuredCurves = JsonSerializer.Deserialize<AlsExportedFloatCurveMetadata[]>(curves.GetRawText(), options)
@@ -249,7 +256,7 @@ public sealed class AlsAnimationCurvesJsonConverter : JsonConverter<AlsAnimation
             return AlsAnimationCurves.Structured(structuredCurves);
         }
 
-        throw new JsonException("Animation metadata curves must contain either legacy names or structured curves.");
+        throw new JsonException("Animation metadata curves must contain structured curve objects.");
     }
 
     public override void Write(Utf8JsonWriter writer, AlsAnimationCurves value, JsonSerializerOptions options)
@@ -260,27 +267,225 @@ public sealed class AlsAnimationCurvesJsonConverter : JsonConverter<AlsAnimation
             return;
         }
 
-        JsonSerializer.Serialize(writer, value.LegacyNames
-            ?? throw new JsonException("Animation metadata legacy curve names are required."), options);
+        throw new JsonException("Animation metadata schema v2 does not support legacy curve names.");
     }
 }
 
 public sealed record AlsExportedFloatCurveMetadata(
-    int StableCurveId,
-    string CanonicalKind,
-    string SourceName,
-    string SourceProvenance,
-    string PreInfinity,
-    string PostInfinity,
-    AlsExportedFloatCurveKeyMetadata[] Keys);
+    [property: JsonRequired] int StableCurveId,
+    [property: JsonRequired] string CanonicalKind,
+    [property: JsonRequired] string SourceName,
+    [property: JsonRequired] string SourceProvenance,
+    [property: JsonRequired] string PreInfinity,
+    [property: JsonRequired] string PostInfinity,
+    [property: JsonRequired] AlsExportedFloatCurveKeyMetadata[] Keys);
 
 public sealed record AlsExportedFloatCurveKeyMetadata(
-    double TimeSeconds,
-    double Value,
-    string Interpolation,
-    double ArriveTangent,
-    double LeaveTangent);
+    [property: JsonRequired] double TimeSeconds,
+    [property: JsonRequired] double Value,
+    [property: JsonRequired] string Interpolation,
+    [property: JsonRequired] double ArriveTangent,
+    [property: JsonRequired] double LeaveTangent);
 
 public sealed record AlsAnimationNotifyMetadata(string Name, float Time, float Duration, int SourceIndex);
 
-public sealed record AlsAnimationSyncMarkerMetadata(string Name, float Time);
+[JsonConverter(typeof(AlsTimelineEventMetadataJsonConverter))]
+public sealed record AlsTimelineEventMetadata(
+    string StableEventId,
+    string Kind,
+    string SourceClassPath,
+    string DisplayName,
+    double TimeSeconds,
+    double DurationSeconds,
+    double TriggerWeightThreshold,
+    string TickMode,
+    int SourceIndex,
+    int TrackIndex,
+    AlsTimelineEventPayloadMetadata Payload);
+
+public abstract record AlsTimelineEventPayloadMetadata;
+
+public sealed record AlsGenericEventPayloadMetadata : AlsTimelineEventPayloadMetadata;
+
+public sealed record AlsFootstepEventPayloadMetadata(string Foot) : AlsTimelineEventPayloadMetadata;
+
+public sealed record AlsSetActionEventPayloadMetadata(string Action) : AlsTimelineEventPayloadMetadata;
+
+public sealed record AlsSetGroundedEntryEventPayloadMetadata(string Mode) : AlsTimelineEventPayloadMetadata;
+
+public sealed record AlsEarlyBlendOutEventPayloadMetadata(
+    double BlendOutSeconds,
+    bool CheckInput,
+    bool CheckLocomotionMode,
+    string LocomotionMode,
+    bool CheckRotationMode,
+    string RotationMode,
+    bool CheckStance,
+    string Stance) : AlsTimelineEventPayloadMetadata;
+
+public sealed record AlsRootMotionScaleEventPayloadMetadata(double TranslationScale) : AlsTimelineEventPayloadMetadata;
+
+public sealed record AlsAnimationSyncMarkerMetadata(
+    [property: JsonRequired] string StableMarkerId,
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] double TimeSeconds,
+    [property: JsonRequired] int SourceIndex,
+    [property: JsonRequired] int TrackIndex)
+{
+    [JsonIgnore]
+    public float Time => (float)TimeSeconds;
+}
+
+public sealed class AlsTimelineEventMetadataJsonConverter : JsonConverter<AlsTimelineEventMetadata>
+{
+    private static readonly string[] EventProperties =
+    [
+        "stableEventId", "kind", "sourceClassPath", "displayName", "timeSeconds", "durationSeconds",
+        "triggerWeightThreshold", "tickMode", "sourceIndex", "trackIndex", "payload",
+    ];
+
+    public override AlsTimelineEventMetadata Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        using var document = JsonDocument.ParseValue(ref reader);
+        var element = document.RootElement;
+        RequireExactProperties(element, EventProperties, "Timeline event");
+
+        var kind = element.GetProperty("kind").GetString()
+            ?? throw new JsonException("Timeline event kind is required.");
+        var payload = ReadPayload(kind, element.GetProperty("payload"), options);
+        return new AlsTimelineEventMetadata(
+            ReadString(element, "stableEventId"),
+            kind,
+            ReadString(element, "sourceClassPath"),
+            ReadString(element, "displayName"),
+            element.GetProperty("timeSeconds").GetDouble(),
+            element.GetProperty("durationSeconds").GetDouble(),
+            element.GetProperty("triggerWeightThreshold").GetDouble(),
+            ReadString(element, "tickMode"),
+            element.GetProperty("sourceIndex").GetInt32(),
+            element.GetProperty("trackIndex").GetInt32(),
+            payload);
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        AlsTimelineEventMetadata value,
+        JsonSerializerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        EnsurePayloadMatchesKind(value.Kind, value.Payload);
+
+        writer.WriteStartObject();
+        writer.WriteString("stableEventId", value.StableEventId);
+        writer.WriteString("kind", value.Kind);
+        writer.WriteString("sourceClassPath", value.SourceClassPath);
+        writer.WriteString("displayName", value.DisplayName);
+        writer.WriteNumber("timeSeconds", value.TimeSeconds);
+        writer.WriteNumber("durationSeconds", value.DurationSeconds);
+        writer.WriteNumber("triggerWeightThreshold", value.TriggerWeightThreshold);
+        writer.WriteString("tickMode", value.TickMode);
+        writer.WriteNumber("sourceIndex", value.SourceIndex);
+        writer.WriteNumber("trackIndex", value.TrackIndex);
+        writer.WritePropertyName("payload");
+        JsonSerializer.Serialize(writer, value.Payload, value.Payload.GetType(), options);
+        writer.WriteEndObject();
+    }
+
+    private static AlsTimelineEventPayloadMetadata ReadPayload(
+        string kind,
+        JsonElement payload,
+        JsonSerializerOptions options) => kind switch
+        {
+            "Generic" => DeserializePayload<AlsGenericEventPayloadMetadata>(payload, [], kind, options),
+            "Footstep" => DeserializePayload<AlsFootstepEventPayloadMetadata>(payload, ["foot"], kind, options),
+            "SetAction" => DeserializePayload<AlsSetActionEventPayloadMetadata>(payload, ["action"], kind, options),
+            "SetGroundedEntry" => DeserializePayload<AlsSetGroundedEntryEventPayloadMetadata>(payload, ["mode"], kind, options),
+            "EarlyBlendOut" => DeserializePayload<AlsEarlyBlendOutEventPayloadMetadata>(payload,
+                ["blendOutSeconds", "checkInput", "checkLocomotionMode", "locomotionMode", "checkRotationMode",
+                    "rotationMode", "checkStance", "stance"], kind, options),
+            "RootMotionScale" => DeserializePayload<AlsRootMotionScaleEventPayloadMetadata>(
+                payload, ["translationScale"], kind, options),
+            _ => throw new JsonException($"Timeline event kind '{kind}' is not supported."),
+        };
+
+    private static T DeserializePayload<T>(
+        JsonElement payload,
+        string[] expectedProperties,
+        string kind,
+        JsonSerializerOptions options)
+        where T : AlsTimelineEventPayloadMetadata
+    {
+        RequireExactProperties(payload, expectedProperties, $"Timeline event {kind} payload");
+        var result = payload.Deserialize<T>(options)
+            ?? throw new JsonException($"Timeline event {kind} payload deserialized to null.");
+        ValidatePayloadEnums(result);
+        return result;
+    }
+
+    private static void ValidatePayloadEnums(AlsTimelineEventPayloadMetadata payload)
+    {
+        var valid = payload switch
+        {
+            AlsGenericEventPayloadMetadata => true,
+            AlsFootstepEventPayloadMetadata value => value.Foot is "Unspecified" or "Left" or "Right",
+            AlsSetActionEventPayloadMetadata value => value.Action is "None" or "Rolling" or "Mantling" or "Ragdolling" or "GettingUp",
+            AlsSetGroundedEntryEventPayloadMetadata value => value.Mode is "None" or "FromRoll",
+            AlsEarlyBlendOutEventPayloadMetadata value =>
+                value.LocomotionMode is ("Grounded" or "InAir" or "Mantling" or "Ragdoll" or "Recovering") &&
+                value.RotationMode is ("VelocityDirection" or "LookingDirection" or "Aiming") &&
+                value.Stance is ("Standing" or "Crouching"),
+            AlsRootMotionScaleEventPayloadMetadata => true,
+            _ => false,
+        };
+        if (!valid)
+        {
+            throw new JsonException("Timeline event payload contains an unsupported enum value.");
+        }
+    }
+
+    private static void EnsurePayloadMatchesKind(string kind, AlsTimelineEventPayloadMetadata payload)
+    {
+        var matches = (kind, payload) switch
+        {
+            ("Generic", AlsGenericEventPayloadMetadata) => true,
+            ("Footstep", AlsFootstepEventPayloadMetadata) => true,
+            ("SetAction", AlsSetActionEventPayloadMetadata) => true,
+            ("SetGroundedEntry", AlsSetGroundedEntryEventPayloadMetadata) => true,
+            ("EarlyBlendOut", AlsEarlyBlendOutEventPayloadMetadata) => true,
+            ("RootMotionScale", AlsRootMotionScaleEventPayloadMetadata) => true,
+            _ => false,
+        };
+        if (!matches)
+        {
+            throw new JsonException($"Timeline event kind '{kind}' does not match its payload DTO.");
+        }
+    }
+
+    private static string ReadString(JsonElement element, string propertyName) =>
+        element.GetProperty(propertyName).GetString()
+        ?? throw new JsonException($"Timeline event {propertyName} is required.");
+
+    private static void RequireExactProperties(JsonElement element, string[] expectedProperties, string context)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException($"{context} must be an object.");
+        }
+
+        var expected = new HashSet<string>(expectedProperties, StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!expected.Remove(property.Name))
+            {
+                throw new JsonException($"{context} contains unknown property '{property.Name}'.");
+            }
+        }
+        if (expected.Count != 0)
+        {
+            throw new JsonException($"{context} is missing required property '{expected.Order(StringComparer.Ordinal).First()}'.");
+        }
+    }
+}

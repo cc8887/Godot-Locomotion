@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 2,
+  "exporterVersion": "2.0.0",
+  "sourceEngineVersion": "5.9.0",
+  "sourceProjectId": "p5a-typed-fixture",
+  "sourceContentRoot": "/Game/Test",
+  "coordinateSystem": {
+    "sourceHandedness": "left",
+    "sourceUpAxis": "Z",
+    "targetHandedness": "right",
+    "targetUpAxis": "Y"
+  },
+  "unitScale": 0.01,
+  "skeletons": [
+    {
+      "id": "09ee83c5ee0df9c7343e9ebc943d4902498af3e5",
+      "objectPath": "/Game/Test/Skeleton.Skeleton",
+      "packagePath": "/Game/Test/Skeleton",
+      "assetName": "Skeleton",
+      "classPath": "/Script/Engine.Skeleton",
+      "outputPath": null,
+      "dependencies": [],
+      "metadata": {}
+    }
+  ],
+  "skeletalMeshes": [],
+  "staticMeshes": [],
+  "animations": [
+    {
+      "id": "67aa33bdcab9e580ed7bec894c9858bb5cf30764",
+      "objectPath": "/Game/Test/Walk.Walk",
+      "packagePath": "/Game/Test/Walk",
+      "assetName": "Walk",
+      "classPath": "/Script/Engine.AnimSequence",
+      "outputPath": "animations/67aa33bdcab9e580ed7bec894c9858bb5cf30764.fbx",
+      "dependencies": ["09ee83c5ee0df9c7343e9ebc943d4902498af3e5"],
+      "metadata": {
+        "overlay": false,
+        "prop": false,
+        "playLength": 1.0,
+        "frameRateNumerator": 30,
+        "frameRateDenominator": 1,
+        "sampledKeyCount": 31,
+        "loop": true,
+        "interpolation": 1,
+        "rootMotionEnabled": false,
+        "rootMotionRootLock": 0,
+        "forceRootLock": false,
+        "useNormalizedRootMotionScale": true,
+        "additiveType": 0,
+        "additiveBasePoseType": 0,
+        "additiveBasePoseFrame": 0,
+        "additiveBasePoseObjectPath": "",
+        "additiveBasePoseId": "",
+        "skeletonId": "09ee83c5ee0df9c7343e9ebc943d4902498af3e5",
+        "skeletonObjectPath": "/Game/Test/Skeleton.Skeleton",
+        "curves": [],
+        "timeline": [
+          {
+            "stableEventId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "kind": "Generic",
+            "sourceClassPath": "/Script/Engine.AnimNotify",
+            "displayName": "Generic Notify",
+            "timeSeconds": 0.1,
+            "durationSeconds": 0.0,
+            "triggerWeightThreshold": 0.0,
+            "tickMode": "Queued",
+            "sourceIndex": 0,
+            "trackIndex": 0,
+            "payload": {}
+          },
+          {
+            "stableEventId": "cccccccccccccccccccccccccccccccccccccccc",
+            "kind": "Footstep",
+            "sourceClassPath": "/Script/ALS.AlsAnimNotify_Footstep",
+            "displayName": "Footstep",
+            "timeSeconds": 0.2,
+            "durationSeconds": 0.0,
+            "triggerWeightThreshold": 0.1,
+            "tickMode": "Queued",
+            "sourceIndex": 1,
+            "trackIndex": 0,
+            "payload": { "foot": "Left" }
+          },
+          {
+            "stableEventId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "EarlyBlendOut",
+            "sourceClassPath": "/Script/ALS.AlsAnimNotifyState_EarlyBlendOut",
+            "displayName": "Early Blend Out",
+            "timeSeconds": 0.25,
+            "durationSeconds": 0.5,
+            "triggerWeightThreshold": 0.25,
+            "tickMode": "BranchingPoint",
+            "sourceIndex": 3,
+            "trackIndex": 0,
+            "payload": {
+              "blendOutSeconds": 0.2,
+              "checkInput": true,
+              "checkLocomotionMode": true,
+              "locomotionMode": "Grounded",
+              "checkRotationMode": true,
+              "rotationMode": "LookingDirection",
+              "checkStance": true,
+              "stance": "Standing"
+            }
+          },
+          {
+            "stableEventId": "dddddddddddddddddddddddddddddddddddddddd",
+            "kind": "SetAction",
+            "sourceClassPath": "/Script/ALS.AlsAnimNotifyState_SetAction",
+            "displayName": "Set Action",
+            "timeSeconds": 0.3,
+            "durationSeconds": 0.1,
+            "triggerWeightThreshold": 1.0,
+            "tickMode": "BranchingPoint",
+            "sourceIndex": 2,
+            "trackIndex": 1,
+            "payload": { "action": "Rolling" }
+          },
+          {
+            "stableEventId": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "kind": "SetGroundedEntry",
+            "sourceClassPath": "/Script/ALS.AlsAnimNotifyState_SetGroundedEntryState",
+            "displayName": "Set Grounded Entry",
+            "timeSeconds": 0.4,
+            "durationSeconds": 0.1,
+            "triggerWeightThreshold": 0.5,
+            "tickMode": "Queued",
+            "sourceIndex": 4,
+            "trackIndex": 1,
+            "payload": { "mode": "FromRoll" }
+          }
+        ],
+        "syncMarkers": [
+          {
+            "stableMarkerId": "1111111111111111111111111111111111111111",
+            "name": "Left",
+            "timeSeconds": 0.2,
+            "sourceIndex": 0,
+            "trackIndex": 0
+          },
+          {
+            "stableMarkerId": "2222222222222222222222222222222222222222",
+            "name": "Right",
+            "timeSeconds": 0.7,
+            "sourceIndex": 1,
+            "trackIndex": 0
+          }
+        ]
+      }
+    }
+  ],
+  "montages": [
+    {
+      "id": "6c20b27228103a946c74a94315f04c9b93e50116",
+      "objectPath": "/Game/Test/Roll.Roll",
+      "packagePath": "/Game/Test/Roll",
+      "assetName": "Roll",
+      "classPath": "/Script/Engine.AnimMontage",
+      "outputPath": null,
+      "dependencies": ["67aa33bdcab9e580ed7bec894c9858bb5cf30764"],
+      "metadata": {
+        "overlay": false,
+        "prop": false,
+        "sections": [
+          {
+            "name": "Default",
+            "nextSection": "",
+            "startTime": 0.0
+          }
+        ],
+        "slots": [
+          {
+            "slotName": "Grounded Slot",
+            "segments": [
+              {
+                "animationId": "67aa33bdcab9e580ed7bec894c9858bb5cf30764",
+                "animationObjectPath": "/Game/Test/Walk.Walk",
+                "startPosition": 0.0,
+                "animationStartTime": 0.0,
+                "animationEndTime": 1.0,
+                "playRate": 1.0,
+                "loopCount": 1
+              }
+            ]
+          }
+        ],
+        "playLength": 1.0,
+        "blendInTime": 0.2,
+        "blendInOption": 0,
+        "blendOutTime": 0.2,
+        "blendOutOption": 0,
+        "blendOutTriggerTime": -1.0,
+        "enableAutoBlendOut": true,
+        "timeline": [
+          {
+            "stableEventId": "ffffffffffffffffffffffffffffffffffffffff",
+            "kind": "RootMotionScale",
+            "sourceClassPath": "/Script/ALS.AlsAnimNotifyState_RootMotionScale",
+            "displayName": "Root Motion Scale",
+            "timeSeconds": 0.5,
+            "durationSeconds": 0.25,
+            "triggerWeightThreshold": 0.25,
+            "tickMode": "BranchingPoint",
+            "sourceIndex": 0,
+            "trackIndex": 0,
+            "payload": { "translationScale": 0.0 }
+          }
+        ]
+      }
+    }
+  ],
+  "blendSpaces": [],
+  "aimOffsets": [],
+  "materials": [],
+  "textures": [],
+  "physicsAssets": [],
+  "curves": [],
+  "configAssets": [],
+  "files": [
+    {
+      "relativePath": "animations/67aa33bdcab9e580ed7bec894c9858bb5cf30764.fbx",
+      "sha256": "39e21c717a0c58458478ffc8cc7598bc6cb92486687b5b2af63a38164a89a3ef",
+      "size": 17
+    }
+  ],
+  "auditSummary": {
+    "status": "complete",
+    "assetCount": 3,
+    "fileCount": 1,
+    "errorCount": 0,
+    "warningCount": 0
+  }
+}

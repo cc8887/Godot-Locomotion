@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "exporterVersion": "1.0.0",
+  "schemaVersion": 2,
+  "exporterVersion": "2.0.0",
   "sourceEngineVersion": "5.9.0",
   "sourceProjectId": "fixture-project",
   "sourceContentRoot": "/Game/Test",
@@ -130,7 +130,7 @@
             ]
           }
         ],
-        "notifies": [],
+        "timeline": [],
         "syncMarkers": []
       }
     }
