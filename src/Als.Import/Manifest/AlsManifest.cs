@@ -1,46 +1,59 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GodotAls.Import.Manifest;
 
 public sealed record AlsManifest(
-    int SchemaVersion,
-    string ExporterVersion,
-    string SourceEngineVersion,
-    string SourceProjectId,
-    string SourceContentRoot,
-    AlsCoordinateSystem CoordinateSystem,
-    double UnitScale,
-    AlsManifestAsset[] Skeletons,
-    AlsManifestAsset[] SkeletalMeshes,
-    AlsManifestAsset[] StaticMeshes,
-    AlsManifestAsset[] Animations,
-    AlsManifestAsset[] Montages,
-    AlsManifestAsset[] BlendSpaces,
-    AlsManifestAsset[] AimOffsets,
-    AlsManifestAsset[] Materials,
-    AlsManifestAsset[] Textures,
-    AlsManifestAsset[] PhysicsAssets,
-    AlsManifestAsset[] Curves,
-    AlsManifestAsset[] ConfigAssets,
-    AlsManifestFile[] Files,
-    AlsAuditSummary AuditSummary);
+    [property: JsonRequired] int SchemaVersion,
+    [property: JsonRequired] string ExporterVersion,
+    [property: JsonRequired] string SourceEngineVersion,
+    [property: JsonRequired] string SourceProjectId,
+    [property: JsonRequired] string SourceContentRoot,
+    [property: JsonRequired] AlsCoordinateSystem CoordinateSystem,
+    [property: JsonRequired] double UnitScale,
+    [property: JsonRequired] AlsManifestAsset[] Skeletons,
+    [property: JsonRequired] AlsManifestAsset[] SkeletalMeshes,
+    [property: JsonRequired] AlsManifestAsset[] StaticMeshes,
+    [property: JsonRequired] AlsManifestAsset[] Animations,
+    [property: JsonRequired] AlsManifestAsset[] Montages,
+    [property: JsonRequired] AlsManifestAsset[] BlendSpaces,
+    [property: JsonRequired] AlsManifestAsset[] AimOffsets,
+    [property: JsonRequired] AlsManifestAsset[] Materials,
+    [property: JsonRequired] AlsManifestAsset[] Textures,
+    [property: JsonRequired] AlsManifestAsset[] PhysicsAssets,
+    [property: JsonRequired] AlsManifestAsset[] Curves,
+    [property: JsonRequired] AlsManifestAsset[] ConfigAssets,
+    [property: JsonRequired] AlsManifestFile[] Files,
+    [property: JsonRequired] AlsAuditSummary AuditSummary)
+{
+    public const int CurrentSchemaVersion = 2;
+    public const string CurrentExporterVersion = "2.0.0";
+}
 
 public sealed record AlsCoordinateSystem(
-    string SourceHandedness,
-    string SourceUpAxis,
-    string TargetHandedness,
-    string TargetUpAxis);
+    [property: JsonRequired] string SourceHandedness,
+    [property: JsonRequired] string SourceUpAxis,
+    [property: JsonRequired] string TargetHandedness,
+    [property: JsonRequired] string TargetUpAxis);
 
 public sealed record AlsManifestAsset(
-    string Id,
-    string ObjectPath,
-    string PackagePath,
-    string AssetName,
-    string ClassPath,
-    string? OutputPath,
-    string[] Dependencies,
-    JsonElement Metadata);
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string ObjectPath,
+    [property: JsonRequired] string PackagePath,
+    [property: JsonRequired] string AssetName,
+    [property: JsonRequired] string ClassPath,
+    [property: JsonRequired] string? OutputPath,
+    [property: JsonRequired] string[] Dependencies,
+    [property: JsonRequired] JsonElement Metadata);
 
-public sealed record AlsManifestFile(string RelativePath, string Sha256, long Size);
+public sealed record AlsManifestFile(
+    [property: JsonRequired] string RelativePath,
+    [property: JsonRequired] string Sha256,
+    [property: JsonRequired] long Size);
 
-public sealed record AlsAuditSummary(string Status, int AssetCount, int FileCount, int ErrorCount, int WarningCount);
+public sealed record AlsAuditSummary(
+    [property: JsonRequired] string Status,
+    [property: JsonRequired] int AssetCount,
+    [property: JsonRequired] int FileCount,
+    [property: JsonRequired] int ErrorCount,
+    [property: JsonRequired] int WarningCount);

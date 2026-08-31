@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using GodotAls.Import.Manifest;
 
 namespace GodotAls.Import.Metadata;
@@ -19,22 +20,48 @@ public sealed record AlsStaticMeshMetadata(bool Overlay, bool Prop, int Material
 }
 
 public sealed record AlsMontageMetadata(
-    bool Overlay, bool Prop, AlsMontageSectionMetadata[] Sections, AlsMontageSlotMetadata[] Slots,
-    float PlayLength, float BlendInTime, int BlendInOption, float BlendOutTime,
-    int BlendOutOption, float BlendOutTriggerTime, bool EnableAutoBlendOut)
+    [property: JsonRequired] bool Overlay,
+    [property: JsonRequired] bool Prop,
+    [property: JsonRequired] AlsMontageSectionMetadata[] Sections,
+    [property: JsonRequired] AlsMontageSlotMetadata[] Slots,
+    [property: JsonRequired] float PlayLength,
+    [property: JsonRequired] float BlendInTime,
+    [property: JsonRequired] int BlendInOption,
+    [property: JsonRequired] float BlendOutTime,
+    [property: JsonRequired] int BlendOutOption,
+    [property: JsonRequired] float BlendOutTriggerTime,
+    [property: JsonRequired] bool EnableAutoBlendOut,
+    [property: JsonRequired] AlsTimelineEventMetadata[] Timeline)
 {
-    public static AlsMontageMetadata Read(JsonElement element) =>
-        element.Deserialize<AlsMontageMetadata>(AlsManifestSerializer.JsonOptions)
-        ?? throw new JsonException("Montage metadata deserialized to null.");
+    public static AlsMontageMetadata Read(JsonElement element)
+    {
+        var metadata = element.Deserialize<AlsMontageMetadata>(AlsManifestSerializer.JsonOptions)
+            ?? throw new JsonException("Montage metadata deserialized to null.");
+        if (metadata.Sections is null || metadata.Slots is null || metadata.Timeline is null)
+        {
+            throw new JsonException("Montage sections, slots, and timeline are required arrays.");
+        }
+        return metadata;
+    }
 }
 
-public sealed record AlsMontageSectionMetadata(string Name, string NextSection, float StartTime);
+public sealed record AlsMontageSectionMetadata(
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] string NextSection,
+    [property: JsonRequired] float StartTime);
 
-public sealed record AlsMontageSlotMetadata(string SlotName, AlsMontageSegmentMetadata[] Segments);
+public sealed record AlsMontageSlotMetadata(
+    [property: JsonRequired] string SlotName,
+    [property: JsonRequired] AlsMontageSegmentMetadata[] Segments);
 
 public sealed record AlsMontageSegmentMetadata(
-    string AnimationId, string AnimationObjectPath, float StartPosition,
-    float AnimationStartTime, float AnimationEndTime, float PlayRate, int LoopCount);
+    [property: JsonRequired] string AnimationId,
+    [property: JsonRequired] string AnimationObjectPath,
+    [property: JsonRequired] float StartPosition,
+    [property: JsonRequired] float AnimationStartTime,
+    [property: JsonRequired] float AnimationEndTime,
+    [property: JsonRequired] float PlayRate,
+    [property: JsonRequired] int LoopCount);
 
 public sealed record AlsBlendMetadata(
     bool Overlay, bool Prop, AlsBlendParameterMetadata[] Parameters, AlsBlendSampleMetadata[] Samples)

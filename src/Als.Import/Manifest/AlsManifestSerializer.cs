@@ -20,9 +20,21 @@ public static class AlsManifestSerializer
         var manifest = JsonSerializer.Deserialize<AlsManifest>(json, JsonOptions)
             ?? throw new JsonException("ALS manifest deserialized to null.");
         EnsureRequiredMembers(manifest);
+        if (manifest.SchemaVersion != AlsManifest.CurrentSchemaVersion)
+        {
+            throw new JsonException("ALS manifest schemaVersion must be 2.");
+        }
+        if (!string.Equals(manifest.ExporterVersion, AlsManifest.CurrentExporterVersion, StringComparison.Ordinal))
+        {
+            throw new JsonException("ALS manifest exporterVersion must be 2.0.0.");
+        }
         foreach (var animation in manifest.Animations)
         {
             AlsAnimationMetadata.Read(animation.Metadata);
+        }
+        foreach (var montage in manifest.Montages)
+        {
+            AlsMontageMetadata.Read(montage.Metadata);
         }
         return manifest;
     }

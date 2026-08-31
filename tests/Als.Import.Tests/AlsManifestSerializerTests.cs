@@ -20,7 +20,8 @@ public sealed class AlsManifestSerializerTests
     {
         var manifest = AlsManifestSerializer.Load(FixturePath());
 
-        Assert.Equal(1, manifest.SchemaVersion);
+        Assert.Equal(2, manifest.SchemaVersion);
+        Assert.Equal("2.0.0", manifest.ExporterVersion);
         Assert.Equal("complete", manifest.AuditSummary.Status);
         Assert.Single(manifest.Skeletons);
         Assert.Single(manifest.Animations);
@@ -32,8 +33,8 @@ public sealed class AlsManifestSerializerTests
     {
         var json = File.ReadAllText(FixturePath());
         var unknown = json.Replace(
-            "\"schemaVersion\": 1,",
-            "\"schemaVersion\": 1, \"unexpected\": true,",
+            "\"schemaVersion\": 2,",
+            "\"schemaVersion\": 2, \"unexpected\": true,",
             StringComparison.Ordinal);
         var wrongCase = json.Replace("\"schemaVersion\"", "\"SchemaVersion\"", StringComparison.Ordinal);
 
@@ -168,18 +169,18 @@ public sealed class AlsManifestSerializerTests
         var keys = curve["keys"]!.AsArray();
         switch (mutation)
         {
-        case "empty":
-            keys.Clear();
-            break;
-        case "single":
-            keys.RemoveAt(1);
-            break;
-        case "first":
-            keys[0]!.AsObject()["timeSeconds"] = 0.01;
-            break;
-        case "last":
-            keys[1]!.AsObject()["timeSeconds"] = 0.9;
-            break;
+            case "empty":
+                keys.Clear();
+                break;
+            case "single":
+                keys.RemoveAt(1);
+                break;
+            case "first":
+                keys[0]!.AsObject()["timeSeconds"] = 0.01;
+                break;
+            case "last":
+                keys[1]!.AsObject()["timeSeconds"] = 0.9;
+                break;
         }
         var json = root.ToJsonString();
 
@@ -396,21 +397,211 @@ public sealed class AlsManifestSerializerTests
     }
 
     [Fact]
-    public void LegacyCurveNamesReserializeAsNamesRatherThanInventedStructuredCurves()
+    public void RejectsLegacyCurveNameArraysInSchemaV2()
     {
         var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
         root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"] = new JsonArray("RotationAmount");
-        using var metadataDocument = JsonDocument.Parse(root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.ToJsonString());
-        var metadata = AlsAnimationMetadata.Read(metadataDocument.RootElement);
 
-        Assert.False(metadata.Curves.IsStructured);
-        Assert.Equal(["RotationAmount"], Assert.IsType<string[]>(metadata.Curves.LegacyNames));
-        Assert.Throws<JsonException>(() => metadata.Curves.RequireStructuredPayload());
+        Assert.False(IsSchemaValid(root.ToJsonString()));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(root.ToJsonString()));
+    }
 
-        var serialized = JsonSerializer.Serialize(metadata, AlsManifestSerializer.JsonOptions);
-        using var document = JsonDocument.Parse(serialized);
+    [Fact]
+    public void LoadsAndRoundTripsEveryTypedSequenceAndMontageTimelineField()
+    {
+        Assert.True(IsSchemaValid(File.ReadAllText(TypedTimelineFixturePath())));
+        var manifest = AlsManifestSerializer.Load(TypedTimelineFixturePath());
+        var sequence = AlsAnimationMetadata.Read(Assert.Single(manifest.Animations).Metadata);
+        var montage = AlsMontageMetadata.Read(Assert.Single(manifest.Montages).Metadata);
 
-        Assert.Equal(JsonValueKind.String, document.RootElement.GetProperty("curves")[0].ValueKind);
+        Assert.Equal(5, sequence.Timeline.Length);
+        Assert.Equal(["Generic", "Footstep", "EarlyBlendOut", "SetAction", "SetGroundedEntry"],
+            sequence.Timeline.Select(value => value.Kind).ToArray());
+        Assert.IsType<AlsGenericEventPayloadMetadata>(sequence.Timeline[0].Payload);
+        Assert.Equal("Left", Assert.IsType<AlsFootstepEventPayloadMetadata>(sequence.Timeline[1].Payload).Foot);
+        var earlyBlendOut = Assert.IsType<AlsEarlyBlendOutEventPayloadMetadata>(sequence.Timeline[2].Payload);
+        Assert.Equal(0.2, earlyBlendOut.BlendOutSeconds);
+        Assert.True(earlyBlendOut.CheckInput);
+        Assert.True(earlyBlendOut.CheckLocomotionMode);
+        Assert.Equal("Grounded", earlyBlendOut.LocomotionMode);
+        Assert.True(earlyBlendOut.CheckRotationMode);
+        Assert.Equal("LookingDirection", earlyBlendOut.RotationMode);
+        Assert.True(earlyBlendOut.CheckStance);
+        Assert.Equal("Standing", earlyBlendOut.Stance);
+        Assert.Equal("Rolling", Assert.IsType<AlsSetActionEventPayloadMetadata>(sequence.Timeline[3].Payload).Action);
+        Assert.Equal("FromRoll", Assert.IsType<AlsSetGroundedEntryEventPayloadMetadata>(sequence.Timeline[4].Payload).Mode);
+
+        Assert.Equal(["Left", "Right"], sequence.SyncMarkers.Select(value => value.Name).ToArray());
+        Assert.Equal("1111111111111111111111111111111111111111", sequence.SyncMarkers[0].StableMarkerId);
+        Assert.Equal(0.2, sequence.SyncMarkers[0].TimeSeconds);
+        Assert.Equal(0, sequence.SyncMarkers[0].SourceIndex);
+        Assert.Equal(0, sequence.SyncMarkers[0].TrackIndex);
+
+        var montageEvent = Assert.Single(montage.Timeline);
+        Assert.Equal("RootMotionScale", montageEvent.Kind);
+        Assert.Equal(0.0, Assert.IsType<AlsRootMotionScaleEventPayloadMetadata>(montageEvent.Payload).TranslationScale);
+        Assert.Equal(string.Empty, Assert.Single(montage.Sections).NextSection);
+
+        var sequenceJson = JsonSerializer.Serialize(sequence, AlsManifestSerializer.JsonOptions);
+        var montageJson = JsonSerializer.Serialize(montage, AlsManifestSerializer.JsonOptions);
+        using var sequenceDocument = JsonDocument.Parse(sequenceJson);
+        using var montageDocument = JsonDocument.Parse(montageJson);
+        var restoredSequence = AlsAnimationMetadata.Read(sequenceDocument.RootElement);
+        var restoredMontage = AlsMontageMetadata.Read(montageDocument.RootElement);
+
+        Assert.Equal(sequence.Timeline, restoredSequence.Timeline);
+        Assert.Equal(sequence.SyncMarkers, restoredSequence.SyncMarkers);
+        Assert.Equal(montage.Timeline, restoredMontage.Timeline);
+    }
+
+    [Fact]
+    public void RejectsManifestV1AndAnyExporterVersionOtherThanTwo()
+    {
+        var v1 = MutateTypedFixture(root => root["schemaVersion"] = 1);
+        var oldExporter = MutateTypedFixture(root => root["exporterVersion"] = "1.0.0");
+        var futureExporter = MutateTypedFixture(root => root["exporterVersion"] = "2.1.0");
+
+        Assert.False(IsSchemaValid(v1));
+        Assert.False(IsSchemaValid(oldExporter));
+        Assert.False(IsSchemaValid(futureExporter));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(v1));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(oldExporter));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(futureExporter));
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("unknown")]
+    public void RejectsMissingOrUnknownTimelineEventFields(string mutation)
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            var timelineEvent = FindTimelineEvent(root, "Generic");
+            if (mutation == "missing")
+            {
+                timelineEvent.Remove("displayName");
+            }
+            else
+            {
+                timelineEvent["unexpected"] = true;
+            }
+        });
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Theory]
+    [InlineData("Generic", "foot", "Left")]
+    [InlineData("Footstep", "action", "Rolling")]
+    [InlineData("SetAction", "mode", "FromRoll")]
+    [InlineData("SetGroundedEntry", "foot", "Right")]
+    [InlineData("EarlyBlendOut", "translationScale", "1")]
+    [InlineData("RootMotionScale", "checkInput", "true")]
+    public void RejectsFieldsFromAnotherKindsPayload(string kind, string field, string value)
+    {
+        var json = MutateTypedFixture(root => FindTimelineEvent(root, kind)["payload"]!.AsObject()[field] = value);
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Theory]
+    [InlineData("Footstep", "foot")]
+    [InlineData("SetAction", "action")]
+    [InlineData("SetGroundedEntry", "mode")]
+    [InlineData("EarlyBlendOut", "locomotionMode")]
+    [InlineData("RootMotionScale", "translationScale")]
+    public void RejectsMissingKindSpecificPayloadFields(string kind, string field)
+    {
+        var json = MutateTypedFixture(root => FindTimelineEvent(root, kind)["payload"]!.AsObject().Remove(field));
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Fact]
+    public void DisabledEarlyBlendOutComparisonsStillRequireEnumFields()
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            var payload = FindTimelineEvent(root, "EarlyBlendOut")["payload"]!.AsObject();
+            payload["checkLocomotionMode"] = false;
+            payload.Remove("locomotionMode");
+        });
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Theory]
+    [InlineData("Footstep", "foot", "Front")]
+    [InlineData("SetAction", "action", "Jumping")]
+    [InlineData("SetGroundedEntry", "mode", "Walking")]
+    [InlineData("EarlyBlendOut", "locomotionMode", "Swimming")]
+    [InlineData("EarlyBlendOut", "rotationMode", "ViewDirection")]
+    [InlineData("EarlyBlendOut", "stance", "Prone")]
+    public void RejectsUnknownPayloadEnumValues(string kind, string field, string value)
+    {
+        var json = MutateTypedFixture(root => FindTimelineEvent(root, kind)["payload"]!.AsObject()[field] = value);
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("-Infinity")]
+    public void RejectsNonFiniteTimelineNumberText(string value)
+    {
+        var json = MutateTypedFixture(root => FindTimelineEvent(root, "Generic")["timeSeconds"] = value);
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
+    }
+
+    [Fact]
+    public void RejectsAnimationOrMontageWithoutTimeline()
+    {
+        var animationJson = MutateTypedFixture(root =>
+            root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject().Remove("timeline"));
+        var montageJson = MutateTypedFixture(root =>
+            root["montages"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject().Remove("timeline"));
+
+        Assert.False(IsSchemaValid(animationJson));
+        Assert.False(IsSchemaValid(montageJson));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(animationJson));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(montageJson));
+    }
+
+    [Theory]
+    [InlineData("animationScalar")]
+    [InlineData("montageScalar")]
+    [InlineData("markerScalar")]
+    public void RejectsMissingRequiredScalarMetadataFields(string mutation)
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            switch (mutation)
+            {
+                case "animationScalar":
+                    root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject().Remove("playLength");
+                    break;
+                case "montageScalar":
+                    root["montages"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject().Remove("blendInOption");
+                    break;
+                case "markerScalar":
+                    root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["syncMarkers"]!
+                        .AsArray()[0]!.AsObject().Remove("sourceIndex");
+                    break;
+                default:
+                    throw new InvalidOperationException(mutation);
+            }
+        });
+
+        Assert.False(IsSchemaValid(json));
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
     }
 
     [Fact]
@@ -516,4 +707,21 @@ public sealed class AlsManifestSerializerTests
 
     internal static string FixturePath() =>
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "valid_manifest.json");
+
+    internal static string TypedTimelineFixturePath() =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "p5a_typed_timeline_manifest.json");
+
+    internal static string MutateTypedFixture(Action<JsonObject> update)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(TypedTimelineFixturePath()))!.AsObject();
+        update(root);
+        return root.ToJsonString();
+    }
+
+    internal static JsonObject FindTimelineEvent(JsonObject root, string kind)
+    {
+        var events = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["timeline"]!.AsArray()
+            .Concat(root["montages"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["timeline"]!.AsArray());
+        return events.Select(value => value!.AsObject()).Single(value => value["kind"]!.GetValue<string>() == kind);
+    }
 }

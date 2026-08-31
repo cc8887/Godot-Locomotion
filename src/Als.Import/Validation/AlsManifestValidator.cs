@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using GodotAls.Import.Manifest;
+using GodotAls.Import.Metadata;
 
 namespace GodotAls.Import.Validation;
 
@@ -19,6 +20,12 @@ public static partial class AlsManifestValidator
         {
             Add(issues, "ALSMANIFEST001", null, "$.schemaVersion", "Unsupported manifest schema.",
                 options.SupportedSchemaVersion.ToString(), manifest.SchemaVersion.ToString());
+        }
+
+        if (!string.Equals(manifest.ExporterVersion, options.SupportedExporterVersion, StringComparison.Ordinal))
+        {
+            Add(issues, "ALSMANIFEST013", null, "$.exporterVersion", "Unsupported manifest exporter version.",
+                options.SupportedExporterVersion, manifest.ExporterVersion);
         }
 
         if (options.RequireCompleteAudit && !string.Equals(manifest.AuditSummary.Status, "complete", StringComparison.Ordinal))
@@ -53,11 +60,14 @@ public static partial class AlsManifestValidator
             ValidateSection(section, ids, issues);
         }
 
+        var eventIds = new HashSet<string>(StringComparer.Ordinal);
+        var markerIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var section in sections)
         {
             for (var index = 0; index < section.Assets.Length; index++)
             {
                 ValidateAssetReferences(section.Name, index, section.Assets[index], ids, issues);
+                ValidateTypedMetadata(section.Name, index, section.Assets[index], eventIds, markerIds, issues);
             }
         }
 
@@ -166,6 +176,7 @@ public static partial class AlsManifestValidator
             {
                 var propertyPath = $"{path}.{property.Name}";
                 if ((property.Name == "id" || property.Name.EndsWith("Id", StringComparison.Ordinal)) &&
+                    property.Name is not ("stableEventId" or "stableMarkerId") &&
                     property.Value.ValueKind == JsonValueKind.String)
                 {
                     var reference = property.Value.GetString();
@@ -188,6 +199,173 @@ public static partial class AlsManifestValidator
             {
                 ValidateMetadataReferences(item, $"{path}[{index}]", assetId, ids, issues);
                 index++;
+            }
+        }
+    }
+
+    private static void ValidateTypedMetadata(
+        string section,
+        int index,
+        AlsManifestAsset asset,
+        HashSet<string> eventIds,
+        HashSet<string> markerIds,
+        List<AlsValidationIssue> issues)
+    {
+        if (section == "animations")
+        {
+            var path = $"$.animations[{index}].metadata";
+            var metadata = AlsAnimationMetadata.Read(asset.Metadata);
+            ValidateTimeline(metadata.Timeline, metadata.PlayLength, path, asset.Id, eventIds, issues);
+            ValidateMarkers(metadata.SyncMarkers, metadata.PlayLength, path, asset.Id, markerIds, issues);
+        }
+        else if (section == "montages")
+        {
+            var path = $"$.montages[{index}].metadata";
+            var metadata = AlsMontageMetadata.Read(asset.Metadata);
+            ValidateTimeline(metadata.Timeline, metadata.PlayLength, path, asset.Id, eventIds, issues);
+            ValidateMontageSections(metadata, path, asset.Id, issues);
+        }
+    }
+
+    private static void ValidateTimeline(
+        AlsTimelineEventMetadata[] timeline,
+        double sourceLength,
+        string metadataPath,
+        string assetId,
+        HashSet<string> eventIds,
+        List<AlsValidationIssue> issues)
+    {
+        var sourceIndices = new HashSet<int>();
+        for (var index = 0; index < timeline.Length; index++)
+        {
+            var value = timeline[index];
+            var path = $"{metadataPath}.timeline[{index}]";
+            if (!StableIdRegex().IsMatch(value.StableEventId) || !eventIds.Add(value.StableEventId))
+            {
+                Add(issues, "ALSMANIFEST014", assetId, $"{path}.stableEventId",
+                    "Timeline stable event ID must be a unique lowercase SHA-1.");
+            }
+            if (string.IsNullOrWhiteSpace(value.SourceClassPath))
+            {
+                Add(issues, "ALSMANIFEST015", assetId, $"{path}.sourceClassPath", "Timeline source class path is required.");
+            }
+            if (string.IsNullOrWhiteSpace(value.DisplayName))
+            {
+                Add(issues, "ALSMANIFEST015", assetId, $"{path}.displayName", "Timeline display name is required.");
+            }
+            if (!double.IsFinite(value.TimeSeconds) || value.TimeSeconds < 0.0 ||
+                !double.IsFinite(sourceLength) || value.TimeSeconds > sourceLength)
+            {
+                Add(issues, "ALSMANIFEST016", assetId, $"{path}.timeSeconds", "Timeline time is outside the source length.");
+            }
+            if (!double.IsFinite(value.DurationSeconds) || value.DurationSeconds < 0.0 ||
+                !double.IsFinite(value.TimeSeconds + value.DurationSeconds) ||
+                value.TimeSeconds + value.DurationSeconds > sourceLength)
+            {
+                Add(issues, "ALSMANIFEST016", assetId, $"{path}.durationSeconds", "Timeline state end is outside the source length.");
+            }
+            if (!double.IsFinite(value.TriggerWeightThreshold) ||
+                value.TriggerWeightThreshold < 0.0 || value.TriggerWeightThreshold > 1.0)
+            {
+                Add(issues, "ALSMANIFEST017", assetId, $"{path}.triggerWeightThreshold",
+                    "Timeline trigger threshold must be in [0, 1].");
+            }
+            if (value.TickMode is not ("Queued" or "BranchingPoint"))
+            {
+                Add(issues, "ALSMANIFEST018", assetId, $"{path}.tickMode", "Timeline tick mode is unsupported.");
+            }
+            if (value.SourceIndex < 0 || !sourceIndices.Add(value.SourceIndex))
+            {
+                Add(issues, "ALSMANIFEST019", assetId, $"{path}.sourceIndex",
+                    "Timeline source index must be nonnegative and unique within its source asset.");
+            }
+            if (value.TrackIndex < 0)
+            {
+                Add(issues, "ALSMANIFEST020", assetId, $"{path}.trackIndex", "Timeline track index must be nonnegative.");
+            }
+
+            switch (value.Payload)
+            {
+            case AlsEarlyBlendOutEventPayloadMetadata payload
+                when !double.IsFinite(payload.BlendOutSeconds) || payload.BlendOutSeconds < 0.0:
+                Add(issues, "ALSMANIFEST021", assetId, $"{path}.payload.blendOutSeconds",
+                    "EarlyBlendOut blend duration must be finite and nonnegative.");
+                break;
+            case AlsRootMotionScaleEventPayloadMetadata payload
+                when !double.IsFinite(payload.TranslationScale) || payload.TranslationScale < 0.0:
+                Add(issues, "ALSMANIFEST021", assetId, $"{path}.payload.translationScale",
+                    "RootMotionScale translation scale must be finite and nonnegative.");
+                break;
+            }
+        }
+    }
+
+    private static void ValidateMarkers(
+        AlsAnimationSyncMarkerMetadata[] markers,
+        double sourceLength,
+        string metadataPath,
+        string assetId,
+        HashSet<string> markerIds,
+        List<AlsValidationIssue> issues)
+    {
+        var sourceIndices = new HashSet<int>();
+        for (var index = 0; index < markers.Length; index++)
+        {
+            var value = markers[index];
+            var path = $"{metadataPath}.syncMarkers[{index}]";
+            if (!StableIdRegex().IsMatch(value.StableMarkerId) || !markerIds.Add(value.StableMarkerId))
+            {
+                Add(issues, "ALSMANIFEST022", assetId, $"{path}.stableMarkerId",
+                    "Sync marker stable ID must be a unique lowercase SHA-1.");
+            }
+            if (string.IsNullOrWhiteSpace(value.Name))
+            {
+                Add(issues, "ALSMANIFEST023", assetId, $"{path}.name", "Sync marker name is required.");
+            }
+            if (!double.IsFinite(value.TimeSeconds) || value.TimeSeconds < 0.0 || value.TimeSeconds > sourceLength)
+            {
+                Add(issues, "ALSMANIFEST023", assetId, $"{path}.timeSeconds", "Sync marker time is outside the source length.");
+            }
+            if (value.SourceIndex < 0 || !sourceIndices.Add(value.SourceIndex))
+            {
+                Add(issues, "ALSMANIFEST023", assetId, $"{path}.sourceIndex",
+                    "Sync marker source index must be nonnegative and unique within its source asset.");
+            }
+            if (value.TrackIndex < 0)
+            {
+                Add(issues, "ALSMANIFEST023", assetId, $"{path}.trackIndex", "Sync marker track index must be nonnegative.");
+            }
+        }
+    }
+
+    private static void ValidateMontageSections(
+        AlsMontageMetadata metadata,
+        string metadataPath,
+        string assetId,
+        List<AlsValidationIssue> issues)
+    {
+        var names = metadata.Sections.Select(value => value.Name).ToHashSet(StringComparer.Ordinal);
+        var seenNames = new HashSet<string>(StringComparer.Ordinal);
+        double? previousStart = null;
+        for (var index = 0; index < metadata.Sections.Length; index++)
+        {
+            var value = metadata.Sections[index];
+            var path = $"{metadataPath}.sections[{index}]";
+            if (string.IsNullOrWhiteSpace(value.Name) || !seenNames.Add(value.Name))
+            {
+                Add(issues, "ALSMANIFEST024", assetId, $"{path}.name", "Montage section name must be nonempty and unique.");
+            }
+            if (!float.IsFinite(value.StartTime) || value.StartTime < 0f || value.StartTime > metadata.PlayLength ||
+                previousStart is not null && value.StartTime <= previousStart.Value)
+            {
+                Add(issues, "ALSMANIFEST024", assetId, $"{path}.startTime",
+                    "Montage section start times must be finite, strictly increasing, and inside the montage.");
+            }
+            previousStart = value.StartTime;
+            if (value.NextSection == "None" || value.NextSection.Length != 0 && !names.Contains(value.NextSection))
+            {
+                Add(issues, "ALSMANIFEST024", assetId, $"{path}.nextSection",
+                    "Montage nextSection must be empty or resolve within the montage.");
             }
         }
     }
