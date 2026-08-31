@@ -15,6 +15,7 @@ public partial class P4AnimationGraphSmoke : Node
     private const int FrameCount = 240;
     private const ulong DigestOffset = 14695981039346656037UL;
     private const ulong DigestPrime = 1099511628211UL;
+    private const ulong ExpectedCurveSamplerDigest = 0x82014E8E191BAE63UL;
 
     private static readonly string[] PoseBoneNames =
     [
@@ -1692,10 +1693,26 @@ public partial class P4AnimationGraphSmoke : Node
                     new AlsFloatCurveKeyDefinition(1f, 1f, 0f, 4f, AlsCurveInterpolation.Cubic),
                     new AlsFloatCurveKeyDefinition(3f, 5f, -2f, 0f, AlsCurveInterpolation.Linear),
                 ]),
+            new AlsFloatCurveDefinition(13, AlsCanonicalCurveKind.None, "CubicOvershoot",
+                AlsCurveProvenance.SourceCurve,
+                [
+                    new AlsFloatCurveKeyDefinition(0f, 0f, 0f, 4f, AlsCurveInterpolation.Cubic),
+                    new AlsFloatCurveKeyDefinition(2f, 1f, -2f, 0f, AlsCurveInterpolation.Linear),
+                ]),
+            new AlsFloatCurveDefinition(
+                19,
+                AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond,
+                "RotationYawSpeedRadiansPerSecond",
+                AlsCurveProvenance.DerivedRootTrack,
+                [
+                    new AlsFloatCurveKeyDefinition(0f, -2f, 0f, 0f, AlsCurveInterpolation.Linear),
+                    new AlsFloatCurveKeyDefinition(2f, 2f, 0f, 0f, AlsCurveInterpolation.Linear),
+                ]),
         };
-        var sampler = new AlsCurveSampler(curves);
+        var sampler = new AlsCurveSampler([curves[4], curves[0], curves[3], curves[1], curves[2]]);
         var values = new float[3];
         var ids = new[] { 3, 7, 11 };
+        var samplerDigest = DigestOffset;
 
         AssertSamples(-1f, 2f, -2f, 1f);
         AssertSamples(0f, 2f, -2f, 1f);
@@ -1714,9 +1731,63 @@ public partial class P4AnimationGraphSmoke : Node
         {
             throw new InvalidOperationException("Non-finite curve time polluted the caller buffer.");
         }
+        AppendFloatBits(ref samplerDigest, values[0]);
+        AppendFloatBits(ref samplerDigest, values[1]);
+        AppendFloatBits(ref samplerDigest, values[2]);
         if (sampler.TrySample(ids, 1f, values.AsSpan(0, 2)))
         {
             throw new InvalidOperationException("Short curve destination was accepted.");
+        }
+
+        if (!sampler.TrySample(13, 1f, out var finiteOvershoot))
+        {
+            throw new InvalidOperationException("Finite Cubic overshoot sample failed.");
+        }
+        AssertFloatBits(finiteOvershoot, 2f, "Cubic tangent-unit overshoot");
+        AppendFloatBits(ref samplerDigest, finiteOvershoot);
+
+        if (curves[4].CanonicalKind is not AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond ||
+            curves[4].Provenance is not AlsCurveProvenance.DerivedRootTrack ||
+            !sampler.TrySample(19, 0.5f, out var negativeYaw) ||
+            !sampler.TrySample(19, 1.5f, out var positiveYaw))
+        {
+            throw new InvalidOperationException("Canonical derived yaw curve was not sampleable.");
+        }
+        AssertFloatBits(negativeYaw, -1f, "Canonical negative yaw");
+        AssertFloatBits(positiveYaw, 1f, "Canonical positive yaw");
+        AppendFloatBits(ref samplerDigest, negativeYaw);
+        AppendFloatBits(ref samplerDigest, positiveYaw);
+
+        var callerOrderIds = new[] { 19, 3, 13, 7, 11 };
+        var callerOrderValues = new float[callerOrderIds.Length];
+        if (!sampler.TrySample(callerOrderIds, 0.5f, callerOrderValues))
+        {
+            throw new InvalidOperationException("Caller-ordered multi-curve sample failed.");
+        }
+        var callerOrderExpected = new[] { -1f, 2f, 1.46875f, -1f, 1f };
+        for (var index = 0; index < callerOrderValues.Length; index++)
+        {
+            AssertFloatBits(
+                callerOrderValues[index],
+                callerOrderExpected[index],
+                $"Caller-ordered curve {callerOrderIds[index]}");
+            AppendFloatBits(ref samplerDigest, callerOrderValues[index]);
+        }
+
+        var duplicateIds = new[] { 7, 7, 3 };
+        var longDestination = new[] { 83f, 83f, 83f, 89f, 97f };
+        if (!sampler.TrySample(duplicateIds, 0.5f, longDestination))
+        {
+            throw new InvalidOperationException("Duplicate caller curve IDs were rejected.");
+        }
+        AssertFloatBits(longDestination[0], -1f, "First duplicate curve");
+        AssertFloatBits(longDestination[1], -1f, "Second duplicate curve");
+        AssertFloatBits(longDestination[2], 2f, "Duplicate batch trailing sample");
+        AssertFloatBits(longDestination[3], 89f, "Oversized destination first tail");
+        AssertFloatBits(longDestination[4], 97f, "Oversized destination second tail");
+        for (var index = 0; index < longDestination.Length; index++)
+        {
+            AppendFloatBits(ref samplerDigest, longDestination[index]);
         }
 
         var direct = new AlsCurveSampler(23, curves[1].Keys);
@@ -1725,10 +1796,51 @@ public partial class P4AnimationGraphSmoke : Node
             throw new InvalidOperationException("Direct key-array curve binding failed.");
         }
 
+        var negativeTime = new AlsCurveSampler(29,
+        [
+            new AlsFloatCurveKeyDefinition(-2f, -1f, 0f, 0f, AlsCurveInterpolation.Linear),
+            new AlsFloatCurveKeyDefinition(-1f, 1f, 0f, 0f, AlsCurveInterpolation.Linear),
+        ]);
+        if (!negativeTime.TrySample(29, -1.5f, out var negativeTimeValue))
+        {
+            throw new InvalidOperationException("Negative direct key times were rejected.");
+        }
+        AssertFloatBits(negativeTimeValue, 0f, "Negative direct key-time midpoint");
+        AppendFloatBits(ref samplerDigest, negativeTimeValue);
+
         ExpectInvalid([
             new AlsFloatCurveKeyDefinition(1f, 0f, 0f, 0f, AlsCurveInterpolation.Linear),
             new AlsFloatCurveKeyDefinition(1f, 1f, 0f, 0f, AlsCurveInterpolation.Linear),
         ]);
+        ExpectInvalid([
+            new AlsFloatCurveKeyDefinition(0f, 0f, 0f, 0f, (AlsCurveInterpolation)byte.MaxValue),
+        ]);
+        ExpectArgumentNull(() => _ = new AlsCurveSampler((AlsFloatCurveDefinition[])null!));
+        ExpectArgumentNull(() => _ = new AlsCurveSampler((AlsFloatCurveKeyDefinition[])null!));
+        ExpectArgumentNull(() => _ = new AlsCurveSampler(41, (AlsFloatCurveKeyDefinition[])null!));
+        ExpectNullCurveEntry(() => _ = new AlsCurveSampler([curves[0], null!]));
+        ExpectInvalidCurves([curves[0], curves[0]]);
+        ExpectInvalidCurves([
+            new AlsFloatCurveDefinition(
+                -1, AlsCanonicalCurveKind.None, "NegativeId", AlsCurveProvenance.SourceCurve,
+                [new AlsFloatCurveKeyDefinition(0f, 0f, 0f, 0f, AlsCurveInterpolation.Linear)]),
+        ]);
+        ExpectInvalidCurves([
+            new AlsFloatCurveDefinition(
+                43, AlsCanonicalCurveKind.None, "Empty", AlsCurveProvenance.SourceCurve, []),
+        ]);
+
+        var snapshotKeys = new[]
+        {
+            new AlsFloatCurveKeyDefinition(0f, 3f, 0f, 0f, AlsCurveInterpolation.Linear),
+        };
+        var snapshotSampler = new AlsCurveSampler(47, snapshotKeys);
+        snapshotKeys[0] = snapshotKeys[0] with { Value = 99f };
+        if (!snapshotSampler.TrySample(47, 0f, out var snapshotValue))
+        {
+            throw new InvalidOperationException("Snapshot sampler was not sampleable.");
+        }
+        AssertFloatBits(snapshotValue, 3f, "Constructor key snapshot");
 
         var extremeLinear = new AlsCurveSampler(31,
         [
@@ -1739,6 +1851,8 @@ public partial class P4AnimationGraphSmoke : Node
         {
             throw new InvalidOperationException("Extreme linear midpoint must remain finite zero.");
         }
+        AssertFloatBits(midpoint, 0f, "Extreme linear midpoint");
+        AppendFloatBits(ref samplerDigest, midpoint);
 
         var overshoot = new AlsCurveSampler(37,
         [
@@ -1781,19 +1895,43 @@ public partial class P4AnimationGraphSmoke : Node
             throw new InvalidOperationException(
                 $"Steady curve sampling allocated managed memory: {allocated} B");
         }
+        Append(ref samplerDigest, unchecked((ulong)allocated));
+        if (samplerDigest != ExpectedCurveSamplerDigest)
+        {
+            throw new InvalidOperationException(
+                $"Curve sampler digest changed: expected={ExpectedCurveSamplerDigest:X16} actual={samplerDigest:X16}");
+        }
+        GD.Print(
+            $"P4_CURVE_SAMPLER_OK digest={samplerDigest:X16} warm_curve_batch_allocation={allocated}B");
 
         void AssertSamples(float time, float constant, float linear, float cubic)
         {
-            if (!sampler.TrySample(ids, time, values) ||
-                !Mathf.IsEqualApprox(values[0], constant) ||
-                !Mathf.IsEqualApprox(values[1], linear) ||
-                !Mathf.IsEqualApprox(values[2], cubic))
+            if (!sampler.TrySample(ids, time, values))
             {
                 throw new InvalidOperationException(
                     $"Curve sample mismatch at {time:R}: [{values[0]:R},{values[1]:R},{values[2]:R}]");
             }
+            AssertFloatBits(values[0], constant, $"Constant at {time:R}");
+            AssertFloatBits(values[1], linear, $"Linear at {time:R}");
+            AssertFloatBits(values[2], cubic, $"Cubic at {time:R}");
+            AppendFloatBits(ref samplerDigest, values[0]);
+            AppendFloatBits(ref samplerDigest, values[1]);
+            AppendFloatBits(ref samplerDigest, values[2]);
         }
 
+        static void AssertFloatBits(float actual, float expected, string label)
+        {
+            var actualBits = BitConverter.SingleToInt32Bits(actual);
+            var expectedBits = BitConverter.SingleToInt32Bits(expected);
+            if (actualBits != expectedBits)
+            {
+                throw new InvalidOperationException(
+                    $"{label} bits changed: expected=0x{expectedBits:X8} actual=0x{actualBits:X8}");
+            }
+        }
+
+        static void AppendFloatBits(ref ulong digest, float value) =>
+            Append(ref digest, unchecked((uint)BitConverter.SingleToInt32Bits(value)));
 
         static void ExpectInvalid(AlsFloatCurveKeyDefinition[] keys)
         {
@@ -1801,6 +1939,42 @@ public partial class P4AnimationGraphSmoke : Node
             {
                 _ = new AlsCurveSampler(keys);
                 throw new InvalidOperationException("Malformed curve keys were accepted.");
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        static void ExpectArgumentNull(Action action)
+        {
+            try
+            {
+                action();
+                throw new InvalidOperationException("Null curve constructor input was accepted.");
+            }
+            catch (ArgumentNullException)
+            {
+            }
+        }
+
+        static void ExpectNullCurveEntry(Action action)
+        {
+            try
+            {
+                action();
+                throw new InvalidOperationException("Null curve entry was accepted.");
+            }
+            catch (ArgumentException exception) when (exception is not ArgumentNullException)
+            {
+            }
+        }
+
+        static void ExpectInvalidCurves(AlsFloatCurveDefinition[] invalidCurves)
+        {
+            try
+            {
+                _ = new AlsCurveSampler(invalidCurves);
+                throw new InvalidOperationException("Malformed curve definitions were accepted.");
             }
             catch (ArgumentException)
             {

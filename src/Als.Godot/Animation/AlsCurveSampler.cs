@@ -1,10 +1,12 @@
+using GodotAls.Core.Curves;
 using GodotAls.Import.Compilation;
 
 namespace GodotAls.Animation;
 
 public sealed class AlsCurveSampler
 {
-    private readonly BoundCurve[] _curves;
+    private readonly AlsCurveBinding[] _bindings;
+    private readonly AlsCurveKey[] _keys;
 
     public AlsCurveSampler(AlsFloatCurveKeyDefinition[] keys)
         : this(0, keys)
@@ -26,13 +28,22 @@ public sealed class AlsCurveSampler
     public AlsCurveSampler(AlsFloatCurveDefinition[] curves)
     {
         ArgumentNullException.ThrowIfNull(curves);
-        _curves = new BoundCurve[curves.Length];
+        var ordered = new AlsFloatCurveDefinition[curves.Length];
+        for (var curveIndex = 0; curveIndex < curves.Length; curveIndex++)
+        {
+            ordered[curveIndex] = curves[curveIndex]
+                ?? throw new ArgumentException("Curve entries cannot be null.", nameof(curves));
+        }
+        Array.Sort(
+            ordered,
+            static (left, right) => left.CurveId.CompareTo(right.CurveId));
+
+        var sourceKeys = new AlsFloatCurveKeyDefinition[ordered.Length][];
+        var totalKeyCount = 0;
         var previousId = -1;
-        var ordered = curves.OrderBy(value => value.CurveId).ToArray();
         for (var curveIndex = 0; curveIndex < ordered.Length; curveIndex++)
         {
-            var curve = ordered[curveIndex]
-                ?? throw new ArgumentException("Curve entries cannot be null.", nameof(curves));
+            var curve = ordered[curveIndex];
             if (curve.CurveId < 0 || curve.CurveId == previousId)
             {
                 throw new ArgumentException(
@@ -45,6 +56,11 @@ public sealed class AlsCurveSampler
                 throw new ArgumentException(
                     $"Curve {curve.CurveId} must contain at least one key.", nameof(curves));
             }
+            if (keys.Length > int.MaxValue - totalKeyCount)
+            {
+                throw new ArgumentException("Curve key table is too large.", nameof(curves));
+            }
+
             for (var keyIndex = 0; keyIndex < keys.Length; keyIndex++)
             {
                 ref readonly var key = ref keys[keyIndex];
@@ -52,7 +68,7 @@ public sealed class AlsCurveSampler
                     !float.IsFinite(key.Value) ||
                     !float.IsFinite(key.ArriveTangent) ||
                     !float.IsFinite(key.LeaveTangent) ||
-                    (uint)key.Interpolation > (uint)AlsCurveInterpolation.Cubic ||
+                    !TryMapInterpolation(key.Interpolation, out _) ||
                     (keyIndex != 0 && key.TimeSeconds <= keys[keyIndex - 1].TimeSeconds))
                 {
                     throw new ArgumentException(
@@ -61,19 +77,53 @@ public sealed class AlsCurveSampler
                 }
             }
 
-            _curves[curveIndex] = new BoundCurve(curve.CurveId, keys);
+            sourceKeys[curveIndex] = keys;
+            totalKeyCount += keys.Length;
             previousId = curve.CurveId;
+        }
+
+        _bindings = new AlsCurveBinding[ordered.Length];
+        _keys = new AlsCurveKey[totalKeyCount];
+        var keyOffset = 0;
+        for (var curveIndex = 0; curveIndex < ordered.Length; curveIndex++)
+        {
+            var curve = ordered[curveIndex];
+            var keys = sourceKeys[curveIndex];
+            _bindings[curveIndex] = new AlsCurveBinding(
+                curve.CurveId,
+                keyOffset,
+                keys.Length,
+                0f,
+                1,
+                0);
+            for (var keyIndex = 0; keyIndex < keys.Length; keyIndex++)
+            {
+                ref readonly var source = ref keys[keyIndex];
+                if (!TryMapInterpolation(source.Interpolation, out var interpolation))
+                {
+                    throw new InvalidOperationException(
+                        "Validated curve contained an unsupported interpolation.");
+                }
+                _keys[keyOffset + keyIndex] = new AlsCurveKey(
+                    source.TimeSeconds,
+                    source.Value,
+                    source.ArriveTangent,
+                    source.LeaveTangent,
+                    interpolation);
+            }
+            keyOffset += keys.Length;
         }
     }
 
     public bool TrySample(int curveId, float timeSeconds, out float value)
     {
         value = 0f;
-        if (!float.IsFinite(timeSeconds) || !TryFindCurve(curveId, out var curve))
+        if (!float.IsFinite(timeSeconds) || !TryFindBindingIndex(curveId, out var bindingIndex))
         {
             return false;
         }
-        return TryCalculate(curve.Keys, timeSeconds, out value);
+        return AlsCurveRuntime.TrySample(
+            _bindings[bindingIndex], _keys, 0, timeSeconds, out value, out _);
     }
 
     public bool TrySample(
@@ -88,8 +138,9 @@ public sealed class AlsCurveSampler
 
         for (var index = 0; index < curveIds.Length; index++)
         {
-            if (!TryFindCurve(curveIds[index], out var curve) ||
-                !TryCalculate(curve.Keys, timeSeconds, out _))
+            if (!TryFindBindingIndex(curveIds[index], out var bindingIndex) ||
+                !AlsCurveRuntime.TrySample(
+                    _bindings[bindingIndex], _keys, 0, timeSeconds, out _, out _))
             {
                 return false;
             }
@@ -97,26 +148,27 @@ public sealed class AlsCurveSampler
 
         for (var index = 0; index < curveIds.Length; index++)
         {
-            TryFindCurve(curveIds[index], out var curve);
-            TryCalculate(curve.Keys, timeSeconds, out destination[index]);
+            TryFindBindingIndex(curveIds[index], out var bindingIndex);
+            AlsCurveRuntime.TrySample(
+                _bindings[bindingIndex], _keys, 0, timeSeconds, out destination[index], out _);
         }
         return true;
     }
 
-    private bool TryFindCurve(int curveId, out BoundCurve curve)
+    private bool TryFindBindingIndex(int curveId, out int bindingIndex)
     {
         var low = 0;
-        var high = _curves.Length - 1;
+        var high = _bindings.Length - 1;
         while (low <= high)
         {
             var middle = low + ((high - low) >> 1);
-            var candidate = _curves[middle];
-            if (candidate.CurveId == curveId)
+            var candidateId = _bindings[middle].CurveId;
+            if (candidateId == curveId)
             {
-                curve = candidate;
+                bindingIndex = middle;
                 return true;
             }
-            if (candidate.CurveId < curveId)
+            if (candidateId < curveId)
             {
                 low = middle + 1;
             }
@@ -125,93 +177,28 @@ public sealed class AlsCurveSampler
                 high = middle - 1;
             }
         }
-        curve = default;
+        bindingIndex = -1;
         return false;
     }
 
-    private static bool TryCalculate(
-        AlsFloatCurveKeyDefinition[] keys,
-        float timeSeconds,
-        out float value)
+    private static bool TryMapInterpolation(
+        AlsCurveInterpolation source,
+        out AlsCurveInterpolationMode destination)
     {
-        value = 0f;
-        if (timeSeconds <= keys[0].TimeSeconds)
+        switch (source)
         {
-            value = keys[0].Value;
-            return true;
+            case AlsCurveInterpolation.Constant:
+                destination = AlsCurveInterpolationMode.Constant;
+                return true;
+            case AlsCurveInterpolation.Linear:
+                destination = AlsCurveInterpolationMode.Linear;
+                return true;
+            case AlsCurveInterpolation.Cubic:
+                destination = AlsCurveInterpolationMode.Cubic;
+                return true;
+            default:
+                destination = default;
+                return false;
         }
-        if (timeSeconds >= keys[^1].TimeSeconds)
-        {
-            value = keys[^1].Value;
-            return true;
-        }
-
-        var low = 0;
-        var high = keys.Length - 1;
-        while (high - low > 1)
-        {
-            var middle = low + ((high - low) >> 1);
-            if (keys[middle].TimeSeconds <= timeSeconds)
-            {
-                low = middle;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
-
-        ref readonly var left = ref keys[low];
-        ref readonly var right = ref keys[high];
-        if (timeSeconds == left.TimeSeconds)
-        {
-            value = left.Value;
-            return true;
-        }
-        if (timeSeconds == right.TimeSeconds)
-        {
-            value = right.Value;
-            return true;
-        }
-
-        var duration = (double)right.TimeSeconds - left.TimeSeconds;
-        var alpha = ((double)timeSeconds - left.TimeSeconds) / duration;
-        var calculated = left.Interpolation switch
-        {
-            AlsCurveInterpolation.Constant => left.Value,
-            AlsCurveInterpolation.Linear =>
-                ((double)left.Value * (1d - alpha)) + ((double)right.Value * alpha),
-            AlsCurveInterpolation.Cubic => Hermite(in left, in right, duration, alpha),
-            _ => throw new InvalidOperationException("Validated curve contained an unsupported interpolation."),
-        };
-        if (!double.IsFinite(calculated) ||
-            calculated < -float.MaxValue || calculated > float.MaxValue)
-        {
-            return false;
-        }
-        value = (float)calculated;
-        return float.IsFinite(value);
     }
-
-    private static double Hermite(
-        in AlsFloatCurveKeyDefinition left,
-        in AlsFloatCurveKeyDefinition right,
-        double duration,
-        double alpha)
-    {
-        var alpha2 = alpha * alpha;
-        var alpha3 = alpha2 * alpha;
-        var h00 = (2d * alpha3) - (3d * alpha2) + 1d;
-        var h10 = alpha3 - (2d * alpha2) + alpha;
-        var h01 = (-2d * alpha3) + (3d * alpha2);
-        var h11 = alpha3 - alpha2;
-        return (h00 * left.Value) +
-            (h10 * left.LeaveTangent * duration) +
-            (h01 * right.Value) +
-            (h11 * right.ArriveTangent * duration);
-    }
-
-    private readonly record struct BoundCurve(
-        int CurveId,
-        AlsFloatCurveKeyDefinition[] Keys);
 }

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Curves;
 using GodotAls.Core.Events;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
@@ -179,6 +180,75 @@ public sealed class HotPathAllocationTests
         }
 
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+    }
+
+    [Fact]
+    public void WarmEvaluationAllocatesZeroBytes()
+    {
+        AlsCurveKey[] keys =
+        [
+            new(0f, 1f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+            new(1f, 3f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+            new(0f, -1f, 0f, 0f, AlsCurveInterpolationMode.Constant),
+        ];
+        AlsCurveBinding[] bindings =
+        [
+            new(17, 0, 2, 1f, 1, 0),
+            new(31, 2, 1, 1f, 1, 0),
+        ];
+        AlsCurveBlendSample[] samples =
+        [
+            new(0, 0, 0.25f, 0.75f),
+            new(1, 0, 0.25f, 0.25f),
+        ];
+
+        ExerciseCurveRuntime(keys, bindings, samples, 100, out _, out _);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        ExerciseCurveRuntime(keys, bindings, samples, 10_000, out var finalCycle, out var checksum);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+        Assert.Equal(1_250L, finalCycle);
+        Assert.True(float.IsFinite(checksum));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static void ExerciseCurveRuntime(
+        AlsCurveKey[] keys,
+        AlsCurveBinding[] bindings,
+        AlsCurveBlendSample[] samples,
+        int iterations,
+        out long finalCycle,
+        out float checksum)
+    {
+        var cycle = 0L;
+        var time = 0f;
+        var sum = 0f;
+        for (var index = 0; index < iterations; index++)
+        {
+            if (!AlsCurveRuntime.TrySample(
+                    bindings[0], keys, 0, 0.75f, out var sampled, out var failure) ||
+                failure != AlsP5FailureCode.None ||
+                !AlsCurveRuntime.TryBlend(
+                    bindings, keys, samples, out var blended, out failure) ||
+                failure != AlsP5FailureCode.None ||
+                !AlsCurveRuntime.TryBlendAdditiveToDefault(
+                    1f, 0f, 2f, bindings, keys, samples, out var additive, out failure) ||
+                failure != AlsP5FailureCode.None ||
+                !AlsCurveRuntime.TryAdvancePlaybackTime(
+                    1f, 1, cycle, time, 0.125f, 1f,
+                    out cycle, out time, out failure) ||
+                failure != AlsP5FailureCode.None)
+            {
+                throw new InvalidOperationException("Curve runtime allocation probe failed.");
+            }
+
+            sum += sampled + blended + additive + time;
+        }
+
+        finalCycle = cycle;
+        checksum = sum;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
