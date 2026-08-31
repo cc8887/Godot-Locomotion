@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using GodotAls.Import.Compilation;
@@ -38,36 +40,22 @@ public sealed class AlsAnimationSetCompilerTests
     }
 
     [Fact]
-    public void LegacyCurveNamesRemainExplicitAndDoNotCreateTypedCurves()
+    public void ManifestV2RejectsLegacyCurveNames()
     {
         var manifest = MutateAnimationMetadata(root =>
             root["curves"] = new JsonArray("RotationAmount", "YawOffset"));
 
-        var definition = AlsAnimationSetCompiler.Compile(manifest);
-        var clip = Assert.Single(definition.Animations);
-
-        Assert.Empty(clip.Curves);
-        Assert.Equal(["RotationAmount", "YawOffset"], clip.LegacyCurveNames);
-
-        var restored = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(definition));
-        Assert.Empty(restored.Animations[0].Curves);
-        Assert.Equal(["RotationAmount", "YawOffset"], restored.Animations[0].LegacyCurveNames);
-        var exposedRestoredNames = restored.Animations[0].LegacyCurveNames;
-        exposedRestoredNames[0] = "Mutated";
-        Assert.Equal(["RotationAmount", "YawOffset"], restored.Animations[0].LegacyCurveNames);
+        var exception = Assert.Throws<AlsCompilationException>(() => AlsAnimationSetCompiler.Compile(manifest));
+        Assert.Contains(exception.Issues, value => value.Code == "ALSMANIFEST029");
     }
 
     [Fact]
-    public void LegacyCurveNameOrderRemainsAnOpaqueCompatibilityPayload()
+    public void ManifestV2RejectsLegacyCurveNamesRegardlessOfOrder()
     {
         var manifest = MutateAnimationMetadata(root =>
             root["curves"] = new JsonArray("Zed", "Alpha"));
-        var definition = AlsAnimationSetCompiler.Compile(manifest);
-
-        var restored = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(definition));
-
-        Assert.Equal(["Zed", "Alpha"], restored.Animations[0].LegacyCurveNames);
-        Assert.Empty(restored.Animations[0].Curves);
+        var exception = Assert.Throws<AlsCompilationException>(() => AlsAnimationSetCompiler.Compile(manifest));
+        Assert.Contains(exception.Issues, value => value.Code == "ALSMANIFEST029");
     }
 
     [Fact]
@@ -154,11 +142,10 @@ public sealed class AlsAnimationSetCompilerTests
     [Fact]
     public void LegacyCurveNameGettersAndRecordWithRemainImmutable()
     {
-        var manifest = MutateAnimationMetadata(root =>
-            root["curves"] = new JsonArray("RotationAmount", "YawOffset"));
-        var original = AlsAnimationSetCompiler.Compile(manifest).Animations[0];
+        var original = AlsAnimationSetCompiler.Compile(
+            AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath())).Animations[0];
         var callerOwnedNames = new[] { "First", "Second" };
-        var clip = original with { LegacyCurveNames = callerOwnedNames };
+        var clip = original with { Curves = [], LegacyCurveNames = callerOwnedNames };
 
         callerOwnedNames[0] = "MutatedInput";
         var exposedNames = clip.LegacyCurveNames;
@@ -584,6 +571,8 @@ public sealed class AlsAnimationSetCompilerTests
             curve.GetProperty("canonicalKind").GetInt32());
         Assert.Equal("RotationAmount", curve.GetProperty("sourceName").GetString());
         Assert.Equal((int)AlsCurveProvenance.SourceCurve, curve.GetProperty("provenance").GetInt32());
+        Assert.Equal((int)AlsCurveInfinityMode.Constant, curve.GetProperty("preInfinity").GetInt32());
+        Assert.Equal((int)AlsCurveInfinityMode.Constant, curve.GetProperty("postInfinity").GetInt32());
         Assert.Equal(2, curve.GetProperty("keys").GetArrayLength());
 
         var restored = AlsAnimationSetPayload.Deserialize(originalPayload);
@@ -592,6 +581,8 @@ public sealed class AlsAnimationSetCompilerTests
         Assert.Equal(original.Animations[0].Curves[0].CanonicalKind, restoredCurve.CanonicalKind);
         Assert.Equal(original.Animations[0].Curves[0].SourceName, restoredCurve.SourceName);
         Assert.Equal(original.Animations[0].Curves[0].Provenance, restoredCurve.Provenance);
+        Assert.Equal(original.Animations[0].Curves[0].PreInfinity, restoredCurve.PreInfinity);
+        Assert.Equal(original.Animations[0].Curves[0].PostInfinity, restoredCurve.PostInfinity);
         Assert.Equal(original.Animations[0].Curves[0].Keys, restoredCurve.Keys);
 
         var originalEventDigest = AlsAnimationEventDigest.OffsetBasis;
@@ -607,7 +598,7 @@ public sealed class AlsAnimationSetCompilerTests
     }
 
     [Fact]
-    public void DefinitionDigestUsesCompiledSemanticsRatherThanUncompiledInfinityModes()
+    public void DefinitionDigestAndPayloadPreserveCompiledInfinityModes()
     {
         var original = AlsAnimationSetCompiler.Compile(
             AlsManifestSerializer.Load(AlsManifestSerializerTests.FixturePath()));
@@ -622,8 +613,10 @@ public sealed class AlsAnimationSetCompilerTests
         Assert.Equal(original.Animations[0].Curves[0].SourceName, changed.Animations[0].Curves[0].SourceName);
         Assert.Equal(original.Animations[0].Curves[0].Provenance, changed.Animations[0].Curves[0].Provenance);
         Assert.Equal(original.Animations[0].Curves[0].Keys, changed.Animations[0].Curves[0].Keys);
-        Assert.Equal(original.DefinitionDigest, changed.DefinitionDigest);
-        Assert.Equal(
+        Assert.Equal(AlsCurveInfinityMode.Linear, changed.Animations[0].Curves[0].PreInfinity);
+        Assert.Equal(AlsCurveInfinityMode.Cycle, changed.Animations[0].Curves[0].PostInfinity);
+        Assert.NotEqual(original.DefinitionDigest, changed.DefinitionDigest);
+        Assert.NotEqual(
             AlsAnimationSetPayload.ComputeSha256(AlsAnimationSetPayload.Serialize(original)),
             AlsAnimationSetPayload.ComputeSha256(AlsAnimationSetPayload.Serialize(changed)));
     }
@@ -638,6 +631,8 @@ public sealed class AlsAnimationSetCompilerTests
         Action<JsonObject>[] mutations =
         [
             root => root["curves"]![0]!["sourceName"] = "RotationAmountChanged",
+            root => root["curves"]![0]!["preInfinity"] = "Linear",
+            root => root["curves"]![0]!["postInfinity"] = "Cycle",
             root => root["curves"]![0]!["keys"]![0]!["timeSeconds"] = 0.2,
             root => root["curves"]![0]!["keys"]![0]!["value"] = 7.0,
             root => root["curves"]![0]!["keys"]![0]!["arriveTangent"] = 7.0,
@@ -670,6 +665,8 @@ public sealed class AlsAnimationSetCompilerTests
             curve with { CanonicalKind = AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond },
             curve with { SourceName = curve.SourceName + "Changed" },
             curve with { Provenance = AlsCurveProvenance.DerivedRootTrack },
+            curve with { PreInfinity = AlsCurveInfinityMode.Linear },
+            curve with { PostInfinity = AlsCurveInfinityMode.Cycle },
             curve with { Keys = ReplaceFirstKey(curve.Keys, key with { TimeSeconds = key.TimeSeconds + 0.01f }) },
             curve with { Keys = ReplaceFirstKey(curve.Keys, key with { Value = key.Value == 0f ? 1f : 0f }) },
             curve with { Keys = ReplaceFirstKey(curve.Keys, key with { ArriveTangent = key.ArriveTangent + 1f }) },
@@ -691,9 +688,8 @@ public sealed class AlsAnimationSetCompilerTests
 
         Assert.Equal(definition.DefinitionDigest, originalDigest);
 
-        var legacyDefinition = AlsAnimationSetCompiler.Compile(MutateAnimationMetadata(root =>
-            root["curves"] = new JsonArray("RotationAmount")));
-        var legacyClip = legacyDefinition.Animations[0];
+        var legacyClip = definition.Animations[0] with { Curves = [], LegacyCurveNames = ["RotationAmount"] };
+        var legacyDefinition = definition with { Animations = [legacyClip] };
         var changedLegacyDefinition = legacyDefinition with
         {
             Animations = [legacyClip with { LegacyCurveNames = ["RotationAmountChanged"] }],
@@ -801,7 +797,7 @@ public sealed class AlsAnimationSetCompilerTests
         {
             overlay = false,
             prop = false,
-            sections = new[] { new { name = "Default", nextSection = "None", startTime = 0f } },
+            sections = new[] { new { name = "Default", nextSection = "", startTime = 0f } },
             slots = new[] { new { slotName = "BaseLayer", segments = new[] { new { animationId = animation.Id, animationObjectPath = animation.ObjectPath, startPosition = 0f, animationStartTime = 0f, animationEndTime = 1f, playRate = 1f, loopCount = 1 } } } },
             playLength = 1f,
             blendInTime = 0.1f,
@@ -810,6 +806,7 @@ public sealed class AlsAnimationSetCompilerTests
             blendOutOption = 2,
             blendOutTriggerTime = -1f,
             enableAutoBlendOut = true,
+            timeline = Array.Empty<object>(),
         });
         var blend = BlendAsset("/Game/Test/BS_Test.BS_Test", "/Script/Engine.BlendSpace", animation);
         var aim = BlendAsset("/Game/Test/AO_Test.AO_Test", "/Script/Engine.AimOffsetBlendSpace", animation);
@@ -988,13 +985,36 @@ public sealed class AlsAnimationSetCompilerTests
 
     private static void AddEvents(JsonObject root)
     {
-        root["notifies"] = JsonNode.Parse("""
-            [{ "name": "Footstep", "time": 0.25, "duration": 0.0, "sourceIndex": 0 }]
+        const string assetId = "67aa33bdcab9e580ed7bec894c9858bb5cf30764";
+        const string classPath = "/Script/Engine.AnimNotify";
+        root["timeline"] = JsonNode.Parse($$"""
+            [{
+              "stableEventId": "{{Sha1($"{assetId}|timeline|0|{classPath}")}}",
+              "kind": "Generic",
+              "sourceClassPath": "{{classPath}}",
+              "displayName": "Footstep",
+              "timeSeconds": 0.25,
+              "durationSeconds": 0.0,
+              "triggerWeightThreshold": 0.0,
+              "tickMode": "Queued",
+              "sourceIndex": 0,
+              "trackIndex": 0,
+              "payload": {}
+            }]
             """);
-        root["syncMarkers"] = JsonNode.Parse("""
-            [{ "name": "Left", "time": 0.5 }]
+        root["syncMarkers"] = JsonNode.Parse($$"""
+            [{
+              "stableMarkerId": "{{Sha1($"{assetId}|marker|0|Left")}}",
+              "name": "Left",
+              "timeSeconds": 0.5,
+              "sourceIndex": 0,
+              "trackIndex": 0
+            }]
             """);
     }
+
+    private static string Sha1(string value) =>
+        Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private static AlsFloatCurveKeyDefinition[] ReplaceFirstKey(
         AlsFloatCurveKeyDefinition[] keys,
@@ -1026,7 +1046,8 @@ public sealed class AlsAnimationSetCompilerTests
     {
         var exception = Assert.Throws<AlsCompilationException>(() => AlsAnimationSetCompiler.Compile(manifest));
         Assert.Contains(exception.Issues, issue => issue.AssetId == manifest.Animations[0].Id &&
-            issue.FieldPath == expectedPath);
+            (issue.FieldPath == expectedPath ||
+             issue.Code == "ALSMANIFEST029" && issue.FieldPath == "$.animations[0].metadata"));
     }
 
     private static void AssertInvalidPayload(Action<JsonObject> mutation, string expectedPath)

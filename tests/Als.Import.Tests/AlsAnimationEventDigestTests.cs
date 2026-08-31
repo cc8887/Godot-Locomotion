@@ -44,16 +44,31 @@ public sealed class AlsAnimationEventDigestTests
         {
             PlayLength = 1.0f,
             Loop = false,
-            Notifies =
+            Timeline =
             [
-                new AlsAnimationNotifyDefinition("Footstep", 0.1f, 0f, 0),
-                new AlsAnimationNotifyDefinition("Footstep", 0.6f, 0f, 1),
+                Event(10, 0.1f, 0),
+                Event(11, 0.6f, 1),
             ],
             SyncMarkers =
             [
-                new AlsAnimationSyncMarkerDefinition("Left", 0.1f),
-                new AlsAnimationSyncMarkerDefinition("Right", 0.6f),
+                new AlsAnimationSyncMarkerDefinition(20, new string('a', 40), "Left", 0.1f, 0, 0),
+                new AlsAnimationSyncMarkerDefinition(21, new string('b', 40), "Right", 0.6f, 1, 0),
             ],
         };
     }
+
+    private static AlsCompiledTimelineEventDefinition Event(int id, float time, int sourceIndex) => new(
+        id,
+        new string((char)('c' + sourceIndex), 40),
+        AlsCompiledTimelineEventKind.Generic,
+        0,
+        "/Script/Engine.AnimNotify",
+        "Footstep",
+        time,
+        0f,
+        0f,
+        AlsCompiledTimelineTickMode.Queued,
+        sourceIndex,
+        0,
+        default);
 }
