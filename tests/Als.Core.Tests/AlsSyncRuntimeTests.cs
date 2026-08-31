@@ -190,6 +190,52 @@ public sealed class AlsSyncRuntimeTests
     }
 
     [Fact]
+    public void NarrowedLeftToRightInteriorPhaseCannotRoundUpToItsRightMarker()
+    {
+        var left = System.MathF.BitDecrement(0.2f);
+        const float right = 0.2f;
+        var markers = new[]
+        {
+            new AlsSyncMarkerDefinition(101, 11, 10, 0, 0, left),
+            new AlsSyncMarkerDefinition(102, 12, 10, 1, 0, right),
+        };
+        var time = System.Math.BitDecrement((double)right);
+        var mapped = new AlsSyncMappedPlayback[1];
+
+        var result = Evaluate(markers, new AlsSyncGroupBinding(1, 0, 1, 11, 12), [new AlsSyncMemberBinding(1, 10, 1f, 1, 1)], [Playback(1, 10, 1, time, time, 1f)], 0.1, mapped, out _, out var failure);
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(101, result.PreviousMarkerId);
+        Assert.Equal(102, result.NextMarkerId);
+        Assert.True(result.Phase > 0f);
+        Assert.Equal(BitConverter.SingleToInt32Bits(left), BitConverter.SingleToInt32Bits(mapped[0].CurrentTimeSeconds));
+        Assert.True(mapped[0].CurrentTimeSeconds < right);
+    }
+
+    [Fact]
+    public void NarrowedRightToLeftInteriorPhaseCannotRoundUpToItsLeftMarker()
+    {
+        const float left = 0.2f;
+        var right = System.MathF.BitDecrement(left);
+        var markers = new[]
+        {
+            new AlsSyncMarkerDefinition(101, 11, 10, 0, 0, left),
+            new AlsSyncMarkerDefinition(102, 12, 10, 1, 0, right),
+        };
+        var time = System.Math.BitDecrement((double)left);
+        var mapped = new AlsSyncMappedPlayback[1];
+
+        var result = Evaluate(markers, new AlsSyncGroupBinding(1, 0, 1, 11, 12), [new AlsSyncMemberBinding(1, 10, 1f, 1, 1)], [Playback(1, 10, 1, time, time, 1f)], 0.1, mapped, out _, out var failure);
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(102, result.PreviousMarkerId);
+        Assert.Equal(101, result.NextMarkerId);
+        Assert.True(result.Phase > 0f);
+        Assert.Equal(BitConverter.SingleToInt32Bits(right), BitConverter.SingleToInt32Bits(mapped[0].CurrentTimeSeconds));
+        Assert.True(mapped[0].CurrentTimeSeconds < left);
+    }
+
+    [Fact]
     public void LargeCycleFollowerKeepsEpsilonMarkerDeltaAndMappedRate()
     {
         const long cycle = 1L << 50;

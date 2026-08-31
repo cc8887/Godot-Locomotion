@@ -234,10 +234,10 @@ public static class AlsSyncRuntime
     private static bool TryMap(in AlsSyncPlayback playback, in AlsSyncMemberBinding member, in Pair pair, in Descriptor previous, in Descriptor current, double delta, out AlsSyncMappedPlayback mapped)
     {
         mapped = default;
-        if (!TryPosition(previous, member.DurationSeconds, pair, out var previousPosition) ||
-            !TryPosition(current, member.DurationSeconds, pair, out var currentPosition) ||
-            !TryOutputLocal(previousPosition.Local, member.DurationSeconds, out var previousTime) ||
-            !TryOutputLocal(currentPosition.Local, member.DurationSeconds, out var currentTime))
+        if (!TryPosition(previous, member.DurationSeconds, pair, out var previousPosition, out var previousNextPosition) ||
+            !TryPosition(current, member.DurationSeconds, pair, out var currentPosition, out var currentNextPosition) ||
+            !TryOutputLocal(previousPosition, previousNextPosition, member.DurationSeconds, out var previousTime) ||
+            !TryOutputLocal(currentPosition, currentNextPosition, member.DurationSeconds, out var currentTime))
         {
             return false;
         }
@@ -252,9 +252,10 @@ public static class AlsSyncRuntime
         return true;
     }
 
-    private static bool TryPosition(in Descriptor descriptor, float duration, in Pair pair, out Position position)
+    private static bool TryPosition(in Descriptor descriptor, float duration, in Pair pair, out Position position, out Position nextPosition)
     {
         position = default;
+        nextPosition = default;
         long leftCycle;
         try { leftCycle = (descriptor.HalfOrdinal & 1L) == 0L ? descriptor.HalfOrdinal / 2L : checked((descriptor.HalfOrdinal - 1L) / 2L); }
         catch (OverflowException) { return false; }
@@ -294,6 +295,7 @@ public static class AlsSyncRuntime
         {
             return false;
         }
+        nextPosition = new Position(endCycle, endLocal == 0d ? 0d : endLocal);
         return true;
     }
 
@@ -320,14 +322,28 @@ public static class AlsSyncRuntime
             ? AssignPosition(position, out cycle, out local)
             : AssignDefault(out cycle, out local);
 
-    private static bool TryOutputLocal(double local, float duration, out float output)
+    private static bool TryOutputLocal(in Position position, in Position exclusiveNextPosition, float duration, out float output)
     {
         output = 0f;
-        if (!double.IsFinite(local) || local < 0d || local >= duration) return false;
-        output = NormalizeZero((float)local);
+        if (!double.IsFinite(position.Local) || position.Local < 0d || position.Local >= duration ||
+            ComparePosition(position, exclusiveNextPosition) >= 0)
+        {
+            return false;
+        }
+        output = NormalizeZero((float)position.Local);
         if (!float.IsFinite(output)) return false;
         if (output >= duration) output = System.MathF.BitDecrement(duration);
+        if (position.Cycle == exclusiveNextPosition.Cycle && output >= exclusiveNextPosition.Local)
+        {
+            output = System.MathF.BitDecrement((float)exclusiveNextPosition.Local);
+        }
         return output >= 0f && output < duration;
+    }
+
+    private static int ComparePosition(in Position left, in Position right)
+    {
+        var compare = left.Cycle.CompareTo(right.Cycle);
+        return compare != 0 ? compare : left.Local.CompareTo(right.Local);
     }
 
     private static bool AssignPosition(in Position position, out long cycle, out double local)
