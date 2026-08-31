@@ -44,6 +44,13 @@ public static class AlsActionPlayer
             return false;
         }
 
+        if ((byte)request.Command > (byte)AlsActionCommand.CancelForRuntimeFailure ||
+            request.Command == AlsActionCommand.None && !IsCanonicalNone(request))
+        {
+            failure = AlsP5FailureCode.NonFiniteInput;
+            return false;
+        }
+
         Span<AlsActionTraversalSlice> stagedSlices = stackalloc AlsActionTraversalSlice[2];
         Span<AlsActionOutcome> stagedOutcomes = stackalloc AlsActionOutcome[2];
         var stagedSliceCount = 0;
@@ -352,7 +359,8 @@ public static class AlsActionPlayer
                 var exactCurrent = montageTime + remaining * definition.PlayRate;
                 var storedCurrent = (float)exactCurrent;
                 if (!float.IsFinite(storedCurrent) ||
-                    storedCurrent <= candidate.PlaybackTime ||
+                    (double)storedCurrent <= montageTime ||
+                    frameDeltaSeconds <= frameOffset ||
                     (double)storedCurrent >= boundary)
                 {
                     failure = AlsP5FailureCode.NonFiniteOutput;
@@ -387,7 +395,8 @@ public static class AlsActionPlayer
             }
 
             var boundaryOffset = frameOffset + secondsToBoundary;
-            if (!double.IsFinite(boundaryOffset) || boundaryOffset > frameDeltaSeconds)
+            if (!double.IsFinite(boundaryOffset) || boundaryOffset > frameDeltaSeconds ||
+                secondsToBoundary > 0d && boundaryOffset <= frameOffset)
             {
                 failure = AlsP5FailureCode.NonFiniteOutput;
                 return false;
@@ -428,6 +437,10 @@ public static class AlsActionPlayer
             {
                 if (section.NextSectionId == -1)
                 {
+                    candidate.SectionId = sectionId;
+                    candidate.SegmentBindingIndex = segmentIndex;
+                    candidate.PlaybackEpoch = epoch;
+                    candidate.PlaybackTime = (float)boundary;
                     completed = true;
                     closingLocalIndex = stagedCount - 1;
                     break;
@@ -466,10 +479,37 @@ public static class AlsActionPlayer
                 activatesSegment = 0;
                 if (remaining == 0d)
                 {
+                    var canonicalMontageTime = (double)(float)montageTime;
+                    if (!double.IsFinite(canonicalMontageTime) ||
+                        canonicalMontageTime <= stagedSlices[stagedCount - 1].PreviousMontageTime ||
+                        canonicalMontageTime >= segmentBoundary)
+                    {
+                        failure = AlsP5FailureCode.NonFiniteOutput;
+                        return false;
+                    }
+
+                    stagedSlices[stagedCount - 1] = CreateSlice(
+                        definition, segment, sectionId, segmentIndex, epoch,
+                        stagedSlices[stagedCount - 1].PreviousMontageTime, canonicalMontageTime,
+                        stagedSlices[stagedCount - 1].FrameStartOffsetSeconds,
+                        stagedSlices[stagedCount - 1].FrameEndOffsetSeconds,
+                        stagedSlices[stagedCount - 1].ActivatesActionAtSliceStart,
+                        stagedSlices[stagedCount - 1].ActivatesSegmentAtSliceStart, 0, 0);
                     candidate.SectionId = sectionId;
                     candidate.SegmentBindingIndex = segmentIndex;
                     candidate.PlaybackEpoch = epoch;
-                    candidate.PlaybackTime = (float)montageTime;
+                    candidate.PlaybackTime = (float)canonicalMontageTime;
+                    if (!TryCreatePlayback(
+                            definition, segment, sectionId, epoch,
+                            stagedSlices[stagedCount - 1].PreviousMontageTime, canonicalMontageTime,
+                            stagedSlices[stagedCount - 1].FrameEndOffsetSeconds -
+                            stagedSlices[stagedCount - 1].FrameStartOffsetSeconds,
+                            out finalPlayback))
+                    {
+                        failure = AlsP5FailureCode.NonFiniteOutput;
+                        return false;
+                    }
+
                     break;
                 }
             }
@@ -586,6 +626,12 @@ public static class AlsActionPlayer
         _ = TryFindDefinition(definitions, current.ActionDefinitionId, out var definitionIndex);
         ref readonly var definition = ref definitions[definitionIndex];
         ref readonly var segment = ref segments[current.SegmentBindingIndex];
+        if (!ValidateEarlyBlendOutBindings(actionTimelineDefinitions, segments, definition))
+        {
+            failure = AlsP5FailureCode.InvalidBinding;
+            return false;
+        }
+
         ref readonly var finalSlice = ref slices[sliceCount - 1];
         if (actionOccurrenceHandleId != definition.OccurrenceHandleId ||
             segmentOccurrenceHandleId != segment.OccurrenceHandleId ||
@@ -593,10 +639,12 @@ public static class AlsActionPlayer
             finalSlice.SegmentOccurrenceHandleId != segmentOccurrenceHandleId ||
             finalSlice.SectionId != current.SectionId ||
             finalSlice.SegmentBindingIndex != current.SegmentBindingIndex ||
+            finalSlice.SegmentId != segment.SegmentId ||
+            finalSlice.AnimationId != segment.AnimationId ||
             finalSlice.PlaybackEpoch != current.PlaybackEpoch ||
             finalSlice.CurrentMontageTime != candidateFinalMontageTime ||
             candidateFinalMontageTime != (double)current.PlaybackTime ||
-            finalSlice.FrameEndOffsetSeconds <= finalSlice.FrameStartOffsetSeconds ||
+            !ValidateFinalEarlyBlendOutSlice(finalSlice, segment) ||
             finalSlice.ClosesActionAfterSlice != 0 ||
             finalSlice.ClosesSegmentAfterSlice != 0)
         {
@@ -629,13 +677,10 @@ public static class AlsActionPlayer
             }
 
             var montageIdentity =
-                eventDefinition.SourceKind == AlsTimelineSourceKind.Montage &&
-                eventDefinition.RequiredOccurrenceHandleId == actionOccurrenceHandleId &&
-                eventDefinition.SourceAnimationId == definition.MontageId;
+                eventDefinition.SourceKind == AlsTimelineSourceKind.Montage;
             var segmentIdentity =
                 eventDefinition.SourceKind == AlsTimelineSourceKind.MontageSegmentAnimation &&
-                eventDefinition.RequiredOccurrenceHandleId == segmentOccurrenceHandleId &&
-                eventDefinition.SourceAnimationId == segment.AnimationId;
+                eventDefinition.RequiredOccurrenceHandleId == segmentOccurrenceHandleId;
             if (!montageIdentity && !segmentIdentity)
             {
                 continue;
@@ -778,6 +823,13 @@ public static class AlsActionPlayer
             {
                 if (definitions[other].DefinitionId == definition.DefinitionId ||
                     definitions[other].OccurrenceHandleId == definition.OccurrenceHandleId)
+                {
+                    return false;
+                }
+
+                if (definitions[other].MontageId == definition.MontageId &&
+                    (definitions[other].MontageDurationSeconds != definition.MontageDurationSeconds ||
+                     definitions[other].SlotId != definition.SlotId))
                 {
                     return false;
                 }
@@ -1069,6 +1121,100 @@ public static class AlsActionPlayer
         return true;
     }
 
+    private static bool ValidateEarlyBlendOutBindings(
+        ReadOnlySpan<AlsTimelineEventDefinition> timelineDefinitions,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        in AlsActionDefinition actionDefinition)
+    {
+        for (var index = 0; index < timelineDefinitions.Length; index++)
+        {
+            ref readonly var timelineDefinition = ref timelineDefinitions[index];
+            if (timelineDefinition.Kind != AlsTimelineEventKind.EarlyBlendOut)
+            {
+                continue;
+            }
+
+            var rangeEnd =
+                (double)timelineDefinition.TimeSeconds + timelineDefinition.DurationSeconds;
+            if (timelineDefinition.DurationSeconds <= 0f ||
+                timelineDefinition.SourceActionId != actionDefinition.DefinitionId ||
+                !double.IsFinite(rangeEnd) ||
+                rangeEnd > actionDefinition.MontageDurationSeconds)
+            {
+                return false;
+            }
+
+            if (timelineDefinition.SourceKind == AlsTimelineSourceKind.Montage)
+            {
+                if (timelineDefinition.RequiredOccurrenceHandleId !=
+                        actionDefinition.OccurrenceHandleId ||
+                    timelineDefinition.SourceAnimationId != actionDefinition.MontageId)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (timelineDefinition.SourceKind != AlsTimelineSourceKind.MontageSegmentAnimation)
+            {
+                return false;
+            }
+
+            var resolved = false;
+            for (var segmentIndex = 0; segmentIndex < segments.Length; segmentIndex++)
+            {
+                ref readonly var segment = ref segments[segmentIndex];
+                if (segment.OccurrenceHandleId == timelineDefinition.RequiredOccurrenceHandleId &&
+                    segment.ActionDefinitionId == actionDefinition.DefinitionId &&
+                    segment.AnimationId == timelineDefinition.SourceAnimationId)
+                {
+                    resolved = true;
+                    break;
+                }
+            }
+
+            if (!resolved)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ValidateFinalEarlyBlendOutSlice(
+        in AlsActionTraversalSlice slice,
+        in AlsActionSegmentBinding segment)
+    {
+        if (!IsCanonicalNonNegative(slice.PreviousMontageTime) ||
+            !IsCanonicalNonNegative(slice.CurrentMontageTime) ||
+            !double.IsFinite(slice.PreviousClipUnwrappedTime) ||
+            !double.IsFinite(slice.CurrentClipUnwrappedTime) ||
+            !IsCanonicalNonNegative(slice.FrameStartOffsetSeconds) ||
+            !IsCanonicalNonNegative(slice.FrameEndOffsetSeconds) ||
+            slice.CurrentMontageTime < slice.PreviousMontageTime ||
+            slice.FrameEndOffsetSeconds < slice.FrameStartOffsetSeconds ||
+            slice.FrameEndOffsetSeconds == slice.FrameStartOffsetSeconds &&
+            slice.FrameStartOffsetSeconds == 0d ||
+            slice.ActivatesActionAtSliceStart is not 0 and not 1 ||
+            slice.ActivatesSegmentAtSliceStart is not 0 and not 1 ||
+            slice.ClosesActionAfterSlice is not 0 and not 1 ||
+            slice.ClosesSegmentAfterSlice is not 0 and not 1)
+        {
+            return false;
+        }
+
+        return slice.PreviousMontageTime >= segment.MontageStartTime &&
+            slice.CurrentMontageTime < segment.MontageEndTime &&
+            slice.PreviousClipUnwrappedTime == MapClip(segment, slice.PreviousMontageTime) &&
+            slice.CurrentClipUnwrappedTime == MapClip(segment, slice.CurrentMontageTime);
+    }
+
+    private static bool IsCanonicalNonNegative(double value) =>
+        double.IsFinite(value) &&
+        (value > 0d || BitConverter.DoubleToInt64Bits(value) == 0L);
+
     private static bool TryFindDefinition(
         ReadOnlySpan<AlsActionDefinition> definitions,
         int definitionId,
@@ -1223,9 +1369,11 @@ public static class AlsActionPlayer
         var currentClipFloat = (float)currentClip;
         var deltaFloat = (float)finalSegmentDelta;
         if (!double.IsFinite(previousClip) || !double.IsFinite(currentClip) ||
+            !double.IsFinite(finalSegmentDelta) || finalSegmentDelta < 0d ||
             !float.IsFinite(previousFloat) || !float.IsFinite(currentFloat) ||
             !float.IsFinite(previousClipFloat) || !float.IsFinite(currentClipFloat) ||
             !float.IsFinite(deltaFloat) || deltaFloat < 0f ||
+            finalSegmentDelta > 0d && deltaFloat == 0f ||
             !float.IsFinite(combinedRate) || combinedRate <= 0f)
         {
             playback = AlsActionPlayback.CreateDefault();
