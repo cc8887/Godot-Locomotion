@@ -693,22 +693,24 @@ public sealed record AlsAnimationSetPayload(
     {
         var eventIds = new HashSet<int>();
         var eventStableIds = new HashSet<string>(StringComparer.Ordinal);
+        var events = new List<(int Id, string StableId, string Path)>();
         var markerIds = new HashSet<int>();
         var markerStableIds = new HashSet<string>(StringComparer.Ordinal);
+        var markers = new List<(int Id, string StableId, string Path)>();
         for (var animationIndex = 0; animationIndex < Animations.Length; animationIndex++)
         {
             var animation = Animations[animationIndex];
-            ValidateTimelineDefinitions(animation.Timeline, animation.Id, animation.PlayLength,
-                $"$.animations[{animationIndex}].timeline", eventIds, eventStableIds);
-            ValidateMarkerDefinitions(animation.SyncMarkers, animation.PlayLength,
-                $"$.animations[{animationIndex}].syncMarkers", markerIds, markerStableIds);
+            ValidateTimelineDefinitions(animation.Timeline, animation.Id, animation.StableId, animation.PlayLength,
+                $"$.animations[{animationIndex}].timeline", eventIds, eventStableIds, events);
+            ValidateMarkerDefinitions(animation.SyncMarkers, animation.StableId, animation.PlayLength,
+                $"$.animations[{animationIndex}].syncMarkers", markerIds, markerStableIds, markers);
         }
         for (var montageIndex = 0; montageIndex < Montages.Length; montageIndex++)
         {
             var montage = Montages[montageIndex];
             var path = $"$.montages[{montageIndex}]";
-            ValidateTimelineDefinitions(montage.Timeline, montage.Id, montage.PlayLength,
-                $"{path}.timeline", eventIds, eventStableIds);
+            ValidateTimelineDefinitions(montage.Timeline, montage.Id, montage.StableId, montage.PlayLength,
+                $"{path}.timeline", eventIds, eventStableIds, events);
             var sections = montage.Sections;
             for (var sectionIndex = 0; sectionIndex < sections.Length; sectionIndex++)
             {
@@ -734,38 +736,56 @@ public sealed record AlsAnimationSetPayload(
                 for (var segmentIndex = 0; segmentIndex < segments.Length; segmentIndex++)
                 {
                     var segment = segments[segmentIndex];
+                    var segmentPath = $"{path}.slots[{slotIndex}].segments[{segmentIndex}]";
                     if (segment.SegmentId != nextSegmentId++ || segment.AnimationId < 0 ||
+                        segment.AnimationId >= Animations.Length ||
                         !float.IsFinite(segment.StartPosition) || !float.IsFinite(segment.AnimationStartTime) ||
                         !float.IsFinite(segment.AnimationEndTime) || !float.IsFinite(segment.PlayRate) ||
-                        segment.StartPosition < 0f || segment.AnimationStartTime < 0f ||
+                        segment.StartPosition < 0f || segment.StartPosition > montage.PlayLength ||
+                        segment.AnimationStartTime < 0f ||
                         segment.AnimationEndTime <= segment.AnimationStartTime || segment.PlayRate <= 0f ||
                         segment.LoopCount < 1)
                     {
-                        throw Invalid($"{path}.slots[{slotIndex}].segments[{segmentIndex}]",
+                        throw Invalid(segmentPath,
                             "Montage segment definition is invalid.");
+                    }
+                    var animation = Animations[segment.AnimationId];
+                    var sourceRange = (double)segment.AnimationEndTime - segment.AnimationStartTime;
+                    var mappedEnd = (double)segment.StartPosition +
+                        (double)segment.LoopCount * sourceRange / segment.PlayRate;
+                    if (!(sourceRange > 0.0) || segment.AnimationEndTime > animation.PlayLength ||
+                        !double.IsFinite(mappedEnd) || mappedEnd > montage.PlayLength + 1e-8)
+                    {
+                        throw Invalid(segmentPath,
+                            "Montage segment source range and mapped range are invalid.");
                     }
                 }
             }
         }
-        ValidateDenseIds(eventIds, "$.animations", "timeline event");
-        ValidateDenseIds(markerIds, "$.animations", "sync marker");
+        ValidateGlobalOrdinals(events, "eventId", "timeline event");
+        ValidateGlobalOrdinals(markers, "markerId", "sync marker");
     }
 
     private static void ValidateTimelineDefinitions(
         AlsCompiledTimelineEventDefinition[] values,
         int sourceAssetId,
+        string sourceStableId,
         float sourceLength,
         string path,
         HashSet<int> ids,
-        HashSet<string> stableIds)
+        HashSet<string> stableIds,
+        List<(int Id, string StableId, string Path)> globalValues)
     {
         AlsCompiledTimelineEventDefinition? previous = null;
         for (var index = 0; index < values.Length; index++)
         {
             var value = values[index];
             var itemPath = $"{path}[{index}]";
+            var expectedStableId = ComputeStableSha1(
+                $"{sourceStableId}|timeline|{value.SourceIndex}|{value.SourceClassPath}");
             if (value.EventId < 0 || !ids.Add(value.EventId) || string.IsNullOrEmpty(value.StableEventId) ||
                 !stableIds.Add(value.StableEventId) || value.SourceAssetId != sourceAssetId ||
+                !string.Equals(value.StableEventId, expectedStableId, StringComparison.Ordinal) ||
                 string.IsNullOrEmpty(value.SourceClassPath) || string.IsNullOrEmpty(value.DisplayName) ||
                 !Enum.IsDefined(typeof(AlsCompiledTimelineEventKind), value.Kind) ||
                 !Enum.IsDefined(typeof(AlsCompiledTimelineTickMode), value.TickMode) ||
@@ -778,6 +798,7 @@ public sealed record AlsAnimationSetPayload(
                 throw Invalid(itemPath, "Timeline event definition is invalid.");
             }
             ValidatePayload(value.Kind, value.Payload, $"{itemPath}.payload");
+            globalValues.Add((value.EventId, value.StableEventId, itemPath));
             if (previous is not null && CompareTimeline(previous, value) >= 0)
             {
                 throw Invalid(itemPath, "Timeline event definitions are not strictly sorted.");
@@ -853,23 +874,30 @@ public sealed record AlsAnimationSetPayload(
 
     private static void ValidateMarkerDefinitions(
         AlsAnimationSyncMarkerDefinition[] values,
+        string sourceStableId,
         float sourceLength,
         string path,
         HashSet<int> ids,
-        HashSet<string> stableIds)
+        HashSet<string> stableIds,
+        List<(int Id, string StableId, string Path)> globalValues)
     {
         AlsAnimationSyncMarkerDefinition? previous = null;
         for (var index = 0; index < values.Length; index++)
         {
             var value = values[index];
             var itemPath = $"{path}[{index}]";
+            var expectedStableId = ComputeStableSha1(
+                $"{sourceStableId}|marker|{value.SourceIndex}|{value.Name}");
             if (value.MarkerId < 0 || !ids.Add(value.MarkerId) || string.IsNullOrEmpty(value.StableMarkerId) ||
-                !stableIds.Add(value.StableMarkerId) || string.IsNullOrEmpty(value.Name) ||
+                !stableIds.Add(value.StableMarkerId) ||
+                !string.Equals(value.StableMarkerId, expectedStableId, StringComparison.Ordinal) ||
+                string.IsNullOrEmpty(value.Name) ||
                 !float.IsFinite(value.TimeSeconds) || value.TimeSeconds < 0f || value.TimeSeconds > sourceLength ||
                 value.SourceIndex < 0 || value.TrackIndex < 0)
             {
                 throw Invalid(itemPath, "Sync marker definition is invalid.");
             }
+            globalValues.Add((value.MarkerId, value.StableMarkerId, itemPath));
             if (previous is not null && CompareMarker(previous, value) >= 0)
             {
                 throw Invalid(itemPath, "Sync marker definitions are not strictly sorted.");
@@ -886,13 +914,24 @@ public sealed record AlsAnimationSetPayload(
         return result == 0 ? string.CompareOrdinal(left.StableMarkerId, right.StableMarkerId) : result;
     }
 
-    private static void ValidateDenseIds(HashSet<int> values, string path, string kind)
+    private static void ValidateGlobalOrdinals(
+        List<(int Id, string StableId, string Path)> values,
+        string idProperty,
+        string kind)
     {
-        if (values.Count != 0 && (values.Min() != 0 || values.Max() != values.Count - 1))
+        var sorted = values.OrderBy(value => value.StableId, StringComparer.Ordinal).ToArray();
+        for (var ordinal = 0; ordinal < sorted.Length; ordinal++)
         {
-            throw Invalid(path, $"Global {kind} IDs must be dense and zero-based.");
+            if (sorted[ordinal].Id != ordinal)
+            {
+                throw Invalid($"{sorted[ordinal].Path}.{idProperty}",
+                    $"Global {kind} ID must equal its stable-ID ordinal.");
+            }
         }
     }
+
+    private static string ComputeStableSha1(string preimage) =>
+        Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(preimage))).ToLowerInvariant();
 
     private static void ValidateCurveIdentity(AlsFloatCurveDefinition curve, string curvePath)
     {
