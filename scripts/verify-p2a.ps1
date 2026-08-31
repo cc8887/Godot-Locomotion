@@ -23,6 +23,7 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
 }
 $canonicalPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path ([IO.Path]::GetFullPath($Output)) -Label 'CanonicalRoot'
+[void](Assert-AlsP2aCanonicalPublicationRoot -RepositoryRoot $repositoryRoot -CanonicalRoot $canonicalPath)
 $publicationPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path (Join-Path $artifactsPath 'p2a-publication') -Label 'PublicationPath'
 $outputPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
@@ -40,15 +41,23 @@ $lockBackupPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositor
 $journalPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path (Join-Path $publicationPath 'transaction.json') -Label 'JournalPath'
 
+$publicationPaths = @{
+    CanonicalRoot = $canonicalPath; CandidateRoot = $outputPath; DeterminismRoot = $determinismPath
+    LockPath = $assetLockPath; LockCandidatePath = $lockCandidatePath
+    CanonicalBackupRoot = $canonicalBackupPath; LockBackupPath = $lockBackupPath; JournalPath = $journalPath
+}
+Assert-AlsP2aPublicationPathTopology -Paths $publicationPaths
 Repair-AlsP2aPublication -RepositoryRoot $repositoryRoot -JournalPath $journalPath
-foreach ($backup in @($canonicalBackupPath, $lockBackupPath)) {
-    if (Test-Path -LiteralPath $backup) {
-        throw "P2A publication has orphaned backup residue without a recovery journal: $backup"
+Invoke-AlsP2aStagingWorkflow -RepositoryRoot $repositoryRoot -CandidateRoot $outputPath `
+    -DeterminismRoot $determinismPath -LockCandidatePath $lockCandidatePath -Action {
+    foreach ($backup in @($canonicalBackupPath, $lockBackupPath)) {
+        if (Test-Path -LiteralPath $backup) {
+            throw "P2A publication has orphaned backup residue without a recovery journal: $backup"
+        }
     }
-}
-foreach ($staging in @($outputPath, $determinismPath, $lockCandidatePath)) {
-    Remove-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot -Path $staging -Label 'stale P2A staging'
-}
+    foreach ($staging in @($outputPath, $determinismPath, $lockCandidatePath)) {
+        Remove-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot -Path $staging -Label 'stale P2A staging'
+    }
 
 function Assert-P2AV2Manifest {
     param(
@@ -295,6 +304,7 @@ $determinismOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export
 $determinismOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A determinism export failed with exit code $LASTEXITCODE."
+}
 }
 $compareScript = Join-Path $PSScriptRoot 'compare-p2a-exports.ps1'
 Invoke-AlsP2aJointPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `

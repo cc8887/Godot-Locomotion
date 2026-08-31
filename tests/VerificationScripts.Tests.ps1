@@ -200,12 +200,21 @@ Describe 'P2B formal manifest lock' {
 
     It 'routes verify-p2a through the one tested joint publication after existing export gates' {
         $source = [IO.File]::ReadAllText($script:P2aVerifierPath)
+        $cleanupBoundary = $source.IndexOf('Invoke-AlsP2aStagingWorkflow')
+        $dryRun = $source.IndexOf('$dryRunOutput = & $editorCommand')
         $fullExportGate = $source.LastIndexOf('GODOT_ALS_P2A_FULL_EXPORT_OK')
+        $determinism = $source.IndexOf('$determinismOutput = & $editorCommand')
         $orchestration = $source.LastIndexOf('Invoke-AlsP2aJointPublication')
         $comparisonArgument = $source.LastIndexOf('-ComparisonScriptPath $compareScript')
         $source | Should Match '\[switch\]\$UpdateAssetLock'
+        $cleanupBoundary | Should BeGreaterThan -1
+        $dryRun | Should BeGreaterThan $cleanupBoundary
         $orchestration | Should BeGreaterThan $fullExportGate
+        $determinism | Should BeGreaterThan $fullExportGate
+        $orchestration | Should BeGreaterThan $determinism
         $comparisonArgument | Should BeGreaterThan $orchestration
+        $source | Should Match 'Assert-AlsP2aCanonicalPublicationRoot'
+        $source | Should Match '(?s)Invoke-AlsP2aStagingWorkflow.+?-Action\s*\{.+?\$determinismOutput.+?\r?\n\}\r?\n\$compareScript.+?\r?\nInvoke-AlsP2aJointPublication'
         $source | Should Not Match 'Invoke-AlsP2aCompareAndPublish'
         $source | Should Not Match 'Publish-AlsExportLock -ManifestPath \$formalManifestPath -LockPath \$assetLockPath'
     }

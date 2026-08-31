@@ -43,6 +43,18 @@ Describe 'ALS exporter build readiness gating' {
         $readyCheckIndex | Should BeGreaterThan $readyMarkerIndex
     }
 
+    It 'requires the native composite production-entry self-test marker before the v2 ready marker' {
+        $selfTestMarkerIndex = $buildScriptSource.IndexOf('GODOT_ALS_COMPOSITE_EXPORT_SELF_TEST_OK cases=1')
+        $selfTestCheckIndex = $buildScriptSource.IndexOf('Contains($compositeSelfTestMarker')
+        $readyMarkerIndex = $buildScriptSource.IndexOf('GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0')
+        $readyCheckIndex = $buildScriptSource.IndexOf('Contains($marker')
+
+        $selfTestMarkerIndex | Should BeGreaterThan -1
+        $selfTestCheckIndex | Should BeGreaterThan $selfTestMarkerIndex
+        $readyMarkerIndex | Should BeGreaterThan $selfTestCheckIndex
+        $readyCheckIndex | Should BeGreaterThan $readyMarkerIndex
+    }
+
     It 'keeps every v2 producer and consumer version declaration consistent' {
         $marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'
 

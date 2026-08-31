@@ -45,7 +45,7 @@ function New-TestP5aManifest {
     $animations = @(& $newAssets 126 'AnimSequence')
     foreach ($animation in $animations) {
         $animation.classPath = '/Script/Engine.AnimSequence'
-        $animation.metadata = [pscustomobject][ordered]@{ timeline = @(); syncMarkers = @() }
+        $animation.metadata = [pscustomobject][ordered]@{ playLength = 1.0; timeline = @(); syncMarkers = @() }
     }
     $sequence = $animations[0]
     $sequenceClass0 = '/Script/Engine.AnimNotify'
@@ -78,7 +78,7 @@ function New-TestP5aManifest {
     $montages = @(& $newAssets 18 'AnimMontage')
     foreach ($montage in $montages) {
         $montage.classPath = '/Script/Engine.AnimMontage'
-        $montage.metadata = [pscustomobject][ordered]@{ timeline = @(); sections = @() }
+        $montage.metadata = [pscustomobject][ordered]@{ playLength = 1.0; timeline = @(); sections = @() }
     }
     $montage = $montages[0]
     $montageClass = '/Script/Engine.AnimNotify'
@@ -142,6 +142,11 @@ function Get-ManifestAuditError([object]$Manifest) {
     catch {
         return $_.Exception.Message
     }
+}
+
+function Set-TestTimelineKind([object]$Event, [string]$Kind, [object]$Payload) {
+    $Event.kind = $Kind
+    $Event.payload = $Payload
 }
 
 function Write-TestExportRoot([string]$Root, [object]$Manifest) {
@@ -218,6 +223,19 @@ function Assert-NoPublicationResidue([object]$Fixture) {
     )) {
         (Test-Path -LiteralPath $path) | Should Be $false
     }
+}
+
+function Write-TestPublicationJournal([object]$Fixture, [string]$State, [bool]$CanonicalOriginalExisted, [bool]$LockOriginalExisted) {
+    $journal = [ordered]@{
+        schemaVersion = 1; state = $State; repositoryRoot = $Fixture.RepositoryRoot
+        canonicalRoot = $Fixture.CanonicalRoot; candidateRoot = $Fixture.CandidateRoot
+        determinismRoot = $Fixture.DeterminismRoot; canonicalBackupRoot = $Fixture.CanonicalBackupRoot
+        lockPath = $Fixture.LockPath; lockCandidatePath = $Fixture.LockCandidatePath
+        lockBackupPath = $Fixture.LockBackupPath; journalPath = $Fixture.JournalPath
+        canonicalOriginalExisted = $CanonicalOriginalExisted; lockOriginalExisted = $LockOriginalExisted
+    }
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Fixture.JournalPath))
+    [IO.File]::WriteAllText($Fixture.JournalPath, ($journal | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 }
 
 Describe 'P5A complete ALS v2 export audit' {
@@ -299,6 +317,168 @@ Describe 'P5A complete ALS v2 export audit' {
         $animationCount.animations = @($animationCount.animations | Select-Object -First 125)
         (Get-ManifestAuditError $animationCount) | Should Match 'animations=125'
     }
+
+    It 'accepts the exact six timeline kinds and their frozen payload domains' {
+        $cases = @(
+            @{ Kind = 'Generic'; Payload = [pscustomobject]@{} },
+            @{ Kind = 'Footstep'; Payload = [pscustomobject][ordered]@{ foot = 'Left' } },
+            @{ Kind = 'SetAction'; Payload = [pscustomobject][ordered]@{ action = 'Mantling' } },
+            @{ Kind = 'SetGroundedEntry'; Payload = [pscustomobject][ordered]@{ mode = 'FromRoll' } },
+            @{ Kind = 'EarlyBlendOut'; Payload = [pscustomobject][ordered]@{
+                    blendOutSeconds = 0.2; checkInput = $true; checkLocomotionMode = $true
+                    locomotionMode = 'Grounded'; checkRotationMode = $true; rotationMode = 'Aiming'
+                    checkStance = $true; stance = 'Standing'
+                } },
+            @{ Kind = 'RootMotionScale'; Payload = [pscustomobject][ordered]@{ translationScale = 1.0 } }
+        )
+        foreach ($case in $cases) {
+            $manifest = New-TestP5aManifest
+            Set-TestTimelineKind $manifest.animations[0].metadata.timeline[0] $case.Kind $case.Payload
+            (Get-ManifestAuditError $manifest) | Should Be ''
+        }
+    }
+
+    It 'rejects unknown kinds and invalid frozen enum values before publication' {
+        $cases = @(
+            @{ Kind = 'UnknownKind'; Payload = [pscustomobject]@{}; Pattern = 'kind' },
+            @{ Kind = 'Footstep'; Payload = [pscustomobject]@{ foot = 'Front' }; Pattern = 'foot' },
+            @{ Kind = 'SetAction'; Payload = [pscustomobject]@{ action = 'InvalidAction' }; Pattern = 'action' },
+            @{ Kind = 'SetGroundedEntry'; Payload = [pscustomobject]@{ mode = 'Walking' }; Pattern = 'mode' },
+            @{ Kind = 'EarlyBlendOut'; Payload = [pscustomobject][ordered]@{
+                    blendOutSeconds = 0.2; checkInput = $true; checkLocomotionMode = $true
+                    locomotionMode = 'Swimming'; checkRotationMode = $true; rotationMode = 'ViewDirection'
+                    checkStance = $true; stance = 'Prone'
+                }; Pattern = 'locomotionMode|rotationMode|stance' }
+        )
+        foreach ($case in $cases) {
+            $manifest = New-TestP5aManifest
+            Set-TestTimelineKind $manifest.animations[0].metadata.timeline[0] $case.Kind $case.Payload
+            (Get-ManifestAuditError $manifest) | Should Match $case.Pattern
+        }
+    }
+
+    It 'rejects missing wrong-shaped and extra payload properties' {
+        $cases = @(
+            @{ Kind = 'SetAction'; Payload = [pscustomobject]@{}; Pattern = 'payload.*action' },
+            @{ Kind = 'SetAction'; Payload = [pscustomobject]@{ mode = 'FromRoll' }; Pattern = 'payload' },
+            @{ Kind = 'Generic'; Payload = [pscustomobject]@{ unexpected = $true }; Pattern = 'payload.*unexpected' },
+            @{ Kind = 'RootMotionScale'; Payload = [pscustomobject]@{ translationScale = 1.0; extra = 0 }; Pattern = 'payload.*extra' }
+        )
+        foreach ($case in $cases) {
+            $manifest = New-TestP5aManifest
+            Set-TestTimelineKind $manifest.animations[0].metadata.timeline[0] $case.Kind $case.Payload
+            (Get-ManifestAuditError $manifest) | Should Match $case.Pattern
+        }
+    }
+
+    It 'rejects missing or extra event properties and empty required strings' {
+        $missing = New-TestP5aManifest
+        $missing.animations[0].metadata.timeline[0].PSObject.Properties.Remove('displayName')
+        (Get-ManifestAuditError $missing) | Should Match 'displayName'
+
+        $extra = New-TestP5aManifest
+        $extra.animations[0].metadata.timeline[0] | Add-Member -NotePropertyName unexpected -NotePropertyValue $true
+        (Get-ManifestAuditError $extra) | Should Match 'unexpected'
+
+        $empty = New-TestP5aManifest
+        $empty.animations[0].metadata.timeline[0].sourceClassPath = ''
+        (Get-ManifestAuditError $empty) | Should Match 'sourceClassPath'
+    }
+
+    It 'rejects non-finite negative overflowing and out-of-bounds event scalars' {
+        $cases = @(
+            @{ Field = 'timeSeconds'; Value = [double]::NaN },
+            @{ Field = 'timeSeconds'; Value = -0.01 },
+            @{ Field = 'timeSeconds'; Value = 1e100 },
+            @{ Field = 'timeSeconds'; Value = 1.01 },
+            @{ Field = 'durationSeconds'; Value = -0.01 },
+            @{ Field = 'durationSeconds'; Value = 0.95 },
+            @{ Field = 'triggerWeightThreshold'; Value = -0.01 },
+            @{ Field = 'triggerWeightThreshold'; Value = 1.01 }
+        )
+        foreach ($case in $cases) {
+            $manifest = New-TestP5aManifest
+            $manifest.animations[0].metadata.timeline[0].($case.Field) = $case.Value
+            (Get-ManifestAuditError $manifest) | Should Match $case.Field
+        }
+    }
+
+    It 'rejects negative fractional and duplicate event indices' {
+        $cases = @(
+            @{ Field = 'sourceIndex'; Value = -1; Pattern = 'sourceIndex' },
+            @{ Field = 'sourceIndex'; Value = 0.5; Pattern = 'sourceIndex' },
+            @{ Field = 'trackIndex'; Value = -1; Pattern = 'trackIndex' }
+        )
+        foreach ($case in $cases) {
+            $manifest = New-TestP5aManifest
+            $manifest.animations[0].metadata.timeline[0].($case.Field) = $case.Value
+            (Get-ManifestAuditError $manifest) | Should Match $case.Pattern
+        }
+        $duplicate = New-TestP5aManifest
+        $duplicate.animations[0].metadata.timeline[1].sourceIndex = 0
+        (Get-ManifestAuditError $duplicate) | Should Match 'sourceIndex.*duplicate|duplicate.*sourceIndex'
+    }
+
+    It 'rejects malformed sync marker shape scalars and source indices' {
+        $missing = New-TestP5aManifest
+        $missing.animations[0].metadata.syncMarkers[0].PSObject.Properties.Remove('name')
+        (Get-ManifestAuditError $missing) | Should Match 'name'
+
+        $extra = New-TestP5aManifest
+        $extra.animations[0].metadata.syncMarkers[0] | Add-Member -NotePropertyName time -NotePropertyValue 0.15
+        (Get-ManifestAuditError $extra) | Should Match 'time'
+
+        foreach ($mutation in @(
+            @{ Field = 'timeSeconds'; Value = [double]::PositiveInfinity },
+            @{ Field = 'timeSeconds'; Value = -0.01 },
+            @{ Field = 'timeSeconds'; Value = 1.01 },
+            @{ Field = 'sourceIndex'; Value = -1 },
+            @{ Field = 'trackIndex'; Value = 0.5 }
+        )) {
+            $manifest = New-TestP5aManifest
+            $manifest.animations[0].metadata.syncMarkers[0].($mutation.Field) = $mutation.Value
+            (Get-ManifestAuditError $manifest) | Should Match $mutation.Field
+        }
+        $duplicate = New-TestP5aManifest
+        $duplicate.animations[0].metadata.syncMarkers[1].sourceIndex = 0
+        (Get-ManifestAuditError $duplicate) | Should Match 'sourceIndex.*duplicate|duplicate.*sourceIndex'
+    }
+
+    It 'rejects malformed duplicate unordered out-of-range and dangling Montage sections' {
+        $cases = @(
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[0].PSObject.Properties.Remove('name') }; Pattern = 'name' },
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[0] | Add-Member -NotePropertyName extra -NotePropertyValue 1 }; Pattern = 'extra' },
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[1].name = 'Default' }; Pattern = 'duplicate.*section|section.*duplicate' },
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[1].startTime = -0.1 }; Pattern = 'startTime' },
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[1].startTime = [double]::NaN }; Pattern = 'startTime' },
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[1].startTime = 0.0 }; Pattern = 'startTime|increasing' },
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[1].startTime = 1.1 }; Pattern = 'startTime' },
+            @{ Mutate = { param($m) $m.montages[0].metadata.sections[0].nextSection = 'Missing' }; Pattern = 'nextSection' }
+        )
+        foreach ($case in $cases) {
+            $manifest = New-TestP5aManifest
+            & $case.Mutate $manifest
+            (Get-ManifestAuditError $manifest) | Should Match $case.Pattern
+        }
+    }
+
+    foreach ($collectionShape in @('timeline', 'syncMarkers', 'sections')) {
+        It "requires $collectionShape metadata to be a JSON array while allowing empty arrays" {
+            $manifest = New-TestP5aManifest
+            switch ($collectionShape) {
+                'timeline' { $manifest.animations[0].metadata.timeline = $manifest.animations[0].metadata.timeline[0] }
+                'syncMarkers' { $manifest.animations[0].metadata.syncMarkers = $manifest.animations[0].metadata.syncMarkers[0] }
+                'sections' { $manifest.montages[0].metadata.sections = $manifest.montages[0].metadata.sections[0] }
+            }
+            (Get-ManifestAuditError $manifest) | Should Match "$collectionShape.*array|array.*$collectionShape"
+
+            $empty = New-TestP5aManifest
+            if ($collectionShape -ceq 'timeline') { $empty.animations[1].metadata.timeline = @() }
+            elseif ($collectionShape -ceq 'syncMarkers') { $empty.animations[1].metadata.syncMarkers = @() }
+            else { $empty.montages[1].metadata.sections = @() }
+            (Get-ManifestAuditError $empty) | Should Be ''
+        }
+    }
 }
 
 Describe 'P5A two-root comparison' {
@@ -317,6 +497,41 @@ Describe 'P5A two-root comparison' {
         try { & $script:CompareExportsPath -ReferenceRoot $fixture.CandidateRoot -CandidateRoot $fixture.DeterminismRoot }
         catch { $errorMessage = $_.Exception.Message }
         $errorMessage | Should Match 'Export differs'
+    }
+
+    It 'rejects a case-only full relative path difference even when file bytes match' {
+        $fixture = New-PublicationFixture 'compare-case'
+        $original = Join-Path $fixture.DeterminismRoot 'export_plan.json'
+        $caseVariant = Join-Path $fixture.DeterminismRoot 'EXPORT_PLAN.JSON'
+        $bytes = [IO.File]::ReadAllBytes($original)
+        Remove-Item -LiteralPath $original
+        [IO.File]::WriteAllBytes($caseVariant, $bytes)
+
+        $errorMessage = ''
+        try { & $script:CompareExportsPath -ReferenceRoot $fixture.CandidateRoot -CandidateRoot $fixture.DeterminismRoot }
+        catch { $errorMessage = $_.Exception.Message }
+
+        $errorMessage | Should Match 'file set differs'
+    }
+
+    It 'rejects a reparse-point export root before reading comparison files' {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return }
+        $fixture = New-PublicationFixture 'compare-junction'
+        $externalParent = Join-Path $TestDrive 'compare-junction-external'
+        $externalRoot = Join-Path $externalParent 'export'
+        [void][IO.Directory]::CreateDirectory($externalParent)
+        Copy-Item -LiteralPath $fixture.CandidateRoot -Destination $externalRoot -Recurse
+        $externalSentinel = Join-Path $externalParent 'sentinel.txt'
+        [IO.File]::WriteAllText($externalSentinel, 'outside')
+        Remove-Item -LiteralPath $fixture.DeterminismRoot -Recurse
+        New-Item -ItemType Junction -Path $fixture.DeterminismRoot -Target $externalRoot | Out-Null
+
+        $errorMessage = ''
+        try { & $script:CompareExportsPath -ReferenceRoot $fixture.CandidateRoot -CandidateRoot $fixture.DeterminismRoot }
+        catch { $errorMessage = $_.Exception.Message }
+
+        $errorMessage | Should Match 'reparse'
+        [IO.File]::ReadAllText($externalSentinel) | Should Be 'outside'
     }
 }
 
@@ -423,5 +638,216 @@ Describe 'P5A joint canonical and lock publication' {
             (Get-FileByteSnapshot (Join-Path $fixture.RepositoryRoot 'reference\als-v4-export.lock.json')) | Should Be $lockBefore
             (Test-Path -LiteralPath $outside) | Should Be $false
         }
+    }
+
+    It 'rejects any ancestor or descendant transaction path before repair comparison or mutation' {
+        foreach ($case in @(
+            @{ Name = 'canonical-ancestor'; Mutate = { param($f) $f.CandidateRoot = Join-Path $f.CanonicalRoot 'candidate' } },
+            @{ Name = 'candidate-ancestor'; Mutate = { param($f) $f.LockCandidatePath = Join-Path $f.CandidateRoot 'lock.json' } },
+            @{ Name = 'journal-ancestor'; Mutate = { param($f) $f.JournalPath = [IO.Path]::GetDirectoryName($f.LockCandidatePath) } }
+        )) {
+            $repo = Join-Path $TestDrive "topology-$($case.Name)"
+            $fixture = [pscustomobject]@{
+                RepositoryRoot = $repo
+                CanonicalRoot = Join-Path $repo 'assets\generated\als_v4'
+                CandidateRoot = Join-Path $repo 'artifacts\p2a-publication\candidate'
+                DeterminismRoot = Join-Path $repo 'artifacts\p2a-determinism\als_v4'
+                LockPath = Join-Path $repo 'reference\als-v4-export.lock.json'
+                LockCandidatePath = Join-Path $repo 'artifacts\p2a-publication\lock.candidate.json'
+                CanonicalBackupRoot = Join-Path $repo 'artifacts\p2a-publication\canonical.backup'
+                LockBackupPath = Join-Path $repo 'artifacts\p2a-publication\lock.backup.json'
+                JournalPath = Join-Path $repo 'artifacts\p2a-publication\transaction.json'
+            }
+            [void][IO.Directory]::CreateDirectory((Join-Path $repo 'assets\config'))
+            $sentinel = Join-Path $repo 'assets\config\sentinel.txt'
+            [IO.File]::WriteAllText($sentinel, 'keep', [Text.UTF8Encoding]::new($false))
+            & $case.Mutate $fixture
+            $probe = Join-Path $repo 'comparison-probe.ps1'
+            $probeMarker = Join-Path $repo 'comparison-called.txt'
+            [IO.File]::WriteAllText($probe, "[IO.File]::WriteAllText('$($probeMarker.Replace("'", "''"))', 'called')", [Text.UTF8Encoding]::new($false))
+
+            $errorMessage = ''
+            try {
+                Invoke-AlsP2aJointPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
+                    -RepositoryRoot $fixture.RepositoryRoot -CanonicalRoot $fixture.CanonicalRoot `
+                    -CandidateRoot $fixture.CandidateRoot -DeterminismRoot $fixture.DeterminismRoot `
+                    -LockPath $fixture.LockPath -LockCandidatePath $fixture.LockCandidatePath `
+                    -CanonicalBackupRoot $fixture.CanonicalBackupRoot -LockBackupPath $fixture.LockBackupPath `
+                    -JournalPath $fixture.JournalPath -ComparisonScriptPath $probe
+            }
+            catch { $errorMessage = $_.Exception.Message }
+
+            $errorMessage | Should Match 'ancestor|descendant|overlap'
+            (Test-Path -LiteralPath $probeMarker) | Should Be $false
+            [IO.File]::ReadAllText($sentinel) | Should Be 'keep'
+            (Test-Path -LiteralPath $fixture.CanonicalBackupRoot) | Should Be $false
+            (Test-Path -LiteralPath $fixture.LockBackupPath) | Should Be $false
+        }
+    }
+
+    It 'rejects a junction input before comparison or deletion and preserves the external sentinel' {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return }
+        $fixture = New-PublicationFixture 'junction'
+        $external = Join-Path $TestDrive 'junction-external'
+        [void][IO.Directory]::CreateDirectory($external)
+        $externalSentinel = Join-Path $external 'sentinel.txt'
+        [IO.File]::WriteAllText($externalSentinel, 'outside', [Text.UTF8Encoding]::new($false))
+        Remove-Item -LiteralPath $fixture.CandidateRoot -Recurse
+        New-Item -ItemType Junction -Path $fixture.CandidateRoot -Target $external | Out-Null
+        $probe = Join-Path $fixture.RepositoryRoot 'comparison-probe.ps1'
+        $probeMarker = Join-Path $fixture.RepositoryRoot 'comparison-called.txt'
+        [IO.File]::WriteAllText($probe, "[IO.File]::WriteAllText('$($probeMarker.Replace("'", "''"))', 'called')", [Text.UTF8Encoding]::new($false))
+
+        $errorMessage = ''
+        try {
+            Invoke-TestPublication -Fixture $fixture
+        }
+        catch { $errorMessage = $_.Exception.Message }
+
+        $errorMessage | Should Match 'reparse'
+        [IO.File]::ReadAllText($externalSentinel) | Should Be 'outside'
+        (Test-Path -LiteralPath $probeMarker) | Should Be $false
+    }
+
+    foreach ($combination in @(
+        @{ Name = 'canonical-only'; Canonical = $true; Lock = $false },
+        @{ Name = 'lock-only'; Canonical = $false; Lock = $true }
+    )) {
+        It "recovers a prepared transaction with $($combination.Name) original resource ownership" {
+            $fixture = New-PublicationFixture "recovery-$($combination.Name)"
+            $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
+            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
+            if ($combination.Canonical) {
+                Move-Item $fixture.CanonicalRoot $fixture.CanonicalBackupRoot
+                Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot
+            }
+            else {
+                Remove-Item $fixture.CanonicalRoot -Recurse
+                Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot
+                $canonicalBefore = '<absent>'
+            }
+            if ($combination.Lock) {
+                Move-Item $fixture.LockPath $fixture.LockBackupPath
+                [IO.File]::WriteAllText($fixture.LockCandidatePath, 'new-lock')
+                Move-Item $fixture.LockCandidatePath $fixture.LockPath
+            }
+            else {
+                Remove-Item $fixture.LockPath
+                [IO.File]::WriteAllText($fixture.LockCandidatePath, 'new-lock')
+                Move-Item $fixture.LockCandidatePath $fixture.LockPath
+                $lockBefore = '<absent>'
+            }
+            Write-TestPublicationJournal $fixture 'prepared' $combination.Canonical $combination.Lock
+
+            Repair-AlsP2aPublication -RepositoryRoot $fixture.RepositoryRoot -JournalPath $fixture.JournalPath
+
+            (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
+            (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
+            Assert-NoPublicationResidue $fixture
+        }
+    }
+
+    foreach ($window in @('AfterCanonicalBackup', 'AfterBothBackups', 'AfterCanonicalInstall')) {
+        It "recovers the prepared crash window $window" {
+            $fixture = New-PublicationFixture "window-$window"
+            $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
+            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
+            Move-Item $fixture.CanonicalRoot $fixture.CanonicalBackupRoot
+            if ($window -ne 'AfterCanonicalBackup') { Move-Item $fixture.LockPath $fixture.LockBackupPath }
+            if ($window -eq 'AfterCanonicalInstall') { Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot }
+            Write-TestPublicationJournal $fixture 'prepared' $true $true
+
+            Repair-AlsP2aPublication -RepositoryRoot $fixture.RepositoryRoot -JournalPath $fixture.JournalPath
+
+            (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
+            (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
+            Assert-NoPublicationResidue $fixture
+        }
+    }
+
+    It 'finishes cleanup for a committed transaction after partial residue removal' {
+        $fixture = New-PublicationFixture 'committed-cleanup'
+        Move-Item $fixture.CanonicalRoot $fixture.CanonicalBackupRoot
+        Move-Item $fixture.LockPath $fixture.LockBackupPath
+        Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot
+        [IO.File]::WriteAllText($fixture.LockCandidatePath, 'committed-lock')
+        Move-Item $fixture.LockCandidatePath $fixture.LockPath
+        $canonicalCommitted = Get-TreeByteSnapshot $fixture.CanonicalRoot
+        $lockCommitted = Get-FileByteSnapshot $fixture.LockPath
+        Remove-Item $fixture.CanonicalBackupRoot -Recurse
+        Write-TestPublicationJournal $fixture 'committed' $true $true
+
+        Repair-AlsP2aPublication -RepositoryRoot $fixture.RepositoryRoot -JournalPath $fixture.JournalPath
+
+        (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalCommitted
+        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockCommitted
+        Assert-NoPublicationResidue $fixture
+    }
+}
+
+Describe 'P5A workflow staging cleanup' {
+    foreach ($phase in @('DryRun', 'FullExport', 'DeterminismExport')) {
+        It "cleans all staging without touching canonical or lock when $phase fails" {
+            (Get-Command Invoke-AlsP2aStagingWorkflow -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
+            if (-not (Get-Command Invoke-AlsP2aStagingWorkflow -ErrorAction SilentlyContinue)) { return }
+            $fixture = New-PublicationFixture "workflow-$phase"
+            Remove-Item $fixture.CandidateRoot -Recurse
+            Remove-Item $fixture.DeterminismRoot -Recurse
+            $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
+            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
+
+            $rejected = $false
+            try {
+                Invoke-AlsP2aStagingWorkflow -RepositoryRoot $fixture.RepositoryRoot `
+                    -CandidateRoot $fixture.CandidateRoot -DeterminismRoot $fixture.DeterminismRoot `
+                    -LockCandidatePath $fixture.LockCandidatePath -Action {
+                        [void][IO.Directory]::CreateDirectory($fixture.CandidateRoot)
+                        [IO.File]::WriteAllText((Join-Path $fixture.CandidateRoot 'candidate.bin'), 'candidate')
+                        if ($phase -eq 'DryRun') { throw 'injected dry-run failure' }
+                        [void][IO.Directory]::CreateDirectory($fixture.DeterminismRoot)
+                        [IO.File]::WriteAllText((Join-Path $fixture.DeterminismRoot 'determinism.bin'), 'determinism')
+                        if ($phase -eq 'FullExport') { throw 'injected full-export failure' }
+                        [IO.File]::WriteAllText($fixture.LockCandidatePath, 'lock-candidate')
+                        throw 'injected determinism failure'
+                    }
+            }
+            catch { $rejected = $true }
+
+            $rejected | Should Be $true
+            (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
+            (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
+            Assert-NoPublicationResidue $fixture
+        }
+    }
+}
+
+Describe 'P5A verify exact canonical boundary' {
+    It 'rejects Output at the assets ancestor before any cleanup or build side effect' {
+        $repo = Join-Path $TestDrive 'verify-boundary'
+        $scripts = Join-Path $repo 'scripts'
+        [void][IO.Directory]::CreateDirectory($scripts)
+        Copy-Item $script:AssetLockFunctionsPath (Join-Path $scripts 'asset-lock-functions.ps1')
+        Copy-Item (Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1') (Join-Path $scripts 'verify-p2a.ps1')
+        [IO.File]::WriteAllText((Join-Path $scripts 'build-als-exporter.ps1'), "throw 'build must not run'", [Text.UTF8Encoding]::new($false))
+        $config = Join-Path $repo 'assets\config'
+        $candidate = Join-Path $repo 'artifacts\p2a-publication\canonical-candidate'
+        [void][IO.Directory]::CreateDirectory($config)
+        [void][IO.Directory]::CreateDirectory($candidate)
+        $configSentinel = Join-Path $config 'sentinel.txt'
+        $stagingSentinel = Join-Path $candidate 'sentinel.txt'
+        [IO.File]::WriteAllText($configSentinel, 'config')
+        [IO.File]::WriteAllText($stagingSentinel, 'staging')
+        $project = Join-Path $repo 'fixture.uproject'
+        [IO.File]::WriteAllText($project, '{}')
+
+        $errorMessage = ''
+        try { & (Join-Path $scripts 'verify-p2a.ps1') -EngineRoot (Join-Path $repo 'engine') -UnrealProject $project -Output (Join-Path $repo 'assets') }
+        catch { $errorMessage = $_.Exception.Message }
+
+        $errorMessage | Should Match 'assets.generated.als_v4|canonical publication root'
+        [IO.File]::ReadAllText($configSentinel) | Should Be 'config'
+        [IO.File]::ReadAllText($stagingSentinel) | Should Be 'staging'
+        (Test-Path (Join-Path $repo 'artifacts\p2a-publication\transaction.json')) | Should Be $false
+        (Test-Path (Join-Path $repo 'artifacts\p2a-publication\als_v4.canonical.backup')) | Should Be $false
     }
 }

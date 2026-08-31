@@ -94,6 +94,137 @@ function Get-AlsP2aSha1 {
     return [Convert]::ToHexString([Security.Cryptography.SHA1]::HashData($bytes)).ToLowerInvariant()
 }
 
+function Assert-AlsP2aExactObjectProperties {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Expected,
+        [AllowNull()][object]$Value,
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    if ($null -eq $Value -or $Value -is [string] -or $Value -is [array] -or $Value -is [ValueType]) {
+        throw "$Path must be an object."
+    }
+    $actual = @($Value.PSObject.Properties | ForEach-Object { $_.Name })
+    $expectedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($name in $Expected) { [void]$expectedSet.Add($name) }
+    foreach ($name in $actual) {
+        if (-not $expectedSet.Contains($name)) { throw "$Path contains unknown property '$name'." }
+    }
+    $actualSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($name in $actual) { [void]$actualSet.Add($name) }
+    foreach ($name in $Expected) {
+        if (-not $actualSet.Contains($name)) { throw "$Path is missing required property '$name'." }
+    }
+    if ($actual.Count -ne $Expected.Count) { throw "$Path contains duplicate or unexpected properties." }
+}
+
+function Assert-AlsP2aNonEmptyString {
+    [CmdletBinding()]
+    param([AllowNull()][object]$Value, [Parameter(Mandatory)][string]$Path)
+
+    if ($Value -isnot [string] -or [string]::IsNullOrWhiteSpace($Value)) {
+        throw "$Path must be a non-empty string."
+    }
+}
+
+function Assert-AlsP2aFiniteNumber {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object]$Value,
+        [Parameter(Mandatory)][string]$Path,
+        [switch]$Nonnegative,
+        [double]$Maximum = [single]::MaxValue
+    )
+
+    $numericTypes = @(
+        [byte], [sbyte], [int16], [uint16], [int32], [uint32], [int64], [uint64], [single], [double], [decimal]
+    )
+    $isNumber = $false
+    foreach ($type in $numericTypes) {
+        if ($Value -is $type) { $isNumber = $true; break }
+    }
+    if (-not $isNumber) { throw "$Path must be a number." }
+    $number = [double]$Value
+    if (-not [double]::IsFinite($number) -or [Math]::Abs($number) -gt [single]::MaxValue) {
+        throw "$Path must be a finite float-representable number."
+    }
+    if ($Nonnegative -and $number -lt 0.0) { throw "$Path must be nonnegative." }
+    if ($number -gt $Maximum) { throw "$Path must be at most $Maximum." }
+    return $number
+}
+
+function Assert-AlsP2aNonnegativeInteger {
+    [CmdletBinding()]
+    param([AllowNull()][object]$Value, [Parameter(Mandatory)][string]$Path)
+
+    $integerTypes = @([byte], [sbyte], [int16], [uint16], [int32], [uint32], [int64], [uint64])
+    $isInteger = $false
+    foreach ($type in $integerTypes) {
+        if ($Value -is $type) { $isInteger = $true; break }
+    }
+    if (-not $isInteger -or [decimal]$Value -lt 0) { throw "$Path must be a nonnegative integer." }
+    return [int64]$Value
+}
+
+function Assert-AlsP2aTimelinePayload {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Kind,
+        [AllowNull()][object]$Payload,
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    switch -CaseSensitive ($Kind) {
+        'Generic' {
+            Assert-AlsP2aExactObjectProperties -Expected @() -Value $Payload -Path $Path
+        }
+        'Footstep' {
+            Assert-AlsP2aExactObjectProperties -Expected @('foot') -Value $Payload -Path $Path
+            if ([string]$Payload.foot -cnotin @('Unspecified', 'Left', 'Right')) {
+                throw "$Path.foot must be one of Unspecified, Left, or Right."
+            }
+        }
+        'SetAction' {
+            Assert-AlsP2aExactObjectProperties -Expected @('action') -Value $Payload -Path $Path
+            if ([string]$Payload.action -cnotin @('None', 'Rolling', 'Mantling', 'Ragdolling', 'GettingUp')) {
+                throw "$Path.action has an invalid frozen action value."
+            }
+        }
+        'SetGroundedEntry' {
+            Assert-AlsP2aExactObjectProperties -Expected @('mode') -Value $Payload -Path $Path
+            if ([string]$Payload.mode -cnotin @('None', 'FromRoll')) {
+                throw "$Path.mode has an invalid frozen grounded-entry value."
+            }
+        }
+        'EarlyBlendOut' {
+            $required = @(
+                'blendOutSeconds', 'checkInput', 'checkLocomotionMode', 'locomotionMode',
+                'checkRotationMode', 'rotationMode', 'checkStance', 'stance'
+            )
+            Assert-AlsP2aExactObjectProperties -Expected $required -Value $Payload -Path $Path
+            [void](Assert-AlsP2aFiniteNumber -Value $Payload.blendOutSeconds -Path "$Path.blendOutSeconds" -Nonnegative)
+            foreach ($field in @('checkInput', 'checkLocomotionMode', 'checkRotationMode', 'checkStance')) {
+                if ($Payload.$field -isnot [bool]) { throw "$Path.$field must be boolean." }
+            }
+            if ([string]$Payload.locomotionMode -cnotin @('Grounded', 'InAir', 'Mantling', 'Ragdoll', 'Recovering')) {
+                throw "$Path.locomotionMode has an invalid frozen value."
+            }
+            if ([string]$Payload.rotationMode -cnotin @('VelocityDirection', 'LookingDirection', 'Aiming')) {
+                throw "$Path.rotationMode has an invalid frozen value."
+            }
+            if ([string]$Payload.stance -cnotin @('Standing', 'Crouching')) {
+                throw "$Path.stance has an invalid frozen value."
+            }
+        }
+        'RootMotionScale' {
+            Assert-AlsP2aExactObjectProperties -Expected @('translationScale') -Value $Payload -Path $Path
+            [void](Assert-AlsP2aFiniteNumber -Value $Payload.translationScale -Path "$Path.translationScale" -Nonnegative)
+        }
+        default { throw "$Path has unknown timeline kind '$Kind'." }
+    }
+}
+
 function Assert-AlsP2aPublishManifest {
     [CmdletBinding()]
     param(
@@ -149,26 +280,58 @@ function Assert-AlsP2aPublishManifest {
 
     foreach ($kind in @('Sequence', 'Montage')) {
         $assets = if ($kind -ceq 'Sequence') { @($Manifest.animations) } else { @($Manifest.montages) }
-        foreach ($asset in $assets) {
+        for ($assetIndex = 0; $assetIndex -lt $assets.Count; $assetIndex++) {
+            $asset = $assets[$assetIndex]
+            $assetPath = if ($kind -ceq 'Sequence') { "animations[$assetIndex]" } else { "montages[$assetIndex]" }
             if ($null -eq $asset.PSObject.Properties['metadata'] -or
                 $null -eq $asset.metadata.PSObject.Properties['timeline'] -or
                 $null -eq $asset.metadata.timeline) {
                 throw "$Label $kind '$($asset.objectPath)' is missing its timeline array."
             }
+            if ($asset.metadata.timeline -isnot [array]) {
+                throw "$Label $assetPath.metadata.timeline must be an array."
+            }
+            if ($null -eq $asset.metadata.PSObject.Properties['playLength']) {
+                throw "$Label $assetPath.metadata is missing required property 'playLength'."
+            }
+            $playLength = Assert-AlsP2aFiniteNumber -Value $asset.metadata.playLength `
+                -Path "$Label $assetPath.metadata.playLength" -Nonnegative
             $assetId = [string]$asset.id
             if ($assetId -cnotmatch '^[0-9a-f]{40}$') {
                 throw "$Label $kind '$($asset.objectPath)' has an invalid stable asset ID."
             }
-            foreach ($event in @($asset.metadata.timeline)) {
+            $eventSourceIndices = [Collections.Generic.HashSet[int64]]::new()
+            $timeline = @($asset.metadata.timeline)
+            for ($eventIndex = 0; $eventIndex -lt $timeline.Count; $eventIndex++) {
+                $event = $timeline[$eventIndex]
+                $eventPath = "$Label $assetPath.metadata.timeline[$eventIndex]"
+                Assert-AlsP2aExactObjectProperties -Expected @(
+                    'stableEventId', 'kind', 'sourceClassPath', 'displayName', 'timeSeconds', 'durationSeconds',
+                    'triggerWeightThreshold', 'tickMode', 'sourceIndex', 'trackIndex', 'payload'
+                ) -Value $event -Path $eventPath
                 $stableEventId = [string]$event.stableEventId
                 if ($stableEventId -cnotmatch '^[0-9a-f]{40}$') {
-                    throw "$Label $kind '$($asset.objectPath)' has an invalid stableEventId."
+                    throw "$eventPath.stableEventId must be a lowercase SHA-1."
                 }
                 if (-not $eventIds.Add($stableEventId)) {
                     throw "$Label manifest contains a duplicate stable event ID: $stableEventId."
                 }
+                Assert-AlsP2aNonEmptyString -Value $event.kind -Path "$eventPath.kind"
+                Assert-AlsP2aNonEmptyString -Value $event.sourceClassPath -Path "$eventPath.sourceClassPath"
+                Assert-AlsP2aNonEmptyString -Value $event.displayName -Path "$eventPath.displayName"
                 $sourceClassPath = [string]$event.sourceClassPath
-                $sourceIndex = [int]$event.sourceIndex
+                $sourceIndex = Assert-AlsP2aNonnegativeInteger -Value $event.sourceIndex -Path "$eventPath.sourceIndex"
+                [void](Assert-AlsP2aNonnegativeInteger -Value $event.trackIndex -Path "$eventPath.trackIndex")
+                if (-not $eventSourceIndices.Add($sourceIndex)) {
+                    throw "$eventPath.sourceIndex is duplicated within the asset: $sourceIndex."
+                }
+                $timeSeconds = Assert-AlsP2aFiniteNumber -Value $event.timeSeconds -Path "$eventPath.timeSeconds" -Nonnegative
+                $durationSeconds = Assert-AlsP2aFiniteNumber -Value $event.durationSeconds -Path "$eventPath.durationSeconds" -Nonnegative
+                [void](Assert-AlsP2aFiniteNumber -Value $event.triggerWeightThreshold `
+                    -Path "$eventPath.triggerWeightThreshold" -Nonnegative -Maximum 1.0)
+                if ($timeSeconds -gt $playLength) { throw "$eventPath.timeSeconds exceeds playLength." }
+                if ($durationSeconds -gt ($playLength - $timeSeconds)) { throw "$eventPath.durationSeconds exceeds playLength." }
+                Assert-AlsP2aTimelinePayload -Kind ([string]$event.kind) -Payload $event.payload -Path "$eventPath.payload"
                 $expectedEventId = Get-AlsP2aSha1 "$assetId|timeline|$sourceIndex|$sourceClassPath"
                 if ($stableEventId -cne $expectedEventId) {
                     throw "$Label stable event ID does not match the stable formula for '$($asset.objectPath)' sourceIndex=$sourceIndex."
@@ -185,15 +348,32 @@ function Assert-AlsP2aPublishManifest {
                     $null -eq $asset.metadata.syncMarkers) {
                     throw "$Label Sequence '$($asset.objectPath)' is missing its syncMarkers array."
                 }
-                foreach ($marker in @($asset.metadata.syncMarkers)) {
+                if ($asset.metadata.syncMarkers -isnot [array]) {
+                    throw "$Label $assetPath.metadata.syncMarkers must be an array."
+                }
+                $markerSourceIndices = [Collections.Generic.HashSet[int64]]::new()
+                $markers = @($asset.metadata.syncMarkers)
+                for ($markerIndex = 0; $markerIndex -lt $markers.Count; $markerIndex++) {
+                    $marker = $markers[$markerIndex]
+                    $markerPath = "$Label $assetPath.metadata.syncMarkers[$markerIndex]"
+                    Assert-AlsP2aExactObjectProperties -Expected @(
+                        'stableMarkerId', 'name', 'timeSeconds', 'sourceIndex', 'trackIndex'
+                    ) -Value $marker -Path $markerPath
                     $stableMarkerId = [string]$marker.stableMarkerId
                     if ($stableMarkerId -cnotmatch '^[0-9a-f]{40}$') {
-                        throw "$Label Sequence '$($asset.objectPath)' has an invalid stableMarkerId."
+                        throw "$markerPath.stableMarkerId must be a lowercase SHA-1."
                     }
                     if (-not $markerIds.Add($stableMarkerId)) {
                         throw "$Label manifest contains a duplicate stable marker ID: $stableMarkerId."
                     }
-                    $sourceIndex = [int]$marker.sourceIndex
+                    Assert-AlsP2aNonEmptyString -Value $marker.name -Path "$markerPath.name"
+                    $sourceIndex = Assert-AlsP2aNonnegativeInteger -Value $marker.sourceIndex -Path "$markerPath.sourceIndex"
+                    [void](Assert-AlsP2aNonnegativeInteger -Value $marker.trackIndex -Path "$markerPath.trackIndex")
+                    if (-not $markerSourceIndices.Add($sourceIndex)) {
+                        throw "$markerPath.sourceIndex is duplicated within the asset: $sourceIndex."
+                    }
+                    $markerTime = Assert-AlsP2aFiniteNumber -Value $marker.timeSeconds -Path "$markerPath.timeSeconds" -Nonnegative
+                    if ($markerTime -gt $playLength) { throw "$markerPath.timeSeconds exceeds playLength." }
                     $name = [string]$marker.name
                     $expectedMarkerId = Get-AlsP2aSha1 "$assetId|marker|$sourceIndex|$name"
                     if ($stableMarkerId -cne $expectedMarkerId) {
@@ -203,11 +383,40 @@ function Assert-AlsP2aPublishManifest {
                 }
             }
             else {
-                foreach ($section in @($asset.metadata.sections)) {
-                    if ([string]$section.nextSection -ceq 'None') {
-                        throw "$Label Montage '$($asset.objectPath)' has forbidden nextSection literal None."
+                if ($null -ne $asset.metadata.PSObject.Properties['syncMarkers']) {
+                    throw "$Label $assetPath.metadata contains Sequence-only property 'syncMarkers'."
+                }
+                if ($null -eq $asset.metadata.PSObject.Properties['sections'] -or $null -eq $asset.metadata.sections) {
+                    throw "$Label $assetPath.metadata is missing required property 'sections'."
+                }
+                if ($asset.metadata.sections -isnot [array]) {
+                    throw "$Label $assetPath.metadata.sections must be an array."
+                }
+                $sectionNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+                $sections = @($asset.metadata.sections)
+                $previousStart = -1.0
+                for ($sectionIndex = 0; $sectionIndex -lt $sections.Count; $sectionIndex++) {
+                    $section = $sections[$sectionIndex]
+                    $sectionPath = "$Label $assetPath.metadata.sections[$sectionIndex]"
+                    Assert-AlsP2aExactObjectProperties -Expected @('name', 'nextSection', 'startTime') `
+                        -Value $section -Path $sectionPath
+                    Assert-AlsP2aNonEmptyString -Value $section.name -Path "$sectionPath.name"
+                    if ($section.nextSection -isnot [string]) { throw "$sectionPath.nextSection must be a string." }
+                    if ([string]$section.nextSection -ceq 'None') { throw "$sectionPath.nextSection forbids literal None." }
+                    if (-not $sectionNames.Add([string]$section.name)) { throw "$sectionPath has a duplicate section name." }
+                    $startTime = Assert-AlsP2aFiniteNumber -Value $section.startTime -Path "$sectionPath.startTime" -Nonnegative
+                    if ($startTime -gt $playLength) { throw "$sectionPath.startTime exceeds playLength." }
+                    if ($sectionIndex -gt 0 -and $startTime -le $previousStart) {
+                        throw "$sectionPath.startTime must be strictly increasing."
                     }
+                    $previousStart = $startTime
                     if ([string]$section.nextSection -ceq '') { $terminalSectionCount++ }
+                }
+                for ($sectionIndex = 0; $sectionIndex -lt $sections.Count; $sectionIndex++) {
+                    $nextSection = [string]$sections[$sectionIndex].nextSection
+                    if ($nextSection -cne '' -and -not $sectionNames.Contains($nextSection)) {
+                        throw "$Label $assetPath.metadata.sections[$sectionIndex].nextSection references missing section '$nextSection'."
+                    }
                 }
             }
         }
@@ -306,6 +515,64 @@ function Resolve-AlsRepositoryDescendantPath {
     return $fullPath
 }
 
+function Test-AlsP2aPathEqual {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Left, [Parameter(Mandatory)][string]$Right)
+
+    $comparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        [StringComparison]::OrdinalIgnoreCase
+    }
+    else { [StringComparison]::Ordinal }
+    return $Left.Equals($Right, $comparison)
+}
+
+function Test-AlsP2aPathAncestor {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Ancestor, [Parameter(Mandatory)][string]$Descendant)
+
+    $comparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        [StringComparison]::OrdinalIgnoreCase
+    }
+    else { [StringComparison]::Ordinal }
+    $prefix = $Ancestor.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) +
+        [IO.Path]::DirectorySeparatorChar
+    return $Descendant.StartsWith($prefix, $comparison)
+}
+
+function Assert-AlsP2aCanonicalPublicationRoot {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepositoryRoot,
+        [Parameter(Mandatory)][string]$CanonicalRoot
+    )
+
+    $expected = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $RepositoryRoot `
+        -Path (Join-Path $RepositoryRoot 'assets\generated\als_v4') -Label 'ExpectedCanonicalRoot'
+    $actual = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $RepositoryRoot `
+        -Path $CanonicalRoot -Label 'CanonicalRoot'
+    if (-not (Test-AlsP2aPathEqual $actual $expected)) {
+        throw "P2A canonical publication root must be exactly '$expected'; received '$actual'."
+    }
+    return $actual
+}
+
+function Assert-AlsP2aPublicationPathTopology {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Paths)
+
+    $entries = @($Paths.GetEnumerator())
+    for ($leftIndex = 0; $leftIndex -lt $entries.Count; $leftIndex++) {
+        for ($rightIndex = $leftIndex + 1; $rightIndex -lt $entries.Count; $rightIndex++) {
+            $left = [string]$entries[$leftIndex].Value
+            $right = [string]$entries[$rightIndex].Value
+            if ((Test-AlsP2aPathEqual $left $right) -or (Test-AlsP2aPathAncestor $left $right) -or
+                (Test-AlsP2aPathAncestor $right $left)) {
+                throw "P2A publication paths must be distinct and must not have ancestor/descendant overlap: $($entries[$leftIndex].Key)='$left', $($entries[$rightIndex].Key)='$right'."
+            }
+        }
+    }
+}
+
 function Remove-AlsRepositoryDescendantPath {
     [CmdletBinding()]
     param(
@@ -389,6 +656,8 @@ function Repair-AlsP2aPublication {
         $paths[$property] = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path ([string]$journal.$property) -Label "journal.$property"
     }
     if ($paths.journalPath -cne $journalFullPath) { throw 'P2A publication journal path does not match its location.' }
+    [void](Assert-AlsP2aCanonicalPublicationRoot -RepositoryRoot $root -CanonicalRoot $paths.canonicalRoot)
+    Assert-AlsP2aPublicationPathTopology -Paths $paths
 
     if ([string]$journal.state -ceq 'committed') {
         if (-not (Test-Path -LiteralPath $paths.canonicalRoot -PathType Container) -or
@@ -437,6 +706,44 @@ function Repair-AlsP2aPublication {
     Write-Host "P2A_PUBLICATION_RECOVERY_OK state=$($journal.state)"
 }
 
+function Invoke-AlsP2aStagingWorkflow {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepositoryRoot,
+        [Parameter(Mandatory)][string]$CandidateRoot,
+        [Parameter(Mandatory)][string]$DeterminismRoot,
+        [Parameter(Mandatory)][string]$LockCandidatePath,
+        [Parameter(Mandatory)][scriptblock]$Action
+    )
+
+    $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+    $staging = @{
+        CandidateRoot = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $CandidateRoot -Label 'CandidateRoot'
+        DeterminismRoot = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $DeterminismRoot -Label 'DeterminismRoot'
+        LockCandidatePath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $LockCandidatePath -Label 'LockCandidatePath'
+    }
+    Assert-AlsP2aPublicationPathTopology -Paths $staging
+    try {
+        & $Action
+    }
+    catch {
+        $failure = $_
+        try {
+            foreach ($entry in @(
+                @{ Path = $staging.CandidateRoot; Label = 'failed workflow candidate staging' },
+                @{ Path = $staging.DeterminismRoot; Label = 'failed workflow determinism staging' },
+                @{ Path = $staging.LockCandidatePath; Label = 'failed workflow lock candidate' }
+            )) {
+                Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $entry.Path -Label $entry.Label
+            }
+        }
+        catch {
+            throw "P2A export workflow failed ('$($failure.Exception.Message)') and staging cleanup also failed: $($_.Exception.Message)"
+        }
+        throw $failure
+    }
+}
+
 function Invoke-AlsP2aJointPublication {
     [CmdletBinding()]
     param(
@@ -469,17 +776,17 @@ function Invoke-AlsP2aJointPublication {
     )) {
         $resolved[$entry.Name] = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $entry.Value -Label $entry.Name
     }
-    if (@($resolved.Values | Sort-Object -Unique).Count -ne $resolved.Count) {
-        throw 'P2A publication paths must all resolve to distinct repository descendants.'
-    }
-    if (-not (Test-Path -LiteralPath $ComparisonScriptPath -PathType Leaf)) {
-        throw "P2A comparison script does not exist: $ComparisonScriptPath"
+    [void](Assert-AlsP2aCanonicalPublicationRoot -RepositoryRoot $root -CanonicalRoot $resolved.CanonicalRoot)
+    Assert-AlsP2aPublicationPathTopology -Paths $resolved
+    $comparisonScript = [IO.Path]::GetFullPath($ComparisonScriptPath)
+    if (-not (Test-Path -LiteralPath $comparisonScript -PathType Leaf)) {
+        throw "P2A comparison script does not exist: $comparisonScript"
     }
 
     Repair-AlsP2aPublication -RepositoryRoot $root -JournalPath $resolved.JournalPath
     try {
         if ($FaultInjectionPoint -ceq 'Comparison') { throw 'Injected P2A comparison failure.' }
-        & $ComparisonScriptPath -ReferenceRoot $resolved.CandidateRoot -CandidateRoot $resolved.DeterminismRoot
+        & $comparisonScript -ReferenceRoot $resolved.CandidateRoot -CandidateRoot $resolved.DeterminismRoot
         $manifestPath = Join-Path $resolved.CandidateRoot 'als_manifest.json'
         $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         $audit = Assert-AlsP2aPublishManifest -Manifest $manifest -Label 'Canonical candidate'

@@ -17,7 +17,27 @@ function Resolve-ExportRoot([string]$Path, [string]$Label) {
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
         throw "$Label does not exist: $Path"
     }
+    $cursor = [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    while (-not [string]::IsNullOrEmpty($cursor)) {
+        $item = Get-Item -LiteralPath $cursor -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "$Label traverses a reparse point and cannot be compared: $cursor"
+        }
+        $parent = [IO.Path]::GetDirectoryName($cursor)
+        if ([string]::IsNullOrEmpty($parent) -or $parent -ceq $cursor) { break }
+        $cursor = $parent.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    }
     return (Resolve-Path -LiteralPath $Path).Path
+}
+
+function Test-ExportRootAncestor([string]$Ancestor, [string]$Descendant) {
+    $comparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        [StringComparison]::OrdinalIgnoreCase
+    }
+    else { [StringComparison]::Ordinal }
+    $prefix = $Ancestor.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) +
+        [IO.Path]::DirectorySeparatorChar
+    return $Descendant.StartsWith($prefix, $comparison)
 }
 
 function Get-ComparableFiles([string]$Root) {
@@ -35,10 +55,14 @@ $candidatePath = Resolve-ExportRoot $CandidateRoot 'CandidateRoot'
 if ($referencePath -ceq $candidatePath) {
     throw 'ReferenceRoot and CandidateRoot must be independent directories.'
 }
+if ((Test-ExportRootAncestor $referencePath $candidatePath) -or
+    (Test-ExportRootAncestor $candidatePath $referencePath)) {
+    throw 'ReferenceRoot and CandidateRoot must not be ancestors or descendants of one another.'
+}
 $referenceFiles = @(Get-ComparableFiles $referencePath)
 $candidateFiles = @(Get-ComparableFiles $candidatePath)
 
-$setDifference = Compare-Object -ReferenceObject $referenceFiles -DifferenceObject $candidateFiles
+$setDifference = Compare-Object -ReferenceObject $referenceFiles -DifferenceObject $candidateFiles -CaseSensitive
 if ($setDifference) {
     $first = $setDifference | Select-Object -First 1
     throw "Export file set differs at '$($first.InputObject)' (side=$($first.SideIndicator))."

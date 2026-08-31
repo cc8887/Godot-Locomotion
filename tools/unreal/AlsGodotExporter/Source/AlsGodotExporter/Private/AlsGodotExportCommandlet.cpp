@@ -4,6 +4,7 @@
 #include "AlsExportPlanner.h"
 #include "AlsFbxExporter.h"
 #include "AlsAnimationMetadataReader.h"
+#include "AlsCompositeAssetReader.h"
 #include "AlsManifestWriter.h"
 #include "AlsOutputAuditor.h"
 #include "AlsTextureExporter.h"
@@ -43,6 +44,15 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=%d"),
             TimelineSelfTestCaseCount);
+        int32 CompositeSelfTestCaseCount = 0;
+        FString CompositeSelfTestError;
+        if (!FAlsCompositeAssetReader::RunSelfTest(CompositeSelfTestCaseCount, CompositeSelfTestError))
+        {
+            UE_LOG(LogAlsGodotExporter, Error, TEXT("Composite export self-test failed: %s"), *CompositeSelfTestError);
+            return 9;
+        }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_COMPOSITE_EXPORT_SELF_TEST_OK cases=%d"),
+            CompositeSelfTestCaseCount);
         const FEngineVersion EngineVersion = FEngineVersion::Current();
         UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_EXPORTER_READY engine=%d.%d.%d plugin=2.0.0"),
             EngineVersion.GetMajor(), EngineVersion.GetMinor(), EngineVersion.GetPatch());
