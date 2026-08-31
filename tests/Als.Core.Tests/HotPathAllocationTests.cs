@@ -5,6 +5,7 @@ using GodotAls.Core.Events;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Pose;
+using GodotAls.Core.Sync;
 
 namespace GodotAls.Core.Tests;
 
@@ -214,6 +215,28 @@ public sealed class HotPathAllocationTests
     }
 
     [Fact]
+    public void SyncEvaluationAllocatesZeroBytesAfterWarmup()
+    {
+        AlsSyncMarkerDefinition[] markers =
+        [
+            new(101, 11, 10, 0, 0, 0.2f), new(102, 12, 10, 1, 0, 0.6f),
+            new(201, 11, 20, 0, 0, 1.4f), new(202, 12, 20, 1, 0, 0.6f),
+        ];
+        AlsSyncMemberBinding[] members = [new(1, 10, 1f, 1, 1), new(1, 20, 2f, 1, 1)];
+        AlsSyncPlayback[] playbacks = [new(1, 10, 1, 0.2d, 0.4d, 1f), new(2, 20, 1, 0.1d, 0.3d, 0.5f)];
+        var mapped = new AlsSyncMappedPlayback[2];
+        var group = new AlsSyncGroupBinding(1, 0, 2, 11, 12);
+
+        ExerciseSyncRuntime(markers, group, members, playbacks, mapped, 100);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        ExerciseSyncRuntime(markers, group, members, playbacks, mapped, 10_000);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+    }
+
+    [Fact]
     public void TimelineAndCommittedNotifyHotPathsAllocateZeroBytesAfterWarmup()
     {
         AlsTimelineEventDefinition[] definitions =
@@ -284,6 +307,27 @@ public sealed class HotPathAllocationTests
 
         finalCycle = cycle;
         checksum = sum;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static void ExerciseSyncRuntime(
+        AlsSyncMarkerDefinition[] markers,
+        in AlsSyncGroupBinding group,
+        AlsSyncMemberBinding[] members,
+        AlsSyncPlayback[] playbacks,
+        AlsSyncMappedPlayback[] mapped,
+        int iterations)
+    {
+        for (var index = 0; index < iterations; index++)
+        {
+            if (!AlsSyncRuntime.TryEvaluateGroup(
+                    markers, group, members, playbacks, 0.2d, mapped,
+                    out var count, out _, out var failure) ||
+                count != 2 || failure != AlsP5FailureCode.None)
+            {
+                throw new InvalidOperationException("Sync runtime allocation probe failed.");
+            }
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
