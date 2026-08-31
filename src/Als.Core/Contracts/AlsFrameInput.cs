@@ -33,7 +33,7 @@ public readonly record struct AlsFrameInput(
 {
     public AlsFootPlacementReleaseSignals FootPlacementReleaseSignals { get; init; }
 
-    public AlsActionRequest ActionRequest { get; init; }
+    public AlsActionRequest ActionRequest { get; init; } = AlsActionRequest.None;
 
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {
