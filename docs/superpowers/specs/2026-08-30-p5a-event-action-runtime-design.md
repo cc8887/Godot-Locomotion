@@ -233,9 +233,11 @@ AlsActionResultCode
 
 初始化 adapter 把只读 Import definition 转成这些 bindings。求值 API 接受 `ReadOnlySpan<T>` 与 caller-owned state/buffer，不在求值期分配。
 
-`AlsAnimationEvent.EventId` 定义为全局编译后的 timeline event ID，不再是 clip 内数组下标。事件还携带固定宽度 kind、source animation/action ID、playback epoch、EventSequence 和 compact payload。整个结构保持 unmanaged，并进入 layout tests。
+`AlsAnimationEvent.EventId` 定义为全局编译后的 timeline event ID，不再是 clip 内数组下标。事件还携带固定宽度 occurrence handle、source animation/action ID、playback epoch/cycle、owner token、EventSequence、boundary ordinal、kind、phase 和 compact payload。整个结构保持 sequential unmanaged，并进入 layout tests。P5 inactive ID、section、segment、binding 和 graph-tail index 一律为 `-1`，唯一例外是作为 Start-ID permanent tombstone 的 `AlsActionPlayerState.LastProcessedRequestId=0` high-watermark；浮点默认值必须是 raw positive zero。因此含 required `-1` 的 CLR `default` 不是合法 P5 runtime default，生产入口必须使用并验证显式工厂。
 
-`AlsFrameResult` 保留 16 槽 inline `AlsEventBuffer`，新增 2 槽 inline `AlsActionOutcomeBuffer` 和 P5A failure code。2 槽上限来自单 Action lane：一次 replacement 最多先产生旧 Action terminal outcome，再产生新 Action `Accepted`。`AlsResultDigest` 覆盖每一个 P5A 字段。
+`AlsFrameResult` 保留 16 槽 inline `AlsEventBuffer`，新增 2 槽 inline `AlsActionOutcomeBuffer` 和 P5A failure code。2 槽上限来自下述三种有序路径而非截断：replacement interruption 后 acceptance；runtime-failure interruption 后一个 normal-request result；rejected normal command 后 existing-owner `Completed`/EBO terminal。`AlsResultDigest` 覆盖每一个 P5A 字段。
+
+Occurrence layout version 固定为 `1`。每项为 `(SourceKind, SourceBindingIndex, GraphSlotIndex, OccurrenceHandleId, AuthorityGroupId)`；handle 必须等于 span ordinal，source key/handle 全局唯一，authority 为从 0 开始的 dense set，Transition/Action graph slot 固定为 0。唯一 public Core gate 是 `AlsP5OccurrenceLayoutContract.Validate(version,digest,entries)`，它不分配、不排序、不修改 caller span，并按 `Version int32 LE -> Count int32 LE -> 每项 SourceKind byte + 四个 int32 LE` 私下重算 FNV-1a 64。Import/Core 精确 field-copy bridge 由 Task 13 实现，Core snapshot/Godot adapter 比较由 Task 14 实现；本阶段不声明不存在的 cross-layer round-trip，也不允许 Core 引用 Import。
 
 ## 八、Curve Runtime
 
@@ -260,23 +262,25 @@ P4 canonical `RotationYawSpeedRadiansPerSecond` 的含义保持不变。root-tra
 
 ### 9.1 时间与 occurrence identity
 
-每个 playback instance 保存：
+每个 playback instance 保存完整 compiled occurrence ownership：
 
 ```text
-animationId / playbackEpoch / cycle
+occurrenceHandleId / sourceAnimationId / sourceActionId
+animationId / playbackEpoch / cycle / ownerToken
 previousTime / currentTime / weight
 eventAuthority / activeStateOwnership
 ```
 
 推进区间固定为 `(previous, current]`。同一 epoch 内时间不得倒退；restart、replacement 或 section jump 创建新 epoch，并在新 timeline 求值前关闭旧 epoch 拥有的 state。
 
-Instant、Begin 和 End 的 occurrence identity 为：
+Instant、Begin 和 End 的唯一 dedup/ownership identity 为：
 
 ```text
-animationId / playbackEpoch / cycle / sourceIndex / phase / boundaryOrdinal
+occurrenceHandleId / sourceAnimationId / sourceActionId / eventId /
+playbackEpoch / playbackCycle / ownerToken / boundaryOrdinal / phase
 ```
 
-Tick 的 occurrence identity 额外包含当前 `FrameId`。这样同一帧 retry 不会重复 Tick，而下一帧仍会正常产生一个 Tick。
+Tick 的 identity 在同一 tuple 后额外包含当前 `AlsFrameResult.Identity.FrameId`。这样同一帧 retry 不会重复 Tick，而下一帧仍会正常产生一个 Tick。同一 Sequence/event 在 Base 与 Action 或两个 Montage segment 中即使 local epoch/cycle 相同，compiled `OccurrenceHandleId` 仍使其合法地区分。`AnimationTime` 固定为从当前 frame simulation start 起算的 finite nonnegative occurrence offset，不是 clip-local authored time；authored local time只由 `EventId` 指向的 immutable definition 保存。唯一兼容例外是 synthetic P3 regression event：它保留历史 `state.AnimationPhase` 字节，同时所有 P5 identity 均为 invalid/default、不会激活 P5 digest extension。
 
 ### 9.2 Blend authority
 
@@ -307,14 +311,15 @@ Main Commit 为每个角色维护一个固定 16 槽 `AlsCommittedNotifyStateBuf
 
 ### 9.4 固定顺序
 
-Worker occurrence 排序键固定为：
+Worker occurrence 排序 tuple 固定为：
 
 1. absolute occurrence time；
 2. old cycle/old owner 的 End 先于 new cycle/new owner；
 3. UE `sourceIndex`；
 4. phase 顺序 `End -> Trigger -> Begin -> Tick`；
 5. animation ID；
-6. playback epoch。
+6. playback epoch；
+7. 完全相等时以 `OccurrenceHandleId` 为最终 complete-tie key。
 
 排序后从 0 开始为当前 character frame 分配单调递增 `EventSequence`。Main Commit 继续遵守：
 
@@ -356,6 +361,12 @@ target 与 lock position 使用 P4 已发布的同一 character/world-space 证�
 
 Transition lane 与 Action lane 独立，不能中断、替换或改变 Action priority。它仍是 Worker-owned 动画状态，不是 gameplay callback。
 
+两条 lane 的 logical gameplay owner 与 visual tail 严格分离，每条 lane 只有两个 Core-owned visual bank：outgoing `O` 与 incoming `I`。唯一离散 step 按此精确 float 运算顺序执行：`Step(value,target,seconds,b) = b <= 1e-5 ? target : clamp(value + sign(target-value) * seconds / b, 0, 1)`。Core 只计算一次 `LaneWeight` 与 `IncomingMix`，再依声明顺序计算 `OutgoingEffectiveWeight = O.Active ? LaneWeight * (1 - IncomingMix) : 0`、`IncomingEffectiveWeight = I.Active ? LaneWeight * IncomingMix : 0`。只有 I 时 mix=1，只有 O tail 时 mix=0，O+I 时 mix 位于 `[0,1]`，两者皆无时两个 scalar 均为 raw positive zero。
+
+首次 accept/promotion 无 tail 时安装 I、mix=1并以完整 frame delta fade lane；有 tail 时保留唯一 O、安装 I、mix 从0开始。rapid replacement 丢弃更旧 tail，把被替换 logical source 的旧 instruction effective contribution `P` 冻结为唯一 O，并在安装新 I 前 rebase `LaneWeight=P, IncomingMix=0`，禁止从旧 `LaneWeight*IncomingMix` 跳回 full lane weight。terminal 在 frame offset `tau` 先推进到 tau、捕获 P、rebase 为 O，再仅用 `frameDelta-tau` fade；EBO 是例外，本帧 graph/timeline 继续使用 pre-rebase incoming instruction，next state 才 rebase 且 residual fade 为0。Visual tail 不进入 Timeline、authority、Notify ownership 或 outcome，也不成为 logical owner。
+
+每个 Timeline playback 持有自己的 local contributing window；Base/Turn/Rotate 复制 descriptor offsets，Transition replacement old close 用 `[0,0]`、current 用 `[0,FrameEndOffsetSeconds]`，Action Montage/Sequence 复制各 traversal slice offsets。每个 event `Weight` 必须 bit-copy 同一 frozen graph instruction 中对应 source 的 effective weight：通常 outgoing/incoming 各取自己的 effective scalar，Action Montage/Sequence 共享 incoming scalar；terminal rebase 后 close 使用 outgoing scalar，EBO 本帧 close 使用 pre-rebase incoming scalar。Timeline、threshold/authority 与实际 graph pose 不得二次计算权重。
+
 ## 十二、ActionPlayer
 
 ### 12.1 固定 lane 与 section
@@ -378,11 +389,11 @@ Action definition 绑定一个 montage、一个支持的 slot、start section、
 - 当前 Action 为 `interruptible=false` 时，新 Start 返回 `RejectedBusy`；
 - 可中断 Action 遇到较低 priority Start 时返回 `RejectedLowerPriority`；
 - equal/higher priority Start 先以 `InterruptedByReplacement` 关闭旧 ownership，再递增 epoch 并接受新 Action；
-- Cancel 只影响匹配的 action/request owner，stale cancel 返回 `RejectedInvalidRequest`；
+- owning Cancel 只影响匹配的 action/request owner。对 non-owning Cancel，`RequestId < LastProcessedRequestId` 是 delayed replay/no-op；相等或更新的首次 stale Cancel 返回一次 `RejectedInvalidRequest` 并记录 command pair，完全相同 replay 随后 no-op；
 - 相同 request ID 重放必须幂等；
 - Commit callback 只能写 Gather N+1 请求，不能重入当前 Worker frame。
 
-Replacement 的 outcome 顺序固定为旧 Action `InterruptedByReplacement` 在前、新 Action `Accepted` 在后。其他路径每帧最多一个 outcome；因此 2 槽 buffer 不会通过截断处理溢出。
+每帧先应用 external recovery latch 提供的 `CancelForRuntimeFailure`，再处理最多一个 normal request。2 槽 outcome 的三种顺序固定为：旧 Action `InterruptedByReplacement` -> 新 Action `Accepted`；`InterruptedByRuntimeFailure` -> 一个 normal-request result；normal command reject -> existing-owner `Completed`/EBO terminal。每条路径均必须在写 buffer 前预计算容量，绝不截断。
 
 `EarlyBlendOut` state 在 Worker 内根据已导出的开关和 Gather 值类型状态判断；条件满足时 Action 返回 `InterruptedByEarlyBlendOut`，不直接调用 gameplay。
 
@@ -436,6 +447,8 @@ Main Gather 发布 input、action request 和 immutable world evidence，不采�
 
 ### 14.2 Worker
 
+Worker 使用一个 whole-frame transaction。pre-foot `TryPrepare` 接收已经求值的 P3 locomotion/view/Turn/Rotate candidate（保留 prior committed P4 foot/P5 fields），先应用 runtime-recovery cancel、再 normal request，推进 logical owners/two-bank instructions，并一次性预检完整 Timeline。post-foot `TryFinalize` 接收同一 candidate 经本帧 P4 foot/pose transaction 后的 state，只覆盖 P5-owned fields，因此每个 P4 foot-lock/pelvis/pose 字节都必须保留。任一失败不发布 candidate state/event/outcome。
+
 Worker 固定顺序：
 
 1. 把 cursor、sync、transition 和 action state 复制到 candidate；
@@ -448,11 +461,11 @@ Worker 固定顺序：
 8. 所有步骤成功后一次提交 pose + P5A state；
 9. 发布一个完整 `AlsFrameResult`。
 
-失败恢复完整 local pose、visual root 和全部 P5A state。同一 identity retry 产生相同 digest，不能重复 event。
+失败恢复完整 local pose、visual root 和全部 P5A state。同一 identity retry 产生相同 digest，不能重复 event。Runtime recovery latch 位于 committed Core state 之外；失败不能清除它，严格更新 identity 的成功 finalize/controller/state commit 后才消费。
 
 ### 14.3 Commit
 
-Main Commit 在 exchange candidate、FrameId、CharacterId、SlotGeneration 和 stage order 全部通过前不派发任何 event。stale、future、duplicate 或 generation mismatch result 派发 0 个事件。
+成功发布的 `AlsFrameResult.P5FailureCode` 必须为 `None`。失败 attempt 只产生独立 `AlsP5FailureRecord`，不得构造 failure-only result。Task 17 在 controller finalization 和 exchange mutation 前执行首个 production publication preflight；Task 18 在 visual commit/event-outcome dispatch 前防御性复验。Main Commit 在 exchange candidate、FrameId、CharacterId、SlotGeneration 和 stage order 全部通过前不派发任何 event。stale、future、duplicate 或 generation mismatch result 派发 0 个事件。
 
 Main-only event sink 接收 immutable value event。它只能在对应后续阶段产生音频、道具或 gameplay 副作用，不能同步修改刚提交的 Worker state。
 

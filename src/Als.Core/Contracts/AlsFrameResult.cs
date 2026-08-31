@@ -90,6 +90,11 @@ public struct AlsFrameResult
     public Vector3 NextRightFootProbeOrigin;
     public long P4ModifierOperationTicks;
     public AlsP4ReasonCode P4ReasonCode;
+    public AlsSyncResult Sync;
+    public AlsDynamicTransitionPlaybackSummary DynamicTransition;
+    public AlsActionPlayback ActionPlayback;
+    public AlsActionOutcomeBuffer ActionOutcomes;
+    public AlsP5FailureCode P5FailureCode;
 
     public static AlsFrameResult CreateDefault(AlsFrameIdentity identity) => new()
     {
@@ -103,5 +108,9 @@ public struct AlsFrameResult
         RotateCurveId = -1,
         LeftFootPose = AlsFootPoseOutput.CreateDefault(),
         RightFootPose = AlsFootPoseOutput.CreateDefault(),
+        Sync = AlsSyncResult.CreateDefault(),
+        DynamicTransition = AlsDynamicTransitionPlaybackSummary.CreateDefault(),
+        ActionPlayback = AlsActionPlayback.CreateDefault(),
+        P5FailureCode = AlsP5FailureCode.None,
     };
 }

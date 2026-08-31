@@ -33,6 +33,8 @@ public readonly record struct AlsFrameInput(
 {
     public AlsFootPlacementReleaseSignals FootPlacementReleaseSignals { get; init; }
 
+    public AlsActionRequest ActionRequest { get; init; }
+
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(deltaTime);
@@ -65,6 +67,7 @@ public readonly record struct AlsFrameInput(
             JumpAccepted: 0)
         {
             FootPlacementReleaseSignals = AlsFootPlacementReleaseSignals.CreateDefault(),
+            ActionRequest = AlsActionRequest.None with { SlotGeneration = identity.SlotGeneration },
         };
     }
 }

@@ -122,12 +122,20 @@ public struct AlsRuntimeState
     // Last committed uncorrected probe origins in character-local space.
     public Vector3 LeftFootProbeOrigin;
     public Vector3 RightFootProbeOrigin;
+    public AlsActionPlayerState ActionPlayer;
+    public AlsDynamicTransitionState DynamicTransition;
+    public AlsLaneBlendState ActionBlendLane;
+    public AlsLaneBlendState DynamicTransitionBlendLane;
 
     public static AlsRuntimeState CreateDefault() => new()
     {
         ViewPose = AlsViewPoseState.CreateUninitialized(),
         LeftFootLock = AlsFootLockState.CreateDefault(),
         RightFootLock = AlsFootLockState.CreateDefault(),
+        ActionPlayer = AlsActionPlayerState.CreateDefault(),
+        DynamicTransition = AlsDynamicTransitionState.CreateDefault(),
+        ActionBlendLane = AlsLaneBlendState.CreateDefault(),
+        DynamicTransitionBlendLane = AlsLaneBlendState.CreateDefault(),
     };
 
     public static void ValidateP4Defaults(in AlsRuntimeState state)
@@ -145,4 +153,50 @@ public struct AlsRuntimeState
                 "Runtime state must enter production with the fixed P4 defaults.");
         }
     }
+
+    public static void ValidateP5Defaults(in AlsRuntimeState state)
+    {
+        ValidateP4Defaults(in state);
+
+        if (state.ActionPlayer.ActionDefinitionId != -1 ||
+            state.ActionPlayer.SectionId != -1 ||
+            state.ActionPlayer.SegmentBindingIndex != -1 ||
+            state.ActionPlayer.RequestId != -1 ||
+            state.ActionPlayer.LastProcessedRequestId != 0 ||
+            state.ActionPlayer.LastProcessedCommandRequestId != -1 ||
+            state.ActionPlayer.LastProcessedCommand != AlsActionCommand.None ||
+            state.ActionPlayer.PlaybackEpoch != 0 ||
+            BitConverter.SingleToInt32Bits(state.ActionPlayer.PlaybackTime) != 0 ||
+            state.ActionPlayer.Priority != 0 ||
+            state.ActionPlayer.Playing != 0 ||
+            state.ActionPlayer.Interruptible != 0 ||
+            state.DynamicTransition.AnimationId != -1 ||
+            state.DynamicTransition.QueuedAnimationId != -1 ||
+            state.DynamicTransition.PlaybackEpoch != 0 ||
+            BitConverter.SingleToInt32Bits(state.DynamicTransition.PreviousPlaybackTime) != 0 ||
+            BitConverter.SingleToInt32Bits(state.DynamicTransition.PlaybackTime) != 0 ||
+            state.DynamicTransition.CooldownFrames != 0 ||
+            state.DynamicTransition.Foot != AlsTransitionFoot.Left ||
+            state.DynamicTransition.QueuedFoot != AlsTransitionFoot.Left ||
+            state.DynamicTransition.Active != 0 ||
+            state.DynamicTransition.Queued != 0 ||
+            !IsDefault(state.ActionBlendLane) ||
+            !IsDefault(state.DynamicTransitionBlendLane))
+        {
+            throw new InvalidOperationException(
+                "Runtime state must enter production with the fixed P5 defaults.");
+        }
+    }
+
+    private static bool IsDefault(in AlsLaneBlendState state) =>
+        state.OutgoingOccurrenceHandleId == -1 &&
+        state.OutgoingAnimationId == -1 &&
+        state.OutgoingBindingIndex == -1 &&
+        state.OutgoingPlaybackEpoch == 0 &&
+        BitConverter.SingleToInt32Bits(state.OutgoingClipTime) == 0 &&
+        BitConverter.SingleToInt32Bits(state.LaneWeight) == 0 &&
+        BitConverter.SingleToInt32Bits(state.IncomingMix) == 0 &&
+        BitConverter.SingleToInt32Bits(state.BlendSeconds) == 0 &&
+        state.VisualActive == 0 &&
+        state.OutgoingActive == 0;
 }

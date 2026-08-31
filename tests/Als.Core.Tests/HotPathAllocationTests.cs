@@ -140,21 +140,89 @@ public sealed class HotPathAllocationTests
             var result = AlsFrameResult.CreateDefault(identity);
             result.TypedEvents.TryAdd(
                 new AlsAnimationEvent(
-                    1,
-                    0.25f,
-                    1f,
-                    AlsAnimationEventPhase.Trigger));
+                    1, -1, -1, -1, 0, 0, 0, 0, 0,
+                    0.25f, 1f, AlsTimelineEventKind.Generic,
+                    AlsAnimationEventPhase.Trigger, default));
 
             exchange.PublishResult(result);
             exchange.TryConsumeResult(identity, out _);
 
             buffer.TryAdd(
                 new AlsAnimationEvent(
-                    2,
-                    0.5f,
-                    1f,
-                    AlsAnimationEventPhase.Trigger));
+                    2, -1, -1, -1, 0, 0, 0, 0, 0,
+                    0.5f, 1f, AlsTimelineEventKind.Generic,
+                    AlsAnimationEventPhase.Trigger, default));
             buffer.Clear();
+        }
+    }
+
+    [Fact]
+    public void P5BuffersDoNotAllocateAfterWarmup()
+    {
+        var events = new AlsEventBuffer();
+        var outcomes = new AlsActionOutcomeBuffer();
+        var animationEvent = new AlsAnimationEvent(
+            1, 2, -1, 3, 1, 0, 0, 0, 0,
+            0.25f, 1f, AlsTimelineEventKind.Generic,
+            AlsAnimationEventPhase.Trigger, default);
+        var outcome = new AlsActionOutcome(1, 2, 1, AlsActionResultCode.Accepted);
+
+        for (var index = 0; index < 100; index++)
+        {
+            ExerciseP5Buffers(ref events, ref outcomes, animationEvent, outcome);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 10_000; index++)
+        {
+            ExerciseP5Buffers(ref events, ref outcomes, animationEvent, outcome);
+        }
+
+        Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static void ExerciseP5Buffers(
+        ref AlsEventBuffer events,
+        ref AlsActionOutcomeBuffer outcomes,
+        in AlsAnimationEvent animationEvent,
+        in AlsActionOutcome outcome)
+    {
+        for (var eventIndex = 0; eventIndex < AlsEventBuffer.Capacity; eventIndex++)
+        {
+            if (!events.TryAdd(animationEvent with { EventId = eventIndex }))
+            {
+                throw new InvalidOperationException("Event buffer fill failed.");
+            }
+        }
+
+        if (events[0].EventId != 0 ||
+            events[AlsEventBuffer.Capacity - 1].EventId != AlsEventBuffer.Capacity - 1 ||
+            events.TryAdd(animationEvent))
+        {
+            throw new InvalidOperationException("Event buffer read or overflow contract failed.");
+        }
+
+        var eventCopy = events;
+        events.Clear();
+        if (eventCopy.Count != AlsEventBuffer.Capacity || eventCopy[1].EventId != 1)
+        {
+            throw new InvalidOperationException("Event buffer copy contract failed.");
+        }
+
+        if (!outcomes.TryAdd(outcome) ||
+            !outcomes.TryAdd(outcome with { RequestId = outcome.RequestId + 1 }) ||
+            outcomes[0] != outcome ||
+            outcomes.TryAdd(outcome))
+        {
+            throw new InvalidOperationException("Outcome buffer contract failed.");
+        }
+
+        var outcomeCopy = outcomes;
+        outcomes.Clear();
+        if (outcomeCopy.Count != AlsActionOutcomeBuffer.Capacity || outcomeCopy[1].RequestId != outcome.RequestId + 1)
+        {
+            throw new InvalidOperationException("Outcome buffer copy contract failed.");
         }
     }
 
