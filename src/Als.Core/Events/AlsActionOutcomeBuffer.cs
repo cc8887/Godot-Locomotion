@@ -3,28 +3,27 @@ using System.Runtime.InteropServices;
 
 namespace GodotAls.Core.Events;
 
-[InlineArray(AlsEventBuffer.Capacity)]
-internal struct AlsEventStorage
+[InlineArray(AlsActionOutcomeBuffer.Capacity)]
+internal struct AlsActionOutcomeStorage
 {
-    private AlsAnimationEvent _element0;
+    private AlsActionOutcome _element0;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct AlsEventBuffer
+public struct AlsActionOutcomeBuffer
 {
-    public const int Capacity = 16;
+    public const int Capacity = 2;
 
-    private AlsEventStorage _storage;
+    private AlsActionOutcomeStorage _storage;
 
     public int Count { get; private set; }
 
-    public AlsAnimationEvent this[int index]
+    public AlsActionOutcome this[int index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
             ArgumentOutOfRangeException.ThrowIfNegative(index);
-
             if (index >= Count)
             {
                 throw new ArgumentOutOfRangeException(nameof(index));
@@ -35,14 +34,14 @@ public struct AlsEventBuffer
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryAdd(AlsAnimationEvent animationEvent)
+    public bool TryAdd(AlsActionOutcome outcome)
     {
         if (Count >= Capacity)
         {
             return false;
         }
 
-        _storage[Count++] = animationEvent;
+        _storage[Count++] = outcome;
         return true;
     }
 

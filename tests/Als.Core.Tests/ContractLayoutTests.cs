@@ -126,7 +126,8 @@ public sealed class ContractLayoutTests
             "LeftFootHit", "RightFootHit", "MantleProbe", "RequestedGait", "Stance",
             "RotationMode", "RequestedAction", "CurrentDriveMode", "RagdollState",
             "AnimationQualityTier", "Command", "CharacterYaw", "MaxAcceleration",
-            "MaxBrakingDeceleration", "JumpAccepted", "FootPlacementReleaseSignals");
+            "MaxBrakingDeceleration", "JumpAccepted", "FootPlacementReleaseSignals",
+            "ActionRequest");
         AssertStorageFieldOrder<AlsRuntimeState>(
             "LocomotionState", "SmoothedVelocity", "SmoothedAcceleration", "Lean",
             "LeftFootLocked", "RightFootLocked", "TurnInPlaceTime", "RotateInPlaceTime",
@@ -136,7 +137,8 @@ public sealed class ContractLayoutTests
             "SmoothedLean", "LandingRecoveryTime", "SmoothedTargetYaw", "TargetYaw",
             "YawSource", "JumpStartActive", "Initialized", "ViewPose", "TurnInPlace", "RotateInPlace",
             "LeftFootLock", "RightFootLock", "PelvisCorrection", "LeftFootProbeOrigin",
-            "RightFootProbeOrigin");
+            "RightFootProbeOrigin", "ActionPlayer", "DynamicTransition", "ActionBlendLane",
+            "DynamicTransitionBlendLane");
         AssertStorageFieldOrder<AlsFrameResult>(
             "Identity", "ResolvedLocomotionState", "RequestedDriveMode", "ProposedRootMotionDelta",
             "PelvisTarget", "LeftFootTarget", "RightFootTarget", "MovementIntent",
@@ -151,7 +153,24 @@ public sealed class ContractLayoutTests
             "RightFootPose", "LeftFootReleaseReason", "RightFootReleaseReason",
             "LeftFootIkWeight", "RightFootIkWeight", "LeftFootLockCurve", "RightFootLockCurve",
             "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
-            "P4ModifierOperationTicks", "P4ReasonCode");
+            "P4ModifierOperationTicks", "P4ReasonCode", "Sync", "DynamicTransition",
+            "ActionPlayback", "ActionOutcomes", "P5FailureCode");
+    }
+
+    [Fact]
+    public void P5MutableStateContractsKeepTheirStorageFieldOrder()
+    {
+        AssertStorageFieldOrder<AlsActionPlayerState>(
+            "ActionDefinitionId", "SectionId", "SegmentBindingIndex", "RequestId",
+            "LastProcessedRequestId", "LastProcessedCommandRequestId", "LastProcessedCommand",
+            "PlaybackEpoch", "PlaybackTime", "Priority", "Playing", "Interruptible");
+        AssertStorageFieldOrder<AlsDynamicTransitionState>(
+            "AnimationId", "QueuedAnimationId", "PlaybackEpoch", "PreviousPlaybackTime",
+            "PlaybackTime", "CooldownFrames", "Foot", "QueuedFoot", "Active", "Queued");
+        AssertStorageFieldOrder<AlsLaneBlendState>(
+            "OutgoingOccurrenceHandleId", "OutgoingAnimationId", "OutgoingBindingIndex",
+            "OutgoingPlaybackEpoch", "OutgoingClipTime", "LaneWeight", "IncomingMix",
+            "BlendSeconds", "VisualActive", "OutgoingActive");
     }
 
     [Fact]

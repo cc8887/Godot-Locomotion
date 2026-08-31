@@ -35,9 +35,19 @@ public static class AlsSyntheticLocomotionModel
         if (input.Identity.FrameId % 30 == 0 &&
             !result.TypedEvents.TryAdd(new AlsAnimationEvent(
                 1,
+                -1,
+                -1,
+                -1,
+                0,
+                0,
+                0,
+                0,
+                0,
                 state.AnimationPhase,
                 1f,
-                AlsAnimationEventPhase.Trigger)))
+                AlsTimelineEventKind.Generic,
+                AlsAnimationEventPhase.Trigger,
+                default)))
         {
             result.ErrorCode = 1;
         }
