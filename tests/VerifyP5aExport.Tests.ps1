@@ -238,6 +238,197 @@ function Write-TestPublicationJournal([object]$Fixture, [string]$State, [bool]$C
     [IO.File]::WriteAllText($Fixture.JournalPath, ($journal | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 }
 
+function New-TestTopLevelManifest([string]$AuditStatus) {
+    $manifest = New-TestP5aManifest
+    $manifest.animations[0].metadata.timeline[0].kind = 'SetAction'
+    $manifest.animations[0].metadata.timeline[0].payload = [pscustomobject]@{ action = 'Mantling' }
+    foreach ($skeleton in $manifest.skeletons) {
+        $skeleton.metadata = [pscustomobject][ordered]@{
+            boneCount = 4
+            bones = @(
+                [pscustomobject]@{ name = 'root' }, [pscustomobject]@{ name = 'pelvis' },
+                [pscustomobject]@{ name = 'foot_l' }, [pscustomobject]@{ name = 'foot_r' }
+            )
+            restPoseHash = ('a' * 40)
+            sockets = @()
+        }
+    }
+    foreach ($animation in $manifest.animations) {
+        $animationFields = [ordered]@{
+            loop = $false; interpolation = 'Linear'; forceRootLock = $false
+            useNormalizedRootMotionScale = $false; additiveBasePoseType = 'None'
+            additiveBasePoseFrame = 0; additiveBasePoseId = ''; additiveBasePoseObjectPath = ''
+        }
+        foreach ($entry in $animationFields.GetEnumerator()) {
+            $animation.metadata | Add-Member -NotePropertyName $entry.Key -NotePropertyValue $entry.Value
+        }
+    }
+    $manifest.animations[0].objectPath = '/Game/AdvancedLocomotionV4/Overlay/Fixture.Fixture'
+    foreach ($montage in $manifest.montages) {
+        $montageFields = [ordered]@{
+            blendInTime = 0.2; blendInOption = 'Linear'; blendOutTime = 0.2
+            blendOutOption = 'Linear'; blendOutTriggerTime = -1.0; enableAutoBlendOut = $true
+        }
+        foreach ($entry in $montageFields.GetEnumerator()) {
+            $montage.metadata | Add-Member -NotePropertyName $entry.Key -NotePropertyValue $entry.Value
+        }
+    }
+    foreach ($blendAsset in @($manifest.blendSpaces) + @($manifest.aimOffsets)) {
+        $blendAsset.metadata = [pscustomobject]@{ samples = @() }
+    }
+    $manifest.blendSpaces[0].metadata.samples = @([pscustomobject]@{ id = 'sample' })
+    foreach ($physicsAsset in $manifest.physicsAssets) {
+        $physicsAsset.metadata = [pscustomobject]@{
+            bodies = @([pscustomobject]@{ id = 'body' })
+            constraints = @([pscustomobject]@{ id = 'constraint' })
+            constraintCount = 1
+        }
+    }
+    $manifest.staticMeshes[0].objectPath = '/Game/AdvancedLocomotionV4/Props/Fixture.Fixture'
+    $manifest.materials[0].classPath = '/Script/Engine.MaterialInstanceConstant'
+    $manifest.materials[0].metadata = [pscustomobject]@{
+        scalarParameterOverrides = @([pscustomobject]@{ name = 'Value' })
+        vectorParameterOverrides = @()
+        textureParameterOverrides = @()
+    }
+    $manifest.auditSummary.status = $AuditStatus
+    return $manifest
+}
+
+function New-TestTopLevelPlan {
+    $kinds = @(
+        'Skeleton', 'SkeletalMesh', 'StaticMesh', 'AnimationSequence', 'AnimMontage',
+        'BlendSpace', 'MaterialInstance', 'PhysicsAsset', 'Texture', 'Blueprint'
+    )
+    $assets = @()
+    for ($index = 0; $index -lt $kinds.Count; $index++) {
+        $assets += [pscustomobject][ordered]@{
+            id = Get-TestStableId ($index + 1)
+            kind = $kinds[$index]
+            objectPath = "/Game/AdvancedLocomotionV4/Fixture/$($kinds[$index])"
+        }
+    }
+    return [pscustomobject][ordered]@{
+        assets = $assets
+        summary = [pscustomobject]@{ assetCount = 267; exportableCount = 141 }
+    }
+}
+
+function New-TestTopLevelVerifierFixture([string]$Name, [string]$Stage, [string]$Corruption) {
+    $repo = Join-Path $TestDrive "top-level-$Name"
+    $scripts = Join-Path $repo 'scripts'
+    $template = Join-Path $repo 'fixture-data\export-template'
+    $canonical = Join-Path $repo 'assets\generated\als_v4'
+    $lock = Join-Path $repo 'reference\als-v4-export.lock.json'
+    $engineRoot = Join-Path $repo 'engine'
+    $editor = Join-Path $engineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+    [void][IO.Directory]::CreateDirectory($scripts)
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($editor))
+    [void][IO.Directory]::CreateDirectory($canonical)
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($lock))
+    Copy-Item $script:AssetLockFunctionsPath (Join-Path $scripts 'asset-lock-functions.ps1')
+    Copy-Item $script:CompareExportsPath (Join-Path $scripts 'compare-p2a-exports.ps1')
+    Copy-Item (Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1') (Join-Path $scripts 'verify-p2a.ps1')
+    [IO.File]::WriteAllText(
+        (Join-Path $scripts 'build-als-exporter.ps1'),
+        "Write-Output 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'; `$global:LASTEXITCODE = 0",
+        [Text.UTF8Encoding]::new($false))
+    $editorSource = Join-Path $repo 'fixture-editor.cs'
+    [IO.File]::WriteAllText($editorSource, @'
+using System;
+using System.IO;
+
+internal static class FixtureEditor
+{
+    private static void CopyTree(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (string directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+            Directory.CreateDirectory(directory.Replace(source, destination));
+        foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+            File.Copy(file, file.Replace(source, destination), true);
+    }
+
+    public static int Main(string[] args)
+    {
+        string output = null;
+        bool dryRun = false;
+        bool export = false;
+        foreach (string argument in args)
+        {
+            if (argument.StartsWith("-Output=", StringComparison.Ordinal))
+                output = argument.Substring("-Output=".Length);
+            if (String.Equals(argument, "-DryRun", StringComparison.Ordinal)) dryRun = true;
+            if (String.Equals(argument, "-Export", StringComparison.Ordinal)) export = true;
+        }
+        if (String.IsNullOrEmpty(output) || args.Length == 0) return 11;
+        string template = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[0])),
+            "fixture-data", "export-template");
+        Directory.CreateDirectory(output);
+        if (dryRun)
+        {
+            Directory.CreateDirectory(Path.Combine(output, "partial"));
+            File.Copy(Path.Combine(template, "export_plan.json"), Path.Combine(output, "export_plan.json"), true);
+            File.Copy(Path.Combine(template, "partial", "als_manifest.partial.json"),
+                Path.Combine(output, "partial", "als_manifest.partial.json"), true);
+            Console.WriteLine("GODOT_ALS_P2A_PLAN_OK assets=267 exportable=141 config=126 excluded=0");
+            return 0;
+        }
+        if (export)
+        {
+            CopyTree(template, output);
+            Console.WriteLine("GODOT_ALS_P2A_EXPORT_OK assets=267 files=141 fbx=137 textures=4 warnings=0");
+            return 0;
+        }
+        return 12;
+    }
+}
+'@, [Text.UTF8Encoding]::new($false))
+    $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    $compilerOutput = @(& $compiler /nologo /target:exe "/out:$editor" $editorSource 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "Fixture editor compilation failed: $($compilerOutput -join ' ')" }
+
+    $formal = New-TestTopLevelManifest 'complete'
+    Write-TestExportRoot -Root $template -Manifest $formal
+    [IO.File]::WriteAllText(
+        (Join-Path $template 'export_plan.json'),
+        (New-TestTopLevelPlan | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(
+        (Join-Path $template 'partial\als_manifest.partial.json'),
+        (New-TestTopLevelManifest 'planned' | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
+
+    $target = if ($Stage -ceq 'Partial') {
+        Join-Path $template 'partial\als_manifest.partial.json'
+    }
+    else { Join-Path $template 'als_manifest.json' }
+    if ($Corruption -ceq 'Duplicate') {
+        $raw = [IO.File]::ReadAllText($target)
+        $corrupted = [regex]::new('"kind"\s*:\s*"Generic"').Replace(
+            $raw, '"kind":"Generic","kind":"Generic"', 1)
+        if ($corrupted -ceq $raw) { throw "Failed to inject duplicate property into $target" }
+        [IO.File]::WriteAllText($target, $corrupted, [Text.UTF8Encoding]::new($false))
+    }
+    else {
+        [IO.File]::WriteAllText($target, '{"schemaVersion":2,', [Text.UTF8Encoding]::new($false))
+    }
+
+    $project = Join-Path $repo 'fixture.uproject'
+    [IO.File]::WriteAllText($project, '{}', [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText((Join-Path $canonical 'old.bin'), 'old-canonical', [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($lock, "old-lock`r`n", [Text.UTF8Encoding]::new($false))
+
+    return [pscustomobject]@{
+        RepositoryRoot = $repo; Scripts = $scripts; EngineRoot = $engineRoot; UnrealProject = $project
+        CanonicalRoot = $canonical; LockPath = $lock
+        CandidateRoot = Join-Path $repo 'artifacts\p2a-publication\canonical-candidate'
+        DeterminismRoot = Join-Path $repo 'artifacts\p2a-determinism\als_v4'
+        LockCandidatePath = Join-Path $repo 'artifacts\p2a-publication\als-v4-export.lock.candidate.json'
+        CanonicalBackupRoot = Join-Path $repo 'artifacts\p2a-publication\als_v4.canonical.backup'
+        LockBackupPath = Join-Path $repo 'artifacts\p2a-publication\als-v4-export.lock.backup.json'
+        JournalPath = Join-Path $repo 'artifacts\p2a-publication\transaction.json'
+    }
+}
+
 Describe 'P5A complete ALS v2 export audit' {
     It 'accepts exact inventory and audits Sequence Montage IDs tick totals terminal links and audio absence' {
         (Get-Command Assert-AlsP2aPublishManifest -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
@@ -947,5 +1138,45 @@ Describe 'P5A verify exact canonical boundary' {
         [IO.File]::ReadAllText($stagingSentinel) | Should Be 'staging'
         (Test-Path (Join-Path $repo 'artifacts\p2a-publication\transaction.json')) | Should Be $false
         (Test-Path (Join-Path $repo 'artifacts\p2a-publication\als_v4.canonical.backup')) | Should Be $false
+    }
+}
+
+Describe 'P5A top-level raw manifest gates' {
+    foreach ($stage in @('Partial', 'Formal')) {
+        foreach ($corruption in @('Duplicate', 'Invalid')) {
+            It "rejects $corruption raw JSON at the $stage manifest before its success marker or transaction" {
+                if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return }
+                $fixture = New-TestTopLevelVerifierFixture "$stage-$corruption" $stage $corruption
+                $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
+                $lockBefore = Get-FileByteSnapshot $fixture.LockPath
+                $output = @()
+                $errorMessage = ''
+
+                try {
+                    & (Join-Path $fixture.Scripts 'verify-p2a.ps1') `
+                        -EngineRoot $fixture.EngineRoot -UnrealProject $fixture.UnrealProject `
+                        -UpdateAssetLock *>&1 | ForEach-Object { $output += $_ }
+                }
+                catch {
+                    $errorMessage = $_.Exception.Message
+                    $output += $_.ToString()
+                }
+
+                $expectedError = if ($corruption -ceq 'Duplicate') { "$stage.*duplicate.*kind" }
+                    else { "$stage.*not valid JSON" }
+                $errorMessage | Should Match $expectedError
+                $text = $output -join "`n"
+                if ($stage -ceq 'Partial') {
+                    $text | Should Not Match 'GODOT_ALS_P2A_METADATA_OK'
+                }
+                else {
+                    $text | Should Match 'GODOT_ALS_P2A_METADATA_OK'
+                }
+                $text | Should Not Match 'GODOT_ALS_P2A_FULL_EXPORT_OK|GODOT_ALS_P2A_JOINT_PUBLISH_OK'
+                (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
+                (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
+                Assert-NoPublicationResidue $fixture
+            }
+        }
     }
 }
