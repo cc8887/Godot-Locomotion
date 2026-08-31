@@ -52,7 +52,11 @@ function Get-ComparableFiles([string]$Root) {
 
 $referencePath = Resolve-ExportRoot $ReferenceRoot 'ReferenceRoot'
 $candidatePath = Resolve-ExportRoot $CandidateRoot 'CandidateRoot'
-if ($referencePath -ceq $candidatePath) {
+$rootComparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+    [StringComparison]::OrdinalIgnoreCase
+}
+else { [StringComparison]::Ordinal }
+if ([string]::Equals($referencePath, $candidatePath, $rootComparison)) {
     throw 'ReferenceRoot and CandidateRoot must be independent directories.'
 }
 if ((Test-ExportRootAncestor $referencePath $candidatePath) -or
@@ -62,10 +66,28 @@ if ((Test-ExportRootAncestor $referencePath $candidatePath) -or
 $referenceFiles = @(Get-ComparableFiles $referencePath)
 $candidateFiles = @(Get-ComparableFiles $candidatePath)
 
-$setDifference = Compare-Object -ReferenceObject $referenceFiles -DifferenceObject $candidateFiles -CaseSensitive
-if ($setDifference) {
-    $first = $setDifference | Select-Object -First 1
-    throw "Export file set differs at '$($first.InputObject)' (side=$($first.SideIndicator))."
+$referenceSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$candidateSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+foreach ($relativePath in $referenceFiles) { [void]$referenceSet.Add($relativePath) }
+foreach ($relativePath in $candidateFiles) { [void]$candidateSet.Add($relativePath) }
+if (-not $referenceSet.SetEquals($candidateSet)) {
+    $referenceOnly = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+    $candidateOnly = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($relativePath in $referenceSet) {
+        if (-not $candidateSet.Contains($relativePath)) { [void]$referenceOnly.Add($relativePath) }
+    }
+    foreach ($relativePath in $candidateSet) {
+        if (-not $referenceSet.Contains($relativePath)) { [void]$candidateOnly.Add($relativePath) }
+    }
+    $first = if ($referenceOnly.Count -eq 0) {
+        [pscustomobject]@{ Path = $candidateOnly.Min; Side = '=>' }
+    }
+    elseif ($candidateOnly.Count -eq 0 -or
+        [StringComparer]::Ordinal.Compare($referenceOnly.Min, $candidateOnly.Min) -le 0) {
+        [pscustomobject]@{ Path = $referenceOnly.Min; Side = '<=' }
+    }
+    else { [pscustomobject]@{ Path = $candidateOnly.Min; Side = '=>' } }
+    throw "Export file set differs at '$($first.Path)' (side=$($first.Side))."
 }
 
 foreach ($relativePath in $referenceFiles) {

@@ -40,7 +40,7 @@ function Publish-AlsExportLock {
         [string]$RepositoryRoot = ''
     )
 
-    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+    $manifest = Read-AlsP2aManifestJson -ManifestPath $ManifestPath -Label 'Export lock candidate'
     $assetCount = [int]$manifest.auditSummary.assetCount
     $fileCount = @($manifest.files).Count
     $animationCount = @($manifest.animations).Count
@@ -92,6 +92,56 @@ function Get-AlsP2aSha1 {
 
     $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
     return [Convert]::ToHexString([Security.Cryptography.SHA1]::HashData($bytes)).ToLowerInvariant()
+}
+
+function Assert-AlsP2aNoDuplicateJsonProperties {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][Text.Json.JsonElement]$Element,
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Label
+    )
+
+    if ($Element.ValueKind -eq [Text.Json.JsonValueKind]::Object) {
+        $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        foreach ($property in $Element.EnumerateObject()) {
+            if (-not $seen.Add($property.Name)) {
+                throw "$Label manifest JSON contains duplicate property '$($property.Name)' at $Path."
+            }
+            Assert-AlsP2aNoDuplicateJsonProperties -Element $property.Value `
+                -Path "$Path.$($property.Name)" -Label $Label
+        }
+    }
+    elseif ($Element.ValueKind -eq [Text.Json.JsonValueKind]::Array) {
+        $index = 0
+        foreach ($item in $Element.EnumerateArray()) {
+            Assert-AlsP2aNoDuplicateJsonProperties -Element $item -Path "$Path[$index]" -Label $Label
+            $index++
+        }
+    }
+}
+
+function Read-AlsP2aManifestJson {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ManifestPath,
+        [Parameter(Mandatory)][string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
+        throw "$Label manifest does not exist: $ManifestPath"
+    }
+    $raw = [IO.File]::ReadAllText($ManifestPath)
+    $document = $null
+    try {
+        try { $document = [Text.Json.JsonDocument]::Parse($raw) }
+        catch { throw "$Label manifest is not valid JSON: $($_.Exception.Message)" }
+        Assert-AlsP2aNoDuplicateJsonProperties -Element $document.RootElement -Path '$' -Label $Label
+        return ($raw | ConvertFrom-Json)
+    }
+    finally {
+        if ($null -ne $document) { $document.Dispose() }
+    }
 }
 
 function Assert-AlsP2aExactObjectProperties {
@@ -164,7 +214,10 @@ function Assert-AlsP2aNonnegativeInteger {
         if ($Value -is $type) { $isInteger = $true; break }
     }
     if (-not $isInteger -or [decimal]$Value -lt 0) { throw "$Path must be a nonnegative integer." }
-    return [int64]$Value
+    if ([decimal]$Value -gt [int32]::MaxValue) {
+        throw "$Path must be in the Int32 range 0..2147483647."
+    }
+    return [int32]$Value
 }
 
 function Assert-AlsP2aTimelinePayload {
@@ -788,7 +841,7 @@ function Invoke-AlsP2aJointPublication {
         if ($FaultInjectionPoint -ceq 'Comparison') { throw 'Injected P2A comparison failure.' }
         & $comparisonScript -ReferenceRoot $resolved.CandidateRoot -CandidateRoot $resolved.DeterminismRoot
         $manifestPath = Join-Path $resolved.CandidateRoot 'als_manifest.json'
-        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $manifest = Read-AlsP2aManifestJson -ManifestPath $manifestPath -Label 'Canonical candidate'
         $audit = Assert-AlsP2aPublishManifest -Manifest $manifest -Label 'Canonical candidate'
         Write-Host "P2A_MANIFEST_AUDIT_OK assets=$($audit.AssetCount) files=$($audit.FileCount) animations=$($audit.AnimationCount) sequence_events=$($audit.SequenceEventCount) montage_events=$($audit.MontageEventCount) events=$($audit.EventCount) queued=$($audit.QueuedCount) branching_points=$($audit.BranchingPointCount) sync_markers=$($audit.SyncMarkerCount) terminal_sections=$($audit.TerminalSectionCount) audio=$($audit.AudioAssetCount)"
 
@@ -859,7 +912,7 @@ function Assert-AlsExportLock {
     $lock = Read-AlsExportLock -LockPath $LockPath
     $actualManifestHash = (Get-FileHash -LiteralPath $ManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualManifestHash -cne $lock.ManifestSha256) { throw "Formal ALS manifest SHA-256 mismatch: expected=$($lock.ManifestSha256) actual=$actualManifestHash" }
-    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+    $manifest = Read-AlsP2aManifestJson -ManifestPath $ManifestPath -Label 'Formal ALS'
     if ([int]$manifest.auditSummary.assetCount -ne $lock.AssetCount -or @($manifest.files).Count -ne $lock.FileCount -or
         @($manifest.animations).Count -ne $lock.AnimationCount -or [string]$manifest.exporterVersion -cne $lock.ExporterVersion -or
         [string]$manifest.sourceProjectId -cne $lock.SourceProjectId) { throw 'Formal ALS manifest counts or producer identity differ from tracked lock.' }

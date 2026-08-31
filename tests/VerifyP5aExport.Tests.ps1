@@ -419,6 +419,33 @@ Describe 'P5A complete ALS v2 export audit' {
         (Get-ManifestAuditError $duplicate) | Should Match 'sourceIndex.*duplicate|duplicate.*sourceIndex'
     }
 
+    foreach ($field in @('sourceIndex', 'trackIndex')) {
+        It "rejects event $field above the Int32 consumer range" {
+            $manifest = New-TestP5aManifest
+            $event = $manifest.animations[0].metadata.timeline[0]
+            $event.$field = [int64]2147483648
+            if ($field -ceq 'sourceIndex') {
+                $event.stableEventId = Get-TestSha1 "$($manifest.animations[0].id)|timeline|2147483648|$($event.sourceClassPath)"
+            }
+
+            (Get-ManifestAuditError $manifest) | Should Match "$field.*Int32|$field.*2147483647"
+        }
+    }
+
+    It 'accepts the Int32 maximum for every event and marker index field' {
+        $manifest = New-TestP5aManifest
+        $event = $manifest.animations[0].metadata.timeline[0]
+        $event.sourceIndex = [int64]2147483647
+        $event.trackIndex = [int64]2147483647
+        $event.stableEventId = Get-TestSha1 "$($manifest.animations[0].id)|timeline|2147483647|$($event.sourceClassPath)"
+        $marker = $manifest.animations[0].metadata.syncMarkers[0]
+        $marker.sourceIndex = [int64]2147483647
+        $marker.trackIndex = [int64]2147483647
+        $marker.stableMarkerId = Get-TestSha1 "$($manifest.animations[0].id)|marker|2147483647|$($marker.name)"
+
+        (Get-ManifestAuditError $manifest) | Should Be ''
+    }
+
     It 'rejects malformed sync marker shape scalars and source indices' {
         $missing = New-TestP5aManifest
         $missing.animations[0].metadata.syncMarkers[0].PSObject.Properties.Remove('name')
@@ -442,6 +469,19 @@ Describe 'P5A complete ALS v2 export audit' {
         $duplicate = New-TestP5aManifest
         $duplicate.animations[0].metadata.syncMarkers[1].sourceIndex = 0
         (Get-ManifestAuditError $duplicate) | Should Match 'sourceIndex.*duplicate|duplicate.*sourceIndex'
+    }
+
+    foreach ($field in @('sourceIndex', 'trackIndex')) {
+        It "rejects sync marker $field above the Int32 consumer range" {
+            $manifest = New-TestP5aManifest
+            $marker = $manifest.animations[0].metadata.syncMarkers[0]
+            $marker.$field = [int64]2147483648
+            if ($field -ceq 'sourceIndex') {
+                $marker.stableMarkerId = Get-TestSha1 "$($manifest.animations[0].id)|marker|2147483648|$($marker.name)"
+            }
+
+            (Get-ManifestAuditError $manifest) | Should Match "$field.*Int32|$field.*2147483647"
+        }
     }
 
     It 'rejects malformed duplicate unordered out-of-range and dangling Montage sections' {
@@ -514,6 +554,20 @@ Describe 'P5A two-root comparison' {
         $errorMessage | Should Match 'file set differs'
     }
 
+    It 'rejects the same Windows export root passed through a case-only path alias' {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return }
+        $fixture = New-PublicationFixture 'compare-same-root-alias'
+
+        $errorMessage = ''
+        try {
+            & $script:CompareExportsPath -ReferenceRoot $fixture.CandidateRoot `
+                -CandidateRoot $fixture.CandidateRoot.ToUpperInvariant()
+        }
+        catch { $errorMessage = $_.Exception.Message }
+
+        $errorMessage | Should Match 'independent'
+    }
+
     It 'rejects a reparse-point export root before reading comparison files' {
         if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return }
         $fixture = New-PublicationFixture 'compare-junction'
@@ -564,6 +618,49 @@ Describe 'P5A joint canonical and lock publication' {
 
         Invoke-TestPublication -Fixture $fixture
 
+        (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
+        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
+        Assert-NoPublicationResidue $fixture
+    }
+
+    It 'rejects recursively duplicated raw manifest properties before journal or publication mutation' {
+        $fixture = New-PublicationFixture 'duplicate-raw-property'
+        $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
+        $lockBefore = Get-FileByteSnapshot $fixture.LockPath
+        $candidateManifest = Join-Path $fixture.CandidateRoot 'als_manifest.json'
+        $determinismManifest = Join-Path $fixture.DeterminismRoot 'als_manifest.json'
+        $raw = [IO.File]::ReadAllText($candidateManifest)
+        $duplicate = [regex]::new('"kind"\s*:\s*"Generic"').Replace(
+            $raw, '"kind":"Generic","kind":"Generic"', 1)
+        $duplicate | Should Not Be $raw
+        $encoding = [Text.UTF8Encoding]::new($false)
+        [IO.File]::WriteAllText($candidateManifest, $duplicate, $encoding)
+        [IO.File]::WriteAllText($determinismManifest, $duplicate, $encoding)
+
+        $errorMessage = ''
+        try { Invoke-TestPublication -Fixture $fixture -UpdateAssetLock }
+        catch { $errorMessage = $_.Exception.Message }
+
+        $errorMessage | Should Match 'duplicate.*kind|kind.*duplicate'
+        (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
+        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
+        Assert-NoPublicationResidue $fixture
+    }
+
+    It 'rejects invalid raw manifest JSON with stable cleanup before publication mutation' {
+        $fixture = New-PublicationFixture 'invalid-raw-json'
+        $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
+        $lockBefore = Get-FileByteSnapshot $fixture.LockPath
+        $invalid = '{"schemaVersion":2,'
+        $encoding = [Text.UTF8Encoding]::new($false)
+        [IO.File]::WriteAllText((Join-Path $fixture.CandidateRoot 'als_manifest.json'), $invalid, $encoding)
+        [IO.File]::WriteAllText((Join-Path $fixture.DeterminismRoot 'als_manifest.json'), $invalid, $encoding)
+
+        $errorMessage = ''
+        try { Invoke-TestPublication -Fixture $fixture -UpdateAssetLock }
+        catch { $errorMessage = $_.Exception.Message }
+
+        $errorMessage | Should Match 'manifest is not valid JSON'
         (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
         (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
         Assert-NoPublicationResidue $fixture
@@ -711,7 +808,8 @@ Describe 'P5A joint canonical and lock publication' {
 
     foreach ($combination in @(
         @{ Name = 'canonical-only'; Canonical = $true; Lock = $false },
-        @{ Name = 'lock-only'; Canonical = $false; Lock = $true }
+        @{ Name = 'lock-only'; Canonical = $false; Lock = $true },
+        @{ Name = 'neither'; Canonical = $false; Lock = $false }
     )) {
         It "recovers a prepared transaction with $($combination.Name) original resource ownership" {
             $fixture = New-PublicationFixture "recovery-$($combination.Name)"
