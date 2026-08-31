@@ -71,9 +71,8 @@ public static class AlsSyncRuntime
         }
 
         // First pass proves every representable mapping before touching caller-owned output.
-        for (var rank = 0; rank < playbacks.Length; rank++)
+        for (var playbackIndex = FindFirstPlayback(playbacks); playbackIndex >= 0; playbackIndex = FindNextPlayback(playbacks, playbackIndex))
         {
-            var playbackIndex = FindNextPlayback(playbacks, rank);
             var memberIndex = FindMemberIndex(groupMembers, playbacks[playbackIndex].AnimationId);
             if (!TryFindPair(markers, group, groupMembers[memberIndex], out var pair) ||
                 !TryMap(playbacks[playbackIndex], groupMembers[memberIndex], pair, previous, current, frameDeltaSeconds, out _))
@@ -83,12 +82,12 @@ public static class AlsSyncRuntime
             }
         }
 
-        for (var rank = 0; rank < playbacks.Length; rank++)
+        var outputIndex = 0;
+        for (var playbackIndex = FindFirstPlayback(playbacks); playbackIndex >= 0; playbackIndex = FindNextPlayback(playbacks, playbackIndex))
         {
-            var playbackIndex = FindNextPlayback(playbacks, rank);
             var memberIndex = FindMemberIndex(groupMembers, playbacks[playbackIndex].AnimationId);
             _ = TryFindPair(markers, group, groupMembers[memberIndex], out var pair);
-            _ = TryMap(playbacks[playbackIndex], groupMembers[memberIndex], pair, previous, current, frameDeltaSeconds, out mappedPlaybacks[rank]);
+            _ = TryMap(playbacks[playbackIndex], groupMembers[memberIndex], pair, previous, current, frameDeltaSeconds, out mappedPlaybacks[outputIndex++]);
         }
 
         var leader = playbacks[leaderIndex];
@@ -189,11 +188,11 @@ public static class AlsSyncRuntime
         descriptor = default;
         if (!TrySplit(unwrapped, member.DurationSeconds, out var cycle, out var local)) return false;
         var earlyIsLeft = pair.LeftTime < pair.RightTime;
-        var early = earlyIsLeft ? pair.LeftTime : pair.RightTime;
-        var late = earlyIsLeft ? pair.RightTime : pair.LeftTime;
+        var early = earlyIsLeft ? (double)pair.LeftTime : pair.RightTime;
+        var late = earlyIsLeft ? (double)pair.RightTime : pair.LeftTime;
         var previousIsLeft = local < early ? !earlyIsLeft : local < late ? earlyIsLeft : !earlyIsLeft;
-        var previousTime = local < early ? late - member.DurationSeconds : local < late ? early : late;
-        var nextTime = local < early ? early : local < late ? late : early + member.DurationSeconds;
+        var previousTime = local < early ? late - (double)member.DurationSeconds : local < late ? early : late;
+        var nextTime = local < early ? early : local < late ? late : early + (double)member.DurationSeconds;
         var previousId = previousIsLeft ? pair.LeftMarkerId : pair.RightMarkerId;
         var nextId = previousIsLeft ? pair.RightMarkerId : pair.LeftMarkerId;
         var previousCycle = cycle;
@@ -201,8 +200,16 @@ public static class AlsSyncRuntime
         if (previousIsLeft && pair.LeftTime > pair.RightTime && local < early) previousCycle--;
         if (!TryHalfOrdinal(previousIsLeft, previousCycle, pair, out var halfOrdinal)) return false;
         var phaseDouble = (local - previousTime) / (nextTime - previousTime);
-        if (!double.IsFinite(phaseDouble) || phaseDouble < 0d || phaseDouble >= 1d || phaseDouble > float.MaxValue) return false;
-        descriptor = new Descriptor(halfOrdinal, previousId, nextId, cycle, NormalizeZero((float)phaseDouble));
+        if (!double.IsFinite(phaseDouble) || phaseDouble < 0d || phaseDouble > float.MaxValue) return false;
+        if (phaseDouble >= 1d)
+        {
+            if (local < nextTime) phaseDouble = System.Math.BitDecrement(1d);
+            else return false;
+        }
+        var phase = NormalizeZero((float)phaseDouble);
+        if (!float.IsFinite(phase)) return false;
+        if (phase >= 1f) phase = System.MathF.BitDecrement(1f);
+        descriptor = new Descriptor(halfOrdinal, previousId, nextId, cycle, phase);
         return true;
     }
 
@@ -227,62 +234,136 @@ public static class AlsSyncRuntime
     private static bool TryMap(in AlsSyncPlayback playback, in AlsSyncMemberBinding member, in Pair pair, in Descriptor previous, in Descriptor current, double delta, out AlsSyncMappedPlayback mapped)
     {
         mapped = default;
-        if (!TryUnwrapped(previous, member.DurationSeconds, pair, out var previousUnwrapped) || !TryUnwrapped(current, member.DurationSeconds, pair, out var currentUnwrapped) ||
-            !TrySplit(previousUnwrapped, member.DurationSeconds, out var previousCycle, out var previousTime) || !TrySplit(currentUnwrapped, member.DurationSeconds, out var currentCycle, out var currentTime))
+        if (!TryPosition(previous, member.DurationSeconds, pair, out var previousPosition) ||
+            !TryPosition(current, member.DurationSeconds, pair, out var currentPosition) ||
+            !TryOutputLocal(previousPosition.Local, member.DurationSeconds, out var previousTime) ||
+            !TryOutputLocal(currentPosition.Local, member.DurationSeconds, out var currentTime))
         {
             return false;
         }
-        var rate = (currentUnwrapped - previousUnwrapped) / delta;
+        var cycleDelta = (Int128)currentPosition.Cycle - previousPosition.Cycle;
+        var mappedDelta = (double)cycleDelta * member.DurationSeconds + (currentPosition.Local - previousPosition.Local);
+        var rate = mappedDelta / delta;
         if (!double.IsFinite(rate) || rate < -float.MaxValue || rate > float.MaxValue) return false;
         var floatRate = (float)rate;
         if (!float.IsFinite(floatRate)) return false;
         mapped = new AlsSyncMappedPlayback(playback.OccurrenceHandleId, playback.AnimationId, playback.PlaybackEpoch, member.DurationSeconds,
-            previousCycle, currentCycle, NormalizeZero(previousTime), NormalizeZero(currentTime), NormalizeZero(floatRate));
+            previousPosition.Cycle, currentPosition.Cycle, NormalizeZero(previousTime), NormalizeZero(currentTime), NormalizeZero(floatRate));
         return true;
     }
 
-    private static bool TryUnwrapped(in Descriptor descriptor, float duration, in Pair pair, out double unwrapped)
+    private static bool TryPosition(in Descriptor descriptor, float duration, in Pair pair, out Position position)
     {
-        unwrapped = 0d;
+        position = default;
         long leftCycle;
         try { leftCycle = (descriptor.HalfOrdinal & 1L) == 0L ? descriptor.HalfOrdinal / 2L : checked((descriptor.HalfOrdinal - 1L) / 2L); }
         catch (OverflowException) { return false; }
-        var rightCycle = pair.RightTime > pair.LeftTime ? leftCycle : leftCycle + 1L;
-        var left = leftCycle * (double)duration + pair.LeftTime;
-        var right = rightCycle * (double)duration + pair.RightTime;
-        double start;
-        double end;
-        if ((descriptor.HalfOrdinal & 1L) == 0L) { start = left; end = right; }
-        else { start = right; end = (leftCycle + 1L) * (double)duration + pair.LeftTime; }
-        unwrapped = start + (end - start) * descriptor.Phase;
-        return double.IsFinite(unwrapped);
+        long rightCycle;
+        long nextLeftCycle;
+        try
+        {
+            rightCycle = pair.RightTime > pair.LeftTime ? leftCycle : checked(leftCycle + 1L);
+            nextLeftCycle = checked(leftCycle + 1L);
+        }
+        catch (OverflowException) { return false; }
+
+        long startCycle;
+        long endCycle;
+        double startLocal;
+        double endLocal;
+        if ((descriptor.HalfOrdinal & 1L) == 0L)
+        {
+            startCycle = leftCycle;
+            startLocal = pair.LeftTime;
+            endCycle = rightCycle;
+            endLocal = pair.RightTime;
+        }
+        else
+        {
+            startCycle = rightCycle;
+            startLocal = pair.RightTime;
+            endCycle = nextLeftCycle;
+            endLocal = pair.LeftTime;
+        }
+
+        var intervalCycles = (Int128)endCycle - startCycle;
+        var interval = (double)intervalCycles * duration + (endLocal - startLocal);
+        var local = startLocal + interval * descriptor.Phase;
+        if (!double.IsFinite(interval) || interval <= 0d || !double.IsFinite(local) ||
+            !TryNormalizePosition(startCycle, local, duration, out position))
+        {
+            return false;
+        }
+        return true;
     }
 
-    private static bool TrySplit(double unwrapped, float duration, out long cycle, out float local)
+    private static bool TryNormalizePosition(long startCycle, double local, float duration, out Position position)
     {
-        cycle = 0;
-        local = 0f;
-        var quotient = System.Math.Floor(unwrapped / duration);
+        position = default;
+        var quotient = System.Math.Floor(local / duration);
         if (!double.IsFinite(quotient) || quotient < long.MinValue || quotient >= 9_223_372_036_854_775_808d) return false;
-        cycle = (long)quotient;
-        var remainder = unwrapped - quotient * duration;
+        var cycleDelta = (long)quotient;
+        long cycle;
+        try { cycle = checked(startCycle + cycleDelta); }
+        catch (OverflowException) { return false; }
+        var remainder = local - quotient * duration;
         if (!double.IsFinite(remainder)) return false;
         if (remainder < 0d) { if (cycle == long.MinValue) return false; cycle--; remainder += duration; }
         if (remainder >= duration) { if (cycle == long.MaxValue) return false; cycle++; remainder -= duration; }
-        if (remainder < 0d || remainder >= duration || remainder > float.MaxValue) return false;
-        local = NormalizeZero((float)remainder);
-        return float.IsFinite(local);
+        if (remainder < 0d || remainder >= duration) return false;
+        position = new Position(cycle, remainder == 0d ? 0d : remainder);
+        return true;
     }
 
-    private static int FindNextPlayback(ReadOnlySpan<AlsSyncPlayback> playbacks, int rank)
+    private static bool TrySplit(double unwrapped, float duration, out long cycle, out double local) =>
+        TryNormalizePosition(0L, unwrapped, duration, out var position)
+            ? AssignPosition(position, out cycle, out local)
+            : AssignDefault(out cycle, out local);
+
+    private static bool TryOutputLocal(double local, float duration, out float output)
     {
+        output = 0f;
+        if (!double.IsFinite(local) || local < 0d || local >= duration) return false;
+        output = NormalizeZero((float)local);
+        if (!float.IsFinite(output)) return false;
+        if (output >= duration) output = System.MathF.BitDecrement(duration);
+        return output >= 0f && output < duration;
+    }
+
+    private static bool AssignPosition(in Position position, out long cycle, out double local)
+    {
+        cycle = position.Cycle;
+        local = position.Local;
+        return true;
+    }
+
+    private static bool AssignDefault(out long cycle, out double local)
+    {
+        cycle = 0;
+        local = 0d;
+        return false;
+    }
+
+    private static int FindFirstPlayback(ReadOnlySpan<AlsSyncPlayback> playbacks)
+    {
+        if (playbacks.Length == 0) return -1;
+        var first = 0;
+        for (var index = 1; index < playbacks.Length; index++) if (CompareKey(playbacks[index], playbacks[first]) < 0) first = index;
+        return first;
+    }
+
+    private static int FindNextPlayback(ReadOnlySpan<AlsSyncPlayback> playbacks, int currentIndex)
+    {
+        var next = -1;
         for (var candidate = 0; candidate < playbacks.Length; candidate++)
         {
-            var less = 0;
-            for (var other = 0; other < playbacks.Length; other++) if (CompareKey(playbacks[other], playbacks[candidate]) < 0) less++;
-            if (less == rank) return candidate;
+            if (CompareKey(playbacks[candidate], playbacks[currentIndex]) > 0 &&
+                (next < 0 || CompareKey(playbacks[candidate], playbacks[next]) < 0))
+            {
+                next = candidate;
+            }
         }
-        return -1;
+        return next;
     }
 
     private static int CompareKey(in AlsSyncPlayback left, in AlsSyncPlayback right)
@@ -298,4 +379,5 @@ public static class AlsSyncRuntime
 
     private readonly record struct Pair(int LeftMarkerId, int RightMarkerId, int LeftSourceIndex, int RightSourceIndex, float LeftTime, float RightTime);
     private readonly record struct Descriptor(long HalfOrdinal, int PreviousMarkerId, int NextMarkerId, long Cycle, float Phase);
+    private readonly record struct Position(long Cycle, double Local);
 }

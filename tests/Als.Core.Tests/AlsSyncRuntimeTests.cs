@@ -73,7 +73,7 @@ public sealed class AlsSyncRuntimeTests
     {
         var mapped = new AlsSyncMappedPlayback[2];
         var result = Evaluate(Markers(), Group(), Members(),
-            [Playback(5, 10, 1, 0.2, 0.6, 2f), Playback(7, 20, 1, 0.3, 0.7, 1f)],
+            [Playback(5, 10, 1, (double)0.2f, (double)0.6f, 2f), Playback(7, 20, 1, 0.3, 0.7, 1f)],
             0.4, mapped, out var count, out var failure);
 
         Assert.Equal(AlsP5FailureCode.None, failure);
@@ -90,7 +90,7 @@ public sealed class AlsSyncRuntimeTests
     public void SupportsBothCanonicalMarkerOrdersAndSemanticFootPhase()
     {
         var leftFirst = new AlsSyncMappedPlayback[1];
-        var leftResult = Evaluate(Markers(), Group(), Members(), [Playback(1, 10, 1, 0.2, 0.4, 1f)], 0.2, leftFirst, out _, out var leftFailure);
+        var leftResult = Evaluate(Markers(), Group(), Members(), [Playback(1, 10, 1, (double)0.2f, 0.4, 1f)], 0.2, leftFirst, out _, out var leftFailure);
         Assert.Equal(AlsP5FailureCode.None, leftFailure);
         Assert.Equal(101, leftResult.PreviousMarkerId);
         Assert.Equal(102, leftResult.NextMarkerId);
@@ -98,7 +98,7 @@ public sealed class AlsSyncRuntimeTests
         AssertClose(0.5f, leftResult.RightFootPhase);
 
         var rightFirst = new AlsSyncMappedPlayback[1];
-        var rightResult = Evaluate(Markers(), Group(), Members(), [Playback(1, 20, 1, 0.6, 1.0, 1f)], 0.4, rightFirst, out _, out var rightFailure);
+        var rightResult = Evaluate(Markers(), Group(), Members(), [Playback(1, 20, 1, (double)0.6f, 1.0, 1f)], 0.4, rightFirst, out _, out var rightFailure);
         Assert.Equal(AlsP5FailureCode.None, rightFailure);
         Assert.Equal(202, rightResult.PreviousMarkerId);
         Assert.Equal(201, rightResult.NextMarkerId);
@@ -110,7 +110,7 @@ public sealed class AlsSyncRuntimeTests
     public void OppositeOrderFollowerNeverJumpsBackwardAcrossLeftOrRightMarkers()
     {
         var atLeft = new AlsSyncMappedPlayback[2];
-        var left = Evaluate(Markers(), Group(), Members(), [Playback(1, 10, 1, 0.1, 0.2, 1f), Playback(2, 20, 1, 0.1, 0.2, 0.5f)], 0.1, atLeft, out _, out var leftFailure);
+        var left = Evaluate(Markers(), Group(), Members(), [Playback(1, 10, 1, 0.1, (double)0.2f, 1f), Playback(2, 20, 1, 0.1, (double)0.2f, 0.5f)], 0.1, atLeft, out _, out var leftFailure);
         Assert.Equal(AlsP5FailureCode.None, leftFailure);
         Assert.Equal(101, left.PreviousMarkerId);
         AssertPositiveZero(left.Phase);
@@ -119,7 +119,7 @@ public sealed class AlsSyncRuntimeTests
         AssertClose(1.4f, atLeft[1].CurrentTimeSeconds);
 
         var atRight = new AlsSyncMappedPlayback[2];
-        var right = Evaluate(Markers(), Group(), Members(), [Playback(1, 10, 1, 0.5, 0.6, 1f), Playback(2, 20, 1, 0.5, 0.6, 0.5f)], 0.1, atRight, out _, out var rightFailure);
+        var right = Evaluate(Markers(), Group(), Members(), [Playback(1, 10, 1, 0.5, (double)0.6f, 1f), Playback(2, 20, 1, 0.5, (double)0.6f, 0.5f)], 0.1, atRight, out _, out var rightFailure);
         Assert.Equal(AlsP5FailureCode.None, rightFailure);
         Assert.Equal(102, right.PreviousMarkerId);
         AssertPositiveZero(right.Phase);
@@ -135,7 +135,7 @@ public sealed class AlsSyncRuntimeTests
     {
         var mapped = new AlsSyncMappedPlayback[2];
         var result = Evaluate(Markers(), Group(), Members(),
-            [Playback(4, 10, 1, 1.8, 2.2, 1f), Playback(5, 20, 1, 1.8, 2.2, 0.5f)],
+            [Playback(4, 10, 1, 1.8, 2d + (double)0.2f, 1f), Playback(5, 20, 1, 1.8, 2d + (double)0.2f, 0.5f)],
             0.4, mapped, out _, out var failure);
 
         Assert.Equal(AlsP5FailureCode.None, failure);
@@ -145,6 +145,93 @@ public sealed class AlsSyncRuntimeTests
         AssertPositiveZero(result.Phase);
         AssertMapping(mapped[0], 4, 10, 1, 1f, 1, 2, 0.8f, 0.2f, 1f);
         AssertMapping(mapped[1], 5, 20, 1, 2f, 2, 2, 0.8666667f, 1.4f, 1.3333334f);
+    }
+
+    [Theory]
+    [InlineData(0.2f, 0.6f, 102)]
+    [InlineData(0.6f, 0.2f, 101)]
+    public void AdjacentDoubleBelowEarlyMarkerStaysInThePreviousHalfOpenInterval(float leftTime, float rightTime, int expectedPreviousMarkerId)
+    {
+        var markers = new[]
+        {
+            new AlsSyncMarkerDefinition(101, 11, 10, 0, 0, leftTime),
+            new AlsSyncMarkerDefinition(102, 12, 10, 1, 0, rightTime),
+        };
+        var local = System.Math.BitDecrement((double)System.Math.Min(leftTime, rightTime));
+        var mapped = new AlsSyncMappedPlayback[1];
+
+        var result = Evaluate(markers, new AlsSyncGroupBinding(1, 0, 1, 11, 12), [new AlsSyncMemberBinding(1, 10, 1f, 1, 1)], [Playback(1, 10, 1, local, local, 1f)], 0.1, mapped, out _, out var failure);
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(expectedPreviousMarkerId, result.PreviousMarkerId);
+        Assert.True(result.Phase > 0f);
+    }
+
+    [Theory]
+    [InlineData(0.2f, 0.6f, 102)]
+    [InlineData(0.6f, 0.2f, 101)]
+    public void AdjacentDoubleBelowDurationDoesNotBecomeTheNextCycle(float leftTime, float rightTime, int expectedPreviousMarkerId)
+    {
+        var markers = new[]
+        {
+            new AlsSyncMarkerDefinition(101, 11, 10, 0, 0, leftTime),
+            new AlsSyncMarkerDefinition(102, 12, 10, 1, 0, rightTime),
+        };
+        var local = System.Math.BitDecrement(1d);
+        var mapped = new AlsSyncMappedPlayback[1];
+
+        var result = Evaluate(markers, new AlsSyncGroupBinding(1, 0, 1, 11, 12), [new AlsSyncMemberBinding(1, 10, 1f, 1, 1)], [Playback(1, 10, 1, local, local, 1f)], 0.1, mapped, out _, out var failure);
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(0L, result.Cycle);
+        Assert.Equal(expectedPreviousMarkerId, result.PreviousMarkerId);
+        Assert.Equal(BitConverter.SingleToInt32Bits(System.MathF.BitDecrement(1f)), BitConverter.SingleToInt32Bits(mapped[0].CurrentTimeSeconds));
+        Assert.True(mapped[0].CurrentTimeSeconds < 1f);
+    }
+
+    [Fact]
+    public void LargeCycleFollowerKeepsEpsilonMarkerDeltaAndMappedRate()
+    {
+        const long cycle = 1L << 50;
+        var markers = new[]
+        {
+            new AlsSyncMarkerDefinition(101, 11, 10, 0, 0, 0f),
+            new AlsSyncMarkerDefinition(102, 12, 10, 1, 0, 0.5f),
+            new AlsSyncMarkerDefinition(201, 11, 20, 0, 0, 0f),
+            new AlsSyncMarkerDefinition(202, 12, 20, 1, 0, float.Epsilon),
+        };
+        var members = new[] { new AlsSyncMemberBinding(1, 10, 1f, 1, 1), new AlsSyncMemberBinding(1, 20, 1f, 1, 1) };
+        var mapped = new AlsSyncMappedPlayback[2];
+
+        _ = Evaluate(markers, Group(), members, [Playback(1, 10, 1, cycle, cycle + 0.5d, 1f), Playback(2, 20, 1, cycle, cycle + 0.5d, 0.5f)], 0.5d, mapped, out var count, out var failure);
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(2, count);
+        AssertMapping(mapped[0], 1, 10, 1, 1f, cycle, cycle, 0f, 0.5f, 1f);
+        AssertMapping(mapped[1], 2, 20, 1, 1f, cycle, cycle, 0f, float.Epsilon, float.Epsilon * 2f);
+        Assert.True(mapped[1].MappedPlayRate > 0f);
+    }
+
+    [Fact]
+    public void ManyPlaybacksAreMappedInAscendingFullKeyOrder()
+    {
+        var playbacks = new[]
+        {
+            Playback(17, 20, 1, 0.2, 0.4, 0.1f), Playback(2, 10, 2, 0.2, 0.4, 0.1f),
+            Playback(9, 20, 1, 0.2, 0.4, 0.1f), Playback(4, 10, 1, 0.2, 0.4, 2f),
+            Playback(13, 20, 2, 0.2, 0.4, 0.1f), Playback(1, 10, 1, 0.2, 0.4, 0.1f),
+            Playback(15, 20, 1, 0.2, 0.4, 0.1f), Playback(7, 10, 2, 0.2, 0.4, 0.1f),
+            Playback(19, 20, 2, 0.2, 0.4, 0.1f), Playback(3, 10, 1, 0.2, 0.4, 0.1f),
+            Playback(11, 20, 1, 0.2, 0.4, 0.1f), Playback(5, 10, 2, 0.2, 0.4, 0.1f),
+        };
+        var mapped = new AlsSyncMappedPlayback[playbacks.Length];
+
+        var result = Evaluate(Markers(), Group(), Members(), playbacks, 0.2, mapped, out var count, out var failure);
+
+        Assert.Equal(AlsP5FailureCode.None, failure);
+        Assert.Equal(4, result.LeaderOccurrenceHandleId);
+        Assert.Equal(playbacks.Length, count);
+        Assert.Equal(new[] { 1, 2, 3, 4, 5, 7, 9, 11, 13, 15, 17, 19 }, mapped.Select(static item => item.OccurrenceHandleId));
     }
 
     [Fact]
@@ -253,7 +340,7 @@ public sealed class AlsSyncRuntimeTests
 
     private static AlsSyncResult Evaluate(ReadOnlySpan<AlsSyncMarkerDefinition> markers, in AlsSyncGroupBinding group, ReadOnlySpan<AlsSyncMemberBinding> members, ReadOnlySpan<AlsSyncPlayback> playbacks, double delta, Span<AlsSyncMappedPlayback> mapped, out int count, out AlsP5FailureCode failure)
     {
-        Assert.True(AlsSyncRuntime.TryEvaluateGroup(markers, group, members, playbacks, delta, mapped, out count, out var result, out failure));
+        Assert.True(AlsSyncRuntime.TryEvaluateGroup(markers, group, members, playbacks, delta, mapped, out count, out var result, out failure), failure.ToString());
         return result;
     }
 
