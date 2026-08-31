@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Events;
+using GodotAls.Core.Simulation;
 
 namespace GodotAls.Core.Tests;
 
@@ -198,6 +199,21 @@ public sealed class AlsP5ContractTests
         Assert.Equal(30U, input.ActionRequest.SlotGeneration);
         Assert.Equal(-1, AlsActionRequest.None.RequestId);
         Assert.Equal(0U, AlsActionRequest.None.SlotGeneration);
+    }
+
+    [Fact]
+    public void PositionalSyntheticInputUsesTheFrozenNoActionRequest()
+    {
+        var input = AlsSyntheticInputSource.Create(
+            new AlsFrameIdentity(10, 20, 9),
+            1f / 60f);
+
+        Assert.Equal(-1, input.ActionRequest.RequestId);
+        Assert.Equal(AlsActionCommand.None, input.ActionRequest.Command);
+        Assert.Equal(-1, input.ActionRequest.ActionDefinitionId);
+        Assert.Equal(-1, input.ActionRequest.StartSectionId);
+        Assert.Equal(0, input.ActionRequest.Priority);
+        Assert.Equal(0U, input.ActionRequest.SlotGeneration);
     }
 
     [Fact]
