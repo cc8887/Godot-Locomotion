@@ -36,8 +36,6 @@ public readonly record struct AlsCurveBlendSample(
 
 public static class AlsCurveRuntime
 {
-    private const double Int64ExclusiveUpperBound = 9223372036854775808d;
-
     public static bool TrySample(
         in AlsCurveBinding binding,
         ReadOnlySpan<AlsCurveKey> keys,
@@ -89,11 +87,15 @@ public static class AlsCurveRuntime
 
         var low = 0;
         var high = curveKeys.Length - 1;
+        var lowTime = first.TimeSeconds;
+        var highTime = last.TimeSeconds;
         while (high - low > 1)
         {
             var middle = low + ((high - low) >> 1);
             var middleTime = curveKeys[middle].TimeSeconds;
-            if (!float.IsFinite(middleTime))
+            if (!float.IsFinite(middleTime) ||
+                middleTime <= lowTime ||
+                middleTime >= highTime)
             {
                 failure = AlsP5FailureCode.InvalidBinding;
                 return false;
@@ -101,10 +103,12 @@ public static class AlsCurveRuntime
             if (middleTime <= timeSeconds)
             {
                 low = middle;
+                lowTime = middleTime;
             }
             else
             {
                 high = middle;
+                highTime = middleTime;
             }
         }
 
@@ -376,42 +380,38 @@ public static class AlsCurveRuntime
             return false;
         }
 
-        var total = (double)currentTimeSeconds + ((double)deltaSeconds * playRate);
-        if (!double.IsFinite(total))
+        var advance = (double)deltaSeconds * playRate;
+        if (!double.IsFinite(advance))
         {
             failure = AlsP5FailureCode.NonFiniteOutput;
             return false;
         }
-
-        var wholeCycles = System.Math.Floor(total / durationSeconds);
-        if (!double.IsFinite(wholeCycles) ||
-            wholeCycles < 0d ||
-            wholeCycles >= Int64ExclusiveUpperBound)
+        if (!TrySplitForwardAdvance(
+                advance, durationSeconds,
+                out var advanceCycles, out var advanceRemainder, out failure))
         {
-            failure = AlsP5FailureCode.InvalidTimeline;
             return false;
         }
 
-        var wholeCycleCount = (long)wholeCycles;
-        if (wholeCycleCount > long.MaxValue - currentCycle)
-        {
-            failure = AlsP5FailureCode.InvalidTimeline;
-            return false;
-        }
-        var resultingCycle = currentCycle + wholeCycleCount;
-        var remainder = total - (wholeCycles * durationSeconds);
-        if (!double.IsFinite(remainder))
+        var combinedRemainder = advanceRemainder + currentTimeSeconds;
+        if (!double.IsFinite(combinedRemainder))
         {
             failure = AlsP5FailureCode.NonFiniteOutput;
             return false;
         }
-        if (remainder < 0d || remainder >= durationSeconds)
+        uint carry = 0;
+        if (combinedRemainder >= durationSeconds)
+        {
+            combinedRemainder -= durationSeconds;
+            carry = 1;
+        }
+        if (combinedRemainder < 0d || combinedRemainder >= durationSeconds)
         {
             failure = AlsP5FailureCode.InvalidTimeline;
             return false;
         }
 
-        var resultingTime = (float)remainder;
+        var resultingTime = (float)combinedRemainder;
         if (!float.IsFinite(resultingTime))
         {
             failure = AlsP5FailureCode.NonFiniteOutput;
@@ -419,12 +419,7 @@ public static class AlsCurveRuntime
         }
         if (resultingTime >= durationSeconds)
         {
-            if (resultingCycle == long.MaxValue)
-            {
-                failure = AlsP5FailureCode.InvalidTimeline;
-                return false;
-            }
-            resultingCycle++;
+            carry++;
             resultingTime = 0f;
         }
         else if (resultingTime == 0f)
@@ -432,9 +427,118 @@ public static class AlsCurveRuntime
             resultingTime = 0f;
         }
 
-        nextCycle = resultingCycle;
+        var availableCycles = (UInt128)(ulong)(long.MaxValue - currentCycle);
+        if (advanceCycles > availableCycles || carry > availableCycles - advanceCycles)
+        {
+            failure = AlsP5FailureCode.InvalidTimeline;
+            return false;
+        }
+
+        var cycleIncrement = advanceCycles + carry;
+        nextCycle = currentCycle + (long)cycleIncrement;
         nextTimeSeconds = resultingTime;
         return true;
+    }
+
+    private static bool TrySplitForwardAdvance(
+        double advance,
+        float durationSeconds,
+        out UInt128 cycles,
+        out double remainder,
+        out AlsP5FailureCode failure)
+    {
+        cycles = 0;
+        remainder = 0d;
+        failure = AlsP5FailureCode.None;
+        if (advance == 0d)
+        {
+            return true;
+        }
+
+        DecomposePositive(advance, out var advanceSignificand, out var advanceExponent);
+        DecomposePositive(durationSeconds, out var durationSignificand, out var durationExponent);
+        var exponentShift = advanceExponent - durationExponent;
+        UInt128 remainderSignificand;
+        int remainderExponent;
+        if (exponentShift >= 0)
+        {
+            var source = (UInt128)advanceSignificand;
+            if (exponentShift >= 128 || source > (UInt128.MaxValue >> exponentShift))
+            {
+                failure = AlsP5FailureCode.InvalidTimeline;
+                return false;
+            }
+
+            var numerator = source << exponentShift;
+            cycles = numerator / durationSignificand;
+            remainderSignificand = numerator % durationSignificand;
+            remainderExponent = durationExponent;
+        }
+        else
+        {
+            var divisorShift = -exponentShift;
+            var source = (UInt128)advanceSignificand;
+            var unshiftedDivisor = (UInt128)durationSignificand;
+            if (divisorShift >= 128 ||
+                unshiftedDivisor > (UInt128.MaxValue >> divisorShift))
+            {
+                remainderSignificand = source;
+                remainderExponent = advanceExponent;
+            }
+            else
+            {
+                var divisor = unshiftedDivisor << divisorShift;
+                cycles = source / divisor;
+                remainderSignificand = source % divisor;
+                remainderExponent = advanceExponent;
+            }
+        }
+
+        remainder = System.Math.ScaleB((double)(ulong)remainderSignificand, remainderExponent);
+        if (!double.IsFinite(remainder) || remainder < 0d || remainder >= durationSeconds)
+        {
+            cycles = 0;
+            remainder = 0d;
+            failure = AlsP5FailureCode.NonFiniteOutput;
+            return false;
+        }
+        return true;
+    }
+
+    private static void DecomposePositive(
+        double value,
+        out ulong significand,
+        out int exponent)
+    {
+        var bits = unchecked((ulong)BitConverter.DoubleToInt64Bits(value));
+        var exponentField = (int)((bits >> 52) & 0x7FFUL);
+        significand = bits & 0x000F_FFFF_FFFF_FFFFUL;
+        if (exponentField == 0)
+        {
+            exponent = -1074;
+            return;
+        }
+
+        significand |= 1UL << 52;
+        exponent = exponentField - 1075;
+    }
+
+    private static void DecomposePositive(
+        float value,
+        out uint significand,
+        out int exponent)
+    {
+        var bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
+        var exponentField = (int)((bits >> 23) & 0xFFU);
+        significand = bits & 0x007F_FFFFU;
+        if (exponentField == 0)
+        {
+            exponent = -149;
+            return;
+        }
+
+        significand |= 1U << 23;
+        exponent = exponentField - 150;
     }
 
     private static bool TryValidateBinding(

@@ -131,6 +131,85 @@ public sealed class AlsCurveRuntimeTests
         Assert.Equal(AlsP5FailureCode.None, failure);
     }
 
+    [Theory]
+    [InlineData(0x38D1B717, 0x38D1B716, 0x47D1B717)]
+    [InlineData(0x358637BD, 0x358637BC, 0x448637BD)]
+    public void PlaybackTimeDoesNotRoundAnExactCycleRemainderIntoAnExtraCycle(
+        int durationBits,
+        int currentTimeBits,
+        int deltaBits)
+    {
+        var duration = BitConverter.Int32BitsToSingle(durationBits);
+        var currentTime = BitConverter.Int32BitsToSingle(currentTimeBits);
+        var delta = BitConverter.Int32BitsToSingle(deltaBits);
+
+        Assert.True(AlsCurveRuntime.TryAdvancePlaybackTime(
+            duration, 1, 0, currentTime, delta, 1f,
+            out var cycle, out var time, out var failure));
+        Assert.Equal(1_073_741_824L, cycle);
+        Assert.Equal(currentTimeBits, BitConverter.SingleToInt32Bits(time));
+        Assert.Equal(AlsP5FailureCode.None, failure);
+    }
+
+    [Fact]
+    public void PlaybackTimePreservesExactInt64QuotientAndLowRemainderAboveTwoToThe53()
+    {
+        const long expectedCycles = 1_249_512_265_072_881_006L;
+        var duration = BitConverter.Int32BitsToSingle(0x3843467A);
+        var currentTime = BitConverter.Int32BitsToSingle(0x3823DACD);
+        var delta = BitConverter.Int32BitsToSingle(0x484298A1);
+        var playRate = BitConverter.Int32BitsToSingle(0x4D8B3535);
+
+        Assert.True(AlsCurveRuntime.TryAdvancePlaybackTime(
+            duration, 1, 0, currentTime, delta, playRate,
+            out var cycle, out var time, out var failure));
+        Assert.Equal(expectedCycles, cycle);
+        Assert.Equal(0x38112061, BitConverter.SingleToInt32Bits(time));
+        Assert.Equal(AlsP5FailureCode.None, failure);
+    }
+
+    [Fact]
+    public void PlaybackTimeKeepsOddQuotientBitsAndChecksFinalInt64Addition()
+    {
+        const long expectedCycles = 6_148_914_691_236_517_205L;
+        const long exactLongMaxStart = 3_074_457_345_618_258_602L;
+        const float powerOfTwo32 = 4_294_967_296f;
+
+        Assert.True(AlsCurveRuntime.TryAdvancePlaybackTime(
+            3f, 1, 0, 0f, powerOfTwo32, powerOfTwo32,
+            out var cycle, out var time, out var failure));
+        Assert.Equal(expectedCycles, cycle);
+        AssertFloatBits(1f, time);
+        Assert.Equal(AlsP5FailureCode.None, failure);
+
+        Assert.True(AlsCurveRuntime.TryAdvancePlaybackTime(
+            3f, 1, exactLongMaxStart, 0f, powerOfTwo32, powerOfTwo32,
+            out cycle, out time, out failure));
+        Assert.Equal(long.MaxValue, cycle);
+        AssertFloatBits(1f, time);
+        Assert.Equal(AlsP5FailureCode.None, failure);
+
+        Assert.False(AlsCurveRuntime.TryAdvancePlaybackTime(
+            3f, 1, exactLongMaxStart + 1, 0f, powerOfTwo32, powerOfTwo32,
+            out cycle, out time, out failure));
+        Assert.Equal(0L, cycle);
+        AssertPositiveZero(time);
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+    }
+
+    [Fact]
+    public void PlaybackTimeSplitsTinyDurationWithoutLosingTheCycleCount()
+    {
+        const float powerOfTwo62 = 4_611_686_018_427_387_904f;
+
+        Assert.True(AlsCurveRuntime.TryAdvancePlaybackTime(
+            float.Epsilon, 1, 0, 0f, float.Epsilon, powerOfTwo62,
+            out var cycle, out var time, out var failure));
+        Assert.Equal(4_611_686_018_427_387_904L, cycle);
+        AssertPositiveZero(time);
+        Assert.Equal(AlsP5FailureCode.None, failure);
+    }
+
     [Fact]
     public void PlaybackTimeHandlesZeroDurationAndFloatRemainderCarry()
     {
@@ -325,6 +404,23 @@ public sealed class AlsCurveRuntimeTests
             AssertPositiveZero(value);
             Assert.Equal(AlsP5FailureCode.InvalidBinding, failure);
         }
+    }
+
+    [Fact]
+    public void RejectsTouchedInvertedBinarySearchBoundsTransactionally()
+    {
+        AlsCurveKey[] keys =
+        [
+            Key(0f, 0f),
+            Key(2f, 2f),
+            Key(1f, 1f),
+        ];
+
+        Assert.False(AlsCurveRuntime.TrySample(
+            Present(1, 0, keys.Length), keys, 0, 0.5f,
+            out var value, out var failure));
+        AssertPositiveZero(value);
+        Assert.Equal(AlsP5FailureCode.InvalidBinding, failure);
     }
 
     [Fact]
