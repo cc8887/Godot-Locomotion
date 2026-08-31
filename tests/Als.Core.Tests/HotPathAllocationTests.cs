@@ -6,6 +6,7 @@ using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Pose;
 using GodotAls.Core.Sync;
+using GodotAls.Core.Transitions;
 
 namespace GodotAls.Core.Tests;
 
@@ -271,6 +272,39 @@ public sealed class HotPathAllocationTests
         Assert.Equal(0, allocated);
     }
 
+    [Fact]
+    public void DynamicTransitionAdvanceAndQueueAllocateZeroBytesAfterWarmup()
+    {
+        var binding = new AlsDynamicTransitionBinding(
+            7,
+            9,
+            new AlsDynamicTransitionClipBinding(10, 100, 10f),
+            new AlsDynamicTransitionClipBinding(11, 100, 10f),
+            new AlsDynamicTransitionClipBinding(12, 100, 10f),
+            new AlsDynamicTransitionClipBinding(13, 100, 10f),
+            0.5f,
+            0.2f,
+            1f,
+            2);
+        var input = new AlsDynamicTransitionInput(
+            AlsStance.Standing,
+            1f,
+            System.Numerics.Vector3.UnitX,
+            System.Numerics.Vector3.Zero,
+            1,
+            System.Numerics.Vector3.Zero,
+            System.Numerics.Vector3.Zero,
+            0);
+
+        ExerciseDynamicTransition(binding, input, 100);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        ExerciseDynamicTransition(binding, input, 10_000);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
     private static void ExerciseCurveRuntime(
         AlsCurveKey[] keys,
@@ -376,6 +410,28 @@ public sealed class HotPathAllocationTests
                 synthetic.Count != 1)
             {
                 throw new InvalidOperationException("Mirror synthetic allocation probe failed.");
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static void ExerciseDynamicTransition(
+        in AlsDynamicTransitionBinding binding,
+        in AlsDynamicTransitionInput input,
+        int iterations)
+    {
+        var state = AlsDynamicTransitionState.CreateDefault();
+        for (var index = 0; index < iterations; index++)
+        {
+            if (!AlsDynamicTransitionRuntime.TryAdvance(
+                    binding, 0.01f, state, out state, out _, out var playback, out var failure) ||
+                failure != AlsP5FailureCode.None ||
+                !AlsDynamicTransitionRuntime.TryQueue(
+                    binding, input, playback.CooldownBlockedThisFrame, state,
+                    out state, out _, out failure) ||
+                failure != AlsP5FailureCode.None)
+            {
+                throw new InvalidOperationException("Dynamic transition allocation probe failed.");
             }
         }
     }
