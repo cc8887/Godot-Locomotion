@@ -180,7 +180,7 @@ $partialManifestPath = Join-Path $outputPath 'partial\als_manifest.partial.json'
 if (-not (Test-Path -LiteralPath $partialManifestPath -PathType Leaf)) {
     throw "Dry-run partial manifest does not exist: $partialManifestPath"
 }
-$manifest = Get-Content -LiteralPath $partialManifestPath -Raw | ConvertFrom-Json
+$manifest = Read-AlsP2aManifestJson -ManifestPath $partialManifestPath -Label 'Partial'
 Assert-P2AV2Manifest -Manifest $manifest -Label 'Partial'
 $allBoneNames = @($manifest.skeletons | ForEach-Object { $_.metadata.bones } | ForEach-Object { $_.name })
 foreach ($boneName in @('root', 'pelvis', 'foot_l', 'foot_r')) {
@@ -271,7 +271,7 @@ $formalManifestPath = Join-Path $outputPath 'als_manifest.json'
 if (-not (Test-Path -LiteralPath $formalManifestPath -PathType Leaf)) {
     throw "Formal manifest does not exist: $formalManifestPath"
 }
-$formalManifest = Get-Content -LiteralPath $formalManifestPath -Raw | ConvertFrom-Json
+$formalManifest = Read-AlsP2aManifestJson -ManifestPath $formalManifestPath -Label 'Formal'
 Assert-P2AV2Manifest -Manifest $formalManifest -Label 'Formal'
 if ($formalManifest.auditSummary.status -cne 'complete' -or $formalManifest.auditSummary.errorCount -ne 0) {
     throw "Formal manifest audit is not complete: $($formalManifest.auditSummary.status)"
