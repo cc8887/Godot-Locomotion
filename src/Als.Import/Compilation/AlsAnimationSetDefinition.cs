@@ -47,13 +47,15 @@ public sealed record AlsAnimationDefinition(
     int AdditiveBasePoseAnimationId,
     AlsFloatCurveDefinition[] Curves,
     string[] LegacyCurveNames,
-    AlsAnimationNotifyDefinition[] Notifies,
+    AlsCompiledTimelineEventDefinition[] Timeline,
     AlsAnimationSyncMarkerDefinition[] SyncMarkers,
     bool Overlay,
     bool Prop)
 {
     private AlsFloatCurveDefinition[] _curves = Curves.ToArray();
     private string[] _legacyCurveNames = LegacyCurveNames.ToArray();
+    private AlsCompiledTimelineEventDefinition[] _timeline = Timeline.ToArray();
+    private AlsAnimationSyncMarkerDefinition[] _syncMarkers = SyncMarkers.ToArray();
 
     public AlsFloatCurveDefinition[] Curves
     {
@@ -66,6 +68,18 @@ public sealed record AlsAnimationDefinition(
         get => _legacyCurveNames.ToArray();
         init => _legacyCurveNames = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
     }
+
+    public AlsCompiledTimelineEventDefinition[] Timeline
+    {
+        get => _timeline.ToArray();
+        init => _timeline = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public AlsAnimationSyncMarkerDefinition[] SyncMarkers
+    {
+        get => _syncMarkers.ToArray();
+        init => _syncMarkers = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
 }
 
 public enum AlsCurveInterpolation : byte
@@ -73,6 +87,15 @@ public enum AlsCurveInterpolation : byte
     Constant,
     Linear,
     Cubic,
+}
+
+public enum AlsCurveInfinityMode : byte
+{
+    Constant,
+    Linear,
+    Cycle,
+    CycleWithOffset,
+    Oscillate,
 }
 
 public enum AlsCurveProvenance : byte
@@ -108,25 +131,155 @@ public sealed record AlsFloatCurveDefinition(
         get => _keys.ToArray();
         init => _keys = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
     }
+
+    public AlsCurveInfinityMode PreInfinity { get; init; } = AlsCurveInfinityMode.Constant;
+
+    public AlsCurveInfinityMode PostInfinity { get; init; } = AlsCurveInfinityMode.Constant;
 }
 
-public sealed record AlsAnimationNotifyDefinition(string Name, float Time, float Duration, int SourceIndex);
+public enum AlsCompiledTimelineEventKind : byte
+{
+    Generic,
+    Footstep,
+    SetAction,
+    SetGroundedEntry,
+    EarlyBlendOut,
+    RootMotionScale,
+}
 
-public sealed record AlsAnimationSyncMarkerDefinition(string Name, float Time);
+public enum AlsCompiledTimelineTickMode : byte
+{
+    Queued,
+    BranchingPoint,
+}
+
+public enum AlsCompiledTimelineFoot : byte
+{
+    Unspecified,
+    Left,
+    Right,
+}
+
+public enum AlsCompiledTimelineAction : byte
+{
+    None,
+    Rolling,
+    Mantling,
+    Ragdolling,
+    GettingUp,
+}
+
+public enum AlsCompiledTimelineGroundedEntryMode : byte
+{
+    None,
+    FromRoll,
+}
+
+public enum AlsCompiledTimelineLocomotionMode : byte
+{
+    Grounded,
+    InAir,
+    Mantling,
+    Ragdoll,
+    Recovering,
+}
+
+public enum AlsCompiledTimelineRotationMode : byte
+{
+    VelocityDirection,
+    LookingDirection,
+    Aiming,
+}
+
+public enum AlsCompiledTimelineStance : byte
+{
+    Standing,
+    Crouching,
+}
+
+public readonly record struct AlsCompiledTimelinePayloadDefinition(
+    AlsCompiledTimelineFoot Foot,
+    AlsCompiledTimelineAction Action,
+    AlsCompiledTimelineGroundedEntryMode GroundedEntryMode,
+    float BlendOutSeconds,
+    bool CheckInput,
+    bool CheckLocomotionMode,
+    AlsCompiledTimelineLocomotionMode LocomotionMode,
+    bool CheckRotationMode,
+    AlsCompiledTimelineRotationMode RotationMode,
+    bool CheckStance,
+    AlsCompiledTimelineStance Stance,
+    float TranslationScale);
+
+public sealed record AlsCompiledTimelineEventDefinition(
+    int EventId,
+    string StableEventId,
+    AlsCompiledTimelineEventKind Kind,
+    int SourceAssetId,
+    string SourceClassPath,
+    string DisplayName,
+    float TimeSeconds,
+    float DurationSeconds,
+    float TriggerWeightThreshold,
+    AlsCompiledTimelineTickMode TickMode,
+    int SourceIndex,
+    int TrackIndex,
+    AlsCompiledTimelinePayloadDefinition Payload);
+
+public sealed record AlsAnimationSyncMarkerDefinition(
+    int MarkerId,
+    string StableMarkerId,
+    string Name,
+    float TimeSeconds,
+    int SourceIndex,
+    int TrackIndex);
 
 public sealed record AlsMontageDefinition(
     int Id, string StableId, string Name, string ObjectPath,
     AlsMontageSectionDefinition[] Sections, AlsMontageSlotDefinition[] Slots,
     float PlayLength, float BlendInTime, int BlendInOption, float BlendOutTime,
     int BlendOutOption, float BlendOutTriggerTime, bool EnableAutoBlendOut,
-    bool Overlay, bool Prop);
+    AlsCompiledTimelineEventDefinition[] Timeline,
+    bool Overlay, bool Prop)
+{
+    private AlsMontageSectionDefinition[] _sections = Sections.ToArray();
+    private AlsMontageSlotDefinition[] _slots = Slots.ToArray();
+    private AlsCompiledTimelineEventDefinition[] _timeline = Timeline.ToArray();
 
-public sealed record AlsMontageSectionDefinition(string Name, string NextSection, float StartTime);
+    public AlsMontageSectionDefinition[] Sections
+    {
+        get => _sections.ToArray();
+        init => _sections = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
 
-public sealed record AlsMontageSlotDefinition(string SlotName, AlsMontageSegmentDefinition[] Segments);
+    public AlsMontageSlotDefinition[] Slots
+    {
+        get => _slots.ToArray();
+        init => _slots = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public AlsCompiledTimelineEventDefinition[] Timeline
+    {
+        get => _timeline.ToArray();
+        init => _timeline = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
+}
+
+public sealed record AlsMontageSectionDefinition(int SectionId, string Name, int NextSectionId, float StartTime);
+
+public sealed record AlsMontageSlotDefinition(int SlotId, string SlotName, AlsMontageSegmentDefinition[] Segments)
+{
+    private AlsMontageSegmentDefinition[] _segments = Segments.ToArray();
+
+    public AlsMontageSegmentDefinition[] Segments
+    {
+        get => _segments.ToArray();
+        init => _segments = value?.ToArray() ?? throw new ArgumentNullException(nameof(value));
+    }
+}
 
 public sealed record AlsMontageSegmentDefinition(
-    int AnimationId, float StartPosition, float AnimationStartTime,
+    int SegmentId, int AnimationId, float StartPosition, float AnimationStartTime,
     float AnimationEndTime, float PlayRate, int LoopCount);
 
 public sealed record AlsBlendDefinition(

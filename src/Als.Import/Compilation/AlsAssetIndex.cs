@@ -14,6 +14,8 @@ public sealed class AlsAssetIndex
     private readonly Dictionary<string, int> _physicsAssetIds;
     private readonly Dictionary<string, int> _curveIds;
     private readonly Dictionary<string, int> _configAssetIds;
+    private readonly Dictionary<string, int> _eventIds;
+    private readonly Dictionary<string, int> _markerIds;
 
     internal AlsAssetIndex(
         AlsSkeletonDefinition[] skeletons,
@@ -41,6 +43,11 @@ public sealed class AlsAssetIndex
         _physicsAssetIds = CreateMap(physicsAssets, value => value.StableId);
         _curveIds = CreateMap(curves, value => value.StableId);
         _configAssetIds = CreateMap(configAssets, value => value.StableId);
+        _eventIds = animations.SelectMany(value => value.Timeline)
+            .Concat(montages.SelectMany(value => value.Timeline))
+            .ToDictionary(value => value.StableEventId, value => value.EventId, StringComparer.Ordinal);
+        _markerIds = animations.SelectMany(value => value.SyncMarkers)
+            .ToDictionary(value => value.StableMarkerId, value => value.MarkerId, StringComparer.Ordinal);
     }
 
     public int GetSkeletonId(string stableId) => GetRequired(_skeletonIds, stableId, "skeleton");
@@ -66,6 +73,10 @@ public sealed class AlsAssetIndex
     public int GetCurveId(string stableId) => GetRequired(_curveIds, stableId, "curve");
 
     public int GetConfigAssetId(string stableId) => GetRequired(_configAssetIds, stableId, "config asset");
+
+    public int GetEventId(string stableId) => GetRequired(_eventIds, stableId, "timeline event");
+
+    public int GetMarkerId(string stableId) => GetRequired(_markerIds, stableId, "sync marker");
 
     internal bool TryGetSkeletonId(string stableId, out int id) => _skeletonIds.TryGetValue(stableId, out id);
 

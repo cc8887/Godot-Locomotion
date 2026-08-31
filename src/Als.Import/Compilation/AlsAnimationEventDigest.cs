@@ -24,10 +24,12 @@ public static class AlsAnimationEventDigest
             return 0;
         }
 
-        var events = clip.Notifies
-            .Select(value => new TimelineEvent(value.Time, 0, value.SourceIndex, value.Name))
-            .Concat(clip.SyncMarkers.Select((value, index) =>
-                new TimelineEvent(value.Time, 1, index, value.Name)))
+        var events = clip.Timeline
+            .Select(value => new TimelineEvent(
+                value.TimeSeconds, 0, value.SourceIndex, value.EventId, value.DisplayName))
+            .Concat(clip.SyncMarkers.Select(value =>
+                new TimelineEvent(
+                    value.TimeSeconds, 1, value.SourceIndex, value.MarkerId, value.Name)))
             .OrderBy(value => value.Time)
             .ThenBy(value => value.Kind)
             .ThenBy(value => value.SourceIndex)
@@ -49,6 +51,7 @@ public static class AlsAnimationEventDigest
                 Append(ref digest, value.Kind);
                 Append(ref digest, cycle);
                 Append(ref digest, value.SourceIndex);
+                Append(ref digest, value.CompiledId);
                 Append(ref digest, (long)Math.Round(value.Time * 1_000_000.0, MidpointRounding.ToEven));
                 foreach (var character in Encoding.UTF8.GetBytes(value.Name))
                 {
@@ -77,5 +80,6 @@ public static class AlsAnimationEventDigest
         float Time,
         int Kind,
         int SourceIndex,
+        int CompiledId,
         string Name);
 }

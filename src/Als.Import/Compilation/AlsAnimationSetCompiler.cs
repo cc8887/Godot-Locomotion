@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using GodotAls.Import.Manifest;
 using GodotAls.Import.Metadata;
@@ -22,10 +24,11 @@ public static class AlsAnimationSetCompiler
         var materialIds = IdMap(manifest.Materials);
         var textureIds = IdMap(manifest.Textures);
 
+        var (eventIds, markerIds) = CompileGlobalTimelineIds(manifest);
         var skeletalMeshes = CompileSkeletalMeshes(manifest.SkeletalMeshes, skeletonIds, materialIds);
         var staticMeshes = CompileStaticMeshes(manifest.StaticMeshes, materialIds);
-        var animations = CompileAnimations(manifest.Animations, skeletonIds, animationIds);
-        var montages = CompileMontages(manifest.Montages, animationIds);
+        var animations = CompileAnimations(manifest.Animations, skeletonIds, animationIds, eventIds, markerIds);
+        var montages = CompileMontages(manifest.Montages, animationIds, animations, eventIds);
         var blendSpaces = CompileBlends(manifest.BlendSpaces, "blendSpaces", animationIds);
         var aimOffsets = CompileBlends(manifest.AimOffsets, "aimOffsets", animationIds);
         var textures = CompileTextures(manifest.Textures);
@@ -100,13 +103,15 @@ public static class AlsAnimationSetCompiler
     private static AlsAnimationDefinition[] CompileAnimations(
         AlsManifestAsset[] assets,
         Dictionary<string, int> skeletonIds,
-        Dictionary<string, int> animationIds) =>
+        Dictionary<string, int> animationIds,
+        Dictionary<string, int> eventIds,
+        Dictionary<string, int> markerIds) =>
         assets.Select((asset, index) =>
         {
             var path = $"$.animations[{index}].metadata";
             var metadata = ReadAnimationMetadata(asset, path);
             RequireOutputPath(asset, "animations", index);
-            RequireArrays(asset, path, metadata.Notifies, metadata.SyncMarkers);
+            RequireArrays(asset, path, metadata.Timeline, metadata.SyncMarkers);
             if (!float.IsFinite(metadata.PlayLength) || metadata.PlayLength < 0 ||
                 metadata.FrameRateNumerator <= 0 ||
                 metadata.FrameRateDenominator <= 0 || metadata.SampledKeyCount < 0)
@@ -125,9 +130,8 @@ public static class AlsAnimationSetCompiler
                 string.IsNullOrEmpty(metadata.AdditiveBasePoseId) ? -1 : animationIds[metadata.AdditiveBasePoseId],
                 curves,
                 legacyCurveNames,
-                metadata.Notifies.Select(value => new AlsAnimationNotifyDefinition(
-                    value.Name, value.Time, value.Duration, value.SourceIndex)).ToArray(),
-                metadata.SyncMarkers.Select(value => new AlsAnimationSyncMarkerDefinition(value.Name, value.Time)).ToArray(),
+                CompileTimeline(index, metadata.Timeline, eventIds),
+                CompileMarkers(metadata.SyncMarkers, markerIds),
                 metadata.Overlay, metadata.Prop);
         }).ToArray();
 
@@ -244,7 +248,11 @@ public static class AlsAnimationSetCompiler
             }
 
             curves[curveIndex] = new AlsFloatCurveDefinition(
-                curveIndex, canonicalKind, source.SourceName, provenance, keys);
+                curveIndex, canonicalKind, source.SourceName, provenance, keys)
+            {
+                PreInfinity = ParseInfinityMode(source.PreInfinity),
+                PostInfinity = ParseInfinityMode(source.PostInfinity),
+            };
         }
 
         ValidateCanonicalMetadata(asset, metadataPath, metadata, canonicalYawCount != 0);
@@ -365,6 +373,16 @@ public static class AlsAnimationSetCompiler
         }
     }
 
+    private static AlsCurveInfinityMode ParseInfinityMode(string value) => value switch
+    {
+        "Constant" => AlsCurveInfinityMode.Constant,
+        "Linear" => AlsCurveInfinityMode.Linear,
+        "Cycle" => AlsCurveInfinityMode.Cycle,
+        "CycleWithOffset" => AlsCurveInfinityMode.CycleWithOffset,
+        "Oscillate" => AlsCurveInfinityMode.Oscillate,
+        _ => throw new ArgumentOutOfRangeException(nameof(value)),
+    };
+
     private static float ToFiniteFloat(string assetId, string path, double value)
     {
         if (!double.IsFinite(value) || value < -float.MaxValue || value > float.MaxValue)
@@ -376,7 +394,9 @@ public static class AlsAnimationSetCompiler
 
     private static AlsMontageDefinition[] CompileMontages(
         AlsManifestAsset[] assets,
-        Dictionary<string, int> animationIds) =>
+        Dictionary<string, int> animationIds,
+        AlsAnimationDefinition[] animations,
+        Dictionary<string, int> eventIds) =>
         assets.Select((asset, index) =>
         {
             var path = $"$.montages[{index}].metadata";
@@ -387,20 +407,203 @@ public static class AlsAnimationSetCompiler
                 throw ContentError("ALSMETA002", asset.Id, $"{path}.slots", "Montage segment arrays are required.");
             }
 
+            var sectionIds = metadata.Sections.Select((value, sectionId) => (value.Name, sectionId))
+                .ToDictionary(value => value.Name, value => value.sectionId, StringComparer.Ordinal);
+            var sections = metadata.Sections.Select((value, sectionId) => new AlsMontageSectionDefinition(
+                sectionId,
+                value.Name,
+                string.IsNullOrEmpty(value.NextSection) ? -1 : sectionIds[value.NextSection],
+                value.StartTime)).ToArray();
+            var nextSegmentId = 0;
+            var slots = metadata.Slots.Select((value, slotId) => new AlsMontageSlotDefinition(
+                slotId,
+                value.SlotName,
+                value.Segments.Select((segment, segmentIndex) =>
+                {
+                    var segmentPath = $"{path}.slots[{slotId}].segments[{segmentIndex}]";
+                    if (!animationIds.TryGetValue(segment.AnimationId, out var animationId))
+                    {
+                        throw ContentError("ALSMONTAGE001", asset.Id, $"{segmentPath}.animationId",
+                            "Montage segment animation reference does not resolve.");
+                    }
+                    var range = (double)segment.AnimationEndTime - segment.AnimationStartTime;
+                    var mappedEnd = segment.StartPosition + segment.LoopCount * range / segment.PlayRate;
+                    if (!(range > 0.0) || segment.AnimationEndTime > animations[animationId].PlayLength ||
+                        !double.IsFinite(mappedEnd) || mappedEnd > metadata.PlayLength + 1e-8)
+                    {
+                        throw ContentError("ALSMONTAGE002", asset.Id, segmentPath,
+                            "Montage segment range must be positive, inside its animation, and map inside the montage.");
+                    }
+                    return new AlsMontageSegmentDefinition(
+                        nextSegmentId++, animationId, segment.StartPosition,
+                        segment.AnimationStartTime, segment.AnimationEndTime,
+                        segment.PlayRate, segment.LoopCount);
+                }).ToArray())).ToArray();
+
             return new AlsMontageDefinition(
                 index, asset.Id, asset.AssetName, asset.ObjectPath,
-                metadata.Sections.Select(value => new AlsMontageSectionDefinition(
-                    value.Name, value.NextSection, value.StartTime)).ToArray(),
-                metadata.Slots.Select(value => new AlsMontageSlotDefinition(
-                    value.SlotName,
-                    value.Segments.Select(segment => new AlsMontageSegmentDefinition(
-                        animationIds[segment.AnimationId], segment.StartPosition,
-                        segment.AnimationStartTime, segment.AnimationEndTime,
-                        segment.PlayRate, segment.LoopCount)).ToArray())).ToArray(),
+                sections,
+                slots,
                 metadata.PlayLength, metadata.BlendInTime, metadata.BlendInOption,
                 metadata.BlendOutTime, metadata.BlendOutOption, metadata.BlendOutTriggerTime,
-                metadata.EnableAutoBlendOut, metadata.Overlay, metadata.Prop);
+                metadata.EnableAutoBlendOut,
+                CompileTimeline(index, metadata.Timeline, eventIds),
+                metadata.Overlay, metadata.Prop);
         }).ToArray();
+
+    private static (Dictionary<string, int> EventIds, Dictionary<string, int> MarkerIds)
+        CompileGlobalTimelineIds(AlsManifest manifest)
+    {
+        var eventStableIds = new List<string>();
+        var markerStableIds = new List<string>();
+        for (var index = 0; index < manifest.Animations.Length; index++)
+        {
+            var asset = manifest.Animations[index];
+            var path = $"$.animations[{index}].metadata";
+            var metadata = ReadAnimationMetadata(asset, path);
+            ValidateStableTimelineIds(asset, path, metadata.Timeline, eventStableIds);
+            ValidateStableMarkerIds(asset, path, metadata.SyncMarkers, markerStableIds);
+        }
+        for (var index = 0; index < manifest.Montages.Length; index++)
+        {
+            var asset = manifest.Montages[index];
+            var path = $"$.montages[{index}].metadata";
+            var metadata = Read(asset, path, AlsMontageMetadata.Read);
+            ValidateStableTimelineIds(asset, path, metadata.Timeline, eventStableIds);
+        }
+
+        return (CreateGlobalIdMap(eventStableIds), CreateGlobalIdMap(markerStableIds));
+    }
+
+    private static void ValidateStableTimelineIds(
+        AlsManifestAsset asset,
+        string metadataPath,
+        AlsTimelineEventMetadata[] timeline,
+        List<string> stableIds)
+    {
+        for (var index = 0; index < timeline.Length; index++)
+        {
+            var value = timeline[index];
+            var expected = ComputeSha1($"{asset.Id}|timeline|{value.SourceIndex}|{value.SourceClassPath}");
+            if (!string.Equals(value.StableEventId, expected, StringComparison.Ordinal))
+            {
+                throw ContentError("ALSTIMELINE001", asset.Id,
+                    $"{metadataPath}.timeline[{index}].stableEventId",
+                    $"Timeline stable event ID does not match recomputed SHA-1 '{expected}'.");
+            }
+            stableIds.Add(value.StableEventId);
+        }
+    }
+
+    private static void ValidateStableMarkerIds(
+        AlsManifestAsset asset,
+        string metadataPath,
+        AlsAnimationSyncMarkerMetadata[] markers,
+        List<string> stableIds)
+    {
+        for (var index = 0; index < markers.Length; index++)
+        {
+            var value = markers[index];
+            var expected = ComputeSha1($"{asset.Id}|marker|{value.SourceIndex}|{value.Name}");
+            if (!string.Equals(value.StableMarkerId, expected, StringComparison.Ordinal))
+            {
+                throw ContentError("ALSTIMELINE002", asset.Id,
+                    $"{metadataPath}.syncMarkers[{index}].stableMarkerId",
+                    $"Sync marker stable ID does not match recomputed SHA-1 '{expected}'.");
+            }
+            stableIds.Add(value.StableMarkerId);
+        }
+    }
+
+    private static Dictionary<string, int> CreateGlobalIdMap(IEnumerable<string> stableIds) =>
+        stableIds.Order(StringComparer.Ordinal).Select((stableId, id) => (stableId, id))
+            .ToDictionary(value => value.stableId, value => value.id, StringComparer.Ordinal);
+
+    private static string ComputeSha1(string preimage) =>
+        Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(preimage))).ToLowerInvariant();
+
+    private static AlsCompiledTimelineEventDefinition[] CompileTimeline(
+        int sourceAssetId,
+        AlsTimelineEventMetadata[] timeline,
+        Dictionary<string, int> eventIds) =>
+        timeline.Select(value => new AlsCompiledTimelineEventDefinition(
+                eventIds[value.StableEventId],
+                value.StableEventId,
+                ParseTimelineKind(value.Kind),
+                sourceAssetId,
+                value.SourceClassPath,
+                value.DisplayName,
+                (float)value.TimeSeconds,
+                (float)value.DurationSeconds,
+                (float)value.TriggerWeightThreshold,
+                ParseTimelineTickMode(value.TickMode),
+                value.SourceIndex,
+                value.TrackIndex,
+                CompileTimelinePayload(value.Payload)))
+            .OrderBy(value => value.TimeSeconds)
+            .ThenBy(value => value.SourceIndex)
+            .ThenBy(value => value.TrackIndex)
+            .ThenBy(value => value.StableEventId, StringComparer.Ordinal)
+            .ToArray();
+
+    private static AlsAnimationSyncMarkerDefinition[] CompileMarkers(
+        AlsAnimationSyncMarkerMetadata[] markers,
+        Dictionary<string, int> markerIds) =>
+        markers.Select(value => new AlsAnimationSyncMarkerDefinition(
+                markerIds[value.StableMarkerId],
+                value.StableMarkerId,
+                value.Name,
+                (float)value.TimeSeconds,
+                value.SourceIndex,
+                value.TrackIndex))
+            .OrderBy(value => value.TimeSeconds)
+            .ThenBy(value => value.SourceIndex)
+            .ThenBy(value => value.TrackIndex)
+            .ThenBy(value => value.StableMarkerId, StringComparer.Ordinal)
+            .ToArray();
+
+    private static AlsCompiledTimelineEventKind ParseTimelineKind(string value) => value switch
+    {
+        "Generic" => AlsCompiledTimelineEventKind.Generic,
+        "Footstep" => AlsCompiledTimelineEventKind.Footstep,
+        "SetAction" => AlsCompiledTimelineEventKind.SetAction,
+        "SetGroundedEntry" => AlsCompiledTimelineEventKind.SetGroundedEntry,
+        "EarlyBlendOut" => AlsCompiledTimelineEventKind.EarlyBlendOut,
+        "RootMotionScale" => AlsCompiledTimelineEventKind.RootMotionScale,
+        _ => throw new ArgumentOutOfRangeException(nameof(value)),
+    };
+
+    private static AlsCompiledTimelineTickMode ParseTimelineTickMode(string value) => value switch
+    {
+        "Queued" => AlsCompiledTimelineTickMode.Queued,
+        "BranchingPoint" => AlsCompiledTimelineTickMode.BranchingPoint,
+        _ => throw new ArgumentOutOfRangeException(nameof(value)),
+    };
+
+    private static AlsCompiledTimelinePayloadDefinition CompileTimelinePayload(
+        AlsTimelineEventPayloadMetadata payload) => payload switch
+    {
+        AlsGenericEventPayloadMetadata => default,
+        AlsFootstepEventPayloadMetadata value => new(
+            Enum.Parse<AlsCompiledTimelineFoot>(value.Foot), default, default, default,
+            default, default, default, default, default, default, default, default),
+        AlsSetActionEventPayloadMetadata value => new(
+            default, Enum.Parse<AlsCompiledTimelineAction>(value.Action), default, default,
+            default, default, default, default, default, default, default, default),
+        AlsSetGroundedEntryEventPayloadMetadata value => new(
+            default, default, Enum.Parse<AlsCompiledTimelineGroundedEntryMode>(value.Mode), default,
+            default, default, default, default, default, default, default, default),
+        AlsEarlyBlendOutEventPayloadMetadata value => new(
+            default, default, default, (float)value.BlendOutSeconds,
+            value.CheckInput, value.CheckLocomotionMode,
+            Enum.Parse<AlsCompiledTimelineLocomotionMode>(value.LocomotionMode),
+            value.CheckRotationMode, Enum.Parse<AlsCompiledTimelineRotationMode>(value.RotationMode),
+            value.CheckStance, Enum.Parse<AlsCompiledTimelineStance>(value.Stance), default),
+        AlsRootMotionScaleEventPayloadMetadata value => new(
+            default, default, default, default, default, default, default, default,
+            default, default, default, (float)value.TranslationScale),
+        _ => throw new ArgumentOutOfRangeException(nameof(payload)),
+    };
 
     private static AlsBlendDefinition[] CompileBlends(
         AlsManifestAsset[] assets,
