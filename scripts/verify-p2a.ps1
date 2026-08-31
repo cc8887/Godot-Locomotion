@@ -15,6 +15,42 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'asset-lock-functions.ps1')
 
+function Assert-P2AV2Manifest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Manifest,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    if ($null -eq $Manifest.PSObject.Properties['schemaVersion'] -or $Manifest.schemaVersion -ne 2) {
+        throw "$Label manifest schemaVersion is not 2."
+    }
+    if ($null -eq $Manifest.PSObject.Properties['exporterVersion'] -or $Manifest.exporterVersion -cne '2.0.0') {
+        throw "$Label manifest exporterVersion is not 2.0.0."
+    }
+    if (@($Manifest.animations | Where-Object { @($_.metadata.timeline).Count -gt 0 }).Count -eq 0) {
+        throw "$Label manifest contains no Sequence timeline entries."
+    }
+    if (@($Manifest.montages | Where-Object { @($_.metadata.timeline).Count -gt 0 }).Count -eq 0) {
+        throw "$Label manifest contains no Montage timeline entries."
+    }
+
+    $allTimelineEntries = @()
+    $allSyncMarkers = @()
+    foreach ($animationAsset in @($Manifest.animations) + @($Manifest.montages)) {
+        $allTimelineEntries += @($animationAsset.metadata.timeline)
+        $allSyncMarkers += @($animationAsset.metadata.syncMarkers)
+    }
+    if ($allSyncMarkers.Count -eq 0) {
+        throw "$Label manifest contains no sync markers."
+    }
+    if (@($allTimelineEntries | Where-Object { $_.kind -cne 'Generic' }).Count -eq 0) {
+        throw "$Label manifest contains no typed timeline events or actions."
+    }
+}
+
 $buildScript = Join-Path $PSScriptRoot 'build-als-exporter.ps1'
 if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
     throw "Build script does not exist: $buildScript"
@@ -105,6 +141,7 @@ if (-not (Test-Path -LiteralPath $partialManifestPath -PathType Leaf)) {
     throw "Dry-run partial manifest does not exist: $partialManifestPath"
 }
 $manifest = Get-Content -LiteralPath $partialManifestPath -Raw | ConvertFrom-Json
+Assert-P2AV2Manifest -Manifest $manifest -Label 'Partial'
 $allBoneNames = @($manifest.skeletons | ForEach-Object { $_.metadata.bones } | ForEach-Object { $_.name })
 foreach ($boneName in @('root', 'pelvis', 'foot_l', 'foot_r')) {
     if ($boneName -notin $allBoneNames) {
@@ -121,12 +158,6 @@ foreach ($skeleton in @($manifest.skeletons)) {
     if (@($skeleton.metadata.bones).Count -ne $skeleton.metadata.boneCount) {
         throw "Skeleton bone count does not match metadata: $($skeleton.objectPath)"
     }
-}
-$animationsWithSemantics = @($manifest.animations | Where-Object {
-    @($_.metadata.curves).Count -gt 0 -or @($_.metadata.timeline).Count -gt 0
-})
-if ($animationsWithSemantics.Count -eq 0) {
-    throw 'Partial manifest contains no animation with curves or timeline entries.'
 }
 foreach ($animation in @($manifest.animations)) {
     foreach ($field in @('loop', 'interpolation', 'forceRootLock', 'useNormalizedRootMotionScale',
@@ -201,6 +232,7 @@ if (-not (Test-Path -LiteralPath $formalManifestPath -PathType Leaf)) {
     throw "Formal manifest does not exist: $formalManifestPath"
 }
 $formalManifest = Get-Content -LiteralPath $formalManifestPath -Raw | ConvertFrom-Json
+Assert-P2AV2Manifest -Manifest $formalManifest -Label 'Formal'
 if ($formalManifest.auditSummary.status -cne 'complete' -or $formalManifest.auditSummary.errorCount -ne 0) {
     throw "Formal manifest audit is not complete: $($formalManifest.auditSummary.status)"
 }
