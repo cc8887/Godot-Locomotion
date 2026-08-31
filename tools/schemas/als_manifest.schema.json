@@ -60,10 +60,15 @@
       "minimum": -1.7976931348623157e308,
       "maximum": 1.7976931348623157e308
     },
-    "nonnegativeFiniteNumber": {
+    "finiteFloat": {
+      "type": "number",
+      "minimum": -3.4028234663852886e38,
+      "maximum": 3.4028234663852886e38
+    },
+    "nonnegativeFiniteFloat": {
       "type": "number",
       "minimum": 0,
-      "maximum": 1.7976931348623157e308
+      "maximum": 3.4028234663852886e38
     },
     "stableId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "assets": { "type": "array", "items": { "$ref": "#/$defs/asset" } },
@@ -148,7 +153,7 @@
       "properties": {
         "overlay": { "type": "boolean" },
         "prop": { "type": "boolean" },
-        "playLength": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "playLength": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
         "frameRateNumerator": { "type": "integer", "minimum": 1 },
         "frameRateDenominator": { "type": "integer", "minimum": 1 },
         "sampledKeyCount": { "type": "integer", "minimum": 0 },
@@ -192,8 +197,8 @@
         "kind": { "enum": ["Generic", "Footstep", "SetAction", "SetGroundedEntry", "EarlyBlendOut", "RootMotionScale"] },
         "sourceClassPath": { "type": "string", "minLength": 1 },
         "displayName": { "type": "string", "minLength": 1 },
-        "timeSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
-        "durationSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "timeSeconds": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
+        "durationSeconds": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
         "triggerWeightThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
         "tickMode": { "enum": ["Queued", "BranchingPoint"] },
         "sourceIndex": { "type": "integer", "minimum": 0 },
@@ -232,7 +237,7 @@
         "checkRotationMode", "rotationMode", "checkStance", "stance"
       ],
       "properties": {
-        "blendOutSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "blendOutSeconds": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
         "checkInput": { "type": "boolean" },
         "checkLocomotionMode": { "type": "boolean" },
         "locomotionMode": { "enum": ["Grounded", "InAir", "Mantling", "Ragdoll", "Recovering"] },
@@ -246,7 +251,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["translationScale"],
-      "properties": { "translationScale": { "$ref": "#/$defs/nonnegativeFiniteNumber" } }
+      "properties": { "translationScale": { "$ref": "#/$defs/nonnegativeFiniteFloat" } }
     },
     "syncMarker": {
       "type": "object",
@@ -255,7 +260,7 @@
       "properties": {
         "stableMarkerId": { "$ref": "#/$defs/stableId" },
         "name": { "type": "string", "minLength": 1 },
-        "timeSeconds": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "timeSeconds": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
         "sourceIndex": { "type": "integer", "minimum": 0 },
         "trackIndex": { "type": "integer", "minimum": 0 }
       }
@@ -272,12 +277,12 @@
         "prop": { "type": "boolean" },
         "sections": { "type": "array", "items": { "$ref": "#/$defs/montageSection" } },
         "slots": { "type": "array", "items": { "$ref": "#/$defs/montageSlot" } },
-        "playLength": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
-        "blendInTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "playLength": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
+        "blendInTime": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
         "blendInOption": { "type": "integer" },
-        "blendOutTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
+        "blendOutTime": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
         "blendOutOption": { "type": "integer" },
-        "blendOutTriggerTime": { "$ref": "#/$defs/finiteNumber" },
+        "blendOutTriggerTime": { "$ref": "#/$defs/finiteFloat" },
         "enableAutoBlendOut": { "type": "boolean" },
         "timeline": { "type": "array", "items": { "$ref": "#/$defs/timelineEvent" } }
       }
@@ -289,7 +294,7 @@
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "nextSection": { "type": "string", "not": { "const": "None" } },
-        "startTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" }
+        "startTime": { "$ref": "#/$defs/nonnegativeFiniteFloat" }
       }
     },
     "montageSlot": {
@@ -311,10 +316,10 @@
       "properties": {
         "animationId": { "$ref": "#/$defs/stableId" },
         "animationObjectPath": { "type": "string", "minLength": 1 },
-        "startPosition": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
-        "animationStartTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
-        "animationEndTime": { "$ref": "#/$defs/nonnegativeFiniteNumber" },
-        "playRate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1.7976931348623157e308 },
+        "startPosition": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
+        "animationStartTime": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
+        "animationEndTime": { "$ref": "#/$defs/nonnegativeFiniteFloat" },
+        "playRate": { "type": "number", "exclusiveMinimum": 0, "maximum": 3.4028234663852886e38 },
         "loopCount": { "type": "integer", "minimum": 1 }
       }
     },

@@ -32,12 +32,16 @@ public sealed record AlsAnimationMetadata(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     string? CanonicalRotationYawProfileSignProvenance = null)
 {
+    [JsonPropertyName("__legacyNotifiesCompatibility")]
     [JsonIgnore]
     public AlsAnimationNotifyMetadata[] Notifies => Timeline.Select(value => new AlsAnimationNotifyMetadata(
         value.DisplayName, (float)value.TimeSeconds, (float)value.DurationSeconds, value.SourceIndex)).ToArray();
 
     public static AlsAnimationMetadata Read(JsonElement element)
     {
+        RejectExplicitNull(element, "Animation metadata");
+        ValidateTimelineJson(element, "Animation metadata");
+        ValidateSyncMarkerJson(element);
         var metadata = element.Deserialize<AlsAnimationMetadata>(AlsManifestSerializer.JsonOptions)
             ?? throw new JsonException("Animation metadata deserialized to null.");
         if (metadata.Timeline is null)
@@ -48,9 +52,104 @@ public sealed record AlsAnimationMetadata(
         {
             throw new JsonException("Animation metadata syncMarkers are required.");
         }
+        if (!float.IsFinite(metadata.PlayLength))
+        {
+            throw new JsonException("Animation metadata playLength must be finite.");
+        }
         var hasCanonicalRotationYaw = ValidateFloatCurves(metadata.Curves, metadata.PlayLength);
         ValidateCanonicalRotationYawProvenance(element, metadata, hasCanonicalRotationYaw);
         return metadata;
+    }
+
+    internal static void ValidateTimelineJson(JsonElement element, string context)
+    {
+        if (!element.TryGetProperty("timeline", out var timeline) || timeline.ValueKind == JsonValueKind.Null)
+        {
+            throw new JsonException($"{context} timeline is required.");
+        }
+        if (timeline.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var index = 0;
+        foreach (var timelineEvent in timeline.EnumerateArray())
+        {
+            var path = $"timeline[{index}]";
+            if (timelineEvent.ValueKind == JsonValueKind.Null)
+            {
+                throw new JsonException($"{context} {path} cannot be null.");
+            }
+            if (timelineEvent.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var propertyName in new[] { "stableEventId", "kind", "sourceClassPath", "displayName", "tickMode", "payload" })
+                {
+                    if (timelineEvent.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Null)
+                    {
+                        throw new JsonException($"{context} {path}.{propertyName} cannot be null.");
+                    }
+                }
+            }
+            index++;
+        }
+    }
+
+    internal static void RejectExplicitNull(JsonElement element, string context, string path = "")
+    {
+        if (element.ValueKind == JsonValueKind.Null)
+        {
+            throw new JsonException($"{context} {path} cannot be null.");
+        }
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                var propertyPath = path.Length == 0 ? property.Name : $"{path}.{property.Name}";
+                RejectExplicitNull(property.Value, context, propertyPath);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            var index = 0;
+            foreach (var item in element.EnumerateArray())
+            {
+                RejectExplicitNull(item, context, $"{path}[{index}]");
+                index++;
+            }
+        }
+    }
+
+    private static void ValidateSyncMarkerJson(JsonElement element)
+    {
+        if (!element.TryGetProperty("syncMarkers", out var markers) || markers.ValueKind == JsonValueKind.Null)
+        {
+            throw new JsonException("Animation metadata syncMarkers are required.");
+        }
+        if (markers.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var index = 0;
+        foreach (var marker in markers.EnumerateArray())
+        {
+            var path = $"syncMarkers[{index}]";
+            if (marker.ValueKind == JsonValueKind.Null)
+            {
+                throw new JsonException($"Animation metadata {path} cannot be null.");
+            }
+            if (marker.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var propertyName in new[] { "stableMarkerId", "name" })
+                {
+                    if (marker.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Null)
+                    {
+                        throw new JsonException($"Animation metadata {path}.{propertyName} cannot be null.");
+                    }
+                }
+            }
+            index++;
+        }
     }
 
     private static void ValidateCanonicalRotationYawProvenance(
@@ -332,6 +431,7 @@ public sealed record AlsAnimationSyncMarkerMetadata(
     [property: JsonRequired] int SourceIndex,
     [property: JsonRequired] int TrackIndex)
 {
+    [JsonPropertyName("__legacyTimeCompatibility")]
     [JsonIgnore]
     public float Time => (float)TimeSeconds;
 }

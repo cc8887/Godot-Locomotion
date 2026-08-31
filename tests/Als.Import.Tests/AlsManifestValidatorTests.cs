@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using GodotAls.Import.Manifest;
 using GodotAls.Import.Validation;
@@ -191,11 +192,147 @@ public sealed class AlsManifestValidatorTests
         AssertIssue(json, "ALSMANIFEST024", path);
     }
 
+    [Theory]
+    [InlineData("animationClassPath", "ALSMANIFEST025", "$.animations[0].classPath")]
+    [InlineData("montageClassPath", "ALSMANIFEST025", "$.montages[0].classPath")]
+    [InlineData("animationPlayLength", "ALSMANIFEST026", "$.animations[0].metadata.playLength")]
+    [InlineData("frameRateNumerator", "ALSMANIFEST026", "$.animations[0].metadata.frameRateNumerator")]
+    [InlineData("frameRateDenominator", "ALSMANIFEST026", "$.animations[0].metadata.frameRateDenominator")]
+    [InlineData("sampledKeyCount", "ALSMANIFEST026", "$.animations[0].metadata.sampledKeyCount")]
+    [InlineData("skeletonObjectPath", "ALSMANIFEST026", "$.animations[0].metadata.skeletonObjectPath")]
+    [InlineData("additiveBasePoseId", "ALSMANIFEST026", "$.animations[0].metadata.additiveBasePoseId")]
+    [InlineData("montagePlayLength", "ALSMANIFEST027", "$.montages[0].metadata.playLength")]
+    [InlineData("montageBlendIn", "ALSMANIFEST027", "$.montages[0].metadata.blendInTime")]
+    [InlineData("montageBlendOut", "ALSMANIFEST027", "$.montages[0].metadata.blendOutTime")]
+    [InlineData("slotName", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].slotName")]
+    [InlineData("segmentAnimationId", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].animationId")]
+    [InlineData("segmentObjectPath", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].animationObjectPath")]
+    [InlineData("segmentStart", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].startPosition")]
+    [InlineData("segmentAnimationStart", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].animationStartTime")]
+    [InlineData("segmentAnimationEnd", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].animationEndTime")]
+    [InlineData("segmentRangeOrder", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].animationEndTime")]
+    [InlineData("segmentPlayRate", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].playRate")]
+    [InlineData("segmentLoopCount", "ALSMANIFEST028", "$.montages[0].metadata.slots[0].segments[0].loopCount")]
+    public void RuntimeConstraintParityRejectsSchemaInvalidMetadata(string mutation, string code, string path)
+    {
+        var json = AlsManifestSerializerTests.MutateTypedFixture(root =>
+        {
+            var animation = root["animations"]!.AsArray()[0]!.AsObject();
+            var animationMetadata = animation["metadata"]!.AsObject();
+            var montage = root["montages"]!.AsArray()[0]!.AsObject();
+            var montageMetadata = montage["metadata"]!.AsObject();
+            var segment = montageMetadata["slots"]!.AsArray()[0]!.AsObject()["segments"]!.AsArray()[0]!.AsObject();
+            switch (mutation)
+            {
+                case "animationClassPath": animation["classPath"] = "/Script/Engine.Texture2D"; break;
+                case "montageClassPath": montage["classPath"] = "/Script/Engine.AnimSequence"; break;
+                case "animationPlayLength": animationMetadata["playLength"] = -0.1; break;
+                case "frameRateNumerator": animationMetadata["frameRateNumerator"] = 0; break;
+                case "frameRateDenominator": animationMetadata["frameRateDenominator"] = 0; break;
+                case "sampledKeyCount": animationMetadata["sampledKeyCount"] = -1; break;
+                case "skeletonObjectPath": animationMetadata["skeletonObjectPath"] = string.Empty; break;
+                case "additiveBasePoseId": animationMetadata["additiveBasePoseId"] = "not-a-sha1"; break;
+                case "montagePlayLength": montageMetadata["playLength"] = -0.1; break;
+                case "montageBlendIn": montageMetadata["blendInTime"] = -0.1; break;
+                case "montageBlendOut": montageMetadata["blendOutTime"] = -0.1; break;
+                case "slotName": montageMetadata["slots"]!.AsArray()[0]!.AsObject()["slotName"] = string.Empty; break;
+                case "segmentAnimationId": segment["animationId"] = "not-a-sha1"; break;
+                case "segmentObjectPath": segment["animationObjectPath"] = string.Empty; break;
+                case "segmentStart": segment["startPosition"] = -0.1; break;
+                case "segmentAnimationStart": segment["animationStartTime"] = -0.1; break;
+                case "segmentAnimationEnd": segment["animationEndTime"] = -0.1; break;
+                case "segmentRangeOrder": segment["animationStartTime"] = 0.8; segment["animationEndTime"] = 0.2; break;
+                case "segmentPlayRate": segment["playRate"] = 0.0; break;
+                case "segmentLoopCount": segment["loopCount"] = 0; break;
+                default: throw new InvalidOperationException(mutation);
+            }
+        });
+
+        if (mutation is not "segmentRangeOrder")
+        {
+            Assert.False(AlsManifestSerializerTests.IsSchemaValid(json));
+        }
+        AssertIssue(json, code, path);
+    }
+
+    [Theory]
+    [InlineData("timelineTime", "ALSMANIFEST016", "$.animations[0].metadata.timeline[0].timeSeconds")]
+    [InlineData("timelineDuration", "ALSMANIFEST016", "$.animations[0].metadata.timeline[0].durationSeconds")]
+    [InlineData("markerTime", "ALSMANIFEST023", "$.animations[0].metadata.syncMarkers[0].timeSeconds")]
+    [InlineData("earlyBlendOut", "ALSMANIFEST021", "$.animations[0].metadata.timeline[2].payload.blendOutSeconds")]
+    [InlineData("rootMotionScale", "ALSMANIFEST021", "$.montages[0].metadata.timeline[0].payload.translationScale")]
+    public void FloatOverflowInDoubleDtoFamiliesIsRejectedByValidator(string mutation, string code, string path)
+    {
+        var json = AlsManifestSerializerTests.MutateTypedFixture(root =>
+        {
+            switch (mutation)
+            {
+                case "timelineTime": AlsManifestSerializerTests.FindTimelineEvent(root, "Generic")["timeSeconds"] = 1e100; break;
+                case "timelineDuration": AlsManifestSerializerTests.FindTimelineEvent(root, "Generic")["durationSeconds"] = 1e100; break;
+                case "markerTime": root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["syncMarkers"]!.AsArray()[0]!.AsObject()["timeSeconds"] = 1e100; break;
+                case "earlyBlendOut": AlsManifestSerializerTests.FindTimelineEvent(root, "EarlyBlendOut")["payload"]!.AsObject()["blendOutSeconds"] = 1e100; break;
+                case "rootMotionScale": AlsManifestSerializerTests.FindTimelineEvent(root, "RootMotionScale")["payload"]!.AsObject()["translationScale"] = 1e100; break;
+                default: throw new InvalidOperationException(mutation);
+            }
+        });
+
+        Assert.False(AlsManifestSerializerTests.IsSchemaValid(json));
+        AssertIssue(json, code, path);
+    }
+
+    [Theory]
+    [InlineData("animations", "$.animations")]
+    [InlineData("animationElement", "$.animations[0]")]
+    [InlineData("timeline", "$.animations[0].metadata.timeline")]
+    [InlineData("sections", "$.montages[0].metadata.sections")]
+    [InlineData("segments", "$.montages[0].metadata.slots[0].segments")]
+    public void ValidatorDefendsConstructedNullCollections(string mutation, string expectedPath)
+    {
+        var manifest = AlsManifestSerializer.Load(AlsManifestSerializerTests.TypedTimelineFixturePath());
+        switch (mutation)
+        {
+            case "animations":
+                manifest = manifest with { Animations = null! };
+                break;
+            case "animationElement":
+                manifest = manifest with { Animations = [null!] };
+                break;
+            case "timeline":
+                manifest = ReplaceMetadata(manifest, "animations", root => root["timeline"] = null);
+                break;
+            case "sections":
+                manifest = ReplaceMetadata(manifest, "montages", root => root["sections"] = null);
+                break;
+            case "segments":
+                manifest = ReplaceMetadata(manifest, "montages", root =>
+                    root["slots"]!.AsArray()[0]!.AsObject()["segments"] = null);
+                break;
+            default:
+                throw new InvalidOperationException(mutation);
+        }
+
+        var issues = AlsManifestValidator.Validate(manifest);
+
+        Assert.Contains(issues, issue => issue.Code == "ALSMANIFEST029" && issue.FieldPath == expectedPath);
+    }
+
     private static void AssertIssue(string json, string code, string path)
     {
         var manifest = AlsManifestSerializer.Deserialize(json);
         var issues = AlsManifestValidator.Validate(manifest);
 
         Assert.Contains(issues, issue => issue.Code == code && issue.FieldPath == path);
+    }
+
+    private static AlsManifest ReplaceMetadata(AlsManifest manifest, string section, Action<JsonObject> update)
+    {
+        var assets = section == "animations" ? manifest.Animations : manifest.Montages;
+        var metadata = JsonNode.Parse(assets[0].Metadata.GetRawText())!.AsObject();
+        update(metadata);
+        using var document = JsonDocument.Parse(metadata.ToJsonString());
+        var replacement = assets[0] with { Metadata = document.RootElement.Clone() };
+        return section == "animations"
+            ? manifest with { Animations = [replacement] }
+            : manifest with { Montages = [replacement] };
     }
 }

@@ -28,12 +28,16 @@ public static class AlsManifestSerializer
         {
             throw new JsonException("ALS manifest exporterVersion must be 2.0.0.");
         }
-        foreach (var animation in manifest.Animations)
+        for (var index = 0; index < manifest.Animations.Length; index++)
         {
+            var animation = manifest.Animations[index]
+                ?? throw new JsonException($"ALS manifest animations[{index}] cannot be null.");
             AlsAnimationMetadata.Read(animation.Metadata);
         }
-        foreach (var montage in manifest.Montages)
+        for (var index = 0; index < manifest.Montages.Length; index++)
         {
+            var montage = manifest.Montages[index]
+                ?? throw new JsonException($"ALS manifest montages[{index}] cannot be null.");
             AlsMontageMetadata.Read(montage.Metadata);
         }
         return manifest;
