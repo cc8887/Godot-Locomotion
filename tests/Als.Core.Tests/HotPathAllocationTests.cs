@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Curves;
 using GodotAls.Core.Events;
 using GodotAls.Core.Exchange;
@@ -305,6 +306,33 @@ public sealed class HotPathAllocationTests
         Assert.Equal(0, allocated);
     }
 
+    [Fact]
+    public void ActionPlayerRequestAdvanceAndEarlyBlendOutAllocateZeroBytesAfterWarmup()
+    {
+        AlsActionDefinition[] definitions =
+        [
+            new(100, 1, 2, 10, 1000, 2f, 3, 10, 5, 1f, 0.25f, 1, 0),
+        ];
+        AlsActionSectionBinding[] sections = [new(10, 10, -1, 0f, 2f)];
+        AlsActionSegmentBinding[] segments = [new(200, 10, 3, 20, 300, 0f, 2f, 0f, 2f, 1f, 1)];
+        AlsTimelineEventDefinition[] timeline =
+        [
+            new(1, 1000, 10, 100, AlsTimelineSourceKind.Montage, 0, 0, 0,
+                0f, 1f, 0f, AlsTimelineEventKind.EarlyBlendOut,
+                AlsTimelineTickMode.Queued,
+                new AlsCompactEventPayload(0, 0, 0, 0, 0.1f, 1, AlsActionResultCode.None)),
+        ];
+        var slices = new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity];
+
+        ExerciseActionPlayer(definitions, sections, segments, timeline, slices, 100);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        ExerciseActionPlayer(definitions, sections, segments, timeline, slices, 10_000);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
     private static void ExerciseCurveRuntime(
         AlsCurveKey[] keys,
@@ -432,6 +460,43 @@ public sealed class HotPathAllocationTests
                 failure != AlsP5FailureCode.None)
             {
                 throw new InvalidOperationException("Dynamic transition allocation probe failed.");
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+    private static void ExerciseActionPlayer(
+        AlsActionDefinition[] definitions,
+        AlsActionSectionBinding[] sections,
+        AlsActionSegmentBinding[] segments,
+        AlsTimelineEventDefinition[] timeline,
+        AlsActionTraversalSlice[] slices,
+        int iterations)
+    {
+        var state = AlsActionPlayerState.CreateDefault();
+        for (var index = 0; index < iterations; index++)
+        {
+            var request = new AlsActionRequest(
+                index + 1, AlsActionCommand.Start, 10, 10, 5, 7);
+            var sliceCount = 0;
+            var outcomes = new AlsActionOutcomeBuffer();
+            if (!AlsActionPlayer.TryApplyRequest(
+                    definitions, sections, segments, 7, 0, request, state,
+                    slices, ref sliceCount, ref outcomes, out state, out _, out var failure) ||
+                failure != AlsP5FailureCode.None ||
+                !AlsActionPlayer.TryAdvance(
+                    definitions, sections, segments, 0.1d, state,
+                    slices, ref sliceCount, ref outcomes, out state, out _, out failure) ||
+                failure != AlsP5FailureCode.None ||
+                !AlsActionPlayer.TryInterruptEarlyBlendOut(
+                    definitions, sections, segments, timeline, 100, 200,
+                    slices[sliceCount - 1].CurrentMontageTime, 1f,
+                    1, AlsTimelineLocomotionMode.Grounded,
+                    AlsTimelineRotationMode.VelocityDirection, AlsTimelineStance.Standing,
+                    state, slices, sliceCount, ref outcomes, out state, out _, out failure) ||
+                failure != AlsP5FailureCode.None || outcomes.Count != 2 || state.Playing != 0)
+            {
+                throw new InvalidOperationException("Action player allocation probe failed.");
             }
         }
     }
