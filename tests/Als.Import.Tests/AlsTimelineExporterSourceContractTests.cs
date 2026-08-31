@@ -147,6 +147,30 @@ public sealed class AlsTimelineExporterSourceContractTests
     }
 
     [Fact]
+    public void ProductionMontageMetadataOmitsSequenceOnlySyncMarkers()
+    {
+        const string readTimeline =
+            "if (!FAlsAnimationMetadataReader::ReadTimeline(*Montage, Asset.Id, OutMetadata, OutError))";
+        const string removeSyncMarkers = "OutMetadata->RemoveField(TEXT(\"syncMarkers\"));";
+
+        Assert.Contains(readTimeline, CompositeReader, StringComparison.Ordinal);
+        Assert.Contains("return false;", CompositeReader[CompositeReader.IndexOf(readTimeline, StringComparison.Ordinal)..],
+            StringComparison.Ordinal);
+        Assert.Contains(removeSyncMarkers, CompositeReader, StringComparison.Ordinal);
+        Assert.True(
+            CompositeReader.IndexOf(removeSyncMarkers, StringComparison.Ordinal) >
+            CompositeReader.IndexOf(readTimeline, StringComparison.Ordinal),
+            "Montage sync markers must be removed only after timeline extraction succeeds.");
+        Assert.DoesNotContain(
+            "return FAlsAnimationMetadataReader::ReadTimeline(*Montage, Asset.Id, OutMetadata, OutError);",
+            CompositeReader,
+            StringComparison.Ordinal);
+
+        Assert.Contains("MontageMetadata->TryGetArrayField(TEXT(\"syncMarkers\"), MontageMarkers)",
+            AnimationReader, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StableIdsIncludeSourceIndexAndClassPath()
     {
         Assert.Contains("TEXT(\"%s|timeline|%d|%s\")", RegistrySource, StringComparison.Ordinal);

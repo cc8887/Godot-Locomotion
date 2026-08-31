@@ -25,20 +25,16 @@ function Get-ComparableFiles([string]$Root) {
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
         throw "Formal manifest is missing: $manifestPath"
     }
-    $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
-    $producerMetadata = @(
-        'als_manifest.json',
-        'export_plan.json',
-        'partial/als_manifest.partial.json',
-        'audit/export_report.json',
-        'audit/export_report.txt'
-    )
-    $files = @($manifest.files | ForEach-Object { $_.relativePath }) + $producerMetadata
-    return @($files | Sort-Object -Unique)
+    return @(Get-ChildItem -LiteralPath $Root -File -Recurse | ForEach-Object {
+        [IO.Path]::GetRelativePath($Root, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, '/')
+    } | Sort-Object -CaseSensitive)
 }
 
 $referencePath = Resolve-ExportRoot $ReferenceRoot 'ReferenceRoot'
 $candidatePath = Resolve-ExportRoot $CandidateRoot 'CandidateRoot'
+if ($referencePath -ceq $candidatePath) {
+    throw 'ReferenceRoot and CandidateRoot must be independent directories.'
+}
 $referenceFiles = @(Get-ComparableFiles $referencePath)
 $candidateFiles = @(Get-ComparableFiles $candidatePath)
 
@@ -58,13 +54,6 @@ foreach ($relativePath in $referenceFiles) {
     if ($referenceLength -ne $candidateLength -or $referenceHash -cne $candidateHash) {
         throw "Export differs at '$relativePath': reference(length=$referenceLength sha256=$referenceHash), candidate(length=$candidateLength sha256=$candidateHash)."
     }
-}
-
-$manifestRelativePath = 'als_manifest.json'
-$referenceManifest = [IO.File]::ReadAllBytes((Join-Path $referencePath $manifestRelativePath))
-$candidateManifest = [IO.File]::ReadAllBytes((Join-Path $candidatePath $manifestRelativePath))
-if (-not [System.Linq.Enumerable]::SequenceEqual[byte]($referenceManifest, $candidateManifest)) {
-    throw 'Formal manifests are not byte-identical.'
 }
 
 Write-Host "P2A_DETERMINISM_OK files=$($referenceFiles.Count)"

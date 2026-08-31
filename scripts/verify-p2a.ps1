@@ -15,6 +15,41 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'asset-lock-functions.ps1')
 
+$repositoryRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
+$artifactsPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $repositoryRoot 'artifacts') -Label 'ArtifactsPath'
+if ([string]::IsNullOrWhiteSpace($Output)) {
+    $Output = Join-Path $repositoryRoot 'assets\generated\als_v4'
+}
+$canonicalPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path ([IO.Path]::GetFullPath($Output)) -Label 'CanonicalRoot'
+$publicationPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $artifactsPath 'p2a-publication') -Label 'PublicationPath'
+$outputPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $publicationPath 'canonical-candidate') -Label 'CandidateRoot'
+$determinismPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $artifactsPath 'p2a-determinism\als_v4') -Label 'DeterminismRoot'
+$assetLockPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $repositoryRoot 'reference\als-v4-export.lock.json') -Label 'LockPath'
+$lockCandidatePath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $publicationPath 'als-v4-export.lock.candidate.json') -Label 'LockCandidatePath'
+$canonicalBackupPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $publicationPath 'als_v4.canonical.backup') -Label 'CanonicalBackupRoot'
+$lockBackupPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $publicationPath 'als-v4-export.lock.backup.json') -Label 'LockBackupPath'
+$journalPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
+    -Path (Join-Path $publicationPath 'transaction.json') -Label 'JournalPath'
+
+Repair-AlsP2aPublication -RepositoryRoot $repositoryRoot -JournalPath $journalPath
+foreach ($backup in @($canonicalBackupPath, $lockBackupPath)) {
+    if (Test-Path -LiteralPath $backup) {
+        throw "P2A publication has orphaned backup residue without a recovery journal: $backup"
+    }
+}
+foreach ($staging in @($outputPath, $determinismPath, $lockCandidatePath)) {
+    Remove-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot -Path $staging -Label 'stale P2A staging'
+}
+
 function Assert-P2AV2Manifest {
     param(
         [Parameter(Mandatory = $true)]
@@ -41,6 +76,8 @@ function Assert-P2AV2Manifest {
     $allSyncMarkers = @()
     foreach ($animationAsset in @($Manifest.animations) + @($Manifest.montages)) {
         $allTimelineEntries += @($animationAsset.metadata.timeline)
+    }
+    foreach ($animationAsset in @($Manifest.animations)) {
         $allSyncMarkers += @($animationAsset.metadata.syncMarkers)
     }
     if ($allSyncMarkers.Count -eq 0) {
@@ -69,8 +106,6 @@ if (-not (($outputLines | Out-String).Contains($marker, [StringComparison]::Ordi
 
 Write-Host 'GODOT_ALS_P2A_READY'
 
-$repositoryRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
-$artifactsPath = Join-Path $repositoryRoot 'artifacts'
 [void](New-Item -ItemType Directory -Path $artifactsPath -Force)
 $godotIgnorePath = Join-Path $artifactsPath '.gdignore'
 if (-not (Test-Path -LiteralPath $godotIgnorePath -PathType Leaf)) {
@@ -79,10 +114,6 @@ if (-not (Test-Path -LiteralPath $godotIgnorePath -PathType Leaf)) {
         "# Generated build and determinism artifacts are not Godot project resources.`n",
         [Text.UTF8Encoding]::new($false))
 }
-if ([string]::IsNullOrWhiteSpace($Output)) {
-    $Output = Join-Path $repositoryRoot 'assets\generated\als_v4'
-}
-$outputPath = [IO.Path]::GetFullPath($Output)
 $editorCommand = Join-Path ([IO.Path]::GetFullPath($EngineRoot)) 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $projectHashBefore = (Get-FileHash -LiteralPath $UnrealProject -Algorithm SHA256).Hash
 
@@ -260,25 +291,15 @@ if (@($formalManifest.files).Count -ne $plan.summary.exportableCount) {
 }
 Write-Host "GODOT_ALS_P2A_FULL_EXPORT_OK files=$(@($formalManifest.files).Count)"
 
-$determinismPath = Join-Path $repositoryRoot 'artifacts\p2a-determinism\als_v4'
 $determinismOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export "-Output=$determinismPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
 $determinismOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A determinism export failed with exit code $LASTEXITCODE."
 }
-
 $compareScript = Join-Path $PSScriptRoot 'compare-p2a-exports.ps1'
-$compareAction = {
-    & $compareScript -ReferenceRoot $outputPath -CandidateRoot $determinismPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "P2A determinism comparison failed with exit code $LASTEXITCODE."
-    }
-}
-$publishAction = {
-    $assetLockPath = Join-Path $repositoryRoot 'reference\als-v4-export.lock.json'
-    Publish-AlsExportLock -ManifestPath $formalManifestPath -LockPath $assetLockPath
-    Write-Host 'GODOT_ALS_P2A_ASSET_LOCK_OK'
-}
-Invoke-AlsP2aCompareAndPublish -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
-    -CompareAction $compareAction -PublishAction $publishAction -UpdateAssetLock:$UpdateAssetLock
+Invoke-AlsP2aJointPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
+    -RepositoryRoot $repositoryRoot -CanonicalRoot $canonicalPath -CandidateRoot $outputPath `
+    -DeterminismRoot $determinismPath -LockPath $assetLockPath -LockCandidatePath $lockCandidatePath `
+    -CanonicalBackupRoot $canonicalBackupPath -LockBackupPath $lockBackupPath -JournalPath $journalPath `
+    -ComparisonScriptPath $compareScript -UpdateAssetLock:$UpdateAssetLock
 Write-Host 'P2A_VERIFICATION_OK'
