@@ -119,7 +119,15 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("const FString& AssetStableId", RegistryHeader, StringComparison.Ordinal);
         Assert.Contains("int32 SourceIndex", RegistryHeader, StringComparison.Ordinal);
         Assert.Contains("FAlsExportedTimelineEntry& OutEntry", RegistryHeader, StringComparison.Ordinal);
-        Assert.DoesNotContain("NotifyEvent.NotifyName.ToString", RegistrySource, StringComparison.Ordinal);
+        const string auditDisplayNameRead = "NotifyEvent.GetNotifyEventName()";
+        const string fixtureDisplayNameWrite = "SelfTestEvent.NotifyName = FName(FixtureLabel);";
+        Assert.Equal(1, RegistrySource.Split(auditDisplayNameRead, StringSplitOptions.None).Length - 1);
+        Assert.Contains("void SetSelfTestEventDisplayName(", RegistrySource, StringComparison.Ordinal);
+        Assert.Equal(1, RegistrySource.Split(fixtureDisplayNameWrite, StringSplitOptions.None).Length - 1);
+        string registryWithoutAllowedDisplayNameAccess = RegistrySource
+            .Replace(auditDisplayNameRead, string.Empty, StringComparison.Ordinal)
+            .Replace(fixtureDisplayNameWrite, string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotifyName", registryWithoutAllowedDisplayNameAccess, StringComparison.Ordinal);
         Assert.DoesNotContain("SourceClassPath.Contains", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("TEXT(\"Unspecified\")", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("TEXT(\"ViewDirection\")", RegistrySource, StringComparison.Ordinal);
@@ -193,6 +201,18 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("NewObject<UAnimMontage>", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("ReadTimeline(*SequenceSelfTest", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("ReadTimeline(*MontageSelfTest", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("GetStringField(TEXT(\"stableEventId\")) != TEXT(\"256a3728fbc2e0cf1a311ccbc7f69a47b050d6e9\")",
+            AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("GetStringField(TEXT(\"stableEventId\")) != TEXT(\"edf169cea14fa4fc2033af2e2d96038491d734cf\")",
+            AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("GetStringField(TEXT(\"stableMarkerId\")) != TEXT(\"2db1fa5b4dfe5ca638c57f2c019f8e555467d352\")",
+            AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("GetStringField(TEXT(\"stableEventId\")) != TEXT(\"f3691e8a18d1bdf4b71ec03f5969a6252d1390da\")",
+            AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("GetStringField(TEXT(\"stableEventId\")) != TEXT(\"e15714690eca6dedcd52a9adbbf5ba5cb5211df5\")",
+            AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("GetStringField(TEXT(\"stableMarkerId\")) != TEXT(\"fbef40037b5759a889aeb69d70869d10cabf4bc4\")",
+            AnimationReader, StringComparison.Ordinal);
         Assert.Contains("ValidateTimelineBounds", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("TimelineEntryLess", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("SyncMarkerLess", AnimationReader, StringComparison.Ordinal);

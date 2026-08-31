@@ -771,8 +771,10 @@ bool FAlsAnimationMetadataReader::RunTimelineSelfTest(int32& OutCaseCount, FStri
         !SequenceTimeline || SequenceTimeline->Num() != 2 || !SequenceMarkers || SequenceMarkers->Num() != 1 ||
         (*SequenceTimeline)[0]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 1 ||
         (*SequenceTimeline)[1]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 0 ||
-        (*SequenceTimeline)[0]->AsObject()->GetStringField(TEXT("stableEventId")).Len() != FSHA1::DigestSize * 2 ||
-        (*SequenceMarkers)[0]->AsObject()->GetNumberField(TEXT("timeSeconds")) != 1.0)
+        (*SequenceTimeline)[0]->AsObject()->GetStringField(TEXT("stableEventId")) != TEXT("256a3728fbc2e0cf1a311ccbc7f69a47b050d6e9") ||
+        (*SequenceTimeline)[1]->AsObject()->GetStringField(TEXT("stableEventId")) != TEXT("edf169cea14fa4fc2033af2e2d96038491d734cf") ||
+        (*SequenceMarkers)[0]->AsObject()->GetNumberField(TEXT("timeSeconds")) != 1.0 ||
+        (*SequenceMarkers)[0]->AsObject()->GetStringField(TEXT("stableMarkerId")) != TEXT("2db1fa5b4dfe5ca638c57f2c019f8e555467d352"))
     {
         OutError = FString::Printf(TEXT("Timeline self-test transient Sequence JSON/order mismatch: %s"),
             *SequenceError);
@@ -819,7 +821,10 @@ bool FAlsAnimationMetadataReader::RunTimelineSelfTest(int32& OutCaseCount, FStri
         !MontageTimeline || MontageTimeline->Num() != 2 || !MontageMarkers || MontageMarkers->Num() != 1 ||
         (*MontageTimeline)[0]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 1 ||
         (*MontageTimeline)[1]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 0 ||
-        (*MontageMarkers)[0]->AsObject()->GetStringField(TEXT("name")) != TEXT("MontageMiddle"))
+        (*MontageTimeline)[0]->AsObject()->GetStringField(TEXT("stableEventId")) != TEXT("f3691e8a18d1bdf4b71ec03f5969a6252d1390da") ||
+        (*MontageTimeline)[1]->AsObject()->GetStringField(TEXT("stableEventId")) != TEXT("e15714690eca6dedcd52a9adbbf5ba5cb5211df5") ||
+        (*MontageMarkers)[0]->AsObject()->GetStringField(TEXT("name")) != TEXT("MontageMiddle") ||
+        (*MontageMarkers)[0]->AsObject()->GetStringField(TEXT("stableMarkerId")) != TEXT("fbef40037b5759a889aeb69d70869d10cabf4bc4"))
     {
         OutError = FString::Printf(TEXT("Timeline self-test transient Montage JSON/order mismatch: %s"),
             *MontageError);

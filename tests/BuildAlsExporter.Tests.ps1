@@ -76,6 +76,27 @@ Describe 'ALS exporter build readiness gating' {
         $animationReaderSource | Should Match ([regex]::Escape('ExpectedCaseCount = 26'))
     }
 
+    It 'locks exact final JSON IDs and permits NotifyName only for audit and fixture setup' {
+        foreach ($expectedId in @(
+            '256a3728fbc2e0cf1a311ccbc7f69a47b050d6e9',
+            'edf169cea14fa4fc2033af2e2d96038491d734cf',
+            '2db1fa5b4dfe5ca638c57f2c019f8e555467d352',
+            'f3691e8a18d1bdf4b71ec03f5969a6252d1390da',
+            'e15714690eca6dedcd52a9adbbf5ba5cb5211df5',
+            'fbef40037b5759a889aeb69d70869d10cabf4bc4'
+        )) {
+            $animationReaderSource | Should Match ([regex]::Escape($expectedId))
+        }
+
+        $auditRead = 'NotifyEvent.GetNotifyEventName()'
+        $fixtureWrite = 'SelfTestEvent.NotifyName = FName(FixtureLabel);'
+        ([regex]::Matches($registrySource, [regex]::Escape($auditRead))).Count | Should Be 1
+        $registrySource | Should Match ([regex]::Escape('void SetSelfTestEventDisplayName('))
+        ([regex]::Matches($registrySource, [regex]::Escape($fixtureWrite))).Count | Should Be 1
+        $registryWithoutAllowedDisplayNameAccess = $registrySource.Replace($auditRead, '').Replace($fixtureWrite, '')
+        $registryWithoutAllowedDisplayNameAccess | Should Not Match 'NotifyName'
+    }
+
     It 'requires independent Sequence Montage marker and typed timeline evidence in both v2 manifests' {
         $verifyScriptSource | Should Match 'function Assert-P2AV2Manifest'
         $verifyScriptSource | Should Match ([regex]::Escape('Assert-P2AV2Manifest -Manifest $manifest -Label ''Partial'''))
