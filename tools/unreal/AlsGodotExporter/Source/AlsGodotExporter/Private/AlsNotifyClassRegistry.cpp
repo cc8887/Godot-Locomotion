@@ -548,6 +548,11 @@ namespace
         TagNameProperty->SetPropertyValue_InContainer(ValueAddress, TagName);
         return true;
     }
+
+    void SetSelfTestEventDisplayName(FAnimNotifyEvent& SelfTestEvent, const TCHAR* FixtureLabel)
+    {
+        SelfTestEvent.NotifyName = FName(FixtureLabel);
+    }
 }
 
 bool FAlsNotifyClassRegistry::Export(const FAnimNotifyEvent& NotifyEvent, const FString& AssetStableId,
@@ -721,7 +726,7 @@ bool FAlsNotifyClassRegistry::RunSelfTest(int32& OutCaseCount, FString& OutError
 
     FAnimNotifyEvent ActionNotifyEvent;
     ActionNotifyEvent.NotifyStateClass = Cast<UAnimNotifyState>(ActionObject);
-    ActionNotifyEvent.NotifyName = TEXT("ActionExportSelfTest");
+    SetSelfTestEventDisplayName(ActionNotifyEvent, TEXT("ActionExportSelfTest"));
     ActionNotifyEvent.SetTime(0.25f);
     ActionNotifyEvent.SetDuration(0.5f);
     ActionNotifyEvent.TriggerWeightThreshold = 0.5f;
@@ -765,7 +770,7 @@ bool FAlsNotifyClassRegistry::RunSelfTest(int32& OutCaseCount, FString& OutError
     }
     FAnimNotifyEvent CrossDomainNotifyEvent;
     CrossDomainNotifyEvent.NotifyStateClass = Cast<UAnimNotifyState>(EarlyBlendOutObject);
-    CrossDomainNotifyEvent.NotifyName = TEXT("CrossDomainSelfTest");
+    SetSelfTestEventDisplayName(CrossDomainNotifyEvent, TEXT("CrossDomainSelfTest"));
     CrossDomainNotifyEvent.SetTime(0.25f);
     CrossDomainNotifyEvent.SetDuration(0.5f);
     CrossDomainNotifyEvent.TriggerWeightThreshold = 0.5f;
