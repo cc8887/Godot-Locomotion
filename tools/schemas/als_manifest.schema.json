@@ -55,11 +55,6 @@
     }
   },
   "$defs": {
-    "finiteNumber": {
-      "type": "number",
-      "minimum": -1.7976931348623157e308,
-      "maximum": 1.7976931348623157e308
-    },
     "finiteFloat": {
       "type": "number",
       "minimum": -3.4028234663852886e38,
@@ -328,11 +323,11 @@
       "additionalProperties": false,
       "required": ["timeSeconds", "value", "interpolation", "arriveTangent", "leaveTangent"],
       "properties": {
-        "timeSeconds": { "$ref": "#/$defs/finiteNumber" },
-        "value": { "$ref": "#/$defs/finiteNumber" },
+        "timeSeconds": { "$ref": "#/$defs/finiteFloat" },
+        "value": { "$ref": "#/$defs/finiteFloat" },
         "interpolation": { "enum": ["Constant", "Linear", "Cubic"] },
-        "arriveTangent": { "$ref": "#/$defs/finiteNumber" },
-        "leaveTangent": { "$ref": "#/$defs/finiteNumber" }
+        "arriveTangent": { "$ref": "#/$defs/finiteFloat" },
+        "leaveTangent": { "$ref": "#/$defs/finiteFloat" }
       }
     },
     "floatCurve": {

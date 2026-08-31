@@ -639,6 +639,45 @@ public sealed class AlsManifestSerializerTests
         Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
     }
 
+    [Theory]
+    [InlineData("emptyNotifies")]
+    [InlineData("populatedNotifies")]
+    [InlineData("emptyMarkerTime")]
+    [InlineData("populatedMarkerTime")]
+    public void InternalCompatibilityPropertyNamesAreRejectedInsteadOfIgnored(string mutation)
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            var metadata = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject();
+            switch (mutation)
+            {
+                case "emptyNotifies":
+                    metadata["__legacyNotifiesCompatibility"] = new JsonArray();
+                    break;
+                case "populatedNotifies":
+                    metadata["__legacyNotifiesCompatibility"] = new JsonArray(new JsonObject
+                    {
+                        ["name"] = "Legacy",
+                        ["time"] = 0.1,
+                        ["duration"] = 0.0,
+                        ["sourceIndex"] = 0,
+                    });
+                    break;
+                case "emptyMarkerTime":
+                    metadata["syncMarkers"]!.AsArray()[0]!.AsObject()["__legacyTimeCompatibility"] = new JsonObject();
+                    break;
+                case "populatedMarkerTime":
+                    metadata["syncMarkers"]!.AsArray()[0]!.AsObject()["__legacyTimeCompatibility"] = 0.2;
+                    break;
+                default:
+                    throw new InvalidOperationException(mutation);
+            }
+        });
+
+        Assert.False(IsSchemaValid(json));
+        AssertLoadThrowsJsonException(json);
+    }
+
     [Fact]
     public void LegacyInputCompatibilityDoesNotLeakIntoWrittenJson()
     {
@@ -648,7 +687,43 @@ public sealed class AlsManifestSerializerTests
 
         using var document = JsonDocument.Parse(json);
         Assert.False(document.RootElement.TryGetProperty("notifies", out _));
+        Assert.False(document.RootElement.TryGetProperty("__legacyNotifiesCompatibility", out _));
         Assert.False(document.RootElement.GetProperty("syncMarkers")[0].TryGetProperty("time", out _));
+        Assert.False(document.RootElement.GetProperty("syncMarkers")[0].TryGetProperty("__legacyTimeCompatibility", out _));
+    }
+
+    [Theory]
+    [InlineData("animation", "array", "Animation metadata must be an object.")]
+    [InlineData("animation", "number", "Animation metadata must be an object.")]
+    [InlineData("animation", "string", "Animation metadata must be an object.")]
+    [InlineData("animation", "boolean", "Animation metadata must be an object.")]
+    [InlineData("animation", "null", "Animation metadata must be an object.")]
+    [InlineData("montage", "array", "Montage metadata must be an object.")]
+    [InlineData("montage", "number", "Montage metadata must be an object.")]
+    [InlineData("montage", "string", "Montage metadata must be an object.")]
+    [InlineData("montage", "boolean", "Montage metadata must be an object.")]
+    [InlineData("montage", "null", "Montage metadata must be an object.")]
+    public void TypedMetadataNonObjectShapesThrowStableJsonException(
+        string section, string shape, string expectedMessage)
+    {
+        var json = MutateTypedFixture(root =>
+        {
+            JsonNode? replacement = shape switch
+            {
+                "array" => new JsonArray(),
+                "number" => JsonValue.Create(42),
+                "string" => JsonValue.Create("invalid"),
+                "boolean" => JsonValue.Create(true),
+                "null" => null,
+                _ => throw new InvalidOperationException(shape),
+            };
+            var assets = root[section == "animation" ? "animations" : "montages"]!.AsArray();
+            assets[0]!.AsObject()["metadata"] = replacement;
+        });
+
+        Assert.False(IsSchemaValid(json));
+        var exception = AssertLoadThrowsJsonException(json);
+        Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -734,6 +809,25 @@ public sealed class AlsManifestSerializerTests
         Assert.False(IsSchemaValid(json));
         var exception = Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(json));
         Assert.Contains(expectedField, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("timeSeconds", 1, "curves[0].keys[1].timeSeconds")]
+    [InlineData("value", 0, "curves[0].keys[0].value")]
+    [InlineData("arriveTangent", 0, "curves[0].keys[0].arriveTangent")]
+    [InlineData("leaveTangent", 0, "curves[0].keys[0].leaveTangent")]
+    public void StructuredCurveFloatOverflowIsRejectedDuringLoad(
+        string field, int keyIndex, string expectedPath)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(FixturePath()))!.AsObject();
+        var key = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["curves"]!
+            .AsArray()[0]!.AsObject()["keys"]!.AsArray()[keyIndex]!.AsObject();
+        key[field] = 1e100;
+        var json = root.ToJsonString();
+
+        Assert.False(IsSchemaValid(json));
+        var exception = AssertLoadThrowsJsonException(json);
+        Assert.Contains(expectedPath, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -855,5 +949,19 @@ public sealed class AlsManifestSerializerTests
         var events = root["animations"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["timeline"]!.AsArray()
             .Concat(root["montages"]!.AsArray()[0]!.AsObject()["metadata"]!.AsObject()["timeline"]!.AsArray());
         return events.Select(value => value!.AsObject()).Single(value => value["kind"]!.GetValue<string>() == kind);
+    }
+
+    private static JsonException AssertLoadThrowsJsonException(string json)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"als-manifest-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, json);
+            return Assert.Throws<JsonException>(() => AlsManifestSerializer.Load(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 }

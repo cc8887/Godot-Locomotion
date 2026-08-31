@@ -342,6 +342,38 @@ public static partial class AlsManifestValidator
             Add(issues, "ALSMANIFEST026", asset.Id, $"{metadataPath}.additiveBasePoseId",
                 "Animation additive base-pose ID must be empty or a lowercase SHA-1.");
         }
+        ValidateStructuredCurves(metadata, metadataPath, asset.Id, issues);
+    }
+
+    private static void ValidateStructuredCurves(
+        AlsAnimationMetadata metadata,
+        string metadataPath,
+        string assetId,
+        List<AlsValidationIssue> issues)
+    {
+        var curves = metadata.Curves.RequireStructuredPayload();
+        for (var curveIndex = 0; curveIndex < curves.Length; curveIndex++)
+        {
+            for (var keyIndex = 0; keyIndex < curves[curveIndex].Keys.Length; keyIndex++)
+            {
+                var key = curves[curveIndex].Keys[keyIndex];
+                var path = $"{metadataPath}.curves[{curveIndex}].keys[{keyIndex}]";
+                ValidateCurveScalar(key.TimeSeconds, $"{path}.timeSeconds", assetId, issues);
+                ValidateCurveScalar(key.Value, $"{path}.value", assetId, issues);
+                ValidateCurveScalar(key.ArriveTangent, $"{path}.arriveTangent", assetId, issues);
+                ValidateCurveScalar(key.LeaveTangent, $"{path}.leaveTangent", assetId, issues);
+            }
+        }
+    }
+
+    private static void ValidateCurveScalar(
+        double value, string path, string assetId, List<AlsValidationIssue> issues)
+    {
+        if (!IsFiniteFloat(value))
+        {
+            Add(issues, "ALSMANIFEST030", assetId, path,
+                "Structured curve key scalar must be representable as a finite float.");
+        }
     }
 
     private static void ValidateMontageContract(
