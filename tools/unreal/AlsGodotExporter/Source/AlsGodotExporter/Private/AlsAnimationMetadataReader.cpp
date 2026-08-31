@@ -10,6 +10,7 @@
 #include "Animation/Skeleton.h"
 #include "Misc/SecureHash.h"
 #include "ReferenceSkeleton.h"
+#include "UObject/UnrealType.h"
 
 #include <limits>
 
@@ -98,6 +99,19 @@ namespace
     {
         Entries.Sort(TimelineEntryLess);
         Markers.Sort(SyncMarkerLess);
+    }
+
+    bool SetSelfTestPlayLength(UAnimSequenceBase& Sequence, const float PlayLength, FString& OutError)
+    {
+        FFloatProperty* SequenceLengthProperty =
+            FindFProperty<FFloatProperty>(UAnimSequenceBase::StaticClass(), TEXT("SequenceLength"));
+        if (!SequenceLengthProperty)
+        {
+            OutError = TEXT("Timeline self-test could not reflect SequenceLength.");
+            return false;
+        }
+        SequenceLengthProperty->SetPropertyValue_InContainer(&Sequence, PlayLength);
+        return true;
     }
 
     TSharedRef<FJsonObject> TimelineEntryToJson(const FAlsExportedTimelineEntry& Entry)
@@ -664,7 +678,7 @@ bool FAlsAnimationMetadataReader::ReadTimeline(const UAnimSequenceBase& Sequence
 
 bool FAlsAnimationMetadataReader::RunTimelineSelfTest(int32& OutCaseCount, FString& OutError)
 {
-    constexpr int32 ExpectedCaseCount = 22;
+    constexpr int32 ExpectedCaseCount = 26;
     OutCaseCount = 0;
     OutError.Reset();
 
@@ -725,6 +739,90 @@ bool FAlsAnimationMetadataReader::RunTimelineSelfTest(int32& OutCaseCount, FStri
     if (!ValidateTimelineBounds(1.0, Entries, Markers, CaseError) || !CaseError.IsEmpty())
     {
         OutError = FString::Printf(TEXT("Timeline self-test rejected an exact end boundary: %s"), *CaseError);
+        return false;
+    }
+    ++OutCaseCount;
+
+    UAnimSequence* SequenceSelfTest = NewObject<UAnimSequence>();
+    if (!SequenceSelfTest || !SetSelfTestPlayLength(*SequenceSelfTest, 1.0f, OutError))
+    {
+        return false;
+    }
+    for (const float Time : {0.75f, 0.25f})
+    {
+        FAnimNotifyEvent& SequenceNotifyEvent = SequenceSelfTest->Notifies.AddDefaulted_GetRef();
+        SequenceNotifyEvent.Notify = NewObject<UAnimNotify_ResetDynamics>(SequenceSelfTest);
+        SequenceNotifyEvent.NotifyName = FName(*FString::Printf(TEXT("SequenceSelfTest%d"),
+            SequenceSelfTest->Notifies.Num()));
+        SequenceNotifyEvent.SetTime(Time);
+        SequenceNotifyEvent.TriggerWeightThreshold = 0.5f;
+        SequenceNotifyEvent.TrackIndex = 0;
+    }
+    FAnimSyncMarker& SequenceMarker = SequenceSelfTest->AuthoredSyncMarkers.AddDefaulted_GetRef();
+    SequenceMarker.MarkerName = TEXT("SequenceBoundary");
+    SequenceMarker.Time = 1.0f;
+    TSharedRef<FJsonObject> SequenceMetadata = MakeShared<FJsonObject>();
+    FString SequenceError;
+    const TArray<TSharedPtr<FJsonValue>>* SequenceTimeline = nullptr;
+    const TArray<TSharedPtr<FJsonValue>>* SequenceMarkers = nullptr;
+    if (!ReadTimeline(*SequenceSelfTest, TEXT("transient-sequence-self-test"), SequenceMetadata, SequenceError) ||
+        !SequenceError.IsEmpty() || !SequenceMetadata->TryGetArrayField(TEXT("timeline"), SequenceTimeline) ||
+        !SequenceMetadata->TryGetArrayField(TEXT("syncMarkers"), SequenceMarkers) ||
+        !SequenceTimeline || SequenceTimeline->Num() != 2 || !SequenceMarkers || SequenceMarkers->Num() != 1 ||
+        (*SequenceTimeline)[0]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 1 ||
+        (*SequenceTimeline)[1]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 0 ||
+        (*SequenceTimeline)[0]->AsObject()->GetStringField(TEXT("stableEventId")).Len() != FSHA1::DigestSize * 2 ||
+        (*SequenceMarkers)[0]->AsObject()->GetNumberField(TEXT("timeSeconds")) != 1.0)
+    {
+        OutError = FString::Printf(TEXT("Timeline self-test transient Sequence JSON/order mismatch: %s"),
+            *SequenceError);
+        return false;
+    }
+    ++OutCaseCount;
+
+    SequenceSelfTest->Notifies[0].SetTime(1.0001f);
+    TSharedRef<FJsonObject> InvalidSequenceMetadata = MakeShared<FJsonObject>();
+    FString InvalidSequenceError;
+    if (ReadTimeline(*SequenceSelfTest, TEXT("transient-sequence-bounds-self-test"),
+            InvalidSequenceMetadata, InvalidSequenceError) || InvalidSequenceError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test transient Sequence accepted an out-of-bounds notify.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    UAnimMontage* MontageSelfTest = NewObject<UAnimMontage>();
+    if (!MontageSelfTest || !SetSelfTestPlayLength(*MontageSelfTest, 1.0f, OutError))
+    {
+        return false;
+    }
+    for (const float Time : {0.8f, 0.4f})
+    {
+        FAnimNotifyEvent& MontageNotifyEvent = MontageSelfTest->Notifies.AddDefaulted_GetRef();
+        MontageNotifyEvent.Notify = NewObject<UAnimNotify_ResetDynamics>(MontageSelfTest);
+        MontageNotifyEvent.NotifyName = FName(*FString::Printf(TEXT("MontageSelfTest%d"),
+            MontageSelfTest->Notifies.Num()));
+        MontageNotifyEvent.SetTime(Time);
+        MontageNotifyEvent.TriggerWeightThreshold = 0.5f;
+        MontageNotifyEvent.TrackIndex = 1;
+    }
+    FAnimSyncMarker& MontageMarker = MontageSelfTest->MarkerData.AuthoredSyncMarkers.AddDefaulted_GetRef();
+    MontageMarker.MarkerName = TEXT("MontageMiddle");
+    MontageMarker.Time = 0.5f;
+    TSharedRef<FJsonObject> MontageMetadata = MakeShared<FJsonObject>();
+    FString MontageError;
+    const TArray<TSharedPtr<FJsonValue>>* MontageTimeline = nullptr;
+    const TArray<TSharedPtr<FJsonValue>>* MontageMarkers = nullptr;
+    if (!ReadTimeline(*MontageSelfTest, TEXT("transient-montage-self-test"), MontageMetadata, MontageError) ||
+        !MontageError.IsEmpty() || !MontageMetadata->TryGetArrayField(TEXT("timeline"), MontageTimeline) ||
+        !MontageMetadata->TryGetArrayField(TEXT("syncMarkers"), MontageMarkers) ||
+        !MontageTimeline || MontageTimeline->Num() != 2 || !MontageMarkers || MontageMarkers->Num() != 1 ||
+        (*MontageTimeline)[0]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 1 ||
+        (*MontageTimeline)[1]->AsObject()->GetIntegerField(TEXT("sourceIndex")) != 0 ||
+        (*MontageMarkers)[0]->AsObject()->GetStringField(TEXT("name")) != TEXT("MontageMiddle"))
+    {
+        OutError = FString::Printf(TEXT("Timeline self-test transient Montage JSON/order mismatch: %s"),
+            *MontageError);
         return false;
     }
     ++OutCaseCount;

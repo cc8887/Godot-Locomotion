@@ -74,7 +74,7 @@ if (-not (($readyOutput | Out-String).Contains($curveSelfTestMarker, [StringComp
     throw "Native curve export self-test marker was not found: $curveSelfTestMarker"
 }
 
-$timelineSelfTestMarker = 'GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=22'
+$timelineSelfTestMarker = 'GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=26'
 if (-not (($readyOutput | Out-String).Contains($timelineSelfTestMarker, [StringComparison]::Ordinal))) {
     throw "Native timeline export self-test marker was not found: $timelineSelfTestMarker"
 }

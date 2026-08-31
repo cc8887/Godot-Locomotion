@@ -35,6 +35,11 @@ namespace
         TEXT("/Game/AdvancedLocomotionV4/Data/Enums/ALS_MovementAction.ALS_MovementAction");
     constexpr TCHAR NativeFootBoneEnumPath[] = TEXT("/Script/ALS.EAlsFootBone");
     constexpr TCHAR GameplayTagStructPath[] = TEXT("/Script/GameplayTags.GameplayTag");
+    constexpr TCHAR LocomotionModeTagPrefix[] = TEXT("Als.LocomotionMode.");
+    constexpr TCHAR RotationModeTagPrefix[] = TEXT("Als.RotationMode.");
+    constexpr TCHAR StanceTagPrefix[] = TEXT("Als.Stance.");
+    constexpr TCHAR LocomotionActionTagPrefix[] = TEXT("Als.LocomotionAction.");
+    constexpr TCHAR GroundedEntryModeTagPrefix[] = TEXT("Als.GroundedEntryMode.");
     constexpr FAlsEnumValueAlias MovementActionAliases[] = {
         {TEXT("NewEnumerator0"), TEXT("Mantling")},
         {TEXT("NewEnumerator1"), TEXT("Mantling")},
@@ -191,7 +196,7 @@ namespace
     }
 
     EAlsPayloadResult TryReadGameplayTag(const UObject& Object,
-        const std::initializer_list<FName> PropertyNames, FString& OutValue)
+        const std::initializer_list<FName> PropertyNames, const TCHAR* ExpectedTagPrefix, FString& OutValue)
     {
         const FProperty* BaseProperty = nullptr;
         for (const FName PropertyName : PropertyNames)
@@ -223,22 +228,26 @@ namespace
             OutValue = TEXT("None");
             return EAlsPayloadResult::Success;
         }
-        OutValue = TagName.ToString();
-        int32 Separator = INDEX_NONE;
-        if (OutValue.FindLastChar(TEXT('.'), Separator))
+        const FString FullTag = TagName.ToString();
+        const FString ExpectedPrefix{ExpectedTagPrefix};
+        if (!FullTag.StartsWith(ExpectedPrefix, ESearchCase::CaseSensitive))
         {
-            OutValue.RightChopInline(Separator + 1);
+            return EAlsPayloadResult::Invalid;
         }
-        return OutValue.IsEmpty() ? EAlsPayloadResult::Invalid : EAlsPayloadResult::Success;
+        OutValue = FullTag.RightChop(ExpectedPrefix.Len());
+        return OutValue.IsEmpty() || OutValue.Contains(TEXT("."), ESearchCase::CaseSensitive)
+            ? EAlsPayloadResult::Invalid
+            : EAlsPayloadResult::Success;
     }
 
     EAlsPayloadResult TryReadEnumOrGameplayTag(const UObject& Object,
         const std::initializer_list<FName> EnumPropertyNames,
-        const std::initializer_list<FName> GameplayTagPropertyNames, FString& OutValue)
+        const std::initializer_list<FName> GameplayTagPropertyNames,
+        const TCHAR* ExpectedTagPrefix, FString& OutValue)
     {
         const EAlsPayloadResult EnumResult = TryReadEnum(Object, EnumPropertyNames, OutValue);
         return EnumResult == EAlsPayloadResult::Unavailable
-            ? TryReadGameplayTag(Object, GameplayTagPropertyNames, OutValue)
+            ? TryReadGameplayTag(Object, GameplayTagPropertyNames, ExpectedTagPrefix, OutValue)
             : EnumResult;
     }
 
@@ -342,7 +351,8 @@ namespace
     {
         FString Action;
         const EAlsPayloadResult ReadResult = TryReadEnumOrGameplayTag(Object,
-            {TEXT("Action"), TEXT("MovementAction")}, {TEXT("LocomotionAction")}, Action);
+            {TEXT("Action"), TEXT("MovementAction")}, {TEXT("LocomotionAction")},
+            LocomotionActionTagPrefix, Action);
         if (ReadResult != EAlsPayloadResult::Success)
         {
             return ReportReadFailure(ReadResult, TEXT("SetAction"), Object, OutError);
@@ -360,7 +370,8 @@ namespace
     {
         FString Mode;
         const EAlsPayloadResult ReadResult = TryReadEnumOrGameplayTag(Object,
-            {TEXT("Mode"), TEXT("GroundedEntryState")}, {TEXT("GroundedEntryMode")}, Mode);
+            {TEXT("Mode"), TEXT("GroundedEntryState")}, {TEXT("GroundedEntryMode")},
+            GroundedEntryModeTagPrefix, Mode);
         if (ReadResult != EAlsPayloadResult::Success)
         {
             return ReportReadFailure(ReadResult, TEXT("SetGroundedEntry"), Object, OutError);
@@ -397,11 +408,13 @@ namespace
             TEXT("bCheckRotationMode"), bCheckRotationMode);
         const EAlsPayloadResult CheckStanceResult = TryReadBool(Object, TEXT("bCheckStance"), bCheckStance);
         const EAlsPayloadResult LocomotionResult = TryReadEnumOrGameplayTag(Object,
-            {TEXT("LocomotionMode")}, {TEXT("LocomotionModeEquals")}, LocomotionMode);
+            {TEXT("LocomotionMode")}, {TEXT("LocomotionModeEquals")},
+            LocomotionModeTagPrefix, LocomotionMode);
         const EAlsPayloadResult RotationResult = TryReadEnumOrGameplayTag(Object,
-            {TEXT("RotationMode")}, {TEXT("RotationModeEquals")}, RotationMode);
+            {TEXT("RotationMode")}, {TEXT("RotationModeEquals")},
+            RotationModeTagPrefix, RotationMode);
         const EAlsPayloadResult StanceResult = TryReadEnumOrGameplayTag(Object,
-            {TEXT("Stance")}, {TEXT("StanceEquals")}, Stance);
+            {TEXT("Stance")}, {TEXT("StanceEquals")}, StanceTagPrefix, Stance);
         const EAlsPayloadResult Results[] = {BlendOutResult, CheckInputResult, CheckLocomotionResult,
             CheckRotationResult, CheckStanceResult, LocomotionResult, RotationResult, StanceResult};
         bool bHasUnavailableField = false;
@@ -614,17 +627,9 @@ bool FAlsNotifyClassRegistry::Export(const FAnimNotifyEvent& NotifyEvent, const 
 
 bool FAlsNotifyClassRegistry::RunSelfTest(int32& OutCaseCount, FString& OutError)
 {
-    constexpr int32 ExpectedCaseCount = 14;
+    constexpr int32 ExpectedCaseCount = 15;
     OutCaseCount = 0;
     OutError.Reset();
-
-    if (CreateSha1(TEXT("\u8d44\u6e90|timeline|7|/Script/\u6d4b\u8bd5.\u7c7b")) !=
-        TEXT("6c352ece91861e5a728baae0272834d99aad0a42"))
-    {
-        OutError = TEXT("Timeline self-test UTF-8 SHA-1 mismatch.");
-        return false;
-    }
-    ++OutCaseCount;
 
     const FAlsEnumValueAlias ExpectedMovementActions[] = {
         {TEXT("NewEnumerator0"), TEXT("Mantling")},
@@ -714,6 +719,28 @@ bool FAlsNotifyClassRegistry::RunSelfTest(int32& OutCaseCount, FString& OutError
     }
     ++OutCaseCount;
 
+    FAnimNotifyEvent ActionNotifyEvent;
+    ActionNotifyEvent.NotifyStateClass = Cast<UAnimNotifyState>(ActionObject);
+    ActionNotifyEvent.NotifyName = TEXT("ActionExportSelfTest");
+    ActionNotifyEvent.SetTime(0.25f);
+    ActionNotifyEvent.SetDuration(0.5f);
+    ActionNotifyEvent.TriggerWeightThreshold = 0.5f;
+    ActionNotifyEvent.TrackIndex = 2;
+    ActionNotifyEvent.MontageTickType = EMontageNotifyTickType::BranchingPoint;
+    FAlsExportedTimelineEntry ActionEntry;
+    FString ActionExportError;
+    if (!FAlsNotifyClassRegistry::Export(ActionNotifyEvent, TEXT("\u8d44\u6e90-self-test"), 7,
+            ActionEntry, ActionExportError) || !ActionExportError.IsEmpty() ||
+        ActionEntry.Kind != TEXT("SetAction") || !ActionEntry.Payload.IsValid() ||
+        ActionEntry.Payload->GetStringField(TEXT("action")) != TEXT("Ragdolling") ||
+        ActionEntry.StableEventId != TEXT("5bae929b17872885ecc5246f3d1e6a8a11ca1184"))
+    {
+        OutError = FString::Printf(TEXT("Timeline self-test production Export typed/UTF-8 mismatch: %s"),
+            *ActionExportError);
+        return false;
+    }
+    ++OutCaseCount;
+
     UObject* EarlyBlendOutObject = CreateSelfTestObject(TEXT("/Script/ALS.AlsAnimNotifyState_EarlyBlendOut"), OutError);
     if (!EarlyBlendOutObject || !SetSelfTestGameplayTag(*EarlyBlendOutObject, TEXT("RotationModeEquals"),
         TEXT("Als.RotationMode.ViewDirection"), OutError))
@@ -725,6 +752,30 @@ bool FAlsNotifyClassRegistry::RunSelfTest(int32& OutCaseCount, FString& OutError
         EarlyBlendOutPayload->GetStringField(TEXT("rotationMode")) != TEXT("LookingDirection"))
     {
         OutError = TEXT("Timeline self-test failed to normalize a typed EarlyBlendOut payload.");
+        return false;
+    }
+    ++OutCaseCount;
+
+    if (!SetSelfTestGameplayTag(*EarlyBlendOutObject, TEXT("RotationModeEquals"),
+            TEXT("Als.RotationMode.ViewDirection"), OutError) ||
+        !SetSelfTestGameplayTag(*EarlyBlendOutObject, TEXT("LocomotionModeEquals"),
+            TEXT("Als.LocomotionAction.Mantling"), OutError))
+    {
+        return false;
+    }
+    FAnimNotifyEvent CrossDomainNotifyEvent;
+    CrossDomainNotifyEvent.NotifyStateClass = Cast<UAnimNotifyState>(EarlyBlendOutObject);
+    CrossDomainNotifyEvent.NotifyName = TEXT("CrossDomainSelfTest");
+    CrossDomainNotifyEvent.SetTime(0.25f);
+    CrossDomainNotifyEvent.SetDuration(0.5f);
+    CrossDomainNotifyEvent.TriggerWeightThreshold = 0.5f;
+    CrossDomainNotifyEvent.TrackIndex = 0;
+    FAlsExportedTimelineEntry CrossDomainEntry;
+    FString CrossDomainError;
+    if (FAlsNotifyClassRegistry::Export(CrossDomainNotifyEvent, TEXT("cross-domain-self-test"), 0,
+            CrossDomainEntry, CrossDomainError) || CrossDomainError.IsEmpty())
+    {
+        OutError = TEXT("Timeline self-test accepted a LocomotionAction tag in LocomotionModeEquals.");
         return false;
     }
     ++OutCaseCount;

@@ -119,7 +119,7 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("const FString& AssetStableId", RegistryHeader, StringComparison.Ordinal);
         Assert.Contains("int32 SourceIndex", RegistryHeader, StringComparison.Ordinal);
         Assert.Contains("FAlsExportedTimelineEntry& OutEntry", RegistryHeader, StringComparison.Ordinal);
-        Assert.DoesNotContain("NotifyName", RegistrySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotifyEvent.NotifyName.ToString", RegistrySource, StringComparison.Ordinal);
         Assert.DoesNotContain("SourceClassPath.Contains", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("TEXT(\"Unspecified\")", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("TEXT(\"ViewDirection\")", RegistrySource, StringComparison.Ordinal);
@@ -161,7 +161,7 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("TEXT(\"BranchingPoint\")", RegistrySource, StringComparison.Ordinal);
         Assert.Contains("RunTimelineSelfTest", CommandletSource, StringComparison.Ordinal);
         Assert.Contains("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=%d", CommandletSource, StringComparison.Ordinal);
-        Assert.Contains("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=22", BuildScript, StringComparison.Ordinal);
+        Assert.Contains("GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=26", BuildScript, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -185,11 +185,53 @@ public sealed class AlsTimelineExporterSourceContractTests
     [Fact]
     public void NativeSelfTestCoversReviewBoundaries()
     {
-        Assert.Contains("ExpectedCaseCount = 22", AnimationReader, StringComparison.Ordinal);
-        Assert.Contains("6c352ece91861e5a728baae0272834d99aad0a42", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("ExpectedCaseCount = 26", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("5bae929b17872885ecc5246f3d1e6a8a11ca1184", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("FAlsNotifyClassRegistry::Export(ActionNotifyEvent", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("Als.LocomotionAction.Mantling", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("NewObject<UAnimSequence>", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("NewObject<UAnimMontage>", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("ReadTimeline(*SequenceSelfTest", AnimationReader, StringComparison.Ordinal);
+        Assert.Contains("ReadTimeline(*MontageSelfTest", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("ValidateTimelineBounds", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("TimelineEntryLess", AnimationReader, StringComparison.Ordinal);
         Assert.Contains("SyncMarkerLess", AnimationReader, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GameplayTagsRequireExactFrozenDomains()
+    {
+        string[] exactPrefixes =
+        [
+            "Als.LocomotionMode.",
+            "Als.RotationMode.",
+            "Als.Stance.",
+            "Als.LocomotionAction.",
+            "Als.GroundedEntryMode.",
+        ];
+        foreach (var prefix in exactPrefixes)
+        {
+            Assert.Contains(prefix, RegistrySource, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("ExpectedTagPrefix", RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("Als.LocomotionAction.Mantling", RegistrySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("FindLastChar(TEXT('.'), Separator)", RegistrySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void P2AVerifierRequiresBothV2ManifestsAndIndependentTimelineEvidence()
+    {
+        Assert.Contains("function Assert-P2AV2Manifest", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("Assert-P2AV2Manifest -Manifest $manifest -Label 'Partial'", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("Assert-P2AV2Manifest -Manifest $formalManifest -Label 'Formal'", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("contains no Sequence timeline entries", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("contains no Montage timeline entries", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("contains no sync markers", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("contains no typed timeline events or actions", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("schemaVersion -ne 2", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("exporterVersion -cne '2.0.0'", VerifyP2A, StringComparison.Ordinal);
+        Assert.DoesNotContain("curves or timeline entries", VerifyP2A, StringComparison.Ordinal);
     }
 
     [Fact]
