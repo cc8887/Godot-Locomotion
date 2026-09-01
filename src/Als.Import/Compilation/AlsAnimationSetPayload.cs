@@ -84,6 +84,27 @@ public sealed record AlsAnimationSetPayload(
         return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
     }
 
+    internal static void ValidateDefinition(AlsAnimationSetDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        try
+        {
+            var payload = FromDefinition(definition);
+            payload.ValidateAnimationCurves();
+            payload.ValidateP5aDefinitions();
+            _ = payload.ToDefinition();
+        }
+        catch (InvalidDataException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or
+            NullReferenceException or IndexOutOfRangeException or KeyNotFoundException)
+        {
+            throw Invalid("$", "ALS animation-set payload structure is invalid.", exception);
+        }
+    }
+
     private static void WriteDefinition(BinaryWriter writer, AlsAnimationSetDefinition value)
     {
         WriteArray(writer, value.Skeletons, WriteSkeleton);
