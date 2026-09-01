@@ -69,8 +69,10 @@ public static class AlsP5CoreRuntimeBindingCompiler
         ArgumentNullException.ThrowIfNull(p5a);
         ArgumentNullException.ThrowIfNull(layout);
 
-        ValidateDefinitionDigest(animationSet);
         ValidateAuthoritativeAnimationSet(animationSet);
+        ValidateDefinitionDigest(animationSet);
+        ValidateProfileShape(locomotion, pose, p5a);
+        PreflightActionTimelineExpansion(animationSet, p5a);
         var animations = animationSet.Animations;
         ValidateAnimationTable(animations);
         ValidateExactLayout(locomotion, pose, p5a, layout);
@@ -167,7 +169,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
     {
         try
         {
-            _ = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(animationSet));
+            AlsAnimationSetPayload.ValidateDefinition(animationSet);
         }
         catch (InvalidDataException exception)
         {
@@ -175,6 +177,93 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 "The animation set failed authoritative payload validation.",
                 nameof(animationSet),
                 exception);
+        }
+    }
+
+    private static void ValidateProfileShape(
+        AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose,
+        AlsP5aAnimationRuntimeProfile p5a)
+    {
+        try
+        {
+            if (locomotion.StandingSamples is null || locomotion.CrouchingSamples is null ||
+                locomotion.LeanAdditiveSamples is null || locomotion.AllAnimationIds is null ||
+                locomotion.StandingSamples.Any(value => value is null) ||
+                locomotion.CrouchingSamples.Any(value => value is null) ||
+                locomotion.LeanAdditiveSamples.Any(value => value is null) ||
+                pose.Masks is null || pose.FootCurves is null)
+            {
+                throw new ArgumentException("A P3/P4 profile contains a null required shape.");
+            }
+
+            var turns = pose.Turns;
+            var rotates = pose.Rotates;
+            var maskEntries = pose.Masks.Entries;
+            var footBindings = pose.FootCurves.Bindings;
+            if (turns is null || rotates is null || maskEntries is null || footBindings is null ||
+                maskEntries.Any(value => value is null || value.BoneIds is null))
+            {
+                throw new ArgumentException("A P4 profile contains a null required row.");
+            }
+
+            var eventSemantics = p5a.EventSemantics;
+            var syncGroups = p5a.SyncGroups;
+            var actions = p5a.Actions;
+            var segmentBindings = p5a.SegmentBindings;
+            var timelineEntries = p5a.TimelineEntries;
+            if (p5a.AllowTransitions is null || p5a.DynamicTransition is null ||
+                eventSemantics is null || syncGroups is null || actions is null ||
+                segmentBindings is null || timelineEntries is null ||
+                p5a.AllowTransitions.AnimationCurveIds is null ||
+                p5a.DynamicTransition.Slots is null ||
+                syncGroups.Any(value => value is null || value.Members is null) ||
+                actions.Any(value => value is null || value.Sections is null))
+            {
+                throw new ArgumentException("The P5A profile contains a null required shape or row.");
+            }
+        }
+        catch (Exception exception) when (exception is NullReferenceException or ArgumentNullException)
+        {
+            throw new ArgumentException("A runtime profile contains a null required shape.", exception);
+        }
+    }
+
+    private static void PreflightActionTimelineExpansion(
+        AlsAnimationSetDefinition animationSet,
+        AlsP5aAnimationRuntimeProfile p5a)
+    {
+        long expandedTimelineEntries = 0;
+        foreach (var action in p5a.Actions)
+        {
+            if ((uint)action.MontageId >= (uint)animationSet.Montages.Length)
+            {
+                throw new ArgumentException("An Action Montage is missing from the current set.");
+            }
+            var montage = animationSet.Montages[action.MontageId];
+            AddActionTimelineBudget(ref expandedTimelineEntries, montage.Timeline.Length);
+            foreach (var slot in montage.Slots)
+            {
+                foreach (var segment in slot.Segments)
+                {
+                    if (segment.LoopCount <= 0 ||
+                        (uint)segment.AnimationId >= (uint)animationSet.Animations.Length)
+                    {
+                        throw new ArgumentException("A current Action segment is unresolved.");
+                    }
+                    long estimatedEntries;
+                    try
+                    {
+                        estimatedEntries = checked((long)segment.LoopCount *
+                            animationSet.Animations[segment.AnimationId].Timeline.Length);
+                    }
+                    catch (OverflowException exception)
+                    {
+                        throw new ArgumentException("The Action timeline expansion budget overflowed.", exception);
+                    }
+                    AddActionTimelineBudget(ref expandedTimelineEntries, estimatedEntries);
+                }
+            }
         }
     }
 
@@ -1389,7 +1478,6 @@ public static class AlsP5CoreRuntimeBindingCompiler
     {
         var expectedSegments = new List<AlsCompiledActionSegmentBinding>();
         var expectedTimeline = new List<AlsCompiledActionTimelineEntry>();
-        long expandedTimelineEntries = 0;
         for (var actionIndex = 0; actionIndex < p5a.Actions.Length; actionIndex++)
         {
             var action = p5a.Actions[actionIndex];
@@ -1446,16 +1534,6 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 {
                     throw new ArgumentException("A current Action segment mapping equation is invalid.");
                 }
-                long estimatedEntries;
-                try
-                {
-                    estimatedEntries = checked((long)segment.LoopCount * animation.Timeline.Length);
-                }
-                catch (OverflowException exception)
-                {
-                    throw new ArgumentException("The Action timeline expansion budget overflowed.", exception);
-                }
-                AddActionTimelineBudget(ref expandedTimelineEntries, estimatedEntries);
                 var mappedDuration = (double)segment.LoopCount *
                     ((double)segment.AnimationEndTime - segment.AnimationStartTime) / segment.PlayRate;
                 if (!double.IsFinite(mappedDuration) || !Finite(montageEnd) ||
@@ -1485,7 +1563,6 @@ public static class AlsP5CoreRuntimeBindingCompiler
                     throw new ArgumentException("An Action section is not covered by current segments.");
             }
 
-            AddActionTimelineBudget(ref expandedTimelineEntries, montage.Timeline.Length);
             foreach (var value in montage.Timeline)
             {
                 ValidateTimelineSource(value, montage.Id, montage.PlayLength);
