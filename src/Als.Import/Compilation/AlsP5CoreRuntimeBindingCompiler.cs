@@ -14,6 +14,47 @@ public static class AlsP5CoreRuntimeBindingCompiler
 {
     private const int Version = 1;
 
+    private static readonly string[] CanonicalBaseAnimationStableIds =
+    [
+        "621a81bf492cb9120b45cfd91b685854afb7dc75",
+        "6124eafdcbeaaf04bca366add34c821faa0e4963", "44a7f89b2c1dac832ca63753c131a037420f9d7e",
+        "fc2d3a4142a1bd82d20877d806c783ff56dfe688", "32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+        "a4c6e0e455e7be7355cdd7c3ce49272d07773b18", "eb84a748fee4615754ce3cbcd3c259b33918b935",
+        "572c3c83c9007964c233db4c7288ae38e20c3dec", "8ae1b9703a7d0144e570247d88629530b376885f",
+        "945bdda63e8a379694c792c3545fe11dd166b724", "859f8a49c55747e7382a1ae15970b23cc12f3f85",
+        "b07a51bbab122c81679ac30d3f2f78f45ac14dc8", "245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+        "8bd6ad52ad04a2ad23b47187886c630701df5260", "146fff5000e151a3790ba5aca8a5bfee4363e909",
+        "8eb8837c9f32973628b83ed2b98f7d68a0e82aa9", "21c24bd7df5192db2e2a860457f2b7b0681de41d",
+        "db60b2c35ce5ef5216c782fc1f33549cbcf8278d", "f9ec8804e251f03c57e04dde4db9bd921457bae4",
+        "0b439429cf3a3692eaea77a81b275ae96eab937f", "8b1315b68336709c4a00bcd18871f0b3ba44308a",
+        "8e310a7484f5a1fda4a549e1b80fd0405b1d4f35",
+    ];
+
+    private static readonly (float X, float Y)[] CanonicalStandingCoordinates =
+    [
+        (0f, .5f), (-.353553f, .353553f), (.353553f, .353553f), (0f, -.5f),
+        (-.353553f, -.353553f), (.353553f, -.353553f), (0f, 1f),
+        (-.707107f, .707107f), (.707107f, .707107f), (0f, -1f),
+        (-.707107f, -.707107f), (.707107f, -.707107f), (0f, 1.5f),
+    ];
+
+    private static readonly (float X, float Y)[] CanonicalCrouchingCoordinates =
+        [(0f, 1f), (-1f, 0f), (1f, 0f), (0f, -1f)];
+
+    private static readonly string[] CanonicalTurnStableIds =
+    [
+        "a73b6e3c8aac55396058a7cb7c65b1afe6a539fa", "f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b",
+        "a3c722afa7c416d15d8c61ed614d4def5b5b758c", "59f469970639c759780278d7ffc8ea717e715207",
+        "ddfa1a6737182bddb3134e78d0460c3ef49f93e1", "c13f1b18a24a33a01827ee93b9b1bdcd64295a0d",
+        "a20c9d988632a569157541f0d6fd8c309ac8ae09", "92e0d292db977093c0ad02b5490c241609032e38",
+    ];
+
+    private static readonly string[] CanonicalRotateStableIds =
+    [
+        "4677f1239a2057a65a5daeaf6ebbbf4f6a997060", "9a04c94cbdf6a02f426768f49c789cb8341e253a",
+        "310b992c1a30d10675842924f95353905f659382", "3c285f6df704e8e73cdfd0fd9bb147c1e5338ef1",
+    ];
+
     public static AlsP5CoreRuntimeBindingSnapshot Compile(
         AlsAnimationSetDefinition animationSet,
         AlsLocomotionAnimationProfile locomotion,
@@ -30,6 +71,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         ValidateDefinitionDigest(animationSet);
         var animations = animationSet.Animations;
         ValidateAnimationTable(animations);
+        ValidateExactLayout(locomotion, pose, p5a, layout);
         var (occurrenceEntries, importEntries) = CompileOccurrenceEntries(layout);
         var baseAnimationIds = BaseAnimationIds(locomotion);
         var turns = pose.Turns;
@@ -56,11 +98,12 @@ public static class AlsP5CoreRuntimeBindingCompiler
         var generalTimeline = CompileGeneralTimeline(
             animations, baseAnimationIds, turns, rotates, p5a.DynamicTransition,
             occurrenceEntries, eventSemantics);
-        CompileSync(p5a, layout, animations, locomotion.SkeletonId, occurrenceEntries,
+        CompileSync(p5a, layout, animations, locomotion.SkeletonId, baseAnimationIds, occurrenceEntries,
             out var syncMarkers, out var syncGroup, out var syncMembers,
             out var syncOccurrences);
         var dynamicTransition = CompileTransition(
             p5a.DynamicTransition, animations, locomotion.SkeletonId, occurrenceEntries);
+        ValidateActionProvenance(animationSet, p5a);
         CompileActions(p5a, occurrenceEntries, eventSemantics, generalTimeline,
             out var timelineDefinitions, out var actionDefinitions,
             out var actionSections, out var actionSegments, out var actionTimelineRanges);
@@ -115,6 +158,22 @@ public static class AlsP5CoreRuntimeBindingCompiler
         {
             throw new ArgumentException("The animation-set definition digest is stale or noncanonical.",
                 nameof(animationSet));
+        }
+    }
+
+    private static void ValidateExactLayout(
+        AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose,
+        AlsP5aAnimationRuntimeProfile p5a,
+        AlsP5OccurrenceLayout supplied)
+    {
+        var expected = AlsP5OccurrenceLayoutCompiler.Compile(locomotion, pose, p5a);
+        if (supplied.Version != expected.Version || supplied.Digest != expected.Digest ||
+            !supplied.Entries.SequenceEqual(expected.Entries) ||
+            !supplied.SyncMappings.SequenceEqual(expected.SyncMappings))
+        {
+            throw new ArgumentException("The occurrence layout differs from the fresh canonical allocation.",
+                nameof(supplied));
         }
     }
 
@@ -219,7 +278,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         for (var index = 0; index < values.Length; index++)
         {
             if (!Enum.IsDefined(values[index].Kind) || values[index].Kind != kinds[index] ||
-                values[index].SemanticId < 0 || !semanticIds.Add(values[index].SemanticId))
+                values[index].SemanticId != index || !semanticIds.Add(values[index].SemanticId))
             {
                 throw new ArgumentException("The event semantic table is invalid.", nameof(values));
             }
@@ -283,6 +342,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         {
             throw new ArgumentException("The frozen P3/P4 graph topology is incomplete.");
         }
+        ValidateP3P4Provenance(animationSet, locomotion, pose, skeleton, baseAnimationIds);
         standingSamples = MapSamples(locomotion.StandingSamples, animations, locomotion.SkeletonId);
         crouchingSamples = MapSamples(locomotion.CrouchingSamples, animations, locomotion.SkeletonId);
         leanSamples = MapSamples(locomotion.LeanAdditiveSamples, animations, locomotion.SkeletonId);
@@ -342,6 +402,368 @@ public static class AlsP5CoreRuntimeBindingCompiler
         }
 
         CompileMasks(pose.Masks, skeleton, out maskHeaders, out logicalBoneIds);
+    }
+
+    private static void ValidateP3P4Provenance(
+        AlsAnimationSetDefinition set,
+        AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose,
+        AlsSkeletonDefinition skeleton,
+        int[] baseAnimationIds)
+    {
+        if (pose.SchemaVersion != 1 || !pose.IsRuntimeComplete ||
+            !string.Equals(set.SkeletalMeshes[locomotion.MannequinMeshId].StableId,
+                "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The P3/P4 runtime identity header is noncanonical.");
+        }
+        if (baseAnimationIds.Distinct().Count() != baseAnimationIds.Length ||
+            baseAnimationIds.Length != CanonicalBaseAnimationStableIds.Length)
+        {
+            throw new ArgumentException("The P3 base animation roles are incomplete or duplicated.");
+        }
+        for (var index = 0; index < baseAnimationIds.Length; index++)
+        {
+            if (!string.Equals(set.Animations[baseAnimationIds[index]].StableId,
+                    CanonicalBaseAnimationStableIds[index], StringComparison.Ordinal))
+            {
+                throw new ArgumentException("A P3 base animation role is not canonical.");
+            }
+        }
+        ValidateCanonicalCoordinates(locomotion.StandingSamples, CanonicalStandingCoordinates);
+        ValidateCanonicalCoordinates(locomotion.CrouchingSamples, CanonicalCrouchingCoordinates);
+        ValidateLeanProvenance(set, locomotion);
+        ValidateAimProvenance(set, pose.Aim, locomotion.SkeletonId);
+        ValidateTurnRotateProvenance(set, pose, locomotion.SkeletonId);
+        ValidateMaskProvenance(pose.Masks, skeleton);
+        ValidateFootProvenance(set, locomotion, pose, skeleton);
+    }
+
+    private static void ValidateCanonicalCoordinates(
+        AlsLocomotionAnimationSample[] samples,
+        (float X, float Y)[] expected)
+    {
+        if (samples.Length != expected.Length) throw new ArgumentException("A P3 sample bank is incomplete.");
+        for (var index = 0; index < samples.Length; index++)
+        {
+            if (samples[index].X != expected[index].X || samples[index].Y != expected[index].Y ||
+                samples[index].RateScale != 1f)
+            {
+                throw new ArgumentException("A P3 sample bank differs from the authored mapping.");
+            }
+        }
+    }
+
+    private static void ValidateLeanProvenance(
+        AlsAnimationSetDefinition set,
+        AlsLocomotionAnimationProfile locomotion)
+    {
+        var blend = set.BlendSpaces.SingleOrDefault(value => string.Equals(value.StableId,
+            "6cdc10621a632cfe5aae96e76a82b37da26891e3", StringComparison.Ordinal));
+        var samples = locomotion.LeanAdditiveSamples;
+        if (blend is null || blend.Samples.Length != samples.Length || samples.Length == 0)
+        {
+            throw new ArgumentException("The P3 Lean additive source is missing or incomplete.");
+        }
+        var baseId = -1;
+        var baseType = -1;
+        var baseFrame = -1;
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var authored = blend.Samples[index];
+            var mapped = samples[index];
+            if (authored.SampleValue.Length < 2 || mapped.AnimationId != authored.AnimationId ||
+                mapped.X != authored.SampleValue[0] || mapped.Y != authored.SampleValue[1] ||
+                mapped.RateScale != authored.RateScale)
+            {
+                throw new ArgumentException("A P3 Lean sample differs from the current BlendSpace.");
+            }
+            var animation = set.Animations[mapped.AnimationId];
+            if (animation.AdditiveType != 1 || animation.SkeletonId != locomotion.SkeletonId ||
+                (uint)animation.AdditiveBasePoseAnimationId >= (uint)set.Animations.Length)
+            {
+                throw new ArgumentException("A P3 Lean sample has invalid additive provenance.");
+            }
+            if (index == 0)
+            {
+                baseId = animation.AdditiveBasePoseAnimationId;
+                baseType = animation.AdditiveBasePoseType;
+                baseFrame = animation.AdditiveBasePoseFrame;
+            }
+            else if (animation.AdditiveBasePoseAnimationId != baseId ||
+                     animation.AdditiveBasePoseType != baseType ||
+                     animation.AdditiveBasePoseFrame != baseFrame)
+            {
+                throw new ArgumentException("P3 Lean samples do not share one additive base.");
+            }
+        }
+        if (baseId != locomotion.LeanAdditiveBasePoseAnimationId ||
+            set.Animations[baseId].AdditiveType != 0 ||
+            set.Animations[baseId].SkeletonId != locomotion.SkeletonId)
+        {
+            throw new ArgumentException("The P3 Lean additive base is invalid.");
+        }
+    }
+
+    private static void ValidateAimProvenance(
+        AlsAnimationSetDefinition set,
+        AlsAimProfile aim,
+        int skeletonId)
+    {
+        var offset = set.AimOffsets[aim.AimOffsetId];
+        if (!string.Equals(offset.StableId, "b4bf2befd979de45f53f300dc0e60c702fc3a686",
+                StringComparison.Ordinal) || offset.Parameters.Length != 3 ||
+            offset.Parameters[0] != new AlsBlendParameterDefinition("Pitch", -90f, 90f, 4) ||
+            offset.Parameters[1] != new AlsBlendParameterDefinition("None", 0f, 100f, 4) ||
+            offset.Parameters[2] != new AlsBlendParameterDefinition("None", 0f, 100f, 4) ||
+            offset.Samples.Length != 3)
+        {
+            throw new ArgumentException("The P4 AimOffset contract is noncanonical.");
+        }
+        var expectedIds = new[] { aim.DownAnimationId, aim.ForwardAnimationId, aim.UpAnimationId };
+        var expectedPitch = new[] { -90f, 0f, 90f };
+        var baseId = aim.AdditiveBasePoseAnimationId;
+        var additiveBaseType = set.Animations[expectedIds[0]].AdditiveBasePoseType;
+        var additiveBaseFrame = set.Animations[expectedIds[0]].AdditiveBasePoseFrame;
+        for (var index = 0; index < expectedIds.Length; index++)
+        {
+            var matching = offset.Samples.Where(value => value.SampleValue is { Length: 3 } &&
+                value.SampleValue[0] == expectedPitch[index] && value.SampleValue[1] == 0f &&
+                value.SampleValue[2] == 0f).ToArray();
+            if (matching.Length != 1)
+                throw new ArgumentException("A P4 Aim sample coordinate is missing or duplicate.");
+            var sample = matching[0];
+            var animation = set.Animations[expectedIds[index]];
+            if (sample.AnimationId != expectedIds[index] || sample.RateScale != 1f ||
+                animation.SkeletonId != skeletonId || animation.AdditiveType != 2 ||
+                animation.AdditiveBasePoseAnimationId != baseId ||
+                animation.AdditiveBasePoseType != additiveBaseType ||
+                animation.AdditiveBasePoseFrame != additiveBaseFrame)
+            {
+                throw new ArgumentException("A P4 Aim sample or additive binding is noncanonical.");
+            }
+        }
+        if (set.Animations[baseId].AdditiveType != 0 || set.Animations[baseId].SkeletonId != skeletonId)
+        {
+            throw new ArgumentException("The P4 Aim additive base is invalid.");
+        }
+    }
+
+    private static void ValidateTurnRotateProvenance(
+        AlsAnimationSetDefinition set,
+        AlsPoseAnimationProfile pose,
+        int skeletonId)
+    {
+        var expectedTurns = new (AlsPoseStance Stance, sbyte Direction, short Degrees)[]
+        {
+            (AlsPoseStance.Standing, -1, 90), (AlsPoseStance.Standing, 1, 90),
+            (AlsPoseStance.Standing, -1, 180), (AlsPoseStance.Standing, 1, 180),
+            (AlsPoseStance.Crouching, -1, 90), (AlsPoseStance.Crouching, 1, 90),
+            (AlsPoseStance.Crouching, -1, 180), (AlsPoseStance.Crouching, 1, 180),
+        };
+        var turnAnimations = new HashSet<int>();
+        for (var index = 0; index < pose.Turns.Length; index++)
+        {
+            var value = pose.Turns[index];
+            var animation = set.Animations[value.AnimationId];
+            if ((value.Stance, value.Direction, value.NominalDegrees) != expectedTurns[index] ||
+                value.BasePlayRate != 1.2f || value.BlendSeconds != .2f || value.ScaleAngle != 1 ||
+                !turnAnimations.Add(value.AnimationId) || animation.SkeletonId != skeletonId ||
+                !string.Equals(animation.StableId, CanonicalTurnStableIds[index], StringComparison.Ordinal) ||
+                !HasCanonicalRotationCurve(animation, value.CurveId))
+            {
+                throw new ArgumentException("A P4 Turn role is noncanonical.");
+            }
+        }
+        var expectedRotates = new (AlsPoseStance Stance, sbyte Direction)[]
+        {
+            (AlsPoseStance.Standing, -1), (AlsPoseStance.Standing, 1),
+            (AlsPoseStance.Crouching, -1), (AlsPoseStance.Crouching, 1),
+        };
+        var rotateAnimations = new HashSet<int>();
+        for (var index = 0; index < pose.Rotates.Length; index++)
+        {
+            var value = pose.Rotates[index];
+            var animation = set.Animations[value.AnimationId];
+            if ((value.Stance, value.Direction) != expectedRotates[index] ||
+                !rotateAnimations.Add(value.AnimationId) || animation.SkeletonId != skeletonId ||
+                !string.Equals(animation.StableId, CanonicalRotateStableIds[index], StringComparison.Ordinal) ||
+                !HasCanonicalRotationCurve(animation, value.CurveId))
+            {
+                throw new ArgumentException("A P4 Rotate role is noncanonical.");
+            }
+        }
+    }
+
+    private static bool HasCanonicalRotationCurve(AlsAnimationDefinition animation, int curveId) =>
+        animation.Curves.Count(value => value.CurveId == curveId &&
+            value.CanonicalKind == AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond &&
+            value.Provenance == AlsCurveProvenance.DerivedRootTrack) == 1;
+
+    private static void ValidateMaskProvenance(
+        AlsLayerMaskProfile masks,
+        AlsSkeletonDefinition skeleton)
+    {
+        var rootNames = new[]
+        {
+            "spine_01", "neck_01", "clavicle_l", "clavicle_r", "Hand_L", "hand_r",
+            "Pelvis", "Thigh_L", "Thigh_R", "Foot_L", "Foot_R",
+        };
+        string[][] boundaryNames =
+        [
+            ["neck_01", "clavicle_l", "clavicle_r"], [], ["Hand_L"], ["hand_r"], [], [],
+            ["spine_01", "Thigh_L", "Thigh_R"], ["Foot_L"], ["Foot_R"], [], [],
+        ];
+        var claimed = new HashSet<int>();
+        var entries = masks.Entries;
+        if (entries.Length != rootNames.Length) throw new ArgumentException("P4 masks are incomplete.");
+        for (var index = 0; index < entries.Length; index++)
+        {
+            var entry = entries[index];
+            var roots = skeleton.LogicalBones.Where(value =>
+                string.Equals(value.Name, rootNames[index], StringComparison.Ordinal)).ToArray();
+            if (roots.Length != 1 || entry.Kind != (AlsPoseMaskKind)index ||
+                entry.RootBoneId != roots[0].LogicalId || entry.BoneIds.Length == 0)
+            {
+                throw new ArgumentException("A P4 mask root is noncanonical.");
+            }
+            var boundaryIds = boundaryNames[index].Select(name => skeleton.LogicalBones.Single(value =>
+                string.Equals(value.Name, name, StringComparison.Ordinal)).LogicalId).ToArray();
+            var expectedMembers = skeleton.LogicalBones.Where(bone =>
+                    IsDescendantOrSelf(skeleton.LogicalBones, bone.LogicalId, entry.RootBoneId) &&
+                    !boundaryIds.Any(boundary =>
+                        IsDescendantOrSelf(skeleton.LogicalBones, bone.LogicalId, boundary)))
+                .Select(value => value.LogicalId).Order().ToArray();
+            if (!entry.BoneIds.SequenceEqual(expectedMembers))
+            {
+                throw new ArgumentException("A P4 mask differs from its canonical boundary expansion.");
+            }
+            var previous = -1;
+            foreach (var boneId in entry.BoneIds)
+            {
+                if (boneId <= previous || !claimed.Add(boneId) ||
+                    !IsDescendantOrSelf(skeleton.LogicalBones, boneId, entry.RootBoneId))
+                {
+                    throw new ArgumentException("P4 mask ownership is not sorted, unique and descendant-closed.");
+                }
+                previous = boneId;
+            }
+        }
+    }
+
+    private static void ValidateFootProvenance(
+        AlsAnimationSetDefinition set,
+        AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose,
+        AlsSkeletonDefinition skeleton)
+    {
+        var masks = pose.Masks.Entries;
+        var feet = pose.Feet;
+        if (feet.LeftLegRootBoneId != masks[(int)AlsPoseMaskKind.LeftLeg].RootBoneId ||
+            feet.RightLegRootBoneId != masks[(int)AlsPoseMaskKind.RightLeg].RootBoneId ||
+            feet.LeftFootRootBoneId != masks[(int)AlsPoseMaskKind.LeftFoot].RootBoneId ||
+            feet.RightFootRootBoneId != masks[(int)AlsPoseMaskKind.RightFoot].RootBoneId ||
+            feet.TraceUpMeters != .5f || feet.TraceDownMeters != .75f ||
+            feet.FootHeightMeters != .13f || feet.MaxPelvisCorrectionMeters != .4f ||
+            feet.PositionHalfLifeSeconds != .08f || feet.RotationHalfLifeSeconds != .1f ||
+            feet.LockReleaseHalfLifeSeconds != .12f || feet.PelvisUpHalfLifeSeconds != .08f ||
+            feet.PelvisDownHalfLifeSeconds != .1f || feet.MaximumLegReachMeters != 1.2f ||
+            feet.CapsuleHalfHeightSource != AlsCapsuleHalfHeightSource.CharacterController ||
+            feet.MaximumThighAngleRadians != MathF.PI / 2f ||
+            feet.MaximumFootAngleRadians != 40f * MathF.PI / 180f ||
+            feet.PlatformTeleportDistanceMeters != 1f ||
+            feet.PlatformTeleportAngleRadians != 45f * MathF.PI / 180f ||
+            feet.LockWeightEpsilon != .0001f)
+        {
+            throw new ArgumentException("The P4 foot-placement settings are noncanonical.");
+        }
+
+        var pelvis = PhysicalBoneId(skeleton, skeleton.RequiredBones.Pelvis);
+        var left = CompileLeg(skeleton, pelvis, feet.LeftLegRootBoneId, feet.LeftFootRootBoneId);
+        var right = CompileLeg(skeleton, pelvis, feet.RightLegRootBoneId, feet.RightFootRootBoneId);
+        if (pose.FootRig != new AlsCompiledFootRig(pelvis, left, right))
+        {
+            throw new ArgumentException("The P4 compiled foot rig differs from the current skeleton.");
+        }
+
+        var reachable = new List<int>();
+        var unique = new HashSet<int>();
+        Add(locomotion.StandingIdleAnimationId);
+        Add(locomotion.CrouchingIdleAnimationId);
+        foreach (var value in locomotion.StandingSamples) Add(value.AnimationId);
+        foreach (var value in locomotion.CrouchingSamples) Add(value.AnimationId);
+        Add(locomotion.JumpStartAnimationId);
+        Add(locomotion.FallLoopAnimationId);
+        Add(locomotion.LandAnimationId);
+        foreach (var value in pose.Turns) Add(value.AnimationId);
+        foreach (var value in pose.Rotates) Add(value.AnimationId);
+
+        var bindings = pose.FootCurves.Bindings;
+        if (bindings.Length != reachable.Count || pose.FootCurves.GroundedIkWeight != 1f ||
+            pose.FootCurves.JumpStartIkWeight != 0f || pose.FootCurves.FallLoopIkWeight != 0f ||
+            pose.FootCurves.LandRecoveryIkWeight != 1f)
+        {
+            throw new ArgumentException("The P4 foot curve closure or unit IK defaults are noncanonical.");
+        }
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            var value = bindings[index];
+            var animation = set.Animations[reachable[index]];
+            var leftCurve = ExactSourceCurveId(animation, "FootLock_L");
+            var rightCurve = ExactSourceCurveId(animation, "FootLock_R");
+            if (value.AnimationId != animation.Id || value.LeftLockCurveId != leftCurve ||
+                value.RightLockCurveId != rightCurve ||
+                BitConverter.SingleToUInt32Bits(value.LeftLockDefault) != 0 ||
+                BitConverter.SingleToUInt32Bits(value.RightLockDefault) != 0)
+            {
+                throw new ArgumentException("A P4 foot curve binding differs from current animation provenance.");
+            }
+        }
+
+        void Add(int animationId)
+        {
+            if (unique.Add(animationId)) reachable.Add(animationId);
+        }
+    }
+
+    private static int ExactSourceCurveId(AlsAnimationDefinition animation, string sourceName)
+    {
+        var matches = animation.Curves.Where(value =>
+            string.Equals(value.SourceName, sourceName, StringComparison.Ordinal)).ToArray();
+        return matches.Length switch
+        {
+            0 => -1,
+            1 => matches[0].CurveId,
+            _ => throw new ArgumentException("An animation contains duplicate canonical source curves."),
+        };
+    }
+
+    private static int PhysicalBoneId(AlsSkeletonDefinition skeleton, int logicalId)
+    {
+        if ((uint)logicalId >= (uint)skeleton.LogicalToPhysical.Length ||
+            (uint)skeleton.LogicalToPhysical[logicalId] >= (uint)skeleton.PhysicalBones.Length)
+        {
+            throw new ArgumentException("A P4 foot bone has no physical mapping.");
+        }
+        return skeleton.LogicalToPhysical[logicalId];
+    }
+
+    private static AlsCompiledLegChain CompileLeg(
+        AlsSkeletonDefinition skeleton,
+        int pelvis,
+        int thighLogical,
+        int footLogical)
+    {
+        var thigh = PhysicalBoneId(skeleton, thighLogical);
+        var foot = PhysicalBoneId(skeleton, footLogical);
+        var knee = skeleton.PhysicalBones[foot].ParentPhysicalId;
+        if ((uint)knee >= (uint)skeleton.PhysicalBones.Length ||
+            skeleton.PhysicalBones[knee].ParentPhysicalId != thigh ||
+            skeleton.PhysicalBones[thigh].ParentPhysicalId != pelvis)
+        {
+            throw new ArgumentException("A P4 foot rig chain is not contiguous.");
+        }
+        return new AlsCompiledLegChain(thigh, knee, foot);
     }
 
     private static void ValidateSkeletonMaps(AlsSkeletonDefinition skeleton)
@@ -490,9 +912,9 @@ public static class AlsP5CoreRuntimeBindingCompiler
         identities = identityList.ToArray();
 
         if (allowTransitions.AnimationCurveIds.Length != animations.Length ||
-            !Finite(allowTransitions.MissingValue) || !Finite(allowTransitions.ClampMinimum) ||
-            !Finite(allowTransitions.ClampMaximum) ||
-            allowTransitions.ClampMinimum > allowTransitions.ClampMaximum)
+            allowTransitions.MissingValue != 1f || allowTransitions.ClampMinimum != 0f ||
+            allowTransitions.ClampMaximum != 1f ||
+            allowTransitions.CombineMode != AlsP5CurveCombineMode.AdditiveToDefault)
         {
             throw new ArgumentException("The AllowTransitions semantic is invalid.");
         }
@@ -508,6 +930,11 @@ public static class AlsP5CoreRuntimeBindingCompiler
         for (var animationId = 0; animationId < animations.Length; animationId++)
         {
             var curveId = allowTransitions.AnimationCurveIds[animationId];
+            var authoredCurveId = ExactSourceCurveId(animations[animationId], "Enable_Transition");
+            if (curveId != authoredCurveId)
+            {
+                throw new ArgumentException("AllowTransitions differs from the current animation curve mapping.");
+            }
             if (curveId == -1)
             {
                 allowTransitionIndices[animationId] = -1;
@@ -774,6 +1201,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         AlsP5OccurrenceLayout layout,
         AlsAnimationDefinition[] animations,
         int skeletonId,
+        int[] baseAnimationIds,
         CoreOccurrenceEntry[] occurrences,
         out AlsSyncMarkerDefinition[] markers,
         out AlsSyncGroupBinding group,
@@ -802,7 +1230,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 animations[member.AnimationId].SkeletonId != skeletonId ||
                 !Positive(member.DurationSeconds) ||
                 member.DurationSeconds != animations[member.AnimationId].PlayLength ||
-                !Enum.IsDefined(member.LoopPolicy))
+                member.LoopPolicy != AlsP5LoopPolicy.Loop || !member.CanLead)
             {
                 throw new ArgumentException("A Sync member is invalid.");
             }
@@ -825,7 +1253,9 @@ public static class AlsP5CoreRuntimeBindingCompiler
             }
             var occurrence = occurrences[mapping.OccurrenceHandleId];
             if (occurrence.SourceKind != CoreOccurrenceKind.Base ||
-                occurrence.OccurrenceHandleId != mapping.OccurrenceHandleId)
+                occurrence.OccurrenceHandleId != mapping.OccurrenceHandleId ||
+                (uint)occurrence.SourceBindingIndex >= (uint)baseAnimationIds.Length ||
+                baseAnimationIds[occurrence.SourceBindingIndex] != member.AnimationId)
             {
                 throw new ArgumentException("A Sync occurrence does not resolve to Base.");
             }
@@ -872,6 +1302,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 (uint)slot.AdditiveBaseAnimationId >= (uint)animations.Length ||
                 animations[slot.AnimationId].SkeletonId != skeletonId ||
                 animations[slot.AdditiveBaseAnimationId].SkeletonId != skeletonId ||
+                animations[slot.AnimationId].AdditiveType == 0 ||
+                animations[slot.AdditiveBaseAnimationId].AdditiveType != 0 ||
                 animations[slot.AnimationId].AdditiveBasePoseAnimationId != slot.AdditiveBaseAnimationId)
             {
                 throw new ArgumentException("A Dynamic Transition slot is invalid.");
@@ -884,6 +1316,210 @@ public static class AlsP5CoreRuntimeBindingCompiler
             occurrence.AuthorityGroupId, clips[0], clips[1], clips[2], clips[3],
             source.DistanceMeters, source.BlendSeconds, source.PlayRate, source.CooldownFrames);
     }
+
+    private static void ValidateActionProvenance(
+        AlsAnimationSetDefinition set,
+        AlsP5aAnimationRuntimeProfile p5a)
+    {
+        var expectedSegments = new List<AlsCompiledActionSegmentBinding>();
+        var expectedTimeline = new List<AlsCompiledActionTimelineEntry>();
+        for (var actionIndex = 0; actionIndex < p5a.Actions.Length; actionIndex++)
+        {
+            var action = p5a.Actions[actionIndex];
+            if ((uint)action.MontageId >= (uint)set.Montages.Length)
+                throw new ArgumentException("An Action Montage is missing from the current set.");
+            var montage = set.Montages[action.MontageId];
+            if (montage.Id != action.MontageId || montage.PlayLength != action.MontageDurationSeconds ||
+                montage.Slots.Length != 1 || montage.Slots[0].SlotId != action.SlotId)
+            {
+                throw new ArgumentException("An Action definition differs from its current Montage.");
+            }
+
+            var expectedSections = new AlsCompiledActionSectionBinding[montage.Sections.Length];
+            for (var sectionIndex = 0; sectionIndex < montage.Sections.Length; sectionIndex++)
+            {
+                var section = montage.Sections[sectionIndex];
+                var end = sectionIndex + 1 < montage.Sections.Length
+                    ? montage.Sections[sectionIndex + 1].StartTime
+                    : montage.PlayLength;
+                if (section.SectionId != sectionIndex || !Finite(section.StartTime) || !Finite(end) ||
+                    section.StartTime < 0f || end <= section.StartTime || end > montage.PlayLength + 1e-6f ||
+                    section.NextSectionId < -1 || section.NextSectionId >= montage.Sections.Length)
+                {
+                    throw new ArgumentException("Current Action Montage sections are invalid.");
+                }
+                expectedSections[sectionIndex] = new AlsCompiledActionSectionBinding(actionIndex,
+                    section.SectionId, section.NextSectionId, section.StartTime, end);
+            }
+            if (!action.Sections.SequenceEqual(expectedSections))
+                throw new ArgumentException("Action sections differ from the current Montage.");
+            ValidateActionSectionGraph(expectedSections, action.StartSectionId, action.LoopPolicy);
+
+            var firstSegmentIndex = expectedSegments.Count;
+            var slot = montage.Slots[0];
+            if (slot.Segments.Length == 0) throw new ArgumentException("Current Action slot has no segments.");
+            for (var segmentIndex = 0; segmentIndex < slot.Segments.Length; segmentIndex++)
+            {
+                var segment = slot.Segments[segmentIndex];
+                if (segment.SegmentId != segmentIndex ||
+                    (uint)segment.AnimationId >= (uint)set.Animations.Length)
+                {
+                    throw new ArgumentException("A current Action segment is unresolved.");
+                }
+                var animation = set.Animations[segment.AnimationId];
+                var montageEnd = segmentIndex + 1 < slot.Segments.Length
+                    ? slot.Segments[segmentIndex + 1].StartPosition
+                    : montage.PlayLength;
+                var mappedDuration = (double)segment.LoopCount *
+                    ((double)segment.AnimationEndTime - segment.AnimationStartTime) / segment.PlayRate;
+                if (animation.AdditiveType != 0 || segment.LoopCount <= 0 || segment.LoopCount == int.MaxValue ||
+                    !Positive(segment.PlayRate) || !Finite(segment.StartPosition) ||
+                    !Finite(segment.AnimationStartTime) || !Finite(segment.AnimationEndTime) ||
+                    segment.StartPosition < 0f || segment.AnimationStartTime < 0f ||
+                    segment.AnimationEndTime <= segment.AnimationStartTime ||
+                    segment.AnimationEndTime > animation.PlayLength + 1e-6f ||
+                    !Finite(montageEnd) || montageEnd <= segment.StartPosition ||
+                    montageEnd > montage.PlayLength + 1e-6f ||
+                    Math.Abs(((double)montageEnd - segment.StartPosition) - mappedDuration) > 1e-8)
+                {
+                    throw new ArgumentException("A current Action segment mapping equation is invalid.");
+                }
+                expectedSegments.Add(new AlsCompiledActionSegmentBinding(actionIndex, slot.SlotId,
+                    segment.SegmentId, segment.AnimationId, segment.StartPosition, montageEnd,
+                    segment.AnimationStartTime, segment.AnimationEndTime, segment.PlayRate,
+                    segment.LoopCount));
+            }
+            var currentSegments = expectedSegments.Skip(firstSegmentIndex).ToArray();
+            foreach (var section in expectedSections)
+            {
+                var cursor = section.StartTime;
+                foreach (var segment in currentSegments.OrderBy(value => value.MontageStartTime))
+                {
+                    if (segment.MontageEndTime <= cursor + 1e-6f) continue;
+                    if (segment.MontageStartTime > cursor + 1e-6f) break;
+                    cursor = Math.Max(cursor, segment.MontageEndTime);
+                    if (cursor >= section.EndTime - 1e-6f) break;
+                }
+                if (cursor < section.EndTime - 1e-6f)
+                    throw new ArgumentException("An Action section is not covered by current segments.");
+            }
+
+            foreach (var value in montage.Timeline)
+            {
+                ValidateTimelineSource(value, montage.Id, montage.PlayLength);
+                expectedTimeline.Add(ToActionTimelineEntry(actionIndex, value,
+                    AlsCompiledActionTimelineSourceKind.Montage, montage.Id, -1,
+                    value.TimeSeconds, value.DurationSeconds, 0));
+            }
+            for (var segmentOffset = 0; segmentOffset < slot.Segments.Length; segmentOffset++)
+            {
+                var bindingIndex = firstSegmentIndex + segmentOffset;
+                AddExpectedSequenceTimeline(bindingIndex, expectedSegments[bindingIndex],
+                    set.Animations[expectedSegments[bindingIndex].AnimationId], expectedTimeline);
+            }
+        }
+
+        if (!p5a.SegmentBindings.SequenceEqual(expectedSegments))
+            throw new ArgumentException("Action segments differ from the current Montage slot.");
+        var sorted = expectedTimeline
+            .OrderBy(value => value.ActionDefinitionId)
+            .ThenBy(value => value.TimeSeconds)
+            .ThenBy(value => value.SourceKind)
+            .ThenBy(value => value.SegmentBindingIndex)
+            .ThenBy(value => value.EventId)
+            .ThenBy(value => value.SourceIndex)
+            .ThenBy(value => value.BoundaryOrdinal)
+            .ThenBy(value => value.TrackIndex)
+            .ToArray();
+        if (!p5a.TimelineEntries.SequenceEqual(sorted))
+            throw new ArgumentException("Action timeline rows differ from current Montage/Sequence provenance.");
+    }
+
+    private static void ValidateActionSectionGraph(
+        AlsCompiledActionSectionBinding[] sections,
+        int startSectionId,
+        AlsP5LoopPolicy loopPolicy)
+    {
+        var seen = new HashSet<int>();
+        var current = startSectionId;
+        for (var step = 0; step <= sections.Length; step++)
+        {
+            if (current < 0)
+            {
+                if (loopPolicy == AlsP5LoopPolicy.Loop || seen.Count != sections.Length)
+                    throw new ArgumentException("The Action section graph terminates or is incomplete.");
+                return;
+            }
+            if ((uint)current >= (uint)sections.Length || !seen.Add(current))
+            {
+                if (current != startSectionId || loopPolicy != AlsP5LoopPolicy.Loop ||
+                    seen.Count != sections.Length)
+                    throw new ArgumentException("The Action section graph cycle is noncanonical.");
+                return;
+            }
+            current = sections[current].NextSectionId;
+        }
+        throw new ArgumentException("The Action section graph is invalid.");
+    }
+
+    private static void AddExpectedSequenceTimeline(
+        int bindingIndex,
+        AlsCompiledActionSegmentBinding segment,
+        AlsAnimationDefinition animation,
+        List<AlsCompiledActionTimelineEntry> output)
+    {
+        var sourceRange = (double)segment.AnimationEndTime - segment.AnimationStartTime;
+        var loopDuration = sourceRange / segment.PlayRate;
+        for (var iteration = 0; iteration < segment.LoopCount; iteration++)
+        {
+            var ordinal = checked(iteration + 1);
+            foreach (var value in animation.Timeline)
+            {
+                if (value.DurationSeconds <= 0f)
+                {
+                    if (value.TimeSeconds < segment.AnimationStartTime ||
+                        value.TimeSeconds > segment.AnimationEndTime) continue;
+                    var time = MapActionTime(segment, loopDuration, iteration, value.TimeSeconds);
+                    if (iteration == segment.LoopCount - 1 && value.TimeSeconds == segment.AnimationEndTime)
+                        time = segment.MontageEndTime;
+                    output.Add(ToActionTimelineEntry(segment.ActionDefinitionId, value,
+                        AlsCompiledActionTimelineSourceKind.Sequence, animation.Id, bindingIndex,
+                        time, 0f, ordinal));
+                    continue;
+                }
+                var begin = Math.Max((double)value.TimeSeconds, segment.AnimationStartTime);
+                var end = Math.Min((double)value.TimeSeconds + value.DurationSeconds,
+                    segment.AnimationEndTime);
+                if (end <= begin) continue;
+                var mappedBegin = MapActionTime(segment, loopDuration, iteration, begin);
+                var mappedEnd = MapActionTime(segment, loopDuration, iteration, end);
+                if (iteration == segment.LoopCount - 1 && end == segment.AnimationEndTime)
+                    mappedEnd = segment.MontageEndTime;
+                output.Add(ToActionTimelineEntry(segment.ActionDefinitionId, value,
+                    AlsCompiledActionTimelineSourceKind.Sequence, animation.Id, bindingIndex,
+                    mappedBegin, mappedEnd - mappedBegin, ordinal));
+            }
+        }
+    }
+
+    private static float MapActionTime(
+        AlsCompiledActionSegmentBinding segment,
+        double loopDuration,
+        int iteration,
+        double sourceTime) => (float)(segment.MontageStartTime + iteration * loopDuration +
+            (sourceTime - segment.AnimationStartTime) / segment.PlayRate);
+
+    private static AlsCompiledActionTimelineEntry ToActionTimelineEntry(
+        int actionId,
+        AlsCompiledTimelineEventDefinition value,
+        AlsCompiledActionTimelineSourceKind sourceKind,
+        int sourceAssetId,
+        int segmentBindingIndex,
+        float time,
+        float duration,
+        int ordinal) => new(actionId, value.EventId, value.Kind, sourceKind, sourceAssetId,
+            segmentBindingIndex, value.SourceIndex, value.TrackIndex, time, duration,
+            value.TriggerWeightThreshold, value.TickMode, value.Payload, ordinal);
 
     private static void CompileActions(
         AlsP5aAnimationRuntimeProfile p5a,
@@ -1009,6 +1645,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         {
             throw new ArgumentException("A timeline payload enum or scalar is invalid.");
         }
+        ValidateCanonicalPayload(kind, value);
         var semanticId = semanticIds.Length == 0 ? 0 : semanticIds[(int)kind];
         return kind switch
         {
@@ -1036,6 +1673,34 @@ public static class AlsP5CoreRuntimeBindingCompiler
                     AlsActionResultCode.None),
             _ => throw new ArgumentException("The timeline event kind is unknown."),
         };
+    }
+
+    private static void ValidateCanonicalPayload(
+        AlsCompiledTimelineEventKind kind,
+        AlsCompiledTimelinePayloadDefinition value)
+    {
+        var footUnused = kind != AlsCompiledTimelineEventKind.Footstep;
+        var actionUnused = kind != AlsCompiledTimelineEventKind.SetAction;
+        var groundedUnused = kind != AlsCompiledTimelineEventKind.SetGroundedEntry;
+        var earlyUnused = kind != AlsCompiledTimelineEventKind.EarlyBlendOut;
+        var translationUnused = kind != AlsCompiledTimelineEventKind.RootMotionScale;
+        if (footUnused && value.Foot != AlsCompiledTimelineFoot.Unspecified ||
+            actionUnused && value.Action != AlsCompiledTimelineAction.None ||
+            groundedUnused && value.GroundedEntryMode != AlsCompiledTimelineGroundedEntryMode.None ||
+            earlyUnused && (BitConverter.SingleToUInt32Bits(value.BlendOutSeconds) != 0 ||
+                value.CheckInput || value.CheckLocomotionMode || value.CheckRotationMode || value.CheckStance ||
+                value.LocomotionMode != AlsCompiledTimelineLocomotionMode.Grounded ||
+                value.RotationMode != AlsCompiledTimelineRotationMode.VelocityDirection ||
+                value.Stance != AlsCompiledTimelineStance.Standing) ||
+            !earlyUnused && (!value.CheckLocomotionMode &&
+                    value.LocomotionMode != AlsCompiledTimelineLocomotionMode.Grounded ||
+                !value.CheckRotationMode &&
+                    value.RotationMode != AlsCompiledTimelineRotationMode.VelocityDirection ||
+                !value.CheckStance && value.Stance != AlsCompiledTimelineStance.Standing) ||
+            translationUnused && BitConverter.SingleToUInt32Bits(value.TranslationScale) != 0)
+        {
+            throw new ArgumentException("A timeline payload contains noncanonical unused fields.");
+        }
     }
 
     private static AlsTimelineFoot MapFoot(AlsCompiledTimelineFoot value) => value switch
