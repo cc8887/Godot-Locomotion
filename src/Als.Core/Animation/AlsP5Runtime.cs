@@ -350,7 +350,7 @@ public static class AlsP5Runtime
             return false;
         }
         if (!ValidateP4Result(p4Result, out failure) ||
-            !ValidatePostFootState(p4NextState, out failure))
+            !ValidatePostFootState(p4NextState, p4Result, out failure))
         {
             return false;
         }
@@ -1682,7 +1682,24 @@ public static class AlsP5Runtime
             result.TurnDirection is < -1 or > 1 ||
             result.RotateDirection is < -1 or > 1 ||
             result.LeftFootPose.PlatformId < -1 ||
-            result.RightFootPose.PlatformId < -1)
+            result.RightFootPose.PlatformId < -1 ||
+            !IsWeight(result.Stride) ||
+            result.PlayRate <= 0f ||
+            !IsPhase(result.AnimationPhase) ||
+            !IsWeight(result.HeadWeight) ||
+            !IsWeight(result.SpineWeight) ||
+            !IsWeight(result.UpperBodyWeight) ||
+            !IsWeight(result.LeftFootPose.LockAmount) ||
+            !IsWeight(result.RightFootPose.LockAmount) ||
+            !IsWeight(result.LeftFootIkWeight) ||
+            !IsWeight(result.RightFootIkWeight) ||
+            !IsWeight(result.LeftFootLockCurve) ||
+            !IsWeight(result.RightFootLockCurve) ||
+            !IsCanonicalQuaternion(result.LeftFootPose.Rotation) ||
+            !IsCanonicalQuaternion(result.RightFootPose.Rotation) ||
+            !IsCanonicalTurnResult(result) ||
+            !IsCanonicalRotateResult(result) ||
+            result.TurnActive == 1 && result.RotateActive == 1)
         {
             return false;
         }
@@ -1692,6 +1709,7 @@ public static class AlsP5Runtime
 
     private static bool ValidatePostFootState(
         in AlsRuntimeState state,
+        in AlsFrameResult result,
         out AlsP5FailureCode failure)
     {
         failure = AlsP5FailureCode.NonFiniteOutput;
@@ -1749,8 +1767,19 @@ public static class AlsP5Runtime
             state.RotateInPlace.Direction is < -1 or > 1 ||
             (uint)state.TurnInPlace.Stance > (uint)AlsStance.Crouching ||
             (uint)state.RotateInPlace.Stance > (uint)AlsStance.Crouching ||
-            !IsCanonicalFootLock(state.LeftFootLock) ||
-            !IsCanonicalFootLock(state.RightFootLock))
+            state.GroundedEntrySpeed < 0f ||
+            state.LandingRecoveryTime < 0f ||
+            !IsPhase(state.AnimationPhase) ||
+            state.ViewPose.YawSpeed < 0f ||
+            !IsWeight(state.ViewPose.HeadWeight) ||
+            !IsWeight(state.ViewPose.SpineWeight) ||
+            !IsCanonicalTurnState(state) ||
+            !IsCanonicalRotateState(state) ||
+            (state.YawSource == AlsYawSource.TurnInPlace) != (result.TurnActive == 1) ||
+            (state.YawSource == AlsYawSource.RotateInPlace) != (result.RotateActive == 1) ||
+            state.TurnInPlace.Active == 1 && state.RotateInPlace.Active == 1 ||
+            !IsCanonicalFootLock(state.LeftFootLock, state.LeftFootLocked) ||
+            !IsCanonicalFootLock(state.RightFootLock, state.RightFootLocked))
         {
             return false;
         }
@@ -1764,10 +1793,153 @@ public static class AlsP5Runtime
         IsFinite(state.ProvenancePosition) && IsFinite(state.ProvenanceRotation) &&
         float.IsFinite(state.Amount);
 
-    private static bool IsCanonicalFootLock(in AlsFootLockState state) =>
-        state.PlatformId >= -1 && state.ColliderId >= -1 &&
-        state.Amount is >= 0f and <= 1f && state.Locked <= 1 &&
-        (uint)state.ReleaseReason <= (uint)AlsFootReleaseReason.Overextended;
+    private static bool IsCanonicalTurnResult(in AlsFrameResult result)
+    {
+        if (result.TurnActive == 0)
+        {
+            return result.TurnAnimationId == -1 &&
+                result.TurnCurveId == -1 &&
+                IsPositiveZero(result.TurnPhase) &&
+                IsPositiveZero(result.TurnPlayRate) &&
+                result.TurnNominalDegrees == 0 &&
+                result.TurnDirection == 0 &&
+                IsPositiveZero(result.TurnYawDelta);
+        }
+
+        return result.TurnAnimationId >= 0 &&
+            result.TurnCurveId >= 0 &&
+            result.TurnPhase >= 0f &&
+            result.TurnPlayRate > 0f &&
+            result.TurnNominalDegrees is 90 or 180 &&
+            result.TurnDirection is -1 or 1;
+    }
+
+    private static bool IsCanonicalRotateResult(in AlsFrameResult result)
+    {
+        if (result.RotateActive == 0)
+        {
+            return result.RotateAnimationId == -1 &&
+                result.RotateCurveId == -1 &&
+                IsPositiveZero(result.RotatePhase) &&
+                IsPositiveZero(result.RotatePlayRate) &&
+                result.RotateDirection == 0 &&
+                IsPositiveZero(result.RotateYawDelta);
+        }
+
+        return result.RotateAnimationId >= 0 &&
+            result.RotateCurveId >= 0 &&
+            result.RotatePhase >= 0f &&
+            result.RotatePlayRate > 0f &&
+            result.RotateDirection is -1 or 1;
+    }
+
+    private static bool IsCanonicalTurnState(in AlsRuntimeState state)
+    {
+        ref readonly var turn = ref state.TurnInPlace;
+        if (turn.ActivationSeconds < 0f || turn.Phase < 0f || turn.PlayRate < 0f)
+        {
+            return false;
+        }
+        if (turn.Active == 0)
+        {
+            return IsPositiveZero(turn.Phase) &&
+                IsPositiveZero(turn.PlayRate) &&
+                IsPositiveZero(turn.RemainingYaw) &&
+                turn.NominalDegrees == 0 &&
+                turn.Direction == 0;
+        }
+
+        return IsPositiveZero(turn.ActivationSeconds) &&
+            turn.PlayRate > 0f &&
+            turn.NominalDegrees is 90 or 180 &&
+            turn.Direction is -1 or 1 &&
+            state.YawSource == AlsYawSource.TurnInPlace;
+    }
+
+    private static bool IsCanonicalRotateState(in AlsRuntimeState state)
+    {
+        ref readonly var rotate = ref state.RotateInPlace;
+        if (rotate.Phase < 0f || rotate.PlayRate < 0f)
+        {
+            return false;
+        }
+        if (rotate.Active == 0)
+        {
+            return IsPositiveZero(rotate.Phase) &&
+                IsPositiveZero(rotate.PlayRate) &&
+                rotate.Direction == 0;
+        }
+
+        return rotate.PlayRate > 0f &&
+            rotate.Direction is -1 or 1 &&
+            state.YawSource == AlsYawSource.RotateInPlace;
+    }
+
+    private static bool IsCanonicalFootLock(in AlsFootLockState state, byte topLevelLocked)
+    {
+        if (state.PlatformId < -1 || state.ColliderId < -1 ||
+            !IsWeight(state.Amount) || state.Locked > 2 ||
+            (uint)state.ReleaseReason > (uint)AlsFootReleaseReason.Overextended ||
+            !IsCanonicalQuaternion(state.LocalRotation) ||
+            !IsCanonicalQuaternion(state.Rotation) ||
+            !IsCanonicalQuaternion(state.ProvenanceRotation) ||
+            topLevelLocked != (state.Locked == 1 ? (byte)1 : (byte)0))
+        {
+            return false;
+        }
+
+        if (state.Locked == 0)
+        {
+            return state.ReleaseReason == AlsFootReleaseReason.None &&
+                state.PlatformId == -1 && state.ColliderId == -1 &&
+                IsPositiveZero(state.Amount) &&
+                state.LocalPosition == Vector3.Zero &&
+                state.LocalRotation == Quaternion.Identity &&
+                state.ProvenancePosition == Vector3.Zero &&
+                state.ProvenanceRotation == Quaternion.Identity;
+        }
+
+        return state.ColliderId >= 0 &&
+            (state.Locked == 1
+                ? state.ReleaseReason == AlsFootReleaseReason.None
+                : state.ReleaseReason != AlsFootReleaseReason.None);
+    }
+
+    private static bool IsWeight(float value) => value is >= 0f and <= 1f;
+
+    private static bool IsPhase(float value) => value is >= 0f and < 1f;
+
+    private static bool IsPositiveZero(float value) =>
+        BitConverter.SingleToInt32Bits(value) == 0;
+
+    private static bool IsCanonicalQuaternion(in Quaternion value)
+    {
+        var lengthSquared =
+            (double)value.X * value.X +
+            (double)value.Y * value.Y +
+            (double)value.Z * value.Z +
+            (double)value.W * value.W;
+        if (!double.IsFinite(lengthSquared) || lengthSquared <= 0d)
+        {
+            return false;
+        }
+
+        var inverseLength = 1d / System.Math.Sqrt(lengthSquared);
+        var x = (float)(value.X * inverseLength);
+        var y = (float)(value.Y * inverseLength);
+        var z = (float)(value.Z * inverseLength);
+        var w = (float)(value.W * inverseLength);
+        var canonicalHemisphere = w > 0f ||
+            w == 0f &&
+            (x > 0f ||
+             x == 0f &&
+             (y > 0f || y == 0f && z >= 0f));
+        return canonicalHemisphere &&
+            MathF.Abs(value.X - x) <= 1e-6f &&
+            MathF.Abs(value.Y - y) <= 1e-6f &&
+            MathF.Abs(value.Z - z) <= 1e-6f &&
+            MathF.Abs(value.W - w) <= 1e-6f;
+    }
 
     private static bool IsValidTransitionProbe(in AlsDynamicTransitionInput input) =>
         (uint)input.Stance <= (uint)AlsStance.Crouching &&
@@ -2056,8 +2228,12 @@ public static class AlsP5Runtime
         {
             return NormalizeZero(target);
         }
-        var quantum = (float)(seconds / (double)blend);
         var direction = MathF.Sign(target - value);
+        if (direction == 0f)
+        {
+            return NormalizeZero(value);
+        }
+        var quantum = (float)(seconds / (double)blend);
         var stepped = value + direction * quantum;
         return NormalizeZero(System.Math.Clamp(stepped, 0f, 1f));
     }

@@ -90,7 +90,9 @@ public sealed class AlsP5HotPathAllocationTests
         var actionSegments = new[]
         {
             new GodotAls.Core.Actions.AlsActionSegmentBinding(
-                3, 0, 0, 0, 20, 0f, 1f, 0f, 1f, 1f, 1),
+                3, 0, 0, 0, 20, 0f, 0.5f, 0f, 0.5f, 1f, 1),
+            new GodotAls.Core.Actions.AlsActionSegmentBinding(
+                4, 0, 0, 1, 21, 0.5f, 1f, 0f, 0.5f, 1f, 1),
         };
         var bindings = new AlsP5RuntimeBindings(
             1, 1, 1,
@@ -114,11 +116,11 @@ public sealed class AlsP5HotPathAllocationTests
             new[] { new AlsActionTimelineRange(0, 1, 0) });
         var basePlayback = new[]
         {
-            new AlsBasePlaybackDescriptor(0, 0, 0, 1, 0d, (double)0.1f, 0d, (double)0.1f, 1f, 1f, 1, 1, 0),
+            new AlsBasePlaybackDescriptor(0, 0, 0, 1, 0d, (double)0.2f, 0d, (double)0.2f, 1f, 1f, 1, 1, 0),
         };
         var input = new AlsP5FrameInput(
-            new AlsFrameIdentity(1, 0, 1), 0d, (double)0.1f, 0.1f, 1,
-            new AlsActionRequest(1, AlsActionCommand.Start, 0, 0, 1, 1), 0, 0,
+            new AlsFrameIdentity(1, 0, 1), 0d, (double)0.2f, 0.2f, 1,
+            AlsActionRequest.None, 0, 0,
             AlsTimelineLocomotionMode.Grounded,
             AlsTimelineRotationMode.LookingDirection,
             AlsTimelineStance.Standing,
@@ -129,9 +131,9 @@ public sealed class AlsP5HotPathAllocationTests
                 AlsAnimationState.Grounded,
                 0f,
                 0f));
-        var currentCursors = Enumerable.Range(0, 4)
+        var currentCursors = Enumerable.Range(0, 5)
             .Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
-        var candidateCursors = Enumerable.Range(0, 4)
+        var candidateCursors = Enumerable.Range(0, 5)
             .Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
         var currentAuthorities = Enumerable.Range(0, 4)
             .Select(AlsTimelineAuthorityState.CreateDefault).ToArray();
@@ -147,15 +149,71 @@ public sealed class AlsP5HotPathAllocationTests
         var syncOutput = new AlsSyncMappedPlayback[1];
         var curveSamples = new AlsCurveBlendSample[5];
         var state = AlsRuntimeState.CreateDefault();
+        state.ActionPlayer = new AlsActionPlayerState
+        {
+            ActionDefinitionId = 0,
+            SectionId = 0,
+            SegmentBindingIndex = 0,
+            RequestId = 1,
+            LastProcessedRequestId = 1,
+            LastProcessedCommandRequestId = 1,
+            LastProcessedCommand = AlsActionCommand.Start,
+            PlaybackEpoch = 1,
+            PlaybackTime = 0.4f,
+            Priority = 1,
+            Playing = 1,
+            Interruptible = 1,
+        };
+        state.ActionBlendLane = AlsLaneBlendState.CreateDefault();
+        state.ActionBlendLane.LaneWeight = 1f;
+        state.ActionBlendLane.IncomingMix = 1f;
+        state.ActionBlendLane.BlendSeconds = 0.2f;
+        state.ActionBlendLane.VisualActive = 1;
         state.DynamicTransition.QueuedAnimationId = 1;
         state.DynamicTransition.QueuedFoot = AlsTransitionFoot.Left;
         state.DynamicTransition.Queued = 1;
         var p4Result = AlsFrameResult.CreateDefault(input.Identity);
+        p4Result.PlayRate = 1f;
+        currentCursors[2] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 2,
+            AnimationId = 10,
+            ActionId = 0,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = (double)0.4f,
+        };
+        currentCursors[3] = new AlsTimelineCursor
+        {
+            OccurrenceHandleId = 3,
+            AnimationId = 20,
+            ActionId = 0,
+            PlaybackEpoch = 1,
+            ConsumedUnwrappedTimeSeconds = (double)0.4f,
+        };
+        currentAuthorities[2] = new AlsTimelineAuthorityState
+        {
+            GroupId = 2,
+            OccurrenceHandleId = 2,
+            AnimationId = 10,
+            ActionId = 0,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
+        currentAuthorities[3] = new AlsTimelineAuthorityState
+        {
+            GroupId = 3,
+            OccurrenceHandleId = 3,
+            AnimationId = 20,
+            ActionId = 0,
+            PlaybackEpoch = 1,
+            Active = 1,
+        };
         var probe = new AlsDynamicTransitionInput(
             AlsStance.Standing, 0f, Vector3.Zero, Vector3.Zero, 0,
             Vector3.Zero, Vector3.Zero, 0);
 
         long before = 0;
+        var traversedSegmentBoundary = false;
         for (var index = 0; index < 10_100; index++)
         {
             if (index == 100)
@@ -173,6 +231,11 @@ public sealed class AlsP5HotPathAllocationTests
             {
                 throw new InvalidOperationException($"Prepare failed: {prepareFailure}");
             }
+            traversedSegmentBoundary |=
+                slices[0].SegmentBindingIndex == 0 &&
+                slices[1].SegmentBindingIndex == 1 &&
+                slices[0].ClosesSegmentAfterSlice == 1 &&
+                slices[1].ActivatesSegmentAtSliceStart == 1;
             var finalizeScratch = scratch;
             if (!AlsP5Runtime.TryFinalize(
                     prepared, ref finalizeScratch, in p4Result, in state, in probe,
@@ -184,6 +247,7 @@ public sealed class AlsP5HotPathAllocationTests
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         Assert.Equal(0, allocated);
+        Assert.True(traversedSegmentBoundary);
     }
 
     private static AlsNotifyStateOwnership[] CreateOwnership()
