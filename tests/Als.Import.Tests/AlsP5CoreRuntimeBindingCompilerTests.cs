@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using GodotAls.Core.Actions;
@@ -731,38 +732,202 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
                 set: RefreshDigest(fixture.Set with { Montages = montages })));
         }
 
-        var earlyAnimationId = Array.FindIndex(fixture.Set.Animations,
-            animation => animation.Timeline.Any(value => value.Kind == AlsCompiledTimelineEventKind.EarlyBlendOut));
-        var earlyAnimations = fixture.Set.Animations;
-        if (earlyAnimationId < 0) earlyAnimationId = Array.FindIndex(earlyAnimations,
-            animation => animation.Timeline.Length > 0);
-        Assert.True(earlyAnimationId >= 0);
-        var earlyTimeline = earlyAnimations[earlyAnimationId].Timeline;
-        var earlyIndex = Array.FindIndex(earlyTimeline,
-            value => value.Kind == AlsCompiledTimelineEventKind.EarlyBlendOut);
-        if (earlyIndex < 0)
+    }
+
+    [Fact]
+    public void AuthoritativeAnimationSetValidationRejectsGeneralTimelineAndCurveForgeries()
+    {
+        var fixture = Fixture.Create();
+        var events = ReachableBaseEvents(fixture);
+        Assert.True(events.Length >= 2);
+        var forgeries = new List<AlsAnimationSetDefinition>();
+
+        var duplicateId = MutateAnimationEvent(fixture.Set, events[1], value => value with
         {
-            earlyIndex = 0;
-            earlyTimeline[earlyIndex] = earlyTimeline[earlyIndex] with
-            {
-                Kind = AlsCompiledTimelineEventKind.EarlyBlendOut,
-                Payload = CanonicalPayload(AlsCompiledTimelineEventKind.EarlyBlendOut),
-            };
-        }
-        earlyTimeline[earlyIndex] = earlyTimeline[earlyIndex] with
+            EventId = fixture.Set.Animations[events[0].AnimationId].Timeline[events[0].EventIndex].EventId,
+        });
+        forgeries.Add(duplicateId);
+
+        var duplicateStableId = MutateAnimationEvent(fixture.Set, events[1], value => value with
         {
-            Payload = earlyTimeline[earlyIndex].Payload with
+            StableEventId = fixture.Set.Animations[events[0].AnimationId].Timeline[events[0].EventIndex]
+                .StableEventId,
+        });
+        forgeries.Add(duplicateStableId);
+
+        var wrongOrdinal = MutateAnimationEvent(fixture.Set, events[0], value => value with
+        {
+            EventId = int.MaxValue,
+        });
+        forgeries.Add(wrongOrdinal);
+
+        var wrongStableId = MutateAnimationEvent(fixture.Set, events[0], value => value with
+        {
+            StableEventId = new string('0', 40),
+        });
+        forgeries.Add(wrongStableId);
+
+        var missingClass = MutateAnimationEvent(fixture.Set, events[0], value => value with
+        {
+            SourceClassPath = "",
+        });
+        forgeries.Add(missingClass);
+
+        var missingDisplay = MutateAnimationEvent(fixture.Set, events[0], value => value with
+        {
+            DisplayName = "",
+        });
+        forgeries.Add(missingDisplay);
+
+        var orderedAnimationId = AuthoredBaseAnimationIds(fixture.Locomotion).First(animationId =>
+            fixture.Set.Animations[animationId].Timeline.Length >= 2);
+        var animations = fixture.Set.Animations.ToArray();
+        var unordered = animations[orderedAnimationId].Timeline;
+        (unordered[0], unordered[1]) = (unordered[1], unordered[0]);
+        animations[orderedAnimationId] = animations[orderedAnimationId] with { Timeline = unordered };
+        forgeries.Add(RefreshDigest(fixture.Set with { Animations = animations }));
+
+        animations = fixture.Set.Animations.ToArray();
+        var curveAnimationId = Array.FindIndex(animations, animation => animation.Curves.Any(curve =>
+            curve.SourceName is "Enable_Transition" or "FootLock_L" or "FootLock_R"));
+        Assert.True(curveAnimationId >= 0);
+        var curves = animations[curveAnimationId].Curves;
+        var curveIndex = Array.FindIndex(curves, curve =>
+            curve.SourceName is "Enable_Transition" or "FootLock_L" or "FootLock_R");
+        curves[curveIndex] = curves[curveIndex] with
+        {
+            CanonicalKind = AlsCanonicalCurveKind.None,
+            Provenance = AlsCurveProvenance.DerivedRootTrack,
+        };
+        animations[curveAnimationId] = animations[curveAnimationId] with { Curves = curves };
+        forgeries.Add(RefreshDigest(fixture.Set with { Animations = animations }));
+        Assert.All(forgeries, source => AssertWrappedSetFailure(fixture, source));
+    }
+
+    [Fact]
+    public void DisabledEarlyBlendOutEnumsRemainLegal()
+    {
+        var fixture = Fixture.Create();
+        var legalSet = MutateActionPayload(fixture, AlsCompiledTimelineEventKind.EarlyBlendOut,
+            payload => payload with
             {
                 CheckLocomotionMode = false,
                 LocomotionMode = AlsCompiledTimelineLocomotionMode.InAir,
-            },
-        };
-        earlyAnimations[earlyAnimationId] = earlyAnimations[earlyAnimationId] with
+                CheckRotationMode = false,
+                RotationMode = AlsCompiledTimelineRotationMode.Aiming,
+                CheckStance = false,
+                Stance = AlsCompiledTimelineStance.Crouching,
+            });
+        var legalP5 = CompileP5(legalSet);
+        var legalLayout = AlsP5OccurrenceLayoutCompiler.Compile(fixture.Locomotion, fixture.Pose, legalP5);
+        var legalRuntime = fixture.Compile(set: legalSet, p5a: legalP5, layout: legalLayout).CreateCoreView();
+        var legalEvent = legalRuntime.TimelineDefinitions.ToArray().Single(value =>
+            value.SourceActionId >= 0 && value.Kind == AlsTimelineEventKind.EarlyBlendOut &&
+            value.Payload.EnumValue0 == (int)AlsCompiledTimelineLocomotionMode.InAir &&
+            value.Payload.EnumValue1 == (int)AlsCompiledTimelineRotationMode.Aiming &&
+            value.Payload.EnumValue2 == (int)AlsCompiledTimelineStance.Crouching);
+        Assert.Equal((int)AlsCompiledTimelineLocomotionMode.InAir, legalEvent.Payload.EnumValue0);
+        Assert.Equal((int)AlsCompiledTimelineRotationMode.Aiming, legalEvent.Payload.EnumValue1);
+        Assert.Equal((int)AlsCompiledTimelineStance.Crouching, legalEvent.Payload.EnumValue2);
+    }
+
+    [Fact]
+    public void ActiveNegativeTimelineScalarsReject()
+    {
+        var fixture = Fixture.Create();
+        var negativeBlendSet = MutateGeneralPayload(fixture,
+            AlsCompiledTimelineEventKind.EarlyBlendOut,
+            payload => payload with { BlendOutSeconds = -0.001f });
+
+        var negativeTranslationSet = MutateGeneralPayload(fixture,
+            AlsCompiledTimelineEventKind.RootMotionScale,
+            payload => payload with { TranslationScale = -0.001f });
+        Assert.All(new[] { negativeBlendSet, negativeTranslationSet }, source =>
         {
-            Timeline = earlyTimeline,
+            AssertWrappedSetFailure(fixture, source);
+        });
+    }
+
+    [Fact]
+    public void EmptyActionTimelineWithHugeLoopReturnsImmediately()
+    {
+        var fixture = Fixture.Create();
+        var empty = BuildLoopActionSet(fixture, int.MaxValue - 1, useEmptyTimeline: true);
+        var emptyP5 = CompileP5(empty);
+        var stopwatch = Stopwatch.StartNew();
+        _ = fixture.Compile(set: empty, p5a: emptyP5,
+            layout: AlsP5OccurrenceLayoutCompiler.Compile(fixture.Locomotion, fixture.Pose, emptyP5));
+        stopwatch.Stop();
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), stopwatch.Elapsed.ToString());
+    }
+
+    [Fact]
+    public void NonemptyActionTimelineOverBudgetRejectsBeforeGrowth()
+    {
+        var fixture = Fixture.Create();
+        var excess = BuildLoopActionSet(fixture, 1_000_001, useEmptyTimeline: false);
+        var excessP5 = RebindActionP5(fixture, excess);
+        var excessLayout = AlsP5OccurrenceLayoutCompiler.Compile(
+            fixture.Locomotion, fixture.Pose, excessP5);
+        var baselineBefore = GC.GetAllocatedBytesForCurrentThread();
+        _ = fixture.Compile();
+        var baselineAllocated = GC.GetAllocatedBytesForCurrentThread() - baselineBefore;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var stopwatch = Stopwatch.StartNew();
+        var exception = Assert.Throws<ArgumentException>(() => fixture.Compile(
+            set: excess, p5a: excessP5, layout: excessLayout));
+        Assert.Contains("budget", exception.Message, StringComparison.OrdinalIgnoreCase);
+        stopwatch.Stop();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), stopwatch.Elapsed.ToString());
+        Assert.True(allocated < baselineAllocated + 2_000_000,
+            $"Allocated {allocated} bytes before budget rejection; legal baseline was {baselineAllocated}.");
+    }
+
+    [Fact]
+    public void ConstructibleP3P4IdsAreBoundsCheckedBeforeEveryIndex()
+    {
+        var fixture = Fixture.Create();
+        var badProfiles = new Action[]
+        {
+            () => fixture.Compile(locomotion: fixture.Locomotion with { StandingIdleAnimationId = -1 }),
+            () => fixture.Compile(locomotion: fixture.Locomotion with { StandingIdleAnimationId = int.MaxValue }),
+            () => fixture.Compile(locomotion: fixture.Locomotion with { StandingSamples = Replace(
+                fixture.Locomotion.StandingSamples, 0,
+                fixture.Locomotion.StandingSamples[0] with { AnimationId = -1 }) }),
+            () => fixture.Compile(locomotion: fixture.Locomotion with { LeanAdditiveSamples = Replace(
+                fixture.Locomotion.LeanAdditiveSamples, 0,
+                fixture.Locomotion.LeanAdditiveSamples[0] with { AnimationId = int.MaxValue }) }),
+            () => fixture.Compile(locomotion: fixture.Locomotion with { LeanAdditiveBasePoseAnimationId = -1 }),
+            () => fixture.Compile(pose: fixture.Pose with
+                { Aim = fixture.Pose.Aim with { AimOffsetId = -1 } }),
+            () => fixture.Compile(pose: fixture.Pose with
+                { Aim = fixture.Pose.Aim with { AimOffsetId = int.MaxValue } }),
+            () => fixture.Compile(pose: fixture.Pose with
+                { Aim = fixture.Pose.Aim with { DownAnimationId = -1 } }),
+            () => fixture.Compile(pose: fixture.Pose with { Turns = Replace(fixture.Pose.Turns, 0,
+                fixture.Pose.Turns[0] with { AnimationId = int.MaxValue }) }),
+            () => fixture.Compile(pose: fixture.Pose with { Turns = Replace(fixture.Pose.Turns, 0,
+                fixture.Pose.Turns[0] with { CurveId = int.MaxValue }) }),
+            () => fixture.Compile(pose: fixture.Pose with { Rotates = Replace(fixture.Pose.Rotates, 0,
+                fixture.Pose.Rotates[0] with { AnimationId = -1 }) }),
+            () => fixture.Compile(pose: fixture.Pose with { Rotates = Replace(fixture.Pose.Rotates, 0,
+                fixture.Pose.Rotates[0] with { CurveId = int.MaxValue }) }),
+            () => fixture.Compile(pose: fixture.Pose with { FootCurves = fixture.Pose.FootCurves with
+                { Bindings = Replace(fixture.Pose.FootCurves.Bindings, 0,
+                    fixture.Pose.FootCurves.Bindings[0] with { AnimationId = -1 }) } }),
+            () => fixture.Compile(pose: fixture.Pose with { FootCurves = fixture.Pose.FootCurves with
+                { Bindings = Replace(fixture.Pose.FootCurves.Bindings, 0,
+                    fixture.Pose.FootCurves.Bindings[0] with { LeftLockCurveId = int.MaxValue }) } }),
+            () => fixture.Compile(pose: fixture.Pose with
+                { Feet = fixture.Pose.Feet with { LeftLegRootBoneId = int.MaxValue } }),
         };
-        Assert.Throws<ArgumentException>(() => fixture.Compile(
-            set: RefreshDigest(fixture.Set with { Animations = earlyAnimations })));
+
+        Assert.All(badProfiles, action =>
+        {
+            var exception = Record.Exception(action);
+            Assert.IsType<ArgumentException>(exception);
+        });
     }
 
     [Fact]
@@ -807,50 +972,138 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
     }
 
     [Fact]
-    public void EveryBindingAndGraphSpanHasFirstMiddleLastAndCountSensitivity()
+    public void ProductionBindingAndGraphDigestsCoverEverySpanAndScalarFamily()
     {
         var snapshot = Fixture.Create().Compile();
         var runtime = snapshot.CreateCoreView();
         var graph = snapshot.CreateGraphBuildView();
+        var binding = BindingDigestInput.Capture(in runtime);
+        var bindingDigest = ProductionBindingDigest(binding);
+        Assert.Equal(runtime.Digest, bindingDigest);
+        AssertProductionSpanMatrix(bindingDigest, binding.CurveKeys,
+            value => value with { Value = value.Value + .125f },
+            values => ProductionBindingDigest(binding with { CurveKeys = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.CurveBindings,
+            value => value with { Required = (byte)(value.Required ^ 1) },
+            values => ProductionBindingDigest(binding with { CurveBindings = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Identities,
+            value => value with { AnimationId = value.AnimationId + 1 },
+            values => ProductionBindingDigest(binding with { Identities = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Ranges,
+            value => value with { BindingOffset = value.BindingOffset + 1 },
+            values => ProductionBindingDigest(binding with { Ranges = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.AllowIndices, value => value + 1,
+            values => ProductionBindingDigest(binding with { AllowIndices = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.FootBindings,
+            value => value with { LeftLockDefault = value.LeftLockDefault + .125f },
+            values => ProductionBindingDigest(binding with { FootBindings = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Timeline,
+            value => value with { EventId = value.EventId + 1 },
+            values => ProductionBindingDigest(binding with { Timeline = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Markers,
+            value => value with { SourceIndex = value.SourceIndex + 1 },
+            values => ProductionBindingDigest(binding with { Markers = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Members,
+            value => value with { CanLead = (byte)(value.CanLead ^ 1) },
+            values => ProductionBindingDigest(binding with { Members = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.SyncOccurrences,
+            value => value with { OccurrenceHandleId = value.OccurrenceHandleId + 1 },
+            values => ProductionBindingDigest(binding with { SyncOccurrences = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Actions,
+            value => value with { Priority = value.Priority + 1 },
+            values => ProductionBindingDigest(binding with { Actions = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Sections,
+            value => value with { StartTime = value.StartTime + .125f },
+            values => ProductionBindingDigest(binding with { Sections = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.Segments,
+            value => value with { LoopCount = value.LoopCount + 1 },
+            values => ProductionBindingDigest(binding with { Segments = values }));
+        AssertProductionSpanMatrix(bindingDigest, binding.ActionRanges,
+            value => value with { DefinitionCount = value.DefinitionCount + 1 },
+            values => ProductionBindingDigest(binding with { ActionRanges = values }));
 
-        AssertSpanSensitivity(runtime.CurveKeys.ToArray(), static (ref ReferenceFnvWriter w, in AlsCurveKey x) =>
-        { w.Add(x.TimeSeconds); w.Add(x.Value); w.Add(x.ArriveTangent); w.Add(x.LeaveTangent); w.Add((byte)x.Interpolation); });
-        AssertSpanSensitivity(runtime.CurveBindings.ToArray(), static (ref ReferenceFnvWriter w, in AlsCurveBinding x) =>
-        { w.Add(x.CurveId); w.Add(x.KeyOffset); w.Add(x.KeyCount); w.Add(x.DurationSeconds); w.Add(x.Required); w.Add(x.Loop); });
-        AssertSpanSensitivity(runtime.CurveBindingIdentities.ToArray(), static (ref ReferenceFnvWriter w, in AlsP5CurveBindingIdentity x) =>
-        { w.Add(x.AnimationId); w.Add(x.CurveId); });
-        AssertSpanSensitivity(runtime.AnimationCurveRanges.ToArray(), static (ref ReferenceFnvWriter w, in AlsAnimationCurveRange x) =>
-        { w.Add(x.AnimationId); w.Add(x.BindingOffset); w.Add(x.BindingCount); });
-        AssertSpanSensitivity(runtime.AllowTransitionsBindingIndices.ToArray(), static (ref ReferenceFnvWriter w, in int x) => w.Add(x));
-        AssertSpanSensitivity(runtime.FootCurveBindings.ToArray(), static (ref ReferenceFnvWriter w, in AlsP4FootCurveRuntimeBinding x) =>
-        { w.Add(x.AnimationId); w.Add(x.LeftLockCurveId); w.Add(x.RightLockCurveId); w.Add(x.LeftLockDefault); w.Add(x.RightLockDefault); });
-        AssertSpanSensitivity(runtime.TimelineDefinitions.ToArray(), WriteTimeline);
-        AssertSpanSensitivity(runtime.SyncMarkers.ToArray(), static (ref ReferenceFnvWriter w, in AlsSyncMarkerDefinition x) =>
-        { w.Add(x.MarkerId); w.Add(x.MarkerNameId); w.Add(x.AnimationId); w.Add(x.SourceIndex); w.Add(x.TrackIndex); w.Add(x.TimeSeconds); });
-        AssertSpanSensitivity(runtime.SyncMembers.ToArray(), static (ref ReferenceFnvWriter w, in AlsSyncMemberBinding x) =>
-        { w.Add(x.GroupId); w.Add(x.AnimationId); w.Add(x.DurationSeconds); w.Add(x.Loop); w.Add(x.CanLead); });
-        AssertSpanSensitivity(runtime.SyncOccurrences.ToArray(), static (ref ReferenceFnvWriter w, in AlsP5SyncOccurrenceBinding x) =>
-        { w.Add(x.GroupId); w.Add(x.GroupMemberIndex); w.Add(x.AnimationId); w.Add(x.OccurrenceHandleId); });
-        AssertSpanSensitivity(runtime.ActionDefinitions.ToArray(), WriteAction);
-        AssertSpanSensitivity(runtime.ActionSections.ToArray(), static (ref ReferenceFnvWriter w, in AlsActionSectionBinding x) =>
-        { w.Add(x.ActionDefinitionId); w.Add(x.SectionId); w.Add(x.NextSectionId); w.Add(x.StartTime); w.Add(x.EndTime); });
-        AssertSpanSensitivity(runtime.ActionSegments.ToArray(), static (ref ReferenceFnvWriter w, in AlsActionSegmentBinding x) =>
-        { w.Add(x.OccurrenceHandleId); w.Add(x.ActionDefinitionId); w.Add(x.SlotId); w.Add(x.SegmentId); w.Add(x.AnimationId); w.Add(x.MontageStartTime); w.Add(x.MontageEndTime); w.Add(x.AnimationStartTime); w.Add(x.AnimationEndTime); w.Add(x.PlayRate); w.Add(x.LoopCount); });
-        AssertSpanSensitivity(runtime.ActionTimelineRanges.ToArray(), static (ref ReferenceFnvWriter w, in AlsActionTimelineRange x) =>
-        { w.Add(x.ActionDefinitionId); w.Add(x.DefinitionOffset); w.Add(x.DefinitionCount); });
+        Assert.All(new[]
+        {
+            ProductionBindingDigest(binding with { LayoutDigest = binding.LayoutDigest + 1 }),
+            ProductionBindingDigest(binding with { Policy = binding.Policy with { MissingValue = -0.0f } }),
+            ProductionBindingDigest(binding with { Policy = binding.Policy with
+                { CombineMode = (GodotAls.Core.Animation.AlsP5CurveCombineMode)255 } }),
+            ProductionBindingDigest(binding with { Policy = binding.Policy with { ClampMinimum = -0.0f } }),
+            ProductionBindingDigest(binding with { Policy = binding.Policy with { ClampMaximum = -0.0f } }),
+            ProductionBindingDigest(binding with { GroundedIk = -0.0f }),
+            ProductionBindingDigest(binding with { JumpIk = -0.0f }),
+            ProductionBindingDigest(binding with { FallIk = -0.0f }),
+            ProductionBindingDigest(binding with { LandIk = -0.0f }),
+            ProductionBindingDigest(binding with { Group = binding.Group with { GroupId = 1 } }),
+            ProductionBindingDigest(binding with { Group = binding.Group with { MemberOffset = 1 } }),
+            ProductionBindingDigest(binding with { Group = binding.Group with { MemberCount = binding.Group.MemberCount + 1 } }),
+            ProductionBindingDigest(binding with { Group = binding.Group with { LeftMarkerNameId = 1 } }),
+            ProductionBindingDigest(binding with { Group = binding.Group with { RightMarkerNameId = 2 } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { OccurrenceHandleId = binding.Transition.OccurrenceHandleId + 1 } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { AuthorityGroupId = binding.Transition.AuthorityGroupId + 1 } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { StandingLeft = binding.Transition.StandingLeft with { AnimationId = binding.Transition.StandingLeft.AnimationId + 1 } } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { StandingRight = binding.Transition.StandingRight with { AdditiveBaseAnimationId = binding.Transition.StandingRight.AdditiveBaseAnimationId + 1 } } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { CrouchingLeft = binding.Transition.CrouchingLeft with { DurationSeconds = -0.0f } } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { CrouchingRight = binding.Transition.CrouchingRight with { AnimationId = binding.Transition.CrouchingRight.AnimationId + 1 } } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { DistanceMeters = binding.Transition.DistanceMeters + .125f } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { BlendSeconds = binding.Transition.BlendSeconds + .125f } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { PlayRate = binding.Transition.PlayRate + .125f } }),
+            ProductionBindingDigest(binding with { Transition = binding.Transition with { CooldownFrames = binding.Transition.CooldownFrames + 1 } }),
+        }, value => Assert.NotEqual(bindingDigest, value));
 
-        AssertSpanSensitivity(graph.StandingSamples.ToArray(), WriteGraphSample);
-        AssertSpanSensitivity(graph.CrouchingSamples.ToArray(), WriteGraphSample);
-        AssertSpanSensitivity(graph.LeanSamples.ToArray(), WriteGraphSample);
-        AssertSpanSensitivity(graph.AllAnimationIds.ToArray(), static (ref ReferenceFnvWriter w, in int x) => w.Add(x));
-        AssertSpanSensitivity(graph.Turns.ToArray(), static (ref ReferenceFnvWriter w, in AlsTurnProfile x) =>
-        { w.Add(x.AnimationId); w.Add(x.CurveId); w.Add((byte)x.Stance); w.Add(x.Direction); w.Add(x.NominalDegrees); w.Add(x.BasePlayRate); w.Add(x.BlendSeconds); w.Add(x.ScaleAngle); });
-        AssertSpanSensitivity(graph.Rotates.ToArray(), static (ref ReferenceFnvWriter w, in AlsRotateProfile x) =>
-        { w.Add(x.AnimationId); w.Add(x.CurveId); w.Add((byte)x.Stance); w.Add(x.Direction); });
-        AssertSpanSensitivity(graph.MaskHeaders.ToArray(), static (ref ReferenceFnvWriter w, in AlsP5GraphMaskHeader x) =>
-        { w.Add((byte)x.Kind); w.Add(x.LogicalRootBoneId); w.Add(x.BoneOffset); w.Add(x.BoneCount); });
-        AssertSpanSensitivity(graph.LogicalBoneIds.ToArray(), static (ref ReferenceFnvWriter w, in int x) => w.Add(x));
-        AssertSpanSensitivity(graph.NormalizedAnimationIds.ToArray(), static (ref ReferenceFnvWriter w, in int x) => w.Add(x));
+        var graphInput = GraphDigestInput.Capture(in graph);
+        var graphDigest = ProductionGraphDigest(graphInput);
+        Assert.Equal(graph.Digest, graphDigest);
+        AssertProductionSpanMatrix(graphDigest, graphInput.Standing,
+            value => value with { X = value.X + .125f },
+            values => ProductionGraphDigest(graphInput with { Standing = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.Crouching,
+            value => value with { Y = value.Y + .125f },
+            values => ProductionGraphDigest(graphInput with { Crouching = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.Lean,
+            value => value with { RateScale = value.RateScale + .125f },
+            values => ProductionGraphDigest(graphInput with { Lean = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.AllAnimations, value => value + 1,
+            values => ProductionGraphDigest(graphInput with { AllAnimations = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.Turns,
+            value => value with { BasePlayRate = value.BasePlayRate + .125f },
+            values => ProductionGraphDigest(graphInput with { Turns = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.Rotates,
+            value => value with { Direction = (sbyte)-value.Direction },
+            values => ProductionGraphDigest(graphInput with { Rotates = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.Headers,
+            value => value with { BoneCount = value.BoneCount + 1 },
+            values => ProductionGraphDigest(graphInput with { Headers = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.LogicalBones, value => value + 1,
+            values => ProductionGraphDigest(graphInput with { LogicalBones = values }));
+        AssertProductionSpanMatrix(graphDigest, graphInput.Normalized, value => value + 1,
+            values => ProductionGraphDigest(graphInput with { Normalized = values }));
+
+        Assert.All(new[]
+        {
+            ProductionGraphDigest(graphInput with { SkeletonId = graphInput.SkeletonId + 1 }),
+            ProductionGraphDigest(graphInput with { MeshId = graphInput.MeshId + 1 }),
+            ProductionGraphDigest(graphInput with { LogicalRoot = graphInput.LogicalRoot + 1 }),
+            ProductionGraphDigest(graphInput with { PhysicalRoot = graphInput.PhysicalRoot + 1 }),
+            ProductionGraphDigest(graphInput with { Presentation = graphInput.Presentation with
+                { TranslationMeters = graphInput.Presentation.TranslationMeters with { X = -0.0f } } }),
+            ProductionGraphDigest(graphInput with { Presentation = graphInput.Presentation with
+                { TranslationMeters = graphInput.Presentation.TranslationMeters with { Y = -0.0f } } }),
+            ProductionGraphDigest(graphInput with { Presentation = graphInput.Presentation with
+                { TranslationMeters = graphInput.Presentation.TranslationMeters with { Z = -0.0f } } }),
+            ProductionGraphDigest(graphInput with { Presentation = graphInput.Presentation with { YawRadians = -0.0f } }),
+            ProductionGraphDigest(graphInput with { StandingIdle = graphInput.StandingIdle + 1 }),
+            ProductionGraphDigest(graphInput with { CrouchingIdle = graphInput.CrouchingIdle + 1 }),
+            ProductionGraphDigest(graphInput with { Jump = graphInput.Jump + 1 }),
+            ProductionGraphDigest(graphInput with { Fall = graphInput.Fall + 1 }),
+            ProductionGraphDigest(graphInput with { Land = graphInput.Land + 1 }),
+            ProductionGraphDigest(graphInput with { LeanBase = graphInput.LeanBase + 1 }),
+            ProductionGraphDigest(graphInput with { Aim = graphInput.Aim with { AimOffsetId = graphInput.Aim.AimOffsetId + 1 } }),
+            ProductionGraphDigest(graphInput with { Aim = graphInput.Aim with { DownAnimationId = graphInput.Aim.DownAnimationId + 1 } }),
+            ProductionGraphDigest(graphInput with { Aim = graphInput.Aim with { ForwardAnimationId = graphInput.Aim.ForwardAnimationId + 1 } }),
+            ProductionGraphDigest(graphInput with { Aim = graphInput.Aim with { UpAnimationId = graphInput.Aim.UpAnimationId + 1 } }),
+            ProductionGraphDigest(graphInput with { Aim = graphInput.Aim with { AdditiveBasePoseAnimationId = graphInput.Aim.AdditiveBasePoseAnimationId + 1 } }),
+        }, value => Assert.NotEqual(graphDigest, value));
     }
 
     [Fact]
@@ -1385,29 +1638,335 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
         Assert.NotEqual(leftWriter.Value, rightWriter.Value);
     }
 
-    private static void AssertSpanSensitivity<T>(T[] values, ReferenceElementWriter<T> write)
-    {
-        Assert.NotEmpty(values);
-        var baseline = SpanDigest(values, write);
-        foreach (var index in new[] { 0, values.Length / 2, values.Length - 1 }.Distinct())
-        {
-            Assert.NotEqual(baseline, SpanDigest(values.Where((_, candidate) => candidate != index).ToArray(), write));
-        }
-        var wrongCount = new ReferenceFnvWriter();
-        wrongCount.Add(values.Length + 1);
-        foreach (ref readonly var value in values.AsSpan()) write(ref wrongCount, in value);
-        Assert.NotEqual(baseline, wrongCount.Value);
-    }
-
-    private static ulong SpanDigest<T>(T[] values, ReferenceElementWriter<T> write)
-    {
-        var writer = new ReferenceFnvWriter();
-        writer.Add<T>(values, write);
-        return writer.Value;
-    }
-
     private static AlsAnimationSetDefinition RefreshDigest(AlsAnimationSetDefinition source) =>
         source with { DefinitionDigest = AlsAnimationSetPayload.ComputeDefinitionDigest(source) };
+
+    private readonly record struct EventLocation(int AnimationId, int EventIndex);
+
+    private static EventLocation[] ReachableBaseEvents(Fixture fixture) =>
+        AuthoredBaseAnimationIds(fixture.Locomotion).Distinct()
+            .SelectMany(animationId => fixture.Set.Animations[animationId].Timeline
+                .Select((_, eventIndex) => new EventLocation(animationId, eventIndex)))
+            .ToArray();
+
+    private static AlsAnimationSetDefinition MutateAnimationEvent(
+        AlsAnimationSetDefinition source,
+        EventLocation location,
+        Func<AlsCompiledTimelineEventDefinition, AlsCompiledTimelineEventDefinition> mutate)
+    {
+        var animations = source.Animations.ToArray();
+        var timeline = animations[location.AnimationId].Timeline;
+        timeline[location.EventIndex] = mutate(timeline[location.EventIndex]);
+        animations[location.AnimationId] = animations[location.AnimationId] with { Timeline = timeline };
+        return RefreshDigest(source with { Animations = animations });
+    }
+
+    private static void AssertWrappedSetFailure(Fixture fixture, AlsAnimationSetDefinition source)
+    {
+        Assert.Equal(AlsAnimationSetPayload.ComputeDefinitionDigest(source), source.DefinitionDigest);
+        var exception = Assert.Throws<ArgumentException>(() => fixture.Compile(set: source));
+        Assert.Equal("animationSet", exception.ParamName);
+        Assert.True(exception.InnerException is InvalidDataException, exception.ToString());
+    }
+
+    private static AlsAnimationSetDefinition MutateActionPayload(
+        Fixture fixture,
+        AlsCompiledTimelineEventKind kind,
+        Func<AlsCompiledTimelinePayloadDefinition, AlsCompiledTimelinePayloadDefinition> mutate)
+    {
+        var compiled = fixture.P5a.TimelineEntries.FirstOrDefault(value => value.Kind == kind);
+        var replaceKind = compiled.Kind != kind;
+        if (replaceKind)
+        {
+            compiled = fixture.P5a.TimelineEntries[0];
+        }
+        if (compiled.SourceKind == AlsCompiledActionTimelineSourceKind.Montage)
+        {
+            var montages = fixture.Set.Montages.ToArray();
+            var timeline = montages[compiled.SourceAssetId].Timeline;
+            var eventIndex = Array.FindIndex(timeline, value => value.EventId == compiled.EventId);
+            Assert.True(eventIndex >= 0);
+            timeline[eventIndex] = timeline[eventIndex] with
+            {
+                Kind = kind,
+                Payload = mutate(replaceKind ? CanonicalPayload(kind) : timeline[eventIndex].Payload),
+            };
+            montages[compiled.SourceAssetId] = montages[compiled.SourceAssetId] with { Timeline = timeline };
+            return RefreshDigest(fixture.Set with { Montages = montages });
+        }
+
+        Assert.Equal(AlsCompiledActionTimelineSourceKind.Sequence, compiled.SourceKind);
+        var animations = fixture.Set.Animations.ToArray();
+        var animationTimeline = animations[compiled.SourceAssetId].Timeline;
+        var animationEventIndex = Array.FindIndex(animationTimeline, value => value.EventId == compiled.EventId);
+        Assert.True(animationEventIndex >= 0);
+        animationTimeline[animationEventIndex] = animationTimeline[animationEventIndex] with
+        {
+            Kind = kind,
+            Payload = mutate(replaceKind ? CanonicalPayload(kind) : animationTimeline[animationEventIndex].Payload),
+        };
+        animations[compiled.SourceAssetId] = animations[compiled.SourceAssetId] with
+        {
+            Timeline = animationTimeline,
+        };
+        return RefreshDigest(fixture.Set with { Animations = animations });
+    }
+
+    private static AlsAnimationSetDefinition MutateGeneralPayload(
+        Fixture fixture,
+        AlsCompiledTimelineEventKind kind,
+        Func<AlsCompiledTimelinePayloadDefinition, AlsCompiledTimelinePayloadDefinition> mutate)
+    {
+        var location = ReachableBaseEvents(fixture)[0];
+        return MutateAnimationEvent(fixture.Set, location, value => value with
+        {
+            Kind = kind,
+            Payload = mutate(CanonicalPayload(kind)),
+        });
+    }
+
+    private static AlsP5aAnimationRuntimeProfile CompileP5(AlsAnimationSetDefinition source) =>
+        AlsP5aAnimationRuntimeProfileCompiler.Compile(File.ReadAllText(Path.Combine(
+            RepositoryRoot.Find(), "assets", "config", "p5a_animation_runtime.json")), source);
+
+    private static AlsAnimationSetDefinition BuildLoopActionSet(
+        Fixture fixture, int loopCount, bool useEmptyTimeline)
+    {
+        var action = fixture.P5a.Actions[0];
+        var montages = fixture.Set.Montages.ToArray();
+        var montage = montages[action.MontageId];
+        var slots = montage.Slots;
+        var slotIndex = Array.FindIndex(slots, value => value.SlotId == action.SlotId);
+        Assert.True(slotIndex >= 0);
+        var segments = slots[slotIndex].Segments;
+        Assert.NotEmpty(segments);
+        var animationId = Array.FindIndex(fixture.Set.Animations, animation =>
+            animation.SkeletonId == fixture.Locomotion.SkeletonId &&
+            animation.PlayLength > 0f && animation.AdditiveType == 0 &&
+            (useEmptyTimeline
+                ? animation.Timeline.Length == 0
+                : animation.Timeline.Length == 1 && animation.Timeline[0].TimeSeconds == 0f));
+        if (animationId < 0 && !useEmptyTimeline)
+        {
+            animationId = Array.FindIndex(fixture.Set.Animations, animation =>
+                animation.SkeletonId == fixture.Locomotion.SkeletonId &&
+                animation.PlayLength > 0f && animation.AdditiveType == 0 &&
+                animation.Timeline.Any(value => value.TimeSeconds == 0f));
+        }
+        Assert.True(animationId >= 0);
+        var animation = fixture.Set.Animations[animationId];
+
+        var animationRange = (float)(montage.PlayLength * segments[0].PlayRate / loopCount);
+        var mappedDuration = loopCount * (double)animationRange / segments[0].PlayRate;
+        var mappedLength = (float)mappedDuration;
+        for (var attempt = 0;
+             mappedLength < montage.PlayLength || Math.Abs(mappedLength - mappedDuration) > 1e-8;
+             attempt++)
+        {
+            Assert.True(attempt < 10_000, "Unable to construct an exact legal loop mapping.");
+            animationRange = MathF.BitIncrement(animationRange);
+            mappedDuration = loopCount * (double)animationRange / segments[0].PlayRate;
+            mappedLength = (float)mappedDuration;
+        }
+        Assert.InRange(animationRange, float.Epsilon, animation.PlayLength);
+        segments[0] = segments[0] with
+        {
+            AnimationId = animationId,
+            StartPosition = 0f,
+            AnimationStartTime = 0f,
+            AnimationEndTime = animationRange,
+            LoopCount = loopCount,
+        };
+        slots[slotIndex] = slots[slotIndex] with { Segments = segments };
+        montages[action.MontageId] = montage with { Slots = slots, PlayLength = mappedLength };
+        return RefreshDigest(fixture.Set with { Montages = montages });
+    }
+
+    private static AlsP5aAnimationRuntimeProfile RebindActionP5(
+        Fixture fixture, AlsAnimationSetDefinition source)
+    {
+        var actions = fixture.P5a.Actions;
+        var actionIndex = 0;
+        var action = actions[actionIndex];
+        var montage = source.Montages[action.MontageId];
+        var sections = montage.Sections.Select((value, index) => new AlsCompiledActionSectionBinding(
+            action.DefinitionId,
+            value.SectionId,
+            value.NextSectionId,
+            value.StartTime,
+            index + 1 < montage.Sections.Length ? montage.Sections[index + 1].StartTime : montage.PlayLength))
+            .ToArray();
+        actions[actionIndex] = action with
+        {
+            MontageDurationSeconds = montage.PlayLength,
+            Sections = sections,
+        };
+
+        var segmentBindings = fixture.P5a.SegmentBindings;
+        for (var index = 0; index < segmentBindings.Length; index++)
+        {
+            var binding = segmentBindings[index];
+            if (binding.ActionDefinitionId != action.DefinitionId)
+            {
+                continue;
+            }
+            var slot = montage.Slots.Single(value => value.SlotId == binding.SlotId);
+            var segment = slot.Segments.Single(value => value.SegmentId == binding.SegmentId);
+            var montageEnd = segment.StartPosition +
+                (float)(segment.LoopCount * ((double)segment.AnimationEndTime - segment.AnimationStartTime) /
+                    segment.PlayRate);
+            segmentBindings[index] = binding with
+            {
+                AnimationId = segment.AnimationId,
+                MontageStartTime = segment.StartPosition,
+                MontageEndTime = montageEnd,
+                AnimationStartTime = segment.AnimationStartTime,
+                AnimationEndTime = segment.AnimationEndTime,
+                PlayRate = segment.PlayRate,
+                LoopCount = segment.LoopCount,
+            };
+        }
+        var timeline = fixture.P5a.TimelineEntries.Where(value =>
+            value.SegmentBindingIndex < 0 ||
+            value.SegmentBindingIndex >= segmentBindings.Length ||
+            segmentBindings[value.SegmentBindingIndex].ActionDefinitionId != action.DefinitionId)
+            .ToArray();
+        return fixture.P5a with
+        {
+            Actions = actions,
+            SegmentBindings = segmentBindings,
+            TimelineEntries = timeline,
+        };
+    }
+
+    private static void AssertProductionSpanMatrix<T>(
+        ulong baseline, T[] values, Func<T, T> mutate, Func<T[], ulong> digest)
+    {
+        Assert.NotEmpty(values);
+        var matrix = values.Length >= 3 ? values : [values[0], values[0], values[0]];
+        var matrixBaseline = digest(matrix);
+        if (values.Length >= 3)
+        {
+            Assert.Equal(baseline, matrixBaseline);
+        }
+        foreach (var index in new[] { 0, matrix.Length / 2, matrix.Length - 1 })
+        {
+            Assert.NotEqual(matrixBaseline, digest(Replace(matrix, index, mutate(matrix[index]))));
+        }
+        Assert.NotEqual(matrixBaseline, digest([.. matrix, matrix[^1]]));
+        Assert.NotEqual(matrixBaseline, digest(matrix[..^1]));
+    }
+
+    private sealed record BindingDigestInput(
+        ulong LayoutDigest,
+        AlsCurveKey[] CurveKeys,
+        AlsCurveBinding[] CurveBindings,
+        AlsP5CurveBindingIdentity[] Identities,
+        AlsAnimationCurveRange[] Ranges,
+        AlsP5CurveSemanticPolicy Policy,
+        int[] AllowIndices,
+        AlsP4FootCurveRuntimeBinding[] FootBindings,
+        float GroundedIk,
+        float JumpIk,
+        float FallIk,
+        float LandIk,
+        AlsTimelineEventDefinition[] Timeline,
+        AlsSyncMarkerDefinition[] Markers,
+        AlsSyncGroupBinding Group,
+        AlsSyncMemberBinding[] Members,
+        AlsP5SyncOccurrenceBinding[] SyncOccurrences,
+        AlsDynamicTransitionBinding Transition,
+        AlsActionDefinition[] Actions,
+        AlsActionSectionBinding[] Sections,
+        AlsActionSegmentBinding[] Segments,
+        AlsActionTimelineRange[] ActionRanges)
+    {
+        public static BindingDigestInput Capture(in AlsP5RuntimeBindings value) => new(
+            value.LayoutDigest,
+            value.CurveKeys.ToArray(),
+            value.CurveBindings.ToArray(),
+            value.CurveBindingIdentities.ToArray(),
+            value.AnimationCurveRanges.ToArray(),
+            value.AllowTransitionsPolicy,
+            value.AllowTransitionsBindingIndices.ToArray(),
+            value.FootCurveBindings.ToArray(),
+            value.GroundedIkWeight,
+            value.JumpStartIkWeight,
+            value.FallLoopIkWeight,
+            value.LandRecoveryIkWeight,
+            value.TimelineDefinitions.ToArray(),
+            value.SyncMarkers.ToArray(),
+            value.SyncGroup,
+            value.SyncMembers.ToArray(),
+            value.SyncOccurrences.ToArray(),
+            value.DynamicTransition,
+            value.ActionDefinitions.ToArray(),
+            value.ActionSections.ToArray(),
+            value.ActionSegments.ToArray(),
+            value.ActionTimelineRanges.ToArray());
+    }
+
+    private static ulong ProductionBindingDigest(BindingDigestInput value)
+        => AlsP5CoreRuntimeBindingCompiler.ComputeBindingDigest(
+            value.LayoutDigest, value.CurveKeys, value.CurveBindings, value.Identities, value.Ranges,
+            value.Policy, value.AllowIndices, value.FootBindings, value.GroundedIk, value.JumpIk,
+            value.FallIk, value.LandIk, value.Timeline, value.Markers, value.Group, value.Members,
+            value.SyncOccurrences, value.Transition, value.Actions, value.Sections, value.Segments,
+            value.ActionRanges);
+
+    private sealed record GraphDigestInput(
+        int SkeletonId,
+        int MeshId,
+        int LogicalRoot,
+        int PhysicalRoot,
+        AlsPresentationDefinition Presentation,
+        int StandingIdle,
+        int CrouchingIdle,
+        int Jump,
+        int Fall,
+        int Land,
+        int LeanBase,
+        AlsP5GraphSample[] Standing,
+        AlsP5GraphSample[] Crouching,
+        AlsP5GraphSample[] Lean,
+        int[] AllAnimations,
+        AlsAimProfile Aim,
+        AlsTurnProfile[] Turns,
+        AlsRotateProfile[] Rotates,
+        AlsP5GraphMaskHeader[] Headers,
+        int[] LogicalBones,
+        int[] Normalized)
+    {
+        public static GraphDigestInput Capture(in AlsP5GraphBuildView value) => new(
+            value.SkeletonId,
+            value.MannequinMeshId,
+            value.RootMotionExtractionLogicalBoneId,
+            value.RootMotionExtractionPhysicalBoneId,
+            value.Presentation,
+            value.StandingIdleAnimationId,
+            value.CrouchingIdleAnimationId,
+            value.JumpStartAnimationId,
+            value.FallLoopAnimationId,
+            value.LandAnimationId,
+            value.LeanAdditiveBaseAnimationId,
+            value.StandingSamples.ToArray(),
+            value.CrouchingSamples.ToArray(),
+            value.LeanSamples.ToArray(),
+            value.AllAnimationIds.ToArray(),
+            value.Aim,
+            value.Turns.ToArray(),
+            value.Rotates.ToArray(),
+            value.MaskHeaders.ToArray(),
+            value.LogicalBoneIds.ToArray(),
+            value.NormalizedAnimationIds.ToArray());
+    }
+
+    private static ulong ProductionGraphDigest(GraphDigestInput value)
+        => AlsP5CoreRuntimeBindingCompiler.ComputeGraphDigest(
+            value.SkeletonId, value.MeshId, value.LogicalRoot, value.PhysicalRoot, value.Presentation,
+            value.StandingIdle, value.CrouchingIdle, value.Jump, value.Fall, value.Land,
+            value.LeanBase, value.Standing, value.Crouching, value.Lean, value.AllAnimations,
+            value.Aim, value.Turns, value.Rotates, value.Headers, value.LogicalBones, value.Normalized);
 
     private static ulong ReferenceLayoutDigest(int version, ReadOnlySpan<ImportOccurrenceEntry> entries)
     {
