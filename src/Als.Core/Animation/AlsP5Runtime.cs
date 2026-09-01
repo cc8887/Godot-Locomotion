@@ -1775,8 +1775,8 @@ public static class AlsP5Runtime
             !IsWeight(state.ViewPose.SpineWeight) ||
             !IsCanonicalTurnState(state) ||
             !IsCanonicalRotateState(state) ||
-            (state.YawSource == AlsYawSource.TurnInPlace) != (result.TurnActive == 1) ||
-            (state.YawSource == AlsYawSource.RotateInPlace) != (result.RotateActive == 1) ||
+            !IsPostFootTurnCoherent(state, result) ||
+            !IsPostFootRotateCoherent(state, result) ||
             state.TurnInPlace.Active == 1 && state.RotateInPlace.Active == 1 ||
             !IsCanonicalFootLock(state.LeftFootLock, state.LeftFootLocked) ||
             !IsCanonicalFootLock(state.RightFootLock, state.RightFootLocked))
@@ -1874,6 +1874,27 @@ public static class AlsP5Runtime
             rotate.Direction is -1 or 1 &&
             state.YawSource == AlsYawSource.RotateInPlace;
     }
+
+    private static bool IsPostFootTurnCoherent(
+        in AlsRuntimeState state,
+        in AlsFrameResult result)
+    {
+        if (result.TurnActive == 0)
+        {
+            return state.YawSource != AlsYawSource.TurnInPlace;
+        }
+
+        return state.YawSource == AlsYawSource.TurnInPlace &&
+            (state.TurnInPlace.Active == 1 || state.TurnInPlace == default);
+    }
+
+    private static bool IsPostFootRotateCoherent(
+        in AlsRuntimeState state,
+        in AlsFrameResult result) =>
+        result.RotateActive == 1
+            ? state.YawSource == AlsYawSource.RotateInPlace &&
+                state.RotateInPlace.Active == 1
+            : state.YawSource != AlsYawSource.RotateInPlace;
 
     private static bool IsCanonicalFootLock(in AlsFootLockState state, byte topLevelLocked)
     {

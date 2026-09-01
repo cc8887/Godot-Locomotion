@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
 using GodotAls.Core.Actions;
 using GodotAls.Core.Animation;
 using GodotAls.Core.Contracts;
@@ -1317,10 +1318,10 @@ public sealed class AlsP5RuntimeTransactionTests
     }
 
     [Theory]
-    [InlineData(AlsYawSource.TurnInPlace)]
-    [InlineData(AlsYawSource.RotateInPlace)]
-    public void Fix2_FinalizeAcceptsCanonicalTerminalTurnRotateState(
-        AlsYawSource yawSource)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Fix3_FinalizeRejectsMissingActiveRotateStateAndPendingTurnTerminal(
+        bool pendingTurn)
     {
         var fixture = new ReviewFixture();
         var bindings = fixture.CreateBindings();
@@ -1332,15 +1333,56 @@ public sealed class AlsP5RuntimeTransactionTests
             fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
             ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
         var postFoot = state;
-        postFoot.YawSource = yawSource;
+        postFoot.YawSource = pendingTurn
+            ? AlsYawSource.TurnInPlace
+            : AlsYawSource.RotateInPlace;
         var p4 = CreateCanonicalP4Result(input.Identity);
-        if (yawSource == AlsYawSource.TurnInPlace)
+        if (pendingTurn)
         {
             SetValidTurn(ref p4);
+            postFoot.TurnInPlace = postFoot.TurnInPlace with { ActivationSeconds = 0.25f };
         }
         else
         {
             SetValidRotate(ref p4);
+        }
+
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in postFoot, in ReviewFixture.ValidProbe,
+            out var owner, out var next, out var result, out var failure));
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+        Assert.Equal(0UL, owner);
+        Assert.Equal(default, next);
+        Assert.Equal(default, result);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Fix3_FinalizeAcceptsActiveRotateStateAndCompleteDefaultTurnTerminal(
+        bool activeRotate)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
+        var postFoot = state;
+        var p4 = CreateCanonicalP4Result(input.Identity);
+        if (activeRotate)
+        {
+            SetValidRotate(ref p4);
+            SetValidRotate(ref postFoot);
+        }
+        else
+        {
+            postFoot.YawSource = AlsYawSource.TurnInPlace;
+            SetValidTurn(ref p4);
+            Assert.Equal(default, postFoot.TurnInPlace);
         }
 
         Assert.True(AlsP5Runtime.TryFinalize(
@@ -1557,14 +1599,8 @@ public sealed class AlsP5RuntimeTransactionTests
             in bindings, in input, in state,
             fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 7,
             ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
-        var postFoot = state;
-        postFoot.SmoothedVelocity = new Vector3(1f, 2f, 3f);
-        postFoot.GroundedEntrySpeed = 4f;
-        postFoot.ViewPose = new AlsViewPoseState(0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f);
-        var p4 = CreateCanonicalP4Result(input.Identity);
-        p4.WorkerElapsedTicks = 123;
-        p4.ErrorCode = 456;
-        p4.PelvisOffset = new Vector3(7f, 8f, 9f);
+        var postFoot = CreateSentinelP4State();
+        var p4 = CreateSentinelP4Result(input.Identity);
         var baselineDigest = AlsResultDigest.OffsetBasis;
         AlsResultDigest.Append(ref baselineDigest, p4);
 
@@ -1572,12 +1608,21 @@ public sealed class AlsP5RuntimeTransactionTests
             prepared, ref scratch, in p4, in postFoot, in ReviewFixture.ValidProbe,
             out _, out var next, out var result, out var failure), failure.ToString());
 
-        Assert.Equal(postFoot.SmoothedVelocity, next.SmoothedVelocity);
-        Assert.Equal(postFoot.GroundedEntrySpeed, next.GroundedEntrySpeed);
-        Assert.Equal(postFoot.ViewPose, next.ViewPose);
-        Assert.Equal(p4.WorkerElapsedTicks, result.WorkerElapsedTicks);
-        Assert.Equal(p4.ErrorCode, result.ErrorCode);
-        Assert.Equal(p4.PelvisOffset, result.PelvisOffset);
+        var expectedNext = postFoot;
+        expectedNext.ActionPlayer = next.ActionPlayer;
+        expectedNext.DynamicTransition = next.DynamicTransition;
+        expectedNext.ActionBlendLane = next.ActionBlendLane;
+        expectedNext.DynamicTransitionBlendLane = next.DynamicTransitionBlendLane;
+        AssertUnmanagedBytesEqual(expectedNext, next);
+
+        var expectedResult = p4;
+        expectedResult.TypedEvents = result.TypedEvents;
+        expectedResult.Sync = result.Sync;
+        expectedResult.DynamicTransition = result.DynamicTransition;
+        expectedResult.ActionPlayback = result.ActionPlayback;
+        expectedResult.ActionOutcomes = result.ActionOutcomes;
+        expectedResult.P5FailureCode = result.P5FailureCode;
+        AssertUnmanagedBytesEqual(expectedResult, result);
         Assert.True(result.TypedEvents.Count > 0);
         Assert.True(result.ActionOutcomes.Count > 0);
         var transactionDigest = AlsResultDigest.OffsetBasis;
@@ -1678,6 +1723,7 @@ public sealed class AlsP5RuntimeTransactionTests
             [
                 new(0, 0, 0, 1, 0.1d, 0.2d, 0d, 0.1d, 1f, 1f, 1, 1, 0),
                 new(1, 1, 1, 1, 0.3d, 0.4d, 0d, 0.1d, 1f, 0.5f, 1, 1, 0),
+                new(2, 1, 2, 2, 0.6d, 0.7d, 0d, 0.1d, 1f, 0.25f, 1, 1, 0),
             ],
             Markers =
             [
@@ -1702,7 +1748,7 @@ public sealed class AlsP5RuntimeTransactionTests
         var bindings = fixture.CreateBindings();
         var input = fixture.CreateInput(0.1f);
         var state = AlsRuntimeState.CreateDefault();
-        var scratch = fixture.CreateScratch(baseCapacity: 2);
+        var scratch = fixture.CreateScratch(baseCapacity: 3);
 
         Assert.True(AlsP5Runtime.TryPrepare(
             in bindings, in input, in state,
@@ -1714,22 +1760,58 @@ public sealed class AlsP5RuntimeTransactionTests
         var mappedCurrent = (double)follower.CurrentCycle * follower.DurationSeconds +
             follower.CurrentTimeSeconds;
         Assert.NotEqual(fixture.Base[1].CurrentUnwrappedTimeSeconds, mappedCurrent);
-        Assert.Equal((float)mappedCurrent * fixture.Base[1].Weight, prepared.LeftLock, 5);
+        Assert.DoesNotContain(prepared.SyncMappedPlaybacks.ToArray(),
+            value => value.OccurrenceHandleId == 2);
+        Assert.Equal(
+            (float)mappedCurrent * fixture.Base[1].Weight +
+                (float)fixture.Base[2].CurrentUnwrappedTimeSeconds * fixture.Base[2].Weight,
+            prepared.LeftLock);
         Assert.Equal(mappedCurrent, fixture.CandidateCursors[1].ConsumedUnwrappedTimeSeconds);
+        Assert.Equal(fixture.Base[2].CurrentUnwrappedTimeSeconds,
+            fixture.CandidateCursors[2].ConsumedUnwrappedTimeSeconds);
+        Assert.Equal((2, 1, 2L),
+            (fixture.CandidateAuthorities[2].OccurrenceHandleId,
+                fixture.CandidateAuthorities[2].AnimationId,
+                fixture.CandidateAuthorities[2].PlaybackEpoch));
     }
 
     [Theory]
-    [InlineData(AlsAnimationState.Grounded, 1f)]
-    [InlineData(AlsAnimationState.JumpStart, 0f)]
-    [InlineData(AlsAnimationState.FallLoop, 0f)]
-    [InlineData(AlsAnimationState.LandRecovery, 1f)]
-    public void MandatoryMatrix_EveryP4AnimationStateSelectsFrozenIkWeight(
+    [InlineData("idle", 0, AlsAnimationState.Grounded, 0, AlsTimelineLocomotionMode.Grounded, AlsTimelineStance.Standing, 1f)]
+    [InlineData("grounded", 1, AlsAnimationState.Grounded, 1, AlsTimelineLocomotionMode.Grounded, AlsTimelineStance.Standing, 1f)]
+    [InlineData("crouch", 2, AlsAnimationState.Grounded, 1, AlsTimelineLocomotionMode.Grounded, AlsTimelineStance.Crouching, 1f)]
+    [InlineData("jump", 3, AlsAnimationState.JumpStart, 1, AlsTimelineLocomotionMode.InAir, AlsTimelineStance.Standing, 0f)]
+    [InlineData("fall", 4, AlsAnimationState.FallLoop, 1, AlsTimelineLocomotionMode.InAir, AlsTimelineStance.Standing, 0f)]
+    [InlineData("land", 5, AlsAnimationState.LandRecovery, 0, AlsTimelineLocomotionMode.Recovering, AlsTimelineStance.Standing, 1f)]
+    public void MandatoryMatrix_EveryLocomotionFamilyUsesNonconstantFootCurveAndFrozenIk(
+        string _,
+        int animationId,
         AlsAnimationState animationState,
+        byte hasInput,
+        AlsTimelineLocomotionMode locomotionMode,
+        AlsTimelineStance stance,
         float expected)
     {
-        var fixture = new ReviewFixture();
+        var fixture = new ReviewFixture
+        {
+            Base =
+            [
+                new(0, animationId, 0, 1, 0d, 0.25d, 0d, 0.25d,
+                    1f, 1f, 1, 1, 0),
+            ],
+            CurveKeys =
+            [
+                new(0f, 0f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+                new(1f, 1f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+            ],
+            CurveBindings = [new(77, 0, 2, 1f, 1, 1)],
+            CurveIdentities = [new(animationId, 77)],
+            FootBindings = [new(animationId, 77, 77, 0f, 0f)],
+        };
+        fixture.CurveRanges[animationId] = new AlsAnimationCurveRange(animationId, 0, 1);
         var bindings = fixture.CreateBindings();
-        var input = fixture.CreateInput(0.1f, animationState: animationState);
+        var input = fixture.CreateInput(
+            0.25f, hasInput: hasInput, animationState: animationState,
+            locomotionMode: locomotionMode, stance: stance);
         var state = AlsRuntimeState.CreateDefault();
         var scratch = fixture.CreateScratch();
 
@@ -1737,6 +1819,8 @@ public sealed class AlsP5RuntimeTransactionTests
             in bindings, in input, in state,
             fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
             ref scratch, out var prepared, out var failure), failure.ToString());
+        AssertBitsEqual(0.25f, prepared.LeftLock);
+        AssertBitsEqual(0.25f, prepared.RightLock);
         AssertBitsEqual(expected, prepared.LeftIk);
         AssertBitsEqual(expected, prepared.RightIk);
     }
@@ -1751,10 +1835,21 @@ public sealed class AlsP5RuntimeTransactionTests
             FootBindings =
             [
                 new(0, -1, -1, 0f, 0f),
-                new(7, -1, -1, 1f, 0f),
-                new(8, -1, -1, 0f, 1f),
+                new(7, 77, 77, 0f, 0f),
+                new(8, 77, 77, 0f, 0f),
             ],
+            CurveKeys =
+            [
+                new(0f, 0f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+                new(1f, 1f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+                new(0f, 0.2f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+                new(1f, 0.6f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+            ],
+            CurveBindings = [new(77, 0, 2, 1f, 1, 1), new(77, 2, 2, 1f, 1, 1)],
+            CurveIdentities = [new(7, 77), new(8, 77)],
         };
+        fixture.CurveRanges[7] = new AlsAnimationCurveRange(7, 0, 1);
+        fixture.CurveRanges[8] = new AlsAnimationCurveRange(8, 1, 1);
         var bindings = fixture.CreateBindings();
         var input = fixture.CreateInput(0.1f, actionBlend: 1f, actionModeBlend: 0.25f);
         var state = AlsRuntimeState.CreateDefault();
@@ -1764,8 +1859,317 @@ public sealed class AlsP5RuntimeTransactionTests
             in bindings, in input, in state,
             fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
             ref scratch, out var prepared, out var failure), failure.ToString());
-        AssertBitsEqual(0.75f, prepared.LeftLock);
-        AssertBitsEqual(0.25f, prepared.RightLock);
+        AssertBitsEqual(0.135f, prepared.LeftLock);
+        AssertBitsEqual(0.135f, prepared.RightLock);
+    }
+
+    [Theory]
+    [InlineData(0.2f, 0f, 1f, 0f, 1f, 0.7f)]
+    [InlineData(0.8f, 0f, 1f, 0f, 1f, 1f)]
+    [InlineData(0.1f, -1f, -0.5f, 0f, 1f, 0f)]
+    public void MandatoryMatrix_AllowTransitionsAddsToDefaultAndClampsOnce(
+        float missing,
+        float startValue,
+        float endValue,
+        float clampMinimum,
+        float clampMaximum,
+        float expected)
+    {
+        var fixture = new ReviewFixture
+        {
+            CurveKeys =
+            [
+                new(0f, startValue, 0f, 0f, AlsCurveInterpolationMode.Linear),
+                new(1f, endValue, 0f, 0f, AlsCurveInterpolationMode.Linear),
+            ],
+            CurveBindings = [new(88, 0, 2, 1f, 1, 1)],
+            CurveIdentities = [new(0, 88)],
+            AllowPolicy = new AlsP5CurveSemanticPolicy(
+                missing, AlsP5CurveCombineMode.AdditiveToDefault,
+                clampMinimum, clampMaximum),
+        };
+        fixture.CurveRanges[0] = new AlsAnimationCurveRange(0, 0, 1);
+        fixture.AllowIndices[0] = 0;
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.5f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+        AssertBitsEqual(expected, prepared.AllowTransitions);
+    }
+
+    [Fact]
+    public void MandatoryMatrix_AllowTransitionsCombinesBtrActionAndTransitionGraphs()
+    {
+        var fixture = new ReviewFixture
+        {
+            Turn = [new(7, 7, 6, 1, 0d, 0.1d, 0d, 0.1d, 1f, 1f, 1, 1, 0)],
+            Rotate = [new(8, 8, 7, 1, 0d, 0.1d, 0d, 0.1d, 1f, 1f, 1, 1, 0)],
+            FootBindings =
+            [
+                new(0, -1, -1, 0f, 0f),
+                new(7, -1, -1, 0f, 0f),
+                new(8, -1, -1, 0f, 0f),
+            ],
+            CurveKeys =
+            [
+                new(0f, 0f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+                new(1f, 1f, 0f, 0f, AlsCurveInterpolationMode.Linear),
+            ],
+            CurveBindings = [new(88, 0, 2, 1f, 1, 1)],
+            CurveIdentities = [new(0, 88)],
+            AllowPolicy = new AlsP5CurveSemanticPolicy(
+                0.1f, AlsP5CurveCombineMode.AdditiveToDefault, 0f, 1f),
+        };
+        fixture.CurveRanges[0] = new AlsAnimationCurveRange(0, 0, 1);
+        foreach (var animationId in new[] { 0, 1, 7, 8, 10, 20 })
+        {
+            fixture.AllowIndices[animationId] = 0;
+        }
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f, actionBlend: 0.5f, actionModeBlend: 0.5f);
+        var actionState = fixture.CreateActiveActionState(0, 0, 0.1f, 0.4f);
+        var actionCursor = fixture.CurrentCursors[2];
+        var sequenceCursor = fixture.CurrentCursors[3];
+        var montageAuthority = fixture.CurrentAuthorities[2];
+        var sequenceAuthority = fixture.CurrentAuthorities[3];
+        var state = fixture.CreateActiveTransitionState(
+            animationId: 1, foot: AlsTransitionFoot.Left, time: 0.2f, laneWeight: 0.4f);
+        state.ActionPlayer = actionState.ActionPlayer;
+        state.ActionBlendLane = actionState.ActionBlendLane;
+        fixture.CurrentCursors[2] = actionCursor;
+        fixture.CurrentCursors[3] = sequenceCursor;
+        fixture.CurrentAuthorities[2] = montageAuthority;
+        fixture.CurrentAuthorities[3] = sequenceAuthority;
+        var scratch = fixture.CreateScratch(baseCapacity: 3);
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+        AssertBitsEqual(0.525f, prepared.AllowTransitions);
+    }
+
+    [Fact]
+    public void MandatoryMatrix_BaseMemberClosesToIdleWhileNonmemberCommitsIndependently()
+    {
+        var fixture = new ReviewFixture
+        {
+            Base =
+            [
+                new(0, 0, 0, 1, 0.2d, 0.2d, 0d, 0d, 1f, 1f, 1, 0, 1),
+                new(1, 1, 0, 2, 0d, 0.1d, 0d, 0.1d, 1f, 1f, 1, 1, 0),
+            ],
+            FootBindings =
+            [
+                new(0, -1, -1, 0f, 0f),
+                new(1, -1, -1, 0f, 0f),
+            ],
+            TimelineDefinitions =
+            [
+                new(400, 0, -1, 0, AlsTimelineSourceKind.Animation, 0, 0, 0,
+                    0f, 1f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+            ],
+        };
+        SetCommittedOccurrence(fixture, 0, 0, 0, 1, 0.2d);
+        fixture.CurrentOwnership[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 400,
+            OccurrenceHandleId = 0,
+            AnimationId = 0,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            OwnerToken = 1,
+            Active = 1,
+        };
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        fixture.Base[0] = fixture.Base[0] with
+        {
+            PreviousUnwrappedTimeSeconds = 0.2d,
+            CurrentUnwrappedTimeSeconds = 0.2d,
+            FrameEndOffsetSeconds = 0d,
+            ActivatesAtFrameStart = 0,
+            ClosesAfterFrame = 1,
+        };
+        fixture.Base[1] = fixture.Base[1] with { AuthorityGroupId = 0, PlaybackEpoch = 2 };
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch(baseCapacity: 2);
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 2,
+            ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
+        var p4 = CreateCanonicalP4Result(input.Identity);
+        Assert.True(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in state, in ReviewFixture.ValidProbe,
+            out _, out _, out var result, out var failure), failure.ToString());
+        Assert.Equal((1, 1, 2L),
+            (fixture.CandidateAuthorities[0].OccurrenceHandleId,
+                fixture.CandidateAuthorities[0].AnimationId,
+                fixture.CandidateAuthorities[0].PlaybackEpoch));
+        Assert.Equal(AlsTimelineCursor.CreateDefault(), fixture.CandidateCursors[0]);
+        Assert.Equal((1, 1, 2L, (double)0.1f),
+            (fixture.CandidateCursors[1].OccurrenceHandleId,
+                fixture.CandidateCursors[1].AnimationId,
+                fixture.CandidateCursors[1].PlaybackEpoch,
+                fixture.CandidateCursors[1].ConsumedUnwrappedTimeSeconds));
+        Assert.Contains(
+            Enumerable.Range(0, result.TypedEvents.Count)
+                .Select(index => result.TypedEvents[index]),
+            value => value.EventId == 400 && value.Phase == AlsAnimationEventPhase.End &&
+                value.SourceAnimationId == 0 && value.PlaybackEpoch == 1);
+    }
+
+    [Fact]
+    public void MandatoryMatrix_TurnStateOwnerClosesBeforeRotateAuthorityBegins()
+    {
+        var fixture = new ReviewFixture
+        {
+            Base = [],
+            Turn = [new(7, 7, 6, 1, 0.2d, 0.2d, 0d, 0d, 1f, 1f, 1, 0, 1)],
+            Rotate = [new(8, 8, 6, 2, 0d, 0.1d, 0d, 0.1d, 1f, 1f, 1, 1, 0)],
+            FootBindings =
+            [
+                new(7, -1, -1, 0f, 0f),
+                new(8, -1, -1, 0f, 0f),
+            ],
+            TimelineDefinitions =
+            [
+                new(300, 7, -1, 7, AlsTimelineSourceKind.Animation, 0, 0, 0,
+                    0f, 1f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+                new(300, 8, -1, 8, AlsTimelineSourceKind.Animation, 1, 0, 0,
+                    0f, 1f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+            ],
+        };
+        SetCommittedOccurrence(fixture, 7, 7, 6, 1, 0.2d);
+        fixture.CurrentOwnership[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 300,
+            OccurrenceHandleId = 7,
+            AnimationId = 7,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            OwnerToken = 1,
+            Active = 1,
+        };
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f, actionBlend: 1f, actionModeBlend: 1f);
+        fixture.Turn[0] = fixture.Turn[0] with
+        {
+            PreviousUnwrappedTimeSeconds = 0.2d,
+            CurrentUnwrappedTimeSeconds = 0.2d,
+            FrameEndOffsetSeconds = 0d,
+            ActivatesAtFrameStart = 0,
+            ClosesAfterFrame = 1,
+        };
+        fixture.Rotate[0] = fixture.Rotate[0] with
+        {
+            AuthorityGroupId = 6,
+            PlaybackEpoch = 2,
+        };
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch(baseCapacity: 2);
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 2,
+            ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
+        var p4 = CreateCanonicalP4Result(input.Identity);
+        Assert.True(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in state, in ReviewFixture.ValidProbe,
+            out var nextToken, out _, out var result, out var failure), failure.ToString());
+
+        Assert.Equal((8, 8, 2L),
+            (fixture.CandidateAuthorities[6].OccurrenceHandleId,
+                fixture.CandidateAuthorities[6].AnimationId,
+                fixture.CandidateAuthorities[6].PlaybackEpoch));
+        Assert.Equal((8, 8, 2L),
+            (fixture.CandidateOwnership[0].OccurrenceHandleId,
+                fixture.CandidateOwnership[0].AnimationId,
+                fixture.CandidateOwnership[0].PlaybackEpoch));
+        Assert.Equal(3UL, nextToken);
+        Assert.Equal(
+            [AlsAnimationEventPhase.End, AlsAnimationEventPhase.Begin],
+            Enumerable.Range(0, result.TypedEvents.Count)
+                .Select(index => result.TypedEvents[index])
+                .Where(value => value.Phase != AlsAnimationEventPhase.Tick)
+                .Select(value => value.Phase));
+    }
+
+    [Theory]
+    [InlineData(0, "restart")]
+    [InlineData(1, "restart")]
+    [InlineData(2, "restart")]
+    [InlineData(0, "backward")]
+    [InlineData(1, "backward")]
+    [InlineData(2, "backward")]
+    [InlineData(0, "inactive")]
+    [InlineData(1, "inactive")]
+    [InlineData(2, "inactive")]
+    public void MandatoryMatrix_EveryBtrBankUsesExactEpochForRestartBackwardAndInactiveReuse(
+        int bank,
+        string reuse)
+    {
+        var handle = bank == 0 ? 0 : bank == 1 ? 7 : 8;
+        var authorityGroup = bank == 0 ? 0 : bank == 1 ? 6 : 7;
+        var currentEpoch = reuse == "backward" ? 5L : 4L;
+        var nextEpoch = reuse == "inactive" ? 9L : currentEpoch + 1L;
+        var oldTime = reuse == "backward" ? 0.8d : 0.4d;
+        var incomingPrevious = reuse == "backward" ? 0.1d : 0d;
+        var incomingCurrent = reuse == "backward" ? 0.15d : 0.1d;
+        AlsBasePlaybackDescriptor[] descriptors = reuse == "inactive"
+            ? [new(handle, handle, authorityGroup, nextEpoch, incomingPrevious, incomingCurrent,
+                0d, 0.1d, 1f, 1f, 1, 1, 0)]
+            :
+            [
+                new(handle, handle, authorityGroup, currentEpoch, oldTime,
+                    reuse == "backward" ? 0.85d : oldTime,
+                    0d, reuse == "backward" ? 0.05d : 0d,
+                    1f, 1f, 1, 0, 1),
+                new(handle, handle, authorityGroup, nextEpoch, incomingPrevious, incomingCurrent,
+                    reuse == "backward" ? 0.05d : 0d, 0.1d,
+                    1f, 1f, 1, 1, 0),
+            ];
+        var fixture = new ReviewFixture
+        {
+            Base = bank == 0 ? descriptors : [],
+            Turn = bank == 1 ? descriptors : [],
+            Rotate = bank == 2 ? descriptors : [],
+            FootBindings = [new(handle, -1, -1, 0f, 0f)],
+        };
+        if (reuse != "inactive")
+        {
+            SetCommittedOccurrence(
+                fixture, handle, handle, authorityGroup, currentEpoch, oldTime);
+        }
+        var bindings = fixture.CreateBindings();
+        var exactDescriptors = descriptors.ToArray();
+        var input = fixture.CreateInput(
+            0.1f,
+            actionBlend: bank == 0 ? 0f : 1f,
+            actionModeBlend: bank == 2 ? 1f : 0f);
+        exactDescriptors.CopyTo(descriptors, 0);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch(baseCapacity: descriptors.Length);
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out _, out var failure), failure.ToString());
+        Assert.Equal((handle, handle, nextEpoch, incomingCurrent),
+            (fixture.CandidateCursors[handle].OccurrenceHandleId,
+                fixture.CandidateCursors[handle].AnimationId,
+                fixture.CandidateCursors[handle].PlaybackEpoch,
+                fixture.CandidateCursors[handle].ConsumedUnwrappedTimeSeconds));
+        Assert.Equal((handle, handle, nextEpoch),
+            (fixture.CandidateAuthorities[authorityGroup].OccurrenceHandleId,
+                fixture.CandidateAuthorities[authorityGroup].AnimationId,
+                fixture.CandidateAuthorities[authorityGroup].PlaybackEpoch));
     }
 
     [Fact]
@@ -1783,42 +2187,72 @@ public sealed class AlsP5RuntimeTransactionTests
             ],
             TimelineDefinitions =
             [
-                new(100, 0, -1, 0, AlsTimelineSourceKind.Animation, 0, 0, 0,
+                new(102, 8, -1, 8, AlsTimelineSourceKind.Animation, 0, 0, 0,
+                    0.07f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+                new(105, 2, -1, 1, AlsTimelineSourceKind.Animation, 1, 0, 0,
+                    0.04f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+                new(100, 0, -1, 0, AlsTimelineSourceKind.Animation, 2, 0, 0,
                     0.05f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
-                new(101, 7, -1, 7, AlsTimelineSourceKind.Animation, 1, 0, 0,
-                    0.05f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
-                new(102, 8, -1, 8, AlsTimelineSourceKind.Animation, 2, 0, 0,
-                    0.05f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
-                new(103, 1, -1, 1, AlsTimelineSourceKind.Animation, 3, 0, 0,
-                    0.05f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
-                new(104, 10, 0, 2, AlsTimelineSourceKind.Montage, 4, 0, 0,
-                    0.15f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
-                new(105, 20, 0, 3, AlsTimelineSourceKind.MontageSegmentAnimation, 5, 0, 0,
-                    0.15f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+                new(104, 1, -1, 1, AlsTimelineSourceKind.Animation, 3, 0, 0,
+                    0.1f, 0.5f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+                new(101, 7, -1, 7, AlsTimelineSourceKind.Animation, 4, 0, 0,
+                    0.02f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+                new(106, 10, 0, 2, AlsTimelineSourceKind.Montage, 5, 0, 0,
+                    0.16f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
+                new(107, 20, 0, 3, AlsTimelineSourceKind.MontageSegmentAnimation, 6, 0, 0,
+                    0.13f, 0f, 0f, AlsTimelineEventKind.Generic, AlsTimelineTickMode.Queued, default),
             ],
-            ActionTimelineRanges = [new(0, 4, 2), new(1, 6, 0)],
+            ActionTimelineRanges = [new(0, 5, 2), new(1, 7, 0)],
         };
         var bindings = fixture.CreateBindings();
-        var input = fixture.CreateInput(0.1f, actionBlend: 0.5f, actionModeBlend: 0.5f);
-        var state = fixture.CreateActiveActionState(0, 0, 0.1f, 0.4f);
-        state.DynamicTransition.QueuedAnimationId = 1;
-        state.DynamicTransition.QueuedFoot = AlsTransitionFoot.Left;
-        state.DynamicTransition.Queued = 1;
+        var input = fixture.CreateInput(0.2f, actionBlend: 0.5f, actionModeBlend: 0.5f);
+        var actionState = fixture.CreateActiveActionState(0, 0, 0.1f, 0.4f);
+        var actionCursor = fixture.CurrentCursors[2];
+        var sequenceCursor = fixture.CurrentCursors[3];
+        var montageAuthority = fixture.CurrentAuthorities[2];
+        var sequenceAuthority = fixture.CurrentAuthorities[3];
+        var state = fixture.CreateActiveTransitionState(
+            animationId: 1, foot: AlsTransitionFoot.Left, time: 0.2f,
+            laneWeight: 0.4f, queuedAnimationId: 2, queuedFoot: AlsTransitionFoot.Right);
+        state.ActionPlayer = actionState.ActionPlayer;
+        state.ActionBlendLane = actionState.ActionBlendLane;
+        fixture.CurrentCursors[2] = actionCursor;
+        fixture.CurrentCursors[3] = sequenceCursor;
+        fixture.CurrentAuthorities[2] = montageAuthority;
+        fixture.CurrentAuthorities[3] = sequenceAuthority;
+        fixture.CurrentOwnership[0] = new AlsNotifyStateOwnership
+        {
+            EventId = 104,
+            OccurrenceHandleId = 1,
+            AnimationId = 1,
+            ActionId = -1,
+            PlaybackEpoch = 1,
+            OwnerToken = 1,
+            Active = 1,
+        };
         var scratch = fixture.CreateScratch(baseCapacity: 3);
 
         Assert.True(AlsP5Runtime.TryPrepare(
             in bindings, in input, in state,
-            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 2,
             ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
         var p4 = CreateCanonicalP4Result(input.Identity);
         Assert.True(AlsP5Runtime.TryFinalize(
             prepared, ref scratch, in p4, in state, in ReviewFixture.ValidProbe,
             out _, out _, out var result, out var failure), failure.ToString());
 
-        Assert.Equal(6, result.TypedEvents.Count);
-        Assert.Equal([100, 101, 102, 103, 104, 105],
+        Assert.Equal(7, result.TypedEvents.Count);
+        Assert.Equal([104, 101, 107, 105, 100, 106, 102],
             Enumerable.Range(0, result.TypedEvents.Count)
                 .Select(index => result.TypedEvents[index].EventId));
+        Assert.Equal(
+            [0, 1017370378, 1022739083, 1025758986, 1028443341, 1031127693, 1032805417],
+            Enumerable.Range(0, result.TypedEvents.Count)
+                .Select(index => BitConverter.SingleToInt32Bits(
+                    result.TypedEvents[index].AnimationTime)));
+        Assert.Equal([1, 7, 20, 2, 0, 10, 8],
+            Enumerable.Range(0, result.TypedEvents.Count)
+                .Select(index => result.TypedEvents[index].SourceAnimationId));
     }
 
     private static void SetCommittedOccurrence(
@@ -1853,6 +2287,106 @@ public sealed class AlsP5RuntimeTransactionTests
         var result = AlsFrameResult.CreateDefault(identity);
         result.PlayRate = 1f;
         return result;
+    }
+
+    private static AlsRuntimeState CreateSentinelP4State()
+    {
+        var state = AlsRuntimeState.CreateDefault();
+        state.LocomotionState = AlsLocomotionState.Recovering;
+        state.SmoothedVelocity = new Vector3(1f, 2f, 3f);
+        state.SmoothedAcceleration = new Vector3(4f, 5f, 6f);
+        state.Lean = 7f;
+        state.LeftFootLocked = 1;
+        state.TurnInPlaceTime = 8f;
+        state.RotateInPlaceTime = 9f;
+        state.ActionPlaybackTime = 10f;
+        state.AnimationPhase = 0.25f;
+        state.PreviousCurveValue = 11f;
+        state.PendingRecoveryState = AlsRagdollState.FaceDown;
+        state.LastCommittedRootMotionFeedback = new AlsRootMotionDelta(
+            new Vector3(12f, 13f, 14f), Quaternion.Identity);
+        state.ActualGait = AlsGait.Sprinting;
+        state.PreviousLocomotionState = AlsLocomotionState.Ragdoll;
+        state.GroundedEntrySpeed = 15f;
+        state.SmoothedLocalVelocity = new Vector2(16f, 17f);
+        state.SmoothedLocalAcceleration = new Vector2(18f, 19f);
+        state.SmoothedLean = new Vector2(20f, 21f);
+        state.LandingRecoveryTime = 22f;
+        state.SmoothedTargetYaw = 23f;
+        state.TargetYaw = 24f;
+        state.JumpStartActive = 1;
+        state.Initialized = 1;
+        state.ViewPose = new AlsViewPoseState(25f, 26f, 27f, 0.3f, 0.4f, 28f, 29f);
+        state.LeftFootLock = new AlsFootLockState(
+            new Vector3(30f, 31f, 32f), Quaternion.Identity,
+            new Vector3(33f, 34f, 35f), Quaternion.Identity,
+            new Vector3(36f, 37f, 38f), Quaternion.Identity,
+            39, 40, 0.5f, 1, AlsFootReleaseReason.None);
+        state.RightFootLock = new AlsFootLockState(
+            new Vector3(41f, 42f, 43f), Quaternion.Identity,
+            new Vector3(44f, 45f, 46f), Quaternion.Identity,
+            new Vector3(47f, 48f, 49f), Quaternion.Identity,
+            50, 51, 0.25f, 2, AlsFootReleaseReason.RayMiss);
+        state.PelvisCorrection = new AlsPelvisCorrectionState(
+            new Vector3(52f, 53f, 54f), new Vector3(55f, 56f, 57f), 58f);
+        state.LeftFootProbeOrigin = new Vector3(59f, 60f, 61f);
+        state.RightFootProbeOrigin = new Vector3(62f, 63f, 64f);
+        return state;
+    }
+
+    private static AlsFrameResult CreateSentinelP4Result(AlsFrameIdentity identity)
+    {
+        var result = CreateCanonicalP4Result(identity);
+        result.ResolvedLocomotionState = AlsLocomotionState.Recovering;
+        result.RequestedDriveMode = AlsDriveMode.RecoveryBlend;
+        result.ProposedRootMotionDelta = new AlsRootMotionDelta(
+            new Vector3(1f, 2f, 3f), Quaternion.Identity);
+        result.PelvisTarget = new Vector3(4f, 5f, 6f);
+        result.LeftFootTarget = new Vector3(7f, 8f, 9f);
+        result.RightFootTarget = new Vector3(10f, 11f, 12f);
+        result.MovementIntent = new Vector3(13f, 14f, 15f);
+        result.RotationIntent = Quaternion.Identity;
+        result.WorkerElapsedTicks = 16;
+        result.ErrorCode = 17;
+        result.ActualGait = AlsGait.Sprinting;
+        result.ActualStance = AlsStance.Crouching;
+        result.ActualRotationMode = AlsRotationMode.Aiming;
+        result.AnimationState = AlsAnimationState.LandRecovery;
+        result.BlendCoordinates = new Vector2(18f, 19f);
+        result.Stride = 0.2f;
+        result.PlayRate = 1.5f;
+        result.Lean = new Vector2(20f, 21f);
+        result.AnimationPhase = 0.3f;
+        result.TargetYaw = 22f;
+        result.AimRelativeYaw = 23f;
+        result.AimRelativePitch = 24f;
+        result.HeadWeight = 0.4f;
+        result.SpineWeight = 0.5f;
+        result.UpperBodyWeight = 0.6f;
+        result.SpineResidualYaw = 25f;
+        result.PelvisOffset = new Vector3(26f, 27f, 28f);
+        result.LeftFootPose = new AlsFootPoseOutput(
+            new Vector3(29f, 30f, 31f), Quaternion.Identity, 0.7f, 32);
+        result.RightFootPose = new AlsFootPoseOutput(
+            new Vector3(33f, 34f, 35f), Quaternion.Identity, 0.8f, 36);
+        result.LeftFootReleaseReason = AlsFootReleaseReason.RayMiss;
+        result.RightFootReleaseReason = AlsFootReleaseReason.Overextended;
+        result.LeftFootIkWeight = 0.9f;
+        result.RightFootIkWeight = 0.1f;
+        result.LeftFootLockCurve = 0.2f;
+        result.RightFootLockCurve = 0.3f;
+        result.NextLeftFootProbeOrigin = new Vector3(37f, 38f, 39f);
+        result.NextRightFootProbeOrigin = new Vector3(40f, 41f, 42f);
+        result.P4ModifierOperationTicks = 43;
+        return result;
+    }
+
+    private static void AssertUnmanagedBytesEqual<T>(T expected, T actual)
+        where T : unmanaged
+    {
+        Assert.Equal(
+            MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref expected, 1)).ToArray(),
+            MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref actual, 1)).ToArray());
     }
 
     private static void ApplyResultDefect(
@@ -2453,6 +2987,8 @@ public sealed class AlsP5RuntimeTransactionTests
         public AlsCurveKey[] CurveKeys = [];
         public AlsCurveBinding[] CurveBindings = [];
         public AlsP5CurveBindingIdentity[] CurveIdentities = [];
+        public AlsP5CurveSemanticPolicy AllowPolicy = new(
+            0f, AlsP5CurveCombineMode.AdditiveToDefault, 0f, 1f);
         public readonly AlsAnimationCurveRange[] CurveRanges;
         public readonly int[] AllowIndices;
 
@@ -2498,7 +3034,7 @@ public sealed class AlsP5RuntimeTransactionTests
         public AlsP5RuntimeBindings CreateBindings() => new(
             1, 0x1234, 0x5678,
             CurveKeys, CurveBindings, CurveIdentities, CurveRanges,
-            new AlsP5CurveSemanticPolicy(0f, AlsP5CurveCombineMode.AdditiveToDefault, 0f, 1f),
+            AllowPolicy,
             AllowIndices, FootBindings,
             1f, 0f, 0f, 1f,
             TimelineDefinitions, Markers, SyncGroup, SyncMembers, SyncOccurrences,
@@ -2511,7 +3047,9 @@ public sealed class AlsP5RuntimeTransactionTests
             byte hasInput = 0,
             float actionBlend = 0f,
             float actionModeBlend = 0f,
-            AlsAnimationState animationState = AlsAnimationState.Grounded)
+            AlsAnimationState animationState = AlsAnimationState.Grounded,
+            AlsTimelineLocomotionMode locomotionMode = AlsTimelineLocomotionMode.Grounded,
+            AlsTimelineStance stance = AlsTimelineStance.Standing)
         {
             for (var index = 0; index < Base.Length; index++)
             {
@@ -2549,9 +3087,9 @@ public sealed class AlsP5RuntimeTransactionTests
             return new AlsP5FrameInput(
                 new AlsFrameIdentity(1, 0, 1), 0d, (double)delta, delta, 1,
                 request ?? AlsActionRequest.None, recovery, hasInput,
-                AlsTimelineLocomotionMode.Grounded,
+                locomotionMode,
                 AlsTimelineRotationMode.LookingDirection,
-                AlsTimelineStance.Standing,
+                stance,
                 new AlsP4CurveFrameInput(
                     Base, Turn, Rotate, animationState,
                     actionBlend, actionModeBlend));
