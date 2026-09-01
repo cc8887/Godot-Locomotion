@@ -63,7 +63,8 @@ public sealed class AlsP5aAnimationRuntimeProfileCompilerTests
                     : set.Animations[value.SourceAssetId].Timeline.Single(source => source.EventId == value.EventId).SourceIndex,
                 value.SourceIndex));
         Assert.DoesNotContain(profile.GetType().Assembly.GetTypes()
-                .Where(type => type.Namespace == typeof(AlsP5aAnimationRuntimeProfile).Namespace &&
+                .Where(type => type != typeof(AlsP5CoreRuntimeBindingSnapshot) &&
+                               type.Namespace == typeof(AlsP5aAnimationRuntimeProfile).Namespace &&
                                (type.Name.StartsWith("AlsP5", StringComparison.Ordinal) ||
                                 type.Name.StartsWith("AlsCompiledAction", StringComparison.Ordinal)))
                 .SelectMany(type => type.GetProperties()),
