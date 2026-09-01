@@ -1735,6 +1735,114 @@ public sealed class AlsActionPlayerTests
         Assert.Equal((double)nonbinaryNext.PlaybackTime, nonbinarySlices[^1].CurrentMontageTime);
     }
 
+    [Fact]
+    public void Round4_RemoteActionClosureRequiresSegmentClosure()
+    {
+        var fixture = Fixture.Basic();
+        var active = StartOwner(fixture, 42);
+        var (advanced, _, advancedSlices, _) = Advance(fixture, active, 2.5d);
+        var slices = NewSlices();
+        advancedSlices.CopyTo(slices, 0);
+        slices[0] = slices[0] with
+        {
+            ClosesActionAfterSlice = 1,
+            ClosesSegmentAfterSlice = 0,
+        };
+        var outcomes = ExistingOutcomeBuffer();
+        var ebo = EarlyState(1, 10, 302, 202, AlsTimelineSourceKind.MontageSegmentAnimation,
+            0, 2f, 2f, 0.2f, 1);
+
+        AssertEboFailure(fixture, [ebo], advanced, slices, advancedSlices.Length, ref outcomes,
+            advancedSlices[^1].CurrentMontageTime, 1f, 0, AlsP5FailureCode.InvalidTimeline,
+            segmentHandle: 202);
+    }
+
+    [Theory]
+    [InlineData("acceptance")]
+    [InlineData("replacement")]
+    public void Round4_CanonicalOwnershipHistoryRemainsEboEligible(string history)
+    {
+        var fixture = Fixture.Basic();
+        var slices = NewSlices();
+        var count = 0;
+        var outcomes = new AlsActionOutcomeBuffer();
+        AlsActionPlayerState active;
+        int segmentHandle;
+        AlsTimelineEventDefinition ebo;
+        if (history == "acceptance")
+        {
+            Assert.True(Apply(fixture, Start(42, 10, 10, 5),
+                AlsActionPlayerState.CreateDefault(), slices, ref count, ref outcomes,
+                out active, out _, out var failure), failure.ToString());
+            segmentHandle = 200;
+            ebo = EarlyState(1, 10, 300, segmentHandle,
+                AlsTimelineSourceKind.MontageSegmentAnimation, 0, 0f, 1f, 0.2f, 1);
+        }
+        else
+        {
+            var owner = StartOwner(fixture, 42);
+            Assert.True(Apply(fixture, Start(43, 10, 11, 5), owner,
+                slices, ref count, ref outcomes, out active, out _, out var failure),
+                failure.ToString());
+            Assert.Equal((byte)1, slices[0].ClosesActionAfterSlice);
+            Assert.Equal((byte)1, slices[0].ClosesSegmentAfterSlice);
+            Assert.Equal((byte)1, slices[1].ActivatesActionAtSliceStart);
+            Assert.Equal((byte)1, slices[1].ActivatesSegmentAtSliceStart);
+            segmentHandle = 202;
+            ebo = EarlyState(1, 10, 302, segmentHandle,
+                AlsTimelineSourceKind.MontageSegmentAnimation, 0, 2f, 2f, 0.2f, 1);
+        }
+
+        Assert.True(AlsActionPlayer.TryAdvance(
+            fixture.Definitions, fixture.Sections, fixture.Segments, 0.5d, active,
+            slices, ref count, ref outcomes, out var advanced, out _, out var advanceFailure),
+            advanceFailure.ToString());
+
+        AssertEboSuccess(fixture, [ebo], advanced, slices[..count], 100, segmentHandle);
+    }
+
+    [Fact]
+    public void Round4_LastInternalOrdinalHasNoTerminalNextCutGuard()
+    {
+        const int loopCount = 26_843_544;
+        const double loopRange = 1d / 268_435_456d;
+        var fixture = Fixture.HighCountToleranceLoop();
+        var active = StartOwner(fixture, 42);
+        active.PlaybackTime = (float)((loopCount - 2d) * loopRange);
+
+        var (next, _, slices, outcomes) = Advance(fixture, active, loopRange);
+
+        Assert.Empty(outcomes);
+        Assert.Single(slices);
+        Assert.Equal((byte)0, slices[0].ClosesActionAfterSlice);
+        Assert.Equal((byte)0, slices[0].ClosesSegmentAfterSlice);
+        Assert.Equal(loopCount * loopRange, slices[0].CurrentMontageTime);
+        Assert.Equal(slices[0].CurrentMontageTime, (double)next.PlaybackTime);
+    }
+
+    [Fact]
+    public void Round4_TerminalOrdinalCannotBecomeGraphOnlyBoundary()
+    {
+        const int loopCount = 26_843_544;
+        const double loopRange = 1d / 268_435_456d;
+        var fixture = Fixture.HighCountToleranceLoop();
+        var active = StartOwner(fixture, 42);
+        active.PlaybackTime = (float)(loopCount * loopRange);
+        var authoritativeRemaining =
+            (double)fixture.Segments[0].MontageEndTime - active.PlaybackTime;
+        Assert.Equal(2d * loopRange, authoritativeRemaining);
+
+        var (next, result, slices, outcomes) =
+            Advance(fixture, active, authoritativeRemaining);
+
+        Assert.Single(slices);
+        Assert.Equal((byte)1, slices[0].ClosesActionAfterSlice);
+        Assert.Equal((byte)1, slices[0].ClosesSegmentAfterSlice);
+        Assert.Equal(AlsActionResultCode.Completed, result.ClosingReason);
+        Assert.Single(outcomes);
+        Assert.Equal((byte)0, next.Playing);
+    }
+
     private static bool Apply(
         in Fixture fixture,
         in AlsActionRequest request,
@@ -2169,5 +2277,12 @@ public sealed class AlsActionPlayerTests
                         start, end, 0f, 1f, segmentRate, loopCount),
                 ]);
         }
+
+        public static Fixture HighCountToleranceLoop() => new(
+            [new AlsActionDefinition(196, 23, 24, 10, 1960, 0.1f,
+                3, 10, 5, 1f, 0.1f, 1, 0)],
+            [new AlsActionSectionBinding(10, 10, -1, 0f, 0.1f)],
+            [new AlsActionSegmentBinding(297, 10, 3, 117, 397,
+                0f, 0.1f, 0f, 1f, 268_435_456f, 26_843_544)]);
     }
 }

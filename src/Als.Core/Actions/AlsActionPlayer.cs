@@ -337,9 +337,14 @@ public static class AlsActionPlayer
             var segmentBoundary = (double)segment.MontageEndTime;
             var loopRange =
                 ((double)segment.AnimationEndTime - segment.AnimationStartTime) / segment.PlayRate;
-            var loopOrdinal = System.Math.Floor(
+            var loopOrdinalValue = System.Math.Floor(
                 (montageTime - segment.MontageStartTime) / loopRange) + 1d;
-            var loopBoundary = (double)segment.MontageStartTime + loopOrdinal * loopRange;
+            var loopOrdinal = loopOrdinalValue >= 1d && loopOrdinalValue < segment.LoopCount
+                ? (int)loopOrdinalValue
+                : -1;
+            var loopBoundary = loopOrdinal >= 1
+                ? (double)segment.MontageStartTime + loopOrdinal * loopRange
+                : double.PositiveInfinity;
             if (loopBoundary >= segmentBoundary)
             {
                 loopBoundary = double.PositiveInfinity;
@@ -480,8 +485,9 @@ public static class AlsActionPlayer
                 if (remaining == 0d)
                 {
                     var canonicalMontageTime = (double)(float)montageTime;
-                    var nextLoopBoundary =
-                        (double)segment.MontageStartTime + (loopOrdinal + 1d) * loopRange;
+                    var nextLoopBoundary = loopOrdinal + 1 < segment.LoopCount
+                        ? (double)segment.MontageStartTime + (loopOrdinal + 1d) * loopRange
+                        : double.PositiveInfinity;
                     if (!double.IsFinite(canonicalMontageTime) ||
                         canonicalMontageTime <= stagedSlices[stagedCount - 1].PreviousMontageTime ||
                         canonicalMontageTime >= nextLoopBoundary ||
@@ -1211,7 +1217,9 @@ public static class AlsActionPlayer
                 slice.ClosesActionAfterSlice is not 0 and not 1 ||
                 slice.ClosesSegmentAfterSlice is not 0 and not 1 ||
                 slice.ActivatesActionAtSliceStart == 1 &&
-                    slice.ActivatesSegmentAtSliceStart != 1)
+                    slice.ActivatesSegmentAtSliceStart != 1 ||
+                slice.ClosesActionAfterSlice == 1 &&
+                    slice.ClosesSegmentAfterSlice != 1)
             {
                 return false;
             }
