@@ -1846,7 +1846,10 @@ public static class AlsP5Runtime
                 IsPositiveZero(turn.PlayRate) &&
                 IsPositiveZero(turn.RemainingYaw) &&
                 turn.NominalDegrees == 0 &&
-                turn.Direction == 0;
+                turn.Direction == 0 &&
+                (turn.ActivationSeconds > 0f ||
+                    IsPositiveZero(turn.ActivationSeconds) &&
+                    turn.Stance == default);
         }
 
         return IsPositiveZero(turn.ActivationSeconds) &&
@@ -1867,7 +1870,8 @@ public static class AlsP5Runtime
         {
             return IsPositiveZero(rotate.Phase) &&
                 IsPositiveZero(rotate.PlayRate) &&
-                rotate.Direction == 0;
+                rotate.Direction == 0 &&
+                rotate.Stance == default;
         }
 
         return rotate.PlayRate > 0f &&
