@@ -1390,6 +1390,99 @@ public sealed class AlsP5RuntimeTransactionTests
             out _, out _, out _, out var failure), failure.ToString());
     }
 
+    [Theory]
+    [InlineData(P4SelectionMismatch.ActiveTurnPhase)]
+    [InlineData(P4SelectionMismatch.ActiveTurnPlayRate)]
+    [InlineData(P4SelectionMismatch.ActiveTurnNominalDegrees)]
+    [InlineData(P4SelectionMismatch.ActiveTurnDirection)]
+    [InlineData(P4SelectionMismatch.ActiveTurnStance)]
+    [InlineData(P4SelectionMismatch.ActiveTurnRotationMode)]
+    [InlineData(P4SelectionMismatch.ActiveTurnRemainingYawSign)]
+    [InlineData(P4SelectionMismatch.PendingTurnStance)]
+    [InlineData(P4SelectionMismatch.PendingTurnRotationMode)]
+    [InlineData(P4SelectionMismatch.ActiveRotatePhase)]
+    [InlineData(P4SelectionMismatch.ActiveRotatePlayRate)]
+    [InlineData(P4SelectionMismatch.ActiveRotateDirection)]
+    [InlineData(P4SelectionMismatch.ActiveRotateStance)]
+    [InlineData(P4SelectionMismatch.ActiveRotateRotationMode)]
+    public void Fix4_FinalizeRejectsCanonicalTurnRotateSelectionMismatch(
+        P4SelectionMismatch mismatch)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
+        var postFoot = state;
+        var p4 = CreateCanonicalP4Result(input.Identity);
+        ConfigureSelectionMismatch(mismatch, ref p4, ref postFoot);
+
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in postFoot, in ReviewFixture.ValidProbe,
+            out var owner, out var next, out var result, out var failure));
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+        Assert.Equal(0UL, owner);
+        Assert.Equal(default, next);
+        Assert.Equal(default, result);
+    }
+
+    [Theory]
+    [InlineData(P4SelectionControl.ActiveTurn)]
+    [InlineData(P4SelectionControl.PendingTurn)]
+    [InlineData(P4SelectionControl.ActiveRotate)]
+    [InlineData(P4SelectionControl.CrouchingTerminalTurn)]
+    public void Fix4_FinalizeAcceptsExactTurnRotateSelectionControl(
+        P4SelectionControl control)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
+        var postFoot = state;
+        var p4 = CreateCanonicalP4Result(input.Identity);
+        switch (control)
+        {
+            case P4SelectionControl.ActiveTurn:
+                SetValidTurn(ref p4);
+                SetValidTurn(ref postFoot);
+                AssertBitsEqual(p4.TurnPhase, postFoot.TurnInPlace.Phase);
+                AssertBitsEqual(p4.TurnPlayRate, postFoot.TurnInPlace.PlayRate);
+                break;
+            case P4SelectionControl.PendingTurn:
+                p4.ActualStance = AlsStance.Crouching;
+                p4.ActualRotationMode = AlsRotationMode.LookingDirection;
+                postFoot.YawSource = AlsYawSource.Locomotion;
+                postFoot.TurnInPlace = new AlsTurnInPlaceState(
+                    0.25f, 0f, 0f, 0f, 0, 0, 0, AlsStance.Crouching);
+                break;
+            case P4SelectionControl.ActiveRotate:
+                SetValidRotate(ref p4);
+                SetValidRotate(ref postFoot);
+                AssertBitsEqual(p4.RotatePhase, postFoot.RotateInPlace.Phase);
+                AssertBitsEqual(p4.RotatePlayRate, postFoot.RotateInPlace.PlayRate);
+                break;
+            case P4SelectionControl.CrouchingTerminalTurn:
+                SetValidTurn(ref p4);
+                p4.ActualStance = AlsStance.Crouching;
+                postFoot.YawSource = AlsYawSource.TurnInPlace;
+                Assert.Equal(default, postFoot.TurnInPlace);
+                break;
+        }
+
+        Assert.True(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in postFoot, in ReviewFixture.ValidProbe,
+            out _, out _, out _, out var failure), failure.ToString());
+    }
+
     [Fact]
     public void Fix2_FootReleaseStateTwoIsCanonicalAndTopLevelLockRemainsClear()
     {
@@ -2567,6 +2660,8 @@ public sealed class AlsP5RuntimeTransactionTests
         result.TurnNominalDegrees = 90;
         result.TurnDirection = 1;
         result.TurnActive = 1;
+        result.ActualStance = AlsStance.Standing;
+        result.ActualRotationMode = AlsRotationMode.LookingDirection;
     }
 
     private static void SetValidRotate(ref AlsFrameResult result)
@@ -2577,6 +2672,8 @@ public sealed class AlsP5RuntimeTransactionTests
         result.RotatePlayRate = 1f;
         result.RotateDirection = -1;
         result.RotateActive = 1;
+        result.ActualStance = AlsStance.Standing;
+        result.ActualRotationMode = AlsRotationMode.Aiming;
     }
 
     private static void SetValidTurn(ref AlsRuntimeState state)
@@ -2593,6 +2690,82 @@ public sealed class AlsP5RuntimeTransactionTests
             0.25f, 1f, -1, 1, AlsStance.Standing);
     }
 
+    private static void ConfigureSelectionMismatch(
+        P4SelectionMismatch mismatch,
+        ref AlsFrameResult result,
+        ref AlsRuntimeState state)
+    {
+        if (mismatch is P4SelectionMismatch.PendingTurnStance or
+            P4SelectionMismatch.PendingTurnRotationMode)
+        {
+            result.ActualRotationMode = AlsRotationMode.LookingDirection;
+            state.YawSource = AlsYawSource.Locomotion;
+            state.TurnInPlace = new AlsTurnInPlaceState(
+                0.25f, 0f, 0f, 0f, 0, 0, 0, AlsStance.Standing);
+            if (mismatch == P4SelectionMismatch.PendingTurnStance)
+            {
+                result.ActualStance = AlsStance.Crouching;
+            }
+            else
+            {
+                result.ActualRotationMode = AlsRotationMode.Aiming;
+            }
+            return;
+        }
+
+        if (mismatch >= P4SelectionMismatch.ActiveRotatePhase)
+        {
+            SetValidRotate(ref result);
+            SetValidRotate(ref state);
+            switch (mismatch)
+            {
+                case P4SelectionMismatch.ActiveRotatePhase:
+                    result.RotatePhase = MathF.BitIncrement(result.RotatePhase);
+                    break;
+                case P4SelectionMismatch.ActiveRotatePlayRate:
+                    result.RotatePlayRate = MathF.BitIncrement(result.RotatePlayRate);
+                    break;
+                case P4SelectionMismatch.ActiveRotateDirection:
+                    result.RotateDirection = 1;
+                    break;
+                case P4SelectionMismatch.ActiveRotateStance:
+                    result.ActualStance = AlsStance.Crouching;
+                    break;
+                case P4SelectionMismatch.ActiveRotateRotationMode:
+                    result.ActualRotationMode = AlsRotationMode.LookingDirection;
+                    break;
+            }
+            return;
+        }
+
+        SetValidTurn(ref result);
+        SetValidTurn(ref state);
+        switch (mismatch)
+        {
+            case P4SelectionMismatch.ActiveTurnPhase:
+                result.TurnPhase = MathF.BitIncrement(result.TurnPhase);
+                break;
+            case P4SelectionMismatch.ActiveTurnPlayRate:
+                result.TurnPlayRate = MathF.BitIncrement(result.TurnPlayRate);
+                break;
+            case P4SelectionMismatch.ActiveTurnNominalDegrees:
+                result.TurnNominalDegrees = 180;
+                break;
+            case P4SelectionMismatch.ActiveTurnDirection:
+                result.TurnDirection = -1;
+                break;
+            case P4SelectionMismatch.ActiveTurnStance:
+                result.ActualStance = AlsStance.Crouching;
+                break;
+            case P4SelectionMismatch.ActiveTurnRotationMode:
+                result.ActualRotationMode = AlsRotationMode.Aiming;
+                break;
+            case P4SelectionMismatch.ActiveTurnRemainingYawSign:
+                state.TurnInPlace = state.TurnInPlace with { RemainingYaw = -1f };
+                break;
+        }
+    }
+
     private static void AssertBitsEqual(float expected, float actual) =>
         Assert.Equal(BitConverter.SingleToInt32Bits(expected), BitConverter.SingleToInt32Bits(actual));
 
@@ -2606,6 +2779,32 @@ public sealed class AlsP5RuntimeTransactionTests
         FootPose,
         PelvisOffset,
         ProbeOrigin,
+    }
+
+    public enum P4SelectionMismatch
+    {
+        ActiveTurnPhase,
+        ActiveTurnPlayRate,
+        ActiveTurnNominalDegrees,
+        ActiveTurnDirection,
+        ActiveTurnStance,
+        ActiveTurnRotationMode,
+        ActiveTurnRemainingYawSign,
+        PendingTurnStance,
+        PendingTurnRotationMode,
+        ActiveRotatePhase,
+        ActiveRotatePlayRate,
+        ActiveRotateDirection,
+        ActiveRotateStance,
+        ActiveRotateRotationMode,
+    }
+
+    public enum P4SelectionControl
+    {
+        ActiveTurn,
+        PendingTurn,
+        ActiveRotate,
+        CrouchingTerminalTurn,
     }
 
     public enum P4ResultCanonicalDefect
