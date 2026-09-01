@@ -1881,11 +1881,37 @@ public static class AlsP5Runtime
     {
         if (result.TurnActive == 0)
         {
+            if (state.TurnInPlace.ActivationSeconds > 0f)
+            {
+                return state.YawSource == AlsYawSource.Locomotion &&
+                    result.ActualStance == state.TurnInPlace.Stance &&
+                    result.ActualRotationMode == AlsRotationMode.LookingDirection;
+            }
+
             return state.YawSource != AlsYawSource.TurnInPlace;
         }
 
-        return state.YawSource == AlsYawSource.TurnInPlace &&
-            (state.TurnInPlace.Active == 1 || state.TurnInPlace == default);
+        if (state.YawSource != AlsYawSource.TurnInPlace ||
+            result.ActualRotationMode != AlsRotationMode.LookingDirection)
+        {
+            return false;
+        }
+
+        ref readonly var turn = ref state.TurnInPlace;
+        if (turn == default)
+        {
+            return true;
+        }
+
+        return turn.Active == 1 &&
+            HaveSameBits(result.TurnPhase, turn.Phase) &&
+            HaveSameBits(result.TurnPlayRate, turn.PlayRate) &&
+            result.TurnNominalDegrees == turn.NominalDegrees &&
+            result.TurnDirection == turn.Direction &&
+            result.ActualStance == turn.Stance &&
+            (turn.Direction == 1
+                ? turn.RemainingYaw > 0f
+                : turn.RemainingYaw < 0f);
     }
 
     private static bool IsPostFootRotateCoherent(
@@ -1893,7 +1919,12 @@ public static class AlsP5Runtime
         in AlsFrameResult result) =>
         result.RotateActive == 1
             ? state.YawSource == AlsYawSource.RotateInPlace &&
-                state.RotateInPlace.Active == 1
+                state.RotateInPlace.Active == 1 &&
+                HaveSameBits(result.RotatePhase, state.RotateInPlace.Phase) &&
+                HaveSameBits(result.RotatePlayRate, state.RotateInPlace.PlayRate) &&
+                result.RotateDirection == state.RotateInPlace.Direction &&
+                result.ActualStance == state.RotateInPlace.Stance &&
+                result.ActualRotationMode == AlsRotationMode.Aiming
             : state.YawSource != AlsYawSource.RotateInPlace;
 
     private static bool IsCanonicalFootLock(in AlsFootLockState state, byte topLevelLocked)
@@ -1932,6 +1963,9 @@ public static class AlsP5Runtime
 
     private static bool IsPositiveZero(float value) =>
         BitConverter.SingleToInt32Bits(value) == 0;
+
+    private static bool HaveSameBits(float left, float right) =>
+        BitConverter.SingleToInt32Bits(left) == BitConverter.SingleToInt32Bits(right);
 
     private static bool IsCanonicalQuaternion(in Quaternion value)
     {
