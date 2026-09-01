@@ -4,6 +4,7 @@ using GodotAls.Core.Curves;
 using GodotAls.Core.Events;
 using GodotAls.Core.Sync;
 using GodotAls.Core.Transitions;
+using System.Numerics;
 
 namespace GodotAls.Core.Animation;
 
@@ -62,7 +63,7 @@ public static class AlsP5Runtime
         var sliceCount = 0;
 
         // Action request arbitration is deliberately first: recovery, then one normal request.
-        if (!AlsActionPlayer.TryApplyRequest(
+        if (!AlsActionPlayer.TryApplyRequestConfigured(
                 bindings.ActionDefinitions,
                 bindings.ActionSections,
                 bindings.ActionSegments,
@@ -81,7 +82,7 @@ public static class AlsP5Runtime
         }
 
         // Transition graph state always advances before conditional Action advancement.
-        if (!AlsDynamicTransitionRuntime.TryAdvance(
+        if (!AlsDynamicTransitionRuntime.TryAdvanceConfigured(
                 bindings.DynamicTransition,
                 input.DeltaTimeSeconds,
                 preFootCandidateState.DynamicTransition,
@@ -96,7 +97,7 @@ public static class AlsP5Runtime
         var actionAfterAdvance = actionAfterRequest;
         var advanceResult = AlsActionAdvanceResult.CreateDefault();
         if (requestResult.StartedOrReplacedThisFrame == 0 &&
-            !AlsActionPlayer.TryAdvance(
+            !AlsActionPlayer.TryAdvanceConfigured(
                 bindings.ActionDefinitions,
                 bindings.ActionSections,
                 bindings.ActionSegments,
@@ -171,7 +172,7 @@ public static class AlsP5Runtime
             }
 
             ref readonly var definition = ref bindings.ActionDefinitions[definitionIndex];
-            if (!AlsActionPlayer.TryInterruptEarlyBlendOut(
+            if (!AlsActionPlayer.TryInterruptEarlyBlendOutConfigured(
                     bindings.ActionDefinitions,
                     bindings.ActionSections,
                     bindings.ActionSegments,
@@ -231,6 +232,7 @@ public static class AlsP5Runtime
                 transitionPlayback,
                 transitionReplacedClosingWeight,
                 scratch.ActionTraversalSlices[..sliceCount],
+                requestResult.InitialSliceIndex,
                 requestResult.ClosingSliceIndex,
                 requestResult.ClosingReason,
                 requestClosingWeight,
@@ -342,11 +344,14 @@ public static class AlsP5Runtime
 
         if (p4Result.Identity != preparedIdentity ||
             p4Result.P4ReasonCode != AlsP4ReasonCode.None ||
-            p4Result.P5FailureCode != AlsP5FailureCode.None ||
-            !ValidateP4Result(p4Result) ||
-            !ValidatePostFootState(p4NextState))
+            p4Result.P5FailureCode != AlsP5FailureCode.None)
         {
             failure = AlsP5FailureCode.InvalidTimeline;
+            return false;
+        }
+        if (!ValidateP4Result(p4Result, out failure) ||
+            !ValidatePostFootState(p4NextState, out failure))
+        {
             return false;
         }
 
@@ -397,7 +402,17 @@ public static class AlsP5Runtime
         ref var control = ref scratch.Control[0];
         if (control.OwnerCookie == 0 ||
             control.Phase is not AlsP5RuntimeScratchPhase.Empty and
-                not AlsP5RuntimeScratchPhase.Prepared)
+                not AlsP5RuntimeScratchPhase.Prepared ||
+            control.Phase == AlsP5RuntimeScratchPhase.Empty &&
+                (control.PreparedRevision != 0 ||
+                 control.PreparedIdentity != default ||
+                 control.PreparedBindingDigest != 0 ||
+                 control.PreparedLayoutDigest != 0) ||
+            control.Phase == AlsP5RuntimeScratchPhase.Prepared &&
+                (control.PreparedRevision == 0 ||
+                 control.PreparedRevision != control.AttemptRevision ||
+                 control.PreparedBindingDigest == 0 ||
+                 control.PreparedLayoutDigest == 0))
         {
             return false;
         }
@@ -451,9 +466,13 @@ public static class AlsP5Runtime
         scoped ref AlsP5RuntimeScratch scratch)
     {
         var contributorCount =
-            input.P4Curves.Base.Length +
+            (long)input.P4Curves.Base.Length +
             input.P4Curves.TurnBanks.Length +
             input.P4Curves.RotateBanks.Length;
+        var requiredPlaybacks =
+            (long)scratch.BaseCapacity + 2L +
+            2L * AlsActionPlayer.TraversalCapacity;
+        var requiredCurveSamples = (long)scratch.BaseCapacity + 4L;
         return scratch.BaseCapacity >= 0 &&
             scratch.MaximumBaseContributorCount >= 0 &&
             contributorCount <= scratch.BaseCapacity &&
@@ -464,11 +483,10 @@ public static class AlsP5Runtime
             scratch.CandidateOwnership.Length == AlsEventBuffer.Capacity &&
             scratch.TimelineOccurrences.Length >= AlsEventBuffer.Capacity &&
             scratch.ActionTraversalSlices.Length >= AlsActionPlayer.TraversalCapacity &&
-            scratch.TimelinePlaybacks.Length >=
-                scratch.BaseCapacity + 2 + (2 * AlsActionPlayer.TraversalCapacity) &&
+            scratch.TimelinePlaybacks.Length >= requiredPlaybacks &&
             scratch.SyncPlaybacks.Length >= scratch.MaximumBaseContributorCount &&
             scratch.SyncMappedPlaybacks.Length >= scratch.MaximumBaseContributorCount &&
-            scratch.CurveSamples.Length >= scratch.BaseCapacity + 4 &&
+            scratch.CurveSamples.Length >= requiredCurveSamples &&
             !currentCursors.Overlaps(scratch.CandidateCursors) &&
             !currentAuthorities.Overlaps(scratch.CandidateAuthorities) &&
             !currentOwnership.Overlaps(scratch.CandidateOwnership);
@@ -576,6 +594,13 @@ public static class AlsP5Runtime
             return false;
         }
 
+        if (!ValidateActionLaneProvenance(state.ActionBlendLane, bindings) ||
+            !ValidateTransitionLaneProvenance(
+                state.DynamicTransitionBlendLane, bindings.DynamicTransition))
+        {
+            return false;
+        }
+
         // Frozen subsystem APIs perform the authoritative definition/state validation.
         failure = AlsP5FailureCode.None;
         return true;
@@ -628,6 +653,45 @@ public static class AlsP5Runtime
             lane.OutgoingBindingIndex >= 0 &&
             lane.OutgoingPlaybackEpoch > 0 &&
             (logicalActive ? lane.IncomingMix < 1f : lane.IncomingMix == 0f);
+    }
+
+    private static bool ValidateActionLaneProvenance(
+        in AlsLaneBlendState lane,
+        in AlsP5RuntimeBindings bindings)
+    {
+        if (lane.OutgoingActive == 0)
+        {
+            return true;
+        }
+        if ((uint)lane.OutgoingBindingIndex >= (uint)bindings.ActionSegments.Length)
+        {
+            return false;
+        }
+        ref readonly var segment = ref bindings.ActionSegments[lane.OutgoingBindingIndex];
+        return segment.OccurrenceHandleId == lane.OutgoingOccurrenceHandleId &&
+            segment.AnimationId == lane.OutgoingAnimationId;
+    }
+
+    private static bool ValidateTransitionLaneProvenance(
+        in AlsLaneBlendState lane,
+        in AlsDynamicTransitionBinding binding)
+    {
+        if (lane.OutgoingActive == 0)
+        {
+            return true;
+        }
+        if (lane.OutgoingOccurrenceHandleId != binding.OccurrenceHandleId)
+        {
+            return false;
+        }
+        return lane.OutgoingBindingIndex switch
+        {
+            0 => binding.StandingLeft.AnimationId == lane.OutgoingAnimationId,
+            1 => binding.StandingRight.AnimationId == lane.OutgoingAnimationId,
+            2 => binding.CrouchingLeft.AnimationId == lane.OutgoingAnimationId,
+            3 => binding.CrouchingRight.AnimationId == lane.OutgoingAnimationId,
+            _ => false,
+        };
     }
 
     private static bool ValidatePersistentTimelineState(
@@ -727,6 +791,10 @@ public static class AlsP5Runtime
             laneWeight = Step(laneWeight, 1f, delta, blend);
             mix = Step(mix, 1f, delta, blend);
             graph = CreateInstruction(outgoing, incoming, laneWeight, mix);
+            if (request.ClosingSliceIndex >= 0)
+            {
+                requestClosingWeight = graph.OutgoingEffectiveWeight;
+            }
             nextLane = CreateLane(
                 outgoing, laneWeight, mix, blend, incoming.Active == 1, outgoingActive);
             CanonicalizeCompletedMix(ref nextLane);
@@ -849,7 +917,12 @@ public static class AlsP5Runtime
             return false;
         }
 
-        var incoming = CreateSource(playback, FindTransitionBindingIndex(binding, playback.AnimationId));
+        var playbackFoot = playback.ActivatesAtFrameStart == 1
+            ? currentTransition.QueuedFoot
+            : currentTransition.Foot;
+        var incoming = CreateSource(
+            playback,
+            FindTransitionBindingIndex(binding, playback.AnimationId, playbackFoot));
         if (playback.ActivatesAtFrameStart == 1)
         {
             var outgoing = oldTail;
@@ -864,16 +937,23 @@ public static class AlsP5Runtime
                 laneWeight = replacedClosingWeight;
             }
             var mix = outgoingActive ? 0f : 1f;
-            laneWeight = Step(laneWeight, 1f, delta, binding.BlendSeconds);
-            mix = Step(mix, 1f, delta, binding.BlendSeconds);
             if (playback.ClosesAfterFrame == 1)
             {
+                var tau = playback.FrameEndOffsetSeconds;
+                laneWeight = Step(laneWeight, 1f, tau, binding.BlendSeconds);
+                mix = Step(mix, 1f, tau, binding.BlendSeconds);
                 var contribution = outgoingActive ? laneWeight * mix : laneWeight;
-                graph = CreateInstruction(incoming, default, contribution, 0f);
-                nextLane = CreateTailLane(incoming, contribution, binding.BlendSeconds);
+                var faded = Step(
+                    contribution, 0f, delta - tau, binding.BlendSeconds);
+                graph = CreateInstruction(incoming, default, faded, 0f);
+                nextLane = faded == 0f
+                    ? AlsLaneBlendState.CreateDefault()
+                    : CreateTailLane(incoming, faded, binding.BlendSeconds);
             }
             else
             {
+                laneWeight = Step(laneWeight, 1f, delta, binding.BlendSeconds);
+                mix = Step(mix, 1f, delta, binding.BlendSeconds);
                 graph = CreateInstruction(outgoing, incoming, laneWeight, mix);
                 nextLane = CreateLane(
                     outgoing, laneWeight, mix, binding.BlendSeconds, true, outgoingActive);
@@ -923,15 +1003,12 @@ public static class AlsP5Runtime
 
         if (playback.ContributesThisFrame == 1)
         {
-            var foot = playback.ActivatesAtFrameStart == 1
-                ? currentTransition.QueuedFoot
-                : currentTransition.Foot;
             var effective = playback.ClosesAfterFrame == 1
                 ? graph.OutgoingEffectiveWeight
                 : graph.IncomingEffectiveWeight;
             summary = new AlsDynamicTransitionPlaybackSummary(
                 playback.AnimationId,
-                foot,
+                playbackFoot,
                 playback.BlendSeconds,
                 playback.PlayRate,
                 effective,
@@ -1000,7 +1077,7 @@ public static class AlsP5Runtime
             return true;
         }
 
-        if (!AlsSyncRuntime.TryEvaluateGroup(
+        if (!AlsSyncRuntime.TryEvaluateGroupConfigured(
                 bindings.SyncMarkers,
                 bindings.SyncGroup,
                 bindings.SyncMembers,
@@ -1083,7 +1160,7 @@ public static class AlsP5Runtime
 
         var policy = bindings.AllowTransitionsPolicy;
         if (policy.CombineMode != AlsP5CurveCombineMode.AdditiveToDefault ||
-            !AlsCurveRuntime.TryBlendAdditiveToDefault(
+            !AlsCurveRuntime.TryBlendAdditiveToDefaultConfigured(
                 policy.MissingValue,
                 policy.ClampMinimum,
                 policy.ClampMaximum,
@@ -1178,7 +1255,7 @@ public static class AlsP5Runtime
         {
             return false;
         }
-        return AlsCurveRuntime.TrySample(
+        return AlsCurveRuntime.TrySampleConfigured(
             bindings.CurveBindings[bindingIndex],
             bindings.CurveKeys,
             cycle,
@@ -1296,6 +1373,7 @@ public static class AlsP5Runtime
         in AlsDynamicTransitionPlayback transitionPlayback,
         float transitionClosingWeight,
         ReadOnlySpan<AlsActionTraversalSlice> slices,
+        int requestInitialIndex,
         int requestClosingIndex,
         AlsActionResultCode requestClosingReason,
         float requestClosingWeight,
@@ -1320,6 +1398,10 @@ public static class AlsP5Runtime
 
         if (transitionClosing.ClosesAfterFrame == 1)
         {
+            var oldPointWeight = transitionPlayback.ActivatesAtFrameStart == 1 &&
+                transitionPlayback.ClosesAfterFrame == 1
+                ? transitionClosingWeight
+                : scratch.TransitionGraph.OutgoingEffectiveWeight;
             scratch.TimelinePlaybacks[count++] = new AlsTimelinePlayback(
                 transitionClosing.OccurrenceHandleId,
                 transitionClosing.AnimationId,
@@ -1331,7 +1413,7 @@ public static class AlsP5Runtime
                 0d,
                 0d,
                 transitionClosing.DurationSeconds,
-                transitionClosingWeight,
+                oldPointWeight,
                 AlsActionResultCode.None,
                 0,
                 0,
@@ -1376,7 +1458,15 @@ public static class AlsP5Runtime
             ref readonly var definition = ref bindings.ActionDefinitions[definitionIndex];
             ref readonly var segment = ref bindings.ActionSegments[slice.SegmentBindingIndex];
             var reason = AlsActionResultCode.None;
-            var weight = scratch.ActionGraph.IncomingEffectiveWeight;
+            var terminal = requestClosingIndex >= 0 || advanceClosingIndex >= 0;
+            var weight = terminal
+                ? scratch.ActionGraph.OutgoingEffectiveWeight
+                : scratch.ActionGraph.IncomingEffectiveWeight;
+            if (terminal && index == requestInitialIndex &&
+                index != requestClosingIndex && index != advanceClosingIndex)
+            {
+                weight = scratch.ActionGraph.IncomingEffectiveWeight;
+            }
             if (index == requestClosingIndex)
             {
                 reason = requestClosingReason;
@@ -1428,7 +1518,7 @@ public static class AlsP5Runtime
         }
 
         scratch.Events.Clear();
-        return AlsTimelineRuntime.TryEvaluate(
+        return AlsTimelineRuntime.TryEvaluateConfigured(
             bindings.TimelineDefinitions,
             scratch.TimelinePlaybacks[..count],
             input.Identity.FrameId,
@@ -1515,8 +1605,14 @@ public static class AlsP5Runtime
         out AlsDynamicTransitionState next,
         out AlsP5FailureCode failure)
     {
+        if (!IsValidTransitionProbe(input))
+        {
+            next = default;
+            failure = AlsP5FailureCode.NonFiniteInput;
+            return false;
+        }
         // The binding is stored as value-only preparation metadata to keep Finalize allocation-free.
-        return AlsDynamicTransitionRuntime.TryQueue(
+        return AlsDynamicTransitionRuntime.TryQueueConfigured(
             scratch.PreparedTransitionBinding,
             input,
             scratch.TransitionCooldownBlockedThisFrame,
@@ -1526,16 +1622,169 @@ public static class AlsP5Runtime
             out failure);
     }
 
-    private static bool ValidateP4Result(in AlsFrameResult result) =>
-        float.IsFinite(result.LeftFootIkWeight) &&
-        float.IsFinite(result.RightFootIkWeight) &&
-        float.IsFinite(result.LeftFootLockCurve) &&
-        float.IsFinite(result.RightFootLockCurve);
+    private static bool ValidateP4Result(
+        in AlsFrameResult result,
+        out AlsP5FailureCode failure)
+    {
+        failure = AlsP5FailureCode.NonFiniteOutput;
+        if (!IsFinite(result.ProposedRootMotionDelta.Translation) ||
+            !IsFinite(result.ProposedRootMotionDelta.Rotation) ||
+            !IsFinite(result.PelvisTarget) ||
+            !IsFinite(result.LeftFootTarget) ||
+            !IsFinite(result.RightFootTarget) ||
+            !IsFinite(result.MovementIntent) ||
+            !IsFinite(result.RotationIntent) ||
+            !IsFinite(result.BlendCoordinates) ||
+            !float.IsFinite(result.Stride) ||
+            !float.IsFinite(result.PlayRate) ||
+            !IsFinite(result.Lean) ||
+            !float.IsFinite(result.AnimationPhase) ||
+            !float.IsFinite(result.TargetYaw) ||
+            !float.IsFinite(result.AimRelativeYaw) ||
+            !float.IsFinite(result.AimRelativePitch) ||
+            !float.IsFinite(result.HeadWeight) ||
+            !float.IsFinite(result.SpineWeight) ||
+            !float.IsFinite(result.UpperBodyWeight) ||
+            !float.IsFinite(result.SpineResidualYaw) ||
+            !float.IsFinite(result.TurnPhase) ||
+            !float.IsFinite(result.TurnPlayRate) ||
+            !float.IsFinite(result.TurnYawDelta) ||
+            !float.IsFinite(result.RotatePhase) ||
+            !float.IsFinite(result.RotatePlayRate) ||
+            !float.IsFinite(result.RotateYawDelta) ||
+            !IsFinite(result.PelvisOffset) ||
+            !IsFinite(result.LeftFootPose.Position) ||
+            !IsFinite(result.LeftFootPose.Rotation) ||
+            !float.IsFinite(result.LeftFootPose.LockAmount) ||
+            !IsFinite(result.RightFootPose.Position) ||
+            !IsFinite(result.RightFootPose.Rotation) ||
+            !float.IsFinite(result.RightFootPose.LockAmount) ||
+            !float.IsFinite(result.LeftFootIkWeight) ||
+            !float.IsFinite(result.RightFootIkWeight) ||
+            !float.IsFinite(result.LeftFootLockCurve) ||
+            !float.IsFinite(result.RightFootLockCurve) ||
+            !IsFinite(result.NextLeftFootProbeOrigin) ||
+            !IsFinite(result.NextRightFootProbeOrigin))
+        {
+            return false;
+        }
 
-    private static bool ValidatePostFootState(in AlsRuntimeState state) =>
-        float.IsFinite(state.AnimationPhase) &&
-        float.IsFinite(state.LeftFootLock.Amount) &&
-        float.IsFinite(state.RightFootLock.Amount);
+        failure = AlsP5FailureCode.InvalidTimeline;
+        if ((uint)result.ResolvedLocomotionState > (uint)AlsLocomotionState.Recovering ||
+            (uint)result.RequestedDriveMode > (uint)AlsDriveMode.RecoveryBlend ||
+            (uint)result.ActualGait > (uint)AlsGait.Sprinting ||
+            (uint)result.ActualStance > (uint)AlsStance.Crouching ||
+            (uint)result.ActualRotationMode > (uint)AlsRotationMode.Aiming ||
+            (uint)result.AnimationState > (uint)AlsAnimationState.LandRecovery ||
+            (uint)result.LeftFootReleaseReason > (uint)AlsFootReleaseReason.Overextended ||
+            (uint)result.RightFootReleaseReason > (uint)AlsFootReleaseReason.Overextended ||
+            result.TurnActive > 1 || result.RotateActive > 1 ||
+            result.TurnDirection is < -1 or > 1 ||
+            result.RotateDirection is < -1 or > 1 ||
+            result.LeftFootPose.PlatformId < -1 ||
+            result.RightFootPose.PlatformId < -1)
+        {
+            return false;
+        }
+        failure = AlsP5FailureCode.None;
+        return true;
+    }
+
+    private static bool ValidatePostFootState(
+        in AlsRuntimeState state,
+        out AlsP5FailureCode failure)
+    {
+        failure = AlsP5FailureCode.NonFiniteOutput;
+        if (!IsFinite(state.SmoothedVelocity) ||
+            !IsFinite(state.SmoothedAcceleration) ||
+            !float.IsFinite(state.Lean) ||
+            !float.IsFinite(state.TurnInPlaceTime) ||
+            !float.IsFinite(state.RotateInPlaceTime) ||
+            !float.IsFinite(state.ActionPlaybackTime) ||
+            !float.IsFinite(state.AnimationPhase) ||
+            !float.IsFinite(state.PreviousCurveValue) ||
+            !IsFinite(state.LastCommittedRootMotionFeedback.Translation) ||
+            !IsFinite(state.LastCommittedRootMotionFeedback.Rotation) ||
+            !float.IsFinite(state.GroundedEntrySpeed) ||
+            !IsFinite(state.SmoothedLocalVelocity) ||
+            !IsFinite(state.SmoothedLocalAcceleration) ||
+            !IsFinite(state.SmoothedLean) ||
+            !float.IsFinite(state.LandingRecoveryTime) ||
+            !float.IsFinite(state.SmoothedTargetYaw) ||
+            !float.IsFinite(state.TargetYaw) ||
+            !float.IsFinite(state.ViewPose.RelativeYaw) ||
+            !float.IsFinite(state.ViewPose.RelativePitch) ||
+            !float.IsFinite(state.ViewPose.YawSpeed) ||
+            !float.IsFinite(state.ViewPose.HeadWeight) ||
+            !float.IsFinite(state.ViewPose.SpineWeight) ||
+            !float.IsFinite(state.ViewPose.SpineResidualYaw) ||
+            !float.IsFinite(state.ViewPose.LastWorldYaw) ||
+            !float.IsFinite(state.TurnInPlace.ActivationSeconds) ||
+            !float.IsFinite(state.TurnInPlace.Phase) ||
+            !float.IsFinite(state.TurnInPlace.PlayRate) ||
+            !float.IsFinite(state.TurnInPlace.RemainingYaw) ||
+            !float.IsFinite(state.RotateInPlace.Phase) ||
+            !float.IsFinite(state.RotateInPlace.PlayRate) ||
+            !IsFiniteFootLock(state.LeftFootLock) ||
+            !IsFiniteFootLock(state.RightFootLock) ||
+            !IsFinite(state.PelvisCorrection.CurrentOffset) ||
+            !IsFinite(state.PelvisCorrection.TargetOffset) ||
+            !float.IsFinite(state.PelvisCorrection.VerticalVelocity) ||
+            !IsFinite(state.LeftFootProbeOrigin) ||
+            !IsFinite(state.RightFootProbeOrigin))
+        {
+            return false;
+        }
+
+        failure = AlsP5FailureCode.InvalidTimeline;
+        if ((uint)state.LocomotionState > (uint)AlsLocomotionState.Recovering ||
+            (uint)state.PendingRecoveryState > (uint)AlsRagdollState.FaceDown ||
+            (uint)state.ActualGait > (uint)AlsGait.Sprinting ||
+            (uint)state.PreviousLocomotionState > (uint)AlsLocomotionState.Recovering ||
+            (uint)state.YawSource > (uint)AlsYawSource.RotateInPlace ||
+            state.LeftFootLocked > 1 || state.RightFootLocked > 1 ||
+            state.JumpStartActive > 1 || state.Initialized > 1 ||
+            state.TurnInPlace.Active > 1 || state.RotateInPlace.Active > 1 ||
+            state.TurnInPlace.Direction is < -1 or > 1 ||
+            state.RotateInPlace.Direction is < -1 or > 1 ||
+            (uint)state.TurnInPlace.Stance > (uint)AlsStance.Crouching ||
+            (uint)state.RotateInPlace.Stance > (uint)AlsStance.Crouching ||
+            !IsCanonicalFootLock(state.LeftFootLock) ||
+            !IsCanonicalFootLock(state.RightFootLock))
+        {
+            return false;
+        }
+        failure = AlsP5FailureCode.None;
+        return true;
+    }
+
+    private static bool IsFiniteFootLock(in AlsFootLockState state) =>
+        IsFinite(state.LocalPosition) && IsFinite(state.LocalRotation) &&
+        IsFinite(state.Offset) && IsFinite(state.Rotation) &&
+        IsFinite(state.ProvenancePosition) && IsFinite(state.ProvenanceRotation) &&
+        float.IsFinite(state.Amount);
+
+    private static bool IsCanonicalFootLock(in AlsFootLockState state) =>
+        state.PlatformId >= -1 && state.ColliderId >= -1 &&
+        state.Amount is >= 0f and <= 1f && state.Locked <= 1 &&
+        (uint)state.ReleaseReason <= (uint)AlsFootReleaseReason.Overextended;
+
+    private static bool IsValidTransitionProbe(in AlsDynamicTransitionInput input) =>
+        (uint)input.Stance <= (uint)AlsStance.Crouching &&
+        float.IsFinite(input.AllowTransitions) &&
+        IsFinite(input.LeftTarget) && IsFinite(input.LeftLock) &&
+        IsFinite(input.RightTarget) && IsFinite(input.RightLock) &&
+        input.LeftRelevant <= 1 && input.RightRelevant <= 1;
+
+    private static bool IsFinite(Vector2 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y);
+
+    private static bool IsFinite(Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+
+    private static bool IsFinite(Quaternion value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) &&
+        float.IsFinite(value.Z) && float.IsFinite(value.W);
 
     private static bool TryGetActionTimelineRange(
         in AlsP5RuntimeBindings bindings,
@@ -1643,7 +1892,7 @@ public static class AlsP5Runtime
         {
             return true;
         }
-        var index = FindTransitionBindingIndex(binding, state.AnimationId);
+        var index = FindTransitionBindingIndex(binding, state.AnimationId, state.Foot);
         if (index < 0)
         {
             return false;
@@ -1663,12 +1912,19 @@ public static class AlsP5Runtime
 
     private static int FindTransitionBindingIndex(
         in AlsDynamicTransitionBinding binding,
-        int animationId)
+        int animationId,
+        AlsTransitionFoot foot)
     {
-        if (binding.StandingLeft.AnimationId == animationId) return 0;
-        if (binding.StandingRight.AnimationId == animationId) return 1;
-        if (binding.CrouchingLeft.AnimationId == animationId) return 2;
-        if (binding.CrouchingRight.AnimationId == animationId) return 3;
+        if (foot == AlsTransitionFoot.Left)
+        {
+            if (binding.StandingLeft.AnimationId == animationId) return 0;
+            if (binding.CrouchingLeft.AnimationId == animationId) return 2;
+        }
+        else if (foot == AlsTransitionFoot.Right)
+        {
+            if (binding.StandingRight.AnimationId == animationId) return 1;
+            if (binding.CrouchingRight.AnimationId == animationId) return 3;
+        }
         return -1;
     }
 

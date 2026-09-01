@@ -43,11 +43,33 @@ public static class AlsCurveRuntime
         float timeSeconds,
         out float value,
         out AlsP5FailureCode failure)
+        => TrySampleCore(
+            binding, keys, true, cycle, timeSeconds, out value, out failure);
+
+    internal static bool TrySampleConfigured(
+        in AlsCurveBinding binding,
+        ReadOnlySpan<AlsCurveKey> keys,
+        long cycle,
+        float timeSeconds,
+        out float value,
+        out AlsP5FailureCode failure)
+        => TrySampleCore(
+            binding, keys, false, cycle, timeSeconds, out value, out failure);
+
+    private static bool TrySampleCore(
+        in AlsCurveBinding binding,
+        ReadOnlySpan<AlsCurveKey> keys,
+        bool validateImmutable,
+        long cycle,
+        float timeSeconds,
+        out float value,
+        out AlsP5FailureCode failure)
     {
         value = 0f;
         failure = AlsP5FailureCode.None;
 
-        if (!TryValidateBinding(binding, keys.Length, out var missing))
+        var missing = binding.KeyCount == 0;
+        if (validateImmutable && !TryValidateBinding(binding, keys.Length, out missing))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
@@ -64,11 +86,12 @@ public static class AlsCurveRuntime
         var curveKeys = keys.Slice(binding.KeyOffset, binding.KeyCount);
         ref readonly var first = ref curveKeys[0];
         ref readonly var last = ref curveKeys[^1];
-        if (!float.IsFinite(first.TimeSeconds) ||
+        if (validateImmutable &&
+            (!float.IsFinite(first.TimeSeconds) ||
             !float.IsFinite(last.TimeSeconds) ||
             !float.IsFinite(first.Value) ||
             !float.IsFinite(last.Value) ||
-            (curveKeys.Length > 1 && last.TimeSeconds <= first.TimeSeconds))
+            (curveKeys.Length > 1 && last.TimeSeconds <= first.TimeSeconds)))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
@@ -235,13 +258,41 @@ public static class AlsCurveRuntime
         ReadOnlySpan<AlsCurveBlendSample> samples,
         out float value,
         out AlsP5FailureCode failure)
+        => TryBlendAdditiveToDefaultCore(
+            defaultValue, clampMinimum, clampMaximum, bindings, keys, samples,
+            true, out value, out failure);
+
+    internal static bool TryBlendAdditiveToDefaultConfigured(
+        float defaultValue,
+        float clampMinimum,
+        float clampMaximum,
+        ReadOnlySpan<AlsCurveBinding> bindings,
+        ReadOnlySpan<AlsCurveKey> keys,
+        ReadOnlySpan<AlsCurveBlendSample> samples,
+        out float value,
+        out AlsP5FailureCode failure)
+        => TryBlendAdditiveToDefaultCore(
+            defaultValue, clampMinimum, clampMaximum, bindings, keys, samples,
+            false, out value, out failure);
+
+    private static bool TryBlendAdditiveToDefaultCore(
+        float defaultValue,
+        float clampMinimum,
+        float clampMaximum,
+        ReadOnlySpan<AlsCurveBinding> bindings,
+        ReadOnlySpan<AlsCurveKey> keys,
+        ReadOnlySpan<AlsCurveBlendSample> samples,
+        bool validateImmutable,
+        out float value,
+        out AlsP5FailureCode failure)
     {
         value = 0f;
         failure = AlsP5FailureCode.None;
-        if (!float.IsFinite(defaultValue) ||
+        if (validateImmutable &&
+            (!float.IsFinite(defaultValue) ||
             !float.IsFinite(clampMinimum) ||
             !float.IsFinite(clampMaximum) ||
-            clampMinimum > clampMaximum)
+            clampMinimum > clampMaximum))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
@@ -263,9 +314,11 @@ public static class AlsCurveRuntime
             }
 
             ref readonly var binding = ref bindings[sample.BindingIndex];
-            if (!TrySample(
+            if (!(validateImmutable ? TrySample(
                     binding, keys, sample.Cycle, sample.TimeSeconds,
-                    out var sampleValue, out failure))
+                    out var sampleValue, out failure) : TrySampleConfigured(
+                    binding, keys, sample.Cycle, sample.TimeSeconds,
+                    out sampleValue, out failure)))
             {
                 return false;
             }

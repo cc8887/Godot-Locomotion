@@ -14,6 +14,35 @@ public static class AlsSyncRuntime
         out int mappingCount,
         out AlsSyncResult result,
         out AlsP5FailureCode failure)
+        => TryEvaluateGroupCore(
+            markers, group, members, playbacks, true, frameDeltaSeconds,
+            mappedPlaybacks, out mappingCount, out result, out failure);
+
+    internal static bool TryEvaluateGroupConfigured(
+        ReadOnlySpan<AlsSyncMarkerDefinition> markers,
+        in AlsSyncGroupBinding group,
+        ReadOnlySpan<AlsSyncMemberBinding> members,
+        ReadOnlySpan<AlsSyncPlayback> playbacks,
+        double frameDeltaSeconds,
+        Span<AlsSyncMappedPlayback> mappedPlaybacks,
+        out int mappingCount,
+        out AlsSyncResult result,
+        out AlsP5FailureCode failure)
+        => TryEvaluateGroupCore(
+            markers, group, members, playbacks, false, frameDeltaSeconds,
+            mappedPlaybacks, out mappingCount, out result, out failure);
+
+    private static bool TryEvaluateGroupCore(
+        ReadOnlySpan<AlsSyncMarkerDefinition> markers,
+        in AlsSyncGroupBinding group,
+        ReadOnlySpan<AlsSyncMemberBinding> members,
+        ReadOnlySpan<AlsSyncPlayback> playbacks,
+        bool validateImmutable,
+        double frameDeltaSeconds,
+        Span<AlsSyncMappedPlayback> mappedPlaybacks,
+        out int mappingCount,
+        out AlsSyncResult result,
+        out AlsP5FailureCode failure)
     {
         mappingCount = 0;
         result = AlsSyncResult.CreateDefault();
@@ -26,7 +55,7 @@ public static class AlsSyncRuntime
         }
 
         var leaderIndex = -1;
-        for (var index = 0; index < groupMembers.Length; index++)
+        for (var index = 0; validateImmutable && index < groupMembers.Length; index++)
         {
             if (!IsValidMember(groupMembers[index], group.GroupId) ||
                 ContainsAnimation(groupMembers[..index], groupMembers[index].AnimationId))
@@ -50,7 +79,7 @@ public static class AlsSyncRuntime
             }
         }
 
-        for (var index = 0; index < groupMembers.Length; index++)
+        for (var index = 0; validateImmutable && index < groupMembers.Length; index++)
         {
             if (!TryFindPair(markers, group, groupMembers[index], out _)) return false;
         }

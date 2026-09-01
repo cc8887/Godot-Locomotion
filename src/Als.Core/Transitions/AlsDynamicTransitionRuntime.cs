@@ -15,6 +15,31 @@ public static class AlsDynamicTransitionRuntime
         out AlsDynamicTransitionPlayback closingPlayback,
         out AlsDynamicTransitionPlayback playback,
         out AlsP5FailureCode failure)
+        => TryAdvanceCore(
+            binding, true, deltaTime, current, out next, out closingPlayback,
+            out playback, out failure);
+
+    internal static bool TryAdvanceConfigured(
+        in AlsDynamicTransitionBinding binding,
+        float deltaTime,
+        in AlsDynamicTransitionState current,
+        out AlsDynamicTransitionState next,
+        out AlsDynamicTransitionPlayback closingPlayback,
+        out AlsDynamicTransitionPlayback playback,
+        out AlsP5FailureCode failure)
+        => TryAdvanceCore(
+            binding, false, deltaTime, current, out next, out closingPlayback,
+            out playback, out failure);
+
+    private static bool TryAdvanceCore(
+        in AlsDynamicTransitionBinding binding,
+        bool validateImmutable,
+        float deltaTime,
+        in AlsDynamicTransitionState current,
+        out AlsDynamicTransitionState next,
+        out AlsDynamicTransitionPlayback closingPlayback,
+        out AlsDynamicTransitionPlayback playback,
+        out AlsP5FailureCode failure)
     {
         next = current;
         closingPlayback = AlsDynamicTransitionPlayback.CreateDefault();
@@ -26,7 +51,7 @@ public static class AlsDynamicTransitionRuntime
             return false;
         }
 
-        if (!IsValidBinding(binding))
+        if (validateImmutable && !IsValidBinding(binding))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
@@ -179,11 +204,36 @@ public static class AlsDynamicTransitionRuntime
         out AlsDynamicTransitionState next,
         out AlsDynamicTransitionQueuedSelection queuedSelection,
         out AlsP5FailureCode failure)
+        => TryQueueCore(
+            binding, true, input, cooldownBlockedThisFrame, current,
+            out next, out queuedSelection, out failure);
+
+    internal static bool TryQueueConfigured(
+        in AlsDynamicTransitionBinding binding,
+        in AlsDynamicTransitionInput input,
+        byte cooldownBlockedThisFrame,
+        in AlsDynamicTransitionState current,
+        out AlsDynamicTransitionState next,
+        out AlsDynamicTransitionQueuedSelection queuedSelection,
+        out AlsP5FailureCode failure)
+        => TryQueueCore(
+            binding, false, input, cooldownBlockedThisFrame, current,
+            out next, out queuedSelection, out failure);
+
+    private static bool TryQueueCore(
+        in AlsDynamicTransitionBinding binding,
+        bool validateImmutable,
+        in AlsDynamicTransitionInput input,
+        byte cooldownBlockedThisFrame,
+        in AlsDynamicTransitionState current,
+        out AlsDynamicTransitionState next,
+        out AlsDynamicTransitionQueuedSelection queuedSelection,
+        out AlsP5FailureCode failure)
     {
         next = current;
         queuedSelection = AlsDynamicTransitionQueuedSelection.CreateDefault();
 
-        if (!IsValidBinding(binding))
+        if (validateImmutable && !IsValidBinding(binding))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
