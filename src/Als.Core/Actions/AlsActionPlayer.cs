@@ -480,8 +480,11 @@ public static class AlsActionPlayer
                 if (remaining == 0d)
                 {
                     var canonicalMontageTime = (double)(float)montageTime;
+                    var nextLoopBoundary =
+                        (double)segment.MontageStartTime + (loopOrdinal + 1d) * loopRange;
                     if (!double.IsFinite(canonicalMontageTime) ||
                         canonicalMontageTime <= stagedSlices[stagedCount - 1].PreviousMontageTime ||
+                        canonicalMontageTime >= nextLoopBoundary ||
                         canonicalMontageTime >= sectionBoundary ||
                         canonicalMontageTime >= segmentBoundary)
                     {
@@ -1202,7 +1205,13 @@ public static class AlsActionPlayer
             if (!IsCanonicalNonNegative(slice.FrameStartOffsetSeconds) ||
                 !IsCanonicalNonNegative(slice.FrameEndOffsetSeconds) ||
                 slice.FrameStartOffsetSeconds > slice.FrameEndOffsetSeconds ||
-                slice.FrameEndOffsetSeconds > finalFrameEnd)
+                slice.FrameEndOffsetSeconds > finalFrameEnd ||
+                slice.ActivatesActionAtSliceStart is not 0 and not 1 ||
+                slice.ActivatesSegmentAtSliceStart is not 0 and not 1 ||
+                slice.ClosesActionAfterSlice is not 0 and not 1 ||
+                slice.ClosesSegmentAfterSlice is not 0 and not 1 ||
+                slice.ActivatesActionAtSliceStart == 1 &&
+                    slice.ActivatesSegmentAtSliceStart != 1)
             {
                 return false;
             }
@@ -1216,15 +1225,8 @@ public static class AlsActionPlayer
             !double.IsFinite(finalSlice.CurrentClipUnwrappedTime) ||
             finalSlice.CurrentMontageTime < finalSlice.PreviousMontageTime ||
             frameIsPoint != montageIsPoint ||
-            frameIsPoint && (finalSlice.FrameStartOffsetSeconds == 0d ||
-                finalSlice.ActivatesSegmentAtSliceStart != 1) ||
+            frameIsPoint && finalSlice.FrameStartOffsetSeconds == 0d ||
             !frameIsPoint && finalSlice.CurrentMontageTime <= finalSlice.PreviousMontageTime ||
-            finalSlice.ActivatesActionAtSliceStart is not 0 and not 1 ||
-            finalSlice.ActivatesSegmentAtSliceStart is not 0 and not 1 ||
-            finalSlice.ClosesActionAfterSlice is not 0 and not 1 ||
-            finalSlice.ClosesSegmentAfterSlice is not 0 and not 1 ||
-            finalSlice.ActivatesActionAtSliceStart == 1 &&
-                finalSlice.ActivatesSegmentAtSliceStart != 1 ||
             finalSlice.PreviousMontageTime < segment.MontageStartTime ||
             finalSlice.PreviousMontageTime >= segment.MontageEndTime ||
             finalSlice.CurrentMontageTime < segment.MontageStartTime ||
@@ -1241,84 +1243,126 @@ public static class AlsActionPlayer
             return false;
         }
 
-        return !frameIsPoint || ValidateEarlyBlendOutPointHandoff(
-            slices, sliceCount, sections, segments, definition, section, segment);
+        if (finalSlice.FrameStartOffsetSeconds == 0d)
+        {
+            return finalSlice.ActivatesActionAtSliceStart == 0 &&
+                finalSlice.ActivatesSegmentAtSliceStart == 0;
+        }
+
+        return sliceCount >= 2 && ValidateEarlyBlendOutSliceRelation(
+            slices[sliceCount - 2], finalSlice, sections, segments, definition);
     }
 
-    private static bool ValidateEarlyBlendOutPointHandoff(
-        ReadOnlySpan<AlsActionTraversalSlice> slices,
-        int sliceCount,
+    private static bool TryValidateEarlyBlendOutSlice(
+        in AlsActionTraversalSlice slice,
         ReadOnlySpan<AlsActionSectionBinding> sections,
         ReadOnlySpan<AlsActionSegmentBinding> segments,
         in AlsActionDefinition definition,
-        in AlsActionSectionBinding section,
-        in AlsActionSegmentBinding segment)
+        out int sectionIndex,
+        out int segmentIndex)
     {
-        if (sliceCount < 2)
-        {
-            return false;
-        }
-
-        ref readonly var point = ref slices[sliceCount - 1];
-        ref readonly var predecessor = ref slices[sliceCount - 2];
-        if (predecessor.ActionOccurrenceHandleId != definition.OccurrenceHandleId ||
-            predecessor.SegmentBindingIndex < 0 ||
-            predecessor.SegmentBindingIndex >= segments.Length ||
-            predecessor.FrameStartOffsetSeconds >= predecessor.FrameEndOffsetSeconds ||
-            predecessor.FrameEndOffsetSeconds != point.FrameStartOffsetSeconds ||
-            predecessor.PreviousMontageTime >= predecessor.CurrentMontageTime ||
-            predecessor.ActivatesActionAtSliceStart is not 0 and not 1 ||
-            predecessor.ActivatesSegmentAtSliceStart is not 0 and not 1 ||
-            predecessor.ClosesActionAfterSlice is not 0 and not 1 ||
-            predecessor.ClosesSegmentAfterSlice is not 0 and not 1 ||
+        sectionIndex = -1;
+        segmentIndex = slice.SegmentBindingIndex;
+        if (slice.ActionOccurrenceHandleId != definition.OccurrenceHandleId ||
+            slice.PlaybackEpoch <= 0 ||
+            segmentIndex < 0 || segmentIndex >= segments.Length ||
             !TryFindSection(
-                sections, definition.DefinitionId, predecessor.SectionId,
-                out var predecessorSectionIndex))
+                sections, definition.DefinitionId, slice.SectionId, out sectionIndex))
         {
             return false;
         }
 
-        ref readonly var predecessorSegment = ref segments[predecessor.SegmentBindingIndex];
+        ref readonly var sliceSection = ref sections[sectionIndex];
+        ref readonly var sliceSegment = ref segments[segmentIndex];
+        return sliceSegment.ActionDefinitionId == definition.DefinitionId &&
+            slice.SegmentOccurrenceHandleId == sliceSegment.OccurrenceHandleId &&
+            slice.SegmentId == sliceSegment.SegmentId &&
+            slice.AnimationId == sliceSegment.AnimationId &&
+            IsCanonicalNonNegative(slice.PreviousMontageTime) &&
+            IsCanonicalNonNegative(slice.CurrentMontageTime) &&
+            double.IsFinite(slice.PreviousClipUnwrappedTime) &&
+            double.IsFinite(slice.CurrentClipUnwrappedTime) &&
+            slice.PreviousMontageTime >= sliceSegment.MontageStartTime &&
+            slice.PreviousMontageTime < sliceSegment.MontageEndTime &&
+            slice.CurrentMontageTime >= sliceSegment.MontageStartTime &&
+            slice.CurrentMontageTime <= sliceSegment.MontageEndTime &&
+            slice.PreviousMontageTime >= sliceSection.StartTime &&
+            slice.PreviousMontageTime < sliceSection.EndTime &&
+            slice.CurrentMontageTime >= sliceSection.StartTime &&
+            slice.CurrentMontageTime <= sliceSection.EndTime &&
+            slice.PreviousMontageTime <= slice.CurrentMontageTime &&
+            slice.PreviousClipUnwrappedTime ==
+                MapClip(sliceSegment, slice.PreviousMontageTime) &&
+            slice.CurrentClipUnwrappedTime ==
+                MapClip(sliceSegment, slice.CurrentMontageTime);
+    }
+
+    private static bool ValidateEarlyBlendOutSliceRelation(
+        in AlsActionTraversalSlice predecessor,
+        in AlsActionTraversalSlice current,
+        ReadOnlySpan<AlsActionSectionBinding> sections,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        in AlsActionDefinition definition)
+    {
+        if (!TryValidateEarlyBlendOutSlice(
+            predecessor, sections, segments, definition,
+            out var predecessorSectionIndex, out var predecessorSegmentIndex) ||
+            !TryValidateEarlyBlendOutSlice(
+            current, sections, segments, definition,
+            out var currentSectionIndex, out var currentSegmentIndex) ||
+            predecessor.FrameStartOffsetSeconds >= predecessor.FrameEndOffsetSeconds ||
+            predecessor.FrameEndOffsetSeconds != current.FrameStartOffsetSeconds ||
+            predecessor.PreviousMontageTime >= predecessor.CurrentMontageTime)
+        {
+            return false;
+        }
+
         ref readonly var predecessorSection = ref sections[predecessorSectionIndex];
-        if (predecessorSegment.ActionDefinitionId != definition.DefinitionId ||
-            predecessor.SegmentOccurrenceHandleId != predecessorSegment.OccurrenceHandleId ||
-            predecessor.SegmentId != predecessorSegment.SegmentId ||
-            predecessor.AnimationId != predecessorSegment.AnimationId ||
-            predecessor.PreviousMontageTime < predecessorSegment.MontageStartTime ||
-            predecessor.PreviousMontageTime >= predecessorSegment.MontageEndTime ||
-            predecessor.CurrentMontageTime <= predecessorSegment.MontageStartTime ||
-            predecessor.CurrentMontageTime > predecessorSegment.MontageEndTime ||
-            predecessor.PreviousMontageTime < predecessorSection.StartTime ||
-            predecessor.PreviousMontageTime >= predecessorSection.EndTime ||
-            predecessor.CurrentMontageTime > predecessorSection.EndTime ||
-            predecessor.PreviousClipUnwrappedTime !=
-                MapClip(predecessorSegment, predecessor.PreviousMontageTime) ||
-            predecessor.CurrentClipUnwrappedTime !=
-                MapClip(predecessorSegment, predecessor.CurrentMontageTime))
-        {
-            return false;
-        }
+        ref readonly var predecessorSegment = ref segments[predecessorSegmentIndex];
+        ref readonly var currentSection = ref sections[currentSectionIndex];
+        ref readonly var currentSegment = ref segments[currentSegmentIndex];
 
-        if (point.ActivatesActionAtSliceStart == 0)
+        if (current.ActivatesActionAtSliceStart == 1)
         {
-            return point.ActivatesSegmentAtSliceStart == 1 &&
-                predecessor.ClosesActionAfterSlice == 0 &&
+            return current.ActivatesSegmentAtSliceStart == 1 &&
+                predecessor.ClosesActionAfterSlice == 1 &&
                 predecessor.ClosesSegmentAfterSlice == 1 &&
-                predecessor.SectionId == point.SectionId &&
-                predecessor.PlaybackEpoch == point.PlaybackEpoch &&
-                predecessor.CurrentMontageTime == point.CurrentMontageTime &&
-                predecessorSegment.MontageEndTime == point.CurrentMontageTime &&
-                segment.MontageStartTime == point.CurrentMontageTime;
+                predecessorSection.NextSectionId == currentSection.SectionId &&
+                predecessor.PlaybackEpoch != long.MaxValue &&
+                predecessor.PlaybackEpoch + 1 == current.PlaybackEpoch &&
+                predecessor.CurrentMontageTime == predecessorSection.EndTime &&
+                current.PreviousMontageTime == currentSection.StartTime;
         }
 
-        return point.ActivatesSegmentAtSliceStart == 1 &&
-            predecessor.ClosesActionAfterSlice == 1 &&
-            predecessor.ClosesSegmentAfterSlice == 1 &&
-            predecessorSection.NextSectionId == section.SectionId &&
-            predecessor.PlaybackEpoch != long.MaxValue &&
-            predecessor.PlaybackEpoch + 1 == point.PlaybackEpoch &&
-            predecessor.CurrentMontageTime == predecessorSection.EndTime &&
-            point.CurrentMontageTime == section.StartTime;
+        if (current.ActivatesSegmentAtSliceStart == 1)
+        {
+            return predecessor.ClosesActionAfterSlice == 0 &&
+                predecessor.ClosesSegmentAfterSlice == 1 &&
+                predecessor.SectionId == current.SectionId &&
+                predecessor.PlaybackEpoch == current.PlaybackEpoch &&
+                predecessor.CurrentMontageTime == current.PreviousMontageTime &&
+                predecessorSegment.MontageEndTime == current.PreviousMontageTime &&
+                currentSegment.MontageStartTime == current.PreviousMontageTime;
+        }
+
+        return predecessor.ClosesActionAfterSlice == 0 &&
+            predecessor.ClosesSegmentAfterSlice == 0 &&
+            predecessor.SectionId == current.SectionId &&
+            predecessor.SegmentBindingIndex == current.SegmentBindingIndex &&
+            predecessor.PlaybackEpoch == current.PlaybackEpoch &&
+            predecessor.CurrentMontageTime == current.PreviousMontageTime &&
+            IsInternalLoopCut(predecessorSegment, predecessor.CurrentMontageTime);
+    }
+
+    private static bool IsInternalLoopCut(
+        in AlsActionSegmentBinding segment,
+        double montageTime)
+    {
+        var loopRange =
+            ((double)segment.AnimationEndTime - segment.AnimationStartTime) / segment.PlayRate;
+        var ordinal = System.Math.Round((montageTime - segment.MontageStartTime) / loopRange);
+        return ordinal >= 1d && ordinal < segment.LoopCount &&
+            (double)segment.MontageStartTime + ordinal * loopRange == montageTime;
     }
 
     private static bool IsCanonicalNonNegative(double value) =>
