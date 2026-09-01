@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Animation;
 using GodotAls.Core.Pose;
 
 namespace GodotAls.Core.Tests;
@@ -171,6 +172,48 @@ public sealed class ContractLayoutTests
             "OutgoingOccurrenceHandleId", "OutgoingAnimationId", "OutgoingBindingIndex",
             "OutgoingPlaybackEpoch", "OutgoingClipTime", "LaneWeight", "IncomingMix",
             "BlendSeconds", "VisualActive", "OutgoingActive");
+    }
+
+    [Fact]
+    public void P5FrameTransactionValuesAreSequentialUnmanagedAndKeepDeclaredOrder()
+    {
+        Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(AlsP5CurveCombineMode)));
+        Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(AlsP5RuntimeScratchPhase)));
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsP5CurveBindingIdentity).StructLayoutAttribute?.Value);
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsAnimationCurveRange).StructLayoutAttribute?.Value);
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsP5CurveSemanticPolicy).StructLayoutAttribute?.Value);
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsP4FootCurveRuntimeBinding).StructLayoutAttribute?.Value);
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsP5SyncOccurrenceBinding).StructLayoutAttribute?.Value);
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsActionTimelineRange).StructLayoutAttribute?.Value);
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsBasePlaybackDescriptor).StructLayoutAttribute?.Value);
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsP5RuntimeScratchControl).StructLayoutAttribute?.Value);
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsP5CurveBindingIdentity>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsAnimationCurveRange>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsP5CurveSemanticPolicy>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsP4FootCurveRuntimeBinding>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsP5SyncOccurrenceBinding>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsActionTimelineRange>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsBasePlaybackDescriptor>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsP5RuntimeScratchControl>());
+        AssertFieldOrder<AlsP5CurveBindingIdentity>("AnimationId", "CurveId");
+        AssertFieldOrder<AlsAnimationCurveRange>("AnimationId", "BindingOffset", "BindingCount");
+        AssertFieldOrder<AlsP5CurveSemanticPolicy>(
+            "MissingValue", "CombineMode", "ClampMinimum", "ClampMaximum");
+        AssertFieldOrder<AlsP4FootCurveRuntimeBinding>(
+            "AnimationId", "LeftLockCurveId", "RightLockCurveId",
+            "LeftLockDefault", "RightLockDefault");
+        AssertFieldOrder<AlsP5SyncOccurrenceBinding>(
+            "GroupId", "GroupMemberIndex", "AnimationId", "OccurrenceHandleId");
+        AssertFieldOrder<AlsActionTimelineRange>(
+            "ActionDefinitionId", "DefinitionOffset", "DefinitionCount");
+        AssertFieldOrder<AlsBasePlaybackDescriptor>(
+            "OccurrenceHandleId", "AnimationId", "AuthorityGroupId", "PlaybackEpoch",
+            "PreviousUnwrappedTimeSeconds", "CurrentUnwrappedTimeSeconds",
+            "FrameStartOffsetSeconds", "FrameEndOffsetSeconds", "DurationSeconds", "Weight",
+            "Loop", "ActivatesAtFrameStart", "ClosesAfterFrame");
+        AssertStorageFieldOrder<AlsP5RuntimeScratchControl>(
+            "OwnerCookie", "AttemptRevision", "PreparedRevision", "PreparedIdentity",
+            "PreparedBindingDigest", "PreparedLayoutDigest", "Phase");
     }
 
     [Fact]

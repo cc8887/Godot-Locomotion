@@ -416,6 +416,30 @@ public sealed class AlsResultDigestTests
     }
 
     [Fact]
+    public void TransactionShapedP5ResultsIncludeEventsAndOutcomesWithoutTokenMetadata()
+    {
+        var identity = new AlsFrameIdentity(91, 3, 7);
+        var first = AlsFrameResult.CreateDefault(identity);
+        first.TypedEvents.TryAdd(new AlsAnimationEvent(
+            1, 2, 3, 4, 5, 6, 7, 0, 8, 0.25f, 0.5f,
+            AlsTimelineEventKind.SetAction, AlsAnimationEventPhase.Trigger,
+            new AlsCompactEventPayload(9, 10, 11, 12, 0.75f, 0, AlsActionResultCode.None)));
+        first.ActionOutcomes.TryAdd(new AlsActionOutcome(
+            13, 3, 5, AlsActionResultCode.Accepted));
+        var second = first;
+        second.ActionOutcomes.Clear();
+        second.ActionOutcomes.TryAdd(new AlsActionOutcome(
+            13, 3, 5, AlsActionResultCode.InterruptedByReplacement));
+        var firstDigest = AlsResultDigest.OffsetBasis;
+        var secondDigest = AlsResultDigest.OffsetBasis;
+
+        AlsResultDigest.Append(ref firstDigest, first);
+        AlsResultDigest.Append(ref secondDigest, second);
+
+        Assert.NotEqual(firstDigest, secondDigest);
+    }
+
+    [Fact]
     public void SignedZeroP5FloatActivatesExtensionAndRetainsRawBits()
     {
         var first = AlsFrameResult.CreateDefault(new AlsFrameIdentity(1, 0, 1));
