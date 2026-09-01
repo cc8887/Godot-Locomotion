@@ -21,11 +21,50 @@ public static class AlsActionPlayer
         out AlsActionPlayerState next,
         out AlsActionRequestResult result,
         out AlsP5FailureCode failure)
+        => TryApplyRequestCore(
+            definitions, sections, segments, true, currentSlotGeneration,
+            cancelForRuntimeFailure, request, current, slices, ref sliceCount,
+            ref outcomes, out next, out result, out failure);
+
+    internal static bool TryApplyRequestConfigured(
+        ReadOnlySpan<AlsActionDefinition> definitions,
+        ReadOnlySpan<AlsActionSectionBinding> sections,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        uint currentSlotGeneration,
+        byte cancelForRuntimeFailure,
+        in AlsActionRequest request,
+        in AlsActionPlayerState current,
+        Span<AlsActionTraversalSlice> slices,
+        ref int sliceCount,
+        ref AlsActionOutcomeBuffer outcomes,
+        out AlsActionPlayerState next,
+        out AlsActionRequestResult result,
+        out AlsP5FailureCode failure)
+        => TryApplyRequestCore(
+            definitions, sections, segments, false, currentSlotGeneration,
+            cancelForRuntimeFailure, request, current, slices, ref sliceCount,
+            ref outcomes, out next, out result, out failure);
+
+    private static bool TryApplyRequestCore(
+        ReadOnlySpan<AlsActionDefinition> definitions,
+        ReadOnlySpan<AlsActionSectionBinding> sections,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        bool validateImmutable,
+        uint currentSlotGeneration,
+        byte cancelForRuntimeFailure,
+        in AlsActionRequest request,
+        in AlsActionPlayerState current,
+        Span<AlsActionTraversalSlice> slices,
+        ref int sliceCount,
+        ref AlsActionOutcomeBuffer outcomes,
+        out AlsActionPlayerState next,
+        out AlsActionRequestResult result,
+        out AlsP5FailureCode failure)
     {
         next = current;
         result = AlsActionRequestResult.CreateDefault();
 
-        if (!ValidateBindings(definitions, sections, segments))
+        if (validateImmutable && !ValidateBindings(definitions, sections, segments))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
@@ -277,6 +316,39 @@ public static class AlsActionPlayer
         out AlsActionPlayerState next,
         out AlsActionAdvanceResult result,
         out AlsP5FailureCode failure)
+        => TryAdvanceCore(
+            definitions, sections, segments, true, frameDeltaSeconds, current,
+            slices, ref sliceCount, ref outcomes, out next, out result, out failure);
+
+    internal static bool TryAdvanceConfigured(
+        ReadOnlySpan<AlsActionDefinition> definitions,
+        ReadOnlySpan<AlsActionSectionBinding> sections,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        double frameDeltaSeconds,
+        in AlsActionPlayerState current,
+        Span<AlsActionTraversalSlice> slices,
+        ref int sliceCount,
+        ref AlsActionOutcomeBuffer outcomes,
+        out AlsActionPlayerState next,
+        out AlsActionAdvanceResult result,
+        out AlsP5FailureCode failure)
+        => TryAdvanceCore(
+            definitions, sections, segments, false, frameDeltaSeconds, current,
+            slices, ref sliceCount, ref outcomes, out next, out result, out failure);
+
+    private static bool TryAdvanceCore(
+        ReadOnlySpan<AlsActionDefinition> definitions,
+        ReadOnlySpan<AlsActionSectionBinding> sections,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        bool validateImmutable,
+        double frameDeltaSeconds,
+        in AlsActionPlayerState current,
+        Span<AlsActionTraversalSlice> slices,
+        ref int sliceCount,
+        ref AlsActionOutcomeBuffer outcomes,
+        out AlsActionPlayerState next,
+        out AlsActionAdvanceResult result,
+        out AlsP5FailureCode failure)
     {
         next = current;
         result = AlsActionAdvanceResult.CreateDefault();
@@ -287,7 +359,7 @@ public static class AlsActionPlayer
             return false;
         }
 
-        if (!ValidateBindings(definitions, sections, segments))
+        if (validateImmutable && !ValidateBindings(definitions, sections, segments))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
@@ -604,12 +676,68 @@ public static class AlsActionPlayer
         out AlsActionPlayerState next,
         out AlsActionEarlyBlendOutResult result,
         out AlsP5FailureCode failure)
+        => TryInterruptEarlyBlendOutCore(
+            definitions, sections, segments, actionTimelineDefinitions, true,
+            actionOccurrenceHandleId, segmentOccurrenceHandleId,
+            candidateFinalMontageTime, provisionalIncomingEffectiveWeight, hasInput,
+            locomotionMode, rotationMode, stance, current, slices, sliceCount,
+            ref outcomes, out next, out result, out failure);
+
+    internal static bool TryInterruptEarlyBlendOutConfigured(
+        ReadOnlySpan<AlsActionDefinition> definitions,
+        ReadOnlySpan<AlsActionSectionBinding> sections,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        ReadOnlySpan<AlsTimelineEventDefinition> actionTimelineDefinitions,
+        int actionOccurrenceHandleId,
+        int segmentOccurrenceHandleId,
+        double candidateFinalMontageTime,
+        float provisionalIncomingEffectiveWeight,
+        byte hasInput,
+        AlsTimelineLocomotionMode locomotionMode,
+        AlsTimelineRotationMode rotationMode,
+        AlsTimelineStance stance,
+        in AlsActionPlayerState current,
+        Span<AlsActionTraversalSlice> slices,
+        int sliceCount,
+        ref AlsActionOutcomeBuffer outcomes,
+        out AlsActionPlayerState next,
+        out AlsActionEarlyBlendOutResult result,
+        out AlsP5FailureCode failure)
+        => TryInterruptEarlyBlendOutCore(
+            definitions, sections, segments, actionTimelineDefinitions, false,
+            actionOccurrenceHandleId, segmentOccurrenceHandleId,
+            candidateFinalMontageTime, provisionalIncomingEffectiveWeight, hasInput,
+            locomotionMode, rotationMode, stance, current, slices, sliceCount,
+            ref outcomes, out next, out result, out failure);
+
+    private static bool TryInterruptEarlyBlendOutCore(
+        ReadOnlySpan<AlsActionDefinition> definitions,
+        ReadOnlySpan<AlsActionSectionBinding> sections,
+        ReadOnlySpan<AlsActionSegmentBinding> segments,
+        ReadOnlySpan<AlsTimelineEventDefinition> actionTimelineDefinitions,
+        bool validateImmutable,
+        int actionOccurrenceHandleId,
+        int segmentOccurrenceHandleId,
+        double candidateFinalMontageTime,
+        float provisionalIncomingEffectiveWeight,
+        byte hasInput,
+        AlsTimelineLocomotionMode locomotionMode,
+        AlsTimelineRotationMode rotationMode,
+        AlsTimelineStance stance,
+        in AlsActionPlayerState current,
+        Span<AlsActionTraversalSlice> slices,
+        int sliceCount,
+        ref AlsActionOutcomeBuffer outcomes,
+        out AlsActionPlayerState next,
+        out AlsActionEarlyBlendOutResult result,
+        out AlsP5FailureCode failure)
     {
         next = current;
         result = AlsActionEarlyBlendOutResult.CreateDefault();
 
-        if (!ValidateBindings(definitions, sections, segments) ||
-            !ValidateTimelineDefinitions(actionTimelineDefinitions))
+        if (validateImmutable &&
+            (!ValidateBindings(definitions, sections, segments) ||
+             !ValidateTimelineDefinitions(actionTimelineDefinitions)))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;
@@ -639,7 +767,8 @@ public static class AlsActionPlayer
             sections, current.ActionDefinitionId, current.SectionId, out var sectionIndex);
         ref readonly var section = ref sections[sectionIndex];
         ref readonly var segment = ref segments[current.SegmentBindingIndex];
-        if (!ValidateEarlyBlendOutBindings(actionTimelineDefinitions, segments, definition))
+        if (validateImmutable &&
+            !ValidateEarlyBlendOutBindings(actionTimelineDefinitions, segments, definition))
         {
             failure = AlsP5FailureCode.InvalidBinding;
             return false;

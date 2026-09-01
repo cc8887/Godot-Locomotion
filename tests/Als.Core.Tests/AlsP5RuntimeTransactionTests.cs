@@ -564,6 +564,614 @@ public sealed class AlsP5RuntimeTransactionTests
         Assert.Equal(firstDigest, secondDigest);
     }
 
+    [Fact]
+    public void ReviewFix_TransitionPromotionTerminalStepsTauCapturesAndFadesResidual()
+    {
+        var fixture = new ReviewFixture();
+        fixture.SetTransitionDuration(0.075f);
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        state.DynamicTransition.QueuedAnimationId = 1;
+        state.DynamicTransition.QueuedFoot = AlsTransitionFoot.Left;
+        state.DynamicTransition.Queued = 1;
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        Assert.Equal((byte)1, prepared.TransitionGraph.Outgoing.Active);
+        Assert.Equal(1, prepared.TransitionGraph.Outgoing.AnimationId);
+        Assert.Equal(0.125f, prepared.TransitionGraph.OutgoingEffectiveWeight, 6);
+        Assert.Equal(0f, prepared.TransitionGraph.IncomingEffectiveWeight);
+    }
+
+    [Fact]
+    public void ReviewFix_TransitionReplacementTerminalPreservesOldPointAndUsesFinalOutgoingForNewTerminal()
+    {
+        var fixture = new ReviewFixture();
+        fixture.SetTransitionDuration(0.075f);
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = fixture.CreateActiveTransitionState(
+            animationId: 2, foot: AlsTransitionFoot.Right, time: 0.02f,
+            laneWeight: 0.4f, queuedAnimationId: 1, queuedFoot: AlsTransitionFoot.Left);
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        Assert.Equal(0.4f, prepared.TransitionReplacedClosingWeight);
+        Assert.Equal(1, prepared.TransitionGraph.Outgoing.AnimationId);
+        Assert.Equal(0.04765625f, prepared.TransitionGraph.OutgoingEffectiveWeight, 6);
+        var oldPoint = Assert.Single(fixture.Playbacks,
+            value => value.AnimationId == 2 && value.ClosesAfterWindow == 1);
+        var newTerminal = Assert.Single(fixture.Playbacks,
+            value => value.AnimationId == 1 && value.ClosesAfterWindow == 1);
+        AssertBitsEqual(prepared.TransitionReplacedClosingWeight, oldPoint.Weight);
+        AssertBitsEqual(prepared.TransitionGraph.OutgoingEffectiveWeight, newTerminal.Weight);
+    }
+
+    [Fact]
+    public void ReviewFix_NormalTransitionReplacementCloseBitCopiesFrozenOutgoingWeight()
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = fixture.CreateActiveTransitionState(
+            animationId: 2, foot: AlsTransitionFoot.Right, time: 0.2f,
+            laneWeight: 0.4f, queuedAnimationId: 1, queuedFoot: AlsTransitionFoot.Left);
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        var oldPoint = Assert.Single(fixture.Playbacks,
+            value => value.AnimationId == 2 && value.ClosesAfterWindow == 1);
+        Assert.NotEqual(BitConverter.SingleToInt32Bits(prepared.TransitionReplacedClosingWeight),
+            BitConverter.SingleToInt32Bits(prepared.TransitionGraph.OutgoingEffectiveWeight));
+        AssertBitsEqual(prepared.TransitionGraph.OutgoingEffectiveWeight, oldPoint.Weight);
+    }
+
+    [Fact]
+    public void ReviewFix_ReusedTransitionAnimationResolvesBindingByAnimationAndFoot()
+    {
+        var fixture = new ReviewFixture();
+        fixture.Transition = new AlsDynamicTransitionBinding(
+            1, 1,
+            new AlsDynamicTransitionClipBinding(1, 9, 1f),
+            new AlsDynamicTransitionClipBinding(1, 9, 1f),
+            new AlsDynamicTransitionClipBinding(1, 9, 1f),
+            new AlsDynamicTransitionClipBinding(1, 9, 1f),
+            0.5f, 0.4f, 1f, 2);
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = fixture.CreateActiveTransitionState(
+            animationId: 1, foot: AlsTransitionFoot.Right, time: 0.1f, laneWeight: 1f);
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        Assert.Equal(1, prepared.TransitionGraph.Incoming.BindingIndex);
+    }
+
+    [Theory]
+    [InlineData((byte)0)]
+    [InlineData((byte)1)]
+    public void ReviewFix_ActionReplacementAndRecoveryStartCloseBitCopyFrozenOutgoingWeight(byte recovery)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var request = new AlsActionRequest(2, AlsActionCommand.Start, 1, 1, 1, 1);
+        var input = fixture.CreateInput(0.1f, request, recovery);
+        var state = fixture.CreateActiveActionState(
+            definitionId: 0, segmentIndex: 0, time: 0.2f, laneWeight: 0.4f);
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        var oldDomains = fixture.Playbacks.Where(value =>
+            value.ActionId == 0 && value.ClosesAfterWindow == 1).ToArray();
+        var newDomains = fixture.Playbacks.Where(value =>
+            value.ActionId == 1 && value.ActivatesAtWindowStart == 1).ToArray();
+        Assert.Equal(2, oldDomains.Length);
+        Assert.Equal(2, newDomains.Length);
+        var outgoingWeight = prepared.ActionGraph.OutgoingEffectiveWeight;
+        var incomingWeight = prepared.ActionGraph.IncomingEffectiveWeight;
+        Assert.All(oldDomains, value =>
+            AssertBitsEqual(outgoingWeight, value.Weight));
+        Assert.All(newDomains, value =>
+            AssertBitsEqual(incomingWeight, value.Weight));
+    }
+
+    [Fact]
+    public void ReviewFix_MultiSliceNaturalTerminalUsesOneFrozenOutgoingWeightForEverySlice()
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.6f);
+        var state = fixture.CreateActiveActionState(
+            definitionId: 0, segmentIndex: 0, time: 0.4f, laneWeight: 0.4f);
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        var domains = fixture.Playbacks
+            .Where(value => value.PlaybackEpoch > 0 && value.ActionId == 0)
+            .ToArray();
+        Assert.Equal(4, domains.Length);
+        Assert.Equal(2, fixture.ActionSlices.Count(value => value.ActionOccurrenceHandleId == 2));
+        var outgoingWeight = prepared.ActionGraph.OutgoingEffectiveWeight;
+        Assert.All(domains, value =>
+            AssertBitsEqual(outgoingWeight, value.Weight));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReviewFix_CommittedVisualTailRequiresExactFrozenProvenance(bool actionTail)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var lane = new AlsLaneBlendState
+        {
+            OutgoingOccurrenceHandleId = actionTail ? 999 : 1,
+            OutgoingAnimationId = actionTail ? 20 : 999,
+            OutgoingBindingIndex = actionTail ? 0 : 1,
+            OutgoingPlaybackEpoch = 1,
+            OutgoingClipTime = 0.2f,
+            LaneWeight = 0.5f,
+            IncomingMix = 0f,
+            BlendSeconds = 0.4f,
+            VisualActive = 1,
+            OutgoingActive = 1,
+        };
+        if (actionTail)
+        {
+            state.ActionBlendLane = lane;
+        }
+        else
+        {
+            state.DynamicTransitionBlendLane = lane;
+        }
+        var scratch = fixture.CreateScratch();
+
+        Assert.False(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out _, out var failure));
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+    }
+
+    [Theory]
+    [InlineData(P4ResultNonFiniteField.RootMotion)]
+    [InlineData(P4ResultNonFiniteField.PelvisTarget)]
+    [InlineData(P4ResultNonFiniteField.RotationIntent)]
+    [InlineData(P4ResultNonFiniteField.BlendCoordinates)]
+    [InlineData(P4ResultNonFiniteField.Turn)]
+    [InlineData(P4ResultNonFiniteField.FootPose)]
+    [InlineData(P4ResultNonFiniteField.PelvisOffset)]
+    [InlineData(P4ResultNonFiniteField.ProbeOrigin)]
+    public void ReviewFix_FinalizeRejectsEveryP4ResultNumericFamilyAsNonFiniteOutput(
+        P4ResultNonFiniteField field)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out _));
+        var p4 = AlsFrameResult.CreateDefault(input.Identity);
+        switch (field)
+        {
+            case P4ResultNonFiniteField.RootMotion:
+                p4.ProposedRootMotionDelta = new AlsRootMotionDelta(
+                    new Vector3(float.NaN, 0f, 0f), Quaternion.Identity);
+                break;
+            case P4ResultNonFiniteField.PelvisTarget:
+                p4.PelvisTarget = new Vector3(0f, float.NaN, 0f);
+                break;
+            case P4ResultNonFiniteField.RotationIntent:
+                p4.RotationIntent = new Quaternion(0f, 0f, float.NaN, 1f);
+                break;
+            case P4ResultNonFiniteField.BlendCoordinates:
+                p4.BlendCoordinates = new Vector2(float.NaN, 0f);
+                break;
+            case P4ResultNonFiniteField.Turn:
+                p4.TurnYawDelta = float.NaN;
+                break;
+            case P4ResultNonFiniteField.FootPose:
+                p4.LeftFootPose = p4.LeftFootPose with { LockAmount = float.NaN };
+                break;
+            case P4ResultNonFiniteField.PelvisOffset:
+                p4.PelvisOffset = new Vector3(float.NaN, 0f, 0f);
+                break;
+            case P4ResultNonFiniteField.ProbeOrigin:
+                p4.NextRightFootProbeOrigin = new Vector3(0f, 0f, float.NaN);
+                break;
+        }
+        var finalize = scratch;
+
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref finalize, in p4, in state, in ReviewFixture.ValidProbe,
+            out var owner, out var next, out var result, out var failure));
+        Assert.Equal(AlsP5FailureCode.NonFiniteOutput, failure);
+        Assert.Equal(0UL, owner);
+        Assert.Equal(default, next);
+        Assert.Equal(default, result);
+        Assert.Equal(AlsP5RuntimeScratchPhase.Empty, fixture.Control[0].Phase);
+    }
+
+    [Fact]
+    public void ReviewFix_FinalizeRejectsNonFiniteNestedP4StateAndConsumesExactToken()
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out _));
+        var p4 = AlsFrameResult.CreateDefault(input.Identity);
+        var postFoot = state;
+        postFoot.LeftFootLock = postFoot.LeftFootLock with
+        {
+            ProvenanceRotation = new Quaternion(float.NaN, 0f, 0f, 1f),
+        };
+        var finalize = scratch;
+
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref finalize, in p4, in postFoot, in ReviewFixture.ValidProbe,
+            out _, out _, out _, out var failure));
+        Assert.Equal(AlsP5FailureCode.NonFiniteOutput, failure);
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref finalize, in p4, in state, in ReviewFixture.ValidProbe,
+            out _, out _, out _, out var retryFailure));
+        Assert.Equal(AlsP5FailureCode.StalePreparedFrame, retryFailure);
+    }
+
+    [Fact]
+    public void ReviewFix_FinalizeRejectsCanonicalInvalidP4ResultAndState()
+    {
+        static void AssertInvalid(bool mutateResult)
+        {
+            var fixture = new ReviewFixture();
+            var bindings = fixture.CreateBindings();
+            var input = fixture.CreateInput(0.1f);
+            var state = AlsRuntimeState.CreateDefault();
+            var scratch = fixture.CreateScratch();
+            Assert.True(AlsP5Runtime.TryPrepare(
+                in bindings, in input, in state,
+                fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+                ref scratch, out var prepared, out _));
+            var p4 = AlsFrameResult.CreateDefault(input.Identity);
+            var postFoot = state;
+            if (mutateResult)
+            {
+                p4.TurnActive = 2;
+            }
+            else
+            {
+                postFoot.LeftFootLocked = 2;
+            }
+            var finalize = scratch;
+            Assert.False(AlsP5Runtime.TryFinalize(
+                prepared, ref finalize, in p4, in postFoot, in ReviewFixture.ValidProbe,
+                out _, out _, out _, out var failure));
+            Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+        }
+
+        AssertInvalid(mutateResult: true);
+        AssertInvalid(mutateResult: false);
+    }
+
+    [Fact]
+    public void ReviewFix_CooldownStillValidatesCurrentPhysicalProbe()
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        state.DynamicTransition.CooldownFrames = 1;
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out _));
+        var p4 = AlsFrameResult.CreateDefault(input.Identity);
+        var badProbe = ReviewFixture.ValidProbe with
+        {
+            LeftTarget = new Vector3(float.NaN, 0f, 0f),
+        };
+        var finalize = scratch;
+
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref finalize, in p4, in state, in badProbe,
+            out _, out _, out _, out var failure));
+        Assert.Equal(AlsP5FailureCode.NonFiniteInput, failure);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReviewFix_CapacityArithmeticCannotWrapAndInactiveControlMustBeCanonical(bool overflow)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        if (!overflow)
+        {
+            fixture.Control[0] = new AlsP5RuntimeScratchControl(77)
+            {
+                AttemptRevision = 5,
+                PreparedRevision = 4,
+                PreparedIdentity = input.Identity,
+                PreparedBindingDigest = 3,
+                PreparedLayoutDigest = 2,
+                Phase = AlsP5RuntimeScratchPhase.Empty,
+            };
+        }
+        var scratch = fixture.CreateScratch(
+            baseCapacity: overflow ? int.MaxValue : 1,
+            timelineLength: overflow ? 1 : -1);
+
+        Assert.False(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out _, out var failure));
+        Assert.Equal(AlsP5FailureCode.InvalidBinding, failure);
+        if (!overflow)
+        {
+            Assert.Equal(5UL, fixture.Control[0].AttemptRevision);
+            Assert.Equal(4UL, fixture.Control[0].PreparedRevision);
+        }
+    }
+
+    [Fact]
+    public void MandatoryMatrix_RapidActionReplacementDiscardsOlderTailAndClosesLogicalSource()
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var request = new AlsActionRequest(2, AlsActionCommand.Start, 1, 1, 1, 1);
+        var input = fixture.CreateInput(0.1f, request);
+        var state = fixture.CreateActiveActionState(0, 0, 0.2f, 0.6f);
+        state.ActionBlendLane = new AlsLaneBlendState
+        {
+            OutgoingOccurrenceHandleId = 6,
+            OutgoingAnimationId = 22,
+            OutgoingBindingIndex = 2,
+            OutgoingPlaybackEpoch = 1,
+            OutgoingClipTime = 0.2f,
+            LaneWeight = 0.6f,
+            IncomingMix = 0.5f,
+            BlendSeconds = 0.4f,
+            VisualActive = 1,
+            OutgoingActive = 1,
+        };
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        Assert.Equal(20, prepared.ActionGraph.Outgoing.AnimationId);
+        Assert.Equal(22, prepared.ActionGraph.Incoming.AnimationId);
+        Assert.DoesNotContain(fixture.Playbacks,
+            value => value.AnimationId == 22 && value.ClosesAfterWindow == 1);
+    }
+
+    [Fact]
+    public void MandatoryMatrix_ZeroBlendCancelFreezesClosingSourceBeforeCanonicalClear()
+    {
+        var fixture = new ReviewFixture();
+        fixture.ActionDefinitions =
+        [
+            fixture.ActionDefinitions[0] with { BlendSeconds = 0f },
+            fixture.ActionDefinitions[1],
+        ];
+        var bindings = fixture.CreateBindings();
+        var request = new AlsActionRequest(1, AlsActionCommand.Cancel, 0, -1, 0, 1);
+        var input = fixture.CreateInput(0.1f, request);
+        var state = fixture.CreateActiveActionState(0, 0, 0.2f, 1f);
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        Assert.Equal((byte)1, prepared.ActionGraph.Outgoing.Active);
+        AssertBitsEqual(0f, prepared.ActionGraph.OutgoingEffectiveWeight);
+        Assert.Equal(AlsLaneBlendState.CreateDefault(), scratch.CandidateActionBlendLane);
+    }
+
+    [Fact]
+    public void MandatoryMatrix_ValidActionTailFadesWithoutEnteringLogicalTimeline()
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        state.ActionBlendLane = new AlsLaneBlendState
+        {
+            OutgoingOccurrenceHandleId = 3,
+            OutgoingAnimationId = 20,
+            OutgoingBindingIndex = 0,
+            OutgoingPlaybackEpoch = 1,
+            OutgoingClipTime = 0.2f,
+            LaneWeight = 0.5f,
+            IncomingMix = 0f,
+            BlendSeconds = 0.4f,
+            VisualActive = 1,
+            OutgoingActive = 1,
+        };
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        Assert.Equal(20, prepared.ActionGraph.Outgoing.AnimationId);
+        Assert.Equal(0.25f, prepared.ActionGraph.OutgoingEffectiveWeight, 6);
+        Assert.DoesNotContain(fixture.Playbacks,
+            value => value.PlaybackEpoch > 0 && value.ActionId >= 0);
+    }
+
+    [Fact]
+    public void MandatoryMatrix_RejectedRequestPrecedesFrameEndEarlyBlendOut()
+    {
+        var fixture = new ReviewFixture();
+        fixture.TimelineDefinitions =
+        [
+            new AlsTimelineEventDefinition(
+                50, 10, 0, 2, AlsTimelineSourceKind.Montage, 0, 0, 0,
+                0f, 1f, 0f, AlsTimelineEventKind.EarlyBlendOut,
+                AlsTimelineTickMode.Queued,
+                new AlsCompactEventPayload(
+                    0, (int)AlsTimelineLocomotionMode.Grounded,
+                    (int)AlsTimelineRotationMode.LookingDirection,
+                    (int)AlsTimelineStance.Standing,
+                    0.3f, 1, AlsActionResultCode.None)),
+        ];
+        fixture.ActionTimelineRanges =
+        [
+            new(0, 0, 1),
+            new(1, 1, 0),
+        ];
+        var bindings = fixture.CreateBindings();
+        var request = new AlsActionRequest(2, AlsActionCommand.Start, 1, 1, 1, 1);
+        var input = fixture.CreateInput(0.1f, request, hasInput: 1);
+        var state = fixture.CreateActiveActionState(0, 0, 0.1f, 0.4f);
+        state.ActionPlayer.Priority = 5;
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+
+        var domains = fixture.Playbacks
+            .Where(value => value.PlaybackEpoch > 0 && value.ActionId == 0)
+            .ToArray();
+        Assert.Equal(2, domains.Length);
+        var incomingWeight = prepared.ActionGraph.IncomingEffectiveWeight;
+        Assert.All(domains, value =>
+            AssertBitsEqual(incomingWeight, value.Weight));
+
+        var p4Result = AlsFrameResult.CreateDefault(input.Identity);
+        var probe = CreateProbe();
+        Assert.True(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4Result, in state, in probe,
+            out _, out _, out var result, out failure), failure.ToString());
+        Assert.Equal(2, result.ActionOutcomes.Count);
+        Assert.Equal(AlsActionResultCode.RejectedLowerPriority,
+            result.ActionOutcomes[0].ResultCode);
+        Assert.Equal(AlsActionResultCode.InterruptedByEarlyBlendOut,
+            result.ActionOutcomes[1].ResultCode);
+    }
+
+    [Fact]
+    public void ReviewFix_BaseTurnRotateWeightsAreBitExactAndAuthorityIndependent()
+    {
+        var fixture = new ReviewFixture();
+        fixture.Base =
+        [
+            new(0, 0, 0, 1, 0d, 0.1d, 0d, 0.1d, 1f, 0.8f, 1, 1, 0),
+        ];
+        fixture.Turn =
+        [
+            new(7, 7, 6, 1, 0d, 0.1d, 0d, 0.1d, 1f, 0.6f, 1, 1, 0),
+        ];
+        fixture.Rotate =
+        [
+            new(8, 8, 7, 1, 0d, 0.1d, 0d, 0.1d, 1f, 0.4f, 1, 1, 0),
+        ];
+        fixture.FootBindings =
+        [
+            new(0, -1, -1, 0f, 0f),
+            new(7, -1, -1, 0f, 0f),
+            new(8, -1, -1, 0f, 0f),
+        ];
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f, actionBlend: 0.25f, actionModeBlend: 0.75f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch(baseCapacity: 3);
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out _, out var failure), failure.ToString());
+
+        AssertBitsEqual(0.8f * (1f - 0.25f), fixture.Playbacks[0].Weight);
+        AssertBitsEqual(0.6f * 0.25f * (1f - 0.75f), fixture.Playbacks[1].Weight);
+        AssertBitsEqual(0.4f * 0.25f * 0.75f, fixture.Playbacks[2].Weight);
+        Assert.Equal((0, 6, 7),
+            (fixture.Playbacks[0].AuthorityGroupId,
+                fixture.Playbacks[1].AuthorityGroupId,
+                fixture.Playbacks[2].AuthorityGroupId));
+    }
+
+    [Fact]
+    public void ReviewFix_ConfiguredPathDoesNotRescanUnrelatedImmutableActionDefinitions()
+    {
+        var fixture = new ReviewFixture();
+        fixture.ActionDefinitions =
+        [
+            .. fixture.ActionDefinitions,
+            new AlsActionDefinition(99, 99, 99, 99, 99, float.NaN, 99, 99, 0,
+                1f, 0.4f, 1, 0),
+        ];
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out _, out var failure), failure.ToString());
+    }
+
+    private static void AssertBitsEqual(float expected, float actual) =>
+        Assert.Equal(BitConverter.SingleToInt32Bits(expected), BitConverter.SingleToInt32Bits(actual));
+
+    public enum P4ResultNonFiniteField
+    {
+        RootMotion,
+        PelvisTarget,
+        RotationIntent,
+        BlendCoordinates,
+        Turn,
+        FootPose,
+        PelvisOffset,
+        ProbeOrigin,
+    }
+
     private static AlsDynamicTransitionInput CreateProbe() => new(
         AlsStance.Standing,
         0f,
@@ -835,6 +1443,322 @@ public sealed class AlsP5RuntimeTransactionTests
         private static AlsNotifyStateOwnership[] CreateOwnership(int count)
         {
             var values = new AlsNotifyStateOwnership[count];
+            for (var index = 0; index < values.Length; index++)
+            {
+                values[index] = AlsNotifyStateOwnership.CreateDefault();
+            }
+            return values;
+        }
+    }
+
+    private sealed class ReviewFixture
+    {
+        public static readonly AlsDynamicTransitionInput ValidProbe = new(
+            AlsStance.Standing, 0f, Vector3.Zero, Vector3.Zero, 0,
+            Vector3.Zero, Vector3.Zero, 0);
+
+        public AlsBasePlaybackDescriptor[] Base =
+        [
+            new(0, 0, 0, 1, 0d, 0.1d, 0d, 0.1d, 1f, 1f, 1, 1, 0),
+        ];
+        public AlsBasePlaybackDescriptor[] Turn = [];
+        public AlsBasePlaybackDescriptor[] Rotate = [];
+        public AlsP4FootCurveRuntimeBinding[] FootBindings =
+        [
+            new(0, -1, -1, 0f, 0f),
+        ];
+        public AlsDynamicTransitionBinding Transition = new(
+            1, 1,
+            new AlsDynamicTransitionClipBinding(1, 9, 1f),
+            new AlsDynamicTransitionClipBinding(2, 9, 1f),
+            new AlsDynamicTransitionClipBinding(3, 9, 1f),
+            new AlsDynamicTransitionClipBinding(4, 9, 1f),
+            0.5f, 0.4f, 1f, 2);
+        public AlsActionDefinition[] ActionDefinitions =
+        [
+            new(2, 2, 3, 0, 10, 1f, 0, 0, 1, 1f, 0.4f, 1, 0),
+            new(5, 4, 5, 1, 11, 1f, 1, 1, 1, 1f, 0.4f, 1, 0),
+        ];
+        public readonly AlsActionSectionBinding[] ActionSections =
+        [
+            new(0, 0, -1, 0f, 1f),
+            new(1, 1, -1, 0f, 1f),
+        ];
+        public readonly AlsActionSegmentBinding[] ActionSegments =
+        [
+            new(3, 0, 0, 0, 20, 0f, 0.5f, 0f, 0.5f, 1f, 1),
+            new(4, 0, 0, 1, 21, 0.5f, 1f, 0f, 0.5f, 1f, 1),
+            new(6, 1, 1, 2, 22, 0f, 1f, 0f, 1f, 1f, 1),
+        ];
+        public AlsActionTimelineRange[] ActionTimelineRanges =
+        [
+            new(0, 0, 0),
+            new(1, 0, 0),
+        ];
+        public AlsTimelineEventDefinition[] TimelineDefinitions = [];
+        public AlsSyncMarkerDefinition[] Markers = [];
+        public AlsSyncGroupBinding SyncGroup = new(0, 0, 1, 10, 11);
+        public AlsSyncMemberBinding[] SyncMembers = [new(0, 0, 1f, 1, 1)];
+        public AlsP5SyncOccurrenceBinding[] SyncOccurrences = [];
+        public readonly AlsCurveKey[] CurveKeys = [];
+        public readonly AlsCurveBinding[] CurveBindings = [];
+        public readonly AlsP5CurveBindingIdentity[] CurveIdentities = [];
+        public readonly AlsAnimationCurveRange[] CurveRanges;
+        public readonly int[] AllowIndices;
+
+        public readonly AlsP5RuntimeScratchControl[] Control = [new(77)];
+        public readonly AlsTimelineCursor[] CurrentCursors = new AlsTimelineCursor[9];
+        public readonly AlsTimelineAuthorityState[] CurrentAuthorities =
+            new AlsTimelineAuthorityState[8];
+        public readonly AlsNotifyStateOwnership[] CurrentOwnership = CreateOwnership();
+        public readonly AlsTimelineCursor[] CandidateCursors = new AlsTimelineCursor[9];
+        public readonly AlsTimelineAuthorityState[] CandidateAuthorities =
+            new AlsTimelineAuthorityState[8];
+        public readonly AlsNotifyStateOwnership[] CandidateOwnership = CreateOwnership();
+        public readonly AlsTimelineOccurrence[] Occurrences = new AlsTimelineOccurrence[16];
+        public readonly AlsActionTraversalSlice[] ActionSlices = new AlsActionTraversalSlice[16];
+        public readonly AlsTimelinePlayback[] Playbacks = new AlsTimelinePlayback[64];
+        public readonly AlsSyncPlayback[] SyncInput = new AlsSyncPlayback[8];
+        public readonly AlsSyncMappedPlayback[] SyncOutput = new AlsSyncMappedPlayback[8];
+        public readonly AlsCurveBlendSample[] CurveSamples = new AlsCurveBlendSample[16];
+
+        public ReviewFixture()
+        {
+            CurveRanges = new AlsAnimationCurveRange[32];
+            AllowIndices = new int[32];
+            Array.Fill(AllowIndices, -1);
+            for (var index = 0; index < CurveRanges.Length; index++)
+            {
+                CurveRanges[index] = new AlsAnimationCurveRange(index, 0, 0);
+            }
+            ResetTimelineState();
+        }
+
+        public void SetTransitionDuration(float duration)
+        {
+            Transition = Transition with
+            {
+                StandingLeft = Transition.StandingLeft with { DurationSeconds = duration },
+                StandingRight = Transition.StandingRight with { DurationSeconds = duration },
+                CrouchingLeft = Transition.CrouchingLeft with { DurationSeconds = duration },
+                CrouchingRight = Transition.CrouchingRight with { DurationSeconds = duration },
+            };
+        }
+
+        public AlsP5RuntimeBindings CreateBindings() => new(
+            1, 0x1234, 0x5678,
+            CurveKeys, CurveBindings, CurveIdentities, CurveRanges,
+            new AlsP5CurveSemanticPolicy(0f, AlsP5CurveCombineMode.AdditiveToDefault, 0f, 1f),
+            AllowIndices, FootBindings,
+            1f, 0f, 0f, 1f,
+            TimelineDefinitions, Markers, SyncGroup, SyncMembers, SyncOccurrences,
+            Transition, ActionDefinitions, ActionSections, ActionSegments, ActionTimelineRanges);
+
+        public AlsP5FrameInput CreateInput(
+            float delta,
+            AlsActionRequest? request = null,
+            byte recovery = 0,
+            byte hasInput = 0,
+            float actionBlend = 0f,
+            float actionModeBlend = 0f)
+        {
+            for (var index = 0; index < Base.Length; index++)
+            {
+                Base[index] = Base[index] with
+                {
+                    PreviousUnwrappedTimeSeconds = 0d,
+                    CurrentUnwrappedTimeSeconds = delta,
+                    FrameStartOffsetSeconds = 0d,
+                    FrameEndOffsetSeconds = delta,
+                    ActivatesAtFrameStart = 1,
+                };
+            }
+            for (var index = 0; index < Turn.Length; index++)
+            {
+                Turn[index] = Turn[index] with
+                {
+                    PreviousUnwrappedTimeSeconds = 0d,
+                    CurrentUnwrappedTimeSeconds = delta,
+                    FrameStartOffsetSeconds = 0d,
+                    FrameEndOffsetSeconds = delta,
+                    ActivatesAtFrameStart = 1,
+                };
+            }
+            for (var index = 0; index < Rotate.Length; index++)
+            {
+                Rotate[index] = Rotate[index] with
+                {
+                    PreviousUnwrappedTimeSeconds = 0d,
+                    CurrentUnwrappedTimeSeconds = delta,
+                    FrameStartOffsetSeconds = 0d,
+                    FrameEndOffsetSeconds = delta,
+                    ActivatesAtFrameStart = 1,
+                };
+            }
+            return new AlsP5FrameInput(
+                new AlsFrameIdentity(1, 0, 1), 0d, (double)delta, delta, 1,
+                request ?? AlsActionRequest.None, recovery, hasInput,
+                AlsTimelineLocomotionMode.Grounded,
+                AlsTimelineRotationMode.LookingDirection,
+                AlsTimelineStance.Standing,
+                new AlsP4CurveFrameInput(
+                    Base, Turn, Rotate, AlsAnimationState.Grounded,
+                    actionBlend, actionModeBlend));
+        }
+
+        public AlsRuntimeState CreateActiveActionState(
+            int definitionId,
+            int segmentIndex,
+            float time,
+            float laneWeight)
+        {
+            ResetTimelineState();
+            ref readonly var definition = ref ActionDefinitions[definitionId];
+            ref readonly var segment = ref ActionSegments[segmentIndex];
+            var state = AlsRuntimeState.CreateDefault();
+            state.ActionPlayer = new AlsActionPlayerState
+            {
+                ActionDefinitionId = definitionId,
+                SectionId = definition.StartSectionId,
+                SegmentBindingIndex = segmentIndex,
+                RequestId = 1,
+                LastProcessedRequestId = 1,
+                LastProcessedCommandRequestId = 1,
+                LastProcessedCommand = AlsActionCommand.Start,
+                PlaybackEpoch = 1,
+                PlaybackTime = time,
+                Priority = 1,
+                Playing = 1,
+                Interruptible = 1,
+            };
+            state.ActionBlendLane = CreateIncomingOnlyLane(laneWeight);
+            CurrentCursors[definition.OccurrenceHandleId] = new AlsTimelineCursor
+            {
+                OccurrenceHandleId = definition.OccurrenceHandleId,
+                AnimationId = definition.MontageId,
+                ActionId = definitionId,
+                PlaybackEpoch = 1,
+                ConsumedUnwrappedTimeSeconds = time,
+            };
+            CurrentCursors[segment.OccurrenceHandleId] = new AlsTimelineCursor
+            {
+                OccurrenceHandleId = segment.OccurrenceHandleId,
+                AnimationId = segment.AnimationId,
+                ActionId = definitionId,
+                PlaybackEpoch = 1,
+                ConsumedUnwrappedTimeSeconds = time,
+            };
+            CurrentAuthorities[definition.MontageAuthorityGroupId] = new AlsTimelineAuthorityState
+            {
+                GroupId = definition.MontageAuthorityGroupId,
+                OccurrenceHandleId = definition.OccurrenceHandleId,
+                AnimationId = definition.MontageId,
+                ActionId = definitionId,
+                PlaybackEpoch = 1,
+                Active = 1,
+            };
+            CurrentAuthorities[definition.SequenceAuthorityGroupId] = new AlsTimelineAuthorityState
+            {
+                GroupId = definition.SequenceAuthorityGroupId,
+                OccurrenceHandleId = segment.OccurrenceHandleId,
+                AnimationId = segment.AnimationId,
+                ActionId = definitionId,
+                PlaybackEpoch = 1,
+                Active = 1,
+            };
+            return state;
+        }
+
+        public AlsRuntimeState CreateActiveTransitionState(
+            int animationId,
+            AlsTransitionFoot foot,
+            float time,
+            float laneWeight,
+            int queuedAnimationId = -1,
+            AlsTransitionFoot queuedFoot = AlsTransitionFoot.Left)
+        {
+            ResetTimelineState();
+            var state = AlsRuntimeState.CreateDefault();
+            state.DynamicTransition = new AlsDynamicTransitionState
+            {
+                AnimationId = animationId,
+                QueuedAnimationId = queuedAnimationId,
+                PlaybackEpoch = 1,
+                PreviousPlaybackTime = time,
+                PlaybackTime = time,
+                Foot = foot,
+                QueuedFoot = queuedFoot,
+                Active = 1,
+                Queued = queuedAnimationId >= 0 ? (byte)1 : (byte)0,
+            };
+            state.DynamicTransitionBlendLane = CreateIncomingOnlyLane(laneWeight);
+            CurrentCursors[1] = new AlsTimelineCursor
+            {
+                OccurrenceHandleId = 1,
+                AnimationId = animationId,
+                ActionId = -1,
+                PlaybackEpoch = 1,
+                ConsumedUnwrappedTimeSeconds = time,
+            };
+            CurrentAuthorities[1] = new AlsTimelineAuthorityState
+            {
+                GroupId = 1,
+                OccurrenceHandleId = 1,
+                AnimationId = animationId,
+                ActionId = -1,
+                PlaybackEpoch = 1,
+                Active = 1,
+            };
+            return state;
+        }
+
+        public AlsP5RuntimeScratch CreateScratch(
+            int baseCapacity = 1,
+            int maximumBaseContributorCount = 8,
+            int timelineLength = -1) => new(
+            baseCapacity,
+            maximumBaseContributorCount,
+            Control,
+            CandidateCursors,
+            CandidateAuthorities,
+            CandidateOwnership,
+            Occurrences,
+            ActionSlices,
+            timelineLength < 0 ? Playbacks : Playbacks.AsSpan(0, timelineLength),
+            SyncInput,
+            SyncOutput,
+            CurveSamples);
+
+        private void ResetTimelineState()
+        {
+            for (var index = 0; index < CurrentCursors.Length; index++)
+            {
+                CurrentCursors[index] = AlsTimelineCursor.CreateDefault();
+                CandidateCursors[index] = AlsTimelineCursor.CreateDefault();
+            }
+            for (var index = 0; index < CurrentAuthorities.Length; index++)
+            {
+                CurrentAuthorities[index] = AlsTimelineAuthorityState.CreateDefault(index);
+                CandidateAuthorities[index] = AlsTimelineAuthorityState.CreateDefault(index);
+            }
+            Array.Clear(Playbacks);
+            Array.Clear(ActionSlices);
+        }
+
+        private static AlsLaneBlendState CreateIncomingOnlyLane(float weight) => new()
+        {
+            OutgoingOccurrenceHandleId = -1,
+            OutgoingAnimationId = -1,
+            OutgoingBindingIndex = -1,
+            LaneWeight = weight,
+            IncomingMix = 1f,
+            BlendSeconds = 0.4f,
+            VisualActive = 1,
+        };
+
+        private static AlsNotifyStateOwnership[] CreateOwnership()
+        {
+            var values = new AlsNotifyStateOwnership[AlsEventBuffer.Capacity];
             for (var index = 0; index < values.Length; index++)
             {
                 values[index] = AlsNotifyStateOwnership.CreateDefault();

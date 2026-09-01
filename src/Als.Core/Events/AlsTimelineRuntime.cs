@@ -25,10 +25,48 @@ public static class AlsTimelineRuntime
         Span<AlsTimelineOccurrence> scratch,
         ref AlsEventBuffer events,
         out AlsP5FailureCode failure)
+        => TryEvaluateCore(
+            definitions, playbacks, true, frameId, frameStartTimeSeconds,
+            frameEndTimeSeconds, cursors, authorities, ownership,
+            ref nextOwnerToken, scratch, ref events, out failure);
+
+    internal static bool TryEvaluateConfigured(
+        ReadOnlySpan<AlsTimelineEventDefinition> definitions,
+        ReadOnlySpan<AlsTimelinePlayback> playbacks,
+        long frameId,
+        double frameStartTimeSeconds,
+        double frameEndTimeSeconds,
+        Span<AlsTimelineCursor> cursors,
+        Span<AlsTimelineAuthorityState> authorities,
+        Span<AlsNotifyStateOwnership> ownership,
+        ref ulong nextOwnerToken,
+        Span<AlsTimelineOccurrence> scratch,
+        ref AlsEventBuffer events,
+        out AlsP5FailureCode failure)
+        => TryEvaluateCore(
+            definitions, playbacks, false, frameId, frameStartTimeSeconds,
+            frameEndTimeSeconds, cursors, authorities, ownership,
+            ref nextOwnerToken, scratch, ref events, out failure);
+
+    private static bool TryEvaluateCore(
+        ReadOnlySpan<AlsTimelineEventDefinition> definitions,
+        ReadOnlySpan<AlsTimelinePlayback> playbacks,
+        bool validateImmutable,
+        long frameId,
+        double frameStartTimeSeconds,
+        double frameEndTimeSeconds,
+        Span<AlsTimelineCursor> cursors,
+        Span<AlsTimelineAuthorityState> authorities,
+        Span<AlsNotifyStateOwnership> ownership,
+        ref ulong nextOwnerToken,
+        Span<AlsTimelineOccurrence> scratch,
+        ref AlsEventBuffer events,
+        out AlsP5FailureCode failure)
     {
         failure = AlsP5FailureCode.None;
 
-        if (!ValidateDefinitions(definitions, cursors.Length, out failure) ||
+        if (validateImmutable &&
+                !ValidateDefinitions(definitions, cursors.Length, out failure) ||
             !ValidatePlaybackShapes(playbacks, cursors.Length, authorities.Length, out failure))
         {
             return false;
@@ -46,7 +84,7 @@ public static class AlsTimelineRuntime
         }
 
         if (!ValidatePlaybacks(playbacks, frameDuration, out failure) ||
-            !ValidateDefinitionBindings(definitions, playbacks, out failure) ||
+            validateImmutable && !ValidateDefinitionBindings(definitions, playbacks, out failure) ||
             !ValidatePlaybackSequences(playbacks, cursors, out failure) ||
             !ValidatePersistentState(definitions, playbacks, cursors, authorities, ownership, out failure) ||
             !ValidateOwnerToken(ownership, nextOwnerToken, out failure) ||
