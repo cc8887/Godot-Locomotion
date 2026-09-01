@@ -13,6 +13,7 @@ namespace GodotAls.Import.Compilation;
 public static class AlsP5CoreRuntimeBindingCompiler
 {
     private const int Version = 1;
+    private const int MaximumExpandedTimelineEntries = 1_000_000;
 
     private static readonly string[] CanonicalBaseAnimationStableIds =
     [
@@ -69,6 +70,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         ArgumentNullException.ThrowIfNull(layout);
 
         ValidateDefinitionDigest(animationSet);
+        ValidateAuthoritativeAnimationSet(animationSet);
         var animations = animationSet.Animations;
         ValidateAnimationTable(animations);
         ValidateExactLayout(locomotion, pose, p5a, layout);
@@ -158,6 +160,21 @@ public static class AlsP5CoreRuntimeBindingCompiler
         {
             throw new ArgumentException("The animation-set definition digest is stale or noncanonical.",
                 nameof(animationSet));
+        }
+    }
+
+    private static void ValidateAuthoritativeAnimationSet(AlsAnimationSetDefinition animationSet)
+    {
+        try
+        {
+            _ = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(animationSet));
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new ArgumentException(
+                "The animation set failed authoritative payload validation.",
+                nameof(animationSet),
+                exception);
         }
     }
 
@@ -342,6 +359,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         {
             throw new ArgumentException("The frozen P3/P4 graph topology is incomplete.");
         }
+        ValidateP3P4ReferenceBounds(animationSet, locomotion, pose, baseAnimationIds, turns, rotates);
         ValidateP3P4Provenance(animationSet, locomotion, pose, skeleton, baseAnimationIds);
         standingSamples = MapSamples(locomotion.StandingSamples, animations, locomotion.SkeletonId);
         crouchingSamples = MapSamples(locomotion.CrouchingSamples, animations, locomotion.SkeletonId);
@@ -402,6 +420,54 @@ public static class AlsP5CoreRuntimeBindingCompiler
         }
 
         CompileMasks(pose.Masks, skeleton, out maskHeaders, out logicalBoneIds);
+    }
+
+    private static void ValidateP3P4ReferenceBounds(
+        AlsAnimationSetDefinition set,
+        AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose,
+        int[] baseAnimationIds,
+        AlsTurnProfile[] turns,
+        AlsRotateProfile[] rotates)
+    {
+        static void RequireAnimation(int animationId, int animationCount)
+        {
+            if ((uint)animationId >= (uint)animationCount)
+            {
+                throw new ArgumentException("A P3/P4 animation ID is out of bounds.");
+            }
+        }
+
+        foreach (var animationId in baseAnimationIds)
+        {
+            RequireAnimation(animationId, set.Animations.Length);
+        }
+        foreach (var sample in locomotion.LeanAdditiveSamples)
+        {
+            if (sample is null)
+            {
+                throw new ArgumentException("A P3 Lean sample is null.");
+            }
+            RequireAnimation(sample.AnimationId, set.Animations.Length);
+        }
+        RequireAnimation(locomotion.LeanAdditiveBasePoseAnimationId, set.Animations.Length);
+
+        if ((uint)pose.Aim.AimOffsetId >= (uint)set.AimOffsets.Length)
+        {
+            throw new ArgumentException("The P4 AimOffset ID is out of bounds.");
+        }
+        RequireAnimation(pose.Aim.DownAnimationId, set.Animations.Length);
+        RequireAnimation(pose.Aim.ForwardAnimationId, set.Animations.Length);
+        RequireAnimation(pose.Aim.UpAnimationId, set.Animations.Length);
+        RequireAnimation(pose.Aim.AdditiveBasePoseAnimationId, set.Animations.Length);
+        foreach (var turn in turns)
+        {
+            RequireAnimation(turn.AnimationId, set.Animations.Length);
+        }
+        foreach (var rotate in rotates)
+        {
+            RequireAnimation(rotate.AnimationId, set.Animations.Length);
+        }
     }
 
     private static void ValidateP3P4Provenance(
@@ -1323,6 +1389,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
     {
         var expectedSegments = new List<AlsCompiledActionSegmentBinding>();
         var expectedTimeline = new List<AlsCompiledActionTimelineEntry>();
+        long expandedTimelineEntries = 0;
         for (var actionIndex = 0; actionIndex < p5a.Actions.Length; actionIndex++)
         {
             var action = p5a.Actions[actionIndex];
@@ -1370,15 +1437,29 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 var montageEnd = segmentIndex + 1 < slot.Segments.Length
                     ? slot.Segments[segmentIndex + 1].StartPosition
                     : montage.PlayLength;
-                var mappedDuration = (double)segment.LoopCount *
-                    ((double)segment.AnimationEndTime - segment.AnimationStartTime) / segment.PlayRate;
                 if (animation.AdditiveType != 0 || segment.LoopCount <= 0 || segment.LoopCount == int.MaxValue ||
                     !Positive(segment.PlayRate) || !Finite(segment.StartPosition) ||
                     !Finite(segment.AnimationStartTime) || !Finite(segment.AnimationEndTime) ||
                     segment.StartPosition < 0f || segment.AnimationStartTime < 0f ||
                     segment.AnimationEndTime <= segment.AnimationStartTime ||
-                    segment.AnimationEndTime > animation.PlayLength + 1e-6f ||
-                    !Finite(montageEnd) || montageEnd <= segment.StartPosition ||
+                    segment.AnimationEndTime > animation.PlayLength + 1e-6f)
+                {
+                    throw new ArgumentException("A current Action segment mapping equation is invalid.");
+                }
+                long estimatedEntries;
+                try
+                {
+                    estimatedEntries = checked((long)segment.LoopCount * animation.Timeline.Length);
+                }
+                catch (OverflowException exception)
+                {
+                    throw new ArgumentException("The Action timeline expansion budget overflowed.", exception);
+                }
+                AddActionTimelineBudget(ref expandedTimelineEntries, estimatedEntries);
+                var mappedDuration = (double)segment.LoopCount *
+                    ((double)segment.AnimationEndTime - segment.AnimationStartTime) / segment.PlayRate;
+                if (!double.IsFinite(mappedDuration) || !Finite(montageEnd) ||
+                    montageEnd <= segment.StartPosition ||
                     montageEnd > montage.PlayLength + 1e-6f ||
                     Math.Abs(((double)montageEnd - segment.StartPosition) - mappedDuration) > 1e-8)
                 {
@@ -1404,6 +1485,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
                     throw new ArgumentException("An Action section is not covered by current segments.");
             }
 
+            AddActionTimelineBudget(ref expandedTimelineEntries, montage.Timeline.Length);
             foreach (var value in montage.Timeline)
             {
                 ValidateTimelineSource(value, montage.Id, montage.PlayLength);
@@ -1468,6 +1550,10 @@ public static class AlsP5CoreRuntimeBindingCompiler
         AlsAnimationDefinition animation,
         List<AlsCompiledActionTimelineEntry> output)
     {
+        if (animation.Timeline.Length == 0)
+        {
+            return;
+        }
         var sourceRange = (double)segment.AnimationEndTime - segment.AnimationStartTime;
         var loopDuration = sourceRange / segment.PlayRate;
         for (var iteration = 0; iteration < segment.LoopCount; iteration++)
@@ -1500,6 +1586,25 @@ public static class AlsP5CoreRuntimeBindingCompiler
                     mappedBegin, mappedEnd - mappedBegin, ordinal));
             }
         }
+    }
+
+    private static void AddActionTimelineBudget(ref long current, long additional)
+    {
+        long total;
+        try
+        {
+            total = checked(current + additional);
+        }
+        catch (OverflowException exception)
+        {
+            throw new ArgumentException("The Action timeline expansion budget overflowed.", exception);
+        }
+        if (total > MaximumExpandedTimelineEntries)
+        {
+            throw new ArgumentException(
+                $"The Action timeline expansion budget exceeds {MaximumExpandedTimelineEntries} entries.");
+        }
+        current = total;
     }
 
     private static float MapActionTime(
@@ -1692,12 +1797,9 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 value.LocomotionMode != AlsCompiledTimelineLocomotionMode.Grounded ||
                 value.RotationMode != AlsCompiledTimelineRotationMode.VelocityDirection ||
                 value.Stance != AlsCompiledTimelineStance.Standing) ||
-            !earlyUnused && (!value.CheckLocomotionMode &&
-                    value.LocomotionMode != AlsCompiledTimelineLocomotionMode.Grounded ||
-                !value.CheckRotationMode &&
-                    value.RotationMode != AlsCompiledTimelineRotationMode.VelocityDirection ||
-                !value.CheckStance && value.Stance != AlsCompiledTimelineStance.Standing) ||
-            translationUnused && BitConverter.SingleToUInt32Bits(value.TranslationScale) != 0)
+            !earlyUnused && value.BlendOutSeconds < 0f ||
+            translationUnused && BitConverter.SingleToUInt32Bits(value.TranslationScale) != 0 ||
+            !translationUnused && value.TranslationScale < 0f)
         {
             throw new ArgumentException("A timeline payload contains noncanonical unused fields.");
         }
@@ -1784,7 +1886,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
     private static bool Finite(float value) => float.IsFinite(value);
     private static bool Positive(float value) => float.IsFinite(value) && value > 0f;
 
-    private static ulong ComputeBindingDigest(
+    internal static ulong ComputeBindingDigest(
         ulong layoutDigest,
         AlsCurveKey[] curveKeys,
         AlsCurveBinding[] curveBindings,
@@ -1843,7 +1945,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         return writer.Value;
     }
 
-    private static ulong ComputeGraphDigest(
+    internal static ulong ComputeGraphDigest(
         int skeletonId, int meshId, int logicalRoot, int physicalRoot,
         AlsPresentationDefinition presentation, int standingIdle, int crouchingIdle,
         int jump, int fall, int land, int leanBase, AlsP5GraphSample[] standing,
