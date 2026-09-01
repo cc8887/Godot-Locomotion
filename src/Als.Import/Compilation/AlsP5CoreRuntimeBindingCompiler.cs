@@ -194,7 +194,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 locomotion.LeanAdditiveSamples.Any(value => value is null) ||
                 pose.Masks is null || pose.FootCurves is null)
             {
-                throw new ArgumentException("A P3/P4 profile contains a null required shape.");
+                throw new ArgumentException(
+                    "Runtime profile shape validation failed: a P3/P4 profile contains a null required shape.");
             }
 
             var turns = pose.Turns;
@@ -204,7 +205,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
             if (turns is null || rotates is null || maskEntries is null || footBindings is null ||
                 maskEntries.Any(value => value is null || value.BoneIds is null))
             {
-                throw new ArgumentException("A P4 profile contains a null required row.");
+                throw new ArgumentException(
+                    "Runtime profile shape validation failed: a P4 profile contains a null required row.");
             }
 
             var eventSemantics = p5a.EventSemantics;
@@ -220,12 +222,15 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 syncGroups.Any(value => value is null || value.Members is null) ||
                 actions.Any(value => value is null || value.Sections is null))
             {
-                throw new ArgumentException("The P5A profile contains a null required shape or row.");
+                throw new ArgumentException(
+                    "Runtime profile shape validation failed: the P5A profile contains a null required shape or row.");
             }
         }
         catch (Exception exception) when (exception is NullReferenceException or ArgumentNullException)
         {
-            throw new ArgumentException("A runtime profile contains a null required shape.", exception);
+            throw new ArgumentException(
+                "Runtime profile shape validation failed: a runtime profile contains a null required shape.",
+                exception);
         }
     }
 

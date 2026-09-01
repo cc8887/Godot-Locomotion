@@ -860,6 +860,40 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
     }
 
     [Fact]
+    public void NullLegacyCurveNameRejectsInTypedCanonicalPhaseBeforeDigest()
+    {
+        var fixture = Fixture.Create();
+        var malformed = WithLegacyCurveNames(fixture.Set, [null!]);
+        Assert.Throws<InvalidDataException>(() => AlsAnimationSetPayload.Deserialize(
+            AlsAnimationSetPayload.Serialize(malformed)));
+
+        AssertTypedSetFailureBeforeDigest(fixture, malformed);
+    }
+
+    [Fact]
+    public void IllFormedUtf16SourceNameCollisionRejectsInTypedCanonicalPhase()
+    {
+        var fixture = Fixture.Create();
+        var malformed = WithOrdinarySourceCurves(fixture.Set, "\uD800", "\uFFFD");
+        Assert.Throws<InvalidDataException>(() => AlsAnimationSetPayload.Deserialize(
+            AlsAnimationSetPayload.Serialize(malformed)));
+
+        AssertTypedSetFailureBeforeDigest(fixture, malformed);
+    }
+
+    [Fact]
+    public void SupplementaryUnicodeScalarRemainsCanonicalAndCompiles()
+    {
+        var fixture = Fixture.Create();
+        var source = RefreshDigest(WithLegacyCurveNames(fixture.Set, ["Curve_\U0001F680"]));
+        var roundTripped = AlsAnimationSetPayload.Deserialize(AlsAnimationSetPayload.Serialize(source));
+        Assert.Contains(roundTripped.Animations,
+            value => value.LegacyCurveNames.SequenceEqual(["Curve_\U0001F680"]));
+
+        _ = fixture.Compile(set: source);
+    }
+
+    [Fact]
     public void EmptyActionTimelineWithHugeLoopReturnsImmediately()
     {
         var fixture = Fixture.Create();
@@ -942,7 +976,12 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
             () => fixture.Compile(p5a: fixture.P5a with { Actions = [null!] }),
         };
 
-        Assert.All(failures, failure => Assert.IsType<ArgumentException>(Record.Exception(failure)));
+        Assert.All(failures, failure =>
+        {
+            var exception = Assert.IsType<ArgumentException>(Record.Exception(failure));
+            Assert.Contains("profile shape validation", exception.Message,
+                StringComparison.OrdinalIgnoreCase);
+        });
     }
 
     [Fact]
@@ -1719,6 +1758,52 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
         var exception = Assert.Throws<ArgumentException>(() => fixture.Compile(set: source));
         Assert.Equal("animationSet", exception.ParamName);
         Assert.True(exception.InnerException is InvalidDataException, exception.ToString());
+    }
+
+    private static void AssertTypedSetFailureBeforeDigest(
+        Fixture fixture,
+        AlsAnimationSetDefinition source)
+    {
+        Assert.Equal(fixture.Set.DefinitionDigest, source.DefinitionDigest);
+        var exception = Assert.Throws<ArgumentException>(() => fixture.Compile(set: source));
+        Assert.Equal("animationSet", exception.ParamName);
+        Assert.IsType<InvalidDataException>(exception.InnerException);
+    }
+
+    private static AlsAnimationSetDefinition WithLegacyCurveNames(
+        AlsAnimationSetDefinition source,
+        string[] legacyCurveNames)
+    {
+        var animations = source.Animations.ToArray();
+        var animationId = Array.FindIndex(animations,
+            value => value.Curves.Length == 0 && value.LegacyCurveNames.Length == 0);
+        Assert.True(animationId >= 0);
+        animations[animationId] = animations[animationId] with { LegacyCurveNames = legacyCurveNames };
+        return source with { Animations = animations };
+    }
+
+    private static AlsAnimationSetDefinition WithOrdinarySourceCurves(
+        AlsAnimationSetDefinition source,
+        string firstSourceName,
+        string secondSourceName)
+    {
+        var animations = source.Animations.ToArray();
+        var animationId = Array.FindIndex(animations,
+            value => value.Curves.Length == 0 && value.LegacyCurveNames.Length == 0);
+        Assert.True(animationId >= 0);
+        var key = new AlsFloatCurveKeyDefinition(
+            0f, 0f, 0f, 0f, AlsCurveInterpolation.Linear);
+        animations[animationId] = animations[animationId] with
+        {
+            Curves =
+            [
+                new AlsFloatCurveDefinition(0, AlsCanonicalCurveKind.None, firstSourceName,
+                    AlsCurveProvenance.SourceCurve, [key]),
+                new AlsFloatCurveDefinition(1, AlsCanonicalCurveKind.None, secondSourceName,
+                    AlsCurveProvenance.SourceCurve, [key]),
+            ],
+        };
+        return source with { Animations = animations };
     }
 
     private static void AssertActionReconstructionFailure(

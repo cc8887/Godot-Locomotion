@@ -89,6 +89,14 @@ public sealed record AlsAnimationSetPayload(
         ArgumentNullException.ThrowIfNull(definition);
         try
         {
+            using (var writer = new BinaryWriter(
+                       Stream.Null,
+                       new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true),
+                       leaveOpen: true))
+            {
+                WriteDefinition(writer, definition);
+            }
+
             var payload = FromDefinition(definition);
             payload.ValidateAnimationCurves();
             payload.ValidateP5aDefinitions();
