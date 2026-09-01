@@ -1483,6 +1483,90 @@ public sealed class AlsP5RuntimeTransactionTests
             out _, out _, out _, out var failure), failure.ToString());
     }
 
+    [Theory]
+    [InlineData(InactivePoseStateDefect.ZeroActivationTurnRetainsStance)]
+    [InlineData(InactivePoseStateDefect.InactiveRotateRetainsStance)]
+    public void Fix5_FinalizeRejectsUnreachableInactivePoseStateAndConsumesToken(
+        InactivePoseStateDefect defect)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
+        var postFoot = state;
+        if (defect == InactivePoseStateDefect.ZeroActivationTurnRetainsStance)
+        {
+            postFoot.TurnInPlace = postFoot.TurnInPlace with { Stance = AlsStance.Crouching };
+        }
+        else
+        {
+            postFoot.RotateInPlace = postFoot.RotateInPlace with { Stance = AlsStance.Crouching };
+        }
+        var p4 = CreateCanonicalP4Result(input.Identity);
+
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in postFoot, in ReviewFixture.ValidProbe,
+            out var owner, out var next, out var result, out var failure));
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+        Assert.Equal(0UL, owner);
+        Assert.Equal(default, next);
+        Assert.Equal(default, result);
+        Assert.Equal(AlsP5RuntimeScratchPhase.Empty, fixture.Control[0].Phase);
+
+        Assert.False(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in postFoot, in ReviewFixture.ValidProbe,
+            out owner, out next, out result, out failure));
+        Assert.Equal(AlsP5FailureCode.StalePreparedFrame, failure);
+        Assert.Equal(0UL, owner);
+        Assert.Equal(default, next);
+        Assert.Equal(default, result);
+    }
+
+    [Theory]
+    [InlineData(InactivePoseStateControl.CompleteDefaultTurn)]
+    [InlineData(InactivePoseStateControl.CompleteDefaultRotate)]
+    [InlineData(InactivePoseStateControl.PendingCrouchingTurn)]
+    public void Fix5_FinalizeAcceptsReachableInactivePoseState(
+        InactivePoseStateControl control)
+    {
+        var fixture = new ReviewFixture();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(0.1f);
+        var state = AlsRuntimeState.CreateDefault();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var prepareFailure), prepareFailure.ToString());
+        var postFoot = state;
+        var p4 = CreateCanonicalP4Result(input.Identity);
+        switch (control)
+        {
+            case InactivePoseStateControl.CompleteDefaultTurn:
+                Assert.Equal(default, postFoot.TurnInPlace);
+                break;
+            case InactivePoseStateControl.CompleteDefaultRotate:
+                Assert.Equal(default, postFoot.RotateInPlace);
+                break;
+            case InactivePoseStateControl.PendingCrouchingTurn:
+                p4.ActualStance = AlsStance.Crouching;
+                p4.ActualRotationMode = AlsRotationMode.LookingDirection;
+                postFoot.YawSource = AlsYawSource.Locomotion;
+                postFoot.TurnInPlace = new AlsTurnInPlaceState(
+                    0.25f, 0f, 0f, 0f, 0, 0, 0, AlsStance.Crouching);
+                break;
+        }
+
+        Assert.True(AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, in p4, in postFoot, in ReviewFixture.ValidProbe,
+            out _, out _, out _, out var failure), failure.ToString());
+    }
+
     [Fact]
     public void Fix2_FootReleaseStateTwoIsCanonicalAndTopLevelLockRemainsClear()
     {
@@ -2805,6 +2889,19 @@ public sealed class AlsP5RuntimeTransactionTests
         PendingTurn,
         ActiveRotate,
         CrouchingTerminalTurn,
+    }
+
+    public enum InactivePoseStateDefect
+    {
+        ZeroActivationTurnRetainsStance,
+        InactiveRotateRetainsStance,
+    }
+
+    public enum InactivePoseStateControl
+    {
+        CompleteDefaultTurn,
+        CompleteDefaultRotate,
+        PendingCrouchingTurn,
     }
 
     public enum P4ResultCanonicalDefect
