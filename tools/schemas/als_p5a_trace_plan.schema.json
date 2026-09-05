@@ -1,0 +1,1990 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ALS P5A trace plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "fixedDeltaSeconds",
+    "reference",
+    "units",
+    "snapshot",
+    "upstreamP4Contract",
+    "sources",
+    "eventMap",
+    "markerMap",
+    "sectionMap",
+    "nativeOnlyEventMap",
+    "cases"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    "kind": {
+      "const": "p5a_trace_plan"
+    },
+    "fixedDeltaSeconds": {
+      "type": "number",
+      "minimum": -3.4028235e+38,
+      "maximum": 3.4028235e+38
+    },
+    "reference": {
+      "$ref": "#/$defs/o19"
+    },
+    "units": {
+      "$ref": "#/$defs/o5"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/o6"
+    },
+    "upstreamP4Contract": {
+      "type": "string",
+      "enum": [
+        "canonical_p4_success_v1"
+      ],
+      "maxLength": 4096
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "$ref": "#/$defs/o15"
+      }
+    },
+    "eventMap": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/o13"
+      }
+    },
+    "markerMap": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/o14"
+      }
+    },
+    "sectionMap": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "$ref": "#/$defs/o2"
+      }
+    },
+    "nativeOnlyEventMap": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "$ref": "#/$defs/o20"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 0
+            },
+            "caseId": {
+              "const": "grounded_marker_interval"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 41,
+              "maxItems": 41,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 1
+            },
+            "caseId": {
+              "const": "authority_tie"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 2
+            },
+            "caseId": {
+              "const": "standing_transition_left"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 33,
+              "maxItems": 33,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 3
+            },
+            "caseId": {
+              "const": "standing_transition_right"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 33,
+              "maxItems": 33,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 4
+            },
+            "caseId": {
+              "const": "crouching_transition_reuse"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 33,
+              "maxItems": 33,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 5
+            },
+            "caseId": {
+              "const": "roll_default_section"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 104,
+              "maxItems": 104,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 6
+            },
+            "caseId": {
+              "const": "montage_owned_notify"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 69,
+              "maxItems": 69,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "caseId",
+            "frames"
+          ],
+          "properties": {
+            "ordinal": {
+              "const": 7
+            },
+            "caseId": {
+              "const": "segment_sequence_notify_state"
+            },
+            "frames": {
+              "type": "array",
+              "minItems": 58,
+              "maxItems": 58,
+              "items": {
+                "$ref": "#/$defs/o25"
+              }
+            }
+          }
+        }
+      ],
+      "items": false
+    }
+  },
+  "$defs": {
+    "o17": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "fixedDeltaSeconds",
+        "reference",
+        "units",
+        "snapshot",
+        "upstreamP4Contract",
+        "sources",
+        "eventMap",
+        "markerMap",
+        "sectionMap",
+        "nativeOnlyEventMap",
+        "cases"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "p5a_trace_plan"
+          ],
+          "maxLength": 4096
+        },
+        "fixedDeltaSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "reference": {
+          "$ref": "#/$defs/o19"
+        },
+        "units": {
+          "$ref": "#/$defs/o5"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/o6"
+        },
+        "upstreamP4Contract": {
+          "type": "string",
+          "enum": [
+            "canonical_p4_success_v1"
+          ],
+          "maxLength": 4096
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "$ref": "#/$defs/o15"
+          }
+        },
+        "eventMap": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/o13"
+          }
+        },
+        "markerMap": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/o14"
+          }
+        },
+        "sectionMap": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/o2"
+          }
+        },
+        "nativeOnlyEventMap": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "$ref": "#/$defs/o20"
+          }
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "prefixItems": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 0
+                },
+                "caseId": {
+                  "const": "grounded_marker_interval"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 41,
+                  "maxItems": 41,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 1
+                },
+                "caseId": {
+                  "const": "authority_tie"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 2
+                },
+                "caseId": {
+                  "const": "standing_transition_left"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 33,
+                  "maxItems": 33,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 3
+                },
+                "caseId": {
+                  "const": "standing_transition_right"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 33,
+                  "maxItems": 33,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 4
+                },
+                "caseId": {
+                  "const": "crouching_transition_reuse"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 33,
+                  "maxItems": 33,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 5
+                },
+                "caseId": {
+                  "const": "roll_default_section"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 104,
+                  "maxItems": 104,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 6
+                },
+                "caseId": {
+                  "const": "montage_owned_notify"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 69,
+                  "maxItems": 69,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ordinal",
+                "caseId",
+                "frames"
+              ],
+              "properties": {
+                "ordinal": {
+                  "const": 7
+                },
+                "caseId": {
+                  "const": "segment_sequence_notify_state"
+                },
+                "frames": {
+                  "type": "array",
+                  "minItems": 58,
+                  "maxItems": 58,
+                  "items": {
+                    "$ref": "#/$defs/o25"
+                  }
+                }
+              }
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "o19": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "targetEngine",
+        "patchHashes"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "enum": [
+            "https://github.com/Sixze/ALS-Refactored.git"
+          ],
+          "maxLength": 4096
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "targetEngine": {
+          "type": "string",
+          "enum": [
+            "5.9.0"
+          ],
+          "maxLength": 4096
+        },
+        "patchHashes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "o5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time",
+        "distance",
+        "angle",
+        "weight"
+      ],
+      "properties": {
+        "time": {
+          "type": "string",
+          "enum": [
+            "second"
+          ],
+          "maxLength": 4096
+        },
+        "distance": {
+          "type": "string",
+          "enum": [
+            "meter"
+          ],
+          "maxLength": 4096
+        },
+        "angle": {
+          "type": "string",
+          "enum": [
+            "radian"
+          ],
+          "maxLength": 4096
+        },
+        "weight": {
+          "type": "string",
+          "enum": [
+            "unitless"
+          ],
+          "maxLength": 4096
+        }
+      }
+    },
+    "o6": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "animationSetDefinitionDigest",
+        "layout",
+        "bindings",
+        "graph"
+      ],
+      "properties": {
+        "animationSetDefinitionDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "layout": {
+          "$ref": "#/$defs/o22"
+        },
+        "bindings": {
+          "$ref": "#/$defs/o22"
+        },
+        "graph": {
+          "$ref": "#/$defs/o22"
+        }
+      }
+    },
+    "o22": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        }
+      }
+    },
+    "o15": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "traceSourceId",
+        "layoutKey",
+        "canonicalEvidence",
+        "nativeVariants"
+      ],
+      "properties": {
+        "traceSourceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "layoutKey": {
+          "$ref": "#/$defs/o26"
+        },
+        "canonicalEvidence": {
+          "$ref": "#/$defs/o8"
+        },
+        "nativeVariants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/o7"
+          }
+        }
+      }
+    },
+    "o26": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceKind",
+        "sourceBindingIndex",
+        "graphSlotIndex"
+      ],
+      "properties": {
+        "sourceKind": {
+          "type": "string",
+          "enum": [
+            "ActionMontage",
+            "ActionSequence",
+            "Base",
+            "Rotate",
+            "Transition",
+            "Turn"
+          ],
+          "maxLength": 4096
+        },
+        "sourceBindingIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "graphSlotIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "o8": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetObjectPath",
+        "assetStableId",
+        "assetClassPath",
+        "durationSeconds",
+        "authoredLoop",
+        "canonicalRole",
+        "montageStableId",
+        "sectionName",
+        "slotName",
+        "segmentIndex"
+      ],
+      "properties": {
+        "assetObjectPath": {
+          "type": "string",
+          "enum": [
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_Default.ALS_N_LandRoll_F_Montage_Default",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_CLF_Pose.ALS_CLF_Pose",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose.ALS_N_Pose",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_F.ALS_N_Walk_F",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.ALS_N_Transition_R",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90",
+            "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.ALS_N_TurnIP_L90"
+          ],
+          "maxLength": 4096
+        },
+        "assetStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "assetClassPath": {
+          "type": "string",
+          "enum": [
+            "/Script/Engine.AnimMontage",
+            "/Script/Engine.AnimSequence"
+          ],
+          "maxLength": 4096
+        },
+        "durationSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "authoredLoop": {
+          "type": "boolean"
+        },
+        "canonicalRole": {
+          "type": "string",
+          "enum": [
+            "action_montage",
+            "action_segment_sequence",
+            "base_sequence",
+            "rotate_sequence",
+            "transition_left_sequence",
+            "transition_right_sequence",
+            "turn_sequence"
+          ],
+          "maxLength": 4096
+        },
+        "montageStableId": {
+          "type": "string",
+          "enum": [
+            "",
+            "2d9341182885d90ad666fff32c025937438b1827"
+          ],
+          "maxLength": 4096
+        },
+        "sectionName": {
+          "type": "string",
+          "enum": [
+            "",
+            "Default"
+          ],
+          "maxLength": 4096
+        },
+        "slotName": {
+          "type": "string",
+          "enum": [
+            "",
+            "BaseLayer"
+          ],
+          "maxLength": 4096
+        },
+        "segmentIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "o7": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nativeRole",
+        "assetObjectPath",
+        "assetStableId",
+        "assetPackageSha256",
+        "assetClassPath",
+        "durationSeconds",
+        "authoredLoop",
+        "stance",
+        "foot",
+        "observationMode",
+        "montageObjectPath",
+        "montageStableId",
+        "sectionName",
+        "slotName",
+        "segmentIndex"
+      ],
+      "properties": {
+        "nativeRole": {
+          "type": "string",
+          "enum": [
+            "base_crouch_pose",
+            "base_stand_pose",
+            "base_walk_forward",
+            "roll_montage",
+            "roll_sequence",
+            "rotate_90_left",
+            "transition_crouching_left",
+            "transition_crouching_right",
+            "transition_standing_left",
+            "transition_standing_right",
+            "turn_90_left"
+          ],
+          "maxLength": 4096
+        },
+        "assetObjectPath": {
+          "type": "string",
+          "enum": [
+            "/ALS/ALS/Animations/Actions/Roll/AM_Als_Roll.AM_Als_Roll",
+            "/ALS/ALS/Animations/Actions/Roll/A_Als_Roll.A_Als_Roll",
+            "/ALS/ALS/Animations/Base/A_Als_Crouch_Pose.A_Als_Crouch_Pose",
+            "/ALS/ALS/Animations/Base/A_Als_Stand_Pose.A_Als_Stand_Pose",
+            "/ALS/ALS/Animations/Grounded/WalkRun/A_Als_Walk_Forward.A_Als_Walk_Forward",
+            "/ALS/ALS/Animations/RotateInPlace/A_Als_Rotate_90_Left.A_Als_Rotate_90_Left",
+            "/ALS/ALS/Animations/Transitions/A_Als_Crouch_DynamicTransition_Left.A_Als_Crouch_DynamicTransition_Left",
+            "/ALS/ALS/Animations/Transitions/A_Als_Crouch_DynamicTransition_Right.A_Als_Crouch_DynamicTransition_Right",
+            "/ALS/ALS/Animations/Transitions/A_Als_Stand_DynamicTransition_Left.A_Als_Stand_DynamicTransition_Left",
+            "/ALS/ALS/Animations/Transitions/A_Als_Stand_DynamicTransition_Right.A_Als_Stand_DynamicTransition_Right",
+            "/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Left.A_Als_Turn_90_Left"
+          ],
+          "maxLength": 4096
+        },
+        "assetStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "assetPackageSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "assetClassPath": {
+          "type": "string",
+          "enum": [
+            "/Script/Engine.AnimMontage",
+            "/Script/Engine.AnimSequence"
+          ],
+          "maxLength": 4096
+        },
+        "durationSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "authoredLoop": {
+          "type": "boolean"
+        },
+        "stance": {
+          "type": "string",
+          "enum": [
+            "",
+            "Crouching",
+            "Standing"
+          ],
+          "maxLength": 4096
+        },
+        "foot": {
+          "type": "string",
+          "enum": [
+            "",
+            "Left",
+            "Right"
+          ],
+          "maxLength": 4096
+        },
+        "observationMode": {
+          "type": "string",
+          "enum": [
+            "DynamicTransitionRuntime",
+            "ReferenceAssetAudit",
+            "RollRuntime"
+          ],
+          "maxLength": 4096
+        },
+        "montageObjectPath": {
+          "type": "string",
+          "enum": [
+            "",
+            "/ALS/ALS/Animations/Actions/Roll/AM_Als_Roll.AM_Als_Roll"
+          ],
+          "maxLength": 4096
+        },
+        "montageStableId": {
+          "type": "string",
+          "enum": [
+            "",
+            "a1e0d64b566eaae1cb9bf5a5c54de27bb03f2e26"
+          ],
+          "maxLength": 4096
+        },
+        "sectionName": {
+          "type": "string",
+          "enum": [
+            "",
+            "Default"
+          ],
+          "maxLength": 4096
+        },
+        "slotName": {
+          "type": "string",
+          "enum": [
+            "",
+            "PostLocomotion",
+            "Transition"
+          ],
+          "maxLength": 4096
+        },
+        "segmentIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "o13": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "traceEventId",
+        "traceSourceId",
+        "canonicalEvidence",
+        "nativeVariants",
+        "hostResolution"
+      ],
+      "properties": {
+        "traceEventId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "traceSourceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "canonicalEvidence": {
+          "$ref": "#/$defs/o9"
+        },
+        "nativeVariants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/o10"
+          }
+        },
+        "hostResolution": {
+          "$ref": "#/$defs/o24"
+        }
+      }
+    },
+    "o9": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetStableId",
+        "stableEventId",
+        "ownerKind",
+        "sourceClassPath",
+        "sourceIndex",
+        "trackIndex",
+        "boundaryOrdinal",
+        "kind",
+        "tickMode",
+        "timeSeconds",
+        "durationSeconds",
+        "triggerWeightThreshold",
+        "payload"
+      ],
+      "properties": {
+        "assetStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "stableEventId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "ownerKind": {
+          "type": "string",
+          "enum": [
+            "MontageTimeline",
+            "SequenceTimeline"
+          ],
+          "maxLength": 4096
+        },
+        "sourceClassPath": {
+          "type": "string",
+          "enum": [
+            "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/CameraShake_Notify.CameraShake_Notify_C",
+            "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+            "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/GroundedEntryState_AnimNotify.GroundedEntryState_AnimNotify_C",
+            "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/MovementAction_NotifyState.MovementAction_NotifyState_C"
+          ],
+          "maxLength": 4096
+        },
+        "sourceIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "trackIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "boundaryOrdinal": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Generic",
+            "SetAction"
+          ],
+          "maxLength": 4096
+        },
+        "tickMode": {
+          "type": "string",
+          "enum": [
+            "Queued"
+          ],
+          "maxLength": 4096
+        },
+        "timeSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "durationSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "triggerWeightThreshold": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "payload": {
+          "$ref": "#/$defs/o23"
+        }
+      }
+    },
+    "o23": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semanticId",
+        "enumValue0",
+        "enumValue1",
+        "enumValue2",
+        "scalarValue0",
+        "flags",
+        "terminationReason"
+      ],
+      "properties": {
+        "semanticId": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "enumValue0": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "enumValue1": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "enumValue2": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "scalarValue0": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "flags": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "terminationReason": {
+          "type": "string",
+          "enum": [
+            "None"
+          ],
+          "maxLength": 4096
+        }
+      }
+    },
+    "o10": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nativeRole",
+        "assetStableId",
+        "stableEventId",
+        "ownerKind",
+        "sourceClassPath",
+        "sourceIndex",
+        "trackIndex",
+        "timeSeconds",
+        "durationSeconds",
+        "triggerWeightThreshold",
+        "tickMode"
+      ],
+      "properties": {
+        "nativeRole": {
+          "type": "string",
+          "enum": [
+            "base_walk_forward",
+            "roll_montage",
+            "roll_sequence",
+            "rotate_90_left",
+            "transition_crouching_left",
+            "transition_crouching_right",
+            "transition_standing_left",
+            "transition_standing_right",
+            "turn_90_left"
+          ],
+          "maxLength": 4096
+        },
+        "assetStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "stableEventId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "ownerKind": {
+          "type": "string",
+          "enum": [
+            "MontageTimeline",
+            "SequenceTimeline"
+          ],
+          "maxLength": 4096
+        },
+        "sourceClassPath": {
+          "type": "string",
+          "enum": [
+            "/Script/ALS.AlsAnimNotifyState_SetLocomotionAction",
+            "/Script/ALS.AlsAnimNotifyState_SetRootMotionScale",
+            "/Script/ALS.AlsAnimNotify_FootstepEffects",
+            "/Script/ALS.AlsAnimNotify_SetGroundedEntryMode",
+            "/Script/ALSCamera.AlsAnimNotify_CameraShake"
+          ],
+          "maxLength": 4096
+        },
+        "sourceIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "trackIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "timeSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "durationSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "triggerWeightThreshold": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "tickMode": {
+          "type": "string",
+          "enum": [
+            "Queued"
+          ],
+          "maxLength": 4096
+        }
+      }
+    },
+    "o24": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "o14": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "traceSourceId",
+        "canonicalEvidence",
+        "nativeVariants",
+        "hostResolution"
+      ],
+      "properties": {
+        "traceSourceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "canonicalEvidence": {
+          "$ref": "#/$defs/o12"
+        },
+        "nativeVariants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/o11"
+          }
+        },
+        "hostResolution": {
+          "$ref": "#/$defs/o30"
+        }
+      }
+    },
+    "o12": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetStableId",
+        "stableMarkerId",
+        "name",
+        "sourceIndex",
+        "trackIndex",
+        "timeSeconds"
+      ],
+      "properties": {
+        "assetStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "stableMarkerId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "name": {
+          "type": "string",
+          "enum": [
+            "Left",
+            "Right"
+          ],
+          "maxLength": 4096
+        },
+        "sourceIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "trackIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "timeSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        }
+      }
+    },
+    "o11": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nativeRole",
+        "assetStableId",
+        "stableMarkerId",
+        "name",
+        "sourceIndex",
+        "trackIndex",
+        "timeSeconds"
+      ],
+      "properties": {
+        "nativeRole": {
+          "type": "string",
+          "enum": [
+            "base_walk_forward"
+          ],
+          "maxLength": 4096
+        },
+        "assetStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "stableMarkerId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "name": {
+          "type": "string",
+          "enum": [
+            "Left",
+            "Right"
+          ],
+          "maxLength": 4096
+        },
+        "sourceIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "trackIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "timeSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        }
+      }
+    },
+    "o30": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "markerId"
+      ],
+      "properties": {
+        "markerId": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "o2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actionTraceSourceId",
+        "canonicalSectionName",
+        "nativeVariants",
+        "hostResolution"
+      ],
+      "properties": {
+        "actionTraceSourceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "canonicalSectionName": {
+          "type": "string",
+          "enum": [
+            "Default"
+          ],
+          "maxLength": 4096
+        },
+        "nativeVariants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/o31"
+          }
+        },
+        "hostResolution": {
+          "$ref": "#/$defs/o32"
+        }
+      }
+    },
+    "o31": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nativeRole",
+        "montageStableId",
+        "sectionName",
+        "sectionIndex"
+      ],
+      "properties": {
+        "nativeRole": {
+          "type": "string",
+          "enum": [
+            "roll_montage"
+          ],
+          "maxLength": 4096
+        },
+        "montageStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sectionName": {
+          "type": "string",
+          "enum": [
+            "Default"
+          ],
+          "maxLength": 4096
+        },
+        "sectionIndex": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        }
+      }
+    },
+    "o32": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sectionId"
+      ],
+      "properties": {
+        "sectionId": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "o20": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nativeRole",
+        "evidence",
+        "deferredOwner"
+      ],
+      "properties": {
+        "nativeRole": {
+          "type": "string",
+          "enum": [
+            "roll_sequence",
+            "rotate_90_left",
+            "turn_90_left"
+          ],
+          "maxLength": 4096
+        },
+        "evidence": {
+          "$ref": "#/$defs/o10"
+        },
+        "deferredOwner": {
+          "type": "string",
+          "enum": [
+            "FootstepAudioVfx",
+            "RootMotion"
+          ],
+          "maxLength": 4096
+        }
+      }
+    },
+    "o16": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "caseId",
+        "frames"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "caseId": {
+          "type": "string",
+          "enum": [
+            "authority_tie",
+            "crouching_transition_reuse",
+            "grounded_marker_interval",
+            "montage_owned_notify",
+            "roll_default_section",
+            "segment_sequence_notify_state",
+            "standing_transition_left",
+            "standing_transition_right"
+          ],
+          "maxLength": 4096
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 104,
+          "items": {
+            "$ref": "#/$defs/o25"
+          }
+        }
+      }
+    },
+    "o25": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frameIndex",
+        "input"
+      ],
+      "properties": {
+        "frameIndex": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "input": {
+          "$ref": "#/$defs/o1"
+        }
+      }
+    },
+    "o1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "window",
+        "modes",
+        "p4Curves",
+        "actionRequest",
+        "cancelActionForRuntimeFailure",
+        "transitionProbe"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/o18"
+        },
+        "window": {
+          "$ref": "#/$defs/o21"
+        },
+        "modes": {
+          "$ref": "#/$defs/o27"
+        },
+        "p4Curves": {
+          "$ref": "#/$defs/o0"
+        },
+        "actionRequest": {
+          "$ref": "#/$defs/o3"
+        },
+        "cancelActionForRuntimeFailure": {
+          "type": "boolean"
+        },
+        "transitionProbe": {
+          "$ref": "#/$defs/o28"
+        }
+      }
+    },
+    "o18": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frameId",
+        "characterId",
+        "slotGeneration"
+      ],
+      "properties": {
+        "frameId": {
+          "type": "string",
+          "pattern": "^(0|-?[1-9][0-9]{0,17}|-9007199254740993|9007199254740993|-9223372036854775808|9223372036854775807)$"
+        },
+        "characterId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "slotGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "o21": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "startSeconds",
+        "endSeconds",
+        "deltaSeconds"
+      ],
+      "properties": {
+        "startSeconds": {
+          "type": "number"
+        },
+        "endSeconds": {
+          "type": "number"
+        },
+        "deltaSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        }
+      }
+    },
+    "o27": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locomotionMode",
+        "rotationMode",
+        "stance",
+        "hasInput"
+      ],
+      "properties": {
+        "locomotionMode": {
+          "type": "string",
+          "enum": [
+            "Grounded",
+            "InAir",
+            "Mantling",
+            "Ragdoll",
+            "Recovering"
+          ],
+          "maxLength": 4096
+        },
+        "rotationMode": {
+          "type": "string",
+          "enum": [
+            "VelocityDirection",
+            "LookingDirection",
+            "Aiming"
+          ],
+          "maxLength": 4096
+        },
+        "stance": {
+          "type": "string",
+          "enum": [
+            "Crouching",
+            "Standing"
+          ],
+          "maxLength": 4096
+        },
+        "hasInput": {
+          "type": "boolean"
+        }
+      }
+    },
+    "o0": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "animationState",
+        "actionBlendAmount",
+        "actionModeBlendAmount",
+        "base",
+        "turnBanks",
+        "rotateBanks"
+      ],
+      "properties": {
+        "animationState": {
+          "type": "string",
+          "enum": [
+            "Grounded",
+            "JumpStart",
+            "FallLoop",
+            "LandRecovery"
+          ],
+          "maxLength": 4096
+        },
+        "actionBlendAmount": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "actionModeBlendAmount": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "base": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/o4"
+          }
+        },
+        "turnBanks": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/o4"
+          }
+        },
+        "rotateBanks": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/o4"
+          }
+        }
+      }
+    },
+    "o4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "traceSourceId",
+        "playbackEpoch",
+        "previousUnwrappedTimeSeconds",
+        "currentUnwrappedTimeSeconds",
+        "frameStartOffsetSeconds",
+        "frameEndOffsetSeconds",
+        "durationSeconds",
+        "weight",
+        "loop",
+        "activatesAtFrameStart",
+        "closesAfterFrame"
+      ],
+      "properties": {
+        "traceSourceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "playbackEpoch": {
+          "type": "string",
+          "pattern": "^(0|-?[1-9][0-9]{0,17}|-9007199254740993|9007199254740993|-9223372036854775808|9223372036854775807)$"
+        },
+        "previousUnwrappedTimeSeconds": {
+          "type": "number"
+        },
+        "currentUnwrappedTimeSeconds": {
+          "type": "number"
+        },
+        "frameStartOffsetSeconds": {
+          "type": "number"
+        },
+        "frameEndOffsetSeconds": {
+          "type": "number"
+        },
+        "durationSeconds": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "weight": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "activatesAtFrameStart": {
+          "type": "boolean"
+        },
+        "closesAfterFrame": {
+          "type": "boolean"
+        }
+      }
+    },
+    "o3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "requestId",
+        "actionTraceSourceId",
+        "startSectionName",
+        "priority",
+        "slotGeneration"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "enum": [
+            "Cancel",
+            "CancelForRuntimeFailure",
+            "None",
+            "Start"
+          ],
+          "maxLength": 4096
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^(0|-?[1-9][0-9]{0,17}|-9007199254740993|9007199254740993|-9223372036854775808|9223372036854775807)$"
+        },
+        "actionTraceSourceId": {
+          "type": "string",
+          "oneOf": [
+            {
+              "const": ""
+            },
+            {
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          ],
+          "maxLength": 4096
+        },
+        "startSectionName": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "slotGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "o28": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "left",
+        "right"
+      ],
+      "properties": {
+        "left": {
+          "$ref": "#/$defs/o29"
+        },
+        "right": {
+          "$ref": "#/$defs/o29"
+        }
+      }
+    },
+    "o29": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetMeters",
+        "lockMeters",
+        "relevant"
+      ],
+      "properties": {
+        "targetMeters": {
+          "$ref": "#/$defs/o33"
+        },
+        "lockMeters": {
+          "$ref": "#/$defs/o33"
+        },
+        "relevant": {
+          "type": "boolean"
+        }
+      }
+    },
+    "o33": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "y": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        },
+        "z": {
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
+        }
+      }
+    }
+  }
+}
