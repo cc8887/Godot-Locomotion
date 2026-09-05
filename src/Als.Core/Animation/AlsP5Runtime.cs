@@ -1026,6 +1026,7 @@ public static class AlsP5Runtime
         out AlsP5FailureCode failure)
     {
         var count = 0;
+        var authorityGroupId = -1;
         for (var index = 0; index < input.P4Curves.Base.Length; index++)
         {
             ref readonly var descriptor = ref input.P4Curves.Base[index];
@@ -1060,6 +1061,13 @@ public static class AlsP5Runtime
                 continue;
             }
 
+            if (authorityGroupId >= 0 && authorityGroupId != descriptor.AuthorityGroupId)
+            {
+                failure = AlsP5FailureCode.InvalidBinding;
+                return false;
+            }
+            authorityGroupId = descriptor.AuthorityGroupId;
+
             scratch.SyncPlaybacks[count++] = new AlsSyncPlayback(
                 descriptor.OccurrenceHandleId,
                 descriptor.AnimationId,
@@ -1091,7 +1099,84 @@ public static class AlsP5Runtime
             return false;
         }
 
+        if (TrySelectSyncLeader(input, authorityGroupId, out var leader))
+        {
+            scratch.Sync = scratch.Sync with
+            {
+                LeaderOccurrenceHandleId = leader.OccurrenceHandleId,
+                LeaderAnimationId = leader.AnimationId,
+                LeaderPlaybackEpoch = leader.PlaybackEpoch,
+            };
+        }
+
         return true;
+    }
+
+    private static bool TrySelectSyncLeader(
+        in AlsP5FrameInput input,
+        int authorityGroupId,
+        out AlsBasePlaybackDescriptor leader)
+    {
+        leader = default;
+        var leaderWeight = 0f;
+        var found = false;
+        ConsiderSyncLeaders(
+            input.P4Curves.Base, authorityGroupId, 0,
+            input.P4Curves.ActionBlendAmount, input.P4Curves.ActionModeBlendAmount,
+            ref found, ref leader, ref leaderWeight);
+        ConsiderSyncLeaders(
+            input.P4Curves.TurnBanks, authorityGroupId, 1,
+            input.P4Curves.ActionBlendAmount, input.P4Curves.ActionModeBlendAmount,
+            ref found, ref leader, ref leaderWeight);
+        ConsiderSyncLeaders(
+            input.P4Curves.RotateBanks, authorityGroupId, 2,
+            input.P4Curves.ActionBlendAmount, input.P4Curves.ActionModeBlendAmount,
+            ref found, ref leader, ref leaderWeight);
+        return found;
+    }
+
+    private static void ConsiderSyncLeaders(
+        ReadOnlySpan<AlsBasePlaybackDescriptor> descriptors,
+        int authorityGroupId,
+        int kind,
+        float actionBlend,
+        float actionModeBlend,
+        ref bool found,
+        ref AlsBasePlaybackDescriptor leader,
+        ref float leaderWeight)
+    {
+        for (var index = 0; index < descriptors.Length; index++)
+        {
+            ref readonly var candidate = ref descriptors[index];
+            if (candidate.AuthorityGroupId != authorityGroupId)
+            {
+                continue;
+            }
+            var candidateWeight = kind switch
+            {
+                0 => BaseWeight(candidate.Weight, actionBlend),
+                1 => TurnWeight(candidate.Weight, actionBlend, actionModeBlend),
+                _ => RotateWeight(candidate.Weight, actionBlend, actionModeBlend),
+            };
+            if (!found || IsBetterSyncLeader(candidate, candidateWeight, leader, leaderWeight))
+            {
+                found = true;
+                leader = candidate;
+                leaderWeight = candidateWeight;
+            }
+        }
+    }
+
+    private static bool IsBetterSyncLeader(
+        in AlsBasePlaybackDescriptor candidate,
+        float candidateWeight,
+        in AlsBasePlaybackDescriptor current,
+        float currentWeight)
+    {
+        if (candidateWeight != currentWeight) return candidateWeight > currentWeight;
+        if (candidate.AnimationId != current.AnimationId) return candidate.AnimationId < current.AnimationId;
+        if (candidate.PlaybackEpoch != current.PlaybackEpoch) return candidate.PlaybackEpoch < current.PlaybackEpoch;
+        return candidate.OccurrenceHandleId < current.OccurrenceHandleId;
     }
 
     private static bool TryCalculateCurves(

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <P5aRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))</P5aRepositoryRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Als.Import\Als.Import.csproj" />
+    <ProjectReference Include="..\..\src\Als.Core\Als.Core.csproj" />
+  </ItemGroup>
+  <Target Name="WriteP5aOracleBuildManifest" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="&quot;$(TargetDir)Als.P5aOracle.exe&quot; --write-build-manifest --repository-root &quot;$(P5aRepositoryRoot)&quot; --output &quot;$(TargetDir)p5a-oracle-build.manifest&quot; --sdk-version &quot;$(NETCoreSdkVersion)&quot;" />
+  </Target>
+</Project>
