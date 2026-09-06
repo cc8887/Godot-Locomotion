@@ -268,11 +268,69 @@ function Get-TestP5aDefaultRunnerDefinition
     $definitions = @($Ast.FindAll({
         param($node)
         $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
-            $node.Extent.Text -match '(?i)Diagnostics\.ProcessStartInfo' -and
-            $node.Extent.Text -match '(?i)\.Start\s*\('
+            $node.Name -match '^Invoke-P5a(?:Generator|Verifier)DefaultProcess$' -and
+            $node.Extent.Text -match '(?i)CreateProcessW'
     }, $true))
     $definitions.Count | Should Be 1
     return $definitions[0]
+}
+
+function Assert-TestP5aNativeRunnerLexicalClosure
+{
+    param([Parameter(Mandatory)][string]$RunnerText)
+
+    # PowerShell AST intentionally treats the Add-Type here-string as opaque.  Keep
+    # this narrow lexical contract alongside the AST closure instead of requiring a
+    # compiler or a network-restored C# parser in the Pester 3/4 harness.
+    foreach ($token in @(
+        'CreateProcessW', 'STARTUPINFOEX', 'EXTENDED_STARTUPINFO_PRESENT',
+        'STARTF_USESTDHANDLES', 'CreatePipe', 'SetHandleInformation',
+        'InitializeProcThreadAttributeList', 'UpdateProcThreadAttribute',
+        'DeleteProcThreadAttributeList', 'PROC_THREAD_ATTRIBUTE_JOB_LIST',
+        'PROC_THREAD_ATTRIBUTE_HANDLE_LIST', 'QueryInformationJobObject',
+        'JOBOBJECT_BASIC_ACCOUNTING_INFORMATION', 'TotalProcesses',
+        'ActiveProcesses', 'JobProcessIds', 'StdOutLines', 'StdErrLines',
+        'StdOutBytes', 'StdErrBytes', 'OutputLimitExceeded',
+        'GetQueuedCompletionStatus', 'RemainingMilliseconds', 'metadata'))
+    {
+        $RunnerText | Should Match ([regex]::Escape($token))
+    }
+
+    foreach ($forbiddenPattern in @(
+        '(?i)ProcessStartInfo', '(?i)Diagnostics\.Process',
+        '(?i)\$process\s*\.\s*Start\s*\(', '(?i)\bProcess\s*\.\s*Start\s*\(',
+        '(?i)AssignProcessToJobObject', '(?i)\bAttach\s*\(',
+        '(?i)ReadToEnd(?:Async)?', '(?i)WaitForExit\s*\(\s*\)',
+        '(?i)WaitAll\s*\(\s*[^,\r\n]+\s*\)', '(?i)Start-Sleep',
+        '(?i)\(\s*\$stdout\s*\+\s*\$stderr\s*\)'))
+    {
+        $RunnerText | Should Not Match $forbiddenPattern
+    }
+
+    foreach ($streamName in @('StdOut', 'StdErr'))
+    {
+        $matches = @([regex]::Matches(
+            $RunnerText,
+            '(?im)\bMax' + $streamName + 'Bytes\s*=\s*([0-9]+)'))
+        $matches.Count | Should Be 1
+        $cap = [int64]$matches[0].Groups[1].Value
+        $cap | Should BeGreaterThan 0
+        ($cap -le 8388608) | Should Be $true
+    }
+
+    $jobListIndex = $RunnerText.LastIndexOf('PROC_THREAD_ATTRIBUTE_JOB_LIST',
+        [StringComparison]::Ordinal)
+    $handleListIndex = $RunnerText.LastIndexOf('PROC_THREAD_ATTRIBUTE_HANDLE_LIST',
+        [StringComparison]::Ordinal)
+    $createIndex = $RunnerText.LastIndexOf('CreateProcessW', [StringComparison]::Ordinal)
+    $jobListIndex | Should BeGreaterThan -1
+    $handleListIndex | Should BeGreaterThan $jobListIndex
+    $createIndex | Should BeGreaterThan $handleListIndex
+    $attributeOrderPattern = '(?s)UpdateProcThreadAttribute.{0,4096}' +
+        'PROC_THREAD_ATTRIBUTE_JOB_LIST.{0,4096}UpdateProcThreadAttribute.{0,4096}' +
+        'PROC_THREAD_ATTRIBUTE_HANDLE_LIST.{0,4096}CreateProcessW\s*\('
+    $RunnerText | Should Match $attributeOrderPattern
+    $RunnerText | Should Match '(?i)(?:TotalProcesses\s*!=|JobTotalProcesses\s*-ne)'
 }
 
 function Assert-TestP5aProcessLaunchClosure
@@ -361,31 +419,9 @@ function Assert-TestP5aProcessLaunchClosure
     $defaultedProcessInvokerParameters[0].DefaultValue.VariablePath.UserPath |
         Should Be ("function:$($runner.Name)")
 
-    $processTypes = @($ast.FindAll({
-        param($node)
-        $node -is [Management.Automation.Language.TypeExpressionAst] -and
-            $node.TypeName.FullName -match '(?i)(^|\.)Diagnostics\.Process(StartInfo)?$'
-    }, $true))
-    $processTypes.Count | Should BeGreaterThan 0
-    foreach ($node in $processTypes)
-    {
-        ($node.Extent.StartOffset -ge $runnerStart -and
-         $node.Extent.EndOffset -le $runnerEnd) | Should Be $true
-    }
-
-    $startCalls = @($ast.FindAll({
-        param($node)
-        $node -is [Management.Automation.Language.InvokeMemberExpressionAst] -and
-            $node.Member.Value -ceq 'Start'
-    }, $true))
-    $startCalls.Count | Should Be 1
-    ($startCalls[0].Extent.StartOffset -ge $runnerStart -and
-     $startCalls[0].Extent.EndOffset -le $runnerEnd) | Should Be $true
-
     $runnerText = $runner.Extent.Text
+    Assert-TestP5aNativeRunnerLexicalClosure -RunnerText $runnerText
     foreach ($pattern in @(
-        'RedirectStandardOutput', 'RedirectStandardError',
-        'Kill\s*\(\s*\$true\s*\)', 'WaitForExit\s*\(',
         'ProcessId', 'DescendantProcesses', 'parentProcessId',
         'ancestorProcessIds', 'imageName', 'executablePath'))
     {
@@ -794,16 +830,18 @@ if ([int]$control.MutatePlanOnCall -eq $call) {
     if ($null -eq $planArgument) { $planArgument = Get-SeparateValue '--trace-plan' }
     if ($null -ne $planArgument) { [IO.File]::AppendAllText($planArgument, 'drift') }
 }
-$outputLines = if ([string]::IsNullOrEmpty($marker)) { @('synthetic dotnet output') } else { @($marker) }
+$stdOutLines = if ([string]::IsNullOrEmpty($marker)) { @('synthetic dotnet output') } else { @($marker) }
+$stdErrLines = @()
 if ([int]$control.FailCall -eq $call) {
     switch ([string]$control.FailureKind) {
-        'missing' { $outputLines = @('ordinary output') }
-        'duplicate' { $outputLines = @($marker, $marker) }
-        'prefix' { $outputLines = @("prefix $marker") }
-        'suffix' { $outputLines = @("$marker suffix") }
-        'wrong' { $outputLines = @('P5A_TRACE_GENERATION_OK cases=7 commit=wrong') }
-        'warning' { $outputLines = @($marker, 'LogTemp: Warning: synthetic warning') }
-        'error' { $outputLines = @($marker, 'LogTemp: Error: synthetic error') }
+        'missing' { $stdOutLines = @('ordinary output') }
+        'duplicate' { $stdOutLines = @($marker, $marker) }
+        'prefix' { $stdOutLines = @("prefix $marker") }
+        'suffix' { $stdOutLines = @("$marker suffix") }
+        'wrong' { $stdOutLines = @('P5A_TRACE_GENERATION_OK cases=7 commit=wrong') }
+        'warning' { $stdErrLines = @('LogTemp: Warning: synthetic warning') }
+        'error' { $stdErrLines = @('LogTemp: Error: synthetic error') }
+        'stderr-marker' { $stdOutLines = @('ordinary output'); $stdErrLines = @($marker) }
     }
 }
 $exitCode = if ([int]$control.FailCall -eq $call -and $control.FailureKind -ceq 'nonzero') { 7 } else { 0 }
@@ -812,8 +850,18 @@ return [pscustomobject]@{
     ProcessId = $directProcessId
     ExitCode = $exitCode
     TimedOut = $timedOut
-    OutputLines = @($outputLines)
+    OutputLimitExceeded = $false
+    StdOutLines = @($stdOutLines)
+    StdErrLines = @($stdErrLines)
+    StdOutBytes = [Text.Encoding]::UTF8.GetByteCount(($stdOutLines -join "`n"))
+    StdErrBytes = [Text.Encoding]::UTF8.GetByteCount(($stdErrLines -join "`n"))
+    # Transitional only: protocol tests keep exercising the pre-split scripts until
+    # their production gates consume StdOutLines and StdErrLines directly.
+    OutputLines = @($stdOutLines) + @($stdErrLines)
     DescendantProcesses = @($descendants)
+    JobTotalProcesses = 1 + @($descendants).Count
+    JobActiveProcesses = 0
+    JobProcessIds = @($directProcessId) + @($descendants | ForEach-Object { [int]$_.processId })
 }
 '@
     $capturedShimPath = $shimPath
@@ -907,7 +955,6 @@ function New-TestP5aProcessContext
     Write-TestP5aText $editor "synthetic editor path; never executed`n"
     Write-TestP5aText $uproject "{}`n"
     [void][IO.Directory]::CreateDirectory($reference)
-    [void][IO.Directory]::CreateDirectory($staging)
     Write-TestP5aText $fixture "synthetic committed fixture`n"
     return [pscustomobject]@{
         Root = $root
@@ -1730,7 +1777,8 @@ function New-TestP5aCheckpointInvoker
     param(
         [string]$FailAt,
         [string]$MutateAt,
-        [string]$MutatePath
+        [string]$MutatePath,
+        [scriptblock]$MutationAction
     )
 
     $records = [Collections.Generic.List[string]]::new()
@@ -1740,6 +1788,7 @@ function New-TestP5aCheckpointInvoker
     $capturedFailure = $FailAt
     $capturedMutation = $MutateAt
     $capturedMutationPath = $MutatePath
+    $capturedMutationAction = $MutationAction
     $invoker = {
         param($Checkpoint, $OracleLease, $DeploymentLease)
 
@@ -1767,6 +1816,10 @@ function New-TestP5aCheckpointInvoker
         if ($name -ceq $capturedMutation -and -not [string]::IsNullOrEmpty($capturedMutationPath))
         {
             [IO.File]::AppendAllText($capturedMutationPath, 'checkpoint-drift')
+        }
+        if ($name -ceq $capturedMutation -and $null -ne $capturedMutationAction)
+        {
+            & $capturedMutationAction $name
         }
         if ($name -ceq $capturedFailure)
         {
@@ -2450,7 +2503,7 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
                 @{ Name = 'alternate-process-invoker'; Source = 'function Invoke-MutatedLaunch { param([scriptblock]$AlternateProcessInvoker); & $AlternateProcessInvoker ''cmd.exe'' @() $pwd 10 ''bypass'' }' + "`n" }
                 @{ Name = 'extra-process-invoker'; Source = 'function Invoke-MutatedLaunch { & $ProcessInvoker ''cmd.exe'' @() $pwd 10 ''bypass'' }' + "`n" }
                 @{ Name = 'conditional-process-invoker'; Source = 'function Invoke-MutatedLaunch { if ($true) { & $ProcessInvoker ''cmd.exe'' @() $pwd 10 ''bypass'' } }' + "`n" }
-                @{ Name = 'second-default-runner'; Source = 'function Invoke-HiddenRunner { $startInfo = [Diagnostics.ProcessStartInfo]::new(); $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo; [void]$process.Start() }' + "`n" }
+                @{ Name = 'second-default-runner'; Source = "function Invoke-P5aGeneratorDefaultProcess { Add-Type -TypeDefinition 'public static class Hidden { public static void CreateProcessW() { } }' }`n" }
             )
             foreach ($mutation in $mutations)
             {
@@ -2473,6 +2526,33 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
                 $path, [ref]$runnerTokens, [ref]$runnerErrors)
             @($runnerErrors).Count | Should Be 0
             $runnerName = (Get-TestP5aDefaultRunnerDefinition -Ast $runnerAst).Name
+            $runnerText = (Get-TestP5aDefaultRunnerDefinition -Ast $runnerAst).Extent.Text
+            foreach ($nativeMutation in @(
+                @{ Name = 'missing-createprocessw'; Token = 'CreateProcessW' }
+                @{ Name = 'missing-job-list'; Token = 'PROC_THREAD_ATTRIBUTE_JOB_LIST' }
+                @{ Name = 'missing-handle-list'; Token = 'PROC_THREAD_ATTRIBUTE_HANDLE_LIST' }
+                @{ Name = 'missing-job-accounting'; Token = 'QueryInformationJobObject' }
+                @{ Name = 'missing-metadata'; Token = 'metadata' }
+                @{ Name = 'missing-total-processes'; Token = 'TotalProcesses' }
+                @{ Name = 'missing-stream-cap'; Token = 'MaxStdOutBytes' }
+                @{ Name = 'process-start-fallback'; Token = 'ProcessStartInfo' }
+                @{ Name = 'post-start-job-attach'; Token = 'AssignProcessToJobObject' }
+                @{ Name = 'unbounded-read'; Token = 'ReadToEndAsync' }
+                @{ Name = 'merged-output'; Token = '($stdout + $stderr)' }
+                @{ Name = 'unbounded-wait'; Token = 'WaitForExit()' }
+            ))
+            {
+                $mutatedRunnerText = if ($nativeMutation.Name -like 'missing-*') {
+                    $runnerText.Replace([string]$nativeMutation.Token, [string]::Empty)
+                }
+                else
+                {
+                    $runnerText + "`n$($nativeMutation.Token)"
+                }
+                Test-TestP5aRejects {
+                    Assert-TestP5aNativeRunnerLexicalClosure -RunnerText $mutatedRunnerText
+                } | Should Be $true
+            }
             $defaultParameter = @($runnerAst.FindAll({
                 param($node)
                 $node -is [Management.Automation.Language.ParameterAst] -and
@@ -2482,7 +2562,10 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
             $fakeDefault = '{ param($FilePath,$Arguments,$WorkingDirectory,$TimeoutSeconds,$PhaseName); ' +
                 '$null = ${function:' + $runnerName + '}; ' +
                 '[pscustomobject]@{ ProcessId = 1; ExitCode = 0; TimedOut = $false; ' +
-                'OutputLines = @(); DescendantProcesses = @() } }'
+                'OutputLimitExceeded = $false; StdOutLines = @(); StdErrLines = @(); ' +
+                'StdOutBytes = 0; StdErrBytes = 0; OutputLines = @(); ' +
+                'DescendantProcesses = @(); JobTotalProcesses = 1; JobActiveProcesses = 0; ' +
+                'JobProcessIds = @(1) } }'
             $productionSource = [IO.File]::ReadAllText($path)
             $deadReferenceSource = $productionSource.Substring(
                 0, $defaultParameter.DefaultValue.Extent.StartOffset) + $fakeDefault +
@@ -2500,12 +2583,11 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
             } | Should Be $true
             $pwshPath = (Get-Command pwsh -CommandType Application -ErrorAction Stop).Source
             [IO.Path]::IsPathFullyQualified($pwshPath) | Should Be $true
+            $escapedPwshPath = $pwshPath.Replace("'", "''")
 
             $streamProbe = Join-Path $TestDrive "default-runner-$baseName-streams.ps1"
             Write-TestP5aText $streamProbe @'
 [Console]::Out.WriteLine('stdout-probe')
-Write-Host 'host-probe'
-Write-Warning 'warning-probe'
 [Console]::Error.WriteLine('stderr-probe')
 '@
             $streamResult = @(Invoke-TestP5aDefaultRunner `
@@ -2520,15 +2602,82 @@ Write-Warning 'warning-probe'
             $streamResult.Count | Should Be 1
             $streamResult[0].ExitCode | Should Be 0
             $streamResult[0].TimedOut | Should Be $false
+            $streamResult[0].OutputLimitExceeded | Should Be $false
             ([int]$streamResult[0].ProcessId) | Should BeGreaterThan 0
             @($streamResult[0].DescendantProcesses).Count | Should Be 0
-            $capturedLines = @($streamResult[0].OutputLines | ForEach-Object { [string]$_ })
-            foreach ($expectedLine in @(
-                'stdout-probe', 'host-probe', 'WARNING: warning-probe', 'stderr-probe'))
+            $stdoutLines = @($streamResult[0].StdOutLines | ForEach-Object { [string]$_ })
+            $stderrLines = @($streamResult[0].StdErrLines | ForEach-Object { [string]$_ })
+            @($stdoutLines | Where-Object { $_ -ceq 'stdout-probe' }).Count | Should Be 1
+            @($stderrLines | Where-Object { $_ -ceq 'stderr-probe' }).Count | Should Be 1
+            @($stdoutLines | Where-Object { $_ -ceq 'stderr-probe' }).Count | Should Be 0
+            @($stderrLines | Where-Object { $_ -ceq 'stdout-probe' }).Count | Should Be 0
+            ([int64]$streamResult[0].StdOutBytes) | Should BeGreaterThan 0
+            ([int64]$streamResult[0].StdErrBytes) | Should BeGreaterThan 0
+            [int]$streamResult[0].JobTotalProcesses | Should Be 1
+            [int]$streamResult[0].JobActiveProcesses | Should Be 0
+            @($streamResult[0].JobProcessIds | ForEach-Object { [int]$_ }) |
+                Should Be @([int]$streamResult[0].ProcessId)
+
+            $capDescendantProbe = Join-Path $TestDrive "default-runner-$baseName-cap-descendant.ps1"
+            $capDescendantPidPath = Join-Path $TestDrive "default-runner-$baseName-cap-descendant.pid"
+            $capProbe = Join-Path $TestDrive "default-runner-$baseName-cap.ps1"
+            Write-TestP5aText $capDescendantProbe "Start-Sleep -Seconds 30`n"
+            $escapedCapDescendantProbe = $capDescendantProbe.Replace("'", "''")
+            $escapedCapDescendantPidPath = $capDescendantPidPath.Replace("'", "''")
+            $capMethod = if ($path -ceq $script:P5aGeneratorPath) {
+                'OpenStandardOutput'
+            } else {
+                'OpenStandardError'
+            }
+            Write-TestP5aText $capProbe @"
+`$child = Start-Process -FilePath '$escapedPwshPath' -ArgumentList @(
+    '-NoProfile', '-File', '$escapedCapDescendantProbe') -PassThru -WindowStyle Hidden
+[IO.File]::WriteAllText('$escapedCapDescendantPidPath', [string]`$child.Id)
+`$payload = New-Object byte[] 8388609
+`$stream = [Console]::$capMethod()
+`$stream.Write(`$payload, 0, `$payload.Length)
+`$stream.Flush()
+Start-Sleep -Seconds 30
+"@
+            $capDescendantPid = 0
+            try
             {
-                @($capturedLines | Where-Object {
-                    $_.Contains($expectedLine, [StringComparison]::Ordinal)
-                }).Count | Should Be 1
+                $capResult = @(Invoke-TestP5aDefaultRunner `
+                    -Kind $(if ($path -ceq $script:P5aGeneratorPath) { 'generator' } else { 'verifier' }) `
+                    -EntrypointPath $path `
+                    -RunnerName $runnerName `
+                    -FilePath $pwshPath `
+                    -Arguments @('-NoProfile', '-File', $capProbe) `
+                    -WorkingDirectory $TestDrive `
+                    -TimeoutSeconds 10 `
+                    -PhaseName 'default-runner-stream-cap')
+                $capResult.Count | Should Be 1
+                $capResult[0].TimedOut | Should Be $false
+                $capResult[0].OutputLimitExceeded | Should Be $true
+                ([int64]$capResult[0].StdOutBytes -lt 8388610) | Should Be $true
+                ([int64]$capResult[0].StdErrBytes -lt 8388610) | Should Be $true
+                [int]$capResult[0].JobActiveProcesses | Should Be 0
+                Test-Path -LiteralPath $capDescendantPidPath -PathType Leaf | Should Be $true
+                $capDescendantPid = [int][IO.File]::ReadAllText($capDescendantPidPath)
+                [int]$capResult[0].JobTotalProcesses | Should Be 2
+                $expectedCapJobProcessIds = @([int]$capResult[0].ProcessId, $capDescendantPid)
+                @($capResult[0].JobProcessIds | ForEach-Object { [int]$_ } | Sort-Object) |
+                    Should Be @($expectedCapJobProcessIds | Sort-Object)
+                for ($attempt = 0; $attempt -lt 20 -and
+                     $null -ne (Get-Process -Id $capDescendantPid -ErrorAction SilentlyContinue); $attempt++)
+                {
+                    Start-Sleep -Milliseconds 100
+                }
+                Get-Process -Id $capDescendantPid -ErrorAction SilentlyContinue |
+                    Should BeNullOrEmpty
+            }
+            finally
+            {
+                if ($capDescendantPid -gt 0)
+                {
+                    $leftover = Get-Process -Id $capDescendantPid -ErrorAction SilentlyContinue
+                    if ($null -ne $leftover) { $leftover.Kill() }
+                }
             }
 
             $shortLivedToolchain = Get-TestP5aDefaultWorkflowToolchain
@@ -2563,6 +2712,7 @@ Write-Warning 'warning-probe'
             $shortLivedRun = $shortLivedRuns[0]
             $shortLivedRun.ExitCode | Should Be 0
             $shortLivedRun.TimedOut | Should Be $false
+            $shortLivedRun.OutputLimitExceeded | Should Be $false
             $evidenceValues = @{}
             foreach ($evidenceName in @(
                 'direct.pid', 'msbuild.pid', 'msbuild.exited',
@@ -2613,6 +2763,12 @@ Write-Warning 'warning-probe'
             )
             $shortLivedDescendants = @($shortLivedRun.DescendantProcesses)
             $shortLivedDescendants.Count | Should Be 3
+            $expectedJobProcessIds = @([int]$shortLivedRun.ProcessId) + @(
+                $shortLivedDescendants | ForEach-Object { [int]$_.processId })
+            [int]$shortLivedRun.JobTotalProcesses | Should Be $expectedJobProcessIds.Count
+            [int]$shortLivedRun.JobActiveProcesses | Should Be 0
+            @($shortLivedRun.JobProcessIds | ForEach-Object { [int]$_ } | Sort-Object) |
+                Should Be @($expectedJobProcessIds | Sort-Object)
             foreach ($expectedDescendant in $expectedShortLived)
             {
                 $matches = @($shortLivedDescendants | Where-Object {
@@ -2662,7 +2818,9 @@ Start-Sleep -Seconds 30
                 $treeResult.Count | Should Be 1
                 $treeResult[0].ExitCode | Should Not Be 0
                 $treeResult[0].TimedOut | Should Be $true
+                $treeResult[0].OutputLimitExceeded | Should Be $false
                 ([int]$treeResult[0].ProcessId) | Should BeGreaterThan 0
+                [int]$treeResult[0].JobActiveProcesses | Should Be 0
                 Test-Path -LiteralPath $descendantPidPath -PathType Leaf | Should Be $true
                 $descendantPid = [int][IO.File]::ReadAllText($descendantPidPath)
                 $returnedDescendant = @($treeResult[0].DescendantProcesses | Where-Object {
@@ -3664,7 +3822,8 @@ Start-Sleep -Seconds 30
         {
             $forwarded = @(Assert-P5aChildGateOutput `
                 -PhaseName 'synthetic ready' `
-                -OutputLines @('ordinary output', $valid) `
+                -StdOutLines @('ordinary output', $valid) `
+                -StdErrLines @() `
                 -ExitCode 0 `
                 -TimedOut $false `
                 -ExpectedMarker $ready `
@@ -3673,23 +3832,25 @@ Start-Sleep -Seconds 30
         }
 
         $invalidCases = @(
-            @{ Lines = @('ordinary output'); Exit = 0; Timeout = $false }
-            @{ Lines = @($ready, $ready); Exit = 0; Timeout = $false }
-            @{ Lines = @("prefix $ready"); Exit = 0; Timeout = $false }
-            @{ Lines = @("$ready suffix"); Exit = 0; Timeout = $false }
-            @{ Lines = @("P5A_TRACE_GENERATION_OK cases=8 commit=$script:P5aLockedCommit"); Exit = 0; Timeout = $false }
-            @{ Lines = @($ready); Exit = 7; Timeout = $false }
-            @{ Lines = @($ready); Exit = 0; Timeout = $true }
-            @{ Lines = @($ready, 'LogTemp: Warning: warning'); Exit = 0; Timeout = $false }
-            @{ Lines = @($ready, 'LogTemp: Error: error'); Exit = 0; Timeout = $false }
-            @{ Lines = @($ready, 'P5A_GOLDEN_GENERATION_OK cases=8 commit=b754d6f0f2bb03741d301f8fb88077ebfe561e17'); Exit = 0; Timeout = $false }
+            @{ StdOut = @('ordinary output'); StdErr = @(); Exit = 0; Timeout = $false }
+            @{ StdOut = @($ready, $ready); StdErr = @(); Exit = 0; Timeout = $false }
+            @{ StdOut = @("prefix $ready"); StdErr = @(); Exit = 0; Timeout = $false }
+            @{ StdOut = @("$ready suffix"); StdErr = @(); Exit = 0; Timeout = $false }
+            @{ StdOut = @("P5A_TRACE_GENERATION_OK cases=8 commit=$script:P5aLockedCommit"); StdErr = @(); Exit = 0; Timeout = $false }
+            @{ StdOut = @($ready); StdErr = @(); Exit = 7; Timeout = $false }
+            @{ StdOut = @($ready); StdErr = @(); Exit = 0; Timeout = $true }
+            @{ StdOut = @($ready); StdErr = @('LogTemp: Warning: warning'); Exit = 0; Timeout = $false }
+            @{ StdOut = @($ready); StdErr = @('LogTemp: Error: error'); Exit = 0; Timeout = $false }
+            @{ StdOut = @('ordinary output'); StdErr = @($ready); Exit = 0; Timeout = $false }
+            @{ StdOut = @($ready, 'P5A_GOLDEN_GENERATION_OK cases=8 commit=b754d6f0f2bb03741d301f8fb88077ebfe561e17'); StdErr = @(); Exit = 0; Timeout = $false }
         )
         foreach ($invalid in $invalidCases)
         {
             Test-TestP5aRejects {
                 Assert-P5aChildGateOutput `
                     -PhaseName 'synthetic invalid marker' `
-                    -OutputLines $invalid.Lines `
+                    -StdOutLines $invalid.StdOut `
+                    -StdErrLines $invalid.StdErr `
                     -ExitCode $invalid.Exit `
                     -TimedOut $invalid.Timeout `
                     -ExpectedMarker $ready `
@@ -5113,6 +5274,7 @@ Start-Sleep -Seconds 30
         $failure | Should Not BeNullOrEmpty
         @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
         Test-Path -LiteralPath $context.Staging | Should Be $false
+
     }
 
     It 'stops verifier on Oracle or dotnet process failures with no retry extra child or leaked child marker' {
@@ -5143,9 +5305,9 @@ Start-Sleep -Seconds 30
         }
     }
 
-    It 'rejects generator staging that is repository-owned nonempty destination-overlapping or reparse-backed without touching sentinels' {
+    It 'rejects generator staging that is preexisting repository-owned nonempty destination-overlapping or reparse-backed without touching sentinels' {
         Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorWorkflow' generator
-        foreach ($caseName in @('repository', 'nonempty', 'destination-in-staging', 'reparse'))
+        foreach ($caseName in @('preexisting-empty', 'repository', 'nonempty', 'destination-in-staging', 'reparse'))
         {
             $context = New-TestP5aProcessContext "generator-exclusive-staging-$caseName"
             $outsideSentinel = Join-Path $TestDrive "generator-exclusive-staging-$caseName-outside.txt"
@@ -5158,6 +5320,9 @@ Start-Sleep -Seconds 30
 
             switch ($caseName)
             {
+                'preexisting-empty' {
+                    [void][IO.Directory]::CreateDirectory($context.Staging)
+                }
                 'repository' {
                     $staging = $context.Root
                     $caseSentinel = Join-Path $context.Root 'repository-sentinel.txt'
@@ -5219,6 +5384,11 @@ Start-Sleep -Seconds 30
             (Get-TestP5aFileHash $outsideSentinel) | Should Be $outsideHash
             (Get-TestP5aFileHash $caseSentinel) | Should Be $caseHash
             (Get-TestP5aFileHash $context.Fixture) | Should Be $fixtureHash
+            if ($caseName -ceq 'preexisting-empty')
+            {
+                Test-Path -LiteralPath $context.Staging -PathType Container | Should Be $true
+                @(Get-ChildItem -LiteralPath $context.Staging -Force).Count | Should Be 0
+            }
             @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
         }
     }
@@ -5255,21 +5425,93 @@ Start-Sleep -Seconds 30
         }).Count | Should Be 0
         @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
         Test-Path -LiteralPath $context.Staging | Should Be $false
+
+        $reparseContext = New-TestP5aProcessContext 'generator-final-publication-reparse'
+        $reparseShim = New-TestP5aProcessShim 'generator-final-publication-reparse-shim'
+        $reparseFileSystem = New-TestP5aAtomicFileSystem
+        $reparseTarget = Join-Path $TestDrive 'generator-final-publication-reparse-target'
+        $reparseOutsideSentinel = Join-Path $TestDrive 'generator-final-publication-reparse-outside.txt'
+        Write-TestP5aText $reparseOutsideSentinel "outside reparse sentinel`n"
+        $reparseOutsideHash = Get-TestP5aFileHash $reparseOutsideSentinel
+        $reparseBefore = Get-TestP5aFileHash $reparseContext.Fixture
+        $capturedStaging = $reparseContext.Staging
+        $capturedReparseTarget = $reparseTarget
+        $reparseAttempts = [Collections.Generic.List[bool]]::new()
+        $capturedReparseAttempts = $reparseAttempts
+        $reparseMutation = {
+            param($Checkpoint)
+
+            Test-Path -LiteralPath $capturedStaging -PathType Container | Should Be $true
+            $capturedReparseAttempts.Add($true)
+            Move-Item -LiteralPath $capturedStaging -Destination $capturedReparseTarget -ErrorAction Stop
+            try
+            {
+                New-Item -ItemType Junction -Path $capturedStaging -Value $capturedReparseTarget `
+                    -ErrorAction Stop | Out-Null
+            }
+            catch
+            {
+                "Missing 13B capability: TestDrive checkpoint junction ($($_.Exception.Message))" |
+                    Should BeNullOrEmpty
+            }
+            ((Get-Item -LiteralPath $capturedStaging -Force).Attributes -band
+                [IO.FileAttributes]::ReparsePoint) | Should Not Be 0
+        }.GetNewClosure()
+        $reparseCheckpoints = New-TestP5aCheckpointInvoker `
+            -MutateAt 'BeforePublication' `
+            -MutationAction $reparseMutation
+        $reparseOutput = [Collections.Generic.List[object]]::new()
+        $reparseFailure = Invoke-TestP5aFailureCapture -Output $reparseOutput -Action {
+            & $script:P5aGeneratorPath `
+                -RepositoryRoot $reparseContext.Root `
+                -UnrealEditorCmd $reparseContext.Editor `
+                -UnrealProject $reparseContext.UProject `
+                -ReferenceRoot $reparseContext.Reference `
+                -StagingRoot $reparseContext.Staging `
+                -DestinationPath $reparseContext.Fixture `
+                -ProcessInvoker $reparseShim.Invoker `
+                -FileSystemInvoker $reparseFileSystem.Invoker `
+                -CheckpointInvoker $reparseCheckpoints.Invoker `
+                -TimeoutSeconds 10
+        }
+
+        $reparseAttempts.Count | Should Be 1
+        $reparseFailure | Should Match '(?i)(reparse|staging|directory|manifest|payload)'
+        @(Get-TestP5aShimRecords $reparseShim).Count | Should Be 7
+        (Get-TestP5aFileHash $reparseContext.Fixture) | Should Be $reparseBefore
+        (Get-TestP5aFileHash $reparseOutsideSentinel) | Should Be $reparseOutsideHash
+        Test-Path -LiteralPath $reparseOutsideSentinel -PathType Leaf | Should Be $true
+        if (Test-Path -LiteralPath $reparseTarget -PathType Container)
+        {
+            Test-Path -LiteralPath (Join-Path $reparseTarget 'native-a.json') -PathType Leaf |
+                Should Be $true
+        }
+        @($reparseFileSystem.Records | Where-Object {
+            $_.operation -in @('File.Replace', 'File.Move')
+        }).Count | Should Be 0
+        @($reparseOutput | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
     }
 
     It 'rejects a valid Oracle marker when any prefixed P5A marker is also emitted' {
         Assert-TestP5aCommandCapability 'Assert-P5aVerifierOracleChild' verifier
         $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=' + ('a' * 64)
-        $result = [pscustomobject]@{
-            TimedOut = $false
-            ExitCode = 0
-            OutputLines = @($marker, "prefix $marker")
-            DescendantProcesses = @()
-        }
+        foreach ($streams in @(
+            @{ StdOut = @($marker, "prefix $marker"); StdErr = @() }
+            @{ StdOut = @($marker); StdErr = @($marker) }
+        ))
+        {
+            $result = [pscustomobject]@{
+                TimedOut = $false
+                ExitCode = 0
+                StdOutLines = @($streams.StdOut)
+                StdErrLines = @($streams.StdErr)
+                DescendantProcesses = @()
+            }
 
-        Test-TestP5aRejects {
-            Assert-P5aVerifierOracleChild -Result $result
-        } | Should Be $true
+            Test-TestP5aRejects {
+                Assert-P5aVerifierOracleChild -Result $result
+            } | Should Be $true
+        }
     }
 
     It 'rejects a same-named executable inside the SDK that is not in the selected closure' {
@@ -5336,8 +5578,12 @@ Start-Sleep -Seconds 30
                     [void]$powerShell.AddParameter('UnrealProject', $context.UProject)
                     [void]$powerShell.AddParameter('ReferenceRoot', $context.Reference)
                 }
-                $output = @($powerShell.Invoke())
+                $output = @()
+                $invokeFailure = $null
+                try { $output = @($powerShell.Invoke()) }
+                catch { $invokeFailure = $_.Exception.Message }
                 $errors = @($powerShell.Streams.Error | ForEach-Object { $_.ToString() })
+                if (-not [string]::IsNullOrEmpty($invokeFailure)) { $errors += $invokeFailure }
                 $errors.Count | Should BeGreaterThan 0
                 $diagnostic = $errors -join ' | '
                 $diagnostic | Should Match '(?i)(apphost|oracle.*evidence|fixed.*release|external.*prerequisite)'
