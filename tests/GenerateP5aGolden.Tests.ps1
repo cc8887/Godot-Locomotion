@@ -5142,4 +5142,292 @@ Start-Sleep -Seconds 30
             }
         }
     }
+
+    It 'rejects generator staging that is repository-owned nonempty destination-overlapping or reparse-backed without touching sentinels' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorWorkflow' generator
+        foreach ($caseName in @('repository', 'nonempty', 'destination-in-staging', 'reparse'))
+        {
+            $context = New-TestP5aProcessContext "generator-exclusive-staging-$caseName"
+            $outsideSentinel = Join-Path $TestDrive "generator-exclusive-staging-$caseName-outside.txt"
+            Write-TestP5aText $outsideSentinel "outside sentinel $caseName`n"
+            $outsideHash = Get-TestP5aFileHash $outsideSentinel
+            $fixtureHash = Get-TestP5aFileHash $context.Fixture
+            $staging = $context.Staging
+            $destination = $context.Fixture
+            $caseSentinel = $outsideSentinel
+
+            switch ($caseName)
+            {
+                'repository' {
+                    $staging = $context.Root
+                    $caseSentinel = Join-Path $context.Root 'repository-sentinel.txt'
+                    Write-TestP5aText $caseSentinel "repository sentinel`n"
+                }
+                'nonempty' {
+                    $caseSentinel = Join-Path $context.Staging 'nonempty-sentinel.txt'
+                    Write-TestP5aText $caseSentinel "nonempty sentinel`n"
+                }
+                'destination-in-staging' {
+                    $destination = Join-Path $context.Staging 'published\trace_p5a.json'
+                }
+                'reparse' {
+                    $reparseTarget = Join-Path $TestDrive "generator-exclusive-staging-$caseName-target"
+                    $caseSentinel = Join-Path $reparseTarget 'target-sentinel.txt'
+                    Write-TestP5aText $caseSentinel "reparse target sentinel`n"
+                    $staging = Join-Path $TestDrive "generator-exclusive-staging-$caseName-link"
+                    try
+                    {
+                        New-Item -ItemType Junction -Path $staging -Value $reparseTarget -ErrorAction Stop | Out-Null
+                    }
+                    catch
+                    {
+                        "Missing 13B capability: TestDrive junction ($($_.Exception.Message))" |
+                            Should BeNullOrEmpty
+                    }
+                    ((Get-Item -LiteralPath $staging -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) |
+                        Should Not Be 0
+                }
+            }
+
+            $caseHash = Get-TestP5aFileHash $caseSentinel
+            $calls = [Collections.Generic.List[int]]::new()
+            $capturedCalls = $calls
+            $safeInvoker = {
+                param($FilePath, $Arguments, $WorkingDirectory, $TimeoutSeconds, $PhaseName)
+
+                $capturedCalls.Add(1)
+                throw 'Unexpected generator child reached an invalid staging directory.'
+            }.GetNewClosure()
+            $output = [Collections.Generic.List[object]]::new()
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                Invoke-P5aGeneratorWorkflow `
+                    -RepositoryRoot $context.Root `
+                    -UnrealEditorCmd $context.Editor `
+                    -UnrealProject $context.UProject `
+                    -ReferenceRoot $context.Reference `
+                    -StagingRoot $staging `
+                    -DestinationPath $destination `
+                    -ProcessInvoker $safeInvoker `
+                    -TimeoutSeconds 10
+            }
+
+            $failure | Should Match '(?i)(staging|repository|destination|reparse)'
+            $calls.Count | Should Be 0
+            Test-Path -LiteralPath $outsideSentinel -PathType Leaf | Should Be $true
+            Test-Path -LiteralPath $caseSentinel -PathType Leaf | Should Be $true
+            Test-Path -LiteralPath $context.Fixture -PathType Leaf | Should Be $true
+            (Get-TestP5aFileHash $outsideSentinel) | Should Be $outsideHash
+            (Get-TestP5aFileHash $caseSentinel) | Should Be $caseHash
+            (Get-TestP5aFileHash $context.Fixture) | Should Be $fixtureHash
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
+        }
+    }
+
+    It 'rejects native-a mutation at the final publication boundary and preserves the prior fixture' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorWorkflow' generator
+        $context = New-TestP5aProcessContext 'generator-final-publication-mutation'
+        $shim = New-TestP5aProcessShim 'generator-final-publication-mutation-shim'
+        $fileSystem = New-TestP5aAtomicFileSystem
+        $paths = Get-TestP5aExpectedProcessPaths $context
+        $checkpoints = New-TestP5aCheckpointInvoker `
+            -MutateAt 'BeforePublication' `
+            -MutatePath $paths.NativeA
+        $before = Get-TestP5aFileHash $context.Fixture
+        $output = [Collections.Generic.List[object]]::new()
+        $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+            & $script:P5aGeneratorPath `
+                -RepositoryRoot $context.Root `
+                -UnrealEditorCmd $context.Editor `
+                -UnrealProject $context.UProject `
+                -ReferenceRoot $context.Reference `
+                -StagingRoot $context.Staging `
+                -DestinationPath $context.Fixture `
+                -ProcessInvoker $shim.Invoker `
+                -FileSystemInvoker $fileSystem.Invoker `
+                -CheckpointInvoker $checkpoints.Invoker `
+                -TimeoutSeconds 10
+        }
+
+        $failure | Should Match '(?i)(manifest|payload|native|changed)'
+        (Get-TestP5aFileHash $context.Fixture) | Should Be $before
+        @($fileSystem.Records | Where-Object {
+            $_.operation -in @('File.Replace', 'File.Move')
+        }).Count | Should Be 0
+        @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
+        Test-Path -LiteralPath $context.Staging | Should Be $false
+    }
+
+    It 'rejects a valid Oracle marker when any prefixed P5A marker is also emitted' {
+        Assert-TestP5aCommandCapability 'Assert-P5aVerifierOracleChild' verifier
+        $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=' + ('a' * 64)
+        $result = [pscustomobject]@{
+            TimedOut = $false
+            ExitCode = 0
+            OutputLines = @($marker, "prefix $marker")
+            DescendantProcesses = @()
+        }
+
+        Test-TestP5aRejects {
+            Assert-P5aVerifierOracleChild -Result $result
+        } | Should Be $true
+    }
+
+    It 'rejects a same-named executable inside the SDK that is not in the selected closure' {
+        Assert-TestP5aCommandCapability 'Assert-P5aVerifierDescendantClosure' verifier
+        $sdkVersion = '8.0.100'
+        $sdkRoot = Join-Path $TestDrive "synthetic-dotnet\sdk\$sdkVersion"
+        $expectedPath = Join-Path $sdkRoot 'MSBuild.exe'
+        $foreignPath = Join-Path $sdkRoot 'shadow\MSBuild.exe'
+        Write-TestP5aText $expectedPath "expected synthetic MSBuild image`n"
+        [void][IO.Directory]::CreateDirectory((Split-Path -Parent $foreignPath))
+        Write-TestP5aText $foreignPath "foreign synthetic MSBuild image`n"
+        $expectedPath = [IO.Path]::GetFullPath($expectedPath)
+        $foreignPath = [IO.Path]::GetFullPath($foreignPath)
+        Assert-TestP5aPathUnderRoot -Path $foreignPath -Root $sdkRoot
+        $pathsByImage = @{ 'MSBuild.exe' = [string[]]@($expectedPath) }
+        @($pathsByImage['MSBuild.exe'] | Where-Object { $_ -ceq $foreignPath }).Count |
+            Should Be 0
+        $closure = [pscustomobject]@{
+            SdkVersion = $sdkVersion
+            PathsByImage = $pathsByImage
+        }
+        $result = [pscustomobject]@{
+            ProcessId = 5002
+            DescendantProcesses = @([pscustomobject]@{
+                processId = 12001
+                parentProcessId = 5002
+                ancestorProcessIds = @(5002)
+                imageName = 'MSBuild.exe'
+                executablePath = $foreignPath
+            })
+        }
+
+        Test-TestP5aRejects {
+            Assert-P5aVerifierDescendantClosure -Result $result -Closure $closure
+        } | Should Be $true
+    }
+
+    It 'accepts the frozen abbreviated entrypoints or fails closed only on an audited external prerequisite' {
+        foreach ($kind in @('generator', 'verifier'))
+        {
+            $context = New-TestP5aProcessContext "frozen-default-entrypoint-$kind"
+            $scriptRoot = Join-Path $context.Root 'scripts'
+            [void][IO.Directory]::CreateDirectory($scriptRoot)
+            $entrypointName = if ($kind -ceq 'generator') {
+                'generate-p5a-golden.ps1'
+            } else {
+                'verify-p5a-golden.ps1'
+            }
+            $entrypoint = Join-Path $scriptRoot $entrypointName
+            $sourceEntrypoint = if ($kind -ceq 'generator') {
+                $script:P5aGeneratorPath
+            } else {
+                $script:P5aVerifierPath
+            }
+            [IO.File]::Copy($sourceEntrypoint, $entrypoint, $true)
+            Remove-Item -LiteralPath $context.Oracle.AppHostPath -Force
+            $powerShell = [Management.Automation.PowerShell]::Create()
+            try
+            {
+                [void]$powerShell.AddCommand($entrypoint)
+                if ($kind -ceq 'generator')
+                {
+                    [void]$powerShell.AddParameter('UnrealEditorCmd', $context.Editor)
+                    [void]$powerShell.AddParameter('UnrealProject', $context.UProject)
+                    [void]$powerShell.AddParameter('ReferenceRoot', $context.Reference)
+                }
+                $output = @($powerShell.Invoke())
+                $errors = @($powerShell.Streams.Error | ForEach-Object { $_.ToString() })
+                $errors.Count | Should BeGreaterThan 0
+                $diagnostic = $errors -join ' | '
+                $diagnostic | Should Match '(?i)(apphost|oracle.*evidence|fixed.*release|external.*prerequisite)'
+                $diagnostic | Should Not Match '(?i)(mandatory|null|cannot bind.*(argument|empty))'
+                @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
+            }
+            finally
+            {
+                $powerShell.Dispose()
+            }
+        }
+    }
+
+    It 'rejects nonpositive timeouts and relative UE or reference paths before any child starts' {
+        foreach ($kind in @('generator', 'verifier'))
+        {
+            foreach ($timeout in @(0, -1))
+            {
+                $context = New-TestP5aProcessContext "nonpositive-timeout-$kind-$timeout"
+                $fixtureHash = Get-TestP5aFileHash $context.Fixture
+                $calls = [Collections.Generic.List[int]]::new()
+                $capturedCalls = $calls
+                $safeInvoker = {
+                    param($FilePath, $Arguments, $WorkingDirectory, $TimeoutSeconds, $PhaseName)
+
+                    $capturedCalls.Add(1)
+                    throw 'Unexpected child reached a nonpositive timeout.'
+                }.GetNewClosure()
+                $output = [Collections.Generic.List[object]]::new()
+                $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                    if ($kind -ceq 'generator')
+                    {
+                        Invoke-P5aGeneratorWorkflow `
+                            -RepositoryRoot $context.Root `
+                            -UnrealEditorCmd $context.Editor `
+                            -UnrealProject $context.UProject `
+                            -ReferenceRoot $context.Reference `
+                            -StagingRoot $context.Staging `
+                            -DestinationPath $context.Fixture `
+                            -ProcessInvoker $safeInvoker `
+                            -TimeoutSeconds $timeout
+                    }
+                    else
+                    {
+                        Invoke-P5aVerifierWorkflow `
+                            -RepositoryRoot $context.Root `
+                            -FixturePath $context.Fixture `
+                            -StagingRoot $context.Staging `
+                            -ProcessInvoker $safeInvoker `
+                            -TimeoutSeconds $timeout
+                    }
+                }
+
+                $failure | Should Match '(?i)timeout.*positive'
+                $calls.Count | Should Be 0
+                (Get-TestP5aFileHash $context.Fixture) | Should Be $fixtureHash
+                @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
+            }
+        }
+
+        foreach ($pathCase in @(
+            @{ Name = 'relative-editor'; UnrealEditorCmd = 'relative-editor.exe'; ReferenceRoot = $null; Diagnostic = '(?i)(unreal|editor).*absolute' }
+            @{ Name = 'relative-reference'; UnrealEditorCmd = $null; ReferenceRoot = 'relative-reference'; Diagnostic = '(?i)reference.*absolute' }
+        ))
+        {
+            $context = New-TestP5aProcessContext "generator-absolute-$($pathCase.Name)"
+            $calls = [Collections.Generic.List[int]]::new()
+            $capturedCalls = $calls
+            $safeInvoker = {
+                param($FilePath, $Arguments, $WorkingDirectory, $TimeoutSeconds, $PhaseName)
+
+                $capturedCalls.Add(1)
+                throw 'Unexpected child reached a relative generator path.'
+            }.GetNewClosure()
+            $output = [Collections.Generic.List[object]]::new()
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                Invoke-P5aGeneratorProcessProtocol `
+                    -RepositoryRoot $context.Root `
+                    -OracleAppHost $context.Oracle.AppHostPath `
+                    -UnrealEditorCmd $(if ($null -eq $pathCase.UnrealEditorCmd) { $context.Editor } else { $pathCase.UnrealEditorCmd }) `
+                    -UnrealProject $context.UProject `
+                    -ReferenceRoot $(if ($null -eq $pathCase.ReferenceRoot) { $context.Reference } else { $pathCase.ReferenceRoot }) `
+                    -StagingRoot $context.Staging `
+                    -ProcessInvoker $safeInvoker `
+                    -TimeoutSeconds 10
+            }
+
+            $failure | Should Match $pathCase.Diagnostic
+            $calls.Count | Should Be 0
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
+        }
+    }
 }
