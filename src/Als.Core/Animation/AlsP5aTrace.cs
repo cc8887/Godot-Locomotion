@@ -22,8 +22,6 @@ public static class AlsP5aTrace
     private const int MaximumStringLength = 4096;
     private const ulong DigestOffset = 14695981039346656037UL;
     private const ulong DigestPrime = 1099511628211UL;
-    private static readonly int[] FrozenCaseFrameCounts = [41, 3, 33, 33, 33, 104, 69, 58];
-    private static readonly int[] FrozenSourceVariantCounts = [1, 1, 1, 1, 1, 2, 2, 1, 1];
 
     private static int LastShadowExecutionCount;
     private static ulong LastShadowExecutionDigest;
@@ -89,6 +87,9 @@ public static class AlsP5aTrace
         }
 
         var bytes = File.ReadAllBytes(path);
+        var representation = label == "plan"
+            ? PreflightRepresentation.Plan
+            : ReadPreflightRepresentation(bytes);
         var reader = new Utf8JsonReader(bytes, new JsonReaderOptions
         {
             AllowTrailingCommas = false,
@@ -120,16 +121,13 @@ public static class AlsP5aTrace
                 else if (reader.TokenType == JsonTokenType.EndArray)
                 {
                     ref var container = ref containers[containerCount - 1];
-                    ValidatePreflightArrayCardinality(label, container.Path, container.ItemCount);
+                    ValidatePreflightArrayCardinality(label, representation, container.Path, container.ItemCount);
                     containerCount--;
                 }
                 else if (reader.TokenType == JsonTokenType.PropertyName)
                 {
+                    ValidatePreflightStringLength(ref reader, label);
                     var name = reader.GetString() ?? throw new InvalidDataException($"P5A {label} contains a null property name.");
-                    if (Encoding.UTF8.GetByteCount(name) > MaximumStringLength)
-                    {
-                        throw new InvalidDataException($"P5A {label} string exceeds 4096 characters.");
-                    }
                     var objectDepth = reader.CurrentDepth - 1;
                     var properties = objectDepth >= 0 ? propertySets[objectDepth] : null;
                     if (properties is null)
@@ -144,11 +142,7 @@ public static class AlsP5aTrace
                 }
                 else if (reader.TokenType == JsonTokenType.String)
                 {
-                    var value = reader.GetString() ?? string.Empty;
-                    if (Encoding.UTF8.GetByteCount(value) > MaximumStringLength)
-                    {
-                        throw new InvalidDataException($"P5A {label} string exceeds 4096 characters.");
-                    }
+                    ValidatePreflightStringLength(ref reader, label);
                     AttachPreflightScalar(containers, containerCount);
                 }
                 else if (reader.TokenType is JsonTokenType.Number or JsonTokenType.True or
@@ -172,6 +166,64 @@ public static class AlsP5aTrace
         return bytes;
     }
 
+    private static PreflightRepresentation ReadPreflightRepresentation(ReadOnlySpan<byte> bytes)
+    {
+        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions
+        {
+            AllowTrailingCommas = false,
+            CommentHandling = JsonCommentHandling.Disallow,
+            MaxDepth = MaximumDocumentDepth,
+        });
+        try
+        {
+            while (reader.Read())
+            {
+                if (reader.TokenType != JsonTokenType.PropertyName || reader.CurrentDepth != 1 ||
+                    !reader.ValueTextEquals("representation"))
+                {
+                    continue;
+                }
+                if (!reader.Read() || reader.TokenType != JsonTokenType.String)
+                {
+                    return PreflightRepresentation.Unknown;
+                }
+                ValidatePreflightStringLength(ref reader, "input");
+                return reader.GetString() switch
+                {
+                    "native_raw" => PreflightRepresentation.NativeRaw,
+                    "native_canonical" => PreflightRepresentation.NativeCanonical,
+                    "port_canonical" => PreflightRepresentation.PortCanonical,
+                    _ => PreflightRepresentation.Unknown,
+                };
+            }
+        }
+        catch (JsonException)
+        {
+            return PreflightRepresentation.Unknown;
+        }
+        return PreflightRepresentation.Unknown;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ValidatePreflightStringLength(ref Utf8JsonReader reader, string label)
+    {
+        // CopyString decodes escapes from either ValueSpan or ValueSequence without allocating a string.
+        Span<byte> decoded = stackalloc byte[MaximumStringLength + 1];
+        int length;
+        try
+        {
+            length = reader.CopyString(decoded);
+        }
+        catch (ArgumentException)
+        {
+            throw new InvalidDataException($"P5A {label} string exceeds 4096 UTF-8 bytes.");
+        }
+        if (length > MaximumStringLength)
+        {
+            throw new InvalidDataException($"P5A {label} string exceeds 4096 UTF-8 bytes.");
+        }
+    }
+
     private static string AttachPreflightValue(PreflightContainer[] containers, int containerCount)
     {
         if (containerCount == 0)
@@ -181,13 +233,16 @@ public static class AlsP5aTrace
         ref var parent = ref containers[containerCount - 1];
         if (parent.IsArray)
         {
-            return $"{parent.Path}[{parent.ItemCount++}]";
+            return $"{parent.Path}/{parent.ItemCount++}";
         }
         var property = parent.PendingProperty ??
             throw new InvalidDataException("P5A JSON container has no owning property.");
         parent.PendingProperty = null;
-        return $"{parent.Path}.{property}";
+        return $"{parent.Path}/{EscapePreflightPathSegment(property)}";
     }
+
+    private static string EscapePreflightPathSegment(string value) =>
+        value.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
 
     private static void AttachPreflightScalar(PreflightContainer[] containers, int containerCount)
     {
@@ -206,79 +261,159 @@ public static class AlsP5aTrace
         }
     }
 
-    private static void ValidatePreflightArrayCardinality(string label, string path, int count)
+    private static void ValidatePreflightArrayCardinality(
+        string label, PreflightRepresentation representation, string path, int count)
     {
-        if (label == "plan")
+        if (representation == PreflightRepresentation.Plan)
         {
-            if (TryRequireExact(path, "$.sources", count, 9, label) ||
-                TryRequireExact(path, "$.eventMap", count, 10, label) ||
-                TryRequireExact(path, "$.markerMap", count, 2, label) ||
-                TryRequireExact(path, "$.sectionMap", count, 1, label) ||
-                TryRequireExact(path, "$.nativeOnlyEventMap", count, 7, label) ||
-                TryRequireExact(path, "$.cases", count, 8, label))
+            if (TryRequireExact(path, "$/sources", count, 9, label) ||
+                TryRequireExact(path, "$/eventMap", count, 10, label) ||
+                TryRequireExact(path, "$/markerMap", count, 2, label) ||
+                TryRequireExact(path, "$/sectionMap", count, 1, label) ||
+                TryRequireExact(path, "$/nativeOnlyEventMap", count, 7, label) ||
+                TryRequireExact(path, "$/cases", count, 8, label))
             {
                 return;
             }
-            if (TryGetIndexedPath(path, "$.sources[", "].nativeVariants", out var sourceIndex) &&
-                (uint)sourceIndex < (uint)FrozenSourceVariantCounts.Length)
+            if (TryGetIndexedPath(path, "$/sources/", "/nativeVariants", out var sourceIndex) &&
+                (uint)sourceIndex < 9u)
             {
-                RequireExactArray(path, count, FrozenSourceVariantCounts[sourceIndex], label);
+                RequireExactArray(path, count, FrozenSourceVariantCount(sourceIndex), label);
                 return;
             }
         }
-        else
+        else if (representation == PreflightRepresentation.NativeRaw)
         {
-            if (TryRequireExact(path, "$.cases", count, 8, label) ||
-                TryRequireExact(path, "$.nativeReferenceAudit.assets", count, 11, label) ||
-                TryRequireExact(path, "$.nativeReferenceAudit.events", count, 19, label) ||
-                TryRequireExact(path, "$.nativeReferenceAudit.markers", count, 2, label) ||
-                TryRequireExact(path, "$.nativeReferenceAudit.curveInventories", count, 5, label))
+            if (TryRequireExact(path, "$/cases", count, 8, label) ||
+                TryRequireExact(path, "$/nativeReferenceAudit/assets", count, 11, label) ||
+                TryRequireExact(path, "$/nativeReferenceAudit/events", count, 19, label) ||
+                TryRequireExact(path, "$/nativeReferenceAudit/markers", count, 2, label) ||
+                TryRequireExact(path, "$/nativeReferenceAudit/curveInventories", count, 5, label))
             {
+                return;
+            }
+            if (TryGetIndexedPath(
+                    path, "$/nativeReferenceAudit/curveInventories/", "/curveNames", out var inventoryIndex) &&
+                (uint)inventoryIndex < 5u)
+            {
+                RequireMaximumArray(path, count, 3, label);
                 return;
             }
         }
 
-        if (TryGetIndexedPath(path, "$.cases[", "].frames", out var caseIndex) &&
-            (uint)caseIndex < (uint)FrozenCaseFrameCounts.Length)
+        if (TryGetIndexedPath(path, "$/cases/", "/frames", out var caseIndex) &&
+            (uint)caseIndex < 8u)
         {
-            RequireExactArray(path, count, FrozenCaseFrameCounts[caseIndex], label);
+            RequireExactArray(path, count, FrozenCaseFrameCount(caseIndex), label);
             return;
         }
-        if (label == "plan" && TryGetCaseIndex(path, out caseIndex))
+        if (TryGetFramePath(path, out caseIndex, out var frameIndex, out var frameMember) &&
+            (uint)caseIndex < 8u && (uint)frameIndex < (uint)FrozenCaseFrameCount(caseIndex))
         {
-            if (path.EndsWith(".input.p4Curves.base", StringComparison.Ordinal))
+            if (representation == PreflightRepresentation.Plan)
             {
-                RequireExactArray(path, count, 1, label);
-                return;
+                if (frameMember == "/input/p4Curves/base")
+                {
+                    RequireExactArray(path, count, 1, label);
+                    return;
+                }
+                if (frameMember is "/input/p4Curves/turnBanks" or "/input/p4Curves/rotateBanks")
+                {
+                    RequireExactArray(path, count, caseIndex == 1 ? 1 : 0, label);
+                    return;
+                }
+                if (frameMember == "/input/syncMappings")
+                {
+                    RequireExactArray(path, count, caseIndex <= 1 ? 1 : 0, label);
+                    return;
+                }
             }
-            if (path.EndsWith(".input.p4Curves.turnBanks", StringComparison.Ordinal) ||
-                path.EndsWith(".input.p4Curves.rotateBanks", StringComparison.Ordinal))
-            {
-                RequireExactArray(path, count, caseIndex == 1 ? 1 : 0, label);
-                return;
-            }
-            if (path.EndsWith(".input.syncMappings", StringComparison.Ordinal))
-            {
-                RequireExactArray(path, count, caseIndex <= 1 ? 1 : 0, label);
-                return;
-            }
-        }
 
-        if (path.EndsWith(".canonicalAssetOracle.events", StringComparison.Ordinal) ||
-            path.EndsWith(".canonicalAssetOracle.activeNotifyStates", StringComparison.Ordinal) ||
-            path.EndsWith(".stateAfter.activeNotifyStates", StringComparison.Ordinal))
-        {
-            RequireMaximumArray(path, count, 16, label);
-        }
-        else if (path.EndsWith(".actionOutcomes", StringComparison.Ordinal))
-        {
-            RequireMaximumArray(path, count, 2, label);
-        }
-        else if (path.EndsWith(".transitionStimulusReceipts", StringComparison.Ordinal))
-        {
-            RequireMaximumArray(path, count, 1, label);
+            if (representation == PreflightRepresentation.NativeRaw)
+            {
+                if (frameMember is "/nativeActual/canonicalAssetOracle/events" or
+                    "/nativeActual/canonicalAssetOracle/activeNotifyStates" or
+                    "/nativeActual/nativeRuntimeTimeline")
+                {
+                    RequireMaximumArray(path, count, 16, label);
+                    return;
+                }
+                if (frameMember == "/nativeActual/actionOutcomes")
+                {
+                    RequireMaximumArray(path, count, 2, label);
+                    return;
+                }
+                if (frameMember == "/nativeActual/transitionStimulusReceipts")
+                {
+                    RequireMaximumArray(path, count, 1, label);
+                    return;
+                }
+            }
+            if (representation is PreflightRepresentation.NativeCanonical or
+                PreflightRepresentation.PortCanonical)
+            {
+                if (frameMember is "/comparableActual/events" or
+                    "/comparableActual/stateAfter/activeNotifyStates")
+                {
+                    RequireMaximumArray(path, count, 16, label);
+                    return;
+                }
+                if (frameMember == "/comparableActual/actionOutcomes")
+                {
+                    RequireMaximumArray(path, count, 2, label);
+                    return;
+                }
+            }
+            if (representation == PreflightRepresentation.PortCanonical)
+            {
+                if (frameMember == "/portAudit/prepared/syncMappings")
+                {
+                    RequireExactArray(path, count, caseIndex <= 1 ? 1 : 0, label);
+                    return;
+                }
+                if (frameMember == "/portAudit/result/events")
+                {
+                    RequireMaximumArray(path, count, 16, label);
+                    return;
+                }
+                if (frameMember == "/portAudit/result/actionOutcomes")
+                {
+                    RequireMaximumArray(path, count, 2, label);
+                    return;
+                }
+                switch (frameMember)
+                {
+                    case "/portAudit/stateAfter/timelineCursors":
+                        RequireExactArray(path, count, 37, label);
+                        return;
+                    case "/portAudit/stateAfter/authorities":
+                        RequireExactArray(path, count, 4, label);
+                        return;
+                    case "/portAudit/stateAfter/notifyOwnership":
+                        RequireExactArray(path, count, 16, label);
+                        return;
+                }
+            }
         }
     }
+
+    private static int FrozenCaseFrameCount(int caseIndex) => caseIndex switch
+    {
+        0 => 41,
+        1 => 3,
+        2 or 3 or 4 => 33,
+        5 => 104,
+        6 => 69,
+        7 => 58,
+        _ => throw new ArgumentOutOfRangeException(nameof(caseIndex)),
+    };
+
+    private static int FrozenSourceVariantCount(int sourceIndex) => sourceIndex switch
+    {
+        0 or 1 or 2 or 3 or 4 or 7 or 8 => 1,
+        5 or 6 => 2,
+        _ => throw new ArgumentOutOfRangeException(nameof(sourceIndex)),
+    };
 
     private static bool TryRequireExact(string path, string expectedPath, int count, int expected, string label)
     {
@@ -310,15 +445,17 @@ public static class AlsP5aTrace
 
     private static string ArrayName(string path)
     {
-        var dot = path.LastIndexOf('.');
-        return dot >= 0 ? path[(dot + 1)..] : path;
+        var slash = path.LastIndexOf('/');
+        return slash >= 0 ? path[(slash + 1)..] : path;
     }
 
     private static bool TryGetIndexedPath(string path, string prefix, string suffix, out int index)
     {
         index = -1;
-        if (!path.StartsWith(prefix, StringComparison.Ordinal) ||
-            !path.EndsWith(suffix, StringComparison.Ordinal))
+        var pathSpan = path.AsSpan();
+        if (!pathSpan.StartsWith(prefix, StringComparison.Ordinal) ||
+            path.Length <= prefix.Length + suffix.Length ||
+            !pathSpan[^suffix.Length..].SequenceEqual(suffix))
         {
             return false;
         }
@@ -326,16 +463,34 @@ public static class AlsP5aTrace
         return int.TryParse(value, out index);
     }
 
-    private static bool TryGetCaseIndex(string path, out int caseIndex)
+    private static bool TryGetFramePath(
+        string path, out int caseIndex, out int frameIndex, out string frameMember)
     {
         caseIndex = -1;
-        const string prefix = "$.cases[";
-        if (!path.StartsWith(prefix, StringComparison.Ordinal))
+        frameIndex = -1;
+        frameMember = string.Empty;
+        const string prefix = "$/cases/";
+        var pathSpan = path.AsSpan();
+        if (!pathSpan.StartsWith(prefix, StringComparison.Ordinal))
         {
             return false;
         }
-        var close = path.IndexOf(']', prefix.Length);
-        return close > prefix.Length && int.TryParse(path.AsSpan(prefix.Length, close - prefix.Length), out caseIndex);
+        var caseEnd = path.IndexOf('/', prefix.Length);
+        const string frames = "/frames/";
+        if (caseEnd <= prefix.Length ||
+            !int.TryParse(pathSpan[prefix.Length..caseEnd], out caseIndex) ||
+            !pathSpan[caseEnd..].StartsWith(frames, StringComparison.Ordinal))
+        {
+            return false;
+        }
+        var frameStart = caseEnd + frames.Length;
+        var frameEnd = path.IndexOf('/', frameStart);
+        if (frameEnd <= frameStart || !int.TryParse(pathSpan[frameStart..frameEnd], out frameIndex))
+        {
+            return false;
+        }
+        frameMember = path[frameEnd..];
+        return true;
     }
 
     private static MaterializedInputs MaterializeAndReplay(
@@ -827,6 +982,15 @@ public static class AlsP5aTrace
         internal string Path;
         internal string? PendingProperty;
         internal int ItemCount;
+    }
+
+    private enum PreflightRepresentation : byte
+    {
+        Unknown,
+        Plan,
+        NativeRaw,
+        NativeCanonical,
+        PortCanonical,
     }
 
     private sealed record PreflightResult(
