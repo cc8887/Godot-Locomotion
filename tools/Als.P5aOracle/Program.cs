@@ -168,7 +168,12 @@ internal static class Program
     private static string RequireVerifierStagingRoot(string repositoryRoot)
     {
         var value = Environment.GetEnvironmentVariable("GODOTALS_P5A_STAGING_ROOT");
-        if (string.IsNullOrWhiteSpace(value) || !Path.IsPathFullyQualified(value))
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                "GODOTALS_P5A_STAGING_ROOT is required for fixture verification.");
+        }
+        if (!Path.IsPathFullyQualified(value))
         {
             throw new InvalidOperationException("GODOTALS_P5A_STAGING_ROOT must be an absolute verifier staging directory.");
         }
