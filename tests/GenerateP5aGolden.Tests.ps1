@@ -988,7 +988,7 @@ function Assert-TestP5aDescendantRecordShape
 {
     param(
         [Parameter(Mandatory)][object]$DirectChildRecord,
-        [Parameter(Mandatory)][string[]]$ExpectedImages,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ExpectedImages,
         [string[]]$ExpectedExecutablePaths = @()
     )
 
@@ -1137,12 +1137,12 @@ function Invoke-TestP5aExternalProcess
 
 function Get-TestP5aDotnetApplicationPath
 {
-    $command = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue
-    if ($null -eq $command)
+    $commands = @(Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue)
+    if ($commands.Count -eq 0)
     {
         'Missing 13B capability: dotnet application selected by global.json' | Should BeNullOrEmpty
     }
-    return [IO.Path]::GetFullPath($command.Source)
+    return [IO.Path]::GetFullPath([string]$commands[0].Source)
 }
 
 function Get-TestP5aSelectedDotnetDescendantClosure
@@ -2712,8 +2712,9 @@ Start-Sleep -Seconds 30
         $runs = @(Invoke-TestP5aWithProcessEnvironment `
             -Values $toolchain.Environment `
             -Action {
+                $dotnetCommands = @(Get-Command dotnet -CommandType Application -ErrorAction Stop)
                 $selectedDotnet = [IO.Path]::GetFullPath(
-                    (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source)
+                    [string]$dotnetCommands[0].Source)
                 $generatorOutput = @(& $script:P5aGeneratorPath `
                     -RepositoryRoot $context.Root `
                     -UnrealEditorCmd $context.Editor `
