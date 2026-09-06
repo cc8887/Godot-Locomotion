@@ -874,9 +874,7 @@ function New-TestP5aEnvironmentMutatingInvoker
         {
             if ($capturedRemove)
             {
-                [Environment]::SetEnvironmentVariable(
-                    'GODOTALS_P5A_STAGING_ROOT', $null,
-                    [EnvironmentVariableTarget]::Process)
+                Remove-Item Env:GODOTALS_P5A_STAGING_ROOT -ErrorAction SilentlyContinue
             }
             else
             {
