@@ -38,7 +38,7 @@ public static class AlsP5aTrace
         scoped in AlsP5RuntimeBindings runtimeBindings,
         ulong graphDigest)
     {
-        var preflight = PreflightInputs(rawPath, tracePlanPath);
+        var preflight = PreflightInputs(rawPath, tracePlanPath, PreflightRepresentation.NativeRaw);
         ValidatePreflightResult(ref preflight);
         var materialized = MaterializeAndReplay(preflight, occurrenceLayout, runtimeBindings, graphDigest);
         var replay = ReplayAllFrames(occurrenceLayout, runtimeBindings, graphDigest);
@@ -52,17 +52,18 @@ public static class AlsP5aTrace
         scoped in AlsP5RuntimeBindings runtimeBindings,
         ulong graphDigest)
     {
-        var preflight = PreflightInputs(fixturePath, tracePlanPath);
+        var preflight = PreflightInputs(fixturePath, tracePlanPath, PreflightRepresentation.NativeCanonical);
         var materialized = MaterializeAndReplay(preflight, occurrenceLayout, runtimeBindings, graphDigest);
         VerifyCanonicalFixture(materialized);
     }
 
-    private static PreflightResult PreflightInputs(string firstPath, string planPath)
+    private static PreflightResult PreflightInputs(
+        string firstPath, string planPath, PreflightRepresentation expectedFirstRepresentation)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(firstPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(planPath);
-        var first = ReadAndValidateCanonicalDocument(firstPath, "input");
-        var plan = ReadAndValidateCanonicalDocument(planPath, "plan");
+        var first = ReadAndValidateCanonicalDocument(firstPath, expectedFirstRepresentation);
+        var plan = ReadAndValidateCanonicalDocument(planPath, PreflightRepresentation.Plan);
         return new PreflightResult(firstPath, planPath, first, plan);
     }
 
@@ -74,8 +75,10 @@ public static class AlsP5aTrace
         }
     }
 
-    private static byte[] ReadAndValidateCanonicalDocument(string path, string label)
+    private static byte[] ReadAndValidateCanonicalDocument(
+        string path, PreflightRepresentation expectedRepresentation)
     {
+        var label = PreflightRepresentationLabel(expectedRepresentation);
         var file = new FileInfo(path);
         if (!file.Exists)
         {
@@ -87,9 +90,6 @@ public static class AlsP5aTrace
         }
 
         var bytes = File.ReadAllBytes(path);
-        var representation = label == "plan"
-            ? PreflightRepresentation.Plan
-            : ReadPreflightRepresentation(bytes);
         var reader = new Utf8JsonReader(bytes, new JsonReaderOptions
         {
             AllowTrailingCommas = false,
@@ -99,10 +99,19 @@ public static class AlsP5aTrace
         var propertySets = new HashSet<string>?[MaximumDocumentDepth + 1];
         var containers = new PreflightContainer[MaximumDocumentDepth + 1];
         var containerCount = 0;
+        var representation = PreflightRepresentation.Unknown;
+        var representationSeen = false;
+        InvalidDataException? cardinalityFailure = null;
         try
         {
             while (reader.Read())
             {
+                var rootRepresentationValue = containerCount == 1 && !containers[0].IsArray &&
+                    containers[0].PendingProperty == "representation";
+                if (rootRepresentationValue && reader.TokenType != JsonTokenType.String)
+                {
+                    representationSeen = true;
+                }
                 if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
                 {
                     var containerPath = AttachPreflightValue(containers, containerCount);
@@ -121,7 +130,18 @@ public static class AlsP5aTrace
                 else if (reader.TokenType == JsonTokenType.EndArray)
                 {
                     ref var container = ref containers[containerCount - 1];
-                    ValidatePreflightArrayCardinality(label, representation, container.Path, container.ItemCount);
+                    if (cardinalityFailure is null)
+                    {
+                        try
+                        {
+                            ValidatePreflightArrayCardinality(
+                                label, expectedRepresentation, container.Path, container.ItemCount);
+                        }
+                        catch (InvalidDataException exception)
+                        {
+                            cardinalityFailure = exception;
+                        }
+                    }
                     containerCount--;
                 }
                 else if (reader.TokenType == JsonTokenType.PropertyName)
@@ -143,6 +163,11 @@ public static class AlsP5aTrace
                 else if (reader.TokenType == JsonTokenType.String)
                 {
                     ValidatePreflightStringLength(ref reader, label);
+                    if (rootRepresentationValue)
+                    {
+                        representationSeen = true;
+                        representation = ParsePreflightRepresentation(ref reader);
+                    }
                     AttachPreflightScalar(containers, containerCount);
                 }
                 else if (reader.TokenType is JsonTokenType.Number or JsonTokenType.True or
@@ -154,7 +179,17 @@ public static class AlsP5aTrace
         }
         catch (JsonException exception)
         {
+            ValidatePreflightRepresentation(label, expectedRepresentation, representation, representationSeen);
+            if (cardinalityFailure is not null)
+            {
+                throw cardinalityFailure;
+            }
             throw new InvalidDataException($"P5A {label} JSON document is invalid or exceeds depth 64.", exception);
+        }
+        ValidatePreflightRepresentation(label, expectedRepresentation, representation, representationSeen);
+        if (cardinalityFailure is not null)
+        {
+            throw cardinalityFailure;
         }
         if (bytes.Length == 0 || bytes[^1] != (byte)'\n' ||
             bytes.Length > 1 && bytes[^2] == (byte)'\n' ||
@@ -166,43 +201,73 @@ public static class AlsP5aTrace
         return bytes;
     }
 
-    private static PreflightRepresentation ReadPreflightRepresentation(ReadOnlySpan<byte> bytes)
+    private static PreflightRepresentation ParsePreflightRepresentation(ref Utf8JsonReader reader)
     {
-        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions
+        if (reader.ValueTextEquals("trace_plan"))
         {
-            AllowTrailingCommas = false,
-            CommentHandling = JsonCommentHandling.Disallow,
-            MaxDepth = MaximumDocumentDepth,
-        });
-        try
-        {
-            while (reader.Read())
-            {
-                if (reader.TokenType != JsonTokenType.PropertyName || reader.CurrentDepth != 1 ||
-                    !reader.ValueTextEquals("representation"))
-                {
-                    continue;
-                }
-                if (!reader.Read() || reader.TokenType != JsonTokenType.String)
-                {
-                    return PreflightRepresentation.Unknown;
-                }
-                ValidatePreflightStringLength(ref reader, "input");
-                return reader.GetString() switch
-                {
-                    "native_raw" => PreflightRepresentation.NativeRaw,
-                    "native_canonical" => PreflightRepresentation.NativeCanonical,
-                    "port_canonical" => PreflightRepresentation.PortCanonical,
-                    _ => PreflightRepresentation.Unknown,
-                };
-            }
+            return PreflightRepresentation.Plan;
         }
-        catch (JsonException)
+        if (reader.ValueTextEquals("native_raw"))
         {
-            return PreflightRepresentation.Unknown;
+            return PreflightRepresentation.NativeRaw;
+        }
+        if (reader.ValueTextEquals("native_canonical"))
+        {
+            return PreflightRepresentation.NativeCanonical;
+        }
+        if (reader.ValueTextEquals("port_canonical"))
+        {
+            return PreflightRepresentation.PortCanonical;
         }
         return PreflightRepresentation.Unknown;
     }
+
+    private static void ValidatePreflightRepresentation(
+        string label,
+        PreflightRepresentation expected,
+        PreflightRepresentation actual,
+        bool seen)
+    {
+        if (expected == PreflightRepresentation.Plan)
+        {
+            return;
+        }
+        var expectedName = PreflightRepresentationName(expected);
+        if (!seen)
+        {
+            throw new InvalidDataException(
+                $"P5A {label} root representation is missing; expected '{expectedName}'.");
+        }
+        if (actual == PreflightRepresentation.Unknown)
+        {
+            throw new InvalidDataException(
+                $"P5A {label} root representation is unsupported; expected '{expectedName}'.");
+        }
+        if (actual != expected)
+        {
+            throw new InvalidDataException(
+                $"P5A {label} root representation '{PreflightRepresentationName(actual)}' is not accepted; " +
+                $"expected '{expectedName}'.");
+        }
+    }
+
+    private static string PreflightRepresentationLabel(PreflightRepresentation representation) => representation switch
+    {
+        PreflightRepresentation.Plan => "plan",
+        PreflightRepresentation.NativeRaw => "writer input",
+        PreflightRepresentation.NativeCanonical => "fixture",
+        PreflightRepresentation.PortCanonical => "port document",
+        _ => throw new ArgumentOutOfRangeException(nameof(representation)),
+    };
+
+    private static string PreflightRepresentationName(PreflightRepresentation representation) => representation switch
+    {
+        PreflightRepresentation.Plan => "trace_plan",
+        PreflightRepresentation.NativeRaw => "native_raw",
+        PreflightRepresentation.NativeCanonical => "native_canonical",
+        PreflightRepresentation.PortCanonical => "port_canonical",
+        _ => "unknown",
+    };
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ValidatePreflightStringLength(ref Utf8JsonReader reader, string label)

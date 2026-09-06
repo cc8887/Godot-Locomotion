@@ -3801,6 +3801,10 @@ internal static class P5aOracleApphost
             () => AssertOmittedPortStatePreflightLimit(family, bundle, "notifyOwnership", 16, 1),
             () => AssertUnknownIntermediatePathIsNotTreatedAsFrozen(family, bundle),
             () => AssertCrossRepresentationPathIsNotTreatedAsFrozen(family, bundle),
+            () => AssertWriterRepresentationPreflight(family, bundle, "missing"),
+            () => AssertWriterRepresentationPreflight(family, bundle, "unknown"),
+            () => AssertWriterRepresentationPreflight(family, bundle, "native_canonical"),
+            () => AssertVerifierRepresentationPreflight(family, bundle),
             () => AssertLargeStringRejectedBeforeMaterialization(family, propertyName: false),
             () => AssertLargeStringRejectedBeforeMaterialization(family, propertyName: true),
             AssertFrozenPreflightCountsCannotBeMutated);
@@ -3920,7 +3924,7 @@ internal static class P5aOracleApphost
         {
             mappings.Add(mappings[0]!.DeepClone());
         }
-        AssertVerifierPreflightRejectsFixture(
+        AssertDirectPreflightRejectsPortDocument(
             family, Poison(P5aFrozenBundle.CanonicalBytes(fixture)), "syncMappings");
     }
 
@@ -3933,7 +3937,7 @@ internal static class P5aOracleApphost
         Assert.Equal(expected, array.Count);
         if (delta < 0) array.RemoveAt(array.Count - 1);
         else array.Add(array[0]!.DeepClone());
-        AssertVerifierPreflightRejectsFixture(
+        AssertDirectPreflightRejectsPortDocument(
             family, Poison(P5aFrozenBundle.CanonicalBytes(fixture)), name);
     }
 
@@ -3963,6 +3967,32 @@ internal static class P5aOracleApphost
             expectedDiagnostic: "invalid", unexpectedDiagnostic: "timelineCursors");
     }
 
+    private static void AssertWriterRepresentationPreflight(
+        int family, P5aFrozenBundle bundle, string representation)
+    {
+        var raw = bundle.Raw.DeepClone().AsObject();
+        if (representation == "missing") raw.Remove("representation");
+        else raw["representation"] = representation == "unknown" ? "unknown_representation" : representation;
+        var rows = raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[23]!["nativeActual"]!
+            ["nativeRuntimeTimeline"]!.AsArray();
+        while (rows.Count < 17) rows.Add(rows[0]!.DeepClone());
+        AssertWriterRejectsFiles(
+            family, bundle.PlanBytes, Poison(P5aFrozenBundle.CanonicalBytes(raw)),
+            expectedDiagnostic: "representation", unexpectedDiagnostic: "nativeRuntimeTimeline");
+    }
+
+    private static void AssertVerifierRepresentationPreflight(int family, P5aFrozenBundle bundle)
+    {
+        var fixture = bundle.NativeExpected.DeepClone().AsObject();
+        fixture["representation"] = "native_raw";
+        var events = fixture["cases"]!.AsArray()[5]!["frames"]!.AsArray()[29]!["comparableActual"]!
+            ["events"]!.AsArray();
+        while (events.Count < 17) events.Add(events[0]!.DeepClone());
+        AssertVerifierPreflightRejectsFixture(
+            family, Poison(P5aFrozenBundle.CanonicalBytes(fixture)),
+            expectedDiagnostic: "representation", unexpectedDiagnostic: "events");
+    }
+
     private static void AssertLargeStringRejectedBeforeMaterialization(int family, bool propertyName)
     {
         const int documentLength = 16 * 1024 * 1024;
@@ -3973,9 +4003,7 @@ internal static class P5aOracleApphost
         Array.Fill(bytes, (byte)'x', prefix.Length, bytes.Length - prefix.Length - suffix.Length);
         suffix.CopyTo(bytes, bytes.Length - suffix.Length);
 
-        var method = typeof(AlsP5aTrace).GetMethod(
-            "ReadAndValidateCanonicalDocument", BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.NotNull(method);
+        var (method, expectedRepresentation) = PreflightInvocation("NativeRaw");
         var directory = Directory.CreateTempSubdirectory("godot-als-p5a-string-allocation-");
         try
         {
@@ -3983,10 +4011,12 @@ internal static class P5aOracleApphost
             var large = Path.Combine(directory.FullName, "large.json");
             File.WriteAllBytes(warmup, Encoding.ASCII.GetBytes("{\"probe\":\"" + new string('x', 4097) + "\"}\n"));
             File.WriteAllBytes(large, bytes);
-            _ = Assert.Throws<TargetInvocationException>(() => method!.Invoke(null, [warmup, "input"]));
+            _ = Assert.Throws<TargetInvocationException>(() =>
+                method.Invoke(null, [warmup, expectedRepresentation]));
 
             var before = GC.GetAllocatedBytesForCurrentThread();
-            var failure = Assert.Throws<TargetInvocationException>(() => method!.Invoke(null, [large, "input"]));
+            var failure = Assert.Throws<TargetInvocationException>(() =>
+                method.Invoke(null, [large, expectedRepresentation]));
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             var invalid = Assert.IsType<InvalidDataException>(failure.InnerException);
             Assert.Contains("4096", invalid.Message, StringComparison.OrdinalIgnoreCase);
@@ -4008,8 +4038,46 @@ internal static class P5aOracleApphost
 
     private static byte[] Poison(byte[] bytes) => bytes.Concat([(byte)0xff]).ToArray();
 
+    private static void AssertDirectPreflightRejectsPortDocument(
+        int family, byte[] documentBytes, string expectedDiagnostic)
+    {
+        var (method, expectedRepresentation) = PreflightInvocation("PortCanonical");
+        var directory = Directory.CreateTempSubdirectory($"godot-als-p5a-port-preflight-{family}-");
+        try
+        {
+            var document = Path.Combine(directory.FullName, "port.json");
+            File.WriteAllBytes(document, documentBytes);
+            var failure = Assert.Throws<TargetInvocationException>(() =>
+                method.Invoke(null, [document, expectedRepresentation]));
+            var invalid = Assert.IsType<InvalidDataException>(failure.InnerException);
+            Assert.Contains(expectedDiagnostic, invalid.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
+    private static (MethodInfo Method, object ExpectedRepresentation) PreflightInvocation(string expectedName)
+    {
+        var representationType = typeof(AlsP5aTrace).GetNestedType(
+            "PreflightRepresentation", BindingFlags.NonPublic);
+        Assert.NotNull(representationType);
+        var method = typeof(AlsP5aTrace).GetMethod(
+            "ReadAndValidateCanonicalDocument",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [typeof(string), representationType!],
+            modifiers: null);
+        Assert.NotNull(method);
+        return (method, Enum.Parse(representationType!, expectedName));
+    }
+
     private static void AssertVerifierPreflightRejectsFixture(
-        int family, byte[] fixtureBytes, string expectedDiagnostic)
+        int family,
+        byte[] fixtureBytes,
+        string expectedDiagnostic,
+        string? unexpectedDiagnostic = null)
     {
         var apphost = RequireBuiltApphost(family);
         var directory = Directory.CreateTempSubdirectory($"godot-als-p5a-preflight-fixture-{family}-");
@@ -4020,6 +4088,9 @@ internal static class P5aOracleApphost
             var result = RunExpectFailure(apphost, family,
                 "--verify-fixture", "--repository-root", P5aRedHarness.RepositoryRoot(), "--fixture", fixture);
             Assert.Contains(expectedDiagnostic, result.Output + result.Error, StringComparison.OrdinalIgnoreCase);
+            if (unexpectedDiagnostic is not null)
+                Assert.DoesNotContain(unexpectedDiagnostic, result.Output + result.Error,
+                    StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
