@@ -2701,6 +2701,7 @@ Start-Sleep -Seconds 30
         Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorWorkflow' generator
         Assert-TestP5aCommandCapability 'Invoke-P5aVerifierWorkflow' verifier
         $toolchain = Get-TestP5aDefaultWorkflowToolchain
+        [IO.File]::WriteAllText($toolchain.LogPath, [string]::Empty)
         $context = $toolchain.Context
         $generatorCheckpoints = New-TestP5aCheckpointInvoker
         $verifierCheckpoints = New-TestP5aCheckpointInvoker
