@@ -3344,7 +3344,11 @@ internal static class P5aOracleApphost
     }
 
     private static void AssertWriterRejectsFiles(
-        int family, byte[] planBytes, byte[] rawBytes, string? expectedDiagnostic = null)
+        int family,
+        byte[] planBytes,
+        byte[] rawBytes,
+        string? expectedDiagnostic = null,
+        string? unexpectedDiagnostic = null)
     {
         var apphost = RequireBuiltApphost(family);
         var directory = Directory.CreateTempSubdirectory($"godot-als-p5a-reject-{family}-");
@@ -3363,6 +3367,9 @@ internal static class P5aOracleApphost
             if (expectedDiagnostic is not null)
                 Assert.Contains(expectedDiagnostic, absentResult.Output + absentResult.Error,
                     StringComparison.OrdinalIgnoreCase);
+            if (unexpectedDiagnostic is not null)
+                Assert.DoesNotContain(unexpectedDiagnostic, absentResult.Output + absentResult.Error,
+                    StringComparison.OrdinalIgnoreCase);
             Assert.False(File.Exists(native), "Rejected writer input created native output.");
             Assert.False(File.Exists(port), "Rejected writer input created port output.");
 
@@ -3373,6 +3380,9 @@ internal static class P5aOracleApphost
                 "--trace-plan", plan, "--raw", raw, "--native-canonical", native, "--port-canonical", port);
             if (expectedDiagnostic is not null)
                 Assert.Contains(expectedDiagnostic, existingResult.Output + existingResult.Error,
+                    StringComparison.OrdinalIgnoreCase);
+            if (unexpectedDiagnostic is not null)
+                Assert.DoesNotContain(unexpectedDiagnostic, existingResult.Output + existingResult.Error,
                     StringComparison.OrdinalIgnoreCase);
             Assert.Equal(sentinel, File.ReadAllBytes(native));
             Assert.Equal(sentinel, File.ReadAllBytes(port));
@@ -3777,6 +3787,24 @@ internal static class P5aOracleApphost
         AssertOversizeSparseRawRejected(family, bundle);
         AssertExactLimitBoundaryDoesNotMisreport(family, bundle);
 
+        Assert.Multiple(
+            () => AssertOmittedRawArrayPreflightLimit(family, bundle, "nativeRuntimeTimeline"),
+            () => AssertOmittedRawArrayPreflightLimit(family, bundle, "curveNames"),
+            () => AssertOmittedCanonicalArrayPreflightLimits(family, bundle),
+            () => AssertOmittedPortSyncMappingPreflightLimit(family, bundle, 0),
+            () => AssertOmittedPortSyncMappingPreflightLimit(family, bundle, 2),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "timelineCursors", 37, -1),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "timelineCursors", 37, 1),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "authorities", 4, -1),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "authorities", 4, 1),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "notifyOwnership", 16, -1),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "notifyOwnership", 16, 1),
+            () => AssertUnknownIntermediatePathIsNotTreatedAsFrozen(family, bundle),
+            () => AssertCrossRepresentationPathIsNotTreatedAsFrozen(family, bundle),
+            () => AssertLargeStringRejectedBeforeMaterialization(family, propertyName: false),
+            () => AssertLargeStringRejectedBeforeMaterialization(family, propertyName: true),
+            AssertFrozenPreflightCountsCannotBeMutated);
+
         AssertWriterRejectsBytesWithDiagnostic(family, bundle =>
         {
             var nested = new StringBuilder();
@@ -3848,10 +3876,163 @@ internal static class P5aOracleApphost
         AssertPreflightPoisonTail(family, bundle);
     }
 
+    private static void AssertOmittedRawArrayPreflightLimit(
+        int family, P5aFrozenBundle bundle, string collection)
+    {
+        var raw = bundle.Raw.DeepClone().AsObject();
+        if (collection == "nativeRuntimeTimeline")
+        {
+            var rows = raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[23]!["nativeActual"]!
+                [collection]!.AsArray();
+            while (rows.Count < 17) rows.Add(rows[0]!.DeepClone());
+        }
+        else
+        {
+            var rows = raw["nativeReferenceAudit"]!["curveInventories"]!.AsArray()[3]![collection]!.AsArray();
+            rows.Add(rows[0]!.DeepClone());
+        }
+        AssertWriterRejectsFiles(
+            family, bundle.PlanBytes, Poison(P5aFrozenBundle.CanonicalBytes(raw)), collection);
+    }
+
+    private static void AssertOmittedCanonicalArrayPreflightLimits(int family, P5aFrozenBundle bundle)
+    {
+        var fixture = bundle.NativeExpected.DeepClone().AsObject();
+        var events = fixture["cases"]!.AsArray()[5]!["frames"]!.AsArray()[29]!["comparableActual"]!
+            ["events"]!.AsArray();
+        while (events.Count < 17) events.Add(events[0]!.DeepClone());
+        AssertVerifierPreflightRejectsFixture(
+            family, Poison(P5aFrozenBundle.CanonicalBytes(fixture)), "events");
+    }
+
+    private static void AssertOmittedPortSyncMappingPreflightLimit(
+        int family, P5aFrozenBundle bundle, int caseIndex)
+    {
+        var fixture = bundle.PortSchemaSeed.DeepClone().AsObject();
+        var mappings = fixture["cases"]!.AsArray()[caseIndex]!["frames"]!.AsArray()[0]!["portAudit"]!
+            ["prepared"]!["syncMappings"]!.AsArray();
+        if (mappings.Count == 0)
+        {
+            mappings.Add(bundle.PortSchemaSeed["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["portAudit"]!
+                ["prepared"]!["syncMappings"]!.AsArray()[0]!.DeepClone());
+        }
+        else
+        {
+            mappings.Add(mappings[0]!.DeepClone());
+        }
+        AssertVerifierPreflightRejectsFixture(
+            family, Poison(P5aFrozenBundle.CanonicalBytes(fixture)), "syncMappings");
+    }
+
+    private static void AssertOmittedPortStatePreflightLimit(
+        int family, P5aFrozenBundle bundle, string name, int expected, int delta)
+    {
+        var fixture = bundle.PortSchemaSeed.DeepClone().AsObject();
+        var array = fixture["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["portAudit"]!
+            ["stateAfter"]![name]!.AsArray();
+        Assert.Equal(expected, array.Count);
+        if (delta < 0) array.RemoveAt(array.Count - 1);
+        else array.Add(array[0]!.DeepClone());
+        AssertVerifierPreflightRejectsFixture(
+            family, Poison(P5aFrozenBundle.CanonicalBytes(fixture)), name);
+    }
+
+    private static void AssertUnknownIntermediatePathIsNotTreatedAsFrozen(
+        int family, P5aFrozenBundle bundle)
+    {
+        var raw = bundle.Raw.DeepClone().AsObject();
+        raw["unknownProbe"] = new JsonObject
+        {
+            ["actionOutcomes"] = new JsonArray(0, 1, 2),
+        };
+        AssertWriterRejectsFiles(
+            family, bundle.PlanBytes, Poison(P5aFrozenBundle.CanonicalBytes(raw)),
+            expectedDiagnostic: "invalid", unexpectedDiagnostic: "actionOutcomes");
+    }
+
+    private static void AssertCrossRepresentationPathIsNotTreatedAsFrozen(
+        int family, P5aFrozenBundle bundle)
+    {
+        var raw = bundle.Raw.DeepClone().AsObject();
+        var rawFrame = raw["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!.AsObject();
+        rawFrame["portAudit"] = bundle.PortSchemaSeed["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!
+            ["portAudit"]!.DeepClone();
+        rawFrame["portAudit"]!["stateAfter"]!["timelineCursors"]!.AsArray().RemoveAt(36);
+        AssertWriterRejectsFiles(
+            family, bundle.PlanBytes, Poison(P5aFrozenBundle.CanonicalBytes(raw)),
+            expectedDiagnostic: "invalid", unexpectedDiagnostic: "timelineCursors");
+    }
+
+    private static void AssertLargeStringRejectedBeforeMaterialization(int family, bool propertyName)
+    {
+        const int documentLength = 16 * 1024 * 1024;
+        var prefix = Encoding.ASCII.GetBytes(propertyName ? "{\"" : "{\"probe\":\"");
+        var suffix = Encoding.ASCII.GetBytes(propertyName ? "\":0}\n" : "\"}\n");
+        var bytes = new byte[documentLength];
+        prefix.CopyTo(bytes, 0);
+        Array.Fill(bytes, (byte)'x', prefix.Length, bytes.Length - prefix.Length - suffix.Length);
+        suffix.CopyTo(bytes, bytes.Length - suffix.Length);
+
+        var method = typeof(AlsP5aTrace).GetMethod(
+            "ReadAndValidateCanonicalDocument", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var directory = Directory.CreateTempSubdirectory("godot-als-p5a-string-allocation-");
+        try
+        {
+            var warmup = Path.Combine(directory.FullName, "warmup.json");
+            var large = Path.Combine(directory.FullName, "large.json");
+            File.WriteAllBytes(warmup, Encoding.ASCII.GetBytes("{\"probe\":\"" + new string('x', 4097) + "\"}\n"));
+            File.WriteAllBytes(large, bytes);
+            _ = Assert.Throws<TargetInvocationException>(() => method!.Invoke(null, [warmup, "input"]));
+
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var failure = Assert.Throws<TargetInvocationException>(() => method!.Invoke(null, [large, "input"]));
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            var invalid = Assert.IsType<InvalidDataException>(failure.InnerException);
+            Assert.Contains("4096", invalid.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.True(allocated < bytes.LongLength * 2,
+                $"Family {family}: {(propertyName ? "property-name" : "value")} preflight allocated " +
+                $"{allocated} bytes for a {bytes.LongLength}-byte document before rejecting the string limit.");
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
+    private static void AssertFrozenPreflightCountsCannotBeMutated()
+    {
+        Assert.DoesNotContain(typeof(AlsP5aTrace).GetFields(BindingFlags.NonPublic | BindingFlags.Static),
+            field => field.FieldType == typeof(int[]));
+    }
+
+    private static byte[] Poison(byte[] bytes) => bytes.Concat([(byte)0xff]).ToArray();
+
+    private static void AssertVerifierPreflightRejectsFixture(
+        int family, byte[] fixtureBytes, string expectedDiagnostic)
+    {
+        var apphost = RequireBuiltApphost(family);
+        var directory = Directory.CreateTempSubdirectory($"godot-als-p5a-preflight-fixture-{family}-");
+        try
+        {
+            var fixture = Path.Combine(directory.FullName, "fixture.json");
+            File.WriteAllBytes(fixture, fixtureBytes);
+            var result = RunExpectFailure(apphost, family,
+                "--verify-fixture", "--repository-root", P5aRedHarness.RepositoryRoot(), "--fixture", fixture);
+            Assert.Contains(expectedDiagnostic, result.Output + result.Error, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
     private static void AssertExactLimitBoundaryDoesNotMisreport(int family, P5aFrozenBundle bundle)
     {
         var exactString = bundle.Raw.DeepClone().AsObject();
         exactString["reference"]!["repository"] = new string('x', 4096);
+        var exactEscapedString = bundle.Raw.DeepClone().AsObject();
+        exactEscapedString["reference"]!["repository"] = new string('\u00e9', 2048);
         var apphost = RequireBuiltApphost(family);
         var directory = Directory.CreateTempSubdirectory("godot-als-p5a-exact-limit-");
         try
@@ -3868,11 +4049,26 @@ internal static class P5aOracleApphost
             Assert.DoesNotContain("4096", result.Output + result.Error, StringComparison.OrdinalIgnoreCase);
             Assert.False(File.Exists(native));
             Assert.False(File.Exists(port));
+
+            File.WriteAllBytes(raw, P5aFrozenBundle.CanonicalBytes(exactEscapedString));
+            var escapedResult = RunExpectFailure(apphost, family,
+                "--write-canonical-pair", "--repository-root", P5aRedHarness.RepositoryRoot(),
+                "--trace-plan", plan, "--raw", raw, "--native-canonical", native, "--port-canonical", port);
+            Assert.DoesNotContain("4096", escapedResult.Output + escapedResult.Error, StringComparison.OrdinalIgnoreCase);
+            Assert.False(File.Exists(native));
+            Assert.False(File.Exists(port));
         }
         finally
         {
             directory.Delete(true);
         }
+
+        AssertWriterRejectsBytesWithDiagnostic(family, frozen =>
+        {
+            var raw = frozen.Raw.DeepClone().AsObject();
+            raw["reference"]!["repository"] = new string('\u00e9', 2049);
+            return P5aFrozenBundle.CanonicalBytes(raw);
+        }, "4096");
     }
 
     private static void AssertPreflightPoisonTail(int family, P5aFrozenBundle bundle)
