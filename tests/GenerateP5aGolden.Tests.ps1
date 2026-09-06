@@ -149,7 +149,7 @@ function Invoke-TestP5aFailureCapture
 {
     param(
         [Parameter(Mandatory)][scriptblock]$Action,
-        [Parameter(Mandatory)][Collections.Generic.List[object]]$Output
+        [Parameter(Mandatory)][AllowEmptyCollection()][Collections.Generic.List[object]]$Output
     )
 
     try
