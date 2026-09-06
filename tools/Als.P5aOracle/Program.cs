@@ -180,10 +180,20 @@ internal static class Program
         var full = Path.GetFullPath(value);
         var repository = Path.GetFullPath(repositoryRoot) + Path.DirectorySeparatorChar;
         if (full.Equals(Path.GetFullPath(repositoryRoot), StringComparison.OrdinalIgnoreCase) ||
-            full.StartsWith(repository, StringComparison.OrdinalIgnoreCase) ||
-            !Directory.Exists(full) || Directory.EnumerateFileSystemEntries(full).Any())
+            full.StartsWith(repository, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("GODOTALS_P5A_STAGING_ROOT must be a unique, empty directory outside the repository.");
+            throw new InvalidOperationException(
+                "GODOTALS_P5A_STAGING_ROOT has unsafe repository containment; it must be outside the repository.");
+        }
+        if (!Directory.Exists(full))
+        {
+            throw new InvalidOperationException(
+                "GODOTALS_P5A_STAGING_ROOT must identify an existing verifier staging directory.");
+        }
+        if (Directory.EnumerateFileSystemEntries(full).Any())
+        {
+            throw new InvalidOperationException(
+                "GODOTALS_P5A_STAGING_ROOT verifier staging directory is non-empty.");
         }
         return full;
     }
