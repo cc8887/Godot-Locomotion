@@ -2125,7 +2125,6 @@ internal static class Program
             FileName = Environment.ProcessPath ??
                 throw new InvalidOperationException("current apphost path is unavailable"),
             UseShellExecute = false,
-            CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
@@ -2146,7 +2145,6 @@ internal static class Program
         {
             FileName = Path.GetFullPath(executablePath),
             UseShellExecute = false,
-            CreateNoWindow = true,
         };
         startInfo.ArgumentList.Add(mode);
         using var process = Process.Start(startInfo) ??
@@ -2631,7 +2629,7 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
             }
             Write-TestP5aText $capProbe @"
 `$child = Start-Process -FilePath '$escapedPwshPath' -ArgumentList @(
-    '-NoProfile', '-File', '$escapedCapDescendantProbe') -PassThru -WindowStyle Hidden
+    '-NoProfile', '-File', '$escapedCapDescendantProbe') -PassThru -NoNewWindow
 [IO.File]::WriteAllText('$escapedCapDescendantPidPath', [string]`$child.Id)
 `$payload = New-Object byte[] 8388609
 `$stream = [Console]::$capMethod()
@@ -2798,7 +2796,7 @@ Start-Sleep -Seconds 30
             $escapedDescendantPidPath = $descendantPidPath.Replace("'", "''")
             Write-TestP5aText $treeProbe @"
 `$child = Start-Process -FilePath '$escapedPwshPath' -ArgumentList @(
-    '-NoProfile', '-File', '$escapedDescendantProbe') -PassThru -WindowStyle Hidden
+    '-NoProfile', '-File', '$escapedDescendantProbe') -PassThru -NoNewWindow
 [IO.File]::WriteAllText('$escapedDescendantPidPath', [string]`$child.Id)
 [Console]::Out.WriteLine('tree-probe-ready')
 Start-Sleep -Seconds 30
