@@ -2250,9 +2250,18 @@ internal static class Program
     foreach ($selectedSdkExecutable in @(
         $selectedMsBuild, $selectedVstest, $selectedTestHost))
     {
-        [void][IO.Directory]::CreateDirectory((Split-Path -Parent $selectedSdkExecutable))
+        $selectedSdkDirectory = Split-Path -Parent $selectedSdkExecutable
+        [void][IO.Directory]::CreateDirectory($selectedSdkDirectory)
         [IO.File]::Copy(
             (Join-Path $output 'Als.P5aOracle.exe'), $selectedSdkExecutable, $true)
+        foreach ($companionName in @(
+            'Als.P5aOracle.dll', 'Als.Import.dll', 'Als.Core.dll',
+            'Als.P5aOracle.deps.json', 'Als.P5aOracle.runtimeconfig.json'))
+        {
+            [IO.File]::Copy(
+                (Join-Path $output $companionName),
+                (Join-Path $selectedSdkDirectory $companionName), $true)
+        }
     }
     $shortLivedEvidenceRoot = Join-Path $bundleRoot 'short-lived-evidence'
     $context.Editor = $context.Oracle.AppHostPath
