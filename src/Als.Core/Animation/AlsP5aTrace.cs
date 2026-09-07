@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -23,7 +25,9 @@ public static class AlsP5aTrace
     private const ulong DigestOffset = 14695981039346656037UL;
     private const ulong DigestPrime = 1099511628211UL;
 
+    [ThreadStatic]
     private static int LastShadowExecutionCount;
+    [ThreadStatic]
     private static ulong LastShadowExecutionDigest;
 
 
@@ -41,7 +45,15 @@ public static class AlsP5aTrace
         var preflight = PreflightInputs(rawPath, tracePlanPath, PreflightRepresentation.NativeRaw);
         ValidatePreflightResult(ref preflight);
         var materialized = MaterializeAndReplay(preflight, occurrenceLayout, runtimeBindings, graphDigest);
-        var replay = ReplayAllFrames(occurrenceLayout, runtimeBindings, graphDigest);
+        ReplaySummary replay;
+        try
+        {
+            replay = ReplayAllFrames(materialized.Plan, occurrenceLayout, runtimeBindings);
+        }
+        catch (Exception exception) when (IsReplayInputFailure(exception))
+        {
+            throw ReplayFailureWithPlanPath(materialized.Plan, exception);
+        }
         WriteReplayOutputs(materialized, replay, nativeCanonicalPath, portCanonicalPath);
     }
 
@@ -55,6 +67,36 @@ public static class AlsP5aTrace
         var preflight = PreflightInputs(fixturePath, tracePlanPath, PreflightRepresentation.NativeCanonical);
         var materialized = MaterializeAndReplay(preflight, occurrenceLayout, runtimeBindings, graphDigest);
         VerifyCanonicalFixture(materialized);
+        ReplaySummary replay;
+        try
+        {
+            replay = ReplayAllFrames(materialized.Plan, occurrenceLayout, runtimeBindings);
+        }
+        catch (Exception exception) when (IsReplayInputFailure(exception))
+        {
+            throw ReplayFailureWithPlanPath(materialized.Plan, exception);
+        }
+        ValidateCrossEnginePair(materialized.First, replay.PortCanonical);
+    }
+
+    private static bool IsReplayInputFailure(Exception exception) =>
+        exception is InvalidDataException or InvalidOperationException or KeyNotFoundException or
+            FormatException or OverflowException or ArgumentException;
+
+    private static Exception ReplayFailureWithPlanPath(
+        JsonObject plan,
+        Exception failure)
+    {
+        var frozenPlan = P5aFrozenPlanDocuments.Create().Plan;
+        if (JsonNode.DeepEquals(plan, frozenPlan))
+        {
+            return failure;
+        }
+
+        var differencePath = FindFirstDifferencePath(plan, frozenPlan, "$plan");
+        return new InvalidDataException(
+            $"P5A trace plan differs from the frozen plan at {differencePath}; Core replay rejected it: {failure.Message}",
+            failure);
     }
 
     private static PreflightResult PreflightInputs(
@@ -673,171 +715,75 @@ public static class AlsP5aTrace
     }
 
     private static ReplaySummary ReplayAllFrames(
+        JsonObject plan,
         scoped in AlsP5OccurrenceLayoutView occurrenceLayout,
-        scoped in AlsP5RuntimeBindings runtimeBindings,
-        ulong graphDigest)
+        scoped in AlsP5RuntimeBindings runtimeBindings)
     {
-        var successfulFrames = 0;
-        for (var caseIndex = 0; caseIndex < 8; caseIndex++)
-        {
-            var frameCount = caseIndex switch
-            {
-                0 => 41,
-                1 => 3,
-                2 or 3 or 4 => 33,
-                5 => 104,
-                6 => 69,
-                _ => 58,
-            };
-            for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
-            {
-                if (IsShadowFrame(caseIndex, frameIndex))
-                {
-                    ConsumeShadowAttempt(caseIndex, frameIndex, runtimeBindings);
-                }
-                if (ReplayFrame(caseIndex, frameIndex, runtimeBindings, graphDigest))
-                {
-                    successfulFrames++;
-                }
-            }
-        }
-        var frozen = P5aFrozenPlanDocuments.Create();
         var portCanonical = P5aPortReplay.Build(
-            frozen.Plan, frozen.PortSchemaSeed, occurrenceLayout, runtimeBindings);
+            plan, occurrenceLayout, runtimeBindings);
+        var successfulFrames = 0;
+        foreach (var caseNode in portCanonical["cases"]!.AsArray())
+        {
+            successfulFrames = checked(
+                successfulFrames + caseNode!["frames"]!.AsArray().Count);
+        }
         return new ReplaySummary(
             successfulFrames, occurrenceLayout.Entries.Length, portCanonical);
     }
 
-    internal static bool IsShadowFrame(int caseIndex, int frameIndex) =>
+    private static int ShadowFrameIndex(int caseIndex) =>
         caseIndex switch
         {
-            0 => frameIndex == 6,
-            1 => frameIndex == 1,
-            2 or 3 or 4 or 5 => frameIndex == 0,
-            6 or 7 => frameIndex == 56,
-            _ => false,
+            0 => 6,
+            1 => 1,
+            2 or 3 or 4 or 5 => 0,
+            6 or 7 => 56,
+            _ => -1,
         };
 
-    private static void ConsumeShadowAttempt(
-        int caseIndex,
-        int frameIndex,
-        scoped in AlsP5RuntimeBindings runtimeBindings)
+    internal static bool IsShadowFrame(int caseIndex, int frameIndex)
     {
-        var control = new[] { new AlsP5RuntimeScratchControl((ulong)caseIndex + 1UL) };
-        var ownership = CreateOwnership();
-        var scratch = CreateMinimalScratch(control, ownership);
-        var input = CreateMinimalInput(caseIndex, frameIndex);
-        var state = AlsRuntimeState.CreateDefault();
-        _ = AlsP5Runtime.TryPrepare(
-            runtimeBindings, input, state, ReadOnlySpan<AlsTimelineCursor>.Empty,
-            ReadOnlySpan<AlsTimelineAuthorityState>.Empty, ownership, 1UL, ref scratch,
-            out var prepared, out _);
-        var p4 = AlsFrameResult.CreateDefault(input.Identity);
-        p4.P4ReasonCode = AlsP4ReasonCode.InvalidSelection;
-        var probe = new AlsDynamicTransitionInput(
-            AlsStance.Standing, 0f, Vector3.Zero, Vector3.Zero, 0,
-            Vector3.Zero, Vector3.Zero, 0);
-        _ = AlsP5Runtime.TryFinalize(
-            prepared, ref scratch, p4, state, probe, out _, out _, out _, out _);
-        _ = AlsP5Runtime.TryFinalize(
-            prepared, ref scratch, AlsFrameResult.CreateDefault(input.Identity), state, probe,
-            out _, out _, out _, out _);
-        var digest = DigestOffset;
-        for (var index = 0; index <= caseIndex; index++)
+        var selectedFrame = ShadowFrameIndex(caseIndex);
+        return selectedFrame >= 0 && frameIndex == selectedFrame;
+    }
+
+    internal static void ResetShadowExecutionAudit()
+    {
+        LastShadowExecutionCount = 0;
+        LastShadowExecutionDigest = DigestOffset;
+    }
+
+    internal static void RecordShadowExecution(int caseIndex, int frameIndex)
+    {
+        if (caseIndex != LastShadowExecutionCount || !IsShadowFrame(caseIndex, frameIndex))
         {
-            var selectedFrame = index switch
-            {
-                0 => 6,
-                1 => 1,
-                6 or 7 => 56,
-                _ => 0,
-            };
-            digest = (digest ^ (uint)index) * DigestPrime;
-            digest = (digest ^ (uint)selectedFrame) * DigestPrime;
+            throw new InvalidDataException(
+                $"P5A shadow audit was recorded out of order at case {caseIndex} frame {frameIndex}.");
         }
-        LastShadowExecutionCount = caseIndex + 1;
+        var digest = LastShadowExecutionDigest;
+        digest = (digest ^ (uint)caseIndex) * DigestPrime;
+        digest = (digest ^ (uint)frameIndex) * DigestPrime;
         LastShadowExecutionDigest = digest;
+        LastShadowExecutionCount++;
     }
 
-    private static bool ReplayFrame(
-        int caseIndex,
-        int frameIndex,
-        scoped in AlsP5RuntimeBindings runtimeBindings,
-        ulong graphDigest)
+    internal static void ValidateShadowExecutionAudit()
     {
-        var control = new[] { new AlsP5RuntimeScratchControl((ulong)caseIndex + 101UL) };
-        var ownership = new AlsNotifyStateOwnership[AlsEventBuffer.Capacity];
-        for (var index = 0; index < ownership.Length; index++)
+        var expectedDigest = DigestOffset;
+        var expectedCount = 0;
+        for (var caseIndex = 0; caseIndex < 8; caseIndex++)
         {
-            ownership[index] = AlsNotifyStateOwnership.CreateDefault();
+            var frameIndex = ShadowFrameIndex(caseIndex);
+            expectedDigest = (expectedDigest ^ (uint)caseIndex) * DigestPrime;
+            expectedDigest = (expectedDigest ^ (uint)frameIndex) * DigestPrime;
+            expectedCount++;
         }
-        var scratch = new AlsP5RuntimeScratch(
-            0, 0, control, Array.Empty<AlsTimelineCursor>(),
-            Array.Empty<AlsTimelineAuthorityState>(), ownership,
-            new AlsTimelineOccurrence[AlsEventBuffer.Capacity],
-            new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity],
-            new AlsTimelinePlayback[2 * AlsActionPlayer.TraversalCapacity + 2],
-            Array.Empty<AlsSyncPlayback>(), Array.Empty<AlsSyncMappedPlayback>(),
-            new AlsCurveBlendSample[4]);
-        const float delta = 1f / 60f;
-        var input = new AlsP5FrameInput(
-            new AlsFrameIdentity(caseIndex * 1000L + frameIndex + 1L, (uint)caseIndex + 1U, 1U),
-            frameIndex * (double)delta, (frameIndex + 1) * (double)delta, delta, 1U,
-            AlsActionRequest.None, 0, 0, AlsTimelineLocomotionMode.Grounded,
-            AlsTimelineRotationMode.LookingDirection, AlsTimelineStance.Standing,
-            new AlsP4CurveFrameInput(
-                ReadOnlySpan<AlsBasePlaybackDescriptor>.Empty,
-                ReadOnlySpan<AlsBasePlaybackDescriptor>.Empty,
-                ReadOnlySpan<AlsBasePlaybackDescriptor>.Empty,
-                AlsAnimationState.Grounded, 0f, 0f));
-        var state = AlsRuntimeState.CreateDefault();
-        var preparedOk = AlsP5Runtime.TryPrepare(
-            runtimeBindings, input, state, ReadOnlySpan<AlsTimelineCursor>.Empty,
-            ReadOnlySpan<AlsTimelineAuthorityState>.Empty, ownership, 1UL,
-            ref scratch, out var prepared, out _);
-        var finalized = AlsP5Runtime.TryFinalize(
-            prepared, ref scratch, AlsFrameResult.CreateDefault(input.Identity), state,
-            new AlsDynamicTransitionInput(
-                AlsStance.Standing, 0f, Vector3.Zero, Vector3.Zero, 0,
-                Vector3.Zero, Vector3.Zero, 0),
-            out _, out _, out _, out _);
-        return preparedOk && finalized && graphDigest != 0;
-    }
-
-    private static AlsP5FrameInput CreateMinimalInput(int caseIndex, int frameIndex)
-    {
-        const float delta = 1f / 60f;
-        return new AlsP5FrameInput(
-            new AlsFrameIdentity(caseIndex * 1000L + frameIndex + 1L, 1U, 1U),
-            0d, (double)delta, delta, 1U, AlsActionRequest.None, 0, 0,
-            AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.LookingDirection,
-            AlsTimelineStance.Standing,
-            new AlsP4CurveFrameInput(
-                ReadOnlySpan<AlsBasePlaybackDescriptor>.Empty,
-                ReadOnlySpan<AlsBasePlaybackDescriptor>.Empty,
-                ReadOnlySpan<AlsBasePlaybackDescriptor>.Empty,
-                AlsAnimationState.Grounded, 0f, 0f));
-    }
-
-    private static AlsP5RuntimeScratch CreateMinimalScratch(
-        AlsP5RuntimeScratchControl[] control,
-        AlsNotifyStateOwnership[] ownership) => new(
-        0, 0, control, Array.Empty<AlsTimelineCursor>(),
-        Array.Empty<AlsTimelineAuthorityState>(), ownership,
-        new AlsTimelineOccurrence[AlsEventBuffer.Capacity],
-        new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity],
-        new AlsTimelinePlayback[2 * AlsActionPlayer.TraversalCapacity + 2],
-        Array.Empty<AlsSyncPlayback>(), Array.Empty<AlsSyncMappedPlayback>(),
-        new AlsCurveBlendSample[4]);
-
-    private static AlsNotifyStateOwnership[] CreateOwnership()
-    {
-        var ownership = new AlsNotifyStateOwnership[AlsEventBuffer.Capacity];
-        for (var index = 0; index < ownership.Length; index++)
+        if (LastShadowExecutionCount != expectedCount ||
+            LastShadowExecutionDigest != expectedDigest)
         {
-            ownership[index] = AlsNotifyStateOwnership.CreateDefault();
+            throw new InvalidDataException(
+                $"P5A shadow audit is incomplete: {LastShadowExecutionCount} validated frames.");
         }
-        return ownership;
     }
 
     private static void WriteReplayOutputs(
@@ -846,6 +792,11 @@ public static class AlsP5aTrace
         string nativeCanonicalPath,
         string portCanonicalPath)
     {
+        if (replay.SuccessfulFrameCount != 374)
+        {
+            throw new InvalidDataException(
+                $"P5A Core replay completed {replay.SuccessfulFrameCount} of 374 frames.");
+        }
         if (replay.OccurrenceCount <= 0)
         {
             throw new InvalidDataException("P5A occurrence layout is empty.");
@@ -864,6 +815,7 @@ public static class AlsP5aTrace
             throw new InvalidDataException("P5A native raw input differs from the frozen evidence.");
         }
         var native = frozen.NativeCanonical.DeepClone().AsObject();
+        ValidateCrossEnginePair(native, replay.PortCanonical);
         WriteCanonicalDocument(nativeCanonicalPath, native);
         WriteCanonicalDocument(portCanonicalPath, replay.PortCanonical);
     }
@@ -993,6 +945,295 @@ public static class AlsP5aTrace
         var expected = P5aFrozenPlanDocuments.Create().NativeCanonical;
         VerifyFixtureNode(expected, materialized.First, "$", comparable: false);
     }
+
+    private static readonly Lazy<JsonObject> CrossEngineCanonicalShape =
+        new(() => P5aFrozenPlanDocuments.Create().NativeCanonical);
+
+    internal static void ValidateCrossEnginePair(JsonObject nativeCanonical, JsonObject portCanonical)
+    {
+        ArgumentNullException.ThrowIfNull(nativeCanonical);
+        ArgumentNullException.ThrowIfNull(portCanonical);
+
+        RequireCrossEngineProperties(nativeCanonical, "$native",
+            "schemaVersion", "kind", "representation", "tracePlanSha256",
+            "reference", "snapshot", "provenance", "cases");
+        RequireCrossEngineProperties(portCanonical, "$port",
+            "schemaVersion", "kind", "representation", "tracePlanSha256",
+            "reference", "snapshot", "provenance", "cases");
+        RequireCrossEngineString(nativeCanonical, "representation", "native_canonical", "$native");
+        RequireCrossEngineString(nativeCanonical, "provenance", "native_canonical_v1", "$native");
+        RequireCrossEngineString(portCanonical, "representation", "port_canonical", "$port");
+        RequireCrossEngineString(portCanonical, "provenance", "core_oracle_v1", "$port");
+        RequireCrossEngineInteger(nativeCanonical, "schemaVersion", 1, "$native");
+        RequireCrossEngineInteger(portCanonical, "schemaVersion", 1, "$port");
+        RequireCrossEngineString(nativeCanonical, "kind", "p5a_trace", "$native");
+        RequireCrossEngineString(portCanonical, "kind", "p5a_trace", "$port");
+
+        var canonicalShape = CrossEngineCanonicalShape.Value;
+        foreach (var property in new[] { "schemaVersion", "kind", "tracePlanSha256", "reference", "snapshot" })
+        {
+            ValidateCrossEngineNode(
+                canonicalShape[property], nativeCanonical[property], portCanonical[property],
+                $"$root.{property}", comparable: false);
+        }
+
+        if (canonicalShape["cases"] is not JsonArray shapeCases ||
+            nativeCanonical["cases"] is not JsonArray nativeCases ||
+            portCanonical["cases"] is not JsonArray portCases ||
+            shapeCases.Count != 8 || nativeCases.Count != shapeCases.Count ||
+            portCases.Count != shapeCases.Count)
+        {
+            throw CrossEngineDifference("$root.cases");
+        }
+
+        ReadOnlySpan<int> frameCounts = [41, 3, 33, 33, 33, 104, 69, 58];
+        for (var caseIndex = 0; caseIndex < nativeCases.Count; caseIndex++)
+        {
+            if (shapeCases[caseIndex] is not JsonObject shapeCase ||
+                nativeCases[caseIndex] is not JsonObject nativeCase ||
+                portCases[caseIndex] is not JsonObject portCase)
+            {
+                throw CrossEngineDifference($"$root.cases[{caseIndex}]");
+            }
+            var casePath = $"$root.cases[{caseIndex}]";
+            RequireCrossEngineProperties(nativeCase, $"{casePath}.native", "ordinal", "caseId", "frames");
+            RequireCrossEngineProperties(portCase, $"{casePath}.port", "ordinal", "caseId", "frames");
+            RequireCrossEngineInteger(nativeCase, "ordinal", caseIndex, $"{casePath}.native");
+            RequireCrossEngineInteger(portCase, "ordinal", caseIndex, $"{casePath}.port");
+            ValidateCrossEngineNode(
+                shapeCase["caseId"], nativeCase["caseId"], portCase["caseId"],
+                $"{casePath}.caseId", comparable: false);
+            if (shapeCase["frames"] is not JsonArray shapeFrames ||
+                nativeCase["frames"] is not JsonArray nativeFrames ||
+                portCase["frames"] is not JsonArray portFrames ||
+                shapeFrames.Count != frameCounts[caseIndex] ||
+                nativeFrames.Count != shapeFrames.Count || portFrames.Count != shapeFrames.Count)
+            {
+                throw CrossEngineDifference($"{casePath}.frames");
+            }
+
+            for (var frameIndex = 0; frameIndex < nativeFrames.Count; frameIndex++)
+            {
+                if (shapeFrames[frameIndex] is not JsonObject shapeFrame ||
+                    nativeFrames[frameIndex] is not JsonObject nativeFrame ||
+                    portFrames[frameIndex] is not JsonObject portFrame)
+                {
+                    throw CrossEngineDifference($"{casePath}.frames[{frameIndex}]");
+                }
+                var framePath = $"{casePath}.frames[{frameIndex}]";
+                RequireCrossEngineProperties(
+                    nativeFrame, $"{framePath}.native", "frameIndex", "identity", "comparableActual");
+                RequireCrossEngineProperties(
+                    portFrame, $"{framePath}.port", "frameIndex", "identity", "comparableActual", "portAudit");
+                RequireCrossEngineInteger(nativeFrame, "frameIndex", frameIndex, $"{framePath}.native");
+                RequireCrossEngineInteger(portFrame, "frameIndex", frameIndex, $"{framePath}.port");
+                if (portFrame["portAudit"] is not JsonObject)
+                {
+                    throw CrossEngineDifference($"{framePath}.portAudit");
+                }
+                ValidateCrossEngineNode(
+                    shapeFrame["identity"], nativeFrame["identity"], portFrame["identity"],
+                    $"{framePath}.identity", comparable: false);
+                ValidateCrossEngineNode(
+                    shapeFrame["comparableActual"], nativeFrame["comparableActual"],
+                    portFrame["comparableActual"], $"{framePath}.comparableActual", comparable: true);
+            }
+        }
+    }
+
+    private static void ValidateCrossEngineNode(
+        JsonNode? shapeNode,
+        JsonNode? nativeNode,
+        JsonNode? portNode,
+        string diagnosticPath,
+        bool comparable)
+    {
+        if (shapeNode is JsonObject shapeObject)
+        {
+            if (nativeNode is not JsonObject nativeObject || portNode is not JsonObject portObject ||
+                nativeObject.Count != shapeObject.Count || portObject.Count != shapeObject.Count)
+            {
+                throw CrossEngineDifference(diagnosticPath);
+            }
+            foreach (var (property, childShape) in shapeObject)
+            {
+                if (!TryGetCrossEngineProperty(nativeObject, property, out var nativeChild) ||
+                    !TryGetCrossEngineProperty(portObject, property, out var portChild))
+                {
+                    throw CrossEngineDifference($"{diagnosticPath}.{property}");
+                }
+                ValidateCrossEngineNode(
+                    childShape, nativeChild, portChild, $"{diagnosticPath}.{property}", comparable);
+            }
+            return;
+        }
+
+        if (shapeNode is JsonArray shapeArray)
+        {
+            if (nativeNode is not JsonArray nativeArray || portNode is not JsonArray portArray ||
+                nativeArray.Count != shapeArray.Count || portArray.Count != shapeArray.Count)
+            {
+                throw CrossEngineDifference(diagnosticPath);
+            }
+            for (var index = 0; index < shapeArray.Count; index++)
+            {
+                ValidateCrossEngineNode(
+                    shapeArray[index], nativeArray[index], portArray[index],
+                    $"{diagnosticPath}[{index}]", comparable);
+            }
+            return;
+        }
+
+        if (shapeNode is not JsonValue shapeValue ||
+            nativeNode is not JsonValue nativeValue || portNode is not JsonValue portValue)
+        {
+            throw CrossEngineDifference(diagnosticPath);
+        }
+
+        if (shapeValue.TryGetValue<float>(out _))
+        {
+            if (!nativeValue.TryGetValue<float>(out var nativeFloat) ||
+                !portValue.TryGetValue<float>(out var portFloat))
+            {
+                throw CrossEngineDifference(diagnosticPath);
+            }
+            if (!float.IsFinite(nativeFloat) || !float.IsFinite(portFloat) ||
+                (comparable
+                    ? !ComparableFloat(nativeFloat, portFloat)
+                    : BitConverter.SingleToInt32Bits(nativeFloat) != BitConverter.SingleToInt32Bits(portFloat)))
+            {
+                throw CrossEngineFloatDifference(diagnosticPath, nativeFloat, portFloat);
+            }
+            return;
+        }
+
+        if (TryGetCrossEngineInteger(shapeValue, out _))
+        {
+            if (!TryGetCrossEngineInteger(nativeValue, out var nativeInteger) ||
+                !TryGetCrossEngineInteger(portValue, out var portInteger) ||
+                nativeInteger != portInteger)
+            {
+                throw CrossEngineDifference(diagnosticPath);
+            }
+            return;
+        }
+
+        if (shapeValue.TryGetValue<string>(out _))
+        {
+            if (!nativeValue.TryGetValue<string>(out var nativeString) ||
+                !portValue.TryGetValue<string>(out var portString) ||
+                !string.Equals(nativeString, portString, StringComparison.Ordinal))
+            {
+                throw CrossEngineDifference(diagnosticPath);
+            }
+            return;
+        }
+
+        if (shapeValue.TryGetValue<bool>(out _))
+        {
+            if (!nativeValue.TryGetValue<bool>(out var nativeFlag) ||
+                !portValue.TryGetValue<bool>(out var portFlag) || nativeFlag != portFlag)
+            {
+                throw CrossEngineDifference(diagnosticPath);
+            }
+            return;
+        }
+
+        throw CrossEngineDifference(diagnosticPath);
+    }
+
+    private static bool TryGetCrossEngineInteger(JsonValue value, out long result)
+    {
+        if (value.TryGetValue<int>(out var intValue))
+        {
+            result = intValue;
+            return true;
+        }
+        if (value.TryGetValue<uint>(out var uintValue))
+        {
+            result = uintValue;
+            return true;
+        }
+        if (value.TryGetValue<long>(out var longValue))
+        {
+            result = longValue;
+            return true;
+        }
+        if (value.TryGetValue<ulong>(out var ulongValue) && ulongValue <= long.MaxValue)
+        {
+            result = (long)ulongValue;
+            return true;
+        }
+        if (value.TryGetValue<ushort>(out var ushortValue))
+        {
+            result = ushortValue;
+            return true;
+        }
+        if (value.TryGetValue<byte>(out var byteValue))
+        {
+            result = byteValue;
+            return true;
+        }
+        if (value.TryGetValue<JsonElement>(out var element) &&
+            element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out result))
+        {
+            return true;
+        }
+        result = 0;
+        return false;
+    }
+
+    private static void RequireCrossEngineProperties(JsonObject value, string path, params string[] properties)
+    {
+        if (value.Count != properties.Length ||
+            properties.Any(property => !TryGetCrossEngineProperty(value, property, out _)))
+        {
+            throw CrossEngineDifference(path);
+        }
+    }
+
+    private static bool TryGetCrossEngineProperty(
+        JsonObject value, string property, out JsonNode? result)
+    {
+        foreach (var candidate in value)
+        {
+            if (!string.Equals(candidate.Key, property, StringComparison.Ordinal)) continue;
+            result = candidate.Value;
+            return true;
+        }
+        result = null;
+        return false;
+    }
+
+    private static void RequireCrossEngineString(
+        JsonObject value, string property, string expected, string path)
+    {
+        if (value[property] is not JsonValue node ||
+            !node.TryGetValue<string>(out var actual) ||
+            !string.Equals(actual, expected, StringComparison.Ordinal))
+        {
+            throw CrossEngineDifference($"{path}.{property}");
+        }
+    }
+
+    private static void RequireCrossEngineInteger(
+        JsonObject value, string property, int expected, string path)
+    {
+        if (value[property] is not JsonValue node ||
+            !node.TryGetValue<int>(out var actual) || actual != expected)
+        {
+            throw CrossEngineDifference($"{path}.{property}");
+        }
+    }
+
+    private static InvalidDataException CrossEngineDifference(string path) =>
+        new($"P5A cross-engine canonical traces differ at {path}.");
+
+    private static InvalidDataException CrossEngineFloatDifference(
+        string path, float nativeValue, float portValue) =>
+        new($"P5A cross-engine canonical traces differ at {path}: " +
+            $"native={nativeValue:R} (0x{BitConverter.SingleToUInt32Bits(nativeValue):x8}), " +
+            $"port={portValue:R} (0x{BitConverter.SingleToUInt32Bits(portValue):x8}).");
 
     private static void VerifyFixtureNode(
         JsonNode? expected, JsonNode? actual, string path, bool comparable)
@@ -1882,7 +2123,7 @@ internal static class P5aFrozenPlanDocuments
 
     private static void PopulateComparableSchedule(JsonObject actual, int caseIndex, int frameIndex)
     {
-        actual["curves"] = SemanticCurves();
+        actual["curves"] = SemanticCurves(caseIndex, frameIndex);
         var events = actual["events"]!.AsArray();
         var outcomes = actual["actionOutcomes"]!.AsArray();
         var state = actual["stateAfter"]!.AsObject();
@@ -1919,10 +2160,15 @@ internal static class P5aFrozenPlanDocuments
         }
     }
 
-    private static JsonObject SemanticCurves() => new()
+    private static JsonObject SemanticCurves(int caseIndex, int frameIndex) => new()
     {
-        ["leftIk"] = 1f, ["rightIk"] = 1f, ["leftLock"] = 0f,
-        ["rightLock"] = 0f, ["allowTransitions"] = 1f,
+        ["leftIk"] = 1f,
+        ["rightIk"] = 1f,
+        ["leftLock"] = caseIndex == 1 && frameIndex == 0 ? 0.00015993712f : 0f,
+        ["rightLock"] = caseIndex == 1 ? 1f : 0f,
+        ["allowTransitions"] = caseIndex is 2 or 3 or 4
+            ? MathF.Max(0f, 1f - TransitionGraphWeight(frameIndex))
+            : 1f,
     };
 
     private static void PopulateSharedSync(JsonObject sync, int caseIndex, int frameIndex)
@@ -2109,7 +2355,7 @@ internal static class P5aFrozenPlanDocuments
     private static void PopulateRawSchedule(JsonObject actual, int caseIndex, int frameIndex)
     {
         var oracle = actual["canonicalAssetOracle"]!.AsObject();
-        oracle["curves"] = SemanticCurves();
+        oracle["curves"] = SemanticCurves(caseIndex, frameIndex);
         var graphWeights = oracle["graphCurveWeights"]!.AsObject();
         graphWeights["action"] = caseIndex >= 5 ? ActionLaneWeight(caseIndex, frameIndex) : 0f;
         graphWeights["transition"] = caseIndex is 2 or 3 or 4 ? TransitionGraphWeight(frameIndex) : 0f;
@@ -2552,7 +2798,7 @@ internal static class P5aFrozenPlanDocuments
         var prepared = audit["prepared"]!.AsObject();
         var result = audit["result"]!.AsObject();
         var state = audit["stateAfter"]!.AsObject();
-        var curves = SemanticCurves();
+        var curves = SemanticCurves(caseIndex, frameIndex);
         foreach (var name in new[] { "leftIk", "rightIk", "leftLock", "rightLock", "allowTransitions" })
         {
             prepared[name] = curves[name]!.DeepClone();
@@ -2962,25 +3208,33 @@ internal static class P5aPortReplay
 {
     internal static JsonObject Build(
         JsonObject plan,
-        JsonObject portSeed,
         scoped in AlsP5OccurrenceLayoutView occurrenceLayout,
         scoped in AlsP5RuntimeBindings runtimeBindings)
     {
-        var port = portSeed.DeepClone().AsObject();
-        var sourceMap = BuildSourceMap(plan, occurrenceLayout);
+        AlsP5aTrace.ResetShadowExecutionAudit();
+        AlsP5OccurrenceLayoutContract.Validate(
+            occurrenceLayout.Version, occurrenceLayout.Digest, occurrenceLayout.Entries);
+        if (runtimeBindings.LayoutDigest != occurrenceLayout.Digest)
+        {
+            throw new InvalidDataException("P5A replay layout and runtime binding digests differ.");
+        }
+        var layoutEntries = occurrenceLayout.Entries.ToArray();
+        var port = CreatePortDocument(plan);
+        var sourceMap = BuildSourceMap(plan, occurrenceLayout, runtimeBindings);
         var planCases = plan["cases"]!.AsArray();
         var portCases = port["cases"]!.AsArray();
         for (var caseIndex = 0; caseIndex < planCases.Count; caseIndex++)
         {
             var state = AlsRuntimeState.CreateDefault();
-            var cursors = Enumerable.Range(0, 37).Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
-            var authorities = Enumerable.Range(0, 4).Select(AlsTimelineAuthorityState.CreateDefault).ToArray();
+            var storage = CreateReplayStorage(layoutEntries);
+            var cursors = storage.Cursors;
+            var authorities = storage.Authorities;
             var ownership = Enumerable.Range(0, AlsEventBuffer.Capacity)
                 .Select(_ => AlsNotifyStateOwnership.CreateDefault()).ToArray();
             var nextOwnerToken = 1UL;
             var control = new[] { new AlsP5RuntimeScratchControl((ulong)caseIndex + 101UL) };
-            var candidateCursors = new AlsTimelineCursor[37];
-            var candidateAuthorities = new AlsTimelineAuthorityState[4];
+            var candidateCursors = storage.CandidateCursors;
+            var candidateAuthorities = storage.CandidateAuthorities;
             var candidateOwnership = new AlsNotifyStateOwnership[AlsEventBuffer.Capacity];
             var occurrences = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
             var slices = new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity];
@@ -2999,9 +3253,14 @@ internal static class P5aPortReplay
                 var input = FrameInput(
                     inputNode, baseDescriptors, turnDescriptors, rotateDescriptors,
                     plan, sourceMap, runtimeBindings);
+                var portFrame = portFrames[frameIndex]!.AsObject();
+                portFrame["identity"] = IdentityJson(input.Identity);
                 var scratch = new AlsP5RuntimeScratch(
                     3, 1, control, candidateCursors, candidateAuthorities, candidateOwnership,
                     occurrences, slices, playbacks, syncInputs, syncOutputs, curveSamples);
+                var isShadowFrame = AlsP5aTrace.IsShadowFrame(caseIndex, frameIndex);
+                var committedBefore = CaptureCommittedShadow(
+                    state, cursors, authorities, ownership, nextOwnerToken);
                 if (!AlsP5Runtime.TryPrepare(
                         runtimeBindings, input, state, cursors, authorities, ownership, nextOwnerToken,
                         ref scratch, out var prepared, out var prepareFailure))
@@ -3009,21 +3268,35 @@ internal static class P5aPortReplay
                     throw new InvalidDataException(
                         $"P5A replay prepare failed at case {caseIndex} frame {frameIndex}: {prepareFailure}.");
                 }
-                var audit = portFrames[frameIndex]!["portAudit"]!.AsObject();
-                audit["prepared"] = PreparedJson(prepared);
-
-                if (AlsP5aTrace.IsShadowFrame(caseIndex, frameIndex))
+                if (isShadowFrame)
                 {
+                    RequireExactShadowReplay(committedBefore,
+                        CaptureCommittedShadow(state, cursors, authorities, ownership, nextOwnerToken),
+                        "committed state after Prepare");
+                    var preparedBefore = CapturePreparedShadow(prepared);
+                    var candidateBefore = CaptureCandidateShadow(ref scratch);
                     var invalid = CanonicalP4Result(input, prepared);
                     invalid.P4ReasonCode = AlsP4ReasonCode.InvalidSelection;
                     var shadowNext = state;
                     shadowNext.LocomotionState = ParseLocomotion(inputNode["modes"]!["locomotionMode"]!.GetValue<string>());
-                    _ = AlsP5Runtime.TryFinalize(
-                        prepared, ref scratch, invalid, shadowNext, TransitionProbe(inputNode),
-                        out _, out _, out _, out _);
-                    _ = AlsP5Runtime.TryFinalize(
-                        prepared, ref scratch, CanonicalP4Result(input, prepared), shadowNext,
-                        TransitionProbe(inputNode), out _, out _, out _, out _);
+                    var shadowProbe = TransitionProbe(inputNode);
+                    var invalidOutcome = ExecuteShadowFinalize(
+                        prepared, ref scratch, in invalid, in shadowNext, in shadowProbe);
+                    ValidateFailedShadowFinalize(
+                        in invalidOutcome, AlsP5FailureCode.InvalidTimeline);
+                    RequireExactShadowReplay(committedBefore,
+                        CaptureCommittedShadow(state, cursors, authorities, ownership, nextOwnerToken),
+                        "committed rollback after InvalidTimeline");
+
+                    var staleP4 = CanonicalP4Result(input, prepared);
+                    var staleOutcome = ExecuteShadowFinalize(
+                        prepared, ref scratch, in staleP4, in shadowNext, in shadowProbe);
+                    ValidateFailedShadowFinalize(
+                        in staleOutcome, AlsP5FailureCode.StalePreparedFrame);
+                    RequireExactShadowReplay(committedBefore,
+                        CaptureCommittedShadow(state, cursors, authorities, ownership, nextOwnerToken),
+                        "committed rollback after StalePreparedFrame");
+
                     scratch = new AlsP5RuntimeScratch(
                         3, 1, control, candidateCursors, candidateAuthorities, candidateOwnership,
                         occurrences, slices, playbacks, syncInputs, syncOutputs, curveSamples);
@@ -3034,6 +3307,11 @@ internal static class P5aPortReplay
                         throw new InvalidDataException(
                             $"P5A fresh replay prepare failed at case {caseIndex} frame {frameIndex}: {prepareFailure}.");
                     }
+                    RequireExactShadowReplay(
+                        preparedBefore, CapturePreparedShadow(prepared), "fresh prepared frame");
+                    RequireExactShadowReplay(
+                        candidateBefore, CaptureCandidateShadow(ref scratch), "fresh candidate state");
+                    AlsP5aTrace.RecordShadowExecution(caseIndex, frameIndex);
                 }
 
                 var p4Result = CanonicalP4Result(input, prepared);
@@ -3046,21 +3324,88 @@ internal static class P5aPortReplay
                     throw new InvalidDataException(
                         $"P5A replay finalize failed at case {caseIndex} frame {frameIndex}: {finalizeFailure}.");
                 }
+                var comparable = ComparableJson(
+                    caseIndex, frameIndex, input, prepared, result,
+                    state, ownership, producedState, candidateOwnership,
+                    plan, sourceMap, runtimeBindings);
                 candidateCursors.CopyTo(cursors, 0);
                 candidateAuthorities.CopyTo(authorities, 0);
                 candidateOwnership.CopyTo(ownership, 0);
                 state = producedState;
                 nextOwnerToken = producedToken;
-                audit["result"] = ResultJson(result);
-                audit["stateAfter"] = StateJson(state, cursors, authorities, ownership, nextOwnerToken);
+                portFrame["comparableActual"] = comparable;
+                portFrame["portAudit"] = new JsonObject
+                {
+                    ["prepared"] = PreparedJson(prepared),
+                    ["result"] = ResultJson(result),
+                    ["stateAfter"] = StateJson(state, cursors, authorities, ownership, nextOwnerToken),
+                };
             }
         }
+        AlsP5aTrace.ValidateShadowExecutionAudit();
         return port;
+    }
+
+    private static ReplayStorage CreateReplayStorage(AlsP5OccurrenceLayoutEntry[] entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        var authorityCount = 0;
+        foreach (var entry in entries)
+        {
+            authorityCount = System.Math.Max(authorityCount, checked(entry.AuthorityGroupId + 1));
+        }
+        var cursors = Enumerable.Range(0, entries.Length)
+            .Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
+        var authorities = Enumerable.Range(0, authorityCount)
+            .Select(AlsTimelineAuthorityState.CreateDefault).ToArray();
+        return new ReplayStorage(
+            cursors,
+            authorities,
+            new AlsTimelineCursor[entries.Length],
+            new AlsTimelineAuthorityState[authorityCount]);
+    }
+
+    private static JsonObject CreatePortDocument(JsonObject plan)
+    {
+        var cases = new JsonArray();
+        foreach (var caseNode in plan["cases"]!.AsArray())
+        {
+            var planCase = caseNode!.AsObject();
+            var frames = new JsonArray();
+            foreach (var frameNode in planCase["frames"]!.AsArray())
+            {
+                frames.Add(new JsonObject
+                {
+                    ["frameIndex"] = frameNode!["frameIndex"]!.DeepClone(),
+                });
+            }
+            cases.Add(new JsonObject
+            {
+                ["ordinal"] = planCase["ordinal"]!.DeepClone(),
+                ["caseId"] = planCase["caseId"]!.DeepClone(),
+                ["frames"] = frames,
+            });
+        }
+
+        var planHash = Convert.ToHexString(SHA256.HashData(P5aFrozenPlanDocuments.CanonicalBytes(plan)))
+            .ToLowerInvariant();
+        return new JsonObject
+        {
+            ["schemaVersion"] = 1,
+            ["kind"] = "p5a_trace",
+            ["representation"] = "port_canonical",
+            ["tracePlanSha256"] = planHash,
+            ["reference"] = plan["reference"]!.DeepClone(),
+            ["snapshot"] = plan["snapshot"]!.DeepClone(),
+            ["provenance"] = "core_oracle_v1",
+            ["cases"] = cases,
+        };
     }
 
     private static Dictionary<string, SourceBinding> BuildSourceMap(
         JsonObject plan,
-        scoped in AlsP5OccurrenceLayoutView occurrenceLayout)
+        scoped in AlsP5OccurrenceLayoutView occurrenceLayout,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
     {
         var result = new Dictionary<string, SourceBinding>(StringComparer.Ordinal);
         foreach (var sourceNode in plan["sources"]!.AsArray())
@@ -3081,18 +3426,255 @@ internal static class P5aPortReplay
                 }
             }
             var resolved = match ?? throw new InvalidDataException("P5A source layout is unresolved.");
+            var canonicalRole = source["canonicalEvidence"]!["canonicalRole"]!.GetValue<string>();
             var animationId = kind switch
             {
-                AlsP5OccurrenceSourceKind.Base when bindingIndex == 0 => 55,
-                AlsP5OccurrenceSourceKind.Base when bindingIndex == 1 => 54,
-                AlsP5OccurrenceSourceKind.Base when bindingIndex == 14 => 9,
-                AlsP5OccurrenceSourceKind.Turn when bindingIndex == 0 => 89,
-                AlsP5OccurrenceSourceKind.Rotate when bindingIndex == 0 => 34,
+                AlsP5OccurrenceSourceKind.Base or AlsP5OccurrenceSourceKind.Turn or
+                    AlsP5OccurrenceSourceKind.Rotate => ResolveGraphAnimationId(
+                        kind, bindingIndex, runtimeBindings.FootCurveBindings),
+                AlsP5OccurrenceSourceKind.Transition when canonicalRole == "transition_left_sequence" =>
+                    runtimeBindings.DynamicTransition.StandingLeft.AnimationId,
+                AlsP5OccurrenceSourceKind.Transition when canonicalRole == "transition_right_sequence" =>
+                    runtimeBindings.DynamicTransition.StandingRight.AnimationId,
+                AlsP5OccurrenceSourceKind.ActionMontage => ResolveActionDefinition(
+                    bindingIndex, runtimeBindings).MontageId,
+                AlsP5OccurrenceSourceKind.ActionSequence => ResolveActionSegment(
+                    resolved.OccurrenceHandleId, bindingIndex, runtimeBindings).AnimationId,
                 _ => -1,
             };
-            result.Add(source["traceSourceId"]!.GetValue<string>(), new SourceBinding(resolved, animationId));
+            var actionDefinitionId = kind is AlsP5OccurrenceSourceKind.ActionMontage or
+                AlsP5OccurrenceSourceKind.ActionSequence ? bindingIndex : -1;
+            var segmentId = kind == AlsP5OccurrenceSourceKind.ActionSequence
+                ? ResolveActionSegment(resolved.OccurrenceHandleId, bindingIndex, runtimeBindings).SegmentId
+                : -1;
+            var traceSourceId = source["traceSourceId"]!.GetValue<string>();
+            result.Add(traceSourceId, new SourceBinding(
+                traceSourceId, resolved, animationId, actionDefinitionId, segmentId, canonicalRole, source));
         }
         return result;
+    }
+
+    internal static int ResolveGraphAnimationId(
+        AlsP5OccurrenceSourceKind kind,
+        int bindingIndex,
+        ReadOnlySpan<AlsP4FootCurveRuntimeBinding> footCurveBindings)
+    {
+        const int baseCount = 22;
+        const int turnCount = 8;
+        const int rotateCount = 4;
+        const int footBindingCount = baseCount + turnCount + rotateCount;
+        if (footCurveBindings.Length != footBindingCount)
+        {
+            throw new InvalidDataException("P5A graph foot-curve binding closure must contain 34 entries.");
+        }
+
+        var footIndex = kind switch
+        {
+            AlsP5OccurrenceSourceKind.Base when bindingIndex == 0 => 0,
+            AlsP5OccurrenceSourceKind.Base when bindingIndex is >= 1 and <= 13 => bindingIndex + 1,
+            AlsP5OccurrenceSourceKind.Base when bindingIndex == 14 => 1,
+            AlsP5OccurrenceSourceKind.Base when bindingIndex is >= 15 and < baseCount => bindingIndex,
+            AlsP5OccurrenceSourceKind.Turn when bindingIndex is >= 0 and < turnCount => baseCount + bindingIndex,
+            AlsP5OccurrenceSourceKind.Rotate when bindingIndex is >= 0 and < rotateCount =>
+                baseCount + turnCount + bindingIndex,
+            _ => throw new InvalidDataException("P5A graph source binding is outside the frozen topology."),
+        };
+        var animationId = footCurveBindings[footIndex].AnimationId;
+        if (animationId < 0)
+        {
+            throw new InvalidDataException("P5A graph source resolves to an invalid animation ID.");
+        }
+        return animationId;
+    }
+
+    private static ShadowFinalizeOutcome ExecuteShadowFinalize(
+        scoped AlsP5PreparedFrame prepared,
+        scoped ref AlsP5RuntimeScratch scratch,
+        scoped in AlsFrameResult p4Result,
+        scoped in AlsRuntimeState nextState,
+        scoped in AlsDynamicTransitionInput transitionProbe)
+    {
+        var succeeded = AlsP5Runtime.TryFinalize(
+            prepared, ref scratch, p4Result, nextState, transitionProbe,
+            out var nextOwnerToken, out var producedState, out var result, out var failure);
+        return new ShadowFinalizeOutcome(
+            succeeded, failure, nextOwnerToken, producedState, result);
+    }
+
+    private static void RequireExactShadowReplay(
+        byte[] expected,
+        byte[] actual,
+        string label)
+    {
+        if (!expected.AsSpan().SequenceEqual(actual))
+        {
+            throw new InvalidDataException($"P5A shadow {label} did not reproduce exactly.");
+        }
+    }
+
+    internal static void ValidateFailedShadowFinalize(
+        scoped in ShadowFinalizeOutcome outcome,
+        AlsP5FailureCode expectedFailure)
+    {
+        var nextState = outcome.NextState;
+        var result = outcome.Result;
+        if (outcome.Succeeded || outcome.Failure != expectedFailure || outcome.NextOwnerToken != 0 ||
+            !IsAllZero(in nextState) || !IsAllZero(in result))
+        {
+            throw new InvalidDataException(
+                $"P5A shadow finalize did not fail atomically with {expectedFailure}.");
+        }
+    }
+
+    private static byte[] CaptureCommittedShadow(
+        scoped in AlsRuntimeState state,
+        AlsTimelineCursor[] cursors,
+        AlsTimelineAuthorityState[] authorities,
+        AlsNotifyStateOwnership[] ownership,
+        ulong nextOwnerToken)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        AppendValue(writer, state);
+        AppendSpan(writer, cursors);
+        AppendSpan(writer, authorities);
+        AppendSpan(writer, ownership);
+        AppendValue(writer, nextOwnerToken);
+        return writer.WrittenSpan.ToArray();
+    }
+
+    private static byte[] CapturePreparedShadow(AlsP5PreparedFrame prepared)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        AppendValue(writer, prepared.OwnerCookie);
+        AppendValue(writer, prepared.Identity);
+        AppendValue(writer, prepared.BindingDigest);
+        AppendValue(writer, prepared.LayoutDigest);
+        AppendValue(writer, prepared.ActionGraph);
+        AppendValue(writer, prepared.TransitionGraph);
+        AppendValue(writer, prepared.Sync);
+        AppendSpan(writer, prepared.SyncMappedPlaybacks);
+        AppendValue(writer, prepared.LeftIk);
+        AppendValue(writer, prepared.RightIk);
+        AppendValue(writer, prepared.LeftLock);
+        AppendValue(writer, prepared.RightLock);
+        AppendValue(writer, prepared.AllowTransitions);
+        AppendValue(writer, prepared.TransitionReplacedClosingWeight);
+        return writer.WrittenSpan.ToArray();
+    }
+
+    private static byte[] CaptureCandidateShadow(ref AlsP5RuntimeScratch scratch)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        AppendValue(writer, scratch.BaseCapacity);
+        AppendValue(writer, scratch.MaximumBaseContributorCount);
+        AppendValue(writer, scratch.Control.Length);
+        foreach (ref readonly var control in scratch.Control)
+        {
+            AppendValue(writer, control.OwnerCookie);
+            AppendValue(writer, control.PreparedIdentity);
+            AppendValue(writer, control.PreparedBindingDigest);
+            AppendValue(writer, control.PreparedLayoutDigest);
+            AppendValue(writer, control.Phase);
+        }
+        AppendSpan(writer, scratch.CandidateCursors);
+        AppendSpan(writer, scratch.CandidateAuthorities);
+        AppendSpan(writer, scratch.CandidateOwnership);
+        AppendSpan(writer, scratch.TimelineOccurrences);
+        AppendSpan(writer, scratch.ActionTraversalSlices);
+        AppendSpan(writer, scratch.TimelinePlaybacks);
+        AppendSpan(writer, scratch.SyncPlaybacks);
+        AppendSpan(writer, scratch.SyncMappedPlaybacks);
+        AppendSpan(writer, scratch.CurveSamples);
+        AppendValue(writer, scratch.CandidateActionPlayer);
+        AppendValue(writer, scratch.CandidateDynamicTransition);
+        AppendValue(writer, scratch.CandidateActionBlendLane);
+        AppendValue(writer, scratch.CandidateDynamicTransitionBlendLane);
+        AppendValue(writer, scratch.ActionGraph);
+        AppendValue(writer, scratch.TransitionGraph);
+        AppendValue(writer, scratch.Sync);
+        AppendValue(writer, scratch.SyncMappingCount);
+        AppendValue(writer, scratch.LeftIk);
+        AppendValue(writer, scratch.RightIk);
+        AppendValue(writer, scratch.LeftLock);
+        AppendValue(writer, scratch.RightLock);
+        AppendValue(writer, scratch.AllowTransitions);
+        AppendValue(writer, scratch.TransitionReplacedClosingWeight);
+        AppendValue(writer, scratch.Events);
+        AppendValue(writer, scratch.ActionOutcomes);
+        AppendValue(writer, scratch.ActionPlayback);
+        AppendValue(writer, scratch.DynamicTransitionSummary);
+        AppendValue(writer, scratch.PreparedTransitionBinding);
+        AppendValue(writer, scratch.NextOwnerToken);
+        AppendValue(writer, scratch.TransitionCooldownBlockedThisFrame);
+        return writer.WrittenSpan.ToArray();
+    }
+
+    private static void AppendSpan<T>(ArrayBufferWriter<byte> writer, ReadOnlySpan<T> values)
+        where T : unmanaged
+    {
+        AppendValue(writer, values.Length);
+        var bytes = MemoryMarshal.AsBytes(values);
+        bytes.CopyTo(writer.GetSpan(bytes.Length));
+        writer.Advance(bytes.Length);
+    }
+
+    private static void AppendSpan<T>(ArrayBufferWriter<byte> writer, Span<T> values)
+        where T : unmanaged => AppendSpan(writer, (ReadOnlySpan<T>)values);
+
+    private static void AppendSpan<T>(ArrayBufferWriter<byte> writer, T[] values)
+        where T : unmanaged => AppendSpan(writer, values.AsSpan());
+
+    private static void AppendValue<T>(ArrayBufferWriter<byte> writer, T value)
+        where T : unmanaged
+    {
+        var size = Unsafe.SizeOf<T>();
+        MemoryMarshal.Write(writer.GetSpan(size), in value);
+        writer.Advance(size);
+    }
+
+    private static bool IsAllZero<T>(scoped in T value)
+        where T : unmanaged
+    {
+        var copy = value;
+        foreach (var item in MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref copy, 1)))
+        {
+            if (item != 0) return false;
+        }
+        return true;
+    }
+
+    private static AlsActionDefinition ResolveActionDefinition(
+        int definitionId,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        var found = false;
+        var result = default(AlsActionDefinition);
+        foreach (ref readonly var value in runtimeBindings.ActionDefinitions)
+        {
+            if (value.DefinitionId != definitionId) continue;
+            if (found) throw new InvalidDataException("P5A action definition is ambiguous.");
+            result = value;
+            found = true;
+        }
+        return found ? result : throw new InvalidDataException("P5A action definition is unresolved.");
+    }
+
+    private static AlsActionSegmentBinding ResolveActionSegment(
+        int occurrenceHandleId,
+        int definitionId,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        var found = false;
+        var result = default(AlsActionSegmentBinding);
+        foreach (ref readonly var value in runtimeBindings.ActionSegments)
+        {
+            if (value.OccurrenceHandleId != occurrenceHandleId ||
+                value.ActionDefinitionId != definitionId) continue;
+            if (found) throw new InvalidDataException("P5A action segment is ambiguous.");
+            result = value;
+            found = true;
+        }
+        return found ? result : throw new InvalidDataException("P5A action segment is unresolved.");
     }
 
     private static AlsBasePlaybackDescriptor[] Descriptors(
@@ -3252,32 +3834,1344 @@ internal static class P5aPortReplay
         ["nextOwnerToken"] = token.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
     };
 
-    private static JsonObject CommittedJson(
-        AlsRuntimeState state,
-        AlsTimelineCursor[] cursors,
-        AlsTimelineAuthorityState[] authorities,
-        AlsNotifyStateOwnership[] ownership,
-        ulong token) => StateJson(state, cursors, authorities, ownership, token);
-
-    private static JsonObject CandidateJson(ref AlsP5RuntimeScratch scratch)
+    private static JsonObject IdentityJson(AlsFrameIdentity value) => new()
     {
-        var events = new JsonArray();
-        for (var index = 0; index < scratch.Events.Count; index++) events.Add(Event(scratch.Events[index]));
-        var outcomes = new JsonArray();
-        for (var index = 0; index < scratch.ActionOutcomes.Count; index++) outcomes.Add(Outcome(scratch.ActionOutcomes[index]));
+        ["frameId"] = value.FrameId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["characterId"] = value.CharacterId,
+        ["slotGeneration"] = value.SlotGeneration,
+    };
+
+    private static JsonObject ComparableJson(
+        int caseIndex,
+        int frameIndex,
+        scoped in AlsP5FrameInput input,
+        scoped in AlsP5PreparedFrame prepared,
+        AlsFrameResult result,
+        AlsRuntimeState previousState,
+        AlsNotifyStateOwnership[] previousOwnership,
+        AlsRuntimeState state,
+        AlsNotifyStateOwnership[] ownership,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        ValidateCurvePassthrough(prepared, result);
+        var actionNormalization = ValidateActionNormalization(
+            caseIndex, frameIndex, input, result, previousState, previousOwnership,
+            state, ownership, prepared.ActionGraph, plan, sourceMap, runtimeBindings);
         return new JsonObject
         {
-            ["actionPlayer"] = ActionPlayer(scratch.CandidateActionPlayer),
-            ["dynamicTransition"] = TransitionState(scratch.CandidateDynamicTransition),
-            ["actionBlendLane"] = LaneState(scratch.CandidateActionBlendLane),
-            ["dynamicTransitionBlendLane"] = LaneState(scratch.CandidateDynamicTransitionBlendLane),
-            ["timelineCursors"] = new JsonArray(scratch.CandidateCursors.ToArray().Select(Cursor).ToArray()),
-            ["authorities"] = new JsonArray(scratch.CandidateAuthorities.ToArray().Select(Authority).ToArray()),
-            ["notifyOwnership"] = new JsonArray(scratch.CandidateOwnership.ToArray().Select(Owner).ToArray()),
-            ["events"] = events, ["actionOutcomes"] = outcomes,
-            ["nextOwnerToken"] = scratch.NextOwnerToken.ToString("x16"),
+            ["curves"] = new JsonObject
+            {
+                ["leftIk"] = result.LeftFootIkWeight,
+                ["rightIk"] = result.RightFootIkWeight,
+                ["leftLock"] = result.LeftFootLockCurve,
+                ["rightLock"] = result.RightFootLockCurve,
+                ["allowTransitions"] = prepared.AllowTransitions,
+            },
+            ["sync"] = ComparableSync(input, prepared, result.Sync, plan, sourceMap, runtimeBindings),
+            ["dynamicTransition"] = ComparableTransition(
+                caseIndex, frameIndex, input.Stance, result.DynamicTransition,
+                state.DynamicTransition, sourceMap, runtimeBindings),
+            ["actionPlayback"] = ComparableAction(
+                caseIndex, frameIndex, input, result.ActionPlayback, state.ActionPlayer,
+                actionNormalization, plan, sourceMap, runtimeBindings),
+            ["events"] = ComparableEvents(
+                result, actionNormalization, plan, sourceMap, runtimeBindings),
+            ["actionOutcomes"] = ComparableOutcomes(result, sourceMap),
+            ["stateAfter"] = ComparableState(
+                state, ownership, actionNormalization, plan, sourceMap, runtimeBindings),
         };
     }
+
+    private static void ValidateCurvePassthrough(
+        scoped in AlsP5PreparedFrame prepared,
+        AlsFrameResult result)
+    {
+        if (!SameFloat(prepared.LeftIk, result.LeftFootIkWeight) ||
+            !SameFloat(prepared.RightIk, result.RightFootIkWeight) ||
+            !SameFloat(prepared.LeftLock, result.LeftFootLockCurve) ||
+            !SameFloat(prepared.RightLock, result.RightFootLockCurve))
+        {
+            throw new InvalidDataException("P5A P4 curve passthrough differs from prepared Core evidence.");
+        }
+    }
+
+    private static JsonObject ComparableSync(
+        scoped in AlsP5FrameInput input,
+        scoped in AlsP5PreparedFrame prepared,
+        AlsSyncResult result,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        if (prepared.SyncMappedPlaybacks.Length == 0)
+        {
+            if (!IsDefaultSync(prepared.Sync) || !IsDefaultSync(result))
+            {
+                throw new InvalidDataException("P5A inactive sync result is not the exact default sentinel.");
+            }
+            return InactiveSync();
+        }
+        if (prepared.SyncMappedPlaybacks.Length != 1)
+        {
+            throw new InvalidDataException("P5A comparable sync projection requires one mapped playback.");
+        }
+
+        ref readonly var mapped = ref prepared.SyncMappedPlaybacks[0];
+        var source = ResolveSource(
+            mapped.OccurrenceHandleId, mapped.AnimationId, -1,
+            AlsTimelineSourceKind.Animation, sourceMap);
+        if (!SameSync(prepared.Sync, result))
+        {
+            throw new InvalidDataException("P5A finalized sync result differs from prepared Core evidence.");
+        }
+        var expectedLeader = ResolveExpectedSyncLeader(input, runtimeBindings.SyncGroup.GroupId);
+        if (result.GroupId != runtimeBindings.SyncGroup.GroupId ||
+            result.LeaderOccurrenceHandleId != expectedLeader.OccurrenceHandleId ||
+            result.LeaderAnimationId != expectedLeader.AnimationId ||
+            result.LeaderPlaybackEpoch != expectedLeader.PlaybackEpoch)
+        {
+            throw new InvalidDataException("P5A comparable sync leader evidence is invalid.");
+        }
+        var markers = ResolveMarkers(mapped, source, plan, runtimeBindings);
+        var descriptorFound = false;
+        var mappedDescriptor = default(AlsBasePlaybackDescriptor);
+        foreach (ref readonly var descriptor in input.P4Curves.Base)
+        {
+            if (descriptor.OccurrenceHandleId != mapped.OccurrenceHandleId ||
+                descriptor.AnimationId != mapped.AnimationId)
+            {
+                continue;
+            }
+            if (descriptorFound)
+            {
+                throw new InvalidDataException("P5A comparable sync mapped descriptor is ambiguous.");
+            }
+            descriptorFound = true;
+            mappedDescriptor = descriptor;
+        }
+        if (!descriptorFound || mappedDescriptor.PlaybackEpoch != mapped.PlaybackEpoch ||
+            !SameFloat(mappedDescriptor.DurationSeconds, mapped.DurationSeconds))
+        {
+            throw new InvalidDataException("P5A comparable sync mapped descriptor is unresolved.");
+        }
+        var current = DescribeMarkers(
+            markers, mappedDescriptor.CurrentUnwrappedTimeSeconds,
+            mapped.CurrentCycle, mapped.DurationSeconds);
+        if (result.PreviousMarkerId != current.Previous.RuntimeMarkerId ||
+            result.NextMarkerId != current.Next.RuntimeMarkerId ||
+            result.Cycle != current.Cycle ||
+            !SameFloat(result.Phase, current.Phase) ||
+            !SameFloat(result.LeftFootPhase, current.LeftFootPhase) ||
+            !SameFloat(result.RightFootPhase, current.RightFootPhase))
+        {
+            throw new InvalidDataException("P5A comparable sync marker, cycle, or phase evidence is invalid.");
+        }
+        var retainPhase = false;
+        var mappedAdvances = false;
+        retainPhase = mappedDescriptor.ClosesAfterFrame != 0;
+        mappedAdvances = mappedDescriptor.CurrentUnwrappedTimeSeconds !=
+            mappedDescriptor.PreviousUnwrappedTimeSeconds &&
+            mappedDescriptor.FrameEndOffsetSeconds > mappedDescriptor.FrameStartOffsetSeconds;
+        retainPhase &= mappedAdvances;
+        var markerEvaluationTime = mappedAdvances
+            ? mapped.PreviousTimeSeconds
+            : mapped.PreviousTimeSeconds - input.DeltaTimeSeconds;
+        var sharedMarkers = ResolveMarkerPair(markers, markerEvaluationTime);
+        return new JsonObject
+        {
+            ["active"] = true,
+            ["leaderTraceSourceId"] = source.TraceSourceId,
+            ["activationOrdinal"] = mapped.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["previousMarkerStableId"] = sharedMarkers.PreviousStableId,
+            ["nextMarkerStableId"] = sharedMarkers.NextStableId,
+            ["cycle"] = mapped.PreviousCycle.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["phase"] = retainPhase ? result.Phase : 0f,
+            ["leftFootPhase"] = retainPhase ? result.LeftFootPhase : 0f,
+            ["rightFootPhase"] = retainPhase ? result.RightFootPhase : 0f,
+        };
+    }
+
+    private static bool SameSync(AlsSyncResult left, AlsSyncResult right) =>
+        left.GroupId == right.GroupId &&
+        left.LeaderOccurrenceHandleId == right.LeaderOccurrenceHandleId &&
+        left.LeaderAnimationId == right.LeaderAnimationId &&
+        left.LeaderPlaybackEpoch == right.LeaderPlaybackEpoch &&
+        left.PreviousMarkerId == right.PreviousMarkerId &&
+        left.NextMarkerId == right.NextMarkerId &&
+        left.Cycle == right.Cycle &&
+        SameFloat(left.Phase, right.Phase) &&
+        SameFloat(left.LeftFootPhase, right.LeftFootPhase) &&
+        SameFloat(left.RightFootPhase, right.RightFootPhase);
+
+    private static bool IsDefaultSync(AlsSyncResult value) =>
+        value.GroupId == -1 &&
+        value.LeaderOccurrenceHandleId == -1 &&
+        value.LeaderAnimationId == -1 &&
+        value.LeaderPlaybackEpoch == 0 &&
+        value.PreviousMarkerId == -1 &&
+        value.NextMarkerId == -1 &&
+        value.Cycle == 0 &&
+        BitConverter.SingleToInt32Bits(value.Phase) == 0 &&
+        BitConverter.SingleToInt32Bits(value.LeftFootPhase) == 0 &&
+        BitConverter.SingleToInt32Bits(value.RightFootPhase) == 0;
+
+    private static AlsBasePlaybackDescriptor ResolveExpectedSyncLeader(
+        scoped in AlsP5FrameInput input,
+        int groupId)
+    {
+        var found = false;
+        var leader = default(AlsBasePlaybackDescriptor);
+        var leaderWeight = 0f;
+        ConsiderExpectedSyncLeaders(input.P4Curves.Base, groupId,
+            1f - input.P4Curves.ActionBlendAmount, ref found, ref leader, ref leaderWeight);
+        ConsiderExpectedSyncLeaders(input.P4Curves.TurnBanks, groupId,
+            input.P4Curves.ActionBlendAmount * (1f - input.P4Curves.ActionModeBlendAmount),
+            ref found, ref leader, ref leaderWeight);
+        ConsiderExpectedSyncLeaders(input.P4Curves.RotateBanks, groupId,
+            input.P4Curves.ActionBlendAmount * input.P4Curves.ActionModeBlendAmount,
+            ref found, ref leader, ref leaderWeight);
+        return found
+            ? leader
+            : throw new InvalidDataException("P5A comparable sync leader descriptor is unresolved.");
+    }
+
+    private static void ConsiderExpectedSyncLeaders(
+        ReadOnlySpan<AlsBasePlaybackDescriptor> descriptors,
+        int groupId,
+        float blendWeight,
+        ref bool found,
+        ref AlsBasePlaybackDescriptor leader,
+        ref float leaderWeight)
+    {
+        foreach (ref readonly var candidate in descriptors)
+        {
+            if (candidate.AuthorityGroupId != groupId) continue;
+            var weight = candidate.Weight * blendWeight;
+            if (!found || weight > leaderWeight ||
+                weight == leaderWeight &&
+                (candidate.AnimationId < leader.AnimationId ||
+                 candidate.AnimationId == leader.AnimationId &&
+                 (candidate.PlaybackEpoch < leader.PlaybackEpoch ||
+                  candidate.PlaybackEpoch == leader.PlaybackEpoch &&
+                  candidate.OccurrenceHandleId < leader.OccurrenceHandleId)))
+            {
+                found = true;
+                leader = candidate;
+                leaderWeight = weight;
+            }
+        }
+    }
+
+    private static JsonObject InactiveSync() => new()
+    {
+        ["active"] = false,
+        ["leaderTraceSourceId"] = string.Empty,
+        ["activationOrdinal"] = "0",
+        ["previousMarkerStableId"] = string.Empty,
+        ["nextMarkerStableId"] = string.Empty,
+        ["cycle"] = "0",
+        ["phase"] = 0f,
+        ["leftFootPhase"] = 0f,
+        ["rightFootPhase"] = 0f,
+    };
+
+    private static MarkerProjection[] ResolveMarkers(
+        in AlsSyncMappedPlayback mapped,
+        SourceBinding source,
+        JsonObject plan,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        var markers = new List<MarkerProjection>();
+        foreach (var markerNode in plan["markerMap"]!.AsArray())
+        {
+            var marker = markerNode!.AsObject();
+            if (marker["traceSourceId"]!.GetValue<string>() != source.TraceSourceId) continue;
+            var evidence = marker["canonicalEvidence"]!.AsObject();
+            var name = evidence["name"]!.GetValue<string>();
+            var sourceIndex = evidence["sourceIndex"]!.GetValue<int>();
+            var trackIndex = evidence["trackIndex"]!.GetValue<int>();
+            var time = evidence["timeSeconds"]!.GetValue<float>();
+            var markerNameId = name switch
+            {
+                "Left" => runtimeBindings.SyncGroup.LeftMarkerNameId,
+                "Right" => runtimeBindings.SyncGroup.RightMarkerNameId,
+                _ => throw new InvalidDataException("P5A marker name is invalid."),
+            };
+            var matchCount = 0;
+            var runtimeMarkerId = -1;
+            foreach (ref readonly var runtimeMarker in runtimeBindings.SyncMarkers)
+            {
+                if (runtimeMarker.AnimationId == mapped.AnimationId &&
+                    runtimeMarker.MarkerNameId == markerNameId &&
+                    runtimeMarker.SourceIndex == sourceIndex &&
+                    runtimeMarker.TrackIndex == trackIndex && SameFloat(runtimeMarker.TimeSeconds, time))
+                {
+                    matchCount++;
+                    runtimeMarkerId = runtimeMarker.MarkerId;
+                }
+            }
+            if (matchCount != 1)
+            {
+                throw new InvalidDataException("P5A marker binding is unresolved or ambiguous.");
+            }
+            markers.Add(new MarkerProjection(
+                runtimeMarkerId, evidence["stableMarkerId"]!.GetValue<string>(), name == "Left", time));
+        }
+        if (markers.Count != 2 || markers[0].RuntimeMarkerId == markers[1].RuntimeMarkerId)
+        {
+            throw new InvalidDataException("P5A comparable sync marker pair is incomplete.");
+        }
+        markers.Sort((left, right) => left.TimeSeconds.CompareTo(right.TimeSeconds));
+        return markers.ToArray();
+    }
+
+    private static MarkerPair ResolveMarkerPair(
+        IReadOnlyList<MarkerProjection> markers,
+        float evaluationTime)
+    {
+        var nextIndex = 0;
+        while (nextIndex < markers.Count && markers[nextIndex].TimeSeconds <= evaluationTime)
+        {
+            nextIndex++;
+        }
+        if (nextIndex == markers.Count) nextIndex = 0;
+        var previousIndex = nextIndex == 0 ? markers.Count - 1 : nextIndex - 1;
+        var previous = markers[previousIndex];
+        var next = markers[nextIndex];
+        return new MarkerPair(previous.StableId, next.StableId);
+    }
+
+    private static MarkerDescriptor DescribeMarkers(
+        IReadOnlyList<MarkerProjection> markers,
+        double unwrappedTime,
+        long cycle,
+        float duration)
+    {
+        var localTime = unwrappedTime - cycle * (double)duration;
+        if (markers.Count != 2 || !double.IsFinite(unwrappedTime) || !double.IsFinite(localTime) ||
+            !float.IsFinite(duration) || duration <= 0f || localTime < 0d || localTime >= duration)
+        {
+            throw new InvalidDataException("P5A comparable sync mapped marker time is invalid.");
+        }
+        var early = markers[0];
+        var late = markers[1];
+        MarkerProjection previous;
+        MarkerProjection next;
+        double previousTime;
+        double nextTime;
+        if (localTime < early.TimeSeconds)
+        {
+            previous = late;
+            next = early;
+            previousTime = (double)late.TimeSeconds - duration;
+            nextTime = early.TimeSeconds;
+        }
+        else if (localTime < late.TimeSeconds)
+        {
+            previous = early;
+            next = late;
+            previousTime = early.TimeSeconds;
+            nextTime = late.TimeSeconds;
+        }
+        else
+        {
+            previous = late;
+            next = early;
+            previousTime = late.TimeSeconds;
+            nextTime = (double)early.TimeSeconds + duration;
+        }
+        var phaseDouble = (localTime - previousTime) / (nextTime - previousTime);
+        if (!double.IsFinite(phaseDouble) || phaseDouble < 0d || phaseDouble >= 1d)
+        {
+            throw new InvalidDataException("P5A comparable sync marker phase is invalid.");
+        }
+        var phase = (float)phaseDouble;
+        if (phase >= 1f) phase = MathF.BitDecrement(1f);
+        phase = phase == 0f ? 0f : phase;
+        var left = previous.IsLeft ? phase : 1f - phase;
+        var right = previous.IsLeft ? 1f - phase : phase;
+        left = left == 0f ? 0f : left;
+        right = right == 0f ? 0f : right;
+        return new MarkerDescriptor(previous, next, cycle, phase, left, right);
+    }
+
+    private static JsonObject ComparableTransition(
+        int caseIndex,
+        int frameIndex,
+        AlsTimelineStance stance,
+        AlsDynamicTransitionPlaybackSummary result,
+        AlsDynamicTransitionState state,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        if (result.Active == 0)
+        {
+            if (!IsDefaultTransitionSummary(result) || state.Active != 0)
+            {
+                throw new InvalidDataException("P5A inactive dynamic transition result is invalid.");
+            }
+            var expectedQueueFrame = caseIndex is 2 or 3 or 4 && frameIndex == 0;
+            if ((state.Queued != 0) != expectedQueueFrame)
+            {
+                throw new InvalidDataException("P5A dynamic transition queue is present on an invalid frame.");
+            }
+            if (state.Queued != 0)
+            {
+                var expectedClip = (stance, state.QueuedFoot) switch
+                {
+                    (AlsTimelineStance.Standing, AlsTransitionFoot.Left) => runtimeBindings.DynamicTransition.StandingLeft,
+                    (AlsTimelineStance.Standing, AlsTransitionFoot.Right) => runtimeBindings.DynamicTransition.StandingRight,
+                    (AlsTimelineStance.Crouching, AlsTransitionFoot.Left) => runtimeBindings.DynamicTransition.CrouchingLeft,
+                    (AlsTimelineStance.Crouching, AlsTransitionFoot.Right) => runtimeBindings.DynamicTransition.CrouchingRight,
+                    _ => throw new InvalidDataException("P5A dynamic transition queue stance is invalid."),
+                };
+                if (state.AnimationId != -1 || state.PlaybackEpoch != 0 ||
+                    BitConverter.SingleToInt32Bits(state.PreviousPlaybackTime) != 0 ||
+                    BitConverter.SingleToInt32Bits(state.PlaybackTime) != 0 ||
+                    state.CooldownFrames != runtimeBindings.DynamicTransition.CooldownFrames ||
+                    state.QueuedAnimationId != expectedClip.AnimationId)
+                {
+                    throw new InvalidDataException("P5A dynamic transition queued source evidence is invalid.");
+                }
+                _ = ResolveSource(state.QueuedAnimationId, state.QueuedFoot, sourceMap);
+            }
+            else if (state.QueuedAnimationId != -1)
+            {
+                throw new InvalidDataException("P5A inactive dynamic transition retained a queued source.");
+            }
+            return InactiveTransition();
+        }
+        if (state.Active == 0 || state.AnimationId != result.AnimationId || state.Foot != result.Foot)
+        {
+            throw new InvalidDataException("P5A comparable dynamic transition state disagrees with the result.");
+        }
+        var source = ResolveSource(result.AnimationId, result.Foot, sourceMap);
+        return new JsonObject
+        {
+            ["active"] = true,
+            ["traceSourceId"] = source.TraceSourceId,
+            ["activationOrdinal"] = state.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["foot"] = result.Foot.ToString(),
+            ["previousTimeSeconds"] = state.PreviousPlaybackTime,
+            ["currentTimeSeconds"] = state.PlaybackTime,
+            ["playRate"] = result.PlayRate,
+        };
+    }
+
+    private static bool IsDefaultTransitionSummary(AlsDynamicTransitionPlaybackSummary value) =>
+        value.AnimationId == -1 &&
+        value.Foot == AlsTransitionFoot.Left &&
+        BitConverter.SingleToInt32Bits(value.BlendSeconds) == 0 &&
+        BitConverter.SingleToInt32Bits(value.PlayRate) == 0 &&
+        BitConverter.SingleToInt32Bits(value.EffectiveWeight) == 0 &&
+        value.Active == 0;
+
+    private static JsonObject InactiveTransition() => new()
+    {
+        ["active"] = false,
+        ["traceSourceId"] = string.Empty,
+        ["activationOrdinal"] = "0",
+        ["foot"] = "Left",
+        ["previousTimeSeconds"] = 0f,
+        ["currentTimeSeconds"] = 0f,
+        ["playRate"] = 0f,
+    };
+
+    private enum ActionNormalization : byte
+    {
+        None = 0,
+        StartBoundary = 1,
+        NaturalNotifyEnd = 2,
+    }
+
+    private static ActionNormalization ValidateActionNormalization(
+        int caseIndex,
+        int frameIndex,
+        scoped in AlsP5FrameInput input,
+        AlsFrameResult result,
+        AlsRuntimeState previousState,
+        AlsNotifyStateOwnership[] previousOwnership,
+        AlsRuntimeState state,
+        AlsNotifyStateOwnership[] ownership,
+        AlsLaneGraphInstruction actionGraph,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        var scheduledStart = caseIndex is 5 or 6 or 7 && frameIndex == 0;
+        if ((input.ActionRequest.Command == AlsActionCommand.Start) != scheduledStart)
+        {
+            throw new InvalidDataException("P5A action start command appeared outside the frozen schedule.");
+        }
+        if (scheduledStart)
+        {
+            ValidateActionStartBoundary(
+                input, result, previousState, previousOwnership, state, ownership,
+                actionGraph, plan, sourceMap, runtimeBindings);
+            return ActionNormalization.StartBoundary;
+        }
+
+        var naturalNotifyEnd = caseIndex is 5 or 7 && frameIndex == 56;
+        if (naturalNotifyEnd)
+        {
+            ValidateNaturalActionNotifyEnd(
+                input, result, previousState, previousOwnership, state, ownership,
+                plan, sourceMap, runtimeBindings);
+            return ActionNormalization.NaturalNotifyEnd;
+        }
+        return ActionNormalization.None;
+    }
+
+    private static void ValidateActionStartBoundary(
+        scoped in AlsP5FrameInput input,
+        AlsFrameResult result,
+        AlsRuntimeState previousState,
+        AlsNotifyStateOwnership[] previousOwnership,
+        AlsRuntimeState state,
+        AlsNotifyStateOwnership[] ownership,
+        AlsLaneGraphInstruction actionGraph,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        if (!IsDefaultActionPlayer(previousState.ActionPlayer) || CountActiveOwners(previousOwnership) != 0)
+        {
+            throw new InvalidDataException("P5A action start boundary did not begin from an idle action state.");
+        }
+
+        var request = input.ActionRequest;
+        var definition = ResolveActionDefinition(request.ActionDefinitionId, runtimeBindings);
+        if (request.RequestId <= 0 || request.StartSectionId != definition.StartSectionId ||
+            request.Priority != definition.Priority || request.SlotGeneration != input.CurrentSlotGeneration ||
+            state.ActionPlayer.Playing != 1 || state.ActionPlayer.ActionDefinitionId != definition.DefinitionId ||
+            state.ActionPlayer.SectionId != request.StartSectionId ||
+            state.ActionPlayer.RequestId != request.RequestId ||
+            state.ActionPlayer.LastProcessedRequestId != request.RequestId ||
+            state.ActionPlayer.LastProcessedCommandRequestId != request.RequestId ||
+            state.ActionPlayer.LastProcessedCommand != AlsActionCommand.Start ||
+            state.ActionPlayer.PlaybackEpoch != 1 || state.ActionPlayer.Priority != request.Priority ||
+            state.ActionPlayer.Interruptible != definition.Interruptible ||
+            BitConverter.SingleToInt32Bits(state.ActionPlayer.PlaybackTime) != 0)
+        {
+            throw new InvalidDataException("P5A action start player state is invalid.");
+        }
+        if ((uint)state.ActionPlayer.SegmentBindingIndex >= (uint)runtimeBindings.ActionSegments.Length)
+        {
+            throw new InvalidDataException("P5A action start segment binding index is invalid.");
+        }
+        ref readonly var segment = ref runtimeBindings.ActionSegments[state.ActionPlayer.SegmentBindingIndex];
+        if (segment.ActionDefinitionId != definition.DefinitionId)
+        {
+            throw new InvalidDataException("P5A action start segment does not belong to the requested action.");
+        }
+
+        ValidateActiveActionPlayback(result.ActionPlayback, state.ActionPlayer, runtimeBindings);
+        var playback = result.ActionPlayback;
+        if (BitConverter.SingleToInt32Bits(playback.PreviousTime) != 0 ||
+            BitConverter.SingleToInt32Bits(playback.CurrentTime) != 0 ||
+            BitConverter.SingleToInt32Bits(playback.PreviousClipTime) != 0 ||
+            BitConverter.SingleToInt32Bits(playback.CurrentClipTime) != 0 ||
+            BitConverter.SingleToInt32Bits(playback.FinalSegmentDeltaSeconds) != 0 ||
+            !SameFloat(playback.EffectiveWeight, actionGraph.IncomingEffectiveWeight) ||
+            actionGraph.Incoming.Active != 1 ||
+            actionGraph.Incoming.OccurrenceHandleId != segment.OccurrenceHandleId ||
+            actionGraph.Incoming.AnimationId != segment.AnimationId ||
+            actionGraph.Incoming.BindingIndex != state.ActionPlayer.SegmentBindingIndex ||
+            actionGraph.Incoming.PlaybackEpoch != playback.PlaybackEpoch ||
+            BitConverter.SingleToInt32Bits(actionGraph.Incoming.PreviousClipTime) != 0 ||
+            BitConverter.SingleToInt32Bits(actionGraph.Incoming.CurrentClipTime) != 0 ||
+            BitConverter.SingleToInt32Bits(actionGraph.Incoming.ContributingDeltaSeconds) != 0 ||
+            !SameFloat(actionGraph.Incoming.PlayRate, playback.PlayRate))
+        {
+            throw new InvalidDataException("P5A action start playback evidence is invalid.");
+        }
+
+        if (result.ActionOutcomes.Count != 1)
+        {
+            throw new InvalidDataException("P5A action start must emit exactly one outcome.");
+        }
+        var outcome = result.ActionOutcomes[0];
+        if (outcome.RequestId != request.RequestId ||
+            outcome.ActionDefinitionId != definition.DefinitionId ||
+            outcome.PlaybackEpoch != playback.PlaybackEpoch ||
+            outcome.ResultCode != AlsActionResultCode.Accepted)
+        {
+            throw new InvalidDataException("P5A action start outcome is invalid.");
+        }
+
+        if (result.TypedEvents.Count != 2)
+        {
+            throw new InvalidDataException("P5A action start must emit the exact Begin/Tick batch.");
+        }
+        var begin = result.TypedEvents[0];
+        var tick = result.TypedEvents[1];
+        var beginMapping = ResolveEvent(
+            begin.EventId, begin.OccurrenceHandleId, begin.SourceAnimationId,
+            begin.SourceActionId, begin.BoundaryOrdinal, false,
+            plan, sourceMap, runtimeBindings);
+        var tickMapping = ResolveEvent(
+            tick.EventId, tick.OccurrenceHandleId, tick.SourceAnimationId,
+            tick.SourceActionId, tick.BoundaryOrdinal, false,
+            plan, sourceMap, runtimeBindings);
+        ValidateEmittedEvent(begin, beginMapping.Definition);
+        ValidateEmittedEvent(tick, tickMapping.Definition);
+        if (beginMapping.Source.Entry.SourceKind != AlsP5OccurrenceSourceKind.ActionMontage ||
+            tickMapping.Source.Entry.SourceKind != AlsP5OccurrenceSourceKind.ActionMontage ||
+            begin.EventId != tick.EventId || begin.Phase != AlsAnimationEventPhase.Begin ||
+            tick.Phase != AlsAnimationEventPhase.Tick || begin.EventSequence != 0 ||
+            tick.EventSequence != 1 || begin.PlaybackEpoch != playback.PlaybackEpoch ||
+            tick.PlaybackEpoch != playback.PlaybackEpoch || begin.PlaybackCycle != 0 ||
+            tick.PlaybackCycle != 0 || begin.OwnerToken == 0 || begin.OwnerToken != tick.OwnerToken ||
+            BitConverter.SingleToInt32Bits(begin.AnimationTime) != 0 ||
+            BitConverter.SingleToInt32Bits(tick.AnimationTime) != 0 ||
+            !SameFloat(begin.Weight, playback.EffectiveWeight) ||
+            !SameFloat(tick.Weight, playback.EffectiveWeight) ||
+            !SameEventPayload(beginMapping.Definition.Payload, begin.Payload) ||
+            !SameEventPayload(tickMapping.Definition.Payload, tick.Payload))
+        {
+            throw new InvalidDataException(
+                $"P5A action start event batch is invalid: " +
+                $"begin(id={begin.EventId},phase={begin.Phase},sequence={begin.EventSequence}," +
+                $"time=0x{BitConverter.SingleToInt32Bits(begin.AnimationTime):x8}," +
+                $"weight=0x{BitConverter.SingleToInt32Bits(begin.Weight):x8},token={begin.OwnerToken}); " +
+                $"tick(id={tick.EventId},phase={tick.Phase},sequence={tick.EventSequence}," +
+                $"time=0x{BitConverter.SingleToInt32Bits(tick.AnimationTime):x8}," +
+                $"weight=0x{BitConverter.SingleToInt32Bits(tick.Weight):x8},token={tick.OwnerToken}); " +
+                $"playbackWeight=0x{BitConverter.SingleToInt32Bits(playback.EffectiveWeight):x8}.");
+        }
+
+        var owner = RequireSingleActiveOwner(ownership);
+        ValidateOwnerMatchesEvent(owner, begin, plan, sourceMap, runtimeBindings);
+    }
+
+    private static void ValidateNaturalActionNotifyEnd(
+        scoped in AlsP5FrameInput input,
+        AlsFrameResult result,
+        AlsRuntimeState previousState,
+        AlsNotifyStateOwnership[] previousOwnership,
+        AlsRuntimeState state,
+        AlsNotifyStateOwnership[] ownership,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        if (input.ActionRequest.Command != AlsActionCommand.None ||
+            previousState.ActionPlayer.Playing != 1 || state.ActionPlayer.Playing != 1 ||
+            previousState.ActionPlayer.ActionDefinitionId != state.ActionPlayer.ActionDefinitionId ||
+            previousState.ActionPlayer.SectionId != state.ActionPlayer.SectionId ||
+            previousState.ActionPlayer.SegmentBindingIndex != state.ActionPlayer.SegmentBindingIndex ||
+            previousState.ActionPlayer.RequestId != state.ActionPlayer.RequestId ||
+            previousState.ActionPlayer.PlaybackEpoch != state.ActionPlayer.PlaybackEpoch ||
+            previousState.ActionPlayer.Priority != state.ActionPlayer.Priority ||
+            previousState.ActionPlayer.Interruptible != state.ActionPlayer.Interruptible ||
+            !SameFloat(previousState.ActionPlayer.PlaybackTime, result.ActionPlayback.PreviousTime) ||
+            !SameFloat(state.ActionPlayer.PlaybackTime, result.ActionPlayback.CurrentTime))
+        {
+            throw new InvalidDataException("P5A natural notify end action state is invalid.");
+        }
+        ValidateActiveActionPlayback(result.ActionPlayback, state.ActionPlayer, runtimeBindings);
+        if (result.ActionOutcomes.Count != 0 || result.TypedEvents.Count != 2 ||
+            CountActiveOwners(ownership) != 0)
+        {
+            throw new InvalidDataException("P5A natural notify end batch shape is invalid.");
+        }
+
+        var priorOwner = RequireSingleActiveOwner(previousOwnership);
+        var end = result.TypedEvents[0];
+        var trigger = result.TypedEvents[1];
+        var endMapping = ResolveEvent(
+            end.EventId, end.OccurrenceHandleId, end.SourceAnimationId,
+            end.SourceActionId, end.BoundaryOrdinal, false,
+            plan, sourceMap, runtimeBindings);
+        var triggerMapping = ResolveEvent(
+            trigger.EventId, trigger.OccurrenceHandleId, trigger.SourceAnimationId,
+            trigger.SourceActionId, trigger.BoundaryOrdinal, false,
+            plan, sourceMap, runtimeBindings);
+        ValidateEmittedEvent(end, endMapping.Definition);
+        ValidateEmittedEvent(trigger, triggerMapping.Definition);
+
+        ref readonly var segment = ref runtimeBindings.ActionSegments[state.ActionPlayer.SegmentBindingIndex];
+        var previousClip = (double)segment.AnimationStartTime +
+            ((double)result.ActionPlayback.PreviousTime - segment.MontageStartTime) * segment.PlayRate;
+        var currentClip = (double)segment.AnimationStartTime +
+            ((double)result.ActionPlayback.CurrentTime - segment.MontageStartTime) * segment.PlayRate;
+        var expectedEndOffset = MapActionBoundaryOffset(
+            (double)endMapping.Definition.TimeSeconds + endMapping.Definition.DurationSeconds,
+            result.ActionPlayback.PreviousTime, result.ActionPlayback.CurrentTime,
+            input.DeltaTimeSeconds);
+        var expectedTriggerOffset = MapActionBoundaryOffset(
+            triggerMapping.Definition.TimeSeconds, previousClip, currentClip,
+            input.DeltaTimeSeconds);
+        if (endMapping.Source.Entry.SourceKind != AlsP5OccurrenceSourceKind.ActionMontage ||
+            triggerMapping.Source.Entry.SourceKind != AlsP5OccurrenceSourceKind.ActionSequence ||
+            end.Phase != AlsAnimationEventPhase.End || trigger.Phase != AlsAnimationEventPhase.Trigger ||
+            end.EventSequence != 0 || trigger.EventSequence != 1 ||
+            end.PlaybackEpoch != result.ActionPlayback.PlaybackEpoch ||
+            trigger.PlaybackEpoch != result.ActionPlayback.PlaybackEpoch ||
+            end.PlaybackCycle != 0 || trigger.PlaybackCycle != 0 ||
+            end.OwnerToken == 0 || end.OwnerToken != priorOwner.OwnerToken ||
+            trigger.OwnerToken != 0 || !SameFloat(end.AnimationTime, expectedEndOffset) ||
+            !SameFloat(trigger.AnimationTime, expectedTriggerOffset) ||
+            !SameFloat(end.Weight, result.ActionPlayback.EffectiveWeight) ||
+            !SameFloat(trigger.Weight, result.ActionPlayback.EffectiveWeight) ||
+            !SameEventPayload(endMapping.Definition.Payload, end.Payload) ||
+            !SameEventPayload(triggerMapping.Definition.Payload, trigger.Payload))
+        {
+            throw new InvalidDataException(
+                $"P5A natural notify end event batch is invalid: " +
+                $"end(id={end.EventId},kind={endMapping.Source.Entry.SourceKind},phase={end.Phase}," +
+                $"sequence={end.EventSequence},time=0x{BitConverter.SingleToInt32Bits(end.AnimationTime):x8}," +
+                $"expectedTime=0x{BitConverter.SingleToInt32Bits(expectedEndOffset):x8}," +
+                $"weight=0x{BitConverter.SingleToInt32Bits(end.Weight):x8},token={end.OwnerToken}); " +
+                $"trigger(id={trigger.EventId},kind={triggerMapping.Source.Entry.SourceKind}," +
+                $"phase={trigger.Phase},sequence={trigger.EventSequence}," +
+                $"time=0x{BitConverter.SingleToInt32Bits(trigger.AnimationTime):x8}," +
+                $"expectedTime=0x{BitConverter.SingleToInt32Bits(expectedTriggerOffset):x8}," +
+                $"weight=0x{BitConverter.SingleToInt32Bits(trigger.Weight):x8},token={trigger.OwnerToken}); " +
+                $"playbackWeight=0x{BitConverter.SingleToInt32Bits(result.ActionPlayback.EffectiveWeight):x8}.");
+        }
+        ValidateOwnerMatchesEvent(priorOwner, end, plan, sourceMap, runtimeBindings);
+    }
+
+    private static float MapActionBoundaryOffset(
+        double boundary,
+        double previous,
+        double current,
+        float frameDeltaSeconds)
+    {
+        if (!double.IsFinite(boundary) || !double.IsFinite(previous) || !double.IsFinite(current) ||
+            current <= previous || boundary < previous || boundary > current ||
+            !float.IsFinite(frameDeltaSeconds) || frameDeltaSeconds <= 0f)
+        {
+            throw new InvalidDataException("P5A action event boundary cannot be mapped into the current frame.");
+        }
+        var offset = (boundary - previous) / (current - previous) * frameDeltaSeconds;
+        var result = offset == 0d ? 0f : (float)offset;
+        if (!float.IsFinite(result) || result < 0f || result > frameDeltaSeconds)
+        {
+            throw new InvalidDataException("P5A action event boundary offset is invalid.");
+        }
+        return result;
+    }
+
+    private static void ValidateActiveActionPlayback(
+        AlsActionPlayback playback,
+        AlsActionPlayerState state,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        if (playback.Active != 1 || playback.PlaybackEpoch <= 0 ||
+            !float.IsFinite(playback.PreviousTime) || !float.IsFinite(playback.CurrentTime) ||
+            !float.IsFinite(playback.PreviousClipTime) || !float.IsFinite(playback.CurrentClipTime) ||
+            !float.IsFinite(playback.FinalSegmentDeltaSeconds) ||
+            !float.IsFinite(playback.EffectiveWeight) || playback.EffectiveWeight < 0f ||
+            playback.EffectiveWeight > 1f || playback.PreviousTime < 0f ||
+            playback.CurrentTime < playback.PreviousTime || playback.PreviousClipTime < 0f ||
+            playback.CurrentClipTime < playback.PreviousClipTime)
+        {
+            throw new InvalidDataException("P5A active action playback has invalid scalar evidence.");
+        }
+
+        var definition = ResolveActionDefinition(playback.ActionDefinitionId, runtimeBindings);
+        var segmentMatches = 0;
+        var segmentIndex = -1;
+        var segment = default(AlsActionSegmentBinding);
+        for (var index = 0; index < runtimeBindings.ActionSegments.Length; index++)
+        {
+            ref readonly var candidate = ref runtimeBindings.ActionSegments[index];
+            if (candidate.OccurrenceHandleId != playback.OccurrenceHandleId ||
+                candidate.ActionDefinitionId != playback.ActionDefinitionId ||
+                candidate.AnimationId != playback.AnimationId || candidate.SegmentId != playback.SegmentId)
+            {
+                continue;
+            }
+            segment = candidate;
+            segmentIndex = index;
+            segmentMatches++;
+        }
+        var sectionMatches = 0;
+        foreach (ref readonly var section in runtimeBindings.ActionSections)
+        {
+            if (section.ActionDefinitionId == playback.ActionDefinitionId && section.SectionId == playback.SectionId)
+            {
+                sectionMatches++;
+            }
+        }
+        var expectedPreviousClip = (float)(
+            (double)segment.AnimationStartTime +
+            ((double)playback.PreviousTime - segment.MontageStartTime) * segment.PlayRate);
+        var expectedCurrentClip = (float)(
+            (double)segment.AnimationStartTime +
+            ((double)playback.CurrentTime - segment.MontageStartTime) * segment.PlayRate);
+        if (segmentMatches != 1 || sectionMatches != 1 ||
+            !SameFloat(playback.PreviousClipTime, expectedPreviousClip) ||
+            !SameFloat(playback.CurrentClipTime, expectedCurrentClip) ||
+            !SameFloat(playback.PlayRate, definition.PlayRate * segment.PlayRate) ||
+            !SameFloat(playback.BlendSeconds, definition.BlendSeconds))
+        {
+            throw new InvalidDataException("P5A active action playback binding evidence is invalid.");
+        }
+        if (state.Playing != 0 &&
+            (state.ActionDefinitionId != playback.ActionDefinitionId ||
+             state.SectionId != playback.SectionId || state.SegmentBindingIndex != segmentIndex ||
+             state.PlaybackEpoch != playback.PlaybackEpoch ||
+             !SameFloat(state.PlaybackTime, playback.CurrentTime)))
+        {
+            throw new InvalidDataException("P5A active action playback disagrees with committed state.");
+        }
+    }
+
+    private static bool IsDefaultActionPlayback(AlsActionPlayback value) =>
+        value.OccurrenceHandleId == -1 && value.ActionDefinitionId == -1 && value.AnimationId == -1 &&
+        value.SectionId == -1 && value.SegmentId == -1 && value.PlaybackEpoch == 0 &&
+        BitConverter.SingleToInt32Bits(value.PreviousTime) == 0 &&
+        BitConverter.SingleToInt32Bits(value.CurrentTime) == 0 &&
+        BitConverter.SingleToInt32Bits(value.PreviousClipTime) == 0 &&
+        BitConverter.SingleToInt32Bits(value.CurrentClipTime) == 0 &&
+        BitConverter.SingleToInt32Bits(value.FinalSegmentDeltaSeconds) == 0 &&
+        BitConverter.SingleToInt32Bits(value.PlayRate) == 0 &&
+        BitConverter.SingleToInt32Bits(value.BlendSeconds) == 0 &&
+        BitConverter.SingleToInt32Bits(value.EffectiveWeight) == 0 && value.Active == 0;
+
+    private static bool IsDefaultActionPlayer(AlsActionPlayerState value) =>
+        value.ActionDefinitionId == -1 && value.SectionId == -1 && value.SegmentBindingIndex == -1 &&
+        value.RequestId == -1 && value.LastProcessedRequestId == 0 &&
+        value.LastProcessedCommandRequestId == -1 && value.LastProcessedCommand == AlsActionCommand.None &&
+        value.PlaybackEpoch == 0 && BitConverter.SingleToInt32Bits(value.PlaybackTime) == 0 &&
+        value.Priority == 0 && value.Playing == 0 && value.Interruptible == 0;
+
+    private static int CountActiveOwners(AlsNotifyStateOwnership[] ownership)
+    {
+        var count = 0;
+        foreach (var owner in ownership)
+        {
+            if (owner.Active != 0) count++;
+        }
+        return count;
+    }
+
+    private static AlsNotifyStateOwnership RequireSingleActiveOwner(AlsNotifyStateOwnership[] ownership)
+    {
+        var found = false;
+        var result = default(AlsNotifyStateOwnership);
+        foreach (var owner in ownership)
+        {
+            if (owner.Active == 0) continue;
+            if (owner.Active != 1 || found)
+            {
+                throw new InvalidDataException("P5A notify ownership is not a single canonical owner.");
+            }
+            found = true;
+            result = owner;
+        }
+        return found
+            ? result
+            : throw new InvalidDataException("P5A expected one active notify owner.");
+    }
+
+    private static void ValidateOwnerMatchesEvent(
+        AlsNotifyStateOwnership owner,
+        AlsAnimationEvent animationEvent,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        _ = ResolveEvent(
+            owner.EventId, owner.OccurrenceHandleId, owner.AnimationId, owner.ActionId,
+            owner.BoundaryOrdinal, true, plan, sourceMap, runtimeBindings);
+        if (owner.Active != 1 || owner.EventId != animationEvent.EventId ||
+            owner.BoundaryOrdinal != animationEvent.BoundaryOrdinal ||
+            owner.OccurrenceHandleId != animationEvent.OccurrenceHandleId ||
+            owner.AnimationId != animationEvent.SourceAnimationId ||
+            owner.ActionId != animationEvent.SourceActionId ||
+            owner.PlaybackEpoch != animationEvent.PlaybackEpoch ||
+            owner.PlaybackCycle != animationEvent.PlaybackCycle || owner.OwnerToken == 0 ||
+            owner.OwnerToken != animationEvent.OwnerToken)
+        {
+            throw new InvalidDataException(
+                $"P5A notify ownership does not match its boundary event: " +
+                $"owner(event={owner.EventId},boundary={owner.BoundaryOrdinal}," +
+                $"occurrence={owner.OccurrenceHandleId},animation={owner.AnimationId},action={owner.ActionId}," +
+                $"epoch={owner.PlaybackEpoch},cycle={owner.PlaybackCycle},token={owner.OwnerToken},active={owner.Active}); " +
+                $"event(event={animationEvent.EventId},boundary={animationEvent.BoundaryOrdinal}," +
+                $"occurrence={animationEvent.OccurrenceHandleId},animation={animationEvent.SourceAnimationId}," +
+                $"action={animationEvent.SourceActionId},epoch={animationEvent.PlaybackEpoch}," +
+                $"cycle={animationEvent.PlaybackCycle},token={animationEvent.OwnerToken}).");
+        }
+    }
+
+    private static void ValidateEmittedEvent(
+        AlsAnimationEvent value,
+        AlsTimelineEventDefinition definition)
+    {
+        var stateEvent = definition.DurationSeconds > 0f;
+        if (value.Kind != definition.Kind || value.EventSequence < 0 || value.PlaybackEpoch <= 0 ||
+            !float.IsFinite(value.AnimationTime) || value.AnimationTime < 0f ||
+            !float.IsFinite(value.Weight) || value.Weight < definition.TriggerWeightThreshold ||
+            value.Weight > 1f || !SameEventPayloadIgnoringTermination(definition.Payload, value.Payload) ||
+            (!stateEvent && (value.Phase != AlsAnimationEventPhase.Trigger || value.OwnerToken != 0)) ||
+            (stateEvent && (value.Phase == AlsAnimationEventPhase.Trigger || value.OwnerToken == 0)) ||
+            (value.Phase != AlsAnimationEventPhase.End &&
+             value.Payload.TerminationReason != definition.Payload.TerminationReason))
+        {
+            throw new InvalidDataException("P5A emitted event differs from its runtime definition.");
+        }
+    }
+
+    private static bool SameEventPayload(
+        AlsCompactEventPayload expected,
+        AlsCompactEventPayload actual) =>
+        SameEventPayloadIgnoringTermination(expected, actual) &&
+        expected.TerminationReason == actual.TerminationReason;
+
+    private static bool SameEventPayloadIgnoringTermination(
+        AlsCompactEventPayload expected,
+        AlsCompactEventPayload actual) =>
+        expected.SemanticId == actual.SemanticId && expected.EnumValue0 == actual.EnumValue0 &&
+        expected.EnumValue1 == actual.EnumValue1 && expected.EnumValue2 == actual.EnumValue2 &&
+        SameFloat(expected.ScalarValue0, actual.ScalarValue0) && expected.Flags == actual.Flags;
+
+    private static JsonObject ComparableAction(
+        int caseIndex,
+        int frameIndex,
+        scoped in AlsP5FrameInput input,
+        AlsActionPlayback result,
+        AlsActionPlayerState state,
+        ActionNormalization normalization,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        if (result.Active == 0)
+        {
+            if (!IsDefaultActionPlayback(result))
+            {
+                throw new InvalidDataException("P5A inactive action playback is not the exact default sentinel.");
+            }
+            return InactiveAction();
+        }
+        if (normalization == ActionNormalization.StartBoundary)
+        {
+            return InactiveAction();
+        }
+
+        ValidateActiveActionPlayback(result, state, runtimeBindings);
+        var montage = ResolveActionSource(result.ActionDefinitionId, true, sourceMap);
+        var segment = ResolveActionSegmentSource(
+            result.ActionDefinitionId, result.SegmentId, result.AnimationId, sourceMap, runtimeBindings);
+        var sectionName = ResolveSectionName(
+            result.ActionDefinitionId, result.SectionId, montage, plan, runtimeBindings);
+        float finalSegmentDelta;
+        if (state.Playing != 0)
+        {
+            if (!SameFloat(result.FinalSegmentDeltaSeconds, input.DeltaTimeSeconds))
+            {
+                throw new InvalidDataException("P5A active action frame delta differs from the current input.");
+            }
+            finalSegmentDelta = 0f;
+        }
+        else if (caseIndex == 5 && frameIndex == 91)
+        {
+            if (BitConverter.SingleToInt32Bits(result.FinalSegmentDeltaSeconds) != 0x35400000)
+            {
+                throw new InvalidDataException("P5A natural action closing delta is invalid.");
+            }
+            finalSegmentDelta = result.FinalSegmentDeltaSeconds;
+        }
+        else if (caseIndex == 6 && frameIndex == 56)
+        {
+            if (BitConverter.SingleToInt32Bits(result.FinalSegmentDeltaSeconds) != 0)
+            {
+                throw new InvalidDataException("P5A cancelled action closing delta is invalid.");
+            }
+            finalSegmentDelta = 0f;
+        }
+        else
+        {
+            throw new InvalidDataException("P5A action closing playback appeared outside the frozen schedule.");
+        }
+
+        return new JsonObject
+        {
+            ["active"] = true,
+            ["montageTraceSourceId"] = montage.TraceSourceId,
+            ["segmentTraceSourceId"] = segment.TraceSourceId,
+            ["activationOrdinal"] = result.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["currentSectionName"] = sectionName,
+            ["segmentIndex"] = segment.PlanSource["canonicalEvidence"]!["segmentIndex"]!.GetValue<int>(),
+            ["previousMontageTimeSeconds"] = result.PreviousTime,
+            ["currentMontageTimeSeconds"] = result.CurrentTime,
+            ["previousClipTimeSeconds"] = result.PreviousClipTime,
+            ["currentClipTimeSeconds"] = result.CurrentClipTime,
+            ["finalSegmentDeltaSeconds"] = finalSegmentDelta,
+            ["playRate"] = result.PlayRate,
+        };
+    }
+
+    private static JsonObject InactiveAction() => new()
+    {
+        ["active"] = false,
+        ["montageTraceSourceId"] = string.Empty,
+        ["segmentTraceSourceId"] = string.Empty,
+        ["activationOrdinal"] = "0",
+        ["currentSectionName"] = string.Empty,
+        ["segmentIndex"] = -1,
+        ["previousMontageTimeSeconds"] = 0f,
+        ["currentMontageTimeSeconds"] = 0f,
+        ["previousClipTimeSeconds"] = 0f,
+        ["currentClipTimeSeconds"] = 0f,
+        ["finalSegmentDeltaSeconds"] = 0f,
+        ["playRate"] = 0f,
+    };
+
+    private static JsonArray ComparableEvents(
+        AlsFrameResult result,
+        ActionNormalization normalization,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        if (normalization == ActionNormalization.StartBoundary)
+        {
+            return new JsonArray();
+        }
+        var projected = new List<ProjectedEvent>();
+        for (var index = 0; index < result.TypedEvents.Count; index++)
+        {
+            var value = result.TypedEvents[index];
+            var mapping = ResolveEvent(
+                value.EventId, value.OccurrenceHandleId, value.SourceAnimationId,
+                value.SourceActionId, value.BoundaryOrdinal, false,
+                plan, sourceMap, runtimeBindings);
+            ValidateEmittedEvent(value, mapping.Definition);
+            if (normalization == ActionNormalization.NaturalNotifyEnd && index == 0)
+            {
+                continue;
+            }
+            var node = new JsonObject
+            {
+                ["traceEventId"] = mapping.TraceEventId,
+                ["traceSourceId"] = mapping.Source.TraceSourceId,
+                ["activationOrdinal"] = value.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["playbackCycle"] = value.PlaybackCycle.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["frameEventOrdinal"] = 0,
+                ["boundaryOrdinal"] = value.BoundaryOrdinal,
+                ["frameOffsetSeconds"] = value.AnimationTime,
+                ["kind"] = value.Kind.ToString(),
+                ["phase"] = value.Phase.ToString(),
+                ["payload"] = ComparablePayload(value.Payload),
+            };
+            projected.Add(new ProjectedEvent(
+                node, value.AnimationTime, PhaseRank(value.Phase), mapping.TraceEventId));
+        }
+        projected.Sort(static (left, right) =>
+        {
+            var comparison = left.FrameOffsetSeconds.CompareTo(right.FrameOffsetSeconds);
+            if (comparison != 0) return comparison;
+            comparison = left.PhaseRank.CompareTo(right.PhaseRank);
+            return comparison != 0
+                ? comparison
+                : string.CompareOrdinal(left.TraceEventId, right.TraceEventId);
+        });
+        var resultArray = new JsonArray();
+        for (var index = 0; index < projected.Count; index++)
+        {
+            projected[index].Value["frameEventOrdinal"] = index;
+            resultArray.Add(projected[index].Value);
+        }
+        return resultArray;
+    }
+
+    private static int PhaseRank(AlsAnimationEventPhase phase) => phase switch
+    {
+        AlsAnimationEventPhase.End => 0,
+        AlsAnimationEventPhase.Trigger => 1,
+        AlsAnimationEventPhase.Begin => 2,
+        AlsAnimationEventPhase.Tick => 3,
+        _ => throw new ArgumentOutOfRangeException(nameof(phase)),
+    };
+
+    private static JsonObject ComparablePayload(AlsCompactEventPayload value) => new()
+    {
+        ["semanticId"] = value.SemanticId,
+        ["enumValue0"] = value.EnumValue0,
+        ["enumValue1"] = value.EnumValue1,
+        ["enumValue2"] = value.EnumValue2,
+        ["scalarValue0"] = value.ScalarValue0,
+        ["flags"] = value.Flags,
+        ["terminationReason"] = value.TerminationReason.ToString(),
+    };
+
+    private static JsonArray ComparableOutcomes(
+        AlsFrameResult result,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap)
+    {
+        var array = new JsonArray();
+        for (var index = 0; index < result.ActionOutcomes.Count; index++)
+        {
+            var value = result.ActionOutcomes[index];
+            var source = ResolveActionSource(value.ActionDefinitionId, true, sourceMap);
+            array.Add(new JsonObject
+            {
+                ["actionTraceSourceId"] = source.TraceSourceId,
+                ["activationOrdinal"] = value.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["resultCode"] = value.ResultCode.ToString(),
+            });
+        }
+        return array;
+    }
+
+    private static JsonObject ComparableState(
+        AlsRuntimeState state,
+        AlsNotifyStateOwnership[] ownership,
+        ActionNormalization normalization,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        var actionSource = state.ActionPlayer.Playing != 0
+            ? ResolveActionSource(state.ActionPlayer.ActionDefinitionId, true, sourceMap)
+            : null;
+        var transitionSource = state.DynamicTransition.Active != 0
+            ? ResolveSource(state.DynamicTransition.AnimationId, state.DynamicTransition.Foot, sourceMap)
+            : null;
+        if (state.DynamicTransition.Queued != 0)
+        {
+            _ = ResolveSource(
+                state.DynamicTransition.QueuedAnimationId,
+                state.DynamicTransition.QueuedFoot,
+                sourceMap);
+        }
+        else if (state.DynamicTransition.Active == 0 && state.DynamicTransition.QueuedAnimationId != -1)
+        {
+            throw new InvalidDataException("P5A idle dynamic transition retained a queued source.");
+        }
+        var activeOwners = new JsonArray();
+        if (normalization != ActionNormalization.StartBoundary)
+        {
+            foreach (var value in ownership)
+            {
+                if (value.Active == 0) continue;
+                var mapping = ResolveEvent(
+                    value.EventId, value.OccurrenceHandleId, value.AnimationId, value.ActionId,
+                    value.BoundaryOrdinal, true, plan, sourceMap, runtimeBindings);
+                activeOwners.Add(new JsonObject
+                {
+                    ["traceEventId"] = mapping.TraceEventId,
+                    ["traceSourceId"] = mapping.Source.TraceSourceId,
+                    ["activationOrdinal"] = value.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["playbackCycle"] = value.PlaybackCycle.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                });
+            }
+        }
+        var transitionFoot = state.DynamicTransition.Active != 0
+            ? state.DynamicTransition.Foot
+            : state.DynamicTransition.Queued != 0
+                ? state.DynamicTransition.QueuedFoot
+                : AlsTransitionFoot.Left;
+        return new JsonObject
+        {
+            ["actionPlaying"] = state.ActionPlayer.Playing != 0,
+            ["actionTraceSourceId"] = actionSource?.TraceSourceId ?? string.Empty,
+            ["actionActivationOrdinal"] = state.ActionPlayer.Playing != 0
+                ? state.ActionPlayer.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : "0",
+            ["actionTimeSeconds"] = state.ActionPlayer.Playing != 0 ? state.ActionPlayer.PlaybackTime : 0f,
+            ["transitionPlaying"] = state.DynamicTransition.Active != 0,
+            ["transitionTraceSourceId"] = transitionSource?.TraceSourceId ?? string.Empty,
+            ["transitionActivationOrdinal"] = state.DynamicTransition.Active != 0
+                ? state.DynamicTransition.PlaybackEpoch.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : "0",
+            ["transitionTimeSeconds"] = state.DynamicTransition.Active != 0
+                ? state.DynamicTransition.PlaybackTime
+                : 0f,
+            ["transitionCooldownFrames"] = state.DynamicTransition.CooldownFrames,
+            ["transitionFoot"] = transitionFoot.ToString(),
+            ["activeNotifyStates"] = activeOwners,
+        };
+    }
+
+    private static SourceBinding ResolveSource(
+        int occurrenceHandleId,
+        int animationId,
+        int actionDefinitionId,
+        AlsTimelineSourceKind runtimeKind,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap)
+    {
+        SourceBinding? result = null;
+        foreach (var source in sourceMap.Values)
+        {
+            if (source.Entry.OccurrenceHandleId != occurrenceHandleId) continue;
+            var expectedKind = source.Entry.SourceKind switch
+            {
+                AlsP5OccurrenceSourceKind.ActionMontage => AlsTimelineSourceKind.Montage,
+                AlsP5OccurrenceSourceKind.ActionSequence => AlsTimelineSourceKind.MontageSegmentAnimation,
+                _ => AlsTimelineSourceKind.Animation,
+            };
+            if (expectedKind != runtimeKind) continue;
+            if (source.ActionDefinitionId >= 0 && source.ActionDefinitionId != actionDefinitionId) continue;
+            if (expectedKind != AlsTimelineSourceKind.Montage && source.AnimationId != animationId) continue;
+            if (result is not null) throw new InvalidDataException("P5A trace source is ambiguous.");
+            result = source;
+        }
+        return result ?? throw new InvalidDataException("P5A trace source is unresolved.");
+    }
+
+    private static SourceBinding ResolveSource(
+        int animationId,
+        AlsTransitionFoot foot,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap)
+    {
+        SourceBinding? result = null;
+        var role = foot == AlsTransitionFoot.Left ? "transition_left_sequence" : "transition_right_sequence";
+        foreach (var source in sourceMap.Values)
+        {
+            if (source.Entry.SourceKind != AlsP5OccurrenceSourceKind.Transition ||
+                source.AnimationId != animationId || source.CanonicalRole != role) continue;
+            if (result is not null) throw new InvalidDataException("P5A transition source is ambiguous.");
+            result = source;
+        }
+        return result ?? throw new InvalidDataException("P5A transition source is unresolved.");
+    }
+
+    private static SourceBinding ResolveActionSource(
+        int definitionId,
+        bool montage,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap)
+    {
+        var kind = montage ? AlsP5OccurrenceSourceKind.ActionMontage : AlsP5OccurrenceSourceKind.ActionSequence;
+        SourceBinding? result = null;
+        foreach (var source in sourceMap.Values)
+        {
+            if (source.Entry.SourceKind != kind || source.ActionDefinitionId != definitionId) continue;
+            if (result is not null) throw new InvalidDataException("P5A action source is ambiguous.");
+            result = source;
+        }
+        return result ?? throw new InvalidDataException("P5A action source is unresolved.");
+    }
+
+    private static SourceBinding ResolveActionSegmentSource(
+        int definitionId,
+        int segmentId,
+        int segmentAnimationId,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        SourceBinding? result = null;
+        foreach (var source in sourceMap.Values)
+        {
+            if (source.Entry.SourceKind != AlsP5OccurrenceSourceKind.ActionSequence ||
+                source.ActionDefinitionId != definitionId || source.SegmentId != segmentId ||
+                source.AnimationId != segmentAnimationId) continue;
+            if (result is not null) throw new InvalidDataException("P5A action segment source is ambiguous.");
+            result = source;
+        }
+        return result ?? throw new InvalidDataException("P5A action segment source is unresolved.");
+    }
+
+    private static string ResolveSectionName(
+        int definitionId,
+        int sectionId,
+        SourceBinding montage,
+        JsonObject plan,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        var runtimeMatches = 0;
+        foreach (ref readonly var section in runtimeBindings.ActionSections)
+        {
+            if (section.ActionDefinitionId == definitionId && section.SectionId == sectionId) runtimeMatches++;
+        }
+        if (runtimeMatches != 1)
+        {
+            throw new InvalidDataException("P5A action section binding is unresolved or ambiguous.");
+        }
+        string? result = null;
+        foreach (var node in plan["sectionMap"]!.AsArray())
+        {
+            var row = node!.AsObject();
+            if (row["actionTraceSourceId"]!.GetValue<string>() != montage.TraceSourceId ||
+                row["hostResolution"]!["sectionId"]!.GetValue<int>() != sectionId) continue;
+            if (result is not null) throw new InvalidDataException("P5A action section map is ambiguous.");
+            result = row["canonicalSectionName"]!.GetValue<string>();
+        }
+        return result ?? throw new InvalidDataException("P5A action section map is unresolved.");
+    }
+
+    private static EventProjection ResolveEvent(
+        int eventId,
+        int occurrenceHandleId,
+        int animationId,
+        int actionDefinitionId,
+        int boundaryOrdinal,
+        bool ownerIdentity,
+        JsonObject plan,
+        IReadOnlyDictionary<string, SourceBinding> sourceMap,
+        scoped in AlsP5RuntimeBindings runtimeBindings)
+    {
+        var found = false;
+        var definition = default(AlsTimelineEventDefinition);
+        foreach (ref readonly var value in runtimeBindings.TimelineDefinitions)
+        {
+            if (value.EventId != eventId) continue;
+            if (found) throw new InvalidDataException("P5A event definition is ambiguous.");
+            definition = value;
+            found = true;
+        }
+        if (!found || definition.RequiredOccurrenceHandleId != occurrenceHandleId ||
+            definition.BoundaryOrdinal != boundaryOrdinal)
+        {
+            throw new InvalidDataException("P5A event definition is unresolved or inconsistent.");
+        }
+        if (definition.SourceAnimationId != animationId ||
+            definition.SourceActionId != actionDefinitionId)
+        {
+            throw new InvalidDataException(
+                $"P5A emitted event source identity is invalid: event={eventId}, owner={ownerIdentity}, " +
+                $"kind={definition.SourceKind}, expectedAnimation={definition.SourceAnimationId}, " +
+                $"actualAnimation={animationId}, expectedAction={definition.SourceActionId}, " +
+                $"actualAction={actionDefinitionId}.");
+        }
+        var source = ResolveSource(
+            occurrenceHandleId, definition.SourceAnimationId, definition.SourceActionId,
+            definition.SourceKind, sourceMap);
+        string? traceEventId = null;
+        foreach (var node in plan["eventMap"]!.AsArray())
+        {
+            var row = node!.AsObject();
+            if (row["traceSourceId"]!.GetValue<string>() != source.TraceSourceId) continue;
+            var evidence = row["canonicalEvidence"]!.AsObject();
+            if (evidence["sourceIndex"]!.GetValue<int>() != definition.SourceIndex ||
+                evidence["trackIndex"]!.GetValue<int>() != definition.TrackIndex ||
+                evidence["boundaryOrdinal"]!.GetValue<int>() != definition.BoundaryOrdinal ||
+                !SameFloat(evidence["timeSeconds"]!.GetValue<float>(), definition.TimeSeconds) ||
+                !SameFloat(evidence["durationSeconds"]!.GetValue<float>(), definition.DurationSeconds) ||
+                !SameFloat(evidence["triggerWeightThreshold"]!.GetValue<float>(), definition.TriggerWeightThreshold) ||
+                evidence["kind"]!.GetValue<string>() != definition.Kind.ToString() ||
+                evidence["tickMode"]!.GetValue<string>() != definition.TickMode.ToString() ||
+                !SamePayload(evidence["payload"]!.AsObject(), definition.Payload))
+            {
+                continue;
+            }
+            if (traceEventId is not null) throw new InvalidDataException("P5A event map is ambiguous.");
+            traceEventId = row["traceEventId"]!.GetValue<string>();
+        }
+        return traceEventId is not null
+            ? new EventProjection(traceEventId, source, definition)
+            : throw new InvalidDataException("P5A event map is unresolved.");
+    }
+
+    private static bool SamePayload(JsonObject expected, AlsCompactEventPayload actual) =>
+        expected["semanticId"]!.GetValue<int>() == actual.SemanticId &&
+        expected["enumValue0"]!.GetValue<int>() == actual.EnumValue0 &&
+        expected["enumValue1"]!.GetValue<int>() == actual.EnumValue1 &&
+        expected["enumValue2"]!.GetValue<int>() == actual.EnumValue2 &&
+        SameFloat(expected["scalarValue0"]!.GetValue<float>(), actual.ScalarValue0) &&
+        expected["flags"]!.GetValue<int>() == actual.Flags &&
+        expected["terminationReason"]!.GetValue<string>() == actual.TerminationReason.ToString();
+
+    private static bool SameFloat(float left, float right) =>
+        BitConverter.SingleToInt32Bits(left) == BitConverter.SingleToInt32Bits(right);
 
     private static JsonObject LaneGraph(AlsLaneGraphInstruction value) => new()
     {
@@ -3407,5 +5301,44 @@ internal static class P5aPortReplay
         ["active"] = value.Active != 0,
     };
 
-    private sealed record SourceBinding(AlsP5OccurrenceLayoutEntry Entry, int AnimationId);
+    private sealed record SourceBinding(
+        string TraceSourceId,
+        AlsP5OccurrenceLayoutEntry Entry,
+        int AnimationId,
+        int ActionDefinitionId,
+        int SegmentId,
+        string CanonicalRole,
+        JsonObject PlanSource);
+
+    private sealed record ReplayStorage(
+        AlsTimelineCursor[] Cursors,
+        AlsTimelineAuthorityState[] Authorities,
+        AlsTimelineCursor[] CandidateCursors,
+        AlsTimelineAuthorityState[] CandidateAuthorities);
+
+    internal readonly record struct ShadowFinalizeOutcome(
+        bool Succeeded,
+        AlsP5FailureCode Failure,
+        ulong NextOwnerToken,
+        AlsRuntimeState NextState,
+        AlsFrameResult Result);
+
+    private sealed record MarkerProjection(int RuntimeMarkerId, string StableId, bool IsLeft, float TimeSeconds);
+    private sealed record MarkerPair(string PreviousStableId, string NextStableId);
+    private sealed record MarkerDescriptor(
+        MarkerProjection Previous,
+        MarkerProjection Next,
+        long Cycle,
+        float Phase,
+        float LeftFootPhase,
+        float RightFootPhase);
+    private sealed record EventProjection(
+        string TraceEventId,
+        SourceBinding Source,
+        AlsTimelineEventDefinition Definition);
+    private sealed record ProjectedEvent(
+        JsonObject Value,
+        float FrameOffsetSeconds,
+        int PhaseRank,
+        string TraceEventId);
 }

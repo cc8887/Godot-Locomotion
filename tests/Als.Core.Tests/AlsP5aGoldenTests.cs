@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Buffers.Binary;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -21,6 +22,36 @@ namespace GodotAls.Core.Tests;
 [Collection(P5aOracleCollection.Name)]
 public sealed class AlsP5aTraceSchemaTests
 {
+    [Fact]
+    public void Family1_ClosedShapeReuseRequiresIdenticalInputsAndCompletedAssertions()
+    {
+        var identity = Guid.NewGuid().ToString("N");
+        var executions = 0;
+        void Run(string schema, string baseline, string representation, Action assertions) =>
+            P5aRedHarness.RunClosedShapeMatrixOnce(schema, baseline, representation, assertions);
+
+        Run(identity, "baseline", "raw", () => executions++);
+        Run(identity, "baseline", "raw", () => executions++);
+        Assert.Equal(1, executions);
+        Run(identity + "-changed", "baseline", "raw", () => executions++);
+        Run(identity, "changed-baseline", "raw", () => executions++);
+        Run(identity, "baseline", "port", () => executions++);
+        Assert.Equal(4, executions);
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            Assert.Throws<InvalidOperationException>(() => Run(identity, "failure", "raw", () =>
+            {
+                executions++;
+                throw new InvalidOperationException("incomplete matrix");
+            }));
+        }
+        Assert.Equal(6, executions);
+        Run(identity, "failure", "raw", () => executions++);
+        Run(identity, "failure", "raw", () => executions++);
+        Assert.Equal(7, executions);
+    }
+
     [Fact]
     public void SyntheticHarnessBuildsCanonicalBytesAndEveryMandatoryFamilyWithoutProductionCapabilities()
     {
@@ -65,6 +96,12 @@ public sealed class AlsP5aTraceSchemaTests
         P5aRedHarness.AssertEveryObjectSchemaIsClosed(planSchema);
         P5aRedHarness.AssertEveryObjectSchemaIsClosed(traceSchema);
         P5aRedHarness.AssertSchemasEvaluateSyntheticRoots(planSchema, traceSchema, 1);
+    }
+
+    [Fact]
+    public void Family2_RawNegativeZeroCanonicalizesWithoutChangingNonzeroCurves()
+    {
+        P5aOracleApphost.AssertRawNegativeZeroCanonicalizes(2);
     }
 
     [Fact]
@@ -277,6 +314,18 @@ public sealed class AlsP5aGoldenTests
     }
 
     [Fact]
+    public void Family14_PortProjectionConsumesCurrentCoreEvidenceWithoutAFrozenOutputSeed()
+    {
+        P5aOracleApphost.AssertPortProjectionEvidence();
+    }
+
+    [Fact]
+    public void Family14_CallResultFlowAnalysisRejectsUnusedAndOverwrittenLocals()
+    {
+        P5aOracleApphost.AssertCallResultFlowAnalysis();
+    }
+
+    [Fact]
     public void Family15_ReadersRejectLimitsBeforeAllocationAndPublicationRemainsAtomic()
     {
         var production = P5aProductionAdapter.Require(15);
@@ -287,6 +336,27 @@ public sealed class AlsP5aGoldenTests
 
 internal static class P5aRedHarness
 {
+    private static readonly object ClosedShapeGate = new();
+    private static readonly HashSet<(string Schema, string Baseline, string Representation)> PassedClosedShapes = [];
+
+    internal static void RunClosedShapeMatrixOnce(
+        string schemaText,
+        string baselineText,
+        string representation,
+        Action assertions)
+    {
+        var key = (
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(schemaText))),
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(baselineText))),
+            representation);
+        lock (ClosedShapeGate)
+        {
+            if (PassedClosedShapes.Contains(key)) return;
+            assertions();
+            PassedClosedShapes.Add(key);
+        }
+    }
+
     internal static JsonObject RequireSchema(int family, string fileName)
     {
         var path = Path.Combine(RepositoryRoot(), "tools", "schemas", fileName);
@@ -311,7 +381,8 @@ internal static class P5aRedHarness
         var schema = JsonSchema.FromText(schemaNode.ToJsonString());
         var plan = P5aSyntheticDocuments.Create().Plan;
         AssertSchemaAccepts(schema, plan, family, "test-owned frozen plan baseline");
-        AssertEveryClosedShapeMutationRejects(schema, plan, family, "plan");
+        RunClosedShapeMatrixOnce(schemaNode.ToJsonString(), plan.ToJsonString(), "plan",
+            () => AssertEveryClosedShapeMutationRejects(schema, plan, family, "plan"));
         AssertPlanSchemaRejectsRootMutations(schemaNode, family);
     }
 
@@ -325,9 +396,12 @@ internal static class P5aRedHarness
         AssertSchemaAccepts(schema, raw, family, "test-owned native_raw baseline");
         AssertSchemaAccepts(schema, nativeCanonical, family, "test-owned native_canonical baseline");
         AssertSchemaAccepts(schema, portCanonical, family, "test-owned port_canonical baseline");
-        AssertEveryClosedShapeMutationRejects(schema, raw, family, "native_raw");
-        AssertEveryClosedShapeMutationRejects(schema, nativeCanonical, family, "native_canonical");
-        AssertEveryClosedShapeMutationRejects(schema, portCanonical, family, "port_canonical");
+        RunClosedShapeMatrixOnce(schemaNode.ToJsonString(), raw.ToJsonString(), "native_raw",
+            () => AssertEveryClosedShapeMutationRejects(schema, raw, family, "native_raw"));
+        RunClosedShapeMatrixOnce(schemaNode.ToJsonString(), nativeCanonical.ToJsonString(), "native_canonical",
+            () => AssertEveryClosedShapeMutationRejects(schema, nativeCanonical, family, "native_canonical"));
+        RunClosedShapeMatrixOnce(schemaNode.ToJsonString(), portCanonical.ToJsonString(), "port_canonical",
+            () => AssertEveryClosedShapeMutationRejects(schema, portCanonical, family, "port_canonical"));
         AssertTraceSchemaRejectsRootMutations(schemaNode, family);
     }
 
@@ -469,7 +543,7 @@ internal static class P5aRedHarness
 
     private static JsonObject MutateAt(JsonObject baseline, object[] path, Action<JsonNode> mutation)
     {
-        var clone = JsonNode.Parse(baseline.ToJsonString())!.AsObject();
+        var clone = baseline.DeepClone().AsObject();
         mutation(Locate(clone, path));
         return clone;
     }
@@ -851,6 +925,52 @@ internal sealed class P5aProductionAdapter
         AssertScopedIn(verifierParameters[2], family, "VerifyFixture occurrenceLayout");
         AssertScopedIn(verifierParameters[3], family, "VerifyFixture runtimeBindings");
 
+        var comparator = type.GetMethod(
+            "ValidateCrossEnginePair",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [typeof(JsonObject), typeof(JsonObject)],
+            modifiers: null);
+        Assert.True(comparator is not null && comparator.ReturnType == typeof(void),
+            Missing(family, "single internal cross-engine JsonObject comparator"));
+        Assert.Contains(comparator!, ReachableMethods(writer));
+        Assert.Contains(comparator!, ReachableMethods(verifier));
+
+        var replayAll = type.GetMethod("ReplayAllFrames", BindingFlags.NonPublic | BindingFlags.Static);
+        var outputWriter = type.GetMethod("WriteReplayOutputs", BindingFlags.NonPublic | BindingFlags.Static);
+        var canonicalWriter = type.GetMethod("WriteCanonicalDocument", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(replayAll);
+        Assert.NotNull(outputWriter);
+        Assert.NotNull(canonicalWriter);
+        Assert.True(P5aOracleApphost.CallResultFlowsTo(writer, replayAll!, outputWriter!),
+            Missing(family, "current Core replay result flows into canonical output validation"));
+        var outputSites = P5aOracleApphost.DirectCallSites(outputWriter!);
+        var compareSite = Assert.Single(outputSites, site => site.Method == comparator);
+        var publicationSites = outputSites.Where(site => site.Method == canonicalWriter).ToArray();
+        Assert.Equal(2, publicationSites.Length);
+        Assert.All(publicationSites, publicationSite =>
+        {
+            Assert.True(compareSite.Offset < publicationSite.Offset,
+                Missing(family, "cross-engine comparison precedes both canonical output writes"));
+            Assert.True(P5aOracleApphost.InstructionDominates(
+                    outputWriter!, compareSite.Offset, publicationSite.Offset),
+                Missing(family, "cross-engine comparison dominates both canonical output writes"));
+        });
+
+        var verifierSites = P5aOracleApphost.DirectCallSites(verifier);
+        var verifierReplaySite = Assert.Single(verifierSites, site => site.Method == replayAll);
+        var verifierCompareSite = Assert.Single(verifierSites, site => site.Method == comparator);
+        Assert.True(verifierReplaySite.Offset < verifierCompareSite.Offset,
+            Missing(family, "fixture verification replays current Core before cross-engine comparison"));
+        Assert.True(P5aOracleApphost.InstructionDominates(
+                verifier, verifierReplaySite.Offset, verifierCompareSite.Offset),
+            Missing(family, "current Core replay dominates fixture cross-engine comparison"));
+        Assert.True(P5aOracleApphost.InstructionDominatesAllNormalReturns(
+                verifier, verifierCompareSite.Offset),
+            Missing(family, "cross-engine comparison dominates every successful fixture return"));
+        Assert.True(P5aOracleApphost.CallResultFlowsTo(verifier, replayAll!, comparator!),
+            Missing(family, "current Core replay result flows into fixture cross-engine comparison"));
+
         P5aVerifyFixture verifierDelegate;
         try
         {
@@ -887,15 +1007,23 @@ internal sealed class P5aProductionAdapter
         Assert.Equal(
             new[] { (0, 6), (1, 1), (2, 0), (3, 0), (4, 0), (5, 0), (6, 56), (7, 56) }, selected);
 
-        var shadow = traceType.GetMethod("ConsumeShadowAttempt", BindingFlags.NonPublic | BindingFlags.Static);
-        var replay = traceType.GetMethod("ReplayFrame", BindingFlags.NonPublic | BindingFlags.Static);
         var replayAll = traceType.GetMethod("ReplayAllFrames", BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.NotNull(shadow);
-        Assert.NotNull(replay);
+        var portReplayType = typeof(AlsP5Runtime).Assembly.GetType(
+            "GodotAls.Core.Animation.P5aPortReplay", throwOnError: true, ignoreCase: false)!;
+        var portReplay = Assert.Single(portReplayType.GetMethods(BindingFlags.NonPublic | BindingFlags.Static),
+            method => method.Name == "Build");
+        var shadowFinalize = portReplayType.GetMethod(
+            "ExecuteShadowFinalize", BindingFlags.NonPublic | BindingFlags.Static);
+        var reset = traceType.GetMethod("ResetShadowExecutionAudit", BindingFlags.NonPublic | BindingFlags.Static);
+        var record = traceType.GetMethod("RecordShadowExecution", BindingFlags.NonPublic | BindingFlags.Static);
+        var complete = traceType.GetMethod("ValidateShadowExecutionAudit", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(replayAll);
-        AssertRuntimeCalls(shadow!, family, expectedPrepare: 1, expectedFinalize: 2);
-        AssertRuntimeCalls(replay!, family, expectedPrepare: 1, expectedFinalize: 1);
-        AssertPortReplayIsolation(replay!, family);
+        Assert.NotNull(shadowFinalize);
+        Assert.NotNull(reset);
+        Assert.NotNull(record);
+        Assert.NotNull(complete);
+        AssertRuntimeCalls(portReplay, family, expectedPrepare: 2, expectedFinalize: 1);
+        AssertRuntimeCalls(shadowFinalize!, family, expectedPrepare: 0, expectedFinalize: 1);
         Assert.Equal(1, P5aOracleApphost.DirectCalledMethods(writer).Count(method => method == replayAll));
         var writerReplaySite = Assert.Single(
             P5aOracleApphost.DirectCallSites(writer), site => site.Method == replayAll);
@@ -904,35 +1032,42 @@ internal sealed class P5aProductionAdapter
         Assert.NotEqual(typeof(void), replayAll!.ReturnType);
         Assert.False(P5aOracleApphost.CallResultIsDiscarded(writer, replayAll),
             Missing(family, "ReplayAllFrames result flows into canonical serialization"));
+        Assert.Equal(typeof(JsonObject), replayAll!.GetParameters()[0].ParameterType);
+        var materialize = traceType.GetMethod("MaterializeAndReplay", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(materialize);
+        Assert.True(P5aOracleApphost.CallResultFlowsTo(writer, materialize!, replayAll),
+            Missing(family, "validated materialized plan flows into ReplayAllFrames"));
         var replayAllCalls = P5aOracleApphost.DirectCalledMethods(replayAll!);
-        Assert.Equal(1, replayAllCalls.Count(method => method == replay));
-        Assert.Equal(1, replayAllCalls.Count(method => method == selector));
-        Assert.Equal(1, replayAllCalls.Count(method => method == shadow));
+        Assert.Equal(1, replayAllCalls.Count(method => method == portReplay));
         var reachable = ReachableMethods(replayAll!);
-        Assert.Contains(shadow!, reachable);
-        Assert.Contains(replay!, reachable);
+        var frozenType = typeof(AlsP5Runtime).Assembly.GetType(
+            "GodotAls.Core.Animation.P5aFrozenPlanDocuments", throwOnError: true, ignoreCase: false)!;
+        var frozenCreate = Assert.Single(frozenType.GetMethods(BindingFlags.NonPublic | BindingFlags.Static),
+            method => method.Name == "Create");
+        Assert.DoesNotContain(frozenCreate, reachable);
+        Assert.Contains(portReplay, reachable);
         Assert.Contains(selector!, reachable);
+        Assert.Contains(reset!, reachable);
+        Assert.Contains(record!, reachable);
+        Assert.Contains(complete!, reachable);
 
-        var sites = P5aOracleApphost.DirectCallSites(replayAll!);
+        var sites = P5aOracleApphost.DirectCallSites(portReplay);
+        var resetSite = Assert.Single(sites, site => site.Method == reset);
         var selectorSite = Assert.Single(sites, site => site.Method == selector);
-        var shadowSite = Assert.Single(sites, site => site.Method == shadow);
-        var replaySite = Assert.Single(sites, site => site.Method == replay);
-        Assert.True(selectorSite.Offset < shadowSite.Offset && shadowSite.Offset < replaySite.Offset,
-            Missing(family, "selector true edge consumes shadow attempt before the fresh valid ReplayFrame"));
-        Assert.Contains(P5aOracleApphost.ConditionalBranches(replayAll!), branch =>
-            selectorSite.Offset < branch.Offset && branch.Offset < shadowSite.Offset && branch.TargetOffset > shadowSite.Offset);
-
-        var shadowRuntimeSites = P5aOracleApphost.DirectCallSites(shadow!)
-            .Where(site => site.Method.DeclaringType == typeof(AlsP5Runtime)).ToArray();
-        Assert.Equal(3, shadowRuntimeSites.Length);
-        Assert.All(shadowRuntimeSites, site => Assert.True(
-            P5aOracleApphost.InstructionDominatesAllNormalReturns(shadow!, site.Offset),
-            Missing(family, $"shadow Core call at IL_{site.Offset:x4} dominates successful return")));
+        var recordSite = Assert.Single(sites, site => site.Method == record);
+        var completeSite = Assert.Single(sites, site => site.Method == complete);
+        Assert.True(resetSite.Offset < selectorSite.Offset && selectorSite.Offset < recordSite.Offset &&
+                    recordSite.Offset < completeSite.Offset,
+            Missing(family, "real semantic replay owns ordered reset/select/record/complete shadow auditing"));
+        Assert.True(P5aOracleApphost.InstructionDominatesAllNormalReturns(portReplay, completeSite.Offset),
+            Missing(family, "complete semantic shadow audit gates every successful Port replay return"));
 
         var count = traceType.GetField("LastShadowExecutionCount", BindingFlags.NonPublic | BindingFlags.Static);
         var digest = traceType.GetField("LastShadowExecutionDigest", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(count);
         Assert.NotNull(digest);
+        Assert.NotNull(count!.GetCustomAttribute<ThreadStaticAttribute>());
+        Assert.NotNull(digest!.GetCustomAttribute<ThreadStaticAttribute>());
         var ownedMethods = traceType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
             .Cast<MethodBase>().Concat(traceType.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
                 .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)))
@@ -943,15 +1078,9 @@ internal sealed class P5aProductionAdapter
                     .Where(site => site.Field == field && site.OpCode == OpCodes.Stsfld)
                     .Select(_ => method))
                 .Distinct().ToArray();
-            Assert.Equal(new MethodBase[] { shadow! }, writers);
-            var writes = P5aOracleApphost.DirectFieldSites(shadow!)
-                .Where(site => site.Field == field && site.OpCode == OpCodes.Stsfld).ToArray();
-            Assert.NotEmpty(writes);
-            Assert.All(writes, site => Assert.True(
-                P5aOracleApphost.InstructionDominatesAllNormalReturns(shadow!, site.Offset),
-                Missing(family, $"shadow audit field '{field.Name}' is written on every successful shadow path")));
+            Assert.Equal(new MethodBase[] { record!, reset! }, writers.OrderBy(method => method.Name).ToArray());
         }
-        var shadowInstructions = P5aOracleApphost.DirectInstructionsForAudit(shadow!);
+        var shadowInstructions = P5aOracleApphost.DirectInstructionsForAudit(record!);
         Assert.DoesNotContain(shadowInstructions, instruction =>
             instruction.OpCode == OpCodes.Ldc_I4_8 ||
             instruction.OpCode == OpCodes.Ldc_I8 &&
@@ -962,40 +1091,6 @@ internal sealed class P5aProductionAdapter
             Missing(family, "shadow digest folds both coordinates"));
     }
 
-    private static void AssertPortReplayIsolation(MethodInfo replay, int family)
-    {
-        var closure = ReachableMethods(replay);
-        foreach (var method in closure.Where(value => IsTraceOwnedHelper(replay.DeclaringType!, value)))
-        {
-            if (method is MethodInfo info)
-                Assert.False(IsForbiddenPortReplayType(info.ReturnType),
-                    Missing(family, $"Port replay return isolation ({method.Name}:{info.ReturnType.FullName})"));
-            foreach (var parameter in method.GetParameters())
-            {
-                var name = parameter.ParameterType.FullName ?? parameter.ParameterType.Name;
-                Assert.False(IsForbiddenPortReplayType(parameter.ParameterType),
-                    Missing(family, $"Port replay isolation from raw/native DTOs ({method.Name}:{name})"));
-            }
-            var body = method.GetMethodBody();
-            if (body is not null)
-            {
-                Assert.DoesNotContain(body.LocalVariables,
-                    local => IsForbiddenPortReplayType(local.LocalType));
-            }
-            Assert.DoesNotContain(P5aOracleApphost.DirectReferencedFields(method), field =>
-                field.IsStatic && !field.IsLiteral && IsTraceOwnedType(replay.DeclaringType!, field.DeclaringType));
-            Assert.DoesNotContain(P5aOracleApphost.DirectCalledMethods(method), called =>
-            {
-                var owner = called.DeclaringType?.FullName ?? string.Empty;
-                return owner.StartsWith("System.IO", StringComparison.Ordinal) ||
-                       owner.StartsWith("System.Text.Json", StringComparison.Ordinal) ||
-                       owner.StartsWith("System.Text.Encoding", StringComparison.Ordinal) ||
-                       owner.StartsWith("System.Reflection", StringComparison.Ordinal) ||
-                       typeof(Delegate).IsAssignableFrom(called.DeclaringType);
-            });
-        }
-    }
-
     private static bool IsTraceOwnedHelper(Type traceType, MethodBase method) =>
         IsTraceOwnedType(traceType, method.DeclaringType);
 
@@ -1004,18 +1099,6 @@ internal sealed class P5aProductionAdapter
         for (var current = candidate; current is not null; current = current.DeclaringType)
             if (current == traceType) return true;
         return false;
-    }
-
-    private static bool IsForbiddenPortReplayType(Type type)
-    {
-        if (type.IsByRef || type.IsPointer || type.IsArray)
-            return IsForbiddenPortReplayType(type.GetElementType()!);
-        var name = type.FullName ?? type.Name;
-        return type == typeof(object) || type == typeof(string) || type == typeof(byte) ||
-               typeof(JsonNode).IsAssignableFrom(type) || type == typeof(JsonElement) ||
-               typeof(Delegate).IsAssignableFrom(type) ||
-               name.Contains("Raw", StringComparison.OrdinalIgnoreCase) ||
-               name.Contains("Native", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AssertRuntimeCalls(
@@ -1123,10 +1206,13 @@ internal sealed class P5aProductionAdapter
     }
 
     internal Exception? VerifyFixtureDirect(
-        string fixturePath, string planPath, P5aCompiledSnapshot snapshot)
+        string fixturePath,
+        string planPath,
+        P5aCompiledSnapshot snapshot,
+        float? groundedIkWeight = null)
     {
         var layout = new AlsP5OccurrenceLayoutView(snapshot.Version, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
-        var bindings = snapshot.CreateCoreBindings();
+        var bindings = snapshot.CreateCoreBindings(groundedIkWeight);
         var staging = Directory.CreateTempSubdirectory("godot-als-p5a-direct-verify-staging-");
         var previous = Environment.GetEnvironmentVariable("GODOTALS_P5A_STAGING_ROOT");
         try
@@ -1340,11 +1426,20 @@ internal sealed class P5aProductionAdapter
 
 internal sealed class P5aCompiledSnapshot
 {
-    internal AlsP5RuntimeBindings CreateCoreBindings() => new(
+    internal AlsP5RuntimeBindings CreateCoreBindings(
+        float? groundedIkWeight = null,
+        AlsP4FootCurveRuntimeBinding[]? footCurveBindings = null,
+        AlsP5CurveSemanticPolicy? allowTransitionsPolicy = null,
+        int[]? allowTransitionsBindingIndices = null,
+        AlsSyncMarkerDefinition[]? syncMarkers = null,
+        AlsTimelineEventDefinition[]? timelineDefinitions = null) => new(
         Version, Digest, LayoutDigest, CurveKeys, CurveBindings, CurveBindingIdentities,
-        AnimationCurveRanges, AllowTransitionsPolicy, AllowTransitionsBindingIndices,
-        FootCurveBindings, GroundedIkWeight, JumpStartIkWeight, FallLoopIkWeight,
-        LandRecoveryIkWeight, TimelineDefinitions, SyncMarkers, SyncGroup, SyncMembers,
+        AnimationCurveRanges, allowTransitionsPolicy ?? AllowTransitionsPolicy,
+        allowTransitionsBindingIndices ?? AllowTransitionsBindingIndices,
+        footCurveBindings ?? FootCurveBindings,
+        groundedIkWeight ?? GroundedIkWeight, JumpStartIkWeight, FallLoopIkWeight,
+        LandRecoveryIkWeight, timelineDefinitions ?? TimelineDefinitions,
+        syncMarkers ?? SyncMarkers, SyncGroup, SyncMembers,
         SyncOccurrences, DynamicTransition, ActionDefinitions, ActionSections,
         ActionSegments, ActionTimelineRanges);
 
@@ -1495,17 +1590,21 @@ internal static class P5aPortAuditReplay
         var portCases = actualPort["cases"]!.AsArray();
         Assert.Equal(8, planCases.Count);
         Assert.Equal(8, portCases.Count);
+        var occurrenceCount = snapshot.OccurrenceEntries.Length;
+        var authorityCount = snapshot.OccurrenceEntries.Max(entry => entry.AuthorityGroupId) + 1;
         for (var caseIndex = 0; caseIndex < planCases.Count; caseIndex++)
         {
             var state = AlsRuntimeState.CreateDefault();
-            var cursors = Enumerable.Range(0, 37).Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
-            var authorities = Enumerable.Range(0, 4).Select(AlsTimelineAuthorityState.CreateDefault).ToArray();
+            var cursors = Enumerable.Range(0, occurrenceCount)
+                .Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
+            var authorities = Enumerable.Range(0, authorityCount)
+                .Select(AlsTimelineAuthorityState.CreateDefault).ToArray();
             var ownership = Enumerable.Range(0, AlsEventBuffer.Capacity)
                 .Select(_ => AlsNotifyStateOwnership.CreateDefault()).ToArray();
             var nextOwnerToken = 1UL;
             var control = new[] { new AlsP5RuntimeScratchControl((ulong)caseIndex + 101UL) };
-            var candidateCursors = new AlsTimelineCursor[37];
-            var candidateAuthorities = new AlsTimelineAuthorityState[4];
+            var candidateCursors = new AlsTimelineCursor[occurrenceCount];
+            var candidateAuthorities = new AlsTimelineAuthorityState[authorityCount];
             var candidateOwnership = new AlsNotifyStateOwnership[AlsEventBuffer.Capacity];
             var occurrences = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
             var slices = new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity];
@@ -1525,6 +1624,15 @@ internal static class P5aPortAuditReplay
                 var input = FrameInput(
                     inputNode, baseDescriptors, turnDescriptors, rotateDescriptors,
                     plan, sourceMap, snapshot);
+                var isShadowFrame = frameIndex == ShadowFrames[caseIndex];
+                var committedBefore = isShadowFrame
+                    ? CommittedJson(state, cursors, authorities, ownership, nextOwnerToken)
+                    : null;
+                var stateBefore = state;
+                var cursorsBefore = isShadowFrame ? cursors.ToArray() : null;
+                var authoritiesBefore = isShadowFrame ? authorities.ToArray() : null;
+                var ownershipBefore = isShadowFrame ? ownership.ToArray() : null;
+                var ownerTokenBefore = nextOwnerToken;
                 var scratch = new AlsP5RuntimeScratch(
                     3, 1, control, candidateCursors, candidateAuthorities, candidateOwnership,
                     occurrences, slices, playbacks, syncInputs, syncOutputs, curveSamples);
@@ -1536,10 +1644,16 @@ internal static class P5aPortAuditReplay
                 AssertJson(preparedJson, portFrames[frameIndex]!["portAudit"]!["prepared"]!,
                     caseIndex, frameIndex, "prepared");
 
-                if (frameIndex == ShadowFrames[caseIndex])
+                if (isShadowFrame)
                 {
-                    var committedBefore = CommittedJson(state, cursors, authorities, ownership, nextOwnerToken);
-                    var stateBefore = state;
+                    AssertJson(committedBefore!,
+                        CommittedJson(state, cursors, authorities, ownership, nextOwnerToken),
+                        caseIndex, frameIndex, "shadow committed after prepare");
+                    Assert.Equal(stateBefore, state);
+                    Assert.Equal(cursorsBefore!, cursors);
+                    Assert.Equal(authoritiesBefore!, authorities);
+                    Assert.Equal(ownershipBefore!, ownership);
+                    Assert.Equal(ownerTokenBefore, nextOwnerToken);
                     var candidateBefore = CandidateJson(ref scratch);
                     var invalid = CanonicalP4Result(input, prepared);
                     invalid.P4ReasonCode = AlsP4ReasonCode.InvalidSelection;
@@ -1548,16 +1662,28 @@ internal static class P5aPortAuditReplay
                     var probe = TransitionProbe(inputNode);
                     Assert.False(AlsP5Runtime.TryFinalize(
                         prepared, ref scratch, invalid, p4Next, probe,
-                        out _, out _, out _, out var shadowFailure));
+                        out var invalidToken, out var invalidState, out var invalidResult,
+                        out var shadowFailure));
                     Assert.Equal(AlsP5FailureCode.InvalidTimeline, shadowFailure);
+                    Assert.Equal(0UL, invalidToken);
+                    Assert.Equal(default, invalidState);
+                    Assert.Equal(default, invalidResult);
                     Assert.False(AlsP5Runtime.TryFinalize(
                         prepared, ref scratch, CanonicalP4Result(input, prepared), p4Next, probe,
-                        out _, out _, out _, out var staleFailure));
+                        out var staleToken, out var staleState, out var staleResult,
+                        out var staleFailure));
                     Assert.Equal(AlsP5FailureCode.StalePreparedFrame, staleFailure);
-                    AssertJson(committedBefore,
+                    Assert.Equal(0UL, staleToken);
+                    Assert.Equal(default, staleState);
+                    Assert.Equal(default, staleResult);
+                    AssertJson(committedBefore!,
                         CommittedJson(state, cursors, authorities, ownership, nextOwnerToken),
                         caseIndex, frameIndex, "shadow committed rollback");
                     Assert.Equal(stateBefore, state);
+                    Assert.Equal(cursorsBefore!, cursors);
+                    Assert.Equal(authoritiesBefore!, authorities);
+                    Assert.Equal(ownershipBefore!, ownership);
+                    Assert.Equal(ownerTokenBefore, nextOwnerToken);
 
                     scratch = new AlsP5RuntimeScratch(
                         3, 1, control, candidateCursors, candidateAuthorities, candidateOwnership,
@@ -1648,6 +1774,45 @@ internal static class P5aPortAuditReplay
         Assert.Equal(r0Entry.OccurrenceHandleId, tieAuthority["occurrenceHandleId"]!.GetValue<int>());
         Assert.False(Audit(actualPort, 1, 2)["stateAfter"]!["authorities"]!
             .AsArray()[r0Entry.AuthorityGroupId]!["active"]!.GetValue<bool>());
+
+        AssertGraphSourceResolution(snapshot);
+    }
+
+    private static void AssertGraphSourceResolution(P5aCompiledSnapshot snapshot)
+    {
+        Assert.Equal(34, snapshot.FootCurveBindings.Length);
+        for (var index = 0; index < snapshot.BaseAnimationIds.Length; index++)
+            Assert.Equal(snapshot.BaseAnimationIds[index], P5aPortReplay.ResolveGraphAnimationId(
+                AlsP5OccurrenceSourceKind.Base, index, snapshot.FootCurveBindings));
+        for (var index = 0; index < snapshot.TurnAnimationIds.Length; index++)
+            Assert.Equal(snapshot.TurnAnimationIds[index], P5aPortReplay.ResolveGraphAnimationId(
+                AlsP5OccurrenceSourceKind.Turn, index, snapshot.FootCurveBindings));
+        for (var index = 0; index < snapshot.RotateAnimationIds.Length; index++)
+            Assert.Equal(snapshot.RotateAnimationIds[index], P5aPortReplay.ResolveGraphAnimationId(
+                AlsP5OccurrenceSourceKind.Rotate, index, snapshot.FootCurveBindings));
+
+        foreach (var (kind, bindingIndex, footIndex) in new[]
+                 {
+                     (AlsP5OccurrenceSourceKind.Base, 0, 0),
+                     (AlsP5OccurrenceSourceKind.Base, 1, 2),
+                     (AlsP5OccurrenceSourceKind.Base, 14, 1),
+                     (AlsP5OccurrenceSourceKind.Turn, 0, 22),
+                     (AlsP5OccurrenceSourceKind.Rotate, 0, 30),
+                 })
+        {
+            var changed = snapshot.FootCurveBindings.ToArray();
+            changed[footIndex] = changed[footIndex] with { AnimationId = 1000 + footIndex };
+            Assert.Equal(1000 + footIndex,
+                P5aPortReplay.ResolveGraphAnimationId(kind, bindingIndex, changed));
+        }
+
+        Assert.Throws<InvalidDataException>(() => P5aPortReplay.ResolveGraphAnimationId(
+            AlsP5OccurrenceSourceKind.Base, 0, snapshot.FootCurveBindings[..^1]));
+        Assert.Throws<InvalidDataException>(() => P5aPortReplay.ResolveGraphAnimationId(
+            AlsP5OccurrenceSourceKind.Base, snapshot.BaseAnimationIds.Length,
+            snapshot.FootCurveBindings));
+        Assert.Throws<InvalidDataException>(() => P5aPortReplay.ResolveGraphAnimationId(
+            AlsP5OccurrenceSourceKind.Transition, 0, snapshot.FootCurveBindings));
     }
 
     private static Dictionary<string, SourceBinding> BuildSourceMap(JsonObject plan, P5aCompiledSnapshot snapshot)
@@ -2210,6 +2375,38 @@ internal sealed record P5aFrozenBundle(
         Assert.Equal(7, bundle.Plan["nativeOnlyEventMap"]!.AsArray().Count);
         Assert.Equal(BitConverter.SingleToInt32Bits(.083333336f),
             BitConverter.SingleToInt32Bits(Frames(bundle.Raw, 2)[1]!["nativeActual"]!["canonicalAssetOracle"]!["graphCurveWeights"]!["transition"]!.GetValue<float>()));
+
+        static JsonObject SharedCurves(JsonObject root, int caseIndex, int frameIndex) =>
+            Frames(root, caseIndex)[frameIndex]!["comparableActual"]!["curves"]!.AsObject();
+        static JsonObject RawCurves(JsonObject root, int caseIndex, int frameIndex) =>
+            Frames(root, caseIndex)[frameIndex]!["nativeActual"]!["canonicalAssetOracle"]!["curves"]!.AsObject();
+        static void AssertCurveBits(JsonObject curves, string name, int expectedBits) =>
+            Assert.Equal(expectedBits, BitConverter.SingleToInt32Bits(curves[name]!.GetValue<float>()));
+
+        var authorityLeftLockBits = new[] { 0x3927b4cb, 0x00000000, 0x00000000 };
+        foreach (var curveRoot in new[] { bundle.NativeExpected, bundle.PortSchemaSeed })
+        for (var frameIndex = 0; frameIndex < authorityLeftLockBits.Length; frameIndex++)
+        {
+            var curves = SharedCurves(curveRoot, 1, frameIndex);
+            AssertCurveBits(curves, "leftLock", authorityLeftLockBits[frameIndex]);
+            AssertCurveBits(curves, "rightLock", 0x3f800000);
+        }
+        for (var frameIndex = 0; frameIndex < authorityLeftLockBits.Length; frameIndex++)
+        {
+            var curves = RawCurves(bundle.Raw, 1, frameIndex);
+            AssertCurveBits(curves, "leftLock", authorityLeftLockBits[frameIndex]);
+            AssertCurveBits(curves, "rightLock", 0x3f800000);
+        }
+
+        foreach (var caseIndex in new[] { 2, 3, 4 })
+        foreach (var (frameIndex, expectedBits) in new[]
+                 { (0, 0x3f800000), (1, 0x3f6aaaab), (12, 0x34000000), (13, 0x00000000), (32, 0x00000000) })
+        {
+            AssertCurveBits(SharedCurves(bundle.NativeExpected, caseIndex, frameIndex),
+                "allowTransitions", expectedBits);
+            AssertCurveBits(RawCurves(bundle.Raw, caseIndex, frameIndex),
+                "allowTransitions", expectedBits);
+        }
 
         var authorityFrames = Frames(bundle.Plan, 1);
         var banks = new[] { "base", "turnBanks", "rotateBanks" };
@@ -2864,11 +3061,36 @@ internal static class P5aOracleApphost
         }
     }
 
-    private static void AssertRawNegativeZeroCanonicalizes(int family)
+    internal static void AssertRawNegativeZeroCanonicalizes(int family)
     {
         var apphost = RequireBuiltApphost(family);
         var bundle = P5aFrozenBundle.Create();
-        var negativeZeroRaw = ReplaceUtf8(bundle.RawBytes, "\"leftLock\": 0", "\"leftLock\": -0");
+        var negativeRawDocument = bundle.Raw.DeepClone().AsObject();
+        var replacedZeros = 0;
+        foreach (var caseNode in negativeRawDocument["cases"]!.AsArray())
+        foreach (var frameNode in caseNode!["frames"]!.AsArray())
+        {
+            var curves = frameNode!["nativeActual"]!["canonicalAssetOracle"]!["curves"]!.AsObject();
+            if (curves["leftLock"]!.GetValue<float>() != 0f) continue;
+            curves["leftLock"] = BitConverter.UInt32BitsToSingle(0x80000000U);
+            replacedZeros++;
+        }
+        Assert.True(replacedZeros > 0, "Negative-zero acceptance requires at least one mutated zero.");
+        var nonzeroBaseline = bundle.Raw["cases"]![1]!["frames"]![0]!
+            ["nativeActual"]!["canonicalAssetOracle"]!["curves"]!["leftLock"]!.GetValue<float>();
+        Assert.True(nonzeroBaseline > 0f, "Negative-zero mutation requires a positive-value control.");
+        Assert.Equal(nonzeroBaseline, negativeRawDocument["cases"]![1]!["frames"]![0]!
+            ["nativeActual"]!["canonicalAssetOracle"]!["curves"]!["leftLock"]!.GetValue<float>());
+        var negativeZeroRaw = P5aFrozenBundle.CanonicalBytes(negativeRawDocument);
+        using (var serialized = JsonDocument.Parse(negativeZeroRaw))
+        {
+            var serializedNegativeZeros = serialized.RootElement.GetProperty("cases").EnumerateArray()
+                .SelectMany(caseNode => caseNode.GetProperty("frames").EnumerateArray())
+                .Count(frameNode => BitConverter.SingleToUInt32Bits(frameNode.GetProperty("nativeActual")
+                    .GetProperty("canonicalAssetOracle").GetProperty("curves")
+                    .GetProperty("leftLock").GetSingle()) == 0x80000000U);
+            Assert.Equal(replacedZeros, serializedNegativeZeros);
+        }
         var directory = Directory.CreateTempSubdirectory("godot-als-p5a-negative-zero-");
         try
         {
@@ -3397,31 +3619,309 @@ internal static class P5aOracleApphost
     {
         var apphost = RequireBuiltApphost(family);
         var bundle = P5aFrozenBundle.Create();
+        var baselinePort = bundle.PortSchemaSeed.DeepClone().AsObject();
+        AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, baselinePort);
+
+        var ignoredAudit = baselinePort.DeepClone().AsObject();
+        ignoredAudit["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["portAudit"]!
+            ["stateAfter"]!["nextOwnerToken"] = "ffffffffffffffff";
+        AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, ignoredAudit);
+
+        foreach (var mutation in new (bool Native, string Property, string Value)[]
+                 {
+                     (true, "representation", "port_canonical"),
+                     (true, "provenance", "core_oracle_v1"),
+                     (false, "representation", "native_canonical"),
+                     (false, "provenance", "native_canonical_v1"),
+                 })
+        {
+            var nativeHeader = bundle.NativeExpected.DeepClone().AsObject();
+            var portHeader = baselinePort.DeepClone().AsObject();
+            (mutation.Native ? nativeHeader : portHeader)[mutation.Property] = mutation.Value;
+            Assert.Throws<InvalidDataException>(() =>
+                AlsP5aTrace.ValidateCrossEnginePair(nativeHeader, portHeader));
+        }
+
+        var extraRoot = baselinePort.DeepClone().AsObject();
+        extraRoot["unexpected"] = true;
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, extraRoot));
+
+        var missingFrameProperty = baselinePort.DeepClone().AsObject();
+        missingFrameProperty["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!.AsObject()
+            .Remove("identity");
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, missingFrameProperty));
+
+        var caseInsensitivePort = JsonNode.Parse(
+            baselinePort.ToJsonString(), new JsonNodeOptions { PropertyNameCaseInsensitive = true })!.AsObject();
+        var representationNode = caseInsensitivePort["representation"]!;
+        Assert.True(caseInsensitivePort.Remove("representation"));
+        caseInsensitivePort["Representation"] = representationNode;
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, caseInsensitivePort));
+
+        var tolerant = baselinePort.DeepClone().AsObject();
+        tolerant["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["comparableActual"]!
+            ["curves"]!["leftLock"] = 1e-5f;
+        AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, tolerant);
+
+        var beyondTolerance = baselinePort.DeepClone().AsObject();
+        beyondTolerance["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["comparableActual"]!
+            ["curves"]!["leftLock"] = 0.000010001f;
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, beyondTolerance));
+
+        foreach (var nonFinite in new[] { float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+        {
+            var invalidFloat = baselinePort.DeepClone().AsObject();
+            invalidFloat["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["comparableActual"]!
+                ["curves"]!["leftLock"] = nonFinite;
+            Assert.Throws<InvalidDataException>(() =>
+                AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, invalidFloat));
+        }
+
+        var nullComparableNative = bundle.NativeExpected.DeepClone().AsObject();
+        var nullComparablePort = baselinePort.DeepClone().AsObject();
+        nullComparableNative["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["comparableActual"] = null;
+        nullComparablePort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["comparableActual"] = null;
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(nullComparableNative, nullComparablePort));
+
+        var objectFloatNative = bundle.NativeExpected.DeepClone().AsObject();
+        var objectFloatPort = baselinePort.DeepClone().AsObject();
+        objectFloatNative["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["comparableActual"]!
+            ["curves"]!["leftLock"] = new JsonObject();
+        objectFloatPort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["comparableActual"]!
+            ["curves"]!["leftLock"] = new JsonObject();
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(objectFloatNative, objectFloatPort));
+
+        var floatIdentityPort = baselinePort.DeepClone().AsObject();
+        floatIdentityPort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["identity"]!
+            ["characterId"] = 1000f;
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, floatIdentityPort));
+
+        var floatDiscretePort = baselinePort.DeepClone().AsObject();
+        floatDiscretePort["cases"]!.AsArray()[5]!["frames"]!.AsArray()[1]!["comparableActual"]!
+            ["actionPlayback"]!["segmentIndex"] = 0f;
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, floatDiscretePort));
+
+        var discreteIdentity = baselinePort.DeepClone().AsObject();
+        discreteIdentity["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["identity"]!
+            ["frameId"] = "unexpected";
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, discreteIdentity));
+
+        var reordered = baselinePort.DeepClone().AsObject();
+        var reorderedEvents = reordered["cases"]!.AsArray()[5]!["frames"]!.AsArray()[29]!
+            ["comparableActual"]!["events"]!.AsArray();
+        var firstEvent = reorderedEvents[0]!.DeepClone();
+        var secondEvent = reorderedEvents[1]!.DeepClone();
+        reorderedEvents[0] = secondEvent;
+        reorderedEvents[1] = firstEvent;
+        Assert.Throws<InvalidDataException>(() =>
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, reordered));
+
         var directory = Directory.CreateTempSubdirectory("godot-als-p5a-compare-");
         try
         {
             var fixturePath = Path.Combine(directory.FullName, "fixture.json");
+            var planPath = Path.Combine(directory.FullName, "plan.json");
+            File.WriteAllBytes(fixturePath, bundle.NativeExpectedBytes);
+            File.WriteAllBytes(planPath, bundle.PlanBytes);
+            var snapshot = P5aCompiledSnapshot.Load(apphost, family);
+            var layout = new AlsP5OccurrenceLayoutView(
+                snapshot.Version, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
+            var driftedBindings = snapshot.CreateCoreBindings(groundedIkWeight: 0.5f);
+            Assert.Equal(snapshot.Digest, driftedBindings.Digest);
+            Assert.Equal(snapshot.LayoutDigest, driftedBindings.LayoutDigest);
+            var driftedPort = P5aPortReplay.Build(
+                bundle.Plan, in layout, in driftedBindings);
+            Assert.Equal(0.5f, driftedPort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!
+                ["comparableActual"]!["curves"]!["leftIk"]!.GetValue<float>());
+            Assert.Equal(0.5f, driftedPort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!
+                ["portAudit"]!["prepared"]!["leftIk"]!.GetValue<float>());
+            Assert.Equal(1f, bundle.PortSchemaSeed["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!
+                ["comparableActual"]!["curves"]!["leftIk"]!.GetValue<float>());
+
+            var remappedGraphCurves = snapshot.FootCurveBindings.ToArray();
+            var originalTurnAnimationId = remappedGraphCurves[22].AnimationId;
+            var remappedTurnAnimationId = remappedGraphCurves[23].AnimationId;
+            remappedGraphCurves[22] = remappedGraphCurves[22] with
+            {
+                AnimationId = remappedTurnAnimationId,
+            };
+            remappedGraphCurves[23] = remappedGraphCurves[23] with
+            {
+                AnimationId = originalTurnAnimationId,
+            };
+            var remappedTimelineDefinitions = snapshot.TimelineDefinitions.Select(definition =>
+                definition.SourceAnimationId == originalTurnAnimationId
+                    ? definition with { SourceAnimationId = remappedTurnAnimationId }
+                    : definition).ToArray();
+            var remappedGraphBindings = snapshot.CreateCoreBindings(
+                footCurveBindings: remappedGraphCurves,
+                timelineDefinitions: remappedTimelineDefinitions);
+            var remappedGraphPort = P5aPortReplay.Build(
+                bundle.Plan, in layout, in remappedGraphBindings);
+            var turnOccurrenceHandleId = Assert.Single(snapshot.OccurrenceEntries, entry =>
+                entry.SourceKind == AlsP5OccurrenceSourceKind.Turn &&
+                entry.SourceBindingIndex == 0).OccurrenceHandleId;
+            var remappedTurnCursorAnimationIds = remappedGraphPort["cases"]!.AsArray()
+                .SelectMany(caseNode => caseNode!["frames"]!.AsArray())
+                .SelectMany(frameNode => frameNode!["portAudit"]!["stateAfter"]!["timelineCursors"]!.AsArray())
+                .Where(cursorNode => cursorNode!["occurrenceHandleId"]!.GetValue<int>() == turnOccurrenceHandleId)
+                .Select(cursorNode => cursorNode!["animationId"]!.GetValue<int>())
+                .ToArray();
+            Assert.Contains(remappedTurnAnimationId, remappedTurnCursorAnimationIds);
+            Assert.DoesNotContain(originalTurnAnimationId, remappedTurnCursorAnimationIds);
+
+            var missingFootCurves = snapshot.FootCurveBindings.Select(binding => binding with
+            {
+                LeftLockCurveId = -1,
+                RightLockCurveId = -1,
+                LeftLockDefault = .25f,
+                RightLockDefault = .75f,
+            }).ToArray();
+            var missingAllowTransitions = Enumerable.Repeat(
+                -1, snapshot.AllowTransitionsBindingIndices.Length).ToArray();
+            var missingAllowValue = 1f - 1e-5f;
+            var missingCurveBindings = snapshot.CreateCoreBindings(
+                footCurveBindings: missingFootCurves,
+                allowTransitionsPolicy: snapshot.AllowTransitionsPolicy with { MissingValue = missingAllowValue },
+                allowTransitionsBindingIndices: missingAllowTransitions);
+            var missingCurvePort = P5aPortReplay.Build(
+                bundle.Plan, in layout, in missingCurveBindings);
+            var missingCurves = missingCurvePort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!
+                ["comparableActual"]!["curves"]!;
+            Assert.Equal(0x3e800000, BitConverter.SingleToInt32Bits(
+                missingCurves["leftLock"]!.GetValue<float>()));
+            Assert.Equal(0x3f400000, BitConverter.SingleToInt32Bits(
+                missingCurves["rightLock"]!.GetValue<float>()));
+            Assert.Equal(BitConverter.SingleToInt32Bits(missingAllowValue),
+                BitConverter.SingleToInt32Bits(missingCurves["allowTransitions"]!.GetValue<float>()));
+            Assert.True(MathF.Abs(1f - missingAllowValue) > 1e-5f);
+            Assert.Throws<InvalidDataException>(() =>
+                AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, missingCurvePort));
+
+            var remappedMarkers = snapshot.SyncMarkers.Select(marker =>
+                marker with { MarkerId = checked(marker.MarkerId + 1000) }).ToArray();
+            var remappedSyncBindings = snapshot.CreateCoreBindings(syncMarkers: remappedMarkers);
+            var remappedSyncPort = P5aPortReplay.Build(
+                bundle.Plan, in layout, in remappedSyncBindings);
+            AlsP5aTrace.ValidateCrossEnginePair(bundle.NativeExpected, remappedSyncPort);
+            var originalSync = driftedPort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!
+                ["portAudit"]!["result"]!["sync"]!;
+            var remappedSync = remappedSyncPort["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!
+                ["portAudit"]!["result"]!["sync"]!;
+            Assert.Equal(originalSync["previousMarkerId"]!.GetValue<int>() + 1000,
+                remappedSync["previousMarkerId"]!.GetValue<int>());
+            Assert.Equal(originalSync["nextMarkerId"]!.GetValue<int>() + 1000,
+                remappedSync["nextMarkerId"]!.GetValue<int>());
+
+            var duplicateMarkerIds = snapshot.SyncMarkers.Select(marker =>
+                marker with { MarkerId = 1 }).ToArray();
+            var duplicateMarkerBindings = snapshot.CreateCoreBindings(syncMarkers: duplicateMarkerIds);
+            Exception? duplicateMarkerFailure = null;
+            try
+            {
+                _ = P5aPortReplay.Build(bundle.Plan, in layout, in duplicateMarkerBindings);
+            }
+            catch (Exception exception)
+            {
+                duplicateMarkerFailure = exception;
+            }
+            Assert.IsType<InvalidDataException>(duplicateMarkerFailure);
+
+            var rawPath = Path.Combine(directory.FullName, "raw.json");
+            var nativeOutputPath = Path.Combine(directory.FullName, "native-output.json");
+            var portOutputPath = Path.Combine(directory.FullName, "port-output.json");
+            File.WriteAllBytes(rawPath, bundle.RawBytes);
+            Exception? writerReplayDrift = null;
+            try
+            {
+                AlsP5aTrace.WriteCanonicalPair(
+                    rawPath, planPath, nativeOutputPath, portOutputPath,
+                    in layout, in driftedBindings, snapshot.GraphDigest);
+            }
+            catch (Exception exception)
+            {
+                writerReplayDrift = exception;
+            }
+            Assert.IsType<InvalidDataException>(writerReplayDrift);
+            Assert.Contains("cross-engine", writerReplayDrift!.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.False(File.Exists(nativeOutputPath));
+            Assert.False(File.Exists(portOutputPath));
+
+            var nativeSentinel = Encoding.UTF8.GetBytes("native-sentinel");
+            var portSentinel = Encoding.UTF8.GetBytes("port-sentinel");
+            File.WriteAllBytes(nativeOutputPath, nativeSentinel);
+            File.WriteAllBytes(portOutputPath, portSentinel);
+            Exception? sentinelWriterReplayDrift = null;
+            try
+            {
+                AlsP5aTrace.WriteCanonicalPair(
+                    rawPath, planPath, nativeOutputPath, portOutputPath,
+                    in layout, in driftedBindings, snapshot.GraphDigest);
+            }
+            catch (Exception exception)
+            {
+                sentinelWriterReplayDrift = exception;
+            }
+            Assert.IsType<InvalidDataException>(sentinelWriterReplayDrift);
+            Assert.Equal(nativeSentinel, File.ReadAllBytes(nativeOutputPath));
+            Assert.Equal(portSentinel, File.ReadAllBytes(portOutputPath));
+
+            var replayDrift = production.VerifyFixtureDirect(
+                fixturePath, planPath, snapshot, groundedIkWeight: 0.5f);
+            Assert.IsType<InvalidDataException>(replayDrift);
+            Assert.Contains("cross-engine", replayDrift!.Message, StringComparison.OrdinalIgnoreCase);
+
             var apphostSamples = 0;
             var pointers = ComparableFloatPointers(bundle.NativeExpected);
             foreach (var pointer in pointers)
             foreach (var requestedDifference in new[]
                      { 0.000009999f, -0.000009999f, 0.00001f, -0.00001f, 0.000010001f, -0.000010001f })
             {
-                var fixture = bundle.NativeExpected.DeepClone().AsObject();
-                var comparable = fixture["cases"]!.AsArray()[pointer.CaseIndex]!["frames"]!
+                var nativeComparable = bundle.NativeExpected["cases"]!.AsArray()[pointer.CaseIndex]!["frames"]!
                     .AsArray()[pointer.FrameIndex]!["comparableActual"]!;
-                var owner = LocateParent(comparable, pointer.Path);
+                var portComparable = baselinePort["cases"]!.AsArray()[pointer.CaseIndex]!["frames"]!
+                    .AsArray()[pointer.FrameIndex]!["comparableActual"]!;
                 var property = (string)pointer.Path[^1];
-                var baseline = owner[property]!.GetValue<float>();
+                var baseline = LocateParent(nativeComparable, pointer.Path)[property]!.GetValue<float>();
+                var portBaseline = LocateParent(portComparable, pointer.Path)[property]!.GetValue<float>();
+                Assert.Equal(BitConverter.SingleToInt32Bits(baseline), BitConverter.SingleToInt32Bits(portBaseline));
                 var mutated = baseline + requestedDifference;
-                owner[property] = mutated;
                 var shouldPass = MathF.Abs(mutated - baseline) <= 1e-5f;
                 Assert.Equal(shouldPass, production.CompareComparableFloat(baseline, mutated, family));
                 Assert.Equal(shouldPass, production.CompareComparableFloat(mutated, baseline, family));
+                JsonObject? nativeFixtureForApphost = null;
+                foreach (var mutateNative in new[] { true, false })
+                {
+                    var nativeFixture = bundle.NativeExpected.DeepClone().AsObject();
+                    var portFixture = baselinePort.DeepClone().AsObject();
+                    var selected = mutateNative ? nativeFixture : portFixture;
+                    var comparable = selected["cases"]!.AsArray()[pointer.CaseIndex]!["frames"]!
+                        .AsArray()[pointer.FrameIndex]!["comparableActual"]!;
+                    LocateParent(comparable, pointer.Path)[property] = mutated;
+                    if (mutateNative) nativeFixtureForApphost = nativeFixture;
+                    if (shouldPass)
+                    {
+                        AlsP5aTrace.ValidateCrossEnginePair(nativeFixture, portFixture);
+                    }
+                    else
+                    {
+                        Assert.Throws<InvalidDataException>(() =>
+                            AlsP5aTrace.ValidateCrossEnginePair(nativeFixture, portFixture));
+                    }
+                }
 
                 if (pointer == pointers[0] && apphostSamples < 6)
                 {
-                    File.WriteAllBytes(fixturePath, P5aFrozenBundle.CanonicalBytes(fixture));
+                    File.WriteAllBytes(fixturePath, P5aFrozenBundle.CanonicalBytes(nativeFixtureForApphost!));
                     if (shouldPass)
                         Run(apphost, family, "--verify-fixture", "--repository-root",
                             P5aRedHarness.RepositoryRoot(), "--fixture", fixturePath);
@@ -3430,6 +3930,20 @@ internal static class P5aOracleApphost
                             P5aRedHarness.RepositoryRoot(), "--fixture", fixturePath);
                     apphostSamples++;
                 }
+            }
+
+            foreach (var pointer in pointers)
+            foreach (var nonFinite in new[] { float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+            foreach (var mutateNative in new[] { true, false })
+            {
+                var nativeFixture = bundle.NativeExpected.DeepClone().AsObject();
+                var portFixture = baselinePort.DeepClone().AsObject();
+                var selected = mutateNative ? nativeFixture : portFixture;
+                var comparable = selected["cases"]!.AsArray()[pointer.CaseIndex]!["frames"]!
+                    .AsArray()[pointer.FrameIndex]!["comparableActual"]!;
+                LocateParent(comparable, pointer.Path)[(string)pointer.Path[^1]] = nonFinite;
+                Assert.Throws<InvalidDataException>(() =>
+                    AlsP5aTrace.ValidateCrossEnginePair(nativeFixture, portFixture));
             }
 
             var exact = bundle.NativeExpected.DeepClone().AsObject();
@@ -3498,7 +4012,7 @@ internal static class P5aOracleApphost
                 }
             }
         }
-        Assert.True(byShape.Count >= 20, $"Comparable f32 pointer catalog unexpectedly small: {byShape.Count}.");
+        Assert.Equal(21, byShape.Count);
         return byShape.Values.OrderBy(pointer => pointer.Shape, StringComparer.Ordinal).ToArray();
     }
 
@@ -4324,10 +4838,25 @@ internal static class P5aOracleApphost
             var root = P5aRedHarness.RepositoryRoot();
             var project = Path.Combine(root, "tools", "Als.P5aOracle", "Als.P5aOracle.csproj");
             Assert.True(File.Exists(project), Missing(family, "Release Oracle project"));
-            Run(ResolveDotnetHost(family), family,
-                "build", project, "-c", "Release", "--no-incremental", "--nologo");
             var apphost = Path.Combine(root, "tools", "Als.P5aOracle", "bin", "Release", "net8.0",
                 OperatingSystem.IsWindows() ? "Als.P5aOracle.exe" : "Als.P5aOracle");
+            var prebuiltApphost = Environment.GetEnvironmentVariable(
+                "GODOTALS_P5A_PREBUILT_ORACLE_APPHOST");
+            if (!string.IsNullOrEmpty(prebuiltApphost))
+            {
+                Assert.True(Path.IsPathFullyQualified(prebuiltApphost),
+                    Missing(family, "absolute prebuilt Release Oracle apphost"));
+                Assert.True(Path.GetFullPath(prebuiltApphost).Equals(
+                        Path.GetFullPath(apphost), StringComparison.OrdinalIgnoreCase),
+                    Missing(family, "fixed prebuilt Release Oracle apphost"));
+                Assert.True(File.Exists(apphost),
+                    Missing(family, $"prebuilt Release Oracle apphost '{apphost}'"));
+                _apphost = apphost;
+                return apphost;
+            }
+
+            Run(ResolveDotnetHost(family), family,
+                "build", project, "-c", "Release", "--no-incremental", "--nologo");
             Assert.True(File.Exists(apphost), Missing(family, $"Release Oracle apphost '{apphost}'"));
             _apphost = apphost;
             return apphost;
@@ -5004,37 +5533,411 @@ internal static class P5aOracleApphost
     internal static bool CallResultIsDiscarded(MethodBase caller, MethodBase callee)
     {
         var site = Assert.Single(DirectCallSites(caller), value => value.Method == callee);
+        return CallResultAtSiteIsDiscarded(caller, site.Offset);
+    }
+
+    internal static bool CallResultAtSiteIsDiscarded(MethodBase caller, int siteOffset)
+    {
         var il = caller.GetMethodBody()!.GetILAsByteArray()!;
-        var offset = site.Offset;
+        var offset = siteOffset;
         var opcode = ReadOpCode(il, ref offset);
         offset += OperandSize(opcode.OperandType, il, offset);
         var next = ReadOpCode(il, ref offset);
         return next == OpCodes.Pop;
     }
 
+    internal static bool CallResultAtSiteFlowsTo(
+        MethodBase caller,
+        int producerOffset,
+        int consumerOffset)
+    {
+        var instructions = DirectInstructions(caller);
+        var producerIndex = Array.FindIndex(instructions, instruction => instruction.Offset == producerOffset);
+        var consumerIndex = Array.FindIndex(instructions, instruction => instruction.Offset == consumerOffset);
+        if (producerIndex < 0 || consumerIndex <= producerIndex + 1) return false;
+
+        var store = instructions[producerIndex + 1];
+        if (!IsLocalStore(store.OpCode) || store.LocalIndex < 0) return false;
+        var local = store.LocalIndex;
+        if (instructions[(producerIndex + 2)..consumerIndex]
+            .Any(instruction => IsLocalStore(instruction.OpCode) && instruction.LocalIndex == local)) return false;
+
+        var loadIndex = Array.FindLastIndex(instructions, consumerIndex - 1, consumerIndex - producerIndex - 1,
+            instruction => instruction.LocalIndex == local &&
+                           LocalIndex(instruction.OpCode, caller.GetMethodBody()!.GetILAsByteArray()!,
+                               OperandOffset(caller, instruction.Offset), store: false) == local);
+        if (loadIndex <= producerIndex + 1 ||
+            !InstructionDominates(caller, instructions[loadIndex].Offset, consumerOffset)) return false;
+
+        var liveValueCount = 1;
+        for (var index = loadIndex + 1; index < consumerIndex; index++)
+        {
+            var instruction = instructions[index];
+            if (instruction.OpCode == OpCodes.Nop) continue;
+            if (instruction.OpCode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch or
+                FlowControl.Return or FlowControl.Throw || instruction.OpCode.StackBehaviourPop != StackBehaviour.Pop0)
+            {
+                return false;
+            }
+            liveValueCount += PushCount(instruction.OpCode.StackBehaviourPush);
+        }
+        return liveValueCount <= CallPopCount(instructions[consumerIndex].Member! as MethodBase ??
+            throw new InvalidOperationException("Consumer call metadata is unavailable."));
+    }
+
+    internal static void AssertPortProjectionEvidence()
+    {
+        const string typeName = "GodotAls.Core.Animation.P5aPortReplay";
+        var replayType = typeof(AlsP5Runtime).Assembly.GetType(typeName, throwOnError: true, ignoreCase: false)!;
+        var build = Assert.Single(replayType.GetMethods(BindingFlags.NonPublic | BindingFlags.Static),
+            method => method.Name == "Build");
+        Assert.Equal(3, build.GetParameters().Length);
+        Assert.Equal(typeof(JsonObject), build.GetParameters()[0].ParameterType);
+        Assert.Equal(typeof(AlsP5OccurrenceLayoutView).MakeByRefType(), build.GetParameters()[1].ParameterType);
+        Assert.Equal(typeof(AlsP5RuntimeBindings).MakeByRefType(), build.GetParameters()[2].ParameterType);
+
+        var finalizeSites = DirectCallSites(build).Where(site =>
+            site.Method.DeclaringType == typeof(AlsP5Runtime) && site.Method.Name == "TryFinalize").ToArray();
+        Assert.Single(finalizeSites);
+        Assert.False(CallResultAtSiteIsDiscarded(build, finalizeSites[0].Offset));
+        var shadowFinalize = RequiredMethod(replayType, "ExecuteShadowFinalize");
+        var shadowFinalizeSite = Assert.Single(DirectCallSites(shadowFinalize), site =>
+            site.Method.DeclaringType == typeof(AlsP5Runtime) && site.Method.Name == "TryFinalize");
+        Assert.False(CallResultAtSiteIsDiscarded(shadowFinalize, shadowFinalizeSite.Offset));
+        var failedShadowValidator = RequiredMethod(replayType, "ValidateFailedShadowFinalize");
+        var exactShadowValidator = RequiredMethod(replayType, "RequireExactShadowReplay");
+        var committedSnapshot = RequiredMethod(replayType, "CaptureCommittedShadow");
+        var preparedSnapshot = RequiredMethod(replayType, "CapturePreparedShadow");
+        var candidateSnapshot = RequiredMethod(replayType, "CaptureCandidateShadow");
+        var replayStorage = RequiredMethod(replayType, "CreateReplayStorage");
+        var graphResolver = RequiredMethod(replayType, "ResolveGraphAnimationId");
+        var recordShadowExecution = RequiredMethod(typeof(AlsP5aTrace), "RecordShadowExecution");
+        var buildClosure = OwnedReachableMethods(build, replayType);
+        Assert.Contains(shadowFinalize, buildClosure);
+        Assert.Contains(failedShadowValidator, buildClosure);
+        Assert.Contains(exactShadowValidator, buildClosure);
+        Assert.Contains(committedSnapshot, buildClosure);
+        Assert.Contains(preparedSnapshot, buildClosure);
+        Assert.Contains(candidateSnapshot, buildClosure);
+        Assert.Contains(graphResolver, buildClosure);
+        var executeSites = DirectCallSites(build).Where(site => site.Method == shadowFinalize).ToArray();
+        var validateSites = DirectCallSites(build).Where(site => site.Method == failedShadowValidator).ToArray();
+        var prepareSites = DirectCallSites(build).Where(site =>
+            site.Method.DeclaringType == typeof(AlsP5Runtime) && site.Method.Name == "TryPrepare").ToArray();
+        var committedSites = DirectCallSites(build).Where(site => site.Method == committedSnapshot).ToArray();
+        var exactSites = DirectCallSites(build).Where(site => site.Method == exactShadowValidator).ToArray();
+        var recordSite = Assert.Single(DirectCallSites(build), site => site.Method == recordShadowExecution);
+        Assert.Equal(2, executeSites.Length);
+        Assert.Equal(2, validateSites.Length);
+        Assert.Equal(2, prepareSites.Length);
+        Assert.Equal(4, committedSites.Length);
+        Assert.Equal(5, exactSites.Length);
+        Assert.True(committedSites[0].Offset < prepareSites[0].Offset &&
+                    prepareSites[0].Offset < exactSites[0].Offset &&
+                    exactSites[0].Offset < executeSites[0].Offset);
+        Assert.True(InstructionDominates(build, committedSites[0].Offset, prepareSites[0].Offset));
+        for (var index = 0; index < executeSites.Length; index++)
+        {
+            Assert.True(executeSites[index].Offset < validateSites[index].Offset);
+            Assert.True(CallResultAtSiteFlowsTo(
+                build, executeSites[index].Offset, validateSites[index].Offset));
+        }
+        foreach (var validationSite in validateSites.Concat(exactSites))
+        {
+            Assert.True(InstructionDominates(build, validationSite.Offset, recordSite.Offset),
+                $"Shadow validation at IL_{validationSite.Offset:X4} must dominate audit recording.");
+        }
+        Assert.Equal(2, DirectCalledMethods(build).Count(method => method == failedShadowValidator));
+        Assert.Equal(5, DirectCalledMethods(build).Count(method => method == exactShadowValidator));
+        Assert.Equal(4, DirectCalledMethods(build).Count(method => method == committedSnapshot));
+        Assert.Equal(2, DirectCalledMethods(build).Count(method => method == preparedSnapshot));
+        Assert.Equal(2, DirectCalledMethods(build).Count(method => method == candidateSnapshot));
+        Assert.Equal(1, DirectCalledMethods(build).Count(method => method == replayStorage));
+        AssertReads(preparedSnapshot, replayType, typeof(AlsP5PreparedFrame),
+            "OwnerCookie", "Identity", "BindingDigest", "LayoutDigest", "ActionGraph", "TransitionGraph",
+            "Sync", "SyncMappedPlaybacks", "LeftIk", "RightIk", "LeftLock", "RightLock",
+            "AllowTransitions", "TransitionReplacedClosingWeight");
+        AssertReads(candidateSnapshot, replayType, typeof(AlsP5RuntimeScratch),
+            "BaseCapacity", "MaximumBaseContributorCount", "Control", "CandidateCursors",
+            "CandidateAuthorities", "CandidateOwnership", "TimelineOccurrences", "ActionTraversalSlices",
+            "TimelinePlaybacks", "SyncPlaybacks", "SyncMappedPlaybacks", "CurveSamples",
+            "CandidateActionPlayer", "CandidateDynamicTransition", "CandidateActionBlendLane",
+            "CandidateDynamicTransitionBlendLane", "ActionGraph", "TransitionGraph", "Sync",
+            "SyncMappingCount", "LeftIk", "RightIk", "LeftLock", "RightLock", "AllowTransitions",
+            "TransitionReplacedClosingWeight", "Events", "ActionOutcomes", "ActionPlayback",
+            "DynamicTransitionSummary", "PreparedTransitionBinding", "NextOwnerToken",
+            "TransitionCooldownBlockedThisFrame");
+        AssertReads(candidateSnapshot, replayType, typeof(AlsP5RuntimeScratchControl),
+            "OwnerCookie", "PreparedIdentity", "PreparedBindingDigest", "PreparedLayoutDigest", "Phase");
+        AssertReadsAllFieldsExcept(preparedSnapshot, replayType, typeof(AlsP5PreparedFrame), "Revision");
+        AssertReadsAllFieldsExcept(candidateSnapshot, replayType, typeof(AlsP5RuntimeScratch),
+            "ViewPreparedRevision");
+        AssertReadsAllFieldsExcept(candidateSnapshot, replayType, typeof(AlsP5RuntimeScratchControl),
+            "AttemptRevision", "PreparedRevision");
+        AssertReadsAllFieldsExcept(failedShadowValidator, replayType, shadowFinalize.ReturnType);
+        AssertReads(failedShadowValidator, replayType, shadowFinalize.ReturnType,
+            "Succeeded", "Failure", "NextOwnerToken", "NextState", "Result");
+        AssertReads(graphResolver, replayType, typeof(AlsP4FootCurveRuntimeBinding), "AnimationId");
+
+        var probeEntries = new[]
+        {
+            new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Base, 0, 0, 0, 0),
+            new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Base, 1, 1, 1, 1),
+            new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Turn, 0, 0, 2, 0),
+            new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Rotate, 0, 0, 3, 1),
+            new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.ActionMontage, 0, 0, 4, 1),
+        };
+        var storage = replayStorage.Invoke(null, [probeEntries])!;
+        Assert.Equal(5, ((Array)storage.GetType().GetProperty("Cursors")!.GetValue(storage)!).Length);
+        Assert.Equal(2, ((Array)storage.GetType().GetProperty("Authorities")!.GetValue(storage)!).Length);
+        Assert.Equal(5, ((Array)storage.GetType().GetProperty("CandidateCursors")!.GetValue(storage)!).Length);
+        Assert.Equal(2, ((Array)storage.GetType().GetProperty("CandidateAuthorities")!.GetValue(storage)!).Length);
+
+        var comparable = RequiredMethod(replayType, "ComparableJson");
+        AssertReads(comparable, replayType, typeof(AlsP5PreparedFrame),
+            "LeftIk", "RightIk", "LeftLock", "RightLock", "AllowTransitions");
+
+        var sync = RequiredMethod(replayType, "ComparableSync");
+        AssertReads(sync, replayType, typeof(AlsSyncResult),
+            "PreviousMarkerId", "NextMarkerId", "Cycle", "Phase", "LeftFootPhase", "RightFootPhase");
+        var sameSync = RequiredMethod(replayType, "SameSync");
+        var isDefaultSync = RequiredMethod(replayType, "IsDefaultSync");
+        var syncClosure = OwnedReachableMethods(sync, replayType);
+        Assert.Contains(sameSync, syncClosure);
+        Assert.Contains(isDefaultSync, syncClosure);
+
+        static bool InvokeSyncPredicate(MethodInfo method, params object[] arguments) =>
+            (bool)method.Invoke(null, arguments)!;
+        var defaultSync = AlsSyncResult.CreateDefault();
+        Assert.True(InvokeSyncPredicate(isDefaultSync, defaultSync));
+        var negativeZero = BitConverter.Int32BitsToSingle(unchecked((int)0x80000000));
+        foreach (var driftedDefault in new[]
+                 {
+                     defaultSync with { GroupId = 0 },
+                     defaultSync with { LeaderOccurrenceHandleId = 0 },
+                     defaultSync with { LeaderAnimationId = 0 },
+                     defaultSync with { LeaderPlaybackEpoch = 1 },
+                     defaultSync with { PreviousMarkerId = 0 },
+                     defaultSync with { NextMarkerId = 0 },
+                     defaultSync with { Cycle = 1 },
+                     defaultSync with { Phase = negativeZero },
+                     defaultSync with { LeftFootPhase = negativeZero },
+                     defaultSync with { RightFootPhase = negativeZero },
+                 })
+        {
+            Assert.False(InvokeSyncPredicate(isDefaultSync, driftedDefault));
+        }
+
+        var activeSync = new AlsSyncResult(0, 1, 2, 3, 4, 5, 6, .25f, .75f, .5f);
+        Assert.True(InvokeSyncPredicate(sameSync, activeSync, activeSync));
+        foreach (var driftedActive in new[]
+                 {
+                     activeSync with { GroupId = 1 },
+                     activeSync with { LeaderOccurrenceHandleId = 2 },
+                     activeSync with { LeaderAnimationId = 3 },
+                     activeSync with { LeaderPlaybackEpoch = 4 },
+                     activeSync with { PreviousMarkerId = 5 },
+                     activeSync with { NextMarkerId = 4 },
+                     activeSync with { Cycle = 7 },
+                     activeSync with { Phase = MathF.BitIncrement(activeSync.Phase) },
+                     activeSync with { LeftFootPhase = MathF.BitIncrement(activeSync.LeftFootPhase) },
+                     activeSync with { RightFootPhase = MathF.BitIncrement(activeSync.RightFootPhase) },
+                 })
+        {
+            Assert.False(InvokeSyncPredicate(sameSync, activeSync, driftedActive));
+        }
+
+        var action = RequiredMethod(replayType, "ComparableAction");
+        AssertReads(action, replayType, typeof(AlsActionPlayback), "FinalSegmentDeltaSeconds");
+
+        var state = RequiredMethod(replayType, "ComparableState");
+        AssertReads(state, replayType, typeof(AlsDynamicTransitionState), "QueuedAnimationId");
+    }
+
+    internal static void AssertCallResultFlowAnalysis()
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Static;
+        var type = typeof(P5aOracleApphost);
+        var producer = type.GetMethod(nameof(FlowProducer), flags)!;
+        var consumer = type.GetMethod(nameof(FlowConsumer), flags)!;
+        Assert.True(CallResultFlowsTo(type.GetMethod(nameof(FlowGood), flags)!, producer, consumer));
+        Assert.False(CallResultFlowsTo(type.GetMethod(nameof(FlowLoadedButUnused), flags)!, producer, consumer));
+        Assert.False(CallResultFlowsTo(type.GetMethod(nameof(FlowOverwritten), flags)!, producer, consumer));
+    }
+
+    private static MethodInfo RequiredMethod(Type type, string name) =>
+        Assert.Single(type.GetMethods(BindingFlags.NonPublic | BindingFlags.Static), method => method.Name == name);
+
+    private static void AssertReads(MethodBase root, Type owner, Type evidenceType, params string[] names)
+    {
+        var reachable = OwnedReachableMethods(root, owner);
+        var fields = reachable.SelectMany(DirectFieldSites)
+            .Where(site => site.Field.DeclaringType == evidenceType)
+            .Select(site => site.Field.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var calls = reachable.SelectMany(DirectCalledMethods)
+            .Where(method => method.DeclaringType == evidenceType)
+            .Select(method => method.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var name in names)
+        {
+            Assert.True(fields.Contains(name) || fields.Contains($"<{name}>k__BackingField") ||
+                        calls.Contains($"get_{name}"),
+                $"P5A port projection does not read current {evidenceType.Name}.{name} evidence.");
+        }
+    }
+
+    private static void AssertReadsAllFieldsExcept(
+        MethodBase root,
+        Type owner,
+        Type evidenceType,
+        params string[] excludedNames)
+    {
+        static string LogicalName(string name) =>
+            name.StartsWith('<') && name.EndsWith(">k__BackingField", StringComparison.Ordinal)
+                ? name[1..name.IndexOf('>')]
+                : name;
+
+        var declared = evidenceType
+            .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic |
+                       BindingFlags.DeclaredOnly)
+            .Select(field => LogicalName(field.Name))
+            .ToHashSet(StringComparer.Ordinal);
+        var excluded = excludedNames.ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(excludedNames.Length, excluded.Count);
+        Assert.All(excluded, name => Assert.Contains(name, declared));
+        var expected = declared
+            .Where(name => !excluded.Contains(name))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        var reachable = OwnedReachableMethods(root, owner);
+        var actual = reachable
+            .SelectMany(DirectFieldSites)
+            .Where(site => site.Field.DeclaringType == evidenceType)
+            .Select(site => LogicalName(site.Field.Name))
+            .Concat(reachable.SelectMany(DirectCalledMethods)
+                .Where(method => method.DeclaringType == evidenceType &&
+                                 method.Name.StartsWith("get_", StringComparison.Ordinal))
+                .Select(method => method.Name[4..]))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(expected, actual);
+    }
+
+    private static MethodBase[] OwnedReachableMethods(MethodBase root, Type owner)
+    {
+        var result = new HashSet<MethodBase>();
+        var pending = new Queue<MethodBase>();
+        pending.Enqueue(root);
+        while (pending.TryDequeue(out var method))
+        {
+            if (!result.Add(method)) continue;
+            foreach (var called in DirectCalledMethods(method))
+                if (called.DeclaringType == owner) pending.Enqueue(called);
+        }
+        return result.ToArray();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static object FlowProducer() => new();
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void FlowConsumer(object first, object second)
+    {
+        GC.KeepAlive(first);
+        GC.KeepAlive(second);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void FlowGood()
+    {
+        var value = FlowProducer();
+        FlowConsumer(new object(), value);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void FlowLoadedButUnused()
+    {
+        var value = FlowProducer();
+        _ = value.GetHashCode();
+        FlowConsumer(new object(), new object());
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void FlowOverwritten()
+    {
+        var value = FlowProducer();
+        value = new object();
+        FlowConsumer(new object(), value);
+    }
+
     internal static bool CallResultFlowsTo(MethodBase caller, MethodBase producer, MethodBase consumer)
     {
-        var producerSite = Assert.Single(DirectCallSites(caller), value => value.Method == producer);
-        var consumerSite = Assert.Single(DirectCallSites(caller), value => value.Method == consumer);
-        var il = caller.GetMethodBody()!.GetILAsByteArray()!;
-        var offset = producerSite.Offset;
-        var call = ReadOpCode(il, ref offset);
-        offset += OperandSize(call.OperandType, il, offset);
-        var storeOffset = offset;
-        var store = ReadOpCode(il, ref offset);
-        var local = LocalIndex(store, il, offset, store: true);
-        if (local < 0) return false;
-        offset += OperandSize(store.OperandType, il, offset);
-        for (; offset < consumerSite.Offset;)
+        var instructions = DirectInstructions(caller);
+        var producerIndex = Array.FindIndex(instructions,
+            instruction => instruction.Member == producer &&
+                           instruction.OpCode is var opcode && (opcode == OpCodes.Call || opcode == OpCodes.Callvirt));
+        var consumerIndex = Array.FindIndex(instructions,
+            instruction => instruction.Member == consumer &&
+                           instruction.OpCode is var opcode && (opcode == OpCodes.Call || opcode == OpCodes.Callvirt));
+        if (producerIndex < 0 || consumerIndex <= producerIndex + 1) return false;
+
+        var store = instructions[producerIndex + 1];
+        if (!IsLocalStore(store.OpCode) || store.LocalIndex < 0) return false;
+        var local = store.LocalIndex;
+        if (instructions[(producerIndex + 2)..consumerIndex]
+            .Any(instruction => IsLocalStore(instruction.OpCode) && instruction.LocalIndex == local)) return false;
+
+        var loadIndex = Array.FindLastIndex(instructions, consumerIndex - 1, consumerIndex - producerIndex - 1,
+            instruction => instruction.LocalIndex == local &&
+                           (LocalIndex(instruction.OpCode, caller.GetMethodBody()!.GetILAsByteArray()!,
+                                OperandOffset(caller, instruction.Offset), store: false) == local));
+        if (loadIndex <= producerIndex + 1 ||
+            !InstructionDominates(caller, instructions[loadIndex].Offset, instructions[consumerIndex].Offset)) return false;
+
+        var taintedValueCount = 1;
+        for (var index = loadIndex + 1; index < consumerIndex; index++)
         {
-            var opcode = ReadOpCode(il, ref offset);
-            var loaded = LocalIndex(opcode, il, offset, store: false);
-            if (loaded == local) return true;
-            offset += OperandSize(opcode.OperandType, il, offset);
+            var instruction = instructions[index];
+            if (instruction.OpCode == OpCodes.Nop) continue;
+            if (index == loadIndex + 1 && instruction.Member is MethodInfo getter && getter.IsSpecialName &&
+                getter.Name.StartsWith("get_", StringComparison.Ordinal) &&
+                !getter.IsStatic && getter.GetParameters().Length == 0 && getter.ReturnType != typeof(void))
+            {
+                continue;
+            }
+            if (instruction.OpCode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch or
+                FlowControl.Return or FlowControl.Throw || instruction.OpCode.StackBehaviourPop != StackBehaviour.Pop0)
+            {
+                return false;
+            }
+            taintedValueCount += PushCount(instruction.OpCode.StackBehaviourPush);
         }
-        _ = storeOffset;
-        return false;
+
+        return taintedValueCount <= CallPopCount(consumer);
     }
+
+    private static int OperandOffset(MethodBase method, int instructionOffset)
+    {
+        var il = method.GetMethodBody()!.GetILAsByteArray()!;
+        var offset = instructionOffset;
+        _ = ReadOpCode(il, ref offset);
+        return offset;
+    }
+
+    private static int PushCount(StackBehaviour behaviour) => behaviour switch
+    {
+        StackBehaviour.Push0 => 0,
+        StackBehaviour.Push1 or StackBehaviour.Pushi or StackBehaviour.Pushi8 or
+            StackBehaviour.Pushr4 or StackBehaviour.Pushr8 or StackBehaviour.Pushref => 1,
+        StackBehaviour.Push1_push1 => 2,
+        _ => throw new InvalidOperationException($"Unsupported IL push behavior: {behaviour}."),
+    };
+
+    private static int CallPopCount(MethodBase method) =>
+        method.GetParameters().Length + (method.IsStatic ? 0 : 1);
 
     internal static int CountReturns(MethodBase method) => CountOpcode(method, OpCodes.Ret);
 
@@ -5052,6 +5955,8 @@ internal static class P5aOracleApphost
         var value when !store && value == OpCodes.Ldloc_3.Value => 3,
         var value when !store && value == OpCodes.Ldloc_S.Value => il[operandOffset],
         var value when !store && value == OpCodes.Ldloc.Value => BitConverter.ToUInt16(il, operandOffset),
+        var value when !store && value == OpCodes.Ldloca_S.Value => il[operandOffset],
+        var value when !store && value == OpCodes.Ldloca.Value => BitConverter.ToUInt16(il, operandOffset),
         _ => -1,
     };
 
@@ -5947,7 +6852,7 @@ internal static class P5aSyntheticDocuments
 
     private static void PopulateComparableSchedule(JsonObject actual, int caseIndex, int frameIndex)
     {
-        actual["curves"] = SemanticCurves();
+        actual["curves"] = SemanticCurves(caseIndex, frameIndex);
         var events = actual["events"]!.AsArray();
         var outcomes = actual["actionOutcomes"]!.AsArray();
         var state = actual["stateAfter"]!.AsObject();
@@ -5984,10 +6889,15 @@ internal static class P5aSyntheticDocuments
         }
     }
 
-    private static JsonObject SemanticCurves() => new()
+    private static JsonObject SemanticCurves(int caseIndex, int frameIndex) => new()
     {
-        ["leftIk"] = 1f, ["rightIk"] = 1f, ["leftLock"] = 0f,
-        ["rightLock"] = 0f, ["allowTransitions"] = 1f,
+        ["leftIk"] = 1f,
+        ["rightIk"] = 1f,
+        ["leftLock"] = caseIndex == 1 && frameIndex == 0 ? 0.00015993712f : 0f,
+        ["rightLock"] = caseIndex == 1 ? 1f : 0f,
+        ["allowTransitions"] = caseIndex is 2 or 3 or 4
+            ? MathF.Max(0f, 1f - TransitionGraphWeight(frameIndex))
+            : 1f,
     };
 
     private static void PopulateSharedSync(JsonObject sync, int caseIndex, int frameIndex)
@@ -6174,7 +7084,7 @@ internal static class P5aSyntheticDocuments
     private static void PopulateRawSchedule(JsonObject actual, int caseIndex, int frameIndex)
     {
         var oracle = actual["canonicalAssetOracle"]!.AsObject();
-        oracle["curves"] = SemanticCurves();
+        oracle["curves"] = SemanticCurves(caseIndex, frameIndex);
         var graphWeights = oracle["graphCurveWeights"]!.AsObject();
         graphWeights["action"] = caseIndex >= 5 ? ActionLaneWeight(caseIndex, frameIndex) : 0f;
         graphWeights["transition"] = caseIndex is 2 or 3 or 4 ? TransitionGraphWeight(frameIndex) : 0f;
@@ -6617,7 +7527,7 @@ internal static class P5aSyntheticDocuments
         var prepared = audit["prepared"]!.AsObject();
         var result = audit["result"]!.AsObject();
         var state = audit["stateAfter"]!.AsObject();
-        var curves = SemanticCurves();
+        var curves = SemanticCurves(caseIndex, frameIndex);
         foreach (var name in new[] { "leftIk", "rightIk", "leftLock", "rightLock", "allowTransitions" })
         {
             prepared[name] = curves[name]!.DeepClone();

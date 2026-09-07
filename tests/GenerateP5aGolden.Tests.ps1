@@ -318,6 +318,27 @@ function Assert-TestP5aNativeRunnerLexicalClosure
         ($cap -le 8388608) | Should Be $true
     }
 
+    foreach ($limit in @(
+        @{ Name = 'MaxActiveProcesses'; Maximum = 128 }
+        @{ Name = 'MaxTrackedProcesses'; Maximum = 4096 }
+        @{ Name = 'MaxProcessDepth'; Maximum = 64 }
+        @{ Name = 'MaxExecutablePathCharacters'; Maximum = 8388608 }
+        @{ Name = 'MaxAncestorEdges'; Maximum = 262144 }
+    ))
+    {
+        $matches = @([regex]::Matches(
+            $RunnerText,
+            '(?im)\b' + $limit.Name + '\s*=\s*([0-9]+)'))
+        $matches.Count | Should Be 1
+        $value = [int64]$matches[0].Groups[1].Value
+        $value | Should BeGreaterThan 0
+        ($value -le [int64]$limit.Maximum) | Should Be $true
+        @([regex]::Matches($RunnerText, '\b' + $limit.Name + '\b')).Count |
+            Should BeGreaterThan 1
+    }
+    $RunnerText | Should Match 'JOB_OBJECT_LIMIT_ACTIVE_PROCESS'
+    $RunnerText | Should Match 'ActiveProcessLimit'
+
     $jobListIndex = $RunnerText.LastIndexOf('PROC_THREAD_ATTRIBUTE_JOB_LIST',
         [StringComparison]::Ordinal)
     $handleListIndex = $RunnerText.LastIndexOf('PROC_THREAD_ATTRIBUTE_HANDLE_LIST',
@@ -388,6 +409,13 @@ function Assert-TestP5aProcessLaunchClosure
             }
         }
     }
+
+    @($ast.FindAll({
+        param($node)
+        $node -is [Management.Automation.Language.InvokeMemberExpressionAst] -and
+            $node.Member -is [Management.Automation.Language.StringConstantExpressionAst] -and
+            $node.Member.Value -ceq 'Start'
+    }, $true)).Count | Should Be 0
 
     $processInvokerCommands.Count | Should Be 1
     $ancestor = $processInvokerCommands[0].Parent
@@ -481,6 +509,18 @@ function New-TestP5aOracleRepository
         'src/Als.Core/Als.Core.csproj' = "<Project Sdk=`"Microsoft.NET.Sdk`"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>`n"
         'src/Als.Core/CoreOne.cs' = "namespace Als.Core; public sealed class CoreOne { }`n"
         'src/Als.Core/Nested/CoreTwo.cs' = "namespace Als.Core; public sealed class CoreTwo { }`n"
+        'tests/Als.Core.Tests/Als.Core.Tests.csproj' = "<Project Sdk=`"Microsoft.NET.Sdk`"><PropertyGroup><TargetFramework>net8.0</TargetFramework><IsTestProject>true</IsTestProject></PropertyGroup></Project>`n"
+        'tests/Als.Core.Tests/AlsP5aGoldenTests.cs' = "namespace Als.Core.Tests; public sealed class AlsP5aGoldenTests { }`n"
+        'tests/Als.Core.Tests/Nested/P5aTestHelper.cs' = "namespace Als.Core.Tests; internal static class P5aTestHelper { }`n"
+        'tests/Als.Core.Tests/bin/Generated.cs' = "this test file is excluded`n"
+        'tests/Als.Core.Tests/OBJ/Generated.cs' = "this test file is excluded ordinal-ignore-case`n"
+        'tests/Als.Core.Tests/TestResults/Generated.cs' = "this test result is excluded`n"
+        'tools/schemas/als_p5a_trace.schema.json' = "{}`n"
+        'tools/schemas/als_p5a_trace_plan.schema.json' = "{}`n"
+        'assets/generated/als_v4/als_manifest.json' = "{}`n"
+        'assets/config/p3_locomotion_profile.json' = "{}`n"
+        'assets/config/p4_pose_profile.json' = "{}`n"
+        'assets/config/p5a_animation_runtime.json' = "{}`n"
         'src/Als.Import/bin/Generated.cs' = "this file is excluded`n"
         'src/Als.Core/OBJ/Generated.cs' = "this file is excluded ordinal-ignore-case`n"
     }
@@ -741,6 +781,8 @@ $record = [ordered]@{
     descendantProcesses = @($descendants)
     p5aStagingRootEnvironment = [Environment]::GetEnvironmentVariable(
         'GODOTALS_P5A_STAGING_ROOT', [EnvironmentVariableTarget]::Process)
+    p5aPrebuiltOracleApphostEnvironment = [Environment]::GetEnvironmentVariable(
+        'GODOTALS_P5A_PREBUILT_ORACLE_APPHOST', [EnvironmentVariableTarget]::Process)
     leaseProbeWritable = @($leaseProbeWritable)
 }
 Add-Content -LiteralPath $LogPath -Encoding UTF8 -Value ($record | ConvertTo-Json -Compress -Depth 20)
@@ -979,6 +1021,43 @@ function Get-TestP5aOracleLeasePaths
     ) | ForEach-Object { [IO.Path]::GetFullPath([string]$_) }
     @($paths | Sort-Object -Unique).Count | Should Be $paths.Count
     return [string[]]$paths
+}
+
+function Get-TestP5aVerifierLeasePaths
+{
+    param([Parameter(Mandatory)][object]$Context)
+
+    $testRoot = [IO.Path]::GetFullPath((Join-Path `
+        $Context.Root 'tests\Als.Core.Tests'))
+    $testSources = [string[]]@(Get-ChildItem -LiteralPath $testRoot `
+        -Filter '*.cs' -File -Recurse | Where-Object {
+            $relative = [IO.Path]::GetRelativePath($testRoot, $_.FullName)
+            -not @($relative.Split([IO.Path]::DirectorySeparatorChar) | Where-Object {
+                $_.Equals('bin', [StringComparison]::OrdinalIgnoreCase) -or
+                $_.Equals('obj', [StringComparison]::OrdinalIgnoreCase) -or
+                $_.Equals('TestResults', [StringComparison]::OrdinalIgnoreCase)
+            }).Count
+        } | ForEach-Object { [IO.Path]::GetFullPath($_.FullName) })
+    [Array]::Sort($testSources, [StringComparer]::Ordinal)
+    return [string[]]@(
+        @(Get-TestP5aOracleLeasePaths $Context)
+        [IO.Path]::GetFullPath($Context.Fixture)
+        [IO.Path]::GetFullPath((Join-Path `
+            $Context.Root 'tools\schemas\als_p5a_trace.schema.json'))
+        [IO.Path]::GetFullPath((Join-Path `
+            $Context.Root 'tools\schemas\als_p5a_trace_plan.schema.json'))
+        [IO.Path]::GetFullPath((Join-Path `
+            $Context.Root 'assets\generated\als_v4\als_manifest.json'))
+        [IO.Path]::GetFullPath((Join-Path `
+            $Context.Root 'assets\config\p3_locomotion_profile.json'))
+        [IO.Path]::GetFullPath((Join-Path `
+            $Context.Root 'assets\config\p4_pose_profile.json'))
+        [IO.Path]::GetFullPath((Join-Path `
+            $Context.Root 'assets\config\p5a_animation_runtime.json'))
+        [IO.Path]::GetFullPath((Join-Path `
+            $testRoot 'Als.Core.Tests.csproj'))
+        @($testSources)
+    )
 }
 
 function Get-TestP5aDeploymentLeasePaths
@@ -1393,6 +1472,7 @@ param(
     $Kind, $EntrypointPath, $RunnerName, $FilePath, $Arguments,
     $WorkingDirectory, $TimeoutSeconds, $PhaseName
 )
+$requestedTimeoutSeconds = $TimeoutSeconds
 if ($Kind -ceq 'generator') {
     . $EntrypointPath `
         -UnrealEditorCmd '13b-default-runner-dot-source' `
@@ -1406,7 +1486,7 @@ $runner = Get-Command -Name $RunnerName -CommandType Function -ErrorAction Stop
     -FilePath $FilePath `
     -Arguments @($Arguments) `
     -WorkingDirectory $WorkingDirectory `
-    -TimeoutSeconds $TimeoutSeconds `
+    -TimeoutSeconds $requestedTimeoutSeconds `
     -PhaseName $PhaseName
 '@
     $powerShell = [Management.Automation.PowerShell]::Create()
@@ -1635,7 +1715,7 @@ function Invoke-TestP5aObservedDefaultAtomicPublication
             -ValidatedFixturePath $SourcePath `
             -DestinationPath $DestinationPath)
 
-        $expectedRenameCount = if ($destinationExisted) { 2 } else { 1 }
+        $expectedRenameCount = 1
         $renamedRecords = [Collections.Generic.List[object]]::new()
         $deadline = [DateTime]::UtcNow.AddSeconds(3)
         while ($renamedRecords.Count -lt $expectedRenameCount -and
@@ -2541,7 +2621,11 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
             ))
             {
                 $mutatedRunnerText = if ($nativeMutation.Name -like 'missing-*') {
-                    $runnerText.Replace([string]$nativeMutation.Token, [string]::Empty)
+                    [regex]::Replace(
+                        $runnerText,
+                        [regex]::Escape([string]$nativeMutation.Token),
+                        [string]::Empty,
+                        [Text.RegularExpressions.RegexOptions]::IgnoreCase)
                 }
                 else
                 {
@@ -2802,6 +2886,7 @@ Start-Sleep -Seconds 30
 Start-Sleep -Seconds 30
 "@
             $descendantPid = 0
+            $rootPid = 0
             try
             {
                 $treeResult = @(Invoke-TestP5aDefaultRunner `
@@ -2818,6 +2903,7 @@ Start-Sleep -Seconds 30
                 $treeResult[0].TimedOut | Should Be $true
                 $treeResult[0].OutputLimitExceeded | Should Be $false
                 ([int]$treeResult[0].ProcessId) | Should BeGreaterThan 0
+                $rootPid = [int]$treeResult[0].ProcessId
                 [int]$treeResult[0].JobActiveProcesses | Should Be 0
                 Test-Path -LiteralPath $descendantPidPath -PathType Leaf | Should Be $true
                 $descendantPid = [int][IO.File]::ReadAllText($descendantPidPath)
@@ -2839,6 +2925,8 @@ Start-Sleep -Seconds 30
                 }
                 Get-Process -Id $descendantPid -ErrorAction SilentlyContinue |
                     Should BeNullOrEmpty
+                Get-Process -Id $rootPid -ErrorAction SilentlyContinue |
+                    Should BeNullOrEmpty
             }
             finally
             {
@@ -2846,6 +2934,11 @@ Start-Sleep -Seconds 30
                 {
                     $leftover = Get-Process -Id $descendantPid -ErrorAction SilentlyContinue
                     if ($null -ne $leftover) { $leftover.Kill() }
+                }
+                if ($rootPid -gt 0)
+                {
+                    $leftoverRoot = Get-Process -Id $rootPid -ErrorAction SilentlyContinue
+                    if ($null -ne $leftoverRoot) { $leftoverRoot.Kill() }
                 }
             }
         }
@@ -2862,6 +2955,7 @@ Start-Sleep -Seconds 30
         $generatorCheckpoints = New-TestP5aCheckpointInvoker
         $verifierCheckpoints = New-TestP5aCheckpointInvoker
         $oracleLeasePaths = @(Get-TestP5aOracleLeasePaths $context)
+        $verifierLeasePaths = @(Get-TestP5aVerifierLeasePaths $context)
         $deploymentLeasePaths = @(Get-TestP5aDeploymentLeasePaths $context)
 
         $runs = @(Invoke-TestP5aWithProcessEnvironment `
@@ -2937,7 +3031,7 @@ Start-Sleep -Seconds 30
             -ExpectedCheckpoints @(
                 'OracleEvidenceOpened', 'BeforeOracleChild', 'OracleChildCompleted',
                 'BeforeDotnetChild', 'ChildrenCompleted') `
-            -OracleHandleCount $oracleLeasePaths.Count
+            -OracleHandleCount $verifierLeasePaths.Count
 
         $forbiddenEnvironment = @{}
         foreach ($entry in $toolchain.Environment.GetEnumerator())
@@ -2947,7 +3041,6 @@ Start-Sleep -Seconds 30
         $forbiddenEnvironment.GODOTALS_P5A_DEFAULT_FORBIDDEN_DESCENDANT_MODE =
             '--write-native-plan'
         $context.Staging = Join-Path $TestDrive 'default-workflows-forbidden-staging'
-        [void][IO.Directory]::CreateDirectory($context.Staging)
         $fixtureHashBeforeForbiddenDescendant = Get-TestP5aFileHash $context.Fixture
         $forbiddenOutput = [Collections.Generic.List[object]]::new()
         $forbiddenDescendantPid = 0
@@ -4281,6 +4374,64 @@ Start-Sleep -Seconds 30
         }
     }
 
+    It 'cleans owned generator staging before atomic commit and preserves the prior fixture when cleanup is blocked' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorWorkflow' generator
+        $context = New-TestP5aProcessContext 'generator-strict-precommit-cleanup'
+        $shim = New-TestP5aProcessShim 'generator-strict-precommit-cleanup-shim'
+        $fileSystem = New-TestP5aAtomicFileSystem
+        $paths = Get-TestP5aExpectedProcessPaths $context
+        $lockState = [pscustomobject]@{ Stream = $null }
+        $capturedLockState = $lockState
+        $capturedPlanPath = $paths.PlanA
+        $lockMutation = {
+            param($Checkpoint)
+            $capturedLockState.Stream = [IO.File]::Open(
+                $capturedPlanPath, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+                [IO.FileShare]::Read)
+        }.GetNewClosure()
+        $checkpoints = New-TestP5aCheckpointInvoker `
+            -MutateAt 'BeforePublication' -MutationAction $lockMutation
+        $before = Get-TestP5aFileHash $context.Fixture
+        $output = [Collections.Generic.List[object]]::new()
+        try
+        {
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                & $script:P5aGeneratorPath `
+                    -RepositoryRoot $context.Root `
+                    -UnrealEditorCmd $context.Editor `
+                    -UnrealProject $context.UProject `
+                    -ReferenceRoot $context.Reference `
+                    -StagingRoot $context.Staging `
+                    -DestinationPath $context.Fixture `
+                    -ProcessInvoker $shim.Invoker `
+                    -FileSystemInvoker $fileSystem.Invoker `
+                    -CheckpointInvoker $checkpoints.Invoker `
+                    -TimeoutSeconds 10
+            }
+            $failure | Should Match '(?i)(used by another process|sharing|access|cleanup)'
+            @(Get-TestP5aShimRecords $shim).Count | Should Be 7
+            @($fileSystem.Records | Where-Object {
+                $_.operation -ceq 'File.Copy'
+            }).Count | Should Be 1
+            @($fileSystem.Records | Where-Object {
+                $_.operation -in @('File.Replace', 'File.Move')
+            }).Count | Should Be 0
+            (Get-TestP5aFileHash $context.Fixture) | Should Be $before
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
+                Should Be 0
+            Test-Path -LiteralPath $context.Staging -PathType Container |
+                Should Be $true
+        }
+        finally
+        {
+            if ($null -ne $lockState.Stream) { $lockState.Stream.Dispose() }
+            if (Test-Path -LiteralPath $context.Staging)
+            {
+                Remove-Item -LiteralPath $context.Staging -Recurse -Force
+            }
+        }
+    }
+
     It 'reopens the generated ready manifest and rejects a staged payload mutation before publication' {
         Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorWorkflow' generator
         $context = New-TestP5aProcessContext 'generator-manifest-reopen-entrypoint'
@@ -4585,23 +4736,26 @@ Start-Sleep -Seconds 30
                 Should Be (Split-Path -Parent $resolvedDestination)
             [IO.Path]::GetPathRoot($incoming[0].OldFullPath) |
                 Should Be ([IO.Path]::GetPathRoot($resolvedDestination))
-            @($observation.DeletedPaths | Where-Object {
-                $_ -ceq $resolvedDestination
-            }).Count | Should Be 0
             $outgoing = @($observation.Renamed | Where-Object {
                 $_.OldFullPath -ceq $resolvedDestination -and
                     $_.FullPath -cne $resolvedDestination
             })
             if ($destinationExists)
             {
-                $outgoing.Count | Should Be 1
-                @($observation.Renamed).Count | Should Be 2
+                $outgoing.Count | Should Be 0
+                @($observation.Renamed).Count | Should Be 1
+                @($observation.DeletedPaths | Where-Object {
+                    $_ -ceq $resolvedDestination
+                }).Count | Should Be 1
                 $observation.OldHandleText | Should Be "default old fixture`n"
             }
             else
             {
                 $outgoing.Count | Should Be 0
                 @($observation.Renamed).Count | Should Be 1
+                @($observation.DeletedPaths | Where-Object {
+                    $_ -ceq $resolvedDestination
+                }).Count | Should Be 0
                 $observation.OldHandleText | Should BeNullOrEmpty
             }
         }
@@ -4722,10 +4876,136 @@ Start-Sleep -Seconds 30
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $missingDestination) -File).Count | Should Be 1
     }
 
+    It 'rejects copied incoming fixture corruption before atomic commit' {
+        Assert-TestP5aCommandCapability 'Publish-P5aFixtureAtomically' generator
+        Assert-TestP5aCommandCapability 'Open-P5aGeneratorOwnedStaging' generator
+        Assert-TestP5aCommandCapability 'Open-P5aGeneratorPinnedFile' generator
+        $root = Join-Path $TestDrive 'atomic-corrupt-incoming'
+        $staging = Join-Path $root 'staging'
+        $source = Join-Path $staging 'native-a.json'
+        $destination = Join-Path $root 'official\trace_p5a.json'
+        $stagingLease = $null
+        $sourceLease = $null
+        try
+        {
+            [void][IO.Directory]::CreateDirectory($root)
+            $stagingLease = Open-P5aGeneratorOwnedStaging $staging
+            Write-TestP5aText $source "trusted fixture`n"
+            Write-TestP5aText $destination "prior fixture`n"
+            $before = Get-TestP5aFileHash $destination
+            $sourceLease = Open-P5aGeneratorPinnedFile $source
+            $expectedFixtureSha256 = [string]$sourceLease.HashSha256()
+            $records = [Collections.Generic.List[object]]::new()
+            $capturedRecords = $records
+            $corruptingFileSystem = {
+                param(
+                    $Operation,
+                    $SourcePath,
+                    $DestinationPath,
+                    $OracleLease,
+                    $DeploymentLease,
+                    $ValidatedFixtureLease,
+                    $PublicationLease
+                )
+
+                $capturedRecords.Add([pscustomobject]@{
+                    operation = [string]$Operation
+                    sourcePath = [string]$SourcePath
+                    destinationPath = [string]$DestinationPath
+                })
+                if ([string]$Operation -cne 'File.Copy')
+                {
+                    throw "Unexpected copied-temp commit operation: $Operation"
+                }
+                if ($null -eq $ValidatedFixtureLease)
+                {
+                    throw 'Copied-temp corruption test did not receive the pinned source lease.'
+                }
+                $ValidatedFixtureLease.CopyTo([string]$DestinationPath)
+                [IO.File]::WriteAllText(
+                    [string]$DestinationPath,
+                    "corrupted incoming fixture`n",
+                    [Text.UTF8Encoding]::new($false))
+            }.GetNewClosure()
+            $output = [Collections.Generic.List[object]]::new()
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                Publish-P5aFixtureAtomically `
+                    -ValidatedFixturePath $source `
+                    -DestinationPath $destination `
+                    -FileSystemInvoker $corruptingFileSystem `
+                    -StagingLease $stagingLease `
+                    -ValidatedFixtureLease $sourceLease `
+                    -StagingPayloadLeases @($sourceLease) `
+                    -ExpectedFixtureSha256 $expectedFixtureSha256
+            }
+
+            $failure | Should Match '(?i)copied fixture bytes.*validated manifest payload'
+            @($records | ForEach-Object { $_.operation }) | Should Be @('File.Copy')
+            (Get-TestP5aFileHash $destination) | Should Be $before
+            Test-Path -LiteralPath $staging | Should Be $false
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $destination) -File).Count |
+                Should Be 1
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
+                Should Be 0
+        }
+        finally
+        {
+            try { if ($null -ne $sourceLease) { $sourceLease.Dispose() } } catch { }
+            try { if ($null -ne $stagingLease) { $stagingLease.Dispose() } } catch { }
+            if (Test-Path -LiteralPath $staging)
+            {
+                Remove-Item -LiteralPath $staging -Recurse -Force
+            }
+        }
+    }
+
+    It 'rejects a file symlink when opening pinned generator and verifier sources' {
+        Assert-TestP5aCommandCapability 'Open-P5aGeneratorPinnedFile' generator
+        Assert-TestP5aCommandCapability 'Open-P5aVerifierFixedFileLease' verifier
+        $root = Join-Path $TestDrive 'pinned-source-file-symlink'
+        $target = Join-Path $root 'target.json'
+        $link = Join-Path $root 'native-a.json'
+        Write-TestP5aText $target "symlink target`n"
+        try
+        {
+            New-Item -ItemType SymbolicLink -Path $link -Target $target `
+                -ErrorAction Stop | Out-Null
+        }
+        catch
+        {
+            Set-ItResult -Skipped -Because `
+                "file symlink creation is unavailable without elevation: $($_.Exception.Message)"
+            return
+        }
+
+        ((Get-Item -LiteralPath $link -Force).Attributes -band
+            [IO.FileAttributes]::ReparsePoint) | Should Not Be 0
+        foreach ($commandName in @(
+            'Open-P5aGeneratorPinnedFile',
+            'Open-P5aVerifierFixedFileLease'))
+        {
+            $leaseState = [pscustomobject]@{ Value = $null }
+            $output = [Collections.Generic.List[object]]::new()
+            try
+            {
+                $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                    $leaseState.Value = & $commandName -Path $link
+                }
+                $failure | Should Not BeNullOrEmpty
+                $failure | Should Match '(?i)(reparse|canonical.*path|requested.*path)'
+            }
+            finally
+            {
+                if ($null -ne $leaseState.Value) { $leaseState.Value.Dispose() }
+            }
+        }
+    }
+
     It 'runs exactly two verifier direct children with fixed apphost then exact focused dotnet cwd argv and allows descendants' {
         Assert-TestP5aCommandCapability 'Invoke-P5aVerifierProcessProtocol' verifier
         $context = New-TestP5aProcessContext 'verifier-two'
         $shim = New-TestP5aProcessShim 'verifier-two-shim'
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
         $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
         $nestedDescendants = @(
             New-TestP5aNestedDotnetDescendantRecords `
@@ -4734,9 +5014,28 @@ Start-Sleep -Seconds 30
             DescendantRecords = @($nestedDescendants)
         }
         $ambientEnvironment = 'test-ambient-verifier-two'
-        $run = Invoke-TestP5aWithAmbientStagingEnvironment `
-            -AmbientValue $ambientEnvironment `
-            -Action { Invoke-TestP5aVerifierProtocol $context $shim }
+        $ambientOracleApphost = 'test-ambient-prebuilt-oracle'
+        $selectedEnvironment = @{}
+        foreach ($entry in $toolchain.Environment.GetEnumerator())
+        {
+            $selectedEnvironment[[string]$entry.Key] = [string]$entry.Value
+        }
+        $selectedEnvironment.GODOTALS_P5A_PREBUILT_ORACLE_APPHOST =
+            $ambientOracleApphost
+        $selectedRun = {
+            $selectedResult = Invoke-TestP5aWithAmbientStagingEnvironment `
+                -AmbientValue $ambientEnvironment `
+                -Action { Invoke-TestP5aVerifierProtocol $context $shim }
+            $selectedResult | Add-Member -NotePropertyName PrebuiltOracleValueAfterAction `
+                -NotePropertyValue ([Environment]::GetEnvironmentVariable(
+                    'GODOTALS_P5A_PREBUILT_ORACLE_APPHOST',
+                    [EnvironmentVariableTarget]::Process))
+            return $selectedResult
+        }
+        $runs = @(Invoke-TestP5aWithProcessEnvironment `
+            -Values $selectedEnvironment -Action $selectedRun)
+        $runs.Count | Should Be 1
+        $run = $runs[0]
         $output = @($run.Output)
         $records = @(Get-TestP5aShimRecords $shim)
 
@@ -4753,7 +5052,7 @@ Start-Sleep -Seconds 30
         @($records[0].arguments) | Should Be @(
             '--verify-fixture', '--repository-root', $context.Root,
             '--fixture', $context.Fixture)
-        $records[1].filePath | Should Be (Get-TestP5aDotnetApplicationPath)
+        $records[1].filePath | Should Be $toolchain.SelectedDotnet
         $records[1].workingDirectory | Should Be $context.Root
         $trxPath = (Get-TestP5aExpectedProcessPaths $context).Trx
         @($records[1].arguments) | Should Be @(
@@ -4763,7 +5062,11 @@ Start-Sleep -Seconds 30
             '--logger', "trx;LogFileName=$trxPath")
         $records[0].p5aStagingRootEnvironment | Should Be ([IO.Path]::GetFullPath($context.Staging))
         $records[1].p5aStagingRootEnvironment | Should Be $ambientEnvironment
+        $records[0].p5aPrebuiltOracleApphostEnvironment | Should Be $ambientOracleApphost
+        $records[1].p5aPrebuiltOracleApphostEnvironment |
+            Should Be ([IO.Path]::GetFullPath($context.Oracle.AppHostPath))
         $run.ValueAfterAction | Should Be $ambientEnvironment
+        $run.PrebuiltOracleValueAfterAction | Should Be $ambientOracleApphost
         Assert-TestP5aPathUnderRoot $trxPath $context.Staging
         $expectedParentMarker = "P5A_GOLDEN_FIXTURE_OK cases=8 commit=$script:P5aLockedCommit"
         Assert-TestP5aExactParentMarker -Output @($output) `
@@ -4775,8 +5078,9 @@ Start-Sleep -Seconds 30
         Assert-TestP5aCommandCapability 'Invoke-P5aVerifierWorkflow' verifier
         $context = New-TestP5aProcessContext 'verifier-entrypoint-success'
         $shim = New-TestP5aProcessShim 'verifier-entrypoint-success-shim'
-        $leasePaths = @(Get-TestP5aOracleLeasePaths $context)
+        $leasePaths = @(Get-TestP5aVerifierLeasePaths $context)
         $checkpoints = New-TestP5aCheckpointInvoker
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
         $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
         $nestedDescendants = @(
             New-TestP5aNestedDotnetDescendantRecords `
@@ -4786,17 +5090,23 @@ Start-Sleep -Seconds 30
             ProbeLockedPaths = @($leasePaths)
         }
         $ambientEnvironment = 'test-ambient-verifier-entrypoint'
-        $run = Invoke-TestP5aWithAmbientStagingEnvironment `
-            -AmbientValue $ambientEnvironment `
-            -Action {
-                & $script:P5aVerifierPath `
-                    -RepositoryRoot $context.Root `
-                    -FixturePath $context.Fixture `
-                    -StagingRoot $context.Staging `
-                    -ProcessInvoker $shim.Invoker `
-                    -CheckpointInvoker $checkpoints.Invoker `
-                    -TimeoutSeconds 10
-            }
+        $selectedRun = {
+            Invoke-TestP5aWithAmbientStagingEnvironment `
+                -AmbientValue $ambientEnvironment `
+                -Action {
+                    & $script:P5aVerifierPath `
+                        -RepositoryRoot $context.Root `
+                        -FixturePath $context.Fixture `
+                        -StagingRoot $context.Staging `
+                        -ProcessInvoker $shim.Invoker `
+                        -CheckpointInvoker $checkpoints.Invoker `
+                        -TimeoutSeconds 10
+                }
+        }
+        $runs = @(Invoke-TestP5aWithProcessEnvironment `
+            -Values $toolchain.Environment -Action $selectedRun)
+        $runs.Count | Should Be 1
+        $run = $runs[0]
         $output = @($run.Output)
         $records = @(Get-TestP5aShimRecords $shim)
 
@@ -4900,6 +5210,287 @@ Start-Sleep -Seconds 30
         }
     }
 
+    It 'canonicalizes supported extended paths and rejects device namespace aliases before any child starts' {
+        Assert-TestP5aCommandCapability 'Assert-P5aGeneratorInvocationContract' generator
+        Assert-TestP5aCommandCapability 'Invoke-P5aVerifierProcessProtocol' verifier
+        $generatorContext = New-TestP5aProcessContext 'generator-extended-staging-alias'
+        $generatorInsideStaging = [IO.Path]::GetFullPath((Join-Path `
+            $generatorContext.Root 'forbidden-generator-staging'))
+        $generatorExtendedStaging = '\\?\' + $generatorInsideStaging
+        Test-TestP5aRejects {
+            Assert-P5aGeneratorInvocationContract `
+                -RepositoryRoot $generatorContext.Root `
+                -UnrealEditorCmd $generatorContext.Editor `
+                -UnrealProject $generatorContext.UProject `
+                -ReferenceRoot $generatorContext.Reference `
+                -StagingRoot $generatorExtendedStaging `
+                -DestinationPath $generatorContext.Fixture `
+                -TimeoutSeconds 10
+        } | Should Be $true
+
+        $context = New-TestP5aProcessContext 'verifier-extended-staging-alias'
+        $shim = New-TestP5aProcessShim 'verifier-extended-staging-alias-shim'
+        $insideStaging = [IO.Path]::GetFullPath((Join-Path `
+            $context.Root 'forbidden-verifier-staging'))
+        $context.Staging = '\\?\' + $insideStaging
+
+        Test-TestP5aRejects {
+            Invoke-TestP5aVerifierProtocol $context $shim
+        } | Should Be $true
+        @(Get-TestP5aShimRecords $shim).Count | Should Be 0
+        Test-Path -LiteralPath $insideStaging | Should Be $false
+
+        foreach ($unsupportedPath in @(
+            '\\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy1\staging'
+            '\\?\Volume{00000000-0000-0000-0000-000000000000}\staging'
+            '\\.\C:\Windows'))
+        {
+            Test-TestP5aRejects {
+                Get-P5aGeneratorFullPath $unsupportedPath
+            } | Should Be $true
+            Test-TestP5aRejects {
+                Get-P5aVerifierFullPath $unsupportedPath
+            } | Should Be $true
+        }
+
+        $volumeRoot = [IO.Path]::GetPathRoot($TestDrive)
+        (Get-P5aGeneratorFullPath $volumeRoot) | Should Be $volumeRoot
+        (Get-P5aVerifierFullPath $volumeRoot) | Should Be $volumeRoot
+        $volumeChild = Join-Path $volumeRoot 'p5a-boundary-probe'
+        (Test-P5aGeneratorPathWithin -Path $volumeChild -Root $volumeRoot) |
+            Should Be $true
+        (Test-P5aVerifierPathWithin -Path $volumeChild -Root $volumeRoot) |
+            Should Be $true
+    }
+
+    It 'holds fixture schemas manifest and profiles through the final verifier checkpoint' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aVerifierWorkflow' verifier
+        $context = New-TestP5aProcessContext 'verifier-runtime-input-lease'
+        $shim = New-TestP5aProcessShim 'verifier-runtime-input-lease-shim'
+        $leasePaths = @(Get-TestP5aVerifierLeasePaths $context)
+        $fixtureHash = Get-TestP5aFileHash $context.Fixture
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
+        $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
+        $nestedDescendants = @(
+            New-TestP5aNestedDotnetDescendantRecords `
+                -Closure $dotnetClosure -DirectProcessId 5002)
+        Set-TestP5aShimControl $shim @{
+            DescendantRecords = @($nestedDescendants)
+            ProbeLockedPaths = @($leasePaths)
+        }
+        $checkpoints = New-TestP5aCheckpointInvoker `
+            -MutateAt 'ChildrenCompleted' -MutatePath $context.Fixture
+        $selectedAction = {
+            & $script:P5aVerifierPath `
+                -RepositoryRoot $context.Root `
+                -FixturePath $context.Fixture `
+                -StagingRoot $context.Staging `
+                -ProcessInvoker $shim.Invoker `
+                -CheckpointInvoker $checkpoints.Invoker `
+                -TimeoutSeconds 10
+        }
+        $output = [Collections.Generic.List[object]]::new()
+        $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+            Invoke-TestP5aWithProcessEnvironment `
+                -Values $toolchain.Environment -Action $selectedAction
+        }
+
+        $failure | Should Match '(?i)(used by another process|sharing|access|lease)'
+        @(Get-TestP5aShimRecords $shim).Count | Should Be 2
+        Assert-TestP5aLeaseProbeRecords `
+            -Records @(Get-TestP5aShimRecords $shim) -ExpectedPaths $leasePaths
+        Assert-TestP5aLeaseContinuity -CheckpointObserver $checkpoints `
+            -ExpectedCheckpoints @(
+                'OracleEvidenceOpened', 'BeforeOracleChild', 'OracleChildCompleted',
+                'BeforeDotnetChild', 'ChildrenCompleted') `
+            -OracleHandleCount $leasePaths.Count
+        (Get-TestP5aFileHash $context.Fixture) | Should Be $fixtureHash
+        @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
+            Should Be 0
+        Test-Path -LiteralPath $context.Staging | Should Be $false
+    }
+
+    It 'pins the focused test project and recursive sources and rejects a new source before dotnet starts' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aVerifierWorkflow' verifier
+        foreach ($case in @(
+            @{ Name = 'mutate'; Existing = $true; Diagnostic = '(?i)(used by another process|sharing|access|lease)' }
+            @{ Name = 'add'; Existing = $false; Diagnostic = '(?i)runtime input closure changed' }
+        ))
+        {
+            $context = New-TestP5aProcessContext `
+                "verifier-focused-test-input-$($case.Name)"
+            $shim = New-TestP5aProcessShim `
+                "verifier-focused-test-input-$($case.Name)-shim"
+            $leasePaths = @(Get-TestP5aVerifierLeasePaths $context)
+            $toolchain = Get-TestP5aDefaultWorkflowToolchain
+            $target = if ($case.Existing) {
+                Join-Path $context.Root 'tests\Als.Core.Tests\AlsP5aGoldenTests.cs'
+            } else {
+                Join-Path $context.Root 'tests\Als.Core.Tests\InjectedP5aTest.cs'
+            }
+            $targetBefore = if ($case.Existing) { Get-TestP5aFileHash $target } else { '' }
+            $capturedTarget = $target
+            $mutation = {
+                param($Checkpoint)
+                [IO.File]::AppendAllText(
+                    $capturedTarget,
+                    "namespace Injected; public sealed class SpoofedTest { }`n")
+            }.GetNewClosure()
+            $checkpoints = New-TestP5aCheckpointInvoker `
+                -MutateAt 'BeforeDotnetChild' -MutationAction $mutation
+            Set-TestP5aShimControl $shim @{ ProbeLockedPaths = @($leasePaths) }
+            $selectedAction = {
+                & $script:P5aVerifierPath `
+                    -RepositoryRoot $context.Root `
+                    -FixturePath $context.Fixture `
+                    -StagingRoot $context.Staging `
+                    -ProcessInvoker $shim.Invoker `
+                    -CheckpointInvoker $checkpoints.Invoker `
+                    -TimeoutSeconds 10
+            }
+            $output = [Collections.Generic.List[object]]::new()
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                Invoke-TestP5aWithProcessEnvironment `
+                    -Values $toolchain.Environment -Action $selectedAction
+            }
+
+            $failure | Should Match $case.Diagnostic
+            @(Get-TestP5aShimRecords $shim).Count | Should Be 1
+            Assert-TestP5aLeaseProbeRecords `
+                -Records @(Get-TestP5aShimRecords $shim) -ExpectedPaths $leasePaths
+            Assert-TestP5aLeaseContinuity -CheckpointObserver $checkpoints `
+                -ExpectedCheckpoints @(
+                    'OracleEvidenceOpened', 'BeforeOracleChild',
+                    'OracleChildCompleted', 'BeforeDotnetChild') `
+                -OracleHandleCount $leasePaths.Count
+            if ($case.Existing)
+            {
+                (Get-TestP5aFileHash $target) | Should Be $targetBefore
+            }
+            else
+            {
+                Test-Path -LiteralPath $target -PathType Leaf | Should Be $true
+            }
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
+                Should Be 0
+            Test-Path -LiteralPath $context.Staging | Should Be $false
+        }
+    }
+
+    It 'fails closed without a success marker when strict verifier staging cleanup is blocked' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aVerifierWorkflow' verifier
+        $context = New-TestP5aProcessContext 'verifier-strict-cleanup'
+        $shim = New-TestP5aProcessShim 'verifier-strict-cleanup-shim'
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
+        $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
+        $nestedDescendants = @(
+            New-TestP5aNestedDotnetDescendantRecords `
+                -Closure $dotnetClosure -DirectProcessId 5002)
+        Set-TestP5aShimControl $shim @{
+            DescendantRecords = @($nestedDescendants)
+        }
+        $lockState = [pscustomobject]@{ Stream = $null }
+        $capturedLockState = $lockState
+        $capturedTrxPath = (Get-TestP5aExpectedProcessPaths $context).Trx
+        $lockMutation = {
+            param($Checkpoint)
+            $capturedLockState.Stream = [IO.File]::Open(
+                $capturedTrxPath, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+                [IO.FileShare]::None)
+        }.GetNewClosure()
+        $checkpoints = New-TestP5aCheckpointInvoker `
+            -MutateAt 'ChildrenCompleted' -MutationAction $lockMutation
+        $selectedAction = {
+            & $script:P5aVerifierPath `
+                -RepositoryRoot $context.Root `
+                -FixturePath $context.Fixture `
+                -StagingRoot $context.Staging `
+                -ProcessInvoker $shim.Invoker `
+                -CheckpointInvoker $checkpoints.Invoker `
+                -TimeoutSeconds 10
+        }
+        $output = [Collections.Generic.List[object]]::new()
+        try
+        {
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                Invoke-TestP5aWithProcessEnvironment `
+                    -Values $toolchain.Environment -Action $selectedAction
+            }
+            $failure | Should Match '(?i)(used by another process|sharing|access|cleanup)'
+            @(Get-TestP5aShimRecords $shim).Count | Should Be 2
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
+                Should Be 0
+            Test-Path -LiteralPath $context.Staging -PathType Container | Should Be $true
+        }
+        finally
+        {
+            if ($null -ne $lockState.Stream) { $lockState.Stream.Dispose() }
+            if (Test-Path -LiteralPath $context.Staging)
+            {
+                Remove-Item -LiteralPath $context.Staging -Recurse -Force
+            }
+        }
+    }
+
+    It 'never traverses an unexpected verifier staging child directory during cleanup' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aVerifierWorkflow' verifier
+        $context = New-TestP5aProcessContext 'verifier-directory-cleanup'
+        $shim = New-TestP5aProcessShim 'verifier-directory-cleanup-shim'
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
+        $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
+        $nestedDescendants = @(
+            New-TestP5aNestedDotnetDescendantRecords `
+                -Closure $dotnetClosure -DirectProcessId 5002)
+        Set-TestP5aShimControl $shim @{
+            DescendantRecords = @($nestedDescendants)
+        }
+        $outside = Join-Path $TestDrive 'verifier-directory-cleanup-outside'
+        $outsideSentinel = Join-Path $outside 'sentinel.txt'
+        Write-TestP5aText $outsideSentinel "outside sentinel`n"
+        $capturedStaging = $context.Staging
+        $capturedOutside = $outside
+        $junctionMutation = {
+            param($Checkpoint)
+            New-Item -ItemType Junction `
+                -Path (Join-Path $capturedStaging 'unexpected-directory') `
+                -Target $capturedOutside | Out-Null
+        }.GetNewClosure()
+        $checkpoints = New-TestP5aCheckpointInvoker `
+            -MutateAt 'ChildrenCompleted' -MutationAction $junctionMutation
+        $selectedAction = {
+            & $script:P5aVerifierPath `
+                -RepositoryRoot $context.Root `
+                -FixturePath $context.Fixture `
+                -StagingRoot $context.Staging `
+                -ProcessInvoker $shim.Invoker `
+                -CheckpointInvoker $checkpoints.Invoker `
+                -TimeoutSeconds 10
+        }
+        $output = [Collections.Generic.List[object]]::new()
+        try
+        {
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                Invoke-TestP5aWithProcessEnvironment `
+                    -Values $toolchain.Environment -Action $selectedAction
+            }
+            $failure | Should Match '(?i)unexpected.*directory'
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
+                Should Be 0
+            Test-Path -LiteralPath $outsideSentinel -PathType Leaf |
+                Should Be $true
+            [IO.File]::ReadAllText($outsideSentinel) | Should Be "outside sentinel`n"
+            Test-Path -LiteralPath $context.Staging -PathType Container |
+                Should Be $true
+        }
+        finally
+        {
+            if (Test-Path -LiteralPath $context.Staging)
+            {
+                Remove-Item -LiteralPath $context.Staging -Recurse -Force
+            }
+        }
+    }
+
     It 'executes both top-level entrypoints in clean runspaces without cross-script helpers' {
         Assert-TestP5aPathCapability $script:P5aGeneratorPath 'scripts/generate-p5a-golden.ps1'
         Assert-TestP5aPathCapability $script:P5aVerifierPath 'scripts/verify-p5a-golden.ps1'
@@ -4923,7 +5514,8 @@ Start-Sleep -Seconds 30
 
         $verifierContext = New-TestP5aProcessContext 'verifier-isolated-entrypoint'
         $verifierShim = New-TestP5aProcessShim 'verifier-isolated-entrypoint-shim'
-        $verifierLeasePaths = @(Get-TestP5aOracleLeasePaths $verifierContext)
+        $verifierLeasePaths = @(Get-TestP5aVerifierLeasePaths $verifierContext)
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
         $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
         $nestedDescendants = @(
             New-TestP5aNestedDotnetDescendantRecords `
@@ -4933,12 +5525,18 @@ Start-Sleep -Seconds 30
             ProbeLockedPaths = @($verifierLeasePaths)
         }
         $verifierAmbientEnvironment = 'test-ambient-verifier-isolated'
-        $verifierRun = Invoke-TestP5aWithAmbientStagingEnvironment `
-            -AmbientValue $verifierAmbientEnvironment `
-            -Action {
-                Invoke-TestP5aIsolatedEntrypoint `
-                    -Kind verifier -Context $verifierContext -Shim $verifierShim
-            }
+        $selectedRun = {
+            Invoke-TestP5aWithAmbientStagingEnvironment `
+                -AmbientValue $verifierAmbientEnvironment `
+                -Action {
+                    Invoke-TestP5aIsolatedEntrypoint `
+                        -Kind verifier -Context $verifierContext -Shim $verifierShim
+                }
+        }
+        $runs = @(Invoke-TestP5aWithProcessEnvironment `
+            -Values $toolchain.Environment -Action $selectedRun)
+        $runs.Count | Should Be 1
+        $verifierRun = $runs[0]
         $verifierOutput = @($verifierRun.Output)
         $verifierRecords = @(Get-TestP5aShimRecords $verifierShim)
         $verifierRecords.Count | Should Be 2
@@ -4949,7 +5547,7 @@ Start-Sleep -Seconds 30
             -ExpectedExecutablePaths @($nestedDescendants | ForEach-Object {
                 $_.executablePath
             })
-        $verifierRecords[1].filePath | Should Be (Get-TestP5aDotnetApplicationPath)
+        $verifierRecords[1].filePath | Should Be $toolchain.SelectedDotnet
         Assert-TestP5aLeaseProbeRecords -Records $verifierRecords `
             -ExpectedPaths $verifierLeasePaths
         $verifierRecords[0].p5aStagingRootEnvironment |
@@ -4962,6 +5560,7 @@ Start-Sleep -Seconds 30
 
     It 'keeps the complete nested selected-SDK dotnet test chain under the second direct child' {
         Assert-TestP5aCommandCapability 'Invoke-P5aVerifierProcessProtocol' verifier
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
         $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
         $nestedDescendants = @(
             New-TestP5aNestedDotnetDescendantRecords `
@@ -4972,9 +5571,15 @@ Start-Sleep -Seconds 30
             DescendantRecords = @($nestedDescendants)
         }
         $ambientEnvironment = 'test-ambient-descendant-complete-nested'
-        $run = Invoke-TestP5aWithAmbientStagingEnvironment `
-            -AmbientValue $ambientEnvironment `
-            -Action { Invoke-TestP5aVerifierProtocol $context $shim }
+        $selectedRun = {
+            Invoke-TestP5aWithAmbientStagingEnvironment `
+                -AmbientValue $ambientEnvironment `
+                -Action { Invoke-TestP5aVerifierProtocol $context $shim }
+        }
+        $runs = @(Invoke-TestP5aWithProcessEnvironment `
+            -Values $toolchain.Environment -Action $selectedRun)
+        $runs.Count | Should Be 1
+        $run = $runs[0]
         $output = @($run.Output)
         $records = @(Get-TestP5aShimRecords $shim)
         $records.Count | Should Be 2
@@ -4994,9 +5599,124 @@ Start-Sleep -Seconds 30
             -ExpectedMarker "P5A_GOLDEN_FIXTURE_OK cases=8 commit=$script:P5aLockedCommit"
     }
 
+    It 'allows only the fixed repository testhost and system conhost paths in the selected dotnet closure' {
+        Assert-TestP5aCommandCapability 'Get-P5aVerifierDotnetClosure' verifier
+        $context = New-TestP5aProcessContext 'verifier-real-dotnet-closure'
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
+        $projectTestHost = Join-Path `
+            $context.Root 'tests\Als.Core.Tests\bin\Debug\net8.0\testhost.exe'
+        $shadowTestHost = Join-Path `
+            $context.Root 'tests\Als.Core.Tests\bin\Debug\net8.0\shadow\testhost.exe'
+        $shadowConhost = Join-Path $context.Root 'shadow\conhost.exe'
+        Write-TestP5aText $projectTestHost "fixed project testhost`n"
+        Write-TestP5aText $shadowTestHost "shadow project testhost`n"
+        Write-TestP5aText $shadowConhost "shadow system conhost`n"
+
+        $getClosure = {
+            Get-P5aVerifierDotnetClosure -RepositoryRoot $context.Root
+        }
+        $closures = @(Invoke-TestP5aWithProcessEnvironment `
+            -Values $toolchain.Environment -Action $getClosure)
+        $closures.Count | Should Be 1
+        $closure = $closures[0]
+        $systemConhost = [IO.Path]::GetFullPath(
+            (Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
+
+        @($closure.PathsByImage['testhost.exe']) | Should Be @(
+            [IO.Path]::GetFullPath($toolchain.SelectedTestHost),
+            [IO.Path]::GetFullPath($projectTestHost))
+        @($closure.PathsByImage['conhost.exe']) | Should Be @($systemConhost)
+        @($closure.PathsByImage['Als.P5aOracle.exe']) | Should Be @(
+            [IO.Path]::GetFullPath($context.Oracle.AppHostPath))
+        @($closure.PathsByImage.Values | ForEach-Object { @($_) }) |
+            Should Not Contain ([IO.Path]::GetFullPath($shadowTestHost))
+        @($closure.PathsByImage.Values | ForEach-Object { @($_) }) |
+            Should Not Contain ([IO.Path]::GetFullPath($shadowConhost))
+    }
+
+    It 'accepts the real dotnet testhost conhost and prebuilt Oracle descendant chain' {
+        Assert-TestP5aCommandCapability 'Invoke-P5aVerifierProcessProtocol' verifier
+        $context = New-TestP5aProcessContext 'verifier-real-dotnet-chain'
+        $shim = New-TestP5aProcessShim 'verifier-real-dotnet-chain-shim'
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
+        $projectTestHost = Join-Path `
+            $context.Root 'tests\Als.Core.Tests\bin\Debug\net8.0\testhost.exe'
+        Write-TestP5aText $projectTestHost "fixed project testhost`n"
+        $systemConhost = [IO.Path]::GetFullPath(
+            (Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
+        Test-Path -LiteralPath $systemConhost -PathType Leaf | Should Be $true
+        $realDescendants = @(
+            [pscustomobject][ordered]@{
+                processId = 12001
+                parentProcessId = 5002
+                ancestorProcessIds = @(5002)
+                imageName = 'dotnet.exe'
+                executablePath = [IO.Path]::GetFullPath($toolchain.SelectedDotnet)
+            }
+            [pscustomobject][ordered]@{
+                processId = 12002
+                parentProcessId = 12001
+                ancestorProcessIds = @(5002, 12001)
+                imageName = 'testhost.exe'
+                executablePath = [IO.Path]::GetFullPath($projectTestHost)
+            }
+            [pscustomobject][ordered]@{
+                processId = 12003
+                parentProcessId = 12002
+                ancestorProcessIds = @(5002, 12001, 12002)
+                imageName = 'conhost.exe'
+                executablePath = $systemConhost
+            }
+            [pscustomobject][ordered]@{
+                processId = 12004
+                parentProcessId = 12002
+                ancestorProcessIds = @(5002, 12001, 12002)
+                imageName = 'Als.P5aOracle.exe'
+                executablePath = [IO.Path]::GetFullPath($context.Oracle.AppHostPath)
+            }
+        )
+        Set-TestP5aShimControl $shim @{
+            DescendantRecords = @($realDescendants)
+        }
+        $ambientEnvironment = 'test-ambient-real-dotnet-chain'
+        $selectedRun = {
+            Invoke-TestP5aWithAmbientStagingEnvironment `
+                -AmbientValue $ambientEnvironment `
+                -Action { Invoke-TestP5aVerifierProtocol $context $shim }
+        }
+        $runs = @(Invoke-TestP5aWithProcessEnvironment `
+            -Values $toolchain.Environment -Action $selectedRun)
+        $runs.Count | Should Be 1
+        $run = $runs[0]
+        $records = @(Get-TestP5aShimRecords $shim)
+
+        $records.Count | Should Be 2
+        Assert-TestP5aDescendantRecordShape -DirectChildRecord $records[1] `
+            -ExpectedImages @(
+                'dotnet.exe', 'testhost.exe', 'conhost.exe', 'Als.P5aOracle.exe') `
+            -ExpectedExecutablePaths @($realDescendants | ForEach-Object {
+                $_.executablePath
+            })
+        Assert-TestP5aExactParentMarker -Output @($run.Output) `
+            -ExpectedMarker "P5A_GOLDEN_FIXTURE_OK cases=8 commit=$script:P5aLockedCommit"
+    }
+
     It 'rejects illegal descendants from both initial Oracle children and either verifier child' {
         Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorProcessProtocol' generator
         Assert-TestP5aCommandCapability 'Invoke-P5aVerifierProcessProtocol' verifier
+        $toolchain = Get-TestP5aDefaultWorkflowToolchain
+        $invokeSelectedVerifier = {
+            param([Parameter(Mandatory)][object]$Context,
+                  [Parameter(Mandatory)][object]$Shim)
+
+            $selectedContext = $Context
+            $selectedShim = $Shim
+            $selectedAction = {
+                Invoke-TestP5aVerifierProtocol $selectedContext $selectedShim
+            }
+            Invoke-TestP5aWithProcessEnvironment `
+                -Values $toolchain.Environment -Action $selectedAction
+        }
         $illegalGeneratorImages = @(
             'pwsh.exe',
             'cmd.exe',
@@ -5007,7 +5727,8 @@ Start-Sleep -Seconds 30
             'dotnet.exe',
             'MSBuild.exe',
             'testhost.exe',
-            'vstest.console.exe')
+            'vstest.console.exe',
+            'conhost.exe')
 
         foreach ($call in 1..7)
         {
@@ -5061,10 +5782,11 @@ Start-Sleep -Seconds 30
                 {
                     $output = [Collections.Generic.List[object]]::new()
                     $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
-                        Invoke-TestP5aVerifierProtocol $context $shim
+                        & $invokeSelectedVerifier $context $shim
                     }
                     $failure | Should Not BeNullOrEmpty
-                    $failure | Should Match '(?i)descendant.*(forbidden|not allowed|unexpected)'
+                    $failure | Should Match `
+                        '(?i)descendant.*(forbidden|not allowed|unexpected|selected.*dotnet|executable.*closure)'
                     @(Get-TestP5aShimRecords $shim).Count | Should Be $call
                     [Environment]::GetEnvironmentVariable(
                         $environmentName, [EnvironmentVariableTarget]::Process) |
@@ -5083,7 +5805,9 @@ Start-Sleep -Seconds 30
         }
 
         $dotnetClosure = Get-TestP5aCompleteSelectedDotnetDescendantClosure
-        foreach ($image in @('dotnet.exe', 'MSBuild.exe', 'testhost.exe', 'vstest.console.exe'))
+        foreach ($image in @(
+            'dotnet.exe', 'MSBuild.exe', 'testhost.exe', 'vstest.console.exe',
+            'conhost.exe'))
         {
             $context = New-TestP5aProcessContext "verifier-descendant-outside-sdk-$image"
             $shim = New-TestP5aProcessShim "verifier-descendant-outside-sdk-$image-shim"
@@ -5093,7 +5817,7 @@ Start-Sleep -Seconds 30
             }
             $output = [Collections.Generic.List[object]]::new()
             $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
-                Invoke-TestP5aVerifierProtocol $context $shim
+                & $invokeSelectedVerifier $context $shim
             }
             $failure | Should Match '(?i)descendant.*(selected.*dotnet|sdk.*closure|executable.*closure)'
             @(Get-TestP5aShimRecords $shim).Count | Should Be 2
@@ -5115,6 +5839,9 @@ Start-Sleep -Seconds 30
             @{ Name = 'relative-path'; Diagnostic = '(?i)descendant.*path.*absolute' }
             @{ Name = 'mismatched-image-path'; Diagnostic = '(?i)descendant.*(image|basename).*path' }
             @{ Name = 'duplicate-process-id'; Diagnostic = '(?i)descendant.*duplicate.*process' }
+            @{ Name = 'conhost-wrong-parent'; Diagnostic = '(?i)conhost.*parent.*testhost' }
+            @{ Name = 'oracle-wrong-parent'; Diagnostic = '(?i)Oracle apphost.*parent.*testhost' }
+            @{ Name = 'project-testhost-wrong-parent'; Diagnostic = '(?i)project testhost.*parent.*dotnet' }
         ))
         {
             $context = New-TestP5aProcessContext "verifier-malformed-tree-$($treeCase.Name)"
@@ -5123,6 +5850,12 @@ Start-Sleep -Seconds 30
             $msbuildPath = [string]@($dotnetClosure.PathsByImage['MSBuild.exe'])[0]
             $vstestPath = [string]@($dotnetClosure.PathsByImage['vstest.console.exe'])[0]
             $testhostPath = [string]@($dotnetClosure.PathsByImage['testhost.exe'])[0]
+            $projectTesthostPath = Join-Path `
+                $context.Root 'tests\Als.Core.Tests\bin\Debug\net8.0\testhost.exe'
+            if ($treeCase.Name -ceq 'project-testhost-wrong-parent')
+            {
+                Write-TestP5aText $projectTesthostPath "fixed project testhost`n"
+            }
             $records = switch ($treeCase.Name)
             {
                 'orphan-parent' { @(@{
@@ -5226,6 +5959,30 @@ Start-Sleep -Seconds 30
                         ancestorProcessIds = @($directProcessId); imageName = 'vstest.console.exe'
                         executablePath = $vstestPath
                     }) }
+                'conhost-wrong-parent' { @(@{
+                    processId = 12001; parentProcessId = $directProcessId
+                    ancestorProcessIds = @($directProcessId); imageName = 'conhost.exe'
+                    executablePath = [IO.Path]::GetFullPath(
+                        (Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
+                }) }
+                'oracle-wrong-parent' { @(@{
+                    processId = 12001; parentProcessId = $directProcessId
+                    ancestorProcessIds = @($directProcessId)
+                    imageName = 'Als.P5aOracle.exe'
+                    executablePath = [IO.Path]::GetFullPath($context.Oracle.AppHostPath)
+                }) }
+                'project-testhost-wrong-parent' { @(
+                    @{
+                        processId = 12001; parentProcessId = $directProcessId
+                        ancestorProcessIds = @($directProcessId); imageName = 'MSBuild.exe'
+                        executablePath = $msbuildPath
+                    },
+                    @{
+                        processId = 12002; parentProcessId = 12001
+                        ancestorProcessIds = @($directProcessId, 12001)
+                        imageName = 'testhost.exe'
+                        executablePath = [IO.Path]::GetFullPath($projectTesthostPath)
+                    }) }
             }
             Set-TestP5aShimControl $shim @{
                 DescendantCall = 2
@@ -5233,7 +5990,7 @@ Start-Sleep -Seconds 30
             }
             $output = [Collections.Generic.List[object]]::new()
             $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
-                Invoke-TestP5aVerifierProtocol $context $shim
+                & $invokeSelectedVerifier $context $shim
             }
             $failure | Should Not BeNullOrEmpty
             $failure | Should Match $treeCase.Diagnostic
@@ -5391,38 +6148,47 @@ Start-Sleep -Seconds 30
         }
     }
 
-    It 'rejects native-a mutation at the final publication boundary and preserves the prior fixture' {
+    It 'rejects native-a mutation while its retained lease spans both publication checkpoints' {
         Assert-TestP5aCommandCapability 'Invoke-P5aGeneratorWorkflow' generator
-        $context = New-TestP5aProcessContext 'generator-final-publication-mutation'
-        $shim = New-TestP5aProcessShim 'generator-final-publication-mutation-shim'
-        $fileSystem = New-TestP5aAtomicFileSystem
-        $paths = Get-TestP5aExpectedProcessPaths $context
-        $checkpoints = New-TestP5aCheckpointInvoker `
-            -MutateAt 'BeforePublication' `
-            -MutatePath $paths.NativeA
-        $before = Get-TestP5aFileHash $context.Fixture
-        $output = [Collections.Generic.List[object]]::new()
-        $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
-            & $script:P5aGeneratorPath `
-                -RepositoryRoot $context.Root `
-                -UnrealEditorCmd $context.Editor `
-                -UnrealProject $context.UProject `
-                -ReferenceRoot $context.Reference `
-                -StagingRoot $context.Staging `
-                -DestinationPath $context.Fixture `
-                -ProcessInvoker $shim.Invoker `
-                -FileSystemInvoker $fileSystem.Invoker `
-                -CheckpointInvoker $checkpoints.Invoker `
-                -TimeoutSeconds 10
-        }
+        foreach ($checkpoint in @('ChildrenCompleted', 'BeforePublication'))
+        {
+            $context = New-TestP5aProcessContext `
+                "generator-retained-native-mutation-$checkpoint"
+            $shim = New-TestP5aProcessShim `
+                "generator-retained-native-mutation-$checkpoint-shim"
+            $fileSystem = New-TestP5aAtomicFileSystem
+            $paths = Get-TestP5aExpectedProcessPaths $context
+            $checkpoints = New-TestP5aCheckpointInvoker `
+                -MutateAt $checkpoint `
+                -MutatePath $paths.NativeA
+            $before = Get-TestP5aFileHash $context.Fixture
+            $output = [Collections.Generic.List[object]]::new()
+            $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
+                & $script:P5aGeneratorPath `
+                    -RepositoryRoot $context.Root `
+                    -UnrealEditorCmd $context.Editor `
+                    -UnrealProject $context.UProject `
+                    -ReferenceRoot $context.Reference `
+                    -StagingRoot $context.Staging `
+                    -DestinationPath $context.Fixture `
+                    -ProcessInvoker $shim.Invoker `
+                    -FileSystemInvoker $fileSystem.Invoker `
+                    -CheckpointInvoker $checkpoints.Invoker `
+                    -TimeoutSeconds 10
+            }
 
-        $failure | Should Match '(?i)(manifest|payload|native|changed)'
-        (Get-TestP5aFileHash $context.Fixture) | Should Be $before
-        @($fileSystem.Records | Where-Object {
-            $_.operation -in @('File.Replace', 'File.Move')
-        }).Count | Should Be 0
-        @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
-        Test-Path -LiteralPath $context.Staging | Should Be $false
+            $failure | Should Not BeNullOrEmpty
+            $failure | Should Match `
+                '(?i)(used by another process|sharing|access|locked|lease)'
+            @($checkpoints.Records) | Should Contain $checkpoint
+            (Get-TestP5aFileHash $context.Fixture) | Should Be $before
+            @($fileSystem.Records | Where-Object {
+                $_.operation -in @('File.Replace', 'File.Move')
+            }).Count | Should Be 0
+            @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
+                Should Be 0
+            Test-Path -LiteralPath $context.Staging | Should Be $false
+        }
 
         $reparseContext = New-TestP5aProcessContext 'generator-final-publication-reparse'
         $reparseShim = New-TestP5aProcessShim 'generator-final-publication-reparse-shim'
@@ -5474,7 +6240,8 @@ Start-Sleep -Seconds 30
         }
 
         $reparseAttempts.Count | Should Be 1
-        $reparseFailure | Should Match '(?i)(reparse|staging|directory|manifest|payload)'
+        $reparseFailure | Should Match `
+            '(?i)(reparse|staging|directory|manifest|payload|used by another process|sharing|access)'
         @(Get-TestP5aShimRecords $reparseShim).Count | Should Be 7
         (Get-TestP5aFileHash $reparseContext.Fixture) | Should Be $reparseBefore
         (Get-TestP5aFileHash $reparseOutsideSentinel) | Should Be $reparseOutsideHash
