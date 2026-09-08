@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GodotAls.Core.Actions;
 using GodotAls.Import.Validation;
 
 namespace GodotAls.Import.Compilation;
@@ -374,7 +375,7 @@ public static class AlsP5aAnimationRuntimeProfileCompiler
             actions[actionIndex] = new AlsCompiledActionDefinition(
                 actionIndex, montageId, montage.PlayLength, matchingSlots[0].SlotId,
                 matchingSections[0].SectionId, priority, interruptible, playRate, blendSeconds,
-                loopPolicy, []);
+                loopPolicy, [], CompileLifecycle(montage, path));
         }
 
         var timeline = new List<AlsCompiledActionTimelineEntry>((int)expandedTimelineEntries);
@@ -409,6 +410,21 @@ public static class AlsP5aAnimationRuntimeProfileCompiler
             .ThenBy(value => value.BoundaryOrdinal)
             .ThenBy(value => value.TrackIndex)
             .ToArray());
+    }
+
+    private static AlsActionLifecycleSettings CompileLifecycle(AlsMontageDefinition montage, string path)
+    {
+        if (!float.IsFinite(montage.BlendInTime) || montage.BlendInTime < 0f ||
+            !float.IsFinite(montage.BlendOutTime) || montage.BlendOutTime < 0f ||
+            !float.IsFinite(montage.BlendOutTriggerTime) ||
+            montage.BlendInOption is < 0 or > 2 || montage.BlendOutOption is < 0 or > 2)
+        {
+            throw Failure("ALSP5A041", path, "Action Montage lifecycle settings are invalid or unsupported.");
+        }
+        return new AlsActionLifecycleSettings(
+            montage.EnableAutoBlendOut ? AlsActionLifecycleMode.MontageAutoBlendOut : AlsActionLifecycleMode.MontageHoldAtEnd,
+            montage.BlendInTime, (AlsActionBlendOption)montage.BlendInOption,
+            montage.BlendOutTime, (AlsActionBlendOption)montage.BlendOutOption, montage.BlendOutTriggerTime);
     }
 
     private static AlsCompiledActionSectionBinding[] CompileSections(

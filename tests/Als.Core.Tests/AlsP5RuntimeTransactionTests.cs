@@ -77,7 +77,8 @@ public sealed class AlsP5RuntimeTransactionTests
     {
         var fixture = new Fixture();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(version: 2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(version: 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(version: 3));
         Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(digest: 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(layoutDigest: 0));
     }
@@ -723,6 +724,159 @@ public sealed class AlsP5RuntimeTransactionTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NaturalLifecycleCandidateRollsBackAfterAFailedFinalize(bool held)
+    {
+        var fixture = new ReviewFixture();
+        fixture.ActionDefinitions[0] = fixture.ActionDefinitions[0] with
+        {
+            Lifecycle = new(AlsActionLifecycleMode.MontageAutoBlendOut, 0f,
+                AlsActionBlendOption.Linear, .5f, AlsActionBlendOption.Linear, 0f),
+        };
+        var bindings = fixture.CreateBindings();
+        var state = fixture.CreateActiveActionState(0, 1, held ? 1f : .75f, 1f);
+        state.ActionPlayer.Lifecycle = new()
+        {
+            Alpha = .5f, RemainingSeconds = .125f, BeginWeight = 1f,
+            CurrentWeight = .5f, BlendingOut = 1, TraversalFinished = held ? (byte)1 : (byte)0,
+        };
+        if (held) fixture.ResetTimelineState();
+        var before = state;
+        var input = fixture.CreateInput(.125f);
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(bindings, input, state, fixture.CurrentCursors,
+            fixture.CurrentAuthorities, fixture.CurrentOwnership, 1, ref scratch,
+            out var prepared, out var failure), failure.ToString());
+        var candidate = scratch.CandidateActionPlayer;
+        var lane = scratch.CandidateActionBlendLane;
+        Assert.Equal((byte)0, candidate.Playing);
+        var p4 = CreateCanonicalP4Result(input.Identity);
+        p4.P4ReasonCode = AlsP4ReasonCode.InvalidSelection;
+        Assert.False(AlsP5Runtime.TryFinalize(prepared, ref scratch, p4, state, CreateProbe(),
+            out _, out _, out _, out failure));
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+        Assert.Equal(before, state);
+        p4.P4ReasonCode = AlsP4ReasonCode.None;
+        Assert.False(AlsP5Runtime.TryFinalize(prepared, ref scratch, p4, state, CreateProbe(),
+            out _, out _, out _, out failure));
+        Assert.Equal(AlsP5FailureCode.StalePreparedFrame, failure);
+        Assert.True(AlsP5Runtime.TryPrepare(bindings, input, state, fixture.CurrentCursors,
+            fixture.CurrentAuthorities, fixture.CurrentOwnership, 1, ref scratch,
+            out prepared, out failure), failure.ToString());
+        Assert.Equal(candidate, scratch.CandidateActionPlayer);
+        Assert.Equal(lane, scratch.CandidateActionBlendLane);
+        Assert.True(AlsP5Runtime.TryFinalize(prepared, ref scratch, p4, state, CreateProbe(),
+            out _, out var produced, out var result, out failure), failure.ToString());
+        Assert.Equal(candidate, produced.ActionPlayer);
+        Assert.Equal(1, result.ActionOutcomes.Count);
+        Assert.Equal(AlsActionResultCode.Completed, result.ActionOutcomes[0].ResultCode);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void HeldEndpointCanCancelReplaceOrRecoverWithoutDuplicateNotifyEnds(int command)
+    {
+        var fixture = new ReviewFixture();
+        fixture.ActionDefinitions[0] = fixture.ActionDefinitions[0] with
+        {
+            Lifecycle = new(AlsActionLifecycleMode.MontageHoldAtEnd, 0f,
+                AlsActionBlendOption.Linear, .5f, AlsActionBlendOption.Linear, -1f),
+        };
+        var bindings = fixture.CreateBindings();
+        var state = fixture.CreateActiveActionState(0, 1, 1f, 1f);
+        state.ActionPlayer.Lifecycle = new()
+        {
+            Alpha = 1f, CurrentWeight = 1f, DesiredWeight = 1f, TraversalFinished = 1,
+        };
+        fixture.ResetTimelineState();
+        var request = command switch
+        {
+            0 => new AlsActionRequest(1, AlsActionCommand.Cancel, 0, -1, 0, 1),
+            1 => new AlsActionRequest(2, AlsActionCommand.Start, 1, 1, 1, 1),
+            _ => AlsActionRequest.None,
+        };
+        var input = fixture.CreateInput(.1f, request, command == 2 ? (byte)1 : (byte)0);
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(bindings, input, state, fixture.CurrentCursors,
+            fixture.CurrentAuthorities, fixture.CurrentOwnership, 1, ref scratch,
+            out _, out var failure), failure.ToString());
+        Assert.Equal(command == 1 ? (byte)1 : (byte)0, scratch.CandidateActionPlayer.Playing);
+        Assert.Equal(default, scratch.CandidateActionPlayer.Lifecycle);
+        Assert.Equal(command == 1 ? 2 : 1, scratch.ActionOutcomes.Count);
+        Assert.Equal(0, scratch.Events.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NaturalLifecycleCompletionFreezesTheFinalSegmentProvenance(bool lifecycle)
+    {
+        var fixture = new ReviewFixture();
+        if (lifecycle)
+        {
+            fixture.ActionDefinitions[0] = fixture.ActionDefinitions[0] with
+            {
+                Lifecycle = new(AlsActionLifecycleMode.MontageAutoBlendOut, 0f,
+                    AlsActionBlendOption.Linear, .5f, AlsActionBlendOption.Linear, -1f),
+            };
+        }
+        var bindings = fixture.CreateBindings();
+        var state = fixture.CreateActiveActionState(0, 0, .4f, 1f);
+        if (lifecycle) state.ActionPlayer.Lifecycle = new()
+        {
+            RemainingSeconds = .25f, BeginWeight = 1f, CurrentWeight = 1f, BlendingOut = 1,
+        };
+        var input = fixture.CreateInput(lifecycle ? .3f : .6f);
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(bindings, input, state, fixture.CurrentCursors,
+            fixture.CurrentAuthorities, fixture.CurrentOwnership, 1, ref scratch,
+            out var prepared, out var failure), failure.ToString());
+        Assert.Equal(1, prepared.ActionGraph.Outgoing.BindingIndex);
+        Assert.Equal(1, scratch.CandidateActionBlendLane.OutgoingBindingIndex);
+        Assert.Equal(AlsActionResultCode.Completed, scratch.ActionOutcomes[0].ResultCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LifecycleEndpointHoldAndLaterCompletionDoNotFabricateNotifyTraversal(bool completes)
+    {
+        var fixture = new ReviewFixture();
+        fixture.ActionDefinitions[0] = fixture.ActionDefinitions[0] with
+        {
+            Lifecycle = new AlsActionLifecycleSettings(
+                completes ? AlsActionLifecycleMode.MontageAutoBlendOut : AlsActionLifecycleMode.MontageHoldAtEnd,
+                0f, AlsActionBlendOption.Linear, .5f, AlsActionBlendOption.Linear, 0f),
+        };
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(.25f);
+        var state = fixture.CreateActiveActionState(0, 1, 1f, 1f);
+        state.ActionPlayer.Lifecycle = new AlsActionLifecycleState
+        {
+            Alpha = completes ? .5f : 1f,
+            RemainingSeconds = completes ? .25f : 0f,
+            BeginWeight = completes ? 1f : 0f,
+            CurrentWeight = completes ? .5f : 1f,
+            DesiredWeight = completes ? 0f : 1f,
+            BlendingOut = completes ? (byte)1 : (byte)0,
+            TraversalFinished = 1,
+        };
+        fixture.ResetTimelineState();
+        var scratch = fixture.CreateScratch();
+        Assert.True(AlsP5Runtime.TryPrepare(in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out var prepared, out var failure), failure.ToString());
+        Assert.Equal(completes ? (byte)0 : (byte)1, scratch.CandidateActionPlayer.Playing);
+        Assert.Equal(completes ? 1 : 0, scratch.ActionOutcomes.Count);
+        Assert.Equal((byte)1, completes ? prepared.ActionGraph.Outgoing.Active : prepared.ActionGraph.Incoming.Active);
+        Assert.Equal(1f, prepared.ActionGraph.LaneWeight);
+        Assert.DoesNotContain(fixture.Playbacks, playback => playback.ActionId == 0 && playback.PlaybackEpoch > 0);
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void ReviewFix_CommittedVisualTailRequiresExactFrozenProvenance(bool actionTail)
@@ -1043,10 +1197,17 @@ public sealed class AlsP5RuntimeTransactionTests
             value => value.PlaybackEpoch > 0 && value.ActionId >= 0);
     }
 
-    [Fact]
-    public void MandatoryMatrix_RejectedRequestPrecedesFrameEndEarlyBlendOut()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MandatoryMatrix_RejectedRequestPrecedesFrameEndEarlyBlendOut(bool lifecycle)
     {
         var fixture = new ReviewFixture();
+        if (lifecycle) fixture.ActionDefinitions[0] = fixture.ActionDefinitions[0] with
+        {
+            Lifecycle = new(AlsActionLifecycleMode.MontageAutoBlendOut, .2f,
+                AlsActionBlendOption.Linear, .5f, AlsActionBlendOption.Linear, -1f),
+        };
         fixture.TimelineDefinitions =
         [
             new AlsTimelineEventDefinition(
@@ -1068,6 +1229,10 @@ public sealed class AlsP5RuntimeTransactionTests
         var request = new AlsActionRequest(2, AlsActionCommand.Start, 1, 1, 1, 1);
         var input = fixture.CreateInput(0.1f, request, hasInput: 1);
         var state = fixture.CreateActiveActionState(0, 0, 0.1f, 0.4f);
+        if (lifecycle) state.ActionPlayer.Lifecycle = new()
+        {
+            Alpha = .5f, RemainingSeconds = .1f, CurrentWeight = .5f, DesiredWeight = 1f,
+        };
         state.ActionPlayer.Priority = 5;
         var scratch = fixture.CreateScratch();
 
@@ -1094,6 +1259,7 @@ public sealed class AlsP5RuntimeTransactionTests
             result.ActionOutcomes[0].ResultCode);
         Assert.Equal(AlsActionResultCode.InterruptedByEarlyBlendOut,
             result.ActionOutcomes[1].ResultCode);
+        Assert.Equal(default, scratch.CandidateActionPlayer.Lifecycle);
     }
 
     [Fact]
@@ -3328,7 +3494,7 @@ public sealed class AlsP5RuntimeTransactionTests
         }
 
         public AlsP5RuntimeBindings CreateBindings() => new(
-            1, 0x1234, 0x5678,
+            AlsP5RuntimeBindings.CurrentVersion, 0x1234, 0x5678,
             CurveKeys, CurveBindings, CurveIdentities, CurveRanges,
             AllowPolicy,
             AllowIndices, FootBindings,
@@ -3514,7 +3680,7 @@ public sealed class AlsP5RuntimeTransactionTests
             SyncOutput,
             CurveSamples);
 
-        private void ResetTimelineState()
+        public void ResetTimelineState()
         {
             for (var index = 0; index < CurrentCursors.Length; index++)
             {

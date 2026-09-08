@@ -9,6 +9,7 @@ class UAlsAnimationInstance;
 class UAlsAnimationInstanceSettings;
 class UAlsCharacterMovementComponent;
 class UAlsMovementSettings;
+class UAnimMontage;
 
 UCLASS(Transient)
 class AAlsTraceController : public AController
@@ -55,11 +56,19 @@ public:
     void SetTraceViewRotation(const FRotator& Rotation);
     void ApplyTraceDesiredState(FGameplayTag NewRotationMode, bool bNewAiming,
                                 FGameplayTag NewStance, FGameplayTag NewOverlayMode);
+    void BindTraceMontageStartedObserver(UAnimMontage* Montage, TFunction<void(UAnimMontage*)> Observer);
+    void UnbindTraceMontageStartedObserver();
 
 protected:
     virtual void BeginPlay() override;
 
 private:
+    UFUNCTION()
+    void ObserveTraceMontageStarted(UAnimMontage* Montage);
+
+    TWeakObjectPtr<UAnimMontage> TraceObservedMontage;
+    TFunction<void(UAnimMontage*)> TraceMontageStartedObserver;
+
     UPROPERTY(Transient)
     TObjectPtr<UAlsAnimationInstanceSettings> TraceAnimationSettings;
 };

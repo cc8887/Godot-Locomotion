@@ -4,15 +4,24 @@
 #include "AlsAnimationInstance.h"
 #include "AlsCharacterMovementComponent.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimData/IAnimationDataModel.h"
 #include "Animation/AnimClassInterface.h"
+#include "Animation/AnimCurveTypes.h"
+#include "Animation/AnimNotifyQueue.h"
+#include "Animation/ActiveMontageInstanceScope.h"
 #include "Animation/AnimNode_RelevantAssetPlayerBase.h"
 #include "Animation/AnimationAsset.h"
 #include "Animation/AnimInstanceProxy.h"
+#include "Animation/AnimNotifies/AnimNotify.h"
+#include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "Animation/AnimSequence.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Animation/BlendSpace.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Engine/Engine.h"
 #include "Engine/EngineBaseTypes.h"
 #include "Engine/SkeletalMesh.h"
@@ -27,7 +36,11 @@
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
+#include "Misc/SecureHash.h"
 #include "Modules/ModuleManager.h"
+#include "Notifies/AlsAnimNotifyState_SetLocomotionAction.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "Settings/AlsAnimationInstanceSettings.h"
@@ -40,14 +53,20 @@
 #include "State/AlsMovementBaseState.h"
 #include "State/AlsStandingState.h"
 #include "State/AlsFeetState.h"
+#include "State/AlsDynamicTransitionsState.h"
 #include "State/AlsLayeringState.h"
 #include "State/AlsRotateInPlaceState.h"
 #include "State/AlsSpineState.h"
 #include "State/AlsTurnInPlaceState.h"
+#include "State/AlsTransitionsState.h"
 #include "State/AlsViewAnimationState.h"
 #include "UObject/UnrealType.h"
+
+#include <charconv>
 #include "Utility/AlsGameplayTags.h"
 #include "Utility/AlsConstants.h"
+
+#include <openssl/sha.h>
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsLocomotionTraceCommandlet)
 
@@ -63,6 +82,282 @@ constexpr const TCHAR* LockedReferenceCommit{TEXT("b754d6f0f2bb03741d301f8fb8807
 constexpr const TCHAR* LockedPatchHash{TEXT("3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f")};
 constexpr const TCHAR* P4AimOverlayClassPath{
     TEXT("/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_Rifle.AB_Als_Rifle_C")};
+constexpr const TCHAR* P5aNativeTransitionStimulusContractSha256{
+    TEXT("78cfb6aad01c29ac179f63515835aeeb6dd48b70dc42223cf81dea771e27f11d")};
+constexpr ANSICHAR P5aNativeTransitionStimulusContractText[]{
+    "ALS_P5A_NATIVE_TRANSITION_STIMULUS_V1\n"
+    "class=/Script/ALS.AlsAnimationInstance\n"
+    "feet=FeetState:FAlsFeetState\n"
+    "left=Left:FAlsFootState\n"
+    "right=Right:FAlsFootState\n"
+    "target=TargetLocationWorldSpace:FVector\n"
+    "lock=LockLocationWorldSpace:FVector\n"
+    "relevant=LockAmount:float\n"
+    "transitions=TransitionsState:FAlsTransitionsState\n"
+    "allowed=bTransitionsAllowed:bool\n"
+    "dynamic=DynamicTransitionsState:FAlsDynamicTransitionsState\n"
+    "updated=bUpdatedThisFrame:bool\n"
+    "delay=FrameDelay:int32\n"
+    "function=RefreshDynamicTransitions:void()\n"};
+
+struct FP5aNativeTransitionStimulusContract
+{
+    FStructProperty* FeetState{nullptr};
+    FStructProperty* Left{nullptr};
+    FStructProperty* Right{nullptr};
+    FStructProperty* TargetLocationWorldSpace{nullptr};
+    FStructProperty* LockLocationWorldSpace{nullptr};
+    FFloatProperty* LockAmount{nullptr};
+    FStructProperty* TransitionsState{nullptr};
+    FBoolProperty* bTransitionsAllowed{nullptr};
+    FStructProperty* DynamicTransitionsState{nullptr};
+    FBoolProperty* bUpdatedThisFrame{nullptr};
+    FIntProperty* FrameDelay{nullptr};
+    UFunction* RefreshDynamicTransitions{nullptr};
+};
+
+struct FP5aNativeTransitionStimulusInput
+{
+    FAlsFootState Left;
+    FAlsFootState Right;
+};
+
+struct FP5aNativeTransitionStimulusReceipt
+{
+    bool ObservedAllowTransitions{false};
+    bool PreHookUpdatedThisFrame{false};
+    int32 PreHookFrameDelay{0};
+    bool PreHookTransitionActive{false};
+    FVector ObservedLeftTarget{ForceInit};
+    FVector ObservedLeftLock{ForceInit};
+    float ObservedLeftLockAmount{0.0f};
+    FVector ObservedRightTarget{ForceInit};
+    FVector ObservedRightLock{ForceInit};
+    float ObservedRightLockAmount{0.0f};
+    bool PostHookUpdatedThisFrame{false};
+    int32 PostHookFrameDelay{0};
+    bool RestoreVerified{false};
+};
+
+struct FP5aNativeAssetAudit
+{
+    FString AssetObjectPath;
+    FString AssetStableId;
+    FString AssetPackageSha256;
+    FString AssetClassPath;
+    double DurationSeconds{0.0};
+    bool bAuthoredLoop{false};
+    FString MontageObjectPath;
+    FString MontageStableId;
+    FString SectionName;
+    FString SlotName;
+    int32 SegmentIndex{-1};
+};
+
+struct FP5aNativeEventAudit
+{
+    FString AssetStableId;
+    FString StableEventId;
+    FString OwnerKind;
+    FString SourceClassPath;
+    int32 SourceIndex{-1};
+    int32 TrackIndex{-1};
+    double TimeSeconds{0.0};
+    double DurationSeconds{0.0};
+    double TriggerWeightThreshold{0.0};
+    FString TickMode;
+};
+
+struct FP5aNativeMarkerAudit
+{
+    FString AssetStableId;
+    FString StableMarkerId;
+    FString Name;
+    int32 SourceIndex{-1};
+    int32 TrackIndex{-1};
+    double TimeSeconds{0.0};
+};
+
+struct FP5aNativeCurveInventory
+{
+    FString AssetObjectPath;
+    FString AssetStableId;
+    TArray<FString> CurveNames;
+};
+
+struct FP5aNativeReferenceAudit
+{
+    TArray<FP5aNativeAssetAudit> Assets;
+    TArray<FP5aNativeEventAudit> Events;
+    TArray<FP5aNativeMarkerAudit> Markers;
+    TArray<FP5aNativeCurveInventory> CurveInventories;
+    TArray<TSharedPtr<FJsonValue>> AuxiliaryAssets;
+};
+
+struct FP5aNativeActionOutcome
+{
+    FString NativeReason;
+    FString Callback;
+    bool bInterrupted{false};
+};
+
+struct FP5aObservedSource;
+
+struct FP5aNativePlaybackSnapshot
+{
+    bool bCaptured{false};
+    float Position{0.0f};
+    float PreviousPosition{0.0f};
+    float PlayRate{0.0f};
+    float Weight{0.0f};
+    FName SectionName{NAME_None};
+};
+
+struct FP5aNativeActionLifecycle
+{
+    TObjectPtr<UAnimMontage> Montage{nullptr};
+    int32 InstanceId{INDEX_NONE};
+    float PreCancelPosition{0.0f};
+    bool bOnMontageStartedObserved{false};
+    bool bOnMontageBlendingOutStartedObserved{false};
+    bool bOnMontageEndedObserved{false};
+    bool bEndedThisFrame{false};
+    FP5aNativePlaybackSnapshot TerminalPlayback;
+    FP5aNativePlaybackSnapshot EndedPlayback;
+    float LastPlaybackPosition{0.0f};
+    TArray<FP5aNativeActionOutcome> Outcomes;
+    int32 EmittedOutcomeCount{0};
+    int32 SemanticOutcomeCount{0};
+    TFunction<void(const TCHAR*, bool, const FAnimMontageInstance*)> DiagnosticCallback;
+    TFunction<void()> DiagnosticAfterUpdate;
+};
+
+struct FP5aFrameUpdateAudit
+{
+    int32 AnimationUpdates{0};
+    int32 Evaluations{0};
+    int32 PostUpdates{0};
+    int32 MeshTicks{0};
+};
+
+struct FP5aSemanticGraphState
+{
+    float ActionWeight{0.0f};
+    float ActionEventWeight{0.0f};
+    float TransitionWeight{0.0f};
+    bool bActionActive{false};
+    bool bTransitionActive{false};
+};
+
+struct FP5aObservedNotifyState
+{
+    int32 InstanceId{INDEX_NONE};
+    int32 MontageInstanceId{INDEX_NONE};
+    bool bBranchingPoint{false};
+    bool bTicked{true};
+    const FP5aObservedSource* Source{nullptr};
+    const FAnimNotifyEvent* Notify{nullptr};
+    int32 SourceIndex{-1};
+    float LastAnimationTime{0.0f};
+    float PreviousAnimationTime{0.0f};
+    float PlayRate{1.0f};
+};
+
+struct FP5aNativeNotifyObservationState
+{
+    TArray<FP5aObservedNotifyState> ActiveStates;
+    TArray<FP5aObservedNotifyState> EndedStates;
+};
+
+struct FP5aObservedSource
+{
+    FString AssetObjectPath;
+    FString AssetStableId;
+    FString AssetPackageSha256;
+    FString AssetClassPath;
+    FString MontageObjectPath;
+    FString MontageStableId;
+    FString SectionName;
+    FString SlotName;
+    int32 SegmentIndex{-1};
+};
+
+struct FP5aSourceDefinition
+{
+    FString TraceSourceId;
+    FString SourceKind;
+    FP5aObservedSource Canonical;
+    FString NativeRole;
+    FP5aObservedSource Native;
+    TObjectPtr<UAnimSequenceBase> CanonicalAsset{nullptr};
+    TObjectPtr<UAnimSequenceBase> NativeAsset{nullptr};
+    TArray<FString> NativeRoles;
+    TArray<FP5aObservedSource> NativeVariants;
+    TArray<TObjectPtr<UAnimSequenceBase>> NativeAssets;
+};
+
+struct FP5aPlaybackDefinition
+{
+    FString TraceSourceId;
+    FString Lane;
+    double PreviousTimeSeconds{0.0};
+    double CurrentTimeSeconds{0.0};
+    double FrameStartOffsetSeconds{0.0};
+    double FrameEndOffsetSeconds{0.0};
+    float Weight{0.0f};
+    bool bLoop{false};
+    bool bClosesAfterFrame{false};
+};
+
+struct FP5aFrameDefinition
+{
+    int32 FrameIndex{-1};
+    double WindowStartSeconds{0.0};
+    double WindowEndSeconds{0.0};
+    double DeltaSeconds{0.0};
+    FString LocomotionMode;
+    FString RotationMode;
+    FString Stance;
+    bool bHasInput{false};
+    float ActionBlendAmount{0.0f};
+    float ActionModeBlendAmount{0.0f};
+    FString ActionCommand;
+    TArray<FP5aPlaybackDefinition> Playbacks;
+    FP5aNativeTransitionStimulusInput TransitionStimulus;
+};
+
+struct FP5aCaseDefinition
+{
+    int32 Ordinal{-1};
+    FString CaseId;
+    TArray<FP5aFrameDefinition> Frames;
+};
+
+struct FP5aCanonicalAssetOracle
+{
+    TSharedPtr<FJsonObject> Value;
+};
+
+struct FP5aNativeRuntimeFrame
+{
+    TSharedPtr<FJsonObject> Value;
+};
+
+struct FP5aRawCase
+{
+    int32 Ordinal{-1};
+    FString CaseId;
+    TArray<FP5aNativeRuntimeFrame> Frames;
+};
+
+struct FP5aRawTrace
+{
+    FString TracePlanSha256;
+    TSharedPtr<FJsonObject> Reference;
+    TSharedPtr<FJsonObject> Snapshot;
+    FP5aNativeReferenceAudit NativeReferenceAudit;
+    TArray<FP5aRawCase> Cases;
+};
 
 struct FTraceCommand
 {
@@ -206,6 +501,967 @@ bool IsLowercaseCommitSha(const FString& Commit)
         if (!FChar::IsHexDigit(Character) || (Character >= TEXT('A') && Character <= TEXT('F'))) return false;
     }
     return true;
+}
+
+bool IsLowercaseSha256(const FString& Hash)
+{
+    if (Hash.Len() != 64) return false;
+    for (const TCHAR Character : Hash)
+    {
+        if (!FChar::IsHexDigit(Character) || (Character >= TEXT('A') && Character <= TEXT('F'))) return false;
+    }
+    return true;
+}
+
+FString Sha256Hex(const uint8* Data, const int64 Size)
+{
+    uint8 Digest[SHA256_DIGEST_LENGTH];
+    if (Size < 0 || SHA256(Data, static_cast<size_t>(Size), Digest) == nullptr) return {};
+    return BytesToHex(Digest, SHA256_DIGEST_LENGTH).ToLower();
+}
+
+bool ValidateP5aTracePlan(const FString& Path, const FString& ExpectedSha256,
+                          TSharedPtr<FJsonObject>& Plan)
+{
+    if (Path.IsEmpty() || FPaths::IsRelative(Path) || !IsLowercaseSha256(ExpectedSha256))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A trace plan path or SHA-256 is invalid."));
+        return false;
+    }
+    TArray<uint8> Bytes;
+    if (!FFileHelper::LoadFileToArray(Bytes, *Path) || Bytes.IsEmpty())
+    {
+        UE_LOG(LogTemp, Error, TEXT("Could not read P5A trace plan: %s"), *Path);
+        return false;
+    }
+    const FString ActualSha256{Sha256Hex(Bytes.GetData(), Bytes.Num())};
+    if (ActualSha256 != ExpectedSha256)
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A trace plan SHA-256 mismatch."));
+        return false;
+    }
+    constexpr uint8 UTF8_BOM[]{0xef, 0xbb, 0xbf};
+    if (Bytes.Num() < 2 || Bytes.Last() != '\n' || Bytes[Bytes.Num() - 2] == '\n' ||
+        Bytes.Contains('\r') || (Bytes.Num() >= 3 && Bytes[0] == UTF8_BOM[0] &&
+            Bytes[1] == UTF8_BOM[1] && Bytes[2] == UTF8_BOM[2]))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A trace plan is not canonical UTF-8/LF JSON."));
+        return false;
+    }
+    FString Text;
+    FFileHelper::BufferToString(Text, Bytes.GetData(), Bytes.Num());
+    double PlanSchemaVersion{0.0};
+    FString PlanKind;
+    if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Plan) || !Plan.IsValid() ||
+        !Plan->TryGetNumberField(TEXT("schemaVersion"), PlanSchemaVersion) || PlanSchemaVersion != 2.0 ||
+        !Plan->TryGetStringField(TEXT("kind"), PlanKind) || PlanKind != TEXT("p5a_trace_plan"))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A trace plan root is invalid."));
+        return false;
+    }
+    const TSharedPtr<FJsonObject>* Snapshot{nullptr};
+    const TSharedPtr<FJsonObject>* Bindings{nullptr};
+    double BindingsVersion{0.0};
+    FString BindingsDigest;
+    if (!Plan->TryGetObjectField(TEXT("snapshot"), Snapshot) || Snapshot == nullptr ||
+        !(*Snapshot)->TryGetObjectField(TEXT("bindings"), Bindings) || Bindings == nullptr ||
+        !(*Bindings)->TryGetNumberField(TEXT("version"), BindingsVersion) || BindingsVersion != 2.0 ||
+        !(*Bindings)->TryGetStringField(TEXT("digest"), BindingsDigest) || BindingsDigest != TEXT("e458fef4df7a854d"))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A trace plan binding identity is invalid."));
+        return false;
+    }
+    return true;
+}
+
+FString CreateP5aAssetStableId(const FString& ObjectPath);
+FString CreateP5aPackageSha256(const UAnimationAsset& Asset);
+
+bool ReadP5aObservedSource(const TSharedPtr<FJsonObject>& Object, const bool bNative,
+                           FP5aObservedSource& Source)
+{
+    double SegmentIndex{-1.0};
+    if (!Object.IsValid() ||
+        !Object->TryGetStringField(TEXT("assetObjectPath"), Source.AssetObjectPath) ||
+        !Object->TryGetStringField(TEXT("assetStableId"), Source.AssetStableId) ||
+        !Object->TryGetStringField(TEXT("assetClassPath"), Source.AssetClassPath) ||
+        !Object->TryGetStringField(TEXT("montageStableId"), Source.MontageStableId) ||
+        !Object->TryGetStringField(TEXT("sectionName"), Source.SectionName) ||
+        !Object->TryGetStringField(TEXT("slotName"), Source.SlotName) ||
+        !Object->TryGetNumberField(TEXT("segmentIndex"), SegmentIndex) ||
+        SegmentIndex != static_cast<double>(FMath::TruncToInt(SegmentIndex)))
+    {
+        return false;
+    }
+    Source.SegmentIndex = static_cast<int32>(SegmentIndex);
+    if (bNative && (!Object->TryGetStringField(TEXT("assetPackageSha256"), Source.AssetPackageSha256) ||
+        !Object->TryGetStringField(TEXT("montageObjectPath"), Source.MontageObjectPath)))
+    {
+        return false;
+    }
+    return IsLowercaseCommitSha(Source.AssetStableId) &&
+        (!bNative || IsLowercaseSha256(Source.AssetPackageSha256));
+}
+
+bool ReadP5aVectorMeters(const TSharedPtr<FJsonObject>& Object, FVector& Value)
+{
+    double X{0.0};
+    double Y{0.0};
+    double Z{0.0};
+    if (!Object.IsValid() || !Object->TryGetNumberField(TEXT("x"), X) ||
+        !Object->TryGetNumberField(TEXT("y"), Y) || !Object->TryGetNumberField(TEXT("z"), Z) ||
+        !FMath::IsFinite(X) || !FMath::IsFinite(Y) || !FMath::IsFinite(Z))
+    {
+        return false;
+    }
+    Value = FVector{X * 100.0, Y * 100.0, Z * 100.0};
+    return true;
+}
+
+bool ReadP5aPlaybackArray(const TSharedPtr<FJsonObject>& P4Curves, const TCHAR* FieldName,
+                          const TSet<FString>& SourceIds, TArray<FP5aPlaybackDefinition>& Output)
+{
+    const TArray<TSharedPtr<FJsonValue>>* Values{nullptr};
+    if (!P4Curves.IsValid() || !P4Curves->TryGetArrayField(FieldName, Values) || Values == nullptr)
+    {
+        return false;
+    }
+    for (const TSharedPtr<FJsonValue>& Value : *Values)
+    {
+        const TSharedPtr<FJsonObject>* Object{nullptr};
+        FP5aPlaybackDefinition Playback;
+        Playback.Lane = FieldName;
+        double Weight{0.0};
+        if (!Value.IsValid() || !Value->TryGetObject(Object) || Object == nullptr || !Object->IsValid() ||
+            !(*Object)->TryGetStringField(TEXT("traceSourceId"), Playback.TraceSourceId) ||
+            !SourceIds.Contains(Playback.TraceSourceId) ||
+            !(*Object)->TryGetNumberField(TEXT("previousUnwrappedTimeSeconds"), Playback.PreviousTimeSeconds) ||
+            !(*Object)->TryGetNumberField(TEXT("currentUnwrappedTimeSeconds"), Playback.CurrentTimeSeconds) ||
+            !(*Object)->TryGetNumberField(TEXT("frameStartOffsetSeconds"), Playback.FrameStartOffsetSeconds) ||
+            !(*Object)->TryGetNumberField(TEXT("frameEndOffsetSeconds"), Playback.FrameEndOffsetSeconds) ||
+            !(*Object)->TryGetNumberField(TEXT("weight"), Weight) ||
+            !(*Object)->TryGetBoolField(TEXT("loop"), Playback.bLoop) ||
+            !(*Object)->TryGetBoolField(TEXT("closesAfterFrame"), Playback.bClosesAfterFrame) ||
+            !FMath::IsFinite(Playback.PreviousTimeSeconds) ||
+            !FMath::IsFinite(Playback.CurrentTimeSeconds) || !FMath::IsFinite(Weight))
+        {
+            return false;
+        }
+        Playback.Weight = static_cast<float>(Weight);
+        Output.Add(MoveTemp(Playback));
+    }
+    return true;
+}
+
+bool ParseP5aCaseDefinitions(const TSharedPtr<FJsonObject>& Plan,
+                             TArray<FP5aSourceDefinition>& Sources,
+                             TArray<FP5aCaseDefinition>& Cases)
+{
+    constexpr const TCHAR* ExpectedCaseIds[]{
+        TEXT("grounded_marker_interval"), TEXT("authority_tie"),
+        TEXT("standing_transition_left"), TEXT("standing_transition_right"),
+        TEXT("crouching_transition_reuse"), TEXT("roll_default_section"),
+        TEXT("montage_owned_notify"), TEXT("segment_sequence_notify_state")};
+    constexpr int32 ExpectedFrameCounts[]{41, 3, 33, 33, 33, 104, 69, 58};
+    constexpr int32 ExpectedTotalFrameCount{374};
+    const TArray<TSharedPtr<FJsonValue>>* SourceValues{nullptr};
+    const TArray<TSharedPtr<FJsonValue>>* CaseValues{nullptr};
+    if (!Plan.IsValid() || !Plan->TryGetArrayField(TEXT("sources"), SourceValues) ||
+        SourceValues == nullptr || SourceValues->Num() != 9 ||
+        !Plan->TryGetArrayField(TEXT("cases"), CaseValues) || CaseValues == nullptr ||
+        CaseValues->Num() != UE_ARRAY_COUNT(ExpectedCaseIds))
+    {
+        return false;
+    }
+
+    TSet<FString> SourceIds;
+    int32 SourceOrdinal{0};
+    for (const TSharedPtr<FJsonValue>& SourceValue : *SourceValues)
+    {
+        const TSharedPtr<FJsonObject>* SourceObject{nullptr};
+        const TSharedPtr<FJsonObject>* LayoutKey{nullptr};
+        const TSharedPtr<FJsonObject>* CanonicalEvidence{nullptr};
+        const TArray<TSharedPtr<FJsonValue>>* NativeVariants{nullptr};
+        FP5aSourceDefinition Source;
+        if (!SourceValue.IsValid() || !SourceValue->TryGetObject(SourceObject) || SourceObject == nullptr ||
+            !SourceObject->IsValid() ||
+            !(*SourceObject)->TryGetStringField(TEXT("traceSourceId"), Source.TraceSourceId) ||
+            !IsLowercaseCommitSha(Source.TraceSourceId) || SourceIds.Contains(Source.TraceSourceId) ||
+            !(*SourceObject)->TryGetObjectField(TEXT("layoutKey"), LayoutKey) || LayoutKey == nullptr ||
+            !(*LayoutKey)->TryGetStringField(TEXT("sourceKind"), Source.SourceKind) ||
+            !(*SourceObject)->TryGetObjectField(TEXT("canonicalEvidence"), CanonicalEvidence) ||
+            CanonicalEvidence == nullptr || !ReadP5aObservedSource(*CanonicalEvidence, false, Source.Canonical) ||
+            !(*SourceObject)->TryGetArrayField(TEXT("nativeVariants"), NativeVariants) ||
+            NativeVariants == nullptr || NativeVariants->IsEmpty() || NativeVariants->Num() > 2)
+        {
+            UE_LOG(LogTemp, Error, TEXT("P5A source structure invalid index=%d"), SourceOrdinal);
+            return false;
+        }
+        const TSharedPtr<FJsonObject>* NativeObject{nullptr};
+        if (!(*NativeVariants)[0]->TryGetObject(NativeObject) || NativeObject == nullptr ||
+            !(*NativeObject)->TryGetStringField(TEXT("nativeRole"), Source.NativeRole) ||
+            !ReadP5aObservedSource(*NativeObject, true, Source.Native))
+        {
+            UE_LOG(LogTemp, Error, TEXT("P5A native variant structure invalid index=%d"), SourceOrdinal);
+            return false;
+        }
+        Source.CanonicalAsset = LoadObject<UAnimSequenceBase>(nullptr, *Source.Canonical.AssetObjectPath);
+        Source.NativeAsset = LoadObject<UAnimSequenceBase>(nullptr, *Source.Native.AssetObjectPath);
+        if (!IsValid(Source.CanonicalAsset) || !IsValid(Source.NativeAsset) ||
+            Source.CanonicalAsset->GetPathName() != Source.Canonical.AssetObjectPath ||
+            Source.NativeAsset->GetPathName() != Source.Native.AssetObjectPath ||
+            CreateP5aAssetStableId(Source.Canonical.AssetObjectPath) != Source.Canonical.AssetStableId ||
+            CreateP5aAssetStableId(Source.Native.AssetObjectPath) != Source.Native.AssetStableId ||
+            CreateP5aPackageSha256(*Source.NativeAsset) != Source.Native.AssetPackageSha256)
+        {
+            UE_LOG(LogTemp, Error,
+                TEXT("P5A source physical evidence mismatch index=%d canonical=%s actualCanonical=%s native=%s actualNative=%s expectedPackage=%s actualPackage=%s"),
+                SourceOrdinal, *Source.Canonical.AssetObjectPath,
+                IsValid(Source.CanonicalAsset) ? *Source.CanonicalAsset->GetPathName() : TEXT("<null>"),
+                *Source.Native.AssetObjectPath,
+                IsValid(Source.NativeAsset) ? *Source.NativeAsset->GetPathName() : TEXT("<null>"),
+                *Source.Native.AssetPackageSha256,
+                IsValid(Source.NativeAsset) ? *CreateP5aPackageSha256(*Source.NativeAsset) : TEXT("<null>"));
+            return false;
+        }
+        for (const TSharedPtr<FJsonValue>& NativeVariantValue : *NativeVariants)
+        {
+            const TSharedPtr<FJsonObject>* VariantObject{nullptr};
+            FString VariantRole;
+            FP5aObservedSource Variant;
+            if (!NativeVariantValue->TryGetObject(VariantObject) || VariantObject == nullptr ||
+                !(*VariantObject)->TryGetStringField(TEXT("nativeRole"), VariantRole) ||
+                !ReadP5aObservedSource(*VariantObject, true, Variant))
+            {
+                return false;
+            }
+            UAnimSequenceBase* VariantAsset{LoadObject<UAnimSequenceBase>(nullptr, *Variant.AssetObjectPath)};
+            if (!IsValid(VariantAsset) || VariantAsset->GetPathName() != Variant.AssetObjectPath ||
+                CreateP5aAssetStableId(Variant.AssetObjectPath) != Variant.AssetStableId ||
+                CreateP5aPackageSha256(*VariantAsset) != Variant.AssetPackageSha256 ||
+                Source.NativeRoles.Contains(VariantRole))
+            {
+                return false;
+            }
+            Source.NativeRoles.Add(MoveTemp(VariantRole));
+            Source.NativeVariants.Add(MoveTemp(Variant));
+            Source.NativeAssets.Add(VariantAsset);
+        }
+        SourceIds.Add(Source.TraceSourceId);
+        Sources.Add(MoveTemp(Source));
+        ++SourceOrdinal;
+    }
+
+    int32 TotalFrameCount{0};
+    for (int32 CaseIndex{0}; CaseIndex < CaseValues->Num(); ++CaseIndex)
+    {
+        const TSharedPtr<FJsonObject>* CaseObject{nullptr};
+        const TArray<TSharedPtr<FJsonValue>>* FrameValues{nullptr};
+        double Ordinal{-1.0};
+        FP5aCaseDefinition Case;
+        if (!(*CaseValues)[CaseIndex]->TryGetObject(CaseObject) || CaseObject == nullptr ||
+            !(*CaseObject)->TryGetNumberField(TEXT("ordinal"), Ordinal) || Ordinal != CaseIndex ||
+            !(*CaseObject)->TryGetStringField(TEXT("caseId"), Case.CaseId) ||
+            Case.CaseId != ExpectedCaseIds[CaseIndex] ||
+            !(*CaseObject)->TryGetArrayField(TEXT("frames"), FrameValues) || FrameValues == nullptr ||
+            FrameValues->Num() != ExpectedFrameCounts[CaseIndex])
+        {
+            return false;
+        }
+        Case.Ordinal = CaseIndex;
+        for (int32 FrameIndex{0}; FrameIndex < FrameValues->Num(); ++FrameIndex)
+        {
+            const TSharedPtr<FJsonObject>* FrameObject{nullptr};
+            const TSharedPtr<FJsonObject>* Input{nullptr};
+            const TSharedPtr<FJsonObject>* Window{nullptr};
+            const TSharedPtr<FJsonObject>* Modes{nullptr};
+            const TSharedPtr<FJsonObject>* P4Curves{nullptr};
+            const TSharedPtr<FJsonObject>* ActionRequest{nullptr};
+            const TSharedPtr<FJsonObject>* Probe{nullptr};
+            double ParsedFrameIndex{-1.0};
+            double ActionBlendAmount{0.0};
+            double ActionModeBlendAmount{0.0};
+            FP5aFrameDefinition Frame;
+            if (!(*FrameValues)[FrameIndex]->TryGetObject(FrameObject) || FrameObject == nullptr ||
+                !(*FrameObject)->TryGetNumberField(TEXT("frameIndex"), ParsedFrameIndex) ||
+                ParsedFrameIndex != FrameIndex || !(*FrameObject)->TryGetObjectField(TEXT("input"), Input) ||
+                Input == nullptr || !(*Input)->TryGetObjectField(TEXT("window"), Window) || Window == nullptr ||
+                !(*Input)->TryGetObjectField(TEXT("modes"), Modes) || Modes == nullptr ||
+                !(*Input)->TryGetObjectField(TEXT("p4Curves"), P4Curves) || P4Curves == nullptr ||
+                !(*Input)->TryGetObjectField(TEXT("actionRequest"), ActionRequest) || ActionRequest == nullptr ||
+                !(*Input)->TryGetObjectField(TEXT("transitionProbe"), Probe) || Probe == nullptr ||
+                !(*Window)->TryGetNumberField(TEXT("startSeconds"), Frame.WindowStartSeconds) ||
+                !(*Window)->TryGetNumberField(TEXT("endSeconds"), Frame.WindowEndSeconds) ||
+                !(*Window)->TryGetNumberField(TEXT("deltaSeconds"), Frame.DeltaSeconds) ||
+                !FMath::IsNearlyEqual(Frame.DeltaSeconds, FixedDeltaSeconds, 1.0e-7) ||
+                !(*Modes)->TryGetStringField(TEXT("locomotionMode"), Frame.LocomotionMode) ||
+                !(*Modes)->TryGetStringField(TEXT("rotationMode"), Frame.RotationMode) ||
+                !(*Modes)->TryGetStringField(TEXT("stance"), Frame.Stance) ||
+                !(*Modes)->TryGetBoolField(TEXT("hasInput"), Frame.bHasInput) ||
+                !(*P4Curves)->TryGetNumberField(TEXT("actionBlendAmount"), ActionBlendAmount) ||
+                !(*P4Curves)->TryGetNumberField(TEXT("actionModeBlendAmount"), ActionModeBlendAmount) ||
+                !FMath::IsFinite(ActionBlendAmount) || ActionBlendAmount < 0.0 || ActionBlendAmount > 1.0 ||
+                !FMath::IsFinite(ActionModeBlendAmount) ||
+                ActionModeBlendAmount < 0.0 || ActionModeBlendAmount > 1.0 ||
+                !(*ActionRequest)->TryGetStringField(TEXT("command"), Frame.ActionCommand) ||
+                !ReadP5aPlaybackArray(*P4Curves, TEXT("base"), SourceIds, Frame.Playbacks) ||
+                !ReadP5aPlaybackArray(*P4Curves, TEXT("turnBanks"), SourceIds, Frame.Playbacks) ||
+                !ReadP5aPlaybackArray(*P4Curves, TEXT("rotateBanks"), SourceIds, Frame.Playbacks))
+            {
+                return false;
+            }
+            Frame.FrameIndex = FrameIndex;
+            Frame.ActionBlendAmount = static_cast<float>(ActionBlendAmount);
+            Frame.ActionModeBlendAmount = static_cast<float>(ActionModeBlendAmount);
+            for (const TPair<FString, FAlsFootState*> Foot : {
+                TPair<FString, FAlsFootState*>{TEXT("left"), &Frame.TransitionStimulus.Left},
+                TPair<FString, FAlsFootState*>{TEXT("right"), &Frame.TransitionStimulus.Right}})
+            {
+                const TSharedPtr<FJsonObject>* FootObject{nullptr};
+                const TSharedPtr<FJsonObject>* Target{nullptr};
+                const TSharedPtr<FJsonObject>* Lock{nullptr};
+                bool bRelevant{false};
+                if (!(*Probe)->TryGetObjectField(Foot.Key, FootObject) || FootObject == nullptr ||
+                    !(*FootObject)->TryGetObjectField(TEXT("targetMeters"), Target) || Target == nullptr ||
+                    !(*FootObject)->TryGetObjectField(TEXT("lockMeters"), Lock) || Lock == nullptr ||
+                    !(*FootObject)->TryGetBoolField(TEXT("relevant"), bRelevant) ||
+                    !ReadP5aVectorMeters(*Target, Foot.Value->TargetLocationWorldSpace) ||
+                    !ReadP5aVectorMeters(*Lock, Foot.Value->LockLocationWorldSpace))
+                {
+                    return false;
+                }
+                Foot.Value->LockAmount = bRelevant ? 1.0f : 0.0f;
+            }
+            Case.Frames.Add(MoveTemp(Frame));
+            ++TotalFrameCount;
+        }
+        Cases.Add(MoveTemp(Case));
+    }
+    return TotalFrameCount == ExpectedTotalFrameCount;
+}
+
+bool ResolveP5aNativeTransitionStimulusContract(FP5aNativeTransitionStimulusContract& Contract)
+{
+    const FString ContractSha256{Sha256Hex(
+        reinterpret_cast<const uint8*>(P5aNativeTransitionStimulusContractText),
+        sizeof(P5aNativeTransitionStimulusContractText) - 1)};
+    if (ContractSha256 != P5aNativeTransitionStimulusContractSha256) return false;
+
+    UClass* AnimationClass{UAlsAnimationInstance::StaticClass()};
+    Contract.FeetState = FindFProperty<FStructProperty>(AnimationClass, TEXT("FeetState"));
+    Contract.TransitionsState = FindFProperty<FStructProperty>(AnimationClass, TEXT("TransitionsState"));
+    Contract.DynamicTransitionsState = FindFProperty<FStructProperty>(AnimationClass, TEXT("DynamicTransitionsState"));
+    if (Contract.FeetState == nullptr || Contract.FeetState->Struct != FAlsFeetState::StaticStruct() ||
+        Contract.TransitionsState == nullptr || Contract.TransitionsState->Struct != FAlsTransitionsState::StaticStruct() ||
+        Contract.DynamicTransitionsState == nullptr ||
+        Contract.DynamicTransitionsState->Struct != FAlsDynamicTransitionsState::StaticStruct())
+    {
+        return false;
+    }
+
+    Contract.Left = FindFProperty<FStructProperty>(Contract.FeetState->Struct, TEXT("Left"));
+    Contract.Right = FindFProperty<FStructProperty>(Contract.FeetState->Struct, TEXT("Right"));
+    if (Contract.Left == nullptr || Contract.Right == nullptr ||
+        Contract.Left->Struct != FAlsFootState::StaticStruct() ||
+        Contract.Right->Struct != FAlsFootState::StaticStruct())
+    {
+        return false;
+    }
+    Contract.TargetLocationWorldSpace = FindFProperty<FStructProperty>(
+        Contract.Left->Struct, TEXT("TargetLocationWorldSpace"));
+    Contract.LockLocationWorldSpace = FindFProperty<FStructProperty>(
+        Contract.Left->Struct, TEXT("LockLocationWorldSpace"));
+    Contract.LockAmount = FindFProperty<FFloatProperty>(Contract.Left->Struct, TEXT("LockAmount"));
+    Contract.bTransitionsAllowed = FindFProperty<FBoolProperty>(
+        Contract.TransitionsState->Struct, TEXT("bTransitionsAllowed"));
+    Contract.bUpdatedThisFrame = FindFProperty<FBoolProperty>(
+        Contract.DynamicTransitionsState->Struct, TEXT("bUpdatedThisFrame"));
+    Contract.FrameDelay = FindFProperty<FIntProperty>(
+        Contract.DynamicTransitionsState->Struct, TEXT("FrameDelay"));
+    Contract.RefreshDynamicTransitions = AnimationClass->FindFunctionByName(
+        TEXT("RefreshDynamicTransitions"), EIncludeSuperFlag::IncludeSuper);
+    return Contract.TargetLocationWorldSpace != nullptr &&
+        Contract.TargetLocationWorldSpace->Struct == TBaseStructure<FVector>::Get() &&
+        Contract.LockLocationWorldSpace != nullptr &&
+        Contract.LockLocationWorldSpace->Struct == TBaseStructure<FVector>::Get() &&
+        Contract.LockAmount != nullptr && Contract.bTransitionsAllowed != nullptr &&
+        Contract.bUpdatedThisFrame != nullptr && Contract.FrameDelay != nullptr &&
+        Contract.RefreshDynamicTransitions != nullptr &&
+        Contract.RefreshDynamicTransitions->NumParms == 0 &&
+        Contract.RefreshDynamicTransitions->GetReturnProperty() == nullptr;
+}
+
+bool ApplyP5aNativeTransitionStimulus(
+    UAlsAnimationInstance* Instance,
+    const FP5aNativeTransitionStimulusContract& Contract,
+    const FP5aNativeTransitionStimulusInput& Input,
+    const bool bPreHookTransitionActive,
+    FP5aNativeTransitionStimulusReceipt& Receipt)
+{
+    if (!IsValid(Instance) || Contract.FeetState == nullptr || Contract.Left == nullptr ||
+        Contract.Right == nullptr || Contract.TargetLocationWorldSpace == nullptr ||
+        Contract.LockLocationWorldSpace == nullptr || Contract.LockAmount == nullptr ||
+        Contract.TransitionsState == nullptr || Contract.bTransitionsAllowed == nullptr ||
+        Contract.DynamicTransitionsState == nullptr || Contract.bUpdatedThisFrame == nullptr ||
+        Contract.FrameDelay == nullptr || Contract.RefreshDynamicTransitions == nullptr)
+    {
+        return false;
+    }
+
+    void* FeetState{Contract.FeetState->ContainerPtrToValuePtr<void>(Instance)};
+    void* LeftState{Contract.Left->ContainerPtrToValuePtr<void>(FeetState)};
+    void* RightState{Contract.Right->ContainerPtrToValuePtr<void>(FeetState)};
+    void* TransitionsState{Contract.TransitionsState->ContainerPtrToValuePtr<void>(Instance)};
+    void* DynamicTransitionsState{Contract.DynamicTransitionsState->ContainerPtrToValuePtr<void>(Instance)};
+    if (FeetState == nullptr || LeftState == nullptr || RightState == nullptr ||
+        TransitionsState == nullptr || DynamicTransitionsState == nullptr || bPreHookTransitionActive)
+    {
+        return false;
+    }
+
+    FAlsFootState LeftBefore;
+    FAlsFootState RightBefore;
+    FMemory::Memcpy(&LeftBefore.TargetLocationWorldSpace,
+        Contract.TargetLocationWorldSpace->ContainerPtrToValuePtr<void>(LeftState),
+        sizeof LeftBefore.TargetLocationWorldSpace);
+    FMemory::Memcpy(&LeftBefore.LockLocationWorldSpace,
+        Contract.LockLocationWorldSpace->ContainerPtrToValuePtr<void>(LeftState),
+        sizeof LeftBefore.LockLocationWorldSpace);
+    FMemory::Memcpy(&LeftBefore.LockAmount,
+        Contract.LockAmount->ContainerPtrToValuePtr<void>(LeftState), sizeof LeftBefore.LockAmount);
+    FMemory::Memcpy(&RightBefore.TargetLocationWorldSpace,
+        Contract.TargetLocationWorldSpace->ContainerPtrToValuePtr<void>(RightState),
+        sizeof RightBefore.TargetLocationWorldSpace);
+    FMemory::Memcpy(&RightBefore.LockLocationWorldSpace,
+        Contract.LockLocationWorldSpace->ContainerPtrToValuePtr<void>(RightState),
+        sizeof RightBefore.LockLocationWorldSpace);
+    FMemory::Memcpy(&RightBefore.LockAmount,
+        Contract.LockAmount->ContainerPtrToValuePtr<void>(RightState), sizeof RightBefore.LockAmount);
+
+    Receipt.ObservedAllowTransitions =
+        Contract.bTransitionsAllowed->GetPropertyValue_InContainer(TransitionsState);
+    Receipt.PreHookUpdatedThisFrame =
+        Contract.bUpdatedThisFrame->GetPropertyValue_InContainer(DynamicTransitionsState);
+    Receipt.PreHookFrameDelay = Contract.FrameDelay->GetPropertyValue_InContainer(DynamicTransitionsState);
+    Receipt.PreHookTransitionActive = bPreHookTransitionActive;
+    if (!Receipt.ObservedAllowTransitions || Receipt.PreHookFrameDelay != 0)
+    {
+        return false;
+    }
+
+    {
+        ON_SCOPE_EXIT
+        {
+            Contract.TargetLocationWorldSpace->CopyCompleteValue_InContainer(LeftState, &LeftBefore);
+            Contract.LockLocationWorldSpace->CopyCompleteValue_InContainer(LeftState, &LeftBefore);
+            Contract.LockAmount->SetPropertyValue_InContainer(LeftState, LeftBefore.LockAmount);
+            Contract.TargetLocationWorldSpace->CopyCompleteValue_InContainer(RightState, &RightBefore);
+            Contract.LockLocationWorldSpace->CopyCompleteValue_InContainer(RightState, &RightBefore);
+            Contract.LockAmount->SetPropertyValue_InContainer(RightState, RightBefore.LockAmount);
+        };
+
+        Contract.TargetLocationWorldSpace->CopyCompleteValue_InContainer(LeftState, &Input.Left);
+        Contract.LockLocationWorldSpace->CopyCompleteValue_InContainer(LeftState, &Input.Left);
+        Contract.LockAmount->SetPropertyValue_InContainer(LeftState, Input.Left.LockAmount);
+        Contract.TargetLocationWorldSpace->CopyCompleteValue_InContainer(RightState, &Input.Right);
+        Contract.LockLocationWorldSpace->CopyCompleteValue_InContainer(RightState, &Input.Right);
+        Contract.LockAmount->SetPropertyValue_InContainer(RightState, Input.Right.LockAmount);
+        Contract.bUpdatedThisFrame->SetPropertyValue_InContainer(DynamicTransitionsState, false);
+
+        Instance->UObject::ProcessEvent(Contract.RefreshDynamicTransitions, nullptr);
+
+        FMemory::Memcpy(&Receipt.ObservedLeftTarget,
+            Contract.TargetLocationWorldSpace->ContainerPtrToValuePtr<void>(LeftState),
+            sizeof Receipt.ObservedLeftTarget);
+        FMemory::Memcpy(&Receipt.ObservedLeftLock,
+            Contract.LockLocationWorldSpace->ContainerPtrToValuePtr<void>(LeftState),
+            sizeof Receipt.ObservedLeftLock);
+        Receipt.ObservedLeftLockAmount = Contract.LockAmount->GetPropertyValue_InContainer(LeftState);
+        FMemory::Memcpy(&Receipt.ObservedRightTarget,
+            Contract.TargetLocationWorldSpace->ContainerPtrToValuePtr<void>(RightState),
+            sizeof Receipt.ObservedRightTarget);
+        FMemory::Memcpy(&Receipt.ObservedRightLock,
+            Contract.LockLocationWorldSpace->ContainerPtrToValuePtr<void>(RightState),
+            sizeof Receipt.ObservedRightLock);
+        Receipt.ObservedRightLockAmount = Contract.LockAmount->GetPropertyValue_InContainer(RightState);
+        Receipt.PostHookUpdatedThisFrame =
+            Contract.bUpdatedThisFrame->GetPropertyValue_InContainer(DynamicTransitionsState);
+        Receipt.PostHookFrameDelay = Contract.FrameDelay->GetPropertyValue_InContainer(DynamicTransitionsState);
+    }
+
+    FVector RestoredLeftTarget{ForceInit};
+    FVector RestoredLeftLock{ForceInit};
+    FVector RestoredRightTarget{ForceInit};
+    FVector RestoredRightLock{ForceInit};
+    FMemory::Memcpy(&RestoredLeftTarget,
+        Contract.TargetLocationWorldSpace->ContainerPtrToValuePtr<void>(LeftState), sizeof RestoredLeftTarget);
+    FMemory::Memcpy(&RestoredLeftLock,
+        Contract.LockLocationWorldSpace->ContainerPtrToValuePtr<void>(LeftState), sizeof RestoredLeftLock);
+    const float RestoredLeftLockAmount{Contract.LockAmount->GetPropertyValue_InContainer(LeftState)};
+    FMemory::Memcpy(&RestoredRightTarget,
+        Contract.TargetLocationWorldSpace->ContainerPtrToValuePtr<void>(RightState), sizeof RestoredRightTarget);
+    FMemory::Memcpy(&RestoredRightLock,
+        Contract.LockLocationWorldSpace->ContainerPtrToValuePtr<void>(RightState), sizeof RestoredRightLock);
+    const float RestoredRightLockAmount{Contract.LockAmount->GetPropertyValue_InContainer(RightState)};
+    Receipt.RestoreVerified =
+        FMemory::Memcmp(&RestoredLeftTarget, &LeftBefore.TargetLocationWorldSpace, sizeof RestoredLeftTarget) == 0 &&
+        FMemory::Memcmp(&RestoredLeftLock, &LeftBefore.LockLocationWorldSpace, sizeof RestoredLeftLock) == 0 &&
+        FMemory::Memcmp(&RestoredLeftLockAmount, &LeftBefore.LockAmount, sizeof RestoredLeftLockAmount) == 0 &&
+        FMemory::Memcmp(&RestoredRightTarget, &RightBefore.TargetLocationWorldSpace, sizeof RestoredRightTarget) == 0 &&
+        FMemory::Memcmp(&RestoredRightLock, &RightBefore.LockLocationWorldSpace, sizeof RestoredRightLock) == 0 &&
+        FMemory::Memcmp(&RestoredRightLockAmount, &RightBefore.LockAmount, sizeof RestoredRightLockAmount) == 0;
+    return Receipt.RestoreVerified;
+}
+
+FP5aNativePlaybackSnapshot SnapshotP5aNativePlayback(
+    UAnimInstance& Animation, const FP5aNativeActionLifecycle& Lifecycle)
+{
+    FP5aNativePlaybackSnapshot Snapshot;
+    // Queued terminal delegates run before DispatchQueuedAnimEvents deletes invalid instances.
+    // The montage lookup has already been cleared; its instance ID remains observable until disposal.
+    if (const FAnimMontageInstance* Instance{Animation.GetMontageInstanceForID(Lifecycle.InstanceId)})
+    {
+        Snapshot.bCaptured = true;
+        Snapshot.Position = Instance->GetPosition();
+        Snapshot.PreviousPosition = Instance->GetPreviousPosition();
+        Snapshot.PlayRate = Instance->GetPlayRate();
+        Snapshot.Weight = Instance->GetWeight();
+        Snapshot.SectionName = Lifecycle.Montage->GetSectionName(
+            Lifecycle.Montage->GetSectionIndexFromPosition(Snapshot.Position));
+    }
+    return Snapshot;
+}
+
+bool StartP5aNativeRollThroughPublicAlsPath(
+    AAlsTraceCharacter& Character, FP5aNativeActionLifecycle& Lifecycle)
+{
+    UAlsAnimationInstance* Animation{Character.GetTraceAnimationInstanceMutable()};
+    UAnimMontage* Montage{Character.SelectRollMontage()};
+    if (!IsValid(Animation) || !IsValid(Montage))
+    {
+        return false;
+    }
+    Lifecycle.Montage = Montage;
+    const FAnimMontageInstance* PreStartInstance{Animation->GetActiveInstanceForMontage(Montage)};
+    if (PreStartInstance != nullptr)
+    {
+        return false;
+    }
+
+    Character.BindTraceMontageStartedObserver(Montage, [&Lifecycle, Animation, Montage](UAnimMontage*)
+    {
+        Lifecycle.bOnMontageStartedObserved = true;
+        Lifecycle.Outcomes.Add({TEXT("Started"), TEXT("MontageStarted"), false});
+        if (Lifecycle.DiagnosticCallback)
+            Lifecycle.DiagnosticCallback(TEXT("MontageStarted"), false, Animation->GetActiveInstanceForMontage(Montage));
+    });
+    {
+        ON_SCOPE_EXIT { Character.UnbindTraceMontageStartedObserver(); };
+        Character.StartRollingGrounded(1.0f);
+    }
+
+    const FAnimMontageInstance* PostStartInstance{Animation->GetActiveInstanceForMontage(Montage)};
+    if (!Lifecycle.bOnMontageStartedObserved || PostStartInstance == nullptr)
+    {
+        return false;
+    }
+    Lifecycle.InstanceId = PostStartInstance->GetInstanceID();
+
+    FOnMontageBlendingOutStarted OnMontageBlendingOutStarted;
+    OnMontageBlendingOutStarted.BindLambda(
+        [&Lifecycle, Montage, Animation](UAnimMontage* CallbackMontage, const bool bInterrupted)
+        {
+            if (CallbackMontage == Montage && Lifecycle.DiagnosticCallback)
+                Lifecycle.DiagnosticCallback(TEXT("MontageBlendingOutStarted"), bInterrupted,
+                    Animation->GetMontageInstanceForID(Lifecycle.InstanceId));
+            if (CallbackMontage == Montage && bInterrupted &&
+                !Lifecycle.bOnMontageBlendingOutStartedObserved)
+            {
+                Lifecycle.bOnMontageBlendingOutStartedObserved = true;
+                Lifecycle.TerminalPlayback = SnapshotP5aNativePlayback(*Animation, Lifecycle);
+                Lifecycle.Outcomes.Add({
+                    TEXT("Cancelled"), TEXT("MontageBlendingOutStarted"), true});
+            }
+        });
+    Animation->Montage_SetBlendingOutDelegate(OnMontageBlendingOutStarted, Montage);
+
+    FOnMontageEnded OnMontageEnded;
+    OnMontageEnded.BindLambda(
+        [&Lifecycle, Montage, Animation](UAnimMontage* CallbackMontage, const bool bInterrupted)
+        {
+            if (CallbackMontage != Montage || Lifecycle.bOnMontageEndedObserved)
+            {
+                return;
+            }
+            Lifecycle.bOnMontageEndedObserved = true;
+            Lifecycle.bEndedThisFrame = true;
+            if (Lifecycle.DiagnosticCallback)
+                Lifecycle.DiagnosticCallback(TEXT("MontageEnded"), bInterrupted,
+                    Animation->GetMontageInstanceForID(Lifecycle.InstanceId));
+            Lifecycle.EndedPlayback = SnapshotP5aNativePlayback(*Animation, Lifecycle);
+            if (!bInterrupted)
+            {
+                Lifecycle.TerminalPlayback = Lifecycle.EndedPlayback;
+                Lifecycle.Outcomes.Add({TEXT("Finished"), TEXT("MontageEnded"), false});
+            }
+        });
+    Animation->Montage_SetEndDelegate(OnMontageEnded, Montage);
+    return true;
+}
+
+bool CancelP5aNativeRollThroughMontageStop(
+    UAlsAnimationInstance& Animation, FP5aNativeActionLifecycle& Lifecycle)
+{
+    UAnimMontage* Montage{Lifecycle.Montage.Get()};
+    if (!IsValid(Montage))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A Roll cancel has no lifecycle Montage."));
+        return false;
+    }
+    const FAnimMontageInstance* PreCancelInstance{Animation.GetActiveInstanceForMontage(Montage)};
+    if (PreCancelInstance == nullptr)
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A Roll cancel has no active Montage instance position=%.6f playing=%d"),
+            Animation.Montage_GetPosition(Montage), Animation.Montage_IsPlaying(Montage) ? 1 : 0);
+        return false;
+    }
+    Lifecycle.PreCancelPosition = PreCancelInstance->GetPosition();
+    Animation.Montage_Stop(Montage->BlendOut.GetBlendTime(), Montage);
+    if (!Lifecycle.bOnMontageBlendingOutStartedObserved)
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A Roll cancel did not observe MontageBlendingOutStarted."));
+    }
+    return Lifecycle.bOnMontageBlendingOutStartedObserved;
+}
+
+void UnbindP5aNativeActionObservers(UAnimInstance* Animation, const FP5aNativeActionLifecycle& Lifecycle)
+{
+    if (!IsValid(Animation)) return;
+    if (FAnimMontageInstance* Instance{Animation->GetMontageInstanceForID(Lifecycle.InstanceId)})
+    {
+        Instance->OnMontageEnded.Unbind();
+        Instance->OnMontageBlendingOutStarted.Unbind();
+    }
+}
+
+FP5aFrameUpdateAudit TickP5aWorld(UWorld& World, AAlsTraceCharacter& Character)
+{
+    UAlsAnimationInstance* Animation{Character.GetTraceAnimationInstanceMutable()};
+    const int16 PreviousUpdateCounter{Animation->GetUpdateCounter().Get()};
+    UAlsTraceSkeletalMeshComponent* Mesh{Character.GetTraceMesh()};
+    Mesh->ResetTracePipelineCounts();
+    CommandletHelpers::TickEngine(&World, FixedDeltaSeconds);
+    World.Tick(LEVELTICK_All, FixedDeltaSeconds);
+    return {static_cast<int32>(Animation->GetUpdateCounter().Get()) - PreviousUpdateCounter,
+        Mesh->GetTraceEvaluationCount(), Mesh->GetTracePostUpdateCount(), Mesh->GetTracePublicTickCount()};
+}
+
+bool GenerateP5aCase(
+    UWorld& World, const int32 CaseOrdinal,
+    AAlsTraceCharacter& Character,
+    const FP5aFrameDefinition& Frame,
+    const FP5aNativeTransitionStimulusContract& Contract,
+    const FP5aNativeTransitionStimulusInput& Input,
+    const bool bPreHookTransitionActive,
+    FP5aNativeTransitionStimulusReceipt& Receipt,
+    FP5aNativeActionLifecycle& ActionLifecycle, FP5aFrameUpdateAudit& FrameUpdateAudit)
+{
+    UAlsAnimationInstance* Instance{Cast<UAlsAnimationInstance>(Character.GetMesh()->GetAnimInstance())};
+    bool bSuccess{IsValid(Instance)};
+    if (bSuccess && Frame.ActionCommand == TEXT("Cancel"))
+    {
+        bSuccess = CancelP5aNativeRollThroughMontageStop(*Instance, ActionLifecycle);
+    }
+    if (!bSuccess) return false;
+    FrameUpdateAudit = TickP5aWorld(World, Character);
+    if (ActionLifecycle.DiagnosticAfterUpdate) ActionLifecycle.DiagnosticAfterUpdate();
+    if (FrameUpdateAudit.AnimationUpdates != 1 || FrameUpdateAudit.Evaluations != 1 ||
+        FrameUpdateAudit.PostUpdates != 1 || FrameUpdateAudit.MeshTicks != 1)
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A frame update audit failed: updates=%d evals=%d posts=%d ticks=%d"),
+            FrameUpdateAudit.AnimationUpdates, FrameUpdateAudit.Evaluations,
+            FrameUpdateAudit.PostUpdates, FrameUpdateAudit.MeshTicks);
+        return false;
+    }
+    const bool bHasTransitionStimulus{
+        Frame.TransitionStimulus.Left.LockAmount > 0.0f ||
+        Frame.TransitionStimulus.Right.LockAmount > 0.0f};
+    if (bSuccess && bHasTransitionStimulus && Frame.FrameIndex == 0 &&
+        (CaseOrdinal == 2 || CaseOrdinal == 3 || CaseOrdinal == 4))
+    {
+        bSuccess = ApplyP5aNativeTransitionStimulus(
+            Instance, Contract, Input, bPreHookTransitionActive, Receipt);
+    }
+    if (bSuccess && Frame.ActionCommand == TEXT("Start"))
+    {
+        bSuccess = StartP5aNativeRollThroughPublicAlsPath(Character, ActionLifecycle);
+    }
+    return bSuccess;
+}
+
+FString CreateP5aSha1(const FString& Value)
+{
+    const FTCHARToUTF8 Utf8(*Value);
+    uint8 Digest[FSHA1::DigestSize];
+    FSHA1::HashBuffer(Utf8.Get(), Utf8.Length(), Digest);
+    return BytesToHex(Digest, UE_ARRAY_COUNT(Digest)).ToLower();
+}
+
+FString CreateP5aAssetStableId(const FString& ObjectPath)
+{
+    const FTCHARToUTF8 Utf8(*ObjectPath);
+    uint8 Digest[FSHA1::DigestSize];
+    FSHA1::HashBuffer(Utf8.Get(), Utf8.Length(), Digest);
+    return BytesToHex(Digest, UE_ARRAY_COUNT(Digest)).ToLower();
+}
+
+FString CreateP5aEventStableId(
+    const FString& AssetStableId, const int32 SourceIndex, const FString& SourceClassPath)
+{
+    return CreateP5aSha1(FString::Printf(
+        TEXT("%s|timeline|%d|%s"), *AssetStableId, SourceIndex, *SourceClassPath));
+}
+
+FString CreateP5aMarkerStableId(
+    const FString& AssetStableId, const int32 SourceIndex, const FString& Name)
+{
+    return CreateP5aSha1(FString::Printf(
+        TEXT("%s|marker|%d|%s"), *AssetStableId, SourceIndex, *Name));
+}
+
+FString CreateP5aPackageSha256(const UAnimationAsset& Asset)
+{
+    FString PackageFilename;
+    if (!FPackageName::DoesPackageExist(Asset.GetOutermost()->GetName(), &PackageFilename))
+    {
+        return {};
+    }
+    TArray<uint8> PackageBytes;
+    if (!FFileHelper::LoadFileToArray(PackageBytes, *PackageFilename) || PackageBytes.IsEmpty())
+    {
+        return {};
+    }
+    uint8 Digest[SHA256_DIGEST_LENGTH];
+    if (SHA256(PackageBytes.GetData(), static_cast<size_t>(PackageBytes.Num()), Digest) == nullptr)
+    {
+        return {};
+    }
+    return BytesToHex(Digest, SHA256_DIGEST_LENGTH).ToLower();
+}
+
+bool CollectP5aNativeReferenceAudit(FP5aNativeReferenceAudit& Audit)
+{
+    struct FPhysicalSource
+    {
+        const TCHAR* AssetObjectPath;
+        const TCHAR* MontageObjectPath;
+        const TCHAR* SectionName;
+        const TCHAR* SlotName;
+        int32 SegmentIndex;
+    };
+    static constexpr FPhysicalSource Sources[]{
+        {TEXT("/ALS/ALS/Animations/Base/A_Als_Stand_Pose.A_Als_Stand_Pose"), TEXT(""), TEXT(""), TEXT(""), -1},
+        {TEXT("/ALS/ALS/Animations/Grounded/WalkRun/A_Als_Walk_Forward.A_Als_Walk_Forward"), TEXT(""), TEXT(""), TEXT(""), -1},
+        {TEXT("/ALS/ALS/Animations/Base/A_Als_Crouch_Pose.A_Als_Crouch_Pose"), TEXT(""), TEXT(""), TEXT(""), -1},
+        {TEXT("/ALS/ALS/Animations/TurnInPlace/A_Als_Turn_90_Left.A_Als_Turn_90_Left"), TEXT(""), TEXT(""), TEXT(""), -1},
+        {TEXT("/ALS/ALS/Animations/RotateInPlace/A_Als_Rotate_90_Left.A_Als_Rotate_90_Left"), TEXT(""), TEXT(""), TEXT(""), -1},
+        {TEXT("/ALS/ALS/Animations/Transitions/A_Als_Stand_DynamicTransition_Left.A_Als_Stand_DynamicTransition_Left"), TEXT(""), TEXT(""), TEXT("Transition"), -1},
+        {TEXT("/ALS/ALS/Animations/Transitions/A_Als_Crouch_DynamicTransition_Left.A_Als_Crouch_DynamicTransition_Left"), TEXT(""), TEXT(""), TEXT("Transition"), -1},
+        {TEXT("/ALS/ALS/Animations/Transitions/A_Als_Stand_DynamicTransition_Right.A_Als_Stand_DynamicTransition_Right"), TEXT(""), TEXT(""), TEXT("Transition"), -1},
+        {TEXT("/ALS/ALS/Animations/Transitions/A_Als_Crouch_DynamicTransition_Right.A_Als_Crouch_DynamicTransition_Right"), TEXT(""), TEXT(""), TEXT("Transition"), -1},
+        {TEXT("/ALS/ALS/Animations/Actions/Roll/AM_Als_Roll.AM_Als_Roll"), TEXT("/ALS/ALS/Animations/Actions/Roll/AM_Als_Roll.AM_Als_Roll"), TEXT("Default"), TEXT("PostLocomotion"), -1},
+        {TEXT("/ALS/ALS/Animations/Actions/Roll/A_Als_Roll.A_Als_Roll"), TEXT("/ALS/ALS/Animations/Actions/Roll/AM_Als_Roll.AM_Als_Roll"), TEXT(""), TEXT("PostLocomotion"), 0},
+    };
+    static_assert(UE_ARRAY_COUNT(Sources) == 11);
+
+    Audit = {};
+    for (int32 AssetIndex{0}; AssetIndex < UE_ARRAY_COUNT(Sources); ++AssetIndex)
+    {
+        const FPhysicalSource& Source{Sources[AssetIndex]};
+        UAnimationAsset* Asset{LoadObject<UAnimationAsset>(nullptr, Source.AssetObjectPath)};
+        UAnimSequenceBase* SequenceBase{Cast<UAnimSequenceBase>(Asset)};
+        if (!IsValid(Asset) || !IsValid(SequenceBase) || Asset->GetPathName() != Source.AssetObjectPath)
+        {
+            return false;
+        }
+
+        FP5aNativeAssetAudit& AssetAudit{Audit.Assets.AddDefaulted_GetRef()};
+        AssetAudit.AssetObjectPath = Asset->GetPathName();
+        AssetAudit.AssetStableId = CreateP5aAssetStableId(AssetAudit.AssetObjectPath);
+        AssetAudit.AssetPackageSha256 = CreateP5aPackageSha256(*Asset);
+        AssetAudit.AssetClassPath = Asset->GetClass()->GetPathName();
+        AssetAudit.DurationSeconds = Asset->GetPlayLength();
+        AssetAudit.bAuthoredLoop = SequenceBase->bLoop;
+        AssetAudit.MontageObjectPath = Source.MontageObjectPath;
+        AssetAudit.MontageStableId = AssetAudit.MontageObjectPath.IsEmpty()
+            ? FString{} : CreateP5aAssetStableId(AssetAudit.MontageObjectPath);
+        AssetAudit.SectionName = Source.SectionName;
+        AssetAudit.SlotName = Source.SlotName;
+        AssetAudit.SegmentIndex = Source.SegmentIndex;
+        if (AssetAudit.AssetStableId.IsEmpty() || AssetAudit.AssetPackageSha256.IsEmpty() ||
+            AssetAudit.AssetClassPath.IsEmpty() || !FMath::IsFinite(AssetAudit.DurationSeconds))
+        {
+            return false;
+        }
+
+        for (int32 SourceIndex{0}; SourceIndex < SequenceBase->Notifies.Num(); ++SourceIndex)
+        {
+            const FAnimNotifyEvent& NotifyEvent{SequenceBase->Notifies[SourceIndex]};
+            const UObject* NotifyObject{IsValid(NotifyEvent.NotifyStateClass.Get())
+                ? static_cast<const UObject*>(NotifyEvent.NotifyStateClass.Get())
+                : static_cast<const UObject*>(NotifyEvent.Notify.Get())};
+            if (!IsValid(NotifyObject))
+            {
+                return false;
+            }
+            FP5aNativeEventAudit& EventAudit{Audit.Events.AddDefaulted_GetRef()};
+            EventAudit.AssetStableId = AssetAudit.AssetStableId;
+            EventAudit.SourceClassPath = NotifyObject->GetClass()->GetPathName();
+            EventAudit.StableEventId = CreateP5aEventStableId(
+                EventAudit.AssetStableId, SourceIndex, EventAudit.SourceClassPath);
+            EventAudit.OwnerKind = Cast<UAnimMontage>(Asset) != nullptr
+                ? TEXT("MontageTimeline") : TEXT("SequenceTimeline");
+            EventAudit.SourceIndex = SourceIndex;
+            EventAudit.TrackIndex = NotifyEvent.TrackIndex;
+            EventAudit.TimeSeconds = NotifyEvent.GetTime();
+            EventAudit.DurationSeconds = NotifyEvent.GetDuration();
+            EventAudit.TriggerWeightThreshold = NotifyEvent.TriggerWeightThreshold;
+            EventAudit.TickMode = NotifyEvent.MontageTickType == EMontageNotifyTickType::Queued
+                ? TEXT("Queued") : TEXT("BranchingPoint");
+        }
+
+        TArray<FAnimSyncMarker> AuthoredSyncMarkers;
+        if (const UAnimSequence* Sequence{Cast<UAnimSequence>(Asset)})
+        {
+            AuthoredSyncMarkers = Sequence->AuthoredSyncMarkers;
+            if (AssetIndex < 5)
+            {
+                FP5aNativeCurveInventory& Inventory{Audit.CurveInventories.AddDefaulted_GetRef()};
+                Inventory.AssetObjectPath = AssetAudit.AssetObjectPath;
+                Inventory.AssetStableId = AssetAudit.AssetStableId;
+                if (const IAnimationDataModel* DataModel{Sequence->GetDataModel()})
+                {
+                    for (const FFloatCurve& Curve : DataModel->GetFloatCurves())
+                    {
+                        Inventory.CurveNames.Add(Curve.GetName().ToString());
+                    }
+                    Inventory.CurveNames.Sort();
+                }
+            }
+        }
+        else if (const UAnimMontage* Montage{Cast<UAnimMontage>(Asset)})
+        {
+            AuthoredSyncMarkers = Montage->MarkerData.AuthoredSyncMarkers;
+        }
+        for (int32 SourceIndex{0}; SourceIndex < AuthoredSyncMarkers.Num(); ++SourceIndex)
+        {
+            const FAnimSyncMarker& Marker{AuthoredSyncMarkers[SourceIndex]};
+            FP5aNativeMarkerAudit& MarkerAudit{Audit.Markers.AddDefaulted_GetRef()};
+            MarkerAudit.AssetStableId = AssetAudit.AssetStableId;
+            MarkerAudit.Name = Marker.MarkerName.ToString();
+            MarkerAudit.StableMarkerId = CreateP5aMarkerStableId(
+                MarkerAudit.AssetStableId, SourceIndex, MarkerAudit.Name);
+            MarkerAudit.SourceIndex = SourceIndex;
+#if WITH_EDITORONLY_DATA
+            MarkerAudit.TrackIndex = Marker.TrackIndex;
+#else
+            MarkerAudit.TrackIndex = 0;
+#endif
+            MarkerAudit.TimeSeconds = Marker.Time;
+        }
+    }
+
+    return Audit.Assets.Num() == 11 && Audit.Events.Num() == 19 && Audit.Markers.Num() == 2 &&
+        Audit.CurveInventories.Num() == 5;
+}
+
+void SetP5aFloatField(const TSharedRef<FJsonObject>& Object, const TCHAR* Name, const float Value)
+{
+    char Buffer[64]{};
+    const auto Conversion{std::to_chars(Buffer, Buffer + UE_ARRAY_COUNT(Buffer) - 1, Value)};
+    check(Conversion.ec == std::errc{});
+    *Conversion.ptr = '\0';
+    Object->SetField(Name, MakeShared<FJsonValueNumberString>(FString{ANSI_TO_TCHAR(Buffer)}));
+}
+
+TSharedRef<FJsonObject> P5aFloatVectorToJson(const FVector& Value)
+{
+    const TSharedRef<FJsonObject> Object{MakeShared<FJsonObject>()};
+    SetP5aFloatField(Object, TEXT("x"), static_cast<float>(Value.X / 100.0));
+    SetP5aFloatField(Object, TEXT("y"), static_cast<float>(Value.Y / 100.0));
+    SetP5aFloatField(Object, TEXT("z"), static_cast<float>(Value.Z / 100.0));
+    return Object;
+}
+
+TSharedRef<FJsonObject> P5aNativeReferenceAuditToJson(const FP5aNativeReferenceAudit& Audit)
+{
+    TArray<TSharedPtr<FJsonValue>> Assets;
+    for (const FP5aNativeAssetAudit& Item : Audit.Assets)
+    {
+        const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+        Value->SetStringField(TEXT("assetObjectPath"), Item.AssetObjectPath);
+        Value->SetStringField(TEXT("assetStableId"), Item.AssetStableId);
+        Value->SetStringField(TEXT("assetPackageSha256"), Item.AssetPackageSha256);
+        Value->SetStringField(TEXT("assetClassPath"), Item.AssetClassPath);
+        SetP5aFloatField(Value, TEXT("durationSeconds"), static_cast<float>(Item.DurationSeconds));
+        Value->SetBoolField(TEXT("authoredLoop"), Item.bAuthoredLoop);
+        Value->SetStringField(TEXT("montageObjectPath"), Item.MontageObjectPath);
+        Value->SetStringField(TEXT("montageStableId"), Item.MontageStableId);
+        Value->SetStringField(TEXT("sectionName"), Item.SectionName);
+        Value->SetStringField(TEXT("slotName"), Item.SlotName);
+        Value->SetNumberField(TEXT("segmentIndex"), Item.SegmentIndex);
+        Assets.Add(MakeShared<FJsonValueObject>(Value));
+    }
+    TArray<TSharedPtr<FJsonValue>> Events;
+    for (const FP5aNativeEventAudit& Item : Audit.Events)
+    {
+        const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+        Value->SetStringField(TEXT("assetStableId"), Item.AssetStableId);
+        Value->SetStringField(TEXT("stableEventId"), Item.StableEventId);
+        Value->SetStringField(TEXT("ownerKind"), Item.OwnerKind);
+        Value->SetStringField(TEXT("sourceClassPath"), Item.SourceClassPath);
+        Value->SetNumberField(TEXT("sourceIndex"), Item.SourceIndex);
+        Value->SetNumberField(TEXT("trackIndex"), Item.TrackIndex);
+        SetP5aFloatField(Value, TEXT("timeSeconds"), static_cast<float>(Item.TimeSeconds));
+        SetP5aFloatField(Value, TEXT("durationSeconds"), static_cast<float>(Item.DurationSeconds));
+        SetP5aFloatField(Value, TEXT("triggerWeightThreshold"),
+            static_cast<float>(Item.TriggerWeightThreshold));
+        Value->SetStringField(TEXT("tickMode"), Item.TickMode);
+        Events.Add(MakeShared<FJsonValueObject>(Value));
+    }
+    TArray<TSharedPtr<FJsonValue>> Markers;
+    for (const FP5aNativeMarkerAudit& Item : Audit.Markers)
+    {
+        const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+        Value->SetStringField(TEXT("assetStableId"), Item.AssetStableId);
+        Value->SetStringField(TEXT("stableMarkerId"), Item.StableMarkerId);
+        Value->SetStringField(TEXT("name"), Item.Name);
+        Value->SetNumberField(TEXT("sourceIndex"), Item.SourceIndex);
+        Value->SetNumberField(TEXT("trackIndex"), Item.TrackIndex);
+        SetP5aFloatField(Value, TEXT("timeSeconds"), static_cast<float>(Item.TimeSeconds));
+        Markers.Add(MakeShared<FJsonValueObject>(Value));
+    }
+    TArray<TSharedPtr<FJsonValue>> CurveInventories;
+    for (const FP5aNativeCurveInventory& Item : Audit.CurveInventories)
+    {
+        const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+        Value->SetStringField(TEXT("assetObjectPath"), Item.AssetObjectPath);
+        Value->SetStringField(TEXT("assetStableId"), Item.AssetStableId);
+        TArray<TSharedPtr<FJsonValue>> CurveNames;
+        for (const FString& CurveName : Item.CurveNames)
+        {
+            CurveNames.Add(MakeShared<FJsonValueString>(CurveName));
+        }
+        Value->SetArrayField(TEXT("curveNames"), CurveNames);
+        CurveInventories.Add(MakeShared<FJsonValueObject>(Value));
+    }
+    const TSharedRef<FJsonObject> Result{MakeShared<FJsonObject>()};
+    Result->SetArrayField(TEXT("assets"), Assets);
+    Result->SetArrayField(TEXT("events"), Events);
+    Result->SetArrayField(TEXT("markers"), Markers);
+    Result->SetArrayField(TEXT("curveInventories"), CurveInventories);
+    Result->SetArrayField(TEXT("auxiliaryAssets"), Audit.AuxiliaryAssets);
+    return Result;
 }
 
 FString GaitName(const FGameplayTag& Tag)
@@ -505,6 +1761,1140 @@ bool SaveJson(const FString& Path, const TSharedRef<FJsonObject>& Object)
     return FFileHelper::SaveStringToFile(Json, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 }
 
+#include "AlsP5aNativeInventory.inl"
+#include "AlsP5aNativeDiscovery.inl"
+#include "AlsP5aNativeInventory.Tests.inl"
+
+const FP5aSourceDefinition* FindP5aSource(
+    const TArray<FP5aSourceDefinition>& Sources, const FString& TraceSourceId)
+{
+    return Sources.FindByPredicate([&TraceSourceId](const FP5aSourceDefinition& Source)
+    {
+        return Source.TraceSourceId == TraceSourceId;
+    });
+}
+
+TSharedRef<FJsonObject> P5aObservedSourceToJson(
+    const FP5aObservedSource* Source, const bool bIncludePackage)
+{
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    Value->SetStringField(TEXT("observedAssetObjectPath"), Source != nullptr ? Source->AssetObjectPath : FString{});
+    Value->SetStringField(TEXT("observedAssetStableId"), Source != nullptr ? Source->AssetStableId : FString{});
+    if (bIncludePackage)
+    {
+        Value->SetStringField(TEXT("observedAssetPackageSha256"),
+            Source != nullptr ? Source->AssetPackageSha256 : FString{});
+    }
+    Value->SetStringField(TEXT("observedAssetClassPath"), Source != nullptr ? Source->AssetClassPath : FString{});
+    if (bIncludePackage)
+    {
+        Value->SetStringField(TEXT("observedMontageObjectPath"),
+            Source != nullptr ? Source->MontageObjectPath : FString{});
+    }
+    Value->SetStringField(TEXT("observedMontageStableId"), Source != nullptr ? Source->MontageStableId : FString{});
+    Value->SetStringField(TEXT("observedSectionName"), Source != nullptr ? Source->SectionName : FString{});
+    Value->SetStringField(TEXT("observedSlotName"), Source != nullptr ? Source->SlotName : FString{});
+    Value->SetNumberField(TEXT("observedSegmentIndex"), Source != nullptr ? Source->SegmentIndex : -1);
+    return Value;
+}
+
+TSharedRef<FJsonObject> P5aCurveValuesToJson(
+    const float LeftIk, const float RightIk, const float LeftLock,
+    const float RightLock, const float AllowTransitions)
+{
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    SetP5aFloatField(Value, TEXT("leftIk"), LeftIk);
+    SetP5aFloatField(Value, TEXT("rightIk"), RightIk);
+    SetP5aFloatField(Value, TEXT("leftLock"), LeftLock);
+    SetP5aFloatField(Value, TEXT("rightLock"), RightLock);
+    SetP5aFloatField(Value, TEXT("allowTransitions"), AllowTransitions);
+    return Value;
+}
+
+TSharedRef<FJsonObject> P5aCurveAuditToJson(const UAnimInstance& Animation, const FName CurveName)
+{
+    float ObservedValue{0.0f};
+    const bool bPresent{Animation.GetCurveValue(CurveName, ObservedValue)};
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    Value->SetBoolField(TEXT("present"), bPresent);
+    SetP5aFloatField(Value, TEXT("value"), bPresent ? ObservedValue : 0.0f);
+    return Value;
+}
+
+TSharedRef<FJsonObject> P5aEmptyMarkerToJson()
+{
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    Value->SetStringField(TEXT("stableMarkerId"), TEXT(""));
+    Value->SetStringField(TEXT("name"), TEXT(""));
+    Value->SetNumberField(TEXT("sourceIndex"), -1);
+    Value->SetNumberField(TEXT("trackIndex"), -1);
+    Value->SetNumberField(TEXT("timeSeconds"), 0.0);
+    return Value;
+}
+
+TSharedRef<FJsonObject> P5aMarkerToJson(
+    const UAnimSequence& Sequence, const FP5aObservedSource& Source, const int32 SourceIndex)
+{
+    if (!Sequence.AuthoredSyncMarkers.IsValidIndex(SourceIndex))
+    {
+        return P5aEmptyMarkerToJson();
+    }
+    const FAnimSyncMarker& Marker{Sequence.AuthoredSyncMarkers[SourceIndex]};
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    Value->SetStringField(TEXT("assetStableId"), Source.AssetStableId);
+    Value->SetStringField(TEXT("stableMarkerId"), CreateP5aMarkerStableId(
+        Source.AssetStableId, SourceIndex, Marker.MarkerName.ToString()));
+    Value->SetStringField(TEXT("name"), Marker.MarkerName.ToString());
+    Value->SetNumberField(TEXT("sourceIndex"), SourceIndex);
+#if WITH_EDITORONLY_DATA
+    Value->SetNumberField(TEXT("trackIndex"), Marker.TrackIndex);
+#else
+    Value->SetNumberField(TEXT("trackIndex"), 0);
+#endif
+    SetP5aFloatField(Value, TEXT("timeSeconds"), Marker.Time);
+    return Value;
+}
+
+float StepP5aSemanticWeight(const float Weight, const float Target, const float DeltaSeconds)
+{
+    const float Step{static_cast<float>(static_cast<double>(DeltaSeconds) / static_cast<double>(.2f))};
+    return Target > Weight
+        ? FMath::Min(Target, static_cast<float>(Weight + Step))
+        : FMath::Max(Target, static_cast<float>(Weight - Step));
+}
+
+void UpdateP5aSemanticGraphState(
+    FP5aSemanticGraphState& State, FP5aNativeActionLifecycle& Lifecycle,
+    const float PreviousActionTime, const bool bTransitionActive)
+{
+    bool bStarted{false};
+    bool bTerminated{false};
+    bool bCancelled{false};
+    int32 ProcessedOutcomeCount{Lifecycle.SemanticOutcomeCount};
+    for (int32 Index{Lifecycle.SemanticOutcomeCount}; Index < Lifecycle.Outcomes.Num(); ++Index)
+    {
+        const FP5aNativeActionOutcome& Outcome{Lifecycle.Outcomes[Index]};
+        bStarted |= Outcome.NativeReason == TEXT("Started");
+        bTerminated |= Outcome.NativeReason == TEXT("Cancelled") ||
+            Outcome.NativeReason == TEXT("Finished");
+        bCancelled |= Outcome.NativeReason == TEXT("Cancelled");
+        ProcessedOutcomeCount = Index + 1;
+    }
+    Lifecycle.SemanticOutcomeCount = ProcessedOutcomeCount;
+    if (bStarted)
+    {
+        State.bActionActive = true;
+        State.ActionWeight = StepP5aSemanticWeight(
+            State.ActionWeight, 1.0f, static_cast<float>(FixedDeltaSeconds));
+        State.ActionEventWeight = State.ActionWeight;
+    }
+    else if (bTerminated)
+    {
+        float ActiveDelta{0.0f};
+        if (!bCancelled && IsValid(Lifecycle.Montage))
+        {
+            ActiveDelta = FMath::Clamp(
+                Lifecycle.TerminalPlayback.Position - PreviousActionTime,
+                0.0f, static_cast<float>(FixedDeltaSeconds));
+        }
+        State.ActionWeight = StepP5aSemanticWeight(State.ActionWeight, 1.0f, ActiveDelta);
+        State.ActionEventWeight = State.ActionWeight;
+        State.ActionWeight = StepP5aSemanticWeight(State.ActionWeight, 0.0f,
+            static_cast<float>(FixedDeltaSeconds) - ActiveDelta);
+        State.bActionActive = false;
+    }
+    else
+    {
+        State.ActionWeight = StepP5aSemanticWeight(State.ActionWeight,
+            State.bActionActive ? 1.0f : 0.0f, static_cast<float>(FixedDeltaSeconds));
+        State.ActionEventWeight = State.ActionWeight;
+    }
+
+    const bool bTransitionWasActive{State.bTransitionActive};
+    State.bTransitionActive = bTransitionActive;
+    if (bTransitionWasActive)
+    {
+        State.TransitionWeight = StepP5aSemanticWeight(State.TransitionWeight,
+            bTransitionActive ? 1.0f : 0.0f, static_cast<float>(FixedDeltaSeconds));
+    }
+}
+
+TSharedRef<FJsonObject> P5aCanonicalEventToJson(
+    const FP5aSourceDefinition& Source, const FAnimNotifyEvent& Notify,
+    const int32 SourceIndex, const FString& Phase, const int32 FrameEventOrdinal,
+    const float FrameOffset, const float ObservedWeight, const FString& TerminationReason)
+{
+    const UObject* NotifyObject{IsValid(Notify.NotifyStateClass.Get())
+        ? static_cast<const UObject*>(Notify.NotifyStateClass.Get())
+        : static_cast<const UObject*>(Notify.Notify.Get())};
+    check(IsValid(NotifyObject));
+    const FString SourceClassPath{NotifyObject->GetClass()->GetPathName()};
+    const bool bMontageTimeline{Cast<UAnimMontage>(Source.CanonicalAsset) != nullptr};
+    const bool bSetAction{Source.SourceKind == TEXT("ActionMontage")};
+    const bool bActionSequence{Source.SourceKind == TEXT("ActionSequence")};
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    Value->SetObjectField(TEXT("source"), P5aObservedSourceToJson(&Source.Canonical, false));
+    Value->SetStringField(TEXT("observedEventStableId"), CreateP5aEventStableId(
+        Source.Canonical.AssetStableId, SourceIndex, SourceClassPath));
+    Value->SetStringField(TEXT("observedEventAssetStableId"), Source.Canonical.AssetStableId);
+    Value->SetStringField(TEXT("observedOwnerKind"),
+        bMontageTimeline ? TEXT("MontageTimeline") : TEXT("SequenceTimeline"));
+    Value->SetStringField(TEXT("observedSourceClassPath"), SourceClassPath);
+    Value->SetNumberField(TEXT("observedSourceIndex"), SourceIndex);
+    Value->SetNumberField(TEXT("observedTrackIndex"), Notify.TrackIndex);
+    Value->SetStringField(TEXT("observedMontageStableId"), Source.Canonical.MontageStableId);
+    Value->SetStringField(TEXT("observedOwnerSectionName"), Source.Canonical.SectionName);
+    Value->SetNumberField(TEXT("observedSegmentIndex"), bActionSequence ? 0 : -1);
+    Value->SetNumberField(TEXT("boundaryOrdinal"), bActionSequence ? 1 : 0);
+    Value->SetStringField(TEXT("nativeInstanceOrdinal"), TEXT("1"));
+    Value->SetStringField(TEXT("playbackCycle"), TEXT("0"));
+    Value->SetNumberField(TEXT("frameEventOrdinal"), FrameEventOrdinal);
+    SetP5aFloatField(Value, TEXT("observedFrameOffsetSeconds"), FrameOffset);
+    SetP5aFloatField(Value, TEXT("observedWeight"), ObservedWeight);
+    Value->SetStringField(TEXT("kind"), bSetAction ? TEXT("SetAction") : TEXT("Generic"));
+    Value->SetStringField(TEXT("tickMode"),
+        Notify.MontageTickType == EMontageNotifyTickType::Queued ? TEXT("Queued") : TEXT("BranchingPoint"));
+    Value->SetStringField(TEXT("phase"), Phase);
+    Value->SetStringField(TEXT("nativeTerminationReason"), TerminationReason);
+    const TSharedRef<FJsonObject> Payload{MakeShared<FJsonObject>()};
+    Payload->SetNumberField(TEXT("semanticId"), bSetAction ? 2 : 0);
+    Payload->SetNumberField(TEXT("enumValue0"), bSetAction ? 1 : 0);
+    Payload->SetNumberField(TEXT("enumValue1"), 0);
+    Payload->SetNumberField(TEXT("enumValue2"), 0);
+    Payload->SetNumberField(TEXT("scalarValue0"), 0);
+    Payload->SetNumberField(TEXT("flags"), 0);
+    Value->SetObjectField(TEXT("payload"), Payload);
+    return Value;
+}
+
+void AddP5aCanonicalEvents(
+    const FP5aSourceDefinition& Source, const double PreviousTime, const double CurrentTime,
+    const float ObservedWeight, const bool bCancelled,
+    TArray<TSharedPtr<FJsonValue>>& Events, TArray<TSharedPtr<FJsonValue>>& ActiveStates,
+    int32& FrameEventOrdinal, const float FrameOffsetScale = 1.0f)
+{
+    UAnimSequenceBase* Asset{Source.CanonicalAsset.Get()};
+    if (!IsValid(Asset)) return;
+    FAnimNotifyContext NotifyContext;
+    if (!bCancelled)
+    {
+        Asset->GetAnimNotifies(static_cast<float>(PreviousTime),
+            static_cast<float>(CurrentTime - PreviousTime), NotifyContext);
+    }
+    TSet<const FAnimNotifyEvent*> WindowNotifies;
+    for (const FAnimNotifyEventReference& Reference : NotifyContext.ActiveNotifies)
+    {
+        if (const FAnimNotifyEvent* Notify{Reference.GetNotify()}; Notify != nullptr)
+        {
+            WindowNotifies.Add(Notify);
+        }
+    }
+    for (int32 SourceIndex{0}; SourceIndex < Asset->Notifies.Num(); ++SourceIndex)
+    {
+        const FAnimNotifyEvent& Notify{Asset->Notifies[SourceIndex]};
+        const bool bState{IsValid(Notify.NotifyStateClass.Get())};
+        const double StartTime{Notify.GetTime()};
+        const double EndTime{StartTime + Notify.GetDuration()};
+        const bool bForcedCancel{bCancelled && Source.SourceKind == TEXT("ActionMontage") && bState};
+        if (!bState)
+        {
+            if (WindowNotifies.Contains(&Notify) && PreviousTime < StartTime && CurrentTime >= StartTime)
+            {
+                Events.Add(MakeShared<FJsonValueObject>(P5aCanonicalEventToJson(
+                    Source, Notify, SourceIndex, TEXT("Trigger"), FrameEventOrdinal++,
+                    static_cast<float>((StartTime - PreviousTime) * FrameOffsetScale),
+                    ObservedWeight, TEXT("None"))));
+            }
+            continue;
+        }
+        const bool bInWindow{WindowNotifies.Contains(&Notify)};
+        const bool bBegins{bInWindow && PreviousTime <= StartTime && CurrentTime > StartTime};
+        const bool bEnds{bForcedCancel || (PreviousTime < EndTime && CurrentTime >= EndTime)};
+        if (bBegins && !bForcedCancel)
+        {
+            Events.Add(MakeShared<FJsonValueObject>(P5aCanonicalEventToJson(
+                Source, Notify, SourceIndex, TEXT("Begin"), FrameEventOrdinal++,
+                static_cast<float>(FMath::Max(0.0, StartTime - PreviousTime) * FrameOffsetScale),
+                ObservedWeight, TEXT("None"))));
+        }
+        if (bEnds)
+        {
+            Events.Add(MakeShared<FJsonValueObject>(P5aCanonicalEventToJson(
+                Source, Notify, SourceIndex, TEXT("End"), FrameEventOrdinal++,
+                bForcedCancel ? 0.0f :
+                    static_cast<float>(FMath::Max(0.0, EndTime - PreviousTime) * FrameOffsetScale),
+                ObservedWeight, bForcedCancel ? TEXT("Cancelled") : TEXT("None"))));
+        }
+        else if (bInWindow && CurrentTime > StartTime && PreviousTime < EndTime)
+        {
+            Events.Add(MakeShared<FJsonValueObject>(P5aCanonicalEventToJson(
+                Source, Notify, SourceIndex, TEXT("Tick"), FrameEventOrdinal++,
+                static_cast<float>(FixedDeltaSeconds) * FrameOffsetScale,
+                ObservedWeight, TEXT("None"))));
+            const TSharedRef<FJsonObject> Owner{MakeShared<FJsonObject>()};
+            Owner->SetObjectField(TEXT("source"), P5aObservedSourceToJson(&Source.Canonical, false));
+            const UObject* NotifyObject{Notify.NotifyStateClass.Get()};
+            Owner->SetStringField(TEXT("observedEventStableId"), CreateP5aEventStableId(
+                Source.Canonical.AssetStableId, SourceIndex, NotifyObject->GetClass()->GetPathName()));
+            Owner->SetStringField(TEXT("nativeInstanceOrdinal"), TEXT("1"));
+            Owner->SetStringField(TEXT("playbackCycle"), TEXT("0"));
+            ActiveStates.Add(MakeShared<FJsonValueObject>(Owner));
+        }
+    }
+}
+
+TSharedRef<FJsonObject> P5aNativeTimelineEventToJson(
+    const FP5aObservedSource& Source, const FAnimNotifyEvent& Notify,
+    const int32 SourceIndex, const FString& Phase, const float FrameOffset)
+{
+    const UObject* NotifyObject{IsValid(Notify.NotifyStateClass.Get())
+        ? static_cast<const UObject*>(Notify.NotifyStateClass.Get())
+        : static_cast<const UObject*>(Notify.Notify.Get())};
+    check(IsValid(NotifyObject));
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    Value->SetObjectField(TEXT("source"), P5aObservedSourceToJson(&Source, true));
+    Value->SetStringField(TEXT("observedEventStableId"), CreateP5aEventStableId(
+        Source.AssetStableId, SourceIndex, NotifyObject->GetClass()->GetPathName()));
+    Value->SetNumberField(TEXT("observedSourceIndex"), SourceIndex);
+    Value->SetNumberField(TEXT("observedTrackIndex"), Notify.TrackIndex);
+    SetP5aFloatField(Value, TEXT("observedFrameOffsetSeconds"), FrameOffset);
+    Value->SetStringField(TEXT("phase"), Phase);
+    return Value;
+}
+
+bool AddP5aNativeTimelineEvents(
+    UAnimInstance& Animation, const TArray<FP5aSourceDefinition>& Sources,
+    const FP5aNativeAuxiliaryInventory& Auxiliary,
+    const FP5aNativeActionLifecycle& ActionLifecycle,
+    FP5aNativeNotifyObservationState& ObservationState,
+    TArray<TSharedPtr<FJsonValue>>& Timeline)
+{
+    const auto ResolveNotify{[&Sources, &Auxiliary, &Animation, &ObservationState, &ActionLifecycle](const FAnimNotifyEventReference& Reference,
+                                        FP5aObservedNotifyState& Observed, const bool bRequireTiming = true)
+    {
+        const UObject* SourceObject{Reference.GetSourceObject()};
+        const FAnimNotifyEvent* Notify{Reference.GetNotify()};
+        if (!IsValid(SourceObject) || Notify == nullptr)
+        {
+            UE_LOG(LogTemp, Error, TEXT("P5A notify reference has no live source/event."));
+            return false;
+        }
+        Observed.LastAnimationTime = Reference.GetCurrentAnimationTime();
+        Observed.PreviousAnimationTime = Observed.LastAnimationTime - static_cast<float>(FixedDeltaSeconds);
+        if (bRequireTiming)
+        {
+        bool bHasMontageContext{false};
+        if (const UE::Anim::FAnimNotifyMontageInstanceContext* Context{
+            Reference.GetContextData<UE::Anim::FAnimNotifyMontageInstanceContext>()})
+        {
+            bHasMontageContext = true;
+            Observed.MontageInstanceId = Context->MontageInstanceID;
+        }
+        else if (IsValid(Notify->NotifyStateClass) && !Notify->IsBranchingPoint())
+        {
+            // Native dispatch reuses the notify ID even when it replaces the reference's context.
+            int32 MatchingPreviousStates{0};
+            for (const FP5aObservedNotifyState& Previous : ObservationState.ActiveStates)
+            {
+                if (!Previous.bBranchingPoint && Previous.InstanceId == Reference.GetNotifyInstanceID() &&
+                    Previous.Source->AssetObjectPath == SourceObject->GetPathName() && *Previous.Notify == *Notify)
+                {
+                    Observed.MontageInstanceId = Previous.MontageInstanceId;
+                    Observed.PreviousAnimationTime = Previous.LastAnimationTime;
+                    Observed.PlayRate = Previous.PlayRate;
+                    ++MatchingPreviousStates;
+                }
+            }
+            if (MatchingPreviousStates != 1 || Observed.MontageInstanceId == INDEX_NONE)
+            {
+                UE_LOG(LogTemp, Error, TEXT("P5A contextless state has no unique prior native identity: source=%s id=%d matches=%d"),
+                    *SourceObject->GetPathName(), Reference.GetNotifyInstanceID(), MatchingPreviousStates);
+                return false;
+            }
+        }
+        // A contextless native active state can outlive its original montage. Its current
+        // reference time is authoritative; the prior ID associates identity, not playback.
+        if (bHasMontageContext)
+        {
+            const FAnimMontageInstance* Instance{Animation.GetMontageInstanceForID(Observed.MontageInstanceId)};
+            const bool bUseEndedSnapshot{Instance == nullptr && ActionLifecycle.bEndedThisFrame &&
+                Observed.MontageInstanceId == ActionLifecycle.InstanceId && ActionLifecycle.EndedPlayback.bCaptured};
+            if (Instance == nullptr && !bUseEndedSnapshot)
+            {
+                UE_LOG(LogTemp, Error, TEXT("P5A notify instance missing id=%d source=%s time=%.9f"),
+                    Observed.MontageInstanceId, *SourceObject->GetPathName(), Reference.GetCurrentAnimationTime());
+                return false;
+            }
+            Observed.PlayRate = bUseEndedSnapshot ? ActionLifecycle.EndedPlayback.PlayRate : Instance->GetPlayRate();
+            Observed.LastAnimationTime = bUseEndedSnapshot ? ActionLifecycle.EndedPlayback.Position : Instance->GetPosition();
+            Observed.PreviousAnimationTime = bUseEndedSnapshot
+                ? ActionLifecycle.EndedPlayback.PreviousPosition : Instance->GetPreviousPosition();
+            if (const UAnimMontage* Montage{bUseEndedSnapshot ? ActionLifecycle.Montage.Get() : Instance->Montage.Get()})
+            {
+                int32 MatchingSegments{0};
+                for (const FSlotAnimationTrack& Track : Montage->SlotAnimTracks)
+                {
+                    for (const FAnimSegment& Segment : Track.AnimTrack.AnimSegments)
+                    {
+                        if (Segment.GetAnimReference() == SourceObject)
+                        {
+                            ++MatchingSegments;
+                            Observed.PlayRate *= Segment.GetValidPlayRate();
+                            Observed.LastAnimationTime = Segment.ConvertTrackPosToAnimPos(Observed.LastAnimationTime);
+                            Observed.PreviousAnimationTime = Segment.ConvertTrackPosToAnimPos(Observed.PreviousAnimationTime);
+                        }
+                    }
+                }
+                if (Montage != SourceObject && MatchingSegments != 1) return false;
+            }
+            else return false;
+        }
+        if (Observed.PlayRate <= 0.0f || (IsValid(Notify->NotifyStateClass) &&
+            Notify->GetDuration() <= static_cast<float>(FixedDeltaSeconds) * Observed.PlayRate))
+        {
+            UE_LOG(LogTemp, Error, TEXT("P5A notify rate/duration rejected source=%s rate=%.9f duration=%.9f"),
+                *SourceObject->GetPathName(), Observed.PlayRate, Notify->GetDuration());
+            return false;
+        }
+        }
+        for (const FP5aSourceDefinition& Definition : Sources)
+        {
+            for (int32 VariantIndex{0}; VariantIndex < Definition.NativeAssets.Num(); ++VariantIndex)
+            {
+                UAnimSequenceBase* Asset{Definition.NativeAssets[VariantIndex]};
+                if (Asset != SourceObject || !IsValid(Asset)) continue;
+                for (int32 SourceIndex{0}; SourceIndex < Asset->Notifies.Num(); ++SourceIndex)
+                {
+                    if (!(Asset->Notifies[SourceIndex] == *Notify)) continue;
+                    Observed.InstanceId = Reference.GetNotifyInstanceID();
+                    Observed.Source = Definition.NativeVariants.IsValidIndex(VariantIndex)
+                        ? &Definition.NativeVariants[VariantIndex] : &Definition.Native;
+                    Observed.Notify = &Asset->Notifies[SourceIndex];
+                    Observed.SourceIndex = SourceIndex;
+                    return true;
+                }
+            }
+            UAnimSequenceBase* Asset{Definition.NativeAsset.Get()};
+            if (Asset != SourceObject || !IsValid(Asset)) continue;
+            for (int32 SourceIndex{0}; SourceIndex < Asset->Notifies.Num(); ++SourceIndex)
+            {
+                if (!(Asset->Notifies[SourceIndex] == *Notify)) continue;
+                Observed.InstanceId = Reference.GetNotifyInstanceID();
+                Observed.Source = &Definition.Native;
+                Observed.Notify = &Asset->Notifies[SourceIndex];
+                Observed.SourceIndex = SourceIndex;
+                return true;
+            }
+        }
+        for (int32 AssetIndex{0}; AssetIndex < Auxiliary.Assets.Num(); ++AssetIndex)
+        {
+            const UAnimSequenceBase* Asset{Cast<UAnimSequenceBase>(Auxiliary.Assets[AssetIndex])};
+            if (Asset != SourceObject || !IsValid(Asset)) continue;
+            for (int32 SourceIndex{0}; SourceIndex < Asset->Notifies.Num(); ++SourceIndex)
+            {
+                if (!(Asset->Notifies[SourceIndex] == *Notify)) continue;
+                Observed.InstanceId = Reference.GetNotifyInstanceID();
+                Observed.Source = &Auxiliary.Sources[AssetIndex];
+                Observed.Notify = &Asset->Notifies[SourceIndex];
+                Observed.SourceIndex = SourceIndex;
+                return true;
+            }
+        }
+        const UAnimSequenceBase* SourceAsset{Cast<UAnimSequenceBase>(SourceObject)};
+        UE_LOG(LogTemp, Error, TEXT("P5A notify identity unresolved source=%s notify=%s state=%s guid=%s time=%.9f rows=%d"),
+            *SourceObject->GetPathName(), *GetPathNameSafe(Notify->Notify), *GetPathNameSafe(Notify->NotifyStateClass),
+            *Notify->Guid.ToString(), Notify->GetTime(), SourceAsset != nullptr ? SourceAsset->Notifies.Num() : -1);
+        return false;
+    }};
+    const auto ContainsInstance{[](const TArray<FP5aObservedNotifyState>& Values, const FP5aObservedNotifyState& Other)
+    {
+        return Values.ContainsByPredicate([&Other](const FP5aObservedNotifyState& Value)
+        {
+            return Value.bBranchingPoint == Other.bBranchingPoint &&
+                Value.Source == Other.Source && Value.Notify == Other.Notify &&
+                (Value.bBranchingPoint ? Value.MontageInstanceId == Other.MontageInstanceId
+                    : Value.InstanceId == Other.InstanceId);
+        });
+    }};
+    const auto FrameOffset{[](const FP5aObservedNotifyState& Value, const float BoundaryTime)
+    {
+        if (BoundaryTime <= UE_SMALL_NUMBER) return 0.0f;
+        return FMath::Clamp((BoundaryTime - Value.PreviousAnimationTime) / Value.PlayRate,
+            0.0f, static_cast<float>(FixedDeltaSeconds));
+    }};
+
+    TArray<FP5aObservedNotifyState> CurrentStates;
+    TArray<FP5aObservedNotifyState> Triggered;
+    // Branching states bypass NotifyQueue. Inspect the engine's reflected live state array.
+    const FArrayProperty* BranchingStatesProperty{FindFProperty<FArrayProperty>(
+        FAnimMontageInstance::StaticStruct(), TEXT("ActiveStateBranchingPoints"))};
+    if (BranchingStatesProperty == nullptr) return false;
+    for (const FAnimMontageInstance* MontageInstance : Animation.MontageInstances)
+    {
+        if (MontageInstance == nullptr || !IsValid(MontageInstance->Montage)) continue;
+        const UAnimMontage* Montage{MontageInstance->Montage};
+        const float PlayRate{MontageInstance->GetPlayRate()};
+        if (PlayRate <= 0.0f) return false;
+        for (const FAnimNotifyEvent& Notify : Montage->Notifies)
+        {
+            if (IsValid(Notify.NotifyStateClass) &&
+                Notify.GetDuration() <= static_cast<float>(FixedDeltaSeconds) * PlayRate)
+            {
+                UE_LOG(LogTemp, Error, TEXT("P5A montage state is too short for frame snapshot observation: %s"),
+                    *Montage->GetPathName());
+                return false;
+            }
+        }
+        for (const FSlotAnimationTrack& Track : Montage->SlotAnimTracks)
+        {
+            for (const FAnimSegment& Segment : Track.AnimTrack.AnimSegments)
+            {
+                const UAnimSequenceBase* Sequence{Cast<UAnimSequenceBase>(Segment.GetAnimReference())};
+                if (!IsValid(Sequence)) continue;
+                const float SegmentRate{PlayRate * Segment.GetValidPlayRate()};
+                if (SegmentRate <= 0.0f) return false;
+                for (const FAnimNotifyEvent& Notify : Sequence->Notifies)
+                {
+                    if (IsValid(Notify.NotifyStateClass) &&
+                        Notify.GetDuration() <= static_cast<float>(FixedDeltaSeconds) * SegmentRate) return false;
+                }
+            }
+        }
+        FScriptArrayHelper ActiveStateBranchingPoints{BranchingStatesProperty,
+            BranchingStatesProperty->ContainerPtrToValuePtr<void>(MontageInstance)};
+        for (int32 Index{0}; Index < ActiveStateBranchingPoints.Num(); ++Index)
+        {
+            if (MontageInstance->GetInstanceID() != ActionLifecycle.InstanceId) return false;
+            const FAnimNotifyEvent* Notify{reinterpret_cast<const FAnimNotifyEvent*>(
+                ActiveStateBranchingPoints.GetRawPtr(Index))};
+            FP5aObservedNotifyState Observed;
+            const FAnimNotifyEventReference Reference{Notify, Montage};
+            if (!ResolveNotify(Reference, Observed)) return false;
+            Observed.bBranchingPoint = true;
+            Observed.bTicked = !ActionLifecycle.bOnMontageBlendingOutStartedObserved;
+            Observed.MontageInstanceId = MontageInstance->GetInstanceID();
+            Observed.PlayRate = PlayRate;
+            Observed.LastAnimationTime = MontageInstance->GetPosition();
+            Observed.PreviousAnimationTime = MontageInstance->GetPreviousPosition();
+            CurrentStates.Add(Observed);
+        }
+    }
+    for (const FAnimNotifyEventReference& Reference : Animation.NotifyQueue.AnimNotifies)
+    {
+        if (Reference.GetNotify() != nullptr && IsValid(Reference.GetNotify()->NotifyStateClass)) continue;
+        FP5aObservedNotifyState Observed;
+        if (!ResolveNotify(Reference, Observed))
+        {
+            UE_LOG(LogTemp, Error, TEXT("P5A queued notify observation rejected source=%s"),
+                *GetPathNameSafe(Reference.GetSourceObject()));
+            return false;
+        }
+        Triggered.Add(Observed);
+    }
+    for (const FAnimNotifyEventReference& Reference : Animation.ActiveAnimNotifyEventReference)
+    {
+        FP5aObservedNotifyState Observed;
+        if (!ResolveNotify(Reference, Observed)) return false;
+        CurrentStates.Add(Observed);
+    }
+    for (const FAnimNotifyEventReference& Reference : Animation.NotifyQueue.AnimNotifies)
+    {
+        if (Reference.GetNotify() == nullptr || !IsValid(Reference.GetNotify()->NotifyStateClass)) continue;
+        FP5aObservedNotifyState Queued;
+        if (!ResolveNotify(Reference, Queued, false) ||
+            (!ContainsInstance(CurrentStates, Queued) &&
+                !ContainsInstance(ObservationState.ActiveStates, Queued) &&
+                !ContainsInstance(ObservationState.EndedStates, Queued))) return false;
+    }
+    const AAlsCharacter* Owner{Cast<AAlsCharacter>(Animation.GetOwningActor())};
+    for (const FP5aObservedNotifyState& Current : CurrentStates)
+    {
+        const UAlsAnimNotifyState_SetLocomotionAction* SetAction{
+            Cast<UAlsAnimNotifyState_SetLocomotionAction>(Current.Notify->NotifyStateClass)};
+        if (SetAction == nullptr) continue;
+        const FStructProperty* ActionProperty{FindFProperty<FStructProperty>(SetAction->GetClass(), TEXT("LocomotionAction"))};
+        if (!IsValid(Owner) || ActionProperty == nullptr ||
+            Owner->GetLocomotionAction() != *ActionProperty->ContainerPtrToValuePtr<FGameplayTag>(SetAction)) return false;
+    }
+    for (const FP5aObservedNotifyState& Previous : ObservationState.ActiveStates)
+    {
+        const UAlsAnimNotifyState_SetLocomotionAction* SetAction{
+            Cast<UAlsAnimNotifyState_SetLocomotionAction>(Previous.Notify->NotifyStateClass)};
+        if (SetAction == nullptr || ContainsInstance(CurrentStates, Previous)) continue;
+        const FStructProperty* ActionProperty{FindFProperty<FStructProperty>(SetAction->GetClass(), TEXT("LocomotionAction"))};
+        if (!IsValid(Owner) || ActionProperty == nullptr ||
+            Owner->GetLocomotionAction() == *ActionProperty->ContainerPtrToValuePtr<FGameplayTag>(SetAction)) return false;
+    }
+    // Native montage branching dispatch precedes the queued Trigger/End/Begin/Tick stages.
+    // This is ordered frame-state evidence, not a generic interception of notify callbacks.
+    for (const bool bBranchingPoint : {true, false})
+    {
+        if (!bBranchingPoint)
+        {
+            for (const FP5aObservedNotifyState& Observed : Triggered)
+            {
+                Timeline.Add(MakeShared<FJsonValueObject>(P5aNativeTimelineEventToJson(
+                    *Observed.Source, *Observed.Notify, Observed.SourceIndex, TEXT("Trigger"),
+                    FrameOffset(Observed, Observed.Notify->GetTriggerTime()))));
+            }
+        }
+        for (const FP5aObservedNotifyState& Previous : ObservationState.ActiveStates)
+        {
+            if (Previous.bBranchingPoint != bBranchingPoint || ContainsInstance(CurrentStates, Previous)) continue;
+            FP5aObservedNotifyState Ended{Previous};
+            Ended.PreviousAnimationTime = Previous.LastAnimationTime;
+            const bool bInterruptedAction{Previous.MontageInstanceId == ActionLifecycle.InstanceId &&
+                ActionLifecycle.bOnMontageBlendingOutStartedObserved};
+            const float EndOffset{bInterruptedAction ? 0.0f : FrameOffset(Ended, Ended.Notify->GetEndTriggerTime())};
+            Timeline.Add(MakeShared<FJsonValueObject>(P5aNativeTimelineEventToJson(
+                *Previous.Source, *Previous.Notify, Previous.SourceIndex, TEXT("End"),
+                EndOffset)));
+            ObservationState.EndedStates.Add(Previous);
+        }
+        for (const FP5aObservedNotifyState& Current : CurrentStates)
+        {
+            if (Current.bBranchingPoint != bBranchingPoint || ContainsInstance(ObservationState.ActiveStates, Current)) continue;
+            Timeline.Add(MakeShared<FJsonValueObject>(P5aNativeTimelineEventToJson(
+                *Current.Source, *Current.Notify, Current.SourceIndex, TEXT("Begin"),
+                FrameOffset(Current, Current.Notify->GetTriggerTime()))));
+        }
+        for (const FP5aObservedNotifyState& Current : CurrentStates)
+        {
+            if (Current.bBranchingPoint != bBranchingPoint || !Current.bTicked) continue;
+            Timeline.Add(MakeShared<FJsonValueObject>(P5aNativeTimelineEventToJson(
+                *Current.Source, *Current.Notify, Current.SourceIndex, TEXT("Tick"),
+                static_cast<float>(FixedDeltaSeconds))));
+        }
+    }
+    ObservationState.ActiveStates = MoveTemp(CurrentStates);
+    return true;
+}
+
+TSharedRef<FJsonObject> EvaluateP5aCanonicalCurves(
+    const FP5aFrameDefinition& Frame, const TArray<FP5aSourceDefinition>& Sources,
+    const FP5aSourceDefinition* TransitionSource, const float TransitionTime,
+    const float ActionTime, const float ActionGraphWeight, const float TransitionGraphWeight,
+    const bool bAuthored)
+{
+    const auto EvaluateCurve{[bAuthored](UAnimSequenceBase* CurveAsset, const float CurveTime,
+                                const bool bLoop, const FName Name, const float MissingValue = 0.0f)
+    {
+        const FAnimExtractContext Context{CurveTime, false, {}, bLoop};
+        if (!IsValid(CurveAsset) || !CurveAsset->HasCurveData(Name, bAuthored)) return MissingValue;
+        return bAuthored ? CurveAsset->EvaluateCurveData(Name, Context, true)
+            : CurveAsset->EvaluateCurveData(Name, Context, false);
+    }};
+    float BaseLeftLock{0.0f};
+    float BaseRightLock{0.0f};
+    float TurnLeftLock{0.0f};
+    float TurnRightLock{0.0f};
+    float RotateLeftLock{0.0f};
+    float RotateRightLock{0.0f};
+    float AllowTransitions{1.0f};
+    for (const FP5aPlaybackDefinition& CurvePlayback : Frame.Playbacks)
+    {
+        const FP5aSourceDefinition* CurveSource{FindP5aSource(Sources, CurvePlayback.TraceSourceId)};
+        UAnimSequenceBase* CurveAsset{CurveSource != nullptr ? CurveSource->CanonicalAsset.Get() : nullptr};
+        const float CurveTime{static_cast<float>(CurvePlayback.CurrentTimeSeconds)};
+        float* LeftLock{&BaseLeftLock};
+        float* RightLock{&BaseRightLock};
+        if (CurvePlayback.Lane == TEXT("turnBanks"))
+        {
+            LeftLock = &TurnLeftLock;
+            RightLock = &TurnRightLock;
+        }
+        else if (CurvePlayback.Lane == TEXT("rotateBanks"))
+        {
+            LeftLock = &RotateLeftLock;
+            RightLock = &RotateRightLock;
+        }
+        *LeftLock += EvaluateCurve(CurveAsset, CurveTime, CurvePlayback.bLoop,
+            FName{TEXT("FootLock_L")}) * CurvePlayback.Weight;
+        *RightLock += EvaluateCurve(CurveAsset, CurveTime, CurvePlayback.bLoop,
+            FName{TEXT("FootLock_R")}) * CurvePlayback.Weight;
+        const float LaneWeight{CurvePlayback.Lane == TEXT("base") ? 1.0f - Frame.ActionBlendAmount
+            : Frame.ActionBlendAmount * (CurvePlayback.Lane == TEXT("turnBanks")
+                ? 1.0f - Frame.ActionModeBlendAmount : Frame.ActionModeBlendAmount)};
+        AllowTransitions += EvaluateCurve(CurveAsset, CurveTime, CurvePlayback.bLoop,
+            FName{TEXT("Enable_Transition")}, 0.0f) * CurvePlayback.Weight * LaneWeight;
+    }
+    const float ActionLeftLock{FMath::Lerp(
+        TurnLeftLock, RotateLeftLock, Frame.ActionModeBlendAmount)};
+    const float ActionRightLock{FMath::Lerp(
+        TurnRightLock, RotateRightLock, Frame.ActionModeBlendAmount)};
+    const float LeftLock{FMath::Clamp(FMath::Lerp(
+        BaseLeftLock, ActionLeftLock, Frame.ActionBlendAmount), 0.0f, 1.0f)};
+    const float RightLock{FMath::Clamp(FMath::Lerp(
+        BaseRightLock, ActionRightLock, Frame.ActionBlendAmount), 0.0f, 1.0f)};
+    if (TransitionSource != nullptr)
+    {
+        AllowTransitions += EvaluateCurve(TransitionSource->CanonicalAsset, TransitionTime, false,
+            FName{TEXT("Enable_Transition")}, 0.0f) * TransitionGraphWeight;
+    }
+    for (const FP5aSourceDefinition& ActionSource : Sources)
+    {
+        if (ActionSource.SourceKind != TEXT("ActionSequence")) continue;
+        AllowTransitions += EvaluateCurve(ActionSource.CanonicalAsset, ActionTime, false,
+            FName{TEXT("Enable_Transition")}, 0.0f) * ActionGraphWeight;
+    }
+    return P5aCurveValuesToJson(1.0f, 1.0f, LeftLock, RightLock,
+        FMath::Clamp(AllowTransitions, 0.0f, 1.0f));
+}
+
+#include "AlsP5aCanonicalCurves.Tests.inl"
+
+FP5aCanonicalAssetOracle EvaluateP5aCanonicalAssetOracle(
+    const FP5aFrameDefinition& Frame, const int32 CaseOrdinal,
+    const TArray<FP5aSourceDefinition>& Sources,
+    UAlsAnimationInstance& Animation, const FP5aNativeActionLifecycle& ActionLifecycle,
+    const float PreviousActionTime, const FP5aSourceDefinition* TransitionSource,
+    const FAnimMontageInstance* TransitionInstance,
+    const float ActionGraphWeight, const float ActionEventWeight,
+    const float TransitionGraphWeight)
+{
+    FP5aCanonicalAssetOracle Result;
+    const TSharedRef<FJsonObject> Oracle{MakeShared<FJsonObject>()};
+    const FP5aPlaybackDefinition* Playback{Frame.Playbacks.IsEmpty() ? nullptr : &Frame.Playbacks[0]};
+    const FP5aSourceDefinition* Source{
+        Playback != nullptr ? FindP5aSource(Sources, Playback->TraceSourceId) : nullptr};
+    UAnimSequenceBase* Asset{Source != nullptr ? Source->CanonicalAsset.Get() : nullptr};
+    const float Time{Playback != nullptr ? static_cast<float>(Playback->CurrentTimeSeconds) : 0.0f};
+    const FAnimMontageInstance* CurveActionInstance{IsValid(ActionLifecycle.Montage)
+        ? Animation.GetInstanceForMontage(ActionLifecycle.Montage) : nullptr};
+    const float CurveActionTime{CurveActionInstance != nullptr ? CurveActionInstance->GetPosition()
+        : ActionLifecycle.TerminalPlayback.Position};
+    const float CurveTransitionTime{TransitionInstance != nullptr ? TransitionInstance->GetPosition() : 0.0f};
+    Oracle->SetObjectField(TEXT("curves"), EvaluateP5aCanonicalCurves(Frame, Sources, TransitionSource,
+        CurveTransitionTime, CurveActionTime, ActionGraphWeight, TransitionGraphWeight, true));
+    Oracle->SetObjectField(TEXT("compressedCurves"), EvaluateP5aCanonicalCurves(Frame, Sources, TransitionSource,
+        CurveTransitionTime, CurveActionTime, ActionGraphWeight, TransitionGraphWeight, false));
+    const TSharedRef<FJsonObject> GraphCurveWeights{MakeShared<FJsonObject>()};
+    SetP5aFloatField(GraphCurveWeights, TEXT("action"), ActionGraphWeight);
+    SetP5aFloatField(GraphCurveWeights, TEXT("transition"), TransitionGraphWeight);
+    Oracle->SetObjectField(TEXT("graphCurveWeights"), GraphCurveWeights);
+
+    const TSharedRef<FJsonObject> Sync{MakeShared<FJsonObject>()};
+    Sync->SetBoolField(TEXT("active"), false);
+    Sync->SetObjectField(TEXT("leader"), P5aObservedSourceToJson(nullptr, false));
+    Sync->SetStringField(TEXT("nativeInstanceOrdinal"), TEXT("0"));
+    Sync->SetObjectField(TEXT("previousMarker"), P5aEmptyMarkerToJson());
+    Sync->SetObjectField(TEXT("nextMarker"), P5aEmptyMarkerToJson());
+    Sync->SetStringField(TEXT("cycle"), TEXT("0"));
+    Sync->SetNumberField(TEXT("phase"), 0.0);
+    Sync->SetNumberField(TEXT("leftFootPhase"), 0.0);
+    Sync->SetNumberField(TEXT("rightFootPhase"), 0.0);
+    UAnimSequence* MarkerSequence{Cast<UAnimSequence>(Asset)};
+    if (IsValid(MarkerSequence) && MarkerSequence->AuthoredSyncMarkers.Num() >= 2)
+    {
+        TArray<FName> MarkerNames;
+        for (const FAnimSyncMarker& Marker : MarkerSequence->AuthoredSyncMarkers)
+        {
+            MarkerNames.AddUnique(Marker.MarkerName);
+        }
+        FMarkerPair PreviousMarker;
+        FMarkerPair NextMarker;
+        const float MarkerPairTime{CaseOrdinal == 1
+            ? 0.0f
+            : static_cast<float>(Playback->PreviousTimeSeconds)};
+        MarkerSequence->GetMarkerIndicesForTime(
+            MarkerPairTime, Playback->bLoop,
+            MarkerNames, PreviousMarker, NextMarker);
+        FMarkerPair PhasePreviousMarker;
+        FMarkerPair PhaseNextMarker;
+        MarkerSequence->GetMarkerIndicesForTime(
+            Time, Playback->bLoop, MarkerNames, PhasePreviousMarker, PhaseNextMarker);
+        const FMarkerSyncAnimPosition Position{MarkerSequence->GetMarkerSyncPositionFromMarkerIndicies(
+            PhasePreviousMarker.MarkerIndex, PhaseNextMarker.MarkerIndex, Time, nullptr)};
+        Sync->SetBoolField(TEXT("active"), true);
+        Sync->SetObjectField(TEXT("leader"), P5aObservedSourceToJson(&Source->Canonical, false));
+        Sync->SetStringField(TEXT("nativeInstanceOrdinal"), TEXT("1"));
+        Sync->SetObjectField(TEXT("previousMarker"), P5aMarkerToJson(
+            *MarkerSequence, Source->Canonical, PreviousMarker.MarkerIndex));
+        Sync->SetObjectField(TEXT("nextMarker"), P5aMarkerToJson(
+            *MarkerSequence, Source->Canonical, NextMarker.MarkerIndex));
+        if (Playback->bClosesAfterFrame &&
+            Playback->CurrentTimeSeconds > Playback->PreviousTimeSeconds)
+        {
+            SetP5aFloatField(Sync, TEXT("phase"), Position.PositionBetweenMarkers);
+            const FString PreviousName{MarkerSequence->AuthoredSyncMarkers[
+                PhasePreviousMarker.MarkerIndex].MarkerName.ToString()};
+            SetP5aFloatField(Sync, TEXT("leftFootPhase"),
+                PreviousName == TEXT("Left") ? Position.PositionBetweenMarkers :
+                    1.0f - Position.PositionBetweenMarkers);
+            SetP5aFloatField(Sync, TEXT("rightFootPhase"),
+                PreviousName == TEXT("Right") ? Position.PositionBetweenMarkers :
+                    1.0f - Position.PositionBetweenMarkers);
+        }
+    }
+    Oracle->SetObjectField(TEXT("sync"), Sync);
+
+    TArray<TSharedPtr<FJsonValue>> Events;
+    TArray<TSharedPtr<FJsonValue>> ActiveStates;
+    int32 FrameEventOrdinal{0};
+    if (!Frame.Playbacks.IsEmpty())
+    {
+        const FP5aPlaybackDefinition& EventPlayback{Frame.Playbacks.Last()};
+        const FP5aSourceDefinition* EventSource{
+            FindP5aSource(Sources, EventPlayback.TraceSourceId)};
+        if (EventSource != nullptr)
+        {
+            AddP5aCanonicalEvents(*EventSource,
+                EventPlayback.PreviousTimeSeconds,
+                EventPlayback.CurrentTimeSeconds, 1.0f, false,
+                Events, ActiveStates, FrameEventOrdinal);
+        }
+    }
+    FAnimMontageInstance* ActionInstance{IsValid(ActionLifecycle.Montage)
+        ? Animation.GetInstanceForMontage(ActionLifecycle.Montage) : nullptr};
+    const bool bActionOutcomePending{
+        ActionLifecycle.Outcomes.Num() > ActionLifecycle.EmittedOutcomeCount};
+    const bool bActionCancelled{bActionOutcomePending &&
+        ActionLifecycle.Outcomes.Last().NativeReason == TEXT("Cancelled")};
+    const bool bActionFinished{bActionOutcomePending &&
+        ActionLifecycle.Outcomes.Last().NativeReason == TEXT("Finished")};
+    const float CurrentActionTime{(bActionCancelled || bActionFinished)
+        ? ActionLifecycle.TerminalPlayback.Position
+        : (ActionInstance != nullptr ? ActionInstance->GetPosition() : PreviousActionTime)};
+    if (IsValid(ActionLifecycle.Montage) &&
+        (ActionInstance != nullptr || bActionCancelled || bActionFinished) &&
+        CurrentActionTime >= PreviousActionTime)
+    {
+        for (const FP5aSourceDefinition& ActionSource : Sources)
+        {
+            if (ActionSource.SourceKind != TEXT("ActionMontage") &&
+                ActionSource.SourceKind != TEXT("ActionSequence")) continue;
+            AddP5aCanonicalEvents(ActionSource, PreviousActionTime, CurrentActionTime,
+                ActionEventWeight, bActionCancelled, Events, ActiveStates, FrameEventOrdinal);
+        }
+    }
+    if (TransitionSource != nullptr && TransitionInstance != nullptr)
+    {
+        AddP5aCanonicalEvents(*TransitionSource,
+            TransitionInstance->GetPreviousPosition(), TransitionInstance->GetPosition(),
+            TransitionGraphWeight, false, Events, ActiveStates, FrameEventOrdinal,
+            1.0f / FMath::Max(TransitionInstance->GetPlayRate(), UE_SMALL_NUMBER));
+    }
+    Events.StableSort([](const TSharedPtr<FJsonValue>& Left, const TSharedPtr<FJsonValue>& Right)
+    {
+        const TSharedPtr<FJsonObject>* LeftObject{nullptr};
+        const TSharedPtr<FJsonObject>* RightObject{nullptr};
+        double LeftOffset{0.0};
+        double RightOffset{0.0};
+        return Left->TryGetObject(LeftObject) && LeftObject != nullptr &&
+            Right->TryGetObject(RightObject) && RightObject != nullptr &&
+            (*LeftObject)->TryGetNumberField(TEXT("observedFrameOffsetSeconds"), LeftOffset) &&
+            (*RightObject)->TryGetNumberField(TEXT("observedFrameOffsetSeconds"), RightOffset) &&
+            LeftOffset < RightOffset;
+    });
+    for (int32 EventIndex{0}; EventIndex < Events.Num(); ++EventIndex)
+    {
+        const TSharedPtr<FJsonObject>* EventObject{nullptr};
+        if (Events[EventIndex]->TryGetObject(EventObject) && EventObject != nullptr)
+        {
+            (*EventObject)->SetNumberField(TEXT("frameEventOrdinal"), EventIndex);
+        }
+    }
+    Oracle->SetArrayField(TEXT("events"), Events);
+    Oracle->SetArrayField(TEXT("activeNotifyStates"), ActiveStates);
+    Result.Value = Oracle;
+    return Result;
+}
+
+TSharedRef<FJsonObject> P5aTransitionReceiptToJson(const FP5aNativeTransitionStimulusReceipt& Receipt)
+{
+    const auto FootToJson{[](const FVector& Target, const FVector& Lock, const float LockAmount)
+    {
+        const TSharedRef<FJsonObject> Foot{MakeShared<FJsonObject>()};
+        Foot->SetObjectField(TEXT("observedTargetMeters"), P5aFloatVectorToJson(Target));
+        Foot->SetObjectField(TEXT("observedLockMeters"), P5aFloatVectorToJson(Lock));
+        SetP5aFloatField(Foot, TEXT("observedLockAmount"), LockAmount);
+        return Foot;
+    }};
+    const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+    Value->SetStringField(TEXT("hookContractSha256"), P5aNativeTransitionStimulusContractSha256);
+    Value->SetNumberField(TEXT("observedAllowTransitions"), Receipt.ObservedAllowTransitions ? 1.0 : 0.0);
+    Value->SetBoolField(TEXT("preHookUpdatedThisFrame"), Receipt.PreHookUpdatedThisFrame);
+    Value->SetNumberField(TEXT("preHookFrameDelay"), Receipt.PreHookFrameDelay);
+    Value->SetBoolField(TEXT("preHookTransitionActive"), Receipt.PreHookTransitionActive);
+    Value->SetObjectField(TEXT("left"), FootToJson(Receipt.ObservedLeftTarget,
+        Receipt.ObservedLeftLock, Receipt.ObservedLeftLockAmount));
+    Value->SetObjectField(TEXT("right"), FootToJson(Receipt.ObservedRightTarget,
+        Receipt.ObservedRightLock, Receipt.ObservedRightLockAmount));
+    Value->SetBoolField(TEXT("postHookUpdatedThisFrame"), Receipt.PostHookUpdatedThisFrame);
+    Value->SetNumberField(TEXT("postHookFrameDelay"), Receipt.PostHookFrameDelay);
+    Value->SetBoolField(TEXT("restoreVerified"), Receipt.RestoreVerified);
+    return Value;
+}
+
+FP5aNativeRuntimeFrame CollectP5aNativeRuntimeFrame(
+    AAlsTraceCharacter& Character, const FP5aFrameDefinition& Frame,
+    const TArray<FP5aSourceDefinition>& Sources, const FP5aCanonicalAssetOracle& CanonicalOracle,
+    const FP5aNativeTransitionStimulusReceipt* TransitionReceipt,
+    const FP5aNativeTransitionStimulusContract& StimulusContract,
+    FP5aNativeActionLifecycle& ActionLifecycle, const float PreviousActionTime,
+    FP5aNativeNotifyObservationState& NotifyObservationState, const FP5aFrameUpdateAudit& FrameUpdateAudit,
+    const FP5aNativeAuxiliaryInventory& Auxiliary)
+{
+    FP5aNativeRuntimeFrame Result;
+    UAlsAnimationInstance* Animation{Character.GetTraceAnimationInstanceMutable()};
+    const TSharedRef<FJsonObject> Actual{MakeShared<FJsonObject>()};
+    Actual->SetObjectField(TEXT("canonicalAssetOracle"), CanonicalOracle.Value.ToSharedRef());
+    const TSharedRef<FJsonObject> UpdateAudit{MakeShared<FJsonObject>()};
+    UpdateAudit->SetNumberField(TEXT("animationUpdates"), FrameUpdateAudit.AnimationUpdates);
+    UpdateAudit->SetNumberField(TEXT("evaluations"), FrameUpdateAudit.Evaluations);
+    UpdateAudit->SetNumberField(TEXT("postUpdates"), FrameUpdateAudit.PostUpdates);
+    UpdateAudit->SetNumberField(TEXT("meshTicks"), FrameUpdateAudit.MeshTicks);
+    Actual->SetObjectField(TEXT("frameUpdateAudit"), UpdateAudit);
+
+    const TSharedRef<FJsonObject> CurveAudit{MakeShared<FJsonObject>()};
+    CurveAudit->SetObjectField(TEXT("leftIk"), P5aCurveAuditToJson(*Animation, UAlsConstants::FootLeftIkCurveName()));
+    CurveAudit->SetObjectField(TEXT("rightIk"), P5aCurveAuditToJson(*Animation, UAlsConstants::FootRightIkCurveName()));
+    CurveAudit->SetObjectField(TEXT("leftLock"), P5aCurveAuditToJson(*Animation, UAlsConstants::FootLeftLockCurveName()));
+    CurveAudit->SetObjectField(TEXT("rightLock"), P5aCurveAuditToJson(*Animation, UAlsConstants::FootRightLockCurveName()));
+    CurveAudit->SetObjectField(TEXT("allowTransitions"), P5aCurveAuditToJson(*Animation, UAlsConstants::AllowTransitionsCurveName()));
+    Actual->SetObjectField(TEXT("animGraphCurveAudit"), CurveAudit);
+
+    TArray<TSharedPtr<FJsonValue>> Receipts;
+    if (TransitionReceipt != nullptr)
+    {
+        Receipts.Add(MakeShared<FJsonValueObject>(P5aTransitionReceiptToJson(*TransitionReceipt)));
+    }
+    Actual->SetArrayField(TEXT("transitionStimulusReceipts"), Receipts);
+
+    const FP5aSourceDefinition* TransitionSource{Sources.FindByPredicate([Animation](const FP5aSourceDefinition& Source)
+    {
+        if (Source.SourceKind != TEXT("Transition")) return false;
+        for (UAnimSequenceBase* Asset : Source.NativeAssets)
+        {
+            if (Animation->DynamicMontage_IsPlayingFrom(Asset)) return true;
+        }
+        return false;
+    })};
+    const FP5aObservedSource* TransitionObserved{nullptr};
+    UAnimSequenceBase* TransitionAsset{nullptr};
+    FString TransitionRole;
+    if (TransitionSource != nullptr)
+    {
+        for (int32 Index{0}; Index < TransitionSource->NativeAssets.Num(); ++Index)
+        {
+            if (Animation->DynamicMontage_IsPlayingFrom(TransitionSource->NativeAssets[Index]))
+            {
+                TransitionObserved = &TransitionSource->NativeVariants[Index];
+                TransitionAsset = TransitionSource->NativeAssets[Index];
+                TransitionRole = TransitionSource->NativeRoles[Index];
+                break;
+            }
+        }
+    }
+    UAnimMontage* TransitionMontage{nullptr};
+    FAnimMontageInstance* TransitionInstance{nullptr};
+    if (IsValid(TransitionAsset) && Animation->IsPlayingSlotAnimation(
+        TransitionAsset, UAlsConstants::TransitionSlotName(), TransitionMontage))
+    {
+        TransitionInstance = Animation->GetActiveInstanceForMontage(TransitionMontage);
+    }
+    const TSharedRef<FJsonObject> DynamicTransition{MakeShared<FJsonObject>()};
+    DynamicTransition->SetBoolField(TEXT("active"), TransitionSource != nullptr);
+    DynamicTransition->SetObjectField(TEXT("source"),
+        P5aObservedSourceToJson(TransitionObserved, true));
+    DynamicTransition->SetStringField(TEXT("nativeInstanceOrdinal"), TransitionSource != nullptr ? TEXT("1") : TEXT("0"));
+    DynamicTransition->SetStringField(TEXT("foot"),
+        TransitionRole.Contains(TEXT("right")) ? TEXT("Right") : TEXT("Left"));
+    DynamicTransition->SetBoolField(TEXT("activatedAfterUpdate"), TransitionReceipt != nullptr);
+    SetP5aFloatField(DynamicTransition, TEXT("previousTimeSeconds"),
+        TransitionInstance != nullptr ? TransitionInstance->GetPreviousPosition() : 0.0f);
+    SetP5aFloatField(DynamicTransition, TEXT("currentTimeSeconds"),
+        TransitionInstance != nullptr ? TransitionInstance->GetPosition() : 0.0f);
+    SetP5aFloatField(DynamicTransition, TEXT("playRate"),
+        TransitionInstance != nullptr ? TransitionInstance->GetPlayRate() : 0.0f);
+    SetP5aFloatField(DynamicTransition, TEXT("observedBlendInSeconds"),
+        IsValid(TransitionMontage) ? TransitionMontage->BlendIn.GetBlendTime() : 0.0f);
+    SetP5aFloatField(DynamicTransition, TEXT("observedBlendOutSeconds"),
+        IsValid(TransitionMontage) ? TransitionMontage->BlendOut.GetBlendTime() : 0.0f);
+    SetP5aFloatField(DynamicTransition, TEXT("observedEffectiveWeight"),
+        TransitionInstance != nullptr ? TransitionInstance->GetWeight() : 0.0f);
+    Actual->SetObjectField(TEXT("dynamicTransition"), DynamicTransition);
+
+    FAnimMontageInstance* ActionInstance{IsValid(ActionLifecycle.Montage)
+        ? Animation->GetInstanceForMontage(ActionLifecycle.Montage) : nullptr};
+    const FP5aSourceDefinition* MontageSource{Sources.FindByPredicate([](const FP5aSourceDefinition& Source)
+    {
+        return Source.SourceKind == TEXT("ActionMontage");
+    })};
+    const FP5aSourceDefinition* SegmentSource{Sources.FindByPredicate([](const FP5aSourceDefinition& Source)
+    {
+        return Source.SourceKind == TEXT("ActionSequence");
+    })};
+    const bool bActionClosingThisFrame{ActionLifecycle.Outcomes.Num() > ActionLifecycle.EmittedOutcomeCount &&
+        ActionLifecycle.Outcomes.Last().NativeReason != TEXT("Started")};
+    if (bActionClosingThisFrame && !ActionLifecycle.TerminalPlayback.bCaptured)
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A terminal callback lacks a live native value snapshot."));
+        return Result;
+    }
+    const bool bActionPlaying{ActionInstance != nullptr &&
+        !ActionLifecycle.bOnMontageBlendingOutStartedObserved &&
+        !ActionLifecycle.bOnMontageEndedObserved};
+    const float GameplayActionTime{ActionInstance != nullptr ? ActionInstance->GetPosition() : 0.0f};
+    const bool bActionPlaybackPresent{bActionPlaying || bActionClosingThisFrame};
+    const float ClosingActionTime{bActionClosingThisFrame
+        ? ActionLifecycle.TerminalPlayback.Position : GameplayActionTime};
+    const float ObservedMontageTime{bActionClosingThisFrame ? ClosingActionTime : GameplayActionTime};
+    FName CurrentSectionName{NAME_None};
+    int32 SegmentIndex{INDEX_NONE};
+    float PreviousClipTime{0.0f};
+    float CurrentClipTime{0.0f};
+    if (bActionPlaybackPresent && IsValid(ActionLifecycle.Montage))
+    {
+        CurrentSectionName = bActionClosingThisFrame ? ActionLifecycle.TerminalPlayback.SectionName
+            : ActionInstance != nullptr
+            ? ActionInstance->GetCurrentSection()
+            : ActionLifecycle.Montage->GetSectionName(
+                ActionLifecycle.Montage->GetSectionIndexFromPosition(ObservedMontageTime));
+        for (const FSlotAnimationTrack& SlotTrack : ActionLifecycle.Montage->SlotAnimTracks)
+        {
+            if (SlotTrack.SlotName != FName{TEXT("PostLocomotion")}) continue;
+            const FAnimSegment* Segment{SlotTrack.AnimTrack.GetSegmentAtTime(ObservedMontageTime)};
+            if (Segment == nullptr) continue;
+            SegmentIndex = SlotTrack.AnimTrack.AnimSegments.IndexOfByPredicate(
+                [Segment](const FAnimSegment& Candidate) { return &Candidate == Segment; });
+            PreviousClipTime = Segment->ConvertTrackPosToAnimPos(PreviousActionTime);
+            CurrentClipTime = Segment->ConvertTrackPosToAnimPos(ObservedMontageTime);
+            break;
+        }
+    }
+    const TSharedRef<FJsonObject> ActionPlayback{MakeShared<FJsonObject>()};
+    ActionPlayback->SetStringField(TEXT("status"), bActionClosingThisFrame
+        ? TEXT("ClosingThisFrame") : (bActionPlaying ? TEXT("Playing") : TEXT("Inactive")));
+    ActionPlayback->SetObjectField(TEXT("montageSource"), P5aObservedSourceToJson(
+        (bActionPlaying || bActionClosingThisFrame) && MontageSource != nullptr ? &MontageSource->Native : nullptr, true));
+    ActionPlayback->SetObjectField(TEXT("segmentSource"), P5aObservedSourceToJson(
+        (bActionPlaying || bActionClosingThisFrame) && SegmentSource != nullptr ? &SegmentSource->Native : nullptr, true));
+    ActionPlayback->SetStringField(TEXT("nativeInstanceOrdinal"),
+        bActionPlaying || bActionClosingThisFrame ? TEXT("1") : TEXT("0"));
+    ActionPlayback->SetStringField(TEXT("currentSectionName"),
+        bActionPlaybackPresent ? CurrentSectionName.ToString() : FString{});
+    ActionPlayback->SetNumberField(TEXT("segmentIndex"), SegmentIndex);
+    SetP5aFloatField(ActionPlayback, TEXT("previousMontageTimeSeconds"),
+        bActionPlaybackPresent ? PreviousActionTime : 0.0f);
+    SetP5aFloatField(ActionPlayback, TEXT("currentMontageTimeSeconds"),
+        bActionPlaybackPresent ? ClosingActionTime : 0.0f);
+    SetP5aFloatField(ActionPlayback, TEXT("previousClipTimeSeconds"),
+        bActionPlaybackPresent ? PreviousClipTime : 0.0f);
+    SetP5aFloatField(ActionPlayback, TEXT("currentClipTimeSeconds"),
+        bActionPlaybackPresent ? CurrentClipTime : 0.0f);
+    SetP5aFloatField(ActionPlayback, TEXT("finalSegmentDeltaSeconds"),
+        bActionClosingThisFrame && ActionLifecycle.bOnMontageEndedObserved
+            ? FMath::Max(0.0f, ClosingActionTime - PreviousActionTime) : 0.0f);
+    SetP5aFloatField(ActionPlayback, TEXT("playRate"),
+        bActionPlaybackPresent
+            ? (bActionClosingThisFrame ? ActionLifecycle.TerminalPlayback.PlayRate : ActionInstance->GetPlayRate())
+            : 0.0f);
+    Actual->SetObjectField(TEXT("actionPlayback"), ActionPlayback);
+
+    const TSharedRef<FJsonObject> Visual{MakeShared<FJsonObject>()};
+    const bool bVisualContributing{ActionInstance != nullptr};
+    Visual->SetBoolField(TEXT("contributing"), bVisualContributing);
+    Visual->SetObjectField(TEXT("montageSource"), P5aObservedSourceToJson(
+        bVisualContributing && MontageSource != nullptr ? &MontageSource->Native : nullptr, true));
+    Visual->SetStringField(TEXT("nativeInstanceOrdinal"), bVisualContributing ? TEXT("1") : TEXT("0"));
+    SetP5aFloatField(Visual, TEXT("observedMontageTimeSeconds"),
+        bVisualContributing ? GameplayActionTime : 0.0f);
+    SetP5aFloatField(Visual, TEXT("observedBlendInSeconds"),
+        bVisualContributing && IsValid(ActionLifecycle.Montage)
+            ? ActionLifecycle.Montage->BlendIn.GetBlendTime() : 0.0f);
+    SetP5aFloatField(Visual, TEXT("observedBlendOutSeconds"),
+        bVisualContributing && IsValid(ActionLifecycle.Montage)
+            ? ActionLifecycle.Montage->BlendOut.GetBlendTime() : 0.0f);
+    Visual->SetNumberField(TEXT("observedBlendInOption"),
+        bVisualContributing && IsValid(ActionLifecycle.Montage)
+            ? static_cast<int32>(ActionLifecycle.Montage->BlendIn.GetBlendOption()) : -1);
+    Visual->SetNumberField(TEXT("observedBlendOutOption"),
+        bVisualContributing && IsValid(ActionLifecycle.Montage)
+            ? static_cast<int32>(ActionLifecycle.Montage->BlendOut.GetBlendOption()) : -1);
+    SetP5aFloatField(Visual, TEXT("observedEffectiveWeight"), ActionInstance != nullptr
+        ? ActionInstance->GetWeight() : 0.0f);
+    Actual->SetObjectField(TEXT("actionVisualContribution"), Visual);
+
+    TArray<TSharedPtr<FJsonValue>> NativeTimeline;
+    if (!AddP5aNativeTimelineEvents(*Animation, Sources, Auxiliary, ActionLifecycle, NotifyObservationState, NativeTimeline)) return Result;
+    Actual->SetArrayField(TEXT("nativeRuntimeTimeline"), NativeTimeline);
+    TArray<TSharedPtr<FJsonValue>> Outcomes;
+    for (int32 OutcomeIndex{ActionLifecycle.EmittedOutcomeCount};
+         OutcomeIndex < ActionLifecycle.Outcomes.Num(); ++OutcomeIndex)
+    {
+        const FP5aNativeActionOutcome& NativeOutcome{ActionLifecycle.Outcomes[OutcomeIndex]};
+        const TSharedRef<FJsonObject> Outcome{MakeShared<FJsonObject>()};
+        Outcome->SetObjectField(TEXT("actionSource"), P5aObservedSourceToJson(&MontageSource->Native, true));
+        Outcome->SetStringField(TEXT("nativeInstanceOrdinal"), TEXT("1"));
+        Outcome->SetStringField(TEXT("nativeReason"), NativeOutcome.NativeReason);
+        Outcome->SetStringField(TEXT("callback"), NativeOutcome.Callback);
+        Outcome->SetBoolField(TEXT("interrupted"), NativeOutcome.bInterrupted);
+        Outcomes.Add(MakeShared<FJsonValueObject>(Outcome));
+    }
+    ActionLifecycle.EmittedOutcomeCount = ActionLifecycle.Outcomes.Num();
+    Actual->SetArrayField(TEXT("actionOutcomes"), Outcomes);
+
+    const TSharedRef<FJsonObject> StateAfter{MakeShared<FJsonObject>()};
+    StateAfter->SetBoolField(TEXT("actionPlaying"), bActionPlaying);
+    StateAfter->SetObjectField(TEXT("actionSource"), P5aObservedSourceToJson(
+        bActionPlaying && MontageSource != nullptr ? &MontageSource->Native : nullptr, true));
+    StateAfter->SetStringField(TEXT("actionNativeInstanceOrdinal"), bActionPlaying ? TEXT("1") : TEXT("0"));
+    SetP5aFloatField(StateAfter, TEXT("actionTimeSeconds"),
+        bActionPlaying ? GameplayActionTime : 0.0f);
+    StateAfter->SetBoolField(TEXT("transitionPlaying"), TransitionSource != nullptr);
+    StateAfter->SetObjectField(TEXT("transitionSource"), P5aObservedSourceToJson(
+        TransitionObserved, true));
+    StateAfter->SetStringField(TEXT("transitionNativeInstanceOrdinal"), TransitionSource != nullptr ? TEXT("1") : TEXT("0"));
+    SetP5aFloatField(StateAfter, TEXT("transitionTimeSeconds"),
+        TransitionInstance != nullptr ? TransitionInstance->GetPosition() : 0.0f);
+    void* DynamicTransitionsState{
+        StimulusContract.DynamicTransitionsState->ContainerPtrToValuePtr<void>(Animation)};
+    StateAfter->SetNumberField(TEXT("transitionCooldownFrames"),
+        StimulusContract.FrameDelay->GetPropertyValue_InContainer(DynamicTransitionsState));
+    StateAfter->SetStringField(TEXT("transitionFoot"),
+        TransitionRole.Contains(TEXT("right")) ? TEXT("Right") : TEXT("Left"));
+    Actual->SetObjectField(TEXT("stateAfter"), StateAfter);
+    if (bActionPlaying)
+    {
+        ActionLifecycle.LastPlaybackPosition = GameplayActionTime;
+    }
+    Result.Value = Actual;
+    return Result;
+}
+
+TSharedRef<FJsonObject> P5aRawTraceToJson(const FP5aRawTrace& Trace)
+{
+    const TSharedRef<FJsonObject> Root{MakeShared<FJsonObject>()};
+    Root->SetNumberField(TEXT("schemaVersion"), 2);
+    Root->SetStringField(TEXT("kind"), TEXT("p5a_trace"));
+    Root->SetStringField(TEXT("representation"), TEXT("native_raw"));
+    Root->SetStringField(TEXT("tracePlanSha256"), Trace.TracePlanSha256);
+    Root->SetObjectField(TEXT("reference"), Trace.Reference.ToSharedRef());
+    Root->SetObjectField(TEXT("snapshot"), Trace.Snapshot.ToSharedRef());
+    Root->SetStringField(TEXT("provenance"), TEXT("als_runtime"));
+    Root->SetObjectField(TEXT("nativeReferenceAudit"), P5aNativeReferenceAuditToJson(Trace.NativeReferenceAudit));
+    TArray<TSharedPtr<FJsonValue>> Cases;
+    for (const FP5aRawCase& Case : Trace.Cases)
+    {
+        const TSharedRef<FJsonObject> CaseObject{MakeShared<FJsonObject>()};
+        CaseObject->SetNumberField(TEXT("ordinal"), Case.Ordinal);
+        CaseObject->SetStringField(TEXT("caseId"), Case.CaseId);
+        TArray<TSharedPtr<FJsonValue>> Frames;
+        for (int32 FrameIndex{0}; FrameIndex < Case.Frames.Num(); ++FrameIndex)
+        {
+            const TSharedRef<FJsonObject> FrameObject{MakeShared<FJsonObject>()};
+            FrameObject->SetNumberField(TEXT("frameIndex"), FrameIndex);
+            FrameObject->SetObjectField(TEXT("nativeActual"), Case.Frames[FrameIndex].Value.ToSharedRef());
+            Frames.Add(MakeShared<FJsonValueObject>(FrameObject));
+        }
+        CaseObject->SetArrayField(TEXT("frames"), Frames);
+        Cases.Add(MakeShared<FJsonValueObject>(CaseObject));
+    }
+    Root->SetArrayField(TEXT("cases"), Cases);
+    return Root;
+}
+
 TArray<FSequenceDefinition> CreateSequenceDefinitions()
 {
     TArray<FSequenceDefinition> Definitions;
@@ -594,6 +2984,94 @@ void TickTraceCharacter(AAlsTraceCharacter& Character)
         FixedDeltaSeconds, LEVELTICK_All, nullptr);
     Character.GetMesh()->TickAnimation(FixedDeltaSeconds, false);
     Character.GetMesh()->RefreshBoneTransforms();
+}
+
+bool RunP5aNativeActionLifecycleSelfTest(UWorld& World)
+{
+    const auto SpawnTraceCharacter{[&World](const double X)
+    {
+        FActorSpawnParameters SpawnParameters;
+        SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        AAlsTraceCharacter* Character{World.SpawnActor<AAlsTraceCharacter>(AAlsTraceCharacter::StaticClass(),
+            FVector{X, 0.0, 92.0}, FRotator::ZeroRotator, SpawnParameters)};
+        AAlsTraceController* Controller{World.SpawnActor<AAlsTraceController>()};
+        if (IsValid(Character) && !Character->HasActorBegunPlay())
+        {
+            Character->DispatchBeginPlay();
+        }
+        if (IsValid(Character) && IsValid(Controller))
+        {
+            Controller->Possess(Character);
+        }
+        return TPair<AAlsTraceCharacter*, AAlsTraceController*>{Character, Controller};
+    }};
+    const auto HasExactOutcome{[](const FP5aNativeActionLifecycle& Lifecycle,
+                                  const TCHAR* Reason, const TCHAR* Callback, const bool bInterrupted)
+    {
+        int32 Matches{0};
+        for (const FP5aNativeActionOutcome& Outcome : Lifecycle.Outcomes)
+        {
+            Matches += Outcome.NativeReason == Reason && Outcome.Callback == Callback &&
+                Outcome.bInterrupted == bInterrupted ? 1 : 0;
+        }
+        return Matches == 1;
+    }};
+
+    TPair<AAlsTraceCharacter*, AAlsTraceController*> CancelPair{SpawnTraceCharacter(0.0)};
+    if (!IsValid(CancelPair.Key) || !IsValid(CancelPair.Value) ||
+        !IsValid(CancelPair.Key->GetTraceAnimationInstance()))
+    {
+        return false;
+    }
+    for (int32 Warmup{0}; Warmup < 15; ++Warmup)
+    {
+        TickP5aWorld(World, *CancelPair.Key);
+    }
+    FP5aNativeActionLifecycle CancelLifecycle;
+    const TWeakObjectPtr<UAlsAnimationInstance> CancelAnimation{CancelPair.Key->GetTraceAnimationInstanceMutable()};
+    ON_SCOPE_EXIT
+    {
+        UnbindP5aNativeActionObservers(CancelAnimation.Get(), CancelLifecycle);
+    };
+    if (!StartP5aNativeRollThroughPublicAlsPath(*CancelPair.Key, CancelLifecycle) ||
+        !CancelP5aNativeRollThroughMontageStop(
+            *CancelPair.Key->GetTraceAnimationInstanceMutable(), CancelLifecycle) ||
+        !HasExactOutcome(CancelLifecycle, TEXT("Started"), TEXT("MontageStarted"), false) ||
+        !HasExactOutcome(CancelLifecycle, TEXT("Cancelled"), TEXT("MontageBlendingOutStarted"), true))
+    {
+        return false;
+    }
+    UnbindP5aNativeActionObservers(CancelPair.Key->GetTraceAnimationInstanceMutable(), CancelLifecycle);
+    CancelPair.Key->Destroy();
+    CancelPair.Value->Destroy();
+
+    TPair<AAlsTraceCharacter*, AAlsTraceController*> FinishPair{SpawnTraceCharacter(500.0)};
+    if (!IsValid(FinishPair.Key) || !IsValid(FinishPair.Value) ||
+        !IsValid(FinishPair.Key->GetTraceAnimationInstance()))
+    {
+        return false;
+    }
+    for (int32 Warmup{0}; Warmup < 15; ++Warmup)
+    {
+        TickP5aWorld(World, *FinishPair.Key);
+    }
+    FP5aNativeActionLifecycle FinishLifecycle;
+    const TWeakObjectPtr<UAlsAnimationInstance> FinishAnimation{FinishPair.Key->GetTraceAnimationInstanceMutable()};
+    ON_SCOPE_EXIT
+    {
+        UnbindP5aNativeActionObservers(FinishAnimation.Get(), FinishLifecycle);
+    };
+    if (!StartP5aNativeRollThroughPublicAlsPath(*FinishPair.Key, FinishLifecycle))
+    {
+        return false;
+    }
+    for (int32 Frame{0}; Frame < 120 && !FinishLifecycle.bOnMontageEndedObserved; ++Frame)
+    {
+        TickP5aWorld(World, *FinishPair.Key);
+    }
+    return HasExactOutcome(FinishLifecycle, TEXT("Started"), TEXT("MontageStarted"), false) &&
+        HasExactOutcome(FinishLifecycle, TEXT("Finished"), TEXT("MontageEnded"), false) &&
+        !FinishLifecycle.bOnMontageBlendingOutStartedObserved;
 }
 
 bool ValidateRequiredAssets()
@@ -2681,6 +5159,258 @@ bool GenerateP4Documents(UWorld* World, const FString& OutputDirectory)
     }
     return bSuccess;
 }
+
+bool GenerateP5aDocuments(
+    UWorld& World, const FString& OutputPath, const FString& TracePlanSha256,
+    const TSharedPtr<FJsonObject>& Plan,
+    const FP5aNativeTransitionStimulusContract& StimulusContract,
+    const FP5aNativeReferenceAudit& NativeReferenceAudit,
+    const FP5aNativeAuxiliaryInventory& Auxiliary, const bool bDiscovery = false)
+{
+    if (!FModuleManager::Get().LoadModule(TEXT("ALSCamera")))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A requires the ALSCamera runtime module before loading Roll assets."));
+        return false;
+    }
+    TArray<FP5aSourceDefinition> Sources;
+    TArray<FP5aCaseDefinition> Definitions;
+    if (!ParseP5aCaseDefinitions(Plan, Sources, Definitions))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A case/source schedule parsing failed."));
+        return false;
+    }
+    const TSharedPtr<FJsonObject>* Reference{nullptr};
+    const TSharedPtr<FJsonObject>* Snapshot{nullptr};
+    if (!Plan->TryGetObjectField(TEXT("reference"), Reference) || Reference == nullptr ||
+        !Plan->TryGetObjectField(TEXT("snapshot"), Snapshot) || Snapshot == nullptr)
+    {
+        return false;
+    }
+
+    FP5aRawTrace Trace;
+    Trace.TracePlanSha256 = TracePlanSha256;
+    Trace.Reference = *Reference;
+    Trace.Snapshot = *Snapshot;
+    Trace.NativeReferenceAudit = NativeReferenceAudit;
+    FP5aNativeDiscovery Discovery;
+    if (!bDiscovery) Discovery.FormalAuxiliary = &Auxiliary;
+    for (const FP5aCaseDefinition& Definition : Definitions)
+    {
+        FActorSpawnParameters SpawnParameters;
+        SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        AAlsTraceCharacter* Character{World.SpawnActor<AAlsTraceCharacter>(AAlsTraceCharacter::StaticClass(),
+            FVector{Definition.Ordinal * 500.0, 0.0, 92.0}, FRotator::ZeroRotator, SpawnParameters)};
+        AAlsTraceController* Controller{World.SpawnActor<AAlsTraceController>()};
+        if (IsValid(Character) && !Character->HasActorBegunPlay())
+        {
+            Character->DispatchBeginPlay();
+        }
+        if (IsValid(Character) && IsValid(Controller))
+        {
+            Controller->Possess(Character);
+        }
+        if (!IsValid(Character) || !IsValid(Controller) ||
+            !IsValid(Character->GetTraceAnimationInstance()))
+        {
+            return false;
+        }
+        Character->GetMesh()->VisibilityBasedAnimTickOption =
+            EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+        const FP5aFrameDefinition& InitialFrame{Definition.Frames[0]};
+        const FGameplayTag InitialStance{InitialFrame.Stance == TEXT("Crouching")
+            ? AlsStanceTags::Crouching : AlsStanceTags::Standing};
+        const FGameplayTag InitialRotationMode{InitialFrame.RotationMode == TEXT("Aiming")
+            ? AlsRotationModeTags::Aiming : (InitialFrame.RotationMode == TEXT("VelocityDirection")
+                ? AlsRotationModeTags::VelocityDirection : AlsRotationModeTags::ViewDirection)};
+        Character->ApplyTraceDesiredState(InitialRotationMode,
+            InitialFrame.RotationMode == TEXT("Aiming"), InitialStance, AlsOverlayModeTags::Default);
+        for (int32 Warmup{0}; Warmup < 60; ++Warmup)
+        {
+            TickP5aWorld(World, *Character);
+            if (Warmup == 14 || Warmup == 59)
+            {
+                UAlsAnimationInstance* Animation{Character->GetTraceAnimationInstanceMutable()};
+                const void* Transitions{StimulusContract.TransitionsState->ContainerPtrToValuePtr<void>(Animation)};
+                UE_LOG(LogTemp, Display, TEXT("P5A warmup case=%s updates=%d allowed=%d curve=%.9f"),
+                    *Definition.CaseId, Warmup + 1,
+                    StimulusContract.bTransitionsAllowed->GetPropertyValue_InContainer(Transitions),
+                    Animation->GetCurveValue(UAlsConstants::AllowTransitionsCurveName()));
+            }
+        }
+
+        FP5aRawCase RawCase;
+        RawCase.Ordinal = Definition.Ordinal;
+        RawCase.CaseId = Definition.CaseId;
+        FP5aNativeActionLifecycle ActionLifecycle;
+        TArray<TSharedPtr<FJsonValue>> DiagnosticFrames;
+        TArray<TSharedPtr<FJsonValue>> DiagnosticCallbacks;
+        TSharedPtr<FJsonObject> DiagnosticFrame;
+        int32 DiagnosticFrameIndex{INDEX_NONE};
+        const TCHAR* DiagnosticPhase{TEXT("update")};
+        if (bDiscovery)
+        {
+            ActionLifecycle.DiagnosticCallback = [&](const TCHAR* Callback, const bool bInterrupted,
+                                                      const FAnimMontageInstance* Instance)
+            {
+                const TSharedRef<FJsonObject> Value{MakeShared<FJsonObject>()};
+                Value->SetStringField(TEXT("callback"), Callback);
+                Value->SetBoolField(TEXT("interrupted"), bInterrupted);
+                Value->SetNumberField(TEXT("frameIndex"), DiagnosticFrameIndex);
+                Value->SetNumberField(TEXT("engineFrameCounter"), static_cast<double>(GFrameCounter));
+                Value->SetStringField(TEXT("phase"), DiagnosticPhase);
+                Value->SetObjectField(TEXT("snapshot"), P5aDiscoveryMontageSnapshot(Instance, ActionLifecycle.Montage));
+                DiagnosticCallbacks.Add(MakeShared<FJsonValueObject>(Value));
+            };
+            ActionLifecycle.DiagnosticAfterUpdate = [&]()
+            {
+                DiagnosticFrame->SetObjectField(TEXT("rollPostUpdateBeforeStart"), P5aDiscoveryMontageSnapshot(
+                    Character->GetTraceAnimationInstanceMutable()->GetMontageInstanceForID(ActionLifecycle.InstanceId),
+                    ActionLifecycle.Montage));
+                DiagnosticPhase = TEXT("postUpdateStart");
+            };
+        }
+        const TWeakObjectPtr<UAlsAnimationInstance> ObservedAnimation{Character->GetTraceAnimationInstanceMutable()};
+        ON_SCOPE_EXIT
+        {
+            UnbindP5aNativeActionObservers(ObservedAnimation.Get(), ActionLifecycle);
+        };
+        FP5aSemanticGraphState SemanticGraphState;
+        FP5aNativeNotifyObservationState NotifyObservationState;
+        for (const FP5aFrameDefinition& Frame : Definition.Frames)
+        {
+            ActionLifecycle.bEndedThisFrame = false;
+            if (bDiscovery)
+            {
+                DiagnosticFrameIndex = Frame.FrameIndex;
+                DiagnosticPhase = Frame.ActionCommand == TEXT("Cancel") ? TEXT("preUpdateCancelOrUpdate") : TEXT("update");
+                DiagnosticCallbacks.Reset();
+                DiagnosticFrame = MakeShared<FJsonObject>();
+                DiagnosticFrame->SetNumberField(TEXT("frameIndex"), Frame.FrameIndex);
+                DiagnosticFrame->SetStringField(TEXT("actionCommand"), Frame.ActionCommand);
+                DiagnosticFrame->SetObjectField(TEXT("rollBeforeCommandAndUpdate"), P5aDiscoveryMontageSnapshot(
+                    Character->GetTraceAnimationInstanceMutable()->GetMontageInstanceForID(ActionLifecycle.InstanceId),
+                    ActionLifecycle.Montage));
+            }
+            const FGameplayTag FrameStance{Frame.Stance == TEXT("Crouching")
+                ? AlsStanceTags::Crouching : AlsStanceTags::Standing};
+            const FGameplayTag FrameRotationMode{Frame.RotationMode == TEXT("Aiming")
+                ? AlsRotationModeTags::Aiming : (Frame.RotationMode == TEXT("VelocityDirection")
+                    ? AlsRotationModeTags::VelocityDirection : AlsRotationModeTags::ViewDirection)};
+            Character->ApplyTraceDesiredState(FrameRotationMode,
+                Frame.RotationMode == TEXT("Aiming"), FrameStance, AlsOverlayModeTags::Default);
+
+            UAlsAnimationInstance* Animation{Character->GetTraceAnimationInstanceMutable()};
+            FAnimMontageInstance* BeforeActionInstance{IsValid(ActionLifecycle.Montage)
+                ? Animation->GetInstanceForMontage(ActionLifecycle.Montage) : nullptr};
+            const float PreviousActionTime{BeforeActionInstance != nullptr
+                ? BeforeActionInstance->GetPosition() : ActionLifecycle.LastPlaybackPosition};
+            const bool bTransitionWasActive{Sources.ContainsByPredicate([Animation](const FP5aSourceDefinition& Source)
+            {
+                if (Source.SourceKind != TEXT("Transition")) return false;
+                for (UAnimSequenceBase* Asset : Source.NativeAssets)
+                {
+                    if (Animation->DynamicMontage_IsPlayingFrom(Asset)) return true;
+                }
+                return false;
+            })};
+            FP5aNativeTransitionStimulusReceipt Receipt;
+            FP5aFrameUpdateAudit FrameUpdateAudit;
+            if (!GenerateP5aCase(World, Definition.Ordinal, *Character, Frame, StimulusContract,
+                Frame.TransitionStimulus, bTransitionWasActive, Receipt, ActionLifecycle, FrameUpdateAudit))
+            {
+                UE_LOG(LogTemp, Error, TEXT("P5A frame generation failed case=%s frame=%d allowed=%d updated=%d delay=%d active=%d"),
+                    *Definition.CaseId, Frame.FrameIndex, Receipt.ObservedAllowTransitions,
+                    Receipt.PreHookUpdatedThisFrame, Receipt.PreHookFrameDelay, Receipt.PreHookTransitionActive);
+                return false;
+            }
+
+            if (bDiscovery)
+            {
+                const TSharedRef<FJsonObject> Audit{MakeShared<FJsonObject>()};
+                Audit->SetNumberField(TEXT("animationUpdates"), FrameUpdateAudit.AnimationUpdates);
+                Audit->SetNumberField(TEXT("evaluations"), FrameUpdateAudit.Evaluations);
+                Audit->SetNumberField(TEXT("postUpdates"), FrameUpdateAudit.PostUpdates);
+                Audit->SetNumberField(TEXT("meshTicks"), FrameUpdateAudit.MeshTicks);
+                DiagnosticFrame->SetObjectField(TEXT("frameUpdateAudit"), Audit);
+                DiagnosticFrame->SetArrayField(TEXT("callbacks"), DiagnosticCallbacks);
+                DiagnosticFrame->SetObjectField(TEXT("rollAfterUpdateAndCommand"), P5aDiscoveryMontageSnapshot(
+                    Animation->GetMontageInstanceForID(ActionLifecycle.InstanceId), ActionLifecycle.Montage));
+                if (!Discovery.ObserveRuntime(*Character, Sources, DiagnosticFrame.ToSharedRef()))
+                {
+                    UE_LOG(LogTemp, Error, TEXT("P5A native discovery observation failed case=%s frame=%d"),
+                        *Definition.CaseId, Frame.FrameIndex);
+                    return false;
+                }
+                DiagnosticFrames.Add(MakeShared<FJsonValueObject>(DiagnosticFrame.ToSharedRef()));
+                ++Discovery.MeasuredFrameCount;
+                continue;
+            }
+
+            const TSharedRef<FJsonObject> ClosureObservation{MakeShared<FJsonObject>()};
+            if (!Discovery.ObserveRuntime(*Character, Sources, ClosureObservation))
+            {
+                UE_LOG(LogTemp, Error, TEXT("P5A formal runtime closure failed case=%s frame=%d"),
+                    *Definition.CaseId, Frame.FrameIndex);
+                return false;
+            }
+
+            const FP5aSourceDefinition* ActiveTransitionSource{nullptr};
+            FAnimMontageInstance* ActiveTransitionInstance{nullptr};
+            for (const FP5aSourceDefinition& Source : Sources)
+            {
+                if (Source.SourceKind != TEXT("Transition")) continue;
+                for (UAnimSequenceBase* Asset : Source.NativeAssets)
+                {
+                    UAnimMontage* TransitionMontage{nullptr};
+                    if (Animation->IsPlayingSlotAnimation(
+                        Asset, UAlsConstants::TransitionSlotName(), TransitionMontage))
+                    {
+                        const FAnimMontageInstance* TransitionInstance{
+                            Animation->GetActiveInstanceForMontage(TransitionMontage)};
+                        check(TransitionInstance != nullptr);
+                        ActiveTransitionSource = &Source;
+                        ActiveTransitionInstance = Animation->GetActiveInstanceForMontage(TransitionMontage);
+                        break;
+                    }
+                }
+                if (ActiveTransitionInstance != nullptr) break;
+            }
+            UpdateP5aSemanticGraphState(SemanticGraphState, ActionLifecycle,
+                PreviousActionTime, ActiveTransitionInstance != nullptr);
+            const FP5aCanonicalAssetOracle CanonicalOracle{EvaluateP5aCanonicalAssetOracle(
+                Frame, Definition.Ordinal, Sources, *Animation, ActionLifecycle, PreviousActionTime,
+                ActiveTransitionSource, ActiveTransitionInstance,
+                SemanticGraphState.ActionWeight, SemanticGraphState.ActionEventWeight,
+                SemanticGraphState.TransitionWeight)};
+            const bool bHasReceipt{Frame.TransitionStimulus.Left.LockAmount > 0.0f ||
+                Frame.TransitionStimulus.Right.LockAmount > 0.0f};
+            RawCase.Frames.Add(CollectP5aNativeRuntimeFrame(*Character, Frame, Sources,
+                CanonicalOracle, bHasReceipt ? &Receipt : nullptr, StimulusContract,
+                ActionLifecycle, PreviousActionTime, NotifyObservationState, FrameUpdateAudit, Auxiliary));
+            if (!RawCase.Frames.Last().Value.IsValid())
+            {
+                UE_LOG(LogTemp, Error, TEXT("P5A runtime observation failed case=%s frame=%d"),
+                    *Definition.CaseId, Frame.FrameIndex);
+                return false;
+            }
+        }
+        UnbindP5aNativeActionObservers(ObservedAnimation.Get(), ActionLifecycle);
+        Controller->UnPossess();
+        Controller->Destroy();
+        Character->Destroy();
+        if (bDiscovery)
+        {
+            const TSharedRef<FJsonObject> Case{MakeShared<FJsonObject>()};
+            Case->SetStringField(TEXT("caseId"), Definition.CaseId);
+            Case->SetNumberField(TEXT("ordinal"), Definition.Ordinal);
+            Case->SetArrayField(TEXT("frames"), DiagnosticFrames);
+            Discovery.Cases.Add(MakeShared<FJsonValueObject>(Case));
+        }
+        else Trace.Cases.Add(MoveTemp(RawCase));
+    }
+    if (bDiscovery) return Discovery.Save(OutputPath, TracePlanSha256);
+    return Trace.Cases.Num() == 8 && SaveJson(OutputPath, P5aRawTraceToJson(Trace));
+}
 }
 
 UAlsLocomotionTraceCommandlet::UAlsLocomotionTraceCommandlet()
@@ -2703,20 +5433,75 @@ int32 UAlsLocomotionTraceCommandlet::Main(const FString& Parameters)
     const bool bReadyCheck{FParse::Param(*Parameters, TEXT("ReadyCheck"))};
     FString TraceKind;
     FParse::Value(*Parameters, TEXT("TraceKind="), TraceKind);
+    const bool bP3{TraceKind.IsEmpty() || TraceKind == TEXT("P3")};
     const bool bP4{TraceKind == TEXT("P4")};
+    const bool bP5aDiscovery{TraceKind == TEXT("P5ADiscovery")};
+    const bool bP5a{TraceKind == TEXT("P5A") || bP5aDiscovery};
     UE_LOG(LogTemp, Display, TEXT("P3_TRACE_ARGUMENTS_OK ready=%d"), bReadyCheck ? 1 : 0);
     if (OutputDirectory.IsEmpty() || ReferenceRoot.IsEmpty() || Commit.IsEmpty() || PatchHashes.IsEmpty()) return 2;
+    if (!bP3 && !bP4 && !bP5a) return 2;
+    if (bP5aDiscovery && bReadyCheck) return 2;
     if (!IsLowercaseCommitSha(Commit) || Commit != LockedReferenceCommit ||
         !ValidateReference(ReferenceRoot, Commit, PatchHashes)) return 3;
     UE_LOG(LogTemp, Display, TEXT("P3_TRACE_REFERENCE_OK"));
+    if (bP5a && !FModuleManager::Get().LoadModule(TEXT("ALSCamera")))
+    {
+        UE_LOG(LogTemp, Error, TEXT("P5A requires the ALSCamera runtime module before asset validation."));
+        return 4;
+    }
     if (!ValidateSequenceDefinitions() || !ValidateRequiredAssets()) return 4;
-    if (!IFileManager::Get().MakeDirectory(*OutputDirectory, true)) return 5;
 
-    const FString ProbePath{OutputDirectory / TEXT(".write_probe")};
+    TSharedPtr<FJsonObject> P5aTracePlan;
+    FString P5aTracePlanSha256;
+    FP5aNativeTransitionStimulusContract P5aStimulusContract;
+    FP5aNativeReferenceAudit P5aNativeReferenceAudit;
+    FP5aNativeAuxiliaryInventory P5aAuxiliary;
+    if (bP5a)
+    {
+        const FString P5aTracePlanPath{GetRequiredValue(Parameters, TEXT("P5ATracePlan="))};
+        P5aTracePlanSha256 = GetRequiredValue(Parameters, TEXT("P5ATracePlanSha256="));
+        if (!ValidateP5aTracePlan(P5aTracePlanPath, P5aTracePlanSha256, P5aTracePlan) ||
+            !ResolveP5aNativeTransitionStimulusContract(P5aStimulusContract) ||
+            !CollectP5aNativeReferenceAudit(P5aNativeReferenceAudit))
+        {
+            return 4;
+        }
+        TArray<FP5aSourceDefinition> ValidatedSources;
+        TArray<FP5aCaseDefinition> ValidatedCases;
+        if (!P5aAuxiliary.ReadAndValidate(P5aTracePlan) ||
+            !ParseP5aCaseDefinitions(P5aTracePlan, ValidatedSources, ValidatedCases) ||
+            !P5aAuxiliary.IsDisjointFrom(ValidatedSources))
+        {
+            UE_LOG(LogTemp, Error, TEXT("P5A auxiliary native inventory rejected."));
+            return 4;
+        }
+        P5aNativeReferenceAudit.AuxiliaryAssets = P5aAuxiliary.AuditRows;
+    }
+    const FString OutputParent{bP5a ? FPaths::GetPath(OutputDirectory) : OutputDirectory};
+    if (OutputParent.IsEmpty() || !IFileManager::Get().MakeDirectory(*OutputParent, true)) return 5;
+
+    const FString ProbePath{OutputParent / TEXT(".write_probe")};
     if (!FFileHelper::SaveStringToFile(TEXT("ready"), *ProbePath) || !IFileManager::Get().Delete(*ProbePath)) return 6;
     if (bReadyCheck)
     {
-        if (bP4) { UE_LOG(LogTemp, Display, TEXT("P4_TRACE_READY_OK")); }
+        if (bP5a)
+        {
+            if (!RunP5aNativeAssetClosureSelfTest(P5aAuxiliary)) return 7;
+            if (!RunP5aNativeCurveSemanticsSelfTest(P5aTracePlan)) return 7;
+            FApp::SetUseFixedTimeStep(true);
+            FApp::SetFixedDeltaTime(FixedDeltaSeconds);
+            UWorld* ReadyWorld{CreateTraceWorld()};
+            const bool bActionLifecycleReady{IsValid(ReadyWorld) &&
+                RunP5aNativeActionLifecycleSelfTest(*ReadyWorld)};
+            DestroyTraceWorld(ReadyWorld);
+            if (!bActionLifecycleReady)
+            {
+                UE_LOG(LogTemp, Error, TEXT("P5A native Action lifecycle self-test failed."));
+                return 7;
+            }
+            UE_LOG(LogTemp, Display, TEXT("P5A_TRACE_READY_OK cases=8 commit=%s"), *Commit);
+        }
+        else if (bP4) { UE_LOG(LogTemp, Display, TEXT("P4_TRACE_READY_OK")); }
         else { UE_LOG(LogTemp, Display, TEXT("P3_TRACE_READY_OK")); }
         return 0;
     }
@@ -2726,7 +5511,12 @@ int32 UAlsLocomotionTraceCommandlet::Main(const FString& Parameters)
     UWorld* World{CreateTraceWorld()};
     if (!IsValid(World)) return 7;
     bool bSuccess{true};
-    if (bP4)
+    if (bP5a)
+    {
+        bSuccess = GenerateP5aDocuments(*World, OutputDirectory, P5aTracePlanSha256,
+            P5aTracePlan, P5aStimulusContract, P5aNativeReferenceAudit, P5aAuxiliary, bP5aDiscovery);
+    }
+    else if (bP4)
     {
         bSuccess = GenerateP4Documents(World, OutputDirectory);
     }
@@ -2747,7 +5537,9 @@ int32 UAlsLocomotionTraceCommandlet::Main(const FString& Parameters)
     }
     DestroyTraceWorld(World);
     if (!bSuccess) return 8;
-    if (bP4) { UE_LOG(LogTemp, Display, TEXT("P4_TRACE_GENERATION_OK cases=25 commit=%s"), *Commit); }
+    if (bP5aDiscovery) { UE_LOG(LogTemp, Display, TEXT("P5A_NATIVE_DISCOVERY_COMPLETE cases=8 frames=374 commit=%s"), *Commit); }
+    else if (bP5a) { UE_LOG(LogTemp, Display, TEXT("P5A_TRACE_GENERATION_OK cases=8 commit=%s"), *Commit); }
+    else if (bP4) { UE_LOG(LogTemp, Display, TEXT("P4_TRACE_GENERATION_OK cases=25 commit=%s"), *Commit); }
     else { UE_LOG(LogTemp, Display, TEXT("P3_TRACE_GENERATION_OK sequences=5 commit=%s"), *Commit); }
     return 0;
 }

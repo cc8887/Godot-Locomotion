@@ -1,3 +1,5 @@
+using GodotAls.Core.Actions;
+
 namespace GodotAls.Import.Compilation;
 
 public enum AlsP5CurveCombineMode : byte
@@ -110,7 +112,8 @@ public sealed record AlsCompiledActionDefinition(
     float PlayRate,
     float BlendSeconds,
     AlsP5LoopPolicy LoopPolicy,
-    AlsCompiledActionSectionBinding[] Sections)
+    AlsCompiledActionSectionBinding[] Sections,
+    AlsActionLifecycleSettings Lifecycle = default)
 {
     private AlsCompiledActionSectionBinding[] _sections = Sections.ToArray();
 

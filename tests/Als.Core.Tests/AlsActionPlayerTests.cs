@@ -13,6 +13,7 @@ public sealed class AlsActionPlayerTests
     public void ContractsAreSequentialUnmanagedInFrozenOrderWithExplicitDefaults()
     {
         AssertContract<AlsActionDefinition>();
+        AssertContract<AlsActionLifecycleSettings>();
         AssertContract<AlsActionSectionBinding>();
         AssertContract<AlsActionSegmentBinding>();
         AssertContract<AlsActionTraversalSlice>();
@@ -27,7 +28,12 @@ public sealed class AlsActionPlayerTests
             ("MontageId", typeof(int)), ("MontageDurationSeconds", typeof(float)),
             ("SlotId", typeof(int)), ("StartSectionId", typeof(int)),
             ("Priority", typeof(int)), ("PlayRate", typeof(float)),
-            ("BlendSeconds", typeof(float)), ("Interruptible", typeof(byte)), ("Loop", typeof(byte)));
+            ("BlendSeconds", typeof(float)), ("Interruptible", typeof(byte)), ("Loop", typeof(byte)),
+            ("Lifecycle", typeof(AlsActionLifecycleSettings)));
+        AssertFields<AlsActionLifecycleSettings>(
+            ("Mode", typeof(AlsActionLifecycleMode)), ("BlendInSeconds", typeof(float)),
+            ("BlendInOption", typeof(AlsActionBlendOption)), ("BlendOutSeconds", typeof(float)),
+            ("BlendOutOption", typeof(AlsActionBlendOption)), ("BlendOutTriggerSeconds", typeof(float)));
         AssertFields<AlsActionSectionBinding>(
             ("ActionDefinitionId", typeof(int)), ("SectionId", typeof(int)),
             ("NextSectionId", typeof(int)), ("StartTime", typeof(float)), ("EndTime", typeof(float)));
@@ -55,7 +61,7 @@ public sealed class AlsActionPlayerTests
         AssertFields<AlsActionAdvanceResult>(
             ("ContributingPlayback", typeof(AlsActionPlayback)), ("FirstSliceIndex", typeof(int)),
             ("AddedSliceCount", typeof(int)), ("ClosingSliceIndex", typeof(int)),
-            ("ClosingReason", typeof(AlsActionResultCode)));
+            ("ClosingReason", typeof(AlsActionResultCode)), ("CompletionOffsetSeconds", typeof(double)));
         AssertFields<AlsActionEarlyBlendOutResult>(
             ("ClosingSliceIndex", typeof(int)), ("BlendOutSeconds", typeof(float)),
             ("Interrupted", typeof(byte)));

@@ -164,7 +164,12 @@ public sealed class ContractLayoutTests
         AssertStorageFieldOrder<AlsActionPlayerState>(
             "ActionDefinitionId", "SectionId", "SegmentBindingIndex", "RequestId",
             "LastProcessedRequestId", "LastProcessedCommandRequestId", "LastProcessedCommand",
-            "PlaybackEpoch", "PlaybackTime", "Priority", "Playing", "Interruptible");
+            "PlaybackEpoch", "PlaybackTime", "Priority", "Playing", "Interruptible", "Lifecycle");
+        AssertStorageFieldOrder<AlsActionLifecycleState>(
+            "Alpha", "RemainingSeconds", "BeginWeight", "CurrentWeight", "DesiredWeight",
+            "BlendingOut", "TraversalFinished");
+        Assert.Equal(LayoutKind.Sequential, typeof(AlsActionLifecycleState).StructLayoutAttribute?.Value);
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsActionLifecycleState>());
         AssertStorageFieldOrder<AlsDynamicTransitionState>(
             "AnimationId", "QueuedAnimationId", "PlaybackEpoch", "PreviousPlaybackTime",
             "PlaybackTime", "CooldownFrames", "Foot", "QueuedFoot", "Active", "Queued");

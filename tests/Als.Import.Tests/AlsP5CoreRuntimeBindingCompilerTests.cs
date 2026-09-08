@@ -17,11 +17,186 @@ using ImportOccurrenceKind = GodotAls.Import.Compilation.AlsP5OccurrenceSourceKi
 
 namespace GodotAls.Import.Tests;
 
-public sealed class AlsP5CoreRuntimeBindingCompilerTests
+public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     private const ulong FrozenLayoutDigest = 0xD6FEF54173240D32UL;
-    private const ulong FrozenBindingDigest = 0x2B4BE600D531C734UL;
+    private const ulong FrozenBindingDigest = 0xE458FEF4DF7A854DUL;
     private const ulong FrozenGraphDigest = 0x44403C2869D8F615UL;
+
+    [Fact]
+    public void CanonicalRollRuntimeKeepsLogicalCompletionSeparateFromVisualTail()
+    {
+        var snapshot = Fixture.Create().Compile();
+        var runtime = snapshot.CreateCoreView();
+        var entries = snapshot.CreateOccurrenceLayoutView().Entries.ToArray();
+        var cursors = entries.Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
+        var authorities = Enumerable.Range(0, entries.Max(entry => entry.AuthorityGroupId) + 1)
+            .Select(AlsTimelineAuthorityState.CreateDefault).ToArray();
+        var ownership = Enumerable.Range(0, AlsEventBuffer.Capacity)
+            .Select(_ => AlsNotifyStateOwnership.CreateDefault()).ToArray();
+        var candidateCursors = new AlsTimelineCursor[cursors.Length];
+        var candidateAuthorities = new AlsTimelineAuthorityState[authorities.Length];
+        var candidateOwnership = new AlsNotifyStateOwnership[ownership.Length];
+        var control = new[] { new AlsP5RuntimeScratchControl(1) };
+        var occurrences = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var slices = new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity];
+        var playbacks = new AlsTimelinePlayback[34];
+        var curves = new AlsCurveBlendSample[4];
+        var state = AlsRuntimeState.CreateDefault();
+        var nextToken = 1UL;
+        var definition = runtime.ActionDefinitions[0];
+        const float delta = 1f / 60f;
+        for (var frame = 0; frame <= 103; frame++)
+        {
+            var identity = new AlsFrameIdentity(frame, 0, 1);
+            var request = frame == 0
+                ? new AlsActionRequest(1, AlsActionCommand.Start, definition.DefinitionId,
+                    definition.StartSectionId, definition.Priority, 1)
+                : AlsActionRequest.None;
+            var input = new AlsP5FrameInput(identity, frame * (double)delta,
+                (frame + 1) * (double)delta, delta, 1, request, 0, 0,
+                AlsTimelineLocomotionMode.Grounded, AlsTimelineRotationMode.VelocityDirection,
+                AlsTimelineStance.Standing, new AlsP4CurveFrameInput([], [], [], AlsAnimationState.Grounded, 0f, 0f));
+            var scratch = new AlsP5RuntimeScratch(0, 0, control, candidateCursors,
+                candidateAuthorities, candidateOwnership, occurrences, slices, playbacks, [], [], curves);
+            Assert.True(AlsP5Runtime.TryPrepare(runtime, input, state, cursors, authorities,
+                ownership, nextToken, ref scratch, out var prepared, out var failure), $"F{frame}: {failure}");
+            var p4 = AlsFrameResult.CreateDefault(identity);
+            p4.PlayRate = 1f;
+            Assert.True(AlsP5Runtime.TryFinalize(prepared, ref scratch, p4, state, default,
+                out nextToken, out var producedState, out var result, out failure), $"F{frame}: {failure}");
+            state = producedState;
+            candidateCursors.CopyTo(cursors, 0);
+            candidateAuthorities.CopyTo(authorities, 0);
+            candidateOwnership.CopyTo(ownership, 0);
+            if (frame >= 90)
+            {
+                output.WriteLine($"F{frame}: playback.active={result.ActionPlayback.Active}; previous={result.ActionPlayback.PreviousTime:R}; current={result.ActionPlayback.CurrentTime:R}; delta={result.ActionPlayback.FinalSegmentDeltaSeconds:R}; effective={result.ActionPlayback.EffectiveWeight:R}; playing={state.ActionPlayer.Playing}; stateTime={state.ActionPlayer.PlaybackTime:R}; outcome={(result.ActionOutcomes.Count > 0 ? result.ActionOutcomes[0].ResultCode : AlsActionResultCode.None)}; graph.weight={prepared.ActionGraph.LaneWeight:R}; outgoing={prepared.ActionGraph.Outgoing.Active}; incoming={prepared.ActionGraph.Incoming.Active}; lane.weight={state.ActionBlendLane.LaneWeight:R}; lane.visual={state.ActionBlendLane.VisualActive}; lane.clip={state.ActionBlendLane.OutgoingClipTime:R}");
+            }
+            if (frame < 90) Assert.Equal((byte)1, state.ActionPlayer.Playing);
+            if (frame == 90)
+            {
+                Assert.Equal(AlsActionResultCode.Completed, result.ActionOutcomes[0].ResultCode);
+                Assert.Equal(1.4999992847442627f, result.ActionPlayback.CurrentTime);
+                Assert.Equal(1f, prepared.ActionGraph.LaneWeight);
+                Assert.Equal((byte)0, state.ActionPlayer.Playing);
+                Assert.Equal(.2f, state.ActionBlendLane.BlendSeconds);
+            }
+            if (frame > 90) Assert.Equal(0, result.ActionOutcomes.Count);
+            if (frame == 103) Assert.Equal(AlsLaneBlendState.CreateDefault(), state.ActionBlendLane);
+        }
+    }
+
+    [Fact]
+    public void CanonicalRollCompletesItsAuthoredBlendBeforeClipTraversalEnds()
+    {
+        var runtime = Fixture.Create().Compile().CreateCoreView();
+        var definition = runtime.ActionDefinitions[0];
+        var state = AlsActionPlayerState.CreateDefault();
+        var slices = new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity];
+        var count = 0;
+        var outcomes = new AlsActionOutcomeBuffer();
+        Assert.True(AlsActionPlayer.TryApplyRequest(
+            runtime.ActionDefinitions, runtime.ActionSections, runtime.ActionSegments,
+            1, 0, new AlsActionRequest(1, AlsActionCommand.Start, definition.DefinitionId,
+                definition.StartSectionId, definition.Priority, 1), state,
+            slices, ref count, ref outcomes, out state, out _, out var failure), failure.ToString());
+
+        AlsActionAdvanceResult result = default;
+        for (var frame = 1; frame <= 90; frame++)
+        {
+            count = 0;
+            outcomes.Clear();
+            Assert.True(AlsActionPlayer.TryAdvance(
+                runtime.ActionDefinitions, runtime.ActionSections, runtime.ActionSegments,
+                (double)(1f / 60f), state, slices, ref count, ref outcomes,
+                out state, out result, out failure), failure.ToString());
+            if (frame < 90) Assert.Equal((byte)1, state.Playing);
+        }
+        Assert.Equal(AlsActionResultCode.Completed, result.ClosingReason);
+        Assert.Equal((byte)0, state.Playing);
+        Assert.Equal(1, outcomes.Count);
+        Assert.True(result.ContributingPlayback.CurrentTime < definition.MontageDurationSeconds);
+        Assert.Equal(.2f, definition.BlendSeconds);
+    }
+
+    [Fact]
+    public void DisabledAssetAutoBlendOutKeepsLogicalOwnerAtTheEndpoint()
+    {
+        var fixture = Fixture.Create();
+        var montages = fixture.Set.Montages;
+        var montageId = fixture.P5a.Actions[0].MontageId;
+        montages[montageId] = montages[montageId] with { EnableAutoBlendOut = false };
+        var set = RefreshDigest(fixture.Set with { Montages = montages });
+        var p5a = AlsP5aAnimationRuntimeProfileCompiler.Compile(File.ReadAllText(Path.Combine(
+            RepositoryRoot.Find(), "assets", "config", "p5a_animation_runtime.json")), set);
+        var runtime = fixture.Compile(set: set, p5a: p5a).CreateCoreView();
+        var definition = runtime.ActionDefinitions[0];
+        var state = AlsActionPlayerState.CreateDefault();
+        var slices = new AlsActionTraversalSlice[AlsActionPlayer.TraversalCapacity];
+        var count = 0;
+        var outcomes = new AlsActionOutcomeBuffer();
+        Assert.True(AlsActionPlayer.TryApplyRequest(
+            runtime.ActionDefinitions, runtime.ActionSections, runtime.ActionSegments,
+            1, 0, new AlsActionRequest(1, AlsActionCommand.Start, definition.DefinitionId,
+                definition.StartSectionId, definition.Priority, 1), state,
+            slices, ref count, ref outcomes, out state, out _, out var failure), failure.ToString());
+        count = 0;
+        outcomes.Clear();
+        Assert.True(AlsActionPlayer.TryAdvance(
+            runtime.ActionDefinitions, runtime.ActionSections, runtime.ActionSegments,
+            2d, state, slices, ref count, ref outcomes, out state, out _, out failure), failure.ToString());
+        Assert.Equal((byte)1, state.Playing);
+        Assert.Equal(definition.MontageDurationSeconds, state.PlaybackTime);
+        Assert.Equal(0, outcomes.Count);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(14)]
+    [InlineData(258)]
+    public void LifecycleCompilerRejectsUnsupportedOptionsWithoutNarrowingThem(int option)
+    {
+        var fixture = Fixture.Create();
+        var montages = fixture.Set.Montages;
+        var montageId = fixture.P5a.Actions[0].MontageId;
+        montages[montageId] = montages[montageId] with { BlendInOption = option };
+        var set = RefreshDigest(fixture.Set with { Montages = montages });
+        Assert.Throws<ArgumentException>(() => fixture.Compile(set: set));
+        Assert.Throws<AlsCompilationException>(() => AlsP5aAnimationRuntimeProfileCompiler.Compile(
+            File.ReadAllText(Path.Combine(RepositoryRoot.Find(), "assets", "config", "p5a_animation_runtime.json")), set));
+    }
+
+    [Theory]
+    [InlineData("mode")]
+    [InlineData("in-duration")]
+    [InlineData("in-option")]
+    [InlineData("out-duration")]
+    [InlineData("out-option")]
+    [InlineData("trigger")]
+    public void EachLifecycleSettingIsProvenanceCheckedAndHashed(string field)
+    {
+        var fixture = Fixture.Create();
+        var snapshot = fixture.Compile();
+        var runtime = snapshot.CreateCoreView();
+        var settings = runtime.ActionDefinitions[0].Lifecycle;
+        var changed = field switch
+        {
+            "mode" => settings with { Mode = AlsActionLifecycleMode.MontageHoldAtEnd },
+            "in-duration" => settings with { BlendInSeconds = .125f },
+            "in-option" => settings with { BlendInOption = AlsActionBlendOption.Linear },
+            "out-duration" => settings with { BlendOutSeconds = .5f },
+            "out-option" => settings with { BlendOutOption = AlsActionBlendOption.Cubic },
+            _ => settings with { BlendOutTriggerSeconds = 0f },
+        };
+        var actions = fixture.P5a.Actions;
+        actions[0] = actions[0] with { Lifecycle = changed };
+        Assert.Throws<ArgumentException>(() => fixture.Compile(p5a: fixture.P5a with { Actions = actions }));
+        var input = BindingDigestInput.Capture(runtime);
+        var coreActions = input.Actions.ToArray();
+        coreActions[0] = coreActions[0] with { Lifecycle = changed };
+        Assert.NotEqual(snapshot.Digest, ProductionBindingDigest(input with { Actions = coreActions }));
+    }
 
     [Fact]
     public void PublicSurfaceIsFrozenStackSafeAndGodotFree()
@@ -92,13 +267,13 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
         var occurrence = snapshot.CreateOccurrenceLayoutView();
         var graph = snapshot.CreateGraphBuildView();
 
-        Assert.Equal(1, snapshot.Version);
+        Assert.Equal(2, snapshot.Version);
         Assert.Equal(fixture.Set.DefinitionDigest, snapshot.AnimationSetDefinitionDigest);
         Assert.Equal(snapshot.Digest, runtime.Digest);
         Assert.Equal(snapshot.LayoutDigest, runtime.LayoutDigest);
         Assert.Equal(snapshot.LayoutDigest, occurrence.Digest);
         Assert.Equal(snapshot.GraphDigest, graph.Digest);
-        Assert.Equal(1, runtime.Version);
+        Assert.Equal(2, runtime.Version);
         Assert.Equal(1, occurrence.Version);
         Assert.Equal(1, graph.Version);
 
@@ -2380,6 +2555,8 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests
         w.Add(x.DefinitionId); w.Add(x.MontageId); w.Add(x.MontageDurationSeconds); w.Add(x.SlotId);
         w.Add(x.StartSectionId); w.Add(x.Priority); w.Add(x.PlayRate); w.Add(x.BlendSeconds);
         w.Add(x.Interruptible); w.Add(x.Loop);
+        w.Add((byte)x.Lifecycle.Mode); w.Add(x.Lifecycle.BlendInSeconds); w.Add((byte)x.Lifecycle.BlendInOption);
+        w.Add(x.Lifecycle.BlendOutSeconds); w.Add((byte)x.Lifecycle.BlendOutOption); w.Add(x.Lifecycle.BlendOutTriggerSeconds);
     }
 
     private static void WriteGraphSample(ref ReferenceFnvWriter w, in AlsP5GraphSample x)

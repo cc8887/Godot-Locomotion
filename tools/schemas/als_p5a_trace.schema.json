@@ -19,6 +19,7 @@
       "properties": {
         "schemaVersion": {
           "type": "integer",
+          "const": 2,
           "minimum": -2147483648,
           "maximum": 2147483647
         },
@@ -335,6 +336,7 @@
       "properties": {
         "schemaVersion": {
           "type": "integer",
+          "const": 2,
           "minimum": -2147483648,
           "maximum": 2147483647
         },
@@ -648,6 +650,7 @@
       "properties": {
         "schemaVersion": {
           "type": "integer",
+          "const": 2,
           "minimum": -2147483648,
           "maximum": 2147483647
         },
@@ -979,6 +982,7 @@
       "properties": {
         "schemaVersion": {
           "type": "integer",
+          "const": 2,
           "minimum": -2147483648,
           "maximum": 2147483647
         },
@@ -1316,7 +1320,8 @@
         "assets",
         "events",
         "markers",
-        "curveInventories"
+        "curveInventories",
+        "auxiliaryAssets"
       ],
       "properties": {
         "assets": {
@@ -1350,6 +1355,23 @@
           "items": {
             "$ref": "#/$defs/b0_o10"
           }
+        },
+        "auxiliaryAssets": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "prefixItems": [
+            { "$ref": "#/$defs/p5a_native_audit_dependency_0" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_1" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_2" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_3" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_4" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_5" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_6" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_7" },
+            { "$ref": "#/$defs/p5a_native_audit_dependency_8" }
+          ],
+          "items": false
         }
       }
     },
@@ -1683,7 +1705,8 @@
         "actionVisualContribution",
         "nativeRuntimeTimeline",
         "actionOutcomes",
-        "stateAfter"
+        "stateAfter",
+        "frameUpdateAudit"
       ],
       "properties": {
         "canonicalAssetOracle": {
@@ -1727,6 +1750,9 @@
         },
         "stateAfter": {
           "$ref": "#/$defs/b0_o0"
+        },
+        "frameUpdateAudit": {
+          "$ref": "#/$defs/p5a_frame_update_audit"
         }
       }
     },
@@ -1738,7 +1764,8 @@
         "graphCurveWeights",
         "sync",
         "events",
-        "activeNotifyStates"
+        "activeNotifyStates",
+        "compressedCurves"
       ],
       "properties": {
         "curves": {
@@ -1765,6 +1792,9 @@
           "items": {
             "$ref": "#/$defs/b0_o25"
           }
+        },
+        "compressedCurves": {
+          "$ref": "#/$defs/p5a_compressed_curves"
         }
       }
     },
@@ -2008,9 +2038,9 @@
           "type": "boolean"
         },
         "value": {
-          "type": "integer",
-          "minimum": -2147483648,
-          "maximum": 2147483647
+          "type": "number",
+          "minimum": -3.4028235e+38,
+          "maximum": 3.4028235e+38
         }
       }
     },
@@ -2867,6 +2897,7 @@
       "properties": {
         "schemaVersion": {
           "type": "integer",
+          "const": 2,
           "minimum": -2147483648,
           "maximum": 2147483647
         },
@@ -3654,7 +3685,7 @@
         "activeNotifyStates": {
           "type": "array",
           "minItems": 0,
-          "maxItems": 1,
+          "maxItems": 16,
           "items": {
             "$ref": "#/$defs/b1_o7"
           }
@@ -3861,6 +3892,7 @@
       "properties": {
         "schemaVersion": {
           "type": "integer",
+          "const": 2,
           "minimum": -2147483648,
           "maximum": 2147483647
         },
@@ -4652,7 +4684,7 @@
         "activeNotifyStates": {
           "type": "array",
           "minItems": 0,
-          "maxItems": 1,
+          "maxItems": 16,
           "items": {
             "$ref": "#/$defs/b2_o16"
           }
@@ -5267,7 +5299,8 @@
         "playbackTime",
         "priority",
         "playing",
-        "interruptible"
+        "interruptible",
+        "lifecycle"
       ],
       "properties": {
         "actionDefinitionId": {
@@ -5333,6 +5366,9 @@
         },
         "interruptible": {
           "type": "boolean"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/p5a_action_lifecycle"
         }
       }
     },
@@ -6049,7 +6085,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6060,7 +6097,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6075,7 +6113,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6083,10 +6121,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6113,7 +6154,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6121,13 +6162,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -6160,7 +6204,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6171,7 +6216,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6185,8 +6231,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6194,10 +6240,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6224,7 +6273,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6232,13 +6281,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -6271,7 +6323,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6282,7 +6335,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6297,7 +6351,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6305,10 +6359,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6335,7 +6392,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6343,13 +6400,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -6381,7 +6441,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6392,7 +6453,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6406,8 +6468,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6415,10 +6477,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6445,7 +6510,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6453,13 +6518,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -6522,7 +6590,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6533,7 +6602,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6548,7 +6618,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6556,10 +6626,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6586,7 +6659,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6594,13 +6667,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -6632,7 +6708,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6643,7 +6720,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6657,8 +6735,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6666,10 +6744,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6696,7 +6777,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6704,13 +6785,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -6773,7 +6857,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6784,7 +6869,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6799,7 +6885,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6807,10 +6893,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6837,7 +6926,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6845,13 +6934,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -6883,7 +6975,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -6894,7 +6987,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -6908,8 +7002,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -6917,10 +7011,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -6947,7 +7044,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -6955,13 +7052,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7024,7 +7124,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7035,7 +7136,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7050,7 +7152,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -7058,10 +7160,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -7088,7 +7193,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -7096,13 +7201,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7134,7 +7242,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7145,7 +7254,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7159,8 +7269,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -7168,10 +7278,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -7198,7 +7311,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -7206,13 +7319,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7291,7 +7407,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7302,7 +7419,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7317,7 +7435,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -7325,10 +7443,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -7355,7 +7476,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -7363,13 +7484,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7404,7 +7528,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7415,7 +7540,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7429,8 +7555,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 3,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "uniqueItems": true,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
@@ -7439,10 +7565,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -7469,7 +7598,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -7477,13 +7606,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7566,7 +7698,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7577,7 +7710,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7591,8 +7725,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -7600,10 +7734,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -7630,7 +7767,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -7638,13 +7775,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7688,7 +7828,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7699,7 +7840,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7714,7 +7856,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -7722,10 +7864,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -7752,7 +7897,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -7760,13 +7905,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7800,7 +7948,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7811,7 +7960,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7825,8 +7975,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -7834,10 +7984,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -7864,7 +8017,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -7872,13 +8025,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -7962,7 +8118,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -7973,7 +8130,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -7987,8 +8145,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -7996,10 +8154,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -8026,7 +8187,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -8034,13 +8195,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -8073,7 +8237,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -8084,7 +8249,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -8099,7 +8265,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -8107,10 +8273,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -8137,7 +8306,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -8145,13 +8314,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -8186,7 +8358,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -8197,7 +8370,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -8211,8 +8385,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -8220,10 +8394,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -8250,7 +8427,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -8258,13 +8435,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -8347,7 +8527,8 @@
             "actionVisualContribution",
             "nativeRuntimeTimeline",
             "actionOutcomes",
-            "stateAfter"
+            "stateAfter",
+            "frameUpdateAudit"
           ],
           "properties": {
             "canonicalAssetOracle": {
@@ -8358,7 +8539,8 @@
                 "graphCurveWeights",
                 "sync",
                 "events",
-                "activeNotifyStates"
+                "activeNotifyStates",
+                "compressedCurves"
               ],
               "properties": {
                 "curves": {
@@ -8372,8 +8554,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o14"
                   }
@@ -8381,10 +8563,13 @@
                 "activeNotifyStates": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b0_o25"
                   }
+                },
+                "compressedCurves": {
+                  "$ref": "#/$defs/p5a_compressed_curves"
                 }
               }
             },
@@ -8411,7 +8596,7 @@
             "nativeRuntimeTimeline": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 5,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b0_o28"
               }
@@ -8419,13 +8604,16 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b0_o2"
               }
             },
             "stateAfter": {
               "$ref": "#/$defs/b0_o0"
+            },
+            "frameUpdateAudit": {
+              "$ref": "#/$defs/p5a_frame_update_audit"
             }
           }
         }
@@ -8515,7 +8703,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -8523,7 +8711,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -8581,8 +8769,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -8590,7 +8778,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -8649,7 +8837,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -8657,7 +8845,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -8714,8 +8902,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -8723,7 +8911,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -8812,7 +9000,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -8820,7 +9008,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -8877,8 +9065,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -8886,7 +9074,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -8975,7 +9163,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -8983,7 +9171,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9040,8 +9228,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9049,7 +9237,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9138,7 +9326,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9146,7 +9334,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9203,8 +9391,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9212,7 +9400,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9317,7 +9505,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9325,7 +9513,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9435,8 +9623,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9444,7 +9632,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9502,8 +9690,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9511,7 +9699,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9581,7 +9769,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9589,7 +9777,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9699,8 +9887,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9708,7 +9896,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9766,8 +9954,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9775,7 +9963,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9834,7 +10022,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9842,7 +10030,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -9952,8 +10140,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -9961,7 +10149,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -10019,8 +10207,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b1_o6"
               }
@@ -10028,7 +10216,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b1_o2"
               }
@@ -10125,7 +10313,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -10133,7 +10321,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -10183,7 +10371,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -10191,7 +10379,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -10259,8 +10447,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -10268,7 +10456,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -10318,7 +10506,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -10326,7 +10514,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -10395,7 +10583,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -10403,7 +10591,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -10453,7 +10641,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -10461,7 +10649,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -10528,8 +10716,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -10537,7 +10725,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -10587,7 +10775,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -10595,7 +10783,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -10694,7 +10882,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -10702,7 +10890,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -10752,7 +10940,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -10760,7 +10948,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -10827,8 +11015,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -10836,7 +11024,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -10886,7 +11074,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -10894,7 +11082,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -10993,7 +11181,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -11001,7 +11189,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -11051,7 +11239,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -11059,7 +11247,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -11126,8 +11314,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -11135,7 +11323,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -11185,7 +11373,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -11193,7 +11381,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -11292,7 +11480,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -11300,7 +11488,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -11350,7 +11538,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -11358,7 +11546,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -11425,8 +11613,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -11434,7 +11622,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -11484,7 +11672,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -11492,7 +11680,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -11560,7 +11748,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -11568,7 +11756,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -11617,8 +11805,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -11626,7 +11814,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -11745,8 +11933,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -11754,7 +11942,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -11803,8 +11991,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -11812,7 +12000,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -11880,8 +12068,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -11889,7 +12077,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -11938,8 +12126,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -11947,7 +12135,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -12014,8 +12202,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -12023,7 +12211,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -12072,8 +12260,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -12081,7 +12269,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -12195,7 +12383,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -12203,7 +12391,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -12253,7 +12441,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -12261,7 +12449,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -12329,7 +12517,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -12337,7 +12525,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -12386,8 +12574,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -12395,7 +12583,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -12515,8 +12703,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -12524,7 +12712,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -12573,8 +12761,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -12582,7 +12770,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -12650,8 +12838,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -12659,7 +12847,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -12708,8 +12896,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -12717,7 +12905,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -12796,7 +12984,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -12804,7 +12992,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -12854,7 +13042,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -12862,7 +13050,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -12930,7 +13118,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -12938,7 +13126,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -12987,8 +13175,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -12996,7 +13184,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -13115,8 +13303,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -13124,7 +13312,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -13173,8 +13361,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 1,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -13182,7 +13370,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -13250,8 +13438,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -13259,7 +13447,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -13308,8 +13496,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -13317,7 +13505,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -13384,8 +13572,8 @@
             },
             "events": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -13393,7 +13581,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -13442,8 +13630,8 @@
                 },
                 "events": {
                   "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
+                  "minItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -13451,7 +13639,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -13519,7 +13707,7 @@
             "events": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 0,
+              "maxItems": 16,
               "items": {
                 "$ref": "#/$defs/b2_o15"
               }
@@ -13527,7 +13715,7 @@
             "actionOutcomes": {
               "type": "array",
               "minItems": 0,
-              "maxItems": 1,
+              "maxItems": 2,
               "items": {
                 "$ref": "#/$defs/b2_o11"
               }
@@ -13577,7 +13765,7 @@
                 "events": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 0,
+                  "maxItems": 16,
                   "items": {
                     "$ref": "#/$defs/b2_o23"
                   }
@@ -13585,7 +13773,7 @@
                 "actionOutcomes": {
                   "type": "array",
                   "minItems": 0,
-                  "maxItems": 1,
+                  "maxItems": 2,
                   "items": {
                     "$ref": "#/$defs/b2_o4"
                   }
@@ -13603,6 +13791,434 @@
               "$ref": "#/$defs/b2_o1"
             }
           }
+        }
+      }
+    },
+    "p5a_frame_update_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "animationUpdates",
+        "evaluations",
+        "postUpdates",
+        "meshTicks"
+      ],
+      "properties": {
+        "animationUpdates": {
+          "type": "integer",
+          "const": 1
+        },
+        "evaluations": {
+          "type": "integer",
+          "const": 1
+        },
+        "postUpdates": {
+          "type": "integer",
+          "const": 1
+        },
+        "meshTicks": {
+          "type": "integer",
+          "const": 1
+        }
+      }
+    },
+    "p5a_action_lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alpha",
+        "remainingSeconds",
+        "beginWeight",
+        "currentWeight",
+        "desiredWeight",
+        "blendingOut",
+        "traversalFinished"
+      ],
+      "properties": {
+        "alpha": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "remainingSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3.4028235e+38
+        },
+        "beginWeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "currentWeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "desiredWeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blendingOut": {
+          "type": "boolean"
+        },
+        "traversalFinished": {
+          "type": "boolean"
+        }
+      }
+    },
+    "p5a_native_audit_dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetObjectPath",
+        "assetStableId",
+        "assetPackageSha256",
+        "assetClassPath",
+        "events"
+      ],
+      "properties": {
+        "assetObjectPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "assetStableId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "assetPackageSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "assetClassPath": {
+          "enum": [
+            "/Script/Engine.AnimSequence",
+            "/Script/Engine.BlendSpace",
+            "/Script/Engine.BlendSpace1D"
+          ]
+        },
+        "events": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/p5a_native_audit_event"
+          }
+        }
+      }
+    },
+    "p5a_native_audit_dependency_0": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Base/A_Als_Idle.A_Als_Idle"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 0,
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_1": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Grounded/Lean/BS_Als_Lean.BS_Als_Lean"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 0,
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_2": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Grounded/WalkRun/BS_Als_WalkRun_Forward.BS_Als_WalkRun_Forward"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 0,
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_3": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Overlays/Other/A_Als_Default_Poses.A_Als_Default_Poses"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 0,
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_4": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Transitions/A_Als_CrouchToStand.A_Als_CrouchToStand"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/p5a_native_audit_event_b8fb558141cba57d764453522a35a2e41d14f48c" },
+                { "$ref": "#/$defs/p5a_native_audit_event_54b1f5d2f42f2c4e347e3b2f0daf2df277773a8c" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_5": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Transitions/A_Als_StandToCrouch.A_Als_StandToCrouch"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/p5a_native_audit_event_c1bad251b4a8b5c278b2b176c0511e57927efba7" },
+                { "$ref": "#/$defs/p5a_native_audit_event_d7f672e5d8d58833394ff17bbf23f8bf40d4adae" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_6": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Transitions/A_Als_Stand_Transition_Right.A_Als_Stand_Transition_Right"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/p5a_native_audit_event_31009e422b1cc9903e0d851dd26d730acd39e802" },
+                { "$ref": "#/$defs/p5a_native_audit_event_3b22dbb668b87ea06ce5b7c593a6b3d6acb42dcd" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_7": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/Transitions/A_Als_Stop_Left.A_Als_Stop_Left"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/p5a_native_audit_event_7df629e5830201a5308443184652a050529411ef" },
+                { "$ref": "#/$defs/p5a_native_audit_event_51b2b24f1f74a61ee88e2589d9beca46759b7340" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_dependency_8": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_dependency" },
+        {
+          "properties": {
+            "assetObjectPath": {
+              "const": "/ALS/ALS/Animations/View/BS_Als_Look.BS_Als_Look"
+            },
+            "events": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 0,
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "p5a_native_audit_event_b8fb558141cba57d764453522a35a2e41d14f48c": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "b8fb558141cba57d764453522a35a2e41d14f48c" } } }
+      ]
+    },
+    "p5a_native_audit_event_54b1f5d2f42f2c4e347e3b2f0daf2df277773a8c": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "54b1f5d2f42f2c4e347e3b2f0daf2df277773a8c" } } }
+      ]
+    },
+    "p5a_native_audit_event_c1bad251b4a8b5c278b2b176c0511e57927efba7": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "c1bad251b4a8b5c278b2b176c0511e57927efba7" } } }
+      ]
+    },
+    "p5a_native_audit_event_d7f672e5d8d58833394ff17bbf23f8bf40d4adae": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "d7f672e5d8d58833394ff17bbf23f8bf40d4adae" } } }
+      ]
+    },
+    "p5a_native_audit_event_31009e422b1cc9903e0d851dd26d730acd39e802": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "31009e422b1cc9903e0d851dd26d730acd39e802" } } }
+      ]
+    },
+    "p5a_native_audit_event_3b22dbb668b87ea06ce5b7c593a6b3d6acb42dcd": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "3b22dbb668b87ea06ce5b7c593a6b3d6acb42dcd" } } }
+      ]
+    },
+    "p5a_native_audit_event_7df629e5830201a5308443184652a050529411ef": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "7df629e5830201a5308443184652a050529411ef" } } }
+      ]
+    },
+    "p5a_native_audit_event_51b2b24f1f74a61ee88e2589d9beca46759b7340": {
+      "allOf": [
+        { "$ref": "#/$defs/p5a_native_audit_event" },
+        { "properties": { "stableEventId": { "const": "51b2b24f1f74a61ee88e2589d9beca46759b7340" } } }
+      ]
+    },
+    "p5a_native_audit_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stableEventId",
+        "sourceClassPath",
+        "sourceIndex",
+        "trackIndex",
+        "timeSeconds",
+        "durationSeconds",
+        "triggerWeightThreshold",
+        "tickMode"
+      ],
+      "properties": {
+        "stableEventId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sourceClassPath": {
+          "const": "/Script/ALS.AlsAnimNotify_FootstepEffects"
+        },
+        "sourceIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "trackIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "timeSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3.4028235e+38
+        },
+        "durationSeconds": {
+          "const": 0
+        },
+        "triggerWeightThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "tickMode": {
+          "const": "Queued"
+        }
+      }
+    },
+    "p5a_compressed_curves": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "leftIk",
+        "rightIk",
+        "leftLock",
+        "rightLock",
+        "allowTransitions"
+      ],
+      "properties": {
+        "leftIk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rightIk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "leftLock": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rightLock": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "allowTransitions": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }

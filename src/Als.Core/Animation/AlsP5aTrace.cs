@@ -13,8 +13,6 @@ using GodotAls.Core.Events;
 using GodotAls.Core.Sync;
 using GodotAls.Core.Transitions;
 
-[assembly: InternalsVisibleTo("Als.P5aOracle")]
-
 namespace GodotAls.Core.Animation;
 
 public static class AlsP5aTrace
@@ -31,7 +29,7 @@ public static class AlsP5aTrace
     private static ulong LastShadowExecutionDigest;
 
 
-    internal static byte[] BuildNativePlan() =>
+    public static byte[] BuildNativePlan() =>
         P5aFrozenPlanDocuments.CanonicalBytes(P5aFrozenPlanDocuments.Create().Plan);
     public static void WriteCanonicalPair(
         string rawPath,
@@ -45,6 +43,7 @@ public static class AlsP5aTrace
         var preflight = PreflightInputs(rawPath, tracePlanPath, PreflightRepresentation.NativeRaw);
         ValidatePreflightResult(ref preflight);
         var materialized = MaterializeAndReplay(preflight, occurrenceLayout, runtimeBindings, graphDigest);
+        ValidateFrozenPlanAndNativeEvidence(materialized);
         ReplaySummary replay;
         try
         {
@@ -55,6 +54,21 @@ public static class AlsP5aTrace
             throw ReplayFailureWithPlanPath(materialized.Plan, exception);
         }
         WriteReplayOutputs(materialized, replay, nativeCanonicalPath, portCanonicalPath);
+    }
+
+    private static void ValidateFrozenPlanAndNativeEvidence(MaterializedInputs materialized)
+    {
+        var frozen = P5aFrozenPlanDocuments.Create();
+        if (!JsonNode.DeepEquals(materialized.Plan, frozen.Plan))
+        {
+            var differencePath = FindFirstDifferencePath(materialized.Plan, frozen.Plan, "$plan");
+            throw new InvalidDataException(
+                $"P5A trace plan differs from the frozen plan at {differencePath}.");
+        }
+        AlsP5aNativeEvidence.Validate(
+            materialized.Plan,
+            materialized.First,
+            frozen.Raw["nativeReferenceAudit"]!.AsObject());
     }
 
     public static void VerifyFixture(
@@ -378,6 +392,7 @@ public static class AlsP5aTrace
                 TryRequireExact(path, "$/markerMap", count, 2, label) ||
                 TryRequireExact(path, "$/sectionMap", count, 1, label) ||
                 TryRequireExact(path, "$/nativeOnlyEventMap", count, 7, label) ||
+                TryRequireExact(path, "$/nativeAuditDependencies", count, 9, label) ||
                 TryRequireExact(path, "$/cases", count, 8, label))
             {
                 return;
@@ -388,6 +403,12 @@ public static class AlsP5aTrace
                 RequireExactArray(path, count, FrozenSourceVariantCount(sourceIndex), label);
                 return;
             }
+            if (TryGetIndexedPath(path, "$/nativeAuditDependencies/", "/events", out var dependencyIndex) &&
+                (uint)dependencyIndex < 9u)
+            {
+                RequireMaximumArray(path, count, 2, label);
+                return;
+            }
         }
         else if (representation == PreflightRepresentation.NativeRaw)
         {
@@ -395,6 +416,7 @@ public static class AlsP5aTrace
                 TryRequireExact(path, "$/nativeReferenceAudit/assets", count, 11, label) ||
                 TryRequireExact(path, "$/nativeReferenceAudit/events", count, 19, label) ||
                 TryRequireExact(path, "$/nativeReferenceAudit/markers", count, 2, label) ||
+                TryRequireExact(path, "$/nativeReferenceAudit/auxiliaryAssets", count, 9, label) ||
                 TryRequireExact(path, "$/nativeReferenceAudit/curveInventories", count, 5, label))
             {
                 return;
@@ -404,6 +426,12 @@ public static class AlsP5aTrace
                 (uint)inventoryIndex < 5u)
             {
                 RequireMaximumArray(path, count, 3, label);
+                return;
+            }
+            if (TryGetIndexedPath(path, "$/nativeReferenceAudit/auxiliaryAssets/", "/events", out var dependencyIndex) &&
+                (uint)dependencyIndex < 9u)
+            {
+                RequireMaximumArray(path, count, 2, label);
                 return;
             }
         }
@@ -613,6 +641,7 @@ public static class AlsP5aTrace
         if (first["representation"]?.GetValue<string>() == "native_raw")
         {
             ValidateRawReceiptZeroBits(first);
+            ValidateNativeFrameAudits(first);
             NormalizeNegativeZeros(first);
         }
         ValidateHostAndPlan(first, plan, preflight.PlanBytes, occurrenceLayout, runtimeBindings, graphDigest);
@@ -644,6 +673,30 @@ public static class AlsP5aTrace
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private static void ValidateNativeFrameAudits(JsonObject raw)
+    {
+        foreach (var caseNode in raw["cases"]!.AsArray())
+        foreach (var frameNode in caseNode!["frames"]!.AsArray())
+        {
+            var actual = frameNode!["nativeActual"]!.AsObject();
+            if (actual["frameUpdateAudit"] is not JsonObject counters || counters.Count != 4)
+                throw new InvalidDataException("P5A frameUpdateAudit must contain four measured counters.");
+            foreach (var name in new[] { "animationUpdates", "evaluations", "postUpdates", "meshTicks" })
+            {
+                if (counters[name] is not JsonValue node || !node.TryGetValue<int>(out var count) || count != 1)
+                    throw new InvalidDataException($"P5A frameUpdateAudit '{name}' must be the integer 1.");
+            }
+            if (actual["canonicalAssetOracle"]?["compressedCurves"] is not JsonObject curves || curves.Count != 5)
+                throw new InvalidDataException("P5A compressedCurves must contain five independent audit scalars.");
+            foreach (var name in new[] { "leftIk", "rightIk", "leftLock", "rightLock", "allowTransitions" })
+            {
+                if (curves[name] is not JsonValue node || !node.TryGetValue<float>(out var value) ||
+                    !float.IsFinite(value) || value < 0f || value > 1f)
+                    throw new InvalidDataException($"P5A compressedCurves '{name}' must be finite and in [0,1].");
             }
         }
     }
@@ -688,12 +741,12 @@ public static class AlsP5aTrace
         scoped in AlsP5RuntimeBindings runtimeBindings,
         ulong graphDigest)
     {
-        if (plan["schemaVersion"]?.GetValue<int>() != 1 ||
+        if (plan["schemaVersion"]?.GetValue<int>() != 2 ||
             plan["kind"]?.GetValue<string>() != "p5a_trace_plan")
         {
             throw new InvalidDataException("P5A plan schemaVersion or kind is invalid.");
         }
-        if (first["schemaVersion"]?.GetValue<int>() != 1)
+        if (first["schemaVersion"]?.GetValue<int>() != 2)
         {
             throw new InvalidDataException("P5A input schemaVersion is invalid.");
         }
@@ -703,7 +756,7 @@ public static class AlsP5aTrace
             throw new InvalidDataException("P5A input tracePlanSha256 does not match the plan bytes.");
         }
         if (occurrenceLayout.Version != 1 || occurrenceLayout.Digest != 0xd6fef54173240d32UL ||
-            runtimeBindings.Version != 1 || runtimeBindings.Digest != 0x2b4be600d531c734UL ||
+            runtimeBindings.Version != 2 || runtimeBindings.Digest != 0xe458fef4df7a854dUL ||
             graphDigest != 0x44403c2869d8f615UL)
         {
             throw new InvalidDataException("P5A host snapshot does not match the frozen plan.");
@@ -801,65 +854,531 @@ public static class AlsP5aTrace
         {
             throw new InvalidDataException("P5A occurrence layout is empty.");
         }
-        var frozen = P5aFrozenPlanDocuments.Create();
-        if (!JsonNode.DeepEquals(materialized.Plan, frozen.Plan))
-        {
-            var differencePath = FindFirstDifferencePath(materialized.Plan, frozen.Plan, "$plan");
-            throw new InvalidDataException(
-                $"P5A trace plan differs from the frozen plan at {differencePath}.");
-        }
-        var comparableRaw = materialized.First.DeepClone().AsObject();
-        NormalizeRawOnlyVisualWeights(comparableRaw, frozen.Raw);
-        if (!JsonNode.DeepEquals(comparableRaw, frozen.Raw))
-        {
-            throw new InvalidDataException("P5A native raw input differs from the frozen evidence.");
-        }
-        var native = frozen.NativeCanonical.DeepClone().AsObject();
+        var native = ProjectNativeCanonical(materialized.Plan, materialized.First);
         ValidateCrossEnginePair(native, replay.PortCanonical);
         WriteCanonicalDocument(nativeCanonicalPath, native);
         WriteCanonicalDocument(portCanonicalPath, replay.PortCanonical);
     }
 
-    private static void NormalizeRawOnlyVisualWeights(JsonObject actual, JsonObject expected)
+    // WriteReplayOutputs supplies plan-locked, schema-validated raw evidence. This projector
+    // enforces crosswalk identities but is not a second full raw-document validator.
+    internal static JsonObject ProjectNativeCanonical(JsonObject plan, JsonObject raw)
     {
-        if (actual["cases"] is not JsonArray actualCases || expected["cases"] is not JsonArray expectedCases)
+        var planCases = plan["cases"]!.AsArray();
+        var rawCases = raw["cases"]!.AsArray();
+        if (planCases.Count != rawCases.Count)
         {
-            return;
+            throw new InvalidDataException("P5A native projection case count differs from the plan.");
         }
-        for (var caseIndex = 0; caseIndex < System.Math.Min(actualCases.Count, expectedCases.Count); caseIndex++)
+
+        var cases = new JsonArray();
+        for (var caseIndex = 0; caseIndex < planCases.Count; caseIndex++)
         {
-            if (actualCases[caseIndex]?["frames"] is not JsonArray actualFrames ||
-                expectedCases[caseIndex]?["frames"] is not JsonArray expectedFrames)
+            var planCase = planCases[caseIndex]!.AsObject();
+            var rawCase = rawCases[caseIndex]!.AsObject();
+            var planFrames = planCase["frames"]!.AsArray();
+            var rawFrames = rawCase["frames"]!.AsArray();
+            if (planFrames.Count != rawFrames.Count)
+            {
+                throw new InvalidDataException($"P5A native projection frame count differs in case {caseIndex}.");
+            }
+
+            var frames = new JsonArray();
+            for (var frameIndex = 0; frameIndex < planFrames.Count; frameIndex++)
+            {
+                var planFrame = planFrames[frameIndex]!.AsObject();
+                var rawFrame = rawFrames[frameIndex]!.AsObject();
+                if (rawFrame["frameIndex"]!.GetValue<int>() != frameIndex ||
+                    planFrame["frameIndex"]!.GetValue<int>() != frameIndex)
+                {
+                    throw new InvalidDataException(
+                        $"P5A native projection frame index is invalid at case {caseIndex} frame {frameIndex}.");
+                }
+                frames.Add(new JsonObject
+                {
+                    ["frameIndex"] = frameIndex,
+                    ["identity"] = planFrame["input"]!["identity"]!.DeepClone(),
+                    ["comparableActual"] = ProjectNativeComparable(
+                        plan, rawFrame["nativeActual"]!.AsObject(), caseIndex, frameIndex),
+                });
+            }
+            cases.Add(new JsonObject
+            {
+                ["ordinal"] = planCase["ordinal"]!.DeepClone(),
+                ["caseId"] = planCase["caseId"]!.DeepClone(),
+                ["frames"] = frames,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["schemaVersion"] = raw["schemaVersion"]!.DeepClone(),
+            ["kind"] = "p5a_trace",
+            ["representation"] = "native_canonical",
+            ["tracePlanSha256"] = raw["tracePlanSha256"]!.DeepClone(),
+            ["reference"] = raw["reference"]!.DeepClone(),
+            ["snapshot"] = raw["snapshot"]!.DeepClone(),
+            ["provenance"] = "native_canonical_v1",
+            ["cases"] = cases,
+        };
+    }
+
+    private static JsonObject ProjectNativeComparable(
+        JsonObject plan,
+        JsonObject actual,
+        int caseIndex,
+        int frameIndex)
+    {
+        var oracle = actual["canonicalAssetOracle"]!.AsObject();
+        return new JsonObject
+        {
+            ["curves"] = oracle["curves"]!.DeepClone(),
+            ["sync"] = ProjectNativeSync(plan, oracle["sync"]!.AsObject()),
+            ["dynamicTransition"] = ProjectNativeTransition(
+                plan, actual["dynamicTransition"]!.AsObject(), caseIndex, frameIndex),
+            ["actionPlayback"] = ProjectNativeActionPlayback(
+                plan, actual["actionPlayback"]!.AsObject(), caseIndex, frameIndex),
+            ["events"] = ProjectNativeEvents(
+                plan, oracle["events"]!.AsArray(), caseIndex, frameIndex),
+            ["actionOutcomes"] = ProjectNativeOutcomes(plan, actual["actionOutcomes"]!.AsArray()),
+            ["stateAfter"] = ProjectNativeState(
+                plan, actual["stateAfter"]!.AsObject(), oracle["activeNotifyStates"]!.AsArray(),
+                caseIndex, frameIndex),
+        };
+    }
+
+    private static JsonObject ProjectNativeSync(JsonObject plan, JsonObject sync)
+    {
+        if (!sync["active"]!.GetValue<bool>())
+        {
+            return ProjectedInactiveSync();
+        }
+        var source = ResolveObservedCanonicalSource(plan, sync["leader"]!.AsObject());
+        RequireProjectedSourceKind(source, "Base", "sync leader");
+        return new JsonObject
+        {
+            ["active"] = true,
+            ["leaderTraceSourceId"] = source["traceSourceId"]!.GetValue<string>(),
+            ["activationOrdinal"] = sync["nativeInstanceOrdinal"]!.DeepClone(),
+            ["previousMarkerStableId"] = ResolveObservedCanonicalMarker(
+                plan, source, sync["previousMarker"]!.AsObject()),
+            ["nextMarkerStableId"] = ResolveObservedCanonicalMarker(
+                plan, source, sync["nextMarker"]!.AsObject()),
+            ["cycle"] = sync["cycle"]!.DeepClone(),
+            ["phase"] = sync["phase"]!.DeepClone(),
+            ["leftFootPhase"] = sync["leftFootPhase"]!.DeepClone(),
+            ["rightFootPhase"] = sync["rightFootPhase"]!.DeepClone(),
+        };
+    }
+
+    private static JsonObject ProjectedInactiveSync() => new()
+    {
+        ["active"] = false, ["leaderTraceSourceId"] = string.Empty, ["activationOrdinal"] = "0",
+        ["previousMarkerStableId"] = string.Empty, ["nextMarkerStableId"] = string.Empty,
+        ["cycle"] = "0", ["phase"] = 0f, ["leftFootPhase"] = 0f, ["rightFootPhase"] = 0f,
+    };
+
+    private static JsonObject ProjectNativeTransition(
+        JsonObject plan,
+        JsonObject transition,
+        int caseIndex,
+        int frameIndex)
+    {
+        if (!transition["active"]!.GetValue<bool>() || caseIndex is 2 or 3 or 4 && frameIndex == 0)
+        {
+            return ProjectedInactiveTransition();
+        }
+        var source = ResolveObservedNativeSource(plan, transition["source"]!.AsObject());
+        RequireProjectedSourceKind(source, "Transition", "dynamic transition");
+        return new JsonObject
+        {
+            ["active"] = true,
+            ["traceSourceId"] = source["traceSourceId"]!.GetValue<string>(),
+            ["activationOrdinal"] = transition["nativeInstanceOrdinal"]!.DeepClone(),
+            ["foot"] = transition["foot"]!.DeepClone(),
+            ["previousTimeSeconds"] = transition["previousTimeSeconds"]!.DeepClone(),
+            ["currentTimeSeconds"] = transition["currentTimeSeconds"]!.DeepClone(),
+            ["playRate"] = transition["playRate"]!.DeepClone(),
+        };
+    }
+
+    private static JsonObject ProjectedInactiveTransition() => new()
+    {
+        ["active"] = false, ["traceSourceId"] = string.Empty, ["activationOrdinal"] = "0",
+        ["foot"] = "Left", ["previousTimeSeconds"] = 0f, ["currentTimeSeconds"] = 0f,
+        ["playRate"] = 0f,
+    };
+
+    private static JsonObject ProjectNativeActionPlayback(
+        JsonObject plan,
+        JsonObject playback,
+        int caseIndex,
+        int frameIndex)
+    {
+        var status = playback["status"]!.GetValue<string>();
+        if (status == "Inactive" || caseIndex is 5 or 6 or 7 && frameIndex == 0)
+        {
+            return ProjectedInactiveAction();
+        }
+        if (status is not ("Playing" or "ClosingThisFrame"))
+        {
+            throw new InvalidDataException($"P5A native action playback status '{status}' is invalid.");
+        }
+        var montage = ResolveObservedNativeSource(plan, playback["montageSource"]!.AsObject());
+        var segment = ResolveObservedNativeSource(plan, playback["segmentSource"]!.AsObject());
+        RequireProjectedSourceKind(montage, "ActionMontage", "action montage");
+        RequireProjectedSourceKind(segment, "ActionSequence", "action segment");
+        var canonicalSection = montage["canonicalEvidence"]!["sectionName"]!.GetValue<string>();
+        var canonicalSegmentIndex = segment["canonicalEvidence"]!["segmentIndex"]!.GetValue<int>();
+        if (playback["currentSectionName"]!.GetValue<string>() != canonicalSection ||
+            playback["segmentIndex"]!.GetValue<int>() != canonicalSegmentIndex)
+        {
+            throw new InvalidDataException("P5A native action section or segment index is inconsistent.");
+        }
+        return new JsonObject
+        {
+            ["active"] = true,
+            ["montageTraceSourceId"] = montage["traceSourceId"]!.GetValue<string>(),
+            ["segmentTraceSourceId"] = segment["traceSourceId"]!.GetValue<string>(),
+            ["activationOrdinal"] = playback["nativeInstanceOrdinal"]!.DeepClone(),
+            ["currentSectionName"] = canonicalSection,
+            ["segmentIndex"] = canonicalSegmentIndex,
+            ["previousMontageTimeSeconds"] = playback["previousMontageTimeSeconds"]!.DeepClone(),
+            ["currentMontageTimeSeconds"] = playback["currentMontageTimeSeconds"]!.DeepClone(),
+            ["previousClipTimeSeconds"] = playback["previousClipTimeSeconds"]!.DeepClone(),
+            ["currentClipTimeSeconds"] = playback["currentClipTimeSeconds"]!.DeepClone(),
+            ["finalSegmentDeltaSeconds"] = playback["finalSegmentDeltaSeconds"]!.DeepClone(),
+            ["playRate"] = playback["playRate"]!.DeepClone(),
+        };
+    }
+
+    private static JsonObject ProjectedInactiveAction() => new()
+    {
+        ["active"] = false, ["montageTraceSourceId"] = string.Empty,
+        ["segmentTraceSourceId"] = string.Empty, ["activationOrdinal"] = "0",
+        ["currentSectionName"] = string.Empty, ["segmentIndex"] = -1,
+        ["previousMontageTimeSeconds"] = 0f, ["currentMontageTimeSeconds"] = 0f,
+        ["previousClipTimeSeconds"] = 0f, ["currentClipTimeSeconds"] = 0f,
+        ["finalSegmentDeltaSeconds"] = 0f, ["playRate"] = 0f,
+    };
+
+    private static JsonArray ProjectNativeEvents(
+        JsonObject plan,
+        JsonArray events,
+        int caseIndex,
+        int frameIndex)
+    {
+        var projected = new List<(JsonObject Value, float Offset, int Phase, string TraceEventId)>();
+        foreach (var eventNode in events)
+        {
+            var observed = eventNode!.AsObject();
+            var phase = observed["phase"]!.GetValue<string>();
+            var kind = observed["kind"]!.GetValue<string>();
+            if (caseIndex is 5 or 6 or 7 && frameIndex == 0 ||
+                caseIndex is 5 or 6 or 7 && frameIndex == 1 && phase == "Begin" ||
+                caseIndex is 5 or 7 && frameIndex == 56 && phase == "End" && kind == "SetAction")
             {
                 continue;
             }
-            for (var frameIndex = 0;
-                 frameIndex < System.Math.Min(actualFrames.Count, expectedFrames.Count);
-                 frameIndex++)
+            var source = ResolveObservedCanonicalSource(plan, observed["source"]!.AsObject());
+            var mapping = ResolveObservedCanonicalEvent(plan, source, observed, requireFullEvidence: true);
+            var traceEventId = mapping["traceEventId"]!.GetValue<string>();
+            var offset = observed["observedFrameOffsetSeconds"]!.GetValue<float>();
+            var value = new JsonObject
             {
-                if (actualFrames[frameIndex]?["nativeActual"]?["actionVisualContribution"] is not JsonObject visual ||
-                    expectedFrames[frameIndex]?["nativeActual"]?["actionVisualContribution"]?["observedEffectiveWeight"]
-                        is not JsonNode expectedWeight ||
-                    visual["observedEffectiveWeight"] is not JsonValue weightNode ||
-                    !weightNode.TryGetValue<float>(out var weight) ||
-                    visual["contributing"] is not JsonValue contributingNode ||
-                    !contributingNode.TryGetValue<bool>(out var contributing))
-                {
-                    continue;
-                }
-                if (!float.IsFinite(weight) || weight < 0f || weight > 1f || (!contributing && weight != 0f))
-                {
-                    throw new InvalidDataException(
-                        "P5A actionVisualContribution observedEffectiveWeight is invalid.");
-                }
-                visual["observedEffectiveWeight"] = expectedWeight.DeepClone();
+                ["traceEventId"] = traceEventId,
+                ["traceSourceId"] = source["traceSourceId"]!.GetValue<string>(),
+                ["activationOrdinal"] = observed["nativeInstanceOrdinal"]!.DeepClone(),
+                ["playbackCycle"] = observed["playbackCycle"]!.DeepClone(),
+                ["frameEventOrdinal"] = 0,
+                ["boundaryOrdinal"] = observed["boundaryOrdinal"]!.DeepClone(),
+                ["frameOffsetSeconds"] = observed["observedFrameOffsetSeconds"]!.DeepClone(),
+                ["kind"] = observed["kind"]!.DeepClone(),
+                ["phase"] = observed["phase"]!.DeepClone(),
+                ["payload"] = ProjectNativePayload(observed),
+            };
+            projected.Add((value, offset, ProjectedPhaseRank(phase), traceEventId));
+        }
+        projected.Sort(static (left, right) =>
+        {
+            var result = left.Offset.CompareTo(right.Offset);
+            if (result != 0) return result;
+            result = left.Phase.CompareTo(right.Phase);
+            return result != 0 ? result : string.CompareOrdinal(left.TraceEventId, right.TraceEventId);
+        });
+        var result = new JsonArray();
+        for (var index = 0; index < projected.Count; index++)
+        {
+            projected[index].Value["frameEventOrdinal"] = index;
+            result.Add(projected[index].Value);
+        }
+        return result;
+    }
+
+    private static JsonObject ProjectNativePayload(JsonObject observed)
+    {
+        var reason = observed["nativeTerminationReason"]!.GetValue<string>() switch
+        {
+            "None" => "None",
+            "Cancelled" when observed["phase"]!.GetValue<string>() == "End" =>
+                "InterruptedByExplicitCancel",
+            var invalid => throw new InvalidDataException(
+                $"P5A native canonical event termination reason '{invalid}' is invalid."),
+        };
+        var payload = observed["payload"]!.AsObject();
+        return new JsonObject
+        {
+            ["semanticId"] = payload["semanticId"]!.DeepClone(),
+            ["enumValue0"] = payload["enumValue0"]!.DeepClone(),
+            ["enumValue1"] = payload["enumValue1"]!.DeepClone(),
+            ["enumValue2"] = payload["enumValue2"]!.DeepClone(),
+            ["scalarValue0"] = payload["scalarValue0"]!.DeepClone(),
+            ["flags"] = payload["flags"]!.DeepClone(),
+            ["terminationReason"] = reason,
+        };
+    }
+
+    private static int ProjectedPhaseRank(string phase) => phase switch
+    {
+        "End" => 0, "Trigger" => 1, "Begin" => 2, "Tick" => 3,
+        _ => throw new InvalidDataException($"P5A canonical event phase '{phase}' is invalid."),
+    };
+
+    private static JsonArray ProjectNativeOutcomes(JsonObject plan, JsonArray outcomes)
+    {
+        var result = new JsonArray();
+        foreach (var outcomeNode in outcomes)
+        {
+            var outcome = outcomeNode!.AsObject();
+            var reason = outcome["nativeReason"]!.GetValue<string>();
+            var callback = outcome["callback"]!.GetValue<string>();
+            var interrupted = outcome["interrupted"]!.GetValue<bool>();
+            var resultCode = (reason, callback, interrupted) switch
+            {
+                ("Started", "MontageStarted", false) => "Accepted",
+                ("Finished", "MontageEnded", false) => "Completed",
+                ("Cancelled", "MontageBlendingOutStarted", true) => "InterruptedByExplicitCancel",
+                _ => throw new InvalidDataException(
+                    $"P5A native action outcome tuple '{reason}/{callback}/{interrupted}' is invalid."),
+            };
+            var source = ResolveObservedNativeSource(plan, outcome["actionSource"]!.AsObject());
+            RequireProjectedSourceKind(source, "ActionMontage", "action outcome");
+            result.Add(new JsonObject
+            {
+                ["actionTraceSourceId"] = source["traceSourceId"]!.GetValue<string>(),
+                ["activationOrdinal"] = outcome["nativeInstanceOrdinal"]!.DeepClone(),
+                ["resultCode"] = resultCode,
+            });
+        }
+        return result;
+    }
+
+    private static JsonObject ProjectNativeState(
+        JsonObject plan,
+        JsonObject state,
+        JsonArray owners,
+        int caseIndex,
+        int frameIndex)
+    {
+        var actionPlaying = state["actionPlaying"]!.GetValue<bool>();
+        var transitionPlaying = state["transitionPlaying"]!.GetValue<bool>();
+        var hideTransition = caseIndex is 2 or 3 or 4 && frameIndex == 0;
+        var actionSource = actionPlaying
+            ? ResolveObservedNativeSource(plan, state["actionSource"]!.AsObject())
+            : null;
+        var transitionSource = transitionPlaying && !hideTransition
+            ? ResolveObservedNativeSource(plan, state["transitionSource"]!.AsObject())
+            : null;
+        if (actionSource is not null) RequireProjectedSourceKind(actionSource, "ActionMontage", "action state");
+        if (transitionSource is not null)
+            RequireProjectedSourceKind(transitionSource, "Transition", "transition state");
+        return new JsonObject
+        {
+            ["actionPlaying"] = actionPlaying,
+            ["actionTraceSourceId"] = actionSource?["traceSourceId"]?.GetValue<string>() ?? string.Empty,
+            ["actionActivationOrdinal"] = actionPlaying
+                ? state["actionNativeInstanceOrdinal"]!.DeepClone() : JsonValue.Create("0"),
+            ["actionTimeSeconds"] = actionPlaying
+                ? state["actionTimeSeconds"]!.DeepClone() : JsonValue.Create(0f),
+            ["transitionPlaying"] = transitionPlaying && !hideTransition,
+            ["transitionTraceSourceId"] = transitionSource?["traceSourceId"]?.GetValue<string>() ?? string.Empty,
+            ["transitionActivationOrdinal"] = transitionPlaying && !hideTransition
+                ? state["transitionNativeInstanceOrdinal"]!.DeepClone() : JsonValue.Create("0"),
+            ["transitionTimeSeconds"] = transitionPlaying && !hideTransition
+                ? state["transitionTimeSeconds"]!.DeepClone() : JsonValue.Create(0f),
+            ["transitionCooldownFrames"] = state["transitionCooldownFrames"]!.DeepClone(),
+            ["transitionFoot"] = state["transitionFoot"]!.DeepClone(),
+            ["activeNotifyStates"] = ProjectNativeOwners(plan, owners, caseIndex, frameIndex),
+        };
+    }
+
+    private static JsonArray ProjectNativeOwners(
+        JsonObject plan,
+        JsonArray owners,
+        int caseIndex,
+        int frameIndex)
+    {
+        var result = new JsonArray();
+        if (caseIndex is 5 or 6 or 7 && frameIndex == 0)
+        {
+            return result;
+        }
+        foreach (var ownerNode in owners)
+        {
+            var owner = ownerNode!.AsObject();
+            var source = ResolveObservedCanonicalSource(plan, owner["source"]!.AsObject());
+            var mapping = ResolveObservedCanonicalEvent(plan, source, owner, requireFullEvidence: false);
+            result.Add(new JsonObject
+            {
+                ["traceEventId"] = mapping["traceEventId"]!.GetValue<string>(),
+                ["traceSourceId"] = source["traceSourceId"]!.GetValue<string>(),
+                ["activationOrdinal"] = owner["nativeInstanceOrdinal"]!.DeepClone(),
+                ["playbackCycle"] = owner["playbackCycle"]!.DeepClone(),
+            });
+        }
+        return result;
+    }
+
+    private static JsonObject ResolveObservedCanonicalSource(JsonObject plan, JsonObject observed)
+    {
+        JsonObject? match = null;
+        foreach (var sourceNode in plan["sources"]!.AsArray())
+        {
+            var source = sourceNode!.AsObject();
+            var evidence = source["canonicalEvidence"]!.AsObject();
+            if (!ObservedCanonicalSourceMatches(observed, evidence)) continue;
+            if (match is not null)
+                throw new InvalidDataException("P5A canonical observed source is ambiguous.");
+            match = source;
+        }
+        return match ?? throw new InvalidDataException("P5A canonical observed source is unresolved.");
+    }
+
+    private static bool ObservedCanonicalSourceMatches(JsonObject observed, JsonObject evidence) =>
+        observed["observedAssetObjectPath"]!.GetValue<string>() == evidence["assetObjectPath"]!.GetValue<string>() &&
+        observed["observedAssetStableId"]!.GetValue<string>() == evidence["assetStableId"]!.GetValue<string>() &&
+        observed["observedAssetClassPath"]!.GetValue<string>() == evidence["assetClassPath"]!.GetValue<string>() &&
+        observed["observedMontageStableId"]!.GetValue<string>() == evidence["montageStableId"]!.GetValue<string>() &&
+        observed["observedSectionName"]!.GetValue<string>() == evidence["sectionName"]!.GetValue<string>() &&
+        observed["observedSlotName"]!.GetValue<string>() == evidence["slotName"]!.GetValue<string>() &&
+        observed["observedSegmentIndex"]!.GetValue<int>() == evidence["segmentIndex"]!.GetValue<int>();
+
+    private static JsonObject ResolveObservedNativeSource(JsonObject plan, JsonObject observed)
+    {
+        JsonObject? match = null;
+        foreach (var sourceNode in plan["sources"]!.AsArray())
+        {
+            var source = sourceNode!.AsObject();
+            foreach (var variantNode in source["nativeVariants"]!.AsArray())
+            {
+                var variant = variantNode!.AsObject();
+                if (!ObservedNativeSourceMatches(observed, variant)) continue;
+                if (match is not null)
+                    throw new InvalidDataException("P5A native observed source is ambiguous.");
+                match = source;
             }
+        }
+        return match ?? throw new InvalidDataException("P5A native observed source is unresolved.");
+    }
+
+    private static bool ObservedNativeSourceMatches(JsonObject observed, JsonObject evidence) =>
+        observed["observedAssetObjectPath"]!.GetValue<string>() == evidence["assetObjectPath"]!.GetValue<string>() &&
+        observed["observedAssetStableId"]!.GetValue<string>() == evidence["assetStableId"]!.GetValue<string>() &&
+        observed["observedAssetPackageSha256"]!.GetValue<string>() == evidence["assetPackageSha256"]!.GetValue<string>() &&
+        observed["observedAssetClassPath"]!.GetValue<string>() == evidence["assetClassPath"]!.GetValue<string>() &&
+        observed["observedMontageObjectPath"]!.GetValue<string>() == evidence["montageObjectPath"]!.GetValue<string>() &&
+        observed["observedMontageStableId"]!.GetValue<string>() == evidence["montageStableId"]!.GetValue<string>() &&
+        observed["observedSectionName"]!.GetValue<string>() == evidence["sectionName"]!.GetValue<string>() &&
+        observed["observedSlotName"]!.GetValue<string>() == evidence["slotName"]!.GetValue<string>() &&
+        observed["observedSegmentIndex"]!.GetValue<int>() == evidence["segmentIndex"]!.GetValue<int>();
+
+    private static void RequireProjectedSourceKind(JsonObject source, string expected, string context)
+    {
+        if (source["layoutKey"]!["sourceKind"]!.GetValue<string>() != expected)
+        {
+            throw new InvalidDataException($"P5A projected {context} source kind is invalid.");
         }
     }
 
-    private static string FindFirstDifferencePath(JsonNode? actual, JsonNode? expected, string path)
+    private static string ResolveObservedCanonicalMarker(
+        JsonObject plan,
+        JsonObject source,
+        JsonObject observed)
     {
-        if (JsonNode.DeepEquals(actual, expected))
+        string? result = null;
+        foreach (var markerNode in plan["markerMap"]!.AsArray())
+        {
+            var marker = markerNode!.AsObject();
+            var evidence = marker["canonicalEvidence"]!.AsObject();
+            if (marker["traceSourceId"]!.GetValue<string>() != source["traceSourceId"]!.GetValue<string>() ||
+                observed["assetStableId"]!.GetValue<string>() != evidence["assetStableId"]!.GetValue<string>() ||
+                observed["stableMarkerId"]!.GetValue<string>() != evidence["stableMarkerId"]!.GetValue<string>() ||
+                observed["name"]!.GetValue<string>() != evidence["name"]!.GetValue<string>() ||
+                observed["sourceIndex"]!.GetValue<int>() != evidence["sourceIndex"]!.GetValue<int>() ||
+                observed["trackIndex"]!.GetValue<int>() != evidence["trackIndex"]!.GetValue<int>() ||
+                BitConverter.SingleToInt32Bits(observed["timeSeconds"]!.GetValue<float>()) !=
+                BitConverter.SingleToInt32Bits(evidence["timeSeconds"]!.GetValue<float>()))
+            {
+                continue;
+            }
+            if (result is not null)
+                throw new InvalidDataException("P5A canonical observed marker is ambiguous.");
+            result = evidence["stableMarkerId"]!.GetValue<string>();
+        }
+        return result ?? throw new InvalidDataException("P5A canonical observed marker is unresolved.");
+    }
+
+    private static JsonObject ResolveObservedCanonicalEvent(
+        JsonObject plan,
+        JsonObject source,
+        JsonObject observed,
+        bool requireFullEvidence)
+    {
+        JsonObject? result = null;
+        foreach (var eventNode in plan["eventMap"]!.AsArray())
+        {
+            var mapping = eventNode!.AsObject();
+            var evidence = mapping["canonicalEvidence"]!.AsObject();
+            if (mapping["traceSourceId"]!.GetValue<string>() != source["traceSourceId"]!.GetValue<string>() ||
+                observed["observedEventStableId"]!.GetValue<string>() != evidence["stableEventId"]!.GetValue<string>())
+            {
+                continue;
+            }
+            if (requireFullEvidence && !ObservedCanonicalEventMatches(observed, evidence)) continue;
+            if (result is not null)
+                throw new InvalidDataException("P5A canonical observed event is ambiguous.");
+            result = mapping;
+        }
+        return result ?? throw new InvalidDataException("P5A canonical observed event is unresolved.");
+    }
+
+    private static bool ObservedCanonicalEventMatches(JsonObject observed, JsonObject evidence)
+    {
+        if (observed["observedEventAssetStableId"]!.GetValue<string>() != evidence["assetStableId"]!.GetValue<string>() ||
+            observed["observedOwnerKind"]!.GetValue<string>() != evidence["ownerKind"]!.GetValue<string>() ||
+            observed["observedSourceClassPath"]!.GetValue<string>() != evidence["sourceClassPath"]!.GetValue<string>() ||
+            observed["observedSourceIndex"]!.GetValue<int>() != evidence["sourceIndex"]!.GetValue<int>() ||
+            observed["observedTrackIndex"]!.GetValue<int>() != evidence["trackIndex"]!.GetValue<int>() ||
+            observed["boundaryOrdinal"]!.GetValue<int>() != evidence["boundaryOrdinal"]!.GetValue<int>() ||
+            observed["kind"]!.GetValue<string>() != evidence["kind"]!.GetValue<string>() ||
+            observed["tickMode"]!.GetValue<string>() != evidence["tickMode"]!.GetValue<string>())
+        {
+            return false;
+        }
+        var payload = observed["payload"]!.AsObject();
+        var expectedPayload = evidence["payload"]!.AsObject();
+        return payload["semanticId"]!.GetValue<int>() == expectedPayload["semanticId"]!.GetValue<int>() &&
+               payload["enumValue0"]!.GetValue<int>() == expectedPayload["enumValue0"]!.GetValue<int>() &&
+               payload["enumValue1"]!.GetValue<int>() == expectedPayload["enumValue1"]!.GetValue<int>() &&
+               payload["enumValue2"]!.GetValue<int>() == expectedPayload["enumValue2"]!.GetValue<int>() &&
+               BitConverter.SingleToInt32Bits(payload["scalarValue0"]!.GetValue<float>()) ==
+               BitConverter.SingleToInt32Bits(expectedPayload["scalarValue0"]!.GetValue<float>()) &&
+               payload["flags"]!.GetValue<int>() == expectedPayload["flags"]!.GetValue<int>();
+    }
+
+    internal static string FindFirstDifferencePath(JsonNode? actual, JsonNode? expected, string path)
+    {
+        if (JsonEvidenceEquals(actual, expected))
         {
             return path;
         }
@@ -872,7 +1391,7 @@ public static class AlsP5aTrace
                 {
                     return propertyPath;
                 }
-                if (!JsonNode.DeepEquals(actualValue, expectedValue))
+                if (!JsonEvidenceEquals(actualValue, expectedValue))
                 {
                     return FindFirstDifferencePath(actualValue, expectedValue, propertyPath);
                 }
@@ -890,7 +1409,7 @@ public static class AlsP5aTrace
             var commonCount = System.Math.Min(actualArray.Count, expectedArray.Count);
             for (var index = 0; index < commonCount; index++)
             {
-                if (!JsonNode.DeepEquals(actualArray[index], expectedArray[index]))
+                if (!JsonEvidenceEquals(actualArray[index], expectedArray[index]))
                 {
                     return FindFirstDifferencePath(actualArray[index], expectedArray[index], $"{path}[{index}]");
                 }
@@ -901,6 +1420,92 @@ public static class AlsP5aTrace
             }
         }
         return path;
+    }
+
+    internal static bool JsonEvidenceEquals(JsonNode? actual, JsonNode? expected)
+    {
+        if (actual is null || expected is null)
+        {
+            return actual is null && expected is null;
+        }
+        if (actual is JsonObject actualObject && expected is JsonObject expectedObject)
+        {
+            if (actualObject.Count != expectedObject.Count)
+            {
+                return false;
+            }
+            foreach (var (name, expectedValue) in expectedObject)
+            {
+                if (!actualObject.TryGetPropertyValue(name, out var actualValue) ||
+                    !JsonEvidenceEquals(actualValue, expectedValue))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (actual is JsonArray actualArray && expected is JsonArray expectedArray)
+        {
+            if (actualArray.Count != expectedArray.Count)
+            {
+                return false;
+            }
+            for (var index = 0; index < actualArray.Count; index++)
+            {
+                if (!JsonEvidenceEquals(actualArray[index], expectedArray[index]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (actual.GetValueKind() == JsonValueKind.Number &&
+            expected.GetValueKind() == JsonValueKind.Number)
+        {
+            return CanonicalJsonNumber.Parse(actual.ToJsonString()) ==
+                   CanonicalJsonNumber.Parse(expected.ToJsonString());
+        }
+        return JsonNode.DeepEquals(actual, expected);
+    }
+
+    private readonly record struct CanonicalJsonNumber(bool Negative, string Digits, BigInteger Exponent)
+    {
+        public static CanonicalJsonNumber Parse(string text)
+        {
+            var negative = text[0] == '-';
+            var numberStart = negative ? 1 : 0;
+            var exponentMarker = text.IndexOfAny(['e', 'E'], numberStart);
+            var significandEnd = exponentMarker >= 0 ? exponentMarker : text.Length;
+            var decimalPoint = text.IndexOf('.', numberStart, significandEnd - numberStart);
+            var fractionalDigitCount = decimalPoint >= 0 ? significandEnd - decimalPoint - 1 : 0;
+            var digits = decimalPoint >= 0
+                ? string.Concat(text.AsSpan(numberStart, decimalPoint - numberStart),
+                    text.AsSpan(decimalPoint + 1, significandEnd - decimalPoint - 1))
+                : text[numberStart..significandEnd];
+            var exponent = exponentMarker >= 0
+                ? BigInteger.Parse(text.AsSpan(exponentMarker + 1),
+                    System.Globalization.NumberStyles.AllowLeadingSign,
+                    System.Globalization.CultureInfo.InvariantCulture)
+                : BigInteger.Zero;
+            exponent -= fractionalDigitCount;
+
+            digits = digits.TrimStart('0');
+            if (digits.Length == 0)
+            {
+                return new CanonicalJsonNumber(false, "0", BigInteger.Zero);
+            }
+            var trailingZeroCount = 0;
+            while (digits[digits.Length - 1 - trailingZeroCount] == '0')
+            {
+                trailingZeroCount++;
+            }
+            if (trailingZeroCount > 0)
+            {
+                digits = digits[..^trailingZeroCount];
+                exponent += trailingZeroCount;
+            }
+            return new CanonicalJsonNumber(negative, digits, exponent);
+        }
     }
 
     private static void WriteCanonicalDocument(string path, JsonObject document)
@@ -937,17 +1542,24 @@ public static class AlsP5aTrace
         {
             throw new InvalidDataException("P5A fixture representation must be native_canonical.");
         }
-        if (!ComparableFloat(0f, 0f))
-        {
-            throw new InvalidDataException("P5A fixture float comparison failed.");
-        }
-
-        var expected = P5aFrozenPlanDocuments.Create().NativeCanonical;
-        VerifyFixtureNode(expected, materialized.First, "$", comparable: false);
     }
 
-    private static readonly Lazy<JsonObject> CrossEngineCanonicalShape =
+    // This frozen document is used only for recursive keys, JSON leaf types, and array cardinalities.
+    // No observed canonical value is sourced from it.
+    private static readonly Lazy<JsonObject> CrossEngineCanonicalShapeTemplate =
         new(() => P5aFrozenPlanDocuments.Create().NativeCanonical);
+
+    private static readonly Lazy<(JsonNode Event, JsonNode Outcome, JsonNode State)> CanonicalRuntimeItemShapes =
+        new(() =>
+        {
+            var actuals = CrossEngineCanonicalShapeTemplate.Value["cases"]!.AsArray()
+                .SelectMany(caseNode => caseNode!["frames"]!.AsArray())
+                .Select(frame => frame!["comparableActual"]!).ToArray();
+            return (
+                actuals.SelectMany(actual => actual["events"]!.AsArray()).First()!,
+                actuals.SelectMany(actual => actual["actionOutcomes"]!.AsArray()).First()!,
+                actuals.SelectMany(actual => actual["stateAfter"]!["activeNotifyStates"]!.AsArray()).First()!);
+        });
 
     internal static void ValidateCrossEnginePair(JsonObject nativeCanonical, JsonObject portCanonical)
     {
@@ -964,12 +1576,12 @@ public static class AlsP5aTrace
         RequireCrossEngineString(nativeCanonical, "provenance", "native_canonical_v1", "$native");
         RequireCrossEngineString(portCanonical, "representation", "port_canonical", "$port");
         RequireCrossEngineString(portCanonical, "provenance", "core_oracle_v1", "$port");
-        RequireCrossEngineInteger(nativeCanonical, "schemaVersion", 1, "$native");
-        RequireCrossEngineInteger(portCanonical, "schemaVersion", 1, "$port");
+        RequireCrossEngineInteger(nativeCanonical, "schemaVersion", 2, "$native");
+        RequireCrossEngineInteger(portCanonical, "schemaVersion", 2, "$port");
         RequireCrossEngineString(nativeCanonical, "kind", "p5a_trace", "$native");
         RequireCrossEngineString(portCanonical, "kind", "p5a_trace", "$port");
 
-        var canonicalShape = CrossEngineCanonicalShape.Value;
+        var canonicalShape = CrossEngineCanonicalShapeTemplate.Value;
         foreach (var property in new[] { "schemaVersion", "kind", "tracePlanSha256", "reference", "snapshot" })
         {
             ValidateCrossEngineNode(
@@ -1070,6 +1682,20 @@ public static class AlsP5aTrace
 
         if (shapeNode is JsonArray shapeArray)
         {
+            if (comparable && TryGetCanonicalRuntimeItemShape(diagnosticPath, out var itemShape, out var capacity))
+            {
+                if (nativeNode is not JsonArray nativeItems || portNode is not JsonArray portItems ||
+                    nativeItems.Count != portItems.Count || nativeItems.Count > capacity)
+                {
+                    throw CrossEngineDifference(diagnosticPath);
+                }
+                for (var index = 0; index < nativeItems.Count; index++)
+                {
+                    ValidateCrossEngineNode(itemShape, nativeItems[index], portItems[index],
+                        $"{diagnosticPath}[{index}]", comparable: true);
+                }
+                return;
+            }
             if (nativeNode is not JsonArray nativeArray || portNode is not JsonArray portArray ||
                 nativeArray.Count != shapeArray.Count || portArray.Count != shapeArray.Count)
             {
@@ -1140,6 +1766,32 @@ public static class AlsP5aTrace
         }
 
         throw CrossEngineDifference(diagnosticPath);
+    }
+
+    private static bool TryGetCanonicalRuntimeItemShape(string path, out JsonNode? shape, out int capacity)
+    {
+        // Runtime row counts belong to each engine's result, not the historical frame schedule.
+        if (path.EndsWith(".comparableActual.events", StringComparison.Ordinal))
+        {
+            shape = CanonicalRuntimeItemShapes.Value.Event;
+            capacity = AlsEventBuffer.Capacity;
+            return true;
+        }
+        if (path.EndsWith(".comparableActual.actionOutcomes", StringComparison.Ordinal))
+        {
+            shape = CanonicalRuntimeItemShapes.Value.Outcome;
+            capacity = AlsActionOutcomeBuffer.Capacity;
+            return true;
+        }
+        if (path.EndsWith(".comparableActual.stateAfter.activeNotifyStates", StringComparison.Ordinal))
+        {
+            shape = CanonicalRuntimeItemShapes.Value.State;
+            capacity = 16;
+            return true;
+        }
+        shape = null;
+        capacity = 0;
+        return false;
     }
 
     private static bool TryGetCrossEngineInteger(JsonValue value, out long result)
@@ -1334,7 +1986,7 @@ internal static class P5aFrozenPlanDocuments
         var snapshot = Snapshot();
         var plan = new JsonObject
         {
-            ["schemaVersion"] = 1,
+            ["schemaVersion"] = 2,
             ["kind"] = "p5a_trace_plan",
             ["fixedDeltaSeconds"] = 0.016666668f,
             ["reference"] = reference.DeepClone(),
@@ -1352,6 +2004,7 @@ internal static class P5aFrozenPlanDocuments
             ["markerMap"] = Repeat(2, MarkerMapRow),
             ["sectionMap"] = Repeat(1, SectionMapRow),
             ["nativeOnlyEventMap"] = Repeat(7, NativeOnlyEventMapRow),
+            ["nativeAuditDependencies"] = P5aNativeAuditDependencies.Create(),
             ["cases"] = Cases(PlanFrame),
         };
 
@@ -1393,7 +2046,7 @@ internal static class P5aFrozenPlanDocuments
     {
         var root = new JsonObject
         {
-            ["schemaVersion"] = 1,
+            ["schemaVersion"] = 2,
             ["kind"] = "p5a_trace",
             ["representation"] = representation,
             ["tracePlanSha256"] = tracePlanSha,
@@ -1421,7 +2074,7 @@ internal static class P5aFrozenPlanDocuments
     {
         ["animationSetDefinitionDigest"] = "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
         ["layout"] = new JsonObject { ["version"] = 1, ["digest"] = "d6fef54173240d32" },
-        ["bindings"] = new JsonObject { ["version"] = 1, ["digest"] = "2b4be600d531c734" },
+        ["bindings"] = new JsonObject { ["version"] = 2, ["digest"] = "e458fef4df7a854d" },
         ["graph"] = new JsonObject { ["version"] = 1, ["digest"] = "44403c2869d8f615" },
     };
 
@@ -1966,6 +2619,7 @@ internal static class P5aFrozenPlanDocuments
         ["events"] = Repeat(19, NativeEventAudit),
         ["markers"] = Repeat(2, NativeMarkerAudit),
         ["curveInventories"] = Repeat(5, NativeCurveInventory),
+        ["auxiliaryAssets"] = P5aNativeAuditDependencies.Create(),
     };
 
     private static JsonObject NativeActual(int caseIndex, int frameIndex)
@@ -1977,9 +2631,14 @@ internal static class P5aFrozenPlanDocuments
 
     private static JsonObject NativeActualDefault() => new()
     {
+        ["frameUpdateAudit"] = new JsonObject
+        {
+            ["animationUpdates"] = 1, ["evaluations"] = 1, ["postUpdates"] = 1, ["meshTicks"] = 1,
+        },
         ["canonicalAssetOracle"] = new JsonObject
         {
             ["curves"] = Curves(),
+            ["compressedCurves"] = Curves(),
             ["graphCurveWeights"] = new JsonObject { ["action"] = 0f, ["transition"] = 0f },
             ["sync"] = new JsonObject
             {
@@ -2359,10 +3018,18 @@ internal static class P5aFrozenPlanDocuments
         var graphWeights = oracle["graphCurveWeights"]!.AsObject();
         graphWeights["action"] = caseIndex >= 5 ? ActionLaneWeight(caseIndex, frameIndex) : 0f;
         graphWeights["transition"] = caseIndex is 2 or 3 or 4 ? TransitionGraphWeight(frameIndex) : 0f;
+        var allowTransitionsPresent = caseIndex switch
+        {
+            5 => frameIndex < 6 || frameIndex >= 75,
+            6 => frameIndex < 6 || frameIndex >= 56,
+            7 => frameIndex < 6 || frameIndex >= 58,
+            _ => true,
+        };
         foreach (var audit in actual["animGraphCurveAudit"]!.AsObject())
         {
-            audit.Value!["present"] = true;
-            audit.Value["value"] = audit.Key is "leftIk" or "rightIk" or "allowTransitions" ? 1f : 0f;
+            var present = audit.Key != "allowTransitions" || allowTransitionsPresent;
+            audit.Value!["present"] = present;
+            audit.Value["value"] = present && audit.Key is "leftIk" or "rightIk" or "allowTransitions" ? 1f : 0f;
         }
 
         if (caseIndex is 0 or 1)
@@ -2491,7 +3158,7 @@ internal static class P5aFrozenPlanDocuments
         if (frameIndex == 23)
         {
             var row = CanonicalEventRows[caseIndex == 3 ? 5 : 4].NativeRows[caseIndex == 4 ? 1 : 0];
-            actual["nativeRuntimeTimeline"]!.AsArray().Add(RawTimelineEvent(row, "Trigger", .01111111f));
+            actual["nativeRuntimeTimeline"]!.AsArray().Add(RawTimelineEvent(row, "Trigger", .011111101f));
         }
         if (frameIndex == 32)
         {
@@ -2605,40 +3272,31 @@ internal static class P5aFrozenPlanDocuments
     {
         if (frameIndex == 1)
         {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Begin", 0f));
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Tick", .016666668f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Begin", 0f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
         }
-        else if (frameIndex is >= 2 and <= 56 && !(caseIndex == 6 && frameIndex == 56))
+        else if (frameIndex >= 2 &&
+                 (caseIndex == 5 || caseIndex == 7 || frameIndex < 56))
         {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Tick", .016666668f));
+            if (frameIndex == 7)
+                timeline.Add(RawTimelineEvent(CanonicalEventRows[7].NativeRows[0], "Trigger", 7.450581e-9f));
+            if (frameIndex == 28)
+                timeline.Add(RawTimelineEvent(CanonicalEventRows[8].NativeRows[0], "Trigger", .016666532f));
+            if (frameIndex == 57)
+            {
+                timeline.Add(RawTimelineEvent(CanonicalEventRows[9].NativeRows[0], "Trigger", .016566992f));
+                timeline.Add(RawTimelineEvent(NativeOnlyEventRows[4], "Trigger", .016567051f));
+            }
+            if (frameIndex == 61 && caseIndex == 5)
+                timeline.Add(RawTimelineEvent(NativeOnlyEventRows[5], "Trigger", 2.3841858e-7f));
+            if (frameIndex == 75 && caseIndex == 5)
+                timeline.Add(RawTimelineEvent(NativeOnlyEventRows[6], "Trigger", 4.7683716e-7f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
-        }
-        if (frameIndex == 7) timeline.Add(RawTimelineEvent(CanonicalEventRows[7].NativeRows[0], "Trigger", .00000001f));
-        if (frameIndex == 28) timeline.Add(RawTimelineEvent(CanonicalEventRows[8].NativeRows[0], "Trigger", .0166667f));
-        if (frameIndex == 57 && caseIndex != 6)
-        {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Tick", 0f));
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "End", 0f));
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[9].NativeRows[0], "Trigger", 0f));
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[4], "Trigger", 0f));
         }
         if (frameIndex == 56 && caseIndex == 6)
         {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "End", 0f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "End", 0f));
         }
-        if (frameIndex is >= 58 and <= 90 && caseIndex == 5)
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
-        if (frameIndex == 91 && caseIndex == 5)
-        {
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", 7.1525574e-7f));
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "End", 7.1525574e-7f));
-        }
-        if (frameIndex == 61) timeline.Add(RawTimelineEvent(NativeOnlyEventRows[5], "Trigger", 0f));
-        if (frameIndex == 75) timeline.Add(RawTimelineEvent(NativeOnlyEventRows[6], "Trigger", 0f));
     }
 
     private static float NativeVisualWeight(int caseIndex, int frameIndex)
@@ -3087,6 +3745,12 @@ internal static class P5aFrozenPlanDocuments
         ["lastProcessedCommandRequestId"] = "0", ["lastProcessedCommand"] = "None",
         ["playbackEpoch"] = "0", ["playbackTime"] = 0f, ["priority"] = 0,
         ["playing"] = false, ["interruptible"] = false,
+        ["lifecycle"] = new JsonObject
+        {
+            ["alpha"] = 0f, ["remainingSeconds"] = 0f, ["beginWeight"] = 0f,
+            ["currentWeight"] = 0f, ["desiredWeight"] = 0f,
+            ["blendingOut"] = false, ["traversalFinished"] = false,
+        },
     };
 
     private static JsonObject TransitionState() => new()
@@ -3391,7 +4055,7 @@ internal static class P5aPortReplay
             .ToLowerInvariant();
         return new JsonObject
         {
-            ["schemaVersion"] = 1,
+            ["schemaVersion"] = 2,
             ["kind"] = "p5a_trace",
             ["representation"] = "port_canonical",
             ["tracePlanSha256"] = planHash,
@@ -3857,7 +4521,7 @@ internal static class P5aPortReplay
     {
         ValidateCurvePassthrough(prepared, result);
         var actionNormalization = ValidateActionNormalization(
-            caseIndex, frameIndex, input, result, previousState, previousOwnership,
+            input, result, previousState, previousOwnership,
             state, ownership, prepared.ActionGraph, plan, sourceMap, runtimeBindings);
         return new JsonObject
         {
@@ -3874,7 +4538,8 @@ internal static class P5aPortReplay
                 caseIndex, frameIndex, input.Stance, result.DynamicTransition,
                 state.DynamicTransition, sourceMap, runtimeBindings),
             ["actionPlayback"] = ComparableAction(
-                caseIndex, frameIndex, input, result.ActionPlayback, state.ActionPlayer,
+                input, result.ActionPlayback, previousState.ActionPlayer, state.ActionPlayer,
+                result.ActionOutcomes,
                 actionNormalization, plan, sourceMap, runtimeBindings),
             ["events"] = ComparableEvents(
                 result, actionNormalization, plan, sourceMap, runtimeBindings),
@@ -4287,8 +4952,6 @@ internal static class P5aPortReplay
     }
 
     private static ActionNormalization ValidateActionNormalization(
-        int caseIndex,
-        int frameIndex,
         scoped in AlsP5FrameInput input,
         AlsFrameResult result,
         AlsRuntimeState previousState,
@@ -4300,12 +4963,7 @@ internal static class P5aPortReplay
         IReadOnlyDictionary<string, SourceBinding> sourceMap,
         scoped in AlsP5RuntimeBindings runtimeBindings)
     {
-        var scheduledStart = caseIndex is 5 or 6 or 7 && frameIndex == 0;
-        if ((input.ActionRequest.Command == AlsActionCommand.Start) != scheduledStart)
-        {
-            throw new InvalidDataException("P5A action start command appeared outside the frozen schedule.");
-        }
-        if (scheduledStart)
+        if (input.ActionRequest.Command == AlsActionCommand.Start)
         {
             ValidateActionStartBoundary(
                 input, result, previousState, previousOwnership, state, ownership,
@@ -4313,7 +4971,11 @@ internal static class P5aPortReplay
             return ActionNormalization.StartBoundary;
         }
 
-        var naturalNotifyEnd = caseIndex is 5 or 7 && frameIndex == 56;
+        var naturalNotifyEnd = result.ActionOutcomes.Count == 0 && result.TypedEvents.Count == 2 &&
+            result.TypedEvents[0].Phase == AlsAnimationEventPhase.End &&
+            result.TypedEvents[0].Payload.TerminationReason == AlsActionResultCode.None &&
+            previousState.ActionPlayer.Playing == 1 && state.ActionPlayer.Playing == 1 &&
+            CountActiveOwners(previousOwnership) == 1 && CountActiveOwners(ownership) == 0;
         if (naturalNotifyEnd)
         {
             ValidateNaturalActionNotifyEnd(
@@ -4639,7 +5301,8 @@ internal static class P5aPortReplay
         value.RequestId == -1 && value.LastProcessedRequestId == 0 &&
         value.LastProcessedCommandRequestId == -1 && value.LastProcessedCommand == AlsActionCommand.None &&
         value.PlaybackEpoch == 0 && BitConverter.SingleToInt32Bits(value.PlaybackTime) == 0 &&
-        value.Priority == 0 && value.Playing == 0 && value.Interruptible == 0;
+        value.Priority == 0 && value.Playing == 0 && value.Interruptible == 0 &&
+        AlsActionLifecycle.IsDefault(value.Lifecycle);
 
     private static int CountActiveOwners(AlsNotifyStateOwnership[] ownership)
     {
@@ -4733,11 +5396,11 @@ internal static class P5aPortReplay
         SameFloat(expected.ScalarValue0, actual.ScalarValue0) && expected.Flags == actual.Flags;
 
     private static JsonObject ComparableAction(
-        int caseIndex,
-        int frameIndex,
         scoped in AlsP5FrameInput input,
         AlsActionPlayback result,
+        AlsActionPlayerState previousState,
         AlsActionPlayerState state,
+        AlsActionOutcomeBuffer outcomes,
         ActionNormalization normalization,
         JsonObject plan,
         IReadOnlyDictionary<string, SourceBinding> sourceMap,
@@ -4771,25 +5434,11 @@ internal static class P5aPortReplay
             }
             finalSegmentDelta = 0f;
         }
-        else if (caseIndex == 5 && frameIndex == 91)
-        {
-            if (BitConverter.SingleToInt32Bits(result.FinalSegmentDeltaSeconds) != 0x35400000)
-            {
-                throw new InvalidDataException("P5A natural action closing delta is invalid.");
-            }
-            finalSegmentDelta = result.FinalSegmentDeltaSeconds;
-        }
-        else if (caseIndex == 6 && frameIndex == 56)
-        {
-            if (BitConverter.SingleToInt32Bits(result.FinalSegmentDeltaSeconds) != 0)
-            {
-                throw new InvalidDataException("P5A cancelled action closing delta is invalid.");
-            }
-            finalSegmentDelta = 0f;
-        }
         else
         {
-            throw new InvalidDataException("P5A action closing playback appeared outside the frozen schedule.");
+            finalSegmentDelta = ValidateActionClosingForProjection(
+                input.ActionRequest.Command, input.DeltaTimeSeconds,
+                result, previousState, state, outcomes);
         }
 
         return new JsonObject
@@ -4807,6 +5456,60 @@ internal static class P5aPortReplay
             ["finalSegmentDeltaSeconds"] = finalSegmentDelta,
             ["playRate"] = result.PlayRate,
         };
+    }
+
+    internal static float ValidateActionClosingForProjection(
+        AlsActionCommand command,
+        float frameDeltaSeconds,
+        AlsActionPlayback playback,
+        AlsActionPlayerState previousState,
+        AlsActionPlayerState state,
+        AlsActionOutcomeBuffer outcomes)
+    {
+        if (previousState.Playing != 1 || state.Playing != 0 || outcomes.Count != 1 ||
+            playback.ActionDefinitionId != previousState.ActionDefinitionId ||
+            playback.SectionId != previousState.SectionId ||
+            playback.PlaybackEpoch != previousState.PlaybackEpoch ||
+            !SameFloat(playback.PreviousTime, previousState.PlaybackTime) ||
+            state.ActionDefinitionId != -1 || state.SectionId != -1 || state.SegmentBindingIndex != -1 ||
+            state.RequestId != -1 || BitConverter.SingleToInt32Bits(state.PlaybackTime) != 0 ||
+            state.Priority != 0 || state.Interruptible != 0 || !AlsActionLifecycle.IsDefault(state.Lifecycle))
+        {
+            throw new InvalidDataException("P5A closing action state is inconsistent with its playback snapshot.");
+        }
+
+        var outcome = outcomes[0];
+        if (outcome.RequestId != previousState.RequestId ||
+            outcome.ActionDefinitionId != playback.ActionDefinitionId ||
+            outcome.PlaybackEpoch != playback.PlaybackEpoch)
+        {
+            throw new InvalidDataException("P5A closing action outcome identity is invalid.");
+        }
+
+        if (outcome.ResultCode == AlsActionResultCode.Completed)
+        {
+            if (command != AlsActionCommand.None ||
+                !float.IsFinite(playback.FinalSegmentDeltaSeconds) ||
+                playback.FinalSegmentDeltaSeconds < 0f ||
+                playback.FinalSegmentDeltaSeconds > frameDeltaSeconds ||
+                previousState.Lifecycle.BlendingOut != 1)
+            {
+                throw new InvalidDataException("P5A natural action closing evidence is invalid.");
+            }
+            return playback.FinalSegmentDeltaSeconds;
+        }
+
+        if (outcome.ResultCode == AlsActionResultCode.InterruptedByExplicitCancel)
+        {
+            if (command != AlsActionCommand.Cancel ||
+                BitConverter.SingleToInt32Bits(playback.FinalSegmentDeltaSeconds) != 0)
+            {
+                throw new InvalidDataException("P5A cancelled action closing evidence is invalid.");
+            }
+            return 0f;
+        }
+
+        throw new InvalidDataException("P5A action closing outcome is not a supported terminal result.");
     }
 
     private static JsonObject InactiveAction() => new()
@@ -5258,6 +5961,14 @@ internal static class P5aPortReplay
         ["lastProcessedCommand"] = value.LastProcessedCommand.ToString(), ["playbackEpoch"] = value.PlaybackEpoch.ToString(),
         ["playbackTime"] = value.PlaybackTime, ["priority"] = value.Priority,
         ["playing"] = value.Playing != 0, ["interruptible"] = value.Interruptible != 0,
+        ["lifecycle"] = new JsonObject
+        {
+            ["alpha"] = value.Lifecycle.Alpha, ["remainingSeconds"] = value.Lifecycle.RemainingSeconds,
+            ["beginWeight"] = value.Lifecycle.BeginWeight, ["currentWeight"] = value.Lifecycle.CurrentWeight,
+            ["desiredWeight"] = value.Lifecycle.DesiredWeight,
+            ["blendingOut"] = value.Lifecycle.BlendingOut != 0,
+            ["traversalFinished"] = value.Lifecycle.TraversalFinished != 0,
+        },
     };
 
     private static JsonObject TransitionState(AlsDynamicTransitionState value) => new()

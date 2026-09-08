@@ -152,6 +152,18 @@ public readonly record struct AlsActionRequest(
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public struct AlsActionLifecycleState
+{
+    public float Alpha;
+    public float RemainingSeconds;
+    public float BeginWeight;
+    public float CurrentWeight;
+    public float DesiredWeight;
+    public byte BlendingOut;
+    public byte TraversalFinished;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public struct AlsActionPlayerState
 {
     public int ActionDefinitionId;
@@ -166,6 +178,7 @@ public struct AlsActionPlayerState
     public int Priority;
     public byte Playing;
     public byte Interruptible;
+    public AlsActionLifecycleState Lifecycle;
 
     public static AlsActionPlayerState CreateDefault() => new()
     {

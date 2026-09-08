@@ -265,10 +265,10 @@ public sealed class AlsP5CoreRuntimeBindingSnapshot
         _actionSegments, _actionTimelineRanges);
 
     public AlsP5OccurrenceLayoutView CreateOccurrenceLayoutView() =>
-        new(Version, LayoutDigest, _occurrenceEntries);
+        new(1, LayoutDigest, _occurrenceEntries);
 
     public AlsP5GraphBuildView CreateGraphBuildView() => new(
-        Version, GraphDigest, _skeletonId, _mannequinMeshId,
+        1, GraphDigest, _skeletonId, _mannequinMeshId,
         _rootMotionExtractionLogicalBoneId, _rootMotionExtractionPhysicalBoneId,
         _presentation, _standingIdleAnimationId, _crouchingIdleAnimationId,
         _jumpStartAnimationId, _fallLoopAnimationId, _landAnimationId,

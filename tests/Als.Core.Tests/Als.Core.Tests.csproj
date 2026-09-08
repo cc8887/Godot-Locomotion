@@ -25,5 +25,7 @@
           CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures/P4/*.json"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/P5A/*.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

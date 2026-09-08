@@ -267,6 +267,11 @@ public sealed class AlsP5ContractTests
 
     [Theory]
     [InlineData("action-time")]
+    [InlineData("lifecycle-alpha")]
+    [InlineData("lifecycle-remaining")]
+    [InlineData("lifecycle-begin")]
+    [InlineData("lifecycle-current")]
+    [InlineData("lifecycle-desired")]
     [InlineData("transition-previous")]
     [InlineData("transition-current")]
     [InlineData("action-lane-clip")]
@@ -285,6 +290,11 @@ public sealed class AlsP5ContractTests
         switch (field)
         {
             case "action-time": state.ActionPlayer.PlaybackTime = negativeZero; break;
+            case "lifecycle-alpha": state.ActionPlayer.Lifecycle.Alpha = negativeZero; break;
+            case "lifecycle-remaining": state.ActionPlayer.Lifecycle.RemainingSeconds = negativeZero; break;
+            case "lifecycle-begin": state.ActionPlayer.Lifecycle.BeginWeight = negativeZero; break;
+            case "lifecycle-current": state.ActionPlayer.Lifecycle.CurrentWeight = negativeZero; break;
+            case "lifecycle-desired": state.ActionPlayer.Lifecycle.DesiredWeight = negativeZero; break;
             case "transition-previous": state.DynamicTransition.PreviousPlaybackTime = negativeZero; break;
             case "transition-current": state.DynamicTransition.PlaybackTime = negativeZero; break;
             case "action-lane-clip": state.ActionBlendLane.OutgoingClipTime = negativeZero; break;
