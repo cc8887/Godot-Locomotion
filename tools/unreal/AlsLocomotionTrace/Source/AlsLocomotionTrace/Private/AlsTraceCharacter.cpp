@@ -3,7 +3,9 @@
 #include "AlsAnimationInstance.h"
 #include "AlsCharacterMovementComponent.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Modules/ModuleManager.h"
 #include "Settings/AlsAnimationInstanceSettings.h"
 #include "Settings/AlsCharacterSettings.h"
 #include "Settings/AlsMovementSettings.h"
@@ -42,6 +44,8 @@ void UAlsTraceSkeletalMeshComponent::ResetTracePipelineCounts()
 AAlsTraceCharacter::AAlsTraceCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UAlsTraceSkeletalMeshComponent>(ACharacter::MeshComponentName))
 {
+    // Settings load Roll transitively during CDO construction, before commandlet Main can run.
+    FModuleManager::Get().LoadModuleChecked<IModuleInterface>(TEXT("ALSCamera"));
     static ConstructorHelpers::FObjectFinder<UAlsCharacterSettings> CharacterSettingsAsset{
 	TEXT("/ALS/ALS/Data/Character/CS_Als_Default.CS_Als_Default")};
     static ConstructorHelpers::FObjectFinder<UAlsMovementSettings> MovementSettingsAsset{
@@ -110,6 +114,34 @@ void AAlsTraceCharacter::SetTraceViewRotation(const FRotator& Rotation)
     ViewState.Rotation = NormalizedRotation;
     ViewState.PreviousYawAngle = UE_REAL_TO_FLOAT(NormalizedRotation.Yaw);
     ViewState.YawSpeed = 0.0f;
+}
+
+void AAlsTraceCharacter::BindTraceMontageStartedObserver(
+    UAnimMontage* Montage, TFunction<void(UAnimMontage*)> Observer)
+{
+    UnbindTraceMontageStartedObserver();
+    TraceObservedMontage = Montage;
+    TraceMontageStartedObserver = MoveTemp(Observer);
+    GetTraceAnimationInstanceMutable()->OnMontageStarted.AddDynamic(
+        this, &AAlsTraceCharacter::ObserveTraceMontageStarted);
+}
+
+void AAlsTraceCharacter::UnbindTraceMontageStartedObserver()
+{
+    if (UAlsAnimationInstance* Animation{GetTraceAnimationInstanceMutable()})
+    {
+        Animation->OnMontageStarted.RemoveDynamic(this, &AAlsTraceCharacter::ObserveTraceMontageStarted);
+    }
+    TraceObservedMontage.Reset();
+    TraceMontageStartedObserver = nullptr;
+}
+
+void AAlsTraceCharacter::ObserveTraceMontageStarted(UAnimMontage* Montage)
+{
+    if (Montage == TraceObservedMontage.Get() && TraceMontageStartedObserver)
+    {
+        TraceMontageStartedObserver(Montage);
+    }
 }
 
 void AAlsTraceCharacter::ApplyTraceDesiredState(const FGameplayTag NewRotationMode, const bool bNewAiming,

@@ -96,7 +96,7 @@ public readonly ref struct AlsP4CurveFrameInput
 
 public readonly ref struct AlsP5RuntimeBindings
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public readonly int Version;
     public readonly ulong Digest;

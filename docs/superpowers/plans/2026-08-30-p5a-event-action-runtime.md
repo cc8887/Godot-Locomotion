@@ -1577,6 +1577,38 @@ git commit -m "feat(core): transact complete p5 animation frames"
 
 ### Task 13: Add the Deterministic P5A Cross-engine Golden
 
+2026-09-08 后续修订已获用户批准，以下范围优先于本节旧的原生清单数量、F91 结束帧和 snapshot 冻结值；Task 13C 验收完成前仍不进入 Task 14：
+
+- 先通过独立诊断模式发现八个用例、374 帧实际涉及的原生资产与 Notify，再冻结独立的辅助审计清单。诊断输出不能发布为 Golden；正式采集仍拒绝未知资产，辅助资产不能冒充 canonical source。
+- Roll 必须区分片段遍历结束、动作生命周期结束与视觉淡出。以真实 Montage 参数和逐帧观测校核自然停止规则，必要时扩展 Core 的值类型状态与 Import 绑定；不得硬编码帧号、容忍整帧差或把原生输出作为 Core 输入。
+- 已导出的 canonical Roll 包含 `.1` 淡入、`.3` 淡出、HermiteCubic、默认触发时间和自动淡出开关，无须为此重复导出。profile 的 `.2` lane blend 仍是独立呈现策略。
+- 废除逐帧原生输出与旧合成整份模板的相等校验，改为闭合字段/类型、精确来源/身份、跨帧生命周期约束和独立跨引擎比较。事件、活动状态、结果数组保留 `16/16/2` 上限及双方严格顺序，不冻结旧帧数量。
+- 所有受影响的版本、绑定摘要和 schema 同步更新；未变的资产、layout、graph 不制造无关变更。新增状态必须覆盖事务回滚、reset、审计序列化及零分配测试。
+- 本次计划与 trace schema 升为 `2`，bindings 为 `2/e458fef4df7a854d`；layout 与 graph 仍为 `1`。独立辅助清单冻结 9 项资产、8 项 authored Footstep，既有 9 个语义 source 不增加。静态事件清单不等于实际发生记录。
+- 混合权重可能先于剩余时间归零达到目标，Core 保留真实浮点余时而不拒绝或强制清零。正式原生闭包只允许已验证的动态 Montage 包装引用已登记的持久资源，不普遍放行 transient 资产。
+- `Enable_Transition` 按既定 `AdditiveToDefault` 规则累计：默认值 `1` 加各实际曲线增量乘有效权重，缺失曲线贡献 `0`。已是增量的 authored 值不能再次减去默认值；原始动画图曲线只要求有限值，不强制限制为 `[0,1]`。
+- 双次完整原生采集、双次独立 Core 回放、同引擎确定性、跨引擎比较、完整拒绝矩阵和独立审查通过后，才发布新 Golden。相机、输入、P4 行为与 `Gather -> Worker -> Commit` 所有权保持不变。
+
+2026-09-08 用户确认的 13C 修正：当前 Golden 尚未通过真实采集复核，不能据此进入 Task 14。以下规则覆盖先前诊断输出中不可靠的原生数值，但不改变资产、reference commit、snapshot 或 374 个测量帧：
+
+- `/Game` 语义曲线与 exporter 的 authored keys 同源，调用 `EvaluateCurveData(..., true)`；`canonicalAssetOracle.compressedCurves` 独立调用 `false`，只作原生审计，不替代语义值。`Enable_Transition` 必须实际采样。
+- 每个测量帧只执行一次正常 engine/world update，不额外调用动画 tick 或骨骼 refresh。`nativeActual.frameUpdateAudit` 的 `animationUpdates/evaluations/postUpdates/meshTicks` 必须都是实测整数 `1`；初始姿态在测量前通过普通预热稳定。
+- Started/Cancelled/Finished 来自真实 Montage delegate。结束前保存播放值快照并按作用域解绑回调；禁止补造实例、延后结束帧或把视觉权重改成 `1`。Transition 注入仅限已批准的脚部探针与更新 guard，不强制打开 transition permission。
+- Physical Notify 使用队列与活动状态快照，明确不声称通用回调拦截。顺序依据引擎执行约定；可能在单帧内进入并退出且不能证明的短状态拒绝采集，未知相关来源拒绝，消失状态不得继续输出 Tick。
+- Montage 结束不等于所有 Sequence State 已消失。若本帧原生活动列表仍有同一 State，只能通过先前唯一的 NotifyInstanceID 与精确来源/事件身份连续观察，采用本帧引用时间，不推进已销毁的 Montage。仅队列残留不产生 Tick；结束快照仅可用于真实结束回调所在帧。原生实际保留的状态如实记入 physical audit。
+- 原生 canonical 必须由 raw DTO 与精确 source/event/marker crosswalk 投影，不能复制冻结的 native expected。压缩审计与原生视觉权重不能作为 Core 输入。真实跨引擎结束帧或离散状态差异必须报告，不得用容差、冻结值或挪帧掩盖。
+- 只有修正后的两次真实采集、独立 Core replay、跨引擎比较与 verifier 全部通过，才能重新发布并提交 Golden；旧的未提交 fixture 不是通过证据。
+
+2026-09-09 Task 13C 验收完成，Task 14 及后续 Godot 接入尚未实施：
+
+- 已完成真实曲线/单次正常更新/生命周期回调修正、独立原生 canonical 投影，以及由资产参数驱动的 Core Montage 生命周期。当前固定输入下 Roll 自然结束于 F90；实现不硬编码该帧，片段遍历、动作结束和视觉淡出保持分离。
+- 正式七步生成流程和独立 UE-free verifier 均正常退出，分别输出唯一 `P5A_GOLDEN_GENERATION_OK` 与 `P5A_GOLDEN_FIXTURE_OK`，用例数均为 `8`，reference commit 均为 `b754d6f0f2bb03741d301f8fb88077ebfe561e17`。374 帧的双次原生采集、双次独立 Core 回放、同引擎确定性、跨引擎比较及原子发布通过。
+- 唯一 Golden 为 `tests/Als.Core.Tests/Fixtures/P5A/trace_p5a_runtime.json`，1047469 字节，SHA-256 为 `DE6E763FC71C7173D960287A94101099F0FBDDD0CE5C320CBA1F535089906D1A`。Git 自动换行开启时的重新检出也保持相同字节与哈希。
+- 最终脚本回归 `71/71`、重编译插件后的原生测试 `15/15`、Debug Import 绑定测试 `45/45` 通过。Release Import 全量为 `519/519`。独立审查为 `SPEC PASS / QUALITY PASS`。
+- 所选 226 项矩阵由原运行的 225 项通过，以及唯一 Family6 清理失败后的完整同测试重跑通过共同覆盖；两份原始 TRX 均保留，不能称为单次 226/226 全绿。正式 verifier 自己的子测试报告则全部通过，与该覆盖并集无关。
+- 全量 Core 回归仍为 `1376/1378`，两项 Sync 输入/绑定冲突测试未在本轮修复；代码历史显示冲突早于本轮，但没有用干净 HEAD 重跑来证明基线失败。Import 此前一次 `2264B` 分配波动尚未解释，后续通过不等于已定位并修复。因此本记录不是仓库全绿或完整 P5A Demo 验收。
+- 实际运行发现的两项工具兼容问题已通过测试先行修正：仅允许受文件锁和身份审计约束的 `zen.exe` 启动同目录 Crashpad；原生自测保留执行，仅将普通诊断移出正式标记前缀。未放宽正式标记、进程身份或发布校验。相机、输入、P4 行为、资产锁与并发所有权均未改动。
+
 **Files:**
 - Modify: `src/Als.Import/Als.Import.csproj`
 - Create: `src/Als.Import/Compilation/AlsP5CoreRuntimeBindingSnapshot.cs`
@@ -1595,13 +1627,13 @@ git commit -m "feat(core): transact complete p5 animation frames"
 - Create: `tests/Als.Core.Tests/Fixtures/P5A/trace_p5a_runtime.json`
 - Modify: `tests/Als.Core.Tests/Als.Core.Tests.csproj`
 
-- [ ] **Step 1: Add failing schema/generator/golden tests**
+- [x] **Step 1: Add failing schema/generator/golden tests**
 
 Require trace kind `P5A`, schema version `1`, exact reference commit, patch hashes, real asset IDs, sample window, curve value, layout/Core-binding/graph-build versions and digests, occurrence identity/order, marker pair/cycle/phase, transition choice and Action state/outcome. Freeze a separate version-1 native trace-plan sidecar with distinct `sources` and `cases` sections. Each source entry contains a lowercase 40-hex `traceSourceId`, the host-only exact layout key `{ SourceKind, SourceBindingIndex, GraphSlotIndex }`, and expected UE-observable evidence `{ assetStableId, nativeRole, montageStableId, sectionName, segmentIndex }` with inapplicable fields empty/-1. The Oracle host alone derives `traceSourceId` as lowercase SHA-1 of this exact byte preimage in field order: raw ASCII `ALS_P5A_TRACE_SOURCE_V1` (no terminator), the compiled `SourceKind` byte, signed `SourceBindingIndex` and `GraphSlotIndex` as little-endian `int32`, then `assetStableId`, `nativeRole`, `montageStableId` and `sectionName` each as a little-endian signed `int32` UTF-8 byte count followed by the exact UTF-8 bytes without normalization, then signed `segmentIndex` as little-endian `int32`. The host rejects a digest collision or duplicate preimage; UE only verifies and echoes the supplied ID after observing the evidence and never reproduces this allocator. Tests mutate every preimage field and freeze the generated IDs. Every case begins from the same declared empty/default P5 ownership, cursor, authority, Action, Transition and lane state; neither schema serializes Core-only internals nor asks UE to reset a non-native structure. The ordered schedule instead uses enough common warm-up frames to build every long-lived state on both sides. Per-frame shared semantic inputs are identity/generation and simulation window/delta; P3 locomotion state, locomotion/rotation mode, stance and `hasInput`; Base/Turn/Rotate source time, weight, activation/closure and local contributing window keyed by `traceSourceId`; semantic Action request; and upstream P4 physical foot target/lock probe. The Action request wire is exactly `{ command, requestId, actionTraceSourceId, startSectionName, priority, slotGeneration }`: Start/Cancel reference an `ActionMontage` source entry, None uses empty source/section, and `requestId` follows the lossless signed-64 rule below. The Oracle resolves that source + section name through the snapshot into `ActionDefinitionId/StartSectionId`; UE resolves it through sidecar-observed Montage/section identity into native objects. Both schemas reject `ActionDefinitionId`, `StartSectionId` or any other Import/profile integer identity in shared/native rows. `AllowTransitions`, general curve samples, Sync mapping, Timeline ownership and Action/Transition/lane next state are outputs independently computed by each engine, never plan inputs. No expected/native observation is stored in the input section. UE resets its native character to the declared semantic default and consumes these frames; the port oracle creates Core defaults and independently consumes the same frames. UE raw `nativeActual` rows use `{ traceSourceId, observedAssetStableId, nativeRole, observedMontageStableId, observedSectionName, observedSegmentIndex, ...observed values }`; they never contain profile indices, graph slots, occurrence handles or authority IDs. Canonical rows contain the sidecar/layout-resolved handle/authority identity. Reject duplicate/unknown trace IDs, evidence mismatch, non-unique layout resolution, missing/extra/reordered case frames and any unused sidecar source. Tests mutate every true input family and require the port result to change or reject even when a fixed nativeActual document is held constant; changing curve keys/samples or playback time must independently change computed `AllowTransitions`/Transition behavior. Tests also reject any code path that reads nativeActual values to construct Core input, and reject any plan field that attempts to seed Core-only state or `AllowTransitions`. Add a failing pure bridge test that maps every Import curve/event/marker/sync/transition/action/section/segment/foot and graph-build field into owned arrays, mutates each source field, validates all three digests, and round-trips `CreateCoreView()`, `CreateOccurrenceLayoutView()` and `CreateGraphBuildView()` without Godot. Freeze exactly these eight ordinal case IDs: `grounded_marker_interval`, `authority_tie`, `standing_transition_left`, `standing_transition_right`, `crouching_transition_reuse`, `roll_default_section`, `montage_owned_notify`, `segment_sequence_notify_state`. Add generator tests for deterministic sidecar generation, native run twice, both trace representations, the oracle host ProjectReferences, native canonicalization/Core oracle twice through the same compiled snapshot, same-engine byte comparison, cross-engine tolerant structural comparison, stale-fixture rejection, lock check, staging cleanup, atomic publication and exact case set/count.
 
 Freeze lossless wire types in both schemas. `LayoutDigest`, `BindingDigest`, `GraphDigest` and every other exact `ulong` (including owner token) are exactly 16 lowercase hexadecimal characters with no `0x`; every exact signed 64-bit field, including frame ID, playback epoch/cycle, event sequence and Action request/outcome `RequestId`, is an invariant-culture decimal string matching `^(0|-?[1-9][0-9]*)$`. JSON numbers are forbidden for all 64-bit fields. Float/double samples remain finite JSON numbers. The sidecar contains no self-referential digest field: after the host closes the complete file, the PowerShell generator hashes its exact raw bytes with SHA-256, passes the lowercase 64-hex value separately as `-P5ATracePlanSha256`, and requires raw/canonical documents to repeat that value. UE hashes the exact bytes before parsing and rejects any mismatch, so C++ and C# share no implicit canonical-JSON algorithm. Checked invariant parsers handle all 64-bit fields. Schema/tests cover each signed family above `2^53` (including `RequestId`), `long.MinValue/MaxValue`, `ulong.MaxValue`, `-0`, leading signs/zeroes, wrong case/width and overflow; generator tests cover BOM/LF/trailing-byte changes by their byte hash.
 
-- [ ] **Step 2: Run RED golden tests**
+- [x] **Step 2: Run RED golden tests**
 
 Run:
 
@@ -1613,11 +1645,11 @@ dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj -c Debug --filter Ful
 
 Expected: FAIL because the pure Core-binding bridge, trace kind, schema, generator and fixture do not exist.
 
-- [ ] **Step 3: Extend the existing UE trace commandlet**
+- [x] **Step 3: Extend the existing UE trace commandlet**
 
 Add `-TraceKind=P5A -P5ATracePlan=<absolute staging path> -P5ATracePlanSha256=<64-lower-hex>` to the same plugin and shared ready/build flow. Capture real ALS runtime state from the locked reference and source project for the eight frozen cases: grounded Left/Right marker interval, authority tie, Standing Left/Right transition, Crouching explicit-reuse transition, Roll `Default` section, Montage-owned Notify and segment Sequence Notify/State. Before capture, C++ hashes the exact sidecar bytes, strictly validates the supplied hash/schema/commit/assets, resolves each requested UE package/object, resets the native runtime to the common semantic default and applies only that case's ordered warm-up/input frames. It checks the observed runtime role plus Montage/section/segment evidence. Every event/playback row writes only `traceSourceId` plus independently observed `nativeActual` evidence/results; input rows are neither copied into actual output nor synthesized from observations. C++ neither copies the .NET layout allocator nor emits profile indices, graph-slot IDs, Godot occurrence/authority IDs or port reason codes. Emit exact `P5A_TRACE_READY_OK cases=8 commit=b754d6f0f2bb03741d301f8fb88077ebfe561e17` and `P5A_TRACE_GENERATION_OK cases=8 commit=b754d6f0f2bb03741d301f8fb88077ebfe561e17`.
 
-- [ ] **Step 4: Generate deterministic native and port documents**
+- [x] **Step 4: Generate deterministic native and port documents**
 
 In this task add a one-way `Als.Import -> Als.Core` project reference; Core remains independent. Declare `AlsP5CoreRuntimeBindingCompiler` as `public static class` and `AlsP5CoreRuntimeBindingSnapshot` as `public sealed class`; `Compile`, `CreateCoreView`, `CreateOccurrenceLayoutView`, `CreateGraphBuildView`, `Version`, `Digest`, `LayoutDigest`, `GraphDigest` and `AnimationSetDefinitionDigest` are public so both the Oracle host and Godot assembly can consume the bridge, while every owned backing array remains private and immutable after construction. `AnimationSetDefinitionDigest` is the existing canonical 64-lower-hex Task 3 definition digest copied at compilation; it is initialization provenance, not a hot Core string field. The compiler is the sole pure bridge from the canonical animation set plus P3/P4/P5 profiles and `AlsP5OccurrenceLayout` into owned arrays. It exact-copies the complete layout entry array, including Idle/non-member Base banks, and `CreateOccurrenceLayoutView()` returns that owned copy with the original layout version/digest; no consumer reconstructs handles from bindings or a digest. `CreateCoreView()` returns `AlsP5RuntimeBindings`; it maps the Core curve enum, exact required handles/ordinals, Base/Turn/Rotate authority/windows, foot constants, marker/sync data and every Transition/Action binding. Snapshot version is `1`; its nonzero binding FNV-1a digest uses exactly the Task 12 byte sequence: little-endian `Version`, `LayoutDigest`, then every remaining runtime payload scalar and array element field in constructor/declaration order, excluding the stored `Digest` field and padding.
 
@@ -1636,7 +1668,7 @@ The PowerShell generator captures each native subprocess output, requires exactl
 
 Add a separate UE-free committed-fixture gate `verify-p5a-golden.ps1`. It validates the checked-in schema/fixture bytes and exact ordered case set/count/commit, then invokes the Oracle host in `--verify-fixture` mode. That mode reloads the current canonical manifest plus P3/P4/P5 profiles, recompiles the current snapshot, requires the fixture's version/layout/binding/graph digests/provenance and every exact integer identity to match, and executes the current Core oracle against native expected values with the same discrete-exact/float-`1e-5` comparator. Pester includes stale layout/binding/graph digests and changed current-profile negative cases. The gate also runs focused `AlsP5aGoldenTests`, rejects warnings/errors or duplicate markers, and alone emits exactly `P5A_GOLDEN_FIXTURE_OK cases=8 commit=b754d6f0f2bb03741d301f8fb88077ebfe561e17`. It never invokes UE or regenerates the fixture and never forwards the generator or native trace markers; this is the exact golden marker consumed by Task 22.
 
-- [ ] **Step 5: Run real generation and GREEN golden tests**
+- [x] **Step 5: Run real generation and GREEN golden tests**
 
 Run:
 
@@ -1650,7 +1682,7 @@ pwsh -NoProfile -File scripts/verify-p5a-golden.ps1
 
 Expected: deterministic comparison passes, generator prints `P5A_GOLDEN_GENERATION_OK cases=8 commit=b754d6f0f2bb03741d301f8fb88077ebfe561e17`, all eight golden cases PASS, and the committed-fixture gate prints exactly `P5A_GOLDEN_FIXTURE_OK cases=8 commit=b754d6f0f2bb03741d301f8fb88077ebfe561e17`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Als.Import/Als.Import.csproj src/Als.Import/Compilation/AlsP5CoreRuntimeBindingSnapshot.cs src/Als.Import/Compilation/AlsP5CoreRuntimeBindingCompiler.cs tests/Als.Import.Tests/AlsP5CoreRuntimeBindingCompilerTests.cs tools/schemas/als_p5a_trace.schema.json tools/schemas/als_p5a_trace_plan.schema.json tools/unreal/AlsLocomotionTrace src/Als.Core/Animation/AlsP5aTrace.cs tools/Als.P5aOracle scripts/generate-p5a-golden.ps1 scripts/verify-p5a-golden.ps1 tests/GenerateP5aGolden.Tests.ps1 tests/Als.Core.Tests/AlsP5aGoldenTests.cs tests/Als.Core.Tests/Fixtures/P5A tests/Als.Core.Tests/Als.Core.Tests.csproj

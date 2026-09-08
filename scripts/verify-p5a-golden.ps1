@@ -39,6 +39,7 @@ public static class P5aVerifierPreboundRunnerNative
     private const long MaxStdOutBytes = 8388608;
     private const long MaxStdErrBytes = 8388608;
     private const uint CREATE_SUSPENDED = 0x00000004;
+    private const uint CREATE_NO_WINDOW = 0x08000000;
     private const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
     private const uint STARTF_USESTDHANDLES = 0x00000100;
     private const uint HANDLE_FLAG_INHERIT = 0x00000001;
@@ -822,7 +823,7 @@ public static class P5aVerifierPreboundRunnerNative
             startup.StartupInfo.hStdOutput = stdoutWrite;
             startup.StartupInfo.hStdError = stderrWrite;
             startup.lpAttributeList = attributeList;
-            uint flags = CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT;
+            uint flags = CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW;
             if (!CreateProcessW(
                 filePath, BuildCommandLine(filePath, arguments),
                 IntPtr.Zero, IntPtr.Zero, true, flags, IntPtr.Zero,
@@ -2185,7 +2186,7 @@ function Assert-P5aVerifierOracleChild
             throw "P5A Oracle verification $streamProperty evidence is missing."
         }
     }
-    $markerPattern = '^P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=[0-9a-f]{64}$'
+    $markerPattern = '^P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=[0-9a-f]{64}$'
     $stdoutLines = @($Result.StdOutLines)
     $stderrLines = @($Result.StdErrLines)
     $markers = @($stdoutLines | Where-Object { [string]$_ -cmatch $markerPattern })
@@ -2221,9 +2222,30 @@ function Assert-P5aVerifierOracleChild
         throw 'P5A verifier Oracle child descendant metadata is missing.'
     }
     $descendants = @($Result.DescendantProcesses)
-    if ($descendants.Count -ne 0)
+    if ($descendants.Count -eq 0) { return }
+    $directId = [int]$Result.ProcessId
+    $systemConhost = Get-P5aVerifierFullPath (Join-Path `
+        ([Environment]::SystemDirectory) 'conhost.exe')
+    if ($descendants.Count -ne 1)
     {
-        throw 'P5A verifier Oracle child descendant process is forbidden.'
+        throw 'P5A verifier Oracle child has a forbidden descendant process count.'
+    }
+    $record = $descendants[0]
+    foreach ($property in @(
+        'processId', 'parentProcessId', 'ancestorProcessIds', 'imageName', 'executablePath'))
+    {
+        if ($null -eq $record.PSObject.Properties[$property])
+        {
+            throw "P5A verifier Oracle child descendant metadata is missing '$property'."
+        }
+    }
+    $ancestors = @($record.ancestorProcessIds | ForEach-Object { [int]$_ })
+    if ([string]$record.imageName -cne 'conhost.exe' -or
+        (Get-P5aVerifierFullPath ([string]$record.executablePath)) -ine $systemConhost -or
+        [int]$record.parentProcessId -ne $directId -or
+        $ancestors.Count -ne 1 -or $ancestors[0] -ne $directId)
+    {
+        throw 'P5A verifier Oracle child descendant is forbidden because it is not its direct system console host.'
     }
 }
 
@@ -2465,10 +2487,18 @@ function Assert-P5aVerifierDescendantClosure
             throw 'P5A verifier Oracle apphost parent must be the allowed project testhost.'
         }
         if ($role -cne 'SystemConhost') { continue }
-        if ($parentId -eq $directId -or -not $rolesById.ContainsKey($parentId) -or
-            [string]$rolesById[$parentId] -cnotin @('ProjectTestHost', 'SdkTestHost'))
+        $parentIsAllowedRuntimeOwner = $rolesById.ContainsKey($parentId) -and
+            [string]$rolesById[$parentId] -cin @(
+                'ProjectTestHost', 'SdkTestHost', 'OracleAppHost')
+        if ($parentId -ne $directId -and -not $parentIsAllowedRuntimeOwner)
         {
-            throw 'P5A verifier system conhost parent must be an allowed testhost.'
+            $ancestors = @($record.ancestorProcessIds | ForEach-Object { [int]$_ })
+            $parentRole = if ($rolesById.ContainsKey($parentId)) {
+                [string]$rolesById[$parentId]
+            } else {
+                'Unknown'
+            }
+            throw "P5A verifier system conhost parent must be an allowed runtime owner: pid=$recordId,parent=$parentId,parentRole=$parentRole,ancestors=$($ancestors -join ',')."
         }
         if (@($records | Where-Object {
                     [int]$_.parentProcessId -eq $recordId
@@ -2501,7 +2531,7 @@ function Assert-P5aTrx
     $counters = @($document.SelectNodes("//*[local-name()='Counters']"))
     if ($counters.Count -ne 1) { throw 'P5A verifier TRX counters are missing or duplicated.' }
     $counter = $counters[0]
-    foreach ($name in @('total', 'passed', 'failed', 'error', 'notExecuted', 'skipped'))
+    foreach ($name in @('total', 'passed', 'failed', 'error', 'notExecuted'))
     {
         if ($null -eq $counter.Attributes[$name] -or
             [string]$counter.Attributes[$name].Value -cnotmatch '^[0-9]+$')
@@ -2509,10 +2539,19 @@ function Assert-P5aTrx
             throw "P5A verifier TRX counter '$name' is invalid."
         }
     }
+    $skipped = 0
+    if ($null -ne $counter.Attributes['skipped'])
+    {
+        if ([string]$counter.Attributes['skipped'].Value -cnotmatch '^[0-9]+$')
+        {
+            throw "P5A verifier TRX counter 'skipped' is invalid."
+        }
+        $skipped = [int]$counter.skipped
+    }
     $total = [int]$counter.total
     if ($total -le 0 -or [int]$counter.passed -ne $total -or
         [int]$counter.failed -ne 0 -or [int]$counter.error -ne 0 -or
-        [int]$counter.notExecuted -ne 0 -or [int]$counter.skipped -ne 0)
+        [int]$counter.notExecuted -ne 0 -or $skipped -ne 0)
     {
         throw 'P5A verifier TRX reports zero, failed, skipped, or unexecuted tests.'
     }

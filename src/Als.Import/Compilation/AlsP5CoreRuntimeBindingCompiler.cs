@@ -13,6 +13,7 @@ namespace GodotAls.Import.Compilation;
 public static class AlsP5CoreRuntimeBindingCompiler
 {
     private const int Version = 1;
+    private const int BindingVersion = AlsP5RuntimeBindings.CurrentVersion;
     private const int MaximumExpandedTimelineEntries = 1_000_000;
 
     private static readonly string[] CanonicalBaseAnimationStableIds =
@@ -134,7 +135,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         }
 
         return new AlsP5CoreRuntimeBindingSnapshot(
-            Version, bindingDigest, layout.Digest, graphDigest,
+            BindingVersion, bindingDigest, layout.Digest, graphDigest,
             animationSet.DefinitionDigest, curveKeys, curveBindings,
             curveBindingIdentities, animationCurveRanges, allowTransitionsPolicy,
             allowTransitionsBindingIndices, footCurveBindings,
@@ -1490,7 +1491,15 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 throw new ArgumentException("An Action Montage is missing from the current set.");
             var montage = set.Montages[action.MontageId];
             if (montage.Id != action.MontageId || montage.PlayLength != action.MontageDurationSeconds ||
-                montage.Slots.Length != 1 || montage.Slots[0].SlotId != action.SlotId)
+                !float.IsFinite(montage.BlendInTime) || montage.BlendInTime < 0f ||
+                !float.IsFinite(montage.BlendOutTime) || montage.BlendOutTime < 0f ||
+                !float.IsFinite(montage.BlendOutTriggerTime) ||
+                montage.BlendInOption is < 0 or > 2 || montage.BlendOutOption is < 0 or > 2 ||
+                montage.Slots.Length != 1 || montage.Slots[0].SlotId != action.SlotId ||
+                action.Lifecycle != new AlsActionLifecycleSettings(
+                    montage.EnableAutoBlendOut ? AlsActionLifecycleMode.MontageAutoBlendOut : AlsActionLifecycleMode.MontageHoldAtEnd,
+                    montage.BlendInTime, (AlsActionBlendOption)montage.BlendInOption,
+                    montage.BlendOutTime, (AlsActionBlendOption)montage.BlendOutOption, montage.BlendOutTriggerTime))
             {
                 throw new ArgumentException("An Action definition differs from its current Montage.");
             }
@@ -1738,7 +1747,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 source.MontageId, source.MontageDurationSeconds, source.SlotId,
                 source.StartSectionId, source.Priority, source.PlayRate, source.BlendSeconds,
                 source.Interruptible ? (byte)1 : (byte)0,
-                source.LoopPolicy == AlsP5LoopPolicy.Loop ? (byte)1 : (byte)0);
+                source.LoopPolicy == AlsP5LoopPolicy.Loop ? (byte)1 : (byte)0, source.Lifecycle);
             foreach (var value in source.Sections)
             {
                 sectionList.Add(new AlsActionSectionBinding(value.ActionDefinitionId,
@@ -1993,7 +2002,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         AlsActionTimelineRange[] actionRanges)
     {
         var writer = new FnvWriter();
-        writer.Add(Version); writer.Add(layoutDigest);
+        writer.Add(BindingVersion); writer.Add(layoutDigest);
         writer.Add(curveKeys, static (ref FnvWriter w, in AlsCurveKey x) =>
         { w.Add(x.TimeSeconds); w.Add(x.Value); w.Add(x.ArriveTangent); w.Add(x.LeaveTangent); w.Add((byte)x.Interpolation); });
         writer.Add(curveBindings, static (ref FnvWriter w, in AlsCurveBinding x) =>
@@ -2086,6 +2095,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
         w.Add(x.DefinitionId); w.Add(x.MontageId); w.Add(x.MontageDurationSeconds); w.Add(x.SlotId);
         w.Add(x.StartSectionId); w.Add(x.Priority); w.Add(x.PlayRate); w.Add(x.BlendSeconds);
         w.Add(x.Interruptible); w.Add(x.Loop);
+        w.Add((byte)x.Lifecycle.Mode); w.Add(x.Lifecycle.BlendInSeconds); w.Add((byte)x.Lifecycle.BlendInOption);
+        w.Add(x.Lifecycle.BlendOutSeconds); w.Add((byte)x.Lifecycle.BlendOutOption); w.Add(x.Lifecycle.BlendOutTriggerSeconds);
     }
     private static void WriteGraphSample(ref FnvWriter w, in AlsP5GraphSample x)
     { w.Add(x.AnimationId); w.Add(x.X); w.Add(x.Y); w.Add(x.RateScale); }

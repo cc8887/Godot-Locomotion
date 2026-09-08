@@ -153,7 +153,9 @@ public static class AlsP5Runtime
         var eboResult = AlsActionEarlyBlendOutResult.CreateDefault();
         var actionAfterEbo = actionAfterAdvance;
         var eboClosingWeight = 0f;
-        if (requestResult.StartedOrReplacedThisFrame == 0 && actionAfterAdvance.Playing == 1)
+        if (requestResult.StartedOrReplacedThisFrame == 0 &&
+            actionAfterAdvance.Playing == 1 && sliceCount > 0 &&
+            actionAfterAdvance.Lifecycle.TraversalFinished == 0)
         {
             if (!TryGetActionTimelineRange(
                     bindings, actionAfterAdvance.ActionDefinitionId,
@@ -759,10 +761,13 @@ public static class AlsP5Runtime
         }
 
         var started = request.StartedOrReplacedThisFrame == 1;
+        var requestTerminal = request.ClosingReason != AlsActionResultCode.None;
         var finalPlayback = started ? request.InitialPlayback : advance.ContributingPlayback;
         var finalBindingIndex = afterAdvance.Playing == 1
             ? afterAdvance.SegmentBindingIndex
-            : afterRequest.Playing == 1 ? afterRequest.SegmentBindingIndex : -1;
+            : (uint)advance.ClosingSliceIndex < (uint)slices.Length
+                ? slices[advance.ClosingSliceIndex].SegmentBindingIndex
+                : afterRequest.Playing == 1 ? afterRequest.SegmentBindingIndex : -1;
         var incoming = CreateSource(finalPlayback, finalBindingIndex);
 
         if (started)
@@ -779,7 +784,7 @@ public static class AlsP5Runtime
             var outgoing = oldTail;
             var outgoingActive = currentLane.OutgoingActive == 1;
             var laneWeight = currentLane.LaneWeight;
-            if (request.ClosingSliceIndex >= 0)
+            if (requestTerminal)
             {
                 requestClosingWeight = LogicalIncomingWeight(currentLane, currentAction.Playing == 1);
                 outgoing = oldLogical;
@@ -791,7 +796,7 @@ public static class AlsP5Runtime
             laneWeight = Step(laneWeight, 1f, delta, blend);
             mix = Step(mix, 1f, delta, blend);
             graph = CreateInstruction(outgoing, incoming, laneWeight, mix);
-            if (request.ClosingSliceIndex >= 0)
+            if (requestTerminal)
             {
                 requestClosingWeight = graph.OutgoingEffectiveWeight;
             }
@@ -806,18 +811,16 @@ public static class AlsP5Runtime
             return true;
         }
 
-        var requestTerminal = request.ClosingSliceIndex >= 0;
-        var advanceTerminal = advance.ClosingSliceIndex >= 0;
+        var advanceTerminal = advance.ClosingReason != AlsActionResultCode.None;
         if (requestTerminal || advanceTerminal)
         {
             var closingIndex = requestTerminal
                 ? request.ClosingSliceIndex
                 : advance.ClosingSliceIndex;
-            if ((uint)closingIndex >= (uint)slices.Length)
+            if (closingIndex >= 0 && (uint)closingIndex >= (uint)slices.Length)
             {
                 return false;
             }
-            var closingReason = requestTerminal ? request.ClosingReason : advance.ClosingReason;
             var blend = requestTerminal
                 ? request.ClosingBlendSeconds
                 : FindActionBlend(bindings, currentAction.ActionDefinitionId);
@@ -826,7 +829,7 @@ public static class AlsP5Runtime
                 failure = AlsP5FailureCode.InvalidBinding;
                 return false;
             }
-            var tau = requestTerminal ? 0d : slices[closingIndex].FrameEndOffsetSeconds;
+            var tau = requestTerminal ? 0d : advance.CompletionOffsetSeconds;
             var steadyLane = Step(currentLane.LaneWeight, 1f, tau, blend);
             var steadyMix = Step(currentLane.IncomingMix, 1f, tau, blend);
             var contribution = currentAction.Playing == 1
@@ -849,7 +852,16 @@ public static class AlsP5Runtime
             {
                 advanceClosingWeight = graph.OutgoingEffectiveWeight;
             }
-            playback = CreateClosingActionPlayback(bindings, slices[closingIndex], graph.OutgoingEffectiveWeight);
+            playback = closingIndex >= 0
+                ? CreateClosingActionPlayback(bindings, slices[closingIndex], graph.OutgoingEffectiveWeight)
+                : requestTerminal
+                    ? new AlsActionPlayback(
+                        oldLogical.OccurrenceHandleId, currentAction.ActionDefinitionId, oldLogical.AnimationId,
+                        currentAction.SectionId, bindings.ActionSegments[currentAction.SegmentBindingIndex].SegmentId,
+                        currentAction.PlaybackEpoch, currentAction.PlaybackTime, currentAction.PlaybackTime,
+                        oldLogical.CurrentClipTime, oldLogical.CurrentClipTime, 0f,
+                        oldLogical.PlayRate, blend, graph.OutgoingEffectiveWeight, 1)
+                    : finalPlayback with { EffectiveWeight = graph.OutgoingEffectiveWeight };
             failure = AlsP5FailureCode.None;
             return true;
         }

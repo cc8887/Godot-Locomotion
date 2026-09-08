@@ -106,9 +106,12 @@ public static class AlsActionPlayer
         {
             _ = TryFindDefinition(definitions, candidate.ActionDefinitionId, out var definitionIndex);
             ref readonly var closingDefinition = ref definitions[definitionIndex];
-            closingSlice = stagedSliceCount;
-            stagedSlices[stagedSliceCount++] = CreatePointSlice(
-                closingDefinition, segments[candidate.SegmentBindingIndex], candidate, 0, 0, 1, 1);
+            if (candidate.Lifecycle.TraversalFinished == 0)
+            {
+                closingSlice = stagedSliceCount;
+                stagedSlices[stagedSliceCount++] = CreatePointSlice(
+                    closingDefinition, segments[candidate.SegmentBindingIndex], candidate, 0, 0, 1, 1);
+            }
             stagedOutcomes[stagedOutcomeCount++] = OwnerOutcome(
                 candidate, AlsActionResultCode.InterruptedByRuntimeFailure);
             closingBlend = closingDefinition.BlendSeconds;
@@ -180,10 +183,13 @@ public static class AlsActionPlayer
                         _ = TryFindDefinition(definitions, candidate.ActionDefinitionId,
                             out var closingDefinitionIndex);
                         ref readonly var oldDefinition = ref definitions[closingDefinitionIndex];
-                        closingSlice = stagedSliceCount;
-                        stagedSlices[stagedSliceCount++] = CreatePointSlice(
-                            oldDefinition, segments[candidate.SegmentBindingIndex], candidate,
-                            0, 0, 1, 1);
+                        if (candidate.Lifecycle.TraversalFinished == 0)
+                        {
+                            closingSlice = stagedSliceCount;
+                            stagedSlices[stagedSliceCount++] = CreatePointSlice(
+                                oldDefinition, segments[candidate.SegmentBindingIndex], candidate,
+                                0, 0, 1, 1);
+                        }
                         stagedOutcomes[stagedOutcomeCount++] = OwnerOutcome(
                             candidate, AlsActionResultCode.InterruptedByReplacement);
                         closingBlend = oldDefinition.BlendSeconds;
@@ -215,6 +221,7 @@ public static class AlsActionPlayer
                     candidate.Priority = request.Priority;
                     candidate.Playing = 1;
                     candidate.Interruptible = definition.Interruptible;
+                    candidate.Lifecycle = AlsActionLifecycle.Start(definition.Lifecycle);
                     initialSlice = stagedSliceCount;
                     stagedSlices[stagedSliceCount++] = CreatePointSlice(
                         definition, segment, candidate, 1, 1, 0, 0);
@@ -256,10 +263,13 @@ public static class AlsActionPlayer
                     _ = TryFindDefinition(definitions, candidate.ActionDefinitionId,
                         out var definitionIndex);
                     ref readonly var definition = ref definitions[definitionIndex];
-                    closingSlice = stagedSliceCount;
-                    stagedSlices[stagedSliceCount++] = CreatePointSlice(
-                        definition, segments[candidate.SegmentBindingIndex], candidate,
-                        0, 0, 1, 1);
+                    if (candidate.Lifecycle.TraversalFinished == 0)
+                    {
+                        closingSlice = stagedSliceCount;
+                        stagedSlices[stagedSliceCount++] = CreatePointSlice(
+                            definition, segments[candidate.SegmentBindingIndex], candidate,
+                            0, 0, 1, 1);
+                    }
                     stagedOutcomes[stagedOutcomeCount++] = OwnerOutcome(
                         candidate, AlsActionResultCode.InterruptedByExplicitCancel);
                     closingBlend = definition.BlendSeconds;
@@ -383,6 +393,13 @@ public static class AlsActionPlayer
         Span<AlsActionTraversalSlice> stagedSlices = stackalloc AlsActionTraversalSlice[TraversalCapacity];
         var stagedCount = 0;
         var candidate = current;
+        var lifecycleEnabled = definition.Lifecycle.Mode != AlsActionLifecycleMode.LegacySectionEnd;
+        if (lifecycleEnabled && (!float.IsFinite((float)frameDeltaSeconds) || (float)frameDeltaSeconds <= 0f))
+        {
+            failure = AlsP5FailureCode.InvalidDeltaTime;
+            return false;
+        }
+        AlsActionLifecycle.AdvanceWeight(definition.Lifecycle, (float)frameDeltaSeconds, ref candidate.Lifecycle);
         var remaining = frameDeltaSeconds;
         var frameOffset = 0d;
         var montageTime = (double)current.PlaybackTime;
@@ -395,7 +412,17 @@ public static class AlsActionPlayer
         var closingLocalIndex = -1;
         var finalPlayback = AlsActionPlayback.CreateDefault();
 
-        while (true)
+        if (candidate.Lifecycle.TraversalFinished == 1)
+        {
+            if (!TryCreatePlayback(definition, segments[segmentIndex], sectionId, epoch,
+                    montageTime, montageTime, 0d, out finalPlayback))
+            {
+                failure = AlsP5FailureCode.NonFiniteOutput;
+                return false;
+            }
+        }
+
+        while (candidate.Lifecycle.TraversalFinished == 0)
         {
             if (!TryFindSection(sections, definition.DefinitionId, sectionId, out var sectionIndex))
             {
@@ -518,8 +545,15 @@ public static class AlsActionPlayer
                     candidate.SegmentBindingIndex = segmentIndex;
                     candidate.PlaybackEpoch = epoch;
                     candidate.PlaybackTime = (float)boundary;
-                    completed = true;
-                    closingLocalIndex = stagedCount - 1;
+                    if (lifecycleEnabled)
+                    {
+                        candidate.Lifecycle.TraversalFinished = 1;
+                    }
+                    else
+                    {
+                        completed = true;
+                        closingLocalIndex = stagedCount - 1;
+                    }
                     break;
                 }
 
@@ -625,6 +659,37 @@ public static class AlsActionPlayer
             }
         }
 
+        if (lifecycleEnabled && current.Lifecycle.TraversalFinished == 0)
+        {
+            _ = TryFindSection(sections, definition.DefinitionId, candidate.SectionId, out var finalSectionIndex);
+            ref readonly var finalSection = ref sections[finalSectionIndex];
+            ref readonly var finalSlice = ref stagedSlices[stagedCount - 1];
+            // Notify segment/loop slices are not extra montage updates.
+            var unadvancedSectionHandoff = finalSlice.ActivatesActionAtSliceStart == 1 &&
+                finalSlice.PreviousMontageTime == finalSlice.CurrentMontageTime;
+            if (finalSection.NextSectionId == -1 && !unadvancedSectionHandoff)
+            {
+                AlsActionLifecycle.TryBeginBlendOut(definition.Lifecycle,
+                    (finalSection.EndTime - candidate.PlaybackTime) / definition.PlayRate, ref candidate.Lifecycle);
+            }
+        }
+
+        if (lifecycleEnabled && AlsActionLifecycle.IsComplete(candidate.Lifecycle))
+        {
+            completed = true;
+            if (stagedCount > 0)
+            {
+                closingLocalIndex = stagedCount - 1;
+                stagedSlices[closingLocalIndex] = stagedSlices[closingLocalIndex] with
+                {
+                    ClosesActionAfterSlice = 1,
+                    ClosesSegmentAfterSlice = 1,
+                };
+            }
+        }
+
+        var completionOffset = !completed ? 0d : lifecycleEnabled
+            ? frameDeltaSeconds : stagedSlices[closingLocalIndex].FrameEndOffsetSeconds;
         var outcomeCount = completed ? 1 : 0;
         if (sliceCount + stagedCount > TraversalCapacity ||
             outcomes.Count + outcomeCount > AlsActionOutcomeBuffer.Capacity)
@@ -651,7 +716,8 @@ public static class AlsActionPlayer
             firstSlice,
             stagedCount,
             closingLocalIndex < 0 ? -1 : firstSlice + closingLocalIndex,
-            completed ? AlsActionResultCode.Completed : AlsActionResultCode.None);
+            completed ? AlsActionResultCode.Completed : AlsActionResultCode.None,
+            completionOffset);
         failure = AlsP5FailureCode.None;
         return true;
     }
@@ -947,6 +1013,7 @@ public static class AlsActionPlayer
                 definition.Priority < 0 ||
                 !float.IsFinite(definition.PlayRate) || definition.PlayRate <= 0f ||
                 !float.IsFinite(definition.BlendSeconds) || definition.BlendSeconds < 0f ||
+                !AlsActionLifecycle.IsValid(definition.Lifecycle) ||
                 definition.Interruptible is not 0 and not 1 ||
                 definition.Loop is not 0 and not 1)
             {
@@ -1170,7 +1237,8 @@ public static class AlsActionPlayer
                 state.RequestId == -1 &&
                 BitConverter.SingleToInt32Bits(state.PlaybackTime) == 0 &&
                 state.Priority == 0 &&
-                state.Interruptible == 0;
+                state.Interruptible == 0 &&
+                AlsActionLifecycle.IsDefault(state.Lifecycle);
         }
 
         if (state.RequestId <= 0 ||
@@ -1190,9 +1258,13 @@ public static class AlsActionPlayer
         ref readonly var section = ref sections[sectionIndex];
         ref readonly var segment = ref segments[state.SegmentBindingIndex];
         return state.Interruptible == definition.Interruptible &&
+            AlsActionLifecycle.IsValid(definition.Lifecycle, state.Lifecycle) &&
             segment.ActionDefinitionId == state.ActionDefinitionId &&
-            state.PlaybackTime >= section.StartTime && state.PlaybackTime < section.EndTime &&
-            state.PlaybackTime >= segment.MontageStartTime && state.PlaybackTime < segment.MontageEndTime;
+            (state.Lifecycle.TraversalFinished == 1
+                ? section.NextSectionId == -1 && state.PlaybackTime == section.EndTime &&
+                    state.PlaybackTime > segment.MontageStartTime && state.PlaybackTime <= segment.MontageEndTime
+                : state.PlaybackTime >= section.StartTime && state.PlaybackTime < section.EndTime &&
+                    state.PlaybackTime >= segment.MontageStartTime && state.PlaybackTime < segment.MontageEndTime);
     }
 
     private static bool ValidateDestination(
@@ -1726,6 +1798,7 @@ public static class AlsActionPlayer
         state.Priority = 0;
         state.Playing = 0;
         state.Interruptible = 0;
+        state.Lifecycle = default;
     }
 
     private static bool IsValid(AlsTimelineLocomotionMode value) =>

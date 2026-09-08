@@ -15,6 +15,9 @@ public class AlsLocomotionTrace : ModuleRules
             "Json",
             "JsonUtilities",
             "ALS",
+            "ALSCamera",
         });
+
+        AddEngineThirdPartyPrivateStaticDependencies(target, "OpenSSL");
     }
 }

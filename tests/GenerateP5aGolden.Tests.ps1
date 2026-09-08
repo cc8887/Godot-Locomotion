@@ -3,10 +3,14 @@ $script:P5aGeneratorPath = Join-Path $script:P5aRepositoryRoot 'scripts\generate
 $script:P5aVerifierPath = Join-Path $script:P5aRepositoryRoot 'scripts\verify-p5a-golden.ps1'
 $script:P5aOracleProjectPath = Join-Path $script:P5aRepositoryRoot 'tools\Als.P5aOracle\Als.P5aOracle.csproj'
 $script:P5aOracleProgramPath = Join-Path $script:P5aRepositoryRoot 'tools\Als.P5aOracle\Program.cs'
+$script:P5aNativeCommandletPath = Join-Path $script:P5aRepositoryRoot `
+    'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\Private\AlsLocomotionTraceCommandlet.cpp'
+$script:P5aNativeBuildRulesPath = Join-Path $script:P5aRepositoryRoot `
+    'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\AlsLocomotionTrace.Build.cs'
 $script:P5aLockedCommit = 'b754d6f0f2bb03741d301f8fb88077ebfe561e17'
 $script:P5aLockedPatch = '3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f'
 $script:P5aLayoutDigest = 'd6fef54173240d32'
-$script:P5aBindingDigest = '2b4be600d531c734'
+$script:P5aBindingDigest = 'e458fef4df7a854d'
 $script:P5aGraphDigest = '44403c2869d8f615'
 $script:P5aGeneratorLoadError = $null
 $script:P5aVerifierLoadError = $null
@@ -283,7 +287,7 @@ function Assert-TestP5aNativeRunnerLexicalClosure
     # this narrow lexical contract alongside the AST closure instead of requiring a
     # compiler or a network-restored C# parser in the Pester 3/4 harness.
     foreach ($token in @(
-        'CreateProcessW', 'STARTUPINFOEX', 'EXTENDED_STARTUPINFO_PRESENT',
+        'CreateProcessW', 'STARTUPINFOEX', 'EXTENDED_STARTUPINFO_PRESENT', 'CREATE_NO_WINDOW',
         'STARTF_USESTDHANDLES', 'CreatePipe', 'SetHandleInformation',
         'InitializeProcThreadAttributeList', 'UpdateProcThreadAttribute',
         'DeleteProcThreadAttributeList', 'PROC_THREAD_ATTRIBUTE_JOB_LIST',
@@ -644,14 +648,21 @@ public sealed class SyntheticGameEditorTarget : TargetRules
     $alsManifest = Join-Path $project 'Plugins\ALS\Binaries\Win64\UnrealEditor.modules'
     $traceManifest = Join-Path $deployed 'Binaries\Win64\UnrealEditor.modules'
     Write-TestP5aText $alsManifest @"
-{"BuildId":"$buildId","Modules":{"ALS":"UnrealEditor-ALS.dll"}}
+{"BuildId":"$buildId","Modules":{"ALS":"UnrealEditor-ALS.dll","ALSCamera":"UnrealEditor-ALSCamera.dll","ALSEditor":"UnrealEditor-ALSEditor.dll","ALSExtras":"UnrealEditor-ALSExtras.dll"}}
 "@
     Write-TestP5aText $traceManifest @"
 {"BuildId":"$buildId","Modules":{"AlsLocomotionTrace":"UnrealEditor-AlsLocomotionTrace.dll"}}
 "@
-    $alsDll = Join-Path (Split-Path -Parent $alsManifest) 'UnrealEditor-ALS.dll'
+    $alsDllRoot = Split-Path -Parent $alsManifest
+    $alsDll = Join-Path $alsDllRoot 'UnrealEditor-ALS.dll'
+    $alsCameraDll = Join-Path $alsDllRoot 'UnrealEditor-ALSCamera.dll'
+    $alsEditorDll = Join-Path $alsDllRoot 'UnrealEditor-ALSEditor.dll'
+    $alsExtrasDll = Join-Path $alsDllRoot 'UnrealEditor-ALSExtras.dll'
     $traceDll = Join-Path (Split-Path -Parent $traceManifest) 'UnrealEditor-AlsLocomotionTrace.dll'
     Write-TestP5aText $alsDll "synthetic ALS DLL`n"
+    Write-TestP5aText $alsCameraDll "synthetic ALSCamera DLL`n"
+    Write-TestP5aText $alsEditorDll "synthetic ALSEditor DLL`n"
+    Write-TestP5aText $alsExtrasDll "synthetic ALSExtras DLL`n"
     Write-TestP5aText $traceDll "synthetic trace DLL`n"
 
     $sourceTime = [DateTime]::UtcNow.AddMinutes(-10)
@@ -674,6 +685,9 @@ public sealed class SyntheticGameEditorTarget : TargetRules
         AlsManifestPath = $alsManifest
         TraceManifestPath = $traceManifest
         AlsDllPath = $alsDll
+        AlsCameraDllPath = $alsCameraDll
+        AlsEditorDllPath = $alsEditorDll
+        AlsExtrasDllPath = $alsExtrasDll
         TraceDllPath = $traceDll
     }
 }
@@ -732,7 +746,9 @@ if ($call -eq $descendantCall) {
             }
         })
     } else {
-        $descendantImages = @($control.DescendantImages)
+        $descendantImages = @(if ($null -eq $control.DescendantImages) { @() } else {
+            @($control.DescendantImages)
+        })
         for ($index = 0; $index -lt $descendantImages.Count; $index++) {
             $image = [string]$descendantImages[$index]
             $configuredPath = $null
@@ -812,7 +828,7 @@ if ($mode -ceq '--write-native-plan') {
     Write-Utf8 $output $bytes
     $planHash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLowerInvariant()
     if ([int]$control.PlanMarkerMismatchCall -eq $call) { $planHash = 'f' * 64 }
-    $marker = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=$planHash"
+    $marker = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=$planHash"
 }
 elseif ($mode -ceq '--write-canonical-pair') {
     $nativeBytes = if ($call -eq 7 -and $control.NativeBDrift) {
@@ -829,10 +845,10 @@ elseif ($mode -ceq '--write-canonical-pair') {
     Write-Utf8 (Get-SeparateValue '--port-canonical') $portBytes
     $plan = Get-SeparateValue '--trace-plan'
     $planHash = (Get-FileHash -LiteralPath $plan -Algorithm SHA256).Hash.ToLowerInvariant()
-    $marker = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=$planHash"
+    $marker = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=$planHash"
 }
 elseif ($mode -ceq '--verify-fixture') {
-    $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=' + ('a' * 64)
+    $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=' + ('a' * 64)
 }
 elseif ($mode -ceq 'test') {
     $loggerIndex = [Array]::IndexOf([string[]]$ChildArguments, '--logger')
@@ -1075,6 +1091,9 @@ function Get-TestP5aDeploymentLeasePaths
         $Context.Deployment.AlsManifestPath
         $Context.Deployment.TraceManifestPath
         $Context.Deployment.AlsDllPath
+        $Context.Deployment.AlsCameraDllPath
+        $Context.Deployment.AlsEditorDllPath
+        $Context.Deployment.AlsExtrasDllPath
         $Context.Deployment.TraceDllPath
     )
     $paths = @($ownedPaths) + @($deployedPaths) + @($evidencePaths) |
@@ -2025,7 +2044,10 @@ function Get-TestP5aBuildEvidence
         alsModuleManifestSha256 = 'b' * 64
         traceModuleManifestSha256 = 'c' * 64
         alsModuleDllSha256 = 'd' * 64
-        traceModuleDllSha256 = 'e' * 64
+        alsCameraModuleDllSha256 = 'e' * 64
+        alsEditorModuleDllSha256 = 'f' * 64
+        alsExtrasModuleDllSha256 = '0' * 64
+        traceModuleDllSha256 = '1' * 64
     }
 }
 
@@ -2077,7 +2099,7 @@ namespace Als.P5aOracle;
 
 internal static class Program
 {
-    private const string MarkerPrefix = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=";
+    private const string MarkerPrefix = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=";
 
     private static int Main(string[] args)
     {
@@ -2496,6 +2518,1021 @@ function New-TestP5aNestedDotnetDescendantRecords
     )
 }
 
+function ConvertTo-TestP5aCppCodeMask
+{
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    $mask = $Text.ToCharArray()
+    $length = $Text.Length
+    $index = 0
+    while ($index -lt $length)
+    {
+        $next = if ($index + 1 -lt $length) { $Text[$index + 1] } else { [char]0 }
+        if ($Text[$index] -eq '/' -and $next -eq '/')
+        {
+            $end = $Text.IndexOf("`n", $index + 2, [StringComparison]::Ordinal)
+            if ($end -lt 0) { $end = $length }
+            for ($cursor = $index; $cursor -lt $end; $cursor++) { $mask[$cursor] = ' ' }
+            $index = $end
+            continue
+        }
+        if ($Text[$index] -eq '/' -and $next -eq '*')
+        {
+            $end = $Text.IndexOf('*/', $index + 2, [StringComparison]::Ordinal)
+            if ($end -lt 0) { throw 'Unclosed C++ block comment.' }
+            $end += 2
+            for ($cursor = $index; $cursor -lt $end; $cursor++)
+            {
+                if ($mask[$cursor] -ne "`r" -and $mask[$cursor] -ne "`n") { $mask[$cursor] = ' ' }
+            }
+            $index = $end
+            continue
+        }
+        if ($Text[$index] -eq 'R' -and $next -eq '"')
+        {
+            $delimiterEnd = $Text.IndexOf('(', $index + 2)
+            if ($delimiterEnd -lt 0 -or $delimiterEnd - ($index + 2) -gt 16)
+            {
+                throw 'Invalid or unclosed C++ raw string delimiter.'
+            }
+            $delimiter = $Text.Substring($index + 2, $delimiterEnd - ($index + 2))
+            if ($delimiter -match '[\s\\()]') { throw 'Invalid C++ raw string delimiter.' }
+            $terminator = ')' + $delimiter + '"'
+            $end = $Text.IndexOf($terminator, $delimiterEnd + 1, [StringComparison]::Ordinal)
+            if ($end -lt 0) { throw 'Unclosed C++ raw string.' }
+            $end += $terminator.Length
+            for ($cursor = $index; $cursor -lt $end; $cursor++)
+            {
+                if ($mask[$cursor] -ne "`r" -and $mask[$cursor] -ne "`n") { $mask[$cursor] = ' ' }
+            }
+            $index = $end
+            continue
+        }
+        if ($Text[$index] -eq '"' -or $Text[$index] -eq "'")
+        {
+            $quote = $Text[$index]
+            $cursor = $index + 1
+            $closed = $false
+            while ($cursor -lt $length)
+            {
+                if ($Text[$cursor] -eq '\')
+                {
+                    $cursor += 2
+                    continue
+                }
+                if ($Text[$cursor] -eq $quote)
+                {
+                    $cursor++
+                    $closed = $true
+                    break
+                }
+                $cursor++
+            }
+            if (-not $closed) { throw 'Unclosed C++ string or character literal.' }
+            for ($literalIndex = $index; $literalIndex -lt $cursor; $literalIndex++)
+            {
+                if ($mask[$literalIndex] -ne "`r" -and $mask[$literalIndex] -ne "`n")
+                {
+                    $mask[$literalIndex] = ' '
+                }
+            }
+            $index = $cursor
+            continue
+        }
+        $index++
+    }
+    return -join $mask
+}
+
+function Get-TestP5aCppFunctionDefinitions
+{
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    $code = ConvertTo-TestP5aCppCodeMask $Text
+    $definitions = [Collections.Generic.List[object]]::new()
+    $pattern = '(?<![A-Za-z0-9_])' + [regex]::Escape($Name) + '\s*\('
+    foreach ($match in [regex]::Matches($code, $pattern))
+    {
+        $openParenthesis = $code.IndexOf('(', $match.Index)
+        $depth = 0
+        $closeParenthesis = -1
+        for ($index = $openParenthesis; $index -lt $code.Length; $index++)
+        {
+            if ($code[$index] -eq '(') { $depth++ }
+            elseif ($code[$index] -eq ')')
+            {
+                $depth--
+                if ($depth -eq 0) { $closeParenthesis = $index; break }
+            }
+        }
+        if ($closeParenthesis -lt 0) { throw "Unclosed parameter list for C++ token '$Name'." }
+        $bodyStart = $closeParenthesis + 1
+        while ($bodyStart -lt $code.Length -and [char]::IsWhiteSpace($code[$bodyStart])) { $bodyStart++ }
+        if ($bodyStart -ge $code.Length -or $code[$bodyStart] -ne '{') { continue }
+        $depth = 0
+        $bodyEnd = -1
+        for ($index = $bodyStart; $index -lt $code.Length; $index++)
+        {
+            if ($code[$index] -eq '{') { $depth++ }
+            elseif ($code[$index] -eq '}')
+            {
+                $depth--
+                if ($depth -eq 0) { $bodyEnd = $index; break }
+            }
+        }
+        if ($bodyEnd -lt 0) { throw "Unclosed function body for C++ token '$Name'." }
+        [void]$definitions.Add([pscustomobject]@{
+            Name = $Name
+            Start = $match.Index
+            BodyStart = $bodyStart
+            BodyEnd = $bodyEnd
+            Text = $Text.Substring($bodyStart, $bodyEnd - $bodyStart + 1)
+            Code = $code.Substring($bodyStart, $bodyEnd - $bodyStart + 1)
+        })
+    }
+    return @($definitions)
+}
+
+function Assert-TestP5a13cCapability
+{
+    param(
+        [Parameter(Mandatory)][int]$Family,
+        [Parameter(Mandatory)][bool]$Condition,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    if (-not $Condition)
+    {
+        "Missing 13C capability [family $Family]: $Name" | Should BeNullOrEmpty
+    }
+}
+
+function Assert-TestP5aTransitionInjectionClosure
+{
+    param([Parameter(Mandatory)][string]$Text)
+
+    $code = ConvertTo-TestP5aCppCodeMask $Text
+    $helper = @(Get-TestP5aCppFunctionDefinitions $Text 'ApplyP5aNativeTransitionStimulus')
+    $case = @(Get-TestP5aCppFunctionDefinitions $Text 'GenerateP5aCase')
+    $helper.Count | Should Be 1
+    $case.Count | Should Be 1
+    @([regex]::Matches($code, '\bApplyP5aNativeTransitionStimulus\s*\(')).Count |
+        Should Be 2
+    @([regex]::Matches($case[0].Code, '\bApplyP5aNativeTransitionStimulus\s*\(')).Count |
+        Should Be 1
+    @([regex]::Matches($helper[0].Code, '\bUObject::ProcessEvent\s*\(')).Count |
+        Should Be 1
+    @([regex]::Matches($helper[0].Code, '\bON_SCOPE_EXIT\b')).Count | Should Be 1
+    $helper[0].Code | Should Not Match '(?i)Montage_Play|Montage_SetPosition|TickAnimation|TFunction|delegate'
+    $helper[0].Code | Should Not Match '\(\s*\*|->\s*\*|=\s*&\s*[A-Za-z_][A-Za-z0-9_:]*'
+    $lambdaPattern =
+        '\[\s*(?:&|=|this|[A-Za-z_][A-Za-z0-9_]*)(?:\s*,\s*(?:&?\s*[A-Za-z_][A-Za-z0-9_]*|this))*\s*\]' +
+        '\s*(?:\([^)]*\)\s*)?\{'
+    $helper[0].Code | Should Not Match $lambdaPattern
+
+    $allowedCalls = @(
+        'IsValid', 'ContainerPtrToValuePtr', 'GetPropertyValue_InContainer',
+        'SetPropertyValue_InContainer', 'CopyCompleteValue_InContainer',
+        'Identical_InContainer', 'Memcpy', 'Memcmp', 'ProcessEvent', 'sizeof', 'alignas'
+    )
+    foreach ($call in [regex]::Matches(
+        $helper[0].Code,
+        '(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*::)?([A-Za-z_][A-Za-z0-9_]*)\s*\('))
+    {
+        if ($call.Groups[1].Value -in @('if', 'for', 'while', 'switch', 'return')) { continue }
+        $allowedCalls | Should Contain $call.Groups[1].Value
+    }
+}
+
+Describe 'P5A native capture source RED contract' -Tag 'P5a13cRed' {
+    BeforeAll {
+        $script:P5aNativeCommandletText = [IO.File]::ReadAllText($script:P5aNativeCommandletPath)
+        $script:P5aNativeCommandletCode = ConvertTo-TestP5aCppCodeMask $script:P5aNativeCommandletText
+        $script:P5aNativeBuildRulesText = [IO.File]::ReadAllText($script:P5aNativeBuildRulesPath)
+        $script:P5aNativeCharacterText = [IO.File]::ReadAllText((Join-Path `
+            (Split-Path -Parent $script:P5aNativeCommandletPath) 'AlsTraceCharacter.cpp'))
+        $script:P5aNativeCharacterCode = ConvertTo-TestP5aCppCodeMask $script:P5aNativeCharacterText
+    }
+
+    It 'keeps the C++ scanner comment literal raw-string and balanced-body aware' {
+        $control = @'
+// void ApplyP5aNativeTransitionStimulus() { Fake(); }
+const char* Escaped = "ApplyP5aNativeTransitionStimulus() { \" }";
+const char Character = '}';
+const char* Raw = R"tag(ApplyP5aNativeTransitionStimulus() { } })tag";
+void ApplyP5aNativeTransitionStimulus()
+{
+    if (true) { UObject::ProcessEvent(nullptr, nullptr); }
+}
+'@
+        $definitions = @(Get-TestP5aCppFunctionDefinitions $control 'ApplyP5aNativeTransitionStimulus')
+        $definitions.Count | Should Be 1
+        $definitions[0].Code | Should Match 'UObject::ProcessEvent'
+        $definitions[0].Code | Should Not Match 'Fake'
+        Test-TestP5aRejects { ConvertTo-TestP5aCppCodeMask 'void F(){ R"tag(unclosed'; } |
+            Should Be $true
+        Test-TestP5aRejects { ConvertTo-TestP5aCppCodeMask 'void F(){ /* unclosed'; } |
+            Should Be $true
+        (@(Get-TestP5aCppFunctionDefinitions ($control + "`n" + $control) `
+            'ApplyP5aNativeTransitionStimulus')).Count | Should Be 2
+
+        $validClosure = @'
+void ApplyP5aNativeTransitionStimulus()
+{
+    if (!IsValid(Instance)) { return; }
+    ON_SCOPE_EXIT
+    {
+        Contract.SetPropertyValue_InContainer(Instance, LeftTarget);
+        Contract.SetPropertyValue_InContainer(Instance, LeftLock);
+        Contract.SetPropertyValue_InContainer(Instance, LeftAmount);
+        Contract.SetPropertyValue_InContainer(Instance, RightTarget);
+        Contract.SetPropertyValue_InContainer(Instance, RightLock);
+        Contract.SetPropertyValue_InContainer(Instance, RightAmount);
+    };
+    Contract.SetPropertyValue_InContainer(Instance, LeftTarget);
+    Contract.SetPropertyValue_InContainer(Instance, LeftLock);
+    Contract.SetPropertyValue_InContainer(Instance, LeftAmount);
+    Contract.SetPropertyValue_InContainer(Instance, RightTarget);
+    Contract.SetPropertyValue_InContainer(Instance, RightLock);
+    Contract.SetPropertyValue_InContainer(Instance, RightAmount);
+    UObject::ProcessEvent(Function, nullptr);
+    FMemory::Memcmp(Before, After, 1);
+}
+bool GenerateP5aCase()
+{
+    ApplyP5aNativeTransitionStimulus();
+    return true;
+}
+'@
+        Assert-TestP5aTransitionInjectionClosure $validClosure
+        $mutations = @(
+            @{ Name = 'second-helper'; Value = $validClosure.Replace(
+                'bool GenerateP5aCase()',
+                "void ApplyP5aNativeTransitionStimulus() { }`nbool GenerateP5aCase()") }
+            @{ Name = 'indirect-call'; Value = $validClosure.Replace(
+                'UObject::ProcessEvent(Function, nullptr);',
+                '(*Invoker)(Function, nullptr); UObject::ProcessEvent(Function, nullptr);') }
+            @{ Name = 'macro-wrapped-terminal'; Value = $validClosure.Replace(
+                'UObject::ProcessEvent(Function, nullptr);',
+                'WRAP(UObject::ProcessEvent(Function, nullptr));') }
+            @{ Name = 'function-pointer'; Value = $validClosure.Replace(
+                'UObject::ProcessEvent(Function, nullptr);',
+                'auto FunctionPointer = &UObject::ProcessEvent; UObject::ProcessEvent(Function, nullptr);') }
+            @{ Name = 'extra-lambda'; Value = $validClosure.Replace(
+                'UObject::ProcessEvent(Function, nullptr);',
+                'auto Extra = [&]() { }; UObject::ProcessEvent(Function, nullptr);') }
+            @{ Name = 'unknown-callee'; Value = $validClosure.Replace(
+                'UObject::ProcessEvent(Function, nullptr);',
+                'HiddenHelper(); UObject::ProcessEvent(Function, nullptr);') }
+            @{ Name = 'second-terminal-edge'; Value = $validClosure.Replace(
+                'UObject::ProcessEvent(Function, nullptr);',
+                'UObject::ProcessEvent(Function, nullptr); UObject::ProcessEvent(Function, nullptr);') }
+        )
+        foreach ($mutation in $mutations)
+        {
+            Test-TestP5aRejects {
+                Assert-TestP5aTransitionInjectionClosure $mutation.Value
+            } | Should Be $true
+        }
+    }
+
+    It 'family 1 requires exact P3 P4 P5A dispatch plan hash contract and DTO isolation' {
+        $main = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText 'Main')
+        $main.Count | Should Be 1
+        Assert-TestP5a13cCapability 1 `
+            ($main[0].Text -match 'TraceKind\s*==\s*TEXT\(\s*"P5A"\s*\)') `
+            'exact P5A TraceKind dispatch'
+        Assert-TestP5a13cCapability 1 `
+            ($main[0].Text -match 'P5ATracePlan=' -and $main[0].Text -match 'P5ATracePlanSha256=') `
+            'whole-plan path and SHA-256 arguments'
+        Assert-TestP5a13cCapability 1 `
+            ($script:P5aNativeBuildRulesText -match '"OpenSSL"') 'OpenSSL module dependency'
+        (@(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'ValidateP5aTracePlan')).Count | Should Be 1
+        $planValidator = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'ValidateP5aTracePlan')[0]
+        $planValidator.Text | Should Not Match 'GetStringField\s*\(\s*TEXT\(\s*"representation"'
+        $planValidator.Text | Should Match 'TryGetNumberField'
+        $planValidator.Text | Should Match 'TryGetStringField'
+        foreach ($canonicalByteToken in @('UTF8_BOM', "'\r'", "'\n'"))
+        {
+            $planValidator.Text | Should Match ([regex]::Escape($canonicalByteToken))
+        }
+        (@(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'ResolveP5aNativeTransitionStimulusContract')).Count | Should Be 1
+        $script:P5aNativeCommandletText | Should Match `
+            '78cfb6aad01c29ac179f63515835aeeb6dd48b70dc42223cf81dea771e27f11d'
+        foreach ($forbidden in @('CanonicalRole', 'NativeVariantRole', 'traceSourceId', 'PortResult'))
+        {
+            $script:P5aNativeCommandletCode | Should Not Match `
+                ('(?i)struct\s+FP5aNative(?:Actual|Asset|Event|Marker|Curve)[^;{}]*\b' +
+                    [regex]::Escape($forbidden) + '\b')
+        }
+    }
+
+    It 'family 2 requires one bounded transition injection closure and adversarially unique terminal edge' {
+        $helper = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'ApplyP5aNativeTransitionStimulus')
+        Assert-TestP5a13cCapability 2 ($helper.Count -eq 1) `
+            'one ApplyP5aNativeTransitionStimulus definition'
+        $case = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText 'GenerateP5aCase')
+        Assert-TestP5a13cCapability 2 ($case.Count -eq 1) 'one GenerateP5aCase definition'
+        Assert-TestP5aTransitionInjectionClosure $script:P5aNativeCommandletText
+    }
+
+    It 'family 3 requires the exact six-field inject scope-restore and post-scope readback transaction' {
+        $helper = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'ApplyP5aNativeTransitionStimulus')
+        Assert-TestP5a13cCapability 3 ($helper.Count -eq 1) `
+            'transition stimulus transaction helper'
+        $footWrites = @(
+            @{ Property = 'TargetLocationWorldSpace'; Side = 'LeftState'; Operation = 'CopyCompleteValue_InContainer' }
+            @{ Property = 'LockLocationWorldSpace'; Side = 'LeftState'; Operation = 'CopyCompleteValue_InContainer' }
+            @{ Property = 'LockAmount'; Side = 'LeftState'; Operation = 'SetPropertyValue_InContainer' }
+            @{ Property = 'TargetLocationWorldSpace'; Side = 'RightState'; Operation = 'CopyCompleteValue_InContainer' }
+            @{ Property = 'LockLocationWorldSpace'; Side = 'RightState'; Operation = 'CopyCompleteValue_InContainer' }
+            @{ Property = 'LockAmount'; Side = 'RightState'; Operation = 'SetPropertyValue_InContainer' }
+        )
+        foreach ($write in $footWrites)
+        {
+            $pattern = 'Contract\.' + $write.Property + '\s*->\s*' + $write.Operation +
+                '\s*\(\s*' + $write.Side + '\s*,'
+            @([regex]::Matches($helper[0].Code, $pattern)).Count | Should Be 2
+        }
+        @([regex]::Matches($helper[0].Code,
+            'Contract\.(?:TargetLocationWorldSpace|LockLocationWorldSpace|LockAmount)\s*->\s*' +
+            '(?:CopyCompleteValue_InContainer|SetPropertyValue_InContainer)\s*\(')).Count |
+            Should Be 12
+        @([regex]::Matches($helper[0].Code,
+            'Contract\.bUpdatedThisFrame\s*->\s*SetPropertyValue_InContainer\s*\([^,]+,\s*false\s*\)')).Count |
+            Should Be 1
+        $helper[0].Code | Should Not Match `
+            'Contract\.(?:bTransitionsAllowed|FrameDelay)\s*->\s*SetPropertyValue_InContainer\s*\('
+        @([regex]::Matches($helper[0].Code, '\bON_SCOPE_EXIT\b')).Count | Should Be 1
+        @([regex]::Matches($helper[0].Code, '\bUObject::ProcessEvent\s*\(')).Count | Should Be 1
+        @([regex]::Matches($helper[0].Code, '\bFMemory::Memcmp\s*\(')).Count | Should Be 6
+        foreach ($receiptField in @(
+            'ObservedAllowTransitions', 'PreHookUpdatedThisFrame', 'PreHookFrameDelay',
+            'PreHookTransitionActive', 'ObservedLeftTarget', 'ObservedLeftLock',
+            'ObservedLeftLockAmount', 'ObservedRightTarget', 'ObservedRightLock',
+            'ObservedRightLockAmount', 'PostHookUpdatedThisFrame', 'PostHookFrameDelay',
+            'RestoreVerified'))
+        {
+            $helper[0].Text | Should Match ('Receipt\.' + $receiptField + '\b')
+        }
+        foreach ($restored in @(
+            'RestoredLeftTarget', 'RestoredLeftLock', 'RestoredLeftLockAmount',
+            'RestoredRightTarget', 'RestoredRightLock', 'RestoredRightLockAmount'))
+        {
+            $helper[0].Text | Should Match ('\b' + $restored + '\b')
+        }
+        $afterGuard = $helper[0].Code.Substring($helper[0].Code.IndexOf('ON_SCOPE_EXIT'))
+        $beforeVerification = $afterGuard.Substring(0, $afterGuard.IndexOf('Receipt.RestoreVerified'))
+        $beforeVerification | Should Not Match '\b(?:return|goto|throw)\b'
+        $receiptSerializer = @(Get-TestP5aCppFunctionDefinitions `
+            $script:P5aNativeCommandletText 'P5aTransitionReceiptToJson')[0]
+        $receiptSerializer.Code | Should Match `
+            'P5aFloatVectorToJson\s*\(\s*Target\s*\)'
+        $receiptSerializer.Code | Should Match `
+            'P5aFloatVectorToJson\s*\(\s*Lock\s*\)'
+    }
+
+    It 'family 5 requires complete physical UObject inventory without raw role labels' {
+        $collector = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'CollectP5aNativeReferenceAudit')
+        Assert-TestP5a13cCapability 5 ($collector.Count -eq 1) `
+            'physical native reference audit collector'
+
+        foreach ($typeName in @(
+            'FP5aNativeAssetAudit',
+            'FP5aNativeEventAudit',
+            'FP5aNativeMarkerAudit',
+            'FP5aNativeCurveInventory',
+            'FP5aNativeReferenceAudit'))
+        {
+            $script:P5aNativeCommandletCode | Should Match ('\bstruct\s+' + $typeName + '\b')
+        }
+
+        foreach ($helperName in @(
+            'CreateP5aAssetStableId',
+            'CreateP5aEventStableId',
+            'CreateP5aMarkerStableId',
+            'CreateP5aPackageSha256',
+            'P5aNativeReferenceAuditToJson'))
+        {
+            (@(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText $helperName)).Count |
+                Should Be 1
+        }
+
+        foreach ($countName in @('11', '19', '2', '5'))
+        {
+            $collector[0].Text | Should Match ('\b' + $countName + '\b')
+        }
+
+        foreach ($requiredTraversal in @(
+            'LoadObject\s*<\s*UAnimationAsset\s*>',
+            'GetPathName\s*\(',
+            'GetClass\s*\(\s*\)\s*->\s*GetPathName\s*\(',
+            'GetPlayLength\s*\(',
+            '\bNotifies\b',
+            '\bAuthoredSyncMarkers\b',
+            'GetDataModel\s*\(',
+            'GetFloatCurves\s*\('))
+        {
+            $collector[0].Code | Should Match $requiredTraversal
+        }
+
+        $assetId = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'CreateP5aAssetStableId')[0]
+        $eventId = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'CreateP5aEventStableId')[0]
+        $markerId = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'CreateP5aMarkerStableId')[0]
+        $packageHash = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'CreateP5aPackageSha256')[0]
+        $assetId.Code | Should Match 'FSHA1::HashBuffer'
+        $eventId.Text | Should Match '\|timeline\|'
+        $eventId.Code | Should Match 'CreateP5aSha1'
+        $markerId.Text | Should Match '\|marker\|'
+        $markerId.Code | Should Match 'CreateP5aSha1'
+        $packageHash.Code | Should Match 'FFileHelper::LoadFileToArray'
+        $packageHash.Code | Should Match 'SHA256'
+
+        $serializer = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'P5aNativeReferenceAuditToJson')[0]
+        $script:P5aNativeCommandletCode | Should Match `
+            'P5aNativeReferenceAuditToJson\s*\(\s*const\s+FP5aNativeReferenceAudit\s*&'
+        $serializer.Text | Should Not Match 'Plan|SourceMap|EventMap|Expected'
+        $serializer.Text | Should Match 'SetArrayField\s*\(\s*TEXT\(\s*"assets"\s*\)'
+        $serializer.Text | Should Match 'SetArrayField\s*\(\s*TEXT\(\s*"events"\s*\)'
+        $serializer.Text | Should Match 'SetArrayField\s*\(\s*TEXT\(\s*"markers"\s*\)'
+        $serializer.Text | Should Match 'SetArrayField\s*\(\s*TEXT\(\s*"curveInventories"\s*\)'
+        $collector[0].Text | Should Not Match 'CanonicalRole|NativeVariantRole'
+        $serializer.Text | Should Not Match 'CanonicalRole|NativeVariantRole'
+    }
+
+    It 'family 6 requires public Roll start native cancel and exact lifecycle callback capture' {
+        $actionHelpers = @{}
+        foreach ($name in @(
+            'StartP5aNativeRollThroughPublicAlsPath',
+            'CancelP5aNativeRollThroughMontageStop'))
+        {
+            $definitions = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText $name)
+            $definitions.Count | Should Be 1
+            $actionHelpers[$name] = $definitions[0]
+        }
+        $actionHelpers['StartP5aNativeRollThroughPublicAlsPath'].Code |
+            Should Match '\.StartRollingGrounded\s*\('
+        $actionHelpers['StartP5aNativeRollThroughPublicAlsPath'].Code |
+            Should Match 'GetActiveInstanceForMontage\s*\('
+        $actionHelpers['CancelP5aNativeRollThroughMontageStop'].Code |
+            Should Match '\.Montage_Stop\s*\('
+        $script:P5aNativeCommandletCode | Should Match '\bMontage_SetBlendingOutDelegate\s*\('
+        $script:P5aNativeCommandletCode | Should Match '\bMontage_SetEndDelegate\s*\('
+        Assert-TestP5a13cCapability 6 `
+            ($script:P5aNativeCharacterCode -match '\bOnMontageStarted\b' -and
+                $script:P5aNativeCommandletCode -match '\bOnMontageBlendingOutStarted\b' -and
+                $script:P5aNativeCommandletCode -match '\bOnMontageEnded\b') `
+            'Started Cancelled and Finished native callback capture'
+        foreach ($forbidden in @(
+            'Montage_Play\s*\(', 'Montage_SetPosition', 'TickAnimation\s*\(\s*0',
+            'TriggerAnimNotifies'))
+        {
+            $script:P5aNativeCommandletCode | Should Not Match $forbidden
+        }
+    }
+
+    It 'family 7 requires independent canonical evaluator runtime audit and all 374 envelopes' {
+        $case = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText 'GenerateP5aCase')
+        Assert-TestP5a13cCapability 7 ($case.Count -eq 1) 'P5A case generator'
+        foreach ($name in @(
+            'ParseP5aCaseDefinitions',
+            'EvaluateP5aCanonicalAssetOracle',
+            'CollectP5aNativeRuntimeFrame',
+            'P5aRawTraceToJson',
+            'GenerateP5aDocuments'))
+        {
+            (@(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText $name)).Count |
+                Should Be 1
+        }
+        foreach ($token in @(
+            'EvaluateCurveData', 'GetAnimNotifies', 'GetMarkerIndicesForTime',
+            'GetMarkerSyncPositionFromMarkerIndicies', 'nativeRuntimeTimeline',
+            'canonicalAssetOracle', 'transitionStimulusReceipts'))
+        {
+            $script:P5aNativeCommandletText | Should Match ([regex]::Escape($token))
+        }
+        $curveAudit = @(Get-TestP5aCppFunctionDefinitions `
+            $script:P5aNativeCommandletText 'P5aCurveAuditToJson')[0]
+        $curveAudit.Code | Should Match `
+            'bool\s+bPresent\s*\{\s*Animation\.GetCurveValue\s*\('
+        $curveAudit.Code | Should Match `
+            'SetP5aFloatField\s*\([^;]*ObservedValue'
+        $curveAudit.Code | Should Not Match 'bKnownContractCurve|bNeutralZero'
+
+        $canonicalEvaluator = @(Get-TestP5aCppFunctionDefinitions `
+            $script:P5aNativeCommandletText 'EvaluateP5aCanonicalAssetOracle')[0]
+        $canonicalEvaluator.Code | Should Not Match 'SemanticLeftLock|SemanticRightLock'
+        $canonicalEvaluator.Text | Should Match 'compressedCurves'
+        $curveEvaluator = @(Get-TestP5aCppFunctionDefinitions `
+            $script:P5aNativeCommandletText 'EvaluateP5aCanonicalCurves')[0]
+        $canonicalEvaluator.Text | Should Match 'TEXT\("curves"\)[\s\S]*?EvaluateP5aCanonicalCurves\([^;]*,\s*true\)'
+        $canonicalEvaluator.Text | Should Match 'TEXT\("compressedCurves"\)[\s\S]*?EvaluateP5aCanonicalCurves\([^;]*,\s*false\)'
+        foreach ($lane in @('Base', 'Turn', 'Rotate'))
+        {
+            $curveEvaluator.Code | Should Match ("${lane}LeftLock")
+            $curveEvaluator.Code | Should Match ("${lane}RightLock")
+        }
+        $curveEvaluator.Code | Should Match '\bFMath::Lerp\s*\('
+        $curveEvaluator.Text | Should Match 'EvaluateCurve\([^;]*TEXT\("Enable_Transition"\)'
+        $script:P5aNativeCommandletText | Should Match `
+            'TryGetNumberField\s*\(\s*TEXT\(\s*"actionBlendAmount"'
+        $script:P5aNativeCommandletText | Should Match `
+            'TryGetNumberField\s*\(\s*TEXT\(\s*"actionModeBlendAmount"'
+
+        $canonicalEvents = @(Get-TestP5aCppFunctionDefinitions `
+            $script:P5aNativeCommandletText 'AddP5aCanonicalEvents')[0]
+        $canonicalEvents.Code | Should Match '\bGetAnimNotifies\s*\('
+        $canonicalEvents.Code | Should Match '\bActiveNotifies\b'
+
+        $nativeTimeline = @(Get-TestP5aCppFunctionDefinitions `
+            $script:P5aNativeCommandletText 'AddP5aNativeTimelineEvents')[0]
+        $nativeTimeline.Code | Should Not Match 'SourceIndex\s*=='
+        $nativeTimeline.Code | Should Match '\bNotifyQueue\.AnimNotifies\b'
+        $nativeTimeline.Code | Should Match '\bGetNotifyInstanceID\s*\('
+        $nativeTimeline.Code | Should Match '\bGetSourceObject\s*\('
+        $nativeTimeline.Code | Should Not Match '\bAsset\.Notifies\b'
+        $case[0].Code | Should Match '\bActionCommand\b'
+        $case[0].Code | Should Match '\bFrameIndex\b'
+        $script:P5aNativeCommandletCode | Should Not Match `
+            '\bP5a(?:ActionGraphWeight|ActionLaneWeight|TransitionGraphWeight)\b'
+        $collector = @(Get-TestP5aCppFunctionDefinitions `
+            $script:P5aNativeCommandletText 'CollectP5aNativeRuntimeFrame')[0]
+        $collector.Code | Should Not Match `
+            'observedFrameOffsetSeconds"\s*\)\s*,\s*\.(?:01111111|013643463)f'
+        $script:P5aNativeCommandletText | Should Match '\b374\b'
+        $script:P5aNativeCommandletText | Should Match '\.2f'
+        @([regex]::Matches($case[0].Code, '\bTickP5aWorld\s*\(')).Count | Should Be 1
+        $script:P5aNativeCommandletCode | Should Match `
+            'bSuccess\s*=\s*GenerateP5aDocuments\s*\('
+        $script:P5aNativeCommandletCode | Should Not Match `
+            'if\s*\(\s*bP5a\s*\)\s*\{\s*bSuccess\s*=\s*false\s*;'
+    }
+
+    It 'correction runs one ordinary world update and records measured pipeline counts' {
+        $tick = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText 'TickP5aWorld')
+        $tick.Count | Should Be 1
+        @([regex]::Matches($tick[0].Code, '\bCommandletHelpers::TickEngine\s*\(')).Count | Should Be 1
+        @([regex]::Matches($tick[0].Code, '\bWorld\.Tick\s*\(')).Count | Should Be 1
+        foreach ($counter in @('GetUpdateCounter', 'GetTraceEvaluationCount',
+            'GetTracePostUpdateCount', 'GetTracePublicTickCount'))
+        {
+            $tick[0].Code | Should Match ([regex]::Escape($counter))
+        }
+        foreach ($name in @('GenerateP5aCase', 'GenerateP5aDocuments'))
+        {
+            $body = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText $name)[0]
+            $body.Code | Should Not Match '\b(?:TickAnimation|RefreshBoneTransforms)\s*\('
+        }
+        $script:P5aNativeCommandletText | Should Match 'frameUpdateAudit'
+    }
+
+    It 'correction observes the Started delegate instead of inferring it from an instance' {
+        $allCode = $script:P5aNativeCommandletCode + $script:P5aNativeCharacterCode
+        $allCode | Should Match '\bOnMontageStarted\s*\.\s*Add(?:Unique)?Dynamic\s*\('
+        $allCode | Should Match '\bOnMontageStarted\s*\.\s*RemoveDynamic\s*\('
+        $start = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'StartP5aNativeRollThroughPublicAlsPath')[0]
+        $start.Code | Should Not Match '\bconst\s+bool\s+OnMontageStarted\b'
+    }
+
+    It 'correction forbids forced transition permission and deferred synthetic native completion' {
+        $script:P5aNativeCommandletCode | Should Not Match `
+            '\bbTransitionsAllowed\s*->\s*SetPropertyValue_InContainer\s*\('
+        $script:P5aNativeCommandletCode | Should Not Match `
+            '\b(?:FinishedObservedFrame|bFinishedDeferredThisFrame)\b'
+    }
+
+    It 'correction unbinds lifecycle callbacks before stack observation state leaves scope' {
+        $cleanup = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'UnbindP5aNativeActionObservers')
+        $cleanup.Count | Should Be 1
+        $cleanup[0].Code | Should Match '\bGetMontageInstanceForID\s*\('
+        $cleanup[0].Code | Should Match '\bOnMontageEnded\s*\.\s*Unbind\s*\('
+        $cleanup[0].Code | Should Match '\bOnMontageBlendingOutStarted\s*\.\s*Unbind\s*\('
+        $documents = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'GenerateP5aDocuments')[0]
+        $documents.Code | Should Match '\bON_SCOPE_EXIT\s*\{[^}]*\bUnbindP5aNativeActionObservers\s*\('
+    }
+
+    It 'correction does not force a time-zero state natural End to frame offset zero' {
+        $timeline = @(Get-TestP5aCppFunctionDefinitions $script:P5aNativeCommandletText `
+            'AddP5aNativeTimelineEvents')[0]
+        $timeline.Code | Should Not Match '\bNotify\s*->\s*GetTime\s*\(\s*\)\s*<=\s*UE_SMALL_NUMBER'
+        $timeline.Code | Should Match '\(BoundaryTime\s*-\s*Value\.PreviousAnimationTime\)\s*/\s*Value\.PlayRate'
+    }
+
+    It 'correction loads native notify classes before trace character assets during CDO construction' {
+        $load = [regex]::Match($script:P5aNativeCharacterText,
+            'LoadModuleChecked\s*<\s*IModuleInterface\s*>\s*\(\s*TEXT\("ALSCamera"\)\s*\)')
+        $finder = [regex]::Match($script:P5aNativeCharacterText, '\bConstructorHelpers::FObjectFinder\s*<')
+        $load.Success | Should Be $true
+        $finder.Success | Should Be $true
+        ($load.Index -lt $finder.Index) | Should Be $true
+    }
+}
+
+Describe 'P5A ReadyCheck diagnostic marker separation' -Tag 'P5aReadyDiagnostics' {
+    BeforeAll {
+        . $script:P5aGeneratorPath
+    }
+
+    It 'accepts the actual native self-test diagnostics before the sole ReadyCheck marker' {
+        $nativeRoot = Split-Path -Parent $script:P5aNativeCommandletPath
+        $lines = [Collections.Generic.List[string]]::new()
+        foreach ($entry in @(
+            @{ File = 'AlsP5aNativeInventory.Tests.inl'; Function = 'RunP5aNativeAssetClosureSelfTest' },
+            @{ File = 'AlsP5aCanonicalCurves.Tests.inl'; Function = 'RunP5aNativeCurveSemanticsSelfTest' }))
+        {
+            $source = [IO.File]::ReadAllText((Join-Path $nativeRoot $entry.File))
+            $definitions = @(Get-TestP5aCppFunctionDefinitions $source $entry.Function)
+            $definitions.Count | Should Be 1
+            $messages = [regex]::Matches($definitions[0].Text,
+                'UE_LOG\s*\(\s*LogTemp\s*,\s*Display\s*,\s*TEXT\s*\(\s*"(?<message>[^"]+)"\s*\)')
+            $messages.Count | Should Be 1
+            $message = $messages[0].Groups['message'].Value.Replace('%d', '12')
+            $lines.Add("[2026.09.09-00.00.00:000][  0]LogTemp: Display: $message")
+        }
+        $marker = "P5A_TRACE_READY_OK cases=8 commit=$script:P5aLockedCommit"
+        $lines.Add("[2026.09.09-00.00.00:001][120]LogTemp: Display: $marker")
+        $ordinary = @(Assert-P5aChildGateOutput -PhaseName 'actual native ReadyCheck diagnostics' `
+            -StdOutLines @($lines) -StdErrLines @() -ExitCode 0 -TimedOut $false `
+            -ExpectedMarker $marker -AllowUeWrapper)
+        $ordinary.Count | Should Be 2
+    }
+}
+
+Describe 'P5A generator helper identity and lineage hardening' -Tag 'P5aHelperHardening' {
+    BeforeAll {
+        . $script:P5aGeneratorPath
+    }
+
+    It 'rejects a system console host whose intermediate parent was never observed' {
+        $result = [pscustomobject]@{
+            ProcessId = 5100
+            DescendantProcesses = @([pscustomobject]@{
+                processId = 5101; parentProcessId = 5102
+                ancestorProcessIds = @(5100, 5102); imageName = 'conhost.exe'
+                executablePath = Join-Path ([Environment]::SystemDirectory) 'conhost.exe'
+            })
+        }
+        Test-TestP5aRejects { Assert-P5aGeneratorNoDescendants $result } | Should Be $true
+    }
+
+    It 'rejects a terminal console host that launches another console host' {
+        $consolePath = Join-Path ([Environment]::SystemDirectory) 'conhost.exe'
+        $result = [pscustomobject]@{
+            ProcessId = 5100
+            DescendantProcesses = @(
+                [pscustomobject]@{
+                    processId = 5101; parentProcessId = 5100
+                    ancestorProcessIds = @(5100); imageName = 'conhost.exe'
+                    executablePath = $consolePath
+                },
+                [pscustomobject]@{
+                    processId = 5102; parentProcessId = 5101
+                    ancestorProcessIds = @(5100, 5101); imageName = 'conhost.exe'
+                    executablePath = $consolePath
+                })
+        }
+        Test-TestP5aRejects { Assert-P5aGeneratorNoDescendants $result } | Should Be $true
+    }
+
+    It 'rejects null empty duplicate and root-aliased descendant identities' {
+        $record = [pscustomobject]@{
+            processId = 5101; parentProcessId = 5100
+            ancestorProcessIds = @(5100); imageName = 'conhost.exe'
+            executablePath = Join-Path ([Environment]::SystemDirectory) 'conhost.exe'
+        }
+        foreach ($case in @('null', 'empty-image', 'duplicate-id', 'root-alias'))
+        {
+            $rows = @($record.PSObject.Copy())
+            switch ($case)
+            {
+                'null' { $rows = @($null) }
+                'empty-image' { $rows[0].imageName = '' }
+                'duplicate-id' { $rows += $record.PSObject.Copy() }
+                'root-alias' { $rows[0].processId = 5100 }
+            }
+            $result = [pscustomobject]@{ ProcessId = 5100; DescendantProcesses = $rows }
+            Test-TestP5aRejects { Assert-P5aGeneratorNoDescendants $result } | Should Be $true
+        }
+    }
+
+    It 'rejects arbitrary nesting between otherwise admitted UE helper executables' {
+        foreach ($edge in @(
+            @{ Parent = 'UnrealTraceServer.exe'; Child = 'zen.exe' },
+            @{ Parent = 'crashpad_handler.exe'; Child = 'UnrealTraceServer.exe' },
+            @{ Parent = 'zenserver.exe'; Child = 'zen.exe' },
+            @{ Parent = 'crashpad_handler.exe'; Child = 'crashpad_handler.exe' }))
+        {
+            $name = 'helper-edge-' + $edge.Parent + '-' + $edge.Child
+            $context = New-TestP5aProcessContext $name
+            $shim = New-TestP5aProcessShim ($name + '-shim')
+            $parentPath = Join-Path (Split-Path -Parent $context.Editor) $edge.Parent
+            $childPath = Join-Path (Split-Path -Parent $context.Editor) $edge.Child
+            Write-TestP5aText $parentPath "bundled parent helper`n"
+            if ($childPath -cne $parentPath) { Write-TestP5aText $childPath "bundled child helper`n" }
+            Set-TestP5aShimControl $shim @{
+                DescendantCall = 3
+                DescendantRecords = @(
+                    @{ processId = 5101; parentProcessId = 5003
+                        ancestorProcessIds = @(5003); imageName = $edge.Parent
+                        executablePath = $parentPath },
+                    @{ processId = 5102; parentProcessId = 5101
+                        ancestorProcessIds = @(5003, 5101); imageName = $edge.Child
+                        executablePath = $childPath })
+            }
+            Test-TestP5aRejects { Invoke-TestP5aGeneratorProtocol $context $shim } | Should Be $true
+            @(Get-TestP5aShimRecords $shim).Count | Should Be 3
+        }
+    }
+
+    It 'pins bundled and matching installed UE helpers across all seven children and releases them afterward' {
+        $context = New-TestP5aProcessContext 'helper-pinned'
+        $shim = New-TestP5aProcessShim 'helper-pinned-shim'
+        $localRoot = Join-Path $TestDrive 'helper-pinned-local'
+        $priorLocalAppData = $env:LOCALAPPDATA
+        $probePaths = @()
+        try
+        {
+            $env:LOCALAPPDATA = $localRoot
+            foreach ($image in @('UnrealTraceServer.exe', 'zen.exe', 'zenserver.exe', 'crashpad_handler.exe'))
+            {
+                $bundled = Join-Path (Split-Path -Parent $context.Editor) $image
+                $installedRoot = if ($image -ceq 'UnrealTraceServer.exe') {
+                    Join-Path $localRoot 'UnrealEngine\Common\UnrealTrace\Bin\test-version'
+                } else { Join-Path $localRoot 'UnrealEngine\Common\Zen\Install' }
+                $installed = Join-Path $installedRoot $image
+                Write-TestP5aText $bundled "$image trusted bytes`n"
+                Write-TestP5aText $installed "$image trusted bytes`n"
+                $probePaths += @($bundled, $installed)
+            }
+            $installedZen = Join-Path $localRoot 'UnrealEngine\Common\Zen\Install\zenserver.exe'
+            $bundledZenUtility = Join-Path (Split-Path -Parent $context.Editor) 'zen.exe'
+            $bundledCrashpad = Join-Path (Split-Path -Parent $context.Editor) 'crashpad_handler.exe'
+            $installedCrashpad = Join-Path $localRoot 'UnrealEngine\Common\Zen\Install\crashpad_handler.exe'
+            $bundledTrace = Join-Path (Split-Path -Parent $context.Editor) 'UnrealTraceServer.exe'
+            $installedTrace = Join-Path $localRoot 'UnrealEngine\Common\UnrealTrace\Bin\test-version\UnrealTraceServer.exe'
+            Set-TestP5aShimControl $shim @{
+                ProbeLockedPaths = $probePaths
+                DescendantCall = 3
+                DescendantRecords = @(
+                    @{ processId = 5101; parentProcessId = 5003
+                        ancestorProcessIds = @(5003); imageName = 'zenserver.exe'
+                        executablePath = $installedZen },
+                    @{ processId = 5102; parentProcessId = 5101
+                        ancestorProcessIds = @(5003, 5101); imageName = 'crashpad_handler.exe'
+                        executablePath = $installedCrashpad },
+                    @{ processId = 5103; parentProcessId = 5102
+                        ancestorProcessIds = @(5003, 5101, 5102); imageName = 'conhost.exe'
+                        executablePath = Join-Path ([Environment]::SystemDirectory) 'conhost.exe' },
+                    @{ processId = 5110; parentProcessId = 5003
+                        ancestorProcessIds = @(5003); imageName = 'UnrealTraceServer.exe'
+                        executablePath = $bundledTrace },
+                    @{ processId = 5111; parentProcessId = 5110
+                        ancestorProcessIds = @(5003, 5110); imageName = 'UnrealTraceServer.exe'
+                        executablePath = $installedTrace },
+                    @{ processId = 5120; parentProcessId = 5003
+                        ancestorProcessIds = @(5003); imageName = 'zen.exe'
+                        executablePath = $bundledZenUtility },
+                    @{ processId = 5121; parentProcessId = 5120
+                        ancestorProcessIds = @(5003, 5120); imageName = 'crashpad_handler.exe'
+                        executablePath = $bundledCrashpad })
+            }
+            @(Invoke-TestP5aGeneratorProtocol $context $shim).Count | Should Be 1
+            $records = @(Get-TestP5aShimRecords $shim)
+            $records.Count | Should Be 7
+            foreach ($record in $records)
+            {
+                @($record.leaseProbeWritable).Count | Should Be 8
+                @($record.leaseProbeWritable | Where-Object { $_ }).Count | Should Be 0
+            }
+            foreach ($path in $probePaths)
+            {
+                $probe = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+                $probe.Dispose()
+            }
+        }
+        finally { $env:LOCALAPPDATA = $priorLocalAppData }
+    }
+
+    It 'rejects a bundled helper first introduced after the protocol acquired its helper closure' {
+        $context = New-TestP5aProcessContext 'helper-late'
+        $shim = New-TestP5aProcessShim 'helper-late-shim'
+        $helperPath = Join-Path (Split-Path -Parent $context.Editor) 'crashpad_handler.exe'
+        Set-TestP5aShimControl $shim @{
+            DescendantCall = 3
+            DescendantImages = @('crashpad_handler.exe')
+            DescendantExecutablePaths = @{ 'crashpad_handler.exe' = @($helperPath) }
+        }
+        $inner = $shim.Invoker
+        $count = [Collections.Generic.List[int]]::new()
+        $shim.Invoker = {
+            param($FilePath, $Arguments, $WorkingDirectory, $TimeoutSeconds, $PhaseName)
+            $count.Add($count.Count + 1)
+            if ($count.Count -eq 3) { [IO.File]::WriteAllText($helperPath, 'late substituted helper') }
+            & $inner @PSBoundParameters
+        }.GetNewClosure()
+        Test-TestP5aRejects { Invoke-TestP5aGeneratorProtocol $context $shim } | Should Be $true
+        @(Get-TestP5aShimRecords $shim).Count | Should Be 3
+    }
+
+    It 'allows only the direct system console host in the generator descendant closure' {
+        Assert-TestP5aCommandCapability 'Assert-P5aGeneratorNoDescendants' generator
+        $rootProcessId = 5100
+        $systemConhost = [IO.Path]::GetFullPath((Join-Path $env:SystemRoot 'System32\conhost.exe'))
+        $allowed = [pscustomobject]@{
+            ProcessId = $rootProcessId
+            DescendantProcesses = @([pscustomobject]@{
+                processId = 5101
+                parentProcessId = $rootProcessId
+                ancestorProcessIds = @($rootProcessId)
+                imageName = 'conhost.exe'
+                executablePath = $systemConhost
+            })
+        }
+        @(Assert-P5aGeneratorNoDescendants $allowed).Count | Should Be 0
+
+        $engineHelperPath = Join-Path $TestDrive 'Engine\Binaries\Win64\crashpad_handler.exe'
+        $allowedHelper = [pscustomobject]@{
+            ProcessId = $rootProcessId
+            DescendantProcesses = @([pscustomobject]@{
+                processId = 5103
+                parentProcessId = 5102
+                ancestorProcessIds = @($rootProcessId, 5102)
+                imageName = 'crashpad_handler.exe'
+                executablePath = $engineHelperPath
+            })
+        }
+        Test-TestP5aRejects {
+            Assert-P5aGeneratorNoDescendants $allowedHelper
+        } | Should Be $true
+
+        foreach ($mutation in @(
+            @{ Name = 'foreign-path'; Apply = {
+                param($row) $row.executablePath = Join-Path $TestDrive 'conhost.exe'
+            } }
+            @{ Name = 'indirect-parent'; Apply = {
+                param($row) $row.parentProcessId = 5099
+            } }
+            @{ Name = 'other-image'; Apply = {
+                param($row) $row.imageName = 'cmd.exe'
+            } }
+        ))
+        {
+            $row = $allowed.DescendantProcesses[0].PSObject.Copy()
+            & $mutation.Apply $row
+            $invalid = [pscustomobject]@{
+                ProcessId = $rootProcessId
+                DescendantProcesses = @($row)
+            }
+            Test-TestP5aRejects {
+                Assert-P5aGeneratorNoDescendants $invalid
+            } | Should Be $true
+        }
+    }
+
+    It 'trusts an installed UE helper only when it is a non-reparse byte match for the bundled helper' {
+        Assert-TestP5aCommandCapability 'Open-P5aGeneratorHelperLease' generator
+        $bundled = Join-Path $TestDrive 'trusted-helper\Engine\crashpad_handler.exe'
+        $localRoot = Join-Path $TestDrive 'trusted-helper\Local'
+        $installed = Join-Path $localRoot 'UnrealEngine\Common\Zen\Install\crashpad_handler.exe'
+        $editor = Join-Path (Split-Path -Parent $bundled) 'UnrealEditor-Cmd.exe'
+        $priorLocalAppData = $env:LOCALAPPDATA
+        $lease = $null
+        Write-TestP5aText $bundled "same helper bytes`n"
+        Write-TestP5aText $installed "same helper bytes`n"
+        try
+        {
+            $env:LOCALAPPDATA = $localRoot
+            $lease = Open-P5aGeneratorHelperLease $editor
+            $lease.EntriesByPath.ContainsKey($installed) | Should Be $true
+            $lease.Dispose()
+            Write-TestP5aText $installed "different helper bytes`n"
+            $lease = Open-P5aGeneratorHelperLease $editor
+            $lease.EntriesByPath.ContainsKey($installed) | Should Be $false
+            $lease.Dispose()
+            Remove-Item -LiteralPath $bundled -Force
+            $lease = Open-P5aGeneratorHelperLease $editor
+            $lease.EntriesByPath.ContainsKey($installed) | Should Be $false
+        }
+        finally
+        {
+            if ($null -ne $lease) { $lease.Dispose() }
+            $env:LOCALAPPDATA = $priorLocalAppData
+        }
+    }
+
+    It 'releases pinned helper files after a failed UE child' {
+        $context = New-TestP5aProcessContext 'helper-failure'
+        $shim = New-TestP5aProcessShim 'helper-failure-shim'
+        $helperPath = Join-Path (Split-Path -Parent $context.Editor) 'crashpad_handler.exe'
+        Write-TestP5aText $helperPath "bundled crashpad bytes`n"
+        Set-TestP5aShimControl $shim @{
+            ProbeLockedPaths = @($helperPath); FailCall = 3; FailureKind = 'nonzero'
+        }
+        $failure = $null
+        try { Invoke-TestP5aGeneratorProtocol $context $shim | Out-Null }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should Match 'exited non-zero \(7\)'
+        $records = @(Get-TestP5aShimRecords $shim)
+        $records.Count | Should Be 3
+        @($records[2].leaseProbeWritable | Where-Object { $_ }).Count | Should Be 0
+        $probe = [IO.File]::Open($helperPath, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        $probe.Dispose()
+    }
+}
+
+Describe 'P5A Zen crash handler topology' -Tag 'P5aZenCrashpad' {
+    BeforeAll {
+        . $script:P5aGeneratorPath
+    }
+
+    It 'admits a pinned same-directory crash handler for root-parented <ParentImage> only' -TestCases @(
+        @{ ParentImage = 'zen.exe' },
+        @{ ParentImage = 'zenserver.exe' }
+    ) {
+        param($ParentImage)
+
+        $localRoot = Join-Path $TestDrive ("zen-topology-$ParentImage\Local")
+        $bundledRoot = Join-Path $TestDrive ("zen-topology-$ParentImage\Engine")
+        $installedRoot = Join-Path $localRoot 'UnrealEngine\Common\Zen\Install'
+        $priorLocalAppData = $env:LOCALAPPDATA
+        $lease = $null
+        try
+        {
+            $env:LOCALAPPDATA = $localRoot
+            foreach ($image in @($ParentImage, 'crashpad_handler.exe'))
+            {
+                Write-TestP5aText (Join-Path $bundledRoot $image) "$image trusted bytes`n"
+                Write-TestP5aText (Join-Path $installedRoot $image) "$image trusted bytes`n"
+            }
+            $lease = Open-P5aGeneratorHelperLease (Join-Path $bundledRoot 'UnrealEditor-Cmd.exe')
+            foreach ($parentRoot in @($bundledRoot, $installedRoot))
+            {
+                $parent = [pscustomobject]@{
+                    processId = 5101; parentProcessId = 5100
+                    ancestorProcessIds = @(5100); imageName = $ParentImage
+                    executablePath = Join-Path $parentRoot $ParentImage
+                }
+                $child = [pscustomobject]@{
+                    processId = 5102; parentProcessId = 5101
+                    ancestorProcessIds = @(5100, 5101); imageName = 'crashpad_handler.exe'
+                    executablePath = Join-Path $parentRoot 'crashpad_handler.exe'
+                }
+                $result = [pscustomobject]@{
+                    ProcessId = 5100; DescendantProcesses = @($parent, $child)
+                }
+                @(Assert-P5aGeneratorNoDescendants $result $lease -AllowUeHelpers).Count | Should Be 0
+
+                $otherRoot = if ($parentRoot -ceq $bundledRoot) { $installedRoot } else { $bundledRoot }
+                $child.executablePath = Join-Path $otherRoot 'crashpad_handler.exe'
+                { Assert-P5aGeneratorNoDescendants $result $lease -AllowUeHelpers } |
+                    Should Throw "forbidden parent '$ParentImage'"
+                $child.executablePath = Join-Path $parentRoot 'crashpad_handler.exe'
+
+                $child.parentProcessId = 5100
+                $child.ancestorProcessIds = @(5100)
+                { Assert-P5aGeneratorNoDescendants $result $lease -AllowUeHelpers } |
+                    Should Throw "forbidden parent 'Root'"
+                $child.parentProcessId = 5101
+                $child.ancestorProcessIds = @(5100, 5101)
+
+                $intermediate = [pscustomobject]@{
+                    processId = 5103; parentProcessId = 5100
+                    ancestorProcessIds = @(5100); imageName = $ParentImage
+                    executablePath = $parent.executablePath
+                }
+                $parent.parentProcessId = 5103
+                $parent.ancestorProcessIds = @(5100, 5103)
+                $child.ancestorProcessIds = @(5100, 5103, 5101)
+                $result.DescendantProcesses = @($intermediate, $parent, $child)
+                { Assert-P5aGeneratorNoDescendants $result $lease -AllowUeHelpers } |
+                    Should Throw "forbidden parent '$ParentImage'"
+            }
+        }
+        finally
+        {
+            if ($null -ne $lease) { $lease.Dispose() }
+            $env:LOCALAPPDATA = $priorLocalAppData
+        }
+    }
+}
+
 Describe 'P5A golden synthetic process build and publication RED contract' {
     BeforeAll {
         if (Test-Path -LiteralPath $script:P5aGeneratorPath -PathType Leaf)
@@ -2686,7 +3723,18 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
             $streamResult[0].TimedOut | Should Be $false
             $streamResult[0].OutputLimitExceeded | Should Be $false
             ([int]$streamResult[0].ProcessId) | Should BeGreaterThan 0
-            @($streamResult[0].DescendantProcesses).Count | Should Be 0
+            $streamDescendants = @($streamResult[0].DescendantProcesses)
+            ($streamDescendants.Count -le 1) | Should Be $true
+            if ($streamDescendants.Count -eq 1)
+            {
+                $consoleHost = $streamDescendants[0]
+                [string]$consoleHost.imageName | Should BeExactly 'conhost.exe'
+                [IO.Path]::GetFullPath([string]$consoleHost.executablePath) | Should Be `
+                    ([IO.Path]::GetFullPath((Join-Path ([Environment]::SystemDirectory) 'conhost.exe')))
+                [int]$consoleHost.parentProcessId | Should Be ([int]$streamResult[0].ProcessId)
+                @($consoleHost.ancestorProcessIds | ForEach-Object { [int]$_ }) |
+                    Should Be @([int]$streamResult[0].ProcessId)
+            }
             $stdoutLines = @($streamResult[0].StdOutLines | ForEach-Object { [string]$_ })
             $stderrLines = @($streamResult[0].StdErrLines | ForEach-Object { [string]$_ })
             @($stdoutLines | Where-Object { $_ -ceq 'stdout-probe' }).Count | Should Be 1
@@ -2695,10 +3743,12 @@ Describe 'P5A golden synthetic process build and publication RED contract' {
             @($stderrLines | Where-Object { $_ -ceq 'stdout-probe' }).Count | Should Be 0
             ([int64]$streamResult[0].StdOutBytes) | Should BeGreaterThan 0
             ([int64]$streamResult[0].StdErrBytes) | Should BeGreaterThan 0
-            [int]$streamResult[0].JobTotalProcesses | Should Be 1
+            $expectedStreamProcessIds = @([int]$streamResult[0].ProcessId) + @(
+                $streamDescendants | ForEach-Object { [int]$_.processId })
+            [int]$streamResult[0].JobTotalProcesses | Should Be $expectedStreamProcessIds.Count
             [int]$streamResult[0].JobActiveProcesses | Should Be 0
-            @($streamResult[0].JobProcessIds | ForEach-Object { [int]$_ }) |
-                Should Be @([int]$streamResult[0].ProcessId)
+            @($streamResult[0].JobProcessIds | ForEach-Object { [int]$_ } | Sort-Object) |
+                Should Be @($expectedStreamProcessIds | Sort-Object)
 
             $capDescendantProbe = Join-Path $TestDrive "default-runner-$baseName-cap-descendant.ps1"
             $capDescendantPidPath = Join-Path $TestDrive "default-runner-$baseName-cap-descendant.pid"
@@ -2741,8 +3791,13 @@ Start-Sleep -Seconds 30
                 [int]$capResult[0].JobActiveProcesses | Should Be 0
                 Test-Path -LiteralPath $capDescendantPidPath -PathType Leaf | Should Be $true
                 $capDescendantPid = [int][IO.File]::ReadAllText($capDescendantPidPath)
-                [int]$capResult[0].JobTotalProcesses | Should Be 2
-                $expectedCapJobProcessIds = @([int]$capResult[0].ProcessId, $capDescendantPid)
+                $capDescendants = @($capResult[0].DescendantProcesses)
+                @($capDescendants | Where-Object {
+                    [int]$_.processId -eq $capDescendantPid
+                }).Count | Should Be 1
+                $expectedCapJobProcessIds = @([int]$capResult[0].ProcessId) + @(
+                    $capDescendants | ForEach-Object { [int]$_.processId })
+                [int]$capResult[0].JobTotalProcesses | Should Be $expectedCapJobProcessIds.Count
                 @($capResult[0].JobProcessIds | ForEach-Object { [int]$_ } | Sort-Object) |
                     Should Be @($expectedCapJobProcessIds | Sort-Object)
                 for ($attempt = 0; $attempt -lt 20 -and
@@ -2844,7 +3899,26 @@ Start-Sleep -Seconds 30
                 }
             )
             $shortLivedDescendants = @($shortLivedRun.DescendantProcesses)
-            $shortLivedDescendants.Count | Should Be 3
+            $expectedShortLivedIds = @($expectedShortLived | ForEach-Object {
+                [int]$_.ProcessId
+            })
+            $extraShortLived = @($shortLivedDescendants | Where-Object {
+                [int]$_.processId -notin $expectedShortLivedIds
+            })
+            ($extraShortLived.Count -le 1) | Should Be $true
+            if ($extraShortLived.Count -eq 1)
+            {
+                $consoleHost = $extraShortLived[0]
+                [string]$consoleHost.imageName | Should BeExactly 'conhost.exe'
+                [IO.Path]::GetFullPath([string]$consoleHost.executablePath) | Should Be `
+                    ([IO.Path]::GetFullPath((Join-Path ([Environment]::SystemDirectory) 'conhost.exe')))
+                [int]$consoleHost.parentProcessId | Should Be ([int]$shortLivedRun.ProcessId)
+                @($consoleHost.ancestorProcessIds | ForEach-Object { [int]$_ }) |
+                    Should Be @([int]$shortLivedRun.ProcessId)
+                @($shortLivedDescendants | Where-Object {
+                    [int]$_.parentProcessId -eq [int]$consoleHost.processId
+                }).Count | Should Be 0
+            }
             $expectedJobProcessIds = @([int]$shortLivedRun.ProcessId) + @(
                 $shortLivedDescendants | ForEach-Object { [int]$_.processId })
             [int]$shortLivedRun.JobTotalProcesses | Should Be $expectedJobProcessIds.Count
@@ -3820,7 +4894,9 @@ Start-Sleep -Seconds 30
             @($lease.Evidence.PSObject.Properties.Name) | Should Be @(
                 'ownedPluginTreeSha256', 'targetReceiptSha256',
                 'alsModuleManifestSha256', 'traceModuleManifestSha256',
-                'alsModuleDllSha256', 'traceModuleDllSha256')
+                'alsModuleDllSha256', 'alsCameraModuleDllSha256',
+                'alsEditorModuleDllSha256', 'alsExtrasModuleDllSha256',
+                'traceModuleDllSha256')
             (($lease.Evidence | ConvertTo-Json -Compress) -match [regex]::Escape($fixture.Root)) |
                 Should Be $false
             $expectedOwnedPaths = @(Get-ChildItem -LiteralPath $fixture.OwnedRoot -File -Recurse |
@@ -3831,7 +4907,8 @@ Start-Sleep -Seconds 30
                 ForEach-Object { $_.FullName })
             $expectedEvidencePaths = @(
                 $fixture.ReceiptPath, $fixture.AlsManifestPath, $fixture.TraceManifestPath,
-                $fixture.AlsDllPath, $fixture.TraceDllPath)
+                $fixture.AlsDllPath, $fixture.AlsCameraDllPath, $fixture.AlsEditorDllPath,
+                $fixture.AlsExtrasDllPath, $fixture.TraceDllPath)
             @($lease.OwnedPaths | Sort-Object) | Should Be @($expectedOwnedPaths | Sort-Object)
             @($lease.DeployedPaths | Sort-Object) | Should Be @($expectedDeployedPaths | Sort-Object)
             @($lease.EvidencePaths | Sort-Object) | Should Be @($expectedEvidencePaths | Sort-Object)
@@ -3887,6 +4964,14 @@ Start-Sleep -Seconds 30
             } }
             @{ Name = 'missing-als-dll'; Apply = {
                 param($x) Remove-Item -LiteralPath $x.AlsDllPath -Force
+            } }
+            @{ Name = 'missing-als-camera-dll'; Apply = {
+                param($x) Remove-Item -LiteralPath $x.AlsCameraDllPath -Force
+            } }
+            @{ Name = 'unexpected-als-module'; Apply = {
+                param($x) Write-TestP5aText $x.AlsManifestPath ([IO.File]::ReadAllText($x.AlsManifestPath).Replace(
+                    '"ALSExtras":"UnrealEditor-ALSExtras.dll"',
+                    '"ALSExtras":"UnrealEditor-ALSExtras.dll","Unexpected":"Unexpected.dll"'))
             } }
             @{ Name = 'ambiguous-editor-target'; Apply = {
                 param($x) Write-TestP5aText (Join-Path $x.ProjectRoot 'Source\OtherEditor.Target.cs') 'class OtherEditorTarget { }'
@@ -4010,6 +5095,7 @@ Start-Sleep -Seconds 30
                 '-nosplash'
                 '-nullrhi'
                 '-nosound'
+                '-Multiprocess'
                 "-abslog=$($ueLogs[$index - 2])"
             )
             @($records[$index].arguments) | Should Be $expected
@@ -4502,7 +5588,9 @@ Start-Sleep -Seconds 30
         @($document.buildEvidence.PSObject.Properties.Name) | Should Be @(
             'ownedPluginTreeSha256', 'targetReceiptSha256',
             'alsModuleManifestSha256', 'traceModuleManifestSha256',
-            'alsModuleDllSha256', 'traceModuleDllSha256')
+            'alsModuleDllSha256', 'alsCameraModuleDllSha256',
+            'alsEditorModuleDllSha256', 'alsExtrasModuleDllSha256',
+            'traceModuleDllSha256')
 
         [IO.File]::AppendAllText((Join-Path $staging 'raw-a.json'), 'drift')
         Test-TestP5aRejects {
@@ -5745,9 +6833,14 @@ Start-Sleep -Seconds 30
                 $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
                     Invoke-TestP5aGeneratorProtocol $context $shim
                 }
+                $records = @(Get-TestP5aShimRecords $shim)
+                $records.Count | Should Be $call
+                $observedDescendants = @($records[$call - 1].descendantProcesses)
+                $observedDescendants.Count | Should Be 1
+                $observedDescendants[0].imageName | Should Be $image
+                [IO.Path]::GetFileName($observedDescendants[0].executablePath) | Should Be $image
                 $failure | Should Not BeNullOrEmpty
                 $failure | Should Match '(?i)descendant.*(forbidden|not allowed|unexpected)'
-                @(Get-TestP5aShimRecords $shim).Count | Should Be $call
                 @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
                     Should Be 0
                 Test-Path -LiteralPath $context.Staging | Should Be $false
@@ -5784,10 +6877,15 @@ Start-Sleep -Seconds 30
                     $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
                         & $invokeSelectedVerifier $context $shim
                     }
+                    $records = @(Get-TestP5aShimRecords $shim)
+                    $records.Count | Should Be $call
+                    $observedDescendants = @($records[$call - 1].descendantProcesses)
+                    $observedDescendants.Count | Should Be 1
+                    $observedDescendants[0].imageName | Should Be $image
+                    [IO.Path]::GetFileName($observedDescendants[0].executablePath) | Should Be $image
                     $failure | Should Not BeNullOrEmpty
                     $failure | Should Match `
                         '(?i)descendant.*(forbidden|not allowed|unexpected|selected.*dotnet|executable.*closure)'
-                    @(Get-TestP5aShimRecords $shim).Count | Should Be $call
                     [Environment]::GetEnvironmentVariable(
                         $environmentName, [EnvironmentVariableTarget]::Process) |
                         Should Be $ambientEnvironment
@@ -5811,16 +6909,24 @@ Start-Sleep -Seconds 30
         {
             $context = New-TestP5aProcessContext "verifier-descendant-outside-sdk-$image"
             $shim = New-TestP5aProcessShim "verifier-descendant-outside-sdk-$image-shim"
+            $outsidePath = Join-Path $context.Root "outside-sdk\$image"
+            Write-TestP5aText $outsidePath 'external SDK descendant'
             Set-TestP5aShimControl $shim @{
                 DescendantCall = 2
                 DescendantImages = @($image)
+                DescendantExecutablePaths = @{ $image = @($outsidePath) }
             }
             $output = [Collections.Generic.List[object]]::new()
             $failure = Invoke-TestP5aFailureCapture -Output $output -Action {
                 & $invokeSelectedVerifier $context $shim
             }
-            $failure | Should Match '(?i)descendant.*(selected.*dotnet|sdk.*closure|executable.*closure)'
-            @(Get-TestP5aShimRecords $shim).Count | Should Be 2
+            $records = @(Get-TestP5aShimRecords $shim)
+            $records.Count | Should Be 2
+            $observedDescendants = @($records[1].descendantProcesses)
+            $observedDescendants.Count | Should Be 1
+            $observedDescendants[0].imageName | Should Be $image
+            $observedDescendants[0].executablePath | Should Be $outsidePath
+            $failure | Should Be 'P5A verifier descendant is outside the selected dotnet executable closure.'
             @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count |
                 Should Be 0
             Test-Path -LiteralPath $context.Staging | Should Be $false
@@ -5839,7 +6945,7 @@ Start-Sleep -Seconds 30
             @{ Name = 'relative-path'; Diagnostic = '(?i)descendant.*path.*absolute' }
             @{ Name = 'mismatched-image-path'; Diagnostic = '(?i)descendant.*(image|basename).*path' }
             @{ Name = 'duplicate-process-id'; Diagnostic = '(?i)descendant.*duplicate.*process' }
-            @{ Name = 'conhost-wrong-parent'; Diagnostic = '(?i)conhost.*parent.*testhost' }
+            @{ Name = 'conhost-wrong-parent'; Diagnostic = '(?i)conhost.*parent.*runtime owner' }
             @{ Name = 'oracle-wrong-parent'; Diagnostic = '(?i)Oracle apphost.*parent.*testhost' }
             @{ Name = 'project-testhost-wrong-parent'; Diagnostic = '(?i)project testhost.*parent.*dotnet' }
         ))
@@ -5959,12 +7065,18 @@ Start-Sleep -Seconds 30
                         ancestorProcessIds = @($directProcessId); imageName = 'vstest.console.exe'
                         executablePath = $vstestPath
                     }) }
-                'conhost-wrong-parent' { @(@{
-                    processId = 12001; parentProcessId = $directProcessId
-                    ancestorProcessIds = @($directProcessId); imageName = 'conhost.exe'
-                    executablePath = [IO.Path]::GetFullPath(
-                        (Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
-                }) }
+                'conhost-wrong-parent' { @(
+                    @{
+                        processId = 12001; parentProcessId = $directProcessId
+                        ancestorProcessIds = @($directProcessId); imageName = 'MSBuild.exe'
+                        executablePath = $msbuildPath
+                    },
+                    @{
+                        processId = 12002; parentProcessId = 12001
+                        ancestorProcessIds = @($directProcessId, 12001); imageName = 'conhost.exe'
+                        executablePath = [IO.Path]::GetFullPath(
+                            (Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
+                    }) }
                 'oracle-wrong-parent' { @(@{
                     processId = 12001; parentProcessId = $directProcessId
                     ancestorProcessIds = @($directProcessId)
@@ -6029,6 +7141,14 @@ Start-Sleep -Seconds 30
         $failure | Should Not BeNullOrEmpty
         @($output | Where-Object { [string]$_ -match '^P5A_GOLDEN_' }).Count | Should Be 0
         Test-Path -LiteralPath $context.Staging | Should Be $false
+
+        $standardStaging = Join-Path $TestDrive 'verifier-trx-standard-no-skipped'
+        [void][IO.Directory]::CreateDirectory($standardStaging)
+        $standardTrx = Join-Path $standardStaging 'p5a-golden-tests.trx'
+        Write-TestP5aText $standardTrx `
+            '<TestRun><ResultSummary outcome="Completed"><Counters total="1" passed="1" failed="0" error="0" notExecuted="0" /></ResultSummary></TestRun>'
+        { Assert-P5aTrx -StagingRoot $standardStaging -TrxPath $standardTrx } |
+            Should Not Throw
 
     }
 
@@ -6259,7 +7379,7 @@ Start-Sleep -Seconds 30
 
     It 'rejects a valid Oracle marker when any prefixed P5A marker is also emitted' {
         Assert-TestP5aCommandCapability 'Assert-P5aVerifierOracleChild' verifier
-        $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=' + ('a' * 64)
+        $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=' + ('a' * 64)
         foreach ($streams in @(
             @{ StdOut = @($marker, "prefix $marker"); StdErr = @() }
             @{ StdOut = @($marker); StdErr = @($marker) }
@@ -6277,6 +7397,56 @@ Start-Sleep -Seconds 30
                 Assert-P5aVerifierOracleChild -Result $result
             } | Should Be $true
         }
+    }
+
+    It 'allows only a terminal system console host directly owned by the Oracle child' {
+        Assert-TestP5aCommandCapability 'Assert-P5aVerifierOracleChild' verifier
+        $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=' + ('a' * 64)
+        $rootId = 5002
+        $systemConhost = [IO.Path]::GetFullPath((Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
+        $validConhost = [pscustomobject]@{
+            processId = 5101
+            parentProcessId = $rootId
+            ancestorProcessIds = @($rootId)
+            imageName = 'conhost.exe'
+            executablePath = $systemConhost
+        }
+        $result = [pscustomobject]@{
+            ProcessId = $rootId
+            TimedOut = $false
+            ExitCode = 0
+            StdOutLines = @($marker)
+            StdErrLines = @()
+            DescendantProcesses = @($validConhost)
+        }
+        { Assert-P5aVerifierOracleChild -Result $result } | Should Not Throw
+
+        foreach ($invalid in @(
+            [pscustomobject]@{
+                processId = 5101; parentProcessId = $rootId; ancestorProcessIds = @($rootId)
+                imageName = 'conhost.exe'; executablePath = (Join-Path $TestDrive 'conhost.exe')
+            },
+            [pscustomobject]@{
+                processId = 5101; parentProcessId = 5999; ancestorProcessIds = @($rootId, 5999)
+                imageName = 'conhost.exe'; executablePath = $systemConhost
+            },
+            [pscustomobject]@{
+                processId = 5101; parentProcessId = $rootId; ancestorProcessIds = @($rootId)
+                imageName = 'Als.P5aOracle.exe'; executablePath = $systemConhost
+            }))
+        {
+            $result.DescendantProcesses = @($invalid)
+            Test-TestP5aRejects {
+                Assert-P5aVerifierOracleChild -Result $result
+            } | Should Be $true
+        }
+        $result.DescendantProcesses = @($validConhost, [pscustomobject]@{
+            processId = 5102; parentProcessId = 5101; ancestorProcessIds = @($rootId, 5101)
+            imageName = 'conhost.exe'; executablePath = $systemConhost
+        })
+        Test-TestP5aRejects {
+            Assert-P5aVerifierOracleChild -Result $result
+        } | Should Be $true
     }
 
     It 'rejects a same-named executable inside the SDK that is not in the selected closure' {
@@ -6309,6 +7479,74 @@ Start-Sleep -Seconds 30
             })
         }
 
+        Test-TestP5aRejects {
+            Assert-P5aVerifierDescendantClosure -Result $result -Closure $closure
+        } | Should Be $true
+    }
+
+    It 'allows a terminal system console host directly owned by the selected dotnet root' {
+        Assert-TestP5aCommandCapability 'Assert-P5aVerifierDescendantClosure' verifier
+        $rootId = 5002
+        $systemConhost = [IO.Path]::GetFullPath((Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
+        $rolesByPath = [Collections.Generic.Dictionary[string,string]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
+        $rolesByPath[$systemConhost] = 'SystemConhost'
+        $closure = [pscustomobject]@{
+            SdkVersion = '8.0.100'
+            PathsByImage = @{ 'conhost.exe' = [string[]]@($systemConhost) }
+            RolesByPath = $rolesByPath
+        }
+        $result = [pscustomobject]@{
+            ProcessId = $rootId
+            DescendantProcesses = @([pscustomobject]@{
+                processId = 5101
+                parentProcessId = $rootId
+                ancestorProcessIds = @($rootId)
+                imageName = 'conhost.exe'
+                executablePath = $systemConhost
+            })
+        }
+        { Assert-P5aVerifierDescendantClosure -Result $result -Closure $closure } |
+            Should Not Throw
+
+        $projectTestHost = [IO.Path]::GetFullPath((Join-Path $script:P5aRepositoryRoot `
+            'tests\Als.Core.Tests\bin\Debug\net8.0\testhost.exe'))
+        $oracleAppHost = [IO.Path]::GetFullPath((Join-Path $script:P5aRepositoryRoot `
+            'tools\Als.P5aOracle\bin\Release\net8.0\Als.P5aOracle.exe'))
+        foreach ($path in @($projectTestHost, $oracleAppHost))
+        {
+            Test-Path -LiteralPath $path -PathType Leaf | Should Be $true
+        }
+        $closure.PathsByImage['testhost.exe'] = [string[]]@($projectTestHost)
+        $closure.PathsByImage['Als.P5aOracle.exe'] = [string[]]@($oracleAppHost)
+        $closure.RolesByPath[$projectTestHost] = 'ProjectTestHost'
+        $closure.RolesByPath[$oracleAppHost] = 'OracleAppHost'
+        $nestedResult = [pscustomobject]@{
+            ProcessId = $rootId
+            DescendantProcesses = @(
+                [pscustomobject]@{
+                    processId = 5201; parentProcessId = $rootId; ancestorProcessIds = @($rootId)
+                    imageName = 'testhost.exe'; executablePath = $projectTestHost
+                },
+                [pscustomobject]@{
+                    processId = 5202; parentProcessId = 5201; ancestorProcessIds = @($rootId, 5201)
+                    imageName = 'Als.P5aOracle.exe'; executablePath = $oracleAppHost
+                },
+                [pscustomobject]@{
+                    processId = 5203; parentProcessId = 5202; ancestorProcessIds = @($rootId, 5201, 5202)
+                    imageName = 'conhost.exe'; executablePath = $systemConhost
+                })
+        }
+        { Assert-P5aVerifierDescendantClosure -Result $nestedResult -Closure $closure } |
+            Should Not Throw
+
+        $result.DescendantProcesses += [pscustomobject]@{
+            processId = 5102
+            parentProcessId = 5101
+            ancestorProcessIds = @($rootId, 5101)
+            imageName = 'conhost.exe'
+            executablePath = $systemConhost
+        }
         Test-TestP5aRejects {
             Assert-P5aVerifierDescendantClosure -Result $result -Closure $closure
         } | Should Be $true

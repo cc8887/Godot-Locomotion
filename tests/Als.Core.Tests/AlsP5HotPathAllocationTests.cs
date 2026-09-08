@@ -1,4 +1,5 @@
 using System.Numerics;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Curves;
@@ -8,11 +9,13 @@ using GodotAls.Core.Transitions;
 
 namespace GodotAls.Core.Tests;
 
-[Collection("AllocationTests")]
+[Collection(AllocationTestCollection.Name)]
 public sealed class AlsP5HotPathAllocationTests
 {
-    [Fact]
-    public void CompletePrepareFinalizePathAllocatesZeroBytesAfterOneHundredWarmups()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompletePrepareFinalizePathAllocatesZeroBytesAfterOneHundredWarmups(bool lifecycle)
     {
         var curveKeys = new[]
         {
@@ -83,6 +86,11 @@ public sealed class AlsP5HotPathAllocationTests
             new GodotAls.Core.Actions.AlsActionDefinition(
                 2, 2, 3, 0, 10, 1f, 0, 0, 1, 1f, 0.2f, 1, 0),
         };
+        if (lifecycle) actionDefinitions[0] = actionDefinitions[0] with
+        {
+            Lifecycle = new(AlsActionLifecycleMode.MontageAutoBlendOut, .2f,
+                AlsActionBlendOption.HermiteCubic, .5f, AlsActionBlendOption.HermiteCubic, -1f),
+        };
         var actionSections = new[]
         {
             new GodotAls.Core.Actions.AlsActionSectionBinding(0, 0, -1, 0f, 1f),
@@ -95,7 +103,7 @@ public sealed class AlsP5HotPathAllocationTests
                 4, 0, 0, 1, 21, 0.5f, 1f, 0f, 0.5f, 1f, 1),
         };
         var bindings = new AlsP5RuntimeBindings(
-            1, 1, 1,
+            AlsP5RuntimeBindings.CurrentVersion, 1, 1,
             curveKeys,
             curveBindings,
             curveIdentities,
@@ -165,6 +173,10 @@ public sealed class AlsP5HotPathAllocationTests
             Interruptible = 1,
         };
         state.ActionBlendLane = AlsLaneBlendState.CreateDefault();
+        if (lifecycle) state.ActionPlayer.Lifecycle = new()
+        {
+            Alpha = .5f, RemainingSeconds = .1f, CurrentWeight = .5f, DesiredWeight = 1f,
+        };
         state.ActionBlendLane.LaneWeight = 1f;
         state.ActionBlendLane.IncomingMix = 1f;
         state.ActionBlendLane.BlendSeconds = 0.2f;

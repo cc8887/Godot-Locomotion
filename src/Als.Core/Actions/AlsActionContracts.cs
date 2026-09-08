@@ -3,6 +3,30 @@ using GodotAls.Core.Contracts;
 
 namespace GodotAls.Core.Actions;
 
+public enum AlsActionLifecycleMode : byte
+{
+    // Compatibility for manually constructed definitions, never asset-compiled Actions.
+    LegacySectionEnd,
+    MontageAutoBlendOut,
+    MontageHoldAtEnd,
+}
+
+public enum AlsActionBlendOption : byte
+{
+    Linear,
+    Cubic,
+    HermiteCubic,
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsActionLifecycleSettings(
+    AlsActionLifecycleMode Mode,
+    float BlendInSeconds,
+    AlsActionBlendOption BlendInOption,
+    float BlendOutSeconds,
+    AlsActionBlendOption BlendOutOption,
+    float BlendOutTriggerSeconds);
+
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsActionDefinition(
     int OccurrenceHandleId,
@@ -17,7 +41,8 @@ public readonly record struct AlsActionDefinition(
     float PlayRate,
     float BlendSeconds,
     byte Interruptible,
-    byte Loop);
+    byte Loop,
+    AlsActionLifecycleSettings Lifecycle = default);
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsActionSectionBinding(
@@ -78,12 +103,14 @@ public readonly record struct AlsActionRequestResult(
 }
 
 [StructLayout(LayoutKind.Sequential)]
+// ClosingReason remains terminal evidence when an already-closed source produces no slice.
 public readonly record struct AlsActionAdvanceResult(
     AlsActionPlayback ContributingPlayback,
     int FirstSliceIndex,
     int AddedSliceCount,
     int ClosingSliceIndex,
-    AlsActionResultCode ClosingReason)
+    AlsActionResultCode ClosingReason,
+    double CompletionOffsetSeconds = 0d)
 {
     public static AlsActionAdvanceResult CreateDefault() => new(
         AlsActionPlayback.CreateDefault(),

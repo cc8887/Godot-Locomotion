@@ -16,10 +16,12 @@
     "markerMap",
     "sectionMap",
     "nativeOnlyEventMap",
+    "nativeAuditDependencies",
     "cases"
   ],
   "properties": {
     "schemaVersion": {
+      "const": 2,
       "type": "integer",
       "minimum": -2147483648,
       "maximum": 2147483647
@@ -87,6 +89,9 @@
       "items": {
         "$ref": "#/$defs/o20"
       }
+    },
+    "nativeAuditDependencies": {
+      "$ref": "#/$defs/nativeAuditDependencies"
     },
     "cases": {
       "type": "array",
@@ -298,6 +303,228 @@
     }
   },
   "$defs": {
+    "nativeAuditDependencies": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "prefixItems": [
+        { "$ref": "#/$defs/nativeAuditDependency0" },
+        { "$ref": "#/$defs/nativeAuditDependency1" },
+        { "$ref": "#/$defs/nativeAuditDependency2" },
+        { "$ref": "#/$defs/nativeAuditDependency3" },
+        { "$ref": "#/$defs/nativeAuditDependency4" },
+        { "$ref": "#/$defs/nativeAuditDependency5" },
+        { "$ref": "#/$defs/nativeAuditDependency6" },
+        { "$ref": "#/$defs/nativeAuditDependency7" },
+        { "$ref": "#/$defs/nativeAuditDependency8" }
+      ],
+      "items": false
+    },
+    "nativeAuditDependency0": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Base/A_Als_Idle.A_Als_Idle" },
+            "events": { "type": "array", "minItems": 0, "maxItems": 0, "items": false }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency1": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Grounded/Lean/BS_Als_Lean.BS_Als_Lean" },
+            "events": { "type": "array", "minItems": 0, "maxItems": 0, "items": false }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency2": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Grounded/WalkRun/BS_Als_WalkRun_Forward.BS_Als_WalkRun_Forward" },
+            "events": { "type": "array", "minItems": 0, "maxItems": 0, "items": false }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency3": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Overlays/Other/A_Als_Default_Poses.A_Als_Default_Poses" },
+            "events": { "type": "array", "minItems": 0, "maxItems": 0, "items": false }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency4": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Transitions/A_Als_CrouchToStand.A_Als_CrouchToStand" },
+            "events": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/nativeAuditEvent_b8fb558141cba57d764453522a35a2e41d14f48c" },
+                { "$ref": "#/$defs/nativeAuditEvent_54b1f5d2f42f2c4e347e3b2f0daf2df277773a8c" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency5": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Transitions/A_Als_StandToCrouch.A_Als_StandToCrouch" },
+            "events": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/nativeAuditEvent_c1bad251b4a8b5c278b2b176c0511e57927efba7" },
+                { "$ref": "#/$defs/nativeAuditEvent_d7f672e5d8d58833394ff17bbf23f8bf40d4adae" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency6": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Transitions/A_Als_Stand_Transition_Right.A_Als_Stand_Transition_Right" },
+            "events": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/nativeAuditEvent_31009e422b1cc9903e0d851dd26d730acd39e802" },
+                { "$ref": "#/$defs/nativeAuditEvent_3b22dbb668b87ea06ce5b7c593a6b3d6acb42dcd" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency7": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/Transitions/A_Als_Stop_Left.A_Als_Stop_Left" },
+            "events": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "prefixItems": [
+                { "$ref": "#/$defs/nativeAuditEvent_7df629e5830201a5308443184652a050529411ef" },
+                { "$ref": "#/$defs/nativeAuditEvent_51b2b24f1f74a61ee88e2589d9beca46759b7340" }
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "nativeAuditDependency8": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditDependency" },
+        {
+          "properties": {
+            "assetObjectPath": { "const": "/ALS/ALS/Animations/View/BS_Als_Look.BS_Als_Look" },
+            "events": { "type": "array", "minItems": 0, "maxItems": 0, "items": false }
+          }
+        }
+      ]
+    },
+    "nativeAuditEvent_b8fb558141cba57d764453522a35a2e41d14f48c": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "b8fb558141cba57d764453522a35a2e41d14f48c" } } }
+      ]
+    },
+    "nativeAuditEvent_54b1f5d2f42f2c4e347e3b2f0daf2df277773a8c": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "54b1f5d2f42f2c4e347e3b2f0daf2df277773a8c" } } }
+      ]
+    },
+    "nativeAuditEvent_c1bad251b4a8b5c278b2b176c0511e57927efba7": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "c1bad251b4a8b5c278b2b176c0511e57927efba7" } } }
+      ]
+    },
+    "nativeAuditEvent_d7f672e5d8d58833394ff17bbf23f8bf40d4adae": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "d7f672e5d8d58833394ff17bbf23f8bf40d4adae" } } }
+      ]
+    },
+    "nativeAuditEvent_31009e422b1cc9903e0d851dd26d730acd39e802": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "31009e422b1cc9903e0d851dd26d730acd39e802" } } }
+      ]
+    },
+    "nativeAuditEvent_3b22dbb668b87ea06ce5b7c593a6b3d6acb42dcd": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "3b22dbb668b87ea06ce5b7c593a6b3d6acb42dcd" } } }
+      ]
+    },
+    "nativeAuditEvent_7df629e5830201a5308443184652a050529411ef": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "7df629e5830201a5308443184652a050529411ef" } } }
+      ]
+    },
+    "nativeAuditEvent_51b2b24f1f74a61ee88e2589d9beca46759b7340": {
+      "allOf": [
+        { "$ref": "#/$defs/nativeAuditEvent" },
+        { "properties": { "stableEventId": { "const": "51b2b24f1f74a61ee88e2589d9beca46759b7340" } } }
+      ]
+    },
+    "nativeAuditDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetObjectPath", "assetStableId", "assetPackageSha256", "assetClassPath", "events"],
+      "properties": {
+        "assetObjectPath": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "assetStableId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "assetPackageSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "assetClassPath": { "enum": ["/Script/Engine.AnimSequence", "/Script/Engine.BlendSpace", "/Script/Engine.BlendSpace1D"] },
+        "events": {
+          "type": "array", "minItems": 0, "maxItems": 2,
+          "items": { "$ref": "#/$defs/nativeAuditEvent" }
+        }
+      }
+    },
+    "nativeAuditEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableEventId", "sourceClassPath", "sourceIndex", "trackIndex", "timeSeconds", "durationSeconds", "triggerWeightThreshold", "tickMode"],
+      "properties": {
+        "stableEventId": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "sourceClassPath": { "const": "/Script/ALS.AlsAnimNotify_FootstepEffects" },
+        "sourceIndex": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "trackIndex": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "timeSeconds": { "type": "number", "minimum": 0, "maximum": 3.4028235e+38 },
+        "durationSeconds": { "const": 0 },
+        "triggerWeightThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tickMode": { "const": "Queued" }
+      }
+    },
     "o17": {
       "type": "object",
       "additionalProperties": false,
@@ -314,10 +541,12 @@
         "markerMap",
         "sectionMap",
         "nativeOnlyEventMap",
+        "nativeAuditDependencies",
         "cases"
       ],
       "properties": {
         "schemaVersion": {
+          "const": 2,
           "type": "integer",
           "minimum": -2147483648,
           "maximum": 2147483647
@@ -389,6 +618,9 @@
           "items": {
             "$ref": "#/$defs/o20"
           }
+        },
+        "nativeAuditDependencies": {
+          "$ref": "#/$defs/nativeAuditDependencies"
         },
         "cases": {
           "type": "array",

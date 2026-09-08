@@ -23,6 +23,25 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsP5aTraceSchemaTests
 {
     [Fact]
+    public void Family1_PureSchemaObjectDeclarationsRemainClosed()
+    {
+        P5aRedHarness.AssertEveryObjectSchemaIsClosed(
+            P5aRedHarness.RequireSchema(1, "als_p5a_trace_plan.schema.json"));
+        P5aRedHarness.AssertEveryObjectSchemaIsClosed(
+            P5aRedHarness.RequireSchema(1, "als_p5a_trace.schema.json"));
+    }
+
+    [Fact]
+    public void Family1_PurePlanSchemaRejectsClosedShapeMutations() =>
+        P5aRedHarness.AssertPlanSchemaEvaluatesFrozenBaselineAndMutations(
+            P5aRedHarness.RequireSchema(1, "als_p5a_trace_plan.schema.json"), 1);
+
+    [Fact]
+    public void Family1_PureTraceSchemaRejectsClosedShapeMutations() =>
+        P5aRedHarness.AssertTraceSchemaEvaluatesFrozenBaselinesAndMutations(
+            P5aRedHarness.RequireSchema(1, "als_p5a_trace.schema.json"), 1);
+
+    [Fact]
     public void Family1_ClosedShapeReuseRequiresIdenticalInputsAndCompletedAssertions()
     {
         var identity = Guid.NewGuid().ToString("N");
@@ -105,6 +124,12 @@ public sealed class AlsP5aTraceSchemaTests
     }
 
     [Fact]
+    public void Family2_EquivalentJsonNumberLexemesCompareByValue()
+    {
+        P5aOracleApphost.AssertEquivalentJsonNumberLexemesCompareByValue(2);
+    }
+
+    [Fact]
     public void Family2_NumericAndCanonicalBytesRejectEveryIntegerHexZeroAndEncodingMutation()
     {
         var production = P5aProductionAdapter.Require(2);
@@ -135,6 +160,7 @@ public sealed class AlsP5aTraceSchemaTests
         P5aRedHarness.AssertArrayCardinality(schema, "markerMap", 2, 2);
         P5aRedHarness.AssertArrayCardinality(schema, "sectionMap", 1, 1);
         P5aRedHarness.AssertArrayCardinality(schema, "nativeOnlyEventMap", 7, 7);
+        P5aRedHarness.AssertArrayCardinality(schema, "nativeAuditDependencies", 9, 9);
         P5aRedHarness.AssertSchemaContainsAll(schema, "transition_crouching_left",
             "transition_standing_left", "transition_standing_right", "transition_crouching_right");
         P5aRedHarness.AssertPlanSchemaEvaluatesFrozenBaselineAndMutations(schema, 4);
@@ -168,6 +194,7 @@ public sealed class AlsP5aTraceSchemaTests
         P5aRedHarness.AssertArrayCardinality(schema, "events", 19, 19);
         P5aRedHarness.AssertArrayCardinality(schema, "markers", 2, 2);
         P5aRedHarness.AssertArrayCardinality(schema, "curveInventories", 5, 5);
+        P5aRedHarness.AssertArrayCardinality(schema, "auxiliaryAssets", 9, 9);
         P5aRedHarness.AssertSchemaContainsAll(schema, "nativeReferenceAudit",
             "nativeRuntimeTimeline", "canonicalAssetOracle");
         P5aRedHarness.AssertTraceSchemaEvaluatesFrozenBaselinesAndMutations(schema, 6);
@@ -201,6 +228,49 @@ public sealed class AlsP5aTraceSchemaTests
     }
 
     [Fact]
+    public void Family10_AnimGraphCurveAuditValuesRemainValidatedRawOnlyEvidence()
+    {
+        P5aOracleApphost.AssertRawOnlyCurveAuditBoundary(10);
+    }
+
+    [Fact]
+    public void Family10_CanonicalCurveEvidenceUsesTheCrossEngineToleranceAtTheWriterBoundary()
+    {
+        P5aOracleApphost.AssertCanonicalCurveWriterTolerance(10);
+    }
+
+    [Fact]
+    public void Family10_NativeCanonicalProjectsToleratedAuthoredCurveEvidence()
+    {
+        P5aOracleApphost.AssertAuthoredCurveProjectsToNativeCanonical(10);
+    }
+
+    [Fact]
+    public void Family10_NativeFrameCountersAndCompressedCurvesAreRequiredIndependentAudits()
+    {
+        P5aOracleApphost.AssertNativeFrameAndCompressionAuditBoundary(10);
+    }
+
+    [Fact]
+    public void Family10_TraceSchemaClosesTheNewAuditFields()
+    {
+        var schemaNode = P5aRedHarness.RequireSchema(10, "als_p5a_trace.schema.json");
+        var schema = JsonSchema.FromText(schemaNode.ToJsonString());
+        var raw = P5aFrozenBundle.Create().Raw.DeepClone().AsObject();
+        var actual = raw["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["nativeActual"]!;
+        actual["canonicalAssetOracle"]!["compressedCurves"]!["leftLock"] = .14193964f;
+        using (var document = JsonDocument.Parse(raw.ToJsonString()))
+            Assert.True(schema.Evaluate(document.RootElement).IsValid);
+        actual["frameUpdateAudit"]!["animationUpdates"] = 2;
+        using (var document = JsonDocument.Parse(raw.ToJsonString()))
+            Assert.False(schema.Evaluate(document.RootElement).IsValid);
+        actual["frameUpdateAudit"]!["animationUpdates"] = 1;
+        actual["canonicalAssetOracle"]!["compressedCurves"]!["unknown"] = 0f;
+        using (var document = JsonDocument.Parse(raw.ToJsonString()))
+            Assert.False(schema.Evaluate(document.RootElement).IsValid);
+    }
+
+    [Fact]
     public void Family12_ActionRowsRequireBoundaryCompactionClosingEvidenceAndExactCallbackTuples()
     {
         var production = P5aProductionAdapter.Require(12);
@@ -212,6 +282,19 @@ public sealed class AlsP5aTraceSchemaTests
             "MontageStarted", "MontageBlendingOutStarted", "MontageEnded", "interrupted",
             "nativeInstanceOrdinal");
         P5aRedHarness.AssertTraceSchemaEvaluatesFrozenBaselinesAndMutations(schema, 12);
+    }
+
+
+    [Fact]
+    public void Family12_LegalEarlierNativeCompletionIsRejectedAgainstCurrentCoreReplay()
+    {
+        P5aOracleApphost.AssertLegalEarlierNativeLifecycleFailsCrossEngineWriter(12);
+    }
+
+    [Fact]
+    public void Family12_NativeCanonicalRejectsSwappedPhysicalActionRoles()
+    {
+        P5aOracleApphost.AssertNativeProjectionRejectsSwappedActionRoles(12);
     }
 
     [Fact]
@@ -459,7 +542,7 @@ internal static class P5aRedHarness
     {
         var uniqueObjects = new Dictionary<string, object[]>(StringComparer.Ordinal);
         var lockedArrays = new Dictionary<string, object[]>(StringComparer.Ordinal);
-        CollectMutationTargets(baseline, [], uniqueObjects, lockedArrays);
+        CollectMutationTargets(baseline, [], representation, uniqueObjects, lockedArrays);
 
         foreach (var (signature, path) in uniqueObjects)
         {
@@ -480,16 +563,19 @@ internal static class P5aRedHarness
         foreach (var (name, path) in lockedArrays)
         {
             var original = Locate(baseline, path).AsArray();
-            Assert.NotEmpty(original);
+            if (original.Count > 0)
+            {
+                AssertSchemaRejects(schema,
+                    MutateAt(baseline, path, node => node.AsArray().RemoveAt(node.AsArray().Count - 1)),
+                    family,
+                    $"{representation}:{name}:missing-row");
+            }
+            var extraRow = ExtraLockedArrayRow(representation, JsonPath(path), original);
             AssertSchemaRejects(schema,
-                MutateAt(baseline, path, node => node.AsArray().RemoveAt(node.AsArray().Count - 1)),
-                family,
-                $"{representation}:{name}:missing-row");
-            AssertSchemaRejects(schema,
-                MutateAt(baseline, path, node => node.AsArray().Add(node.AsArray()[0]!.DeepClone())),
+                MutateAt(baseline, path, node => node.AsArray().Add(extraRow.DeepClone())),
                 family,
                 $"{representation}:{name}:extra-row");
-            if (original.Count > 1 && name.StartsWith("cases:", StringComparison.Ordinal))
+            if (original.Count > 1 && RejectsArrayReordering(representation, JsonPath(path)))
             {
                 AssertSchemaRejects(schema,
                     MutateAt(baseline, path, node =>
@@ -508,6 +594,7 @@ internal static class P5aRedHarness
     private static void CollectMutationTargets(
         JsonNode node,
         object[] path,
+        string representation,
         IDictionary<string, object[]> uniqueObjects,
         IDictionary<string, object[]> lockedArrays)
     {
@@ -522,11 +609,11 @@ internal static class P5aRedHarness
                     continue;
                 }
                 var childPath = path.Concat(new object[] { name }).ToArray();
-                if (value is JsonArray childArray && childArray.Count > 0 && LockedArrayNames.Contains(name))
+                if (value is JsonArray && IsLockedArrayForClosedShape(representation, JsonPath(childPath)))
                 {
-                    lockedArrays.TryAdd($"{name}:{string.Join('/', childPath)}", childPath);
+                    lockedArrays.TryAdd($"{name}:{MutationSchemaPath(childPath)}", childPath);
                 }
-                CollectMutationTargets(value, childPath, uniqueObjects, lockedArrays);
+                CollectMutationTargets(value, childPath, representation, uniqueObjects, lockedArrays);
             }
         }
         else if (node is JsonArray array)
@@ -535,7 +622,8 @@ internal static class P5aRedHarness
             {
                 if (array[index] is not null)
                 {
-                    CollectMutationTargets(array[index]!, path.Concat(new object[] { index }).ToArray(), uniqueObjects, lockedArrays);
+                    CollectMutationTargets(array[index]!, path.Concat(new object[] { index }).ToArray(), representation,
+                        uniqueObjects, lockedArrays);
                 }
             }
         }
@@ -563,26 +651,133 @@ internal static class P5aRedHarness
         return current;
     }
 
-    private static readonly HashSet<string> LockedArrayNames = new(StringComparer.Ordinal)
+    private static bool IsLockedArrayForClosedShape(string representation, string path)
     {
-        "sources", "eventMap", "markerMap", "sectionMap", "nativeOnlyEventMap", "cases", "frames",
-        "assets", "events", "markers", "curveInventories", "timelineCursors", "authorities",
-        "notifyOwnership",
-    };
+        var normalized = NormalizeArrayPolicyPath(path);
+        if (representation == "plan")
+        {
+            return normalized is "/sources" or "/eventMap" or "/markerMap" or "/sectionMap" or
+                "/nativeOnlyEventMap" or "/nativeAuditDependencies" or "/nativeAuditDependencies/*/events" or
+                "/cases" or "/cases/*/frames" or "/cases/*/frames/*/input/p4Curves/base";
+        }
+
+        if (normalized is "/cases" or "/cases/*/frames")
+        {
+            return representation is "native_raw" or "native_canonical" or "port_canonical";
+        }
+
+        if (representation == "native_raw")
+        {
+            return normalized is "/nativeReferenceAudit/assets" or "/nativeReferenceAudit/events" or
+                "/nativeReferenceAudit/markers" or "/nativeReferenceAudit/curveInventories" or
+                "/nativeReferenceAudit/auxiliaryAssets" or "/nativeReferenceAudit/auxiliaryAssets/*/events";
+        }
+
+        return representation == "port_canonical" &&
+            (normalized is "/cases/*/frames/*/portAudit/stateAfter/timelineCursors" or
+                "/cases/*/frames/*/portAudit/stateAfter/authorities" or
+                "/cases/*/frames/*/portAudit/stateAfter/notifyOwnership");
+    }
+
+    private static bool RejectsArrayReordering(string representation, string path)
+    {
+        var normalized = NormalizeArrayPolicyPath(path);
+        return normalized == "/cases" ||
+            representation == "plan" &&
+            (normalized is "/nativeAuditDependencies" or "/nativeAuditDependencies/*/events") ||
+            representation == "native_raw" &&
+            (normalized is "/nativeReferenceAudit/auxiliaryAssets" or
+                "/nativeReferenceAudit/auxiliaryAssets/*/events");
+    }
+
+    private static string NormalizeArrayPolicyPath(string path) => "/" + string.Join('/',
+        path.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => int.TryParse(segment, out _) ? "*" : segment));
+
+    private static string JsonPath(IEnumerable<object> path) => "/" + string.Join('/', path);
+
+    private static JsonNode ExtraLockedArrayRow(string representation, string path, JsonArray original)
+    {
+        if (original.Count > 0)
+        {
+            return original[0]!.DeepClone();
+        }
+
+        var normalized = NormalizeArrayPolicyPath(path);
+        Assert.True(
+            (representation is "plan" or "native_raw") &&
+            (normalized is "/nativeAuditDependencies/*/events" or
+                "/nativeReferenceAudit/auxiliaryAssets/*/events"),
+            $"No valid extra-row fixture is registered for empty locked array {representation}:{path}.");
+        return P5aAuxiliaryAuditFixture.Create()[4]!["events"]!.AsArray()[0]!.DeepClone();
+    }
+
+    private static string MutationSchemaPath(IReadOnlyList<object> path)
+    {
+        var segments = new string[path.Count];
+        for (var index = 0; index < path.Count; index++)
+        {
+            segments[index] = path[index] is int && index > 0 && Equals(path[index - 1], "frames")
+                ? "*"
+                : path[index].ToString()!;
+        }
+        return "/" + string.Join('/', segments);
+    }
 
     internal static void AssertEveryObjectSchemaIsClosed(JsonObject root)
     {
-        var objectCount = 0;
+        var allowedRefinements = new HashSet<JsonObject>();
         Visit(root, node =>
         {
-            if (node is not JsonObject schema ||
-                !schema.TryGetPropertyValue("properties", out var propertiesNode) ||
-                propertiesNode is not JsonObject properties)
+            if (node is not JsonObject composite ||
+                composite["allOf"] is not JsonArray allOf)
             {
                 return;
             }
 
+            var baseProperties = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var member in allOf.OfType<JsonObject>())
+            {
+                var resolved = ResolveLocalReference(root, member);
+                if (TryGetClosedObjectProperties(resolved, out var properties))
+                {
+                    baseProperties.UnionWith(properties);
+                }
+            }
+
+            foreach (var refinement in allOf.OfType<JsonObject>().Where(candidate =>
+                         !IsObjectDeclaration(candidate) && candidate["properties"] is JsonObject))
+            {
+                Assert.NotEmpty(baseProperties);
+                var refinementProperties = refinement["properties"]!.AsObject()
+                    .Select(property => property.Key)
+                    .ToArray();
+                Assert.All(refinementProperties, property => Assert.Contains(property, baseProperties));
+                allowedRefinements.Add(refinement);
+            }
+        });
+
+        var objectCount = 0;
+        Visit(root, node =>
+        {
+            if (node is not JsonObject schema)
+            {
+                return;
+            }
+
+            if (!IsObjectDeclaration(schema))
+            {
+                if (schema["properties"] is JsonObject)
+                {
+                    Assert.Contains(schema, allowedRefinements);
+                }
+                return;
+            }
+
             objectCount++;
+            Assert.True(schema["properties"] is JsonObject,
+                "Every object schema must declare its properties.");
+            var properties = schema["properties"]!.AsObject();
             Assert.True(schema.TryGetPropertyValue("additionalProperties", out var additional) &&
                         additional is JsonValue additionalValue &&
                         additionalValue.TryGetValue<bool>(out var allowed) && !allowed,
@@ -596,6 +791,26 @@ internal static class P5aRedHarness
                 required.OrderBy(value => value, StringComparer.Ordinal));
         });
         Assert.True(objectCount > 0, "The schema must contain at least one closed object branch.");
+    }
+
+    private static bool IsObjectDeclaration(JsonObject schema) =>
+        schema["type"] is JsonValue type && type.TryGetValue<string>(out var value) && value == "object";
+
+    private static bool TryGetClosedObjectProperties(JsonObject schema, out string[] properties)
+    {
+        properties = [];
+        if (!IsObjectDeclaration(schema) || schema["properties"] is not JsonObject declaredProperties ||
+            schema["additionalProperties"] is not JsonValue additional ||
+            !additional.TryGetValue<bool>(out var allowed) || allowed ||
+            schema["required"] is not JsonArray required)
+        {
+            return false;
+        }
+
+        properties = declaredProperties.Select(property => property.Key).ToArray();
+        var requiredProperties = required.Select(value => value!.GetValue<string>()).ToArray();
+        return properties.OrderBy(value => value, StringComparer.Ordinal)
+            .SequenceEqual(requiredProperties.OrderBy(value => value, StringComparer.Ordinal), StringComparer.Ordinal);
     }
 
     internal static void AssertSchemaContainsAll(JsonObject schema, params string[] literals)
@@ -985,7 +1200,7 @@ internal sealed class P5aProductionAdapter
         AssertPrivateShadowContract(type, writer, family);
         AssertStreamingPreflightContract(type, writer, family);
         var publicSurface = type.GetMembers(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
-        Assert.Equal(new[] { "VerifyFixture", "WriteCanonicalPair" }, publicSurface
+        Assert.Equal(new[] { "BuildNativePlan", "VerifyFixture", "WriteCanonicalPair" }, publicSurface
             .OfType<MethodInfo>().Select(method => method.Name).Order(StringComparer.Ordinal).ToArray());
         Assert.DoesNotContain(publicSurface, member => member is not MethodInfo);
         Assert.Empty(type.GetConstructors(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static));
@@ -1179,7 +1394,7 @@ internal sealed class P5aProductionAdapter
             File.WriteAllBytes(fixturePath, new UTF8Encoding(false).GetBytes("{\"schemaVersion\":1}\n"));
             File.WriteAllBytes(planPath, P5aFrozenBundle.Create().PlanBytes);
             var snapshot = P5aCompiledSnapshot.Load(P5aOracleApphost.RequireBuiltApphost(family), family);
-            var layout = new AlsP5OccurrenceLayoutView(snapshot.Version, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
+            var layout = new AlsP5OccurrenceLayoutView(snapshot.LayoutVersion, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
             var bindings = snapshot.CreateCoreBindings();
             Exception? failure = null;
             try
@@ -1211,7 +1426,7 @@ internal sealed class P5aProductionAdapter
         P5aCompiledSnapshot snapshot,
         float? groundedIkWeight = null)
     {
-        var layout = new AlsP5OccurrenceLayoutView(snapshot.Version, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
+        var layout = new AlsP5OccurrenceLayoutView(snapshot.LayoutVersion, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
         var bindings = snapshot.CreateCoreBindings(groundedIkWeight);
         var staging = Directory.CreateTempSubdirectory("godot-als-p5a-direct-verify-staging-");
         var previous = Environment.GetEnvironmentVariable("GODOTALS_P5A_STAGING_ROOT");
@@ -1277,10 +1492,10 @@ internal sealed class P5aProductionAdapter
         string portPath)
     {
         var snapshot = P5aCompiledSnapshot.Load(apphost, family);
-        var layout = new AlsP5OccurrenceLayoutView(snapshot.Version, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
+        var layout = new AlsP5OccurrenceLayoutView(snapshot.LayoutVersion, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
         var bindings = snapshot.CreateCoreBindings();
         Assert.Equal(0xd6fef54173240d32UL, layout.Digest);
-        Assert.Equal(0x2b4be600d531c734UL, bindings.Digest);
+        Assert.Equal(0xe458fef4df7a854dUL, bindings.Digest);
         Assert.Equal(0x44403c2869d8f615UL, snapshot.GraphDigest);
         Assert.Equal("152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
             snapshot.AnimationSetDefinitionDigest);
@@ -1344,7 +1559,7 @@ internal sealed class P5aProductionAdapter
             File.WriteAllText(rawPath, "{}\n", new UTF8Encoding(false));
             File.WriteAllBytes(planPath, P5aFrozenBundle.Create().PlanBytes);
             var snapshot = P5aCompiledSnapshot.Load(P5aOracleApphost.RequireBuiltApphost(family), family);
-            var layout = new AlsP5OccurrenceLayoutView(snapshot.Version, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
+            var layout = new AlsP5OccurrenceLayoutView(snapshot.LayoutVersion, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
             var bindings = snapshot.CreateCoreBindings();
             Exception? failure = null;
             try
@@ -1383,7 +1598,7 @@ internal sealed class P5aProductionAdapter
     {
         var transitionClip = new AlsDynamicTransitionClipBinding(1, 2, 1f);
         return new AlsP5RuntimeBindings(
-            1,
+            2,
             1,
             layoutDigest,
             Array.Empty<AlsCurveKey>(),
@@ -1444,6 +1659,7 @@ internal sealed class P5aCompiledSnapshot
         ActionSegments, ActionTimelineRanges);
 
     internal required int Version { get; init; }
+    internal required int LayoutVersion { get; init; }
     internal required ulong Digest { get; init; }
     internal required ulong LayoutDigest { get; init; }
     internal required ulong GraphDigest { get; init; }
@@ -1524,6 +1740,7 @@ internal sealed class P5aCompiledSnapshot
         return new P5aCompiledSnapshot
         {
             Version = Property<int>("Version"), Digest = Property<ulong>("Digest"),
+            LayoutVersion = ObjectProperty<int>(layout, "Version"),
             LayoutDigest = Property<ulong>("LayoutDigest"), GraphDigest = Property<ulong>("GraphDigest"),
             AnimationSetDefinitionDigest = Property<string>("AnimationSetDefinitionDigest"),
             CurveKeys = Field<AlsCurveKey[]>("_curveKeys"), CurveBindings = Field<AlsCurveBinding[]>("_curveBindings"),
@@ -2106,6 +2323,14 @@ internal static class P5aPortAuditReplay
         ["lastProcessedCommand"] = value.LastProcessedCommand.ToString(), ["playbackEpoch"] = value.PlaybackEpoch.ToString(),
         ["playbackTime"] = value.PlaybackTime, ["priority"] = value.Priority,
         ["playing"] = value.Playing != 0, ["interruptible"] = value.Interruptible != 0,
+        ["lifecycle"] = new JsonObject
+        {
+            ["alpha"] = value.Lifecycle.Alpha, ["remainingSeconds"] = value.Lifecycle.RemainingSeconds,
+            ["beginWeight"] = value.Lifecycle.BeginWeight, ["currentWeight"] = value.Lifecycle.CurrentWeight,
+            ["desiredWeight"] = value.Lifecycle.DesiredWeight,
+            ["blendingOut"] = value.Lifecycle.BlendingOut != 0,
+            ["traversalFinished"] = value.Lifecycle.TraversalFinished != 0,
+        },
     };
 
     private static JsonObject TransitionState(AlsDynamicTransitionState value) => new()
@@ -2318,6 +2543,9 @@ internal sealed record P5aFrozenBundle(
             Frames(root, caseIndex)[frameIndex]!["comparableActual"]!["events"]!.AsArray();
         static JsonArray NativeTimeline(JsonObject root, int caseIndex, int frameIndex) =>
             Frames(root, caseIndex)[frameIndex]!["nativeActual"]!["nativeRuntimeTimeline"]!.AsArray();
+        static bool CurvePresent(JsonObject root, int caseIndex, int frameIndex, string curveName) =>
+            Frames(root, caseIndex)[frameIndex]!["nativeActual"]!["animGraphCurveAudit"]![curveName]!["present"]!
+                .GetValue<bool>();
 
         const double widenedDelta = 0.01666666753590107d;
         foreach (var traceCase in bundle.Plan["cases"]!.AsArray())
@@ -2375,6 +2603,14 @@ internal sealed record P5aFrozenBundle(
         Assert.Equal(7, bundle.Plan["nativeOnlyEventMap"]!.AsArray().Count);
         Assert.Equal(BitConverter.SingleToInt32Bits(.083333336f),
             BitConverter.SingleToInt32Bits(Frames(bundle.Raw, 2)[1]!["nativeActual"]!["canonicalAssetOracle"]!["graphCurveWeights"]!["transition"]!.GetValue<float>()));
+        Assert.True(CurvePresent(bundle.Raw, 5, 5, "allowTransitions"));
+        Assert.False(CurvePresent(bundle.Raw, 5, 6, "allowTransitions"));
+        Assert.False(CurvePresent(bundle.Raw, 5, 74, "allowTransitions"));
+        Assert.True(CurvePresent(bundle.Raw, 5, 75, "allowTransitions"));
+        Assert.False(CurvePresent(bundle.Raw, 6, 55, "allowTransitions"));
+        Assert.True(CurvePresent(bundle.Raw, 6, 56, "allowTransitions"));
+        Assert.True(CurvePresent(bundle.Raw, 7, 5, "allowTransitions"));
+        Assert.False(CurvePresent(bundle.Raw, 7, 57, "allowTransitions"));
 
         static JsonObject SharedCurves(JsonObject root, int caseIndex, int frameIndex) =>
             Frames(root, caseIndex)[frameIndex]!["comparableActual"]!["curves"]!.AsObject();
@@ -2459,7 +2695,7 @@ internal sealed record P5aFrozenBundle(
         Assert.Equal(new[] { "Begin", "Tick" }, rawAction[1]!["nativeActual"]!["canonicalAssetOracle"]!["events"]!.AsArray()
             .Select(item => item!["phase"]!.GetValue<string>()).ToArray());
         Assert.Equal("Tick", Assert.Single(sharedAction[1]!["comparableActual"]!["events"]!.AsArray())!["phase"]!.GetValue<string>());
-        Assert.False(rawAction[91]!["nativeActual"]!["actionVisualContribution"]!["contributing"]!.GetValue<bool>());
+        Assert.False(rawAction[90]!["nativeActual"]!["actionVisualContribution"]!["contributing"]!.GetValue<bool>());
         Assert.True(Frames(bundle.Raw, 6)[68]!["nativeActual"]!["actionVisualContribution"]!["contributing"]!.GetValue<bool>());
 
         AssertActionWeightBits(bundle.Raw, 5, 0, 0x3daaaaab);
@@ -2487,10 +2723,8 @@ internal sealed record P5aFrozenBundle(
             {
                 if (caseIndex == 6 && frameIndex >= 56)
                     expected = frameIndex == 56 ? SubTowardZero(1f) : SubTowardZero(expected);
-                else if (caseIndex == 5 && frameIndex >= 91)
-                    expected = frameIndex == 91
-                        ? MathF.Max(0f, 1f - (0.016666668f - 7.1525574e-7f) / .2f)
-                        : SubTowardZero(expected);
+                else if (caseIndex == 5 && frameIndex >= 90)
+                    expected = frameIndex == 90 ? 1f : SubTowardZero(expected);
                 else
                     expected = AddTowardOne(expected);
                 Assert.Equal(BitConverter.SingleToInt32Bits(expected), BitConverter.SingleToInt32Bits(
@@ -2506,9 +2740,10 @@ internal sealed record P5aFrozenBundle(
         var cancelOutcome = Assert.Single(cancel["actionOutcomes"]!.AsArray())!;
         Assert.Equal(("Cancelled", "MontageBlendingOutStarted", true),
             (cancelOutcome["nativeReason"]!.GetValue<string>(), cancelOutcome["callback"]!.GetValue<string>(), cancelOutcome["interrupted"]!.GetValue<bool>()));
-        var natural = rawAction[91]!["nativeActual"]!["actionPlayback"]!;
-        Assert.Equal(0x3fc00000, BitConverter.SingleToInt32Bits(natural["currentMontageTimeSeconds"]!.GetValue<float>()));
-        Assert.Equal(0x35400000, BitConverter.SingleToInt32Bits(natural["finalSegmentDeltaSeconds"]!.GetValue<float>()));
+        var natural = rawAction[90]!["nativeActual"]!["actionPlayback"]!;
+        Assert.Equal(0x3fbffffa, BitConverter.SingleToInt32Bits(natural["currentMontageTimeSeconds"]!.GetValue<float>()));
+        Assert.Equal(BitConverter.SingleToInt32Bits(0.01666665f),
+            BitConverter.SingleToInt32Bits(natural["finalSegmentDeltaSeconds"]!.GetValue<float>()));
     }
 
     private static void AssertDescriptorBits(JsonObject descriptor, long previous, long current, long endOffset)
@@ -2618,7 +2853,7 @@ internal static class P5aOracleApphost
             case 1:
                 AssertWriterRejects(family, raw => raw["unexpected"] = true);
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
-                    "  \"schemaVersion\": 1,", "  \"schemaVersion\": 1,\n  \"schemaVersion\": 1,"));
+                    "  \"schemaVersion\": 2,", "  \"schemaVersion\": 2,\n  \"schemaVersion\": 2,"));
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
                     "\"representation\": \"native_raw\"",
                     "\"representation\": \"native_raw\", \"representation\": \"native_raw\""));
@@ -2634,7 +2869,7 @@ internal static class P5aOracleApphost
                 AssertWriterRejectsBytes(family, bundle => bundle.RawBytes[..^1]);
                 AssertWriterRejectsBytes(family, bundle => bundle.RawBytes.Concat([(byte)'\n']).ToArray());
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
-                    "\"schemaVersion\": 1", "\"schemaVersion\": 1.0"));
+                    "\"schemaVersion\": 2", "\"schemaVersion\": 2.0"));
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
                     "\"layout\": {\n      \"version\": 1,\n      \"digest\": \"d6fef54173240d32\"",
                     "\"layout\": {\n      \"version\": 1,\n      \"digest\": \"D6fef54173240d32\""));
@@ -2767,6 +3002,9 @@ internal static class P5aOracleApphost
                 AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
                     raw["cases"]!.AsArray()[5]!["frames"]!.AsArray()[1]!["nativeActual"]!
                         ["actionVisualContribution"]!["observedEffectiveWeight"] = .75f);
+                AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
+                    raw["cases"]!.AsArray()[4]!["frames"]!.AsArray()[0]!["nativeActual"]!
+                        ["animGraphCurveAudit"]!["allowTransitions"]!["value"] = .998425f);
                 break;
             case 11:
                 AssertWriterRejects(family, raw =>
@@ -3119,6 +3357,90 @@ internal static class P5aOracleApphost
         }
     }
 
+    internal static void AssertEquivalentJsonNumberLexemesCompareByValue(int family)
+    {
+        var apphost = RequireBuiltApphost(family);
+        var bundle = P5aFrozenBundle.Create();
+        var equivalentBytes = RewriteNumberLexeme(
+            RewriteNumberLexeme(bundle.RawBytes, "triggerWeightThreshold", "1E-05", "1e-05"),
+            "x", "0.09", "9e-2");
+        var changedBytes = RewriteNumberLexeme(bundle.RawBytes, "triggerWeightThreshold", "1E-05", "2e-05");
+        var roundedButDifferentBytes = RewriteNumberLexeme(bundle.RawBytes, "x", "0.09", "0.089999999999999997");
+        var underflowBytes = RewriteNumberLexeme(bundle.RawBytes, "x", "0.09", "1e-9999");
+        var directory = Directory.CreateTempSubdirectory("godot-als-p5a-number-lexeme-");
+        try
+        {
+            var plan = Path.Combine(directory.FullName, "plan.json");
+            var equivalentRaw = Path.Combine(directory.FullName, "equivalent-raw.json");
+            var changedRaw = Path.Combine(directory.FullName, "changed-raw.json");
+            var native = Path.Combine(directory.FullName, "native.json");
+            var port = Path.Combine(directory.FullName, "port.json");
+            File.WriteAllBytes(plan, bundle.PlanBytes);
+            File.WriteAllBytes(equivalentRaw, equivalentBytes);
+            File.WriteAllBytes(changedRaw, changedBytes);
+            Run(apphost, family, "--write-canonical-pair", "--repository-root", P5aRedHarness.RepositoryRoot(),
+                "--trace-plan", plan, "--raw", equivalentRaw,
+                "--native-canonical", native, "--port-canonical", port);
+            var changedResult = RunExpectFailure(apphost, family,
+                "--write-canonical-pair", "--repository-root", P5aRedHarness.RepositoryRoot(),
+                "--trace-plan", plan, "--raw", changedRaw,
+                "--native-canonical", Path.Combine(directory.FullName, "changed-native.json"),
+                "--port-canonical", Path.Combine(directory.FullName, "changed-port.json"));
+            Assert.Contains("triggerWeightThreshold", changedResult.Error, StringComparison.Ordinal);
+            foreach (var (label, bytes) in new[]
+            {
+                ("rounded-but-different", roundedButDifferentBytes),
+                ("underflow", underflowBytes)
+            })
+            {
+                var raw = Path.Combine(directory.FullName, $"{label}-raw.json");
+                File.WriteAllBytes(raw, bytes);
+                var result = RunExpectFailure(apphost, family,
+                    "--write-canonical-pair", "--repository-root", P5aRedHarness.RepositoryRoot(),
+                    "--trace-plan", plan, "--raw", raw,
+                    "--native-canonical", Path.Combine(directory.FullName, $"{label}-native.json"),
+                    "--port-canonical", Path.Combine(directory.FullName, $"{label}-port.json"));
+                Assert.Contains("observedTargetMeters.x", result.Error, StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
+    internal static byte[] RewriteNumberLexeme(byte[] document, string property, string original, string replacement)
+    {
+        var originalBytes = Encoding.UTF8.GetBytes(original);
+        var replacementBytes = Encoding.UTF8.GetBytes(replacement);
+        var reader = new Utf8JsonReader(document);
+        using var output = new MemoryStream();
+        var targetProperty = false;
+        var copiedThrough = 0;
+        var replacements = 0;
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.PropertyName)
+            {
+                targetProperty = reader.ValueTextEquals(property);
+                continue;
+            }
+            if (targetProperty && reader.TokenType == JsonTokenType.Number &&
+                reader.ValueSpan.SequenceEqual(originalBytes))
+            {
+                var tokenStart = checked((int)reader.TokenStartIndex);
+                output.Write(document.AsSpan(copiedThrough, tokenStart - copiedThrough));
+                output.Write(replacementBytes);
+                copiedThrough = checked((int)reader.BytesConsumed);
+                replacements++;
+            }
+            targetProperty = false;
+        }
+        Assert.True(replacements > 0, $"No complete numeric token matched {property}={original}.");
+        output.Write(document.AsSpan(copiedThrough));
+        return output.ToArray();
+    }
+
     private static void AssertEvidenceMapLeafMatrix(int family)
     {
         var schema = JsonSchema.FromText(
@@ -3298,7 +3620,7 @@ internal static class P5aOracleApphost
 
     private static void AssertNativeAuditMatrix(int family)
     {
-        foreach (var collection in new[] { "assets", "events", "markers", "curveInventories" })
+        foreach (var collection in new[] { "assets", "events", "markers", "curveInventories", "auxiliaryAssets" })
         {
             var rowCount = P5aFrozenBundle.Create().Raw["nativeReferenceAudit"]![collection]!.AsArray().Count;
             for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
@@ -3734,7 +4056,7 @@ internal static class P5aOracleApphost
             File.WriteAllBytes(planPath, bundle.PlanBytes);
             var snapshot = P5aCompiledSnapshot.Load(apphost, family);
             var layout = new AlsP5OccurrenceLayoutView(
-                snapshot.Version, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
+                snapshot.LayoutVersion, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
             var driftedBindings = snapshot.CreateCoreBindings(groundedIkWeight: 0.5f);
             Assert.Equal(snapshot.Digest, driftedBindings.Digest);
             Assert.Equal(snapshot.LayoutDigest, driftedBindings.LayoutDigest);
@@ -4024,7 +4346,7 @@ internal static class P5aOracleApphost
         return current;
     }
 
-    private static void AssertRawOnlyMutationLeavesPortUnchanged(int family, Action<JsonObject> mutateRaw)
+    private static byte[] AssertRawOnlyMutationLeavesPortUnchanged(int family, Action<JsonObject> mutateRaw)
     {
         var apphost = RequireBuiltApphost(family);
         var bundle = P5aFrozenBundle.Create();
@@ -4051,13 +4373,282 @@ internal static class P5aOracleApphost
                 "--write-canonical-pair", "--repository-root", P5aRedHarness.RepositoryRoot(),
                 "--trace-plan", planPath, "--raw", rawPath,
                 "--native-canonical", nativePath, "--port-canonical", portPath);
-            Assert.Equal(File.ReadAllBytes(baselinePortPath), File.ReadAllBytes(portPath));
+            var baselinePortBytes = File.ReadAllBytes(baselinePortPath);
+            Assert.Equal(baselinePortBytes, File.ReadAllBytes(portPath));
             Assert.True(File.Exists(nativePath));
+            return baselinePortBytes;
         }
         finally
         {
             directory.Delete(true);
         }
+    }
+
+    internal static void AssertRawOnlyCurveAuditBoundary(int family)
+    {
+        AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
+            raw["cases"]!.AsArray()[4]!["frames"]!.AsArray()[0]!["nativeActual"]!
+                ["animGraphCurveAudit"]!["allowTransitions"]!["value"] = .998425f);
+        AssertWriterRejects(family, raw =>
+        {
+            var audit = raw["cases"]!.AsArray()[4]!["frames"]!.AsArray()[0]!["nativeActual"]!
+                ["animGraphCurveAudit"]!["allowTransitions"]!;
+            audit["present"] = false;
+            audit["value"] = .5f;
+        });
+        AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
+            raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[1]!["nativeActual"]!
+                ["dynamicTransition"]!["observedEffectiveWeight"] = .25f);
+        AssertWriterRejects(family, raw =>
+            raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[1]!["nativeActual"]!
+                ["dynamicTransition"]!["observedEffectiveWeight"] = 1.0001f);
+        AssertWriterRejects(family, raw =>
+            raw["cases"]!.AsArray()[0]!["frames"]!.AsArray()[0]!["nativeActual"]!
+                ["dynamicTransition"]!["observedEffectiveWeight"] = .25f);
+    }
+
+    internal static void AssertCanonicalCurveWriterTolerance(int family)
+    {
+        var bundle = P5aFrozenBundle.Create();
+        var expected = bundle.Raw["cases"]!.AsArray()[1]!["frames"]!.AsArray()[0]!
+            ["nativeActual"]!["canonicalAssetOracle"]!["curves"]!["leftLock"]!.GetValue<float>();
+        var currentPortBytes = AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
+            raw["cases"]!.AsArray()[1]!["frames"]!.AsArray()[0]!["nativeActual"]!
+                ["canonicalAssetOracle"]!["curves"]!["leftLock"] = expected - 1.786e-8f);
+        AssertWriterRejects(family, raw =>
+            raw["cases"]!.AsArray()[1]!["frames"]!.AsArray()[0]!["nativeActual"]!
+                ["canonicalAssetOracle"]!["curves"]!["leftLock"] = expected + .000010001f);
+        var expectedOffset = bundle.Raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[32]!
+            ["nativeActual"]!["canonicalAssetOracle"]!["events"]!.AsArray()[0]!
+            ["observedFrameOffsetSeconds"]!.GetValue<float>();
+        AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
+            raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[32]!["nativeActual"]!
+                ["canonicalAssetOracle"]!["events"]!.AsArray()[0]!["observedFrameOffsetSeconds"] =
+                    expectedOffset - 2.37e-7f);
+        var currentPort = JsonNode.Parse(currentPortBytes)!;
+        var coreOffset = currentPort["cases"]![2]!["frames"]![32]!["comparableActual"]!["events"]![0]!
+            ["frameOffsetSeconds"]!.GetValue<float>();
+        const float tolerance = 1e-5f;
+        var inside = coreOffset + tolerance;
+        if (MathF.Abs(inside - coreOffset) > tolerance) inside = MathF.BitDecrement(inside);
+        var outside = MathF.BitIncrement(inside);
+        Assert.True(MathF.Abs(inside - coreOffset) <= tolerance);
+        Assert.True(MathF.Abs(outside - coreOffset) > tolerance);
+        Assert.InRange(inside, 0f, 1f / 60f);
+        Assert.InRange(outside, 0f, 1f / 60f);
+        AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
+            raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[32]!["nativeActual"]!
+                ["canonicalAssetOracle"]!["events"]!.AsArray()[0]!["observedFrameOffsetSeconds"] = inside);
+        AssertWriterRejects(family, raw =>
+            raw["cases"]!.AsArray()[2]!["frames"]!.AsArray()[32]!["nativeActual"]!
+                ["canonicalAssetOracle"]!["events"]!.AsArray()[0]!["observedFrameOffsetSeconds"] = outside);
+    }
+
+    internal static void AssertAuthoredCurveProjectsToNativeCanonical(int family)
+    {
+        const float observedLeftLock = .00015992f;
+        var apphost = RequireBuiltApphost(family);
+        var bundle = P5aFrozenBundle.Create();
+        var raw = bundle.Raw.DeepClone().AsObject();
+        raw["cases"]!.AsArray()[1]!["frames"]!.AsArray()[0]!["nativeActual"]!
+            ["canonicalAssetOracle"]!["curves"]!["leftLock"] = observedLeftLock;
+        var directory = Directory.CreateTempSubdirectory("godot-als-p5a-native-projection-");
+        try
+        {
+            var planPath = Path.Combine(directory.FullName, "plan.json");
+            var rawPath = Path.Combine(directory.FullName, "raw.json");
+            var baselinePortPath = Path.Combine(directory.FullName, "baseline-port.json");
+            var baselineNativePath = Path.Combine(directory.FullName, "baseline-native.json");
+            var nativePath = Path.Combine(directory.FullName, "native.json");
+            var portPath = Path.Combine(directory.FullName, "port.json");
+            File.WriteAllBytes(planPath, bundle.PlanBytes);
+            File.WriteAllBytes(rawPath, bundle.RawBytes);
+            Run(apphost, family,
+                "--write-canonical-pair", "--repository-root", P5aRedHarness.RepositoryRoot(),
+                "--trace-plan", planPath, "--raw", rawPath,
+                "--native-canonical", baselineNativePath, "--port-canonical", baselinePortPath);
+            File.WriteAllBytes(rawPath, P5aFrozenBundle.CanonicalBytes(raw));
+            Run(apphost, family,
+                "--write-canonical-pair", "--repository-root", P5aRedHarness.RepositoryRoot(),
+                "--trace-plan", planPath, "--raw", rawPath,
+                "--native-canonical", nativePath, "--port-canonical", portPath);
+
+            Assert.Equal(File.ReadAllBytes(baselinePortPath), File.ReadAllBytes(portPath));
+            var native = JsonNode.Parse(File.ReadAllBytes(nativePath))!.AsObject();
+            Assert.Equal(observedLeftLock, native["cases"]!.AsArray()[1]!["frames"]!.AsArray()[0]!
+                ["comparableActual"]!["curves"]!["leftLock"]!.GetValue<float>());
+            Assert.NotEqual(File.ReadAllBytes(baselineNativePath), File.ReadAllBytes(nativePath));
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
+    internal static void AssertLegalEarlierNativeLifecycleFailsCrossEngineWriter(int family)
+    {
+        var bundle = P5aFrozenBundle.Create();
+        var raw = bundle.Raw.DeepClone().AsObject();
+        var frames = raw["cases"]!.AsArray()[5]!["frames"]!.AsArray();
+        var closingActual = frames[90]!["nativeActual"]!.AsObject();
+        var observedOutcome = closingActual["actionOutcomes"]!.AsArray()[0]!.DeepClone();
+        var movedActual = frames[89]!["nativeActual"]!.AsObject();
+        var movedPlayback = movedActual["actionPlayback"]!.AsObject();
+        movedPlayback["status"] = "ClosingThisFrame";
+        movedPlayback["finalSegmentDeltaSeconds"] =
+            movedPlayback["currentMontageTimeSeconds"]!.GetValue<float>() -
+            movedPlayback["previousMontageTimeSeconds"]!.GetValue<float>();
+        movedActual["actionOutcomes"] = new JsonArray(observedOutcome);
+        var inactiveActual = frames[91]!["nativeActual"]!.AsObject();
+        CopyNativeActionState(inactiveActual, movedActual);
+        closingActual["actionPlayback"] = inactiveActual["actionPlayback"]!.DeepClone();
+        closingActual["actionOutcomes"] = new JsonArray();
+        CopyNativeActionState(inactiveActual, closingActual);
+
+        var delta = bundle.Plan["cases"]![5]!["frames"]![89]!["input"]!["window"]!
+            ["deltaSeconds"]!.GetValue<float>();
+        var previousWeight = frames[88]!["nativeActual"]!["canonicalAssetOracle"]!
+            ["graphCurveWeights"]!["action"]!.GetValue<float>();
+        var activeDelta = movedPlayback["finalSegmentDeltaSeconds"]!.GetValue<float>();
+        var weight = StepSemanticWeight(previousWeight, 1f, activeDelta);
+        weight = StepSemanticWeight(weight, 0f, delta - activeDelta);
+        movedActual["canonicalAssetOracle"]!["graphCurveWeights"]!["action"] = weight;
+        for (var frameIndex = 90; frameIndex < frames.Count; frameIndex++)
+        {
+            weight = StepSemanticWeight(weight, 0f, delta);
+            frames[frameIndex]!["nativeActual"]!["canonicalAssetOracle"]!
+                ["graphCurveWeights"]!["action"] = weight;
+        }
+
+        AlsP5aNativeEvidence.Validate(
+            bundle.Plan, raw, bundle.Raw["nativeReferenceAudit"]!.AsObject());
+        var native = AlsP5aTrace.ProjectNativeCanonical(bundle.Plan, raw);
+        var projectedFrames = native["cases"]!.AsArray()[5]!["frames"]!.AsArray();
+        Assert.True(projectedFrames[89]!["comparableActual"]!["actionPlayback"]!["active"]!.GetValue<bool>());
+        Assert.Equal("Completed", projectedFrames[89]!["comparableActual"]!["actionOutcomes"]!
+            .AsArray()[0]!["resultCode"]!.GetValue<string>());
+        Assert.False(projectedFrames[90]!["comparableActual"]!["actionPlayback"]!["active"]!.GetValue<bool>());
+        Assert.Empty(projectedFrames[90]!["comparableActual"]!["actionOutcomes"]!.AsArray());
+
+        var apphost = RequireBuiltApphost(family);
+        var snapshot = P5aCompiledSnapshot.Load(apphost, family);
+        var layout = new AlsP5OccurrenceLayoutView(
+            snapshot.LayoutVersion, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
+        var bindings = snapshot.CreateCoreBindings();
+        var port = P5aPortReplay.Build(bundle.Plan, in layout, in bindings);
+        var portFrames = port["cases"]!.AsArray()[5]!["frames"]!.AsArray();
+        Assert.Empty(portFrames[89]!["comparableActual"]!["actionOutcomes"]!.AsArray());
+        Assert.Equal("Completed", portFrames[90]!["comparableActual"]!["actionOutcomes"]!
+            .AsArray()[0]!["resultCode"]!.GetValue<string>());
+
+        var directory = Directory.CreateTempSubdirectory("godot-als-p5a-lifecycle-mismatch-");
+        try
+        {
+            var planPath = Path.Combine(directory.FullName, "plan.json");
+            var rawPath = Path.Combine(directory.FullName, "raw.json");
+            var nativePath = Path.Combine(directory.FullName, "native.json");
+            var portPath = Path.Combine(directory.FullName, "port.json");
+            File.WriteAllBytes(planPath, bundle.PlanBytes);
+            File.WriteAllBytes(rawPath, P5aFrozenBundle.CanonicalBytes(raw));
+            Exception? failure = null;
+            try
+            {
+                AlsP5aTrace.WriteCanonicalPair(
+                    rawPath, planPath, nativePath, portPath,
+                    in layout, in bindings, snapshot.GraphDigest);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+            var mismatch = Assert.IsType<InvalidDataException>(failure);
+            Assert.Contains("cross-engine", mismatch.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.False(File.Exists(nativePath));
+            Assert.False(File.Exists(portPath));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    private static void CopyNativeActionState(JsonObject sourceActual, JsonObject targetActual)
+    {
+        foreach (var name in new[]
+                 {
+                     "actionPlaying", "actionSource", "actionNativeInstanceOrdinal", "actionTimeSeconds",
+                 })
+            targetActual["stateAfter"]![name] = sourceActual["stateAfter"]![name]!.DeepClone();
+    }
+
+    private static float StepSemanticWeight(float weight, float target, float delta)
+    {
+        var step = (float)((double)delta / (double).2f);
+        return target > weight
+            ? global::System.MathF.Min(target, weight + step)
+            : global::System.MathF.Max(target, weight - step);
+    }
+
+    internal static void AssertNativeProjectionRejectsSwappedActionRoles(int family)
+    {
+        var bundle = P5aFrozenBundle.Create();
+        var raw = bundle.Raw.DeepClone().AsObject();
+        var playback = raw["cases"]!.AsArray()[5]!["frames"]!.AsArray()[1]!["nativeActual"]!
+            ["actionPlayback"]!.AsObject();
+        var montageSource = playback["montageSource"]!.DeepClone();
+        var segmentSource = playback["segmentSource"]!.DeepClone();
+        playback["montageSource"] = segmentSource;
+        playback["segmentSource"] = montageSource;
+
+        var traceType = typeof(AlsP5Runtime).Assembly.GetType(
+            "GodotAls.Core.Animation.AlsP5aTrace", throwOnError: true, ignoreCase: false)!;
+        var projector = traceType.GetMethod(
+            "ProjectNativeCanonical", BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null, [typeof(JsonObject), typeof(JsonObject)], modifiers: null)!;
+        var exception = Assert.Throws<TargetInvocationException>(() => projector.Invoke(null, [bundle.Plan, raw]));
+        Assert.IsType<InvalidDataException>(exception.InnerException);
+    }
+
+    internal static void AssertNativeFrameAndCompressionAuditBoundary(int family)
+    {
+        AssertRawOnlyMutationLeavesPortUnchanged(family, raw =>
+        {
+            foreach (var caseNode in raw["cases"]!.AsArray())
+            foreach (var frameNode in caseNode!["frames"]!.AsArray())
+            {
+                var actual = frameNode!["nativeActual"]!.AsObject();
+                actual["frameUpdateAudit"] = new JsonObject
+                {
+                    ["animationUpdates"] = 1, ["evaluations"] = 1,
+                    ["postUpdates"] = 1, ["meshTicks"] = 1,
+                };
+                actual["canonicalAssetOracle"]!["compressedCurves"] = new JsonObject
+                {
+                    ["leftIk"] = 1f, ["rightIk"] = 1f, ["leftLock"] = .14193964f,
+                    ["rightLock"] = .75f, ["allowTransitions"] = .5f,
+                };
+            }
+        });
+        static JsonObject Actual(JsonObject raw) => raw["cases"]!.AsArray()[0]!
+            ["frames"]!.AsArray()[0]!["nativeActual"]!.AsObject();
+        foreach (var counter in new[] { "animationUpdates", "evaluations", "postUpdates", "meshTicks" })
+        {
+            AssertWriterRejects(family, raw => Actual(raw)["frameUpdateAudit"]![counter] = 0);
+            AssertWriterRejects(family, raw => Actual(raw)["frameUpdateAudit"]![counter] = 2);
+            AssertWriterRejects(family, raw => Actual(raw)["frameUpdateAudit"]![counter] = 1.5);
+            AssertWriterRejects(family, raw => Actual(raw)["frameUpdateAudit"]!.AsObject().Remove(counter));
+        }
+        AssertWriterRejects(family, raw => Actual(raw).Remove("frameUpdateAudit"));
+        AssertWriterRejects(family, raw => Actual(raw)["frameUpdateAudit"]!["extra"] = 1);
+        AssertWriterRejects(family, raw => Actual(raw)["canonicalAssetOracle"]!
+            .AsObject().Remove("compressedCurves"));
+        AssertWriterRejects(family, raw => Actual(raw)["canonicalAssetOracle"]!["compressedCurves"]!
+            .AsObject().Remove("leftLock"));
+        AssertWriterRejects(family, raw => Actual(raw)["canonicalAssetOracle"]!["compressedCurves"]!["leftLock"] = -.01f);
+        AssertWriterRejects(family, raw => Actual(raw)["canonicalAssetOracle"]!["compressedCurves"]!["leftLock"] = 1.01f);
+        AssertWriterRejects(family, raw => Actual(raw)["canonicalAssetOracle"]!["compressedCurves"]!["leftLock"] = "0.5");
+        AssertWriterRejects(family, raw => Actual(raw)["canonicalAssetOracle"]!["compressedCurves"]!["extra"] = 0f);
+        AssertWriterRejects(family, raw => Actual(raw)["canonicalAssetOracle"]!["curves"]!["leftLock"] = .14193964f);
     }
 
     private static void AssertVerifierRejectsFixture(int family, string apphost, JsonObject fixture, string label)
@@ -4870,7 +5461,7 @@ internal static class P5aOracleApphost
             Missing(family, $"'{executable} {string.Join(' ', arguments)}' exits zero. stdout={result.Output} stderr={result.Error}"));
         if (Path.GetFileNameWithoutExtension(executable).Equals("Als.P5aOracle", StringComparison.Ordinal))
         {
-            Assert.Contains("P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan=",
+            Assert.Contains("P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=",
                 result.Output, StringComparison.Ordinal);
         }
     }
@@ -6063,7 +6654,7 @@ internal static class P5aSyntheticDocuments
         var snapshot = Snapshot();
         var plan = new JsonObject
         {
-            ["schemaVersion"] = 1,
+            ["schemaVersion"] = 2,
             ["kind"] = "p5a_trace_plan",
             ["fixedDeltaSeconds"] = 0.016666668f,
             ["reference"] = reference.DeepClone(),
@@ -6081,6 +6672,7 @@ internal static class P5aSyntheticDocuments
             ["markerMap"] = Repeat(2, MarkerMapRow),
             ["sectionMap"] = Repeat(1, SectionMapRow),
             ["nativeOnlyEventMap"] = Repeat(7, NativeOnlyEventMapRow),
+            ["nativeAuditDependencies"] = P5aAuxiliaryAuditFixture.Create(),
             ["cases"] = Cases(PlanFrame),
         };
 
@@ -6122,7 +6714,7 @@ internal static class P5aSyntheticDocuments
     {
         var root = new JsonObject
         {
-            ["schemaVersion"] = 1,
+            ["schemaVersion"] = 2,
             ["kind"] = "p5a_trace",
             ["representation"] = representation,
             ["tracePlanSha256"] = tracePlanSha,
@@ -6150,7 +6742,7 @@ internal static class P5aSyntheticDocuments
     {
         ["animationSetDefinitionDigest"] = "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
         ["layout"] = new JsonObject { ["version"] = 1, ["digest"] = "d6fef54173240d32" },
-        ["bindings"] = new JsonObject { ["version"] = 1, ["digest"] = "2b4be600d531c734" },
+        ["bindings"] = new JsonObject { ["version"] = 2, ["digest"] = "e458fef4df7a854d" },
         ["graph"] = new JsonObject { ["version"] = 1, ["digest"] = "44403c2869d8f615" },
     };
 
@@ -6695,6 +7287,7 @@ internal static class P5aSyntheticDocuments
         ["events"] = Repeat(19, NativeEventAudit),
         ["markers"] = Repeat(2, NativeMarkerAudit),
         ["curveInventories"] = Repeat(5, NativeCurveInventory),
+        ["auxiliaryAssets"] = P5aAuxiliaryAuditFixture.Create(),
     };
 
     private static JsonObject NativeActual(int caseIndex, int frameIndex)
@@ -6706,9 +7299,14 @@ internal static class P5aSyntheticDocuments
 
     private static JsonObject NativeActualDefault() => new()
     {
+        ["frameUpdateAudit"] = new JsonObject
+        {
+            ["animationUpdates"] = 1, ["evaluations"] = 1, ["postUpdates"] = 1, ["meshTicks"] = 1,
+        },
         ["canonicalAssetOracle"] = new JsonObject
         {
             ["curves"] = Curves(),
+            ["compressedCurves"] = Curves(),
             ["graphCurveWeights"] = new JsonObject { ["action"] = 0f, ["transition"] = 0f },
             ["sync"] = new JsonObject
             {
@@ -6963,12 +7561,12 @@ internal static class P5aSyntheticDocuments
         int frameIndex)
     {
         var cancelFrame = caseIndex == 6 ? 56 : int.MaxValue;
-        var finishFrame = caseIndex == 5 ? 91 : int.MaxValue;
+        var finishFrame = caseIndex == 5 ? 90 : int.MaxValue;
         var playbackActive = frameIndex > 0 && frameIndex <= global::System.Math.Min(cancelFrame, finishFrame);
         if (playbackActive)
         {
             var previous = Q(frameIndex - 1);
-            var current = frameIndex == 91 ? 1.5f : Q(frameIndex);
+            var current = Q(frameIndex);
             if (caseIndex == 6 && frameIndex == 56)
             {
                 previous = Q(55);
@@ -6985,7 +7583,7 @@ internal static class P5aSyntheticDocuments
             playback["currentMontageTimeSeconds"] = current;
             playback["previousClipTimeSeconds"] = previous;
             playback["currentClipTimeSeconds"] = current;
-            playback["finalSegmentDeltaSeconds"] = frameIndex == 91 ? 7.1525574e-7f : 0f;
+            playback["finalSegmentDeltaSeconds"] = frameIndex == 90 ? .01666665f : 0f;
             playback["playRate"] = 1f;
         }
 
@@ -6998,7 +7596,7 @@ internal static class P5aSyntheticDocuments
             events.Add(SharedEvent(6, "End", 0, 0f, "InterruptedByExplicitCancel"));
             outcomes.Add(SharedOutcome("InterruptedByExplicitCancel"));
         }
-        else if (caseIndex == 5 && frameIndex == 91)
+        else if (caseIndex == 5 && frameIndex == 90)
         {
             outcomes.Add(SharedOutcome("Completed"));
         }
@@ -7009,7 +7607,7 @@ internal static class P5aSyntheticDocuments
 
         var actionPlaying = caseIndex switch
         {
-            5 => frameIndex < 91,
+            5 => frameIndex < 90,
             6 => frameIndex < 56,
             _ => true,
         };
@@ -7088,10 +7686,18 @@ internal static class P5aSyntheticDocuments
         var graphWeights = oracle["graphCurveWeights"]!.AsObject();
         graphWeights["action"] = caseIndex >= 5 ? ActionLaneWeight(caseIndex, frameIndex) : 0f;
         graphWeights["transition"] = caseIndex is 2 or 3 or 4 ? TransitionGraphWeight(frameIndex) : 0f;
+        var allowTransitionsPresent = caseIndex switch
+        {
+            5 => frameIndex < 6 || frameIndex >= 75,
+            6 => frameIndex < 6 || frameIndex >= 56,
+            7 => frameIndex < 6 || frameIndex >= 58,
+            _ => true,
+        };
         foreach (var audit in actual["animGraphCurveAudit"]!.AsObject())
         {
-            audit.Value!["present"] = true;
-            audit.Value["value"] = audit.Key is "leftIk" or "rightIk" or "allowTransitions" ? 1f : 0f;
+            var present = audit.Key != "allowTransitions" || allowTransitionsPresent;
+            audit.Value!["present"] = present;
+            audit.Value["value"] = present && audit.Key is "leftIk" or "rightIk" or "allowTransitions" ? 1f : 0f;
         }
 
         if (caseIndex is 0 or 1)
@@ -7137,12 +7743,8 @@ internal static class P5aSyntheticDocuments
         {
             return TowardZero(1f, frameIndex - 55, 0.016666668f / .2f);
         }
-        if (caseIndex == 5 && frameIndex >= 91)
-        {
-            var value = global::System.MathF.Max(0f,
-                1f - (0.016666668f - 7.1525574e-7f) / .2f);
-            return TowardZero(value, frameIndex - 91, 0.016666668f / .2f);
-        }
+        if (caseIndex == 5 && frameIndex >= 90)
+            return TowardZero(1f, frameIndex - 90, 0.016666668f / .2f);
         return ActionGraphWeight(frameIndex);
     }
 
@@ -7220,7 +7822,7 @@ internal static class P5aSyntheticDocuments
         if (frameIndex == 23)
         {
             var row = CanonicalEventRows[caseIndex == 3 ? 5 : 4].NativeRows[caseIndex == 4 ? 1 : 0];
-            actual["nativeRuntimeTimeline"]!.AsArray().Add(RawTimelineEvent(row, "Trigger", .01111111f));
+            actual["nativeRuntimeTimeline"]!.AsArray().Add(RawTimelineEvent(row, "Trigger", .011111101f));
         }
         if (frameIndex == 32)
         {
@@ -7239,15 +7841,15 @@ internal static class P5aSyntheticDocuments
         {
             outcomes.Add(RawOutcome("Cancelled", "MontageBlendingOutStarted", interrupted: true));
         }
-        if (caseIndex == 5 && frameIndex == 91)
+        if (caseIndex == 5 && frameIndex == 90)
         {
             outcomes.Add(RawOutcome("Finished", "MontageEnded", interrupted: false));
         }
 
-        var closingFrame = caseIndex == 6 ? 56 : caseIndex == 5 ? 91 : int.MaxValue;
+        var closingFrame = caseIndex == 6 ? 56 : caseIndex == 5 ? 90 : int.MaxValue;
         if (frameIndex <= closingFrame)
         {
-            var current = frameIndex == 91 ? 1.5f : Q(frameIndex);
+            var current = Q(frameIndex);
             var previous = frameIndex == 0 ? 0f : Q(frameIndex - 1);
             if (caseIndex == 6 && frameIndex == 56)
             {
@@ -7265,13 +7867,13 @@ internal static class P5aSyntheticDocuments
             playback["currentMontageTimeSeconds"] = current;
             playback["previousClipTimeSeconds"] = previous;
             playback["currentClipTimeSeconds"] = current;
-            playback["finalSegmentDeltaSeconds"] = frameIndex == 91 ? 7.1525574e-7f : 0f;
+            playback["finalSegmentDeltaSeconds"] = frameIndex == 90 ? .01666665f : 0f;
             playback["playRate"] = 1f;
         }
 
         var visualTail = caseIndex switch
         {
-            5 => frameIndex < 91,
+            5 => frameIndex < 90,
             6 => frameIndex <= 68,
             _ => true,
         };
@@ -7292,7 +7894,7 @@ internal static class P5aSyntheticDocuments
         AddRawCanonicalActionEvents(oracle, caseIndex, frameIndex);
         AddPhysicalActionTimeline(actual["nativeRuntimeTimeline"]!.AsArray(), caseIndex, frameIndex);
 
-        var playing = caseIndex switch { 5 => frameIndex < 91, 6 => frameIndex < 56, _ => true };
+        var playing = caseIndex switch { 5 => frameIndex < 90, 6 => frameIndex < 56, _ => true };
         var state = actual["stateAfter"]!.AsObject();
         state["actionPlaying"] = playing;
         state["actionSource"] = playing ? ObservedNative("roll_montage") : ObservedNativeSource();
@@ -7334,40 +7936,31 @@ internal static class P5aSyntheticDocuments
     {
         if (frameIndex == 1)
         {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Begin", 0f));
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Tick", .016666668f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Begin", 0f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
         }
-        else if (frameIndex is >= 2 and <= 56 && !(caseIndex == 6 && frameIndex == 56))
+        else if (frameIndex >= 2 &&
+                 (caseIndex == 5 || caseIndex == 7 || frameIndex < 56))
         {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Tick", .016666668f));
+            if (frameIndex == 7)
+                timeline.Add(RawTimelineEvent(CanonicalEventRows[7].NativeRows[0], "Trigger", 7.450581e-9f));
+            if (frameIndex == 28)
+                timeline.Add(RawTimelineEvent(CanonicalEventRows[8].NativeRows[0], "Trigger", .016666532f));
+            if (frameIndex == 57)
+            {
+                timeline.Add(RawTimelineEvent(CanonicalEventRows[9].NativeRows[0], "Trigger", .016566992f));
+                timeline.Add(RawTimelineEvent(NativeOnlyEventRows[4], "Trigger", .016567051f));
+            }
+            if (frameIndex == 61 && caseIndex == 5)
+                timeline.Add(RawTimelineEvent(NativeOnlyEventRows[5], "Trigger", 2.3841858e-7f));
+            if (frameIndex == 75 && caseIndex == 5)
+                timeline.Add(RawTimelineEvent(NativeOnlyEventRows[6], "Trigger", 4.7683716e-7f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
-        }
-        if (frameIndex == 7) timeline.Add(RawTimelineEvent(CanonicalEventRows[7].NativeRows[0], "Trigger", .00000001f));
-        if (frameIndex == 28) timeline.Add(RawTimelineEvent(CanonicalEventRows[8].NativeRows[0], "Trigger", .0166667f));
-        if (frameIndex == 57 && caseIndex != 6)
-        {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "Tick", 0f));
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "End", 0f));
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[9].NativeRows[0], "Trigger", 0f));
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[4], "Trigger", 0f));
         }
         if (frameIndex == 56 && caseIndex == 6)
         {
-            timeline.Add(RawTimelineEvent(CanonicalEventRows[6].NativeRows[0], "End", 0f));
             timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "End", 0f));
         }
-        if (frameIndex is >= 58 and <= 90 && caseIndex == 5)
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", .016666668f));
-        if (frameIndex == 91 && caseIndex == 5)
-        {
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "Tick", 7.1525574e-7f));
-            timeline.Add(RawTimelineEvent(NativeOnlyEventRows[3], "End", 7.1525574e-7f));
-        }
-        if (frameIndex == 61) timeline.Add(RawTimelineEvent(NativeOnlyEventRows[5], "Trigger", 0f));
-        if (frameIndex == 75) timeline.Add(RawTimelineEvent(NativeOnlyEventRows[6], "Trigger", 0f));
     }
 
     private static float NativeVisualWeight(int caseIndex, int frameIndex)
@@ -7611,7 +8204,7 @@ internal static class P5aSyntheticDocuments
     private static void PopulatePortAction(JsonObject result, JsonObject state, int caseIndex, int frameIndex)
     {
         var cancelled = caseIndex == 6 && frameIndex >= 56;
-        var completed = caseIndex == 5 && frameIndex >= 91;
+        var completed = caseIndex == 5 && frameIndex >= 90;
         var playing = !cancelled && !completed;
         var player = state["actionPlayer"]!.AsObject();
         player["lastProcessedRequestId"] = "1";
@@ -7648,14 +8241,14 @@ internal static class P5aSyntheticDocuments
             SetAuthority(state, 2, 35, 2, 0);
             SetAuthority(state, 3, 36, 28, 0);
         }
-        if (caseIndex == 5 && frameIndex == 91)
+        if (caseIndex == 5 && frameIndex == 90)
         {
             var action = result["actionPlayback"]!.AsObject();
             action["occurrenceHandleId"] = 35; action["actionDefinitionId"] = 0;
             action["animationId"] = 2; action["sectionId"] = 0; action["segmentId"] = 0;
-            action["playbackEpoch"] = "1"; action["previousTime"] = Q(90);
-            action["currentTime"] = 1.5f; action["previousClipTime"] = Q(90);
-            action["currentClipTime"] = 1.5f; action["finalSegmentDeltaSeconds"] = 7.1525574e-7f;
+            action["playbackEpoch"] = "1"; action["previousTime"] = Q(89);
+            action["currentTime"] = Q(90); action["previousClipTime"] = Q(89);
+            action["currentClipTime"] = Q(90); action["finalSegmentDeltaSeconds"] = .016666668f;
             action["playRate"] = 1f; action["blendSeconds"] = .2f;
             action["effectiveWeight"] = ActionLaneWeight(caseIndex, frameIndex); action["active"] = true;
         }
@@ -7684,7 +8277,7 @@ internal static class P5aSyntheticDocuments
                 if (caseIndex == 6)
                     result["actionOutcomes"]!.AsArray().Add(CoreOutcome("InterruptedByExplicitCancel"));
             }
-            if (caseIndex == 5 && frameIndex == 91)
+            if (caseIndex == 5 && frameIndex == 90)
                 result["actionOutcomes"]!.AsArray().Add(CoreOutcome("Completed"));
         }
         if (frameIndex <= 55)
@@ -7816,6 +8409,12 @@ internal static class P5aSyntheticDocuments
         ["lastProcessedCommandRequestId"] = "0", ["lastProcessedCommand"] = "None",
         ["playbackEpoch"] = "0", ["playbackTime"] = 0f, ["priority"] = 0,
         ["playing"] = false, ["interruptible"] = false,
+        ["lifecycle"] = new JsonObject
+        {
+            ["alpha"] = 0f, ["remainingSeconds"] = 0f, ["beginWeight"] = 0f,
+            ["currentWeight"] = 0f, ["desiredWeight"] = 0f,
+            ["blendingOut"] = false, ["traversalFinished"] = false,
+        },
     };
 
     private static JsonObject TransitionState() => new()

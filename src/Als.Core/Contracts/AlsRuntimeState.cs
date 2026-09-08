@@ -170,6 +170,7 @@ public struct AlsRuntimeState
             state.ActionPlayer.Priority != 0 ||
             state.ActionPlayer.Playing != 0 ||
             state.ActionPlayer.Interruptible != 0 ||
+            !GodotAls.Core.Actions.AlsActionLifecycle.IsDefault(state.ActionPlayer.Lifecycle) ||
             state.DynamicTransition.AnimationId != -1 ||
             state.DynamicTransition.QueuedAnimationId != -1 ||
             state.DynamicTransition.PlaybackEpoch != 0 ||

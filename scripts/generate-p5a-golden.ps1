@@ -44,6 +44,7 @@ public static class P5aGeneratorPreboundNativeProcess
     private const int MaxStdOutBytes = 8388608;
     private const int MaxStdErrBytes = 8388608;
     private const uint CREATE_SUSPENDED = 0x00000004;
+    private const uint CREATE_NO_WINDOW = 0x08000000;
     private const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
     private const uint STARTF_USESTDHANDLES = 0x00000100;
     private const uint HANDLE_FLAG_INHERIT = 0x00000001;
@@ -410,7 +411,7 @@ public static class P5aGeneratorPreboundNativeProcess
             var commandLine = new StringBuilder(BuildCommandLine(executable, arguments));
             if (!CreateProcessW(
                     executable, commandLine, IntPtr.Zero, IntPtr.Zero, true,
-                    CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT,
+                    CREATE_SUSPENDED | CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT,
                     IntPtr.Zero, currentDirectory, ref startup, out processInformation))
                 ThrowLastError("CreateProcessW");
             CloseOwnedHandle(ref standardInputRead);
@@ -1143,6 +1144,101 @@ function Assert-P5aGeneratorNoReparsePoint
         $parent = Split-Path -Parent $current
         if ([string]::IsNullOrEmpty($parent) -or $parent -ceq $current) { break }
         $current = $parent
+    }
+}
+
+function Open-P5aGeneratorHelperLease
+{
+    param([Parameter(Mandatory)][string]$UnrealEditorCmd)
+
+    $handles = [Collections.Generic.List[object]]::new()
+    $entries = [Collections.Generic.Dictionary[string,object]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    try
+    {
+        $engineBinaryRoot = Split-Path -Parent (Get-P5aGeneratorFullPath $UnrealEditorCmd)
+        $candidates = [Collections.Generic.List[object]]::new()
+        $candidates.Add([pscustomobject]@{
+            Path = Join-Path ([Environment]::SystemDirectory) 'conhost.exe'
+            Role = 'SystemConhost'; BundledPath = $null
+        })
+        foreach ($image in @('UnrealTraceServer.exe', 'zen.exe', 'zenserver.exe', 'crashpad_handler.exe'))
+        {
+            $bundled = Join-Path $engineBinaryRoot $image
+            if (-not (Test-Path -LiteralPath $bundled -PathType Leaf)) { continue }
+            $candidates.Add([pscustomobject]@{
+                Path = $bundled; Role = $image; BundledPath = $null
+            })
+            if ($image -ceq 'UnrealTraceServer.exe')
+            {
+                $traceRoot = Join-Path $env:LOCALAPPDATA 'UnrealEngine\Common\UnrealTrace\Bin'
+                if (Test-Path -LiteralPath $traceRoot -PathType Container)
+                {
+                    Assert-P5aGeneratorNoReparsePoint $traceRoot
+                    foreach ($installed in @(Get-ChildItem -LiteralPath $traceRoot `
+                        -Filter $image -File -Recurse))
+                    {
+                        $candidates.Add([pscustomobject]@{
+                            Path = $installed.FullName; Role = $image; BundledPath = $bundled
+                        })
+                    }
+                }
+            }
+            else
+            {
+                $installed = Join-Path $env:LOCALAPPDATA "UnrealEngine\Common\Zen\Install\$image"
+                if (Test-Path -LiteralPath $installed -PathType Leaf)
+                {
+                    $candidates.Add([pscustomobject]@{
+                        Path = $installed; Role = $image; BundledPath = $bundled
+                    })
+                }
+            }
+        }
+        foreach ($candidate in $candidates)
+        {
+            $path = Get-P5aGeneratorFullPath $candidate.Path
+            Assert-P5aGeneratorNoReparsePoint $path
+            $handle = Open-P5aGeneratorPinnedFile $path
+            $handles.Add($handle)
+            $hash = $handle.HashSha256()
+            if ($null -ne $candidate.BundledPath -and
+                $hash -cne [string]$entries[[string]$candidate.BundledPath].Sha256)
+            {
+                $handle.Dispose()
+                $null = $handles.Remove($handle)
+                continue
+            }
+            $entries.Add($path, [pscustomobject]@{
+                Role = [string]$candidate.Role; Handle = $handle; Sha256 = $hash
+                Installed = $null -ne $candidate.BundledPath
+            })
+        }
+        $lease = [pscustomobject]@{ Handles = @($handles); EntriesByPath = $entries }
+        Add-Member -InputObject $lease -MemberType ScriptMethod -Name Dispose -Value {
+            foreach ($handle in @($this.Handles)) { $handle.Dispose() }
+        }
+        return $lease
+    }
+    catch
+    {
+        foreach ($handle in $handles) { $handle.Dispose() }
+        throw
+    }
+}
+
+function Assert-P5aGeneratorHelperLease
+{
+    param([Parameter(Mandatory)][object]$Lease)
+
+    foreach ($entry in $Lease.EntriesByPath.Values)
+    {
+        if (-not $entry.Handle.MatchesPath() -or
+            $entry.Handle.HashSha256() -cne [string]$entry.Sha256)
+        {
+            throw 'P5A generator helper executable identity or bytes changed.'
+        }
+        Assert-P5aGeneratorNoReparsePoint ([string]$entry.Handle.Name)
     }
 }
 
@@ -2236,39 +2332,64 @@ function Get-P5aDeployedBuildEvidence
     $buildId = [string]$receipt.Version.BuildId
     $alsManifestPath = Join-Path $projectRoot 'Plugins\ALS\Binaries\Win64\UnrealEditor.modules'
     $traceManifestPath = Join-Path $deployedRoot 'Binaries\Win64\UnrealEditor.modules'
-    $moduleRows = @(
-        @{ Name = 'ALS'; Path = $alsManifestPath },
-        @{ Name = 'AlsLocomotionTrace'; Path = $traceManifestPath })
-    $moduleDllPaths = @()
-    foreach ($row in $moduleRows)
+    $manifestRows = @(
+        @{
+            Path = $alsManifestPath
+            Modules = [ordered]@{
+                ALS = 'UnrealEditor-ALS.dll'
+                ALSCamera = 'UnrealEditor-ALSCamera.dll'
+                ALSEditor = 'UnrealEditor-ALSEditor.dll'
+                ALSExtras = 'UnrealEditor-ALSExtras.dll'
+            }
+        },
+        @{
+            Path = $traceManifestPath
+            Modules = [ordered]@{
+                AlsLocomotionTrace = 'UnrealEditor-AlsLocomotionTrace.dll'
+            }
+        })
+    $moduleDllPaths = [ordered]@{}
+    foreach ($row in $manifestRows)
     {
         try { $manifest = [IO.File]::ReadAllText($row.Path) | ConvertFrom-Json -Depth 30 }
         catch { throw "P5A module manifest is missing or malformed: $($row.Path)" }
         $modules = @($manifest.Modules.PSObject.Properties)
-        $match = @($modules | Where-Object { $_.Name -ceq $row.Name })
-        if ([string]$manifest.BuildId -cne $buildId -or $modules.Count -ne 1 -or
-            $match.Count -ne 1 -or [IO.Path]::GetFileName([string]$match[0].Value) -cne
-            [string]$match[0].Value)
+        $expectedNames = @($row.Modules.Keys)
+        $actualNames = @($modules | ForEach-Object { $_.Name })
+        if ([string]$manifest.BuildId -cne $buildId -or
+            @(Compare-Object -CaseSensitive -ReferenceObject $expectedNames `
+                -DifferenceObject $actualNames).Count -ne 0)
         {
-            throw "P5A module manifest BuildId or mapping is invalid for '$($row.Name)'."
+            throw "P5A module manifest BuildId or module set is invalid: $($row.Path)"
         }
-        $dllPath = Join-Path (Split-Path -Parent $row.Path) ([string]$match[0].Value)
-        if (-not (Test-Path -LiteralPath $dllPath -PathType Leaf))
+        foreach ($moduleName in $expectedNames)
         {
-            throw "P5A mapped module DLL is missing: $dllPath"
+            $match = @($modules | Where-Object { $_.Name -ceq $moduleName })
+            $mappedName = if ($match.Count -eq 1) { [string]$match[0].Value } else { '' }
+            if ($mappedName -cne [string]$row.Modules[$moduleName] -or
+                [IO.Path]::GetFileName($mappedName) -cne $mappedName)
+            {
+                throw "P5A module manifest mapping is invalid for '$moduleName'."
+            }
+            $dllPath = Join-Path (Split-Path -Parent $row.Path) $mappedName
+            if (-not (Test-Path -LiteralPath $dllPath -PathType Leaf))
+            {
+                throw "P5A mapped module DLL is missing: $dllPath"
+            }
+            $moduleDllPaths[$moduleName] = $dllPath
         }
-        $moduleDllPaths += $dllPath
     }
     $newestDeployedSource = @($closures[1].Paths | ForEach-Object {
         [IO.File]::GetLastWriteTimeUtc($_)
     } | Sort-Object -Descending)[0]
-    if ([IO.File]::GetLastWriteTimeUtc($moduleDllPaths[1]) -lt $newestDeployedSource)
+    if ([IO.File]::GetLastWriteTimeUtc($moduleDllPaths.AlsLocomotionTrace) -lt $newestDeployedSource)
     {
         throw 'P5A deployed trace module DLL is stale relative to deployed source.'
     }
     $evidencePaths = @(
         $receiptPath, $alsManifestPath, $traceManifestPath,
-        $moduleDllPaths[0], $moduleDllPaths[1])
+        $moduleDllPaths.ALS, $moduleDllPaths.ALSCamera, $moduleDllPaths.ALSEditor,
+        $moduleDllPaths.ALSExtras, $moduleDllPaths.AlsLocomotionTrace)
     foreach ($path in $evidencePaths) { Assert-P5aGeneratorNoReparsePoint $path }
     return [pscustomobject]@{
         Evidence = [pscustomobject][ordered]@{
@@ -2276,8 +2397,11 @@ function Get-P5aDeployedBuildEvidence
             targetReceiptSha256 = Get-P5aGeneratorFileHash $receiptPath
             alsModuleManifestSha256 = Get-P5aGeneratorFileHash $alsManifestPath
             traceModuleManifestSha256 = Get-P5aGeneratorFileHash $traceManifestPath
-            alsModuleDllSha256 = Get-P5aGeneratorFileHash $moduleDllPaths[0]
-            traceModuleDllSha256 = Get-P5aGeneratorFileHash $moduleDllPaths[1]
+            alsModuleDllSha256 = Get-P5aGeneratorFileHash $moduleDllPaths.ALS
+            alsCameraModuleDllSha256 = Get-P5aGeneratorFileHash $moduleDllPaths.ALSCamera
+            alsEditorModuleDllSha256 = Get-P5aGeneratorFileHash $moduleDllPaths.ALSEditor
+            alsExtrasModuleDllSha256 = Get-P5aGeneratorFileHash $moduleDllPaths.ALSExtras
+            traceModuleDllSha256 = Get-P5aGeneratorFileHash $moduleDllPaths.AlsLocomotionTrace
         }
         OwnedPaths = @($closures[0].Paths)
         DeployedPaths = @($closures[1].Paths)
@@ -2416,14 +2540,117 @@ function Assert-P5aChildGateOutput
 
 function Assert-P5aGeneratorNoDescendants
 {
-    param([Parameter(Mandatory)][object]$ProcessResult)
+    param(
+        [Parameter(Mandatory)][object]$ProcessResult,
+        [object]$HelperLease,
+        [switch]$AllowUeHelpers
+    )
 
-    $forbidden = @($ProcessResult.DescendantProcesses | Where-Object {
-            $null -ne $_ -and -not [string]::IsNullOrEmpty([string]$_.imageName)
-        } | Sort-Object imageName, processId)
-    if ($forbidden.Count -ne 0)
+    $rootProcessId = [int]$ProcessResult.ProcessId
+    if ($rootProcessId -le 0 -or
+        $null -eq $ProcessResult.PSObject.Properties['DescendantProcesses'] -or
+        $null -eq $ProcessResult.DescendantProcesses)
     {
-        throw "P5A generator descendant process '$($forbidden[0].imageName)' is forbidden."
+        throw 'P5A generator descendant root or metadata collection is invalid.'
+    }
+    if ($null -ne $HelperLease)
+    {
+        Assert-P5aGeneratorHelperLease $HelperLease
+    }
+    $conhostPath = Get-P5aGeneratorFullPath (Join-Path ([Environment]::SystemDirectory) 'conhost.exe')
+    $records = @($ProcessResult.DescendantProcesses)
+    $byId = @{}
+    $rolesById = @{}
+    foreach ($record in $records)
+    {
+        if ($null -eq $record) { throw 'P5A generator descendant metadata record is null.' }
+        foreach ($name in @('processId', 'parentProcessId', 'ancestorProcessIds', 'imageName', 'executablePath'))
+        {
+            if ($null -eq $record.PSObject.Properties[$name])
+            {
+                throw "P5A generator descendant metadata '$name' is missing."
+            }
+        }
+        $recordId = [int]$record.processId
+        if ($recordId -le 0 -or $recordId -eq $rootProcessId -or $byId.ContainsKey($recordId))
+        {
+            throw 'P5A generator descendant process identity is invalid or duplicated.'
+        }
+        $byId[$recordId] = $record
+        $path = [string]$record.executablePath
+        $image = [string]$record.imageName
+        if ([string]::IsNullOrWhiteSpace($image) -or
+            -not [IO.Path]::IsPathFullyQualified($path) -or
+            [IO.Path]::GetFileName($path) -cne $image)
+        {
+            throw 'P5A generator descendant image or executable path is invalid.'
+        }
+        $path = Get-P5aGeneratorFullPath $path
+        if ($image -ceq 'conhost.exe' -and $path -ieq $conhostPath)
+        {
+            $rolesById[$recordId] = 'SystemConhost'
+        }
+        elseif ($AllowUeHelpers -and $null -ne $HelperLease -and
+            $HelperLease.EntriesByPath.ContainsKey($path))
+        {
+            $rolesById[$recordId] = [string]$HelperLease.EntriesByPath[$path].Role
+        }
+        else
+        {
+            throw "P5A generator descendant process '$image' is forbidden (path=$path)."
+        }
+        Assert-P5aGeneratorNoReparsePoint $path
+    }
+    foreach ($record in $records)
+    {
+        $recordId = [int]$record.processId
+        $parentId = [int]$record.parentProcessId
+        $ancestors = @($record.ancestorProcessIds | ForEach-Object { [int]$_ })
+        $expected = [Collections.Generic.List[int]]::new()
+        $seen = [Collections.Generic.HashSet[int]]::new()
+        $null = $seen.Add($recordId)
+        $cursor = $parentId
+        while ($cursor -ne $rootProcessId)
+        {
+            if (-not $seen.Add($cursor) -or -not $byId.ContainsKey($cursor))
+            {
+                throw 'P5A generator descendant parent is missing or cyclic.'
+            }
+            $expected.Insert(0, $cursor)
+            $cursor = [int]$byId[$cursor].parentProcessId
+        }
+        $expected.Insert(0, $rootProcessId)
+        if ($ancestors.Count -ne $expected.Count -or
+            @((Compare-Object @($expected) $ancestors -SyncWindow 0)).Count -ne 0)
+        {
+            throw 'P5A generator descendant ancestor chain is incoherent.'
+        }
+        $role = [string]$rolesById[$recordId]
+        $parentRole = if ($parentId -eq $rootProcessId) { 'Root' } else { [string]$rolesById[$parentId] }
+        $allowed = switch ($role)
+        {
+            'SystemConhost' { $parentRole -cne 'SystemConhost' }
+            'UnrealTraceServer.exe' {
+                $parentRole -ceq 'Root' -or
+                    ($parentRole -ceq 'UnrealTraceServer.exe' -and $ancestors.Count -eq 2 -and
+                     $HelperLease.EntriesByPath[(Get-P5aGeneratorFullPath $record.executablePath)].Installed)
+            }
+            'zen.exe' { $parentRole -ceq 'Root' }
+            'zenserver.exe' { $parentRole -ceq 'Root' }
+            'crashpad_handler.exe' {
+                ($parentRole -ceq 'zen.exe' -or $parentRole -ceq 'zenserver.exe') -and
+                    (Split-Path -Parent $record.executablePath) -ieq
+                    (Split-Path -Parent $byId[$parentId].executablePath)
+            }
+            default { $false }
+        }
+        if (-not $allowed -or
+            ($role -ceq 'SystemConhost' -and @($records | Where-Object {
+                [int]$_.parentProcessId -eq $recordId
+            }).Count -ne 0))
+        {
+            throw "P5A generator descendant helper role '$role' has a forbidden parent '$parentRole' or child."
+        }
     }
 }
 
@@ -2503,25 +2730,28 @@ function Invoke-P5aGeneratorProcessProtocol
     }
     $commit = 'b754d6f0f2bb03741d301f8fb88077ebfe561e17'
     $patch = '3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f'
-    $digestPrefix = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=2b4be600d531c734 graph=44403c2869d8f615 plan='
+    $digestPrefix = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan='
     $protocolSucceeded = $false
     $retainedOutputLeases = [Collections.Generic.List[object]]::new()
     $retainedNativeLease = $null
+    $helperLease = $null
     try
     {
         Assert-P5aGeneratorPhysicalStagingBoundary `
             -RepositoryRoot $root -StagingLease $StagingLease
+        $helperLease = Open-P5aGeneratorHelperLease -UnrealEditorCmd $UnrealEditorCmd
         foreach ($planRow in @(
             @{ Name = 'A'; Path = $paths.PlanA },
             @{ Name = 'B'; Path = $paths.PlanB }))
         {
+            Assert-P5aGeneratorHelperLease $helperLease
             $result = Invoke-P5aGeneratorChild -ProcessInvoker $ProcessInvoker `
                 -FilePath $OracleAppHost `
                 -Arguments @('--write-native-plan', '--repository-root', $root,
                              '--output', $planRow.Path) `
                 -WorkingDirectory $root -TimeoutSeconds $TimeoutSeconds `
                 -PhaseName "P5A native plan $($planRow.Name)"
-            Assert-P5aGeneratorNoDescendants $result
+            Assert-P5aGeneratorNoDescendants $result -HelperLease $helperLease
             $planHash = Get-P5aGeneratorFileHash $planRow.Path
             Assert-P5aChildGateOutput -PhaseName "P5A native plan $($planRow.Name)" `
                 -StdOutLines @($result.StdOutLines) -StdErrLines @($result.StdErrLines) `
@@ -2544,12 +2774,14 @@ function Invoke-P5aGeneratorProcessProtocol
                 "-ReferenceCommit=$commit", "-PatchHashes=$patch",
                 "-P5ATracePlan=$($paths.PlanA)", "-P5ATracePlanSha256=$planHash",
                 '-stdout', '-FullStdOutLogOutput', '-unattended', '-nosplash',
-                '-nullrhi', '-nosound', "-abslog=$($row.Log)")
+                '-nullrhi', '-nosound', '-Multiprocess', "-abslog=$($row.Log)")
+            Assert-P5aGeneratorHelperLease $helperLease
             $result = Invoke-P5aGeneratorChild -ProcessInvoker $ProcessInvoker `
                 -FilePath $UnrealEditorCmd -Arguments $arguments `
                 -WorkingDirectory $root -TimeoutSeconds $TimeoutSeconds `
                 -PhaseName "P5A UE $($row.Name)"
-            Assert-P5aGeneratorNoDescendants $result
+            Assert-P5aGeneratorNoDescendants $result `
+                -HelperLease $helperLease -AllowUeHelpers
             $expectedMarker = if ($row.Ready) {
                 "P5A_TRACE_READY_OK cases=8 commit=$commit"
             } else {
@@ -2575,6 +2807,7 @@ function Invoke-P5aGeneratorProcessProtocol
             @{ Name = 'A'; Raw = $paths.RawA; Native = $paths.NativeA; Port = $paths.PortA },
             @{ Name = 'B'; Raw = $paths.RawB; Native = $paths.NativeB; Port = $paths.PortB }))
         {
+            Assert-P5aGeneratorHelperLease $helperLease
             $result = Invoke-P5aGeneratorChild -ProcessInvoker $ProcessInvoker `
                 -FilePath $OracleAppHost `
                 -Arguments @(
@@ -2583,7 +2816,7 @@ function Invoke-P5aGeneratorProcessProtocol
                     '--native-canonical', $pairRow.Native, '--port-canonical', $pairRow.Port) `
                 -WorkingDirectory $root -TimeoutSeconds $TimeoutSeconds `
                 -PhaseName "P5A canonical pair $($pairRow.Name)"
-            Assert-P5aGeneratorNoDescendants $result
+            Assert-P5aGeneratorNoDescendants $result -HelperLease $helperLease
             Assert-P5aChildGateOutput -PhaseName "P5A canonical pair $($pairRow.Name)" `
                 -StdOutLines @($result.StdOutLines) -StdErrLines @($result.StdErrLines) `
                 -ExitCode $result.ExitCode -OutputLimitExceeded $result.OutputLimitExceeded `
@@ -2659,6 +2892,7 @@ function Invoke-P5aGeneratorProcessProtocol
     }
     finally
     {
+        if ($null -ne $helperLease) { $helperLease.Dispose() }
         if (-not $protocolSucceeded)
         {
             foreach ($outputLease in $retainedOutputLeases)
@@ -2728,7 +2962,9 @@ function Write-P5aReadyManifest
     $buildNames = @(
         'ownedPluginTreeSha256', 'targetReceiptSha256',
         'alsModuleManifestSha256', 'traceModuleManifestSha256',
-        'alsModuleDllSha256', 'traceModuleDllSha256')
+        'alsModuleDllSha256', 'alsCameraModuleDllSha256',
+        'alsEditorModuleDllSha256', 'alsExtrasModuleDllSha256',
+        'traceModuleDllSha256')
     Assert-P5aGeneratorEvidenceObject $OracleEvidence $oracleNames 'Oracle'
     Assert-P5aGeneratorEvidenceObject $BuildEvidence $buildNames 'Build'
 
@@ -2817,7 +3053,9 @@ function Assert-P5aReadyManifest
     $buildNames = @(
         'ownedPluginTreeSha256', 'targetReceiptSha256',
         'alsModuleManifestSha256', 'traceModuleManifestSha256',
-        'alsModuleDllSha256', 'traceModuleDllSha256')
+        'alsModuleDllSha256', 'alsCameraModuleDllSha256',
+        'alsEditorModuleDllSha256', 'alsExtrasModuleDllSha256',
+        'traceModuleDllSha256')
     Assert-P5aGeneratorEvidenceObject $document.oracleEvidence $oracleNames 'Oracle'
     Assert-P5aGeneratorEvidenceObject $document.buildEvidence $buildNames 'Build'
 

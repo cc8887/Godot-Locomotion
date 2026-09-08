@@ -1,3 +1,4 @@
 .gitattributes text eol=lf
 # Unified patch context preserves the upstream JSON tab after Git's context marker.
 reference/patches/*.patch text eol=lf whitespace=-space-before-tab
+tests/Als.Core.Tests/Fixtures/P5A/*.json text eol=lf
