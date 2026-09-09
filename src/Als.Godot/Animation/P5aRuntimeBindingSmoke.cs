@@ -1,5 +1,6 @@
 using Godot;
 using GodotAls.Assets;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Contracts;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
@@ -57,6 +58,7 @@ public partial class P5aRuntimeBindingSmoke : Node
         VerifyLibrary(animationSet, locomotion, pose, snapshot, library);
         VerifyPhysicalDescriptors(locomotion, pose, binding);
         VerifyStalePairings(animationSet, locomotion, pose, p5a, layout, snapshot, library);
+        VerifyInvalidDurationsRejected(animationSet, snapshot);
         VerifyMutatedSkeletonRejected(animationSet, snapshot);
         VerifyCoherentNonIdentityRootFixture();
     }
@@ -172,6 +174,48 @@ public partial class P5aRuntimeBindingSmoke : Node
         Require(core.ActionDefinitions[0].MontageAuthorityGroupId !=
             core.ActionDefinitions[0].SequenceAuthorityGroupId,
             "Montage and Sequence must occupy distinct authority domains.");
+        Require(core.DynamicTransition == beforeCore.DynamicTransition &&
+            core.ActionDefinitions.SequenceEqual(beforeCore.ActionDefinitions) &&
+            core.ActionSections.SequenceEqual(beforeCore.ActionSections) &&
+            core.ActionSegments.SequenceEqual(beforeCore.ActionSegments) &&
+            core.ActionTimelineRanges.SequenceEqual(beforeCore.ActionTimelineRanges),
+            "Transition/Action snapshot fields or handles changed through the adapter.");
+        var authoredAction = p5a.Actions[0];
+        var montageOccurrence = occurrence.Entries.ToArray().Single(value =>
+            value.SourceKind == CoreOccurrenceKind.ActionMontage && value.SourceBindingIndex == 0);
+        var segmentOccurrence = occurrence.Entries.ToArray().Single(value =>
+            value.SourceKind == CoreOccurrenceKind.ActionSequence && value.SourceBindingIndex == 0);
+        Require(core.ActionDefinitions[0] == new AlsActionDefinition(
+            montageOccurrence.OccurrenceHandleId, montageOccurrence.AuthorityGroupId,
+            segmentOccurrence.AuthorityGroupId, authoredAction.DefinitionId,
+            authoredAction.MontageId, authoredAction.MontageDurationSeconds,
+            authoredAction.SlotId, authoredAction.StartSectionId, authoredAction.Priority,
+            authoredAction.PlayRate, authoredAction.BlendSeconds,
+            authoredAction.Interruptible ? (byte)1 : (byte)0,
+            authoredAction.LoopPolicy == AlsP5LoopPolicy.Loop ? (byte)1 : (byte)0,
+            authoredAction.Lifecycle), "The declared Roll definition or handle changed.");
+        var authoredSection = authoredAction.Sections[0];
+        Require(core.ActionSections[0] == new AlsActionSectionBinding(
+            authoredSection.ActionDefinitionId, authoredSection.SectionId,
+            authoredSection.NextSectionId, authoredSection.StartTime, authoredSection.EndTime),
+            "The declared Roll section changed.");
+        var authoredSegment = p5a.SegmentBindings[0];
+        Require(core.ActionSegments[0] == new AlsActionSegmentBinding(
+            segmentOccurrence.OccurrenceHandleId, authoredSegment.ActionDefinitionId,
+            authoredSegment.SlotId, authoredSegment.SegmentId, authoredSegment.AnimationId,
+            authoredSegment.MontageStartTime, authoredSegment.MontageEndTime,
+            authoredSegment.AnimationStartTime, authoredSegment.AnimationEndTime,
+            authoredSegment.PlayRate, authoredSegment.LoopCount),
+            "The declared Roll segment or occurrence handle changed.");
+        var transitionOccurrence = occurrence.Entries.ToArray().Single(value =>
+            value.SourceKind == CoreOccurrenceKind.Transition && value.SourceBindingIndex == 0);
+        Require(core.DynamicTransition.OccurrenceHandleId == transitionOccurrence.OccurrenceHandleId &&
+            core.DynamicTransition.AuthorityGroupId == transitionOccurrence.AuthorityGroupId &&
+            core.DynamicTransition.DistanceMeters == p5a.DynamicTransition.DistanceMeters &&
+            core.DynamicTransition.BlendSeconds == p5a.DynamicTransition.BlendSeconds &&
+            core.DynamicTransition.PlayRate == p5a.DynamicTransition.PlayRate &&
+            core.DynamicTransition.CooldownFrames == p5a.DynamicTransition.CooldownFrames,
+            "Transition timing, policy or occurrence handle changed.");
 
         var entries = occurrence.Entries;
         Require(entries.Length > 0 && entries.ToArray().Select(value => value.OccurrenceHandleId)
@@ -396,6 +440,41 @@ public partial class P5aRuntimeBindingSmoke : Node
         hierarchyLibrary.Skeleton.SetBoneParent(descendant, -1);
         ExpectInvalid(() => AlsP5aAnimationRuntimeBinding.Compile(snapshot, hierarchyLibrary),
             "skeleton hierarchy");
+    }
+
+    private static void VerifyInvalidDurationsRejected(
+        AlsAnimationSetDefinition animationSet,
+        AlsP5CoreRuntimeBindingSnapshot snapshot)
+    {
+        var animationId = snapshot.CreateGraphBuildView().StandingIdleAnimationId;
+        foreach (var length in new[]
+            { 0f, -1f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+        {
+            var animations = animationSet.Animations.ToArray();
+            animations[animationId] = animations[animationId] with { PlayLength = length };
+            var draft = animationSet with { Animations = animations };
+            var digest = AlsAnimationSetPayload.ComputeDefinitionDigest(draft);
+            var invalidSet = draft with { DefinitionDigest = digest };
+            // Forge only the header to exercise BuildP5a's own publication gate,
+            // independently of the upstream compiler's duration validation.
+            var clone = (AlsP5CoreRuntimeBindingSnapshot)typeof(object)
+                .GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic)!.Invoke(snapshot, null)!;
+            typeof(AlsP5CoreRuntimeBindingSnapshot)
+                .GetField("<AnimationSetDefinitionDigest>k__BackingField",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(clone, digest);
+            try
+            {
+                using var unexpected = AlsAnimationLibraryBuilder.BuildP5a(invalidSet, clone);
+            }
+            catch (InvalidOperationException exception) when (
+                exception.Message == "A P5A clip has an invalid duration.")
+            {
+                continue;
+            }
+            throw new InvalidOperationException("BuildP5a published an invalid clip duration.");
+        }
     }
 
     private static void VerifyCoherentNonIdentityRootFixture()

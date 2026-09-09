@@ -228,34 +228,8 @@ internal sealed class AlsP5aAnimationRuntimeBinding : IDisposable
         in AlsP5GraphBuildView graph,
         in AlsP5RuntimeBindings core)
     {
-        var expected = new HashSet<int>(graph.AllAnimationIds.ToArray());
-        Add(graph.StandingIdleAnimationId);
-        Add(graph.CrouchingIdleAnimationId);
-        Add(graph.JumpStartAnimationId);
-        Add(graph.FallLoopAnimationId);
-        Add(graph.LandAnimationId);
-        Add(graph.LeanAdditiveBaseAnimationId);
-        Add(graph.Aim.DownAnimationId);
-        Add(graph.Aim.ForwardAnimationId);
-        Add(graph.Aim.UpAnimationId);
-        Add(graph.Aim.AdditiveBasePoseAnimationId);
-        foreach (ref readonly var value in graph.StandingSamples) Add(value.AnimationId);
-        foreach (ref readonly var value in graph.CrouchingSamples) Add(value.AnimationId);
-        foreach (ref readonly var value in graph.LeanSamples) Add(value.AnimationId);
-        foreach (ref readonly var value in graph.Turns) Add(value.AnimationId);
-        foreach (ref readonly var value in graph.Rotates) Add(value.AnimationId);
-        Add(core.DynamicTransition.StandingLeft.AnimationId);
-        Add(core.DynamicTransition.StandingLeft.AdditiveBaseAnimationId);
-        Add(core.DynamicTransition.StandingRight.AnimationId);
-        Add(core.DynamicTransition.StandingRight.AdditiveBaseAnimationId);
-        Add(core.DynamicTransition.CrouchingLeft.AnimationId);
-        Add(core.DynamicTransition.CrouchingLeft.AdditiveBaseAnimationId);
-        Add(core.DynamicTransition.CrouchingRight.AnimationId);
-        Add(core.DynamicTransition.CrouchingRight.AdditiveBaseAnimationId);
-        foreach (ref readonly var member in core.SyncMembers) Add(member.AnimationId);
-        foreach (ref readonly var segment in core.ActionSegments) Add(segment.AnimationId);
-
-        if (library.Resources.Count != expected.Count)
+        var expected = AlsAnimationLibraryBuilder.GetP5aAnimationClosure(in graph, in core);
+        if (library.Resources.Count != expected.Length)
         {
             throw new InvalidOperationException("The P5A library resource closure changed.");
         }
@@ -283,11 +257,6 @@ internal sealed class AlsP5aAnimationRuntimeBinding : IDisposable
             }
         }
 
-        void Add(int animationId)
-        {
-            if (animationId < 0) throw new InvalidOperationException("A snapshot animation ID is invalid.");
-            expected.Add(animationId);
-        }
     }
 
     private static CoreOccurrenceEntry FindOccurrence(
