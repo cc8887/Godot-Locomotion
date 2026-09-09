@@ -133,18 +133,19 @@ public sealed class AlsAnimationLibraryBuildResult : IDisposable
             }
         }
 
-        using var actualRootPath = CreateBonePath(Root, Skeleton, p5a.PhysicalRootBoneId);
+        using var actualRootPath = AlsAnimationLibraryBuilder.CreateBonePath(
+            Root, Skeleton, p5a.PhysicalRootBoneId);
         if (!string.Equals(actualRootPath.ToString(), p5a.PhysicalRootPath.ToString(),
                 StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The P5A library physical root path changed.");
         }
 
-        var actualFilters = BuildActionFilterPaths(
+        var actualFilters = AlsAnimationLibraryBuilder.BuildActionFilterPaths(
             Root, Skeleton, p5a.PhysicalRootBoneId, p5a.ExpectedPhysicalParents);
         try
         {
-            if (actualFilters.Count != p5a.ActionFilterPaths.Count ||
+            if (actualFilters.Length != p5a.ActionFilterPaths.Count ||
                 !actualFilters.Select(value => value.ToString()).SequenceEqual(
                     p5a.ActionFilterPaths.Select(value => value.ToString())))
             {
@@ -160,43 +161,6 @@ public sealed class AlsAnimationLibraryBuildResult : IDisposable
     private OwnedP5aAnimationLibraryData RequireP5a() => _p5a ??
         throw new InvalidOperationException("The animation library has no P5A build stamp.");
 
-    private static NodePath CreateBonePath(Node root, Skeleton3D skeleton, int boneId)
-    {
-        using var skeletonPath = root.GetPathTo(skeleton);
-        return new NodePath($"{skeletonPath}:{skeleton.GetBoneName(boneId)}");
-    }
-
-    private static List<NodePath> BuildActionFilterPaths(
-        Node root,
-        Skeleton3D skeleton,
-        int physicalRootBoneId,
-        IReadOnlyList<int> parents)
-    {
-        using var skeletonPath = root.GetPathTo(skeleton);
-        var paths = new List<NodePath>(parents.Count - 1);
-        for (var boneId = 0; boneId < parents.Count; boneId++)
-        {
-            if (boneId == physicalRootBoneId ||
-                !HasPhysicalAncestor(parents, boneId, physicalRootBoneId))
-            {
-                continue;
-            }
-            paths.Add(new NodePath($"{skeletonPath}:{skeleton.GetBoneName(boneId)}"));
-        }
-        return paths;
-    }
-
-    private static bool HasPhysicalAncestor(
-        IReadOnlyList<int> parents,
-        int boneId,
-        int ancestor)
-    {
-        for (var current = parents[boneId]; current >= 0; current = parents[current])
-        {
-            if (current == ancestor) return true;
-        }
-        return false;
-    }
 }
 
 internal sealed class OwnedP5aAnimationLibraryData : IDisposable
@@ -320,7 +284,16 @@ public static class AlsAnimationLibraryBuilder
         var occurrence = coreBindings.CreateOccurrenceLayoutView();
         AlsP5OccurrenceLayoutContract.Validate(
             occurrence.Version, occurrence.Digest, occurrence.Entries);
-        var animationIds = BuildP5aAnimationClosure(animationSet, in graph, in core);
+        var animationIds = GetP5aAnimationClosure(in graph, in core);
+        foreach (var animationId in animationIds)
+        {
+            ValidateClosureAnimation(animationSet, animationId, graph.SkeletonId, "P5A");
+            var length = animationSet.Animations[animationId].PlayLength;
+            if (!float.IsFinite(length) || length <= 0f)
+            {
+                throw new InvalidOperationException("A P5A clip has an invalid duration.");
+            }
+        }
         var normalized = ValidateP5aGraphInputs(animationSet, in graph, animationIds);
         var stamp = new AlsP5aAnimationLibraryStamp(
             coreBindings.AnimationSetDefinitionDigest,
@@ -446,25 +419,37 @@ public static class AlsAnimationLibraryBuilder
                 }
                 var parents = skeletonDefinition.PhysicalBones
                     .Select(value => value.ParentPhysicalId).ToArray();
-                var physicalRootPath = CreateBonePath(
-                    targetRoot, targetSkeleton, rootMotionExtractionPhysicalBoneId);
-                var actionFilterPaths = BuildP5aActionFilterPaths(
-                    targetRoot,
-                    targetSkeleton,
-                    skeletonDefinition,
-                    rootMotionExtractionLogicalBoneId,
-                    rootMotionExtractionPhysicalBoneId,
-                    mannequin.Name);
-                p5a = new OwnedP5aAnimationLibraryData(
-                    p5aStamp.Value,
-                    new ReadOnlyDictionary<int, AlsP5aAnimationResourceDescriptor>(resources),
-                    rootMotionExtractionPhysicalBoneId,
-                    physicalRootPath,
-                    actionFilterPaths,
-                    parents,
-                    skeletonDefinition.PhysicalBones.Select(value => value.Name).ToArray(),
-                    Enumerable.Range(0, targetSkeleton.GetBoneCount())
-                        .Select(targetSkeleton.GetBoneRest).ToArray());
+                NodePath? physicalRootPath = null;
+                NodePath[]? actionFilterPaths = null;
+                try
+                {
+                    actionFilterPaths = BuildP5aActionFilterPaths(
+                        targetRoot, targetSkeleton, skeletonDefinition,
+                        rootMotionExtractionLogicalBoneId,
+                        rootMotionExtractionPhysicalBoneId, mannequin.Name);
+                    physicalRootPath = CreateBonePath(
+                        targetRoot, targetSkeleton, rootMotionExtractionPhysicalBoneId);
+                    p5a = new OwnedP5aAnimationLibraryData(
+                        p5aStamp.Value,
+                        new ReadOnlyDictionary<int, AlsP5aAnimationResourceDescriptor>(resources),
+                        rootMotionExtractionPhysicalBoneId,
+                        physicalRootPath,
+                        actionFilterPaths,
+                        parents,
+                        skeletonDefinition.PhysicalBones.Select(value => value.Name).ToArray(),
+                        Enumerable.Range(0, targetSkeleton.GetBoneCount())
+                            .Select(targetSkeleton.GetBoneRest).ToArray());
+                    physicalRootPath = null;
+                    actionFilterPaths = null;
+                }
+                finally
+                {
+                    physicalRootPath?.Dispose();
+                    if (actionFilterPaths is not null)
+                    {
+                        foreach (var path in actionFilterPaths) path.Dispose();
+                    }
+                }
             }
 
             var result = new AlsAnimationLibraryBuildResult(
@@ -546,21 +531,20 @@ public static class AlsAnimationLibraryBuilder
         }
     }
 
-    private static int[] BuildP5aAnimationClosure(
-        AlsAnimationSetDefinition animationSet,
+    internal static int[] GetP5aAnimationClosure(
         in AlsP5GraphBuildView graph,
         in AlsP5RuntimeBindings core)
     {
         var closure = new HashSet<int>();
-        var skeletonId = graph.SkeletonId;
+        var ordered = new List<int>();
         foreach (var animationId in graph.AllAnimationIds)
         {
-            ValidateClosureAnimation(animationSet, animationId, graph.SkeletonId, "P5A graph");
-            if (!closure.Add(animationId))
+            if (animationId < 0 || !closure.Add(animationId))
             {
                 throw new InvalidOperationException(
                     $"P5A graph contains duplicate animation ID: {animationId}");
             }
+            ordered.Add(animationId);
         }
 
         var requiredGraphIds = new List<int>
@@ -583,8 +567,7 @@ public static class AlsAnimationLibraryBuilder
         requiredGraphIds.AddRange(graph.Rotates.ToArray().Select(value => value.AnimationId));
         foreach (var animationId in requiredGraphIds)
         {
-            ValidateClosureAnimation(animationSet, animationId, graph.SkeletonId, "P5A graph");
-            closure.Add(animationId);
+            AddRuntimeAnimation(animationId, "graph");
         }
 
         AddTransition(core.DynamicTransition.StandingLeft);
@@ -600,7 +583,7 @@ public static class AlsAnimationLibraryBuilder
             AddRuntimeAnimation(segment.AnimationId, "Action Sequence");
         }
 
-        return closure.OrderBy(value => value).ToArray();
+        return ordered.ToArray();
 
         void AddTransition(AlsDynamicTransitionClipBinding transition)
         {
@@ -610,8 +593,11 @@ public static class AlsAnimationLibraryBuilder
 
         void AddRuntimeAnimation(int animationId, string label)
         {
-            ValidateClosureAnimation(animationSet, animationId, skeletonId, label);
-            closure.Add(animationId);
+            if (animationId < 0)
+            {
+                throw new InvalidOperationException($"A P5A {label} animation ID is invalid.");
+            }
+            if (closure.Add(animationId)) ordered.Add(animationId);
         }
     }
 
@@ -751,30 +737,39 @@ public static class AlsAnimationLibraryBuilder
         ValidateP5aTargetSkeleton(
             target, skeleton, logicalRootBoneId, physicalRootBoneId, assetName);
         var parents = skeleton.PhysicalBones.Select(value => value.ParentPhysicalId).ToArray();
-        return BuildActionFilterPaths(root, target, physicalRootBoneId, parents).ToArray();
+        return BuildActionFilterPaths(root, target, physicalRootBoneId, parents);
     }
 
-    private static NodePath CreateBonePath(Node root, Skeleton3D skeleton, int boneId)
+    internal static NodePath CreateBonePath(Node root, Skeleton3D skeleton, int boneId)
     {
         using var skeletonPath = root.GetPathTo(skeleton);
         return new NodePath($"{skeletonPath}:{skeleton.GetBoneName(boneId)}");
     }
 
-    private static IEnumerable<NodePath> BuildActionFilterPaths(
+    internal static NodePath[] BuildActionFilterPaths(
         Node root,
         Skeleton3D skeleton,
         int physicalRootBoneId,
         IReadOnlyList<int> parents)
     {
         using var skeletonPath = root.GetPathTo(skeleton);
-        for (var boneId = 0; boneId < parents.Count; boneId++)
+        var paths = new List<NodePath>(parents.Count);
+        try
         {
-            if (boneId == physicalRootBoneId ||
-                !HasPhysicalAncestor(parents, boneId, physicalRootBoneId))
+            for (var boneId = 0; boneId < parents.Count; boneId++)
             {
-                continue;
+                if (boneId != physicalRootBoneId &&
+                    HasPhysicalAncestor(parents, boneId, physicalRootBoneId))
+                {
+                    paths.Add(new NodePath($"{skeletonPath}:{skeleton.GetBoneName(boneId)}"));
+                }
             }
-            yield return new NodePath($"{skeletonPath}:{skeleton.GetBoneName(boneId)}");
+            return paths.ToArray();
+        }
+        catch
+        {
+            foreach (var path in paths) path.Dispose();
+            throw;
         }
     }
 
