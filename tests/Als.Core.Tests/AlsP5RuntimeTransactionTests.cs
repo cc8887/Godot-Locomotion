@@ -180,6 +180,26 @@ public sealed class AlsP5RuntimeTransactionTests
     }
 
     [Fact]
+    public void SyncMembersWithDifferentAuthorityGroupsRejectBeforeTimeline()
+    {
+        var fixture = new Fixture(withSync: true);
+        fixture.Base[1] = fixture.Base[1] with { AuthorityGroupId = 1 };
+        var scratch = fixture.CreateScratch();
+        var bindings = fixture.CreateBindings();
+        var input = fixture.CreateInput(frameId: 1);
+        var state = AlsRuntimeState.CreateDefault();
+        var previousCursors = fixture.CurrentCursors.ToArray();
+
+        Assert.False(AlsP5Runtime.TryPrepare(
+            in bindings, in input, in state,
+            fixture.CurrentCursors, fixture.CurrentAuthorities, fixture.CurrentOwnership, 1,
+            ref scratch, out _, out var failure));
+
+        Assert.Equal(AlsP5FailureCode.InvalidBinding, failure);
+        Assert.Equal(previousCursors, fixture.CurrentCursors);
+    }
+
+    [Fact]
     public void AcceptedActionUsesZeroDeltaSliceAndFullFrameLaneFade()
     {
         var fixture = new Fixture(withAction: true);
@@ -2065,8 +2085,8 @@ public sealed class AlsP5RuntimeTransactionTests
             Base =
             [
                 new(0, 0, 0, 1, 0.1d, 0.2d, 0d, 0.1d, 1f, 1f, 1, 1, 0),
-                new(1, 1, 1, 1, 0.3d, 0.4d, 0d, 0.1d, 1f, 0.5f, 1, 1, 0),
-                new(2, 1, 2, 2, 0.6d, 0.7d, 0d, 0.1d, 1f, 0.25f, 1, 1, 0),
+                new(1, 1, 0, 1, 0.3d, 0.4d, 0d, 0.1d, 1f, 0.5f, 1, 1, 0),
+                new(2, 1, 0, 2, 0.6d, 0.7d, 0d, 0.1d, 1f, 0.25f, 1, 1, 0),
             ],
             Markers =
             [
@@ -2112,10 +2132,12 @@ public sealed class AlsP5RuntimeTransactionTests
         Assert.Equal(mappedCurrent, fixture.CandidateCursors[1].ConsumedUnwrappedTimeSeconds);
         Assert.Equal(fixture.Base[2].CurrentUnwrappedTimeSeconds,
             fixture.CandidateCursors[2].ConsumedUnwrappedTimeSeconds);
-        Assert.Equal((2, 1, 2L),
-            (fixture.CandidateAuthorities[2].OccurrenceHandleId,
-                fixture.CandidateAuthorities[2].AnimationId,
-                fixture.CandidateAuthorities[2].PlaybackEpoch));
+        Assert.Equal((0, 0, 1L),
+            (fixture.CandidateAuthorities[0].OccurrenceHandleId,
+                fixture.CandidateAuthorities[0].AnimationId,
+                fixture.CandidateAuthorities[0].PlaybackEpoch));
+        Assert.Equal(AlsTimelineAuthorityState.CreateDefault(2),
+            fixture.CandidateAuthorities[2]);
     }
 
     [Theory]
@@ -3226,7 +3248,7 @@ public sealed class AlsP5RuntimeTransactionTests
                 Base =
                 [
                     new(0, 0, 0, 1, 0.1d, 0.2d, 0d, 0.1d, 1f, 1f, 1, 1, 0),
-                    new(1, 1, 1, 1, 0.3d, 0.4d, 0d, 0.1d, 1f, 0.5f, 1, 1, 0),
+                    new(1, 1, 0, 1, 0.3d, 0.4d, 0d, 0.1d, 1f, 0.5f, 1, 1, 0),
                 ];
                 Playbacks = new AlsTimelinePlayback[36];
                 SyncInput = new AlsSyncPlayback[2];
