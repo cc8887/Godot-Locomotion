@@ -96,6 +96,48 @@ public sealed class AlsTurnRotateModelTests
         Assert.Equal(AlsYawSource.TurnInPlace, state.YawSource);
     }
 
+    [Theory]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(120)]
+    [InlineData(240)]
+    public void RealLengthTurnsSurviveRoundedPhaseBoundaries(int framesPerSecond)
+    {
+        foreach (var angle in new[] { -179.97f, -90.03f, -45.03f, 45.03f, 90.03f, 179.97f })
+        foreach (var stance in new[] { AlsStance.Standing, AlsStance.Crouching })
+        {
+            var settings = AlsTurnRotateSettings.CreateReference();
+            settings = settings with
+            {
+                StandingTurn90Left = settings.StandingTurn90Left with { DurationSeconds = 2f },
+                StandingTurn90Right = settings.StandingTurn90Right with { DurationSeconds = 2f },
+                StandingTurn180Left = settings.StandingTurn180Left with { DurationSeconds = 2f },
+                StandingTurn180Right = settings.StandingTurn180Right with { DurationSeconds = 2f },
+                CrouchingTurn90Left = settings.CrouchingTurn90Left with { DurationSeconds = 2f },
+                CrouchingTurn90Right = settings.CrouchingTurn90Right with { DurationSeconds = 2f },
+                CrouchingTurn180Left = settings.CrouchingTurn180Left with { DurationSeconds = 70f / 30f },
+                CrouchingTurn180Right = settings.CrouchingTurn180Right with { DurationSeconds = 70f / 30f },
+            };
+            var yaw = Degrees(angle);
+            var state = State(yaw);
+            var completed = false;
+            for (var frame = 0; frame < framesPerSecond * 4; frame++)
+            {
+                Assert.True(Evaluate(settings, Input(1f / framesPerSecond, stance), View(yaw), state,
+                    out var next, out var selection, out var reason),
+                    $"angle={angle} stance={stance} frame={frame} phase={state.TurnInPlace.Phase:R} reason={reason}");
+                state = next;
+                if (selection.Active == 0) continue;
+                Assert.True(AlsTurnRotateModel.TryFinalizeYaw(selection, 1f, 1f, out _, out _));
+                if (state.TurnInPlace.Active != 0) continue;
+                Assert.Equal(selection.Duration, selection.CurrentPhase);
+                completed = true;
+                break;
+            }
+            Assert.True(completed);
+        }
+    }
+
     [Fact]
     public void TurnDelayMapsFortyFiveToZeroAndOneEightyToPointSevenFive()
     {

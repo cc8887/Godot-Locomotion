@@ -11,7 +11,7 @@ namespace Als.P5aOracle;
 internal static class Program
 {
     private const string RuntimeMarkerPrefix =
-        "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=";
+        "P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=";
 
     private static int Main(string[] args)
     {
@@ -368,8 +368,8 @@ internal static class P5aPlanBuilder
     {
         if (snapshot.AnimationSetDefinitionDigest !=
             "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129" ||
-            snapshot.LayoutDigest != 0xd6fef54173240d32UL ||
-            snapshot.Version != 2 || snapshot.Digest != 0xe458fef4df7a854dUL ||
+            snapshot.LayoutDigest != 0xf2336240d749284bUL ||
+            snapshot.Version != 2 || snapshot.Digest != 0x40f33e59692dfd38UL ||
             snapshot.GraphDigest != 0x44403c2869d8f615UL)
         {
             throw new InvalidDataException("P5A snapshot does not match the frozen native plan inputs.");
@@ -377,7 +377,7 @@ internal static class P5aPlanBuilder
         var bytes = AlsP5aTrace.BuildNativePlan();
         var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         if (bytes.Length != 986747 ||
-            hash != "785304e344308564a12f69a0be801e6f03ea6a241e8c83075a800193b68368e0")
+            hash != "7909b939803f60a657adf19867f379cb6fbc93c8001df1c37e05f3a603aa6f0b")
         {
             throw new InvalidDataException(
                 $"P5A frozen plan bytes are not canonical (length={bytes.Length}, sha256={hash}).");

@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-30-p5a-event-action-runtime-design.md`
 
+**2026-09-09 已批准修订：** `docs/superpowers/specs/2026-09-09-p5a-physical-playback-identity-design.md` 优先于下文 Task 5/6 的历史 layout v1 数量/键描述。布局升级为 v2，Base22 + Turn16 + Rotate8 + Transition1 + Montage1 + Sequence1 = 49；唯一键包括 GraphSlotIndex，Turn/Rotate 固定双 bank 各有 handle，current/outgoing 角色转换不换身份。Base Sync 仍为 17 项，不复制 Base 或 Action/Transition 事件身份。Task 14 完成记录保留为历史；Task 15/16 必须消费此修订。Task 16 的“distinct handles/epochs”意为完整播放身份不同，两个槽位的 epoch 数值允许相同。修订实施/验证进度见追加 ledger 和修订验证报告。
+
 **Global Constraints:**
 
 - P5A 是单次完整交付，不建立另一条 dispatch/runtime；所有 Godot 改动扩展现有 `AlsP3Character -> AlsP3WorkerRoot -> AlsP3CommitStage`。

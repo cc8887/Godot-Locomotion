@@ -2730,7 +2730,7 @@ function Invoke-P5aGeneratorProcessProtocol
     }
     $commit = 'b754d6f0f2bb03741d301f8fb88077ebfe561e17'
     $patch = '3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f'
-    $digestPrefix = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan='
+    $digestPrefix = 'P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan='
     $protocolSucceeded = $false
     $retainedOutputLeases = [Collections.Generic.List[object]]::new()
     $retainedNativeLease = $null

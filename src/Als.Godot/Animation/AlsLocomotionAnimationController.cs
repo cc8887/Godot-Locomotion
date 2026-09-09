@@ -144,6 +144,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private readonly AlsLocomotionGraphBuildResult _graph;
     private readonly Skeleton3D _skeleton;
     private readonly float _playRateMaximum;
+    private readonly Vector2[][] _standingBlendRings;
+    private readonly Vector2[] _crouchingBlendRing;
     private readonly long _ownerId = Interlocked.Increment(ref _nextOwnerId);
     private readonly int[] _poseBoneIndices = new int[PoseBoneNames.Length];
     private AnimationNodeStateMachinePlayback? _topPlayback;
@@ -219,6 +221,10 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _skeleton = graph.TargetSkeleton;
         ArgumentNullException.ThrowIfNull(settings);
         _playRateMaximum = settings.PlayRateMaximum;
+        _standingBlendRings = graph.Handles.StandingGaitRadii
+            .Select(radius => BuildBlendRing(graph.Handles.BaseCurves.StandingSamples, radius)).ToArray();
+        _crouchingBlendRing = BuildBlendRing(
+            graph.Handles.BaseCurves.CrouchingSamples, graph.Handles.CrouchingRadius);
     }
 
     public AlsLocomotionAnimationController(
@@ -1460,12 +1466,35 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             return Vector2.Zero;
         }
 
-        var radius = result.ActualStance == AlsStance.Crouching
-            ? _graph.Handles.CrouchingRadius
-            : _graph.Handles.StandingGaitRadii[(int)result.ActualGait];
-        return new Vector2(
-            (float)((right / magnitude) * radius),
-            (float)((forward / magnitude) * radius));
+        var ring = result.ActualStance == AlsStance.Crouching
+            ? _crouchingBlendRing
+            : _standingBlendRings[(int)result.ActualGait];
+        if (ring.Length == 1) return ring[0] * result.Stride;
+        var direction = new Vector2(
+            (float)(right / magnitude), (float)(forward / magnitude));
+        // A circular radius can leave the selected gait polygon and blend in faster clips.
+        for (var index = 0; index < ring.Length; index++)
+        {
+            var start = ring[index];
+            var edge = ring[(index + 1) % ring.Length] - start;
+            var denominator = direction.Cross(edge);
+            if (MathF.Abs(denominator) <= 1e-8f) continue;
+            var distance = start.Cross(edge) / denominator;
+            var along = start.Cross(direction) / denominator;
+            if (distance >= 0f && along >= -1e-6f && along <= 1f + 1e-6f)
+                // Preserve the idle center as speed approaches zero, including direction reversals.
+                return start.Lerp(start + edge, Math.Clamp(along, 0f, 1f)) * result.Stride;
+        }
+        throw new InvalidOperationException("Locomotion direction has no selected gait polygon intersection.");
+    }
+
+    private static Vector2[] BuildBlendRing(AlsLocomotionAnimationSample[] samples, float radius)
+    {
+        var ring = samples.Select(value => new Vector2(value.X, value.Y))
+            .Where(value => MathF.Abs(value.Length() - radius) <= 1e-4f)
+            .OrderBy(value => MathF.Atan2(value.Y, value.X)).ToArray();
+        if (ring.Length == 0) throw new InvalidOperationException("Locomotion gait ring is empty.");
+        return ring;
     }
 
     private static Vector2 Clamp(Vector2 value, Vector2 minimum, Vector2 maximum) => new(

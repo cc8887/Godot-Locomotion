@@ -69,6 +69,7 @@ public static class AlsAnimationBinder
 
             using var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
             RewriteTrackPaths(targetRoot, targetSkeleton, boundAnimation, clip.Name);
+            ApplyReferencePoseRootLock(targetSkeleton, boundAnimation, clip, skeletonDefinition);
 
             using var library = new AnimationLibrary();
             ThrowIfError(library.AddAnimation(boundAnimationName, boundAnimation), "add bound animation", clip.Name);
@@ -135,6 +136,32 @@ public static class AlsAnimationBinder
 
             using var targetPath = new NodePath($"{skeletonPath}:{boneName}");
             animation.TrackSetPath(trackIndex, targetPath);
+        }
+    }
+
+    internal static void ApplyReferencePoseRootLock(
+        Skeleton3D skeleton, Godot.Animation animation,
+        AlsAnimationDefinition clip, AlsSkeletonDefinition definition)
+    {
+        if (!clip.ForceRootLock || clip.RootMotionEnabled || clip.RootMotionRootLock != 0) return;
+        var rootId = definition.LogicalToPhysical[definition.RequiredBones.Root];
+        var rest = skeleton.GetBoneRest(rootId);
+        var rootName = skeleton.GetBoneName(rootId).ToString();
+        // UE RefPose ForceRootLock removes the exported root transform before pose blending.
+        // Keep the tracks explicit so a preceding clip cannot leave its root pose behind.
+        for (var track = 0; track < animation.GetTrackCount(); track++)
+        {
+            using var path = animation.TrackGetPath(track);
+            if (path.GetSubNameCount() != 1 || path.GetSubName(0) != rootName) continue;
+            var value = animation.TrackGetType(track) switch
+            {
+                Godot.Animation.TrackType.Position3D => Variant.From(rest.Origin),
+                Godot.Animation.TrackType.Rotation3D => Variant.From(rest.Basis.GetRotationQuaternion()),
+                Godot.Animation.TrackType.Scale3D => Variant.From(rest.Basis.Scale),
+                _ => throw new InvalidOperationException($"Unsupported root track in {clip.Name}."),
+            };
+            for (var key = 0; key < animation.TrackGetKeyCount(track); key++)
+                animation.TrackSetKeyValue(track, key, value);
         }
     }
 

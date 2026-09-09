@@ -4,7 +4,7 @@ namespace GodotAls.Import.Compilation;
 
 public static class AlsP5OccurrenceLayoutCompiler
 {
-    private const int LayoutVersion = 1;
+    private const int LayoutVersion = 2;
     private const ulong FnvOffset = 14695981039346656037UL;
     private const ulong FnvPrime = 1099511628211UL;
 
@@ -31,12 +31,12 @@ public static class AlsP5OccurrenceLayoutCompiler
         var actions = p5a.Actions;
         var segments = p5a.SegmentBindings;
         var entries = new List<AlsP5OccurrenceLayoutEntry>(
-            baseAnimationIds.Length + pose.Turns.Length + pose.Rotates.Length + 1 +
+            baseAnimationIds.Length + 2 * pose.Turns.Length + 2 * pose.Rotates.Length + 1 +
             actions.Length + segments.Length);
 
         AddBank(entries, AlsP5OccurrenceSourceKind.Base, baseAnimationIds.Length, 0);
-        AddBank(entries, AlsP5OccurrenceSourceKind.Turn, pose.Turns.Length, 0);
-        AddBank(entries, AlsP5OccurrenceSourceKind.Rotate, pose.Rotates.Length, 0);
+        AddBank(entries, AlsP5OccurrenceSourceKind.Turn, pose.Turns.Length, 0, 2);
+        AddBank(entries, AlsP5OccurrenceSourceKind.Rotate, pose.Rotates.Length, 0, 2);
         AddEntry(entries, AlsP5OccurrenceSourceKind.Transition, 0, 0, 1);
 
         for (var actionIndex = 0; actionIndex < actions.Length; actionIndex++)
@@ -83,7 +83,7 @@ public static class AlsP5OccurrenceLayoutCompiler
             throw new ArgumentException("P5 occurrence layout must not be empty.", nameof(entries));
         }
 
-        var keys = new HashSet<(AlsP5OccurrenceSourceKind Kind, int Binding)>();
+        var keys = new HashSet<(AlsP5OccurrenceSourceKind Kind, int Binding, int Slot)>();
         var handles = new HashSet<int>();
         var authorities = new HashSet<int>();
         for (var index = 0; index < entries.Count; index++)
@@ -95,7 +95,7 @@ public static class AlsP5OccurrenceLayoutCompiler
             {
                 throw new ArgumentException("P5 occurrence layout contains an invalid field.", nameof(entries));
             }
-            if (!keys.Add((entry.SourceKind, entry.SourceBindingIndex)) ||
+            if (!keys.Add((entry.SourceKind, entry.SourceBindingIndex, entry.GraphSlotIndex)) ||
                 !handles.Add(entry.OccurrenceHandleId))
             {
                 throw new ArgumentException("P5 occurrence layout contains duplicate identity.", nameof(entries));
@@ -128,11 +128,15 @@ public static class AlsP5OccurrenceLayoutCompiler
         List<AlsP5OccurrenceLayoutEntry> entries,
         AlsP5OccurrenceSourceKind kind,
         int count,
-        int authorityGroupId)
+        int authorityGroupId,
+        int bankCount = 1)
     {
-        for (var index = 0; index < count; index++)
+        for (var bank = 0; bank < bankCount; bank++)
         {
-            AddEntry(entries, kind, index, index, authorityGroupId);
+            for (var index = 0; index < count; index++)
+            {
+                AddEntry(entries, kind, index, bank * count + index, authorityGroupId);
+            }
         }
     }
 

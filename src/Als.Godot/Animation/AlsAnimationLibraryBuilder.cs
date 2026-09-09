@@ -374,6 +374,8 @@ public static class AlsAnimationLibraryBuilder
                 }
                 AlsAnimationBinder.RewriteTrackPaths(
                     targetRoot, targetSkeleton, boundAnimation, clip.Name);
+                AlsAnimationBinder.ApplyReferencePoseRootLock(
+                    targetSkeleton, boundAnimation, clip, skeletonDefinition);
                 StringName? animationName = new($"clip_{animationId}");
                 try
                 {

@@ -237,7 +237,7 @@ AlsActionResultCode
 
 `AlsFrameResult` 保留 16 槽 inline `AlsEventBuffer`，新增 2 槽 inline `AlsActionOutcomeBuffer` 和 P5A failure code。2 槽上限来自下述三种有序路径而非截断：replacement interruption 后 acceptance；runtime-failure interruption 后一个 normal-request result；rejected normal command 后 existing-owner `Completed`/EBO terminal。`AlsResultDigest` 覆盖每一个 P5A 字段。
 
-Occurrence layout version 固定为 `1`。每项为 `(SourceKind, SourceBindingIndex, GraphSlotIndex, OccurrenceHandleId, AuthorityGroupId)`；handle 必须等于 span ordinal，source key/handle 全局唯一，authority 为从 0 开始的 dense set，Transition/Action graph slot 固定为 0。唯一 public Core gate 是 `AlsP5OccurrenceLayoutContract.Validate(version,digest,entries)`，它不分配、不排序、不修改 caller span，并按 `Version int32 LE -> Count int32 LE -> 每项 SourceKind byte + 四个 int32 LE` 私下重算 FNV-1a 64。Import/Core 精确 field-copy bridge 由 Task 13 实现，Core snapshot/Godot adapter 比较由 Task 14 实现；本阶段不声明不存在的 cross-layer round-trip，也不允许 Core 引用 Import。
+Occurrence layout version 于 2026-09-09 修订为 `2`，详见 `2026-09-09-p5a-physical-playback-identity-design.md`。每项为 `(SourceKind, SourceBindingIndex, GraphSlotIndex, OccurrenceHandleId, AuthorityGroupId)`；唯一 source key 包含前三项，handle 必须等于 span ordinal，authority 为从 0 开始的 dense set，Transition/Action graph slot 固定为 0。Base 22 项保持不变，Turn 8 和 Rotate 4 个 binding 分别登记两个物理 bank，共 49 个生产 handle；同槽位角色转换保持 handle，重启以 epoch 区分。唯一 public Core gate 是 `AlsP5OccurrenceLayoutContract.Validate(version,digest,entries)`，它不分配、不排序、不修改 caller span，并按 `Version int32 LE -> Count int32 LE -> 每项 SourceKind byte + 四个 int32 LE` 私下重算 FNV-1a 64。Import/Core 精确 field-copy bridge 由 Task 13 实现，Core snapshot/Godot adapter 比较由 Task 14 实现；Core 不引用 Import。
 
 ## 八、Curve Runtime
 

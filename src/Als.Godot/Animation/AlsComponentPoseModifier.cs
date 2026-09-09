@@ -46,6 +46,10 @@ public readonly record struct AlsPoseModifierInput(
     public System.Numerics.Quaternion CharacterWorldRotation { get; init; } =
         System.Numerics.Quaternion.Identity;
 
+    public bool UseAnimatedFootOffsets { get; init; }
+    public System.Numerics.Vector3 LeftFootReferenceWorldOrigin { get; init; }
+    public System.Numerics.Vector3 RightFootReferenceWorldOrigin { get; init; }
+
     public static AlsPoseModifierInput FromResult(in AlsFrameResult result)
     {
         var pitch = Math.Clamp(result.AimRelativePitch / (MathF.PI * 0.5f), -1f, 1f);
@@ -401,6 +405,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
                         _leftTargetToFootBind,
                         _leftBindPoleInPelvis,
                         input.CharacterWorldRotation,
+                        input.UseAnimatedFootOffsets,
+                        input.LeftFootReferenceWorldOrigin,
                         out leftPhysicalTargetWorld))
                 {
                     reason = AlsP4ReasonCode.NonFiniteInput;
@@ -420,6 +426,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
                         _rightTargetToFootBind,
                         _rightBindPoleInPelvis,
                         input.CharacterWorldRotation,
+                        input.UseAnimatedFootOffsets,
+                        input.RightFootReferenceWorldOrigin,
                         out rightPhysicalTargetWorld))
                 {
                     reason = AlsP4ReasonCode.NonFiniteInput;
@@ -1126,6 +1134,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
         in Transform3D targetToFootBind,
         in Vector3 bindPoleInPelvis,
         in System.Numerics.Quaternion characterWorldRotationValue,
+        bool useAnimatedFootOffsets,
+        in System.Numerics.Vector3 referenceWorldOrigin,
         out Transform3D physicalTargetWorld)
     {
         physicalTargetWorld = default;
@@ -1139,12 +1149,40 @@ public sealed class AlsComponentPoseModifier : IDisposable
         var desiredFootWorld = targetWorld * targetToFootBind;
         var hipWorld = _skeleton.GlobalTransform *
             _scratch.ComponentPose[leg.ThighBoneId].Origin;
-        if (!ConstrainPhysicalThighDirection(
-                hipWorld,
-                characterWorldRotationValue,
-                ref desiredFootWorld))
+        if (!useAnimatedFootOffsets || target.LockAmount > 0f)
         {
-            return false;
+            var constrained = desiredFootWorld;
+            if (!ConstrainPhysicalThighDirection(hipWorld, characterWorldRotationValue, ref constrained))
+                return false;
+            // Constrain the lock contribution before adding the animated swing pose.
+            // A nearly released lock must not apply a full-strength thigh correction.
+            desiredFootWorld = useAnimatedFootOffsets
+                ? desiredFootWorld.InterpolateWith(constrained, target.LockAmount)
+                : constrained;
+        }
+        if (useAnimatedFootOffsets)
+        {
+            var animatedWorld = _skeleton.GlobalTransform * _scratch.OriginalComponentPose[leg.FootBoneId];
+            var unlockedAmount = 1f - target.LockAmount;
+            var up = ToGodot(characterWorldRotationValue).Normalized() * Vector3.Up;
+            var animatedDelta = animatedWorld.Origin - ToGodot(referenceWorldOrigin);
+            animatedDelta -= up * MathF.Min(0f, up.Dot(animatedDelta));
+            if (target.LockAmount == 0f)
+            {
+                var terrainOffset = up.Dot(desiredFootWorld.Origin - ToGodot(referenceWorldOrigin));
+                desiredFootWorld.Origin = animatedWorld.Origin + up *
+                    (terrainOffset - MathF.Min(0f, up.Dot(animatedWorld.Origin - ToGodot(referenceWorldOrigin))));
+            }
+            else
+            {
+                desiredFootWorld.Origin += animatedDelta * unlockedAmount;
+            }
+            var terrainRotation = ToGodot(target.Rotation).Normalized() *
+                ToGodot(characterWorldRotationValue).Normalized().Inverse();
+            var animatedRotation = (terrainRotation * animatedWorld.Basis.Orthonormalized()
+                .GetRotationQuaternion()).Normalized();
+            desiredFootWorld.Basis = new Basis(desiredFootWorld.Basis.Orthonormalized()
+                .GetRotationQuaternion().Slerp(animatedRotation, unlockedAmount).Normalized());
         }
         physicalTargetWorld = desiredFootWorld;
         var desiredFoot = worldToSkeleton * desiredFootWorld;
@@ -1696,6 +1734,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
             !IsUnit(input.UpperBodyWeight) || !IsUnit(input.ArmLocalWeight) ||
             !IsUnit(input.LeftFootIkWeight) || !IsUnit(input.RightFootIkWeight) ||
             !IsFinite(input.PelvisOffset) ||
+            !IsFinite(input.LeftFootReferenceWorldOrigin) ||
+            !IsFinite(input.RightFootReferenceWorldOrigin) ||
             !IsFinite(input.CharacterWorldRotation) ||
             input.CharacterWorldRotation.LengthSquared() <= 1e-12f ||
             (input.LeftFootIkWeight > 0f && !IsValidFootTarget(input.LeftFootPose)) ||

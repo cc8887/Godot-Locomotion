@@ -19,9 +19,62 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITestOutputHelper output)
 {
-    private const ulong FrozenLayoutDigest = 0xD6FEF54173240D32UL;
-    private const ulong FrozenBindingDigest = 0xE458FEF4DF7A854DUL;
+    private const ulong FrozenLayoutDigest = 0xF2336240D749284BUL;
+    private const ulong FrozenBindingDigest = 0x40F33E59692DFD38UL;
     private const ulong FrozenGraphDigest = 0x44403C2869D8F615UL;
+
+    [Theory]
+    [InlineData(CoreOccurrenceKind.Turn)]
+    [InlineData(CoreOccurrenceKind.Rotate)]
+    public void CompiledPhysicalCopiesKeepIndependentCursorsAndOneEventAuthority(CoreOccurrenceKind kind)
+    {
+        var fixture = Fixture.Create();
+        var snapshot = fixture.Compile();
+        var runtime = snapshot.CreateCoreView();
+        var layout = snapshot.CreateOccurrenceLayoutView().Entries.ToArray();
+        var copies = layout.Where(value => value.SourceKind == kind && value.SourceBindingIndex == 0).ToArray();
+        Assert.Equal(2, copies.Length);
+        var definitions = runtime.TimelineDefinitions.ToArray().Where(value =>
+            copies.Any(copy => copy.OccurrenceHandleId == value.RequiredOccurrenceHandleId)).ToArray();
+        var first = definitions.First(value => value.DurationSeconds == 0f);
+        Assert.Contains(definitions, value => value.EventId == first.EventId &&
+            value.RequiredOccurrenceHandleId == copies[1].OccurrenceHandleId);
+        var duration = fixture.Set.Animations[first.SourceAnimationId].PlayLength;
+        var playbacks = copies.Select((copy, index) => new AlsTimelinePlayback(
+            copy.OccurrenceHandleId, first.SourceAnimationId, -1, copy.AuthorityGroupId, 1,
+            first.TimeSeconds - .05d, first.TimeSeconds + .05d + index * .01d,
+            0d, .125d, duration, index == 0 ? .25f : .75f,
+            AlsActionResultCode.None, 0, 1, 0)).ToArray();
+        var cursors = layout.Select(_ => AlsTimelineCursor.CreateDefault()).ToArray();
+        var authorities = Enumerable.Range(0, 4).Select(AlsTimelineAuthorityState.CreateDefault).ToArray();
+        var owners = Enumerable.Range(0, AlsEventBuffer.Capacity)
+            .Select(_ => AlsNotifyStateOwnership.CreateDefault()).ToArray();
+        var scratch = new AlsTimelineOccurrence[AlsEventBuffer.Capacity];
+        var token = 1UL;
+        var events = new AlsEventBuffer();
+
+        var aliased = playbacks.ToArray();
+        aliased[1] = aliased[1] with { OccurrenceHandleId = copies[0].OccurrenceHandleId, PlaybackEpoch = 2 };
+        Assert.False(AlsTimelineRuntime.TryEvaluate(definitions, aliased, 1, 0d, .125d,
+            cursors, authorities, owners, ref token, scratch, ref events, out var failure));
+        Assert.Equal(AlsP5FailureCode.InvalidTimeline, failure);
+        Assert.All(cursors, value => Assert.Equal(AlsTimelineCursor.CreateDefault(), value));
+        Assert.Equal(0, events.Count);
+        Assert.Equal(1UL, token);
+
+        Assert.True(AlsTimelineRuntime.TryEvaluate(definitions, playbacks, 1, 0d, .125d,
+            cursors, authorities, owners, ref token, scratch, ref events, out failure), failure.ToString());
+        Assert.Equal(1, events.Count);
+        Assert.Equal(first.EventId, events[0].EventId);
+        Assert.Equal(copies[1].OccurrenceHandleId, events[0].OccurrenceHandleId);
+        Assert.Equal(copies[1].OccurrenceHandleId, authorities[0].OccurrenceHandleId);
+        for (var index = 0; index < copies.Length; index++)
+        {
+            Assert.Equal(1L, cursors[copies[index].OccurrenceHandleId].PlaybackEpoch);
+            Assert.Equal(playbacks[index].CurrentUnwrappedTimeSeconds,
+                cursors[copies[index].OccurrenceHandleId].ConsumedUnwrappedTimeSeconds);
+        }
+    }
 
     [Fact]
     public void CanonicalRollRuntimeKeepsLogicalCompletionSeparateFromVisualTail()
@@ -274,7 +327,7 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
         Assert.Equal(snapshot.LayoutDigest, occurrence.Digest);
         Assert.Equal(snapshot.GraphDigest, graph.Digest);
         Assert.Equal(2, runtime.Version);
-        Assert.Equal(1, occurrence.Version);
+        Assert.Equal(2, occurrence.Version);
         Assert.Equal(1, graph.Version);
 
         Assert.Equal(fixture.Layout.Entries.Length, occurrence.Entries.Length);
@@ -483,12 +536,13 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
         var occurrence = snapshot.CreateOccurrenceLayoutView();
         var graph = snapshot.CreateGraphBuildView();
 
-        Assert.Equal(FrozenLayoutDigest, snapshot.LayoutDigest);
-        Assert.Equal(FrozenBindingDigest, snapshot.Digest);
-        Assert.Equal(FrozenGraphDigest, snapshot.GraphDigest);
         Assert.Equal(ReferenceLayoutDigest(occurrence.Version, occurrence.Entries), snapshot.LayoutDigest);
         Assert.Equal(ReferenceBindingDigest(in runtime), snapshot.Digest);
         Assert.Equal(ReferenceGraphDigest(in graph), snapshot.GraphDigest);
+        output.WriteLine($"layout={snapshot.LayoutDigest:x16} binding={snapshot.Digest:x16} graph={snapshot.GraphDigest:x16}");
+        Assert.Equal(FrozenLayoutDigest, snapshot.LayoutDigest);
+        Assert.Equal(FrozenBindingDigest, snapshot.Digest);
+        Assert.Equal(FrozenGraphDigest, snapshot.GraphDigest);
     }
 
     [Fact]
@@ -718,7 +772,7 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
         var fixture = Fixture.Create();
         Assert.Throws<ArgumentException>(() => fixture.Compile(fixture.Set with { DefinitionDigest = "A".PadLeft(64, '0') }));
         Assert.Throws<ArgumentException>(() => fixture.Compile(fixture.Set with { DefinitionDigest = fixture.Set.DefinitionDigest.ToUpperInvariant() }));
-        Assert.Throws<ArgumentException>(() => fixture.Compile(layout: fixture.Layout with { Version = 2 }));
+        Assert.Throws<ArgumentException>(() => fixture.Compile(layout: fixture.Layout with { Version = 1 }));
         Assert.Throws<ArgumentException>(() => fixture.Compile(layout: fixture.Layout with { Digest = fixture.Layout.Digest + 1 }));
         Assert.Throws<ArgumentException>(() => fixture.Compile(layout: fixture.Layout with { Digest = 0 }));
 

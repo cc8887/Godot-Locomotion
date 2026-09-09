@@ -265,7 +265,7 @@ public sealed class AlsP5CoreRuntimeBindingSnapshot
         _actionSegments, _actionTimelineRanges);
 
     public AlsP5OccurrenceLayoutView CreateOccurrenceLayoutView() =>
-        new(1, LayoutDigest, _occurrenceEntries);
+        new(AlsP5OccurrenceLayoutContract.CurrentVersion, LayoutDigest, _occurrenceEntries);
 
     public AlsP5GraphBuildView CreateGraphBuildView() => new(
         1, GraphDigest, _skeletonId, _mannequinMeshId,

@@ -18,6 +18,7 @@ public partial class P4LocomotionDemo : Node3D
 
     private readonly AlsPlayerInputAdapter _playerInput = new();
     private IAlsLocomotionCommandSource? _smokeCommandSource;
+    private Action<AlsP3RuntimeContext>? _configureSmokeContext;
     private AlsP3RuntimeContext _context = null!;
     private AlsP3CharacterSlot _slot = null!;
     private AlsOrbitCamera _orbitCamera = null!;
@@ -82,7 +83,9 @@ public partial class P4LocomotionDemo : Node3D
         ProcessThreadGroupOrder = -1;
     }
 
-    internal void ConfigureForSmoke(IAlsLocomotionCommandSource commandSource)
+    internal void ConfigureForSmoke(
+        IAlsLocomotionCommandSource commandSource,
+        Action<AlsP3RuntimeContext>? configureContext = null)
     {
         ArgumentNullException.ThrowIfNull(commandSource);
         if (IsInsideTree() || _smokeCommandSource is not null)
@@ -91,6 +94,7 @@ public partial class P4LocomotionDemo : Node3D
                 "P4 demo smoke source must be configured exactly once before AddChild.");
         }
         _smokeCommandSource = commandSource;
+        _configureSmokeContext = configureContext;
     }
 
     public override void _Ready()
@@ -129,6 +133,7 @@ public partial class P4LocomotionDemo : Node3D
                 profile,
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: _smokeCommandSource is not null || OS.IsDebugBuild());
+            _configureSmokeContext?.Invoke(_context);
 
             IAlsLocomotionCommandSource commandSource =
                 _smokeCommandSource ?? _playerInput;
