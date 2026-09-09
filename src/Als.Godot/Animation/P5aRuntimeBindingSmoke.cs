@@ -348,7 +348,7 @@ public partial class P5aRuntimeBindingSmoke : Node
             .Append(locomotion.LandAnimationId)
             .ToArray();
         var slots = binding.PhysicalSlots;
-        Require(slots.Count == expectedBase.Length + pose.Turns.Length + pose.Rotates.Length,
+        Require(slots.Count == expectedBase.Length + 2 * pose.Turns.Length + 2 * pose.Rotates.Length,
             "The fixed Base/Turn/Rotate physical descriptors are incomplete.");
         for (var index = 0; index < expectedBase.Length; index++)
         {
@@ -358,6 +358,26 @@ public partial class P5aRuntimeBindingSmoke : Node
                 slot.OccurrenceHandleId >= 0 && slot.AuthorityGroupId >= 0 &&
                 !slot.GraphNodeName.IsEmpty,
                 $"Base physical slot binding changed at {index}.");
+        }
+
+        foreach (var (kind, animations) in new[]
+        {
+            (CoreOccurrenceKind.Turn, pose.Turns.Select(value => value.AnimationId).ToArray()),
+            (CoreOccurrenceKind.Rotate, pose.Rotates.Select(value => value.AnimationId).ToArray()),
+        })
+        {
+            for (var index = 0; index < animations.Length; index++)
+            {
+                var copies = slots.Where(value => value.SourceKind == kind &&
+                    value.SourceBindingIndex == index).ToArray();
+                Require(copies.Length == 2 && copies[0].GraphSlotIndex == index &&
+                    copies[1].GraphSlotIndex == animations.Length + index &&
+                    copies[0].OccurrenceHandleId != copies[1].OccurrenceHandleId &&
+                    copies[0].GraphNodeName != copies[1].GraphNodeName &&
+                    copies.All(value => value.AnimationId == animations[index] &&
+                        value.AuthorityGroupId == 0 && value.SyncGroupId == -1),
+                    $"The {kind} physical copies alias at binding {index}.");
+            }
         }
 
         var syncOccurrences = binding.CreateCoreView().SyncOccurrences;

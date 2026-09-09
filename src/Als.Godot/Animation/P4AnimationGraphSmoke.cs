@@ -37,6 +37,30 @@ public partial class P4AnimationGraphSmoke : Node
         }
     }
 
+    private void VerifyUprightTurns(AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile locomotionProfile, AlsPoseAnimationProfile poseProfile)
+    {
+        using var library = AlsAnimationLibraryBuilder.Build(definition, locomotionProfile, poseProfile);
+        AddChild(library.Root);
+        foreach (var id in poseProfile.Turns.Select(turn => turn.AnimationId)
+                     .Prepend(locomotionProfile.StandingIdleAnimationId))
+        {
+            library.Player.Play($"als/{library.ClipNames[id]}");
+            for (var sample = 0; sample <= 100; sample++)
+            {
+                var phase = sample / 100f;
+                library.Player.Seek(definition.Animations[id].PlayLength * phase, true);
+                var skeleton = library.Skeleton;
+                var pelvis = skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(skeleton.FindBone("pelvis")).Origin;
+                var head = skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(skeleton.FindBone("head")).Origin;
+                var clip = definition.Animations[id];
+                if ((head - pelvis).Normalized().Y < 0.5f)
+                    throw new InvalidOperationException($"Turn clip tilts the character out of the upright plane: {clip.Name} phase={phase}");
+            }
+        }
+        GD.Print("P4_TURN_UPRIGHT_OK clips=9 samples=909");
+    }
+
     private ulong RunSmoke()
     {
         VerifyCurveSampler();
@@ -53,6 +77,7 @@ public partial class P4AnimationGraphSmoke : Node
         var settings = AlsLocomotionSettings.Load(
             Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
 
+        VerifyUprightTurns(definition, locomotionProfile, poseProfile);
         VerifyLibraryContract(definition, locomotionProfile, poseProfile);
         VerifyAuthoritativeActionPhase(definition, locomotionProfile, poseProfile, settings);
         VerifyTurnBlend(definition, locomotionProfile, poseProfile, settings);

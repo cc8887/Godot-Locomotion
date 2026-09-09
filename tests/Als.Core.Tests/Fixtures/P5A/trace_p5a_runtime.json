@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "kind": "p5a_trace",
   "representation": "native_canonical",
-  "tracePlanSha256": "785304e344308564a12f69a0be801e6f03ea6a241e8c83075a800193b68368e0",
+  "tracePlanSha256": "7909b939803f60a657adf19867f379cb6fbc93c8001df1c37e05f3a603aa6f0b",
   "reference": {
     "repository": "https://github.com/Sixze/ALS-Refactored.git",
     "commit": "b754d6f0f2bb03741d301f8fb88077ebfe561e17",
@@ -14,12 +14,12 @@
   "snapshot": {
     "animationSetDefinitionDigest": "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
     "layout": {
-      "version": 1,
-      "digest": "d6fef54173240d32"
+      "version": 2,
+      "digest": "f2336240d749284b"
     },
     "bindings": {
       "version": 2,
-      "digest": "e458fef4df7a854d"
+      "digest": "40f33e59692dfd38"
     },
     "graph": {
       "version": 1,

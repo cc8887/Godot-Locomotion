@@ -2186,7 +2186,7 @@ function Assert-P5aVerifierOracleChild
             throw "P5A Oracle verification $streamProperty evidence is missing."
         }
     }
-    $markerPattern = '^P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=[0-9a-f]{64}$'
+    $markerPattern = '^P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=[0-9a-f]{64}$'
     $stdoutLines = @($Result.StdOutLines)
     $stderrLines = @($Result.StdErrLines)
     $markers = @($stdoutLines | Where-Object { [string]$_ -cmatch $markerPattern })

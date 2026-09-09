@@ -103,7 +103,7 @@ Describe 'P5A native diagnostic boundary' {
             $data.schemaVersion | Should -Be 2
             $data.representation | Should -Be 'native_raw'
             $data.snapshot.bindings.version | Should -Be 2
-            $data.snapshot.bindings.digest | Should -Be 'e458fef4df7a854d'
+            $data.snapshot.bindings.digest | Should -Be '40f33e59692dfd38'
             @($data.cases).Count | Should -Be 8
             @($data.cases.frames).Count | Should -Be 374
             @($data.nativeReferenceAudit.assets).Count | Should -Be 11

@@ -1274,28 +1274,28 @@ public static class AlsP5CoreRuntimeBindingCompiler
         int actionCount,
         int segmentCount)
     {
-        var expectedCount = checked(baseCount + turnCount + rotateCount + 1 + actionCount + segmentCount);
+        var expectedCount = checked(baseCount + 2 * turnCount + 2 * rotateCount + 1 + actionCount + segmentCount);
         if (entries.Length != expectedCount)
         {
             throw new ArgumentException("The P5 occurrence layout closure is incomplete.");
         }
         ValidateBank(CoreOccurrenceKind.Base, baseCount, graphSlotIsBinding: true);
-        ValidateBank(CoreOccurrenceKind.Turn, turnCount, graphSlotIsBinding: true);
-        ValidateBank(CoreOccurrenceKind.Rotate, rotateCount, graphSlotIsBinding: true);
+        ValidateBank(CoreOccurrenceKind.Turn, turnCount, graphSlotIsBinding: true, bankCount: 2);
+        ValidateBank(CoreOccurrenceKind.Rotate, rotateCount, graphSlotIsBinding: true, bankCount: 2);
         ValidateBank(CoreOccurrenceKind.Transition, 1, graphSlotIsBinding: false);
         ValidateBank(CoreOccurrenceKind.ActionMontage, actionCount, graphSlotIsBinding: false);
         ValidateBank(CoreOccurrenceKind.ActionSequence, segmentCount, graphSlotIsBinding: false);
 
-        void ValidateBank(CoreOccurrenceKind kind, int count, bool graphSlotIsBinding)
+        void ValidateBank(CoreOccurrenceKind kind, int count, bool graphSlotIsBinding, int bankCount = 1)
         {
             var bank = entries.Where(value => value.SourceKind == kind).ToArray();
-            if (bank.Length != count)
+            if (bank.Length != count * bankCount)
             {
                 throw new ArgumentException("A P5 occurrence bank is incomplete.");
             }
             for (var index = 0; index < bank.Length; index++)
             {
-                if (bank[index].SourceBindingIndex != index ||
+                if (bank[index].SourceBindingIndex != index % count ||
                     bank[index].GraphSlotIndex != (graphSlotIsBinding ? index : 0))
                 {
                     throw new ArgumentException("A P5 occurrence bank key is invalid.");

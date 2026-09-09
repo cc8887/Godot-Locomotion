@@ -7,35 +7,63 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsP5OccurrenceLayoutCompilerTests
 {
     [Fact]
+    public void PhysicalTurnAndRotateBanksHaveDistinctHandlesWithSharedAuthority()
+    {
+        var (locomotion, pose, p5a) = CompileProfiles();
+        var layout = AlsP5OccurrenceLayoutCompiler.Compile(locomotion, pose, p5a);
+        Assert.Equal(2, layout.Version);
+        Assert.Equal(49, layout.Entries.Length);
+        foreach (var (kind, count) in new[]
+        {
+            (AlsP5OccurrenceSourceKind.Turn, 8),
+            (AlsP5OccurrenceSourceKind.Rotate, 4),
+        })
+        {
+            for (var binding = 0; binding < count; binding++)
+            {
+                var copies = layout.Entries.Where(value =>
+                    value.SourceKind == kind && value.SourceBindingIndex == binding).ToArray();
+                Assert.Equal(2, copies.Length);
+                Assert.Equal(new[] { binding, count + binding }, copies.Select(value => value.GraphSlotIndex));
+                Assert.NotEqual(copies[0].OccurrenceHandleId, copies[1].OccurrenceHandleId);
+                Assert.All(copies, value => Assert.Equal(0, value.AuthorityGroupId));
+            }
+        }
+        Assert.Equal(17, layout.SyncMappings.Length);
+        Assert.All(layout.SyncMappings, value => Assert.InRange(value.OccurrenceHandleId, 0, 21));
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1, layout.Entries));
+    }
+
+    [Fact]
     public void AllocatesExactContiguousSourceAndAuthorityOrderWithSyncMappings()
     {
         var (locomotion, pose, p5a) = CompileProfiles();
         var layout = AlsP5OccurrenceLayoutCompiler.Compile(locomotion, pose, p5a);
 
-        Assert.Equal(1, layout.Version);
+        Assert.Equal(2, layout.Version);
         Assert.NotEqual(0UL, layout.Digest);
-        Assert.Equal(37, layout.Entries.Length);
+        Assert.Equal(49, layout.Entries.Length);
         var expectedEntries = new List<AlsP5OccurrenceLayoutEntry>();
         AddExpectedBank(AlsP5OccurrenceSourceKind.Base, 22, 0);
-        AddExpectedBank(AlsP5OccurrenceSourceKind.Turn, 8, 0);
-        AddExpectedBank(AlsP5OccurrenceSourceKind.Rotate, 4, 0);
-        expectedEntries.Add(new(AlsP5OccurrenceSourceKind.Transition, 0, 0, 34, 1));
-        expectedEntries.Add(new(AlsP5OccurrenceSourceKind.ActionMontage, 0, 0, 35, 2));
-        expectedEntries.Add(new(AlsP5OccurrenceSourceKind.ActionSequence, 0, 0, 36, 3));
+        AddExpectedBank(AlsP5OccurrenceSourceKind.Turn, 8, 0, 2);
+        AddExpectedBank(AlsP5OccurrenceSourceKind.Rotate, 4, 0, 2);
+        expectedEntries.Add(new(AlsP5OccurrenceSourceKind.Transition, 0, 0, 46, 1));
+        expectedEntries.Add(new(AlsP5OccurrenceSourceKind.ActionMontage, 0, 0, 47, 2));
+        expectedEntries.Add(new(AlsP5OccurrenceSourceKind.ActionSequence, 0, 0, 48, 3));
         Assert.Equal(expectedEntries, layout.Entries);
         Assert.Equal(Enumerable.Range(0, layout.Entries.Length),
             layout.Entries.Select(value => value.OccurrenceHandleId));
         Assert.Collection(layout.Entries.GroupBy(value => value.SourceKind),
             group => Assert.Equal((AlsP5OccurrenceSourceKind.Base, 22), (group.Key, group.Count())),
-            group => Assert.Equal((AlsP5OccurrenceSourceKind.Turn, 8), (group.Key, group.Count())),
-            group => Assert.Equal((AlsP5OccurrenceSourceKind.Rotate, 4), (group.Key, group.Count())),
+            group => Assert.Equal((AlsP5OccurrenceSourceKind.Turn, 16), (group.Key, group.Count())),
+            group => Assert.Equal((AlsP5OccurrenceSourceKind.Rotate, 8), (group.Key, group.Count())),
             group => Assert.Equal((AlsP5OccurrenceSourceKind.Transition, 1), (group.Key, group.Count())),
             group => Assert.Equal((AlsP5OccurrenceSourceKind.ActionMontage, 1), (group.Key, group.Count())),
             group => Assert.Equal((AlsP5OccurrenceSourceKind.ActionSequence, 1), (group.Key, group.Count())));
-        Assert.All(layout.Entries.Take(34), value => Assert.Equal(0, value.AuthorityGroupId));
-        Assert.Equal(1, layout.Entries[34].AuthorityGroupId);
-        Assert.Equal(2, layout.Entries[35].AuthorityGroupId);
-        Assert.Equal(3, layout.Entries[36].AuthorityGroupId);
+        Assert.All(layout.Entries.Take(46), value => Assert.Equal(0, value.AuthorityGroupId));
+        Assert.Equal(1, layout.Entries[46].AuthorityGroupId);
+        Assert.Equal(2, layout.Entries[47].AuthorityGroupId);
+        Assert.Equal(3, layout.Entries[48].AuthorityGroupId);
         Assert.Equal(new[] { 0, 1, 2, 3 }, layout.Entries.Select(value => value.AuthorityGroupId).Distinct());
         Assert.Equal(17, layout.SyncMappings.Length);
         var expectedBaseAnimations = BaseAnimationSlots(locomotion);
@@ -52,11 +80,11 @@ public sealed class AlsP5OccurrenceLayoutCompilerTests
         Assert.Equal(p5a.SyncGroups[0].Members.Select(value => value.AnimationId),
             layout.SyncMappings.OrderBy(value => value.GroupMemberIndex).Select(value => value.AnimationId));
 
-        void AddExpectedBank(AlsP5OccurrenceSourceKind kind, int count, int authority)
+        void AddExpectedBank(AlsP5OccurrenceSourceKind kind, int count, int authority, int bankCount = 1)
         {
-            for (var index = 0; index < count; index++)
+            for (var index = 0; index < count * bankCount; index++)
             {
-                expectedEntries.Add(new(kind, index, index, expectedEntries.Count, authority));
+                expectedEntries.Add(new(kind, index % count, index, expectedEntries.Count, authority));
             }
         }
     }
@@ -80,10 +108,10 @@ public sealed class AlsP5OccurrenceLayoutCompilerTests
             locomotion.FallLoopAnimationId,
             locomotion.LandAnimationId,
         }, new[] { expected[0], expected[1], expected[14], expected[19], expected[20], expected[21] });
-        Assert.Equal(Enumerable.Range(0, 8), layout.Entries
+        Assert.Equal(Enumerable.Range(0, 16), layout.Entries
             .Where(value => value.SourceKind == AlsP5OccurrenceSourceKind.Turn)
             .Select(value => value.GraphSlotIndex));
-        Assert.Equal(Enumerable.Range(0, 4), layout.Entries
+        Assert.Equal(Enumerable.Range(0, 8), layout.Entries
             .Where(value => value.SourceKind == AlsP5OccurrenceSourceKind.Rotate)
             .Select(value => value.GraphSlotIndex));
         Assert.Single(layout.Entries, value => value.SourceKind == AlsP5OccurrenceSourceKind.Transition);
@@ -125,22 +153,22 @@ public sealed class AlsP5OccurrenceLayoutCompilerTests
             new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Base, 0, 0, 0, 0),
             new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Transition, 0, 0, 1, 1),
         };
-        AlsP5OccurrenceLayoutCompiler.Validate(1, valid);
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
+        AlsP5OccurrenceLayoutCompiler.Validate(2, valid);
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(2,
             [valid[0], valid[0] with { OccurrenceHandleId = 1, AuthorityGroupId = 1 }]));
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
-            [valid[0], valid[0] with { GraphSlotIndex = 1, OccurrenceHandleId = 1, AuthorityGroupId = 1 }]));
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
+        AlsP5OccurrenceLayoutCompiler.Validate(2,
+            [valid[0], valid[0] with { GraphSlotIndex = 1, OccurrenceHandleId = 1, AuthorityGroupId = 1 }]);
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(2,
             [valid[0], valid[1] with { OccurrenceHandleId = 0 }]));
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(2,
             [valid[0], valid[1] with { OccurrenceHandleId = 2 }]));
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(2,
             [valid[0], valid[1] with { AuthorityGroupId = 2 }]));
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(2,
             [valid[0] with { GraphSlotIndex = -1 }, valid[1]]));
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(2,
             [valid[0] with { OccurrenceHandleId = -1 }, valid[1]]));
-        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(1,
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Validate(2,
             [valid[0] with { AuthorityGroupId = -1 }, valid[1]]));
     }
 
@@ -176,7 +204,7 @@ public sealed class AlsP5OccurrenceLayoutCompilerTests
 
         var layout = AlsP5OccurrenceLayoutCompiler.Compile(locomotion, pose, p5a);
 
-        Assert.Equal(39, layout.Entries.Length);
+        Assert.Equal(51, layout.Entries.Length);
         Assert.Equal(Enumerable.Range(0, 6), layout.Entries
             .Select(value => value.AuthorityGroupId).Distinct().Order());
         Assert.All(layout.Entries.Where(value => value.SourceKind is
@@ -215,7 +243,7 @@ public sealed class AlsP5OccurrenceLayoutCompilerTests
             value.SourceKind == AlsP5OccurrenceSourceKind.ActionSequence).ToArray();
 
         Assert.Equal(2, sequenceEntries.Length);
-        Assert.Equal(new[] { 36, 37 }, sequenceEntries.Select(value => value.OccurrenceHandleId));
+        Assert.Equal(new[] { 48, 49 }, sequenceEntries.Select(value => value.OccurrenceHandleId));
         Assert.Equal(new[] { 0, 1 }, sequenceEntries.Select(value => value.SourceBindingIndex));
         Assert.All(sequenceEntries, value => Assert.Equal(3, value.AuthorityGroupId));
     }

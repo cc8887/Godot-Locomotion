@@ -503,14 +503,16 @@ public static class AlsTurnRotateModel
 
         if (selection.YawSource == AlsYawSource.TurnInPlace)
         {
+            // Compare the forward sum: subtracting nearby rounded phases amplifies ULP error.
             if ((selection.NominalDegrees != 90 && selection.NominalDegrees != 180) ||
                 selection.ScaleAngle > 1 ||
                 selection.PreviousPhase >= selection.Duration ||
                 selection.CurrentPhase <= selection.PreviousPhase ||
                 selection.CurrentPhase > selection.Duration ||
                 !NearlyEqual(
-                    selection.PhaseTravel,
-                    (double)selection.CurrentPhase - selection.PreviousPhase) ||
+                    selection.CurrentPhase,
+                    (double)selection.PreviousPhase + selection.PhaseTravel,
+                    maximumUlps: 1) ||
                 !NearlyEqual(
                     selection.PhaseTravel,
                     (double)selection.PhasePlayRate * selection.EffectiveDeltaTime))
@@ -557,7 +559,7 @@ public static class AlsTurnRotateModel
         (direction == -1 && remainingYaw < 0f) ||
         (direction == 1 && remainingYaw > 0f);
 
-    private static bool NearlyEqual(float actual, double expected)
+    private static bool NearlyEqual(float actual, double expected, long maximumUlps = 16)
     {
         if (!double.IsFinite(expected) || expected < 0d || expected > float.MaxValue)
         {
@@ -573,7 +575,7 @@ public static class AlsTurnRotateModel
         var actualBits = BitConverter.SingleToInt32Bits(actual);
         var expectedBits = BitConverter.SingleToInt32Bits(roundedExpected);
         return actualBits >= 0 && expectedBits >= 0 &&
-               System.Math.Abs((long)actualBits - expectedBits) <= 16L;
+               System.Math.Abs((long)actualBits - expectedBits) <= maximumUlps;
     }
 
     private static AlsTurnClipSettings SelectTurnClip(

@@ -519,7 +519,7 @@ public static class AlsP5aTrace
                 switch (frameMember)
                 {
                     case "/portAudit/stateAfter/timelineCursors":
-                        RequireExactArray(path, count, 37, label);
+                        RequireExactArray(path, count, 49, label);
                         return;
                     case "/portAudit/stateAfter/authorities":
                         RequireExactArray(path, count, 4, label);
@@ -755,8 +755,8 @@ public static class AlsP5aTrace
         {
             throw new InvalidDataException("P5A input tracePlanSha256 does not match the plan bytes.");
         }
-        if (occurrenceLayout.Version != 1 || occurrenceLayout.Digest != 0xd6fef54173240d32UL ||
-            runtimeBindings.Version != 2 || runtimeBindings.Digest != 0xe458fef4df7a854dUL ||
+        if (occurrenceLayout.Version != 2 || occurrenceLayout.Digest != 0xf2336240d749284bUL ||
+            runtimeBindings.Version != 2 || runtimeBindings.Digest != 0x40f33e59692dfd38UL ||
             graphDigest != 0x44403c2869d8f615UL)
         {
             throw new InvalidDataException("P5A host snapshot does not match the frozen plan.");
@@ -2073,8 +2073,8 @@ internal static class P5aFrozenPlanDocuments
     private static JsonObject Snapshot() => new()
     {
         ["animationSetDefinitionDigest"] = "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
-        ["layout"] = new JsonObject { ["version"] = 1, ["digest"] = "d6fef54173240d32" },
-        ["bindings"] = new JsonObject { ["version"] = 2, ["digest"] = "e458fef4df7a854d" },
+        ["layout"] = new JsonObject { ["version"] = 2, ["digest"] = "f2336240d749284b" },
+        ["bindings"] = new JsonObject { ["version"] = 2, ["digest"] = "40f33e59692dfd38" },
         ["graph"] = new JsonObject { ["version"] = 1, ["digest"] = "44403c2869d8f615" },
     };
 
@@ -2773,7 +2773,7 @@ internal static class P5aFrozenPlanDocuments
         {
             ["actionPlayer"] = ActionPlayerState(), ["dynamicTransition"] = TransitionState(),
             ["actionBlendLane"] = LaneState(), ["dynamicTransitionBlendLane"] = LaneState(),
-            ["timelineCursors"] = Repeat(37, _ => TimelineCursor()),
+            ["timelineCursors"] = Repeat(49, _ => TimelineCursor()),
             ["authorities"] = Repeat(4, AuthorityState),
             ["notifyOwnership"] = Repeat(16, _ => NotifyOwnership()),
             ["nextOwnerToken"] = "0000000000000001",
@@ -3524,8 +3524,8 @@ internal static class P5aFrozenPlanDocuments
                 transition["playRate"] = 1.5f;
                 transition["effectiveWeight"] = TransitionGraphWeight(frameIndex);
                 transition["active"] = true;
-                SetCursor(state, 34, animationId, -1, T(frameIndex));
-                SetAuthority(state, 1, 34, animationId, -1);
+                SetCursor(state, 46, animationId, -1, T(frameIndex));
+                SetAuthority(state, 1, 46, animationId, -1);
             }
         }
         if (caseIndex >= 5)
@@ -3558,7 +3558,7 @@ internal static class P5aFrozenPlanDocuments
             player["playbackTime"] = Q(frameIndex);
             player["playing"] = true;
             var action = result["actionPlayback"]!.AsObject();
-            action["occurrenceHandleId"] = 35;
+            action["occurrenceHandleId"] = 47;
             action["actionDefinitionId"] = 0;
             action["animationId"] = 2;
             action["sectionId"] = 0;
@@ -3572,15 +3572,15 @@ internal static class P5aFrozenPlanDocuments
             action["blendSeconds"] = .2f;
             action["effectiveWeight"] = ActionLaneWeight(caseIndex, frameIndex);
             action["active"] = true;
-            SetCursor(state, 35, 2, 0, Q(frameIndex));
-            SetCursor(state, 36, 28, 0, Q(frameIndex));
-            SetAuthority(state, 2, 35, 2, 0);
-            SetAuthority(state, 3, 36, 28, 0);
+            SetCursor(state, 47, 2, 0, Q(frameIndex));
+            SetCursor(state, 48, 28, 0, Q(frameIndex));
+            SetAuthority(state, 2, 47, 2, 0);
+            SetAuthority(state, 3, 48, 28, 0);
         }
         if (caseIndex == 5 && frameIndex == 91)
         {
             var action = result["actionPlayback"]!.AsObject();
-            action["occurrenceHandleId"] = 35; action["actionDefinitionId"] = 0;
+            action["occurrenceHandleId"] = 47; action["actionDefinitionId"] = 0;
             action["animationId"] = 2; action["sectionId"] = 0; action["segmentId"] = 0;
             action["playbackEpoch"] = "1"; action["previousTime"] = Q(90);
             action["currentTime"] = 1.5f; action["previousClipTime"] = Q(90);
@@ -3592,24 +3592,24 @@ internal static class P5aFrozenPlanDocuments
         var events = result["events"]!.AsArray();
         if (frameIndex == 0)
         {
-            events.Add(CoreEvent(6, 35, 2, "Begin", 0f, 1));
-            events.Add(CoreEvent(6, 35, 2, "Tick", 0f, 2));
+            events.Add(CoreEvent(6, 47, 2, "Begin", 0f, 1));
+            events.Add(CoreEvent(6, 47, 2, "Tick", 0f, 2));
             result["actionOutcomes"]!.AsArray().Add(CoreOutcome("Accepted"));
         }
         else
         {
             var sequence = 2L + frameIndex;
             if (frameIndex == 7)
-                events.Add(CoreEvent(7, 36, 28, "Trigger", .0009986386f, sequence++));
+                events.Add(CoreEvent(7, 48, 28, "Trigger", .0009986386f, sequence++));
             if (frameIndex == 29)
-                events.Add(CoreEvent(8, 36, 28, "Trigger", .013360381f, sequence++));
+                events.Add(CoreEvent(8, 48, 28, "Trigger", .013360381f, sequence++));
             if (frameIndex is >= 1 and <= 55)
-                events.Add(CoreEvent(6, 35, 2, "Tick", .016666668f, sequence));
+                events.Add(CoreEvent(6, 47, 2, "Tick", .016666668f, sequence));
             if (frameIndex == 56)
             {
-                events.Add(CoreEvent(6, 35, 2, "End", caseIndex == 6 ? 0f : .013460934f, sequence++));
+                events.Add(CoreEvent(6, 47, 2, "End", caseIndex == 6 ? 0f : .013460934f, sequence++));
                 if (caseIndex is 5 or 7)
-                    events.Add(CoreEvent(9, 36, 28, "Trigger", .014472842f, sequence));
+                    events.Add(CoreEvent(9, 48, 28, "Trigger", .014472842f, sequence));
                 if (caseIndex == 6)
                     result["actionOutcomes"]!.AsArray().Add(CoreOutcome("InterruptedByExplicitCancel"));
             }
@@ -3620,7 +3620,7 @@ internal static class P5aFrozenPlanDocuments
         {
             var owner = state["notifyOwnership"]!.AsArray()[0]!.AsObject();
             owner["eventId"] = 6; owner["boundaryOrdinal"] = 0;
-            owner["occurrenceHandleId"] = 35; owner["animationId"] = 2; owner["actionId"] = 0;
+            owner["occurrenceHandleId"] = 47; owner["animationId"] = 2; owner["actionId"] = 0;
             owner["playbackEpoch"] = "1"; owner["playbackCycle"] = "0";
             owner["ownerToken"] = "0000000000000001"; owner["active"] = true;
             state["nextOwnerToken"] = "0000000000000002";
@@ -5816,7 +5816,8 @@ internal static class P5aPortReplay
         var definition = default(AlsTimelineEventDefinition);
         foreach (ref readonly var value in runtimeBindings.TimelineDefinitions)
         {
-            if (value.EventId != eventId) continue;
+            if (value.EventId != eventId || value.RequiredOccurrenceHandleId != occurrenceHandleId ||
+                value.BoundaryOrdinal != boundaryOrdinal) continue;
             if (found) throw new InvalidDataException("P5A event definition is ambiguous.");
             definition = value;
             found = true;

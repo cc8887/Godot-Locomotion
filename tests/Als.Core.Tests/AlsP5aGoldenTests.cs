@@ -1494,12 +1494,12 @@ internal sealed class P5aProductionAdapter
         var snapshot = P5aCompiledSnapshot.Load(apphost, family);
         var layout = new AlsP5OccurrenceLayoutView(snapshot.LayoutVersion, snapshot.LayoutDigest, snapshot.OccurrenceEntries);
         var bindings = snapshot.CreateCoreBindings();
-        Assert.Equal(0xd6fef54173240d32UL, layout.Digest);
-        Assert.Equal(0xe458fef4df7a854dUL, bindings.Digest);
+        Assert.Equal(0xf2336240d749284bUL, layout.Digest);
+        Assert.Equal(0x40f33e59692dfd38UL, bindings.Digest);
         Assert.Equal(0x44403c2869d8f615UL, snapshot.GraphDigest);
         Assert.Equal("152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
             snapshot.AnimationSetDefinitionDigest);
-        Assert.Equal(37, layout.Entries.Length);
+        Assert.Equal(49, layout.Entries.Length);
         Assert.Equal(4, layout.Entries.ToArray().Select(value => value.AuthorityGroupId).Distinct().Count());
 
         _writeCanonicalPair(rawPath, planPath, nativePath, portPath,
@@ -1980,7 +1980,8 @@ internal static class P5aPortAuditReplay
                     Assert.Single(frame!["portAudit"]!["prepared"]!["syncMappings"]!.AsArray())!["animationId"]!.GetValue<int>());
 
         var r0Entry = Assert.Single(snapshot.OccurrenceEntries,
-            entry => entry.SourceKind == AlsP5OccurrenceSourceKind.Rotate && entry.SourceBindingIndex == 0);
+            entry => entry.SourceKind == AlsP5OccurrenceSourceKind.Rotate &&
+                entry.SourceBindingIndex == 0 && entry.GraphSlotIndex == 0);
         var tieF1 = Audit(actualPort, 1, 1);
         Assert.Equal(r0Entry.OccurrenceHandleId,
             tieF1["result"]!["sync"]!["leaderOccurrenceHandleId"]!.GetValue<int>());
@@ -2858,8 +2859,8 @@ internal static class P5aOracleApphost
                     "\"representation\": \"native_raw\"",
                     "\"representation\": \"native_raw\", \"representation\": \"native_raw\""));
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
-                    "\"layout\": {\n      \"version\": 1,\n      \"digest\": \"d6fef54173240d32\"",
-                    "\"layout\": {\n      \"version\": 1,\n      \"version\": 1,\n      \"digest\": \"d6fef54173240d32\""));
+                    "\"layout\": {\n      \"version\": 2,\n      \"digest\": \"f2336240d749284b\"",
+                    "\"layout\": {\n      \"version\": 2,\n      \"version\": 2,\n      \"digest\": \"f2336240d749284b\""));
                 break;
             case 2:
                 AssertWriterRejectsBytes(family, bundle =>
@@ -2871,8 +2872,8 @@ internal static class P5aOracleApphost
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
                     "\"schemaVersion\": 2", "\"schemaVersion\": 2.0"));
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
-                    "\"layout\": {\n      \"version\": 1,\n      \"digest\": \"d6fef54173240d32\"",
-                    "\"layout\": {\n      \"version\": 1,\n      \"digest\": \"D6fef54173240d32\""));
+                    "\"layout\": {\n      \"version\": 2,\n      \"digest\": \"f2336240d749284b\"",
+                    "\"layout\": {\n      \"version\": 2,\n      \"digest\": \"F2336240d749284b\""));
                 AssertWriterRejectsBytes(family, bundle => ReplaceUtf8(bundle.RawBytes,
                     "\"leftLock\": 0", "\"leftLock\": NaN"));
                 AssertPrimitiveEncodingMatrix(family);
@@ -4091,7 +4092,7 @@ internal static class P5aOracleApphost
                 bundle.Plan, in layout, in remappedGraphBindings);
             var turnOccurrenceHandleId = Assert.Single(snapshot.OccurrenceEntries, entry =>
                 entry.SourceKind == AlsP5OccurrenceSourceKind.Turn &&
-                entry.SourceBindingIndex == 0).OccurrenceHandleId;
+                entry.SourceBindingIndex == 0 && entry.GraphSlotIndex == 0).OccurrenceHandleId;
             var remappedTurnCursorAnimationIds = remappedGraphPort["cases"]!.AsArray()
                 .SelectMany(caseNode => caseNode!["frames"]!.AsArray())
                 .SelectMany(frameNode => frameNode!["portAudit"]!["stateAfter"]!["timelineCursors"]!.AsArray())
@@ -4898,8 +4899,8 @@ internal static class P5aOracleApphost
             () => AssertOmittedCanonicalArrayPreflightLimits(family, bundle),
             () => AssertOmittedPortSyncMappingPreflightLimit(family, bundle, 0),
             () => AssertOmittedPortSyncMappingPreflightLimit(family, bundle, 2),
-            () => AssertOmittedPortStatePreflightLimit(family, bundle, "timelineCursors", 37, -1),
-            () => AssertOmittedPortStatePreflightLimit(family, bundle, "timelineCursors", 37, 1),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "timelineCursors", 49, -1),
+            () => AssertOmittedPortStatePreflightLimit(family, bundle, "timelineCursors", 49, 1),
             () => AssertOmittedPortStatePreflightLimit(family, bundle, "authorities", 4, -1),
             () => AssertOmittedPortStatePreflightLimit(family, bundle, "authorities", 4, 1),
             () => AssertOmittedPortStatePreflightLimit(family, bundle, "notifyOwnership", 16, -1),
@@ -5461,7 +5462,7 @@ internal static class P5aOracleApphost
             Missing(family, $"'{executable} {string.Join(' ', arguments)}' exits zero. stdout={result.Output} stderr={result.Error}"));
         if (Path.GetFileNameWithoutExtension(executable).Equals("Als.P5aOracle", StringComparison.Ordinal))
         {
-            Assert.Contains("P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=",
+            Assert.Contains("P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=",
                 result.Output, StringComparison.Ordinal);
         }
     }
@@ -6741,8 +6742,8 @@ internal static class P5aSyntheticDocuments
     private static JsonObject Snapshot() => new()
     {
         ["animationSetDefinitionDigest"] = "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
-        ["layout"] = new JsonObject { ["version"] = 1, ["digest"] = "d6fef54173240d32" },
-        ["bindings"] = new JsonObject { ["version"] = 2, ["digest"] = "e458fef4df7a854d" },
+        ["layout"] = new JsonObject { ["version"] = 2, ["digest"] = "f2336240d749284b" },
+        ["bindings"] = new JsonObject { ["version"] = 2, ["digest"] = "40f33e59692dfd38" },
         ["graph"] = new JsonObject { ["version"] = 1, ["digest"] = "44403c2869d8f615" },
     };
 
@@ -7441,7 +7442,7 @@ internal static class P5aSyntheticDocuments
         {
             ["actionPlayer"] = ActionPlayerState(), ["dynamicTransition"] = TransitionState(),
             ["actionBlendLane"] = LaneState(), ["dynamicTransitionBlendLane"] = LaneState(),
-            ["timelineCursors"] = Repeat(37, _ => TimelineCursor()),
+            ["timelineCursors"] = Repeat(49, _ => TimelineCursor()),
             ["authorities"] = Repeat(4, AuthorityState),
             ["notifyOwnership"] = Repeat(16, _ => NotifyOwnership()),
             ["nextOwnerToken"] = "0000000000000001",
@@ -8188,8 +8189,8 @@ internal static class P5aSyntheticDocuments
                 transition["playRate"] = 1.5f;
                 transition["effectiveWeight"] = TransitionGraphWeight(frameIndex);
                 transition["active"] = true;
-                SetCursor(state, 34, animationId, -1, T(frameIndex));
-                SetAuthority(state, 1, 34, animationId, -1);
+                SetCursor(state, 46, animationId, -1, T(frameIndex));
+                SetAuthority(state, 1, 46, animationId, -1);
             }
         }
         if (caseIndex >= 5)
@@ -8222,7 +8223,7 @@ internal static class P5aSyntheticDocuments
             player["playbackTime"] = Q(frameIndex);
             player["playing"] = true;
             var action = result["actionPlayback"]!.AsObject();
-            action["occurrenceHandleId"] = 35;
+            action["occurrenceHandleId"] = 47;
             action["actionDefinitionId"] = 0;
             action["animationId"] = 2;
             action["sectionId"] = 0;
@@ -8236,15 +8237,15 @@ internal static class P5aSyntheticDocuments
             action["blendSeconds"] = .2f;
             action["effectiveWeight"] = ActionLaneWeight(caseIndex, frameIndex);
             action["active"] = true;
-            SetCursor(state, 35, 2, 0, Q(frameIndex));
-            SetCursor(state, 36, 28, 0, Q(frameIndex));
-            SetAuthority(state, 2, 35, 2, 0);
-            SetAuthority(state, 3, 36, 28, 0);
+            SetCursor(state, 47, 2, 0, Q(frameIndex));
+            SetCursor(state, 48, 28, 0, Q(frameIndex));
+            SetAuthority(state, 2, 47, 2, 0);
+            SetAuthority(state, 3, 48, 28, 0);
         }
         if (caseIndex == 5 && frameIndex == 90)
         {
             var action = result["actionPlayback"]!.AsObject();
-            action["occurrenceHandleId"] = 35; action["actionDefinitionId"] = 0;
+            action["occurrenceHandleId"] = 47; action["actionDefinitionId"] = 0;
             action["animationId"] = 2; action["sectionId"] = 0; action["segmentId"] = 0;
             action["playbackEpoch"] = "1"; action["previousTime"] = Q(89);
             action["currentTime"] = Q(90); action["previousClipTime"] = Q(89);
@@ -8256,24 +8257,24 @@ internal static class P5aSyntheticDocuments
         var events = result["events"]!.AsArray();
         if (frameIndex == 0)
         {
-            events.Add(CoreEvent(6, 35, 2, "Begin", 0f, 1));
-            events.Add(CoreEvent(6, 35, 2, "Tick", 0f, 2));
+            events.Add(CoreEvent(6, 47, 2, "Begin", 0f, 1));
+            events.Add(CoreEvent(6, 47, 2, "Tick", 0f, 2));
             result["actionOutcomes"]!.AsArray().Add(CoreOutcome("Accepted"));
         }
         else
         {
             var sequence = 2L + frameIndex;
             if (frameIndex == 7)
-                events.Add(CoreEvent(7, 36, 28, "Trigger", .0009986386f, sequence++));
+                events.Add(CoreEvent(7, 48, 28, "Trigger", .0009986386f, sequence++));
             if (frameIndex == 29)
-                events.Add(CoreEvent(8, 36, 28, "Trigger", .013360381f, sequence++));
+                events.Add(CoreEvent(8, 48, 28, "Trigger", .013360381f, sequence++));
             if (frameIndex is >= 1 and <= 55)
-                events.Add(CoreEvent(6, 35, 2, "Tick", .016666668f, sequence));
+                events.Add(CoreEvent(6, 47, 2, "Tick", .016666668f, sequence));
             if (frameIndex == 56)
             {
-                events.Add(CoreEvent(6, 35, 2, "End", caseIndex == 6 ? 0f : .013460934f, sequence++));
+                events.Add(CoreEvent(6, 47, 2, "End", caseIndex == 6 ? 0f : .013460934f, sequence++));
                 if (caseIndex is 5 or 7)
-                    events.Add(CoreEvent(9, 36, 28, "Trigger", .014472842f, sequence));
+                    events.Add(CoreEvent(9, 48, 28, "Trigger", .014472842f, sequence));
                 if (caseIndex == 6)
                     result["actionOutcomes"]!.AsArray().Add(CoreOutcome("InterruptedByExplicitCancel"));
             }
@@ -8284,7 +8285,7 @@ internal static class P5aSyntheticDocuments
         {
             var owner = state["notifyOwnership"]!.AsArray()[0]!.AsObject();
             owner["eventId"] = 6; owner["boundaryOrdinal"] = 0;
-            owner["occurrenceHandleId"] = 35; owner["animationId"] = 2; owner["actionId"] = 0;
+            owner["occurrenceHandleId"] = 47; owner["animationId"] = 2; owner["actionId"] = 0;
             owner["playbackEpoch"] = "1"; owner["playbackCycle"] = "0";
             owner["ownerToken"] = "0000000000000001"; owner["active"] = true;
             state["nextOwnerToken"] = "0000000000000002";

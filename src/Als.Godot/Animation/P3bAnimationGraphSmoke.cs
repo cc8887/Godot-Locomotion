@@ -22,9 +22,9 @@ public partial class P3bAnimationGraphSmoke : Node
     private static readonly DirectionCase[] DirectionCases =
     [
         new("forward", System.Numerics.Vector2.UnitY, new Vector2(0f, 1f)),
-        new("left", -System.Numerics.Vector2.UnitX, new Vector2(-1f, 0f)),
+        new("left", -System.Numerics.Vector2.UnitX, new Vector2(-0.707107f, 0f)),
         new("back", -System.Numerics.Vector2.UnitY, new Vector2(0f, -1f)),
-        new("right", System.Numerics.Vector2.UnitX, new Vector2(1f, 0f)),
+        new("right", System.Numerics.Vector2.UnitX, new Vector2(0.707107f, 0f)),
     ];
 
     public override void _Ready()
@@ -622,10 +622,18 @@ public partial class P3bAnimationGraphSmoke : Node
         var cases = new[]
         {
             new GaitBlendCase(0, 0f, 0f, AlsGait.Walking, Vector2.Zero),
-            new GaitBlendCase(88, 0f, 0.875f, AlsGait.Walking, new Vector2(0f, 0.5f)),
+            new GaitBlendCase(88, 0f, 0.875f, AlsGait.Walking, new Vector2(0f, 0.25f)),
+            new GaitBlendCase(88, 0.875f, 0f, AlsGait.Walking, new Vector2(0.1767765f, 0f)),
+            new GaitBlendCase(88, -0.875f, 0f, AlsGait.Walking, new Vector2(-0.1767765f, 0f)),
+            new GaitBlendCase(1, 0.0175f, 0f, AlsGait.Walking, new Vector2(0.00353553f, 0f)),
+            new GaitBlendCase(1, -0.0175f, 0f, AlsGait.Walking, new Vector2(-0.00353553f, 0f)),
             new GaitBlendCase(175, 0f, 1.75f, AlsGait.Walking, new Vector2(0f, 0.5f)),
             new GaitBlendCase(375, 0f, 3.75f, AlsGait.Running, new Vector2(0f, 1f)),
             new GaitBlendCase(650, 0f, 6.5f, AlsGait.Sprinting, new Vector2(0f, 1.5f)),
+            new GaitBlendCase(175, 1.75f, 0f, AlsGait.Walking, new Vector2(0.353553f, 0f)),
+            new GaitBlendCase(175, -1.75f, 0f, AlsGait.Walking, new Vector2(-0.353553f, 0f)),
+            new GaitBlendCase(375, 3.75f, 0f, AlsGait.Running, new Vector2(0.707107f, 0f)),
+            new GaitBlendCase(375, -3.75f, 0f, AlsGait.Running, new Vector2(-0.707107f, 0f)),
             new GaitBlendCase(
                 175,
                 1.2374369f,
@@ -689,11 +697,11 @@ public partial class P3bAnimationGraphSmoke : Node
         controller.Apply(in crouchingResult, settings.FixedDeltaSeconds);
         var actualCrouchingBlend = graph.Tree.Get(
             graph.Handles.GroundedCrouching.BlendPositionPath!).AsVector2();
-        var expectedCrouchingBlend = new Vector2(0f, 1f);
+        var expectedCrouchingBlend = new Vector2(0f, 2f / 3f);
         if (!actualCrouchingBlend.IsEqualApprox(expectedCrouchingBlend))
         {
             throw new InvalidOperationException(
-                $"P3 crouching outer-ring mapping mismatch: " +
+                    $"P3 crouching stride mapping mismatch: " +
                 $"expected={expectedCrouchingBlend} actual={actualCrouchingBlend}");
         }
     }
@@ -781,7 +789,7 @@ public partial class P3bAnimationGraphSmoke : Node
                 RequireDirectionalResult(result, AlsRotationMode.Aiming, item.Name);
                 controller.Apply(in result, settings.FixedDeltaSeconds);
                 characterYaw = result.TargetYaw;
-                var currentFrameConverged = NormalizedYawError(characterYaw, aimYaw) < 1e-3f;
+                var currentFrameConverged = NormalizedYawError(characterYaw, aimYaw) < 1e-4f;
                 if (currentFrameConverged && previousFrameConverged)
                 {
                     converged = true;

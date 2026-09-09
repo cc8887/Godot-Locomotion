@@ -9,8 +9,8 @@ $script:P5aNativeBuildRulesPath = Join-Path $script:P5aRepositoryRoot `
     'tools\unreal\AlsLocomotionTrace\Source\AlsLocomotionTrace\AlsLocomotionTrace.Build.cs'
 $script:P5aLockedCommit = 'b754d6f0f2bb03741d301f8fb88077ebfe561e17'
 $script:P5aLockedPatch = '3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f'
-$script:P5aLayoutDigest = 'd6fef54173240d32'
-$script:P5aBindingDigest = 'e458fef4df7a854d'
+$script:P5aLayoutDigest = 'f2336240d749284b'
+$script:P5aBindingDigest = '40f33e59692dfd38'
 $script:P5aGraphDigest = '44403c2869d8f615'
 $script:P5aGeneratorLoadError = $null
 $script:P5aVerifierLoadError = $null
@@ -828,7 +828,7 @@ if ($mode -ceq '--write-native-plan') {
     Write-Utf8 $output $bytes
     $planHash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLowerInvariant()
     if ([int]$control.PlanMarkerMismatchCall -eq $call) { $planHash = 'f' * 64 }
-    $marker = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=$planHash"
+    $marker = "P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=$planHash"
 }
 elseif ($mode -ceq '--write-canonical-pair') {
     $nativeBytes = if ($call -eq 7 -and $control.NativeBDrift) {
@@ -845,10 +845,10 @@ elseif ($mode -ceq '--write-canonical-pair') {
     Write-Utf8 (Get-SeparateValue '--port-canonical') $portBytes
     $plan = Get-SeparateValue '--trace-plan'
     $planHash = (Get-FileHash -LiteralPath $plan -Algorithm SHA256).Hash.ToLowerInvariant()
-    $marker = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=$planHash"
+    $marker = "P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=$planHash"
 }
 elseif ($mode -ceq '--verify-fixture') {
-    $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=' + ('a' * 64)
+    $marker = 'P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=' + ('a' * 64)
 }
 elseif ($mode -ceq 'test') {
     $loggerIndex = [Array]::IndexOf([string[]]$ChildArguments, '--logger')
@@ -2099,7 +2099,7 @@ namespace Als.P5aOracle;
 
 internal static class Program
 {
-    private const string MarkerPrefix = "P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=";
+    private const string MarkerPrefix = "P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=";
 
     private static int Main(string[] args)
     {
@@ -7379,7 +7379,7 @@ Start-Sleep -Seconds 30
 
     It 'rejects a valid Oracle marker when any prefixed P5A marker is also emitted' {
         Assert-TestP5aCommandCapability 'Assert-P5aVerifierOracleChild' verifier
-        $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=' + ('a' * 64)
+        $marker = 'P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=' + ('a' * 64)
         foreach ($streams in @(
             @{ StdOut = @($marker, "prefix $marker"); StdErr = @() }
             @{ StdOut = @($marker); StdErr = @($marker) }
@@ -7401,7 +7401,7 @@ Start-Sleep -Seconds 30
 
     It 'allows only a terminal system console host directly owned by the Oracle child' {
         Assert-TestP5aCommandCapability 'Assert-P5aVerifierOracleChild' verifier
-        $marker = 'P5A_ORACLE_DIGESTS layout=d6fef54173240d32 bindings=e458fef4df7a854d graph=44403c2869d8f615 plan=' + ('a' * 64)
+        $marker = 'P5A_ORACLE_DIGESTS layout=f2336240d749284b bindings=40f33e59692dfd38 graph=44403c2869d8f615 plan=' + ('a' * 64)
         $rootId = 5002
         $systemConhost = [IO.Path]::GetFullPath((Join-Path ([Environment]::SystemDirectory) 'conhost.exe'))
         $validConhost = [pscustomobject]@{

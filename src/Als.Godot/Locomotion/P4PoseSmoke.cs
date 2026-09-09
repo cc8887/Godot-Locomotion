@@ -355,6 +355,40 @@ public partial class P4PoseSmoke : Node
             BuildCurrentComponent(skeleton, profile.FootRig.Right.FootBoneId);
         var characterRotation = visualRoot.GlobalTransform.Basis.Orthonormalized()
             .GetRotationQuaternion();
+        var offsetInput = zeroAim with
+        {
+            UseAnimatedFootOffsets = true,
+            CharacterWorldRotation = ToNumerics(characterRotation),
+            LeftFootReferenceWorldOrigin = ToNumerics(leftWorld.Origin - Vector3.Up * 0.2f),
+            RightFootReferenceWorldOrigin = ToNumerics(rightWorld.Origin - Vector3.Up * 0.2f),
+            LeftFootPose = new AlsFootPoseOutput(ToNumerics(leftWorld.Origin - Vector3.Up * 0.2f),
+                ToNumerics(characterRotation), 0f, -1),
+            RightFootPose = new AlsFootPoseOutput(ToNumerics(rightWorld.Origin - Vector3.Up * 0.2f),
+                ToNumerics(characterRotation), 0f, -1),
+            LeftFootIkWeight = 1f,
+            RightFootIkWeight = 1f,
+        };
+        var offsetOutput = default(AlsPoseModifierOutput);
+        Require(modifier.TryApply(in offsetInput, ref offsetOutput, out var offsetReason),
+            $"animated foot offset failed: {offsetReason}");
+        foreach (var (bone, expected) in new[]
+                 { (profile.FootRig.Left.FootBoneId, leftWorld), (profile.FootRig.Right.FootBoneId, rightWorld) })
+        {
+            var actual = skeleton.GlobalTransform * BuildCurrentComponent(skeleton, bone);
+            Require(actual.Origin.DistanceTo(expected.Origin) < 1e-4f &&
+                    1f - MathF.Abs(actual.Basis.GetRotationQuaternion().Dot(expected.Basis.GetRotationQuaternion())) < 1e-5f,
+                "Flat unlocked IK changed the authored lifted-foot position or rotation.");
+        }
+        basePose.Restore(skeleton, visualRoot);
+        foreach (var invalid in new[]
+                 {
+                     offsetInput with { LeftFootReferenceWorldOrigin = new(float.NaN, 0f, 0f) },
+                     offsetInput with { RightFootReferenceWorldOrigin = new(0f, float.PositiveInfinity, 0f) },
+                 })
+        {
+            Require(!modifier.TryApply(in invalid, ref offsetOutput, out _), "Non-finite foot reference was accepted.");
+            before.RequireExact(skeleton, visualRoot, "invalid foot reference");
+        }
         var reachableTargetDelta = Vector3.Right * 0.03f +
             Vector3.Forward * 0.08f + Vector3.Down * 0.02f;
         var leftTargetPosition = leftWorld.Origin + reachableTargetDelta;
@@ -996,7 +1030,25 @@ public partial class P4PoseSmoke : Node
                 {
                     sourceGuardTracks++;
                 }
-                VerifyTrackSamplesNear(source, bound, trackIndex, definition.Name, label);
+                using var path = bound.TrackGetPath(trackIndex);
+                if (definition.ForceRootLock && !definition.RootMotionEnabled &&
+                    definition.RootMotionRootLock == 0 && path.GetSubName(0) == "root")
+                {
+                    var rest = library.Skeleton.GetBoneRest(library.Skeleton.FindBone("root"));
+                    for (var key = 0; key < boundKeyCount; key++)
+                    {
+                        var value = bound.TrackGetKeyValue(trackIndex, key);
+                        var valid = bound.TrackGetType(trackIndex) switch
+                        {
+                            Godot.Animation.TrackType.Position3D => value.AsVector3().DistanceTo(rest.Origin) < 1e-5f,
+                            Godot.Animation.TrackType.Rotation3D => 1f - MathF.Abs(value.AsQuaternion().Dot(rest.Basis.GetRotationQuaternion())) < 1e-5f,
+                            Godot.Animation.TrackType.Scale3D => value.AsVector3().DistanceTo(rest.Basis.Scale) < 1e-5f,
+                            _ => false,
+                        };
+                        Require(valid, $"{label} did not lock the root to the reference pose.");
+                    }
+                }
+                else VerifyTrackSamplesNear(source, bound, trackIndex, definition.Name, label);
             }
             Require(sourceGuardTracks > 0,
                 $"{label} fixture has no imported guard key");

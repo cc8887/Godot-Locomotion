@@ -387,6 +387,13 @@ public partial class AlsP3WorkerRoot : Node3D
                 var footPlacementInput = CreateFootPlacementInput(
                     in input,
                     footSettings.CapsuleHalfHeightMeters);
+                var footUp = System.Numerics.Vector3.Normalize(System.Numerics.Vector3.TransformNormal(
+                    System.Numerics.Vector3.UnitY, footPlacementInput.CharacterTransform));
+                var footPlane = footPlacementInput.CharacterTransform.Translation + footUp * footSettings.FootHeightMeters;
+                // Terrain offsets are measured from the character's foot plane, not the animated swing height.
+                var terrainOrigins = new AlsFootProbeWorldOrigins(
+                    worldOrigins.Left - footUp * System.Numerics.Vector3.Dot(worldOrigins.Left - footPlane, footUp),
+                    worldOrigins.Right - footUp * System.Numerics.Vector3.Dot(worldOrigins.Right - footPlane, footUp));
                 var forcePlatformRelease =
                     identity.FrameId == _forcedPlatformReleaseFrameId;
                 var releaseSignals = ResolveFootPlacementReleaseSignals(
@@ -400,7 +407,7 @@ public partial class AlsP3WorkerRoot : Node3D
                         footCurves.RightIkWeight,
                         footCurves.LeftLockCurve,
                         footCurves.RightLockCurve,
-                        in worldOrigins,
+                        in terrainOrigins,
                         in releaseSignals,
                         in candidateRuntimeState,
                         out candidateRuntimeState,
@@ -504,6 +511,9 @@ public partial class AlsP3WorkerRoot : Node3D
                     : 0L;
                 var modifierInput = AlsPoseModifierInput.FromResult(in candidateResult) with
                 {
+                    UseAnimatedFootOffsets = true,
+                    LeftFootReferenceWorldOrigin = terrainOrigins.Left,
+                    RightFootReferenceWorldOrigin = terrainOrigins.Right,
                     CharacterWorldRotation = System.Numerics.Quaternion
                         .CreateFromRotationMatrix(input.CharacterTransform),
                     InjectFailure = ResolveModifierFailureInjection(in identity),

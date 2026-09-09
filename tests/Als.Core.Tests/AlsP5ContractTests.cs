@@ -10,7 +10,7 @@ namespace GodotAls.Core.Tests;
 [Collection(AllocationTestCollection.Name)]
 public sealed class AlsP5ContractTests
 {
-    private const ulong CanonicalLayoutDigest = 17865444901286441077UL;
+    private const ulong CanonicalLayoutDigest = 8818651929860740556UL;
 
     [Fact]
     public void P5EnumsFreezeStorageAndNumericMappings()
@@ -369,7 +369,7 @@ public sealed class AlsP5ContractTests
         entries[0] = new AlsP5OccurrenceLayoutEntry(
             AlsP5OccurrenceSourceKind.Base, 0, 0, 0, 0);
 
-        var view = new AlsP5OccurrenceLayoutView(1, ReferenceLayoutDigest(1, entries), entries);
+        var view = new AlsP5OccurrenceLayoutView(2, ReferenceLayoutDigest(2, entries), entries);
 
         Assert.Equal(1, view.Entries.Length);
         Assert.Equal(entries[0], view.Entries[0]);
@@ -381,20 +381,36 @@ public sealed class AlsP5ContractTests
         var entries = CanonicalEntries();
         var before = entries.ToArray();
 
-        Assert.Equal(CanonicalLayoutDigest, ReferenceLayoutDigest(1, entries));
-        AlsP5OccurrenceLayoutContract.Validate(1, CanonicalLayoutDigest, entries);
+        Assert.Equal(CanonicalLayoutDigest, ReferenceLayoutDigest(2, entries));
+        AlsP5OccurrenceLayoutContract.Validate(2, CanonicalLayoutDigest, entries);
 
         Assert.Equal(before, entries);
     }
 
     [Fact]
-    public void LayoutValidatorAcceptsFrozenTask5ThirtySevenEntryLayout()
+    public void LayoutV2SeparatesPhysicalCopiesAndRejectsDuplicatePhysicalIdentity()
+    {
+        var entries = new[]
+        {
+            new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Turn, 0, 0, 0, 0),
+            new AlsP5OccurrenceLayoutEntry(AlsP5OccurrenceSourceKind.Turn, 0, 8, 1, 0),
+        };
+        var digest = ReferenceLayoutDigest(2, entries);
+        AlsP5OccurrenceLayoutContract.Validate(2, digest, entries);
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutContract.Validate(1, digest, entries));
+        entries[1] = entries[1] with { GraphSlotIndex = 0 };
+        Assert.Throws<ArgumentException>(() =>
+            AlsP5OccurrenceLayoutContract.Validate(2, ReferenceLayoutDigest(2, entries), entries));
+    }
+
+    [Fact]
+    public void LayoutValidatorAcceptsFortyNinePhysicalSlots()
     {
         var entries = Task5Entries();
 
-        Assert.Equal(37, entries.Length);
-        Assert.Equal(0xD6FEF54173240D32UL, ReferenceLayoutDigest(1, entries));
-        AlsP5OccurrenceLayoutContract.Validate(1, 0xD6FEF54173240D32UL, entries);
+        Assert.Equal(49, entries.Length);
+        Assert.Equal(0xF2336240D749284BUL, ReferenceLayoutDigest(2, entries));
+        AlsP5OccurrenceLayoutContract.Validate(2, 0xF2336240D749284BUL, entries);
     }
 
     [Theory]
@@ -417,12 +433,12 @@ public sealed class AlsP5ContractTests
     public void LayoutValidatorRejectsEveryFrozenInvalidityWithoutMutation(string invalidity)
     {
         var entries = CanonicalEntries();
-        var version = 1;
+        var version = 2;
         var digest = CanonicalLayoutDigest;
 
         switch (invalidity)
         {
-            case "version": version = 2; break;
+            case "version": version = 1; break;
             case "zero-digest": digest = 0; break;
             case "stale-digest": digest++; break;
             case "unknown-kind": entries[0] = entries[0] with { SourceKind = (AlsP5OccurrenceSourceKind)7 }; break;
@@ -430,7 +446,7 @@ public sealed class AlsP5ContractTests
             case "negative-slot": entries[0] = entries[0] with { GraphSlotIndex = -1 }; break;
             case "negative-handle": entries[0] = entries[0] with { OccurrenceHandleId = -1 }; break;
             case "negative-authority": entries[0] = entries[0] with { AuthorityGroupId = -1 }; break;
-            case "duplicate-key": entries[1] = entries[1] with { SourceKind = entries[0].SourceKind, SourceBindingIndex = entries[0].SourceBindingIndex }; break;
+            case "duplicate-key": entries[1] = entries[1] with { SourceKind = entries[0].SourceKind, SourceBindingIndex = entries[0].SourceBindingIndex, GraphSlotIndex = entries[0].GraphSlotIndex }; break;
             case "duplicate-handle": entries[1] = entries[1] with { OccurrenceHandleId = 0 }; break;
             case "nonordinal-handle": entries[1] = entries[1] with { OccurrenceHandleId = 2 }; break;
             case "sparse-authority": entries[1] = entries[1] with { AuthorityGroupId = 2 }; entries[2] = entries[2] with { AuthorityGroupId = 2 }; break;
@@ -455,7 +471,7 @@ public sealed class AlsP5ContractTests
     public void LayoutValidatorRejectsEmptySpan()
     {
         Assert.Throws<ArgumentException>(() =>
-            AlsP5OccurrenceLayoutContract.Validate(1, 1, ReadOnlySpan<AlsP5OccurrenceLayoutEntry>.Empty));
+            AlsP5OccurrenceLayoutContract.Validate(2, 1, ReadOnlySpan<AlsP5OccurrenceLayoutEntry>.Empty));
     }
 
     [Fact]
@@ -464,13 +480,13 @@ public sealed class AlsP5ContractTests
         var entries = CanonicalEntries();
         for (var index = 0; index < 100; index++)
         {
-            AlsP5OccurrenceLayoutContract.Validate(1, CanonicalLayoutDigest, entries);
+            AlsP5OccurrenceLayoutContract.Validate(2, CanonicalLayoutDigest, entries);
         }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var index = 0; index < 10_000; index++)
         {
-            AlsP5OccurrenceLayoutContract.Validate(1, CanonicalLayoutDigest, entries);
+            AlsP5OccurrenceLayoutContract.Validate(2, CanonicalLayoutDigest, entries);
         }
 
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
@@ -485,21 +501,21 @@ public sealed class AlsP5ContractTests
 
     private static AlsP5OccurrenceLayoutEntry[] Task5Entries()
     {
-        var entries = new AlsP5OccurrenceLayoutEntry[37];
+        var entries = new AlsP5OccurrenceLayoutEntry[49];
         var handle = 0;
         AddBank(AlsP5OccurrenceSourceKind.Base, 22, 0);
-        AddBank(AlsP5OccurrenceSourceKind.Turn, 8, 0);
-        AddBank(AlsP5OccurrenceSourceKind.Rotate, 4, 0);
+        AddBank(AlsP5OccurrenceSourceKind.Turn, 8, 0, 2);
+        AddBank(AlsP5OccurrenceSourceKind.Rotate, 4, 0, 2);
         entries[handle] = new(AlsP5OccurrenceSourceKind.Transition, 0, 0, handle++, 1);
         entries[handle] = new(AlsP5OccurrenceSourceKind.ActionMontage, 0, 0, handle++, 2);
         entries[handle] = new(AlsP5OccurrenceSourceKind.ActionSequence, 0, 0, handle, 3);
         return entries;
 
-        void AddBank(AlsP5OccurrenceSourceKind kind, int count, int authority)
+        void AddBank(AlsP5OccurrenceSourceKind kind, int count, int authority, int banks = 1)
         {
-            for (var index = 0; index < count; index++)
+            for (var index = 0; index < count * banks; index++)
             {
-                entries[handle] = new(kind, index, index, handle++, authority);
+                entries[handle] = new(kind, index % count, index, handle++, authority);
             }
         }
     }

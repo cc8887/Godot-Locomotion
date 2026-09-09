@@ -110,7 +110,7 @@ internal sealed class AlsP5aAnimationRuntimeBinding : IDisposable
         }
 
         var descriptors = new AlsP5aPhysicalSlotDescriptor[
-            baseAnimationIds.Length + graph.Turns.Length + graph.Rotates.Length];
+            baseAnimationIds.Length + 2 * graph.Turns.Length + 2 * graph.Rotates.Length];
         var names = new StringName[descriptors.Length];
         var occurrenceEntries = occurrence.Entries.ToArray();
         var syncOccurrences = core.SyncOccurrences.ToArray();
@@ -119,9 +119,9 @@ internal sealed class AlsP5aAnimationRuntimeBinding : IDisposable
             var destination = 0;
             AddBank(CoreOccurrenceKind.Base, baseAnimationIds, "P5Base");
             AddBank(CoreOccurrenceKind.Turn,
-                graph.Turns.ToArray().Select(value => value.AnimationId).ToArray(), "P5Turn");
+                graph.Turns.ToArray().Select(value => value.AnimationId).ToArray(), "P5Turn", 2);
             AddBank(CoreOccurrenceKind.Rotate,
-                graph.Rotates.ToArray().Select(value => value.AnimationId).ToArray(), "P5Rotate");
+                graph.Rotates.ToArray().Select(value => value.AnimationId).ToArray(), "P5Rotate", 2);
             if (descriptors.Count(value => value.SyncGroupId >= 0) != syncOccurrences.Length)
             {
                 throw new InvalidOperationException(
@@ -139,39 +139,44 @@ internal sealed class AlsP5aAnimationRuntimeBinding : IDisposable
             void AddBank(
                 CoreOccurrenceKind sourceKind,
                 IReadOnlyList<int> animationIds,
-                string prefix)
+                string prefix,
+                int bankCount = 1)
             {
-                for (var sourceIndex = 0; sourceIndex < animationIds.Count; sourceIndex++)
+                for (var bank = 0; bank < bankCount; bank++)
                 {
-                    var entry = FindOccurrence(
-                        occurrenceEntries, sourceKind, sourceIndex, sourceIndex);
-                    var syncGroupId = -1;
-                    var syncMemberIndex = -1;
-                    foreach (ref readonly var sync in syncOccurrences.AsSpan())
+                    for (var sourceIndex = 0; sourceIndex < animationIds.Count; sourceIndex++)
                     {
-                        if (sync.OccurrenceHandleId != entry.OccurrenceHandleId) continue;
-                        if (sourceKind != CoreOccurrenceKind.Base ||
-                            sync.AnimationId != animationIds[sourceIndex] || syncGroupId >= 0)
+                        var graphSlotIndex = bank * animationIds.Count + sourceIndex;
+                        var entry = FindOccurrence(
+                            occurrenceEntries, sourceKind, sourceIndex, graphSlotIndex);
+                        var syncGroupId = -1;
+                        var syncMemberIndex = -1;
+                        foreach (ref readonly var sync in syncOccurrences.AsSpan())
                         {
-                            throw new InvalidOperationException(
-                                "A P5A Sync occurrence does not identify one Base slot.");
+                            if (sync.OccurrenceHandleId != entry.OccurrenceHandleId) continue;
+                            if (sourceKind != CoreOccurrenceKind.Base ||
+                                sync.AnimationId != animationIds[sourceIndex] || syncGroupId >= 0)
+                            {
+                                throw new InvalidOperationException(
+                                    "A P5A Sync occurrence does not identify one Base slot.");
+                            }
+                            syncGroupId = sync.GroupId;
+                            syncMemberIndex = sync.GroupMemberIndex;
                         }
-                        syncGroupId = sync.GroupId;
-                        syncMemberIndex = sync.GroupMemberIndex;
-                    }
 
-                    names[destination] = new StringName($"{prefix}{sourceIndex}");
-                    descriptors[destination] = new AlsP5aPhysicalSlotDescriptor(
-                        sourceKind,
-                        sourceIndex,
-                        sourceIndex,
-                        animationIds[sourceIndex],
-                        entry.OccurrenceHandleId,
-                        entry.AuthorityGroupId,
-                        syncGroupId,
-                        syncMemberIndex,
-                        names[destination]);
-                    destination++;
+                        names[destination] = new StringName($"{prefix}{graphSlotIndex}");
+                        descriptors[destination] = new AlsP5aPhysicalSlotDescriptor(
+                            sourceKind,
+                            sourceIndex,
+                            graphSlotIndex,
+                            animationIds[sourceIndex],
+                            entry.OccurrenceHandleId,
+                            entry.AuthorityGroupId,
+                            syncGroupId,
+                            syncMemberIndex,
+                            names[destination]);
+                        destination++;
+                    }
                 }
             }
         }
@@ -269,11 +274,12 @@ internal sealed class AlsP5aAnimationRuntimeBinding : IDisposable
         var result = default(CoreOccurrenceEntry);
         foreach (ref readonly var entry in entries)
         {
-            if (entry.SourceKind != sourceKind || entry.SourceBindingIndex != sourceBindingIndex)
+            if (entry.SourceKind != sourceKind || entry.SourceBindingIndex != sourceBindingIndex ||
+                entry.GraphSlotIndex != graphSlotIndex)
             {
                 continue;
             }
-            if (found || entry.GraphSlotIndex != graphSlotIndex)
+            if (found)
             {
                 throw new InvalidOperationException("A P5A occurrence slot mapping is ambiguous.");
             }

@@ -5256,8 +5256,8 @@
         },
         "timelineCursors": {
           "type": "array",
-          "minItems": 37,
-          "maxItems": 37,
+          "minItems": 49,
+          "maxItems": 49,
           "items": {
             "$ref": "#/$defs/b2_o8"
           }

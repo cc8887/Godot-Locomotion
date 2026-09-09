@@ -351,16 +351,16 @@ public partial class P4FootPlacementSmoke : Node
                     $"probe_r={frame.FootPose.RightProbeWorldOrigin}");
                 Require(PhysicalFootTracksSurface(
                             frame.FootPose.LeftPhysicalTargetWorldPosition,
-                            in leftHit) &&
+                            in leftHit, frame.FootPose.UncorrectedLeftFootWorldPosition, frame.Result.LeftFootPose.LockAmount, in input) &&
                         PhysicalFootTracksSurface(
                             frame.FootPose.RightPhysicalTargetWorldPosition,
-                            in rightHit) &&
+                            in rightHit, frame.FootPose.UncorrectedRightFootWorldPosition, frame.Result.RightFootPose.LockAmount, in input) &&
                         PhysicalFootTracksSurface(
                             frame.FootPose.LeftFootWorldPosition,
-                            in leftHit) &&
+                            in leftHit, frame.FootPose.UncorrectedLeftFootWorldPosition, frame.Result.LeftFootPose.LockAmount, in input) &&
                         PhysicalFootTracksSurface(
                             frame.FootPose.RightFootWorldPosition,
-                            in rightHit),
+                            in rightHit, frame.FootPose.UncorrectedRightFootWorldPosition, frame.Result.RightFootPose.LockAmount, in input),
                     $"lane {lane} physical targets or bones lost surface contact geometry: " +
                     $"target_l={DescribeFootSurface(frame.FootPose.LeftPhysicalTargetWorldPosition, in leftHit)} " +
                     $"actual_l={DescribeFootSurface(frame.FootPose.LeftFootWorldPosition, in leftHit)} " +
@@ -713,16 +713,23 @@ public partial class P4FootPlacementSmoke : Node
                MathF.Abs(NumericsVector3.Dot(delta, hit.Normal)) <= 0.2f;
     }
 
-    private static bool PhysicalFootTracksSurface(
+    private bool PhysicalFootTracksSurface(
         in NumericsVector3 foot,
-        in AlsFootHit hit)
+        in AlsFootHit hit,
+        in NumericsVector3 animatedFoot,
+        float lockAmount,
+        in AlsFrameInput input)
     {
         var delta = foot - hit.Position;
         var normalDistance = NumericsVector3.Dot(delta, hit.Normal);
         // A locked point on a moving platform intentionally separates tangentially
         // from the next probe ray. TargetTracksSurface already bounds the Core target
         // to the fixture; physical contact is the independent plane-normal contract.
-        return normalDistance >= 0.07f && normalDistance <= 0.2f;
+        var capsuleHalfHeight = (input.Stance == AlsStance.Crouching
+            ? _context.MotorSettings.CrouchingHeight : _context.MotorSettings.StandingHeight) * 0.5f;
+        var animatedLift = MathF.Max(0f,
+            animatedFoot.Y - (input.CharacterTransform.Translation.Y - capsuleHalfHeight + 0.13f));
+        return normalDistance >= 0.07f && normalDistance <= 0.2f + animatedLift * (1f - lockAmount);
     }
 
     private static string DescribeFootSurface(

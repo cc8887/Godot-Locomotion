@@ -566,7 +566,7 @@ bool ValidateP5aTracePlan(const FString& Path, const FString& ExpectedSha256,
     if (!Plan->TryGetObjectField(TEXT("snapshot"), Snapshot) || Snapshot == nullptr ||
         !(*Snapshot)->TryGetObjectField(TEXT("bindings"), Bindings) || Bindings == nullptr ||
         !(*Bindings)->TryGetNumberField(TEXT("version"), BindingsVersion) || BindingsVersion != 2.0 ||
-        !(*Bindings)->TryGetStringField(TEXT("digest"), BindingsDigest) || BindingsDigest != TEXT("e458fef4df7a854d"))
+        !(*Bindings)->TryGetStringField(TEXT("digest"), BindingsDigest) || BindingsDigest != TEXT("40f33e59692dfd38"))
     {
         UE_LOG(LogTemp, Error, TEXT("P5A trace plan binding identity is invalid."));
         return false;
