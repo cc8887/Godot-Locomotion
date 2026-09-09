@@ -1691,6 +1691,17 @@ git commit -m "test(golden): add deterministic p5a cross-engine trace"
 
 ### Task 14: Bind the Compiled P5A Profile and Close the Animation Library
 
+**状态（2026-09-09）：已完成并通过独立复审。** 实现提交 `817bdc8`，
+绑定校验与资源所有权修正 `9e565e3`；独立的 Sync 测试合同修正为 `62f80dc`。
+真实资源冒烟输出完整 `P5A_RUNTIME_BINDING_OK`，Debug 编译无警告或错误，
+`verify-p4-pose.ps1` 通过且受控路径分配仍为 `0 B`。
+Core 事务测试 `163/163`、选定 Release 回归 `1371/1371` 通过；后者排除
+`AlsP5aGoldenTests` 和 `TraceSchema`，不代表重新执行了 P5A 黄金对照或完整认证。
+代理中断后，根代理在旧提交 `56cbccb` 的独立临时工作区重建缺失 API 的 RED：
+新 smoke 因不存在 `AlsP5aAnimationRuntimeBinding` 产生三个 `CS0246` 错误；
+当前实现 GREEN。此为重建证据，不冒称恢复了原代理的初始输出。
+相机、输入、资产锁、UE 导出和正式 golden 均未改动。
+
 **Files:**
 - Create: `src/Als.Godot/Animation/AlsP5aAnimationRuntimeBinding.cs`
 - Create (Godot-generated): `src/Als.Godot/Animation/AlsP5aAnimationRuntimeBinding.cs.uid`
@@ -1699,11 +1710,11 @@ git commit -m "test(golden): add deterministic p5a cross-engine trace"
 - Create (Godot-generated): `src/Als.Godot/Animation/P5aRuntimeBindingSmoke.cs.uid`
 - Create: `scenes/tests/p5a_runtime_binding_smoke.tscn`
 
-- [ ] **Step 1: Add a failing real-profile binding smoke**
+- [x] **Step 1: Add a failing real-profile binding smoke**
 
 Load the canonical v2 manifest, P3 locomotion profile, P4 pose profile and P5A runtime profile. Compile the Task 5 occurrence layout and Task 13 pure Core-binding snapshot once, build the P5A library from `animationSet + snapshot`, then pass only that snapshot and stamped library to the adapter. Assert one skeleton/mannequin and exact required root mapping, six event semantic IDs, one compiled `Enable_Transition` semantic, one 17-member group with duration-bearing bindings, the exact four P4 IK constants and every `AlsFootCurveBinding`, four transition slots, one Roll action, one declared slot/section, all compiled Montage segment bindings and a library closure containing every P3 `AllAnimationIds`/Lean resource, all four P4 Aim resources, every Turn/Rotate resource, both Transition/additive-base resources and every Montage-segment Sequence exactly once. Assert every closure animation has exactly one immutable clip-name/play-length/normalized binding equal to the canonical source and loaded Godot resource. Assert the exact normalized-track subset, GraphBuildView graph topology and logical P4 mask provenance, and an Action filter that excludes exactly the validated root while containing every physical descendant. The non-identity logical-to-physical fixture must prove that P4 mask spans remain logical and that only the Action descendant set becomes Godot filter paths. Also assert every occurrence handle is nonnegative/unique, the Base/Turn/Rotate authority domain is shared, Montage and Sequence authority domains differ, animation-set/layout/binding/graph provenance stamps and exact Transition/Action definition/segment handles survive all three snapshot views, every definition receives the required handle/ordinal policy, and recompiling the Godot adapter cannot change any pure snapshot value. Pairing a library built from another definition/layout/binding/graph digest, wrong skeleton or wrong root mapping must fail before graph construction.
 
-- [ ] **Step 2: Run RED binding smoke**
+- [x] **Step 2: Run RED binding smoke**
 
 Run:
 
@@ -1714,7 +1725,7 @@ dotnet build GodotALS.csproj -c Debug
 
 Expected: build/smoke fails because no P5A adapter or P5A library overload exists.
 
-- [ ] **Step 3: Implement initialization-only Import-to-Core flattening**
+- [x] **Step 3: Implement initialization-only Import-to-Core flattening**
 
 ```csharp
 internal sealed class AlsP5aAnimationRuntimeBinding
@@ -1731,11 +1742,11 @@ internal sealed class AlsP5aAnimationRuntimeBinding
 
 The constructor does not receive or flatten raw P3/P4/P5 profiles a second time. It requires the library's immutable P5A build stamp `{ AnimationSetDefinitionDigest, LayoutDigest, BindingDigest, GraphDigest }` to equal the supplied snapshot in O(1), delegates all three views to that owned snapshot, and consumes the library's already-validated skeleton/root, Action filter paths and per-animation clip-name/play-length/normalized table while allocating only immutable Godot parameter names plus physical-slot/Sync membership descriptors. It does not create AnimationTree nodes or parameter paths; those cannot exist until Task 15. It never assigns/remaps occurrence or authority IDs, maps curve enums, recopies timeline/marker/action fields, guesses bone zero/name, or reconstructs P3/P4 topology or logical-to-physical bone paths. P4 logical masks remain owned by the existing `AlsComponentPoseModifier` initialization/pose transaction and are never duplicated as AnimationTree filters. Every fixed Base/Turn/Rotate physical bank, including Idle/non-member slots with no event definitions, resolves `GraphSlotIndex -> OccurrenceHandleId/AuthorityGroupId` from the occurrence view; configured Sync membership comes from the Core binding view; Transition, Action Montage and Sequence use their snapshot handles. The single Action graph lane parameter created later is a Godot handle, not a timeline occurrence handle. The frozen order is `snapshot + stamped library -> AlsP5aAnimationRuntimeBinding descriptors -> Task 15 graph build/parameter handles -> Task 16 controller`. Task 13 Oracle, Task 15 graph handles and Task 12 Core bindings therefore consume the same layout/binding/graph provenance. Validate same-animation reuse without double publication, skeleton identity, Godot animation closure/resource presence and that every snapshot animation ID resolves exactly once. Import retains `sourceClassPath`/`displayName` only for initialization audit; no JSON, object path, event name, marker name or callback enters the hot-path view.
 
-- [ ] **Step 4: Add `BuildP5a` library closure**
+- [x] **Step 4: Add `BuildP5a` library closure**
 
 Add `BuildP5a(AlsAnimationSetDefinition animationSet, AlsP5CoreRuntimeBindingSnapshot coreBindings)`. It first requires `animationSet.DefinitionDigest == coreBindings.AnimationSetDefinitionDigest`, then uses `CreateGraphBuildView()` for the exact precompiled P3 `AllAnimationIds`/Standing/Crouching/Jump/Fall/Land/Lean closure, all P4 Aim/Turn/Rotate/additive-base IDs and normalized-track subset; it unions only the snapshot Core view's Transition/additive-base, Sync and Action segment Sequence IDs. It never infers graph-only clips from occurrence layout. For every unique closure ID, publish one immutable resource descriptor `{ AnimationId, owned StringName ClipName, float PlayLengthSeconds, byte NormalizedTrack }`; `PlayLengthSeconds` is copied from the canonical definition and must be finite/positive and match the loaded Godot `Animation.Length` under the existing import tolerance, while `NormalizedTrack` must exactly match graph-view membership. Using graph-view `SkeletonId`, `MannequinMeshId` and both root IDs, validate the canonical skeleton's `RequiredBones.Root`, logical-to-physical mapping, target `Skeleton3D` identity/rest mapping and root ancestry. Validate every GraphBuildView logical mask header/range/member against the canonical skeleton for provenance, but do not convert or publish those masks as AnimationTree filter paths: the unchanged `AlsComponentPoseModifier` remains their sole runtime consumer in the P4 pose transaction. Independently precompute the only new graph filter, the immutable Action paths for every target physical descendant below the root-motion extraction bone while excluding the root itself; the non-identity mapping fixture must produce this expected physical descendant set. Wrong skeleton/root, invalid mask range/member, missing/extra descendant or normalized-ID mismatch fails before publication. Write the exact immutable `{ AnimationSetDefinitionDigest, LayoutDigest, BindingDigest, GraphDigest }`, physical root ID/path, Action filter paths and resource descriptors into `AlsAnimationLibraryBuildResult`; do not reread P3/P4/P5 profiles or reproduce their sorting. Montage metadata itself is not an FBX clip; the Action lane plays its resolved segment Sequence while Core owns Montage time/section semantics.
 
-- [ ] **Step 5: Generate UIDs and run GREEN smoke**
+- [x] **Step 5: Generate UIDs and run GREEN smoke**
 
 Run:
 
@@ -1747,7 +1758,7 @@ dotnet build GodotALS.csproj -c Debug
 
 Expected: both `.cs.uid` files exist and output is exactly `P5A_RUNTIME_BINDING_OK event_semantics=6 curve_semantics=1 groups=1 members=17 transitions=4 actions=1 segments=1 occurrence_handles_valid=1 authority_global=1 action_domains=2 layout_digest=1 graph_digest=1 root_filter=1`; the locked Roll Montage currently contains exactly one segment.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Als.Godot/Animation/AlsP5aAnimationRuntimeBinding.cs src/Als.Godot/Animation/AlsP5aAnimationRuntimeBinding.cs.uid src/Als.Godot/Animation/AlsAnimationLibraryBuilder.cs src/Als.Godot/Animation/P5aRuntimeBindingSmoke.cs src/Als.Godot/Animation/P5aRuntimeBindingSmoke.cs.uid scenes/tests/p5a_runtime_binding_smoke.tscn
@@ -1755,6 +1766,19 @@ git commit -m "feat(godot): bind compiled p5a animation runtime"
 ```
 
 ### Task 15: Add Independent Transition and Action Graph Lanes
+
+**前置阻塞（2026-09-09，已独立复核）：需先确认播放身份合同修订。**
+Task 5/6 把 current/outgoing 定义为瞬时角色，要求保持同一 layout handle；
+现有 `AlsP5OccurrenceLayoutCompiler.AddBank` 为每个 Base/Turn/Rotate 源槽位
+只生成一个 handle，`CompileSyncMappings` 同样要求每个成员只对应一个源槽位。
+但 Task 15/16 又要求同动画的淡出和淡入分支有独立 handle，并独立映射采样时间。
+这两个要求无法同时满足；禁止在 Godot 层临时分配或重映射编号绕过已冻结合同。
+建议先按固定物理播放 bank 编译独立 handle，仍共享既定事件 authority，明确
+current/outgoing 只改变角色而不改变 bank 身份；需联动评估 occurrence layout、
+Core/Import bridge、Oracle、Task 14 描述及 golden 的版本和溯源摘要。
+另一条路线是修订为同 handle 加独立 epoch/branch 身份，但同样必须先验证
+Timeline cursor、Sync 和 ownership 能承载并发实例，不能仅删掉测试要求。
+两条路线均尚未获本轮批准、均未实施；Task 15 起保持未开始。
 
 **Files:**
 - Modify: `src/Als.Godot/Animation/AlsLocomotionGraphBuilder.cs`
