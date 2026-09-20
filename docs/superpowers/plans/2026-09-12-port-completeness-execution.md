@@ -1567,3 +1567,9 @@ Mantle/Roll、P6 Ragdoll/Get-up/Pose Recovery/Camera 和 P7 十分钟性能预�
 验证范围及结果见 `../../verification/2026-09-20-frozen-reference-replay.md`。
 这不替代当前完整图认证；下一项实际接线是共同 Montage 的 ActionPlayback
 摘要及其事务重试检查，后续玩法和整链验收范围不变。
+
+2026-09-20 后续：共同 Montage 的动作摘要已接入生产结果发布入口，保留
+逻辑所有权与物理淡出的独立身份、冻结权重、隐藏分支语义，以及失败重试。
+当前 Root/Overlay 布局的片段 occurrence 随通知表重编译。验证和限制见
+`../../verification/2026-09-20-action-playback-summary.md`。下一项继续类型化
+Notify 的玩法消费和动作请求来源，尚未完成碰撞安全 Root Motion。

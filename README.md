@@ -100,7 +100,7 @@ dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 | 阶段 | 状态 | 范围 |
 | --- | --- | --- |
 | P3/P4 完整性 | 实现与整体验收中 | 默认完整入口已接通；地形、起停滑步、换髋与上下身联合验收未关闭 |
-| P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage 所有者已实现多项；历史配置回放已分离，玩法消费者、动作摘要及当前完整图验收待完成 |
+| P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage 所有者及动作摘要已接通；类型化玩法消费者、请求来源及当前完整图验收待完成 |
 | P5B | 动画数据/姿势已有，玩法待实施 | Overlay 装备/切换和道具生命周期 |
 | P5C | Roll 播放组件已有，玩法待实施 | Mantle、Roll、碰撞安全 Root Motion |
 | P6 | 基础组件已有，完整功能待实施 | Ragdoll、Get-up、Pose Recovery、完整 ALS Camera |

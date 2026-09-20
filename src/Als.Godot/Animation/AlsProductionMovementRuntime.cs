@@ -398,8 +398,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     public void CompleteEvents(ref AlsFrameResult result)
     {
         RequirePrepared();
-        if (result.Identity != _identity || result.TypedEvents.Count != 0) throw new InvalidOperationException("Overlapping movement event publishers.");
-        result.TypedEvents = _base.SourceEvents; result.ActionOutcomes = _base.Actions.Outcomes;
+        _base.CompleteEvents(ref result);
     }
 
     public void Apply()

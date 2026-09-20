@@ -799,6 +799,29 @@ public partial class BaseLayerFrameSmoke : Node
                 var priorIdentity=owner.CommittedIdentity; var priorRequests=owner.Actions.CommittedHistory;
                 var priorNotify=owner.TurnNotifies.Committed; var priorEvents=owner.Movement.CommittedEventState;
                 Prepare(); owner.Evaluate(AlsLocalPose.Identity,0,0,sink);
+                var published = AlsFrameResult.CreateDefault(id); owner.CompleteEvents(ref published);
+                if (frame == 1)
+                {
+                    var foreign = AlsFrameResult.CreateDefault(new(id.FrameId + 1, id.CharacterId, id.SlotGeneration));
+                    Reject(() => owner.CompleteEvents(ref foreign));
+                    Require(foreign.ActionPlayback == AlsActionPlayback.CreateDefault() && foreign.TypedEvents.Count == 0 && foreign.ActionOutcomes.Count == 0,
+                        "Rejected publisher partially changed the public result.");
+                    Reject(() => owner.CompleteEvents(ref published));
+                }
+                var logical = owner.Actions.CandidateOwners.ToArray().Single();
+                if (logical.InstanceId == 0) Require(published.ActionPlayback == AlsActionPlayback.CreateDefault(), "Closed action published a fading predecessor.");
+                else
+                {
+                    var instance = owner.Montages.Candidate.ToArray().Single(i => i.InstanceId == logical.InstanceId);
+                    var range = definition.MontageNotifies.Ranges.ToArray().Single(r => !r.Direct && r.ActionDefinitionId == logical.DefinitionId);
+                    Require(published.ActionPlayback.PlaybackEpoch == logical.InstanceId && published.ActionPlayback.Active == 1 &&
+                        published.ActionPlayback.OccurrenceHandleId == range.Handle && published.ActionPlayback.CurrentTime == instance.Position &&
+                        published.ActionPlayback.CurrentClipTime == instance.ClipStart + instance.Position * instance.ClipRate,
+                        "Published action identity/time differs from the actual Roll instance.");
+                    var entry = owner.Montages.Evaluation.ToArray().SingleOrDefault(e => e.InstanceId == logical.InstanceId);
+                    Require(published.ActionPlayback.EffectiveWeight == entry.Weight / MathF.Max(1, owner.Montages.SlotWeights(AlsMontageSlot.BaseLayer).TotalNodeWeight),
+                        "Published action weight differs from the frozen Slot contribution.");
+                }
                 var expectedPose=owner.Pose.ToArray(); var expectedCurves=owner.Curves.ToArray(); var events=owner.SourceEvents;
                 var outcomes=owner.Actions.Outcomes; var notify=owner.TurnNotifies.Candidate; var physical=owner.Montages.Candidate.ToArray();
                 var weights=owner.Montages.SlotWeights(AlsMontageSlot.BaseLayer);
@@ -817,6 +840,10 @@ public partial class BaseLayerFrameSmoke : Node
                 if(frame%17==0 && weights.SlotNodeWeight>AlsPoseBlender.WeightThreshold)
                 {
                     Reject(()=>owner.Evaluate(AlsLocalPose.Identity,0,0,sink,fault));
+                    var failedResult = AlsFrameResult.CreateDefault(id);
+                    Reject(() => owner.CompleteEvents(ref failedResult));
+                    Require(failedResult.ActionPlayback == AlsActionPlayback.CreateDefault() && failedResult.TypedEvents.Count == 0 && failedResult.ActionOutcomes.Count == 0,
+                        "Failed pose published part of the action result.");
                     Require(owner.CommittedIdentity==priorIdentity && owner.Actions.CommittedHistory==priorRequests &&
                         owner.TurnNotifies.Committed==priorNotify && owner.Movement.CommittedEventState.NextInstanceId==priorEvents.NextInstanceId,
                         "Failed action pose published request or event state.");
@@ -826,16 +853,20 @@ public partial class BaseLayerFrameSmoke : Node
                 Require(owner.Pose.SequenceEqual(expectedPose) && owner.Curves.SequenceEqual(expectedCurves) &&
                     owner.Montages.Candidate.SequenceEqual(physical) && owner.TurnNotifies.Candidate==notify,"Authored BaseLayer retry differs.");
                 Require(owner.SourceEvents.Count==events.Count && owner.Actions.Outcomes.Count==outcomes.Count,"Action retry counts differ.");
+                var retryPublished = AlsFrameResult.CreateDefault(id); owner.CompleteEvents(ref retryPublished);
+                Require(retryPublished.ActionPlayback == published.ActionPlayback, "Action playback changed across discard/retry.");
+                Require(retryPublished.TypedEvents.Count == events.Count && retryPublished.ActionOutcomes.Count == outcomes.Count,
+                    "Published action event/outcome counts differ.");
                 for(var i=0;i<events.Count;i++)
                 {
-                    Require(owner.SourceEvents[i]==events[i],"Action retry event identity differs.");
+                    Require(owner.SourceEvents[i]==events[i] && retryPublished.TypedEvents[i]==events[i],"Action retry/public event identity differs.");
                     if(events[i].SourceActionId<0)continue;
                     callbacks++; if(events[i].Phase==AlsAnimationEventPhase.Begin)begins++;
                     if(events[i].Phase==AlsAnimationEventPhase.End)ends++;
                 }
                 for(var i=0;i<outcomes.Count;i++)
                 {
-                    Require(owner.Actions.Outcomes[i]==outcomes[i],"Action retry outcome differs.");
+                    Require(owner.Actions.Outcomes[i]==outcomes[i] && retryPublished.ActionOutcomes[i]==outcomes[i],"Action retry/public outcome differs.");
                     switch(outcomes[i].ResultCode)
                     {
                         case AlsActionResultCode.Accepted: accepted++; break;
@@ -851,7 +882,7 @@ public partial class BaseLayerFrameSmoke : Node
         }
         Require(accepted==9 && completed==3 && cancelled==3 && replaced==3 && begins==6 && ends==6 &&
             hidden>0 && fullPose>0 && faults>0,"Authored BaseLayer action lifecycle coverage differs.");
-        GD.Print($"BASE_LAYER_ACTION_OK rates=30,60,120 frames={frames} retries={frames} full_roll_pose={fullPose} hidden={hidden} callbacks={callbacks} begins={begins} ends={ends} accepted={accepted} replaced={replaced} cancelled={cancelled} completed={completed} late_faults={faults} slot=real_roll curves=presence_checked events=unified root_motion=not_applied gameplay=not_connected demo=not_connected");
+        GD.Print($"BASE_LAYER_ACTION_OK rates=30,60,120 frames={frames} retries={frames} full_roll_pose={fullPose} hidden={hidden} callbacks={callbacks} begins={begins} ends={ends} accepted={accepted} replaced={replaced} cancelled={cancelled} completed={completed} late_faults={faults} slot=real_roll curves=presence_checked events=unified playback=physical_owner root_motion=not_applied gameplay=not_connected");
     }
     private sealed class ActionFailureSlot(IAlsBaseLayerSlotPoseSink inner):IAlsBaseLayerSlotPoseSink
     {

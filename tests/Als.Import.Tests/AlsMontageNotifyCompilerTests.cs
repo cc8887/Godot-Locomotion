@@ -13,6 +13,42 @@ public sealed class AlsMontageNotifyCompilerTests
     private static readonly Lazy<Fixture> Data=new(Fixture.Create);
 
     [Fact]
+    public void ActionPlaybackUsesTheSequenceOccurrenceFromTheCurrentNotifyLayout()
+    {
+        var f = Data.Value; var original = f.Compile(Read("v4_action_notify_inputs.json"));
+        var remappedRanges = original.Ranges.ToArray().Select(r => r with { Handle = r.Handle + 1000 }).ToArray();
+        var timelines = new List<AlsTimelineEventDefinition>();
+        foreach (var range in original.Ranges)
+            for (var i = 0; i < range.Count; i++)
+            {
+                Assert.True(original.TryTimeline(new(original.SourcePolicyCount + range.Offset + i, range.Handle, 0, true, false), out var entry));
+                timelines.Add(entry with { RequiredOccurrenceHandleId = range.Handle + 1000 });
+            }
+        var remapped = new AlsMontageNotifyBinding(original.Policies[..original.SourcePolicyCount],
+            original.Policies[original.SourcePolicyCount..], original.Definitions, timelines.ToArray(), remappedRanges);
+        var roll = Assert.Single(f.Actions); var section = Assert.Single(f.Set.Montages[roll.MontageId].Sections);
+        var bank = new AlsMontageRuntime(f.Turns, f.Actions);
+        var actions = new AlsMontageActionRuntime(bank, [new(roll.ActionDefinitionId, section.SectionId, 0, 1, .2f, true)]);
+        var id = new AlsFrameIdentity(1, 1, 1); actions.Begin(id, .05f);
+        actions.ApplyRequest(new(1, AlsActionCommand.Start, roll.ActionDefinitionId, section.SectionId, 100, 1)); actions.Complete();
+        var before = AlsMontageActionPlaybackCompiler.Compile(f.Set, f.Actions, original).ReadOwned(actions, id, roll.Slot);
+        var after = AlsMontageActionPlaybackCompiler.Compile(f.Set, f.Actions, remapped).ReadOwned(actions, id, roll.Slot);
+        var sequence = original.Ranges.ToArray().Single(r => !r.Direct && r.ActionDefinitionId == roll.ActionDefinitionId);
+        Assert.Equal(sequence.Handle, before.OccurrenceHandleId);
+        Assert.Equal(before with { OccurrenceHandleId = before.OccurrenceHandleId + 1000 }, after);
+        Assert.Equal(section.SectionId, after.SectionId);
+        Assert.Equal(f.Set.Montages[roll.MontageId].Slots[0].Segments[0].SegmentId, after.SegmentId);
+    }
+
+    [Fact]
+    public void ActionPlaybackRejectsMissingNotifyBindingOrStalePhysicalMapping()
+    {
+        var f = Data.Value; var binding = f.Compile(Read("v4_action_notify_inputs.json")); var roll = Assert.Single(f.Actions);
+        Assert.Throws<ArgumentException>(() => AlsMontageActionPlaybackCompiler.Compile(f.Set, f.Actions, new([], [], [], [], [])));
+        Assert.Throws<ArgumentException>(() => AlsMontageActionPlaybackCompiler.Compile(f.Set, [roll with { ClipStart = roll.ClipStart + .01f }], binding));
+    }
+
+    [Fact]
     public void StopThenOverlayPreservesRepeatedInstancesAndSameGroupOrderOnRetry()
     {
         var f = Data.Value;

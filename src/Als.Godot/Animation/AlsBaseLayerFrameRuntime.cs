@@ -102,6 +102,22 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     internal AlsMontageRuntime Montages => _montages;
     internal AlsMontageNotifyRuntime TurnNotifies => _turnNotifies;
     internal AlsMontageActionRuntime Actions => _actions;
+    private readonly AlsMontageActionPlaybackReader _actionPlayback;
+
+    public void CompleteEvents(ref AlsFrameResult result)
+    {
+        ValidateCommit(result.Identity);
+        if (result.TypedEvents.Count != 0 || result.ActionOutcomes.Count != 0 ||
+            result.ActionPlayback != AlsActionPlayback.CreateDefault())
+            throw new InvalidOperationException("Overlapping BaseLayer result publishers.");
+        var playback = _authoredActions == true
+            ? _actionPlayback.ReadOwned(_actions, _identity, AlsMontageSlot.BaseLayer, _phase != Phase.Unvisited)
+            : AlsActionPlayback.CreateDefault();
+        var outcomes = HasMontageFrame ? _actions.Outcomes : default;
+        // Resolve every fallible read before writing any part of the public result.
+        var events = SourceEvents;
+        result.TypedEvents = events; result.ActionOutcomes = outcomes; result.ActionPlayback = playback;
+    }
     internal IAlsBaseLayerSlotPoseSink ActionSlot => _actionSlot;
     internal AlsGroundedMontageSlot GroundedSlot => _groundedSlot;
     internal AlsTurnInPlaceDecision CandidateTurn { get { _ = CandidateGlobalInput; return _candidateTurn; } }
@@ -144,7 +160,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         _aimingInput = definition.AimingInput; _committedAimingInput = _aimingInput.InitialState;
         _idleControl = definition.IdleControl;
         _turnInPlace = definition.TurnInPlace; _montages = new(definition.TurnMontageAssets, definition.AuthoredMontageAssets, definition.GroundedTransitionAssets);
-        _actions = new(_montages,definition.ActionPolicies);
+        _actions = new(_montages,definition.ActionPolicies); _actionPlayback = definition.ActionPlayback;
         _turnNotifyBinding = definition.MontageNotifies; _turnNotifies = new(_turnNotifyBinding);
         _overlayTransitions = definition.OverlayTransitions; _stopTransitions = definition.StopTransitions;
         _committedGlobalInput = new(default, definition.InputCurves.Defaults["FallSpeed"] * .01f,

@@ -24,6 +24,7 @@ public sealed class AlsMontageActionRuntime
     private bool _requestApplied;
     private enum Phase { Idle, Preparing, Prepared, Faulted }
     public AlsFrameIdentity CommittedIdentity { get; private set; }
+    internal AlsMontageRuntime Montages => _montages;
     public ReadOnlySpan<AlsMontageActionOwner> CommittedOwners => _committed;
     public ReadOnlySpan<AlsMontageActionOwner> CandidateOwners { get { RequireCandidate(); return _candidate; } }
     public AlsMontageActionHistory CommittedHistory => _history;
