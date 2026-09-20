@@ -109,6 +109,8 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     internal AlsMontageRuntime Montages => _montages;
     internal AlsMontageNotifyRuntime TurnNotifies => _turnNotifies;
     internal AlsMontageActionRuntime Actions => _actions;
+    private readonly bool _rollingGameplay = AlsAnimationRuntimeOptions.Has("--rolling-gameplay");
+    private AlsRollingState _committedRolling, _candidateRolling;
     private readonly AlsMontageActionPlaybackReader _actionPlayback;
     private readonly AlsMontageRootMotionReader _rootMotion;
     private AlsFrameIdentity _motionPreparation;
@@ -162,6 +164,11 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         result.TypedEvents = events; result.ActionOutcomes = outcomes; result.ActionPlayback = playback;
         result.ProposedRootMotionDelta = motion;
         result.RootMotionSource = motionSource.HasMotion ? motionSource : default;
+        if (_rollingGameplay)
+        {
+            _candidateRolling = AlsRollingGameplay.ApplyNotifies(_candidateRolling, events);
+            result.Rolling = _candidateRolling;
+        }
     }
     internal IAlsBaseLayerSlotPoseSink ActionSlot => _actionSlot;
     internal AlsGroundedMontageSlot GroundedSlot => _groundedSlot;
@@ -314,7 +321,10 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         {
         _identity=frame.Identity; SourceUpdated=false; RequestCount=0; _phase=Phase.GlobalUpdating;
         BeginMontageFrame(frame.Identity, frame.DeltaTime);
-        _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None, _cancelForRuntimeFailure);
+        _candidateRolling = _committedRolling;
+        AlsRollingStartContext? rolling = _rollingGameplay ? new(frame.Floor.IsGrounded == 1,
+            !_cancelForRuntimeFailure && _committedRolling.Active ? AlsTimelineAction.Rolling : frame.GameplayAction) : null;
+        _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None, _cancelForRuntimeFailure, rolling);
         _failureEpochCount = 0;
         for (var i = 0; i < _actions.Outcomes.Count; i++)
             if (_actions.Outcomes[i].ResultCode == AlsActionResultCode.InterruptedByRuntimeFailure)
@@ -345,6 +355,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         }
         var control = _candidateControlInput.State;
         _actions.Complete();
+        if (_rollingGameplay) _candidateRolling = AlsRollingGameplay.ApplyOutcomes(_committedRolling, frame, _actions.Outcomes);
         // Global UpdateInAirValues runs even when BaseLayer source relevance is zero.
         _candidateGlobalInput = _candidateMovementState == AlsMovementStateInput.InAir ?
             _airInput.Evaluate(frame, _committedGlobalInput.Lean, feedback, _candidateMovementState) :
@@ -503,6 +514,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             CommittedRefactoredPose = CandidateRefactoredPose;
         }
         if (HasMontageFrame) { _actions.Commit(identity); _turnNotifies.Commit(identity); }
+        _committedRolling = _candidateRolling;
         CommittedStopTransitionCount = StopTransitionCount;
         CommittedIdentity=identity; _sink = null; _phase = Phase.Idle; _cancelForRuntimeFailure = false; _failureEpochCount = 0;
     }
@@ -565,11 +577,13 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         if (_phase == Phase.Disposed) throw new ObjectDisposedException(nameof(AlsBaseLayerFrameRuntime));
         _movement.Discard(); _tail.Discard(); _actions.Discard(); _turnNotifies.Discard(); StopTransitionCount = 0; _sink = null; _phase = Phase.Idle;
         _cancelForRuntimeFailure = false; _failureEpochCount = 0; _motionPreparation = default; _preparedRootMotion = default;
+        _candidateRolling = _committedRolling;
     }
     internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
     {
         Require(Phase.Idle);
         _actions.ClearForLifecycle(abandonedInput);
+        _committedRolling = _candidateRolling = default;
         _movement.ClearNotifyOwnershipForLifecycle();
     }
     public void RequestInertialization(in AlsPoseUpdateContext context, float seconds)

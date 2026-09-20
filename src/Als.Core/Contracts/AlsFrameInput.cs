@@ -45,6 +45,8 @@ public readonly record struct AlsFrameInput(
     public AlsFootIkSceneSample FootIk { get; init; }
     public AlsCharacterMovementInput MovementInput { get; init; }
     public AlsRefactoredGroundPredictionSample RefactoredGroundPrediction { get; init; }
+    public AlsTimelineAction GameplayAction { get; init; }
+    public float MeshHeightOffset { get; init; }
 
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {

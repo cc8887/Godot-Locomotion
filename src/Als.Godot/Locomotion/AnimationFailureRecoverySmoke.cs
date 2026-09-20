@@ -50,8 +50,9 @@ public partial class AnimationFailureRecoverySmoke : Node
             _demo.ConfigureRuntimePolicyForSmoke(_mode, _debug); AddChild(_demo);
             Require(_demo.IsRuntimeReady, "Production Demo initialization failed.");
             _context = _demo.RuntimeContext; _character = _demo.ActiveCharacter;
+            if (AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) RollingGameplaySmoke.PlaceOnOpenFloor(_demo);
             _context.ActionOutcomeCommitted += Outcome; _context.AnimationEventCommitted += Event;
-            Tap(Key.R);
+            if (!AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) Tap(Key.R);
         }
         catch (Exception error) { Fail(error); }
     }
@@ -64,6 +65,7 @@ public partial class AnimationFailureRecoverySmoke : Node
             Require(++_ticks < 180 && _demo.IsRuntimeReady && _demo.ErrorCount == _character.FailureDiagnosticCount,
                 $"Recovery stalled or unexpected diagnostic: phase={_phase} frame={_character.RuntimeCommittedFrameId} errors={_demo.ErrorCount}.");
             var committed = _character.RuntimeCommittedFrameId;
+            if (committed == 2 && AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) Tap(Key.R);
             if (_phase == 0 && committed == 12)
             {
                 Require(_accepted == 1 && _character.CommittedAnimation.StateCount == 1, "No active Roll ownership.");
@@ -71,6 +73,8 @@ public partial class AnimationFailureRecoverySmoke : Node
                 _heldMotion = _character.Diagnostics.Result.ProposedRootMotionDelta;
                 Require(_heldMotionSource.HasMotion && _heldMotionSource.Identity.FrameId == 12,
                     "No committed motion before fault injection.");
+                if (AlsAnimationRuntimeOptions.Has("--rolling-gameplay"))
+                    Require(_character.Diagnostics.Result.Rolling.Active, "No gameplay Roll before fault injection.");
                 if (_replacement) Tap(Key.R);
                 if (_propSwitch) _demo.Overlay = GodotAls.Core.Locomotion.AlsOverlayKind.Bow;
                 Arm(); _phase = 1;
@@ -81,6 +85,8 @@ public partial class AnimationFailureRecoverySmoke : Node
                 Require(_character.Diagnostics.Result.RootMotionSource == _heldMotionSource &&
                     _character.Diagnostics.Result.ProposedRootMotionDelta == _heldMotion,
                     "Failed animation published a new motion source or delta.");
+                if (AlsAnimationRuntimeOptions.Has("--rolling-gameplay"))
+                    Require(_character.Diagnostics.Result.Rolling.InstanceId == _oldEpoch, "Failed frame changed committed Roll owner.");
                 if (_propSwitch) Require(_character.Props!.Committed.Identity.FrameId == 12 &&
                     _character.Props.Committed.Overlay == GodotAls.Core.Locomotion.AlsOverlayKind.Rifle,
                     "Failed animation published the pending prop switch.");
@@ -122,6 +128,9 @@ public partial class AnimationFailureRecoverySmoke : Node
                     "Successful retry lost cancellation, replayed input or duplicated events.");
                 Require(_character.FullMovementDiagnostics.MovementNotifies.Action == AlsTimelineAction.None,
                     "Old SetMovementAction survived the successful recovery frame.");
+                if (AlsAnimationRuntimeOptions.Has("--rolling-gameplay"))
+                    Require(_character.Diagnostics.Result.Rolling.Active == _replacement,
+                        "Recovery retained old Roll state or lost the accepted replacement.");
                 _phase = 2;
             }
             else if (_phase == 2 && committed == 16)

@@ -13,8 +13,10 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 
 共同 Montage 已发布真实动作摘要，并补齐 Roll 的类型化 GroundedEntry 通知及入口重置。
 普通输入现已通过 Motor 接入共同动作所有者，主线程提交后发布动作结果。
-主场景支持 R 原地翻滚动画预览、X 取消，详见
-[最新接线记录](docs/verification/2026-09-20-action-input.md)。碰撞安全 Root Motion 仍待实现，当前预览不驱动胶囊翻滚位移。
+主场景支持 R 地面翻滚、X 取消：同帧 Root Motion 经过胶囊碰撞移动，翻滚锁定
+触发方向并使用半衰期转向，重复播放/空中触发受门控。详见
+[地面 Roll 接线记录](docs/verification/2026-09-20-grounded-roll-gameplay.md)。落地自动 Roll
+及翻滚离地转 Ragdoll 尚未实现；`--action-preview` 保留旧原地预览诊断入口。
 角色永久销毁/换代现会根据主线程已提交记录结束 Notify State 和动作；包含回调内销毁及
 未提交动作隔离。见[退役清理记录](docs/verification/2026-09-20-animation-retirement.md)。
 完整入口现已区分调度暂停与真正停用；停用会清理动作，恢复时保留移动/脚部检查点，
@@ -38,7 +40,7 @@ dotnet build GodotALS.csproj -p:Optimize=true
 
 Editor 使用 F5 运行项目；单独运行旧的 `p4_locomotion_demo.tscn` 是历史诊断入口。
 需要复查旧链路时，在普通启动命令末尾加 `-- --legacy-animation`。
-可用 `-- --overlay=Rifle` 检查指定 Overlay 姿势；道具装备和切换玩法仍待接线。
+可用 `-- --overlay=Rifle` 检查指定 Overlay 姿势及道具，Q / E 切换。
 
 键鼠：
 
@@ -53,8 +55,8 @@ Editor 使用 F5 运行项目；单独运行旧的 `p4_locomotion_demo.tscn` 是
 | 鼠标右键 | Aiming |
 | 鼠标移动 | Orbit camera |
 | `Esc` | 切换鼠标捕获 |
-| `R` | 原地翻滚动画预览（完整动画入口） |
-| `X` | 取消当前已接受的预览动作 |
+| `R` | 地面翻滚，朝触发瞬间的移动方向；无输入时朝角色前方 |
+| `X` | 取消当前已接受的动作 |
 | `Q` / `E` | 上一个 / 下一个 Overlay，按 UE 原始规则装备或清空道具 |
 
 道具已接入正式动画提交：步枪、单/双手手枪、弓、火炬、望远镜、箱子、桶；

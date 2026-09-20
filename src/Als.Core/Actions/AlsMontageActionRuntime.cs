@@ -53,7 +53,8 @@ public sealed class AlsMontageActionRuntime
         _phase=Phase.Preparing;
     }
 
-    public void ApplyRequest(in AlsActionRequest request, bool cancelForRuntimeFailure = false)
+    public void ApplyRequest(in AlsActionRequest request, bool cancelForRuntimeFailure = false,
+        AlsRollingStartContext? rolling = null)
     {
         if (_phase != Phase.Preparing || _requestApplied) throw new InvalidOperationException("Action request phase differs.");
         _requestApplied=true;
@@ -80,6 +81,8 @@ public sealed class AlsMontageActionRuntime
                 { Reject(request,AlsActionResultCode.RejectedMissingDefinition); return; }
                 if (request.StartSectionId!=binding.Policy.StartSectionId)
                 { Reject(request,AlsActionResultCode.RejectedInvalidRequest); return; }
+                if (rolling is { } roll && !AlsRollingGameplay.CanStart(roll, _montages.IsActionPlaying(request.ActionDefinitionId)))
+                { Reject(request,AlsActionResultCode.RejectedBusy); return; }
                 var index=Array.IndexOf(_groups,binding.Group); var old=_candidate[index];
                 if (old.InstanceId>0 && !old.Interruptible) { Reject(request,AlsActionResultCode.RejectedBusy); return; }
                 if (old.InstanceId>0 && request.Priority<old.Priority) { Reject(request,AlsActionResultCode.RejectedLowerPriority); return; }

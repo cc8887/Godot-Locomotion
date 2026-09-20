@@ -55,7 +55,7 @@ public partial class AlsCharacterMotor
         RememberGatherTransform(character);
         var committed = _footProbeExchange.TryReadNative(identity, out var source);
         if (!committed) source = _initialNativeFeet;
-        var component = character * AlsFootIkGodot.Transform(source.ComponentToCharacter);
+        var component = character * AlsFootIkGodot.Transform(RollingGameplay ? NativeComponentToCharacter : source.ComponentToCharacter);
         var root = component * ToGodot(source.RootComponent);
         var leftWorld = component * ToGodot(source.LeftComponent.Position);
         var rightWorld = component * ToGodot(source.RightComponent.Position);

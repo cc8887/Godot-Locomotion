@@ -103,6 +103,13 @@ public partial class AlsCharacterMotor : CharacterBody3D
     internal AlsMontageRootMotionRange LastConsumedRootMotion { get; private set; }
     internal AlsRootMotionDelta LastRootMotionWorldDelta { get; private set; } = AlsRootMotionDelta.Identity;
     internal bool ConsumeMontageRootMotion { get; set; }
+    internal bool RollingGameplay { get; set; }
+    // ACharacter::OnStartCrouch keeps the skeletal mesh at its original height
+    // when the capsule center lowers. The authored pose supplies the crouch.
+    private float MeshHeightOffset => RollingGameplay && _actualStance == AlsStance.Crouching
+        ? (_settings.StandingHeight - _settings.CrouchingHeight) * .5f : 0;
+    private AlsLocalPose NativeComponentToCharacter => _initialNativeFeet.ComponentToCharacter with
+    { Position = _initialNativeFeet.ComponentToCharacter.Position + NumericsVector3.UnitY * MeshHeightOffset };
 
     internal AlsFrameIdentity LastFootGatherRequestIdentity { get; private set; }
 
@@ -250,7 +257,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
         byte hasTargetYaw = 0,
         float targetYaw = 0f,
         AlsCharacterRotationFeedback rotationFeedback = default, AlsRefactoredAnimationFeedback refactoredFeedback = default,
-        AlsMontageRootMotionRange rootMotionSource = default, AlsRootMotionDelta rootMotion = default)
+        AlsMontageRootMotionRange rootMotionSource = default, AlsRootMotionDelta rootMotion = default,
+        AlsRollingState rolling = default)
     {
         ValidateStep(frameId, characterId, generation, deltaTime, hasTargetYaw, targetYaw);
         var hasRootMotion = rootMotionSource.HasMotion;
@@ -262,6 +270,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _publishedVelocityCheckpointPending = false;
         var source = _source!;
         var command = source.GetCommand(frameId);
+        var isRolling = RollingGameplay && rolling.Active;
+        // Desired stance stays in the input adapter; only the effective command
+        // crouches during Rolling, then restores that desired stance with clearance.
+        if (isRolling) command = command with { RequestedStance = AlsStance.Crouching, JumpPressed = 0 };
         var actionRequest = source is IAlsActionRequestSource actionSource
             ? actionSource.GetActionRequest(new(frameId, (uint)characterId, (uint)generation)) : AlsActionRequest.None;
         if (actionRequest.Command != AlsActionCommand.None && _runtimeContext?.MovementGraph is null)
@@ -369,28 +381,35 @@ public partial class AlsCharacterMotor : CharacterBody3D
             MovementDiagnostics = movementStep;
         }
         var nextVelocity = new Vector3(horizontalVelocity.X, verticalVelocity, horizontalVelocity.Z);
-        var rootMotionBasis = GlobalBasis;
+        var rootMotionBasis = Basis.Identity;
         if (hasRootMotion)
         {
             var canonicalToBone = new AlsPrecisePose(default,
                 new(System.Numerics.Quaternion.Conjugate(AlsFootIkCoordinates.FbxToGodotRotation)), AlsDoubleVector.One);
-            var componentToCharacter = AlsPrecisePose.Compose(canonicalToBone, new(_initialNativeFeet.ComponentToCharacter));
+            var componentToCharacter = AlsPrecisePose.Compose(canonicalToBone, new(NativeComponentToCharacter));
             var world = AlsRootMotionKinematics.ToWorld(rootMotion, componentToCharacter, new(AlsFootIkGodot.Pose(GlobalTransform)));
             nextVelocity = ToGodot(world.Translation) / deltaTime;
             // Falling retains gravity; the montage only overrides horizontal velocity.
             if (!groundedBeforeMove || jumpAccepted == 1) nextVelocity.Y = verticalVelocity;
             LastRootMotionWorldDelta = world;
             var q = world.Rotation;
-            rootMotionBasis = new Basis(new Quaternion(q.X, q.Y, q.Z, q.W)) * GlobalBasis;
-            if (rootMotionBasis.Y.Normalized().Dot(Vector3.Up) < .99999f)
+            rootMotionBasis = new Basis(new Quaternion(q.X, q.Y, q.Z, q.W));
+            if ((rootMotionBasis * GlobalBasis).Y.Normalized().Dot(Vector3.Up) < .99999f)
                 throw new InvalidOperationException("Root motion cannot tilt the upright character capsule.");
         }
         RequireFiniteVector(nextVelocity, nameof(nextVelocity));
         Velocity = nextVelocity;
         MoveAndSlide();
+        if (isRolling)
+        {
+            var yaw = AlsRollingGameplay.Rotate(-GetCharacterYaw() * (180f / MathF.PI), rolling.TargetYawDegrees, deltaTime);
+            GlobalBasis = new Basis(Vector3.Up, -yaw * (MathF.PI / 180f));
+        }
         if (hasRootMotion)
         {
-            GlobalBasis = rootMotionBasis;
+            // CMC applies PhysicsRotation after movement, then the extracted
+            // root rotation. Translation used the pre-rotation mesh transform.
+            GlobalBasis = rootMotionBasis * GlobalBasis;
             LastConsumedRootMotion = rootMotionSource;
         }
 
@@ -417,7 +436,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
         var aimRate = AlsAimYawRate.Gather(command.ViewYaw, _previousControlDegrees, deltaTime);
         var lastMovementRotation = GlobalBasis.GetRotationQuaternion();
-        var rotationSample = ApplyCharacterRotation(deltaTime, actualVelocity, grounded, resolvedCommand, aimRate, rotationFeedback, hasRootMotion);
+        var rotationSample = ApplyCharacterRotation(deltaTime, actualVelocity, grounded, resolvedCommand, aimRate, rotationFeedback, hasRootMotion, isRolling);
         var characterTransform = GlobalTransform;
         var characterYaw = GetCharacterYaw(characterTransform.Basis);
         if (!float.IsFinite(characterYaw))
@@ -500,6 +519,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
         {
             FootPlacementReleaseSignals = releaseSignals,
             ActionRequest = actionRequest,
+            GameplayAction = RollingGameplay ? (isRolling ? AlsTimelineAction.Rolling :
+                rotationFeedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : rotationFeedback.Action) : default,
+            MeshHeightOffset = MeshHeightOffset,
             AimYawRateDegrees = aimRate.RateDegrees,
             FirstPerson = FirstPersonView ? (byte)1 : (byte)0,
             CharacterRotation = rotationSample,
@@ -551,7 +573,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
     }
 
     private AlsCharacterRotationSample ApplyCharacterRotation(float delta, NumericsVector3 velocity, bool grounded,
-        in AlsResolvedLocomotionCommand command, in AlsAimYawRateSample aim, in AlsCharacterRotationFeedback feedback, bool hasRootMotion)
+        in AlsResolvedLocomotionCommand command, in AlsAimYawRateSample aim, in AlsCharacterRotationFeedback feedback, bool hasRootMotion, bool isRolling)
     {
         if (_characterRotation is null) return default;
         var speed = (float)System.Math.Sqrt((double)velocity.X * velocity.X + (double)velocity.Z * velocity.Z);
@@ -567,9 +589,13 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var input = new AlsCharacterRotationInput(delta, -before * (180d / System.Math.PI), aim.ControlDegrees,
             WorldYaw(velocity), WorldYaw(command.WorldDirection), speed, command.InputAmount > 0 && _settings.MaxAcceleration > 0,
             hasRootMotion, grounded ? AlsMovementStateInput.Grounded : AlsMovementStateInput.InAir,
-            command.RotationMode, _actualStance, _rotationGait, feedback.Action, FirstPersonView, aim.RateDegrees,
+            command.RotationMode, _actualStance, _rotationGait,
+            isRolling ? AlsTimelineAction.Rolling : RollingGameplay && feedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : feedback.Action,
+            FirstPersonView, aim.RateDegrees,
             feedback.YawOffsetPresent ? feedback.YawOffset : 0, feedback.RotationAmountPresent ? feedback.RotationAmount : 0);
         var rotation = _characterRotation.Evaluate(input, _rotationHistory);
+        if (isRolling)
+            rotation = rotation with { ActorYaw = input.ActorYaw, History = rotation.History with { TargetYaw = input.ActorYaw }, Branch = AlsCharacterRotationBranch.Rolling };
         var yaw = (float)(-rotation.ActorYaw * (System.Math.PI / 180));
         GlobalBasis = new Basis(Vector3.Up, yaw);
         _rotationHistory = rotation.History; RotationDiagnostics = rotation;

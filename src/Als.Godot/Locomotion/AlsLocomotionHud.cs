@@ -33,7 +33,8 @@ public partial class AlsLocomotionHud : VBoxContainer
     public void EnableActionPreview()
     {
         var label = CreateLabel("ActionPreviewHelp");
-        var action = GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--montage-root-motion") ? "翻滚测试" : "原地翻滚动画预览";
+        var action = GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay") ? "地面翻滚" :
+            GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--montage-root-motion") ? "翻滚位移测试" : "原地翻滚动画预览";
         label.Text = $"R：{action}  |  X：取消动作  |  Q / E：切换 Overlay 道具";
     }
 

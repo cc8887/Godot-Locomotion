@@ -31,6 +31,7 @@ public partial class ActionLifecycleSmoke : Node
             var entry = scene.Instantiate<AlsDemoEntry>(); AddChild(entry); _demo = entry.Demo;
             Require(_demo.IsRuntimeReady, "Normal Demo initialization failed.");
             _slot = _demo.GetNode<AlsP3CharacterSlot>("CharacterSlot");
+            if (GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) RollingGameplaySmoke.PlaceOnOpenFloor(_demo);
             _oldGeneration = _demo.ActiveCharacter.Handle.Generation;
             _demo.RuntimeContext.ActionOutcomeCommitted += ObserveOutcome;
         }

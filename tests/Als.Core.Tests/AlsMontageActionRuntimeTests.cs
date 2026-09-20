@@ -153,6 +153,35 @@ public sealed class AlsMontageActionRuntimeTests
         void Tick(int f){owner.Begin(Id(f),.01f);owner.ApplyRequest(Start(f));owner.Complete();owner.Commit(Id(f));}
     }
     private static (AlsMontageRuntime,AlsMontageActionRuntime) Create(bool interruptible=true)
+    => CreateRuntime(interruptible);
+
+    [Fact]
+    public void RollGateRejectsReplayTransactionallyButAllowsNativeBlendOutRestart()
+    {
+        var (bank, owner) = Create();
+        owner.Begin(Id(1), .1f); owner.ApplyRequest(Start(1), rolling: new(true, AlsTimelineAction.None)); owner.Complete(); owner.Commit(Id(1));
+        owner.Begin(Id(2), .1f); owner.ApplyRequest(Start(2), rolling: new(true, AlsTimelineAction.Rolling)); owner.Complete();
+        Assert.Equal(AlsActionResultCode.RejectedBusy, owner.Outcomes[0].ResultCode);
+        Assert.Equal(1, owner.CandidateOwners[0].RequestId); owner.Discard();
+        owner.Begin(Id(2), .1f); owner.ApplyRequest(Start(2), rolling: new(true, AlsTimelineAction.Rolling)); owner.Complete(); owner.Commit(Id(2));
+        var restarted = false;
+        for (var f = 3; f < 20; f++)
+        {
+            owner.Begin(Id(f), .1f);
+            var canRestart = !bank.IsActionPlaying(0);
+            owner.ApplyRequest(Start(f), rolling: new(true, AlsTimelineAction.Rolling)); owner.Complete();
+            if (canRestart)
+            {
+                Assert.Equal(AlsActionResultCode.InterruptedByReplacement, owner.Outcomes[0].ResultCode);
+                Assert.Equal(AlsActionResultCode.Accepted, owner.Outcomes[1].ResultCode);
+                Assert.Equal(2, bank.Candidate.Length); restarted = true; break;
+            }
+            Assert.Equal(AlsActionResultCode.RejectedBusy, owner.Outcomes[0].ResultCode); owner.Commit(Id(f));
+        }
+        Assert.True(restarted);
+    }
+
+    private static (AlsMontageRuntime,AlsMontageActionRuntime) CreateRuntime(bool interruptible)
     {
         var bank=new AlsMontageRuntime([new(10,AlsTurnSlot.Standing,1,2)],
             [new(0,11,AlsMontageSlot.BaseLayer,1,1.5f,0,1,new(AlsActionLifecycleMode.MontageAutoBlendOut,.2f,AlsActionBlendOption.HermiteCubic,.3f,AlsActionBlendOption.HermiteCubic,-1))]);

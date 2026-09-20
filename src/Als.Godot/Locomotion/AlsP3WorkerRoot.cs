@@ -352,6 +352,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 var correctedRoot = AlsP3Presentation.Compose(
                     input.CharacterTransform,
                     _context.PresentationTransform);
+                correctedRoot.Origin += Vector3.Up * input.MeshHeightOffset;
                 AlsP3Presentation.ThrowIfNonFinite(correctedRoot);
                 _visualRoot!.GlobalTransform = correctedRoot;
                 if (measure)

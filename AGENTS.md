@@ -8,7 +8,7 @@
 
 # 运行和验证
 
-- 最新进度：`docs/verification/2026-09-20-root-motion-consumption.md`。共同 Montage 已在 Motor 前同帧准备；`--montage-root-motion` 开启碰撞消费，普通配置 R 仍为原地预览。下一步实现 Refactored Roll 门控、目标转向与落地规则，再接普通入口。
+- 最新进度：`docs/verification/2026-09-20-grounded-roll-gameplay.md`。普通入口 R 已启用地面 Roll 门控、锁定目标/半衰期转向、蹲伏高度补偿及同帧 Root Motion 碰撞消费。`--action-preview` 保留旧动作预览；下一步补落地 Roll 的请求倍率、Ragdoll 优先级及翻滚离地规则，尚未关闭整个 P5C。
 
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。
