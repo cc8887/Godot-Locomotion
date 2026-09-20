@@ -13,4 +13,10 @@ public interface IAlsIslandContacts
         ReadOnlySpan<AlsIslandBody> bodies, double dt);
     void SolvePosition(Span<AlsProjectionDelta> bodies, int iteration, int iterationCount);
     void SolveVelocity(Span<AlsProjectionVelocity> bodies, int iteration, int iterationCount, double dt);
+    // Stage validates every history update before any body state is published.
+    // Commit must not fail after a successful stage; Abort must be idempotent
+    // and nonthrowing. Legacy stateless providers need no lifecycle callbacks.
+    void StageCommit() { }
+    void Commit() { }
+    void Abort() { }
 }

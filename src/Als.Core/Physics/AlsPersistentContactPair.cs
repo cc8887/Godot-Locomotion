@@ -3,8 +3,8 @@ using GodotAls.Core.Locomotion;
 namespace GodotAls.Core.Physics;
 
 // Runtime owner for one detected shape pair. History -> geometry Gather -> rows
-// -> history commit. The world calls Commit only after body-state publication,
-// or Abort on failure; no history is advanced merely by solving a row.
+// -> history commit. The world stages all histories and body states before
+// publishing, or aborts on failure; solving alone never advances history.
 public sealed class AlsPersistentContactPair
 {
     private readonly AlsContactHistory _history;
@@ -55,12 +55,15 @@ public sealed class AlsPersistentContactPair
     public void SolveVelocity(ref AlsProjectionVelocity body0, ref AlsProjectionVelocity body1, float dt, bool friction)
     { RequirePending(); _solver.SolveVelocity(ref body0, ref body1, dt, friction); }
     public void Commit()
+    { StageCommit(); PublishCommit(); }
+    public void StageCommit()
     {
         RequirePending();
         for (var i = 0; i < _solver.Count; i++)
             _results[_sourceIndices[i]] = new(_solver.PointAt(i).StaticFrictionRatio, _solver.InitialPhiAt(i));
-        _history.Commit(_results.AsSpan(0, _history.PreparedCount));
+        _history.StageCommit(_results.AsSpan(0, _history.PreparedCount));
     }
+    public void PublishCommit() => _history.PublishCommit();
     public void Abort() => _history.Abort();
     public void Reset() => _history.Reset();
     private void RequirePending()

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新世界接触进度：`docs/verification/2026-09-21-physics-contact-world.md`。固定拓扑 registry 分配 body generation/shape revision，双向 layer/mask 与身体对禁碰；Godot 独立单目标 Jolt query space 提供球/盒/胶囊/凸包真实几何，Core 接管两端动态响应及多个接触对共同迭代。整步历史先 Stage 再无回调发布，失败不推进身体/历史。30/60/120 Hz 各三场景×60 步通过，双动态总动量误差 0；六项几何/容量/失效/主线程检查通过。Core 2675、Import 2359/1 旧跳过、Godot 构建及原有 144 组关节回放通过。此实现为 O(shape²) 预分配与遍历、统一已解析材质、独立查询世界；不是 Chaos 窄相等价或普通场景自动发现。尚无重力、运动 kinematic、CCD、睡眠、完整资产身体接触绑定与整链落地；普通 demo 未切换，旧 Jolt 失败未关闭。下一步外力/重力与资产整链接触，再睡眠及普通 Ragdoll/Get-up/Pose Recovery。
+
 - 最新持续接触进度：`docs/verification/2026-09-21-physics-contact-history.md`。`AlsContactHistory` 完成默认多点复用/可选唯一匹配、quadratic 距离规则、静止/滑动/零摩擦锚点回存、初始深度、禁用点和事务式提交；有序 body generation/shape revision key 隔离历史，标识仍由未来 world owner 分配。`AlsPersistentContactPair` 串联 history→Gather→行求解→回存，维护禁用点索引。192 组×6 帧原生历史阶段对照通过（1715 恢复/2445 新点，最大锚点差 0）；重复导出一致。Core 2669、Import 2359/1 旧跳过，Godot 构建通过。UE 普通重启首轮日志关闭后访问冲突，未定位；相同参数复跑退出 0，详见记录，勿称已修复。下一步世界身体/形状注册与过滤、真实碰撞查询和多个接触对共同迭代，再重力、睡眠、整链落地、普通 Ragdoll；本批未改变 demo 或关闭旧 Jolt 失败。
 
 - 最新 Gather 进度：`docs/verification/2026-09-21-physics-contact-gather.md`。`AlsContactGather` 从 shape-local 几何/姿态/COM/速度生成接触臂、切线、摩擦误差、恢复目标和初始重叠更新；`GatherGeometry` 事务式缓存并供共享关节迭代使用。432 组原始几何→Gather→完整接触阶段对照通过，本机 Gather 差值 0、最大 DP 4.486e-8 cm、线速度 1.222e-5 cm/s；新旧参考重导一致。Core 首轮既有足部零分配失败（2448 字节，原因未定位），独立与全量复跑通过：Core 2655，Import 2358/1 旧跳过，Godot 构建通过。尚未完成稳定 body/shape 身份、持续锚点匹配与真实碰撞 provider；下步先这些，再重力/动态双向响应/运动 kinematic/睡眠/整链落地/Ragdoll。普通 demo 未切换，旧 Jolt 失败未关闭。

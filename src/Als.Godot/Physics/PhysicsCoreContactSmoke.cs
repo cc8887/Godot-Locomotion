@@ -1,0 +1,138 @@
+using System.Text.Json;
+using Godot;
+using GodotAls.Core.Locomotion;
+using GodotAls.Core.Physics;
+using NVector = System.Numerics.Vector3;
+
+namespace GodotAls.Physics;
+
+public partial class PhysicsCoreContactSmoke : Node3D
+{
+    private readonly List<Shape3D> _resources = [];
+    private AlsGodotContactQuery? _query;
+    private AlsContactRegistry _registry = null!;
+    private AlsWorldContacts _contacts = null!;
+    private AlsJointIsland _island = null!;
+    private int _frame, _scenario, _hz, _totalContacts, _queries;
+    private int _geometryChecks;
+    private double _maxMomentum;
+    private string _report = "";
+    private bool _done;
+    public override void _Ready()
+    {
+        try
+        {
+            var args = OS.GetCmdlineUserArgs();
+            _report = args.FirstOrDefault(a => a.StartsWith("--report="))?[9..] ?? "";
+            _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
+            Require(_hz is 30 or 60 or 120, "Unsupported rate.");
+            Require(System.IO.Path.IsPathFullyQualified(_report) && !System.IO.File.Exists(_report), "Require a new absolute --report path.");
+            Engine.PhysicsTicksPerSecond = _hz; StartScenario();
+        }
+        catch (Exception e) { Fail(e); }
+    }
+    private void StartScenario()
+    {
+        var identity = AlsPrecisePose.Identity;
+        var count = _scenario == 2 ? 3 : 2;
+        _registry = new(count, count); _query = new(_registry);
+        var bodies = new AlsIslandBody[count]; var states = new AlsIslandBodyState[count];
+        for (var i = 0; i < count; i++)
+        {
+            var floor = _scenario != 1 && i == count - 1;
+            Shape3D shape = floor ? new BoxShape3D { Size = new(10, .2f, 10) } : new SphereShape3D { Radius = .5f };
+            _resources.Add(shape);
+            var handle = _registry.Register(new(i, identity, 1, 1, !floor)); _query.Bind(handle, shape);
+            bodies[i] = new(identity, floor ? default : new(1, new(.001, .001, .001)));
+            var position = _scenario == 1 ? new AlsDoubleVector(i == 0 ? -45 : 45, 0, 100) : new AlsDoubleVector(0, 0, floor ? -10 : i == 0 ? 40 : 130);
+            var velocity = _scenario == 1 ? new NVector(i == 0 ? 100 : -100, 0, 0) : NVector.Zero;
+            states[i] = new(identity with { Position = position }, new(velocity, NVector.Zero));
+        }
+        _island = new(bodies, [], states);
+        _contacts = new(_registry, _query, new(.6f, .4f, .4f), new(1f / _hz, 0, 2000), 16);
+        _frame = 0;
+    }
+    public override void _PhysicsProcess(double delta)
+    {
+        if (_done) return;
+        try
+        {
+            // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
+            if (_scenario == 0 && _frame == 0) GeometryChecks();
+            _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
+            if (_scenario == 1)
+            {
+                var momentum = (_island.BodyAt(0).Velocity.Linear + _island.BodyAt(1).Velocity.Linear).Length();
+                _maxMomentum = Math.Max(_maxMomentum, momentum); Require(momentum < .01, "Dynamic pair momentum changed.");
+            }
+            else Require(_island.BodyAt(_island.BodyCount - 1).Actor.Position.Z == -10, "Static floor moved.");
+            if (_frame < 60) return;
+            if (_scenario == 1)
+                Require((_island.BodyAt(1).Actor.Position - _island.BodyAt(0).Actor.Position).LengthSquared >= 99.9 * 99.9, "Dynamic spheres still overlap.");
+            else
+            {
+                Require(_island.BodyAt(0).Actor.Position.Z >= 49.9, "Sphere still penetrates floor.");
+                if (_scenario == 2) Require(_island.BodyAt(1).Actor.Position.Z - _island.BodyAt(0).Actor.Position.Z >= 99.9, "Stack contact was not shared.");
+            }
+            _queries += _query!.NarrowPhaseQueries; Cleanup(); _scenario++;
+            if (_scenario < 3) { StartScenario(); return; }
+            Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
+            var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
+                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
+                chaos_narrow_phase_parity = false, ordinary_character_connected = false };
+            var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
+            using var writer = new System.IO.StreamWriter(stream); writer.Write(json); writer.Flush();
+            GD.Print("CORE_CONTACT_WORLD_OK " + json); _done = true; GetTree().Quit();
+        }
+        catch (Exception e) { Fail(e); }
+    }
+    private void Cleanup()
+    { _query?.Dispose(); _query = null; foreach (var shape in _resources) shape.Dispose(); _resources.Clear(); }
+    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private void Fail(Exception e) { GD.PushError("CORE_CONTACT_WORLD_FAILED " + e); _done = true; Cleanup(); GetTree().Quit(1); }
+    public override void _ExitTree() => Cleanup();
+
+    private void GeometryChecks()
+    {
+        var registry = new AlsContactRegistry(2, 2); var identity = AlsPrecisePose.Identity;
+        var mover = registry.Register(new(0, identity, 1, 1)); var floor = registry.Register(new(1, identity, 1, 1));
+        using var sphere = new SphereShape3D { Radius = .5f };
+        using var box = new BoxShape3D { Size = Vector3.One };
+        using var capsule = new CapsuleShape3D { Radius = .3f, Height = 2 };
+        using var hull = new ConvexPolygonShape3D { Points = [new(-.5f, -.5f, -.5f), new(.5f, -.5f, -.5f), new(-.5f, .5f, -.5f), new(.5f, .5f, -.5f),
+            new(-.5f, -.5f, .5f), new(.5f, -.5f, .5f), new(-.5f, .5f, .5f), new(.5f, .5f, .5f)] };
+        using var ground = new BoxShape3D { Size = new(10, .2f, 10) };
+        using var query = new AlsGodotContactQuery(registry); query.Bind(floor, ground);
+        var bottom = identity with { Position = new(0, 0, -10) }; var buffer = new AlsDetectedContact[16];
+        Shape3D[] shapes = [sphere, box, capsule, hull];
+        for (var i = 0; i < shapes.Length; i++)
+        {
+            if (i > 0) mover = registry.Replace(mover, registry.At(mover.Slot));
+            query.Bind(mover, shapes[i]);
+            var top = identity with { Position = new(0, 0, i == 2 ? 80 : 40), Rotation = i == 1 || i == 3 ? AlsQuaternion.FromAxisAngle(NVector.UnitX, .3f) : AlsQuaternion.Identity };
+            var count = query.Query(mover.Slot, top, floor.Slot, bottom, buffer); Require(count > 0, "Shape did not produce contact geometry.");
+            for (var j = 0; j < count; j++)
+            {
+                Require(buffer[j].Normal1.Z > .999f, "Contact normal sign or coordinate conversion is wrong.");
+                Require(Math.Abs(buffer[j].Point1.Z - 10) < .002, "Floor contact point is not on the physical surface.");
+            }
+            var overflow = false;
+            try { query.Query(mover.Slot, top, floor.Slot, bottom, Span<AlsDetectedContact>.Empty); }
+            catch (InvalidOperationException) { overflow = true; }
+            Require(overflow, "Contact capacity overflow was silently truncated."); _geometryChecks++;
+        }
+        hull.Points = hull.Points; // Resource changes require a registry revision and rebind.
+        var rejected = false;
+        try { query.Query(mover.Slot, identity, floor.Slot, bottom, buffer); }
+        catch (InvalidOperationException) { rejected = true; }
+        Require(rejected, "Changed shape resource reused stale query bounds.");
+        mover = registry.Replace(mover, registry.At(mover.Slot)); query.Bind(mover, hull);
+        var workerRejected = System.Threading.Tasks.Task.Run(() =>
+        {
+            try { query.Query(mover.Slot, identity, floor.Slot, bottom, buffer); return false; }
+            catch (InvalidOperationException) { return true; }
+        }).GetAwaiter().GetResult();
+        Require(workerRejected, "Godot collision query ran off Main."); _geometryChecks += 2;
+    }
+}

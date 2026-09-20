@@ -92,6 +92,7 @@ public sealed class AlsJointIsland
             throw new ArgumentOutOfRangeException(nameof(dt));
         _stepping = true;
         try { Solve(dt, contacts); }
+        catch { contacts?.Abort(); throw; }
         finally { _stepping = false; }
     }
 
@@ -145,6 +146,8 @@ public sealed class AlsJointIsland
             _next[i] = Dynamic(i) ? new(AlsRigidBodyIntegration.StoreActor(_predicted[i], _bodies[i].MassLocal), _velocities[i]) : _states[i];
             ValidateState(i, _next[i]);
         }
+        contacts?.StageCommit();
+        contacts?.Commit();
         _next.AsSpan().CopyTo(_states);
     }
 
