@@ -84,14 +84,18 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     {
         Check();if(!double.IsFinite(dt)||dt<=0||dt>.1)throw new ArgumentOutOfRangeException(nameof(dt));
         LastRowCount=0;if(!_bodies.Active)return;
+        var angleTolerance=AlsJointRowActivation.AngleTolerance(dt);
         foreach(var j in _definition.Joints)
         {
             var rid=_joints[j.Index];if(!rid.IsValid)continue;var s=_settings[j.Index];
             var pBody=_bodies.BodyAt(j.ParentBody);var cBody=_bodies.BodyAt(j.ChildBody);
             var frames=Frames(j.Index);var p=frames.Parent.Basis.Orthonormalized().GetRotationQuaternion();var c=frames.Child.Basis.Orthonormalized().GetRotationQuaternion();
             var current=Angles(p,c);
-            var predicted=Angles(Advance(p,pBody.Freeze?Vector3.Zero:pBody.AngularVelocity,dt),Advance(c,cBody.Freeze?Vector3.Zero:cBody.AngularVelocity,dt));
-            var t=s.AngularDrive.Target;var target=Angles(Quaternion.Identity,new((float)-t.X,(float)t.Y,(float)-t.Z,(float)t.W));
+            var predictedP=Predict(p,pBody,dt);var predictedC=Predict(c,cBody,dt);
+            var predicted=Angles(predictedP,predictedC);
+            var t=s.AngularDrive.Target;var targetRotation=new Quaternion((float)-t.X,(float)t.Y,(float)-t.Z,(float)t.W);
+            var target=Angles(Quaternion.Identity,targetRotation);
+            var driveError=AlsJointAngularKinematics.SwingTwistDriveError(Core(predictedP),Core(predictedC),Core(targetRotation));
             var inverseP=InverseInertia(pBody);var inverseC=InverseInertia(cBody);var childBasis=new Basis(c);
             var desired=Vector3.Zero;
             for(var axis=0;axis<3;axis++)
@@ -103,15 +107,22 @@ internal sealed class AlsPhysicsJointSet : IDisposable
                 // Chaos builds these rows from predicted connector rotations.
                 // A body already moving back inside the limit must retain its
                 // momentum; testing the old angle too adds an extra braking row.
-                var limitActive=motion==AlsJointMotion.Limited&&soft.Enabled&&Math.Abs(next)>angleLimit;
+                var limitActive=motion==AlsJointMotion.Limited&&soft.Enabled&&AlsJointRowActivation.SoftLimitActive(next,angleLimit,angleTolerance);
                 var direction=childBasis[axis];var inv=direction.Dot(inverseP*direction+inverseC*direction);
                 var effective=inv>0?1/inv:0;
                 var driveScale=s.AngularDrive.ForceMode==AlsJointForceMode.Acceleration?effective:.0001;
                 var limitScale=s.AngularSoftForceMode==AlsJointForceMode.Acceleration?effective:.0001;
-                var kd=position?(_driveStiffness>=0?_driveStiffness:Component(s.AngularDrive.Stiffness,coefficient))*driveScale:0;
-                var cd=velocity?(_driveDamping>=0?_driveDamping:Component(s.AngularDrive.Damping,coefficient))*driveScale:0;
+                var stiffness=position?(_driveStiffness>=0?_driveStiffness:Component(s.AngularDrive.Stiffness,coefficient)):0;
+                var drag=velocity?(_driveDamping>=0?_driveDamping:Component(s.AngularDrive.Damping,coefficient)):0;
+                var driveActive=AlsJointRowActivation.DriveActive(motion!=AlsJointMotion.Locked,Component(driveError,axis),stiffness,drag,angleTolerance);
+                var kd=driveActive?stiffness*driveScale:0;
+                var cd=driveActive?drag*driveScale:0;
                 var kl=limitActive?soft.Stiffness*limitScale:0;var cl=limitActive?soft.Damping*limitScale:0;
                 var k=kd+kl;var damping=cd+cl;
+                // Jolt SpringPart treats k == 0 as a hard velocity constraint
+                // and ignores damping. Do not silently turn a native damper
+                // into a hard motor (or drop that row).
+                if(k==0&&damping>0)throw new NotSupportedException("Jolt position motors cannot represent damping-only rows.");
                 var boundary=Math.CopySign(angleLimit,next);
                 desired[axis]=(float)(k>0?(kd*Component(target,axis)+kl*boundary)/k:value);
                 var enabled=motion!=AlsJointMotion.Locked&&k>0;
@@ -189,8 +200,16 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     }
     private static Quaternion Advance(Quaternion q,Vector3 w,double dt)
     {var dq=new Quaternion(w.X,w.Y,w.Z,0)*q;var h=(float)dt*.5f;return new Quaternion(q.X+dq.X*h,q.Y+dq.Y*h,q.Z+dq.Z*h,q.W+dq.W*h).Normalized();}
+    private static Quaternion Predict(Quaternion connector,RigidBody3D body,double dt)
+    {
+        // Chaos and Jolt both apply authored angular drag before integration.
+        // This predicts only: the backend still applies the actual damping once.
+        var velocity=body.Freeze?Vector3.Zero:body.AngularVelocity*Mathf.Max(0,1-body.AngularDamp*(float)dt);
+        return Advance(connector,velocity,dt);
+    }
     private static AlsDoubleVector Angles(Quaternion p,Quaternion c)
     {if(p.Dot(c)<0)c=-c;return AlsJointAngularKinematics.Evaluate(new AlsQuaternion(p.X,p.Y,p.Z,p.W).Normalized(),new AlsQuaternion(c.X,c.Y,c.Z,c.W).Normalized()).Angles;}
+    private static AlsQuaternion Core(Quaternion q)=>new AlsQuaternion(q.X,q.Y,q.Z,q.W).Normalized();
     private static void Validate(AlsPhysicsJointSettings s)
     {
         if(s.LinearMotion.X==AlsJointMotion.Limited||s.LinearMotion.Y==AlsJointMotion.Limited||s.LinearMotion.Z==AlsJointMotion.Limited||

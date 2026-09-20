@@ -14,6 +14,7 @@ public partial class PhysicsJointSetSmoke : Node3D
     private readonly List<Case> _cases=[];
     private int _hz,_frame; private bool _done,_highDrop,_noContact,_pair,_alsDrives,_noSoftSolve,_noSelfCollision;
     private int _pairAxis;private float _pairAngle;
+    private bool _assertDampingOnlyRejected;
     private float _maxAnchor,_maxSpeed,_finalSpeed,_finalAngularSpeed; private double _maxLimit,_finalLimit;
     private string _finalSpeedBody="none";
     public override void _Ready()
@@ -24,7 +25,8 @@ public partial class PhysicsJointSetSmoke : Node3D
             Require(_hz is 30 or 60 or 120,"Expected 30/60/120 Hz."); Engine.PhysicsTicksPerSecond=_hz;
             _highDrop=OS.GetCmdlineUserArgs().Contains("--high-drop");
             _noContact=OS.GetCmdlineUserArgs().Contains("--no-contact");
-            _pair=OS.GetCmdlineUserArgs().Contains("--pair");
+            _assertDampingOnlyRejected=OS.GetCmdlineUserArgs().Contains("--assert-damping-only-rejected");
+            _pair=OS.GetCmdlineUserArgs().Contains("--pair")||_assertDampingOnlyRejected;
             _alsDrives=OS.GetCmdlineUserArgs().Contains("--als-drives");
             _noSoftSolve=OS.GetCmdlineUserArgs().Contains("--no-soft-solve");
             _noSelfCollision=OS.GetCmdlineUserArgs().Contains("--no-self-collision");
@@ -85,6 +87,25 @@ public partial class PhysicsJointSetSmoke : Node3D
         if(_done)return;
         try
         {
+            if(_assertDampingOnlyRejected)
+            {
+                foreach(var c in _cases)
+                {
+                    // Align both connectors so no soft-limit stiffness can
+                    // hide the unsupported pure damping motor underneath.
+                    var frames=c.Joints.Frames(0);var child=c.Bodies.BodyAt(1);
+                    var local=child.GlobalTransform.AffineInverse()*frames.Child;
+                    child.GlobalTransform=frames.Parent*local.AffineInverse();
+                    child.AngularVelocity=Vector3.Zero;
+                    c.Joints.SetEffectiveAngularDrive(0,1.5);
+                    var rejected=false;
+                    try{c.Joints.Step(dt);}
+                    catch(NotSupportedException e) when(e.Message=="Jolt position motors cannot represent damping-only rows."){rejected=true;}
+                    Require(rejected,"Damping-only motor was silently accepted.");
+                }
+                GD.Print("JOINT_DAMPING_ONLY_REJECTION_OK meshes=2");
+                _done=true;GetTree().Quit();return;
+            }
             _frame++; float anchor=0,speed=0,angularSpeed=0; double limit=0;string speedBody="none";
             foreach(var c in _cases)
             {
