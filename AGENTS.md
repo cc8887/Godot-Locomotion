@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新场景接入：`docs/verification/2026-09-21-physics-scene-kinematics.md`。Core 支持外部零质量姿态/速度目标、停止清速、运动唤醒和失败重试；Main 绑定实际 scene shape-owner，支持局部偏移、过滤/禁用/资源变更/移除及显式 teleport。Capture→Step→CommitCapture；资源借用不释放，新增拓扑/缩放/动态 owner 拒绝。真实 World 13 身体/13 形状，球体地面/平移/旋转三场景、13 几何和 9 生命周期在三频率通过；两资产实际场景普通/高速三频率六项十秒自然睡眠通过，共 66 身体/36 关节/69 形状。普通 120 Hz 瞬时锚点 6.709 cm，虽 <10 cm 仍待定位/视觉验收。Core 2700、Import 2363/1 旧跳过、Godot 构建、旧 144 原生对子/厚地板六项/接触三频率回归通过。高速以 `high-verified-*` 为准，首轮条件参数未传入产物不算高速。环境材质仍显式统一，无原生 kinematic/整链新轨迹对照；无关平台运动也保守阻止整组休眠，尚无接触图/局部休眠。下一步完整链移动平台、普通 Ragdoll 世界姿态/动画接入及胶囊相机跟随，再 Get-up/Pose Recovery；普通 demo 与旧 Jolt 失败未关闭。禁止把诊断 FBX 代理直接当普通世界姿态使用。
+
 - 最新接触稳定性：`docs/verification/2026-09-21-physics-contact-normal.md`。真实 Godot 红测确认旧点差法向在分离的流形点上翻转，以及大世界 float 坐标导致点数改变；单目标凸对统一读取 GetRestInfo 法向，double 相对原点后再查询。17 项精度、旧六几何/三场景/五睡眠生命周期在三频率通过。两模型普通/高速 30/60/120 Hz 十秒睡眠六项全部通过，原生阈值/迭代次数未变，睡后 pose/epoch 不变；关闭睡眠的六项粗略落地也过。Core 验收锁定轴改测原生 R01 分量的角残差，Limited 保留 pyramid/twist，0.1 rad 门槛不变；报告保留旧 pyramid 指标与原先 60 Hz 0.1055 失败，不能据此重判旧 Jolt。Core 2693、Import 2363/1 旧跳过、Godot 构建及旧 144 对子通过。额外法向查询有 Main 分配/成本，未做最终性能预算。下一步完整原生整链重力/接触对照、运动 kinematic/真实场景接入，再普通 Ragdoll/Get-up/Pose Recovery；普通 demo 与旧 Jolt 失败仍未关闭。
 
 - 最新睡眠进度：`docs/verification/2026-09-21-physics-sleep.md`。Core 可选整组睡眠、显式/外力/接触变更唤醒、失败事务与睡眠期间接触历史保持完成；实际材质阈值来自 40 个原生身体。144 组×60 步原生对子逐帧睡眠/计数一致（3300 睡眠样本、85 次休眠冲量唤醒），重复导出一致，旧参考重导不变。Godot 球体五项睡眠生命周期及旧三场景/六几何检查在 30/60/120 Hz 通过；Core 2689、Import 2363/1 旧跳过、Godot 构建及旧 144 组对子通过。完整角色十秒睡眠门槛三轮均失败：30 Hz Mannequin 左手仍运动，60/120 Hz AnimMan 腿/躯干仍超原生阈值；另一角色入睡后的姿态/epoch 保持通过。不提高阈值或强制定时睡眠。下一步定位接触/流形/共同迭代稳定性并补完整原生重力接触对照与场景接入；普通 Ragdoll/Get-up/Pose Recovery 未完成，普通 demo 未切换，旧 Jolt 失败未关闭。
