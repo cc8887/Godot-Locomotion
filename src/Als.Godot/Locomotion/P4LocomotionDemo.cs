@@ -223,6 +223,16 @@ public partial class P4LocomotionDemo : Node3D
 
     public override void _UnhandledInput(InputEvent input)
     {
+        if (_runtimeConfigured && !_failed && _context.PropProfile is not null && _slot.ActiveCharacter.LifecycleDiagnostics.IsActive)
+        {
+            var next = input.IsActionPressed("overlay_next", allowEcho: false);
+            var previous = input.IsActionPressed("overlay_previous", allowEcho: false);
+            if (next || previous)
+            {
+                Overlay = (AlsOverlayKind)(((int)Overlay + (next ? 1 : 12)) % 13);
+                GetViewport().SetInputAsHandled(); return;
+            }
+        }
         if (!_runtimeConfigured || !_playerInput.ActionPreviewEnabled || _failed) return;
         var roll = input.IsActionPressed("roll_preview", allowEcho: false);
         var cancel = input.IsActionPressed("action_cancel", allowEcho: false);
@@ -259,6 +269,7 @@ public partial class P4LocomotionDemo : Node3D
             var active = _slot.ActiveCharacter;
             EnsureCameraTarget(active);
             _hud.Refresh(active.Diagnostics, Engine.GetFramesPerSecond(), CountErrors(active));
+            if (active.Props is not null) _hud.RefreshOverlay(active.Props.Committed.Overlay);
         }
         catch (Exception exception)
         {

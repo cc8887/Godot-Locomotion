@@ -150,6 +150,7 @@ internal readonly record struct AlsP3VisualCommitCandidate(
     ulong RootDigest,
     AlsP4FootProbeSourceSnapshot FootProbeSource)
 {
+    public AlsOverlayPropFrame Prop { get; init; }
     public AlsP4FootPlacementPoseSnapshot FootPose { get; init; }
     public AlsCharacterRotationFeedback CharacterRotationFeedback { get; init; }
     public AlsRefactoredAnimationFeedback RefactoredFeedback { get; init; }
@@ -417,6 +418,14 @@ public sealed class AlsP3RuntimeContext
         else if (MovementGraph is not null && AlsAnimationRuntimeOptions.Has("--layered-frame"))
             MovementGraph=MovementGraph.WithSharedOverlaySources(animationSet);
         SourceBindings = MovementGraph?.Binding;
+        if (MovementGraph is not null && (AlsAnimationRuntimeOptions.Has("--layered-frame") || AlsAnimationRuntimeOptions.Has("--foot-ik-frame")))
+        {
+            var config = ProjectSettings.GlobalizePath("res://assets/config");
+            PropProfile = AlsOverlayPropCompiler.Compile(System.IO.File.ReadAllText(System.IO.Path.Combine(config, "v4_overlay_props_inputs.json")),
+                animationSet, animationSet.SkeletalMeshes[MovementGraph.MannequinMeshId].SkeletonId);
+            PropSources = AlsRawAnimationSourceCompiler.Compile(System.IO.File.ReadAllText(System.IO.Path.Combine(config, "v4_overlay_prop_source_inputs.json")),
+                animationSet, PropProfile.Digest, 1, 1, [PropProfile.BowAnimationId], file => System.IO.File.ReadAllBytes(System.IO.Path.Combine(config, file)));
+        }
         motorSettings.Validate();
         if (mainManagedThreadId <= 0)
         {
@@ -441,6 +450,8 @@ public sealed class AlsP3RuntimeContext
     public AlsLocomotionAnimationProfile Profile { get; }
     public AlsP5CoreRuntimeBindingSnapshot? SourceBindings { get; }
     internal AlsMovementGraphDefinition? MovementGraph { get; }
+    internal AlsOverlayPropProfile? PropProfile { get; }
+    internal AlsRawAnimationSourceBank? PropSources { get; }
 
     public event Action<AlsFrameIdentity, AlsAnimationEvent>? AnimationEventCommitted;
     public event Action<AlsFrameIdentity, AlsActionOutcome>? ActionOutcomeCommitted;

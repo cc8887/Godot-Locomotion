@@ -20,6 +20,7 @@ internal readonly record struct AlsP3WorkerLifecycleSnapshot(
 
 public partial class AlsP3WorkerRoot : Node3D
 {
+    private AlsOverlayPropSampler? _props;
     private const string P4ProfilePath = "res://assets/config/p4_pose_profile.json";
 
     private AlsP3RuntimeContext _context = null!;
@@ -181,6 +182,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 _controller.EnableCompleteMovement(context.MovementGraph, _library, context.AnimationSet, _poseProfile,
                     state.Handle.CharacterId,state.Handle.Generation);
             _skeleton = _graph.TargetSkeleton;
+            if (context.PropProfile is not null) _props = new(context.PropProfile, context.PropSources!, context.AnimationSet);
             ConfigureFootProbeSource(context.AnimationSet, _poseProfile);
             var correctedRoot = AlsP3Presentation.Compose(
                 initialLogicalTransform,
@@ -668,6 +670,7 @@ public partial class AlsP3WorkerRoot : Node3D
                     footProbeSource)
                 {
                     FootPose = footPoseSnapshot,
+                    Prop = _props?.Capture(input.Identity, input.Command.RequestedOverlay, _controller) ?? default,
                     CharacterRotationFeedback = _controller.PendingCharacterRotationFeedback,
                     RefactoredFeedback = _controller.PendingRefactoredFeedback,
                     PresentationPending = _controller.PendingPresentation,

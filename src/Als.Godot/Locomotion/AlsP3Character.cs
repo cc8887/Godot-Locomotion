@@ -15,6 +15,7 @@ public partial class AlsP3Character : Node3D
     private AlsCharacterMotor _motor = null!;
     private AlsP3WorkerRoot _worker = null!;
     private AlsP3CommitStage _commit = null!;
+    internal AlsOverlayPropRuntime? Props { get; private set; }
     private AlsFrameInput _stagedReplacementMotorInput;
     private bool _hasStagedReplacementMotorInput;
     private bool _configured;
@@ -261,6 +262,7 @@ public partial class AlsP3Character : Node3D
             _worker = new AlsP3WorkerRoot { Name = "VisualWorker" };
             AddChild(_worker);
             _worker.Configure(context, _state, _motor.GlobalTransform);
+            if (context.PropProfile is not null) Props = new(this, context);
             if (_worker.UsesNativeFootIk) _motor.ConfigureNativeFeet(_worker.InitialNativeFeet, context.MovementGraph!.FootIkInput.Offset);
 
             if (AlsP3FrameStages.SplitFeet)
@@ -408,6 +410,7 @@ public partial class AlsP3Character : Node3D
             _discardedCompletedFrame = published;
         }
         _animationDeactivated = true; AnimationLifecycleRevision++;
+        Props?.Clear();
         _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByLifecycle);
     }
 
@@ -666,6 +669,7 @@ public partial class AlsP3Character : Node3D
 
         Volatile.Write(ref _state.Active, 0);
         DisableRuntimeNodes();
+        Props?.Dispose(); Props = null;
         _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByLifecycle);
     }
 

@@ -8,6 +8,14 @@ public partial class AlsLocomotionHud : VBoxContainer
     private const long PerformanceRefreshInterval = 15;
     private Label _stateLabel = null!;
     private Label _performanceLabel = null!;
+    private Label? _overlayLabel;
+    private GodotAls.Core.Locomotion.AlsOverlayKind? _overlay;
+    public void RefreshOverlay(GodotAls.Core.Locomotion.AlsOverlayKind overlay)
+    {
+        if (_overlay == overlay) return;
+        _overlayLabel ??= CreateLabel("Overlay"); _overlay = overlay;
+        _overlayLabel.Text = $"Overlay: {overlay}";
+    }
     private long _lastStateFrame = long.MinValue;
 
     public string StateText => _stateLabel.Text;
@@ -25,7 +33,7 @@ public partial class AlsLocomotionHud : VBoxContainer
     public void EnableActionPreview()
     {
         var label = CreateLabel("ActionPreviewHelp");
-        label.Text = "R：原地翻滚动画预览  |  X：取消动作";
+        label.Text = "R：原地翻滚动画预览  |  X：取消动作  |  Q / E：切换 Overlay 道具";
     }
 
     public override void _Ready()
