@@ -1,0 +1,223 @@
+using System.Text.Json;
+using Godot;
+using GodotAls.Assets;
+using GodotAls.Core.Locomotion;
+using GodotAls.Core.Physics;
+using GodotAls.Import;
+using GodotAls.Import.Compilation;
+
+namespace GodotAls.Physics;
+
+// Runs the Core owner across real Godot physics callbacks and imported body /
+// skeleton transport. Native samples after frame zero are assertions only.
+public partial class PhysicsCoreJointReplay : Node3D
+{
+    private sealed record Rig(AlsRagdollPhysicsDefinition Definition, AlsPhysicsJointSettings[] Settings,
+        string[] Names, int[] Parents, AlsLocalPose[] Rest);
+    private sealed record Active(Rig Rig, AlsPhysicsBodySet Bodies, AlsForceFreeJointHost Host,
+        AlsLocalPose[] Pose, Transform3D[] Components, int[] BodyBones);
+    private readonly Dictionary<string, Rig> _rigs = [];
+    private readonly List<Active> _active = [];
+    private JsonDocument? _reference;
+    private int _case, _frame, _hz;
+    private bool _done, _chains;
+    private double _positionError, _angleError, _vError, _wError, _transportError, _anchorCm;
+    private string _report = "";
+    private JsonElement Current => _reference!.RootElement.GetProperty("cases")[_case];
+
+    public override void _Ready()
+    {
+        try
+        {
+            var args = OS.GetCmdlineUserArgs(); _chains = args.Contains("--chains");
+            _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
+            Require(_hz is 30 or 60 or 120, "Expected 30/60/120 Hz.");
+            _report = args.FirstOrDefault(a => a.StartsWith("--report="))?[9..] ?? "";
+            Require(System.IO.Path.IsPathFullyQualified(_report) && !System.IO.File.Exists(_report), "Require a new absolute --report path.");
+            _reference = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_awake_solver_reference.json"));
+            Require(!_reference.RootElement.GetProperty("sleepEnabled").GetBoolean(), "Expected an awake reference.");
+            var set = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath).LoadDefinition();
+            foreach (var name in new[] { "Mannequin", "AnimMan" })
+            {
+                var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + name + "." + name);
+                var settings = AlsPhysicsJointCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_joint_reference.json"), definition);
+                var asset = set.SkeletalMeshes.Single(m => m.ObjectPath == definition.Mesh);
+                var model = ResourceLoader.Load<PackedScene>(AlsGodotImportCoordinator.AssetRoot + "/" + asset.ResourcePath).Instantiate<Node3D>(); AddChild(model);
+                var skeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(model)!;
+                var names = Enumerable.Range(0, skeleton.GetBoneCount()).Select(i => skeleton.GetBoneName(i).ToString()).ToArray();
+                _rigs.Add(definition.Mesh, new(definition, settings, names, Enumerable.Range(0, names.Length).Select(skeleton.GetBoneParent).ToArray(),
+                    Enumerable.Range(0, names.Length).Select(i => AlsPhysicsBodySet.Pose(skeleton.GetBoneRest(i))).ToArray()));
+                model.Free();
+            }
+            Engine.PhysicsTicksPerSecond = _chains ? _hz : Current.GetProperty("hz").GetInt32();
+        }
+        catch (Exception e) { Fail(e); }
+    }
+
+    private void StartPair()
+    {
+        var row = Current; var rig = _rigs[row.GetProperty("mesh").GetString()!];
+        var joint = rig.Definition.Joints.Single(j => rig.Definition.Bodies[j.ChildBody].Bone == row.GetProperty("child").GetString());
+        var definition = rig.Definition with { Bodies = [rig.Definition.Bodies[joint.ParentBody] with { Index = 0, PhysicsType = 1 }, rig.Definition.Bodies[joint.ChildBody] with { Index = 1 }],
+            Joints = [joint with { Index = 0, ParentBody = 0, ChildBody = 1 }], DisabledCollisions = [(0, 1)] };
+        var body = row.GetProperty("bodies")[1]; var j = row.GetProperty("jointSettings"); var s = row.GetProperty("solverSettings");
+        Require(row.GetProperty("projectionIterations").GetInt32() == 1, "Expected one native projection iteration.");
+        var states = new[] { Initial(row, "parent"), Initial(row, "child") };
+        // In this isolated-pair reference the conditioned inertia is an exported
+        // input. Full-chain mode below recomputes it from asset geometry/topology.
+        var island = new AlsJointIsland([
+            new(definition.Bodies[0].MassLocal, default),
+            new(definition.Bodies[1].MassLocal, new((float)(1 / D(body, "massKg")), V(body, "bodyConditionedInverseInertia")), D(body, "linearDamping"), D(body, "angularDamping"))],
+            [new(0, 1, Pose(row.GetProperty("parentFrame")), Pose(row.GetProperty("childFrame")),
+                AlsCachedJointSettingsCompiler.Angular(j, s), AlsCachedJointSettingsCompiler.Projection(j, s))], states,
+            row.GetProperty("positionIterations").GetInt32(), row.GetProperty("velocityIterations").GetInt32());
+        Add(rig with { Definition = definition }, island); _frame = 0;
+    }
+
+    private void StartChains()
+    {
+        var solver = Current.GetProperty("solverSettings");
+        foreach (var rig in _rigs.Values)
+        {
+            var definition = rig.Definition;
+            var conditioning = AlsBodyInertiaCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_inertia_reference.json"), definition, rig.Settings);
+            var bodies = definition.Bodies.Select(b => new AlsIslandBody(b.MassLocal, b.PhysicsType == 1 ? default : new((float)(1 / b.MassKg),
+                new AlsDoubleVector(new System.Numerics.Vector3((float)(1 / b.InertiaKgCm2.X), (float)(1 / b.InertiaKgCm2.Y), (float)(1 / b.InertiaKgCm2.Z)) * conditioning[b.Index].InverseInertiaScale)),
+                D(b.Defaults, "linearDamping"), D(b.Defaults, "angularDamping"))).ToArray();
+            var joints = definition.Joints.Where(j => rig.Settings[j.Index].LinearMotion != new AlsJointMotions(AlsJointMotion.Free, AlsJointMotion.Free, AlsJointMotion.Free))
+                .Select(j => new AlsIslandJoint(j.ParentBody, j.ChildBody, AlsCachedJointSettingsCompiler.RigidConnector(j.ParentFrame), AlsCachedJointSettingsCompiler.RigidConnector(j.ChildFrame),
+                    AlsCachedJointSettingsCompiler.Angular(rig.Settings[j.Index].NativeSettings, solver),
+                    AlsCachedJointSettingsCompiler.Projection(rig.Settings[j.Index].NativeSettings, solver))).ToArray();
+            var states = definition.Bodies.Select(b => new AlsIslandBodyState(b.ReferenceComponent,
+                b.PhysicsType == 1 ? default : new(new(200, 0, 0), new(.3f, .7f, -.2f)))).ToArray();
+            // Exercise the shared chain with a perturbed spine, not just an
+            // equilibrium rest pose. No reference trajectory drives this mode.
+            var spine = Array.FindIndex(definition.Bodies, b => b.Bone == "spine_02");
+            var actor = states[spine].Actor;
+            states[spine] = states[spine] with { Actor = actor with { Rotation = (AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitY, .6f) * actor.Rotation).Normalized() } };
+            Add(rig, new(bodies, joints, states));
+        }
+    }
+
+    private void Add(Rig rig, AlsJointIsland island)
+    {
+        var bodies = new AlsPhysicsBodySet(this, rig.Definition, rig.Names, rig.Parents, 1, 1, collisionLayer: 0, collisionMask: 0);
+        try
+        {
+            bodies.Seed(new(1, 1, 1), Transform3D.Identity, rig.Rest, Vector3.Zero, Vector3.Zero);
+            var host = new AlsForceFreeJointHost(bodies, rig.Definition, island);
+            // Verify that an accidental second integration owner fails before a step.
+            var before = island.BodyAt(1); bodies.BodyAt(1).CollisionMask = 1;
+            var rejected = false;
+            try { host.Step(1d / 60); } catch (InvalidOperationException) { rejected = true; }
+            bodies.BodyAt(1).CollisionMask = 0;
+            Require(rejected && island.BodyAt(1) == before, "Competing backend ownership was not rejected atomically.");
+            _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names)));
+        }
+        catch { bodies.Dispose(); throw; }
+    }
+
+    public override void _PhysicsProcess(double dt)
+    {
+        if (_done) return;
+        try
+        {
+            if (_active.Count == 0) { if (_chains) StartChains(); else StartPair(); }
+            Require(Math.Abs(dt - (_chains ? 1d / _hz : D(Current, "dt"))) < 1e-7, "Physics callback step differs.");
+            foreach (var active in _active) CheckTransport(active);
+            if (!_chains) CheckReference();
+            if (_frame < (_chains ? _hz * 10 : 12))
+            {
+                foreach (var active in _active) active.Host.Step(dt);
+                _frame++; return;
+            }
+            if (!_chains)
+            {
+                Release(); _case++;
+                if (_case < _reference!.RootElement.GetProperty("cases").GetArrayLength())
+                { Engine.PhysicsTicksPerSecond = Current.GetProperty("hz").GetInt32(); return; }
+            }
+            var result = new { mode = _chains ? "chains" : "native_pairs", cases = _chains ? 2 : _case,
+                hz = _chains ? _hz : 0, frames_per_case = _chains ? _frame : 12,
+                bodies = _chains ? _active.Sum(a => a.Host.Island.BodyCount) : 2,
+                joints = _chains ? _active.Sum(a => a.Host.Island.JointCount) : 1,
+                max_position_cm = _chains ? (double?)null : _positionError, max_angle_rad = _chains ? (double?)null : _angleError,
+                max_linear_velocity_cmps = _chains ? (double?)null : _vError,
+                max_angular_velocity_radps = _chains ? (double?)null : _wError, max_transport_m = _transportError,
+                max_anchor_cm = _chains ? (double?)_anchorCm : null,
+                contacts = false, gravity = false, sleeping = false, native_pair_parity_asserted = !_chains,
+                full_chain_native_parity_asserted = false, frozen_proxy_ownership_asserted = true };
+            using (var file = new System.IO.FileStream(_report, FileMode.CreateNew, System.IO.FileAccess.Write))
+                JsonSerializer.Serialize(file, result, new JsonSerializerOptions { WriteIndented = true });
+            GD.Print("CORE_JOINT_REPLAY_OK " + JsonSerializer.Serialize(result));
+            _done = true; GetTree().Quit();
+        }
+        catch (Exception e) { Fail(e); }
+    }
+
+    private void CheckReference()
+    {
+        var island = _active[0].Host.Island;
+        for (var i = 0; i < 2; i++)
+        {
+            var expected = Current.GetProperty("samples")[_frame].GetProperty(i == 0 ? "parent" : "child");
+            var pose = Pose(expected.GetProperty("world")); var actual = island.BodyAt(i);
+            var position = Math.Sqrt((actual.Actor.Position - pose.Position).LengthSquared);
+            var angle = 2 * Math.Acos(Math.Clamp(Math.Abs(AlsQuaternion.Dot(actual.Actor.Rotation.Normalized(), pose.Rotation.Normalized())), 0, 1));
+            var v = System.Numerics.Vector3.Distance(actual.Velocity.Linear, V(expected, "linearVelocity").ToSingle());
+            var w = System.Numerics.Vector3.Distance(actual.Velocity.Angular, V(expected, "angularVelocity").ToSingle());
+            _positionError = Math.Max(_positionError, position); _angleError = Math.Max(_angleError, angle); _vError = Math.Max(_vError, v); _wError = Math.Max(_wError, w);
+            Require(position < 2e-5 && angle < 1e-6 && v < 1e-4 && w < 2e-5,
+                $"Native case {_case} frame {_frame} body {i}: position={position} angle={angle} v={v} w={w}");
+        }
+    }
+
+    private void CheckTransport(Active active)
+    {
+        active.Bodies.CaptureLocalPose(Transform3D.Identity, active.Pose);
+        for (var i = 0; i < active.Pose.Length; i++)
+        {
+            var local = AlsPhysicsBodySet.Local(active.Pose[i]); var parent = active.Rig.Parents[i];
+            active.Components[i] = parent < 0 ? local : active.Components[parent] * local;
+        }
+        for (var i = 0; i < active.Host.Island.BodyCount; i++)
+        {
+            var actual = active.Components[active.BodyBones[i]];
+            var expected = AlsPhysicsBodySet.NativeToFbx(active.Host.Island.BodyAt(i).Actor);
+            var distance = actual.Origin.DistanceTo(expected.Origin); _transportError = Math.Max(_transportError, distance);
+            Require(actual.IsFinite() && distance < .00005f, "Skeleton body transport diverged.");
+            Require((actual.Basis.X - expected.Basis.X).Length() < .00005f &&
+                (actual.Basis.Y - expected.Basis.Y).Length() < .00005f && (actual.Basis.Z - expected.Basis.Z).Length() < .00005f,
+                "Skeleton rotation transport diverged.");
+            var proxy = active.Bodies.BodyAt(i);
+            var server = (Transform3D)PhysicsServer3D.BodyGetState(proxy.GetRid(), PhysicsServer3D.BodyState.Transform);
+            Require(server.Origin.DistanceTo(proxy.GlobalPosition) < .000001f &&
+                (server.Basis.X - proxy.GlobalBasis.X).Length() < .000001f &&
+                (server.Basis.Y - proxy.GlobalBasis.Y).Length() < .000001f &&
+                (server.Basis.Z - proxy.GlobalBasis.Z).Length() < .000001f, "Jolt moved a frozen proxy between callbacks.");
+        }
+        if (!_chains || _frame == 0) return;
+        foreach (var joint in active.Rig.Definition.Joints)
+        {
+            if (active.Rig.Settings[joint.Index].LinearMotion == new AlsJointMotions(AlsJointMotion.Free, AlsJointMotion.Free, AlsJointMotion.Free)) continue;
+            var p = AlsPrecisePose.Compose(joint.ParentFrame, active.Host.Island.BodyAt(joint.ParentBody).Actor);
+            var c = AlsPrecisePose.Compose(joint.ChildFrame, active.Host.Island.BodyAt(joint.ChildBody).Actor);
+            var distance = Math.Sqrt((p.Position - c.Position).LengthSquared); _anchorCm = Math.Max(_anchorCm, distance);
+            Require(distance < 10, $"Core chain anchor exceeded 10 cm: {distance}");
+        }
+    }
+    private static AlsIslandBodyState Initial(JsonElement row, string name)
+    {
+        var sample = row.GetProperty("samples")[0].GetProperty(name);
+        return new(Pose(sample.GetProperty("world")), new(V(sample, "linearVelocity").ToSingle(), V(sample, "angularVelocity").ToSingle()));
+    }
+    private static double D(JsonElement e, string name) => e.GetProperty(name).GetDouble();
+    private static AlsDoubleVector V(JsonElement e, string name)
+    { var v = e.GetProperty(name); return new(v[0].GetDouble(), v[1].GetDouble(), v[2].GetDouble()); }
+    private static AlsPrecisePose Pose(JsonElement e)
+    { var q = e.GetProperty("rotation"); return new(V(e, "position"), new(q[0].GetDouble(), q[1].GetDouble(), q[2].GetDouble(), q[3].GetDouble()), AlsDoubleVector.One); }
+    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private void Release() { foreach (var active in _active) active.Bodies.Dispose(); _active.Clear(); }
+    private void Fail(Exception e) { GD.PushError("CORE_JOINT_REPLAY_FAILED " + e); _done = true; GetTree().Quit(1); }
+    public override void _ExitTree() { Release(); _reference?.Dispose(); }
+}
