@@ -14,7 +14,8 @@ public readonly record struct AlsIslandJoint(int Parent, int Child, AlsPrecisePo
 
 // A single-owner, preallocated group of joints, not a collision world. All joints
 // share one DP/DQ and velocity entry per body. No Godot/UE objects or global state.
-// Force-free, awake bodies only; gravity, contacts, moving kinematics, sleep and
+// No external forces; awake bodies only. An optional contact owner shares the
+// iteration buffers. Gravity, moving kinematics, sleep, collision detection and
 // island discovery are deliberately not approximated by this entry point.
 public sealed class AlsJointIsland
 {
@@ -27,6 +28,7 @@ public sealed class AlsJointIsland
     private readonly AlsCachedJoint[] _cached;
     private readonly AlsLockedLinearProjection[] _projections;
     private readonly int _positionIterations, _velocityIterations;
+    private bool _stepping;
     public int BodyCount => _bodies.Length;
     public int JointCount => _joints.Length;
     public AlsIslandBodyState BodyAt(int index) => _states[index];
@@ -74,30 +76,51 @@ public sealed class AlsJointIsland
 
     public void Reset(ReadOnlySpan<AlsIslandBodyState> states)
     {
+        if (_stepping) throw new InvalidOperationException("Cannot reset an island during a step.");
         if (states.Length != _states.Length) throw new ArgumentException("Body state count differs.");
         for (var i = 0; i < states.Length; i++) ValidateState(i, states[i]);
         states.CopyTo(_states);
     }
 
     public void StepForceFree(double dt)
+        => StepForceFree(dt, null);
+
+    public void StepForceFree(double dt, IAlsIslandContacts? contacts)
     {
+        if (_stepping) throw new InvalidOperationException("Island stepping is not reentrant.");
         if (!double.IsFinite(dt) || dt <= 0 || !float.IsFinite(1 / (float)dt) || (float)dt == float.PositiveInfinity)
             throw new ArgumentOutOfRangeException(nameof(dt));
+        _stepping = true;
+        try { Solve(dt, contacts); }
+        finally { _stepping = false; }
+    }
+
+    private void Solve(double dt, IAlsIslandContacts? contacts)
+    {
         Gather(dt);
+        contacts?.Gather(_predicted, _velocities, _bodies, dt);
         for (var iteration = 0; iteration < _positionIterations; iteration++)
+        {
+            // UE default equal priorities are stable-sorted by container order:
+            // collisions are registered before linear joints in the evolution.
+            contacts?.SolvePosition(_deltas, iteration, _positionIterations);
             for (var j = 0; j < _joints.Length; j++)
             {
                 var joint = _joints[j];
                 _cached[j].SolvePosition(ref _deltas[joint.Parent], ref _deltas[joint.Child]);
             }
+        }
         for (var i = 0; i < _bodies.Length; i++)
             _velocities[i] = AlsCachedJoint.AddImplicitVelocity(_velocities[i], _deltas[i], dt, Dynamic(i));
         for (var iteration = 0; iteration < _velocityIterations; iteration++)
+        {
+            contacts?.SolveVelocity(_velocities, iteration, _velocityIterations, dt);
             for (var j = 0; j < _joints.Length; j++)
             {
                 var joint = _joints[j];
                 _cached[j].SolveVelocity(ref _velocities[joint.Parent], ref _velocities[joint.Child]);
             }
+        }
         CommitCorrections();
         // Native container caches ALL projection rows before any projection writes.
         for (var j = 0; j < _joints.Length; j++)

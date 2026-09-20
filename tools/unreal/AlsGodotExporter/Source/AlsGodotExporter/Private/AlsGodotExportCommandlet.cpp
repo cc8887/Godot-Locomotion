@@ -27,6 +27,14 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsContactOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsContactReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Contact export failed: %s"), *Error); return 18; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CONTACT_OK cases=288 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsAwakeSolverOutput="), PhysicsOutput))
     {
         FString Error;
