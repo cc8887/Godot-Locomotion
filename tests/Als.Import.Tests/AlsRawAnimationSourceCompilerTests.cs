@@ -328,11 +328,14 @@ public sealed class AlsRawAnimationSourceCompilerTests
     public void ActualProductionSourceBankCoversRequestedPlayersAndNativeDependencies()
     {
         var root = RepositoryRoot.Find(); var set = P3RepositoryFixtures.LoadAnimationSet();
-        using var requestDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "artifacts/raw-sequence-source-request.json")));
-        var request = requestDocument.RootElement;
+        var indexJson = File.ReadAllText(Path.Combine(root, "assets/config/v4_movement_source_inputs.json"));
+        using var requestDocument = JsonDocument.Parse(indexJson);
+        var request = requestDocument.RootElement.GetProperty("request");
+        Assert.Equal(set.DefinitionDigest, request.GetProperty("definitionDigest").GetString());
+        Assert.Equal("B3CDBA03FD845B98", request.GetProperty("bindingDigest").GetString());
         var roots = request.GetProperty("rootAssets").EnumerateArray().Select(row =>
             Array.FindIndex(set.Animations, a => a.StableId == row.GetProperty("assetId").GetString())).ToArray();
-        var bank = AlsRawAnimationSourceCompiler.Compile(File.ReadAllText(Path.Combine(root, "assets/config/v4_movement_source_inputs.json")),
+        var bank = AlsRawAnimationSourceCompiler.Compile(indexJson,
             set, request.GetProperty("bindingDigest").GetString()!, request.GetProperty("players").GetInt32(),
             request.GetProperty("samples").GetInt32(), roots, file => File.ReadAllBytes(Path.Combine(root, "assets/config", file)));
         Assert.Equal(75, bank.PlayerCount); Assert.Equal(109, bank.SampleCount); Assert.Equal(76, bank.RootAnimationIds.Length);

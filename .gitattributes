@@ -2,3 +2,7 @@
 # Unified patch context preserves the upstream JSON tab after Git's context marker.
 reference/patches/*.patch text eol=lf whitespace=-space-before-tab
 tests/Als.Core.Tests/Fixtures/P5A/*.json text eol=lf
+# Exported graph definitions and raw samples reference exact file-byte hashes.
+# Preserve each export's original bytes, including its line endings.
+assets/config/*.json -text
+assets/config/raw_sequences/*.json -text
