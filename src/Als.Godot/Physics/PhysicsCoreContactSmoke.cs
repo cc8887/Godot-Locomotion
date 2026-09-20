@@ -2,6 +2,7 @@ using System.Text.Json;
 using Godot;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Physics;
+using GodotAls.Import.Compilation;
 using NVector = System.Numerics.Vector3;
 
 namespace GodotAls.Physics;
@@ -60,7 +61,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); SleepChecks(); }
+            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); InteriorFaceChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -94,6 +95,69 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private void Fail(Exception e) { GD.PushError("CORE_CONTACT_WORLD_FAILED " + e); _done = true; Cleanup(); GetTree().Quit(1); }
     public override void _ExitTree() => Cleanup();
+
+    private void AssetFootFaceChecks()
+    {
+        var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + "AnimMan.AnimMan");
+        var source = definition.Bodies.Single(b => b.Bone == "foot_l").Shapes.Single();
+        using var foot = AlsPhysicsContactShapes.Create(source); foot.Margin = 0;
+        using var floor = new BoxShape3D { Size = new(83.17676f, .5f, 63.723648f) };
+        var registry = new AlsContactRegistry(2, 2);
+        using var query = new AlsGodotContactQuery(registry);
+        query.Bind(registry.Register(new(0, AlsPrecisePose.Identity, 1, 1)), foot);
+        query.Bind(registry.Register(new(1, AlsPrecisePose.Identity, 1, 1)), floor);
+        // Captured BEFORE the failing frame-53 solve; these are shape poses,
+        // not post-correction body transforms or expected trajectory samples.
+        var p = new AlsPrecisePose(new(62.337376960394174, -13.16448096873292, -31.806653818699232),
+            new(.0250642728060484, -.7160341143608093, -.07232434302568436, .6938560009002686), AlsDoubleVector.One);
+        var q = AlsPrecisePose.Identity with { Position = new(793.5523986816406, -139.2822265625, -68.39840412139893) };
+        var points = new AlsDetectedContact[16]; var failed = false;
+        var variants = new[] { AlsPrecisePose.Identity,
+            new AlsPrecisePose(new(13, -8, 7), AlsQuaternion.FromAxisAngle(NVector.UnitZ, .83f), AlsDoubleVector.One),
+            new AlsPrecisePose(new(1e7, -2e7, 3e7), AlsQuaternion.FromAxisAngle(NVector.Normalize(new(.3f, .8f, .2f)), .31f), AlsDoubleVector.One) };
+        for (var variant = 0; variant < variants.Length; variant++) foreach (var reversed in new[] { false, true })
+        {
+            var world0 = AlsPrecisePose.Compose(p, variants[variant]); var world1 = AlsPrecisePose.Compose(q, variants[variant]);
+            var count = reversed ? query.Query(1, world1, 0, world0, points) : query.Query(0, world0, 1, world1, points);
+            Require(count > 0, "Captured asset foot contact disappeared.");
+            var normalMin = 1d; var faceError = 0d;
+            for (var i = 0; i < count; i++)
+            {
+                var normal = reversed ? (new AlsDoubleVector(points[i].Normal1).Rotate(world0.Rotation) * -1).Rotate(world1.Rotation.Conjugate()) : new AlsDoubleVector(points[i].Normal1);
+                var floorPoint = reversed ? points[i].Point0 : points[i].Point1;
+                normalMin = Math.Min(normalMin, normal.Z); faceError = Math.Max(faceError, Math.Abs(floorPoint.Z - 25));
+            }
+            GD.Print($"CORE_ASSET_FOOT_FACE variant={variant} reversed={reversed} points={count} min_normal_z={normalMin:R} floor_face_error_cm={faceError:R}");
+            failed |= normalMin < .999 || faceError > .002; _precisionChecks++;
+        }
+        Require(!failed, "Captured foot query selected the bottom face instead of the nearby top face.");
+    }
+
+    private void InteriorFaceChecks()
+    {
+        var registry = new AlsContactRegistry(2, 2); var identity = AlsPrecisePose.Identity;
+        using var hull = new ConvexPolygonShape3D { Margin = 0, Points = Enumerable.Range(0, 8).Select(i =>
+            new Vector3((i & 1) == 0 ? -.25f : .25f, (i & 2) == 0 ? -.25f : .25f, (i & 4) == 0 ? -.25f : .25f)).ToArray() };
+        using var box = new BoxShape3D { Size = Vector3.One * 4 };
+        using var query = new AlsGodotContactQuery(registry);
+        query.Bind(registry.Register(new(0, identity, 1, 1)), hull); query.Bind(registry.Register(new(1, identity, 1, 1)), box);
+        var points = new AlsDetectedContact[16];
+        for (var axis = 0; axis < 3; axis++) for (var sign = -1; sign <= 1; sign += 2)
+        {
+            var position = NVector.Zero; position[axis] = sign * 224;
+            var before = query.InteriorFaceQueries;
+            var count = query.Query(0, identity with { Position = new(position) }, 1, identity, points);
+            Require(count > 0 && query.InteriorFaceQueries == before + 1, "Flat box face was not queried.");
+            for (var i = 0; i < count; i++) Require(points[i].Normal1[axis] * sign > .999f &&
+                Math.Abs(points[i].Point1[axis] - sign * 200) < .002, "Wrong box face or normal.");
+            _precisionChecks++;
+        }
+        var faceQueries = query.InteriorFaceQueries;
+        query.Query(0, identity with { Position = new(224, 224, 0) }, 1, identity, points);
+        Require(query.InteriorFaceQueries == faceQueries, "Box edge was replaced with an infinite face."); _precisionChecks++;
+        var outside = query.Query(0, identity with { Position = new(224, 300, 0) }, 1, identity, points);
+        Require(outside == 0 && query.InteriorFaceQueries == faceQueries, "Finite box footprint was lost."); _precisionChecks++;
+    }
 
     private void GeometryChecks()
     {

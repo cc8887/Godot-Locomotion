@@ -33,6 +33,8 @@ public partial class PhysicsCoreJointReplay : Node3D
     private double _positionError, _angleError, _vError, _wError, _transportError, _anchorCm;
     private string _report = "";
     private string _anchorSource = "";
+    private int _traceFirst = -1, _traceLast = -1;
+    private string[] _traceBones = [];
     private int _contactPoints;
     private double _finalSpeed, _finalAngularSpeed, _maxLimit, _finalLimit;
     private string _finalLimitSource = "";
@@ -50,6 +52,14 @@ public partial class PhysicsCoreJointReplay : Node3D
             _sleep = args.Contains("--sleep"); Require(!_sleep || _drop, "Sleep probe requires --drop.");
             _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
             _platformMode = args.FirstOrDefault(a => a.StartsWith("--platform="))?[11..] ?? "";
+            var trace = args.FirstOrDefault(a => a.StartsWith("--trace-frames="))?[15..];
+            if (trace is not null)
+            {
+                var range = trace.Split(':'); Require(range.Length == 2, "Trace range must be first:last.");
+                _traceFirst = int.Parse(range[0]); _traceLast = int.Parse(range[1]);
+                Require(_traceFirst >= 0 && _traceLast >= _traceFirst, "Invalid trace range.");
+                _traceBones = (args.FirstOrDefault(a => a.StartsWith("--trace-bones="))?[14..] ?? "foot_l").Split(',');
+            }
             Require(_platformMode is "" or "translate" or "rotate", "Unsupported platform mode.");
             Require(_platformMode == "" || _sceneWorld && _sleep && !_highDrop, "Platform lifecycle requires scene-world, sleep and normal drop.");
             Require(!_drop || _chains, "Drop requires --chains.");
@@ -204,7 +214,14 @@ public partial class PhysicsCoreJointReplay : Node3D
                         !body.Material.GetProperty("overrideRestitutionCombine").GetBoolean() &&
                         body.Defaults.GetProperty("gravityGroupIndex").GetInt32() == 0 &&
                         !body.Defaults.GetProperty("bGyroscopicTorqueEnabled").GetBoolean(), "Drop needs homogeneous default material, gravity group zero and no gyroscopic torque.");
-                contacts = new(registry, query, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16);
+                IAlsContactGeometrySource source = query;
+                if (_traceFirst >= 0)
+                {
+                    var names = rig.Definition.Bodies.Select(b => b.Bone).Concat(scene is null ? ["floor"] :
+                        Enumerable.Range(0, scene.BodyCount).Select(i => scene.BodyAt(i).Name.ToString())).ToArray();
+                    source = new AlsContactTrace(query, registry, rig.Definition.Mesh, names, () => _frame, _traceFirst, _traceLast, _traceBones);
+                }
+                contacts = new(registry, source, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16);
             }
             _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names), shapes, query, contacts, scene));
         }

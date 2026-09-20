@@ -35,7 +35,7 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
         var floor = new BoxShape3D { Size = new(40, 1, 40), Margin = 0 }; _resources.Add(floor);
         query.Bind(registry.Register(new(body, AlsPrecisePose.Identity, 1, 1)), floor);
     }
-    private static Shape3D Create(AlsPhysicsShape source) => source.Type switch
+    internal static Shape3D Create(AlsPhysicsShape source) => source.Type switch
     {
         "sphere" => new SphereShape3D { Radius = (float)(source.RadiusCm * .01) },
         "box" => new BoxShape3D { Size = new((float)(source.SizeCm.Y * .01), (float)(source.SizeCm.Z * .01), (float)(source.SizeCm.X * .01)) },
