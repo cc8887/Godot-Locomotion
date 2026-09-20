@@ -8,7 +8,7 @@
 
 # 运行和验证
 
-- 最新进度：`docs/verification/2026-09-20-physics-asset-export.md`。两套原始 PhysicsAsset 几何/质量/惯量/关节及排除对已导出并建立导入定义；下一步创建 Godot 物理骨架与所有权切换，再接真实 Ragdoll/Get-up。普通入口已有地面与中等落差自动 Roll；高落差/翻滚离地的 Ragdoll 仅接通触发判定，物理模拟尚未实现。`--action-preview` 保留旧预览；P5C/P6 未整体验收。
+- 最新进度：`docs/verification/2026-09-20-physics-body-ownership.md`。两套原始 PhysicsAsset 已创建 40 个 Godot 刚体/43 个形状，质量主轴、姿势回传和暂停恢复通过 30/60/120 Hz 无碰撞回归；低 Hz 落地接触仍失败（120 Hz 对照通过），尚未绑定关节或接入普通角色。下一步解决接触策略并实现关节，再接真实 Ragdoll/Get-up。普通入口已有地面与中等落差自动 Roll；高落差/翻滚离地的 Ragdoll 仅接通触发判定。`--action-preview` 保留旧预览；P5C/P6 未整体验收。
 
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。
