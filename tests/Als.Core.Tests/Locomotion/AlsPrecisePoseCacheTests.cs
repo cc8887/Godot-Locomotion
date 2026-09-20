@@ -3,6 +3,7 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Core.Tests.Locomotion;
 
+[Collection(AllocationTestCollection.Name)]
 public sealed class AlsPrecisePoseCacheTests
 {
     private static readonly AlsPoseCacheDefinition Definition=new(3,[0],[new(1,0),new(2,0)]);

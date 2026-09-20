@@ -84,6 +84,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     public ref readonly AlsCycleSyncFrame CommittedSources => ref _movement.CommittedSources;
     public ref readonly AlsCycleSyncFrame Sources { get { RequireGraphCandidate(); return ref _movement.Sources; } }
     public ref readonly AlsEventBuffer SourceEvents { get { RequireGraphCandidate(); return ref _movement.SourceEvents; } }
+    internal bool ResetGroundedEntry { get { RequireGraphCandidate(); return _grounded.ResetGroundedEntry; } }
     internal AlsMainMovementFrameRuntime Movement => _movement;
     internal AlsInAirAnimationInput CommittedGlobalInput => _committedGlobalInput;
     internal AlsGroundedAnimationInput CommittedGroundInput => _committedGroundInput;
@@ -165,14 +166,15 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         _overlayTransitions = definition.OverlayTransitions; _stopTransitions = definition.StopTransitions;
         _committedGlobalInput = new(default, definition.InputCurves.Defaults["FallSpeed"] * .01f,
             definition.InputCurves.Defaults["LandPrediction"], definition.InputStateDefaults.Lean, definition.InputStateDefaults.Speed);
-        _grounded = new(library, standing, set, definition.Sources, definition.Grounded, definition.Crouching, definition.Dependencies, pose);
+        _grounded = new(library, standing, set, definition.Sources, definition.Grounded, definition.Crouching, definition.Dependencies, pose,
+            definition.GroundedEntryNotify.ResetNotifyIndex);
         _groundedSlot = new(definition.RawSources, set, definition.GroundedTransitionAssets, _grounded.CurveNames, definition.StopRawSources);
         try
         {
             _movement = new(library, set, definition.Sources, definition.Binding, definition.Movement, _grounded,
                 definition.Air, definition.Landing, definition.Dependencies,
                 definition.AuthoredMontageAssets.SelectMany(a=>set.Animations[a.AnimationId].Curves).Select(c=>c.SourceName).ToArray(), contributor,
-                refactoredDefinitions);
+                refactoredDefinitions, definition.GroundedEntryNotify.Binding);
             _actionSlot = new(library,set,definition.AuthoredMontageAssets.Select(a=>a.AnimationId).Distinct().ToArray(),
                 _movement.ReferencePose,_movement.CurveNames);
             _tail = new(definition.BaseLayer, _movement.ReferencePose.Length, _movement.CurveNames.Length);

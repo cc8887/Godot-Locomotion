@@ -91,8 +91,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     public AlsRefactoredAnimationFeedback CandidateRefactoredFeedback { get { RequirePrepared(); return _nextRefactoredFeedback; } }
     private AlsGraphTraversalCounter _evaluation, _nextEvaluation;
     private AlsFrameIdentity _identity;
-    private AlsTimelineAction _action, _nextAction;
-    private AlsTimelineGroundedEntryMode _entry, _nextEntry;
+    private AlsMovementNotifyState _notifyState, _nextNotifyState;
     private bool _prepared, _applied, _queriesPending;
     private readonly AlsAnimationSetDefinition? _captureSet;
     private readonly string[]? _captureNames;
@@ -109,7 +108,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             RequirePrepared();
             return new(_identity, Curve(_yawOffset), Curve(_rotationAmount),
                 _yawOffset >= 0 && Curves[_yawOffset].Present,
-                _rotationAmount >= 0 && Curves[_rotationAmount].Present, _nextAction);
+                _rotationAmount >= 0 && Curves[_rotationAmount].Present, _nextNotifyState.Action);
         }
     }
     public AlsFrameIdentity Identity => _identity;
@@ -228,7 +227,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _nextEvaluation = _evaluation.Next(checked((ulong)input.Identity.FrameId));
         var movement = _standing.CreateMovementInput(input);
         var rules = new AlsGroundedRuleInput(movement.ShouldMove, false, false, result.ActualStance,
-            _action == AlsTimelineAction.None, _entry == AlsTimelineGroundedEntryMode.FromRoll, 0, 0)
+            _notifyState.Action == AlsTimelineAction.None, _notifyState.Entry == AlsTimelineGroundedEntryMode.FromRoll, 0, 0)
         {
             MovementState = result.ResolvedLocomotionState switch
             {
@@ -300,19 +299,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             Curves[_refLeftLock] == Curves[_v4LeftLock] && Curves[_refRightLock] == Curves[_v4RightLock];
         if (_refactoredPoseReader is not null)
             _nextRefactoredFeedback = new(_refactoredPoseReader.Read(_identity, Curves), Curve(_predictionBlock));
-        _nextAction = _action; _nextEntry = _entry;
-        for (var i = 0; i < _base.SourceEvents.Count; i++)
-        {
-            var notify = _base.SourceEvents[i];
-            if (notify.Kind == AlsTimelineEventKind.SetAction)
-            {
-                var action = (AlsTimelineAction)notify.Payload.EnumValue0;
-                if (notify.Phase == AlsAnimationEventPhase.Begin) _nextAction = action;
-                else if (notify.Phase == AlsAnimationEventPhase.End && _nextAction == action) _nextAction = AlsTimelineAction.None;
-            }
-            else if (notify.Kind == AlsTimelineEventKind.SetGroundedEntry && notify.Phase == AlsAnimationEventPhase.Trigger)
-                _nextEntry = (AlsTimelineGroundedEntryMode)notify.Payload.EnumValue0;
-        }
+        _nextNotifyState = _notifyState.Advance(_base.SourceEvents, _base.ResetGroundedEntry);
         _prepared = true;
     }
 
@@ -360,7 +347,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         RequirePrepared();
         // Character rotation has already run before this animation input was
         // gathered. Publish diagnostics only; never rotate from the new pose.
-        if (input.Floor.IsGrounded == 0 || _base.CandidateGroundInput.ShouldMove || _action != AlsTimelineAction.None) return;
+        if (input.Floor.IsGrounded == 0 || _base.CandidateGroundInput.ShouldMove || _notifyState.Action != AlsTimelineAction.None) return;
         var delta = input.CharacterRotation.ActorYawDelta;
         var idle = _base.CandidateControlInput.State.Idle;
         if (idle.RotateLeft || idle.RotateRight)
@@ -425,7 +412,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _committedLockProducersMatch = _nextLockProducersMatch;
         _committedRefactoredFeedback = _nextRefactoredFeedback;
         _committedGraphCapture = _nextGraphCapture; _nextGraphCapture = null;
-        _action = _nextAction; _entry = _nextEntry; _prepared = _applied = false;
+        _notifyState = _nextNotifyState; _prepared = _applied = false;
     }
     public void Discard()
     {

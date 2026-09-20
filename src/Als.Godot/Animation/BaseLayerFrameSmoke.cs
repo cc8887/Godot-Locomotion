@@ -77,6 +77,15 @@ public partial class BaseLayerFrameSmoke : Node
             .Concat(poseProfile.Turns.Select(t => t.AnimationId)).Distinct();
         GD.Print($"IDLE_CURVE_ORIGIN grounded_authored_transition_assets={groundAssetIds.Count(id => set.Animations[id].Curves.Any(c => c.SourceName == "Enable_Transition"))} graph_writes=standing_and_crouching_idle");
         var settings = AlsLocomotionInputCompiler.Compile(Read("v4_locomotion_inputs.json")).Movement;
+        if (OS.GetCmdlineUserArgs().Contains("--grounded-native-repeat"))
+        {
+            var repeated = AlsGroundedEntryNotifyCompiler.Compile(
+                Godot.FileAccess.GetFileAsString("res://artifacts/grounded-notify-20260920/native-editor.json"),
+                Read("v4_overlay_transition_inputs.json"), set, AlsGroundedMachineCompiler.CompileMovement(Read("v4_main_movement_graph.json")),
+                AlsP5aAnimationRuntimeProfileCompiler.Compile(Read("p5a_animation_runtime.json"), set));
+            Require(repeated == definition.GroundedEntryNotify, "Normal Editor grounded semantics differ from the cold export.");
+            GD.Print("GROUNDED_NOTIFY_EDITOR_REPEAT_OK property=identical enum=identical connected_semantics=identical");
+        }
         if (OS.GetCmdlineUserArgs().Contains("--unvisited-root"))
         { RunUnvisitedRoot(set,locomotion,poseProfile,definition,settings); return; }
         if (OS.GetCmdlineUserArgs().Contains("--curve-feedback"))
@@ -767,6 +776,8 @@ public partial class BaseLayerFrameSmoke : Node
     {
         var frames=0; var hidden=0; var faults=0; var accepted=0; var completed=0; var cancelled=0; var replaced=0;
         var begins=0; var ends=0; var fullPose=0; var callbacks=0;
+        var typedEntries=0; var resets=0; var fromRoll=0;
+        var consumeNotifies = OS.GetCmdlineUserArgs().Contains("--grounded-entry");
         foreach(var hz in new[]{30,60,120})
         {
             using var library=AlsAnimationLibraryBuilder.BuildP5a(set,definition.Binding); library.UseMovementSources(set,definition.RawSources); AddChild(library.Root);
@@ -774,6 +785,7 @@ public partial class BaseLayerFrameSmoke : Node
             using var owner=new AlsBaseLayerFrameRuntime(definition,library,graph.StandingCycle!,set,poseProfile);
             var sink=new Sink(owner.ReferencePose.ToArray()); var fault=new ActionFailureSlot(owner.ActionSlot);
             var feedback=default(AlsAnimationInputFeedback); var policy=definition.ActionPolicies.Single();
+            var notifyState = default(AlsMovementNotifyState);
             var roll=definition.AuthoredMontageAssets.Single();
             using var clip=library.MovementSources(set, poseProfile.SkeletonId).Create(roll.AnimationId);
             var sampled=owner.ReferencePose.ToArray();
@@ -785,7 +797,9 @@ public partial class BaseLayerFrameSmoke : Node
                 result.ActualGait=AlsGait.Walking; result.ActualRotationMode=AlsRotationMode.LookingDirection; result.PlayRate=result.Stride=1;
                 var speed=frame>hz*4 ? 1.5f:0;
                 var movement=AlsStandingMovementInputModel.Evaluate(id,new(speed,0,0),speed>0 ? 1:0,settings);
-                var rules=new AlsGroundedRuleInput(movement.ShouldMove,false,false,AlsStance.Standing,true,false,0,1)
+                var rules=new AlsGroundedRuleInput(movement.ShouldMove,false,false,AlsStance.Standing,
+                    !consumeNotifies || notifyState.Action == AlsTimelineAction.None,
+                    consumeNotifies && notifyState.Entry == AlsTimelineGroundedEntryMode.FromRoll,0,1)
                     {MovementState=AlsMovementStateInput.Grounded,FeetCrossing=1};
                 var ground=new AlsGroundedFrameInputs(delta,new(1.75f,3.75f,6.5f),1,1,1,
                     new(NVector4.UnitX,default,1,default),new(1,1,default),AlsSlotWeights.Passthrough,
@@ -800,6 +814,10 @@ public partial class BaseLayerFrameSmoke : Node
                 var priorNotify=owner.TurnNotifies.Committed; var priorEvents=owner.Movement.CommittedEventState;
                 Prepare(); owner.Evaluate(AlsLocalPose.Identity,0,0,sink);
                 var published = AlsFrameResult.CreateDefault(id); owner.CompleteEvents(ref published);
+                var nextNotifyState = notifyState.Advance(owner.SourceEvents, owner.ResetGroundedEntry);
+                var resetEntry = owner.ResetGroundedEntry;
+                if (resetEntry) resets++;
+                if (owner.SourceUpdated && owner.Movement.GroundedReadCount > 0 && owner.Grounded.Update.Main.State.CurrentState == 7) fromRoll++;
                 if (frame == 1)
                 {
                     var foreign = AlsFrameResult.CreateDefault(new(id.FrameId + 1, id.CharacterId, id.SlotGeneration));
@@ -855,11 +873,21 @@ public partial class BaseLayerFrameSmoke : Node
                 Require(owner.SourceEvents.Count==events.Count && owner.Actions.Outcomes.Count==outcomes.Count,"Action retry counts differ.");
                 var retryPublished = AlsFrameResult.CreateDefault(id); owner.CompleteEvents(ref retryPublished);
                 Require(retryPublished.ActionPlayback == published.ActionPlayback, "Action playback changed across discard/retry.");
+                Require(owner.ResetGroundedEntry == resetEntry && notifyState.Advance(owner.SourceEvents, owner.ResetGroundedEntry) == nextNotifyState,
+                    "Grounded entry candidate or reset changed across discard/retry.");
                 Require(retryPublished.TypedEvents.Count == events.Count && retryPublished.ActionOutcomes.Count == outcomes.Count,
                     "Published action event/outcome counts differ.");
                 for(var i=0;i<events.Count;i++)
                 {
                     Require(owner.SourceEvents[i]==events[i] && retryPublished.TypedEvents[i]==events[i],"Action retry/public event identity differs.");
+                    if (events[i].EventId == definition.GroundedEntryNotify.Binding.EventId &&
+                        events[i].SourceAnimationId == definition.GroundedEntryNotify.Binding.AnimationId)
+                    {
+                        Require(events[i].Kind == AlsTimelineEventKind.SetGroundedEntry &&
+                            events[i].Payload.EnumValue0 == (int)AlsTimelineGroundedEntryMode.FromRoll &&
+                            events[i].Payload.SemanticId == definition.GroundedEntryNotify.Binding.SemanticId,
+                            "Real Roll callback still has Generic semantics."); typedEntries++;
+                    }
                     if(events[i].SourceActionId<0)continue;
                     callbacks++; if(events[i].Phase==AlsAnimationEventPhase.Begin)begins++;
                     if(events[i].Phase==AlsAnimationEventPhase.End)ends++;
@@ -876,13 +904,17 @@ public partial class BaseLayerFrameSmoke : Node
                     }
                 }
                 var next=AlsAnimationInputFeedback.FromCompletedFrame(id,owner.CurveNames,owner.Curves);
-                owner.Commit(id); feedback=next; frames++;
+                owner.Commit(id); feedback=next; notifyState=nextNotifyState; frames++;
                 void Prepare()=>owner.PrepareFromFrame(input,result,movement,rules,ground,feedback,context,sink);
             }
+            if (consumeNotifies) Require(notifyState.Action == AlsTimelineAction.None && notifyState.Entry == AlsTimelineGroundedEntryMode.None,
+                "Completed Roll left its movement action or consumed entry selection latched.");
         }
         Require(accepted==9 && completed==3 && cancelled==3 && replaced==3 && begins==6 && ends==6 &&
             hidden>0 && fullPose>0 && faults>0,"Authored BaseLayer action lifecycle coverage differs.");
-        GD.Print($"BASE_LAYER_ACTION_OK rates=30,60,120 frames={frames} retries={frames} full_roll_pose={fullPose} hidden={hidden} callbacks={callbacks} begins={begins} ends={ends} accepted={accepted} replaced={replaced} cancelled={cancelled} completed={completed} late_faults={faults} slot=real_roll curves=presence_checked events=unified playback=physical_owner root_motion=not_applied gameplay=not_connected");
+        Require(typedEntries >= 3, "No real Roll grounded entry callbacks were consumed.");
+        if (consumeNotifies) Require(resets >= 3 && fromRoll > 0, "Grounded Entry -> From Roll -> reset path was not covered.");
+        GD.Print($"BASE_LAYER_ACTION_OK rates=30,60,120 frames={frames} retries={frames} full_roll_pose={fullPose} hidden={hidden} callbacks={callbacks} begins={begins} ends={ends} accepted={accepted} replaced={replaced} cancelled={cancelled} completed={completed} late_faults={faults} typed_entries={typedEntries} entry_resets={resets} from_roll_frames={fromRoll} notify_consumers={consumeNotifies} slot=real_roll curves=presence_checked events=unified playback=physical_owner root_motion=not_applied gameplay=not_connected");
     }
     private sealed class ActionFailureSlot(IAlsBaseLayerSlotPoseSink inner):IAlsBaseLayerSlotPoseSink
     {

@@ -1573,3 +1573,10 @@ Mantle/Roll、P6 Ragdoll/Get-up/Pose Recovery/Camera 和 P7 十分钟性能预�
 当前 Root/Overlay 布局的片段 occurrence 随通知表重编译。验证和限制见
 `../../verification/2026-09-20-action-playback-summary.md`。下一项继续类型化
 Notify 的玩法消费和动作请求来源，尚未完成碰撞安全 Root Motion。
+
+2026-09-20 后续：原生 Roll Notify 的 `Grounded Entry State`（带空格属性）
+已经通过 UE 只读导出、枚举及 Blueprint 连接校验补入当前生产事件，包含正确的
+SemanticId、物理实例身份和回调顺序。Grounded Entry 状态退出时消费原生重置
+通知，动作/入口反馈随整帧候选提交或丢弃。实际三档频率 Roll 与逐帧重试通过；
+详见 `../../verification/2026-09-20-grounded-entry-notify.md`。普通动作请求来源、
+其余 Notify gameplay 消费者和碰撞安全 Root Motion 仍待继续，后续 P5B–P7 范围不变。

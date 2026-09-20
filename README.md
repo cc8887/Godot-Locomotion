@@ -11,6 +11,9 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 这仍是开发中的 Demo：地形全程接触、起停滑步、换髋和上下身观感、P5A 收尾及后续玩法尚未全部验收。
 历史 P4 证书不代表当前完整链路已验收；P7 十分钟性能认证也未完成。
 
+共同 Montage 已发布真实动作摘要，并补齐 Roll 的类型化 GroundedEntry 通知及入口重置。
+详见 [最新接线记录](docs/verification/2026-09-20-grounded-entry-notify.md)。普通动作请求输入和碰撞安全 Root Motion 仍待实现。
+
 ## 运行
 
 环境要求：Godot 4.7.2 .NET、.NET 8 SDK、PowerShell 7，以及仓库验证脚本

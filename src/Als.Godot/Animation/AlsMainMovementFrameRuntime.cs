@@ -55,6 +55,7 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
     private AlsP5SourceEventState _committedEvents, _events;
     private AlsGroundedMachineUpdate _update;
     private AlsEventBuffer _sourceEvents;
+    private readonly AlsGroundedEntryNotifyBinding? _groundedEntryNotify;
     private AlsFrameIdentity _committedIdentity, _identity;
     private bool _hasGroundedPose;
     private bool _eventsPrepared;
@@ -96,7 +97,8 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
         AlsGroundedMachineProfile movement, AlsGroundedFrameRuntime grounded,
         AlsAirPoseProfile air, AlsLandingPoseProfile landing, AlsGroundedPoseDependencies dependencies,
         ReadOnlySpan<string> extraCurveNames = default, IAlsSharedSourceContributor? contributor = null,
-        IReadOnlyList<AlsRefactoredPoseCurveWrite>? refactoredCurves = null)
+        IReadOnlyList<AlsRefactoredPoseCurveWrite>? refactoredCurves = null,
+        AlsGroundedEntryNotifyBinding? groundedEntryNotify = null)
     {
         if (movement.Runtime.Kind != AlsGroundedMachineKind.MainMovement || movement.Runtime.InitialState != 0 ||
             binding.CreateCoreView().Sources.Stamp != sources.RuntimeStamp ||
@@ -105,6 +107,7 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
             dependencies.QuickFeetLogicalFactors.Length != grounded.ReferencePose.Length)
             throw new ArgumentException("Main Movement source or machine contract differs.");
         _grounded = grounded; _binding = binding; _contributor = contributor; _machine = movement.Runtime; _dependencies = dependencies;
+        _groundedEntryNotify = groundedEntryNotify;
         _groundedMovementCurves = movement.GroundedMovementCurves ?? throw new ArgumentException("Missing Grounded movement curve wrapper.");
         _node = air.NestedJump.ParentMachineNodeIndex; _jumpNode = air.NestedJump.Runtime.MachineNodeIndex;
         _landingRead = landing.GroundedReadNodeIndex;
@@ -347,6 +350,7 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
             _committedEvents, out _events, out _sourceEvents, out var failure, montageBinding: montageBinding,
             montageNotifies: montageNotifies, montageDirectNotifies: montageDirectNotifies))
         { _phase = Phase.Faulted; throw new InvalidOperationException($"Main Movement events failed: {failure}."); }
+        _groundedEntryNotify?.Apply(ref _sourceEvents);
         _eventsPrepared = true;
     }
 
