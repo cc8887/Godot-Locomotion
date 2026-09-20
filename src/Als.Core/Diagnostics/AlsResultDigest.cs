@@ -36,6 +36,13 @@ public static class AlsResultDigest
             Append(ref digest, result.Rolling.InstanceId);
             Append(ref digest, result.Rolling.TargetYawDegrees);
         }
+        if (result.MovementAction.Trigger != GodotAls.Core.Actions.AlsMovementActionTrigger.None)
+        {
+            Append(ref digest, 0x4D4F4445);
+            Append(ref digest, (byte)result.MovementAction.Trigger);
+            Append(ref digest, result.MovementAction.CachedVelocity);
+            Append(ref digest, result.MovementAction.TargetYawDegrees);
+        }
         Append(ref digest, result.PelvisTarget);
         Append(ref digest, result.LeftFootTarget);
         Append(ref digest, result.RightFootTarget);

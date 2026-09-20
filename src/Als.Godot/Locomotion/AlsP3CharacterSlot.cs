@@ -322,6 +322,8 @@ public partial class AlsP3CharacterSlot : Node
             ActionRequest = _retiredMotorInput.ActionRequest == AlsActionRequest.None
                 ? AlsActionRequest.None // Preserve the legacy command source's unscoped sentinel.
                 : AlsActionRequest.None with { SlotGeneration = replacement.Handle.Generation },
+            ActionParameters = default,
+            MovementAction = default,
         };
         var releasePlatformOnNextStep =
             stagedMotorInput.Floor.PlatformId >= 0 ||

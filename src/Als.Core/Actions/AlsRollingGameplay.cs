@@ -12,8 +12,7 @@ public readonly record struct AlsRollingState(long RequestId, long InstanceId, f
 public readonly record struct AlsRollingStartContext(bool Grounded, AlsTimelineAction Action);
 
 // ALS-Refactored b754d6f: AlsCharacter_Actions.cpp and FAlsRollingSettings C++ defaults.
-// Angles use UE world yaw (degrees). This is the grounded input path; landing and
-// airborne interruption need the real Ragdoll action before they can be enabled.
+// Angles use UE world yaw (degrees). Ragdoll transitions need the physical action.
 public static class AlsRollingGameplay
 {
     public const float RotationHalfLife = .1f;
@@ -46,7 +45,8 @@ public static class AlsRollingGameplay
         {
             var outcome = outcomes[i];
             if (outcome.ResultCode == AlsActionResultCode.Accepted)
-                next = new(outcome.RequestId, outcome.PlaybackEpoch, TargetYaw(frame));
+                next = new(outcome.RequestId, outcome.PlaybackEpoch, frame.ActionParameters.HasTargetYaw
+                    ? frame.ActionParameters.TargetYawDegrees : TargetYaw(frame));
             else if (outcome.PlaybackEpoch == next.InstanceId && outcome.RequestId == next.RequestId &&
                 (outcome.ResultCode == AlsActionResultCode.Completed || outcome.ResultCode >= AlsActionResultCode.InterruptedByReplacement))
                 next = default;

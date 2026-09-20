@@ -47,6 +47,8 @@ public readonly record struct AlsFrameInput(
     public AlsRefactoredGroundPredictionSample RefactoredGroundPrediction { get; init; }
     public AlsTimelineAction GameplayAction { get; init; }
     public float MeshHeightOffset { get; init; }
+    public GodotAls.Core.Actions.AlsMontageActionParameters ActionParameters { get; init; }
+    public GodotAls.Core.Actions.AlsMovementActionTransition MovementAction { get; init; }
 
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {

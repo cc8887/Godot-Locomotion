@@ -8,7 +8,7 @@
 
 # 运行和验证
 
-- 最新进度：`docs/verification/2026-09-20-grounded-roll-gameplay.md`。普通入口 R 已启用地面 Roll 门控、锁定目标/半衰期转向、蹲伏高度补偿及同帧 Root Motion 碰撞消费。`--action-preview` 保留旧动作预览；下一步补落地 Roll 的请求倍率、Ragdoll 优先级及翻滚离地规则，尚未关闭整个 P5C。
+- 最新进度：`docs/verification/2026-09-20-landing-action-routing.md`。普通入口已有地面 Roll 和中等落差自动 Roll（缓存速度判定、1.3 倍率、速度朝向）；高落差/翻滚离地的 Ragdoll 判定仅接通路由，物理模拟尚未实现。下一步补原始 PhysicsAsset 几何/质量/关节数据及物理所有权切换，再接真实 Ragdoll/Get-up。`--action-preview` 保留旧预览；P5C/P6 未整体验收。
 
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。

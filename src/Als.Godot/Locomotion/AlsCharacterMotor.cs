@@ -425,13 +425,26 @@ public partial class AlsCharacterMotor : CharacterBody3D
         // on the same velocity source. World displacement remains in the transform.
         var actualVelocity = ToNumerics(_movementRuntime is null ? GetRealVelocity() : Velocity);
         var grounded = IsOnFloor();
+        var movementAction = RollingGameplay && _lastFrameId > 0
+            ? AlsMovementActionRules.Evaluate(groundedBeforeMove, grounded, _previousActualVelocity,
+                -GetCharacterYaw() * (180f / MathF.PI), isRolling) : default;
+        var actionParameters = default(AlsMontageActionParameters);
+        // A landing edge and its start parameters are gathered only once. Retry
+        // reuses this exact frame; X cancellation takes precedence over auto Roll.
+        if (movementAction.Trigger == AlsMovementActionTrigger.LandingRoll && actionRequest.Command != AlsActionCommand.Cancel)
+        {
+            var policy = _runtimeContext!.MovementGraph!.ActionPolicies[0];
+            actionRequest = new(frameId, AlsActionCommand.Start, policy.DefinitionId, policy.StartSectionId, 100, (uint)generation);
+            actionParameters = new(AlsMovementActionRules.LandingRollPlayRate, true, movementAction.TargetYawDegrees);
+        }
         if (_movementRuntime is not null)
         {
             var acceleration = movementStep.Acceleration;
             var relativeYaw = System.Math.Atan2(acceleration.Y, acceleration.X) * (180 / System.Math.PI) + command.ViewYaw * (180 / System.Math.PI);
             var speedCm = System.Math.Sqrt((double)actualVelocity.X * actualVelocity.X + (double)actualVelocity.Z * actualVelocity.Z) * 100;
             _movementHistory = _movementRuntime.UpdateCharacter(_movementHistory, speedCm, movementStep, _actualStance,
-                resolvedCommand.RotationMode, command.RequestedGait, relativeYaw, grounded, !groundedBeforeMove && grounded, deltaTime);
+                resolvedCommand.RotationMode, command.RequestedGait, relativeYaw, grounded,
+                !groundedBeforeMove && grounded && movementAction.Trigger == AlsMovementActionTrigger.None, deltaTime);
             resolvedCommand = resolvedCommand with { MaxAllowedGait = _movementHistory.AllowedGait };
         }
         var aimRate = AlsAimYawRate.Gather(command.ViewYaw, _previousControlDegrees, deltaTime);
@@ -522,6 +535,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
             GameplayAction = RollingGameplay ? (isRolling ? AlsTimelineAction.Rolling :
                 rotationFeedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : rotationFeedback.Action) : default,
             MeshHeightOffset = MeshHeightOffset,
+            ActionParameters = actionParameters,
+            MovementAction = movementAction,
             AimYawRateDegrees = aimRate.RateDegrees,
             FirstPerson = FirstPersonView ? (byte)1 : (byte)0,
             CharacterRotation = rotationSample,

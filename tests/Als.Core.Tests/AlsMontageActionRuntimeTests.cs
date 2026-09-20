@@ -187,6 +187,38 @@ public sealed class AlsMontageActionRuntimeTests
             [new(0,11,AlsMontageSlot.BaseLayer,1,1.5f,0,1,new(AlsActionLifecycleMode.MontageAutoBlendOut,.2f,AlsActionBlendOption.HermiteCubic,.3f,AlsActionBlendOption.HermiteCubic,-1))]);
         return(bank,new(bank,[new(0,0,0,1,.2f,interruptible)]));
     }
+
+    [Fact]
+    public void CapturedPlayRateBelongsToThePhysicalInstanceAndSurvivesRetry()
+    {
+        var (bank, owner) = Create();
+        owner.Begin(Id(1), .1f); owner.ApplyRequest(Start(1), parameters: new(1.3f, true, 90)); owner.Complete();
+        Assert.Equal(1.3f, bank.Candidate[0].PlayRate); owner.Discard();
+        owner.Begin(Id(1), .1f); owner.ApplyRequest(Start(1), parameters: new(1.3f, true, 90)); owner.Complete(); owner.Commit(Id(1));
+        owner.Begin(Id(2), .1f); owner.ApplyRequest(AlsActionRequest.None); owner.Complete();
+        Assert.InRange(bank.Candidate[0].Position, .129999f, .130001f); owner.Commit(Id(2));
+        owner.Begin(Id(3), .1f); owner.ApplyRequest(Start(3)); owner.Complete();
+        Assert.Equal(1.3f, bank.Candidate[0].PlayRate); Assert.Equal(1f, bank.Candidate[1].PlayRate);
+    }
+
+    [Theory]
+    [InlineData(-1)] [InlineData(float.NaN)] [InlineData(float.PositiveInfinity)]
+    public void InvalidStartRateCannotCancelTheCommittedAction(float rate)
+    {
+        var (bank, owner) = Create(); owner.Begin(Id(1),.1f); owner.ApplyRequest(Start(1)); owner.Complete(); owner.Commit(Id(1));
+        owner.Begin(Id(2),.1f);
+        Assert.Throws<ArgumentException>(() => owner.ApplyRequest(Start(2), true, parameters: new(rate, false, 0)));
+        owner.Discard(); Assert.False(bank.Committed[0].Interrupted); Assert.Equal(1, owner.CommittedOwners[0].RequestId);
+    }
+
+    [Theory]
+    [InlineData(AlsActionCommand.None)] [InlineData(AlsActionCommand.Cancel)]
+    public void StartParametersCannotBeAttachedToOtherCommands(AlsActionCommand command)
+    {
+        var (_, owner) = Create(); owner.Begin(Id(1),.1f);
+        Assert.Throws<ArgumentException>(() => owner.ApplyRequest(command == AlsActionCommand.None ? AlsActionRequest.None : Cancel(1),
+            parameters: new(1.3f, true, 90)));
+    }
     private static AlsFrameIdentity Id(int frame)=>new(frame,1,1);
     private static AlsActionRequest Start(long id)=>new(id,AlsActionCommand.Start,0,0,100,1);
     private static AlsActionRequest Cancel(long id)=>new(id,AlsActionCommand.Cancel,0,-1,0,1);
