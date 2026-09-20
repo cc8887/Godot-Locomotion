@@ -27,6 +27,22 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsAwakeSolverOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsJointSolverReference(PhysicsOutput, Error, true))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Awake solver export failed: %s"), *Error); return 17; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_AWAKE_SOLVER_OK cases=144 assets_saved=0"));
+        return 0;
+    }
+    if (FParse::Value(*Params, TEXT("PhysicsJointStepOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsJointStepReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Joint step export failed: %s"), *Error); return 16; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_JOINT_STEP_OK cases=288 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsAngularRowOutput="), PhysicsOutput))
     {
         FString Error;
