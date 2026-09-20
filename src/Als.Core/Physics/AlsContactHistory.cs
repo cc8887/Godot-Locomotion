@@ -26,6 +26,9 @@ public sealed class AlsContactHistory
     private AlsContactPairKey _key, _pendingKey;
     private long _step = -1, _pendingStep;
     private int _lastPointCount;
+    private int _stagedCount;
+    private float _stagedMinimum;
+    private bool _staged;
     public int SavedCount { get; private set; }
     public float MinInitialPhi { get; private set; }
     public bool Pending { get; private set; }
@@ -87,8 +90,12 @@ public sealed class AlsContactHistory
     }
 
     public void Commit(ReadOnlySpan<AlsContactHistoryResult> results)
+    { StageCommit(results); PublishCommit(); }
+
+    public void StageCommit(ReadOnlySpan<AlsContactHistoryResult> results)
     {
         if (!Pending) throw new InvalidOperationException("Prepare contact history before committing.");
+        _staged = false;
         if (results.Length != PreparedCount) throw new ArgumentException("One result per detected point is required, including disabled points.");
         var count = 0; var minimum = 0f;
         for (var i = 0; i < results.Length; i++)
@@ -113,7 +120,15 @@ public sealed class AlsContactHistory
                 _scratch[count++] = new(anchor0, anchor1, phi);
             }
         }
-        (_saved, _scratch) = (_scratch, _saved); SavedCount = count; MinInitialPhi = minimum;
+        _stagedCount = count; _stagedMinimum = minimum; _staged = true;
+    }
+
+    // After every participant stages successfully, publication performs only
+    // prevalidated swaps and scalar assignments; no callbacks or allocations.
+    public void PublishCommit()
+    {
+        if (!_staged || !Pending) throw new InvalidOperationException("Stage contact results before publishing.");
+        (_saved, _scratch) = (_scratch, _saved); SavedCount = _stagedCount; MinInitialPhi = _stagedMinimum;
         _key = _pendingKey; _step = _pendingStep; _lastPointCount = PreparedCount; ClearPending();
     }
 
@@ -123,6 +138,6 @@ public sealed class AlsContactHistory
         if (Pending) throw new InvalidOperationException("Abort before resetting contact history.");
         SavedCount = 0; MinInitialPhi = 0; _step = -1; _key = default; _lastPointCount = 0;
     }
-    private void ClearPending() { Pending = false; PreparedCount = 0; PreparedMinInitialPhi = 0; PreparedInitialManifold = false; }
+    private void ClearPending() { Pending = false; _staged = false; PreparedCount = 0; PreparedMinInitialPhi = 0; PreparedInitialManifold = false; }
     private static bool Finite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 }
