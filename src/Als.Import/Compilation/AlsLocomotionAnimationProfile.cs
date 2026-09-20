@@ -17,7 +17,12 @@ public sealed record AlsLocomotionAnimationProfile(
     int LandAnimationId,
     AlsLocomotionAnimationSample[] LeanAdditiveSamples,
     int LeanAdditiveBasePoseAnimationId,
-    int[] AllAnimationIds);
+    int[] AllAnimationIds)
+{
+    public AlsStandingWalkRunDefinition[] StandingWalkRun { get; init; } = [];
+}
+
+public sealed record AlsStandingWalkRunDefinition(int WalkPoseId, int WalkId, int RunPoseId, int RunId);
 
 public sealed record AlsLocomotionAnimationSample(
     int AnimationId,

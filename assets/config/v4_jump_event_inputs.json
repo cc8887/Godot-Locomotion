@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_AnimBP.ALS_AnimBP",
+  "defaults": {
+    "Jumped": false,
+    "JumpPlayRate": 1.2000000476837158,
+    "Speed": 0.0
+  },
+  "mapRangeCases": [
+    {
+      "speedCm": 0,
+      "playRate": 1.2
+    },
+    {
+      "speedCm": 75,
+      "playRate": 1.2375
+    },
+    {
+      "speedCm": 150,
+      "playRate": 1.275
+    },
+    {
+      "speedCm": 300,
+      "playRate": 1.35
+    },
+    {
+      "speedCm": 350,
+      "playRate": 1.375
+    },
+    {
+      "speedCm": 600,
+      "playRate": 1.5
+    },
+    {
+      "speedCm": 900,
+      "playRate": 1.5
+    }
+  ]
+}

@@ -2,7 +2,7 @@ using GodotAls.Core.Contracts;
 
 namespace GodotAls.Core.Sync;
 
-public static class AlsSyncRuntime
+public static partial class AlsSyncRuntime
 {
     public static bool TryEvaluateGroup(
         ReadOnlySpan<AlsSyncMarkerDefinition> markers,

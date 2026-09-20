@@ -5,12 +5,13 @@ using GodotAls.Core.Curves;
 using GodotAls.Core.Events;
 using GodotAls.Core.Sync;
 using GodotAls.Core.Transitions;
+using GodotAls.Import.Inspection;
 using CoreOccurrenceEntry = GodotAls.Core.Contracts.AlsP5OccurrenceLayoutEntry;
 using CoreOccurrenceKind = GodotAls.Core.Contracts.AlsP5OccurrenceSourceKind;
 
 namespace GodotAls.Import.Compilation;
 
-public static class AlsP5CoreRuntimeBindingCompiler
+public static partial class AlsP5CoreRuntimeBindingCompiler
 {
     private const int Version = 1;
     private const int BindingVersion = AlsP5RuntimeBindings.CurrentVersion;
@@ -62,7 +63,21 @@ public static class AlsP5CoreRuntimeBindingCompiler
         AlsLocomotionAnimationProfile locomotion,
         AlsPoseAnimationProfile pose,
         AlsP5aAnimationRuntimeProfile p5a,
-        AlsP5OccurrenceLayout layout)
+        AlsP5OccurrenceLayout layout) => CompileInternal(animationSet, locomotion, pose, p5a, layout, null, null);
+
+    public static AlsP5CoreRuntimeBindingSnapshot CompileSourceAware(
+        AlsAnimationSetDefinition animationSet, AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose, AlsP5aAnimationRuntimeProfile p5a, AlsP5OccurrenceLayout layout,
+        AlsLocomotionSourceProfile sources, AlsP5SourceInventory inventory)
+    {
+        ArgumentNullException.ThrowIfNull(sources); ArgumentNullException.ThrowIfNull(inventory);
+        return CompileInternal(animationSet, locomotion, pose, p5a, layout, sources, inventory);
+    }
+
+    private static AlsP5CoreRuntimeBindingSnapshot CompileInternal(
+        AlsAnimationSetDefinition animationSet, AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose, AlsP5aAnimationRuntimeProfile p5a, AlsP5OccurrenceLayout layout,
+        AlsLocomotionSourceProfile? sources, AlsP5SourceInventory? inventory)
     {
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(locomotion);
@@ -76,7 +91,14 @@ public static class AlsP5CoreRuntimeBindingCompiler
         PreflightActionTimelineExpansion(animationSet, p5a);
         var animations = animationSet.Animations;
         ValidateAnimationTable(animations);
-        ValidateExactLayout(locomotion, pose, p5a, layout);
+        if (sources is null) ValidateExactLayout(locomotion, pose, p5a, layout);
+        else
+        {
+            if (sources.AnimationSetDefinitionDigest != animationSet.DefinitionDigest)
+                throw new ArgumentException("Source bindings refer to another animation set.");
+            AlsP5OccurrenceLayoutCompiler.ValidateSourceAware(layout, locomotion, pose, p5a, sources, inventory!);
+            ValidateStandingSourceRoles(animationSet, locomotion);
+        }
         var (occurrenceEntries, importEntries) = CompileOccurrenceEntries(layout);
         var baseAnimationIds = BaseAnimationIds(locomotion);
         var turns = pose.Turns;
@@ -88,6 +110,10 @@ public static class AlsP5CoreRuntimeBindingCompiler
             out var physicalRoot, out var standingSamples, out var crouchingSamples,
             out var leanSamples, out var allAnimationIds, out var maskHeaders,
             out var logicalBoneIds, out var normalizedAnimationIds);
+        if (sources is not null)
+            allAnimationIds = allAnimationIds.Concat(sources.RuntimeSamples.Select(s => s.AnimationId))
+                .Concat(sources.RuntimeSamples.Where(s => s.AdditiveBaseAnimationId >= 0).Select(s => s.AdditiveBaseAnimationId))
+                .Distinct().Order().ToArray();
 
         CompileCurves(animations, p5a.AllowTransitions,
             out var curveKeys, out var curveBindings, out var curveBindingIdentities,
@@ -98,14 +124,15 @@ public static class AlsP5CoreRuntimeBindingCompiler
 
         ValidateRuntimeProfile(p5a, animationSet.Montages, animations,
             locomotion.SkeletonId, occurrenceEntries, importEntries);
-        ValidateOccurrenceClosure(occurrenceEntries, baseAnimationIds.Length,
-            turns.Length, rotates.Length, p5a.Actions.Length, p5a.SegmentBindings.Length);
+        if (sources is null)
+            ValidateOccurrenceClosure(occurrenceEntries, baseAnimationIds.Length,
+                turns.Length, rotates.Length, p5a.Actions.Length, p5a.SegmentBindings.Length);
         var generalTimeline = CompileGeneralTimeline(
             animations, baseAnimationIds, turns, rotates, p5a.DynamicTransition,
-            occurrenceEntries, eventSemantics);
+            occurrenceEntries, eventSemantics, sources is null ? null : layout.SourceMappings);
         CompileSync(p5a, layout, animations, locomotion.SkeletonId, baseAnimationIds, occurrenceEntries,
             out var syncMarkers, out var syncGroup, out var syncMembers,
-            out var syncOccurrences);
+            out var syncOccurrences, retainMappedOnly: sources is not null);
         var dynamicTransition = CompileTransition(
             p5a.DynamicTransition, animations, locomotion.SkeletonId, occurrenceEntries);
         ValidateActionProvenance(animationSet, p5a);
@@ -129,13 +156,20 @@ public static class AlsP5CoreRuntimeBindingCompiler
             locomotion.LeanAdditiveBasePoseAnimationId, standingSamples, crouchingSamples,
             leanSamples, allAnimationIds, pose.Aim, turns, rotates, maskHeaders,
             logicalBoneIds, normalizedAnimationIds);
+        if (sources is not null)
+        {
+            bindingDigest = ComputeSourceSnapshotDigest(AlsP5RuntimeBindings.SourceGraphVersion, bindingDigest,
+                layout, sources, inventory!, locomotion.StandingWalkRun, animationSet.DefinitionDigest);
+            graphDigest = ComputeSourceSnapshotDigest(2, graphDigest,
+                layout, sources, inventory!, locomotion.StandingWalkRun, animationSet.DefinitionDigest);
+        }
         if (bindingDigest == 0 || graphDigest == 0)
         {
             throw new ArgumentException("A P5 runtime snapshot digest must be nonzero.");
         }
 
         return new AlsP5CoreRuntimeBindingSnapshot(
-            BindingVersion, bindingDigest, layout.Digest, graphDigest,
+            sources is null ? BindingVersion : AlsP5RuntimeBindings.SourceGraphVersion, bindingDigest, layout.Digest, graphDigest,
             animationSet.DefinitionDigest, curveKeys, curveBindings,
             curveBindingIdentities, animationCurveRanges, allowTransitionsPolicy,
             allowTransitionsBindingIndices, footCurveBindings,
@@ -150,7 +184,9 @@ public static class AlsP5CoreRuntimeBindingCompiler
             locomotion.FallLoopAnimationId, locomotion.LandAnimationId,
             locomotion.LeanAdditiveBasePoseAnimationId, standingSamples, crouchingSamples,
             leanSamples, allAnimationIds, pose.Aim, turns, rotates, maskHeaders,
-            logicalBoneIds, normalizedAnimationIds);
+            logicalBoneIds, normalizedAnimationIds, sources, sources is null ? null : layout.SourceMappings,
+            sources is null ? null : layout.UnboundNativeSourceIndices, inventory?.Digest ?? "",
+            sources is null ? null : locomotion.StandingWalkRun);
     }
 
     private static void ValidateDefinitionDigest(AlsAnimationSetDefinition animationSet)
@@ -163,6 +199,30 @@ public static class AlsP5CoreRuntimeBindingCompiler
         {
             throw new ArgumentException("The animation-set definition digest is stale or noncanonical.",
                 nameof(animationSet));
+        }
+    }
+
+    private static void ValidateStandingSourceRoles(AlsAnimationSetDefinition set, AlsLocomotionAnimationProfile locomotion)
+    {
+        string[] names = ["ALS_N_WalkRun_F", "ALS_N_WalkRun_B", "ALS_N_WalkRun_FL", "ALS_N_WalkRun_BL", "ALS_N_WalkRun_FR", "ALS_N_WalkRun_BR"];
+        for (var direction = 0; direction < names.Length; direction++)
+        {
+            var matches = set.BlendSpaces.Where(b => b.Name == names[direction]).ToArray();
+            if (matches.Length != 1 || matches[0].Samples.Length != 4)
+                throw new ArgumentException("A canonical Standing direction BlendSpace is missing or ambiguous.");
+            var binding = locomotion.StandingWalkRun[direction];
+            int[] clips = [binding.WalkPoseId, binding.WalkId, binding.RunPoseId, binding.RunId];
+            var seen = new bool[4];
+            foreach (var sample in matches[0].Samples)
+            {
+                if (sample.SampleValue.Length < 2 || sample.SampleValue[0] is not (0 or 1) || sample.SampleValue[1] is not (0 or 1))
+                    throw new ArgumentException("A Standing direction has an unsupported source coordinate.");
+                var corner = (int)sample.SampleValue[0] + 2 * (int)sample.SampleValue[1];
+                if (seen[corner] || sample.AnimationId != clips[corner] || sample.RateScale != 1 ||
+                    set.Animations[sample.AnimationId].SkeletonId != locomotion.SkeletonId)
+                    throw new ArgumentException("Standing direction or Stride/WalkRun corner roles differ from the authored BlendSpace.");
+                seen[corner] = true;
+            }
         }
     }
 
@@ -189,6 +249,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         try
         {
             if (locomotion.StandingSamples is null || locomotion.CrouchingSamples is null ||
+                locomotion.StandingWalkRun is null || locomotion.StandingWalkRun.Any(value => value is null) ||
                 locomotion.LeanAdditiveSamples is null || locomotion.AllAnimationIds is null ||
                 locomotion.StandingSamples.Any(value => value is null) ||
                 locomotion.CrouchingSamples.Any(value => value is null) ||
@@ -358,6 +419,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 AlsP5OccurrenceSourceKind.Transition => CoreOccurrenceKind.Transition,
                 AlsP5OccurrenceSourceKind.ActionMontage => CoreOccurrenceKind.ActionMontage,
                 AlsP5OccurrenceSourceKind.ActionSequence => CoreOccurrenceKind.ActionSequence,
+                AlsP5OccurrenceSourceKind.SourceSample => CoreOccurrenceKind.SourceSample,
+                AlsP5OccurrenceSourceKind.SourceEvaluator => CoreOccurrenceKind.SourceEvaluator,
                 _ => throw new ArgumentException("The occurrence source kind is unknown.", nameof(layout)),
             };
             result[index] = new CoreOccurrenceEntry(kind, value.SourceBindingIndex,
@@ -486,6 +549,7 @@ public static class AlsP5CoreRuntimeBindingCompiler
         var expectedAll = baseAnimationIds
             .Concat(locomotion.LeanAdditiveSamples.Select(value => value.AnimationId))
             .Append(locomotion.LeanAdditiveBasePoseAnimationId)
+            .Concat(locomotion.StandingWalkRun.SelectMany(s => new[] { s.WalkPoseId, s.WalkId, s.RunPoseId, s.RunId }))
             .Distinct().Order().ToArray();
         allAnimationIds = locomotion.AllAnimationIds.ToArray();
         if (!allAnimationIds.SequenceEqual(expectedAll))
@@ -728,7 +792,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
             var value = pose.Turns[index];
             var animation = set.Animations[value.AnimationId];
             if ((value.Stance, value.Direction, value.NominalDegrees) != expectedTurns[index] ||
-                value.BasePlayRate != 1.2f || value.BlendSeconds != .2f || value.ScaleAngle != 1 ||
+                value.BasePlayRate != 1.2f || value.BlendSeconds != .2f ||
+                value.ScaleAngle != (value.Stance == AlsPoseStance.Standing ? 1 : 0) ||
                 !turnAnimations.Add(value.AnimationId) || animation.SkeletonId != skeletonId ||
                 !string.Equals(animation.StableId, CanonicalTurnStableIds[index], StringComparison.Ordinal) ||
                 !HasCanonicalRotationCurve(animation, value.CurveId))
@@ -1311,13 +1376,21 @@ public static class AlsP5CoreRuntimeBindingCompiler
         AlsRotateProfile[] rotates,
         AlsCompiledDynamicTransition transition,
         CoreOccurrenceEntry[] occurrences,
-        int[] semanticIds)
+        int[] semanticIds,
+        AlsP5SourceOccurrenceMapping[]? sourceMappings = null)
     {
         var result = new List<AlsTimelineEventDefinition>();
         foreach (var occurrence in occurrences)
         {
             switch (occurrence.SourceKind)
             {
+                case CoreOccurrenceKind.SourceSample:
+                    var map = sourceMappings?.Single(m => m.OccurrenceHandleId == occurrence.OccurrenceHandleId)
+                        ?? throw new ArgumentException("A source timeline occurrence is unresolved.");
+                    AddAnimation(map.AnimationId);
+                    break;
+                case CoreOccurrenceKind.SourceEvaluator:
+                    break;
                 case CoreOccurrenceKind.Base:
                     if ((uint)occurrence.SourceBindingIndex >= (uint)baseAnimationIds.Length)
                         throw new ArgumentException("A Base occurrence binding is invalid.");
@@ -1367,7 +1440,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
         out AlsSyncMarkerDefinition[] markers,
         out AlsSyncGroupBinding group,
         out AlsSyncMemberBinding[] members,
-        out AlsP5SyncOccurrenceBinding[] mappedOccurrences)
+        out AlsP5SyncOccurrenceBinding[] mappedOccurrences,
+        bool retainMappedOnly = false)
     {
         if (p5a.SyncGroups.Length != 1 || p5a.SyncGroups[0].GroupId != 0)
         {
@@ -1375,7 +1449,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
         }
         var sourceMembers = p5a.SyncGroups[0].Members;
         var sourceMappings = layout.SyncMappings;
-        if (sourceMembers.Length == 0 || sourceMappings.Length != sourceMembers.Length)
+        if (sourceMembers.Length == 0 || sourceMappings.Length == 0 ||
+            (retainMappedOnly ? sourceMappings.Length > sourceMembers.Length : sourceMappings.Length != sourceMembers.Length))
         {
             throw new ArgumentException("The P5A Sync occurrence map is incomplete.");
         }
@@ -1405,7 +1480,8 @@ public static class AlsP5CoreRuntimeBindingCompiler
                 member.LoopPolicy == AlsP5LoopPolicy.Loop ? (byte)1 : (byte)0,
                 member.CanLead ? (byte)1 : (byte)0);
 
-            var mapping = sourceMappings[index];
+            if (retainMappedOnly && !sourceMappings.Any(m => m.GroupMemberIndex == index)) continue;
+            var mapping = retainMappedOnly ? sourceMappings.Single(m => m.GroupMemberIndex == index) : sourceMappings[index];
             if (mapping.SyncGroupId != 0 || mapping.GroupMemberIndex != index ||
                 mapping.AnimationId != member.AnimationId ||
                 (uint)mapping.OccurrenceHandleId >= (uint)occurrences.Length)
@@ -1422,6 +1498,14 @@ public static class AlsP5CoreRuntimeBindingCompiler
             }
             mappedOccurrences[index] = new AlsP5SyncOccurrenceBinding(0, index,
                 member.AnimationId, mapping.OccurrenceHandleId);
+        }
+        if (retainMappedOnly)
+        {
+            var indices = sourceMappings.Select(m => m.GroupMemberIndex).ToArray();
+            var allMarkers = markers; var allMembers = members; var allOccurrences = mappedOccurrences;
+            markers = indices.SelectMany(i => new[] { allMarkers[i * 2], allMarkers[i * 2 + 1] }).ToArray();
+            members = indices.Select(i => allMembers[i]).ToArray();
+            mappedOccurrences = indices.Select((i, denseIndex) => allOccurrences[i] with { GroupMemberIndex = denseIndex }).ToArray();
         }
         group = new AlsSyncGroupBinding(0, 0, members.Length, 0, 1);
     }
@@ -1828,6 +1912,21 @@ public static class AlsP5CoreRuntimeBindingCompiler
         AlsCompiledTimelineTickMode.BranchingPoint => AlsTimelineTickMode.BranchingPoint,
         _ => throw new ArgumentException("The timeline tick mode is unknown."),
     };
+
+    internal static AlsTimelineEventDefinition CompileDynamicSequenceEvent(AlsAnimationDefinition animation,
+        int sourceIndex, int eventId, int handle, ReadOnlySpan<AlsTimelineEventDefinition> existing)
+    {
+        // Dynamic montage sequences do not need a second graph-player occurrence.
+        // Their typed payload still comes from the validated animation-set importer.
+        var value = animation.Timeline.Single(t => t.SourceIndex == sourceIndex && t.EventId == eventId);
+        var kind = MapKind(value.Kind); var semanticIds = new int[Enum.GetValues<AlsCompiledTimelineEventKind>().Length];
+        var semantic = existing.ToArray().Where(t => t.Kind == kind).Select(t => t.Payload.SemanticId).Distinct().ToArray();
+        if (semantic.Length != 1) throw new ArgumentException("Dynamic notify has no unique bound event semantic.");
+        semanticIds[(int)value.Kind] = semantic[0];
+        return new(value.EventId, animation.Id, -1, handle, AlsTimelineSourceKind.MontageSegmentAnimation,
+            value.SourceIndex, value.TrackIndex, 0, value.TimeSeconds, value.DurationSeconds,
+            value.TriggerWeightThreshold, kind, MapTick(value.TickMode), MapPayload(value.Kind, value.Payload, semanticIds));
+    }
 
     private static AlsCompactEventPayload MapPayload(
         AlsCompiledTimelineEventKind kind,

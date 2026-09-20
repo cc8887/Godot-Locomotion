@@ -33,7 +33,7 @@ public partial class AlsP3CharacterSlot : Node
     public AlsP3CharacterSlot()
     {
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-        ProcessThreadGroupOrder = 3;
+        ProcessThreadGroupOrder = AlsP3FrameStages.Lifecycle;
     }
 
     public AlsP3Character ActiveCharacter
@@ -300,9 +300,23 @@ public partial class AlsP3CharacterSlot : Node
         }
 
         var replacement = _spare;
+        var rotation = _retiredMotorInput.CharacterRotation;
+        if (rotation.Applied == 1 && rotation.FeedbackIdentity.SlotGeneration != 0)
+        {
+            var previous = rotation.FeedbackIdentity;
+            if (previous.CharacterId != _retiredMotorInput.Identity.CharacterId ||
+                previous.SlotGeneration != _retiredMotorInput.Identity.SlotGeneration ||
+                previous.FrameId >= publishedMotorFrameId)
+                throw new InvalidOperationException("Cannot migrate foreign or uncommitted rotation history.");
+            // This input already includes the retired Motor's rotation. Transfer
+            // its history with the checkpoint, without evaluating rotation again.
+            // RetiredMotorInput keeps the original provenance for diagnostics.
+            rotation = rotation with { FeedbackIdentity = replacement.HandleIdentity(previous.FrameId) };
+        }
         var stagedMotorInput = _retiredMotorInput with
         {
             Identity = replacement.HandleIdentity(publishedMotorFrameId),
+            CharacterRotation = rotation,
         };
         var releasePlatformOnNextStep =
             stagedMotorInput.Floor.PlatformId >= 0 ||

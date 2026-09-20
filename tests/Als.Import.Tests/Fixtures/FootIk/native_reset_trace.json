@@ -1,0 +1,1123 @@
+{
+  "schemaVersion": 1,
+  "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_AnimBP.ALS_AnimBP_C",
+  "defaultsRestored": true,
+  "rows": [
+    {
+      "hz": 30,
+      "frame": 1,
+      "delta": 0.03333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          3.0,
+          5.0,
+          -17.0
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -19.0,
+          9.0,
+          -23.0
+        ],
+        "FootOffset_L_Rotation": [
+          10.0,
+          20.0,
+          -30.0
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          1.5,
+          2.5,
+          -8.5
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -9.5,
+          4.5,
+          -11.5
+        ],
+        "FootOffset_L_Rotation": [
+          2.5,
+          5.0,
+          -7.5
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 30,
+      "frame": 2,
+      "delta": 0.03333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          1.5,
+          2.5,
+          -8.5
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -9.5,
+          4.5,
+          -11.5
+        ],
+        "FootOffset_L_Rotation": [
+          2.5,
+          5.0,
+          -7.5
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          0.75,
+          1.25,
+          -4.25
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -4.75,
+          2.25,
+          -5.75
+        ],
+        "FootOffset_L_Rotation": [
+          0.625,
+          1.25,
+          -1.875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 30,
+      "frame": 3,
+      "delta": 0.03333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          0.75,
+          1.25,
+          -4.25
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -4.75,
+          2.25,
+          -5.75
+        ],
+        "FootOffset_L_Rotation": [
+          0.625,
+          1.25,
+          -1.875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          0.375,
+          0.625,
+          -2.125
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -2.375,
+          1.125,
+          -2.875
+        ],
+        "FootOffset_L_Rotation": [
+          0.15625,
+          0.3125,
+          -0.46875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 30,
+      "frame": 4,
+      "delta": 0.03333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          0.375,
+          0.625,
+          -2.125
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -2.375,
+          1.125,
+          -2.875
+        ],
+        "FootOffset_L_Rotation": [
+          0.15625,
+          0.3125,
+          -0.46875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          0.1875,
+          0.3125,
+          -1.0625
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -1.1875,
+          0.5625,
+          -1.4375
+        ],
+        "FootOffset_L_Rotation": [
+          0.0390625,
+          0.078125,
+          -0.1171875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 60,
+      "frame": 1,
+      "delta": 0.016666666666666666,
+      "before": {
+        "FootOffset_L_Location": [
+          3.0,
+          5.0,
+          -17.0
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -19.0,
+          9.0,
+          -23.0
+        ],
+        "FootOffset_L_Rotation": [
+          10.0,
+          20.0,
+          -30.0
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          2.25,
+          3.75,
+          -12.75
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -14.25,
+          6.75,
+          -17.25
+        ],
+        "FootOffset_L_Rotation": [
+          5.625,
+          11.25,
+          -16.875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 60,
+      "frame": 2,
+      "delta": 0.016666666666666666,
+      "before": {
+        "FootOffset_L_Location": [
+          2.25,
+          3.75,
+          -12.75
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -14.25,
+          6.75,
+          -17.25
+        ],
+        "FootOffset_L_Rotation": [
+          5.625,
+          11.25,
+          -16.875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          1.6875,
+          2.8125,
+          -9.5625
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -10.6875,
+          5.0625,
+          -12.9375
+        ],
+        "FootOffset_L_Rotation": [
+          3.1640625,
+          6.328125,
+          -9.4921875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 60,
+      "frame": 3,
+      "delta": 0.016666666666666666,
+      "before": {
+        "FootOffset_L_Location": [
+          1.6875,
+          2.8125,
+          -9.5625
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -10.6875,
+          5.0625,
+          -12.9375
+        ],
+        "FootOffset_L_Rotation": [
+          3.1640625,
+          6.328125,
+          -9.4921875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          1.265625,
+          2.109375,
+          -7.171875
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -8.015625,
+          3.796875,
+          -9.703125
+        ],
+        "FootOffset_L_Rotation": [
+          1.77978515625,
+          3.5595703125,
+          -5.33935546875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 60,
+      "frame": 4,
+      "delta": 0.016666666666666666,
+      "before": {
+        "FootOffset_L_Location": [
+          1.265625,
+          2.109375,
+          -7.171875
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -8.015625,
+          3.796875,
+          -9.703125
+        ],
+        "FootOffset_L_Rotation": [
+          1.77978515625,
+          3.5595703125,
+          -5.33935546875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          0.94921875,
+          1.58203125,
+          -5.37890625
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -6.01171875,
+          2.84765625,
+          -7.27734375
+        ],
+        "FootOffset_L_Rotation": [
+          1.001129150390625,
+          2.00225830078125,
+          -3.003387451171875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 120,
+      "frame": 1,
+      "delta": 0.008333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          3.0,
+          5.0,
+          -17.0
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -19.0,
+          9.0,
+          -23.0
+        ],
+        "FootOffset_L_Rotation": [
+          10.0,
+          20.0,
+          -30.0
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          2.625,
+          4.375,
+          -14.875
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -16.625,
+          7.875,
+          -20.125
+        ],
+        "FootOffset_L_Rotation": [
+          7.65625,
+          15.3125,
+          -22.96875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 120,
+      "frame": 2,
+      "delta": 0.008333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          2.625,
+          4.375,
+          -14.875
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -16.625,
+          7.875,
+          -20.125
+        ],
+        "FootOffset_L_Rotation": [
+          7.65625,
+          15.3125,
+          -22.96875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          2.296875,
+          3.828125,
+          -13.015625
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -14.546875,
+          6.890625,
+          -17.609375
+        ],
+        "FootOffset_L_Rotation": [
+          5.86181640625,
+          11.7236328125,
+          -17.58544921875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 120,
+      "frame": 3,
+      "delta": 0.008333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          2.296875,
+          3.828125,
+          -13.015625
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -14.546875,
+          6.890625,
+          -17.609375
+        ],
+        "FootOffset_L_Rotation": [
+          5.86181640625,
+          11.7236328125,
+          -17.58544921875
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          2.009765625,
+          3.349609375,
+          -11.388671875
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -12.728515625,
+          6.029296875,
+          -15.408203125
+        ],
+        "FootOffset_L_Rotation": [
+          4.487953186035156,
+          8.975906372070312,
+          -13.463859558105469
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    },
+    {
+      "hz": 120,
+      "frame": 4,
+      "delta": 0.008333333333333333,
+      "before": {
+        "FootOffset_L_Location": [
+          2.009765625,
+          3.349609375,
+          -11.388671875
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -12.728515625,
+          6.029296875,
+          -15.408203125
+        ],
+        "FootOffset_L_Rotation": [
+          4.487953186035156,
+          8.975906372070312,
+          -13.463859558105469
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      },
+      "after": {
+        "FootOffset_L_Location": [
+          1.758544921875,
+          2.930908203125,
+          -9.965087890625
+        ],
+        "FootOffset_R_Location": [
+          -7.0,
+          11.0,
+          -29.0
+        ],
+        "FootLock_L_Location": [
+          31.0,
+          3.0,
+          -8.0
+        ],
+        "FootLock_R_Location": [
+          -11.137451171875,
+          5.275634765625,
+          -13.482177734375
+        ],
+        "FootOffset_L_Rotation": [
+          3.4360891580581665,
+          6.872178316116333,
+          -10.3082674741745
+        ],
+        "FootOffset_R_Rotation": [
+          -15.0,
+          25.0,
+          35.0
+        ],
+        "FootLock_L_Rotation": [
+          4.0,
+          8.0,
+          12.0
+        ],
+        "FootLock_R_Rotation": [
+          -6.0,
+          2.0,
+          18.0
+        ],
+        "FootLock_L_Alpha": 0.8,
+        "FootLock_R_Alpha": 0.6
+      }
+    }
+  ]
+}

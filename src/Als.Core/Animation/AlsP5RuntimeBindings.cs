@@ -97,6 +97,7 @@ public readonly ref struct AlsP4CurveFrameInput
 public readonly ref struct AlsP5RuntimeBindings
 {
     public const int CurrentVersion = 2;
+    public const int SourceGraphVersion = 3;
 
     public readonly int Version;
     public readonly ulong Digest;
@@ -122,6 +123,8 @@ public readonly ref struct AlsP5RuntimeBindings
     public readonly ReadOnlySpan<AlsActionSectionBinding> ActionSections;
     public readonly ReadOnlySpan<AlsActionSegmentBinding> ActionSegments;
     public readonly ReadOnlySpan<AlsActionTimelineRange> ActionTimelineRanges;
+    public readonly AlsLocomotionSourceView Sources;
+    public readonly AlsP5SourceOccurrenceView SourceOccurrences;
 
     public AlsP5RuntimeBindings(
         int version,
@@ -147,9 +150,11 @@ public readonly ref struct AlsP5RuntimeBindings
         ReadOnlySpan<AlsActionDefinition> actionDefinitions,
         ReadOnlySpan<AlsActionSectionBinding> actionSections,
         ReadOnlySpan<AlsActionSegmentBinding> actionSegments,
-        ReadOnlySpan<AlsActionTimelineRange> actionTimelineRanges)
+        ReadOnlySpan<AlsActionTimelineRange> actionTimelineRanges,
+        AlsLocomotionSourceView sources = default,
+        AlsP5SourceOccurrenceView sourceOccurrences = default)
     {
-        if (version != CurrentVersion)
+        if (version != CurrentVersion && version != SourceGraphVersion)
         {
             throw new ArgumentOutOfRangeException(nameof(version));
         }
@@ -161,6 +166,16 @@ public readonly ref struct AlsP5RuntimeBindings
         {
             throw new ArgumentOutOfRangeException(nameof(layoutDigest));
         }
+        if (version == SourceGraphVersion
+            ? !sources.Stamp.IsValid || sourceOccurrences.Version != AlsP5OccurrenceLayoutContract.SourceGraphVersion ||
+                sourceOccurrences.SourceStamp != sources.Stamp || sourceOccurrences.Digest != layoutDigest ||
+                sourceOccurrences.Mappings.Length != sources.Samples.Length || sources.Players.IsEmpty ||
+                sources.Samples.IsEmpty || sourceOccurrences.Entries.IsEmpty
+            : sources.Stamp != default || !sources.Players.IsEmpty || !sources.Samples.IsEmpty ||
+                !sources.SyncPlayers.IsEmpty || !sources.GroupIds.IsEmpty || !sources.Sequences.IsEmpty || !sources.Markers.IsEmpty ||
+                sourceOccurrences.Version != 0 || sourceOccurrences.Digest != 0 || sourceOccurrences.SourceStamp != default ||
+                !sourceOccurrences.Entries.IsEmpty || !sourceOccurrences.Mappings.IsEmpty)
+            throw new ArgumentException("The P5 binding version and source graph metadata disagree.");
 
         Version = version;
         Digest = digest;
@@ -186,6 +201,8 @@ public readonly ref struct AlsP5RuntimeBindings
         ActionSections = actionSections;
         ActionSegments = actionSegments;
         ActionTimelineRanges = actionTimelineRanges;
+        Sources = sources;
+        SourceOccurrences = sourceOccurrences;
     }
 }
 

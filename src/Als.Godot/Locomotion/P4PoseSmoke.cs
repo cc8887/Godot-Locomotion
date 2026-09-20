@@ -261,6 +261,7 @@ public partial class P4PoseSmoke : Node
         var activeOutput = default(AlsPoseModifierOutput);
         for (var index = 0; index < 100; index++)
         {
+            basePose.Restore(graph.TargetSkeleton, (Node3D)library.Root);
             Require(modifier.TryApply(in activeInput, ref activeOutput, out var activeReason),
                 $"active Aim allocation warmup failed: {activeReason}");
         }
@@ -269,6 +270,8 @@ public partial class P4PoseSmoke : Node
         var activeStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         for (var index = 0; index < 10_000; index++)
         {
+            // Runtime supplies a newly evaluated animation pose before every additive pass.
+            basePose.Restore(graph.TargetSkeleton, (Node3D)library.Root);
             if (!modifier.TryApply(in activeInput, ref activeOutput, out _))
             {
                 throw new InvalidOperationException("active Aim steady evaluation failed");

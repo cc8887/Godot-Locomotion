@@ -1,6 +1,9 @@
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Animation;
+using GodotAls.Core.Events;
+using GodotAls.Core.Math;
 using GodotAls.Import.Compilation;
 
 namespace GodotAls.Animation;
@@ -116,7 +119,19 @@ internal readonly record struct AlsAnimationTransactionDiagnostics(
     float ActionModeBlendAmount,
     double BaseStateElapsed,
     AlsP4BankTransactionDiagnostics TurnBank,
-    AlsP4BankTransactionDiagnostics RotateBank);
+    AlsP4BankTransactionDiagnostics RotateBank,
+    AlsDirectionFeedbackState DirectionFeedback,
+    AlsStandingTurnSlotInput StandingTurnSlot)
+{
+    public AlsFrameIdentity FullMovementIdentity { get; init; }
+    public AlsAnimationInputFeedback FullMovementFeedback { get; init; }
+    public AlsFootIkPropertyState NativeFeet { get; init; }
+    public AlsRefactoredFootRigState RefactoredRig { get; init; }
+    public AlsBasedFootLockFrameState BasedFeet { get; init; }
+    public AlsBinaryBlendState RootSelector { get; init; }
+    public AlsFrameIdentity RootIdentity { get; init; }
+    public AlsRagdollFrameDiagnostics Ragdoll { get; init; }
+}
 
 internal readonly record struct AlsPreparedAnimationCommit(
     long OwnerId,
@@ -128,12 +143,40 @@ internal readonly record struct AlsPreparedAnimationCommit(
 
 public sealed class AlsLocomotionAnimationController : IDisposable
 {
+    private AlsProductionMovementRuntime? _fullMovement;
+    internal bool UsesCompleteMovement => _fullMovement is not null;
+    internal bool UsesLayeredPose => _fullMovement?.UsesLayeredPose == true;
+    internal bool UsesNativeFootIk => _fullMovement?.UsesNativeFootIk == true;
+    internal bool UsesRefactoredFeet => _fullMovement?.UsesRefactoredFeet == true;
+    internal System.Numerics.Vector3 CandidateNativePelvisOffset => _fullMovement?.CandidatePelvisOffset ?? default;
+    internal float CandidateNativeLeftLock => _fullMovement?.CandidateLeftLock ?? 0;
+    internal float CandidateNativeRightLock => _fullMovement?.CandidateRightLock ?? 0;
+    internal AlsFootIkPropertyState CandidateNativeFeet => _fullMovement?.CandidateFeet ?? default;
+    internal AlsBasedFootLockDiagnostics CandidateBasedFeet => _fullMovement?.CandidateBasedFeet ?? default;
+    internal AlsBasedFootLockFrameTrace? CommittedBasedTrace => _fullMovement?.CommittedBasedTrace;
+    internal AlsCharacterRotationFeedback PendingCharacterRotationFeedback => _fullMovement?.CandidateRotationFeedback ?? default;
+    internal AlsRefactoredAnimationFeedback PendingRefactoredFeedback => _fullMovement?.CandidateRefactoredFeedback ?? default;
+    internal bool PendingPresentation => _fullMovement?.CandidatePresentationPending == true;
+    internal AlsFullMovementDiagnostics FullMovementDiagnostics => _fullMovement?.Diagnostics ?? default;
+    internal AlsStandingCycleState StandingCycleState => _fullMovement?.Base.Grounded.CommittedStanding.State ?? _committedPrepared.Cycle.State;
+    internal AlsTransitionStackState StandingTransitions => _fullMovement?.Base.Grounded.CommittedStanding.Transitions ?? _committedPrepared.Cycle.Transitions;
+    internal AlsCycleSyncFrame StandingSync => _fullMovement?.Base.CommittedSources ?? _committedPrepared.Cycle.Sync;
+    internal AlsCycleDetailFrame StandingDetail => _fullMovement?.Base.Grounded.CommittedStanding.Detail ?? _committedPrepared.Cycle.Detail;
+    internal AlsBinaryBlendState StandingSprintBlend => _fullMovement?.Base.Grounded.CommittedStanding.SprintBlend ?? _committedPrepared.Cycle.SprintBlend;
+    internal float StandingSprintMask => _fullMovement?.Base.Grounded.CommittedStanding.SprintMask ?? _committedPrepared.Cycle.SprintMask;
+    internal AlsStandingMovementInput StandingMovementInput => _fullMovement?.Base.Grounded.CommittedStanding.Movement ?? _committedPrepared.Cycle.Movement;
+    internal AlsP5SourceEventState SourceEventState => _fullMovement?.Base.Movement.CommittedEventState ?? _sourceEvents;
+    internal AlsLocomotionTimingPolicy TimingPolicy => _fullMovement is not null ? AlsLocomotionTimingPolicy.CompleteMovementGraph : _graph.StandingCycle is null
+        ? AlsLocomotionTimingPolicy.Model : AlsLocomotionTimingPolicy.StandingSourceGraph;
     private const int WarmupUninitialized = 0;
     private const int WarmupInitializing = 1;
     private const int WarmupReady = 2;
     private const ulong DigestOffsetBasis = 14695981039346656037UL;
     private const ulong DigestPrime = 1099511628211UL;
     private const float QuantizationScale = 100_000f;
+    private const float HipHemisphereForwardThreshold = 0.34202015f;
+    private const double HipVariantBlendSeconds = 0.2;
+    private const double MaximumPoseDirectionRadiansPerSecond = 10.0;
     private static long _nextOwnerId;
 
     private static readonly string[] PoseBoneNames =
@@ -144,6 +187,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private readonly AlsLocomotionGraphBuildResult _graph;
     private readonly Skeleton3D _skeleton;
     private readonly float _playRateMaximum;
+    private readonly System.Numerics.Vector3 _animatedStandingSpeeds;
     private readonly Vector2[][] _standingBlendRings;
     private readonly Vector2[] _crouchingBlendRing;
     private readonly long _ownerId = Interlocked.Increment(ref _nextOwnerId);
@@ -173,6 +217,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     private float _landRecoveryIkWeight;
     private long _preparedRevision;
     private byte _hasPreparedFrame;
+    private bool _sourceTimingPending;
+    private bool _sourceEventsPending;
+    private AlsP5SourceEventState _sourceEvents;
+    private AlsP5SourceEventState _pendingSourceEvents;
+    private AlsEventBuffer _pendingSourceEventBuffer;
     private PreparedApply _pendingPrepared;
     private PreparedP4 _pendingPreparedP4;
     private P4BlendChannelUpdate _pendingTurnUpdate;
@@ -221,6 +270,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _skeleton = graph.TargetSkeleton;
         ArgumentNullException.ThrowIfNull(settings);
         _playRateMaximum = settings.PlayRateMaximum;
+        _animatedStandingSpeeds = new(settings.AnimatedWalkSpeed, settings.AnimatedRunSpeed, settings.AnimatedSprintSpeed);
         _standingBlendRings = graph.Handles.StandingGaitRadii
             .Select(radius => BuildBlendRing(graph.Handles.BaseCurves.StandingSamples, radius)).ToArray();
         _crouchingBlendRing = BuildBlendRing(
@@ -303,7 +353,28 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _actionModeBlendAmount,
         _baseStateElapsed,
         CaptureBankDiagnostics(in _turnChannel),
-        CaptureBankDiagnostics(in _rotateChannel));
+        CaptureBankDiagnostics(in _rotateChannel),
+        _committedPrepared.Cycle.Detail.Standing.Feedback,
+        _committedPrepared.Cycle.Detail.Standing.TurnSlot)
+        { FullMovementIdentity = _fullMovement?.Base.CommittedIdentity ?? default,
+            FullMovementFeedback = _fullMovement?.CommittedFeedback ?? default,
+            NativeFeet = _fullMovement?.CommittedFeet ?? default,
+            RefactoredRig = _fullMovement?.CommittedRefactoredRig ?? default,
+            BasedFeet = _fullMovement?.CommittedBasedFeet ?? default,
+            RootSelector = _fullMovement?.CommittedRoot ?? default,
+            RootIdentity = _fullMovement?.CommittedRootIdentity ?? default,
+            Ragdoll = _fullMovement?.CommittedRagdoll ?? default };
+
+    internal void EnableCompleteMovement(AlsMovementGraphDefinition definition, AlsAnimationLibraryBuildResult library,
+        AlsAnimationSetDefinition set, AlsPoseAnimationProfile pose,uint character,uint generation)
+    {
+        ThrowIfDisposed();
+        if (_warmupState != WarmupReady || _fullMovement is not null || ManualAdvanceCount != 0 || _hasPreparedFrame != 0)
+            throw new InvalidOperationException("Complete movement must be configured once before the first frame.");
+        _fullMovement = new(definition, library, _graph.StandingCycle ?? throw new InvalidOperationException("Standing graph is missing."),
+            set, pose, _animatedStandingSpeeds,character,generation);
+        _graph.Tree.Active = false;
+    }
 
     public void Warmup()
     {
@@ -402,22 +473,26 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         }
     }
 
-    public void Apply(in AlsFrameResult result, double deltaTime)
+    public AlsEventBuffer Apply(in AlsFrameResult result, double deltaTime)
     {
         var p4 = AlsP4AnimationInput.Disabled;
-        Apply(in result, in p4, deltaTime);
+        return Apply(in result, in p4, deltaTime);
     }
 
-    public void Apply(
+    public AlsEventBuffer Apply(
         in AlsFrameResult result,
         in AlsP4AnimationInput p4Input,
-        double deltaTime)
+        double deltaTime,
+        AlsStandingMovementInput? movementInput = null)
     {
-        var prepared = PrepareFrame(in result, in p4Input, deltaTime);
+        var prepared = PrepareFrame(in result, in p4Input, deltaTime, movementInput);
         try
         {
+            var eventResult = result;
+            CompleteSourceEvents(in prepared, ref eventResult);
             ApplyPrepared(in prepared);
             CommitPrepared(in prepared);
+            return eventResult.TypedEvents;
         }
         catch
         {
@@ -433,12 +508,57 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         }
     }
 
+    internal AlsPreparedAnimationFrame PrepareFrame(in AlsFrameResult result, in AlsP4AnimationInput p4Input,
+        in AlsFrameInput input)
+    {
+        if (input.Identity != result.Identity) throw new ArgumentException("Animation input/result identity mismatch.", nameof(input));
+        if (_fullMovement is not null)
+        {
+            ThrowIfDisposed();
+            if (_hasPreparedFrame != 0) throw new InvalidOperationException("A movement candidate is already pending.");
+            _fullMovement.Prepare(input, result);
+            return RegisterMovementCandidate(input, result);
+        }
+        return PrepareFrame(result, p4Input, input.DeltaTime, _graph.StandingCycle?.CreateMovementInput(input));
+    }
+
+    internal AlsPreparedAnimationFrame PrepareFootQueries(in AlsFrameInput input, in AlsFrameResult result,
+        in AlsLocalPose component, out AlsFootRigQueries queries)
+    {
+        ThrowIfDisposed();
+        if (!UsesRefactoredFeet || _hasPreparedFrame != 0)
+            throw new InvalidOperationException("Split movement preparation requires an idle Refactored owner.");
+        queries = _fullMovement!.PrepareFootQueries(input, result, component);
+        return RegisterMovementCandidate(input, result);
+    }
+
+    internal void ResumeFootQueries(in AlsPreparedAnimationFrame prepared, in AlsFootRigObservations observations)
+    {
+        ThrowIfDisposed(); ValidatePrepared(prepared);
+        if (!UsesRefactoredFeet) throw new InvalidOperationException("No split movement owner.");
+        _fullMovement!.ResumeFootQueries(observations);
+    }
+
+    private AlsPreparedAnimationFrame RegisterMovementCandidate(in AlsFrameInput input, in AlsFrameResult result)
+    {
+        _pendingDecision = default(AlsPreparedAnimationFrame) with { OwnerId = _ownerId, Revision = ++_preparedRevision,
+            AnimationState = _fullMovement!.AnimationState, Stance = result.ActualStance,
+            BaseAnimationIdA = -1, BaseAnimationIdB = -1, BaseAnimationIdC = -1,
+            TurnAnimationIdA = -1, TurnAnimationIdB = -1, RotateAnimationIdA = -1, RotateAnimationIdB = -1 };
+        _pendingDeltaTime = input.DeltaTime; _sourceTimingPending = _sourceEventsPending = true;
+        _hasPreparedFrame = _preparedTransactionState = 1;
+        return _pendingDecision;
+    }
+
     public AlsPreparedAnimationFrame PrepareFrame(
         in AlsFrameResult result,
         in AlsP4AnimationInput p4Input,
-        double deltaTime)
+        double deltaTime,
+        AlsStandingMovementInput? movementInput = null)
     {
         ThrowIfDisposed();
+        if (_fullMovement is not null)
+            throw new InvalidOperationException("Complete movement requires the full frame input; legacy preparation cannot advance its sources.");
         if (Volatile.Read(ref _warmupState) != WarmupReady)
         {
             throw new InvalidOperationException(
@@ -449,8 +569,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             throw new InvalidOperationException(
                 "Applied animation frame must be committed or rolled back before preparing another frame.");
         }
-        var prepared = Prepare(result, deltaTime);
         var preparedP4 = PrepareP4(in p4Input);
+        // Standing owns Rotate pose and source time; the legacy channel remains for other branches.
+        var sourceBranch = _graph.StandingCycle is not null && result.AnimationState == AlsAnimationState.Grounded &&
+            result.ActualStance == AlsStance.Standing;
+        if (sourceBranch) preparedP4 = preparedP4 with { RotateActive = false };
 
         var requestedP4Mode = preparedP4.TurnActive ? (byte)1 :
             preparedP4.RotateActive ? (byte)2 : (byte)0;
@@ -498,6 +621,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             preparedP4.RotatePhase,
             deltaTime);
 
+        var turnSlot = new AlsStandingTurnSlotInput(turnUpdate.State.BankA.AnimationId, turnUpdate.State.BankB.AnimationId,
+            turnUpdate.State.BankAPhase, turnUpdate.State.BankBPhase, turnUpdate.State.BlendAmount,
+            nextActionBlendAmount * (1 - nextActionModeBlendAmount));
+        var prepared = Prepare(result, deltaTime, movementInput, turnSlot);
+
         var baseDecision = PrepareBaseCurveDecision(
             result.AnimationState,
             result.ActualStance,
@@ -538,7 +666,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             rotateUpdate.State.BankBPhase,
             rotateUpdate.State.BlendAmount,
             nextActionModeBlendAmount,
-            nextActionBlendAmount)
+            prepared.CycleEnabled ? 0 : nextActionBlendAmount)
         {
             PreviousBaseAnimationIdA = previousBaseDecision.AnimationIdA,
             PreviousBaseAnimationIdB = previousBaseDecision.AnimationIdB,
@@ -549,6 +677,16 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             PreviousBasePhaseNormalized = previousBaseDecision.PhaseNormalized,
             BaseTransitionAlpha = baseTransitionAlpha,
         };
+        if (_graph.StandingCycle is not null)
+        {
+            var sourceSync = prepared.Cycle.Sync;
+            ReadOnlySpan<AlsP5SourceNotifyTick> sourceTicks = sourceSync.NotifyTicks;
+            var count = prepared.CycleEnabled ? sourceSync.NotifyTickCount : 0;
+            if (!AlsP5Runtime.TryPrepareSourceEvents(_graph.StandingCycle.SourceBindings, result.Identity, (float)deltaTime,
+                    sourceTicks[..count], prepared.CycleEnabled ? 1 : 1 - nextActionBlendAmount, _sourceEvents, out _pendingSourceEvents,
+                    out _pendingSourceEventBuffer, out var eventFailure))
+                throw new InvalidOperationException($"P5 source event prepare failed: {eventFailure}");
+        }
         _pendingPrepared = prepared;
         _pendingPreparedP4 = preparedP4;
         _pendingTurnUpdate = turnUpdate;
@@ -566,6 +704,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _pendingBaseStateElapsed = nextBaseStateElapsed;
         _preparedRevision = revision;
         _hasPreparedFrame = 1;
+        _sourceTimingPending = AlsLocomotionModel.HasPendingSourceTiming(result);
+        _sourceEventsPending = _graph.StandingCycle is not null;
         _preparedTransactionState = 1;
         return decision;
     }
@@ -575,6 +715,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     {
         ThrowIfDisposed();
         ValidatePrepared(in prepared);
+        if (_fullMovement is not null) return _fullMovement.FootCurves();
         var ikWeight = prepared.AnimationState switch
         {
             AlsAnimationState.Grounded => _groundedIkWeight,
@@ -611,10 +752,92 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             Math.Clamp(rightLock, 0f, 1f));
     }
 
+    internal void CompleteSourceTiming(in AlsPreparedAnimationFrame prepared,
+        ref AlsRuntimeState state, ref AlsFrameResult result)
+    {
+        ValidatePrepared(in prepared);
+        if (_fullMovement is not null)
+        {
+            if (!_sourceTimingPending) throw new InvalidOperationException("Movement timing was already completed.");
+            _fullMovement.CompleteTiming(ref state, ref result); _sourceTimingPending = false; return;
+        }
+        if (!_pendingPrepared.CycleEnabled)
+        {
+            if (!float.IsFinite(result.Stride) || !float.IsFinite(result.PlayRate) || !float.IsFinite(result.AnimationPhase))
+                throw new InvalidOperationException("Non-source branch cannot publish unresolved timing.");
+            return;
+        }
+        if (!_sourceTimingPending)
+            throw new InvalidOperationException("The prepared source timing was already completed.");
+        var cycle = _pendingPrepared.Cycle.State;
+        AlsLocomotionModel.CompleteStandingSourceTiming(_pendingPrepared.SourceIdentity,
+            new(cycle.Stride, cycle.PlayRate, cycle.Phase), ref state, ref result);
+        _sourceTimingPending = false;
+    }
+
+    internal void CompleteSourceRotation(in AlsPreparedAnimationFrame prepared, in AlsFrameInput input,
+        ref AlsRuntimeState state, ref AlsFrameResult result)
+    {
+        ValidatePrepared(in prepared);
+        if (_fullMovement is not null) { _fullMovement.CompleteRotation(input, ref state, ref result); return; }
+        if (!_pendingPrepared.CycleEnabled || result.RotateActive == 0) return;
+        if (input.Identity != result.Identity || result.Identity != _pendingPrepared.SourceIdentity)
+            throw new InvalidOperationException("Standing rotation feedback identity differs.");
+        var sources = _graph.StandingCycle!.SourceBindings.Sources;
+        var sync = _pendingPrepared.Cycle.Sync;
+        var phase = 0f;
+        var yaw = 0f;
+        for (var i = 0; i < sync.PlayerCount; i++)
+        {
+            var history = sync.Players[i];
+            var binding = sources.Players[history.PlayerId];
+            if (binding.LoopInput != (result.RotateDirection < 0 ? AlsSourceLoopInput.RotateLeft : AlsSourceLoopInput.RotateRight)) continue;
+            var sample = sources.Samples[binding.SampleStart];
+            if (sample.AnimationId != result.RotateAnimationId || history.SampleCount != 1)
+                throw new InvalidOperationException("Standing rotation and P4 selection disagree.");
+            var sampler = _footCurveSamplersByAnimation[sample.AnimationId]!;
+            if (!sampler.TrySample(result.RotateCurveId, history.DeltaPrevious, out var previous) ||
+                !sampler.TrySample(result.RotateCurveId, history.Time, out var current))
+                throw new InvalidOperationException("Standing rotation feedback curve is missing.");
+            phase = history.Time;
+            // Preserve the current P4 yaw integration contract, using only the shared source interval.
+            yaw = (previous + current) * .5f * history.Delta;
+            break;
+        }
+        if (!float.IsFinite(yaw)) throw new InvalidOperationException("Standing rotation feedback is non-finite.");
+        result.RotatePhase = phase;
+        result.RotateYawDelta = yaw;
+        result.TargetYaw = AlsMath.NormalizeAngleRadians(input.CharacterYaw + yaw);
+        state.RotateInPlace = state.RotateInPlace with { Phase = phase };
+    }
+
+    internal void CompleteSourceEvents(in AlsPreparedAnimationFrame prepared, ref AlsFrameResult result)
+    {
+        ValidatePrepared(in prepared);
+        if (_fullMovement is not null)
+        {
+            if (!_sourceEventsPending) throw new InvalidOperationException("Movement events were already completed.");
+            _fullMovement.CompleteEvents(ref result); _sourceEventsPending = false; return;
+        }
+        if (_graph.StandingCycle is null) return;
+        if (!_sourceEventsPending || result.Identity != _pendingSourceEvents.Identity || result.TypedEvents.Count != 0)
+            throw new InvalidOperationException("P5 source events are stale, already copied, or overlap another event producer.");
+        result.TypedEvents = _pendingSourceEventBuffer;
+        _sourceEventsPending = false;
+    }
+
     public void ApplyPrepared(in AlsPreparedAnimationFrame prepared)
     {
         ThrowIfDisposed();
         ValidatePrepared(in prepared);
+        if (_sourceTimingPending || _sourceEventsPending)
+            throw new InvalidOperationException("Complete source timing before applying the candidate pose.");
+        if (_fullMovement is not null)
+        {
+            try { _fullMovement.Apply(); GraphAdvanceCount++; _preparedTransactionState = 2; }
+            catch { try { _fullMovement.Discard(); } finally { ClearPreparedTransaction(); } throw; }
+            return;
+        }
         var stateChanged = prepared.AnimationState != ActiveAnimationState;
         try
         {
@@ -641,7 +864,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
                     _pendingTurnUpdate,
                     _pendingRotateUpdate,
                     _pendingActionModeBlendAmount,
-                    _pendingActionBlendAmount);
+                    _pendingPrepared.CycleEnabled ? 0 : _pendingActionBlendAmount);
             }
 
             _graph.Tree.Advance(_pendingDeltaTime);
@@ -678,6 +901,9 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         ThrowIfDisposed();
         ValidateAppliedPrepared(in prepared);
 
+        if (_sourceTimingPending || _sourceEventsPending)
+            throw new InvalidOperationException("Unresolved source timing cannot be committed.");
+
         if (_pendingBaseTransitionActive == 0)
         {
             return new AlsPreparedAnimationCommit(
@@ -705,12 +931,20 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     internal bool TryFinalizePreparedCommit(in AlsPreparedAnimationCommit commit)
     {
         if (commit.OwnerId != _ownerId ||
+            _sourceTimingPending ||
+            _sourceEventsPending ||
             _hasPreparedFrame != 1 ||
             _preparedTransactionState != 2 ||
             commit.OwnerId != _pendingDecision.OwnerId ||
             commit.Revision != _pendingDecision.Revision)
         {
             return false;
+        }
+        if (_fullMovement is not null)
+        {
+            _fullMovement.Commit(); ManualAdvanceCount++;
+            ActiveAnimationState = _pendingDecision.AnimationState; ActiveStance = _pendingDecision.Stance;
+            ClearPreparedTransaction(); return true;
         }
         ManualAdvanceCount++;
         ActiveAnimationState = _pendingDecision.AnimationState;
@@ -747,6 +981,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             _activeTurnBlendSeconds = _pendingPreparedP4.TurnBinding.BlendSeconds;
         }
+        _graph.StandingCycle?.CommitPose(_pendingPrepared.CycleEnabled);
+        if (_graph.StandingCycle is not null) _sourceEvents = _pendingSourceEvents;
         ClearPreparedTransaction();
         return true;
     }
@@ -755,6 +991,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     {
         ThrowIfDisposed();
         ValidateAppliedPrepared(in prepared);
+        if (_fullMovement is not null)
+        {
+            try { _fullMovement.Discard(); } finally { ClearPreparedTransaction(); }
+            return;
+        }
         try
         {
             RestoreCommittedGraph();
@@ -769,12 +1010,15 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     {
         ThrowIfDisposed();
         ValidatePrepared(in prepared);
+        _fullMovement?.Discard();
         ClearPreparedTransaction();
     }
 
     private void ClearPreparedTransaction()
     {
+        _sourceEventsPending = false;
         _hasPreparedFrame = 0;
+        _sourceTimingPending = false;
         _preparedTransactionState = 0;
     }
 
@@ -889,6 +1133,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         if (state == AlsAnimationState.Grounded)
         {
             nextStateElapsed = 0.0;
+            if (stance == AlsStance.Standing && _graph.StandingCycle is not null)
+                return BaseCurveDecision.Empty(groundedPhase);
             var resolver = stance == AlsStance.Standing
                 ? _standingBaseCurves
                 : _crouchingBaseCurves;
@@ -941,6 +1187,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             prepared.BasePhaseNormalized,
             out var targetLeft,
             out var targetRight);
+        if (_pendingPrepared.CycleEnabled && _graph.StandingCycle is { } targetCycle)
+        {
+            targetLeft = targetCycle.Sample(_pendingPrepared.Cycle, "FootLock_L");
+            targetRight = targetCycle.Sample(_pendingPrepared.Cycle, "FootLock_R");
+        }
         if (prepared.BaseTransitionAlpha >= 1f)
         {
             left = targetLeft;
@@ -957,6 +1208,11 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             prepared.PreviousBasePhaseNormalized,
             out var previousLeft,
             out var previousRight);
+        if (_pendingBaseTransitionPreviousPrepared.CycleEnabled && _graph.StandingCycle is { } previousCycle)
+        {
+            previousLeft = previousCycle.Sample(_pendingBaseTransitionPreviousPrepared.Cycle, "FootLock_L");
+            previousRight = previousCycle.Sample(_pendingBaseTransitionPreviousPrepared.Cycle, "FootLock_R");
+        }
         left = Lerp(previousLeft, targetLeft, prepared.BaseTransitionAlpha);
         right = Lerp(previousRight, targetRight, prepared.BaseTransitionAlpha);
     }
@@ -1056,6 +1312,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
 
         _topPlayback = null;
         _groundedPlayback = null;
+        _fullMovement?.Dispose();
     }
 
     private AnimationNodeStateMachinePlayback GetPlayback(StringName path, string label)
@@ -1297,16 +1554,22 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         }
     }
 
-    private void SetPreparedParameters(in PreparedApply prepared) => SetParameters(
+    private void SetPreparedParameters(in PreparedApply prepared)
+    {
+        if (prepared.CycleEnabled) _graph.StandingCycle!.Apply(_graph.Tree, prepared.Cycle);
+        SetParameters(
         prepared.Parameters,
         prepared.Blend,
         prepared.EffectivePlayRate,
         prepared.Lean,
         prepared.LeanAmount,
         prepared.Phase);
+    }
 
     private void RestoreCommittedGraph()
     {
+        // Also restore the derived pose when the committed branch has not entered Cycle yet.
+        _graph.StandingCycle?.RestorePose();
         if (_baseTransitionActive != 0)
         {
             var transitionElapsed = _baseTransitionFadePosition;
@@ -1408,7 +1671,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             turn,
             rotate,
             _actionModeBlendAmount,
-            _actionBlendAmount);
+            _committedPrepared.CycleEnabled ? 0 : _actionBlendAmount);
     }
 
     private void SetP4Parameters(
@@ -1456,8 +1719,10 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _graph.Tree.Set(handles.AimUpWeightPath, prepared.AimUpWeight);
     }
 
-    private Vector2 MapBlendPosition(in AlsFrameResult result)
+    private Vector2 MapBlendPosition(in AlsFrameResult result, float hipBias,
+        double deltaTime, out Vector2 direction)
     {
+        direction = Vector2.Zero;
         var right = (double)result.BlendCoordinates.X;
         var forward = (double)result.BlendCoordinates.Y;
         var magnitude = Math.Sqrt((right * right) + (forward * forward));
@@ -1466,12 +1731,31 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             return Vector2.Zero;
         }
 
+        // LF/LB and RF/RB are lateral cycles with opposite hip orientations,
+        // not four diagonal directions. Select their hemisphere before projection.
+        if (result.ActualStance == AlsStance.Standing && result.ActualGait != AlsGait.Sprinting)
+        {
+            forward += Math.Abs(right) * hipBias;
+            magnitude = Math.Sqrt((right * right) + (forward * forward));
+        }
+
         var ring = result.ActualStance == AlsStance.Crouching
             ? _crouchingBlendRing
             : _standingBlendRings[(int)result.ActualGait];
         if (ring.Length == 1) return ring[0] * result.Stride;
-        var direction = new Vector2(
+        direction = new Vector2(
             (float)(right / magnitude), (float)(forward / magnitude));
+        if (result.AnimationState == AlsAnimationState.Grounded &&
+            result.ActualStance == AlsStance.Standing && deltaTime > 0.0 &&
+            _committedPrepared.Direction.LengthSquared() > 0.5f)
+        {
+            // Bound pose-direction changes, then project back onto this gait's polygon.
+            // Interpolating coordinates directly would mix slower gait rings on the chord.
+            var previousAngle = _committedPrepared.Direction.Angle();
+            var difference = Mathf.Wrap(direction.Angle() - previousAngle, -Mathf.Pi, Mathf.Pi);
+            var maximumStep = (float)Math.Min(deltaTime * MaximumPoseDirectionRadiansPerSecond, Math.PI);
+            direction = Vector2.FromAngle(previousAngle + Math.Clamp(difference, -maximumStep, maximumStep));
+        }
         // A circular radius can leave the selected gait polygon and blend in faster clips.
         for (var index = 0; index < ring.Length; index++)
         {
@@ -1501,7 +1785,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         Math.Clamp(value.X, minimum.X, maximum.X),
         Math.Clamp(value.Y, minimum.Y, maximum.Y));
 
-    private PreparedApply Prepare(in AlsFrameResult result, double deltaTime)
+    private PreparedApply Prepare(in AlsFrameResult result, double deltaTime, AlsStandingMovementInput? movementInput,
+        AlsStandingTurnSlotInput turnSlot)
     {
         if (!double.IsFinite(deltaTime) || deltaTime < 0.0)
         {
@@ -1519,16 +1804,21 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         {
             throw new ArgumentOutOfRangeException(nameof(result), "Gait is invalid.");
         }
+        var pendingSourceTiming = AlsLocomotionModel.HasPendingSourceTiming(result);
+        var sourceBranch = _graph.StandingCycle is not null && result.AnimationState == AlsAnimationState.Grounded &&
+            result.ActualStance == AlsStance.Standing;
+        if (pendingSourceTiming && !sourceBranch)
+            throw new ArgumentException("Pending source timing requires the standing source graph.", nameof(result));
         if (!float.IsFinite(result.BlendCoordinates.X) ||
             !float.IsFinite(result.BlendCoordinates.Y) ||
-            !float.IsFinite(result.Stride) ||
-            result.Stride < 0f || result.Stride > 1f ||
+            (!pendingSourceTiming && (!float.IsFinite(result.Stride) ||
+            result.Stride < 0f || (!sourceBranch && result.Stride > 1f) ||
             !float.IsFinite(result.PlayRate) ||
-            result.PlayRate <= 0f ||
+            result.PlayRate < 0f || (!sourceBranch && result.PlayRate == 0f) ||
             result.PlayRate > _playRateMaximum ||
+            !float.IsFinite(result.AnimationPhase))) ||
             !float.IsFinite(result.Lean.X) ||
-            !float.IsFinite(result.Lean.Y) ||
-            !float.IsFinite(result.AnimationPhase))
+            !float.IsFinite(result.Lean.Y))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(result),
@@ -1543,7 +1833,35 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         }
 
         var parameters = GetParameters(result.AnimationState, result.ActualStance);
-        var blend = MapBlendPosition(result);
+        if (_graph.StandingCycle is { } standingCycle && result.AnimationState == AlsAnimationState.Grounded &&
+            result.ActualStance == AlsStance.Standing)
+        {
+            if (movementInput is not { } movement)
+                throw new ArgumentException("Standing source graph requires explicit character movement input.", nameof(movementInput));
+            var cycle = standingCycle.Prepare(_committedPrepared.Cycle, result, (float)deltaTime, _animatedStandingSpeeds, movement,
+                includeDetail: true, turnSlot: turnSlot);
+            var cycleLean = Clamp(new Vector2(result.Lean.X, result.Lean.Y), parameters.LeanMinimum, parameters.LeanMaximum);
+            return new PreparedApply(parameters, Vector2.Zero, 0, cycleLean,
+                cycleLean.LengthSquared() > 1e-12f ? 1f : 0f, cycle.State.Phase,
+                CycleEnabled: true, Cycle: cycle, SourceIdentity: result.Identity);
+        }
+        var backwardHips = _committedPrepared.BackwardHips;
+        var hipBias = _committedPrepared.HipBias;
+        if (result.AnimationState == AlsAnimationState.Grounded &&
+            result.ActualStance == AlsStance.Standing && result.ActualGait != AlsGait.Sprinting)
+        {
+            var length = result.BlendCoordinates.Length();
+            if (length > 1e-6f)
+            {
+                var forwardFraction = result.BlendCoordinates.Y / length;
+                // Retain the selected hip variant in the lateral band (70..110 degrees).
+                if (forwardFraction < -HipHemisphereForwardThreshold) backwardHips = true;
+                else if (forwardFraction > HipHemisphereForwardThreshold) backwardHips = false;
+                hipBias = Mathf.MoveToward(hipBias, backwardHips ? -1f : 1f,
+                    (float)Math.Min(deltaTime * 2.0 / HipVariantBlendSeconds, 2.0));
+            }
+        }
+        var blend = MapBlendPosition(result, hipBias, deltaTime, out var direction);
         if (!float.IsFinite(blend.X) || !float.IsFinite(blend.Y))
         {
             throw new ArgumentOutOfRangeException(nameof(result), "Derived blend position is not finite.");
@@ -1582,7 +1900,12 @@ public sealed class AlsLocomotionAnimationController : IDisposable
             effectivePlayRate,
             lean,
             leanAmount,
-            phase);
+            phase,
+            backwardHips,
+            hipBias,
+            direction,
+            Cycle: _graph.StandingCycle is { } inactiveCycle
+                ? inactiveCycle.AdvanceInactiveFeedback(_committedPrepared.Cycle, (float)deltaTime) : _committedPrepared.Cycle);
     }
 
     private PreparedP4 PrepareP4(in AlsP4AnimationInput input)
@@ -1748,7 +2071,13 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         float EffectivePlayRate,
         Vector2 Lean,
         float LeanAmount,
-        float Phase);
+        float Phase,
+        bool BackwardHips = false,
+        float HipBias = 1f,
+        Vector2 Direction = default,
+        bool CycleEnabled = false,
+        AlsStandingCycleFrame Cycle = default,
+        AlsFrameIdentity SourceIdentity = default);
 
     private readonly record struct BaseCurveDecision(
         int AnimationIdA,

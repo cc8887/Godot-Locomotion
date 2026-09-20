@@ -33,6 +33,23 @@
 
 ## File Map
 
+**2026-09-10 完整性补完入口：** 当前人工验证 Demo 的基础移动图已有独立 Cycle
+扩展，但尚未进入本计划的完整 P5A 事务。先执行
+`2026-09-10-locomotion-completeness-recovery.md` 的基础移动补项与布局核对，再回到
+Task 15–21。旧 layout v2 的 Base22/总49测试不能证明新 Cycle 图已绑定；不能以旧
+图通过或单独调用 Sync 核心函数替代生产接线。P5B/P5C/P6/P7 的原范围不变。
+
+第十八批整图证据见 `../../verification/2026-09-10-full-source-inventory.md`：原版编译图
+包含 233 个资产播放器/求值器、277 个静态样本引用，且缓存 PoseLink 使用实际属性索引，
+不能直接使用原始编译编号。此为布局覆盖清单，不是新布局的冻结数量，也不是 Task 15
+完成记录。后续映射必须明确缓存共享和模块范围，保留现有 37/59 源绑定的两级身份。
+
+第二十批已将当前 standing Cycle 的源时间摘要合入现有 Worker 候选事务，移除该分支
+在 Core 中提前计算的旧 Stride/PlayRate/Phase，并增加未完成时间不可提交的门禁。
+见 `../../verification/2026-09-10-standing-source-time-authority.md`。此为实际 Demo
+接线进度，不是 Task 15–21 完成证明；最终源布局、跨状态同步、事件队列/生命周期、
+Detail/起停与 P5 facade 仍需继续，不能把当前七播放器摘要当作最终 P5 ABI。
+
 | Path | Responsibility |
 | --- | --- |
 | `tools/unreal/AlsGodotExporter/Source/AlsGodotExporter/Private/AlsNotifyClassRegistry.*` | 显式 UE class alias 到 typed kind/payload 的唯一映射 |

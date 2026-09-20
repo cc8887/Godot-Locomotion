@@ -405,14 +405,6 @@ public static class AlsFootPlacementModel
 
         if (usableHit)
         {
-            var ignoredRotation = targetRotation;
-            ConstrainThighDirection(
-                characterPosition,
-                characterRotation,
-                characterUp,
-                settings.MaximumThighAngleRadians,
-                ref footTarget,
-                ref ignoredRotation);
             if (!TryRestoreFootClearance(
                     hit.Position,
                     characterUp,
@@ -591,17 +583,24 @@ public static class AlsFootPlacementModel
                 return false;
             }
 
+            var unconstrainedLockPosition = lockPosition;
             ConstrainThighDirection(
                 characterPosition,
                 characterRotation,
                 characterUp,
                 settings.MaximumThighAngleRadians,
-                ref lockPosition,
-                ref lockRotation);
+                ref lockPosition);
             ClampRotationDelta(
                 targetRotation,
                 settings.MaximumFootAngleRadians,
                 ref lockRotation);
+            // Keep terrain clearance on the constrained lock target, before weighting it.
+            if (usableHit && lockPosition != unconstrainedLockPosition &&
+                !TryRestoreFootClearance(hit.Position, characterUp, surfaceNormal,
+                    settings.FootHeightMeters, ref lockPosition))
+            {
+                return false;
+            }
 
             var blend = System.Math.Clamp(next.Amount, 0f, 1f);
             worldPosition = Vector3.Lerp(footTarget, lockPosition, blend);
@@ -625,32 +624,6 @@ public static class AlsFootPlacementModel
                  ref worldPosition)))
         {
             return false;
-        }
-
-        if (usableHit)
-        {
-            var constrainedPosition = worldPosition;
-            var ignoredRotation = worldRotation;
-            ConstrainThighDirection(
-                characterPosition,
-                characterRotation,
-                characterUp,
-                settings.MaximumThighAngleRadians,
-                ref constrainedPosition,
-                ref ignoredRotation);
-            if (constrainedPosition != worldPosition)
-            {
-                worldPosition = constrainedPosition;
-                if (!TryRestoreFootClearance(
-                        hit.Position,
-                        characterUp,
-                        surfaceNormal,
-                        settings.FootHeightMeters,
-                        ref worldPosition))
-                {
-                    return false;
-                }
-            }
         }
 
         if (!TryClampLegReach(
@@ -911,8 +884,7 @@ public static class AlsFootPlacementModel
         in Quaternion characterRotation,
         in Vector3 characterUp,
         float maximumAngle,
-        ref Vector3 targetPosition,
-        ref Quaternion targetRotation)
+        ref Vector3 targetPosition)
     {
         var relative = targetPosition - characterPosition;
         var vertical = characterUp * Vector3.Dot(relative, characterUp);
@@ -941,7 +913,7 @@ public static class AlsFootPlacementModel
 
         var correction = Quaternion.CreateFromAxisAngle(characterUp, clampedAngle - signedAngle);
         targetPosition = characterPosition + vertical + Vector3.Transform(horizontal, correction);
-        targetRotation = NormalizeCanonicalUnchecked(correction * targetRotation);
+        // Reach constraints move the effector, not its independently locked orientation.
     }
 
     private static bool TryBuildFootRotation(

@@ -51,6 +51,11 @@ public partial class P4DemoSmoke : Node
     private float _translatingRightActiveAmount;
     private long _firstTranslatingPlatformFrame = -1;
     private long _lastTranslatingPlatformFrame = -1;
+    private AlsFootLockState _firstTranslatingLeftLock;
+    private AlsFootLockState _firstTranslatingRightLock;
+    private AlsFootLockState _lastTranslatingLeftLock;
+    private AlsFootLockState _lastTranslatingRightLock;
+    private System.Numerics.Vector4 _maximumPlatformWindowCurves;
     private float _maximumTranslatingLockAmount;
     private float _maximumTranslatingLeftLockCurve;
     private float _maximumTranslatingRightLockCurve;
@@ -99,7 +104,7 @@ public partial class P4DemoSmoke : Node
     public P4DemoSmoke()
     {
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-        ProcessThreadGroupOrder = 4;
+        ProcessThreadGroupOrder = AlsP3FrameStages.Observe;
     }
 
     public override void _Ready()
@@ -387,8 +392,15 @@ public partial class P4DemoSmoke : Node
             if (_firstTranslatingPlatformFrame < 0)
             {
                 _firstTranslatingPlatformFrame = frame.CommittedFrameId;
+                _firstTranslatingLeftLock = leftLock;
+                _firstTranslatingRightLock = rightLock;
             }
             _lastTranslatingPlatformFrame = frame.CommittedFrameId;
+            _lastTranslatingLeftLock = leftLock;
+            _lastTranslatingRightLock = rightLock;
+            _maximumPlatformWindowCurves = System.Numerics.Vector4.Max(_maximumPlatformWindowCurves,
+                new(frame.Result.LeftFootIkWeight, frame.Result.RightFootIkWeight,
+                    frame.Result.LeftFootLockCurve, frame.Result.RightFootLockCurve));
             _maximumTranslatingLockAmount = MathF.Max(
                 _maximumTranslatingLockAmount,
                 MathF.Max(leftLock.Amount, rightLock.Amount));
@@ -597,7 +609,12 @@ public partial class P4DemoSmoke : Node
             $"brakeEnd={_routeBrakeEndPosition} rotate={_translatingRotateObserved} " +
             $"rotateYaw=[{_minimumTranslatingRotateYaw},{_maximumTranslatingRotateYaw}] " +
             $"speedMax={_maximumTranslatingRotateSpeed} curves=" +
-            $"({_maximumTranslatingLeftLockCurve},{_maximumTranslatingRightLockCurve})");
+            $"({_maximumTranslatingLeftLockCurve},{_maximumTranslatingRightLockCurve}) " +
+            $"lockStates=L:{_firstTranslatingLeftLock.Locked}/{_firstTranslatingLeftLock.ReleaseReason}->" +
+            $"{_lastTranslatingLeftLock.Locked}/{_lastTranslatingLeftLock.ReleaseReason}," +
+            $"R:{_firstTranslatingRightLock.Locked}/{_firstTranslatingRightLock.ReleaseReason}->" +
+            $"{_lastTranslatingRightLock.Locked}/{_lastTranslatingRightLock.ReleaseReason} " +
+            $"platformWindowCurves(IKL,IKR,LockL,LockR)={_maximumPlatformWindowCurves}");
         Require(_baseChangeObserved,
             $"character did not publish BaseChanged and release the translating lock on the " +
             $"specified static landing: release={_baseChangeReleaseObserved} " +

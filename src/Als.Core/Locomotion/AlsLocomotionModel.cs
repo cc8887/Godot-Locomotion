@@ -79,10 +79,11 @@ public static class AlsLocomotionModel
         in AlsFrameInput input,
         ref AlsRuntimeState state,
         ref AlsFrameResult result,
-        AlsLocomotionSettings settings)
+        AlsLocomotionSettings settings,
+        AlsLocomotionTimingPolicy timingPolicy = AlsLocomotionTimingPolicy.Model)
     {
         var resolvedCommand = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
-        Evaluate(input, resolvedCommand, ref state, ref result, settings);
+        Evaluate(input, resolvedCommand, ref state, ref result, settings, timingPolicy);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -91,9 +92,12 @@ public static class AlsLocomotionModel
         in AlsResolvedLocomotionCommand resolvedCommand,
         ref AlsRuntimeState state,
         ref AlsFrameResult result,
-        AlsLocomotionSettings settings)
+        AlsLocomotionSettings settings,
+        AlsLocomotionTimingPolicy timingPolicy = AlsLocomotionTimingPolicy.Model)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        if ((uint)timingPolicy > (uint)AlsLocomotionTimingPolicy.CompleteMovementGraph)
+            throw new ArgumentOutOfRangeException(nameof(timingPolicy));
         ValidateInput(input);
         ValidateResolvedCommand(resolvedCommand);
         ValidateState(state);
@@ -147,6 +151,7 @@ public static class AlsLocomotionModel
             maxWalkSpeed,
             maxRunSpeed,
             resolvedCommand.MaxAllowedGait);
+        if (input.CharacterRotation.Applied == 1) actualGait = input.CharacterRotation.ActualGait;
 
         var animationState = CalculateAnimationState(
             input,
@@ -175,42 +180,56 @@ public static class AlsLocomotionModel
                 AlsMath.DamperExactAlpha(input.DeltaTime, settings.AccelerationSmoothingHalfLife));
         }
 
-        var targetYaw = CalculateTargetYaw(
+        var targetYaw = input.CharacterRotation.Applied == 1 ? input.CharacterYaw : CalculateTargetYaw(
             input,
             actualGait,
             speed,
             firstFrame,
             settings,
             ref nextState);
+        if (input.CharacterRotation.Applied == 1)
+        {
+            nextState.SmoothedTargetYaw = input.CharacterRotation.SmoothedTargetYaw;
+            nextState.YawSource = AlsYawSource.Locomotion;
+        }
 
-        var referenceSpeed = SampleDirectionalSpeed(
-            SelectGaitSpeeds(stanceSpeeds, actualGait),
-            localYaw,
-            settings.VelocityAngleInterpolationStart,
-            settings.VelocityAngleInterpolationEnd);
-        var stride = referenceSpeed > SmallNumber
-            ? (float)System.Math.Clamp((double)speed / referenceSpeed, 0d, 1d)
-            : 0f;
-        var animatedSpeed = input.Stance == AlsStance.Crouching
-            ? settings.AnimatedCrouchSpeed
-            : actualGait switch
-            {
-                AlsGait.Walking => settings.AnimatedWalkSpeed,
-                AlsGait.Running => settings.AnimatedRunSpeed,
-                AlsGait.Sprinting => settings.AnimatedSprintSpeed,
-                _ => throw new ArgumentOutOfRangeException(nameof(actualGait)),
-            };
-        var playRateDenominator = animatedSpeed * MathF.Max(stride, MinimumPlayRate);
-        var rawPlayRate = playRateDenominator > SmallNumber
-            ? (double)speed / playRateDenominator
-            : 0d;
-        var maximumPlayRate = input.Stance == AlsStance.Crouching
-            ? 2f
-            : MathF.Max(MinimumPlayRate, settings.PlayRateMaximum);
-        var playRate = (float)System.Math.Clamp(
-            rawPlayRate,
-            MinimumPlayRate,
-            maximumPlayRate);
+        var deferTiming = timingPolicy == AlsLocomotionTimingPolicy.CompleteMovementGraph ||
+            timingPolicy == AlsLocomotionTimingPolicy.StandingSourceGraph &&
+            animationState == AlsAnimationState.Grounded && input.Stance == AlsStance.Standing;
+        // Pending values must be completed from the prepared source graph before publication.
+        var stride = float.NaN;
+        var playRate = float.NaN;
+        if (!deferTiming)
+        {
+            var referenceSpeed = SampleDirectionalSpeed(
+                SelectGaitSpeeds(stanceSpeeds, actualGait),
+                localYaw,
+                settings.VelocityAngleInterpolationStart,
+                settings.VelocityAngleInterpolationEnd);
+            stride = referenceSpeed > SmallNumber
+                ? (float)System.Math.Clamp((double)speed / referenceSpeed, 0d, 1d)
+                : 0f;
+            var animatedSpeed = input.Stance == AlsStance.Crouching
+                ? settings.AnimatedCrouchSpeed
+                : actualGait switch
+                {
+                    AlsGait.Walking => settings.AnimatedWalkSpeed,
+                    AlsGait.Running => settings.AnimatedRunSpeed,
+                    AlsGait.Sprinting => settings.AnimatedSprintSpeed,
+                    _ => throw new ArgumentOutOfRangeException(nameof(actualGait)),
+                };
+            var playRateDenominator = animatedSpeed * MathF.Max(stride, MinimumPlayRate);
+            var rawPlayRate = playRateDenominator > SmallNumber
+                ? (double)speed / playRateDenominator
+                : 0d;
+            var maximumPlayRate = input.Stance == AlsStance.Crouching
+                ? 2f
+                : MathF.Max(MinimumPlayRate, settings.PlayRateMaximum);
+            playRate = (float)System.Math.Clamp(
+                rawPlayRate,
+                MinimumPlayRate,
+                maximumPlayRate);
+        }
 
         var leanTarget = CalculateLeanTarget(input, localVelocity, localAcceleration);
         nextState.SmoothedLean = Vector2.Lerp(
@@ -219,7 +238,7 @@ public static class AlsLocomotionModel
             AlsMath.DamperExactAlpha(input.DeltaTime, settings.LeanHalfLife));
 
         var animationPhase = state.AnimationPhase;
-        if (currentLocomotionState == AlsLocomotionState.Grounded &&
+        if (!deferTiming && currentLocomotionState == AlsLocomotionState.Grounded &&
             speed > settings.MovingSpeedThreshold)
         {
             var advancedPhase = ((double)animationPhase +
@@ -244,11 +263,48 @@ public static class AlsLocomotionModel
         nextResult.Stride = stride;
         nextResult.PlayRate = playRate;
         nextResult.Lean = nextState.SmoothedLean;
-        nextResult.AnimationPhase = animationPhase;
+        nextResult.AnimationPhase = deferTiming ? float.NaN : animationPhase;
         nextResult.TargetYaw = targetYaw;
 
         state = nextState;
         result = nextResult;
+    }
+
+    public static bool HasPendingSourceTiming(in AlsFrameResult result) =>
+        float.IsNaN(result.Stride) && float.IsNaN(result.PlayRate) && float.IsNaN(result.AnimationPhase);
+
+    public static void CompleteStandingSourceTiming(
+        in AlsFrameIdentity sourceIdentity,
+        in AlsLocomotionSourceTiming timing,
+        ref AlsRuntimeState state,
+        ref AlsFrameResult result)
+    {
+        if (result.Identity != sourceIdentity || !HasPendingSourceTiming(result) ||
+            result.AnimationState != AlsAnimationState.Grounded || result.ActualStance != AlsStance.Standing ||
+            result.ResolvedLocomotionState != AlsLocomotionState.Grounded || state.LocomotionState != AlsLocomotionState.Grounded ||
+            state.Initialized != 1)
+            throw new InvalidOperationException("Source timing requires the matching pending standing candidate.");
+        if (!float.IsFinite(timing.Stride) || timing.Stride < 0 ||
+            !float.IsFinite(timing.PlayRate) || timing.PlayRate < 0 ||
+            !float.IsFinite(timing.Phase) || timing.Phase < 0 || timing.Phase >= 1)
+            throw new ArgumentOutOfRangeException(nameof(timing));
+        result.Stride = timing.Stride;
+        result.PlayRate = timing.PlayRate;
+        result.AnimationPhase = timing.Phase;
+        state.AnimationPhase = timing.Phase;
+    }
+
+    public static void CompleteMovementSourceTiming(in AlsFrameIdentity sourceIdentity,
+        in AlsLocomotionSourceTiming timing, ref AlsRuntimeState state, ref AlsFrameResult result)
+    {
+        if (result.Identity != sourceIdentity || !HasPendingSourceTiming(result) || state.Initialized != 1 ||
+            state.LocomotionState != result.ResolvedLocomotionState)
+            throw new InvalidOperationException("Source timing requires the matching pending movement candidate.");
+        if (!float.IsFinite(timing.Stride) || timing.Stride < 0 || !float.IsFinite(timing.PlayRate) || timing.PlayRate < 0 ||
+            !float.IsFinite(timing.Phase) || timing.Phase < 0 || timing.Phase >= 1)
+            throw new ArgumentOutOfRangeException(nameof(timing));
+        result.Stride = timing.Stride; result.PlayRate = timing.PlayRate; result.AnimationPhase = timing.Phase;
+        state.AnimationPhase = timing.Phase;
     }
 
     private static AlsAnimationState CalculateAnimationState(
@@ -490,9 +546,18 @@ public static class AlsLocomotionModel
         {
             throw new ArgumentOutOfRangeException(nameof(input), "CharacterYaw must be finite.");
         }
+        var rotation = input.CharacterRotation;
+        if (rotation.Applied > 1 || rotation.Applied == 1 &&
+            (!float.IsFinite(rotation.SmoothedTargetYaw) || !float.IsFinite(rotation.ActorYawDelta) ||
+             (uint)rotation.Branch > (uint)AlsCharacterRotationBranch.AirAiming || (uint)rotation.ActualGait > 2 ||
+             rotation.FeedbackIdentity.SlotGeneration != 0 &&
+             (rotation.FeedbackIdentity.CharacterId != input.Identity.CharacterId ||
+              rotation.FeedbackIdentity.SlotGeneration != input.Identity.SlotGeneration || rotation.FeedbackIdentity.FrameId >= input.Identity.FrameId)))
+            throw new ArgumentException("Invalid character-owned rotation sample.", nameof(input));
 
         ValidateQuaternion(input.ViewRotation, nameof(input.ViewRotation));
         ValidateQuaternion(input.AimRotation, nameof(input.AimRotation));
+        input.MovementInput.Validate();
         if (!float.IsFinite(input.MaxAcceleration) || input.MaxAcceleration < 0f ||
             !float.IsFinite(input.MaxBrakingDeceleration) || input.MaxBrakingDeceleration < 0f)
         {

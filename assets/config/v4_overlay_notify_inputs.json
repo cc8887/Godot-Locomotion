@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_AnimBP.ALS_AnimBP",
+  "overlaySha256": "c5f65b0098023750545afccedffd76b447ca2e9eecac37e2e12bcfd0dad69f22",
+  "notifySchemaVersion": 1,
+  "syncAssets": [
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Barrel/ALS_Props_Barrel_Poses.ALS_Props_Barrel_Poses",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep.ALS_Props_Binoculars_Aim_Sweep",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep_Crouched.ALS_Props_Binoculars_Aim_Sweep_Crouched",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses.ALS_Props_Binoculars_Poses",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep.ALS_Props_Bow_Aim_Sweep",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep_Crouched.ALS_Props_Bow_Aim_Sweep_Crouched",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses.ALS_Props_Bow_Poses",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Box/ALS_Props_Box_Poses.ALS_Props_Box_Poses",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep.ALS_Props_M4A1_Aim_Sweep",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep_Crouched.ALS_Props_M4A1_Aim_Sweep_Crouched",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses.ALS_Props_M4A1_Poses",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F_Arms.ALS_Props_M4A1_Run_F_Arms",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Arms.ALS_Props_M4A1_Sprint_F_Arms",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse_Arms.ALS_Props_M4A1_Sprint_F_Impulse_Arms",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep.ALS_Props_Pistol_1H_Aim_Sweep",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep_Crouched.ALS_Props_Pistol_1H_Aim_Sweep_Crouched",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses.ALS_Props_Pistol_1H_Poses",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep.ALS_Props_Pistol_2H_Aim_Sweep",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep_Crouched.ALS_Props_Pistol_2H_Aim_Sweep_Crouched",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses.ALS_Props_Pistol_2H_Poses",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Shared/ALS_N_SecondaryMotion.ALS_N_SecondaryMotion",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Feminine.ALS_StanceVariation_Feminine",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_HandsTied.ALS_StanceVariation_HandsTied",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Injured.ALS_StanceVariation_Injured",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Masculine.ALS_StanceVariation_Masculine",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Normal.ALS_StanceVariation_Normal",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep.ALS_Props_Torch_Aim_Sweep",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep_Crouched.ALS_Props_Torch_Aim_Sweep_Crouched",
+      "notifies": []
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses.ALS_Props_Torch_Poses",
+      "notifies": []
+    }
+  ]
+}

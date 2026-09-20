@@ -8,7 +8,7 @@ using System.Numerics;
 
 namespace GodotAls.Core.Animation;
 
-public static class AlsP5Runtime
+public static partial class AlsP5Runtime
 {
     private const float BlendEpsilon = 1e-5f;
 

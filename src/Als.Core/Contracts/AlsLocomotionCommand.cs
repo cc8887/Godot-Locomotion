@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Core.Contracts;
 
@@ -15,6 +16,9 @@ public readonly record struct AlsLocomotionCommand(
     AlsRotationMode RequestedRotationMode,
     byte JumpPressed)
 {
+    // Captured with the movement command; retries retain the same selection.
+    public AlsOverlayKind RequestedOverlay { get; init; }
+
     public static AlsLocomotionCommand CreateDefault() => new(
         Vector2.Zero,
         0f,

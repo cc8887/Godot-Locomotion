@@ -10,7 +10,8 @@ namespace GodotAls.Locomotion;
 
 public partial class P4LocomotionDemo : Node3D
 {
-    private const string ProfilePath = "res://assets/config/p3_locomotion_profile.json";
+    [Export] public AlsOverlayKind Overlay { get; set; } = AlsOverlayKind.Default;
+    private const string ProfilePath = "res://assets/config/p4_cycle_locomotion_profile.json";
     private const string SettingsPath = "res://assets/config/p3_locomotion_settings.json";
     private const float TranslationSpeed = 0.06f;
     private const float TranslationRange = 0.45f;
@@ -101,6 +102,16 @@ public partial class P4LocomotionDemo : Node3D
     {
         try
         {
+            var overlayArg = OS.GetCmdlineUserArgs().FirstOrDefault(value => value.StartsWith("--overlay="));
+            if (overlayArg is not null)
+            {
+                if (!Enum.TryParse<AlsOverlayKind>(overlayArg["--overlay=".Length..], true, out var overlay) ||
+                    (uint)overlay > (uint)AlsOverlayKind.Barrel)
+                    throw new ArgumentException("Unknown --overlay selection.");
+                Overlay = overlay;
+            }
+            if (Overlay != AlsOverlayKind.Default && !OS.GetCmdlineUserArgs().Contains("--layered-frame"))
+                throw new ArgumentException("Overlay selection requires the complete --layered-frame animation entry.");
             _slot = GetNode<AlsP3CharacterSlot>("CharacterSlot");
             _orbitCamera = GetNode<AlsOrbitCamera>("OrbitCamera");
             _hud = GetNode<AlsLocomotionHud>("HudLayer/HudMargin/LocomotionHud");
@@ -178,7 +189,7 @@ public partial class P4LocomotionDemo : Node3D
                 _playerInput.CaptureGodotFrame(
                     nextFrame,
                     _orbitCamera.Yaw,
-                    _orbitCamera.Pitch);
+                    _orbitCamera.Pitch, Overlay);
             }
         }
         catch (Exception exception)

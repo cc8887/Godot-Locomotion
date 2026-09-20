@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Core.Contracts;
 
@@ -34,6 +35,16 @@ public readonly record struct AlsFrameInput(
     public AlsFootPlacementReleaseSignals FootPlacementReleaseSignals { get; init; }
 
     public AlsActionRequest ActionRequest { get; init; } = AlsActionRequest.None;
+
+    public AlsLandPredictionSample LandPrediction { get; init; }
+
+    // Character-owned essential values, gathered before animation update.
+    public float AimYawRateDegrees { get; init; }
+    public byte FirstPerson { get; init; }
+    public AlsCharacterRotationSample CharacterRotation { get; init; }
+    public AlsFootIkSceneSample FootIk { get; init; }
+    public AlsCharacterMovementInput MovementInput { get; init; }
+    public AlsRefactoredGroundPredictionSample RefactoredGroundPrediction { get; init; }
 
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {

@@ -30,6 +30,7 @@ public readonly ref struct AlsP5OccurrenceLayoutView
 public static class AlsP5OccurrenceLayoutContract
 {
     public const int CurrentVersion = 2;
+    public const int SourceGraphVersion = 3;
 
     private const ulong OffsetBasis = 14695981039346656037UL;
     private const ulong Prime = 1099511628211UL;
@@ -39,16 +40,18 @@ public static class AlsP5OccurrenceLayoutContract
         ulong digest,
         ReadOnlySpan<AlsP5OccurrenceLayoutEntry> entries)
     {
-        if (version != CurrentVersion || digest == 0 || entries.IsEmpty)
+        if (version != CurrentVersion && version != SourceGraphVersion || digest == 0 || entries.IsEmpty)
         {
             throw new ArgumentException("The P5 occurrence layout header is invalid.");
         }
 
         var maxAuthority = -1;
+        var hasSource = false;
         for (var index = 0; index < entries.Length; index++)
         {
             ref readonly var entry = ref entries[index];
-            if (entry.SourceKind is < AlsP5OccurrenceSourceKind.Base or > AlsP5OccurrenceSourceKind.ActionSequence ||
+            if (entry.SourceKind < AlsP5OccurrenceSourceKind.Base || entry.SourceKind >
+                    (version == SourceGraphVersion ? AlsP5OccurrenceSourceKind.SourceEvaluator : AlsP5OccurrenceSourceKind.ActionSequence) ||
                 entry.SourceBindingIndex < 0 ||
                 entry.GraphSlotIndex < 0 ||
                 entry.OccurrenceHandleId < 0 ||
@@ -61,6 +64,7 @@ public static class AlsP5OccurrenceLayoutContract
             {
                 throw new ArgumentException("The P5 occurrence layout entry is invalid.");
             }
+            hasSource |= entry.SourceKind is AlsP5OccurrenceSourceKind.SourceSample or AlsP5OccurrenceSourceKind.SourceEvaluator;
 
             if (entry.AuthorityGroupId > maxAuthority)
             {
@@ -98,7 +102,7 @@ public static class AlsP5OccurrenceLayoutContract
             }
         }
 
-        if (ComputeDigest(version, entries) != digest)
+        if (version == SourceGraphVersion && !hasSource || ComputeDigest(version, entries) != digest)
         {
             throw new ArgumentException("The P5 occurrence layout digest is stale.");
         }

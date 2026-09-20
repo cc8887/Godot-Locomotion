@@ -49,6 +49,8 @@ public readonly record struct AlsPoseModifierInput(
     public bool UseAnimatedFootOffsets { get; init; }
     public System.Numerics.Vector3 LeftFootReferenceWorldOrigin { get; init; }
     public System.Numerics.Vector3 RightFootReferenceWorldOrigin { get; init; }
+    public System.Numerics.Quaternion LeftFootLockedWorldRotation { get; init; }
+    public System.Numerics.Quaternion RightFootLockedWorldRotation { get; init; }
 
     public static AlsPoseModifierInput FromResult(in AlsFrameResult result)
     {
@@ -407,6 +409,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
                         input.CharacterWorldRotation,
                         input.UseAnimatedFootOffsets,
                         input.LeftFootReferenceWorldOrigin,
+                        input.LeftFootLockedWorldRotation,
                         out leftPhysicalTargetWorld))
                 {
                     reason = AlsP4ReasonCode.NonFiniteInput;
@@ -428,6 +431,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
                         input.CharacterWorldRotation,
                         input.UseAnimatedFootOffsets,
                         input.RightFootReferenceWorldOrigin,
+                        input.RightFootLockedWorldRotation,
                         out rightPhysicalTargetWorld))
                 {
                     reason = AlsP4ReasonCode.NonFiniteInput;
@@ -1136,6 +1140,7 @@ public sealed class AlsComponentPoseModifier : IDisposable
         in System.Numerics.Quaternion characterWorldRotationValue,
         bool useAnimatedFootOffsets,
         in System.Numerics.Vector3 referenceWorldOrigin,
+        in System.Numerics.Quaternion lockedWorldRotation,
         out Transform3D physicalTargetWorld)
     {
         physicalTargetWorld = default;
@@ -1181,6 +1186,8 @@ public sealed class AlsComponentPoseModifier : IDisposable
                 ToGodot(characterWorldRotationValue).Normalized().Inverse();
             var animatedRotation = (terrainRotation * animatedWorld.Basis.Orthonormalized()
                 .GetRotationQuaternion()).Normalized();
+            if (lockedWorldRotation.LengthSquared() > 0f)
+                desiredFootWorld.Basis = new Basis(ToGodot(lockedWorldRotation).Normalized());
             desiredFootWorld.Basis = new Basis(desiredFootWorld.Basis.Orthonormalized()
                 .GetRotationQuaternion().Slerp(animatedRotation, unlockedAmount).Normalized());
         }
@@ -1274,7 +1281,9 @@ public sealed class AlsComponentPoseModifier : IDisposable
             return false;
         }
 
-        var currentFootRotation = _scratch.ComponentPose[leg.FootBoneId]
+        // The effector orientation is independent of thigh/knee swings. Clamping against
+        // their inherited rotation turns a positional IK correction into an ankle twist.
+        var currentFootRotation = _scratch.OriginalComponentPose[leg.FootBoneId]
             .Basis.Orthonormalized().GetRotationQuaternion().Normalized();
         var targetFootRotation = desiredFoot.Basis.Orthonormalized()
             .GetRotationQuaternion().Normalized();
@@ -1354,7 +1363,6 @@ public sealed class AlsComponentPoseModifier : IDisposable
         }
         var correction = new Quaternion(up, clampedAngle - signedAngle).Normalized();
         targetWorld.Origin = hipWorld + vertical + correction * horizontal;
-        targetWorld.Basis = new Basis(correction) * targetWorld.Basis;
         return IsAffineInvertible(targetWorld);
     }
 

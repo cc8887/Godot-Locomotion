@@ -4,7 +4,7 @@ using GodotAls.Core.Contracts;
 
 namespace GodotAls.Core.Events;
 
-public static class AlsTimelineRuntime
+public static partial class AlsTimelineRuntime
 {
     private struct OwnerTokenBudget
     {

@@ -20,7 +20,7 @@ public partial class AlsP3CommitStage : Node
         _state = state;
         _owner = owner;
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-        ProcessThreadGroupOrder = 2;
+        ProcessThreadGroupOrder = AlsP3FrameStages.Commit;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -106,9 +106,12 @@ public partial class AlsP3CommitStage : Node
             return;
         }
 
+        _state.FootProbeExchange.CopyNative(candidate.FootProbeSource.NativeFootPose);
         _owner.CommitMotorLifecycleFrame(frameId);
         _state.HasCommittedTargetYaw = 1;
         _state.CommittedTargetYaw = result.TargetYaw;
+        _state.CommittedCharacterRotationFeedback = candidate.CharacterRotationFeedback;
+        _state.CommittedRefactoredFeedback = candidate.RefactoredFeedback;
         _state.Diagnostics = new AlsP3FrameDiagnostics(
             candidate.Identity,
             commandFrame,
@@ -125,10 +128,19 @@ public partial class AlsP3CommitStage : Node
             candidate.FootProbeSource)
         {
             FootPose = candidate.FootPose,
+            CharacterRotationFeedback = candidate.CharacterRotationFeedback,
+            PresentationPending = candidate.PresentationPending,
         };
-        Volatile.Write(ref _state.VisualReady, 1);
         Volatile.Write(ref _state.CommittedFrameId, frameId);
-        _owner.ShowCommittedVisual(identity);
+        // Keep committing initialization history and events while the cold rig
+        // is hidden. Visibility must not be a prerequisite for its next update.
+        if (!candidate.PresentationPending)
+        {
+            Volatile.Write(ref _state.VisualReady, 1);
+            _owner.ShowCommittedVisual(identity);
+        }
+        // No owner access after callbacks: gameplay may free the character or start a new action.
+        _context.DispatchCommittedAnimationEvents(result);
         if (measure)
         {
             measurement!.AddCommitAllocations(
@@ -149,7 +161,7 @@ public partial class AlsP3CommitStage : Node
             $"exception={failure.ExceptionType} reason={failure.ReasonCode}";
         if (_context.HeadlessOrDebug)
         {
-            GD.PushError($"GODOT_ALS_P3B_FAIL {details}");
+            GD.PushError($"GODOT_ALS_P3B_FAIL {details}\n{failure.Details}");
             GetTree().Quit(1);
         }
         else

@@ -22,9 +22,9 @@ public partial class P3bAnimationGraphSmoke : Node
     private static readonly DirectionCase[] DirectionCases =
     [
         new("forward", System.Numerics.Vector2.UnitY, new Vector2(0f, 1f)),
-        new("left", -System.Numerics.Vector2.UnitX, new Vector2(-0.707107f, 0f)),
+        new("left", -System.Numerics.Vector2.UnitX, new Vector2(-0.707107f, 0.707107f)),
         new("back", -System.Numerics.Vector2.UnitY, new Vector2(0f, -1f)),
-        new("right", System.Numerics.Vector2.UnitX, new Vector2(0.707107f, 0f)),
+        new("right", System.Numerics.Vector2.UnitX, new Vector2(0.707107f, 0.707107f)),
     ];
 
     public override void _Ready()
@@ -55,6 +55,8 @@ public partial class P3bAnimationGraphSmoke : Node
             File.ReadAllText(ProjectSettings.GlobalizePath(ProfilePath)), definition);
         var settings = AlsLocomotionSettings.Load(
             Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
+        VerifyNeutralLean(definition, profile, settings);
+        VerifyHipDirection(definition, profile, settings);
 
         VerifyWarmupFailureRetries(definition, profile, settings);
         VerifyProfileValidation(definition, profile);
@@ -614,6 +616,115 @@ public partial class P3bAnimationGraphSmoke : Node
         }
     }
 
+    private void VerifyNeutralLean(AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile, AlsLocomotionSettings settings)
+    {
+        using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
+        AddChild(library.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
+        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        controller.Warmup();
+        var input = CreateModelInput(1, new System.Numerics.Vector3(1.75f, 0f, 0f),
+            AlsStance.Standing, true, settings.FixedDeltaSeconds);
+        var state = new AlsRuntimeState();
+        var result = new AlsFrameResult();
+        AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
+        result.AnimationPhase = 0.25f;
+        result.Lean = System.Numerics.Vector2.Zero;
+        controller.Apply(in result, 0.0);
+        var ids = new[] { "pelvis", "spine_03", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r" }
+            .Select(graph.TargetSkeleton.FindBone).ToArray();
+        var rotations = ids.Select(graph.TargetSkeleton.GetBonePoseRotation).ToArray();
+        result.Identity = new AlsFrameIdentity(2, 0, 1);
+        result.Lean = new System.Numerics.Vector2(0.0001f, 0f);
+        controller.Apply(in result, 0.0);
+        for (var index = 0; index < ids.Length; index++)
+        {
+            var after = graph.TargetSkeleton.GetBonePoseRotation(ids[index]);
+            if (1f - MathF.Abs(rotations[index].Normalized().Dot(after.Normalized())) > 1e-5f)
+                throw new InvalidOperationException($"Near-zero Lean changes the base pose: {graph.TargetSkeleton.GetBoneName(ids[index])} before={rotations[index]} after={after}");
+        }
+        GD.Print("P3_LEAN_NEUTRAL_OK bones=6");
+    }
+
+    private void VerifyHipDirection(AlsAnimationSetDefinition definition,
+        AlsLocomotionAnimationProfile profile, AlsLocomotionSettings settings)
+    {
+        using var library = AlsAnimationLibraryBuilder.Build(definition, profile);
+        AddChild(library.Root);
+        using var graph = AlsLocomotionGraphBuilder.Build(library, profile, definition);
+        using var controller = new AlsLocomotionAnimationController(graph, settings);
+        controller.Warmup();
+        var result = new AlsFrameResult
+        {
+            AnimationState = AlsAnimationState.Grounded,
+            ResolvedLocomotionState = AlsLocomotionState.Grounded,
+            ActualStance = AlsStance.Standing, ActualGait = AlsGait.Walking,
+            Stride = 1f, PlayRate = 1f, AnimationPhase = 0.25f,
+        };
+        Apply(-1f, 0f, 0.0);
+        var leftHips = Yaw("thigh_l", "thigh_r");
+        var leftShoulders = Yaw("upperarm_l", "upperarm_r");
+        Apply(1f, 0f, 0.0);
+        var hipSeparation = Mathf.Abs(Mathf.Wrap(Yaw("thigh_l", "thigh_r") - leftHips, -Mathf.Pi, Mathf.Pi));
+        var shoulderSeparation = Mathf.Abs(Mathf.Wrap(Yaw("upperarm_l", "upperarm_r") - leftShoulders, -Mathf.Pi, Mathf.Pi));
+        if (hipSeparation < Mathf.DegToRad(40f) || shoulderSeparation < Mathf.DegToRad(20f))
+            throw new InvalidOperationException($"Lateral cycles lost the authored hip/shoulder direction change: hips={Mathf.RadToDeg(hipSeparation)} shoulders={Mathf.RadToDeg(shoulderSeparation)}.");
+
+        var original = ReadStandingBlend(graph);
+        result.BlendCoordinates = new System.Numerics.Vector2(0f, -1f);
+        var p4 = AlsP4AnimationInput.Disabled;
+        var discarded = controller.PrepareFrame(in result, in p4, 0.25);
+        controller.DiscardPrepared(in discarded);
+        Apply(1f, 0f, 1.0 / 60.0);
+        if (!ReadStandingBlend(graph).IsEqualApprox(original))
+            throw new InvalidOperationException("Discarded frame changed hip selection.");
+        result.BlendCoordinates = new System.Numerics.Vector2(0f, -1f);
+        var rolledBack = controller.PrepareFrame(in result, in p4, 0.25);
+        controller.ApplyPrepared(in rolledBack);
+        controller.RollbackPrepared(in rolledBack);
+        Apply(1f, 0f, 1.0 / 60.0);
+        if (!ReadStandingBlend(graph).IsEqualApprox(original))
+            throw new InvalidOperationException("Rolled-back frame changed hip selection.");
+
+        Apply(0f, -1f, 0.25);
+        Apply(1f, 0f, 0.25);
+        if (ReadStandingBlend(graph).Y > -0.35f)
+            throw new InvalidOperationException("Backward movement did not retain the rear hip variant when strafing.");
+        for (var frame = 0; frame < 60; frame++) Apply(1f, (frame % 2 == 0 ? 0.1f : -0.1f), 1.0 / 60.0);
+        if (ReadStandingBlend(graph).Y >= 0f)
+            throw new InvalidOperationException("Lateral input noise toggled the hip hemisphere.");
+        Apply(0f, 1f, 0.25);
+        Apply(1f, 0f, 0.25);
+        if (!ReadStandingBlend(graph).IsEqualApprox(original))
+            throw new InvalidOperationException("Forward movement did not restore the front hip variant.");
+        for (var frame = 0; frame < 30; frame++)
+        {
+            var previousAngle = ReadStandingBlend(graph).Angle();
+            Apply(-1f, 0f, 1.0 / 60.0);
+            var step = Mathf.Abs(Mathf.Wrap(ReadStandingBlend(graph).Angle() - previousAngle, -Mathf.Pi, Mathf.Pi));
+            if (step > 10f / 60f + 1e-4f)
+                throw new InvalidOperationException("Lateral reversal exceeded the pose direction step limit.");
+        }
+        if (!ReadStandingBlend(graph).IsEqualApprox(new Vector2(-original.X, original.Y)))
+            throw new InvalidOperationException("Lateral reversal did not converge to the opposite hip pose.");
+        GD.Print($"P3_HIP_DIRECTION_OK hips_degrees={Mathf.RadToDeg(hipSeparation):F2} shoulders_degrees={Mathf.RadToDeg(shoulderSeparation):F2} hysteresis=60 discard=1 rollback=1");
+
+        void Apply(float right, float forward, double delta)
+        {
+            result.BlendCoordinates = new System.Numerics.Vector2(right, forward);
+            controller.Apply(in result, delta);
+        }
+        float Yaw(string left, string right)
+        {
+            var skeleton = graph.TargetSkeleton;
+            var across = skeleton.GlobalTransform.Basis *
+                (skeleton.GetBoneGlobalPose(skeleton.FindBone(right)).Origin -
+                skeleton.GetBoneGlobalPose(skeleton.FindBone(left)).Origin);
+            return Mathf.Atan2(across.Z, across.X);
+        }
+    }
+
     private static void VerifyGaitBlendMapping(
         AlsLocomotionAnimationController controller,
         AlsLocomotionGraphBuildResult graph,
@@ -623,23 +734,23 @@ public partial class P3bAnimationGraphSmoke : Node
         {
             new GaitBlendCase(0, 0f, 0f, AlsGait.Walking, Vector2.Zero),
             new GaitBlendCase(88, 0f, 0.875f, AlsGait.Walking, new Vector2(0f, 0.25f)),
-            new GaitBlendCase(88, 0.875f, 0f, AlsGait.Walking, new Vector2(0.1767765f, 0f)),
-            new GaitBlendCase(88, -0.875f, 0f, AlsGait.Walking, new Vector2(-0.1767765f, 0f)),
-            new GaitBlendCase(1, 0.0175f, 0f, AlsGait.Walking, new Vector2(0.00353553f, 0f)),
-            new GaitBlendCase(1, -0.0175f, 0f, AlsGait.Walking, new Vector2(-0.00353553f, 0f)),
+            new GaitBlendCase(88, 0.875f, 0f, AlsGait.Walking, new Vector2(0.1767765f, 0.1767765f)),
+            new GaitBlendCase(88, -0.875f, 0f, AlsGait.Walking, new Vector2(-0.1767765f, 0.1767765f)),
+            new GaitBlendCase(1, 0.0175f, 0f, AlsGait.Walking, new Vector2(0.00353553f, 0.00353553f)),
+            new GaitBlendCase(1, -0.0175f, 0f, AlsGait.Walking, new Vector2(-0.00353553f, 0.00353553f)),
             new GaitBlendCase(175, 0f, 1.75f, AlsGait.Walking, new Vector2(0f, 0.5f)),
             new GaitBlendCase(375, 0f, 3.75f, AlsGait.Running, new Vector2(0f, 1f)),
             new GaitBlendCase(650, 0f, 6.5f, AlsGait.Sprinting, new Vector2(0f, 1.5f)),
-            new GaitBlendCase(175, 1.75f, 0f, AlsGait.Walking, new Vector2(0.353553f, 0f)),
-            new GaitBlendCase(175, -1.75f, 0f, AlsGait.Walking, new Vector2(-0.353553f, 0f)),
-            new GaitBlendCase(375, 3.75f, 0f, AlsGait.Running, new Vector2(0.707107f, 0f)),
-            new GaitBlendCase(375, -3.75f, 0f, AlsGait.Running, new Vector2(-0.707107f, 0f)),
+            new GaitBlendCase(175, 1.75f, 0f, AlsGait.Walking, new Vector2(0.353553f, 0.353553f)),
+            new GaitBlendCase(175, -1.75f, 0f, AlsGait.Walking, new Vector2(-0.353553f, 0.353553f)),
+            new GaitBlendCase(375, 3.75f, 0f, AlsGait.Running, new Vector2(0.707107f, 0.707107f)),
+            new GaitBlendCase(375, -3.75f, 0f, AlsGait.Running, new Vector2(-0.707107f, 0.707107f)),
             new GaitBlendCase(
                 175,
                 1.2374369f,
                 1.2374369f,
                 AlsGait.Walking,
-                new Vector2(0.353553f, 0.353553f)),
+                new Vector2(0.2071067f, 0.4142134f)),
         };
 
         for (var index = 0; index < cases.Length; index++)
@@ -661,7 +772,7 @@ public partial class P3bAnimationGraphSmoke : Node
                     $"expected={item.ExpectedGait} actual={result.ActualGait}");
             }
 
-            controller.Apply(in result, settings.FixedDeltaSeconds);
+            controller.Apply(in result, 0.5);
             var actual = graph.Tree.Get(
                 graph.Handles.GroundedStanding.BlendPositionPath!).AsVector2();
             if (!actual.IsEqualApprox(item.ExpectedBlendPosition))
@@ -752,6 +863,7 @@ public partial class P3bAnimationGraphSmoke : Node
             AlsLocomotionModel.Evaluate(input, ref state, ref result, settings);
             RequireDirectionalResult(result, AlsRotationMode.LookingDirection, item.Name);
             controller.Apply(in result, settings.FixedDeltaSeconds);
+            controller.Apply(in result, 0.25);
             RequireStandingBlend(graph, item.ExpectedBlendPosition, 1e-4f,
                 $"LookingDirection {item.Name}");
         }
@@ -804,6 +916,7 @@ public partial class P3bAnimationGraphSmoke : Node
                     $"P3 Aiming {item.Name} did not converge to aim yaw: " +
                     $"expected={aimYaw:R} actual={result.TargetYaw:R}");
             }
+            controller.Apply(in result, 0.25);
             RequireStandingBlend(graph, item.ExpectedBlendPosition, 1e-3f,
                 $"Aiming {item.Name}");
         }
@@ -966,6 +1079,8 @@ public partial class P3bAnimationGraphSmoke : Node
     {
         var actual = ReadStandingBlend(graph);
         RequireFiniteBlend(actual, label);
+        // Lateral movement retains either front or rear hips according to arrival direction.
+        if (expected.X != 0f && expected.Y > 0f) actual.Y = MathF.Abs(actual.Y);
         if (actual.DistanceTo(expected) >= tolerance)
         {
             throw new InvalidOperationException(

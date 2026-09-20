@@ -599,6 +599,11 @@ Godot 导入完成后生成只读运行时数据 `AlsAnimationSet`，包含：
 
 ### P4：Aim、分层姿态和 Foot IK
 
+2026-09-10 完整性复核：下文是历史自动门禁记录，不代表当前 Demo 已达到原版动作
+等价。P3 基础图、P4 动态分层及 P5A Demo 接线仍有缺口；补完顺序见
+`../plans/2026-09-10-locomotion-completeness-recovery.md`。人工发现的滑步、换髋与
+上身问题继续作为未完成项，不以历史测试通过关闭。
+
 状态（2026-08-30）：功能实现和 Task 17 clean-worktree 自动闭环已完成。正式
 `10/parallel` 短时证据为 Gather+Commit p95 `998 us`、Worker p95 `2036 us`、
 整体 p99 `3937 us`，完整 verifier 唯一输出 `P4_VERIFICATION_OK`。Godot Editor

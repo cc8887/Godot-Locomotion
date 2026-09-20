@@ -1,0 +1,393 @@
+{
+  "schemaVersion": 1,
+  "writers": [
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Grounded.AB_Als_Grounded:AnimGraph.AnimGraphNode_ModifyCurve_6",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000,0.000000,0.000000),CurveNames=(\"PoseGrounded\",\"FootLeftIk\",\"FootRightIk\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-688",
+        "NodePosY=64",
+        "ErrorType=4",
+        "NodeGuid=7B9A4F8B492181F9086CA5938BB6DE50"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Grounded.AB_Als_Grounded:AnimGraph.AnimGraphNode_ModifyCurve_6.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": []
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "7415313641D5A36758E9368E04FC1825",
+          "links": "AnimGraphNode_Inertialization_0 A15536DD49BCFEE3A7CC109E4379E603,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "82E928D7454383542A4EC4AD81A77156",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_1",
+          "id": "357B59D84A5969AFD6690598F3C624C4",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_2",
+          "id": "6EE4951543B1747032BB2F9ACFD8DDFD",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "928484544A8DF5AEC86F4CB0E09323AE",
+          "links": "AnimGraphNode_CallFunction_1 37D010EE46BB03D2216DB6B07E20B78E,",
+          "value": null
+        }
+      ]
+    },
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_1.Fall.AnimGraphNode_ModifyCurve_0",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000,0.000000),CurveNames=(\"PoseStanding\",\"PoseInAir\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-432",
+        "ErrorType=4",
+        "NodeGuid=0DA7875D4BB139C769B65C9C18763B40"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_1.Fall.AnimGraphNode_ModifyCurve_0.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": []
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "0BC600ED4A22DE927C92ECBBF3DF2E24",
+          "links": "AnimGraphNode_ModifyCurve_3 A960BB7D46642D37696671B199868282,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "226DD6B54531D58A1AD85897B43CD9D3",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_1",
+          "id": "538FD0E34D968C2DEDE1D2A74CB68A6A",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "A960BB7D46642D37696671B199868282",
+          "links": "AnimGraphNode_CallFunction_2 4CD6C6F741E212716D885C9E048449CA,",
+          "value": null
+        }
+      ]
+    },
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_1.Fall.AnimGraphNode_ModifyCurve_3",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000,0.000000),CurveNames=(\"FootLeftIk\",\"FootRightIk\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-768",
+        "ErrorType=4",
+        "NodeGuid=9C75F3C24016B51960A800ACD8DC7495"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_1.Fall.AnimGraphNode_ModifyCurve_3.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": [
+            "PropertyBindings=((\"Alpha\", (PinType=(PinCategory=\"real\",PinSubCategory=\"float\"),PromotedPinType=(PinCategory=\"real\",PinSubCategory=\"float\"),PropertyName=\"Alpha\",PathAsText=\"GetParent.InAirState.GroundPredictionAmount\",PropertyPath=(\"GetParent\",\"InAirState\",\"GroundPredictionAmount\"),CompiledContext=NSLOCTEXT(\"UObjectDisplayNames\", \"EAnimPropertyAccessCallSite.WorkerThread_Unbatched\", \"Thread Safe\"),CompiledContextDesc=NSLOCTEXT(\"UObjectToolTips\", \"EAnimPropertyAccessCallSite.WorkerThread_Unbatched\", \"Access is made on a worker thread in the anim graph or in a BP function\"),bIsBound=True)))"
+          ]
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "0BC600ED4A22DE927C92ECBBF3DF2E24",
+          "links": "AnimGraphNode_TwoWayBlend_0 A83CD28A47EF90A2B023D3AD52A2E4AF,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "226DD6B54531D58A1AD85897B43CD9D3",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_1",
+          "id": "538FD0E34D968C2DEDE1D2A74CB68A6A",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Alpha",
+          "id": "62E3A3C34626CC9F0BB98EA64C973D18",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "A960BB7D46642D37696671B199868282",
+          "links": "AnimGraphNode_ModifyCurve_0 0BC600ED4A22DE927C92ECBBF3DF2E24,",
+          "value": null
+        }
+      ]
+    },
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_2.Jump.AnimGraphNode_ModifyCurve_0",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000,0.000000),CurveNames=(\"PoseStanding\",\"PoseInAir\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-432",
+        "ErrorType=4",
+        "NodeGuid=FC0FE3874E80B993B1668597E1F6332B"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_2.Jump.AnimGraphNode_ModifyCurve_0.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": []
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "0BC600ED4A22DE927C92ECBBF3DF2E24",
+          "links": "AnimGraphNode_ModifyCurve_3 A960BB7D46642D37696671B199868282,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "226DD6B54531D58A1AD85897B43CD9D3",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_1",
+          "id": "538FD0E34D968C2DEDE1D2A74CB68A6A",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "A960BB7D46642D37696671B199868282",
+          "links": "AnimGraphNode_CallFunction_2 4CD6C6F741E212716D885C9E048449CA,",
+          "value": null
+        }
+      ]
+    },
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_2.Jump.AnimGraphNode_ModifyCurve_3",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000,0.000000),CurveNames=(\"FootLeftIk\",\"FootRightIk\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-768",
+        "ErrorType=4",
+        "NodeGuid=68C883C54265984819F42B82819A58C2"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_2.Jump.AnimGraphNode_ModifyCurve_3.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": [
+            "PropertyBindings=((\"Alpha\", (PinType=(PinCategory=\"real\",PinSubCategory=\"float\"),PromotedPinType=(PinCategory=\"real\",PinSubCategory=\"float\"),PropertyName=\"Alpha\",PathAsText=\"GetParent.InAirState.GroundPredictionAmount\",PropertyPath=(\"GetParent\",\"InAirState\",\"GroundPredictionAmount\"),CompiledContext=NSLOCTEXT(\"UObjectDisplayNames\", \"EAnimPropertyAccessCallSite.WorkerThread_Unbatched\", \"Thread Safe\"),CompiledContextDesc=NSLOCTEXT(\"UObjectToolTips\", \"EAnimPropertyAccessCallSite.WorkerThread_Unbatched\", \"Access is made on a worker thread in the anim graph or in a BP function\"),bIsBound=True)))"
+          ]
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "0BC600ED4A22DE927C92ECBBF3DF2E24",
+          "links": "AnimGraphNode_TwoWayBlend_0 A83CD28A47EF90A2B023D3AD52A2E4AF,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "226DD6B54531D58A1AD85897B43CD9D3",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_1",
+          "id": "538FD0E34D968C2DEDE1D2A74CB68A6A",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Alpha",
+          "id": "62E3A3C34626CC9F0BB98EA64C973D18",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "A960BB7D46642D37696671B199868282",
+          "links": "AnimGraphNode_ModifyCurve_0 0BC600ED4A22DE927C92ECBBF3DF2E24,",
+          "value": null
+        }
+      ]
+    },
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_5.Land.AnimGraphNode_ModifyCurve_0",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000,0.000000,0.000000,0.000000,0.000000,0.000000),CurveNames=(\"FootLeftIk\",\"FootRightIk\",\"FootLeftLock\",\"FootRightLock\",\"PoseStanding\",\"PoseGrounded\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-496",
+        "ErrorType=1",
+        "NodeGuid=201DF7184E78A9689E2A63A5A5EBB72C"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/AB_Als_Locomotion.AB_Als_Locomotion:AnimGraph.AnimGraphNode_StateMachine_9.Locomotion States.AnimStateNode_5.Land.AnimGraphNode_ModifyCurve_0.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": []
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "F03C977048FC1177FFFB7A985D352965",
+          "links": "AnimGraphNode_TwoWayBlend_1 23B301CD4ADCF3C14ABE5B90B778BD8F,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "8B1B94904BC8106DA48D25A35107CF52",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_1",
+          "id": "8527C780462198281E2EFD906932D329",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_2",
+          "id": "8547B403438DD901ACE7828CE894B09F",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_3",
+          "id": "CF5DED4D42AECA02931231A3B2F3D90F",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_4",
+          "id": "42B614BD44C75A734F8A2E8E7F1BC983",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "CurveValues_5",
+          "id": "F37DCCF54195ECDAA2808A884D7B5E5F",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "584C09F04BEEB42040BC81B75EBE1EC0",
+          "links": "AnimGraphNode_CallFunction_0 F9A72810472B342FE41D5BB174C44AAB,",
+          "value": null
+        }
+      ]
+    },
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/Stances/AB_Als_Standing.AB_Als_Standing:AnimGraph.AnimGraphNode_ModifyCurve_1",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000),CurveNames=(\"PoseMoving\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-256",
+        "NodePosY=-464",
+        "NodeGuid=08D63289417750D036ABA9B4536302CF"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/Stances/AB_Als_Standing.AB_Als_Standing:AnimGraph.AnimGraphNode_ModifyCurve_1.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": []
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "565DC60B4DE19E632B772C9FFBF3D193",
+          "links": "AnimGraphNode_ApplyAdditive_1 353207424842CA514A74FFA0A13C8D65,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "3F294F7D4A76052E8AA5009D58A9AA70",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "EA44F3FE4D516438F745D9858BBE5C2E",
+          "links": "AnimGraphNode_SaveCachedPose_2 9702E7154FF395A1230F9DB2EB2FC726,",
+          "value": null
+        }
+      ]
+    },
+    {
+      "path": "/ALS/ALS/Character/AnimationInstances/Stances/AB_Als_Crouching.AB_Als_Crouching:AnimGraph.AnimGraphNode_ModifyCurve_1",
+      "class": "/Script/AnimGraph.AnimGraphNode_ModifyCurve",
+      "properties": [
+        "Node=(CurveValues=(0.000000),CurveNames=(\"PoseMoving\"))",
+        "Binding=\"/Script/AnimGraph.AnimGraphNodeBinding_Base'AnimGraphNodeBinding_Base_0'\"",
+        "NodePosX=-800",
+        "NodePosY=-304",
+        "ErrorType=4",
+        "NodeGuid=0B4ECC824AC79FC82E13A6A57AD53CC5"
+      ],
+      "bindings": [
+        {
+          "path": "/ALS/ALS/Character/AnimationInstances/Stances/AB_Als_Crouching.AB_Als_Crouching:AnimGraph.AnimGraphNode_ModifyCurve_1.AnimGraphNodeBinding_Base_0",
+          "class": "/Script/AnimGraph.AnimGraphNodeBinding_Base",
+          "properties": []
+        }
+      ],
+      "pins": [
+        {
+          "name": "SourcePose",
+          "id": "565DC60B4DE19E632B772C9FFBF3D193",
+          "links": "AnimGraphNode_ApplyAdditive_0 353207424842CA514A74FFA0A13C8D65,",
+          "value": "(LinkID=-1,SourceLinkID=-1)"
+        },
+        {
+          "name": "CurveValues_0",
+          "id": "3F294F7D4A76052E8AA5009D58A9AA70",
+          "links": "",
+          "value": "1.000000"
+        },
+        {
+          "name": "Pose",
+          "id": "EA44F3FE4D516438F745D9858BBE5C2E",
+          "links": "AnimGraphNode_CallFunction_2 A104965B40CB51D2466F808AFB66C146,",
+          "value": null
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ public partial class AlsOrbitCamera : Node3D
     private SpringArm3D? _springArm;
     private float _yaw;
     private float _pitch = -0.2f;
+    private bool _captureRequested = true;
 
     [Export(PropertyHint.Range, "0.0005,0.02,0.0005")]
     public float MouseSensitivity { get; set; } = 0.0025f;
@@ -56,7 +57,7 @@ public partial class AlsOrbitCamera : Node3D
         }
     }
 
-    public override void _UnhandledInput(InputEvent @event)
+    public override void _Input(InputEvent @event)
     {
         if (@event.IsActionPressed("mouse_capture_toggle"))
         {
@@ -91,10 +92,27 @@ public partial class AlsOrbitCamera : Node3D
 
     public void SetMouseCaptured(bool captured)
     {
+        _captureRequested = captured;
         IsMouseCaptured = captured;
         Input.MouseMode = captured
             ? Input.MouseModeEnum.Captured
             : Input.MouseModeEnum.Visible;
+    }
+
+    public override void _Notification(int what)
+    {
+        switch (what)
+        {
+            case (int)NotificationWMWindowFocusOut:
+                IsMouseCaptured = false;
+                break;
+            case (int)NotificationWMWindowFocusIn:
+                IsMouseCaptured = _captureRequested;
+                Input.MouseMode = _captureRequested
+                    ? Input.MouseModeEnum.Captured
+                    : Input.MouseModeEnum.Visible;
+                break;
+        }
     }
 
     private void ApplyOrbit()

@@ -126,6 +126,9 @@ public struct AlsRuntimeState
     public AlsDynamicTransitionState DynamicTransition;
     public AlsLaneBlendState ActionBlendLane;
     public AlsLaneBlendState DynamicTransitionBlendLane;
+    // Physical foot orientation, relative to its movement base while locked. Zero means uncaptured.
+    public Quaternion LeftFootLockPoseRotation;
+    public Quaternion RightFootLockPoseRotation;
 
     public static AlsRuntimeState CreateDefault() => new()
     {

@@ -15,6 +15,11 @@ public class AlsGodotExporter : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new[]
         {
+            "ALS",
+            "ControlRig",
+            "RigVM",
+            "GameplayTags",
+            "AnimGraphRuntime",
             "AssetRegistry",
             "Json",
             "JsonUtilities",

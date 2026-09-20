@@ -51,7 +51,7 @@
       "nominalDegrees": 90,
       "basePlayRate": 1.2,
       "blendSeconds": 0.2,
-      "scaleAngle": true
+      "scaleAngle": false
     },
     {
       "animation": "c13f1b18a24a33a01827ee93b9b1bdcd64295a0d",
@@ -60,7 +60,7 @@
       "nominalDegrees": 90,
       "basePlayRate": 1.2,
       "blendSeconds": 0.2,
-      "scaleAngle": true
+      "scaleAngle": false
     },
     {
       "animation": "a20c9d988632a569157541f0d6fd8c309ac8ae09",
@@ -69,7 +69,7 @@
       "nominalDegrees": 180,
       "basePlayRate": 1.2,
       "blendSeconds": 0.2,
-      "scaleAngle": true
+      "scaleAngle": false
     },
     {
       "animation": "92e0d292db977093c0ad02b5490c241609032e38",
@@ -78,7 +78,7 @@
       "nominalDegrees": 180,
       "basePlayRate": 1.2,
       "blendSeconds": 0.2,
-      "scaleAngle": true
+      "scaleAngle": false
     }
   ],
   "rotates": [

@@ -71,6 +71,33 @@ public sealed class AlsAnimationLibraryBuildResult : IDisposable
 
     internal bool IsP5a => _p5a is not null;
 
+    private AlsMovementPoseSources? _movementPoseSources;
+    internal void UseMovementSources(AlsAnimationSetDefinition set, AlsRawAnimationSourceBank bank)
+    {
+        if (_movementPoseSources is not null)
+        {
+            if (!ReferenceEquals(_movementPoseSources.Bank, bank))
+                throw new InvalidOperationException("Movement source bank cannot change after rig construction.");
+            return;
+        }
+        _movementPoseSources = new(set, bank, Skeleton);
+    }
+
+    internal AlsMovementPoseSources MovementSources(AlsAnimationSetDefinition set, int skeletonId)
+    {
+        if (_movementPoseSources is null)
+        {
+            // Isolated graph fixtures also consume the same verified production closure.
+            // Production installs its shared bank before building any pose graph.
+            var profile = AlsLocomotionProfileCompiler.Compile(Godot.FileAccess.GetFileAsString(
+                "res://assets/config/p4_cycle_locomotion_profile.json"), set);
+            UseMovementSources(set, AlsMovementGraphDefinition.Load(set, profile).RawSources);
+        }
+        if (_movementPoseSources!.Skeleton.SkeletonId != skeletonId || _movementPoseSources.Bank.DefinitionDigest != set.DefinitionDigest)
+            throw new ArgumentException("Movement pose graph uses a foreign skeleton or source definition.");
+        return _movementPoseSources;
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -220,11 +247,23 @@ public static class AlsAnimationLibraryBuilder
     {
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
+        var animationIds = profile.AllAnimationIds;
+        if (profile.StandingWalkRun.Length == 6)
+        {
+            var detail = AlsLocomotionDetailCompiler.Compile(Godot.FileAccess.GetFileAsString(
+                "res://assets/config/v4_locomotion_detail_graph.json"), animationSet, profile.SkeletonId);
+            var detailIds = detail.States.SelectMany(state => state.Players)
+                .SelectMany(player => new[] { player.AnimationId, player.AdditiveBaseAnimationId });
+            var sources = AlsLocomotionSourceCompiler.Compile(Godot.FileAccess.GetFileAsString(
+                "res://assets/config/v4_locomotion_source_graph.json"), animationSet, profile.SkeletonId);
+            animationIds = animationIds.Concat(detailIds).Concat(sources.Samples
+                .Select(s => s.AnimationId)).Distinct().Order().ToArray();
+        }
         return BuildInternal(
             animationSet,
             profile.SkeletonId,
             profile.MannequinMeshId,
-            profile.AllAnimationIds,
+            animationIds,
             normalizedTrackDomainAnimationIds: null,
             p5aStamp: null,
             rootMotionExtractionLogicalBoneId: -1,
@@ -234,12 +273,34 @@ public static class AlsAnimationLibraryBuilder
     public static AlsAnimationLibraryBuildResult Build(
         AlsAnimationSetDefinition animationSet,
         AlsLocomotionAnimationProfile profile,
-        AlsPoseAnimationProfile poseProfile)
+        AlsPoseAnimationProfile poseProfile,
+        AlsLocomotionDetailProfile? detailProfile = null,
+        AlsLocomotionSourceProfile? sourceProfile = null)
     {
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(poseProfile);
         var animationIds = BuildP4AnimationClosure(animationSet, profile, poseProfile);
+        if (detailProfile is null && profile.StandingWalkRun.Length == 6)
+            detailProfile = AlsLocomotionDetailCompiler.Compile(Godot.FileAccess.GetFileAsString(
+                "res://assets/config/v4_locomotion_detail_graph.json"), animationSet, profile.SkeletonId);
+        if (detailProfile is not null)
+        {
+            if (detailProfile.SkeletonId != profile.SkeletonId)
+                throw new InvalidOperationException("Detail library skeleton differs.");
+            var detailIds = detailProfile.States.SelectMany(state => state.Players)
+                .SelectMany(player => new[] { player.AnimationId, player.AdditiveBaseAnimationId }).Distinct().ToArray();
+            foreach (var id in detailIds) ValidateClosureAnimation(animationSet, id, profile.SkeletonId, "Detail");
+            animationIds = animationIds.Concat(detailIds).Distinct().Order().ToArray();
+        }
+        if (profile.StandingWalkRun.Length == 6)
+        {
+            var sources = sourceProfile ?? AlsLocomotionSourceCompiler.Compile(Godot.FileAccess.GetFileAsString(
+                "res://assets/config/v4_locomotion_source_graph.json"), animationSet, profile.SkeletonId);
+            if (sources.SkeletonId != profile.SkeletonId || sources.AnimationSetDefinitionDigest != animationSet.DefinitionDigest)
+                throw new InvalidOperationException("Source library definition differs.");
+            animationIds = animationIds.Concat(sources.Samples.Select(s => s.AnimationId)).Distinct().Order().ToArray();
+        }
         HashSet<int> normalizedTrackDomainAnimationIds =
         [
             poseProfile.Aim.AdditiveBasePoseAnimationId,
