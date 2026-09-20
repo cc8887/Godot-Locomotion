@@ -12,7 +12,9 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 历史 P4 证书不代表当前完整链路已验收；P7 十分钟性能认证也未完成。
 
 共同 Montage 已发布真实动作摘要，并补齐 Roll 的类型化 GroundedEntry 通知及入口重置。
-详见 [最新接线记录](docs/verification/2026-09-20-grounded-entry-notify.md)。普通动作请求输入和碰撞安全 Root Motion 仍待实现。
+普通输入现已通过 Motor 接入共同动作所有者，主线程提交后发布动作结果。
+主场景支持 R 原地翻滚动画预览、X 取消，详见
+[最新接线记录](docs/verification/2026-09-20-action-input.md)。碰撞安全 Root Motion 仍待实现，当前预览不驱动胶囊翻滚位移。
 
 ## 运行
 
@@ -45,6 +47,8 @@ Editor 使用 F5 运行项目；单独运行旧的 `p4_locomotion_demo.tscn` 是
 | 鼠标右键 | Aiming |
 | 鼠标移动 | Orbit camera |
 | `Esc` | 切换鼠标捕获 |
+| `R` | 原地翻滚动画预览（完整动画入口） |
+| `X` | 取消当前已接受的预览动作 |
 
 ## 资产边界
 
@@ -79,6 +83,16 @@ Mannequin、Overlay 与道具模型。最初 P2 批次的审计为 0 error / 0 w
 末尾添加 `-- --capture-dir=res://artifacts/<新名称>` 可保存逐段截图。
 这是平地回归，不替代完整地形及人工输入验收。
 
+动作输入及角色重建回归：
+
+```powershell
+& '<Godot-4.7.2-console.exe>' --headless --path D:\GodotALS res://scenes/tests/action_input_smoke.tscn -- --hz=60
+& '<Godot-4.7.2-console.exe>' --headless --path D:\GodotALS res://scenes/tests/action_lifecycle_smoke.tscn
+```
+
+前者通过实际 R/X 输入检查替换、取消、自然完成和通知反馈；后者检查角色重建、
+提交等待期间的按键锁存，以及回调产生的下一帧请求。动画预览尚不包含 Roll 玩法门控。
+
 ```powershell
 dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj -c Release
 dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
@@ -103,7 +117,7 @@ dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 | 阶段 | 状态 | 范围 |
 | --- | --- | --- |
 | P3/P4 完整性 | 实现与整体验收中 | 默认完整入口已接通；地形、起停滑步、换髋与上下身联合验收未关闭 |
-| P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage 所有者及动作摘要已接通；类型化玩法消费者、请求来源及当前完整图验收待完成 |
+| P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage、动作摘要及普通请求入口已接通；其余玩法消费者、生命周期通知闭合及当前完整图验收待完成 |
 | P5B | 动画数据/姿势已有，玩法待实施 | Overlay 装备/切换和道具生命周期 |
 | P5C | Roll 播放组件已有，玩法待实施 | Mantle、Roll、碰撞安全 Root Motion |
 | P6 | 基础组件已有，完整功能待实施 | Ragdoll、Get-up、Pose Recovery、完整 ALS Camera |

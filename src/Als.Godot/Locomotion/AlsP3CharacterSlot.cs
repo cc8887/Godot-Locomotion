@@ -317,6 +317,11 @@ public partial class AlsP3CharacterSlot : Node
         {
             Identity = replacement.HandleIdentity(publishedMotorFrameId),
             CharacterRotation = rotation,
+            // Movement is already integrated, but the retired actor's command
+            // must never start an action on a fresh generation.
+            ActionRequest = _retiredMotorInput.ActionRequest == AlsActionRequest.None
+                ? AlsActionRequest.None // Preserve the legacy command source's unscoped sentinel.
+                : AlsActionRequest.None with { SlotGeneration = replacement.Handle.Generation },
         };
         var releasePlatformOnNextStep =
             stagedMotorInput.Floor.PlatformId >= 0 ||

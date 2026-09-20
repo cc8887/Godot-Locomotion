@@ -443,6 +443,9 @@ public sealed class AlsP3RuntimeContext
     internal AlsMovementGraphDefinition? MovementGraph { get; }
 
     public event Action<AlsFrameIdentity, AlsAnimationEvent>? AnimationEventCommitted;
+    public event Action<AlsFrameIdentity, AlsActionOutcome>? ActionOutcomeCommitted;
+    public long ActionOutcomesDispatched { get; private set; }
+    public long ActionOutcomeHandlerFailures { get; private set; }
     public long AnimationEventsDispatched { get; private set; }
     public long AnimationEventHandlerFailures { get; private set; }
     internal int SourceEventFailureArmed;
@@ -461,6 +464,17 @@ public sealed class AlsP3RuntimeContext
     {
         if (System.Environment.CurrentManagedThreadId != MainManagedThreadId)
             throw new InvalidOperationException("Animation callbacks must run after main-thread commit.");
+        var actionHandler = ActionOutcomeCommitted;
+        for (var i = 0; i < result.ActionOutcomes.Count; i++)
+        {
+            ActionOutcomesDispatched++;
+            try { actionHandler?.Invoke(result.Identity, result.ActionOutcomes[i]); }
+            catch (Exception exception)
+            {
+                ActionOutcomeHandlerFailures++;
+                GD.PushError($"ALS committed action callback failed: {exception}");
+            }
+        }
         var handler = AnimationEventCommitted;
         for (var i = 0; i < result.TypedEvents.Count; i++)
         {

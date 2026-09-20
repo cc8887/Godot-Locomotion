@@ -1580,3 +1580,11 @@ SemanticId、物理实例身份和回调顺序。Grounded Entry 状态退出时�
 通知，动作/入口反馈随整帧候选提交或丢弃。实际三档频率 Roll 与逐帧重试通过；
 详见 `../../verification/2026-09-20-grounded-entry-notify.md`。普通动作请求来源、
 其余 Notify gameplay 消费者和碰撞安全 Root Motion 仍待继续，后续 P5B–P7 范围不变。
+
+2026-09-20 后续：普通动作请求现经身份化采集、Motor Gather、共同 Montage 和
+Main Commit 回调接通。主场景增加 R 原地翻滚预览、X 取消，拒绝键盘重复事件，
+提交等待期间按键排到尚未采集的帧；角色重建不迁移旧请求、不重复应用移动输入。
+真实键盘、重建/延迟提交/回调请求、十角色双模式和 Core 回归通过，见
+`../../verification/2026-09-20-action-input.md`。这是 P5A 预览入口，尚未加入
+Root Motion 位移、Roll 玩法门控或 Mantle。下一项优先闭合完整生产图的生命周期
+Notify/动作所有权清理，再继续 Overlay 道具、Root Motion 及既定后续阶段。

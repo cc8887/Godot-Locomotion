@@ -251,6 +251,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _publishedVelocityCheckpointPending = false;
         var source = _source!;
         var command = source.GetCommand(frameId);
+        var actionRequest = source is IAlsActionRequestSource actionSource
+            ? actionSource.GetActionRequest(new(frameId, (uint)characterId, (uint)generation)) : AlsActionRequest.None;
+        if (actionRequest.Command != AlsActionCommand.None && _runtimeContext?.MovementGraph is null)
+            throw new InvalidOperationException("Action requests require the complete movement runtime.");
         if (command.JumpPressed > 1)
         {
             throw new ArgumentOutOfRangeException(
@@ -463,6 +467,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             JumpAccepted: jumpAccepted)
         {
             FootPlacementReleaseSignals = releaseSignals,
+            ActionRequest = actionRequest,
             AimYawRateDegrees = aimRate.RateDegrees,
             FirstPerson = FirstPersonView ? (byte)1 : (byte)0,
             CharacterRotation = rotationSample,
