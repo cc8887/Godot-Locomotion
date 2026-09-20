@@ -84,17 +84,27 @@ TSharedRef<FJsonObject> Condition(double InvMP,double InvMC,const Chaos::FVec3& 
 }
 }
 
-bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error)
+bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,bool DisableSleep)
 {
     using namespace AlsJointSolverReference; using namespace Chaos;
     const auto Fail=[&](const FString& Message){Error=Message;return false;};
     if(Output.IsEmpty()||FPaths::IsRelative(Output)||IFileManager::Get().FileExists(*Output))
         return Fail(TEXT("Solver reference requires a new absolute output file."));
+    auto* SleepVar=IConsoleManager::Get().FindConsoleVariable(TEXT("p.Chaos.Solver.Sleep.Enabled"));
+    if(!SleepVar)return Fail(TEXT("Missing native sleep switch."));
+    struct FRestoreSleep
+    {
+        IConsoleVariable* Var;int32 Previous;bool Changed;
+        ~FRestoreSleep(){if(Changed)Var->SetWithCurrentPriority(Previous);}
+    } RestoreSleep{SleepVar,SleepVar->GetInt(),DisableSleep};
+    if(DisableSleep)SleepVar->SetWithCurrentPriority(0);
+    if(DisableSleep&&SleepVar->GetInt()!=0)return Fail(TEXT("Cannot isolate awake solver trajectories."));
     auto Root=MakeShared<FJsonObject>(); Root->SetNumberField(TEXT("schemaVersion"),1);
     Root->SetStringField(TEXT("engine"),FEngineVersion::Current().ToString());
     Root->SetStringField(TEXT("coordinates"),TEXT("UE world bone transforms; cm, kg, radians; force kg*cm/s^2, torque kg*cm^2/s^2"));
     Root->SetStringField(TEXT("observation"),TEXT("Actual synchronous Chaos scene steps; isolated fixed-parent native pair; no contact, gravity, animation tick or saved assets"));
     Root->SetNumberField(TEXT("stepsPerCase"),12);
+    if(DisableSleep)Root->SetBoolField(TEXT("sleepEnabled"),false);
     auto CVars=MakeShared<FJsonObject>();
     for(const TCHAR* Name:{TEXT("p.Chaos.Solver.InertiaConditioning.Enabled"),TEXT("p.Chaos.Solver.InertiaConditioning.Distance"),
         TEXT("p.Chaos.Solver.InertiaConditioning.RotationRatio"),TEXT("p.Chaos.Solver.InertiaConditioning.MaxInvInertiaComponentRatio"),

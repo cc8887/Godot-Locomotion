@@ -1,6 +1,7 @@
 using System.Numerics;
 using GodotAls.Core.Locomotion;
 using M = System.Math;
+using Tensor = GodotAls.Core.Physics.AlsJointInertiaTensor;
 
 namespace GodotAls.Core.Physics;
 
@@ -19,7 +20,7 @@ public readonly record struct AlsAngularJointSettings(
 public readonly record struct AlsAngularSolverBody(AlsQuaternion Initial, AlsQuaternion Predicted,
     AlsQuaternion Connector, AlsJointInverseMass InverseMass);
 
-// Cached Chaos position-phase angular rows. No world access or shared-body mass
+// Cached Chaos angular position and hard velocity rows. No world access or shared-body mass
 // mutation. Construct once per physics step (resets lambda), then interleave
 // SolveLimits / SolveDrives with the world's linear and contact constraints.
 // Scope: unit parent mass scale, no shock propagation, zero drive velocity
@@ -32,24 +33,6 @@ public struct AlsCachedAngularJoint
         public AlsDoubleVector Axis, ParentResponse, ChildResponse;
         public double Error, Limit, InverseMass, K, C, Denominator, Lambda;
         public bool Active, Soft, Limited;
-    }
-
-    private readonly record struct Tensor(AlsDoubleVector X, AlsDoubleVector Y, AlsDoubleVector Z)
-    {
-        public static Tensor World(AlsQuaternion q, AlsJointInverseMass mass)
-        {
-            if (mass.Mass == 0) return default;
-            var x = new AlsDoubleVector(1,0,0).Rotate(q);
-            var y = new AlsDoubleVector(0,1,0).Rotate(q);
-            var z = new AlsDoubleVector(0,0,1).Rotate(q);
-            var i = mass.Inertia;
-            return new(x*(i.X*x.X)+y*(i.Y*y.X)+z*(i.Z*z.X),
-                x*(i.X*x.Y)+y*(i.Y*y.Y)+z*(i.Z*z.Y),
-                x*(i.X*x.Z)+y*(i.Y*y.Z)+z*(i.Z*z.Z));
-        }
-        public AlsDoubleVector Multiply(AlsDoubleVector a, bool single) => single
-            ? new(X.ToSingle()*(float)a.X + (Y.ToSingle()*(float)a.Y + Z.ToSingle()*(float)a.Z))
-            : X*a.X+Y*a.Y+Z*a.Z;
     }
 
     private Row _limitX, _limitY, _limitZ, _driveX, _driveY, _driveZ;
@@ -107,6 +90,23 @@ public struct AlsCachedAngularJoint
         Solve(ref _limitX,ref _limitY,ref _limitZ,ref parentDQ,ref childDQ,SimultaneousLimits,false);
     public void SolveDrives(ref Vector3 parentDQ, ref Vector3 childDQ) =>
         Solve(ref _driveX,ref _driveY,ref _driveZ,ref parentDQ,ref childDQ,SimultaneousDrives,true);
+
+    // Native soft rows already apply damping in the position phase. Hard rows
+    // remove relative angular velocity only after accumulating a position impulse.
+    // Restitution is zero for the ALS asset contract covered here.
+    public void SolveVelocities(ref Vector3 parentW,ref Vector3 childW)
+    {
+        if (SimultaneousLimits) return;
+        SolveVelocity(_limitX,ref parentW,ref childW);
+        SolveVelocity(_limitY,ref parentW,ref childW);
+        SolveVelocity(_limitZ,ref parentW,ref childW);
+    }
+    private readonly void SolveVelocity(in Row r,ref Vector3 p,ref Vector3 c)
+    {
+        if (!r.Active||r.Soft||M.Abs(r.Lambda)<=1e-8f) return;
+        var delta=_hardStiffness*AlsDoubleVector.Dot(new(c-p),r.Axis)/r.InverseMass;
+        p+=(r.ParentResponse*delta).ToSingle(); c+=(r.ChildResponse*delta).ToSingle();
+    }
 
     private void Solve(ref Row x,ref Row y,ref Row z,ref Vector3 p,ref Vector3 c,bool simultaneous,bool drive)
     {

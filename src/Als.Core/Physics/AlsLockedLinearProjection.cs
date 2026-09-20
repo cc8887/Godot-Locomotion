@@ -73,7 +73,8 @@ public readonly struct AlsLockedLinearProjection
     public static AlsPrecisePose Correct(in AlsPrecisePose initial,in AlsProjectionDelta delta)
     {
         var dq=new AlsQuaternion(delta.Rotation.X,delta.Rotation.Y,delta.Rotation.Z,0)*initial.Rotation;
-        return initial with {Position=initial.Position+new AlsDoubleVector(delta.Position),Rotation=(initial.Rotation+dq*.5).Normalized()};
+        return initial with {Position=initial.Position+new AlsDoubleVector(delta.Position),
+            Rotation=delta.Rotation==Vector3.Zero?initial.Rotation:(initial.Rotation+dq*.5).Normalized()};
     }
     private static Row MakeRow(AlsDoubleVector axis,double error,Vector3 arm,float inverseMass,float inverseI)
     {
