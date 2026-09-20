@@ -7,3 +7,4 @@ bool ExportAlsPhysicsJointReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsJointSolverReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsInertiaReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsProjectionReference(const FString& Output, FString& Error);
+bool ExportAlsPhysicsAngularRowReference(const FString& Output, FString& Error);

@@ -27,6 +27,14 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsAngularRowOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsAngularRowReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Angular row export failed: %s"), *Error); return 15; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_ANGULAR_ROWS_OK cases=516 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsProjectionOutput="), PhysicsOutput))
     {
         FString Error;
