@@ -6,8 +6,9 @@ using NVector = System.Numerics.Vector3;
 namespace GodotAls.Physics;
 
 // Geometry-only Jolt query space. It contains exactly one target shape, so every
-// CollideShape point pair has an unambiguous registry identity. Core alone owns
-// dynamic response. Convex shapes only for this adapter; no CCD or native Chaos
+// CollideShape point pair has an unambiguous registry identity. A hull wholly
+// inside a box face can use that exact local half-space. Core alone owns
+// dynamic response. Convex input shapes only; no CCD or native Chaos
 // narrow-phase parity is claimed. Godot's returned arrays allocate on Main.
 internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposable
 {
@@ -22,10 +23,12 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private readonly AlsContactRegistry _registry;
     private readonly Binding?[] _bindings;
     private readonly PhysicsShapeQueryParameters3D _query = new() { CollisionMask = 1, CollideWithBodies = true, CollideWithAreas = false, Margin = 0 };
+    private readonly WorldBoundaryShape3D _interiorPlane = new();
     private Rid _space, _body;
     private PhysicsDirectSpaceState3D _state = null!;
     private bool _bodyHasShape, _disposed;
     public int NarrowPhaseQueries { get; private set; }
+    internal int InteriorFaceQueries { get; private set; }
     public bool IsInvalidated
     {
         get
@@ -62,6 +65,25 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     }
     public int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
+        Check();
+        // Keep the convex hull as the query and the box as the target so the
+        // proven face-interior case below has one ordering. Return the original
+        // body order and shape-local normal to the contact owner.
+        if (BindingAt(shape0).Shape is BoxShape3D && BindingAt(shape1).Shape is ConvexPolygonShape3D)
+        {
+            var count = QueryOrdered(shape1, world1, shape0, world0, destination);
+            for (var i = 0; i < count; i++)
+            {
+                var point = destination[i];
+                var normal = (new AlsDoubleVector(point.Normal1).Rotate(world0.Rotation) * -1).Rotate(world1.Rotation.Conjugate());
+                destination[i] = point with { Point0 = point.Point1, Point1 = point.Point0, Normal1 = normal.ToSingle() };
+            }
+            return count;
+        }
+        return QueryOrdered(shape0, world0, shape1, world1, destination);
+    }
+    private int QueryOrdered(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
+    {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1);
         // Rebase in double precision BEFORE converting to Godot float positions.
         // Only a common translation is removed; world axes/rotations are kept.
@@ -70,8 +92,10 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         var t0 = ToGodot(world0 with { Position = AlsDoubleVector.Zero });
         var t1 = ToGodot(world1 with { Position = world1.Position - world0.Position });
         if (!(t0 * a.Bounds).Grow(1e-5f).Intersects((t1 * b.Bounds).Grow(1e-5f))) return 0;
-        if (!_bodyHasShape) { PhysicsServer3D.BodyAddShape(_body, b.Shape.GetRid()); _bodyHasShape = true; }
-        else PhysicsServer3D.BodySetShape(_body, 0, b.Shape.GetRid());
+        Shape3D target = b.Shape;
+        if (TryInteriorFace(a, t0, b, t1, out var face)) { _interiorPlane.Plane = face; target = _interiorPlane; InteriorFaceQueries++; }
+        if (!_bodyHasShape) { PhysicsServer3D.BodyAddShape(_body, target.GetRid()); _bodyHasShape = true; }
+        else PhysicsServer3D.BodySetShape(_body, 0, target.GetRid());
         PhysicsServer3D.BodySetState(_body, PhysicsServer3D.BodyState.Transform, t1);
         _query.Shape = a.Shape; _query.Transform = t0; _query.Motion = Vector3.Zero;
         var pairs = _state.CollideShape(_query, checked(destination.Length + 1)); NarrowPhaseQueries++;
@@ -80,8 +104,8 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if (pairs.Count == 0) return 0;
         // A face manifold can include separated points within Jolt's manifold
         // tolerance. Point1 - Point0 then reverses direction; it is NOT a normal.
-        // This space has exactly one convex target and the query is also convex,
-        // so every point belongs to the one hit returned by GetRestInfo.
+        // This space has exactly one convex target (or one proven box face) and
+        // the query is convex, so every point belongs to this one rest-info hit.
         using var rest = _state.GetRestInfo(_query); NarrowPhaseQueries++;
         if (rest.Count == 0 || rest["rid"].AsRid() != _body || rest["shape"].AsInt32() != 0)
             throw new InvalidOperationException("Contact manifold has no matching geometric normal.");
@@ -96,6 +120,31 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 (ToNative(inverse1.Basis * normal) * .01).ToSingle());
         }
         return pairs.Count / 2;
+    }
+    private static bool TryInteriorFace(Binding a, Transform3D t0, Binding b, Transform3D t1, out Plane face)
+    {
+        face = default;
+        if (a.Shape is not ConvexPolygonShape3D || b.Shape is not BoxShape3D box) return false;
+        // A bounding box is conservative for the actual hull. Within an escape
+        // distance of this face, the whole hull must remain inside the flat face
+        // and clear of its rounded edges. Only then is this plane locally EXACT,
+        // including the box's authored margin. No shape resource is modified.
+        var hull = (t1.AffineInverse() * t0) * a.Bounds;
+        var min = hull.Position; var max = hull.End; var half = box.Size * .5f;
+        var best = float.PositiveInfinity;
+        for (var axis = 0; axis < 3; axis++) for (var sign = -1; sign <= 1; sign += 2)
+        {
+            var depth = sign > 0 ? half[axis] - min[axis] : half[axis] + max[axis];
+            if (depth < 0 || depth >= best) continue;
+            var clearance = depth + box.Margin + .001f;
+            var inside = true;
+            for (var tangent = 0; tangent < 3; tangent++) if (tangent != axis)
+                inside &= min[tangent] > -half[tangent] + clearance && max[tangent] < half[tangent] - clearance;
+            if (!inside) continue;
+            var normal = Vector3.Zero; normal[axis] = sign;
+            best = depth; face = new(normal, half[axis]);
+        }
+        return float.IsFinite(best);
     }
     private Binding BindingAt(int index)
     {
@@ -141,5 +190,6 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         _query.Dispose();
         if (_body.IsValid) PhysicsServer3D.FreeRid(_body);
         if (_space.IsValid) PhysicsServer3D.FreeRid(_space);
+        _interiorPlane.Dispose();
     }
 }
