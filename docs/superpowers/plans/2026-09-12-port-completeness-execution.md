@@ -1657,3 +1657,10 @@ Overlay gameplay、全流程观感或十分钟性能验收。下一步继续剩�
 `../../verification/2026-09-20-landing-action-routing.md`。下一项明确为原始
 PhysicsAsset 完整几何/质量/关节导出及真实物理骨架，不用数量/连接信息代替。
 Mantle、Get-up/Recovery、Camera、最终观感和性能范围保持。
+
+2026-09-20 后续：两套 PhysicsAsset 已取得实际 body/shape/constraint/排除对，
+包括独立 UE physics world 读取的质量、主惯量和质量局部变换；原始角色使用
+AnimMan，而当前 Godot profile 使用 Mannequin，明确保留各自的绑定。
+导入定义和损坏数据拒绝测试已加入，见
+`../../verification/2026-09-20-physics-asset-export.md`。下一步是消费这些真实数据
+创建 Godot 物理骨架，并完成动画/Main 物理所有权切换；尚未开启真实 Ragdoll。

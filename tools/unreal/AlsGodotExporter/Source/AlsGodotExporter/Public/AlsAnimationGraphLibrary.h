@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Original PhysicsAssets plus native reference-pose body mass and inertia. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportPhysicsAssets(const FString& OutputPath);
+
     /** Actual Refactored RefreshInAir in a transient game world with capsule sweeps. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportGroundPrediction(const FString& OutputPath);

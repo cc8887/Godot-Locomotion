@@ -7,6 +7,7 @@
 #include "AlsCompositeAssetReader.h"
 #include "AlsManifestWriter.h"
 #include "AlsOutputAuditor.h"
+#include "AlsPhysicsAssetExport.h"
 #include "AlsTextureExporter.h"
 #include "Misc/App.h"
 #include "Misc/EngineVersion.h"
@@ -25,6 +26,15 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
+    FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsAssetOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsAssets(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Physics asset export failed: %s"), *Error); return 10; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_ASSETS_OK meshes=2 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Param(*Params, TEXT("ReadyCheck")))
     {
         int32 SelfTestCaseCount = 0;

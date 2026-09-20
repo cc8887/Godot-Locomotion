@@ -18,6 +18,8 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 [地面 Roll 接线记录](docs/verification/2026-09-20-grounded-roll-gameplay.md)。中等落差现支持
 1.3 倍速自动 Roll，详见[落地动作记录](docs/verification/2026-09-20-landing-action-routing.md)。
 高落差及翻滚离地的真实 Ragdoll 尚未实现；`--action-preview` 保留旧原地预览诊断入口。
+两套原始 PhysicsAsset 的形状、质量/惯量、关节和碰撞排除数据现已导出并校验，
+见[物理资产记录](docs/verification/2026-09-20-physics-asset-export.md)，Godot 物理骨架消费仍待实现。
 角色永久销毁/换代现会根据主线程已提交记录结束 Notify State 和动作；包含回调内销毁及
 未提交动作隔离。见[退役清理记录](docs/verification/2026-09-20-animation-retirement.md)。
 完整入口现已区分调度暂停与真正停用；停用会清理动作，恢复时保留移动/脚部检查点，
