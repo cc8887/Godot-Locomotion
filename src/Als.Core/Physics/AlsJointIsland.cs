@@ -3,7 +3,7 @@ using GodotAls.Core.Locomotion;
 namespace GodotAls.Core.Physics;
 
 public readonly record struct AlsIslandBody(AlsPrecisePose MassLocal, AlsJointInverseMass InverseMass,
-    double LinearDamping = 0, double AngularDamping = 0);
+    double LinearDamping = 0, double AngularDamping = 0, bool GravityEnabled = true);
 public readonly record struct AlsIslandBodyState(AlsPrecisePose Actor, AlsProjectionVelocity Velocity);
 public readonly record struct AlsIslandProjection(bool Enabled, float LinearAlpha = 1,
     float TeleportDistance = 5, float VelocityAlpha = AlsLockedLinearProjection.ReferenceVelocityAlpha);
@@ -14,9 +14,9 @@ public readonly record struct AlsIslandJoint(int Parent, int Child, AlsPrecisePo
 
 // A single-owner, preallocated group of joints, not a collision world. All joints
 // share one DP/DQ and velocity entry per body. No Godot/UE objects or global state.
-// No external forces; awake bodies only. An optional contact owner shares the
-// iteration buffers. Gravity, moving kinematics, sleep, collision detection and
-// island discovery are deliberately not approximated by this entry point.
+// Awake bodies only. An optional contact owner shares the iteration buffers.
+// Step accepts explicit gravity and per-step acceleration/impulse inputs;
+// moving kinematics, sleep and island discovery remain separate work.
 public sealed class AlsJointIsland
 {
     private readonly AlsIslandBody[] _bodies;
@@ -86,19 +86,27 @@ public sealed class AlsJointIsland
         => StepForceFree(dt, null);
 
     public void StepForceFree(double dt, IAlsIslandContacts? contacts)
+        => Step(dt, default, default, contacts);
+
+    public void Step(double dt, AlsDoubleVector gravity, ReadOnlySpan<AlsBodyStepForces> forces = default,
+        IAlsIslandContacts? contacts = null, bool dragBeforeIntegration = false)
     {
         if (_stepping) throw new InvalidOperationException("Island stepping is not reentrant.");
         if (!double.IsFinite(dt) || dt <= 0 || !float.IsFinite(1 / (float)dt) || (float)dt == float.PositiveInfinity)
             throw new ArgumentOutOfRangeException(nameof(dt));
+        if (!gravity.IsFinite) throw new ArgumentException("Gravity must be finite.");
+        if (!forces.IsEmpty && forces.Length != BodyCount) throw new ArgumentException("One force input per body is required.");
+        foreach (var force in forces) force.Validate();
         _stepping = true;
-        try { Solve(dt, contacts); }
+        try { Solve(dt, gravity, forces, contacts, dragBeforeIntegration); }
         catch { contacts?.Abort(); throw; }
         finally { _stepping = false; }
     }
 
-    private void Solve(double dt, IAlsIslandContacts? contacts)
+    private void Solve(double dt, AlsDoubleVector gravity, ReadOnlySpan<AlsBodyStepForces> forces,
+        IAlsIslandContacts? contacts, bool dragBeforeIntegration)
     {
-        Gather(dt);
+        Gather(dt, gravity, forces, dragBeforeIntegration);
         contacts?.Gather(_predicted, _velocities, _bodies, dt);
         for (var iteration = 0; iteration < _positionIterations; iteration++)
         {
@@ -151,14 +159,17 @@ public sealed class AlsJointIsland
         _next.AsSpan().CopyTo(_states);
     }
 
-    private void Gather(double dt)
+    private void Gather(double dt, AlsDoubleVector gravity = default, ReadOnlySpan<AlsBodyStepForces> forces = default,
+        bool dragBeforeIntegration = false)
     {
         for (var i = 0; i < _bodies.Length; i++)
         {
             var body = _bodies[i]; var state = _states[i]; _deltas[i] = default;
             _initial[i] = Dynamic(i) ? AlsPrecisePose.Compose(body.MassLocal, state.Actor) : state.Actor;
+            var force = forces.IsEmpty ? default : forces[i];
+            if (body.GravityEnabled) force = force with { Acceleration = force.Acceleration + gravity };
             var result = Dynamic(i) ? AlsRigidBodyIntegration.Predict(state.Actor, body.MassLocal,
-                state.Velocity, body.LinearDamping, body.AngularDamping, dt) : new AlsPredictedRigidBody(state.Actor, default);
+                state.Velocity, body.LinearDamping, body.AngularDamping, dt, force, dragBeforeIntegration) : new AlsPredictedRigidBody(state.Actor, default);
             _predicted[i] = result.MassPose; _velocities[i] = result.Velocity;
         }
         for (var j = 0; j < _joints.Length; j++)
