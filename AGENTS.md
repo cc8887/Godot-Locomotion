@@ -11,4 +11,4 @@
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。
 - 引擎构建使用 `dotnet build GodotALS.csproj -p:Optimize=true`；包含大型值类型及零分配断言的 Core/Import 回归使用 Release。
-- 最近状态和未完成项见 `docs/verification/2026-09-20-main-consolidation-and-demo-entry.md`。
+- 最近回归和未完成项见 `docs/verification/2026-09-20-frozen-reference-replay.md`；入口与资产整合见 `docs/verification/2026-09-20-main-consolidation-and-demo-entry.md`。

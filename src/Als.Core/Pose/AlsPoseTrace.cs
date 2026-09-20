@@ -387,7 +387,8 @@ public sealed class AlsPoseTrace
 
     private static AlsTurnRotateSettings CreateTurnRotateSettings(AlsPoseTraceCase traceCase)
     {
-        var settings = AlsTurnRotateSettings.CreateReference();
+        // The trace loader locks provenance to ALS-Refactored, not the V4 Demo.
+        var settings = AlsTurnRotateSettings.CreateRefactoredReference();
         var rate = traceCase.Stimulus.YawPhasePlayRate;
         if (traceCase.Category == "Turn")
         {

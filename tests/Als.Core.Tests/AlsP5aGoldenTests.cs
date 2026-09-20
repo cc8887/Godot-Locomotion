@@ -1717,7 +1717,7 @@ internal sealed class P5aCompiledSnapshot
             File.ReadAllText(Path.Combine(root, "assets", "config", "p5a_animation_runtime.json")), set);
         var layout = Invoke("GodotAls.Import.Compilation.AlsP5OccurrenceLayoutCompiler", "Compile",
             locomotion, pose, p5a);
-        var value = Invoke("GodotAls.Import.Compilation.AlsP5CoreRuntimeBindingCompiler", "Compile",
+        var value = Invoke("GodotAls.Import.Compilation.AlsP5aFrozenReferenceCompiler", "Compile",
             set, locomotion, pose, p5a, layout);
         var type = value.GetType();
         T Property<T>(string name) => (T)type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)!.GetValue(value)!;

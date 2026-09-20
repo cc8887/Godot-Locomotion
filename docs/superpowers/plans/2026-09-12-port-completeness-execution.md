@@ -1561,3 +1561,9 @@ Mantle/Roll、P6 Ragdoll/Get-up/Pose Recovery/Camera 和 P7 十分钟性能预�
 完整分层与脚部动画入口。Import Release 全库、普通入口键鼠回放、十角色双模式回归通过；
 旧 P4 蹲姿转身 oracle、P5A 冻结计划回归、地形/人工观感与后续玩法仍未关闭。
 详见 `../../verification/2026-09-20-main-consolidation-and-demo-entry.md`。后续在主目录继续，不再逐次新建工作目录。
+
+2026-09-20 后续：已分离 P4 Refactored 冻结回放、P5A v1 历史图和当前 V4
+生产配置，恢复历史输入身份，保留原始夹具、数值容差和正式蹲姿转身设置。
+验证范围及结果见 `../../verification/2026-09-20-frozen-reference-replay.md`。
+这不替代当前完整图认证；下一项实际接线是共同 Montage 的 ActionPlayback
+摘要及其事务重试检查，后续玩法和整链验收范围不变。

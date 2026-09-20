@@ -47,6 +47,20 @@ public readonly record struct AlsTurnRotateSettings(
     AlsRotateClipSettings CrouchingRotateLeft,
     AlsRotateClipSettings CrouchingRotateRight)
 {
+    // ALS V4's crouching assets do not scale their turn angle. The pinned
+    // ALS-Refactored P4 trace uses a different settings family; keep it explicit.
+    public static AlsTurnRotateSettings CreateRefactoredReference()
+    {
+        var settings = CreateReference();
+        return settings with
+        {
+            CrouchingTurn90Left = settings.CrouchingTurn90Left with { ScaleAngle = 1 },
+            CrouchingTurn90Right = settings.CrouchingTurn90Right with { ScaleAngle = 1 },
+            CrouchingTurn180Left = settings.CrouchingTurn180Left with { ScaleAngle = 1 },
+            CrouchingTurn180Right = settings.CrouchingTurn180Right with { ScaleAngle = 1 },
+        };
+    }
+
     public static AlsTurnRotateSettings CreateReference()
     {
         const float turnBasePlayRate = 1.2f;

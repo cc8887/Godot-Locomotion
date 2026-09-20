@@ -562,6 +562,48 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
     }
 
     [Fact]
+    public void HistoricalP5aReplayReconstructsOnlyFourTurnBitsAndDoesNotMutateProduction()
+    {
+        var fixture = Fixture.Create();
+        var current = fixture.Compile();
+        var historical = AlsP5aFrozenReferenceCompiler.Compile(
+            fixture.Set, fixture.Locomotion, fixture.Pose, fixture.P5a, fixture.Layout);
+        var before = current.CreateGraphBuildView();
+        var replay = historical.CreateGraphBuildView();
+        Assert.Equal(ReferenceGraphDigest(in replay), historical.GraphDigest);
+        Assert.Equal(0x44403C2869D8F615UL, historical.GraphDigest);
+        Assert.Equal(current.Digest, historical.Digest);
+        Assert.Equal(current.LayoutDigest, historical.LayoutDigest);
+        var runtime = historical.CreateCoreView();
+        Assert.Equal(ReferenceBindingDigest(in runtime), current.Digest);
+        var changes = 0;
+        for (var i = 0; i < before.Turns.Length; i++)
+        {
+            Assert.Equal(before.Turns[i] with { ScaleAngle = 1 }, replay.Turns[i]);
+            if (before.Turns[i] != replay.Turns[i]) changes++;
+        }
+        Assert.Equal(4, changes);
+        Assert.Equal(FrozenGraphDigest, fixture.Compile().GraphDigest);
+        Assert.All(fixture.Pose.Turns.Where(t => t.Stance == AlsPoseStance.Crouching),
+            t => Assert.Equal((byte)0, t.ScaleAngle));
+    }
+
+    [Fact]
+    public void HistoricalP5aReplayRejectsUnrelatedValidGraphChanges()
+    {
+        var fixture = Fixture.Create();
+        var changed = fixture.Locomotion with
+        {
+            Presentation = fixture.Locomotion.Presentation with
+            { YawRadians = fixture.Locomotion.Presentation.YawRadians + .01f },
+        };
+        Assert.NotEqual(FrozenGraphDigest, fixture.Compile(locomotion: changed).GraphDigest);
+        var error = Assert.Throws<ArgumentException>(() => AlsP5aFrozenReferenceCompiler.Compile(
+            fixture.Set, changed, fixture.Pose, fixture.P5a, fixture.Layout));
+        Assert.Contains("unsupported current V4 snapshot", error.Message);
+    }
+
+    [Fact]
     public void RuntimeTimelineActionAndSyncRowsMatchCurrentAuthoredSourcesIndependently()
     {
         var fixture = Fixture.Create();

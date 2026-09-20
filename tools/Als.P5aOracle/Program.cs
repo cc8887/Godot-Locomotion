@@ -161,7 +161,7 @@ internal static class Program
             File.ReadAllText(Path.Combine(root, "assets", "config", "p5a_animation_runtime.json")),
             animationSet);
         var layout = AlsP5OccurrenceLayoutCompiler.Compile(locomotion, pose, p5a);
-        return AlsP5CoreRuntimeBindingCompiler.Compile(
+        return AlsP5aFrozenReferenceCompiler.Compile(
             animationSet, locomotion, pose, p5a, layout);
     }
 
