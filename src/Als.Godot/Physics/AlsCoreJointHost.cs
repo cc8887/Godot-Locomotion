@@ -7,17 +7,17 @@ namespace GodotAls.Physics;
 
 // Explicit diagnostic ownership: Core integrates; Godot bodies are frozen,
 // non-colliding pose proxies. Never attach Jolt joints or enable gameplay with
-// this host. Contacts require a shared solver, not post-Jolt pose corrections.
-internal sealed class AlsForceFreeJointHost
+// this host without full acceptance. Contacts use the same Core solver buffers.
+internal sealed class AlsCoreJointHost
 {
     private readonly AlsPhysicsBodySet _proxies;
     private readonly AlsPrecisePose[] _massLocal;
     internal AlsJointIsland Island { get; }
 
-    internal AlsForceFreeJointHost(AlsPhysicsBodySet proxies, AlsRagdollPhysicsDefinition definition, AlsJointIsland island)
+    internal AlsCoreJointHost(AlsPhysicsBodySet proxies, AlsRagdollPhysicsDefinition definition, AlsJointIsland island)
     {
         _proxies = proxies; Island = island;
-        if (proxies.BodyCount != island.BodyCount || definition.Bodies.Length != island.BodyCount)
+        if (proxies.BodyCount != definition.Bodies.Length || island.BodyCount < proxies.BodyCount)
             throw new ArgumentException("Core and proxy body counts differ.");
         _massLocal = definition.Bodies.Select(b => b.MassLocal).ToArray();
         CheckOwnership(); Publish();
@@ -28,6 +28,12 @@ internal sealed class AlsForceFreeJointHost
         CheckOwnership(); Island.StepForceFree(dt); Publish();
     }
 
+    // Registered environment bodies may follow the contiguous asset-body prefix.
+    internal void Step(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts)
+    {
+        CheckOwnership(); Island.Step(dt, gravity, contacts: contacts); Publish();
+    }
+
     private void CheckOwnership()
     {
         if (!GodotThread.IsMainThread()) throw new InvalidOperationException("Physics proxy access requires Main.");
@@ -36,7 +42,7 @@ internal sealed class AlsForceFreeJointHost
         {
             var proxy = _proxies.BodyAt(i);
             if (!proxy.Freeze || proxy.FreezeMode != RigidBody3D.FreezeModeEnum.Static || proxy.CollisionLayer != 0 || proxy.CollisionMask != 0)
-                throw new InvalidOperationException("Force-free Core probes require frozen proxies with both collision filters cleared.");
+                throw new InvalidOperationException("Core probes require frozen proxies with both collision filters cleared.");
         }
     }
 

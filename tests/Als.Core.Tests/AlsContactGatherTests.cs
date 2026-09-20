@@ -13,6 +13,26 @@ public sealed class AlsContactGatherTests
         Vector3.Zero, Vector3.Zero, false, false);
 
     [Fact]
+    public void NativeNearNormalSlidingCancellationRemainsValidForGatheredRows()
+    {
+        var contact = Contact with { Normal1 = new(0, 0, .9999999f) };
+        var body = Body with { Velocity = new(new(.02f, 0, -500), Vector3.Zero) };
+        var point = AlsContactGather.Gather(contact, body, Body, Settings).Point;
+        Assert.True(MathF.Abs(Vector3.Dot(point.Normal, point.TangentU)) > 1e-5f);
+        var sliding = body.Velocity.Linear - Vector3.Dot(body.Velocity.Linear, contact.Normal1) * contact.Normal1;
+        Assert.InRange(Vector3.Distance(Vector3.Normalize(sliding), point.TangentU), 0, 1e-7f);
+        var manifold = new AlsCachedContactManifold(1);
+        manifold.GatherGeometry([contact], new(.7f, .7f, .7f), body, AlsQuaternion.Identity, AlsDoubleVector.One,
+            Body, AlsQuaternion.Identity, AlsDoubleVector.One, Settings);
+        var a = new AlsProjectionDelta(); var b = new AlsProjectionDelta();
+        manifold.SolvePosition(ref a, ref b, true);
+        Assert.True(new AlsDoubleVector(manifold.PointAt(0).PushOut).IsFinite);
+        // Direct row callers retain the explicit orthonormal-basis contract.
+        Assert.Throws<ArgumentException>(() => new AlsCachedContactPoint(point, new(.7f, .7f, .7f),
+            AlsQuaternion.Identity, new(1, AlsDoubleVector.One), AlsQuaternion.Identity, new(1, AlsDoubleVector.One)));
+    }
+
+    [Fact]
     public void ContactArmsUseInverseMassWeightedCommonPointAndDoubleWorldOrigin()
     {
         var a = Body with { InverseMass = .5f }; var b = Body with { InverseMass = .25f };

@@ -38,7 +38,7 @@ public sealed class AlsCachedContactManifold
         {
             var gathered = AlsContactGather.Gather(geometry[i], body0, body1, settings);
             _scratch[i] = new(gathered.Point, material, rotation0, new(body0.InverseMass, inverseInertia0),
-                rotation1, new(body1.InverseMass, inverseInertia1));
+                rotation1, new(body1.InverseMass, inverseInertia1), fromNativeGather: true);
             _scratchPhi[i] = gathered.InitialPhi;
         }
         (_points, _scratch) = (_scratch, _points); (_initialPhi, _scratchPhi) = (_scratchPhi, _initialPhi);

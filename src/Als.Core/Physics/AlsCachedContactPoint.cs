@@ -32,9 +32,16 @@ public struct AlsCachedContactPoint
 
     public AlsCachedContactPoint(in AlsContactPointInput input, in AlsContactMaterial material,
         AlsQuaternion rotation0, AlsJointInverseMass mass0, AlsQuaternion rotation1, AlsJointInverseMass mass1)
+        : this(input, material, rotation0, mass0, rotation1, mass1, false) { }
+
+    // Native Gather subtracts the normal velocity in float before normalizing
+    // the small remainder. Cancellation can leave N dot U above 1e-5 even for
+    // valid input. Do not change those axes just to satisfy a stricter row API.
+    internal AlsCachedContactPoint(in AlsContactPointInput input, in AlsContactMaterial material,
+        AlsQuaternion rotation0, AlsJointInverseMass mass0, AlsQuaternion rotation1, AlsJointInverseMass mass1, bool fromNativeGather)
     {
         this = default;
-        Validate(input); Validate(material); Validate(rotation0); Validate(rotation1);
+        Validate(input, fromNativeGather); Validate(material); Validate(rotation0); Validate(rotation1);
         _ = AlsJointMassConditioning.Apply(mass0, mass1, 0, 0);
         _inverseMass0 = InverseMass(mass0.Mass); _inverseMass1 = InverseMass(mass1.Mass);
         var tensor0 = AlsJointInertiaTensor.World(rotation0, _inverseMass0 > 0 ? mass0 : default);
@@ -176,14 +183,15 @@ public struct AlsCachedContactPoint
         foreach (var value in values) if (!float.IsFinite(value) || value < 0) throw new ArgumentException("Invalid contact material.");
         if (material.Stiffness > 1) throw new ArgumentException("Contact stiffness must not exceed one.");
     }
-    private static void Validate(in AlsContactPointInput input)
+    private static void Validate(in AlsContactPointInput input, bool fromNativeGather)
     {
         ReadOnlySpan<Vector3> vectors = stackalloc Vector3[] { input.Arm0, input.Arm1, input.Normal, input.TangentU, input.TangentV, input.Error };
         foreach (var v in vectors) if (!new AlsDoubleVector(v).IsFinite) throw new ArgumentException("Contact input must be finite.");
         if (!float.IsFinite(input.TargetVelocity) || MathF.Abs(input.Normal.LengthSquared() - 1) > 1e-5f ||
-            MathF.Abs(input.TangentU.LengthSquared() - 1) > 1e-5f || MathF.Abs(input.TangentV.LengthSquared() - 1) > 1e-5f ||
-            MathF.Abs(Vector3.Dot(input.Normal, input.TangentU)) > 1e-5f ||
+            MathF.Abs(input.TangentU.LengthSquared() - 1) > 1e-5f ||
+            (!fromNativeGather && (MathF.Abs(input.TangentV.LengthSquared() - 1) > 1e-5f ||
+                MathF.Abs(Vector3.Dot(input.Normal, input.TangentU)) > 1e-5f)) ||
             Vector3.Distance(Vector3.Cross(input.Normal, input.TangentU), input.TangentV) > 1e-5f)
-            throw new ArgumentException("Contact basis must be orthonormal and right handed.");
+            throw new ArgumentException($"Contact basis must be orthonormal and right handed: N={input.Normal}, U={input.TangentU}, V={input.TangentV}, NdotU={Vector3.Dot(input.Normal, input.TangentU)}.");
     }
 }
