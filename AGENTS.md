@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新持续接触进度：`docs/verification/2026-09-21-physics-contact-history.md`。`AlsContactHistory` 完成默认多点复用/可选唯一匹配、quadratic 距离规则、静止/滑动/零摩擦锚点回存、初始深度、禁用点和事务式提交；有序 body generation/shape revision key 隔离历史，标识仍由未来 world owner 分配。`AlsPersistentContactPair` 串联 history→Gather→行求解→回存，维护禁用点索引。192 组×6 帧原生历史阶段对照通过（1715 恢复/2445 新点，最大锚点差 0）；重复导出一致。Core 2669、Import 2359/1 旧跳过，Godot 构建通过。UE 普通重启首轮日志关闭后访问冲突，未定位；相同参数复跑退出 0，详见记录，勿称已修复。下一步世界身体/形状注册与过滤、真实碰撞查询和多个接触对共同迭代，再重力、睡眠、整链落地、普通 Ragdoll；本批未改变 demo 或关闭旧 Jolt 失败。
+
 - 最新 Gather 进度：`docs/verification/2026-09-21-physics-contact-gather.md`。`AlsContactGather` 从 shape-local 几何/姿态/COM/速度生成接触臂、切线、摩擦误差、恢复目标和初始重叠更新；`GatherGeometry` 事务式缓存并供共享关节迭代使用。432 组原始几何→Gather→完整接触阶段对照通过，本机 Gather 差值 0、最大 DP 4.486e-8 cm、线速度 1.222e-5 cm/s；新旧参考重导一致。Core 首轮既有足部零分配失败（2448 字节，原因未定位），独立与全量复跑通过：Core 2655，Import 2358/1 旧跳过，Godot 构建通过。尚未完成稳定 body/shape 身份、持续锚点匹配与真实碰撞 provider；下步先这些，再重力/动态双向响应/运动 kinematic/睡眠/整链落地/Ragdoll。普通 demo 未切换，旧 Jolt 失败未关闭。
 
 - 最新接触进度：`docs/verification/2026-09-21-physics-contact-rows.md`。Core 法向/二维摩擦/速度行与预分配流形完成；288 组 UE 原生 8 轮位置/隐式速度/2 轮速度对照通过，最大 DP 2.261e-8 cm、线速度 9.345e-6 cm/s；重复导出字节一致。`IAlsIslandContacts` 让接触与关节在每轮共用 DP/DQ/速度，解析耦合、失败恢复和重入拒绝通过。Core 2647、Import 2357 通过/1 旧跳过，Godot 构建和原有 144 组关节回放通过。仅行求解及共同迭代接口：接触几何 Gather、body/shape 身份、持续摩擦锚点、真实世界碰撞、重力/运动 kinematic/睡眠仍未接通；普通入口未切换，旧 Jolt 失败未关闭。下一步几何与持续流形，再重力、睡眠、整链落地和 Ragdoll。UE 仅离线参考，继续 C# Core 架构，无引擎 fork。此前关节接入与其他未完成项见下列记录。
