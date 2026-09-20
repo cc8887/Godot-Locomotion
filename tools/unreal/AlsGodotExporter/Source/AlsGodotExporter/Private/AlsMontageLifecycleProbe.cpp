@@ -182,8 +182,9 @@ void UAlsMontageLifecycleProbe::ProbeTick(float Delta)
     UpdateMontageEvaluationData();
 }
 
-bool UAlsMontageLifecycleProbe::ExportTrace(const FString& Output, bool IncludeActions)
+bool UAlsMontageLifecycleProbe::ExportTrace(const FString& Output, bool IncludeActions, bool IncludeRootMotion)
 {
+    if (IncludeRootMotion && !IncludeActions) return false;
     const auto Mesh = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Mannequin.Mannequin"));
     if (!Mesh) return false;
     TArray<UAnimSequence*> Sequences;
@@ -226,6 +227,7 @@ bool UAlsMontageLifecycleProbe::ExportTrace(const FString& Output, bool IncludeA
         auto Component = NewObject<USkeletalMeshComponent>(); Component->SetSkeletalMesh(Mesh);
         auto Instance = NewObject<UAlsMontageLifecycleProbe>(Component); Instance->InitializeAnimation();
         Instance->RootMotionMode = ERootMotionMode::NoRootMotionExtraction;
+        if (IncludeRootMotion) Instance->RootMotionMode = ERootMotionMode::RootMotionFromMontagesOnly;
         TMap<UAnimMontage*, int32> MontageAssets, MontageIds;
         TMap<int32, int32> Identities; int32 Serial = 0;
         const auto Snapshot = [&]()
@@ -252,8 +254,16 @@ bool UAlsMontageLifecycleProbe::ExportTrace(const FString& Output, bool IncludeA
         TArray<TSharedPtr<FJsonValue>> Frames;
         for (int32 Frame = 1; Frame <= Count; ++Frame)
         {
+            const auto RootOwner = [&]() -> int32
+            {
+                const auto Item = Instance->GetRootMotionMontageInstance();
+                return Item ? Identities.FindChecked(Item->GetInstanceID()) : 0;
+            };
+            const int32 RootBeforeTick = IncludeRootMotion ? RootOwner() : 0;
             Instance->ProbeTick(Delta);
             TArray<TSharedPtr<FJsonValue>> Evaluation, Requests;
+            const int32 RootAfterTick = IncludeRootMotion ? RootOwner() : 0;
+            const FRootMotionMovementParams Motion = Instance->ConsumeExtractedRootMotion(1.f);
             TArray<int32> EvaluationIds;
             // Evaluation has no instance ID. Pair by the native builder's exact
             // instance order and weight filter, not the montage asset pointer.
@@ -306,7 +316,23 @@ bool UAlsMontageLifecycleProbe::ExportTrace(const FString& Output, bool IncludeA
             }
             auto Row = MakeShared<FJsonObject>(); Row->SetNumberField(TEXT("frame"), Frame);
             Row->SetArrayField(TEXT("evaluation"), Evaluation); Row->SetArrayField(TEXT("commands"), Requests);
-            Row->SetArrayField(TEXT("instances"), Snapshot()); Frames.Add(MakeShared<FJsonValueObject>(Row));
+            Row->SetArrayField(TEXT("instances"), Snapshot());
+            if (IncludeRootMotion)
+            {
+                auto R = MakeShared<FJsonObject>();
+                R->SetNumberField(TEXT("ownerBeforeTick"),RootBeforeTick);
+                R->SetNumberField(TEXT("ownerAfterTick"),RootAfterTick);
+                R->SetNumberField(TEXT("ownerAfterCommands"),RootOwner());
+                R->SetBoolField(TEXT("hasMotion"),Motion.bHasRootMotion);
+                const FTransform Transform = Motion.bHasRootMotion ? Motion.GetRootMotionTransform() : FTransform::Identity;
+                const FVector P = Transform.GetTranslation(); const FQuat Q = Transform.GetRotation();
+                TArray<TSharedPtr<FJsonValue>> Position, Rotation;
+                for (double V : {P.X,P.Y,P.Z}) Position.Add(MakeShared<FJsonValueNumber>(V));
+                for (double V : {Q.X,Q.Y,Q.Z,Q.W}) Rotation.Add(MakeShared<FJsonValueNumber>(V));
+                R->SetArrayField(TEXT("translationCm"),Position); R->SetArrayField(TEXT("rotation"),Rotation);
+                Row->SetObjectField(TEXT("rootMotion"),R);
+            }
+            Frames.Add(MakeShared<FJsonValueObject>(Row));
         }
         Instance->UninitializeAnimation();
         auto Case = MakeShared<FJsonObject>(); Case->SetStringField(TEXT("name"), Name); Case->SetNumberField(TEXT("delta"), Delta);

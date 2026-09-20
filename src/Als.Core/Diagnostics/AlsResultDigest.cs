@@ -18,6 +18,17 @@ public static class AlsResultDigest
         Append(ref digest, (byte)result.RequestedDriveMode);
         Append(ref digest, result.ProposedRootMotionDelta.Translation);
         Append(ref digest, result.ProposedRootMotionDelta.Rotation);
+        if (result.RootMotionSource.HasMotion)
+        {
+            Append(ref digest, 0x524D); // Root-motion source extension; default historical frames stay unchanged.
+            Append(ref digest, result.RootMotionSource.Identity.FrameId);
+            Append(ref digest, result.RootMotionSource.Identity.CharacterId);
+            Append(ref digest, result.RootMotionSource.Identity.SlotGeneration);
+            Append(ref digest, result.RootMotionSource.InstanceId);
+            Append(ref digest, result.RootMotionSource.AnimationId);
+            Append(ref digest, result.RootMotionSource.StartSeconds);
+            Append(ref digest, result.RootMotionSource.EndSeconds);
+        }
         Append(ref digest, result.PelvisTarget);
         Append(ref digest, result.LeftFootTarget);
         Append(ref digest, result.RightFootTarget);

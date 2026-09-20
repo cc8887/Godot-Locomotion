@@ -110,12 +110,14 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     internal AlsMontageNotifyRuntime TurnNotifies => _turnNotifies;
     internal AlsMontageActionRuntime Actions => _actions;
     private readonly AlsMontageActionPlaybackReader _actionPlayback;
+    private readonly AlsMontageRootMotionReader _rootMotion;
 
     public void CompleteEvents(ref AlsFrameResult result)
     {
         ValidateCommit(result.Identity);
         if (result.TypedEvents.Count != 0 || result.ActionOutcomes.Count != 0 ||
-            result.ActionPlayback != AlsActionPlayback.CreateDefault())
+            result.ActionPlayback != AlsActionPlayback.CreateDefault() || result.RootMotionSource != default ||
+            result.ProposedRootMotionDelta != AlsRootMotionDelta.Identity)
             throw new InvalidOperationException("Overlapping BaseLayer result publishers.");
         var playback = _authoredActions == true
             ? _actionPlayback.ReadOwned(_actions, _identity, AlsMontageSlot.BaseLayer, _phase != Phase.Unvisited)
@@ -123,7 +125,13 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         var outcomes = HasMontageFrame ? _actions.Outcomes : default;
         // Resolve every fallible read before writing any part of the public result.
         var events = SourceEvents;
+        var motionSource = HasMontageFrame ? _montages.RootMotionRange : default;
+        if (motionSource.HasMotion && motionSource.Identity != result.Identity)
+            throw new InvalidOperationException("Root motion belongs to a different animation frame.");
+        var motion = _rootMotion.Read(motionSource);
         result.TypedEvents = events; result.ActionOutcomes = outcomes; result.ActionPlayback = playback;
+        result.ProposedRootMotionDelta = motion;
+        result.RootMotionSource = motionSource.HasMotion ? motionSource : default;
     }
     internal IAlsBaseLayerSlotPoseSink ActionSlot => _actionSlot;
     internal AlsGroundedMontageSlot GroundedSlot => _groundedSlot;
@@ -168,6 +176,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         _idleControl = definition.IdleControl;
         _turnInPlace = definition.TurnInPlace; _montages = new(definition.TurnMontageAssets, definition.AuthoredMontageAssets, definition.GroundedTransitionAssets);
         _actions = new(_montages,definition.ActionPolicies); _actionPlayback = definition.ActionPlayback;
+        _rootMotion = new(definition);
         _turnNotifyBinding = definition.MontageNotifies; _turnNotifies = new(_turnNotifyBinding);
         _overlayTransitions = definition.OverlayTransitions; _stopTransitions = definition.StopTransitions;
         _committedGlobalInput = new(default, definition.InputCurves.Defaults["FallSpeed"] * .01f,

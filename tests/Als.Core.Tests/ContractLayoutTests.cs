@@ -168,7 +168,7 @@ public sealed class ContractLayoutTests
             "LeftFootIkWeight", "RightFootIkWeight", "LeftFootLockCurve", "RightFootLockCurve",
             "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
             "P4ModifierOperationTicks", "P4ReasonCode", "Sync", "DynamicTransition",
-            "ActionPlayback", "ActionOutcomes", "P5FailureCode");
+            "ActionPlayback", "ActionOutcomes", "P5FailureCode", "RootMotionSource");
     }
 
     [Fact]

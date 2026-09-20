@@ -46,6 +46,12 @@ public readonly record struct AlsMontageEvaluation(long InstanceId, int Animatio
 public readonly record struct AlsMontageTraversal(long InstanceId, int AnimationId, AlsMontageSlot Slot,
     float PreviousPosition, float CurrentPosition, float NotifyWeight, bool Interrupted, bool Terminated, int ActionDefinitionId = -1);
 
+public readonly record struct AlsMontageRootMotionRange(AlsFrameIdentity Identity, long InstanceId,
+    int AnimationId, float StartSeconds, float EndSeconds)
+{
+    public bool HasMotion => InstanceId > 0;
+}
+
 // A bank survives Commit and remains readable while the next candidate is prepared.
 // Consumers retain Identity and reject a bank recycled for a later frame.
 public sealed class AlsMontageFrame
@@ -81,6 +87,11 @@ public sealed class AlsMontageRuntime
     private AlsTurnSlotObservation[] _observations = new AlsTurnSlotObservation[8];
     private int _committedCount, _count, _evaluationCount, _traversalCount;
     private long _committedSerial, _serial;
+    private long _committedRootMotionInstance, _rootMotionInstance;
+    private AlsMontageRootMotionRange _rootMotionRange;
+    public long CommittedRootMotionInstance => _committedRootMotionInstance;
+    public long CandidateRootMotionInstance { get { RequirePrepared(); return _rootMotionInstance; } }
+    public AlsMontageRootMotionRange RootMotionRange { get { RequirePrepared(); return _rootMotionRange; } }
     private AlsFrameIdentity _identity;
     private bool _prepared;
     public AlsFrameIdentity CommittedIdentity { get; private set; }
@@ -135,9 +146,13 @@ public sealed class AlsMontageRuntime
             throw new ArgumentException("Invalid montage frame identity, phase or delta.");
         Ensure(_committedCount); _count = _evaluationCount = _traversalCount = 0;
         _identity = identity; _serial = _committedSerial;
+        _rootMotionInstance = _committedRootMotionInstance; _rootMotionRange = new(identity, 0, -1, 0, 0);
         for (var i = 0; i < _committedCount; i++)
         {
             var state = _committed[i]; var blend = state.Blend; var previousWeight = blend.CurrentWeight;
+            // UE selects its motion owner before Advance. Auto-blend-out clears
+            // future ownership, but this tick still extracts its traversed range.
+            var extractMotion = state.InstanceId == _rootMotionInstance && state.Playing;
             if (state.BlendResetPending)
             {
                 AlsActionLifecycle.ResetRange(state.BlendTime,
@@ -158,7 +173,10 @@ public sealed class AlsMontageRuntime
                 var wasStopped = blend.BlendingOut == 1;
                 AlsActionLifecycle.TryBeginBlendOut(state.Settings, remaining, ref blend);
                 if (!wasStopped && blend.BlendingOut == 1)
+                {
                     state = state with { BlendTime = state.Settings.BlendOutTriggerSeconds >= 0 ? state.Settings.BlendOutSeconds : remaining };
+                    if (_rootMotionInstance == state.InstanceId) _rootMotionInstance = 0;
+                }
                 if (move != 0 && position == boundary)
                 {
                     playing = false;
@@ -167,6 +185,9 @@ public sealed class AlsMontageRuntime
                 if (blend.BlendingOut == 1 && state.BlendTime <= 0) playing = false;
             }
             var terminated = AlsActionLifecycle.IsComplete(blend);
+            if (extractMotion && previous != traversalEnd)
+                _rootMotionRange = new(identity, state.InstanceId, state.AnimationId,
+                    state.ClipStart + previous * state.ClipRate, state.ClipStart + traversalEnd * state.ClipRate);
             _traversal[_traversalCount++] = new(state.InstanceId, state.AnimationId, state.Slot,
                 previous, traversalEnd, MathF.Max(previousWeight, blend.CurrentWeight), state.Interrupted, terminated, state.ActionDefinitionId);
             if (terminated) continue;
@@ -278,11 +299,13 @@ public sealed class AlsMontageRuntime
             asset.Lifecycle, new AlsActionLifecycleState { DesiredWeight = 1, RemainingSeconds = .2f }, true, false)
             { BlendResetPending = true, ActionDefinitionId = asset.ActionDefinitionId, ClipStart = asset.ClipStart, ClipRate = asset.ClipRate,
                 MontageId = montageId, OwnsActiveActionLookup = montageId >= 0, AdditiveType = asset.AdditiveType };
+        if (asset.RootMotionEnabled) _rootMotionInstance = _serial;
     }
 
     private void Stop(int index, float seconds, AlsActionBlendOption option)
     {
         var old = _candidate[index];
+        if (_rootMotionInstance == old.InstanceId) _rootMotionInstance = 0;
         var blend = old.Blend; var duration = old.BlendTime;
         var pending = old.BlendResetPending;
         var settings = old.Settings;
@@ -317,6 +340,7 @@ public sealed class AlsMontageRuntime
         ValidateCommit(identity); (_committed, _candidate) = (_candidate, _committed);
         (_committedFrame, _frame) = (_frame, _committedFrame);
         _committedCount = _count; _committedSerial = _serial; CommittedIdentity = identity; _prepared = false;
+        _committedRootMotionInstance = _rootMotionInstance;
     }
     public void Discard() { _prepared = false; _count = _evaluationCount = _traversalCount = 0; _frame.Count = 0; _frame.Identity = default; }
     public void ClearForLifecycle()
@@ -324,6 +348,7 @@ public sealed class AlsMontageRuntime
         if (_prepared) throw new InvalidOperationException("Discard the montage candidate before lifecycle cleanup.");
         Array.Clear(_committed); Array.Clear(_candidate);
         _committedCount = _count = _evaluationCount = _traversalCount = 0;
+        _committedRootMotionInstance = _rootMotionInstance = 0; _rootMotionRange = default;
         _committedFrame.Count = _frame.Count = 0;
         // Keep the frame boundary and serial allocator: resuming this generation
         // must never reuse a physical playback identity.

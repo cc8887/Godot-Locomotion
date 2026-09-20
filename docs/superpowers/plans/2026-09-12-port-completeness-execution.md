@@ -1623,3 +1623,11 @@ Bow oracle、双模式 1600 帧、失败保持/成功切换、带弓停用和换
 Ragdoll 开始清物/结束重新装备仍随真实 Ragdoll 玩法接入；未把本批等同完整
 Overlay gameplay、全流程观感或十分钟性能验收。下一步继续剩余 Notify gameplay
 及 Roll/Mantle 碰撞安全 Root Motion，后续 Ragdoll/Recovery/Camera 范围不变。
+
+2026-09-20 后续：共同 Montage 新增独立 Root Motion 物理来源，按原生推进
+区间采样原始 root track，身份化发布到正式结果；不乘动作姿势权重，停止/
+替换/自动淡出/丢弃重试遵循 UE Montage-only 行为。原生 11 情形、2540 帧
+回放通过，十角色双模式结果一致，见
+`../../verification/2026-09-20-montage-root-motion.md`。Motor 尚未消费位移，
+普通 R 仍是原地预览；下一项调整同帧动画推进—Main 碰撞—脚部查询顺序，
+再接 Roll 玩法门控、转向与落地规则，不能据此关闭 P5C。

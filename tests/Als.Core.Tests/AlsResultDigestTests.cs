@@ -9,6 +9,23 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsResultDigestTests
 {
     [Fact]
+    public void MotionSourceIdentityAndRangeContributeEvenWhenDeltaIsIdentical()
+    {
+        var result = AlsFrameResult.CreateDefault(new(12, 3, 2));
+        var source = new GodotAls.Core.Actions.AlsMontageRootMotionRange(result.Identity, 4, 5, .1f, .2f);
+        var variants = new[] { source, source with { Identity = new(13, 3, 2) },
+            source with { Identity = new(12, 4, 2) }, source with { Identity = new(12, 3, 3) },
+            source with { InstanceId = 5 }, source with { AnimationId = 6 },
+            source with { StartSeconds = .11f }, source with { EndSeconds = .21f }, default };
+        var digests = new HashSet<ulong>();
+        foreach (var variant in variants)
+        {
+            result.RootMotionSource = variant; var digest = AlsResultDigest.OffsetBasis;
+            AlsResultDigest.Append(ref digest, result); Assert.True(digests.Add(digest));
+        }
+    }
+
+    [Fact]
     public void DefaultP3ResultDigestRemainsByteCompatible()
     {
         var digest = AlsResultDigest.OffsetBasis;

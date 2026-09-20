@@ -14,6 +14,8 @@ public partial class ActionInputSmoke : Node
     private Input.MouseModeEnum _oldMouse;
     private bool _oldAccumulation;
     private Vector3 _start;
+    private int _motionFrames;
+    private float _proposedDistance;
 
     public ActionInputSmoke()
     { ProcessThreadGroup = ProcessThreadGroupEnum.MainThread; ProcessThreadGroupOrder = -2; }
@@ -63,6 +65,17 @@ public partial class ActionInputSmoke : Node
                     Require(frame.Result.ActionPlayback.PlaybackEpoch > 0 && frame.Result.ActionPlayback.CurrentTime >= 0,
                         "Active preview has no physical playback identity/time."); _activeFrames++;
                 }
+                var motionSource = frame.Result.RootMotionSource;
+                if (motionSource.HasMotion)
+                {
+                    Require(motionSource.Identity == input.Identity && motionSource.AnimationId >= 0 &&
+                        motionSource.EndSeconds > motionSource.StartSeconds, "Committed motion has stale identity or time.");
+                    var motion = frame.Result.ProposedRootMotionDelta;
+                    Require(float.IsFinite(motion.Translation.LengthSquared()) &&
+                        MathF.Abs(motion.Rotation.LengthSquared() - 1) < .00001f, "Invalid committed root motion.");
+                    _motionFrames++; _proposedDistance += motion.Translation.Length();
+                }
+                else Require(frame.Result.ProposedRootMotionDelta == AlsRootMotionDelta.Identity, "Unowned motion survived a stop.");
                 var position = character.MovementAnchor.GlobalPosition;
                 Require(new Vector2(position.X - _start.X, position.Z - _start.Z).Length() < .0001f,
                     "Animation preview unexpectedly applied gameplay translation.");
@@ -98,13 +111,14 @@ public partial class ActionInputSmoke : Node
 
     private void Complete()
     {
-        Require(_accepted == 3 && _replaced == 1 && _cancelled == 1 && _completed == 1 && _entries > 0 && _activeFrames > 0,
+        Require(_accepted == 3 && _replaced == 1 && _cancelled == 1 && _completed == 1 && _entries > 0 && _activeFrames > 0 &&
+            _motionFrames > 0 && _proposedDistance > 1,
             $"Incomplete action path: accepted={_accepted}, replaced={_replaced}, cancelled={_cancelled}, completed={_completed}, entries={_entries}.");
         Require(_demo!.ActiveCharacter.Diagnostics.Result.ActionPlayback.Active == 0 &&
             _demo.ActiveCharacter.FullMovementDiagnostics.MovementNotifies == default &&
             _demo.RuntimeContext.ActionOutcomeHandlerFailures == 0, "Completed preview retained action state or lost callbacks.");
         Cleanup(); _done = true;
-        GD.Print($"ACTION_INPUT_OK hz={_hz} frames={_committed} accepted={_accepted} replaced={_replaced} cancelled={_cancelled} completed={_completed} active_frames={_activeFrames} grounded_entries={_entries} physical_keys=R,X echo=ignored owner=production callbacks=main_commit root_motion=preview_only");
+        GD.Print($"ACTION_INPUT_OK hz={_hz} frames={_committed} accepted={_accepted} replaced={_replaced} cancelled={_cancelled} completed={_completed} active_frames={_activeFrames} grounded_entries={_entries} physical_keys=R,X echo=ignored owner=production callbacks=main_commit motion_frames={_motionFrames} proposed_distance_m={_proposedDistance:R} root_motion=extracted_not_applied");
         GetTree().Quit();
     }
 

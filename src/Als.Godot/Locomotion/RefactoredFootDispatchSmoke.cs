@@ -184,6 +184,11 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                     _phase = 0; _completedPauses++;
                 }
                 _lastFrames[i] = frame.CommittedFrameId;
+                var motion = frame.Result.RootMotionSource;
+                Require(!motion.HasMotion || motion.Identity == frame.Identity,
+                    "Root motion crossed a character/frame/generation boundary.");
+                Require(motion.HasMotion || frame.Result.ProposedRootMotionDelta == AlsRootMotionDelta.Identity,
+                    "Unowned root motion survived a montage stop.");
                 if (character.Props is not null)
                 {
                     var prop = character.Props.Committed;
