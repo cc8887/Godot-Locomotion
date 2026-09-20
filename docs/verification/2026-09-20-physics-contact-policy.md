@@ -79,13 +79,17 @@ smoke 默认改成十秒观察，最后整整一秒每个物理 tick 都检查�
 
 ## 下一阶段的关节边界
 
-两套资产总计 38 个原生约束，包含非对称 swing cone、twist 的锁定/限制、
+两套资产总计 38 个原生约束，包含不同 Swing1/Swing2 限幅、twist 的锁定/限制、
 软限制、TwistAndSwing 位置/速度驱动、质量调节和投影。
 root-pelvis 的各自由度均 Free，不能为了保持模型完整而固定它。
 
 核对当前 Godot 的 C# PhysicsServer3D API 和
 [Jolt Generic6DOF 实现](https://raw.githubusercontent.com/godotengine/godot/ed1daf0bf/modules/jolt_physics/joints/jolt_generic_6dof_joint_3d.cpp)：
-常规 6DOF 使用 Pyramid swing；不是原生椭圆锥限制的等价实现。部分 Godot
+常规 6DOF 使用 Pyramid swing。后续沿实际 UE 求解器选择追踪并导出 live
+joint settings 后，确认这 38 个约束均启用 `bUseLinearSolver`：该路径的双摆动
+限制同样使用 Pyramid。先前将当前资产认定为椭圆锥的判断有误；椭圆锥属于另一条
+非线性求解路径，不能仅凭 `ConeLimit` 资产字段名判断。详见
+`2026-09-20-physics-joint-reference.md`。几何类型相同仍不意味着受力行为等价，部分 Godot
 softness/damping/restitution 参数在 Jolt 下无效。下一阶段必须逐项适配并
 做受力/关节极限对照，不能只填入角度后宣称完成。随后继续 Main 物理所有权
 与真实角色接线、Ragdoll/Get-up/Pose Recovery、Mantle、完整 Camera 和性能预算。

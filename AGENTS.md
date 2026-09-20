@@ -8,7 +8,7 @@
 
 # 运行和验证
 
-- 最新进度：`docs/verification/2026-09-20-physics-contact-policy.md`。项目采用 Jolt Physics、2 mm penetration slop，两套 40 刚体/43 形状的普通与高速倾斜落地通过 30/60/120 Hz 十秒观察及末秒连续稳定检查；Motor/脚部/键鼠/Roll/落地回归通过。尚未绑定关节或接入普通角色；下一步适配原生非对称软锥限制和驱动，再接真实 Ragdoll/Get-up。普通入口已有地面与中等落差自动 Roll；高落差/翻滚离地的 Ragdoll 仅接通触发判定。`--action-preview` 保留旧预览；P5C/P6 未整体验收。
+- 最新进度：`docs/verification/2026-09-20-physics-joint-reference.md`。已导出两套 38 个 live Chaos 关节参数，并实现带严格绑定的参数编译器和零分配角度/驱动误差数学层，912 组原生参考记录对照通过。实际均为 `bUseLinearSolver=true`，双摆动限制采用 Pyramid；不要再按另一条非线性路径的椭圆锥实现。尚未绑定 Godot 关节或接入普通角色；下一步适配软限制/驱动受力和稳定性，再接真实 Ragdoll/Get-up。项目采用 Jolt Physics、2 mm penetration slop，两套 40 刚体/43 形状的落地测试及普通运行回归见上一份 contact-policy 报告。普通入口已有地面与中等落差自动 Roll；高落差/翻滚离地的 Ragdoll 仅接通触发判定。`--action-preview` 保留旧预览；P5C/P6 未整体验收。
 
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。

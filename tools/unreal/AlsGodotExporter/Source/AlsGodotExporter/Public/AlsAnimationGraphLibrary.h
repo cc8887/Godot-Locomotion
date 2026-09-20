@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Live Chaos joint settings and native angular utility observations. No assets saved. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportPhysicsJointReference(const FString& OutputPath);
+
     /** Original PhysicsAssets plus native reference-pose body mass and inertia. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportPhysicsAssets(const FString& OutputPath);
