@@ -189,12 +189,13 @@ public static class AlsPoseProfileCompiler
             var rate = Finite(source["basePlayRate"], $"{path}.basePlayRate");
             var blend = Finite(source["blendSeconds"], $"{path}.blendSeconds");
             var scale = Boolean(source["scaleAngle"], $"{path}.scaleAngle");
-            if (rate != 1.2f || blend != 0.2f || !scale) throw Failure("ALSPOSE009", path, "Turn settings must use basePlayRate 1.2, blendSeconds 0.2 and scaleAngle true.");
+            if (rate != 1.2f || blend != 0.2f || scale != (stance == AlsPoseStance.Standing))
+                throw Failure("ALSPOSE009", path, "Turn settings must use basePlayRate 1.2, blendSeconds 0.2 and scaleAngle only when standing.");
             var animation = set.Animations[animationId];
             RequireUniqueAnimation(animationIds, animation, $"{path}.animation", "turn");
             RequireExactObjectPath(animation, TurnObjectPaths[(stance, direction, (short)nominal)], $"{path}.animation", "turn");
             if (!combinations.Add((stance, direction, (short)nominal))) throw Failure("ALSPOSE010", path, "Duplicate turn stance, direction and angle combination.");
-            result[index] = new AlsTurnProfile(animationId, CanonicalCurveId(animation, $"{path}.animation"), stance, direction, (short)nominal, rate, blend, 1);
+            result[index] = new AlsTurnProfile(animationId, CanonicalCurveId(animation, $"{path}.animation"), stance, direction, (short)nominal, rate, blend, scale ? (byte)1 : (byte)0);
         }
         RequireCompleteTurns(combinations);
         return result;

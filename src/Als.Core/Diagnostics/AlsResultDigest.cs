@@ -123,6 +123,15 @@ public static class AlsResultDigest
                 Append(ref digest, animationEvent.Payload.ScalarValue0);
                 Append(ref digest, animationEvent.Payload.Flags);
                 Append(ref digest, (ushort)animationEvent.Payload.TerminationReason);
+                if (animationEvent.NativeContext.Present)
+                {
+                    Append(ref digest, (byte)'N'); Append(ref digest, (byte)1);
+                    Append(ref digest, animationEvent.NativeContext.InstanceId);
+                    Append(ref digest, animationEvent.NativeContext.CurrentAnimationTime);
+                    Append(ref digest, animationEvent.NativeContext.CallbackSeconds);
+                    Append(ref digest, animationEvent.NativeContext.ActiveContext ? (byte)1 : (byte)0);
+                    Append(ref digest, animationEvent.NativeContext.ReachedEnd ? (byte)1 : (byte)0);
+                }
             }
 
             Append(ref digest, result.Sync.GroupId);
@@ -230,7 +239,7 @@ public static class AlsResultDigest
         for (var index = 0; index < result.TypedEvents.Count; index++)
         {
             var animationEvent = result.TypedEvents[index];
-            if (animationEvent.SourceAnimationId != -1 ||
+            if (animationEvent.NativeContext.Present || animationEvent.SourceAnimationId != -1 ||
                 animationEvent.SourceActionId != -1 ||
                 animationEvent.OccurrenceHandleId != -1 ||
                 animationEvent.PlaybackEpoch != 0 ||

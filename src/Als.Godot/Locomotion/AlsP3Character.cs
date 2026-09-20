@@ -38,6 +38,7 @@ public partial class AlsP3Character : Node3D
         Volatile.Read(ref _state.FailureDiagnosticCount);
 
     internal long ResultPublishedFrameId => _state.ResultPublishedFrameId;
+    internal AlsP3SplitFootDiagnostics SplitFootDiagnostics => _worker.SplitFootDiagnostics;
 
     internal AlsP4ReasonCode LastFailureReasonCode =>
         (AlsP4ReasonCode)Volatile.Read(ref _state.LastFailureReasonCode);
@@ -75,6 +76,19 @@ public partial class AlsP3Character : Node3D
         _state.WorkerTransactionRollbackDiagnostics;
 
     internal AlsFrameInput LatestMotorInput => _state.MotorInput;
+    internal bool UsesCompleteMovement => _worker.UsesCompleteMovement;
+    internal bool UsesLayeredPose => _worker.UsesLayeredPose;
+    internal GodotAls.Animation.AlsFullMovementDiagnostics FullMovementDiagnostics => _worker.FullMovementDiagnostics;
+    internal GodotAls.Core.Locomotion.AlsRefactoredAnimationFeedback CommittedRefactoredFeedback => _state.CommittedRefactoredFeedback;
+    internal GodotAls.Core.Locomotion.AlsBasedFootLockFrameTrace? BasedFootLockTrace => _worker.CommittedBasedTrace;
+    internal GodotAls.Core.Locomotion.AlsStandingCycleState StandingCycleState => _worker.StandingCycleState;
+    internal GodotAls.Core.Locomotion.AlsBinaryBlendState StandingSprintBlend => _worker.StandingSprintBlend;
+    internal float StandingSprintMask => _worker.StandingSprintMask;
+    internal GodotAls.Animation.AlsCycleDetailFrame StandingDetail => _worker.StandingDetail;
+    internal float RuntimeAnimationPhase => _worker.RuntimeAnimationPhase;
+    internal GodotAls.Core.Locomotion.AlsStandingMovementInput StandingMovementInput => _worker.StandingMovementInput;
+    internal GodotAls.Animation.AlsCycleSyncFrame StandingCycleSync => _worker.StandingCycleSync;
+    internal GodotAls.Core.Animation.AlsP5SourceEventState SourceEventState => _worker.SourceEventState;
 
     internal AlsP3ResultClassificationDiagnostics ResultClassificationDiagnostics =>
         _state.CaptureResultClassification();
@@ -114,7 +128,7 @@ public partial class AlsP3Character : Node3D
             throw new InvalidOperationException(
                 "Replacement Motor input can only be staged on an unused inactive character.");
         }
-        _stagedReplacementMotorInput = input;
+        _stagedReplacementMotorInput = _motor.RecaptureRefactoredPrediction(_motor.RecaptureReplacementFeet(input));
         _hasStagedReplacementMotorInput = true;
     }
 
@@ -236,6 +250,16 @@ public partial class AlsP3Character : Node3D
             _worker = new AlsP3WorkerRoot { Name = "VisualWorker" };
             AddChild(_worker);
             _worker.Configure(context, _state, _motor.GlobalTransform);
+            if (_worker.UsesNativeFootIk) _motor.ConfigureNativeFeet(_worker.InitialNativeFeet, context.MovementGraph!.FootIkInput.Offset);
+
+            if (AlsP3FrameStages.SplitFeet)
+            {
+                if (!_worker.UsesRefactoredFeet) throw new InvalidOperationException("Split foot stages require the complete movement graph.");
+                var prepare = new AlsP3FootPrepareStage { Name = "FootAnimationPrepare" };
+                prepare.Configure(_worker, context.Mode); AddChild(prepare);
+                var query = new AlsP3FootQueryStage { Name = "FootPhysicsQuery" };
+                query.Configure(_worker, _motor); AddChild(query);
+            }
 
             _commit = new AlsP3CommitStage { Name = "Commit" };
             _commit.Configure(context, _state, this);
@@ -262,6 +286,13 @@ public partial class AlsP3Character : Node3D
         try
         {
             var completedFrameId = Volatile.Read(ref _state.PublishedFrameId);
+            // A split animation frame may be canceled while later process
+            // groups are suspended. Keep its already-integrated motor input
+            // until that frame commits; advancing again would skip the next
+            // identity expected by foot/curve/source history. Frozen failure
+            // handling retains the existing motor/recovery policy.
+            if (_worker.UsesRefactoredFeet && Volatile.Read(ref _state.WorkerFrozen) == 0 &&
+                completedFrameId > Volatile.Read(ref _state.CommittedFrameId)) return;
             if (completedFrameId >= AlsP3VisualRootVisibilityObservation.MaximumWorkerFrameId)
             {
                 throw new InvalidOperationException("P3 frame sequence reached its supported limit.");
@@ -299,7 +330,8 @@ public partial class AlsP3Character : Node3D
                     checked((int)_state.Handle.Generation),
                     checked((float)delta),
                     _state.HasCommittedTargetYaw,
-                    _state.CommittedTargetYaw);
+                    _state.CommittedTargetYaw,
+                    _state.CommittedCharacterRotationFeedback, _state.CommittedRefactoredFeedback);
             }
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
@@ -353,6 +385,7 @@ public partial class AlsP3Character : Node3D
         else
         {
             CloseWorkerAdmissionForDeactivation();
+            _worker.CancelSplitFootForLifecycle();
         }
         Volatile.Write(ref _state.Active, active ? 1 : 0);
         ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;

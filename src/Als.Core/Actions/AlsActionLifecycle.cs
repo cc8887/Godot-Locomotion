@@ -107,6 +107,17 @@ internal static class AlsActionLifecycle
         // UE completion uses the shaped output endpoint, which can precede timer zero.
         state.BlendingOut == 1 && state.CurrentWeight == state.DesiredWeight;
 
+    // Explicit replacement uses the incoming montage's blend-in duration. The
+    // caller decides whether a previously stopped instance needs a shorter blend.
+    internal static void Stop(float seconds, AlsActionBlendOption option, ref AlsActionLifecycleState state)
+    {
+        state.BlendingOut = 1;
+        SetRange(ref state, 0, seconds, option);
+    }
+
+    internal static void ResetRange(float seconds, AlsActionBlendOption option, ref AlsActionLifecycleState state) =>
+        SetRange(ref state, state.DesiredWeight, seconds, option);
+
     private static void SetRange(
         ref AlsActionLifecycleState state, float desired, float duration, AlsActionBlendOption option)
     {

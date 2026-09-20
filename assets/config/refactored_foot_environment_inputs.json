@@ -1,0 +1,3761 @@
+{
+  "schemaVersion": 1,
+  "source": "/ALS/ALS/Character/CR_Als.CR_Als",
+  "pelvis": [
+    {
+      "name": "Entry",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionEntryNode",
+      "properties": [
+        "TemplateNotation=\"RefreshPelvisOffset(io Input)\"",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Return",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionReturnNode",
+      "properties": [
+        "TemplateNotation=\"RefreshPelvisOffset(io Input)\"",
+        "Position=(X=704.000000,Y=0.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SetTranslation_1",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"Set Transform::Execute(in Item,in Space,in bInitial,in Value,in Weight,in bPropagateToChildren)\"",
+        "ResolvedFunctionName=\"FRigUnit_SetTranslation::Execute\"",
+        "NodeTitle=\"Set Translation\"",
+        "Position=(X=384.000000,Y=0.000000)",
+        "NodeColor=(R=0.000000,G=0.364706,B=1.000000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'ExecutePin'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Item'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Space'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'bInitial'\"",
+        "Pins(4)=\"/Script/RigVMDeveloper.RigVMPin'Value'\"",
+        "Pins(5)=\"/Script/RigVMDeveloper.RigVMPin'Weight'\"",
+        "Pins(6)=\"/Script/RigVMDeveloper.RigVMPin'bPropagateToChildren'\"",
+        "Pins(7)=\"/Script/RigVMDeveloper.RigVMPin'CachedIndex'\""
+      ],
+      "pins": [
+        {
+          "name": "bInitial",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Initial\"",
+            "Direction=Input",
+            "CPPType=\"bool\""
+          ]
+        },
+        {
+          "name": "bPropagateToChildren",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Propagate to Children\"",
+            "Direction=Input",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"True\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Key.Type",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Type\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"ERigElementType\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/ControlRig.ERigElementType'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.ERigElementType\"",
+            "DefaultValue=\"None\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Key.Name",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Name\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"None\"",
+            "CustomWidgetName=\"ElementName\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Key",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Key\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FRigElementKey\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigElementKey'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.RigElementKey\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Type'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Name'\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Index",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"uint16\"",
+            "DefaultValue=\"65535\""
+          ]
+        },
+        {
+          "name": "CachedIndex.ContainerVersion",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Container Version\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"int32\"",
+            "DefaultValue=\"-1\""
+          ]
+        },
+        {
+          "name": "CachedIndex",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Cached Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FCachedRigElement\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.CachedRigElement'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.CachedRigElement\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Key'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Index'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'ContainerVersion'\""
+          ]
+        },
+        {
+          "name": "ExecutePin",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        },
+        {
+          "name": "Item.Type",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Type\"",
+            "Direction=Input",
+            "CPPType=\"ERigElementType\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/ControlRig.ERigElementType'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.ERigElementType\"",
+            "DefaultValue=\"Bone\""
+          ]
+        },
+        {
+          "name": "Item.Name",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Name\"",
+            "Direction=Input",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"pelvis\"",
+            "CustomWidgetName=\"ElementName\""
+          ]
+        },
+        {
+          "name": "Item",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Item\"",
+            "Direction=Input",
+            "bIsExpanded=True",
+            "CPPType=\"FRigElementKey\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigElementKey'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.RigElementKey\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Type'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Name'\""
+          ]
+        },
+        {
+          "name": "Space",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Space\"",
+            "Direction=Input",
+            "CPPType=\"ERigVMTransformSpace\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/RigVM.ERigVMTransformSpace'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.ERigVMTransformSpace\"",
+            "DefaultValue=\"GlobalSpace\""
+          ]
+        },
+        {
+          "name": "Value.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Value\"",
+            "Direction=Input",
+            "bIsExpanded=True",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Weight",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Weight\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GetTransform_3",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "ResolvedFunctionName=\"FRigUnit_GetTransform::Execute\"",
+        "NodeTitle=\"Get Transform\"",
+        "Position=(X=-144.000000,Y=128.000000)",
+        "NodeColor=(R=0.462745,G=1.000000,B=0.329412,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Item'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Space'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'bInitial'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'Transform'\"",
+        "Pins(4)=\"/Script/RigVMDeveloper.RigVMPin'CachedIndex'\""
+      ],
+      "pins": [
+        {
+          "name": "bInitial",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Initial\"",
+            "Direction=Input",
+            "CPPType=\"bool\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Key.Type",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Type\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"ERigElementType\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/ControlRig.ERigElementType'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.ERigElementType\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Key.Name",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Name\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FName\"",
+            "CustomWidgetName=\"ElementName\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Key",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Key\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FRigElementKey\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigElementKey'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.RigElementKey\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Type'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Name'\""
+          ]
+        },
+        {
+          "name": "CachedIndex.Index",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"uint16\"",
+            "DefaultValue=\"65535\""
+          ]
+        },
+        {
+          "name": "CachedIndex.ContainerVersion",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Container Version\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"int32\"",
+            "DefaultValue=\"-1\""
+          ]
+        },
+        {
+          "name": "CachedIndex",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Cached Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FCachedRigElement\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.CachedRigElement'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.CachedRigElement\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Key'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Index'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'ContainerVersion'\""
+          ]
+        },
+        {
+          "name": "Item.Type",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Type\"",
+            "Direction=Input",
+            "CPPType=\"ERigElementType\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/ControlRig.ERigElementType'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.ERigElementType\"",
+            "DefaultValue=\"Bone\""
+          ]
+        },
+        {
+          "name": "Item.Name",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Name\"",
+            "Direction=Input",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"pelvis\"",
+            "CustomWidgetName=\"ElementName\""
+          ]
+        },
+        {
+          "name": "Item",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Item\"",
+            "Direction=Input",
+            "bIsExpanded=True",
+            "CPPType=\"FRigElementKey\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigElementKey'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.RigElementKey\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Type'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Name'\""
+          ]
+        },
+        {
+          "name": "Space",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Space\"",
+            "Direction=Input",
+            "CPPType=\"ERigVMTransformSpace\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/RigVM.ERigVMTransformSpace'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.ERigVMTransformSpace\"",
+            "DefaultValue=\"GlobalSpace\""
+          ]
+        },
+        {
+          "name": "Transform.Rotation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Rotation\"",
+            "Direction=Output",
+            "CPPType=\"FQuat\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Quat'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Quat\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000)\""
+          ]
+        },
+        {
+          "name": "Transform.Translation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Transform.Translation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Transform.Translation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Transform.Translation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Translation\"",
+            "Direction=Output",
+            "bIsExpanded=True",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Transform.Scale3D.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "Transform.Scale3D.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "Transform.Scale3D.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "Transform.Scale3D",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Scale 3D\"",
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Transform",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Transform\"",
+            "Direction=Output",
+            "bIsExpanded=True",
+            "CPPType=\"FTransform\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Transform'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Transform\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Rotation'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Translation'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Scale3D'\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SpringInterpV2_1_1",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"SpringInterp::Execute(in Target,in Strength,in CriticalDamping,in Force,in bUseCurrentInput,in Current,in TargetVelocityAmount,in bInitializeFromTarget,out Result,out Velocity)\"",
+        "ResolvedFunctionName=\"FRigUnit_SpringInterpV2::Execute\"",
+        "NodeTitle=\"Spring Interpolate\"",
+        "Position=(X=-256.000000,Y=-288.000000)",
+        "NodeColor=(R=0.250000,G=0.050000,B=0.050000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Target'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Strength'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'CriticalDamping'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'Force'\"",
+        "Pins(4)=\"/Script/RigVMDeveloper.RigVMPin'bUseCurrentInput'\"",
+        "Pins(5)=\"/Script/RigVMDeveloper.RigVMPin'Current'\"",
+        "Pins(6)=\"/Script/RigVMDeveloper.RigVMPin'TargetVelocityAmount'\"",
+        "Pins(7)=\"/Script/RigVMDeveloper.RigVMPin'bInitializeFromTarget'\"",
+        "Pins(8)=\"/Script/RigVMDeveloper.RigVMPin'Result'\"",
+        "Pins(9)=\"/Script/RigVMDeveloper.RigVMPin'Velocity'\"",
+        "Pins(10)=\"/Script/RigVMDeveloper.RigVMPin'SimulatedResult'\"",
+        "Pins(11)=\"/Script/RigVMDeveloper.RigVMPin'SpringState'\""
+      ],
+      "pins": [
+        {
+          "name": "bInitializeFromTarget",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Initialize from Target\"",
+            "Direction=Input",
+            "bIsConstant=True",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"true\""
+          ]
+        },
+        {
+          "name": "bUseCurrentInput",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Use Current Input\"",
+            "Direction=Input",
+            "bIsConstant=True",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"false\""
+          ]
+        },
+        {
+          "name": "CriticalDamping",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Critical Damping\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "Current",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Current\"",
+            "Direction=Input",
+            "CPPType=\"float\""
+          ]
+        },
+        {
+          "name": "Force",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Force\"",
+            "Direction=Input",
+            "CPPType=\"float\""
+          ]
+        },
+        {
+          "name": "Result",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Result\"",
+            "Direction=Output",
+            "CPPType=\"float\""
+          ]
+        },
+        {
+          "name": "SimulatedResult",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Simulated Result\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"float\""
+          ]
+        },
+        {
+          "name": "SpringState",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Spring State\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FFloatSpringState\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/Engine.FloatSpringState'\"",
+            "CPPTypeObjectPath=\"/Script/Engine.FloatSpringState\"",
+            "DefaultValue=\"()\""
+          ]
+        },
+        {
+          "name": "Strength",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Strength\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"2.000000\""
+          ]
+        },
+        {
+          "name": "Target",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Target\"",
+            "Direction=Input",
+            "CPPType=\"float\""
+          ]
+        },
+        {
+          "name": "TargetVelocityAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Target Velocity Amount\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Velocity",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Velocity\"",
+            "Direction=Output",
+            "CPPType=\"float\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=114B6FEF473104CCB97560A26F1FEC20",
+        "Position=(X=192.000000,Y=-16.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'ExecuteContext'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "ExecuteContext",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Execute\"",
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"float\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"PelvisOffset\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MathFloatMin_2_1_1",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"Minimum::Execute(in A,in B,out Result)\"",
+        "ResolvedFunctionName=\"FRigVMFunction_MathFloatMin::Execute\"",
+        "NodeTitle=\"Minimum\"",
+        "Position=(X=-896.000000,Y=-336.000000)",
+        "NodeColor=(R=0.050000,G=0.250000,B=0.050000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'A'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'B'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Result'\""
+      ],
+      "pins": [
+        {
+          "name": "A.RigVMInjectionInfo_0.VariableNode_4_1_1_1_1_1_1_1.Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "A.RigVMInjectionInfo_0.VariableNode_4_1_1_1_1_1_1_1.Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootLeftOffsetLocationZ\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        },
+        {
+          "name": "A.RigVMInjectionInfo_0.VariableNode_4_1_1_1_1_1_1_1",
+          "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+          "properties": [
+            "VariableGuid=408C852D4EAA4BF8F98EC38779555E1B",
+            "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+            "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+          ]
+        },
+        {
+          "name": "A.RigVMInjectionInfo_0",
+          "class": "/Script/RigVMDeveloper.RigVMInjectionInfo",
+          "properties": [
+            "Node=\"/Script/RigVMDeveloper.RigVMVariableNode'VariableNode_4_1_1_1_1_1_1_1'\"",
+            "OutputPin=\"/Script/RigVMDeveloper.RigVMPin'VariableNode_4_1_1_1_1_1_1_1.Value'\""
+          ]
+        },
+        {
+          "name": "A",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"A\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "InjectionInfos(0)=\"/Script/RigVMDeveloper.RigVMInjectionInfo'RigVMInjectionInfo_0'\""
+          ]
+        },
+        {
+          "name": "B.RigVMInjectionInfo_0.VariableNode_5_1_1_1_1_1_1_1.Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "B.RigVMInjectionInfo_0.VariableNode_5_1_1_1_1_1_1_1.Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootRightOffsetLocationZ\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        },
+        {
+          "name": "B.RigVMInjectionInfo_0.VariableNode_5_1_1_1_1_1_1_1",
+          "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+          "properties": [
+            "VariableGuid=4988CCAD4F16ED38AC0B6CA9F2AD0DB7",
+            "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+            "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+          ]
+        },
+        {
+          "name": "B.RigVMInjectionInfo_0",
+          "class": "/Script/RigVMDeveloper.RigVMInjectionInfo",
+          "properties": [
+            "Node=\"/Script/RigVMDeveloper.RigVMVariableNode'VariableNode_5_1_1_1_1_1_1_1'\"",
+            "OutputPin=\"/Script/RigVMDeveloper.RigVMPin'VariableNode_5_1_1_1_1_1_1_1.Value'\""
+          ]
+        },
+        {
+          "name": "B",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"B\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "InjectionInfos(0)=\"/Script/RigVMDeveloper.RigVMInjectionInfo'RigVMInjectionInfo_0'\""
+          ]
+        },
+        {
+          "name": "Result",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Result\"",
+            "Direction=Output",
+            "CPPType=\"float\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Clamp",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"Clamp::Execute(in Value,in Minimum,in Maximum,out Result)\"",
+        "ResolvedFunctionName=\"FRigVMFunction_MathDoubleClamp::Execute\"",
+        "Position=(X=-624.000000,Y=-336.000000)",
+        "NodeColor=(R=0.050000,G=0.250000,B=0.050000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Minimum'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Maximum'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'Result'\""
+      ],
+      "pins": [
+        {
+          "name": "Maximum",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"40.000000\""
+          ]
+        },
+        {
+          "name": "Minimum",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"-30.000000\""
+          ]
+        },
+        {
+          "name": "Result",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Add",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"Add::Execute(in A,in B,out Result)\"",
+        "ResolvedFunctionName=\"FRigVMFunction_MathDoubleAdd::Execute\"",
+        "Position=(X=176.000000,Y=272.000000)",
+        "NodeColor=(R=0.050000,G=0.250000,B=0.050000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'A'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'B'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Result'\""
+      ],
+      "pins": [
+        {
+          "name": "B.RigVMInjectionInfo_0.VariableNode_1_1_1_1_1.Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\""
+          ]
+        },
+        {
+          "name": "B.RigVMInjectionInfo_0.VariableNode_1_1_1_1_1.Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"PelvisOffset\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        },
+        {
+          "name": "B.RigVMInjectionInfo_0.VariableNode_1_1_1_1_1",
+          "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+          "properties": [
+            "VariableGuid=114B6FEF473104CCB97560A26F1FEC20",
+            "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+            "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+          ]
+        },
+        {
+          "name": "B.RigVMInjectionInfo_0",
+          "class": "/Script/RigVMDeveloper.RigVMInjectionInfo",
+          "properties": [
+            "Node=\"/Script/RigVMDeveloper.RigVMVariableNode'VariableNode_1_1_1_1_1'\"",
+            "OutputPin=\"/Script/RigVMDeveloper.RigVMPin'VariableNode_1_1_1_1_1.Value'\""
+          ]
+        },
+        {
+          "name": "B",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\"",
+            "InjectionInfos(0)=\"/Script/RigVMDeveloper.RigVMInjectionInfo'RigVMInjectionInfo_0'\""
+          ]
+        },
+        {
+          "name": "A",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Result",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_2",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=176.000000,Y=192.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_3",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=176.000000,Y=224.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_4",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=304.000000,Y=192.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_5",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=304.000000,Y=224.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Multiply",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"Multiply::Execute(in A,in B,out Result)\"",
+        "ResolvedFunctionName=\"FRigVMFunction_MathDoubleMul::Execute\"",
+        "Position=(X=0.000000,Y=-160.000000)",
+        "NodeColor=(R=0.050000,G=0.250000,B=0.050000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'A'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'B'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Result'\""
+      ],
+      "pins": [
+        {
+          "name": "A",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"A\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "B",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"B\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "Result",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Result\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Multiply_1",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"Multiply::Execute(in A,in B,out Result)\"",
+        "ResolvedFunctionName=\"FRigVMFunction_MathDoubleMul::Execute\"",
+        "Position=(X=-432.000000,Y=-192.000000)",
+        "NodeColor=(R=0.050000,G=0.250000,B=0.050000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'A'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'B'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Result'\""
+      ],
+      "pins": [
+        {
+          "name": "A",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"A\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "B",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"B\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        },
+        {
+          "name": "Result",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Result\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=-96.000000,Y=64.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"double\"",
+            "DefaultValue=\"1.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode_1",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=3DD72BEB443F3458005316AF83717BD5",
+        "Position=(X=-768.000000,Y=-160.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value.bUseHandIkBones",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.bUseFootIkBones",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.bFootTransformsValid",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.VelocityBlendForwardAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.VelocityBlendBackwardAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.SpineYawAngle",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.PelvisOffsetAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftRotation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FQuat\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Quat'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Quat\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000)\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Value.FootRightRotation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FQuat\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Quat'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Quat\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000)\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "bIsExpanded=True",
+            "CPPType=\"FAlsControlRigInput\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ALS.AlsControlRigInput'\"",
+            "CPPTypeObjectPath=\"/Script/ALS.AlsControlRigInput\"",
+            "DefaultValue=\"(bUseHandIkBones=False,bUseFootIkBones=False,bFeetTransformValid=False,VelocityBlendForwardAmount=0.000000,VelocityBlendBackwardAmount=0.000000,SpineYawAngle=0.000000,PelvisOffsetAmount=0.000000,FootLeftLocation=(X=0.000000,Y=0.000000,Z=0.000000),FootLeftRotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),FootRightLocation=(X=0.000000,Y=0.000000,Z=0.000000),FootRightRotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),bFeetTransformsValid=False)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'bUseHandIkBones'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'bUseFootIkBones'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'bFootTransformsValid'\"",
+            "SubPins(3)=\"/Script/RigVMDeveloper.RigVMPin'VelocityBlendForwardAmount'\"",
+            "SubPins(4)=\"/Script/RigVMDeveloper.RigVMPin'VelocityBlendBackwardAmount'\"",
+            "SubPins(5)=\"/Script/RigVMDeveloper.RigVMPin'SpineYawAngle'\"",
+            "SubPins(6)=\"/Script/RigVMDeveloper.RigVMPin'PelvisOffsetAmount'\"",
+            "SubPins(7)=\"/Script/RigVMDeveloper.RigVMPin'FootLeftLocation'\"",
+            "SubPins(8)=\"/Script/RigVMDeveloper.RigVMPin'FootLeftRotation'\"",
+            "SubPins(9)=\"/Script/RigVMDeveloper.RigVMPin'FootRightLocation'\"",
+            "SubPins(10)=\"/Script/RigVMDeveloper.RigVMPin'FootRightRotation'\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"RigInput\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RigVMLink_1",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_4_1_1_1_1_1_1_1.Value\"",
+        "TargetPinPath=\"MathFloatMin_2_1_1.A\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_2",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_5_1_1_1_1_1_1_1.Value\"",
+        "TargetPinPath=\"MathFloatMin_2_1_1.B\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_33",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"MathFloatMin_2_1_1.Result\"",
+        "TargetPinPath=\"Clamp.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_0",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"GetTransform_3.Transform.Translation.Z\"",
+        "TargetPinPath=\"Add.A\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_5",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_1_1_1_1_1.Value\"",
+        "TargetPinPath=\"Add.B\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_4",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"Add.Result\"",
+        "TargetPinPath=\"SetTranslation_1.Value.Z\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_16",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"GetTransform_3.Transform.Translation.X\"",
+        "TargetPinPath=\"RerouteNode_2.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_18",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"GetTransform_3.Transform.Translation.Y\"",
+        "TargetPinPath=\"RerouteNode_3.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_19",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_4.Value\"",
+        "TargetPinPath=\"SetTranslation_1.Value.X\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_20",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_2.Value\"",
+        "TargetPinPath=\"RerouteNode_4.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_21",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_5.Value\"",
+        "TargetPinPath=\"SetTranslation_1.Value.Y\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_22",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_3.Value\"",
+        "TargetPinPath=\"RerouteNode_5.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_46",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"Multiply.Result\"",
+        "TargetPinPath=\"VariableNode.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_38",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"Multiply_1.Result\"",
+        "TargetPinPath=\"SpringInterpV2_1_1.Target\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_78",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode.ExecuteContext\"",
+        "TargetPinPath=\"SetTranslation_1.ExecutePin\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_15",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"Clamp.Result\"",
+        "TargetPinPath=\"Multiply_1.A\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_23",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"SpringInterpV2_1_1.Result\"",
+        "TargetPinPath=\"Multiply.A\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_24",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode.Value\"",
+        "TargetPinPath=\"Multiply.B\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_7",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_1.Value.PelvisOffsetAmount\"",
+        "TargetPinPath=\"Multiply_1.B\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_8",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_1.Value.PelvisOffsetAmount\"",
+        "TargetPinPath=\"RerouteNode.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_10",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"Entry.Input\"",
+        "TargetPinPath=\"VariableNode.ExecuteContext\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_54",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"SetTranslation_1.ExecutePin\"",
+        "TargetPinPath=\"Return.Input\""
+      ],
+      "pins": []
+    }
+  ],
+  "offsets": [
+    {
+      "name": "Entry",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionEntryNode",
+      "properties": [
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TraceFootOffset",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionReferenceNode",
+      "properties": [
+        "ReferencedFunctionHeader=(LibraryPointer=(LibraryNodePath=\"/ALS/ALS/Character/CR_Als.CR_Als:RigVMFunctionLibrary.TraceFootOffset\",HostObject=\"/ALS/ALS/Character/CR_Als.CR_Als_C\"),Variant=(Guid=9C6CBF85BE9F3B94B52F3D048747F66F),Name=\"TraceFootOffset\",NodeTitle=\"TraceFootOffset\",Arguments=((Name=\"Input\",DisplayName=\"Execute\",CPPType=\"FRigVMExecuteContext\",CPPTypeObject=\"/Script/RigVM.RigVMExecuteContext\",Direction=IO,DefaultValue=\"()\",PathToTooltip=((\"Input\", \"\"))),(Name=\"FootTargetLocation\",DisplayName=\"FootTargetLocation\",CPPType=\"FVector\",CPPTypeObject=\"/Script/CoreUObject.Vector\",DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\",PathToTooltip=((\"FootTargetLocation\", \"\"),(\"X\", \"\"),(\"Y\", \"\"),(\"Z\", \"\"))),(Name=\"FootIkAmount\",DisplayName=\"FootIkAmount\",CPPType=\"double\",PathToTooltip=((\"FootIkAmount\", \"\"))),(Name=\"OffsetLocationZ\",DisplayName=\"OffsetLocationZ\",CPPType=\"double\",Direction=Output,PathToTooltip=((\"OffsetLocationZ\", \"\"))),(Name=\"OffsetNormal\",DisplayName=\"OffsetNormal\",CPPType=\"FVector\",CPPTypeObject=\"/Script/CoreUObject.Vector\",Direction=Output,DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\",PathToTooltip=((\"OffsetNormal\", \"\"),(\"X\", \"\"),(\"Y\", \"\"),(\"Z\", \"\")))),ExternalVariables=(()))",
+        "Position=(X=400.000000,Y=-160.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'FootTargetLocation'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'FootIkAmount'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'OffsetLocationZ'\"",
+        "Pins(4)=\"/Script/RigVMDeveloper.RigVMPin'OffsetNormal'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "FootIkAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "OffsetLocationZ",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TraceFootOffset_1",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionReferenceNode",
+      "properties": [
+        "ReferencedFunctionHeader=(LibraryPointer=(LibraryNodePath=\"/ALS/ALS/Character/CR_Als.CR_Als:RigVMFunctionLibrary.TraceFootOffset\",HostObject=\"/ALS/ALS/Character/CR_Als.CR_Als_C\"),Variant=(Guid=9C6CBF85BE9F3B94B52F3D048747F66F),Name=\"TraceFootOffset\",NodeTitle=\"TraceFootOffset\",Arguments=((Name=\"Input\",DisplayName=\"Execute\",CPPType=\"FRigVMExecuteContext\",CPPTypeObject=\"/Script/RigVM.RigVMExecuteContext\",Direction=IO,DefaultValue=\"()\",PathToTooltip=((\"Input\", \"\"))),(Name=\"FootTargetLocation\",DisplayName=\"FootTargetLocation\",CPPType=\"FVector\",CPPTypeObject=\"/Script/CoreUObject.Vector\",DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\",PathToTooltip=((\"FootTargetLocation\", \"\"),(\"X\", \"\"),(\"Y\", \"\"),(\"Z\", \"\"))),(Name=\"FootIkAmount\",DisplayName=\"FootIkAmount\",CPPType=\"double\",PathToTooltip=((\"FootIkAmount\", \"\"))),(Name=\"OffsetLocationZ\",DisplayName=\"OffsetLocationZ\",CPPType=\"double\",Direction=Output,PathToTooltip=((\"OffsetLocationZ\", \"\"))),(Name=\"OffsetNormal\",DisplayName=\"OffsetNormal\",CPPType=\"FVector\",CPPTypeObject=\"/Script/CoreUObject.Vector\",Direction=Output,DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\",PathToTooltip=((\"OffsetNormal\", \"\"),(\"X\", \"\"),(\"Y\", \"\"),(\"Z\", \"\")))),ExternalVariables=(()))",
+        "Position=(X=1264.000000,Y=-160.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'FootTargetLocation'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'FootIkAmount'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'OffsetLocationZ'\"",
+        "Pins(4)=\"/Script/RigVMDeveloper.RigVMPin'OffsetNormal'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "FootIkAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "OffsetLocationZ",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Return",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionReturnNode",
+      "properties": [
+        "Position=(X=400.000000,Y=48.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GetCurveValue",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "ResolvedFunctionName=\"FRigUnit_GetCurveValue::Execute\"",
+        "NodeTitle=\"Get Curve Value\"",
+        "Position=(X=128.000000,Y=448.000000)",
+        "NodeColor=(R=0.462745,G=1.000000,B=0.329412,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Curve'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Valid'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Value'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'CachedCurveIndex'\""
+      ],
+      "pins": [
+        {
+          "name": "CachedCurveIndex.Key.Type",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Type\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"ERigElementType\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/ControlRig.ERigElementType'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.ERigElementType\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.Key.Name",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Name\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FName\"",
+            "CustomWidgetName=\"ElementName\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.Key",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Key\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FRigElementKey\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigElementKey'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.RigElementKey\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Type'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Name'\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.Index",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"uint16\"",
+            "DefaultValue=\"65535\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.ContainerVersion",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Container Version\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"int32\"",
+            "DefaultValue=\"-1\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Cached Curve Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FCachedRigElement\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.CachedRigElement'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.CachedRigElement\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Key'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Index'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'ContainerVersion'\""
+          ]
+        },
+        {
+          "name": "Curve",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Curve\"",
+            "Direction=Input",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootLeftIk\"",
+            "CustomWidgetName=\"CurveName\""
+          ]
+        },
+        {
+          "name": "Valid",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Valid\"",
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"True\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Value\"",
+            "Direction=Output",
+            "CPPType=\"float\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GetCurveValue_1",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "ResolvedFunctionName=\"FRigUnit_GetCurveValue::Execute\"",
+        "NodeTitle=\"Get Curve Value\"",
+        "Position=(X=992.000000,Y=336.000000)",
+        "NodeColor=(R=0.462745,G=1.000000,B=0.329412,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Curve'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Valid'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Value'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'CachedCurveIndex'\""
+      ],
+      "pins": [
+        {
+          "name": "CachedCurveIndex.Key.Type",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Type\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"ERigElementType\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/ControlRig.ERigElementType'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.ERigElementType\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.Key.Name",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Name\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FName\"",
+            "CustomWidgetName=\"ElementName\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.Key",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Key\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FRigElementKey\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.RigElementKey'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.RigElementKey\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Type'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Name'\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.Index",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"uint16\"",
+            "DefaultValue=\"65535\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex.ContainerVersion",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Container Version\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"int32\"",
+            "DefaultValue=\"-1\""
+          ]
+        },
+        {
+          "name": "CachedCurveIndex",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Cached Curve Index\"",
+            "Direction=Hidden",
+            "bIsDynamicArray=True",
+            "CPPType=\"FCachedRigElement\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ControlRig.CachedRigElement'\"",
+            "CPPTypeObjectPath=\"/Script/ControlRig.CachedRigElement\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'Key'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Index'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'ContainerVersion'\""
+          ]
+        },
+        {
+          "name": "Curve",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Curve\"",
+            "Direction=Input",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootRightIk\"",
+            "CustomWidgetName=\"CurveName\""
+          ]
+        },
+        {
+          "name": "Valid",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Valid\"",
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"True\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Value\"",
+            "Direction=Output",
+            "CPPType=\"float\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=D8031DE24E4939352D20E78689D7E98F",
+        "Position=(X=928.000000,Y=-160.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'ExecuteContext'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "ExecuteContext",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Execute\"",
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\""
+          ]
+        },
+        {
+          "name": "Value.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootLeftOffsetNormal\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode_3",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=E1196A9B422A3466EDADC8AEC459F64C",
+        "Position=(X=1808.000000,Y=-160.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'ExecuteContext'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "ExecuteContext",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Execute\"",
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\""
+          ]
+        },
+        {
+          "name": "Value.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootRightOffsetNormal\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode_6",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=408C852D4EAA4BF8F98EC38779555E1B",
+        "Position=(X=656.000000,Y=-160.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'ExecuteContext'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "ExecuteContext",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Execute\"",
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootLeftOffsetLocationZ\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode_7",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=4988CCAD4F16ED38AC0B6CA9F2AD0DB7",
+        "Position=(X=1520.000000,Y=-160.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'ExecuteContext'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "ExecuteContext",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Execute\"",
+            "Direction=IO",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootRightOffsetLocationZ\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_1",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=656.000000,Y=-32.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_2",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=832.000000,Y=-32.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=1520.000000,Y=-32.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_3",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=1712.000000,Y=-32.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode_1",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=3DD72BEB443F3458005316AF83717BD5",
+        "Position=(X=-144.000000,Y=80.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value.bUseHandIkBones",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.bUseFootIkBones",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.bFootTransformsValid",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.VelocityBlendForwardAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.VelocityBlendBackwardAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.SpineYawAngle",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.PelvisOffsetAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftRotation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FQuat\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Quat'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Quat\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000)\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Value.FootRightRotation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FQuat\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Quat'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Quat\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000)\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "bIsExpanded=True",
+            "CPPType=\"FAlsControlRigInput\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ALS.AlsControlRigInput'\"",
+            "CPPTypeObjectPath=\"/Script/ALS.AlsControlRigInput\"",
+            "DefaultValue=\"(bUseHandIkBones=False,bUseFootIkBones=False,bFeetTransformValid=False,VelocityBlendForwardAmount=0.000000,VelocityBlendBackwardAmount=0.000000,SpineYawAngle=0.000000,PelvisOffsetAmount=0.000000,FootLeftLocation=(X=0.000000,Y=0.000000,Z=0.000000),FootLeftRotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),FootRightLocation=(X=0.000000,Y=0.000000,Z=0.000000),FootRightRotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),bFeetTransformsValid=False)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'bUseHandIkBones'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'bUseFootIkBones'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'bFootTransformsValid'\"",
+            "SubPins(3)=\"/Script/RigVMDeveloper.RigVMPin'VelocityBlendForwardAmount'\"",
+            "SubPins(4)=\"/Script/RigVMDeveloper.RigVMPin'VelocityBlendBackwardAmount'\"",
+            "SubPins(5)=\"/Script/RigVMDeveloper.RigVMPin'SpineYawAngle'\"",
+            "SubPins(6)=\"/Script/RigVMDeveloper.RigVMPin'PelvisOffsetAmount'\"",
+            "SubPins(7)=\"/Script/RigVMDeveloper.RigVMPin'FootLeftLocation'\"",
+            "SubPins(8)=\"/Script/RigVMDeveloper.RigVMPin'FootLeftRotation'\"",
+            "SubPins(9)=\"/Script/RigVMDeveloper.RigVMPin'FootRightLocation'\"",
+            "SubPins(10)=\"/Script/RigVMDeveloper.RigVMPin'FootRightRotation'\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"RigInput\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RigVMFunction_ControlFlowBranch",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "ResolvedFunctionName=\"FRigVMFunction_ControlFlowBranch::Execute\"",
+        "NodeTitle=\"Branch\"",
+        "Position=(X=192.000000,Y=-80.000000)",
+        "NodeColor=(R=0.000000,G=0.000000,B=0.000000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'ExecuteContext'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Condition'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'True'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'False'\"",
+        "Pins(4)=\"/Script/RigVMDeveloper.RigVMPin'Completed'\"",
+        "Pins(5)=\"/Script/RigVMDeveloper.RigVMPin'BlockToRun'\""
+      ],
+      "pins": [
+        {
+          "name": "BlockToRun",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"None\"",
+            "DefaultValueType=Unset"
+          ]
+        },
+        {
+          "name": "Completed",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\"",
+            "DefaultValueType=Unset"
+          ]
+        },
+        {
+          "name": "Condition",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "ExecuteContext",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\"",
+            "DefaultValueType=Unset"
+          ]
+        },
+        {
+          "name": "False",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\"",
+            "DefaultValueType=Unset"
+          ]
+        },
+        {
+          "name": "True",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\"",
+            "DefaultValueType=Unset"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RerouteNode_4",
+      "class": "/Script/RigVMDeveloper.RigVMRerouteNode",
+      "properties": [
+        "Position=(X=320.000000,Y=320.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=IO",
+            "bIsExpanded=True",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VariableNode_2",
+      "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+      "properties": [
+        "VariableGuid=3DD72BEB443F3458005316AF83717BD5",
+        "Position=(X=928.000000,Y=-32.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+      ],
+      "pins": [
+        {
+          "name": "Value.bUseHandIkBones",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.bUseFootIkBones",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.bFootTransformsValid",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "Value.VelocityBlendForwardAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.VelocityBlendBackwardAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.SpineYawAngle",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.PelvisOffsetAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Value.FootLeftRotation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FQuat\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Quat'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Quat\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000)\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "Value.FootRightLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "Value.FootRightRotation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FQuat\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Quat'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Quat\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000)\""
+          ]
+        },
+        {
+          "name": "Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "bIsExpanded=True",
+            "CPPType=\"FAlsControlRigInput\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/ALS.AlsControlRigInput'\"",
+            "CPPTypeObjectPath=\"/Script/ALS.AlsControlRigInput\"",
+            "DefaultValue=\"(bUseHandIkBones=False,bUseFootIkBones=False,bFeetTransformValid=False,VelocityBlendForwardAmount=0.000000,VelocityBlendBackwardAmount=0.000000,SpineYawAngle=0.000000,PelvisOffsetAmount=0.000000,FootLeftLocation=(X=0.000000,Y=0.000000,Z=0.000000),FootLeftRotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),FootRightLocation=(X=0.000000,Y=0.000000,Z=0.000000),FootRightRotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),bFeetTransformsValid=False)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'bUseHandIkBones'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'bUseFootIkBones'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'bFootTransformsValid'\"",
+            "SubPins(3)=\"/Script/RigVMDeveloper.RigVMPin'VelocityBlendForwardAmount'\"",
+            "SubPins(4)=\"/Script/RigVMDeveloper.RigVMPin'VelocityBlendBackwardAmount'\"",
+            "SubPins(5)=\"/Script/RigVMDeveloper.RigVMPin'SpineYawAngle'\"",
+            "SubPins(6)=\"/Script/RigVMDeveloper.RigVMPin'PelvisOffsetAmount'\"",
+            "SubPins(7)=\"/Script/RigVMDeveloper.RigVMPin'FootLeftLocation'\"",
+            "SubPins(8)=\"/Script/RigVMDeveloper.RigVMPin'FootLeftRotation'\"",
+            "SubPins(9)=\"/Script/RigVMDeveloper.RigVMPin'FootRightLocation'\"",
+            "SubPins(10)=\"/Script/RigVMDeveloper.RigVMPin'FootRightRotation'\""
+          ]
+        },
+        {
+          "name": "Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"RigInput\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RigVMLink_45",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_6.ExecuteContext\"",
+        "TargetPinPath=\"VariableNode.ExecuteContext\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_46",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_7.ExecuteContext\"",
+        "TargetPinPath=\"VariableNode_3.ExecuteContext\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_6",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_2.Value\"",
+        "TargetPinPath=\"VariableNode.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_7",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_1.Value\"",
+        "TargetPinPath=\"RerouteNode_2.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_11",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_3.Value\"",
+        "TargetPinPath=\"VariableNode_3.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_12",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode.Value\"",
+        "TargetPinPath=\"RerouteNode_3.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_43",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode.ExecuteContext\"",
+        "TargetPinPath=\"TraceFootOffset_1.Input\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_44",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"TraceFootOffset_1.Input\"",
+        "TargetPinPath=\"VariableNode_7.ExecuteContext\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_48",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"GetCurveValue_1.Value\"",
+        "TargetPinPath=\"TraceFootOffset_1.FootIkAmount\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_2",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"TraceFootOffset_1.OffsetNormal\"",
+        "TargetPinPath=\"RerouteNode.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_4",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"TraceFootOffset_1.OffsetLocationZ\"",
+        "TargetPinPath=\"VariableNode_7.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_37",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"TraceFootOffset.Input\"",
+        "TargetPinPath=\"VariableNode_6.ExecuteContext\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_40",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"GetCurveValue.Value\"",
+        "TargetPinPath=\"TraceFootOffset.FootIkAmount\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_3",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"TraceFootOffset.OffsetNormal\"",
+        "TargetPinPath=\"RerouteNode_1.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_8",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"TraceFootOffset.OffsetLocationZ\"",
+        "TargetPinPath=\"VariableNode_6.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_9",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_1.Value.bFootTransformsValid\"",
+        "TargetPinPath=\"RigVMFunction_ControlFlowBranch.Condition\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_13",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RigVMFunction_ControlFlowBranch.True\"",
+        "TargetPinPath=\"TraceFootOffset.Input\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_18",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RerouteNode_4.Value\"",
+        "TargetPinPath=\"TraceFootOffset.FootTargetLocation\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_19",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_1.Value.FootLeftLocation\"",
+        "TargetPinPath=\"RerouteNode_4.Value\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_20",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_2.Value.FootRightLocation\"",
+        "TargetPinPath=\"TraceFootOffset_1.FootTargetLocation\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_10",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"Entry.Input\"",
+        "TargetPinPath=\"RigVMFunction_ControlFlowBranch.ExecuteContext\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_14",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"RigVMFunction_ControlFlowBranch.Completed\"",
+        "TargetPinPath=\"Return.Input\""
+      ],
+      "pins": []
+    }
+  ],
+  "traceOffsets": [
+    {
+      "name": "Entry",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionEntryNode",
+      "properties": [
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'FootTargetLocation'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'FootIkAmount'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "FootIkAmount",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Return",
+      "class": "/Script/RigVMDeveloper.RigVMFunctionReturnNode",
+      "properties": [
+        "Position=(X=256.000000,Y=0.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Input'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'OffsetLocationZ'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'OffsetNormal'\""
+      ],
+      "pins": [
+        {
+          "name": "Input",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FRigVMExecuteContext\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/RigVM.RigVMExecuteContext'\"",
+            "CPPTypeObjectPath=\"/Script/RigVM.RigVMExecuteContext\"",
+            "DefaultValue=\"()\""
+          ]
+        },
+        {
+          "name": "OffsetLocationZ",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "DefaultValue=\"(X=0.000000,Y=0.000000,Z=0.000000)\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AlsRigUnit_FootOffset",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "ResolvedFunctionName=\"FAlsRigUnit_FootOffsetTrace::Execute\"",
+        "NodeTitle=\"Foot Offset\"",
+        "Position=(X=-112.000000,Y=128.000000)",
+        "NodeColor=(R=0.200000,G=0.400000,B=1.000000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'FootTargetLocation'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'TraceChannel'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'TraceDistanceUpward'\"",
+        "Pins(3)=\"/Script/RigVMDeveloper.RigVMPin'TraceDistanceDownward'\"",
+        "Pins(4)=\"/Script/RigVMDeveloper.RigVMPin'WalkableFloorAngle'\"",
+        "Pins(5)=\"/Script/RigVMDeveloper.RigVMPin'FootHeight'\"",
+        "Pins(6)=\"/Script/RigVMDeveloper.RigVMPin'bEnabled'\"",
+        "Pins(7)=\"/Script/RigVMDeveloper.RigVMPin'bDrawDebug'\"",
+        "Pins(8)=\"/Script/RigVMDeveloper.RigVMPin'OffsetLocationZ'\"",
+        "Pins(9)=\"/Script/RigVMDeveloper.RigVMPin'OffsetNormal'\""
+      ],
+      "pins": [
+        {
+          "name": "FootHeight.RigVMInjectionInfo_0.VariableNode.Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\""
+          ]
+        },
+        {
+          "name": "FootHeight.RigVMInjectionInfo_0.VariableNode.Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootHeight\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        },
+        {
+          "name": "FootHeight.RigVMInjectionInfo_0.VariableNode",
+          "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+          "properties": [
+            "VariableGuid=183F06A948F2B18BD1AEDA90590EA815",
+            "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+            "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+          ]
+        },
+        {
+          "name": "FootHeight.RigVMInjectionInfo_0",
+          "class": "/Script/RigVMDeveloper.RigVMInjectionInfo",
+          "properties": [
+            "Node=\"/Script/RigVMDeveloper.RigVMVariableNode'VariableNode'\"",
+            "OutputPin=\"/Script/RigVMDeveloper.RigVMPin'VariableNode.Value'\""
+          ]
+        },
+        {
+          "name": "FootHeight",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Foot Height\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"13.500000\"",
+            "InjectionInfos(0)=\"/Script/RigVMDeveloper.RigVMInjectionInfo'RigVMInjectionInfo_0'\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.RigVMInjectionInfo_0.VariableNode_1.Value.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.RigVMInjectionInfo_0.VariableNode_1.Value.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.RigVMInjectionInfo_0.VariableNode_1.Value.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.RigVMInjectionInfo_0.VariableNode_1.Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.RigVMInjectionInfo_0.VariableNode_1.Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootTargetLocation\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.RigVMInjectionInfo_0.VariableNode_1",
+          "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+          "properties": [
+            "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+            "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.RigVMInjectionInfo_0",
+          "class": "/Script/RigVMDeveloper.RigVMInjectionInfo",
+          "properties": [
+            "Node=\"/Script/RigVMDeveloper.RigVMVariableNode'VariableNode_1'\"",
+            "OutputPin=\"/Script/RigVMDeveloper.RigVMPin'VariableNode_1.Value'\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "FootTargetLocation",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Foot Target Location\"",
+            "Direction=Input",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\"",
+            "InjectionInfos(0)=\"/Script/RigVMDeveloper.RigVMInjectionInfo'RigVMInjectionInfo_0'\""
+          ]
+        },
+        {
+          "name": "bDrawDebug",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Draw Debug\"",
+            "Direction=Input",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"False\""
+          ]
+        },
+        {
+          "name": "bEnabled",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Enabled\"",
+            "Direction=Input",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"True\""
+          ]
+        },
+        {
+          "name": "OffsetLocationZ",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Offset Location Z\"",
+            "Direction=Output",
+            "CPPType=\"float\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.X",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"X\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Y",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Y\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal.Z",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Z\"",
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\""
+          ]
+        },
+        {
+          "name": "OffsetNormal",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Offset Normal\"",
+            "Direction=Output",
+            "CPPType=\"FVector\"",
+            "CPPTypeObject=\"/Script/CoreUObject.ScriptStruct'/Script/CoreUObject.Vector'\"",
+            "CPPTypeObjectPath=\"/Script/CoreUObject.Vector\"",
+            "SubPins(0)=\"/Script/RigVMDeveloper.RigVMPin'X'\"",
+            "SubPins(1)=\"/Script/RigVMDeveloper.RigVMPin'Y'\"",
+            "SubPins(2)=\"/Script/RigVMDeveloper.RigVMPin'Z'\""
+          ]
+        },
+        {
+          "name": "TraceChannel",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Trace Channel\"",
+            "Direction=Input",
+            "CPPType=\"ECollisionChannel\"",
+            "CPPTypeObject=\"/Script/CoreUObject.Enum'/Script/Engine.ECollisionChannel'\"",
+            "CPPTypeObjectPath=\"/Script/Engine.ECollisionChannel\"",
+            "DefaultValue=\"ECC_Visibility\""
+          ]
+        },
+        {
+          "name": "TraceDistanceDownward",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Trace Distance Downward\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"80.000000\""
+          ]
+        },
+        {
+          "name": "TraceDistanceUpward",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Trace Distance Upward\"",
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"50.000000\""
+          ]
+        },
+        {
+          "name": "WalkableFloorAngle",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Input",
+            "CPPType=\"float\"",
+            "DefaultValue=\"45.000000\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GreaterEqual",
+      "class": "/Script/RigVMDeveloper.RigVMUnitNode",
+      "properties": [
+        "TemplateNotation=\"GreaterEqual::Execute(in A,in B,out Result)\"",
+        "ResolvedFunctionName=\"FRigVMFunction_MathDoubleGreaterEqual::Execute\"",
+        "Position=(X=-336.000000,Y=224.000000)",
+        "NodeColor=(R=0.050000,G=0.250000,B=0.050000,A=1.000000)",
+        "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'A'\"",
+        "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'B'\"",
+        "Pins(2)=\"/Script/RigVMDeveloper.RigVMPin'Result'\""
+      ],
+      "pins": [
+        {
+          "name": "A.RigVMInjectionInfo_0.VariableNode_3.Value",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Output",
+            "CPPType=\"double\"",
+            "DefaultValueType=Unset"
+          ]
+        },
+        {
+          "name": "A.RigVMInjectionInfo_0.VariableNode_3.Variable",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "Direction=Hidden",
+            "CPPType=\"FName\"",
+            "DefaultValue=\"FootIkAmount\"",
+            "CustomWidgetName=\"VariableName\""
+          ]
+        },
+        {
+          "name": "A.RigVMInjectionInfo_0.VariableNode_3",
+          "class": "/Script/RigVMDeveloper.RigVMVariableNode",
+          "properties": [
+            "Pins(0)=\"/Script/RigVMDeveloper.RigVMPin'Variable'\"",
+            "Pins(1)=\"/Script/RigVMDeveloper.RigVMPin'Value'\""
+          ]
+        },
+        {
+          "name": "A.RigVMInjectionInfo_0",
+          "class": "/Script/RigVMDeveloper.RigVMInjectionInfo",
+          "properties": [
+            "Node=\"/Script/RigVMDeveloper.RigVMVariableNode'VariableNode_3'\"",
+            "OutputPin=\"/Script/RigVMDeveloper.RigVMPin'VariableNode_3.Value'\""
+          ]
+        },
+        {
+          "name": "A",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"A\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000000\"",
+            "InjectionInfos(0)=\"/Script/RigVMDeveloper.RigVMInjectionInfo'RigVMInjectionInfo_0'\""
+          ]
+        },
+        {
+          "name": "B",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"B\"",
+            "Direction=Input",
+            "CPPType=\"double\"",
+            "DefaultValue=\"0.000100\""
+          ]
+        },
+        {
+          "name": "Result",
+          "class": "/Script/RigVMDeveloper.RigVMPin",
+          "properties": [
+            "DisplayName=\"Result\"",
+            "Direction=Output",
+            "CPPType=\"bool\"",
+            "DefaultValue=\"True\""
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RigVMLink_7",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode.Value\"",
+        "TargetPinPath=\"AlsRigUnit_FootOffset.FootHeight\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_8",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_1.Value\"",
+        "TargetPinPath=\"AlsRigUnit_FootOffset.FootTargetLocation\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_1",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"GreaterEqual.Result\"",
+        "TargetPinPath=\"AlsRigUnit_FootOffset.bEnabled\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_3",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"VariableNode_3.Value\"",
+        "TargetPinPath=\"GreaterEqual.A\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_2",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"Entry.Input\"",
+        "TargetPinPath=\"Return.Input\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_6",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"AlsRigUnit_FootOffset.OffsetLocationZ\"",
+        "TargetPinPath=\"Return.OffsetLocationZ\""
+      ],
+      "pins": []
+    },
+    {
+      "name": "RigVMLink_5",
+      "class": "/Script/RigVMDeveloper.RigVMLink",
+      "properties": [
+        "SourcePinPath=\"AlsRigUnit_FootOffset.OffsetNormal\"",
+        "TargetPinPath=\"Return.OffsetNormal\""
+      ],
+      "pins": []
+    }
+  ]
+}

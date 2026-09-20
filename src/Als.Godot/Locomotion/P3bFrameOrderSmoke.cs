@@ -3,6 +3,8 @@ using GodotAls.Assets;
 using GodotAls.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Diagnostics;
+using GodotAls.Core.Animation;
+using GodotAls.Core.Events;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
@@ -13,6 +15,13 @@ namespace GodotAls.Locomotion;
 
 public partial class P3bFrameOrderSmoke : Node
 {
+    private int _refactoredMovingFrames;
+    private int _refactoredPredictionFrames;
+    private int _refactoredPredictionBlockFrames;
+    private AlsRefactoredAnimationFeedback _previousRefactoredFeedback;
+    private ulong _refactoredPoseDigest = AlsResultDigest.OffsetBasis;
+    private AlsFullMovementDiagnostics _lateRefactoredDiagnostics;
+    private ulong _refactoredMovingDigest = AlsResultDigest.OffsetBasis;
     private const string ProfilePath = "res://assets/config/p3_locomotion_profile.json";
     private const string PoseProfilePath = "res://assets/config/p4_pose_profile.json";
     private const long LastFrame = 180;
@@ -27,10 +36,12 @@ public partial class P3bFrameOrderSmoke : Node
     private ulong _resultDigest = AlsResultDigest.OffsetBasis;
     private ulong _poseDigest = AlsResultDigest.OffsetBasis;
     private ulong _fullPoseDigest = AlsResultDigest.OffsetBasis;
+    private int _stopTransitionCount;
     private ulong _rootDigest = AlsResultDigest.OffsetBasis;
     private long _lastCommittedFrame;
     private long _firstJumpFrame;
     private long _firstLandingFrame;
+    private int _landPredictionFrames;
     private bool _oldGenerationRejected;
     private bool _replacementRecoveryPending;
     private bool _replacementGenerationObserved;
@@ -42,10 +53,14 @@ public partial class P3bFrameOrderSmoke : Node
     private int _leftFootBoneId;
     private int _rightFootBoneId;
     private AlsFrameIdentity _previousFootProbeIdentity;
+    private AlsFootIkPoseSample _previousNativeFeet;
+    private int _nativeFootFrames, _nativeLockFrames, _nativeOffsetFrames;
+    private float _nativeMaxLockCurve;
     private System.Numerics.Vector3 _previousLeftFootProbeOrigin;
     private System.Numerics.Vector3 _previousRightFootProbeOrigin;
     private bool _inactiveRigHiddenAfterSeparation;
     private bool _recoveryZeroVisible;
+    private int _pendingVisualFrames;
     private bool _disposeGuardsChecked;
     private bool _workerFailureInjected;
     private long _workerFailureCommittedFrame;
@@ -69,22 +84,46 @@ public partial class P3bFrameOrderSmoke : Node
     private bool _lateTransactionFailureArmed;
     private long _lateTransactionCommittedFrame;
     private long _lateTransactionResultPublishedFrame;
+    private bool _cycleGraph;
+    private int _sourceTimingFrames;
+    private int _completeMovementStates;
+    private bool _fullCoverage;
+    private bool _nativeFootCoverage;
+    private int _crouchingFrames;
+    private long EndFrame => _nativeFootCoverage ? 960 : _fullCoverage ? 600 : LastFrame;
+    private AlsStandingCycleState _lateTransactionCycleState;
+    private AlsStandingMovementInput _lateTransactionMovement;
+    private AlsCharacterRotationFeedback _lateTransactionRotationFeedback;
+    private AlsCycleSyncFrame _lateTransactionCycleSync;
+    private AlsBinaryBlendState _lateTransactionSprintBlend;
+    private float _lateTransactionSprintMask;
+    private AlsP5SourceEventState _lateTransactionSourceEvents;
+    private long _lateTransactionDispatchedEvents;
+    private long _expectedSourceEvents;
+    private long _sourceCallbacks;
+    private long _firstSourceEventFrame;
+    private AlsFrameIdentity _callbackIdentity;
+    private AlsEventBuffer _callbackEvents;
 
     public override void _Ready()
     {
         try
         {
             (_mode, _failurePolicy) = ReadOptions();
+            _cycleGraph = OS.GetCmdlineUserArgs().Contains("--als-cycle");
+            _fullCoverage = OS.GetCmdlineUserArgs().Contains("--full-movement-coverage");
+            _nativeFootCoverage = _fullCoverage && OS.GetCmdlineUserArgs().Contains("--foot-ik-frame");
+            Require(!_fullCoverage || _cycleGraph && _failurePolicy is null, "Full coverage requires the complete graph and no failure fixture.");
             VerifyFailureReasonPublicationOrder();
             ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-            ProcessThreadGroupOrder = 4;
+            ProcessThreadGroupOrder = AlsP3FrameStages.Observe;
 
             var animationSetResource = ResourceLoader.Load<AlsAnimationSetResource>(
                 AlsGodotImportCoordinator.CompiledResourcePath)
                 ?? throw new InvalidOperationException("P3B animation set resource is missing.");
             var animationSet = animationSetResource.LoadDefinition();
             var profile = AlsLocomotionProfileCompiler.Compile(
-                Godot.FileAccess.GetFileAsString(ProfilePath), animationSet);
+                Godot.FileAccess.GetFileAsString(_cycleGraph ? "res://assets/config/p4_cycle_locomotion_profile.json" : ProfilePath), animationSet);
             var settings = AlsLocomotionSettings.Load(
                 Godot.FileAccess.GetFileAsString("res://assets/config/p3_locomotion_settings.json"));
             var motorSettings = new AlsMotorSettings(
@@ -108,6 +147,7 @@ public partial class P3bFrameOrderSmoke : Node
                 profile,
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: _failurePolicy is null or "headless");
+            _context.AnimationEventCommitted += ObserveSourceEvent;
             if (_failurePolicy == "pose_restore")
             {
                 _context.PoseWriterFactory = skeleton =>
@@ -123,7 +163,7 @@ public partial class P3bFrameOrderSmoke : Node
             _slot.Configure(
                 _context,
                 () => CreateCommandSource(_failurePolicy),
-                new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f, 0f));
+                new Vector3(0f, _context.MotorSettings.StandingHeight * 0.5f + (_fullCoverage ? 3 : 0), 0f));
             _active = _slot.ActiveCharacter;
             _initialMovementAnchorPosition = _active.MovementAnchor.GlobalPosition;
             var poseProfile = AlsPoseProfileCompiler.Compile(
@@ -186,7 +226,7 @@ public partial class P3bFrameOrderSmoke : Node
                 ReplaceCharacter();
             }
 
-            if (_active.Diagnostics.CommittedFrameId == LastFrame)
+            if (_active.Diagnostics.CommittedFrameId == EndFrame)
             {
                 Finish();
             }
@@ -223,14 +263,34 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void ValidateCommitted(in AlsP3FrameDiagnostics frame)
     {
+        if (_cycleGraph)
+        {
+            var sourceEvents = _active.SourceEventState;
+            Require(sourceEvents.Initialized && sourceEvents.Identity == frame.Identity,
+                "Source event state was not committed with this frame.");
+            _expectedSourceEvents += frame.Result.TypedEvents.Count;
+            Require(_context.AnimationEventsDispatched == _expectedSourceEvents && _sourceCallbacks == _expectedSourceEvents &&
+                _context.AnimationEventHandlerFailures == 0, "Source event delivery was duplicated, stale, or omitted.");
+            if (frame.Result.TypedEvents.Count > 0)
+            {
+                Require(_callbackIdentity == frame.Identity && _callbackEvents.Count == frame.Result.TypedEvents.Count,
+                    "Main-thread callback batch has another frame identity.");
+                for (var i = 0; i < _callbackEvents.Count; i++) Require(_callbackEvents[i] == frame.Result.TypedEvents[i],
+                    "Main-thread callback differs from the published worker candidate.");
+            }
+        }
         Require(frame.CommandFrameId == frame.CommittedFrameId, "command frame lagged commit");
         Require(frame.MotorSnapshotFrameId == frame.CommittedFrameId, "motor snapshot lagged commit");
         Require(frame.ModelResultFrameId == frame.CommittedFrameId, "model result lagged commit");
         Require(frame.PoseAdvanceFrameId == frame.CommittedFrameId, "pose advance lagged commit");
         Require(frame.Identity == _active.HandleIdentity(frame.CommittedFrameId), "commit identity mismatch");
         var lifecycle = _active.LifecycleDiagnostics;
-        Require(lifecycle.IsActive && lifecycle.IsVisualReady && lifecycle.IsVisible,
-            "committed active P3 character did not reveal its ready visual");
+        var coldPose = AlsP3FrameStages.SplitFeet &&
+            (frame.CommittedFrameId == 1 || frame.CommittedFrameId == ReplacementFrame + 1);
+        Require(frame.PresentationPending == coldPose && lifecycle.IsActive &&
+            lifecycle.IsVisualReady == !coldPose && lifecycle.IsVisible == !coldPose && _active.Visible == !coldPose,
+            "Initial/replacement cold pose must commit hidden; the following complete pose must reveal.");
+        if (coldPose) _pendingVisualFrames++;
         var visibility = _slot.ReplacementDiagnostics;
         Require(visibility.VisibleCharacterCount <= 1,
             "committed P3 character observed more than one real visual root");
@@ -246,19 +306,97 @@ public partial class P3bFrameOrderSmoke : Node
             "committed diagnostics did not carry the same-frame logical motor velocity");
         if (!motor.HasPublishedVelocityCheckpoint)
         {
-            var engineVelocity = motor.GetRealVelocity();
+            var engineVelocity = _context.MovementGraph is null ? motor.GetRealVelocity() : motor.Velocity;
             Require(MathF.Abs(frame.ActualVelocity.X - engineVelocity.X) < 0.00001f &&
                     MathF.Abs(frame.ActualVelocity.Y - engineVelocity.Y) < 0.00001f &&
                     MathF.Abs(frame.ActualVelocity.Z - engineVelocity.Z) < 0.00001f,
                 "committed diagnostics did not carry the same-frame engine motor velocity");
         }
         ValidateProductionFootProbeOrigins(frame);
+        var motorInputForPrediction = _active.LatestMotorInput;
+        var predictionExpected = motorInputForPrediction.Floor.IsGrounded == 0 &&
+            motorInputForPrediction.ActualVelocity.Y < (_context.MovementGraph?.LandPrediction.Settings.FallThreshold ?? -2);
+        Require(motorInputForPrediction.Identity == frame.Identity &&
+            (predictionExpected ? motorInputForPrediction.LandPrediction.Queried == 1 : motorInputForPrediction.LandPrediction == default),
+            "Committed Motor input lost or retained an incorrect landing query snapshot.");
+        if (predictionExpected) _landPredictionFrames++;
+        Require(float.IsFinite(frame.Result.Stride) && float.IsFinite(frame.Result.PlayRate) &&
+            float.IsFinite(frame.Result.AnimationPhase), "Unresolved timing reached a committed frame.");
+        Require(frame.Result.AnimationPhase == _active.RuntimeAnimationPhase,
+            "Published phase and committed runtime phase disagree.");
+        if (_cycleGraph)
+        {
+            var complete = _active.FullMovementDiagnostics;
+            if (OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves"))
+            {
+                var sample = motorInputForPrediction.RefactoredGroundPrediction;
+                Require(complete.LockCurveProducersMatch,
+                    $"V4 authored graph lock writes did not reach their Refactored consumers at {frame.Identity}.");
+                Require(sample.Captured == 1 && sample.Observation.Query.Identity == frame.Identity &&
+                    complete.RefactoredFeedback.Pose.Identity == frame.Identity && complete.RefactoredInputPose == sample.Feedback.Pose,
+                    "Production Refactored query, cached pose and final output identities differ.");
+                if (_previousRefactoredFeedback.Pose.Identity.CharacterId == frame.Identity.CharacterId &&
+                    _previousRefactoredFeedback.Pose.Identity.SlotGeneration == frame.Identity.SlotGeneration)
+                    Require(sample.Feedback == _previousRefactoredFeedback, "Prediction gathering read uncommitted or stale final curves.");
+                _previousRefactoredFeedback = complete.RefactoredFeedback;
+                Require(complete.RefactoredFeedback.GroundPredictionBlock ==
+                    (complete.Feedback.LandPredictionMask.Present ? complete.Feedback.LandPredictionMask.Value : 0),
+                    "Final prediction block lost the V4 source alias during graph mixing.");
+                if (complete.RefactoredFeedback.GroundPredictionBlock > 0) _refactoredPredictionBlockFrames++;
+                Require(float.IsFinite(complete.RefactoredPrediction), "Nonfinite production prediction.");
+                if (complete.RefactoredPrediction > 0 && motorInputForPrediction.Floor.IsGrounded == 0) _refactoredPredictionFrames++;
+                Append(ref _refactoredPoseDigest, complete.RefactoredPrediction);
+                Append(ref _refactoredPoseDigest, complete.RefactoredFeedback.Pose.Grounded);
+                Append(ref _refactoredPoseDigest, complete.RefactoredFeedback.Pose.InAir);
+                Append(ref _refactoredPoseDigest, complete.RefactoredFeedback.Pose.Moving);
+            }
+            if (OS.GetCmdlineUserArgs().Contains("--refactored-movement-curves"))
+            {
+                Require(complete.HasPoseMovingChannel && (!complete.PoseMoving.Present || float.IsFinite(complete.PoseMoving.Value)),
+                    "Production root dropped the committed movement cache curve.");
+                if (complete.PoseMoving.Present && complete.PoseMoving.Value > 0) _refactoredMovingFrames++;
+                Append(ref _refactoredMovingDigest, complete.PoseMoving.Present ? 1UL : 0UL);
+                Append(ref _refactoredMovingDigest, complete.PoseMoving.Value);
+            }
+            _stopTransitionCount += complete.StopTransitions;
+            Require(_active.UsesCompleteMovement && complete.Identity == frame.Identity && complete.Feedback.Identity == frame.Identity &&
+                complete.Feedback.HasFrame && complete.Evaluation.GlobalFrame == (ulong)frame.Identity.FrameId &&
+                complete.Ground.Identity == frame.Identity && complete.Global.Identity == frame.Identity,
+                "Production commit did not publish a complete graph, input, and curve transaction.");
+            Require(complete.Global.Lean == frame.Result.Lean, "Worker retained a legacy Lean input after full movement evaluation.");
+            var rotationInput = _active.LatestMotorInput;
+            Require(rotationInput.CharacterRotation.Applied == 1 && frame.Result.TargetYaw == rotationInput.CharacterYaw &&
+                frame.Result.ActualGait == rotationInput.CharacterRotation.ActualGait && frame.CharacterRotationFeedback.Identity == frame.Identity,
+                "Animation overwrote the character-owned rotation/gait or published foreign curve feedback.");
+            if (rotationInput.CharacterRotation.FeedbackIdentity.SlotGeneration != 0)
+                Require(rotationInput.CharacterRotation.FeedbackIdentity.CharacterId == frame.Identity.CharacterId &&
+                    rotationInput.CharacterRotation.FeedbackIdentity.SlotGeneration == frame.Identity.SlotGeneration &&
+                    rotationInput.CharacterRotation.FeedbackIdentity.FrameId < frame.Identity.FrameId,
+                    "Motor consumed current/future or foreign animation feedback.");
+            _completeMovementStates |= 1 << complete.MovementState;
+            if (frame.Result.ActualStance == AlsStance.Crouching) _crouchingFrames++;
+        }
+        if (_cycleGraph && frame.Result.AnimationState == AlsAnimationState.Grounded &&
+            frame.Result.ActualStance == AlsStance.Standing)
+        {
+            var cycle = _active.StandingCycleState;
+            var movement = _active.StandingMovementInput;
+            var input = _active.LatestMotorInput;
+            var command = AlsLocomotionCommandResolver.Resolve(input.Command, input.Stance);
+            Require(movement == AlsStandingMovementInputModel.Evaluate(frame.Identity, frame.ActualVelocity,
+                    input.MovementInput.Captured == 1 ? input.MovementInput.Amount : input.MaxAcceleration > 0 ? command.InputAmount : 0, new(.01f, 1.5f, 0)) with
+                    { ControlRelativeYawDegrees = AlsYawOffset.VelocityRelativeControlDegrees(frame.ActualVelocity, input.Command.ViewYaw) },
+                "Committed standing movement does not use the same-frame motor input.");
+            Require(frame.Result.AnimationPhase == cycle.Phase && frame.Result.Stride == cycle.Stride &&
+                frame.Result.PlayRate == cycle.PlayRate, "Published timing differs from the actual source graph.");
+            _sourceTimingFrames++;
+        }
 
         if (_firstJumpFrame == 0 && frame.Result.ResolvedLocomotionState == AlsLocomotionState.InAir)
         {
             _firstJumpFrame = frame.CommittedFrameId;
-            Require(frame.Result.AnimationState == AlsAnimationState.JumpStart,
-                "first jump frame was not JumpStart");
+            Require(frame.Result.AnimationState == (_fullCoverage ? AlsAnimationState.FallLoop : AlsAnimationState.JumpStart),
+                "First airborne pose does not match the actual jump/drop input.");
         }
         if (_firstJumpFrame != 0 && _firstLandingFrame == 0 &&
             frame.Result.ResolvedLocomotionState == AlsLocomotionState.Grounded &&
@@ -270,6 +408,7 @@ public partial class P3bFrameOrderSmoke : Node
         }
 
         AlsResultDigest.Append(ref _resultDigest, frame.Result);
+        if (OS.GetCmdlineUserArgs().Contains("--foot-ik-frame")) AppendResultUsingPreviousOccurrenceLayout(frame.Result);
         Append(ref _poseDigest, frame.PoseDigest);
         Append(ref _fullPoseDigest, frame.FullPoseDigest);
         Append(ref _rootDigest, frame.RootDigest);
@@ -327,6 +466,20 @@ public partial class P3bFrameOrderSmoke : Node
                 "slot replacement did not recover the rejected frame");
             Require(replacement.Phase == AlsP3ReplacementPhase.Complete,
                 "slot replacement did not publish its complete phase");
+            if (_cycleGraph)
+            {
+                var retired = replacement.RetiredMotorInput;
+                var restored = _active.LatestMotorInput;
+                var migrated = retired.CharacterRotation;
+                if (migrated.FeedbackIdentity.SlotGeneration != 0)
+                    migrated = migrated with { FeedbackIdentity = _active.HandleIdentity(migrated.FeedbackIdentity.FrameId) };
+                Require(restored.CharacterYaw == retired.CharacterYaw && restored.CharacterRotation == migrated,
+                    "Replacement recalculated rotation instead of transferring the published Motor snapshot.");
+                var history = _active.CapturePublishedMotorLifecycle(restored.Identity.FrameId);
+                Require(Math.Abs(-history.RotationHistory.TargetYaw * Math.PI / 180 - migrated.SmoothedTargetYaw) < .000001 &&
+                    history.RotationGait == migrated.ActualGait,
+                    "Replacement lost the Motor's target rotation or gait history.");
+            }
             _replacementRecoveryCommitted = true;
             _replacementRecoveryPending = false;
         }
@@ -334,6 +487,10 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void Finish()
     {
+        Require(_pendingVisualFrames == (AlsP3FrameStages.SplitFeet ? 2 : 0),
+            "Cold initialization and replacement presentation were not both exercised.");
+        GD.Print($"PRESENTATION_INITIALIZATION_OK pending_frames={_pendingVisualFrames} replacement=verified");
+        if (_cycleGraph) Require(_active.StandingCycleState.FilteredBlendInput.X > 0, "Native Cycle graph was not evaluated.");
         Require(_firstJumpFrame > 0, "jump transition was not observed");
         Require(_firstLandingFrame > _firstJumpFrame, "landing transition was not observed");
         Require(_oldGenerationRejected, "old generation rejection was not exercised");
@@ -357,8 +514,85 @@ public partial class P3bFrameOrderSmoke : Node
             "worker did not run on the expected process group");
 
         var mode = _mode == AlsHarnessMode.Single ? "single" : "parallel";
+        if (_cycleGraph)
+        {
+            Require(_sourceTimingFrames > 0, "No committed source timing frames were checked.");
+            var bindings = _context.SourceBindings ?? throw new InvalidOperationException("Cycle context has no P5 source snapshot.");
+            var sources = bindings.CreateCoreView().Sources;
+            var layered=OS.GetCmdlineUserArgs().Contains("--layered-frame") || OS.GetCmdlineUserArgs().Contains("--foot-ik-frame");
+            var rootExtra = OS.GetCmdlineUserArgs().Contains("--foot-ik-frame") ? 1 : 0;
+            Require(_active.UsesLayeredPose==layered,"Worker did not activate the requested pose owner.");
+            Require(_context.MovementGraph is not null && sources.Players.Length == (layered ? 223 + rootExtra : 75) && sources.Samples.Length == (layered ? 257 + rootExtra : 109) &&
+                sources.Stamp == _context.MovementGraph.Sources.RuntimeStamp, "Worker did not retain the full Main Movement closure.");
+            Require(sources.NotifyRanges.Length == sources.Sequences.Length && sources.NotifyDefinitions.Length > 0 &&
+                sources.NotifyDefinitions.Length == sources.NotifyPolicies.Length, "P5 source snapshot lost its native notify tables.");
+            var sync = _active.StandingCycleSync;
+            Require(sync.Initialized && sync.BindingDigest == bindings.Digest && sync.LayoutDigest == bindings.LayoutDigest &&
+                sync.BindingStamp == bindings.CreateCoreView().Sources.Stamp, "Committed Cycle did not consume its context's P5 snapshot.");
+            GD.Print($"STANDING_CYCLE_WORKER_OK mode={mode} frames={EndFrame} result={_resultDigest:X16} pose={_fullPoseDigest:X16} timing_frames={_sourceTimingFrames}");
+            if (rootExtra != 0 && _fullCoverage)
+            {
+                // Batch 163 connects original Stop state notifies to Grounded Slot.
+                // Raw/additive native samples and 1260 retry frames validate that
+                // behavior; the paired worker digests guard its production result.
+                var based = OS.GetCmdlineUserArgs().Contains("--based-foot-lock");
+                // Separate version policy: preserve the V4 oracle baseline.
+                // Based values were paired across single/parallel after frame,
+                // coordinate, release and independent target/Final tests passed.
+                Require(_stopTransitionCount > 0, "Original Stop state notifications never reached production playback.");
+                if (!AlsP3FrameStages.SplitFeet)
+                {
+                    Require(_resultDigest == (based ? 0xDB9FEFC95ADA4B15UL : 0xEDE506BBD850B05CUL) &&
+                        _fullPoseDigest == (based ? 0x765E1669B4501131UL : 0x96B2DB325984773AUL),
+                        $"Native movement Motor regression: result={_resultDigest:X16} pose={_fullPoseDigest:X16}.");
+                    GD.Print($"NATIVE_MOVEMENT_MOTOR_REGRESSION_OK mode={mode} normalized_result={_overlayIdentityResultDigest:X16} pose={_fullPoseDigest:X16}");
+                }
+                // The new rig changes the actual final pose and foot outputs.
+                // Keep V4 goldens intact; compare the new modes to each other.
+                GD.Print($"STOP_TRANSITION_PRODUCTION_OK mode={mode} commands={_stopTransitionCount} foot_policy={(AlsP3FrameStages.SplitFeet ? "refactored_rig" : based ? "based" : "v4")}");
+            }
+            Require((_completeMovementStates & 5) == 5 && (_completeMovementStates & ((1 << 3) | (1 << 6))) != 0,
+                "Production graph did not evaluate Grounded, Jump and landing.");
+            if (_fullCoverage) Require((_completeMovementStates & 2) != 0 && _crouchingFrames > 0,
+                "Extended production fixture did not evaluate non-jump falling and crouching.");
+            var nativeFeet = OS.GetCmdlineUserArgs().Contains("--foot-ik-frame");
+            GD.Print($"MAIN_MOVEMENT_BINDING_WORKER_OK mode={mode} players={sources.Players.Length} samples={sources.Samples.Length} owner={(nativeFeet ? "layered_through_feet" : layered ? "layered_through_hands" : "complete_base_layer")} states={_completeMovementStates} feedback=committed evaluation=production");
+            if (nativeFeet)
+            {
+                Require(_nativeFootFrames == EndFrame && _nativeLockFrames > 0 && _nativeOffsetFrames > 0,
+                    $"Native production foot replay coverage: frames={_nativeFootFrames}, lock_frames={_nativeLockFrames}, offset_frames={_nativeOffsetFrames}, max_lock_curve={_nativeMaxLockCurve}.");
+                GD.Print($"NATIVE_FOOT_FRAME_WORKER_OK mode={mode} frames={_nativeFootFrames} lock_frames={_nativeLockFrames} offset_frames={_nativeOffsetFrames} history=committed physics=main legacy_writes=0");
+                if (AlsP3FrameStages.SplitFeet)
+                {
+                    var stages = _active.SplitFootDiagnostics;
+                    Require(stages.Rays > 0, "Refactored production never queried the physics world.");
+                    GD.Print($"REFACTORED_FOOT_DISPATCH_OK mode={mode} frames={_nativeFootFrames} active_generation_rays={stages.Rays} stages=0,1,2,3,4 lifecycle=5 skeleton_writer=3");
+                }
+            }
+            var inputCurves = _context.MovementGraph!.InputCurves;
+            Require(inputCurves.Curves.Count == 6 && ReferenceEquals(inputCurves.Curves["StrideBlend_N_Walk"], inputCurves.Curves["StrideBlend_C_Walk"]) &&
+                _context.MovementGraph.InputFunctions.CrouchingPlayRate(inputCurves.AnimatedCrouchingSpeed, 1, 1) == 1,
+                "Movement context lost its native input data/formulas.");
+            GD.Print($"MOVEMENT_INPUT_DEFINITION_OK mode={mode} bindings=6 defaults=13 state_defaults=7 formulas=3 ground_formulas=5 rate_functions=2 native_rate_cases=720 frame_adapter=production");
+            Require(_landPredictionFrames > 0, "Production replay never carried a falling capsule prediction.");
+            GD.Print($"LAND_PREDICTION_FRAME_INPUT_OK mode={mode} frames={_landPredictionFrames} identity=committed physics=main animation=complete_base_layer");
+            Require(_sourceCallbacks > 0, "No real source notify crossed Worker and main-thread Commit.");
+            GD.Print($"P5_SOURCE_EVENTS_COMMIT_OK mode={mode} events={_sourceCallbacks} first_frame={_firstSourceEventFrame} main_thread=1 generation_checked=1");
+            if (OS.GetCmdlineUserArgs().Contains("--refactored-movement-curves"))
+            {
+                Require(_refactoredMovingFrames > 0, "No moving curve survived the complete production root.");
+                GD.Print($"REFACTORED_MOVEMENT_CURVE_PRODUCTION_OK mode={mode} present_frames={_refactoredMovingFrames} curve_digest={_refactoredMovingDigest:X16} source=movement_cache consumer=final_root committed=1");
+            }
+            if (OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves"))
+            {
+                Require(_refactoredPredictionFrames > 0, "No real production air prediction reached the state curve producers.");
+                Require(_refactoredPredictionBlockFrames > 0, "No authored prediction mask reached the production final feedback.");
+                GD.Print($"REFACTORED_SOURCE_CURVES_PRODUCTION_OK mode={mode} blocked_frames={_refactoredPredictionBlockFrames} mask=final_mixed_source previous_frame_feedback=verified");
+                GD.Print($"REFACTORED_POSE_PRODUCTION_OK mode={mode} prediction_frames={_refactoredPredictionFrames} digest={_refactoredPoseDigest:X16} physics=main cached_pose=previous_final commit=atomic generation=cold_recapture");
+            }
+        }
         GD.Print(
-            $"GODOT_ALS_P3B_FRAME_ORDER_OK mode={mode} frames={LastFrame} " +
+            $"GODOT_ALS_P3B_FRAME_ORDER_OK mode={mode} frames={EndFrame} " +
             $"digest={_resultDigest:X16} pose={_poseDigest:X16} " +
             $"full_pose={_fullPoseDigest:X16} root={_rootDigest:X16} " +
             "lag=0 stale=0 generation=1 old_generation_rejected=1 retired_released=1 " +
@@ -377,7 +611,7 @@ public partial class P3bFrameOrderSmoke : Node
             ValidatePoseRestoreFailure();
             return;
         }
-        if (_failurePolicy == "late_transaction")
+        if (_failurePolicy is "late_transaction" or "late_source_event")
         {
             ValidateLateTransactionFailure();
             return;
@@ -412,7 +646,7 @@ public partial class P3bFrameOrderSmoke : Node
 
     private static (AlsHarnessMode Mode, string? FailurePolicy) ReadOptions()
     {
-        var arguments = OS.GetCmdlineUserArgs();
+        var arguments = OS.GetCmdlineUserArgs().Where(value => value is not ("--als-cycle" or "--full-movement-coverage" or "--layered-frame" or "--foot-ik-frame" or "--based-foot-lock" or "--refactored-movement-curves" or "--refactored-pose-curves" or "--refactored-foot-frame")).ToArray();
         if (arguments.Length is < 1 or > 2 ||
             !arguments[0].StartsWith("--als-mode=", StringComparison.Ordinal))
         {
@@ -436,6 +670,7 @@ public partial class P3bFrameOrderSmoke : Node
                 "--als-failure-policy=bounded" => "bounded",
                 "--als-failure-policy=pose_restore" => "pose_restore",
                 "--als-failure-policy=late_transaction" => "late_transaction",
+                "--als-failure-policy=late_source_event" => "late_source_event",
                 var value => throw new InvalidOperationException(
                     $"Unsupported P3B failure policy fixture: {value}"),
             };
@@ -473,6 +708,11 @@ public partial class P3bFrameOrderSmoke : Node
 
         var motorInput = _active.LatestMotorInput;
         var motor = (AlsCharacterMotor)_active.MovementAnchor;
+        if (motorInput.FootIk.Captured == 1)
+        {
+            ValidateNativeFootGather(frame, motorInput, motor);
+            return;
+        }
         if (_previousFootProbeIdentity.CharacterId == motorInput.Identity.CharacterId &&
             _previousFootProbeIdentity.SlotGeneration == motorInput.Identity.SlotGeneration &&
             _previousFootProbeIdentity.FrameId + 1 == motorInput.Identity.FrameId)
@@ -643,18 +883,44 @@ public partial class P3bFrameOrderSmoke : Node
 
     private void ValidateLateTransactionFailure()
     {
+        if (_failurePolicy == "late_source_event" && _lateTransactionFailureArmed && _active.FailureDiagnosticCount == 0)
+        {
+            _lateTransactionCommittedFrame = _active.Diagnostics.CommittedFrameId;
+            _lateTransactionResultPublishedFrame = _active.ResultPublishedFrameId;
+            _lateTransactionCycleState = _active.StandingCycleState;
+            _lateTransactionMovement = _active.StandingMovementInput;
+            _lateTransactionRotationFeedback = _active.Diagnostics.CharacterRotationFeedback;
+            _lateRefactoredDiagnostics = _active.FullMovementDiagnostics;
+            _lateTransactionCycleSync = _active.StandingCycleSync;
+            _lateTransactionSprintBlend = _active.StandingSprintBlend;
+            _lateTransactionSprintMask = _active.StandingSprintMask;
+            _lateTransactionSourceEvents = _active.SourceEventState;
+            _lateTransactionDispatchedEvents = _context.AnimationEventsDispatched;
+        }
         if (!_lateTransactionFailureArmed)
         {
             var committed = _active.Diagnostics;
-            if (committed.CommittedFrameId < 12 || _active.WorkerInFlight != 0)
+            if (committed.CommittedFrameId < (_failurePolicy == "late_source_event" ? 1 : 12) || _active.WorkerInFlight != 0)
             {
                 return;
             }
             _lateTransactionCommittedFrame = committed.CommittedFrameId;
             _lateTransactionResultPublishedFrame = _active.ResultPublishedFrameId;
-            _context.ArmWorkerFailureInjection(
-                AlsP3WorkerFailureInjectionStage.BeforePublish,
-                _active.PublishedFrameId + 1);
+            _lateTransactionCycleState = _active.StandingCycleState;
+            _lateTransactionMovement = _active.StandingMovementInput;
+            _lateTransactionRotationFeedback = _active.Diagnostics.CharacterRotationFeedback;
+            _lateRefactoredDiagnostics = _active.FullMovementDiagnostics;
+            _lateTransactionCycleSync = _active.StandingCycleSync;
+            _lateTransactionSprintBlend = _active.StandingSprintBlend;
+            _lateTransactionSprintMask = _active.StandingSprintMask;
+            _lateTransactionSourceEvents = _active.SourceEventState;
+            _lateTransactionDispatchedEvents = _context.AnimationEventsDispatched;
+            if (_failurePolicy == "late_source_event")
+            {
+                Require(_cycleGraph, "The source event failure scenario requires --als-cycle.");
+                System.Threading.Volatile.Write(ref _context.SourceEventFailureArmed, 1);
+            }
+            else _context.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish, _active.PublishedFrameId + 1);
             _lateTransactionFailureArmed = true;
             return;
         }
@@ -679,6 +945,47 @@ public partial class P3bFrameOrderSmoke : Node
             "late transaction rollback leaked runtime, result, controller or P4 bank state");
         Require(poseRollback.RollbackVerified,
             "late transaction rollback did not restore the captured pose/root");
+        if (_cycleGraph)
+        {
+            Require(_active.Diagnostics.CharacterRotationFeedback == _lateTransactionRotationFeedback,
+                "Late failure published candidate character rotation feedback.");
+            if (OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves"))
+            {
+                var current = _active.FullMovementDiagnostics;
+                Require(current.RefactoredFeedback == _lateRefactoredDiagnostics.RefactoredFeedback &&
+                    current.RefactoredInputPose == _lateRefactoredDiagnostics.RefactoredInputPose &&
+                    current.RefactoredPrediction == _lateRefactoredDiagnostics.RefactoredPrediction &&
+                    _active.CommittedRefactoredFeedback == _lateRefactoredDiagnostics.RefactoredFeedback,
+                    "Late failure changed Refactored prediction, cached pose or main-thread feedback.");
+                GD.Print("REFACTORED_POSE_ROLLBACK_OK prediction=1 cached_pose=1 final_feedback=1 main_feedback=1");
+                if (AlsP3FrameStages.SplitFeet)
+                {
+                    Require(current.RefactoredRig == _lateRefactoredDiagnostics.RefactoredRig &&
+                        current.RefactoredLocks == _lateRefactoredDiagnostics.RefactoredLocks &&
+                        current.FootPoseIdentity == _lateRefactoredDiagnostics.FootPoseIdentity && !_active.SplitFootDiagnostics.Pending,
+                        "Late failure changed Refactored springs, lock targets or final pose history.");
+                    GD.Print("REFACTORED_FOOT_DISPATCH_ROLLBACK_OK rig=1 locks=1 final_pose=1 pending_query=0");
+                }
+            }
+            Require(_lateTransactionCycleState.FilteredBlendInput.X > 0 &&
+                    _active.StandingCycleState == _lateTransactionCycleState,
+                "late failure changed the committed Cycle phase, state or filter output");
+            Require(StandingCycleSmoke.SameSync(_lateTransactionCycleSync, _active.StandingCycleSync),
+                "late failure changed a source clock, sample delta or marker/group history");
+            Require(_active.StandingSprintBlend == _lateTransactionSprintBlend && _active.StandingSprintMask == _lateTransactionSprintMask,
+                "Late failure changed the committed Sprint blend or mask.");
+            Require(_active.StandingMovementInput == _lateTransactionMovement,
+                "late failure changed the committed standing movement input");
+            Require(SameSourceEvents(_lateTransactionSourceEvents, _active.SourceEventState) &&
+                _context.AnimationEventsDispatched == _lateTransactionDispatchedEvents,
+                "Late failure committed notify random/identity/state history or dispatched callbacks.");
+            GD.Print($"STANDING_CYCLE_WORKER_ROLLBACK_OK mode={_mode.ToString().ToLowerInvariant()} source_sync=1 movement_input=1");
+            if (_failurePolicy == "late_source_event")
+            {
+                Require(_context.RejectedSourceEventCount > 0, "Failure did not contain source events.");
+                GD.Print($"P5_SOURCE_EVENTS_ROLLBACK_OK mode={_mode.ToString().ToLowerInvariant()} candidate_events={_context.RejectedSourceEventCount} callbacks_leaked=0 state=1 random=1 identity=1");
+            }
+        }
 
         GD.Print(
             $"GODOT_ALS_P3B_LATE_TRANSACTION_ROLLBACK_OK " +
@@ -689,13 +996,34 @@ public partial class P3bFrameOrderSmoke : Node
         GetTree().Quit();
     }
 
-    private static IAlsLocomotionCommandSource CreateCommandSource(string? failurePolicy) =>
+    private IAlsLocomotionCommandSource CreateCommandSource(string? failurePolicy) =>
         failurePolicy switch
         {
             "interactive" => new MultiFailureCommandSource(),
             "bounded" => new BoundedFailureCommandSource(),
+            null when _nativeFootCoverage => new NativeFootCoverageCommandSource(),
             _ => AlsMotorReplay.CreateHarnessSequence(),
         };
+
+    private void ObserveSourceEvent(AlsFrameIdentity identity, AlsAnimationEvent item)
+    {
+        Require(System.Environment.CurrentManagedThreadId == _context.MainManagedThreadId && item.NativeContext.Present,
+            "Source event callback has no native context or is running on a Worker thread.");
+        Require(_slot.ActiveCharacter.Diagnostics.Identity == identity, "Source event escaped before Commit or from a retired generation.");
+        if (_callbackIdentity != identity) { _callbackIdentity = identity; _callbackEvents.Clear(); }
+        Require(item.EventSequence == _callbackEvents.Count && _callbackEvents.TryAdd(item), "Native callback order or capacity differs.");
+        if (_firstSourceEventFrame == 0) _firstSourceEventFrame = identity.FrameId;
+        _sourceCallbacks++;
+    }
+
+    private static bool SameSourceEvents(AlsP5SourceEventState a, AlsP5SourceEventState b)
+    {
+        if (a.Initialized != b.Initialized || a.Identity != b.Identity || a.SourceStamp != b.SourceStamp ||
+            a.BindingDigest != b.BindingDigest || a.LayoutDigest != b.LayoutDigest || a.RandomSeed != b.RandomSeed ||
+            a.NextInstanceId != b.NextInstanceId || a.ActiveCount != b.ActiveCount) return false;
+        for (var i = 0; i < a.ActiveCount; i++) if (a.ActiveStates[i] != b.ActiveStates[i]) return false;
+        return true;
+    }
 
     private void ValidateDisposeGuards()
     {
@@ -1032,9 +1360,9 @@ public partial class P3bFrameOrderSmoke : Node
         Require(
             IsMainThreadRejection(characterFailure) &&
             IsMainThreadRejection(slotFailure) &&
-            commit!.ProcessThreadGroupOrder == 2 &&
-            _slot.ProcessThreadGroupOrder == 3 &&
-            ProcessThreadGroupOrder == 4,
+            commit!.ProcessThreadGroupOrder == AlsP3FrameStages.Commit &&
+            _slot.ProcessThreadGroupOrder == AlsP3FrameStages.Lifecycle &&
+            ProcessThreadGroupOrder == AlsP3FrameStages.Observe,
             "P3 lifecycle/thread scheduling contract was not enforced: " +
             $"character={DescribeFailure(characterFailure)} " +
             $"slot={DescribeFailure(slotFailure)} " +

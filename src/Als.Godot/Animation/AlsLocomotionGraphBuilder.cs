@@ -26,6 +26,7 @@ public sealed class AlsLocomotionGraphBuildResult : IDisposable
     public Skeleton3D TargetSkeleton { get; }
 
     public AlsLocomotionGraphHandles Handles { get; }
+    internal AlsStandingCycleGraph? StandingCycle { get; init; }
 
     public void Dispose()
     {
@@ -416,14 +417,33 @@ public static class AlsLocomotionGraphBuilder
         AlsAnimationLibraryBuildResult library,
         AlsLocomotionAnimationProfile profile,
         AlsPoseAnimationProfile poseProfile,
-        AlsAnimationSetDefinition animationSet) =>
-        BuildInternal(library, profile, poseProfile, animationSet);
+        AlsAnimationSetDefinition animationSet,
+        AlsP5CoreRuntimeBindingSnapshot? sourceBindings = null) =>
+        BuildInternal(library, profile, poseProfile, animationSet, sourceBindings);
+
+    internal static AlsP5CoreRuntimeBindingSnapshot CompileSourceBindings(AlsAnimationSetDefinition set,
+        AlsLocomotionAnimationProfile profile, AlsPoseAnimationProfile? pose = null,
+        AlsLocomotionSourceProfile? sourceProfile = null)
+    {
+        static string Read(string name) => Godot.FileAccess.GetFileAsString($"res://assets/config/{name}");
+        pose ??= AlsPoseProfileCompiler.Compile(Read("p4_pose_profile.json"), set, profile);
+        var p5 = AlsP5aAnimationRuntimeProfileCompiler.Compile(Read("p5a_animation_runtime.json"), set);
+        // The caller owns the source closure for the entire character transaction. Grounded
+        // may consume the full Main Movement snapshot without compiling a second clock/layout.
+        var sources = sourceProfile ?? AlsLocomotionSourceCompiler.Compile(Read("v4_locomotion_source_graph.json"), set, profile.SkeletonId);
+        if (sources.SkeletonId != profile.SkeletonId || sources.AnimationSetDefinitionDigest != set.DefinitionDigest)
+            throw new InvalidOperationException("Source binding definition differs from the graph.");
+        var inventory = GodotAls.Import.Inspection.AlsP5SourceInventoryCompiler.Compile(Read("v4_anim_graph_inventory.json"), set, sources);
+        var layout = AlsP5OccurrenceLayoutCompiler.CompileSourceAware(profile, pose, p5, sources, inventory);
+        return AlsP5CoreRuntimeBindingCompiler.CompileSourceAware(set, profile, pose, p5, layout, sources, inventory);
+    }
 
     private static AlsLocomotionGraphBuildResult BuildInternal(
         AlsAnimationLibraryBuildResult library,
         AlsLocomotionAnimationProfile profile,
         AlsPoseAnimationProfile? poseProfile,
-        AlsAnimationSetDefinition animationSet)
+        AlsAnimationSetDefinition animationSet,
+        AlsP5CoreRuntimeBindingSnapshot? sourceBindings = null)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(profile);
@@ -450,17 +470,32 @@ public static class AlsLocomotionGraphBuilder
                 StateMachineType = AnimationNodeStateMachine.StateMachineTypeEnum.Nested,
             });
 
-            var standing = BuildGroundedBranch(
+            AlsStandingCycleGraph? standingCycle = null;
+            AnimationNodeBlendTree standing;
+            if (profile.StandingWalkRun.Length == 6)
+            {
+                sourceBindings ??= CompileSourceBindings(animationSet, profile, poseProfile);
+                var refactoredMovementCurves = OS.GetCmdlineUserArgs().Any(a => a is "--refactored-movement-curves" or "--refactored-pose-curves") ?
+                    AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/refactored_pose_curve_inputs.json")) : null;
+                standingCycle = new AlsStandingCycleGraph(library, profile, animationSet,
+                    poseProfile is null ? "Grounded/Standing" : "Base/Grounded/Standing", ownedResources, sourceBindings, poseProfile, refactoredMovementCurves);
+                standing = Own(ownedResources, new AnimationNodeBlendTree());
+                AddLayerAndTimingNodes(standing, standingCycle.Root, library, profile.LeanAdditiveSamples,
+                    profile.LeanAdditiveBasePoseAnimationId, ownedResources);
+            }
+            else standing = BuildGroundedBranch(
                 library,
                 profile.StandingIdleAnimationId,
                 profile.StandingSamples,
                 profile.LeanAdditiveSamples,
+                profile.LeanAdditiveBasePoseAnimationId,
                 ownedResources);
             var crouching = BuildGroundedBranch(
                 library,
                 profile.CrouchingIdleAnimationId,
                 profile.CrouchingSamples,
                 profile.LeanAdditiveSamples,
+                profile.LeanAdditiveBasePoseAnimationId,
                 ownedResources);
             grounded.AddNode(handles.StanceNames[(int)AlsStance.Standing], standing);
             grounded.AddNode(handles.StanceNames[(int)AlsStance.Crouching], crouching);
@@ -476,11 +511,11 @@ public static class AlsLocomotionGraphBuilder
                 ownedResources);
 
             var jumpStart = BuildActionBranch(
-                library, profile.JumpStartAnimationId, profile.LeanAdditiveSamples, false, ownedResources);
+                library, profile.JumpStartAnimationId, profile.LeanAdditiveSamples, profile.LeanAdditiveBasePoseAnimationId, false, ownedResources);
             var fallLoop = BuildActionBranch(
-                library, profile.FallLoopAnimationId, profile.LeanAdditiveSamples, true, ownedResources);
+                library, profile.FallLoopAnimationId, profile.LeanAdditiveSamples, profile.LeanAdditiveBasePoseAnimationId, true, ownedResources);
             var landRecovery = BuildActionBranch(
-                library, profile.LandAnimationId, profile.LeanAdditiveSamples, false, ownedResources);
+                library, profile.LandAnimationId, profile.LeanAdditiveSamples, profile.LeanAdditiveBasePoseAnimationId, false, ownedResources);
 
             baseStateMachine.AddNode(handles.StateNames[(int)AlsAnimationState.Grounded], grounded);
             baseStateMachine.AddNode(handles.StateNames[(int)AlsAnimationState.JumpStart], jumpStart);
@@ -530,10 +565,16 @@ public static class AlsLocomotionGraphBuilder
             {
                 tree.RootNode = rootPath;
             }
+            var basePrefix = poseProfile is null ? string.Empty : "Base/";
+            foreach (var branch in new[] { "Grounded/Standing", "Grounded/Crouching", "JumpStart", "FallLoop", "LandRecovery" })
+            {
+                using var subtractPath = new StringName($"parameters/{basePrefix}{branch}/LeanDelta/sub_amount");
+                tree.Set(subtractPath, 1f);
+            }
             tree.AnimPlayer = handles.AnimationPlayerPath;
 
             var result = new AlsLocomotionGraphBuildResult(
-                tree, library.Skeleton, handles, ownedResources);
+                tree, library.Skeleton, handles, ownedResources) { StandingCycle = standingCycle };
             tree = null;
             handles = null;
             return result;
@@ -661,7 +702,7 @@ public static class AlsLocomotionGraphBuilder
             var basePrefix = poseProfile is null ? "" : "Base/";
             var groundedStanding = CreateParameterSet(
                 $"{basePrefix}Grounded/Standing",
-                true,
+                locomotionProfile.StandingWalkRun.Length == 0,
                 true,
                 layout.StandingBounds,
                 layout.LeanBounds,
@@ -839,6 +880,7 @@ public static class AlsLocomotionGraphBuilder
         int idleAnimationId,
         IReadOnlyList<AlsLocomotionAnimationSample> locomotionSamples,
         IReadOnlyList<AlsLocomotionAnimationSample> leanSamples,
+        int leanBaseAnimationId,
         List<IDisposable> ownedResources)
     {
         var samples = new AlsLocomotionAnimationSample[locomotionSamples.Count + 1];
@@ -854,6 +896,7 @@ public static class AlsLocomotionGraphBuilder
             library,
             samples,
             leanSamples,
+            leanBaseAnimationId,
             true,
             RadialBounds(outerRadius),
             ownedResources);
@@ -863,12 +906,13 @@ public static class AlsLocomotionGraphBuilder
         AlsAnimationLibraryBuildResult library,
         int animationId,
         IReadOnlyList<AlsLocomotionAnimationSample> leanSamples,
+        int leanBaseAnimationId,
         bool loop,
         List<IDisposable> ownedResources)
     {
         var tree = Own(ownedResources, new AnimationNodeBlendTree());
         var clip = CreateAnimationNode(library, animationId, loop, ownedResources);
-        AddLayerAndTimingNodes(tree, clip, library, leanSamples, ownedResources);
+        AddLayerAndTimingNodes(tree, clip, library, leanSamples, leanBaseAnimationId, ownedResources);
         return tree;
     }
 
@@ -1057,6 +1101,7 @@ public static class AlsLocomotionGraphBuilder
         AlsAnimationLibraryBuildResult library,
         IReadOnlyList<AlsLocomotionAnimationSample> locomotionSamples,
         IReadOnlyList<AlsLocomotionAnimationSample> leanSamples,
+        int leanBaseAnimationId,
         bool loop,
         (Vector2 Minimum, Vector2 Maximum)? locomotionBounds,
         List<IDisposable> ownedResources)
@@ -1064,7 +1109,7 @@ public static class AlsLocomotionGraphBuilder
         var tree = Own(ownedResources, new AnimationNodeBlendTree());
         var locomotion = BuildBlendSpace(
             library, locomotionSamples, loop, locomotionBounds, ownedResources);
-        AddLayerAndTimingNodes(tree, locomotion, library, leanSamples, ownedResources);
+        AddLayerAndTimingNodes(tree, locomotion, library, leanSamples, leanBaseAnimationId, ownedResources);
         return tree;
     }
 
@@ -1073,26 +1118,35 @@ public static class AlsLocomotionGraphBuilder
         AnimationRootNode baseNode,
         AlsAnimationLibraryBuildResult library,
         IReadOnlyList<AlsLocomotionAnimationSample> leanSamples,
+        int leanBaseAnimationId,
         List<IDisposable> ownedResources)
     {
         var lean = BuildBlendSpace(library, leanSamples, true, null, ownedResources);
+        var leanBase = CreateAnimationNode(library, leanBaseAnimationId, false, ownedResources);
+        var leanDelta = Own(ownedResources, new AnimationNodeSub2());
         var leanAdd = Own(ownedResources, new AnimationNodeAdd2());
         var scale = Own(ownedResources, new AnimationNodeTimeScale());
         var seek = Own(ownedResources, new AnimationNodeTimeSeek());
 
         using var locomotionName = new StringName("Locomotion");
         using var leanName = new StringName("Lean");
+        using var leanBaseName = new StringName("LeanBase");
+        using var leanDeltaName = new StringName("LeanDelta");
         using var leanAddName = new StringName("LeanAdd");
         using var scaleName = new StringName("Scale");
         using var seekName = new StringName("Seek");
         using var outputName = new StringName("output");
         tree.AddNode(locomotionName, baseNode);
         tree.AddNode(leanName, lean);
+        tree.AddNode(leanBaseName, leanBase);
+        tree.AddNode(leanDeltaName, leanDelta);
         tree.AddNode(leanAddName, leanAdd);
         tree.AddNode(scaleName, scale);
         tree.AddNode(seekName, seek);
         tree.ConnectNode(leanAddName, 0, locomotionName);
-        tree.ConnectNode(leanAddName, 1, leanName);
+        tree.ConnectNode(leanDeltaName, 0, leanName);
+        tree.ConnectNode(leanDeltaName, 1, leanBaseName);
+        tree.ConnectNode(leanAddName, 1, leanDeltaName);
         tree.ConnectNode(scaleName, 0, leanAddName);
         tree.ConnectNode(seekName, 0, scaleName);
         tree.ConnectNode(outputName, 0, seekName);

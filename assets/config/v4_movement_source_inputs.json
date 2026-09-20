@@ -1,0 +1,2744 @@
+{
+  "schemaVersion": 1,
+  "source": "AnimDataModel.BoneAnimationTracks.InternalTrackData",
+  "request": {
+    "definitionDigest": "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
+    "bindingDigest": "B3CDBA03FD845B98",
+    "players": 75,
+    "samples": 109,
+    "rootAssets": [
+      {
+        "assetId": "02e5b725fbe617afc766013edf7f69d6b95b81a4",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_RF.ALS_N_JumpWalk_RF"
+      },
+      {
+        "assetId": "0b439429cf3a3692eaea77a81b275ae96eab937f",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_LF.ALS_N_JumpRun_LF"
+      },
+      {
+        "assetId": "0bfca04ba8155882fc763f8275bb5c7e6e694ec0",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_F.ALS_N_RunPose_F"
+      },
+      {
+        "assetId": "0dafe631fa4b80aec354839565d39a0c2fe4768c",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_L.ALS_N_RunPose_L"
+      },
+      {
+        "assetId": "0ebb17fc0eb021c590cbb3e691d9aabe5f6bcf22",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_R.ALS_N_RunPose_R"
+      },
+      {
+        "assetId": "146fff5000e151a3790ba5aca8a5bfee4363e909",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_CLF_Pose.ALS_CLF_Pose"
+      },
+      {
+        "assetId": "14b8ebe1894df18291324b3fe6d5197e3f1391c9",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy.ALS_N_Land_Heavy"
+      },
+      {
+        "assetId": "15d6284bb8404d8015e3d35c704a0097f54bb1e3",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_B.ALS_N_LeanPose_B"
+      },
+      {
+        "assetId": "1f6188f2d1ced1329443c23a95816e38d8534aac",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpLoop.ALS_N_JumpLoop"
+      },
+      {
+        "assetId": "1f79ab2beef76714e2ed751035d7d021b0da547b",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_R.ALS_CRF_Walk_R"
+      },
+      {
+        "assetId": "21c24bd7df5192db2e2a860457f2b7b0681de41d",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_L.ALS_CLF_Walk_L"
+      },
+      {
+        "assetId": "245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RB.ALS_N_Run_RB"
+      },
+      {
+        "assetId": "300d88125a434aff588e661ef27abf1878d51e2c",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_L.ALS_N_WalkPose_L"
+      },
+      {
+        "assetId": "310b992c1a30d10675842924f95353905f659382",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_L90.ALS_CLF_Rotate_L90"
+      },
+      {
+        "assetId": "32e7c873dcf8fafd51e1140b17fa35081a941126",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_R.ALS_N_LeanPose_R"
+      },
+      {
+        "assetId": "32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_B.ALS_N_Walk_B"
+      },
+      {
+        "assetId": "39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F"
+      },
+      {
+        "assetId": "3c285f6df704e8e73cdfd0fd9bb147c1e5338ef1",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_R90.ALS_CLF_Rotate_R90"
+      },
+      {
+        "assetId": "3c7efe09469508fd9e40015b3bf593dde39c540b",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_0.ALS_N_LeanPose_0"
+      },
+      {
+        "assetId": "3e23712571d6bbea8744fc94dad0904a6a0a0b5d",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L"
+      },
+      {
+        "assetId": "44a7f89b2c1dac832ca63753c131a037420f9d7e",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LF.ALS_N_Walk_LF"
+      },
+      {
+        "assetId": "4677f1239a2057a65a5daeaf6ebbbf4f6a997060",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90"
+      },
+      {
+        "assetId": "48c434a2ee8e7e8e23bfa10890a0cc29357ca3c8",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_L.ALS_CRF_Walk_L"
+      },
+      {
+        "assetId": "4a62810735360da4f17b88b701897cf6299587d7",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_F.ALS_N_WalkPose_F"
+      },
+      {
+        "assetId": "4da4f0f9ce5d2b4d56c61655a3cc75b449763a09",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_L.ALS_N_LocoDetail_Accel_L"
+      },
+      {
+        "assetId": "4e5dc654c0355b51d2f0a3989adf497f8ab0dc8f",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_R.ALS_N_Falling_LeanPose_R"
+      },
+      {
+        "assetId": "4ec40f5759f47deb5b6d03810c58b99f9f8bca03",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy_Additive.ALS_N_Land_Heavy_Additive"
+      },
+      {
+        "assetId": "552198b373c14b6ef38b20c53ab08e9060cc55b7",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep.ALS_N_Look_U_Sweep"
+      },
+      {
+        "assetId": "572c3c83c9007964c233db4c7288ae38e20c3dec",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_F.ALS_N_Run_F"
+      },
+      {
+        "assetId": "59c6b48109bab7ffcd187cec52f931e56e4873d7",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_L.ALS_N_LeanPose_L"
+      },
+      {
+        "assetId": "59f469970639c759780278d7ffc8ea717e715207",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R180.ALS_N_TurnIP_R180"
+      },
+      {
+        "assetId": "59f521b6abdb95915f8a419fe3bef92696f63bff",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light_Additive.ALS_N_Land_Light_Additive"
+      },
+      {
+        "assetId": "5dd27edde6fdf9edf5078f29166920d819fb1ce2",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_WalkPose.ALS_CLF_WalkPose"
+      },
+      {
+        "assetId": "5f9eb6d3f1793245780aa6cd57c05da8443458bf",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_B.ALS_N_LocoDetail_Accel_B"
+      },
+      {
+        "assetId": "6124eafdcbeaaf04bca366add34c821faa0e4963",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_F.ALS_N_Walk_F"
+      },
+      {
+        "assetId": "621a81bf492cb9120b45cfd91b685854afb7dc75",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose.ALS_N_Pose"
+      },
+      {
+        "assetId": "67e28a265355dd85f22a10fe3e622c60f6aabe2c",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F_Impulse.ALS_N_Sprint_F_Impulse"
+      },
+      {
+        "assetId": "69667d9c1ffb6d3f2892c9f3e16b4b52bafc9bcc",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_0.ALS_N_Falling_LeanPose_0"
+      },
+      {
+        "assetId": "7b82799b915a45fb994e39925c869d2e8dd1cb35",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_L.ALS_N_Falling_LeanPose_L"
+      },
+      {
+        "assetId": "8112aef4c58ef102e76e697b84af68b86263529c",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_F.ALS_N_LocoDetail_Accel_F"
+      },
+      {
+        "assetId": "8151479671d553ee126d305e8e0afc3a929d25df",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_F.ALS_N_Falling_LeanPose_F"
+      },
+      {
+        "assetId": "859f8a49c55747e7382a1ae15970b23cc12f3f85",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_B.ALS_N_Run_B"
+      },
+      {
+        "assetId": "8ae1b9703a7d0144e570247d88629530b376885f",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LF.ALS_N_Run_LF"
+      },
+      {
+        "assetId": "8b1315b68336709c4a00bcd18871f0b3ba44308a",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop.ALS_N_FallLoop"
+      },
+      {
+        "assetId": "8bd6ad52ad04a2ad23b47187886c630701df5260",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F.ALS_N_Sprint_F"
+      },
+      {
+        "assetId": "8e23008795aa766a761798e916907dd97aee6506",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Run_BasePose.ALS_N_Run_BasePose"
+      },
+      {
+        "assetId": "8e310a7484f5a1fda4a549e1b80fd0405b1d4f35",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light.ALS_N_Land_Light"
+      },
+      {
+        "assetId": "8eb8837c9f32973628b83ed2b98f7d68a0e82aa9",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_F.ALS_CLF_Walk_F"
+      },
+      {
+        "assetId": "92e0d292db977093c0ad02b5490c241609032e38",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R180.ALS_CLF_TurnIP_R180"
+      },
+      {
+        "assetId": "9455f7d6294a58d4491a6c6c34f433f01414b64d",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_B.ALS_N_Falling_LeanPose_B"
+      },
+      {
+        "assetId": "945bdda63e8a379694c792c3545fe11dd166b724",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RF.ALS_N_Run_RF"
+      },
+      {
+        "assetId": "97cc3ceaeea17275e1684d19ce02cc248fb29b6b",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_R.ALS_N_LocoDetail_Accel_R"
+      },
+      {
+        "assetId": "97d46bf9858376893c1c34a128c27044b4467d82",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.ALS_N_Transition_R"
+      },
+      {
+        "assetId": "9a04c94cbdf6a02f426768f49c789cb8341e253a",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_R90.ALS_N_Rotate_R90"
+      },
+      {
+        "assetId": "9cf40933f81b9ccce915fc572ca3162cf1d0241c",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_LF.ALS_N_JumpWalk_LF"
+      },
+      {
+        "assetId": "a20c9d988632a569157541f0d6fd8c309ac8ae09",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L180.ALS_CLF_TurnIP_L180"
+      },
+      {
+        "assetId": "a3c722afa7c416d15d8c61ed614d4def5b5b758c",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L180.ALS_N_TurnIP_L180"
+      },
+      {
+        "assetId": "a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LB.ALS_N_Walk_LB"
+      },
+      {
+        "assetId": "a73b6e3c8aac55396058a7cb7c65b1afe6a539fa",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.ALS_N_TurnIP_L90"
+      },
+      {
+        "assetId": "b07a51bbab122c81679ac30d3f2f78f45ac14dc8",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LB.ALS_N_Run_LB"
+      },
+      {
+        "assetId": "bab34f5bf1379ae9ccba9b86a2113022051aeb82",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_R.ALS_N_WalkPose_R"
+      },
+      {
+        "assetId": "bbee3b8e0605aecaa74a14b1e60765c5a1c8d455",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_F.ALS_N_LeanPose_F"
+      },
+      {
+        "assetId": "bd603ea3ba08e7c0c4df0acc92f9c9e6ba3d5ab2",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop_Fast.ALS_N_FallLoop_Fast"
+      },
+      {
+        "assetId": "c13f1b18a24a33a01827ee93b9b1bdcd64295a0d",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R90.ALS_CLF_TurnIP_R90"
+      },
+      {
+        "assetId": "c4bba06be47ce74153c2048d0de7b30a6465a84f",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep.ALS_N_Look_D_Sweep"
+      },
+      {
+        "assetId": "d6d9eb028ac8461ea9ed4bc12d6effaa23719d5e",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_RF.ALS_N_JumpRun_RF"
+      },
+      {
+        "assetId": "da7ca3cbd8b535e49ff04a6f72c30cc14598bae1",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_to_CLF.ALS_N_to_CLF"
+      },
+      {
+        "assetId": "db60b2c35ce5ef5216c782fc1f33549cbcf8278d",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_R.ALS_CLF_Walk_R"
+      },
+      {
+        "assetId": "dc1e155fe8b8f411029a0fa3a67968fa03ec2247",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_Flail.ALS_Flail"
+      },
+      {
+        "assetId": "ddfa1a6737182bddb3134e78d0460c3ef49f93e1",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L90.ALS_CLF_TurnIP_L90"
+      },
+      {
+        "assetId": "eb84a748fee4615754ce3cbcd3c259b33918b935",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RB.ALS_N_Walk_RB"
+      },
+      {
+        "assetId": "f68538a704f796bb5ccc6b168794ea3a7ad04eb8",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_CLF_to_N.ALS_CLF_to_N"
+      },
+      {
+        "assetId": "f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.ALS_N_TurnIP_R90"
+      },
+      {
+        "assetId": "f9ec8804e251f03c57e04dde4db9bd921457bae4",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_B.ALS_CLF_Walk_B"
+      },
+      {
+        "assetId": "fc2d3a4142a1bd82d20877d806c783ff56dfe688",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RF.ALS_N_Walk_RF"
+      },
+      {
+        "assetId": "fcbab94ebb8eb39744f1973e98311c413660b9bc",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep.ALS_N_Look_F_Sweep"
+      }
+    ]
+  },
+  "skeletons": [
+    {
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_Mannequin_Skeleton.ALS_Mannequin_Skeleton",
+      "rawBoneNames": [
+        "root",
+        "Pelvis",
+        "spine_01",
+        "spine_02",
+        "spine_03",
+        "clavicle_l",
+        "UpperArm_L",
+        "lowerarm_l",
+        "Hand_L",
+        "index_01_l",
+        "index_02_l",
+        "index_03_l",
+        "middle_01_l",
+        "middle_02_l",
+        "middle_03_l",
+        "pinky_01_l",
+        "pinky_02_l",
+        "pinky_03_l",
+        "ring_01_l",
+        "ring_02_l",
+        "ring_03_l",
+        "thumb_01_l",
+        "thumb_02_l",
+        "thumb_03_l",
+        "lowerarm_twist_01_l",
+        "upperarm_twist_01_l",
+        "clavicle_r",
+        "UpperArm_R",
+        "lowerarm_r",
+        "hand_r",
+        "index_01_r",
+        "index_02_r",
+        "index_03_r",
+        "middle_01_r",
+        "middle_02_r",
+        "middle_03_r",
+        "pinky_01_r",
+        "pinky_02_r",
+        "pinky_03_r",
+        "ring_01_r",
+        "ring_02_r",
+        "ring_03_r",
+        "thumb_01_r",
+        "thumb_02_r",
+        "thumb_03_r",
+        "lowerarm_twist_01_r",
+        "upperarm_twist_01_r",
+        "neck_01",
+        "head",
+        "Thigh_L",
+        "calf_l",
+        "calf_twist_01_l",
+        "Foot_L",
+        "ball_l",
+        "thigh_twist_01_l",
+        "Thigh_R",
+        "calf_r",
+        "calf_twist_01_r",
+        "Foot_R",
+        "ball_r",
+        "thigh_twist_01_r",
+        "ik_foot_root",
+        "ik_foot_l",
+        "ik_foot_r",
+        "ik_hand_root",
+        "ik_hand_gun",
+        "ik_hand_l",
+        "ik_hand_r"
+      ],
+      "rawParents": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        8,
+        12,
+        13,
+        8,
+        15,
+        16,
+        8,
+        18,
+        19,
+        8,
+        21,
+        22,
+        7,
+        6,
+        4,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        29,
+        33,
+        34,
+        29,
+        36,
+        37,
+        29,
+        39,
+        40,
+        29,
+        42,
+        43,
+        28,
+        27,
+        4,
+        47,
+        1,
+        49,
+        50,
+        50,
+        52,
+        49,
+        1,
+        55,
+        56,
+        56,
+        58,
+        55,
+        0,
+        61,
+        61,
+        0,
+        64,
+        65,
+        65
+      ],
+      "logicalBoneNames": [
+        "root",
+        "Pelvis",
+        "spine_01",
+        "spine_02",
+        "spine_03",
+        "clavicle_l",
+        "UpperArm_L",
+        "lowerarm_l",
+        "Hand_L",
+        "index_01_l",
+        "index_02_l",
+        "index_03_l",
+        "middle_01_l",
+        "middle_02_l",
+        "middle_03_l",
+        "pinky_01_l",
+        "pinky_02_l",
+        "pinky_03_l",
+        "ring_01_l",
+        "ring_02_l",
+        "ring_03_l",
+        "thumb_01_l",
+        "thumb_02_l",
+        "thumb_03_l",
+        "lowerarm_twist_01_l",
+        "upperarm_twist_01_l",
+        "clavicle_r",
+        "UpperArm_R",
+        "lowerarm_r",
+        "hand_r",
+        "index_01_r",
+        "index_02_r",
+        "index_03_r",
+        "middle_01_r",
+        "middle_02_r",
+        "middle_03_r",
+        "pinky_01_r",
+        "pinky_02_r",
+        "pinky_03_r",
+        "ring_01_r",
+        "ring_02_r",
+        "ring_03_r",
+        "thumb_01_r",
+        "thumb_02_r",
+        "thumb_03_r",
+        "lowerarm_twist_01_r",
+        "upperarm_twist_01_r",
+        "neck_01",
+        "head",
+        "Thigh_L",
+        "calf_l",
+        "calf_twist_01_l",
+        "Foot_L",
+        "ball_l",
+        "thigh_twist_01_l",
+        "Thigh_R",
+        "calf_r",
+        "calf_twist_01_r",
+        "Foot_R",
+        "ball_r",
+        "thigh_twist_01_r",
+        "ik_foot_root",
+        "ik_foot_l",
+        "ik_foot_r",
+        "ik_hand_root",
+        "ik_hand_gun",
+        "ik_hand_l",
+        "ik_hand_r",
+        "VB ik_foot_l_Offset",
+        "VB ik_foot_r_Offset",
+        "VB RHS_ik_hand_gun",
+        "VB LHS_ik_hand_gun",
+        "VB RHS_ik_hand_l",
+        "VB LHS_ik_hand_r",
+        "VB ik_knee_target_l",
+        "VB ik_knee_target_r",
+        "VB Curves",
+        "VB foot_target_l",
+        "VB foot_target_r"
+      ],
+      "logicalParents": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        8,
+        12,
+        13,
+        8,
+        15,
+        16,
+        8,
+        18,
+        19,
+        8,
+        21,
+        22,
+        7,
+        6,
+        4,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        29,
+        33,
+        34,
+        29,
+        36,
+        37,
+        29,
+        39,
+        40,
+        29,
+        42,
+        43,
+        28,
+        27,
+        4,
+        47,
+        1,
+        49,
+        50,
+        50,
+        52,
+        49,
+        1,
+        55,
+        56,
+        56,
+        58,
+        55,
+        0,
+        61,
+        61,
+        0,
+        64,
+        65,
+        65,
+        62,
+        63,
+        29,
+        8,
+        70,
+        71,
+        62,
+        63,
+        0,
+        61,
+        61
+      ],
+      "logicalToPhysical": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "translationRetargetModes": [
+        "Animation",
+        "Animation",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation"
+      ],
+      "virtualBones": [
+        {
+          "bone": 68,
+          "source": 62,
+          "target": 62
+        },
+        {
+          "bone": 69,
+          "source": 63,
+          "target": 63
+        },
+        {
+          "bone": 70,
+          "source": 29,
+          "target": 65
+        },
+        {
+          "bone": 71,
+          "source": 8,
+          "target": 65
+        },
+        {
+          "bone": 72,
+          "source": 70,
+          "target": 8
+        },
+        {
+          "bone": 73,
+          "source": 71,
+          "target": 29
+        },
+        {
+          "bone": 74,
+          "source": 62,
+          "target": 50
+        },
+        {
+          "bone": 75,
+          "source": 63,
+          "target": 56
+        },
+        {
+          "bone": 76,
+          "source": 0,
+          "target": 0
+        },
+        {
+          "bone": 77,
+          "source": 61,
+          "target": 62
+        },
+        {
+          "bone": 78,
+          "source": 61,
+          "target": 63
+        }
+      ],
+      "referencePose": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            1.3536841578012896e-28,
+            -1.0561532974243164,
+            96.75060272216797
+          ],
+          "rotation": [
+            0.0012852257350459695,
+            0.7071055769920349,
+            -0.0012852257350459695,
+            -0.7071055769920349
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            10.808877944946289,
+            0.8514151573181152,
+            -6.091093883615895e-13
+          ],
+          "rotation": [
+            4.612972644464733e-33,
+            2.498837972987187e-32,
+            -0.062388576567173004,
+            -0.9980519413948059
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            18.875349044799805,
+            -3.8011586666107178,
+            5.966093397091754e-08
+          ],
+          "rotation": [
+            -3.0987430660636946e-33,
+            2.5220951287182057e-32,
+            0.12241965532302856,
+            -0.9924784302711487
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            13.407328605651855,
+            -0.42047739028930664,
+            -5.575239163564671e-13
+          ],
+          "rotation": [
+            -5.563290032127472e-33,
+            2.4794120472190853e-32,
+            0.02425260841846466,
+            -0.9997058510780334
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            11.883687973022461,
+            2.7320878505706787,
+            -3.7819831371307373
+          ],
+          "rotation": [
+            0.20891791582107544,
+            -0.7294167876243591,
+            0.12304386496543884,
+            -0.6396598219871521
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            15.784872055053711,
+            -1.4317954599718519e-09,
+            6.3591301113774534e-09
+          ],
+          "rotation": [
+            0.11299581080675125,
+            -0.33062976598739624,
+            -0.16141915321350098,
+            -0.922962486743927
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            30.339929580688477,
+            -8.407470275528794e-09,
+            3.197513365194027e-09
+          ],
+          "rotation": [
+            -0.054016515612602234,
+            0.07918272912502289,
+            -0.26340970396995544,
+            -0.9599102139472961
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            26.975143432617188,
+            -1.5729639812889218e-09,
+            -9.620748642191757e-09
+          ],
+          "rotation": [
+            -0.617895245552063,
+            -0.019371984526515007,
+            0.010653295554220676,
+            -0.7859495878219604
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            12.068114280700684,
+            -1.7634615898132324,
+            -2.1093976497650146
+          ],
+          "rotation": [
+            0.13330453634262085,
+            0.003180114319548011,
+            0.22317975759506226,
+            -0.9656140804290771
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.2874979972839355,
+            2.9850326654923265e-08,
+            5.0484132430028694e-09
+          ],
+          "rotation": [
+            0.01204353105276823,
+            0.0029058358632028103,
+            0.10444825887680054,
+            -0.9944531321525574
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.3937902450561523,
+            -1.1695448165482958e-08,
+            -2.3492283673931524e-09
+          ],
+          "rotation": [
+            0.010611144825816154,
+            -0.007850884459912777,
+            -0.08285507559776306,
+            -0.9964741468429565
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            12.244280815124512,
+            -1.293643593788147,
+            0.5711619853973389
+          ],
+          "rotation": [
+            0.028522171080112457,
+            0.05687393248081207,
+            0.19848491251468658,
+            -0.9780365824699402
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.640374183654785,
+            3.648182200777228e-09,
+            1.8308625726604077e-09
+          ],
+          "rotation": [
+            -0.01862887479364872,
+            -0.007972199469804764,
+            0.10711660236120224,
+            -0.9940399527549744
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.64884352684021,
+            1.998945720060874e-08,
+            1.6076349140803359e-09
+          ],
+          "rotation": [
+            0.001621426548808813,
+            0.03886699676513672,
+            -0.13362368941307068,
+            -0.990268349647522
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            10.140665054321289,
+            -2.263151168823242,
+            4.643147945404053
+          ],
+          "rotation": [
+            -0.12953773140907288,
+            0.1878969520330429,
+            0.14421314001083374,
+            -0.9628692865371704
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.5709807872772217,
+            -1.8669879864319228e-08,
+            3.9181813349387085e-10
+          ],
+          "rotation": [
+            0.010359718464314938,
+            0.01051939744502306,
+            0.09774821996688843,
+            -0.9951016306877136
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            2.985630750656128,
+            3.005878568274056e-08,
+            -4.0375400800485295e-09
+          ],
+          "rotation": [
+            0.0035809518303722143,
+            -0.03379638493061066,
+            0.008930303156375885,
+            -0.9993824362754822
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            11.497884750366211,
+            -1.7535265684127808,
+            2.846912384033203
+          ],
+          "rotation": [
+            -0.09548048675060272,
+            0.11676570773124695,
+            0.18851163983345032,
+            -0.9704187512397766
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.430177211761475,
+            -4.666503627959173e-09,
+            -9.40334032861756e-10
+          ],
+          "rotation": [
+            0.004301111213862896,
+            0.01416760217398405,
+            0.1159631535410881,
+            -0.9931431412696838
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.4766523838043213,
+            1.678635896951164e-08,
+            2.768651086171303e-09
+          ],
+          "rotation": [
+            -0.00019882837659679353,
+            -0.026257768273353577,
+            -0.11221285909414291,
+            -0.9933372139930725
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.762036323547363,
+            -2.3749806880950928,
+            -2.5378196239471436
+          ],
+          "rotation": [
+            0.6303090453147888,
+            -0.3715250790119171,
+            -0.07729015499353409,
+            -0.6772782206535339
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.8696718215942383,
+            -5.0118700301027275e-09,
+            9.984972848542384e-09
+          ],
+          "rotation": [
+            0.0026046857237815857,
+            -0.08679848909378052,
+            0.13014115393161774,
+            -0.9876854419708252
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.062171459197998,
+            -1.072194777407276e-09,
+            -5.127276381244883e-10
+          ],
+          "rotation": [
+            0.02139909379184246,
+            -0.0018833780195564032,
+            -0.10793746262788773,
+            -0.9939255714416504
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            14,
+            3.552713678800501e-15,
+            0
+          ],
+          "rotation": [
+            -2.7755575615628914e-17,
+            2.7755575615628914e-17,
+            -5.551115123125783e-17,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0.5,
+            1.7763568394002505e-15,
+            0
+          ],
+          "rotation": [
+            -3.469446951953614e-17,
+            -1.6250033905767303e-33,
+            -4.683753385137379e-17,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            11.8837890625,
+            2.732102394104004,
+            3.7820026874542236
+          ],
+          "rotation": [
+            0.7294167876243591,
+            0.20891791582107544,
+            -0.6396598219871521,
+            -0.12304386496543884
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -15.784797668457031,
+            7.013959930191049e-06,
+            -1.1171471669513267e-05
+          ],
+          "rotation": [
+            0.11299581080675125,
+            -0.33062976598739624,
+            -0.16141915321350098,
+            -0.922962486743927
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -30.340049743652344,
+            4.085021373612108e-06,
+            1.7513536931801355e-06
+          ],
+          "rotation": [
+            -0.054016515612602234,
+            0.07918272912502289,
+            -0.26340970396995544,
+            -0.9599102139472961
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -26.975244522094727,
+            -2.5634119083406404e-05,
+            -1.1905384553756448e-06
+          ],
+          "rotation": [
+            -0.617895245552063,
+            -0.019371984526515007,
+            0.010653295554220676,
+            -0.7859495878219604
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -12.067941665649414,
+            1.7637253999710083,
+            2.1094281673431396
+          ],
+          "rotation": [
+            0.13330453634262085,
+            0.003180114319548011,
+            0.22317975759506226,
+            -0.9656140804290771
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.287688255310059,
+            -9.245983528671786e-05,
+            -7.426209776895121e-05
+          ],
+          "rotation": [
+            0.01204353105276823,
+            0.0029058358632028103,
+            0.10444825887680054,
+            -0.9944531321525574
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.3937981128692627,
+            -0.0001206969900522381,
+            -1.2407956091919914e-05
+          ],
+          "rotation": [
+            0.010611144825816154,
+            -0.007850884459912777,
+            -0.08285507559776306,
+            -0.9964741468429565
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -12.244112968444824,
+            1.2937241792678833,
+            -0.5711302161216736
+          ],
+          "rotation": [
+            0.028522171080112457,
+            0.05687393248081207,
+            0.19848491251468658,
+            -0.9780365824699402
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.640568733215332,
+            0.00014491056208498776,
+            7.636955160705838e-06
+          ],
+          "rotation": [
+            -0.01862887479364872,
+            -0.007972199469804764,
+            0.10711660236120224,
+            -0.9940399527549744
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.648909091949463,
+            -3.29968097503297e-05,
+            -2.2666431505058426e-06
+          ],
+          "rotation": [
+            0.001621426548808813,
+            0.03886699676513672,
+            -0.13362368941307068,
+            -0.990268349647522
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -10.140592575073242,
+            2.263354778289795,
+            -4.643094539642334
+          ],
+          "rotation": [
+            -0.12953773140907288,
+            0.1878969520330429,
+            0.14421314001083374,
+            -0.9628692865371704
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.571057081222534,
+            7.801967876730487e-05,
+            -8.107984285743441e-06
+          ],
+          "rotation": [
+            0.010359718464314938,
+            0.01051939744502306,
+            0.09774821996688843,
+            -0.9951016306877136
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -2.985419273376465,
+            -0.00031727668829262257,
+            -3.5056928027188405e-05
+          ],
+          "rotation": [
+            0.0035809644032269716,
+            -0.033796388655900955,
+            0.00893030408769846,
+            -0.9993824362754822
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -11.497973442077637,
+            1.7537660598754883,
+            -2.846914768218994
+          ],
+          "rotation": [
+            -0.09548048675060272,
+            0.11676570773124695,
+            0.18851163983345032,
+            -0.9704187512397766
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.429864406585693,
+            -8.44798851176165e-05,
+            -1.837869785958901e-05
+          ],
+          "rotation": [
+            0.004301111213862896,
+            0.01416760217398405,
+            0.1159631535410881,
+            -0.9931431412696838
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.476658821105957,
+            -7.194164209067822e-05,
+            -2.843127731466666e-06
+          ],
+          "rotation": [
+            -0.00019882837659679353,
+            -0.026257768273353577,
+            -0.11221285909414291,
+            -0.9933372139930725
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.762124538421631,
+            2.375119924545288,
+            2.537801742553711
+          ],
+          "rotation": [
+            0.6303090453147888,
+            -0.3715250790119171,
+            -0.07729015499353409,
+            -0.6772782206535339
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.8695690631866455,
+            -0.00011357050243532285,
+            5.5954889830900356e-05
+          ],
+          "rotation": [
+            0.002604700857773423,
+            -0.08679849654436111,
+            0.13014116883277893,
+            -0.9876854419708252
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.06217622756958,
+            -2.0121733541600406e-06,
+            3.204959284630604e-06
+          ],
+          "rotation": [
+            0.021399078890681267,
+            -0.0018833739450201392,
+            -0.10793746262788773,
+            -0.9939255714416504
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -14,
+            -2.4331944587174803e-05,
+            -6.578326974704396e-06
+          ],
+          "rotation": [
+            -0.11762712150812149,
+            -1.632404232733718e-18,
+            -1.3781446081870406e-17,
+            -0.9930578470230103
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -0.5,
+            3.700793968164362e-06,
+            -1.1559803851923789e-06
+          ],
+          "rotation": [
+            -0.17323486506938934,
+            2.763644010072535e-17,
+            -3.0997381635827322e-18,
+            -0.9848805665969849
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            16.55878257751465,
+            0.3553175628185272,
+            -5.965974025912146e-08
+          ],
+          "rotation": [
+            0,
+            0,
+            -0.20371073484420776,
+            -0.9790310859680176
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            9.283613204956055,
+            -0.3641568720340729,
+            2.9273693708751483e-15
+          ],
+          "rotation": [
+            -3.292063764973974e-33,
+            -2.44310998986661e-32,
+            0.13354197144508362,
+            -0.9910431504249573
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -1.4488286972045898,
+            0.5314235091209412,
+            -9.005809783935547
+          ],
+          "rotation": [
+            0.07370486855506897,
+            0.062138836830854416,
+            -0.008584325201809406,
+            -0.9953052997589111
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -42.57203674316406,
+            -1.707418650909176e-10,
+            -4.667839448302402e-10
+          ],
+          "rotation": [
+            -0.048884253948926926,
+            -0.018863899633288383,
+            -0.06552226841449738,
+            -0.9964744448661804
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -20.476776123046875,
+            -3.552713678800501e-15,
+            0
+          ],
+          "rotation": [
+            0.0028089452534914017,
+            0.0019333207746967673,
+            -0.007612692657858133,
+            -0.9999651908874512
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -40.19668960571289,
+            3.933847025905379e-09,
+            1.8994583683706878e-10
+          ],
+          "rotation": [
+            -0.005885771010071039,
+            -0.03199128806591034,
+            0.07035475224256516,
+            -0.9969915151596069
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -10.453837394714355,
+            16.57785415649414,
+            0.08015594631433487
+          ],
+          "rotation": [
+            8.00762209109962e-05,
+            -2.959302582894452e-05,
+            -0.718633770942688,
+            -0.6953887343406677
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -22.09423828125,
+            2.220446049250313e-16,
+            0
+          ],
+          "rotation": [
+            -0.04744356498122215,
+            -2.1482490410562605e-05,
+            -0.000491108454298228,
+            -0.998873770236969
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -1.4486445188522339,
+            0.5314275622367859,
+            9.005803108215332
+          ],
+          "rotation": [
+            0.062138836830854416,
+            -0.07370486855506897,
+            0.9953052997589111,
+            -0.008584325201809406
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            42.57225036621094,
+            1.6233628912232234e-06,
+            -5.836755576638097e-07
+          ],
+          "rotation": [
+            -0.048884253948926926,
+            -0.018863899633288383,
+            -0.06552226841449738,
+            -0.9964744448661804
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            20.47690773010254,
+            -0.0,
+            3.552713678800501e-15
+          ],
+          "rotation": [
+            0.002807280281558633,
+            0.001933723222464323,
+            -0.007612532936036587,
+            -0.9999651908874512
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            40.19681930541992,
+            -1.6769354260759428e-06,
+            -1.0918018233496696e-05
+          ],
+          "rotation": [
+            -0.005885771010071039,
+            -0.03199128806591034,
+            0.07035475224256516,
+            -0.9969915151596069
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            10.453816413879395,
+            -16.577796936035156,
+            -0.08015844970941544
+          ],
+          "rotation": [
+            8.00762209109962e-05,
+            -2.959302582894452e-05,
+            -0.718633770942688,
+            -0.6953887343406677
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            22.094240188598633,
+            -3.3306690738754696e-16,
+            0
+          ],
+          "rotation": [
+            -0.047445230185985565,
+            -2.1906784240854904e-05,
+            -0.0004911785945296288,
+            -0.9988737106323242
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            -0.0,
+            0
+          ],
+          "rotation": [
+            3.0616171314629196e-17,
+            -0.0,
+            0,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            17.076271057128906,
+            -8.072127342224121,
+            13.465730667114258
+          ],
+          "rotation": [
+            0.0205298513174057,
+            0.7122328281402588,
+            0.011723978444933891,
+            -0.7015450596809387
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -17.0762882232666,
+            -8.072148323059082,
+            13.46557331085205
+          ],
+          "rotation": [
+            -0.7015450596809387,
+            -0.011723978444933891,
+            0.7122328281402588,
+            -0.0205298513174057
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            -0.0,
+            0
+          ],
+          "rotation": [
+            3.0616171314629196e-17,
+            -0.0,
+            0,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -56.64609909057617,
+            -0.33541175723075867,
+            111.67965698242188
+          ],
+          "rotation": [
+            0.6188496947288513,
+            0.06954113394021988,
+            0.3891361653804779,
+            -0.6787946224212646
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            77.88542938232422,
+            69.60191345214844,
+            43.869503021240234
+          ],
+          "rotation": [
+            0.6874741315841675,
+            0.614358127117157,
+            0.38722530007362366,
+            1.857170135315415e-15
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            -0.0,
+            0
+          ],
+          "rotation": [
+            1.1555579666323415e-33,
+            4.163336342344337e-17,
+            2.7755575615628914e-17,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            -2.7538735181131813e-17,
+            0,
+            0.9999999987090954
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            0.9999999987090953
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -2.3346792353834336e-06,
+            -4.2165689137321064e-06,
+            -3.0691049099942175e-06
+          ],
+          "rotation": [
+            -1.3857105577580464e-08,
+            -3.5396378605945245e-08,
+            1.9911389204096963e-10,
+            0.9999999771903716
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -77.88535586665441,
+            -69.60192136611279,
+            -43.869636039071324
+          ],
+          "rotation": [
+            -0.6874741241479181,
+            -0.6143580781191609,
+            -0.3872253024500443,
+            -3.1195351520713066e-08
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            77.88543342221095,
+            69.6019209283701,
+            43.86950478855344
+          ],
+          "rotation": [
+            0.6874741241479181,
+            0.6143580781191609,
+            0.3872253024500443,
+            -3.1195351520713066e-08
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            2.3346792627146195e-06,
+            4.216569003354351e-06,
+            3.069105134926007e-06
+          ],
+          "rotation": [
+            1.3857105577580464e-08,
+            3.5396378605945245e-08,
+            -1.9911389204096963e-10,
+            0.9999999771903716
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            39.716485612717435,
+            5.654177573588729,
+            2.530866782438139
+          ],
+          "rotation": [
+            0.005885772725002422,
+            0.031991286966879064,
+            -0.07035474610993217,
+            -0.996991473516807
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -39.71661717643036,
+            -5.654193834527927,
+            -2.5308636747559845
+          ],
+          "rotation": [
+            0.00588577272500241,
+            0.03199128696687903,
+            -0.07035474610993216,
+            -0.9969914735168071
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            17.076271057128906,
+            -8.072127342224121,
+            13.465730667114258
+          ],
+          "rotation": [
+            0.0205298513174057,
+            0.7122328281402588,
+            0.011723978444933891,
+            -0.7015450596809387
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -17.0762882232666,
+            -8.072148323059082,
+            13.46557331085205
+          ],
+          "rotation": [
+            -0.7015450596809387,
+            -0.011723978444933891,
+            0.7122328281402588,
+            -0.0205298513174057
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "02e5b725fbe617afc766013edf7f69d6b95b81a4",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_RF.ALS_N_JumpWalk_RF",
+      "file": "raw_sequences/02e5b725fbe617afc766013edf7f69d6b95b81a4.json",
+      "sha256": "7288a115476910431e787704f2ce16ee998bfbc0b4d1e97224f2579405692948"
+    },
+    {
+      "assetId": "0b439429cf3a3692eaea77a81b275ae96eab937f",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_LF.ALS_N_JumpRun_LF",
+      "file": "raw_sequences/0b439429cf3a3692eaea77a81b275ae96eab937f.json",
+      "sha256": "80404cf27269dc23f3329ca164571411d1fb89396133e678044fa6ba4fec950e"
+    },
+    {
+      "assetId": "0bfca04ba8155882fc763f8275bb5c7e6e694ec0",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_F.ALS_N_RunPose_F",
+      "file": "raw_sequences/0bfca04ba8155882fc763f8275bb5c7e6e694ec0.json",
+      "sha256": "337a8d0920b2dfa8f1d63f992874a696b89efaf50697def775869f9c813fb388"
+    },
+    {
+      "assetId": "0dafe631fa4b80aec354839565d39a0c2fe4768c",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_L.ALS_N_RunPose_L",
+      "file": "raw_sequences/0dafe631fa4b80aec354839565d39a0c2fe4768c.json",
+      "sha256": "5d44872a5ce89a42beba4b520be40a9a37bc4d33646fe1a06b5dec24427e9304"
+    },
+    {
+      "assetId": "0ebb17fc0eb021c590cbb3e691d9aabe5f6bcf22",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_R.ALS_N_RunPose_R",
+      "file": "raw_sequences/0ebb17fc0eb021c590cbb3e691d9aabe5f6bcf22.json",
+      "sha256": "6e334592d169f04d52fcd8d22f33a3dc8ccad2ef7a2a3da4feeea13df2f8968d"
+    },
+    {
+      "assetId": "146fff5000e151a3790ba5aca8a5bfee4363e909",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_CLF_Pose.ALS_CLF_Pose",
+      "file": "raw_sequences/146fff5000e151a3790ba5aca8a5bfee4363e909.json",
+      "sha256": "3ecd6d8b089fd28bd7c8283ad6c9519d7ee867d96a4cc8811e623473a5219713"
+    },
+    {
+      "assetId": "14b8ebe1894df18291324b3fe6d5197e3f1391c9",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy.ALS_N_Land_Heavy",
+      "file": "raw_sequences/14b8ebe1894df18291324b3fe6d5197e3f1391c9.json",
+      "sha256": "c4c01aca3845b26edfeb6a90a19fbdf39de79f4773ce17467730305a78c2b696"
+    },
+    {
+      "assetId": "15d6284bb8404d8015e3d35c704a0097f54bb1e3",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_B.ALS_N_LeanPose_B",
+      "file": "raw_sequences/15d6284bb8404d8015e3d35c704a0097f54bb1e3.json",
+      "sha256": "6cd98d4f92cca4ea9e84ab170050eb02354c60e691c97b7128dad95683144bc9"
+    },
+    {
+      "assetId": "1f6188f2d1ced1329443c23a95816e38d8534aac",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpLoop.ALS_N_JumpLoop",
+      "file": "raw_sequences/1f6188f2d1ced1329443c23a95816e38d8534aac.json",
+      "sha256": "c9341753e3cb1a286dca0eda5b08fc8731b788d5a54696f6e0d315ed15ba90dd"
+    },
+    {
+      "assetId": "1f79ab2beef76714e2ed751035d7d021b0da547b",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_R.ALS_CRF_Walk_R",
+      "file": "raw_sequences/1f79ab2beef76714e2ed751035d7d021b0da547b.json",
+      "sha256": "3ab86bf01a88f14a8248457cbd9fa4e548176eaa80bab4ece9e6714d8e65762e"
+    },
+    {
+      "assetId": "21c24bd7df5192db2e2a860457f2b7b0681de41d",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_L.ALS_CLF_Walk_L",
+      "file": "raw_sequences/21c24bd7df5192db2e2a860457f2b7b0681de41d.json",
+      "sha256": "19e9626b01c48b2d6204cec0ec455e1d985a2eb7e3aaffac40d5ff73ed769410"
+    },
+    {
+      "assetId": "245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RB.ALS_N_Run_RB",
+      "file": "raw_sequences/245ea51e30449a60b7d2b783ec0f6d24ec3bacc0.json",
+      "sha256": "ab347fb7786beb9f388a9bef4c8a91fafbfc70edf13f42fb4855a3cd2722e2d2"
+    },
+    {
+      "assetId": "300d88125a434aff588e661ef27abf1878d51e2c",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_L.ALS_N_WalkPose_L",
+      "file": "raw_sequences/300d88125a434aff588e661ef27abf1878d51e2c.json",
+      "sha256": "492fda45cc87df65ebeb7d22bf2042da51336889164563ddaae3bcd46c0ee506"
+    },
+    {
+      "assetId": "310b992c1a30d10675842924f95353905f659382",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_L90.ALS_CLF_Rotate_L90",
+      "file": "raw_sequences/310b992c1a30d10675842924f95353905f659382.json",
+      "sha256": "de3a9841c6fcd7e16dbfcb7b3c363f858f5cbe7f42f2087cd58ba77d2fbe7b9f"
+    },
+    {
+      "assetId": "32e7c873dcf8fafd51e1140b17fa35081a941126",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_R.ALS_N_LeanPose_R",
+      "file": "raw_sequences/32e7c873dcf8fafd51e1140b17fa35081a941126.json",
+      "sha256": "f6c407838cad37838d5fca756ee090825dbc7e90512595366e35b7336e062e0a"
+    },
+    {
+      "assetId": "32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_B.ALS_N_Walk_B",
+      "file": "raw_sequences/32fe18c71ccb860fe35c01d6b2b10fa2e4d98297.json",
+      "sha256": "352e496fdbf3d2411211dfd29f28af5fda49131d2dbee46dad114f42de7b9604"
+    },
+    {
+      "assetId": "39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F",
+      "file": "raw_sequences/39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9.json",
+      "sha256": "f6714ca54bb5dafc8b9bb2ca5c8dd538a78ad410ccb0975d73f2d183a29b4fbf"
+    },
+    {
+      "assetId": "3c285f6df704e8e73cdfd0fd9bb147c1e5338ef1",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_R90.ALS_CLF_Rotate_R90",
+      "file": "raw_sequences/3c285f6df704e8e73cdfd0fd9bb147c1e5338ef1.json",
+      "sha256": "89702b643f62ab1c3fec9c9dcb95b26b5ab82e4eeafb5faa003251496bf545d7"
+    },
+    {
+      "assetId": "3c7efe09469508fd9e40015b3bf593dde39c540b",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_0.ALS_N_LeanPose_0",
+      "file": "raw_sequences/3c7efe09469508fd9e40015b3bf593dde39c540b.json",
+      "sha256": "5e8827bac81b1d4eb3d6e1e2e6236da040ca5c0317351400e000552b59975224"
+    },
+    {
+      "assetId": "3e23712571d6bbea8744fc94dad0904a6a0a0b5d",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L",
+      "file": "raw_sequences/3e23712571d6bbea8744fc94dad0904a6a0a0b5d.json",
+      "sha256": "6ef6f5940484fa38048811d2a4ebeafcbd8b04f969c5d4bfd3174b8130d00702"
+    },
+    {
+      "assetId": "44a7f89b2c1dac832ca63753c131a037420f9d7e",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LF.ALS_N_Walk_LF",
+      "file": "raw_sequences/44a7f89b2c1dac832ca63753c131a037420f9d7e.json",
+      "sha256": "a43474d7d4bcd3851cc07c836930418aafbb15089adc7ba8d0a317197d96d342"
+    },
+    {
+      "assetId": "4677f1239a2057a65a5daeaf6ebbbf4f6a997060",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90",
+      "file": "raw_sequences/4677f1239a2057a65a5daeaf6ebbbf4f6a997060.json",
+      "sha256": "238ebe0719a6e44d8f0327871394771e183d351a261deaf071e069270d56f0a9"
+    },
+    {
+      "assetId": "48c434a2ee8e7e8e23bfa10890a0cc29357ca3c8",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_L.ALS_CRF_Walk_L",
+      "file": "raw_sequences/48c434a2ee8e7e8e23bfa10890a0cc29357ca3c8.json",
+      "sha256": "19685089cb9159b48d4013e27ed5014dba051157c97aaadeb9e252600e5a6062"
+    },
+    {
+      "assetId": "4a62810735360da4f17b88b701897cf6299587d7",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_F.ALS_N_WalkPose_F",
+      "file": "raw_sequences/4a62810735360da4f17b88b701897cf6299587d7.json",
+      "sha256": "141084a8b3eec99279b0fe3e3110e33d0d8ec20f4763b414fe3bd982081783f0"
+    },
+    {
+      "assetId": "4da4f0f9ce5d2b4d56c61655a3cc75b449763a09",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_L.ALS_N_LocoDetail_Accel_L",
+      "file": "raw_sequences/4da4f0f9ce5d2b4d56c61655a3cc75b449763a09.json",
+      "sha256": "f3c95c425e749c61e7391319ad5cf99ab494c306c537f17d06a6bd89b83f07ba"
+    },
+    {
+      "assetId": "4e5dc654c0355b51d2f0a3989adf497f8ab0dc8f",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_R.ALS_N_Falling_LeanPose_R",
+      "file": "raw_sequences/4e5dc654c0355b51d2f0a3989adf497f8ab0dc8f.json",
+      "sha256": "7893f28682544b1a4873f110d3a78fa8116e50f388abbd0087bbdb3e528ccddc"
+    },
+    {
+      "assetId": "4ec40f5759f47deb5b6d03810c58b99f9f8bca03",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy_Additive.ALS_N_Land_Heavy_Additive",
+      "file": "raw_sequences/4ec40f5759f47deb5b6d03810c58b99f9f8bca03.json",
+      "sha256": "acbdbf19b301a356fb2907eb147f4bc25ca61cdcdb577f4f977cf9573114afdb"
+    },
+    {
+      "assetId": "552198b373c14b6ef38b20c53ab08e9060cc55b7",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep.ALS_N_Look_U_Sweep",
+      "file": "raw_sequences/552198b373c14b6ef38b20c53ab08e9060cc55b7.json",
+      "sha256": "94eae9af94b772301e2d95ca012a1ccf4e8816a01e6f9263036a46c932ca0455"
+    },
+    {
+      "assetId": "572c3c83c9007964c233db4c7288ae38e20c3dec",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_F.ALS_N_Run_F",
+      "file": "raw_sequences/572c3c83c9007964c233db4c7288ae38e20c3dec.json",
+      "sha256": "9ed80c53110f92ec95cd3d3a262a973a9847b28ded82f1365eb79e02da479fb6"
+    },
+    {
+      "assetId": "59c6b48109bab7ffcd187cec52f931e56e4873d7",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_L.ALS_N_LeanPose_L",
+      "file": "raw_sequences/59c6b48109bab7ffcd187cec52f931e56e4873d7.json",
+      "sha256": "6791276e420f4d2b301dba7674da1f8d28d055c76b3db4e2ff120716d17bf29e"
+    },
+    {
+      "assetId": "59f469970639c759780278d7ffc8ea717e715207",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R180.ALS_N_TurnIP_R180",
+      "file": "raw_sequences/59f469970639c759780278d7ffc8ea717e715207.json",
+      "sha256": "d8afc5a36e37599b7a8d5739c7fdfe443d3125ecbbac3871937949afd32292de"
+    },
+    {
+      "assetId": "59f521b6abdb95915f8a419fe3bef92696f63bff",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light_Additive.ALS_N_Land_Light_Additive",
+      "file": "raw_sequences/59f521b6abdb95915f8a419fe3bef92696f63bff.json",
+      "sha256": "4aef2e71e90ef2104b254a5ffa1e4263eddfd0fbf6d63d394f44dc7cf6b19406"
+    },
+    {
+      "assetId": "5dd27edde6fdf9edf5078f29166920d819fb1ce2",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_WalkPose.ALS_CLF_WalkPose",
+      "file": "raw_sequences/5dd27edde6fdf9edf5078f29166920d819fb1ce2.json",
+      "sha256": "4cd78b9e036be90c24826305714a1ba930a0065280f52c0713deba02b6dc0ee7"
+    },
+    {
+      "assetId": "5f9eb6d3f1793245780aa6cd57c05da8443458bf",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_B.ALS_N_LocoDetail_Accel_B",
+      "file": "raw_sequences/5f9eb6d3f1793245780aa6cd57c05da8443458bf.json",
+      "sha256": "930c1b78a314ac94396c06729b0386a512df982f64dc6b167a26de280459bca8"
+    },
+    {
+      "assetId": "6124eafdcbeaaf04bca366add34c821faa0e4963",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_F.ALS_N_Walk_F",
+      "file": "raw_sequences/6124eafdcbeaaf04bca366add34c821faa0e4963.json",
+      "sha256": "1d960400fa9d49d32859133e7234a6a6665d887260811651f930d4deb31cee37"
+    },
+    {
+      "assetId": "621a81bf492cb9120b45cfd91b685854afb7dc75",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose.ALS_N_Pose",
+      "file": "raw_sequences/621a81bf492cb9120b45cfd91b685854afb7dc75.json",
+      "sha256": "c929ec66e0b04c7dd2bea18a6c3f6a1f25fd6fb63dd6a906731c1cbb8d260807",
+      "dependencyOf": [
+        "3e23712571d6bbea8744fc94dad0904a6a0a0b5d",
+        "4ec40f5759f47deb5b6d03810c58b99f9f8bca03",
+        "552198b373c14b6ef38b20c53ab08e9060cc55b7",
+        "59f469970639c759780278d7ffc8ea717e715207",
+        "59f521b6abdb95915f8a419fe3bef92696f63bff",
+        "97d46bf9858376893c1c34a128c27044b4467d82",
+        "a3c722afa7c416d15d8c61ed614d4def5b5b758c",
+        "a73b6e3c8aac55396058a7cb7c65b1afe6a539fa",
+        "c4bba06be47ce74153c2048d0de7b30a6465a84f",
+        "f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b",
+        "fcbab94ebb8eb39744f1973e98311c413660b9bc"
+      ]
+    },
+    {
+      "assetId": "67e28a265355dd85f22a10fe3e622c60f6aabe2c",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F_Impulse.ALS_N_Sprint_F_Impulse",
+      "file": "raw_sequences/67e28a265355dd85f22a10fe3e622c60f6aabe2c.json",
+      "sha256": "5645879745916c7a59971b7b787a4581d8f1d9ef4c20ef09c7c2fa317c05f78f"
+    },
+    {
+      "assetId": "69667d9c1ffb6d3f2892c9f3e16b4b52bafc9bcc",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_0.ALS_N_Falling_LeanPose_0",
+      "file": "raw_sequences/69667d9c1ffb6d3f2892c9f3e16b4b52bafc9bcc.json",
+      "sha256": "1b60985d40989e4ce36c12208b1ff5eaa2370a8c981488f831b73259493bb0bd"
+    },
+    {
+      "assetId": "7b82799b915a45fb994e39925c869d2e8dd1cb35",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_L.ALS_N_Falling_LeanPose_L",
+      "file": "raw_sequences/7b82799b915a45fb994e39925c869d2e8dd1cb35.json",
+      "sha256": "b5bf9e2907ca1bb70942c394e0c85b6783fd62f32acc82d6fb9b8993b4edd896"
+    },
+    {
+      "assetId": "8112aef4c58ef102e76e697b84af68b86263529c",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_F.ALS_N_LocoDetail_Accel_F",
+      "file": "raw_sequences/8112aef4c58ef102e76e697b84af68b86263529c.json",
+      "sha256": "2417c356e2a7c401ba1f3539f15aa30e44c923828ce11689cfe38638aa7d1d59"
+    },
+    {
+      "assetId": "8151479671d553ee126d305e8e0afc3a929d25df",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_F.ALS_N_Falling_LeanPose_F",
+      "file": "raw_sequences/8151479671d553ee126d305e8e0afc3a929d25df.json",
+      "sha256": "0147620391bb7a75c00868c334448ea64fe4313bbcaaea2d3c68eaaca0e5c41f"
+    },
+    {
+      "assetId": "859f8a49c55747e7382a1ae15970b23cc12f3f85",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_B.ALS_N_Run_B",
+      "file": "raw_sequences/859f8a49c55747e7382a1ae15970b23cc12f3f85.json",
+      "sha256": "674288dac9df8d42764139c3e1b7499e8c64ea30e0b6789da7395d8ffc558284"
+    },
+    {
+      "assetId": "8ae1b9703a7d0144e570247d88629530b376885f",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LF.ALS_N_Run_LF",
+      "file": "raw_sequences/8ae1b9703a7d0144e570247d88629530b376885f.json",
+      "sha256": "f0770db2b164308fb992488703016dea601e38b0cb6bbaf5a33ad921c909c1ef"
+    },
+    {
+      "assetId": "8b1315b68336709c4a00bcd18871f0b3ba44308a",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop.ALS_N_FallLoop",
+      "file": "raw_sequences/8b1315b68336709c4a00bcd18871f0b3ba44308a.json",
+      "sha256": "6a4f56e3e044b237851f405e85058739faed735aebfb12968ef8f86961602ac1",
+      "dependencyOf": [
+        "4e5dc654c0355b51d2f0a3989adf497f8ab0dc8f",
+        "69667d9c1ffb6d3f2892c9f3e16b4b52bafc9bcc",
+        "7b82799b915a45fb994e39925c869d2e8dd1cb35",
+        "8151479671d553ee126d305e8e0afc3a929d25df",
+        "9455f7d6294a58d4491a6c6c34f433f01414b64d"
+      ]
+    },
+    {
+      "assetId": "8bd6ad52ad04a2ad23b47187886c630701df5260",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F.ALS_N_Sprint_F",
+      "file": "raw_sequences/8bd6ad52ad04a2ad23b47187886c630701df5260.json",
+      "sha256": "e7b2a0099a859f926b04b4e1454d53dd8d161e0e9c06be89642855d5b0293f14"
+    },
+    {
+      "assetId": "8e23008795aa766a761798e916907dd97aee6506",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Run_BasePose.ALS_N_Run_BasePose",
+      "file": "raw_sequences/8e23008795aa766a761798e916907dd97aee6506.json",
+      "sha256": "ccf11038fae8be051dd7d4fc1bb5663194f6d03603ac26a363c826d7f04f92ef",
+      "dependencyOf": [
+        "15d6284bb8404d8015e3d35c704a0097f54bb1e3",
+        "32e7c873dcf8fafd51e1140b17fa35081a941126",
+        "3c7efe09469508fd9e40015b3bf593dde39c540b",
+        "4da4f0f9ce5d2b4d56c61655a3cc75b449763a09",
+        "59c6b48109bab7ffcd187cec52f931e56e4873d7",
+        "5f9eb6d3f1793245780aa6cd57c05da8443458bf",
+        "8112aef4c58ef102e76e697b84af68b86263529c",
+        "97cc3ceaeea17275e1684d19ce02cc248fb29b6b",
+        "bbee3b8e0605aecaa74a14b1e60765c5a1c8d455"
+      ]
+    },
+    {
+      "assetId": "8e310a7484f5a1fda4a549e1b80fd0405b1d4f35",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light.ALS_N_Land_Light",
+      "file": "raw_sequences/8e310a7484f5a1fda4a549e1b80fd0405b1d4f35.json",
+      "sha256": "fea937d7edbc40e3707586395937785154764bc0855699d28318fafd23d49c30"
+    },
+    {
+      "assetId": "8eb8837c9f32973628b83ed2b98f7d68a0e82aa9",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_F.ALS_CLF_Walk_F",
+      "file": "raw_sequences/8eb8837c9f32973628b83ed2b98f7d68a0e82aa9.json",
+      "sha256": "b88c9378495ee7ddea6309ad1851dc1e882351166fd5934df00d94b06816c22c"
+    },
+    {
+      "assetId": "92e0d292db977093c0ad02b5490c241609032e38",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R180.ALS_CLF_TurnIP_R180",
+      "file": "raw_sequences/92e0d292db977093c0ad02b5490c241609032e38.json",
+      "sha256": "fde80764acae06cd9f85f70d1678a254a3b2bff04018ac5d8ad90a5e9d820ac7"
+    },
+    {
+      "assetId": "9455f7d6294a58d4491a6c6c34f433f01414b64d",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_B.ALS_N_Falling_LeanPose_B",
+      "file": "raw_sequences/9455f7d6294a58d4491a6c6c34f433f01414b64d.json",
+      "sha256": "6977b6804dcc12af59597bca1b0829a24c896af73ae39da4307a328318c43c2d"
+    },
+    {
+      "assetId": "945bdda63e8a379694c792c3545fe11dd166b724",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RF.ALS_N_Run_RF",
+      "file": "raw_sequences/945bdda63e8a379694c792c3545fe11dd166b724.json",
+      "sha256": "66f16d9a83d7fb2967b96d0695637b6f5d8515aa3a51561946e590b9134c66a3"
+    },
+    {
+      "assetId": "97cc3ceaeea17275e1684d19ce02cc248fb29b6b",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_R.ALS_N_LocoDetail_Accel_R",
+      "file": "raw_sequences/97cc3ceaeea17275e1684d19ce02cc248fb29b6b.json",
+      "sha256": "48677bded12b42f454a0410aa16c1f8504dda66ca89e1f7efb5a34e079c6c379"
+    },
+    {
+      "assetId": "97d46bf9858376893c1c34a128c27044b4467d82",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.ALS_N_Transition_R",
+      "file": "raw_sequences/97d46bf9858376893c1c34a128c27044b4467d82.json",
+      "sha256": "1d14d883b67bac0abd8a188271a5fa3fcd86447c47a9511f8cdf3dbf8048a480"
+    },
+    {
+      "assetId": "9a04c94cbdf6a02f426768f49c789cb8341e253a",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_R90.ALS_N_Rotate_R90",
+      "file": "raw_sequences/9a04c94cbdf6a02f426768f49c789cb8341e253a.json",
+      "sha256": "f0b394456e79b4e75d9de386b0f6875f564da99264e4e8b88f1ade8a3c4de084"
+    },
+    {
+      "assetId": "9cf40933f81b9ccce915fc572ca3162cf1d0241c",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_LF.ALS_N_JumpWalk_LF",
+      "file": "raw_sequences/9cf40933f81b9ccce915fc572ca3162cf1d0241c.json",
+      "sha256": "6b1d1677e3c889fd4900b88d5ce4400b75330e60c75d3db47f2fb4783250f8b9"
+    },
+    {
+      "assetId": "a20c9d988632a569157541f0d6fd8c309ac8ae09",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L180.ALS_CLF_TurnIP_L180",
+      "file": "raw_sequences/a20c9d988632a569157541f0d6fd8c309ac8ae09.json",
+      "sha256": "a585ad66dff84e32f732c904a0f523a9c356c2c583c89eb3483719a5810fcc3a"
+    },
+    {
+      "assetId": "a3c722afa7c416d15d8c61ed614d4def5b5b758c",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L180.ALS_N_TurnIP_L180",
+      "file": "raw_sequences/a3c722afa7c416d15d8c61ed614d4def5b5b758c.json",
+      "sha256": "ddf01f2c7cbaeb2240a2eb7c39c41647092e7bb76954503ab0032d65289985df"
+    },
+    {
+      "assetId": "a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LB.ALS_N_Walk_LB",
+      "file": "raw_sequences/a4c6e0e455e7be7355cdd7c3ce49272d07773b18.json",
+      "sha256": "f05b5d2bef4d87e087680d809ff6e95ae78302229a0b830c8981d4acc2f5e837"
+    },
+    {
+      "assetId": "a73b6e3c8aac55396058a7cb7c65b1afe6a539fa",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.ALS_N_TurnIP_L90",
+      "file": "raw_sequences/a73b6e3c8aac55396058a7cb7c65b1afe6a539fa.json",
+      "sha256": "d97a2cd14bcf653a171f9029f69d9a67776f75b237d59a063c389c06b209e661"
+    },
+    {
+      "assetId": "b07a51bbab122c81679ac30d3f2f78f45ac14dc8",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LB.ALS_N_Run_LB",
+      "file": "raw_sequences/b07a51bbab122c81679ac30d3f2f78f45ac14dc8.json",
+      "sha256": "74ba186cce5d1e1d06932d49531bb8730d8087b8f5267af9c9ac30261c3e141d"
+    },
+    {
+      "assetId": "bab34f5bf1379ae9ccba9b86a2113022051aeb82",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_R.ALS_N_WalkPose_R",
+      "file": "raw_sequences/bab34f5bf1379ae9ccba9b86a2113022051aeb82.json",
+      "sha256": "576c50544fca02f3102823c2f29c4b87804d2290255337d37a0575699500e040"
+    },
+    {
+      "assetId": "bbee3b8e0605aecaa74a14b1e60765c5a1c8d455",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_F.ALS_N_LeanPose_F",
+      "file": "raw_sequences/bbee3b8e0605aecaa74a14b1e60765c5a1c8d455.json",
+      "sha256": "654e3a1d7edb9783615fd911bdb7800889d3b02bbd00c4b55aba29f27433de70"
+    },
+    {
+      "assetId": "bd603ea3ba08e7c0c4df0acc92f9c9e6ba3d5ab2",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop_Fast.ALS_N_FallLoop_Fast",
+      "file": "raw_sequences/bd603ea3ba08e7c0c4df0acc92f9c9e6ba3d5ab2.json",
+      "sha256": "3784c757cbb050aaa7065758c41b8ebc0255740f84550f9802d7cb6588d49802"
+    },
+    {
+      "assetId": "c13f1b18a24a33a01827ee93b9b1bdcd64295a0d",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R90.ALS_CLF_TurnIP_R90",
+      "file": "raw_sequences/c13f1b18a24a33a01827ee93b9b1bdcd64295a0d.json",
+      "sha256": "1a18f4c858e7ab6ddca1e7ca69527653efa951db2cc917cf8ae9e6aaab672f48"
+    },
+    {
+      "assetId": "c4bba06be47ce74153c2048d0de7b30a6465a84f",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep.ALS_N_Look_D_Sweep",
+      "file": "raw_sequences/c4bba06be47ce74153c2048d0de7b30a6465a84f.json",
+      "sha256": "06a97ce499cdb594983dd8f27206f73f7360f6cb857c0d465f29f6a3660005d4"
+    },
+    {
+      "assetId": "d6d9eb028ac8461ea9ed4bc12d6effaa23719d5e",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_RF.ALS_N_JumpRun_RF",
+      "file": "raw_sequences/d6d9eb028ac8461ea9ed4bc12d6effaa23719d5e.json",
+      "sha256": "f4c8e5bf52d8d93cd89a289161f2adddf5de1f29458a59a3bd53867784012ca0"
+    },
+    {
+      "assetId": "da7ca3cbd8b535e49ff04a6f72c30cc14598bae1",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_to_CLF.ALS_N_to_CLF",
+      "file": "raw_sequences/da7ca3cbd8b535e49ff04a6f72c30cc14598bae1.json",
+      "sha256": "0fa0a0c14b1dbc84218198b6e750d2cd96446f1ab6c2197fda12c1bed9693275"
+    },
+    {
+      "assetId": "db60b2c35ce5ef5216c782fc1f33549cbcf8278d",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_R.ALS_CLF_Walk_R",
+      "file": "raw_sequences/db60b2c35ce5ef5216c782fc1f33549cbcf8278d.json",
+      "sha256": "aa174bab59d95559d7b1bb1933284e6936da68a4d20be3d3c807ac3c4f8e4990"
+    },
+    {
+      "assetId": "dc1e155fe8b8f411029a0fa3a67968fa03ec2247",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_Flail.ALS_Flail",
+      "file": "raw_sequences/dc1e155fe8b8f411029a0fa3a67968fa03ec2247.json",
+      "sha256": "eff3cc97866781b653ba11519c96e1b2f7c0a8b4298ca60c67bc81df78e32566"
+    },
+    {
+      "assetId": "ddfa1a6737182bddb3134e78d0460c3ef49f93e1",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L90.ALS_CLF_TurnIP_L90",
+      "file": "raw_sequences/ddfa1a6737182bddb3134e78d0460c3ef49f93e1.json",
+      "sha256": "13fdf8fb8617f80e5a6c989ff18ea598428c3385943df1af492d2c2c94473c55"
+    },
+    {
+      "assetId": "eb84a748fee4615754ce3cbcd3c259b33918b935",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RB.ALS_N_Walk_RB",
+      "file": "raw_sequences/eb84a748fee4615754ce3cbcd3c259b33918b935.json",
+      "sha256": "4d4f99dc799f8ee232fa70b509401325378cdb8d69201060181c3e818adca1fd"
+    },
+    {
+      "assetId": "f68538a704f796bb5ccc6b168794ea3a7ad04eb8",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_CLF_to_N.ALS_CLF_to_N",
+      "file": "raw_sequences/f68538a704f796bb5ccc6b168794ea3a7ad04eb8.json",
+      "sha256": "6c7e6dd8efc179bd6d781b6e0491e62a39a9654c5b8f0a28be59ff42fd283c2c"
+    },
+    {
+      "assetId": "f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.ALS_N_TurnIP_R90",
+      "file": "raw_sequences/f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b.json",
+      "sha256": "3dd33b6aa81f6f951434b58f22ce744e96ac0d055df98cca509c1b25cc64b844"
+    },
+    {
+      "assetId": "f9ec8804e251f03c57e04dde4db9bd921457bae4",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_B.ALS_CLF_Walk_B",
+      "file": "raw_sequences/f9ec8804e251f03c57e04dde4db9bd921457bae4.json",
+      "sha256": "009e0b89c4920a348adbef83b029994938f6ec766bb2f32e36ed2c2551585624"
+    },
+    {
+      "assetId": "fc2d3a4142a1bd82d20877d806c783ff56dfe688",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RF.ALS_N_Walk_RF",
+      "file": "raw_sequences/fc2d3a4142a1bd82d20877d806c783ff56dfe688.json",
+      "sha256": "79d6892021ae37e4bcd98b625c080ae6c79a9daee9abe371511a5782a7e735f2"
+    },
+    {
+      "assetId": "fcbab94ebb8eb39744f1973e98311c413660b9bc",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep.ALS_N_Look_F_Sweep",
+      "file": "raw_sequences/fcbab94ebb8eb39744f1973e98311c413660b9bc.json",
+      "sha256": "f31bb5d0531c2606ee1db5dd45ec518225f3c130730b1fa80ec49b1a81d198a9"
+    }
+  ]
+}

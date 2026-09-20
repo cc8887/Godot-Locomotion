@@ -43,6 +43,8 @@ public readonly ref struct AlsP5GraphBuildView
     public readonly ReadOnlySpan<AlsP5GraphMaskHeader> MaskHeaders;
     public readonly ReadOnlySpan<int> LogicalBoneIds;
     public readonly ReadOnlySpan<int> NormalizedAnimationIds;
+    public readonly ReadOnlySpan<AlsStandingWalkRunDefinition> StandingWalkRun;
+    public readonly AlsLocomotionSourceView Sources;
 
     public AlsP5GraphBuildView(
         int version,
@@ -67,9 +69,11 @@ public readonly ref struct AlsP5GraphBuildView
         ReadOnlySpan<AlsRotateProfile> rotates,
         ReadOnlySpan<AlsP5GraphMaskHeader> maskHeaders,
         ReadOnlySpan<int> logicalBoneIds,
-        ReadOnlySpan<int> normalizedAnimationIds)
+        ReadOnlySpan<int> normalizedAnimationIds,
+        ReadOnlySpan<AlsStandingWalkRunDefinition> standingWalkRun = default,
+        AlsLocomotionSourceView sources = default)
     {
-        if (version != 1)
+        if (version != 1 && version != 2)
         {
             throw new ArgumentOutOfRangeException(nameof(version));
         }
@@ -77,6 +81,9 @@ public readonly ref struct AlsP5GraphBuildView
         {
             throw new ArgumentOutOfRangeException(nameof(digest));
         }
+        if (version == 2 ? !sources.Stamp.IsValid || sources.Stamp.SkeletonId != skeletonId || standingWalkRun.Length != 6
+            : !standingWalkRun.IsEmpty || sources.Stamp != default)
+            throw new ArgumentException("The P5 graph build version and source metadata disagree.");
 
         Version = version;
         Digest = digest;
@@ -101,6 +108,8 @@ public readonly ref struct AlsP5GraphBuildView
         MaskHeaders = maskHeaders;
         LogicalBoneIds = logicalBoneIds;
         NormalizedAnimationIds = normalizedAnimationIds;
+        StandingWalkRun = standingWalkRun;
+        Sources = sources;
     }
 }
 
@@ -149,12 +158,22 @@ public sealed class AlsP5CoreRuntimeBindingSnapshot
     private readonly int _landAnimationId;
     private readonly int _leanAdditiveBaseAnimationId;
     private readonly AlsAimProfile _aim;
+    private readonly AlsLocomotionSourceProfile? _sources;
+    public AlsLocomotionSourceProfile SourceProfile => _sources ?? throw new InvalidOperationException("No native source profile in this binding.");
+    private readonly AlsP5SourceOccurrenceMapping[] _sourceMappings;
+    private readonly int[] _unboundNativeSources;
+    private readonly AlsStandingWalkRunDefinition[] _standingWalkRun;
 
     public int Version { get; }
     public ulong Digest { get; }
     public ulong LayoutDigest { get; }
     public ulong GraphDigest { get; }
     public string AnimationSetDefinitionDigest { get; }
+    public string SourceInventoryDigest { get; }
+    public AlsStandingSprintProfile StandingSprint => _sources?.Sprint ??
+        throw new InvalidOperationException("This snapshot has no native Standing source graph.");
+    public int LayoutVersion => _sources is null ? AlsP5OccurrenceLayoutContract.CurrentVersion : AlsP5OccurrenceLayoutContract.SourceGraphVersion;
+    public ReadOnlySpan<int> UnboundNativeSourceIndices => _unboundNativeSources;
 
     internal AlsP5CoreRuntimeBindingSnapshot(
         int version,
@@ -204,7 +223,12 @@ public sealed class AlsP5CoreRuntimeBindingSnapshot
         AlsRotateProfile[] rotates,
         AlsP5GraphMaskHeader[] maskHeaders,
         int[] logicalBoneIds,
-        int[] normalizedAnimationIds)
+        int[] normalizedAnimationIds,
+        AlsLocomotionSourceProfile? sources = null,
+        AlsP5SourceOccurrenceMapping[]? sourceMappings = null,
+        int[]? unboundNativeSources = null,
+        string sourceInventoryDigest = "",
+        AlsStandingWalkRunDefinition[]? standingWalkRun = null)
     {
         Version = version;
         Digest = digest;
@@ -254,6 +278,11 @@ public sealed class AlsP5CoreRuntimeBindingSnapshot
         _maskHeaders = maskHeaders.ToArray();
         _logicalBoneIds = logicalBoneIds.ToArray();
         _normalizedAnimationIds = normalizedAnimationIds.ToArray();
+        _sources = sources;
+        _sourceMappings = sourceMappings?.ToArray() ?? [];
+        _unboundNativeSources = unboundNativeSources?.ToArray() ?? [];
+        SourceInventoryDigest = sourceInventoryDigest;
+        _standingWalkRun = standingWalkRun?.ToArray() ?? [];
     }
 
     public AlsP5RuntimeBindings CreateCoreView() => new(
@@ -262,17 +291,22 @@ public sealed class AlsP5CoreRuntimeBindingSnapshot
         _footCurveBindings, _groundedIkWeight, _jumpStartIkWeight, _fallLoopIkWeight,
         _landRecoveryIkWeight, _timelineDefinitions, _syncMarkers, _syncGroup, _syncMembers,
         _syncOccurrences, _dynamicTransition, _actionDefinitions, _actionSections,
-        _actionSegments, _actionTimelineRanges);
+        _actionSegments, _actionTimelineRanges, CreateLocomotionSourceView(), CreateSourceOccurrenceView());
+
+    public AlsLocomotionSourceView CreateLocomotionSourceView() => _sources is null ? default : _sources.CreateCoreView();
+
+    public AlsP5SourceOccurrenceView CreateSourceOccurrenceView() => _sources is null ? default :
+        new(LayoutVersion, LayoutDigest, _sources.RuntimeStamp, _occurrenceEntries, _sourceMappings);
 
     public AlsP5OccurrenceLayoutView CreateOccurrenceLayoutView() =>
-        new(AlsP5OccurrenceLayoutContract.CurrentVersion, LayoutDigest, _occurrenceEntries);
+        new(LayoutVersion, LayoutDigest, _occurrenceEntries);
 
     public AlsP5GraphBuildView CreateGraphBuildView() => new(
-        1, GraphDigest, _skeletonId, _mannequinMeshId,
+        _sources is null ? 1 : 2, GraphDigest, _skeletonId, _mannequinMeshId,
         _rootMotionExtractionLogicalBoneId, _rootMotionExtractionPhysicalBoneId,
         _presentation, _standingIdleAnimationId, _crouchingIdleAnimationId,
         _jumpStartAnimationId, _fallLoopAnimationId, _landAnimationId,
         _leanAdditiveBaseAnimationId, _standingSamples, _crouchingSamples, _leanSamples,
         _allAnimationIds, _aim, _turns, _rotates, _maskHeaders, _logicalBoneIds,
-        _normalizedAnimationIds);
+        _normalizedAnimationIds, _standingWalkRun, CreateLocomotionSourceView());
 }

@@ -41,6 +41,22 @@ public sealed class AlsLocomotionProfileCompilerTests
     }
 
     [Fact]
+    public void CycleDemoProfileClosesAllSixNativeWalkRunSpaces()
+    {
+        var definition = P3RepositoryFixtures.LoadAnimationSet();
+        var source = File.ReadAllText(Path.Combine(RepositoryRoot.Find(), "assets", "config", "p4_cycle_locomotion_profile.json"));
+        var profile = AlsLocomotionProfileCompiler.Compile(source, definition);
+        Assert.Equal(6, profile.StandingWalkRun.Length);
+        foreach (var direction in profile.StandingWalkRun)
+        {
+            Assert.Contains("WalkPose", definition.Animations[direction.WalkPoseId].Name);
+            Assert.Contains("RunPose", definition.Animations[direction.RunPoseId].Name);
+            Assert.Contains(direction.WalkPoseId, profile.AllAnimationIds);
+            Assert.Contains(direction.RunPoseId, profile.AllAnimationIds);
+        }
+    }
+
+    [Fact]
     public void RepositoryProfileLocksDirectionalObjectPathsStableIdsAndCoordinates()
     {
         var definition = P3RepositoryFixtures.LoadAnimationSet();
@@ -224,6 +240,7 @@ public sealed class AlsLocomotionProfileCompilerTests
             .Concat([first.JumpStartAnimationId, first.FallLoopAnimationId, first.LandAnimationId])
             .Concat(first.LeanAdditiveSamples.Select(sample => sample.AnimationId))
             .Append(first.LeanAdditiveBasePoseAnimationId)
+            .Concat(first.StandingWalkRun.SelectMany(value => new[] { value.WalkPoseId, value.WalkId, value.RunPoseId, value.RunId }))
             .Distinct()
             .OrderBy(id => id)
             .ToArray();

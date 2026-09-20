@@ -7,6 +7,16 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsP5OccurrenceLayoutCompilerTests
 {
     [Fact]
+    public void RejectsCycleProfileInsteadOfSilentlyDroppingItsNewSources()
+    {
+        var (_, pose, p5a) = CompileProfiles();
+        var cycle = AlsLocomotionProfileCompiler.Compile(File.ReadAllText(Path.Combine(RepositoryRoot.Find(),
+            "assets", "config", "p4_cycle_locomotion_profile.json")), P3RepositoryFixtures.LoadAnimationSet());
+        Assert.Equal(6, cycle.StandingWalkRun.Length);
+        Assert.Throws<ArgumentException>(() => AlsP5OccurrenceLayoutCompiler.Compile(cycle, pose, p5a));
+    }
+
+    [Fact]
     public void PhysicalTurnAndRotateBanksHaveDistinctHandlesWithSharedAuthority()
     {
         var (locomotion, pose, p5a) = CompileProfiles();

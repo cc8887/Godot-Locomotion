@@ -1,0 +1,2312 @@
+{
+  "schemaVersion": 1,
+  "source": "AnimDataModel.BoneAnimationTracks.InternalTrackData",
+  "request": {
+    "definitionDigest": "152e79130c55ebd7f13cd3efbe40a30c21d52c81af863ab1e1926f2da86b5129",
+    "bindingDigest": "ed03fe916977bbb4755633499268ca16207c81d3e63c116b5ea71819b0b601a4",
+    "players": 148,
+    "samples": 148,
+    "rootAssets": [
+      {
+        "assetId": "06205e86a4ddf982dcda158c3710fe19d68845ef",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses.ALS_Props_Bow_Poses"
+      },
+      {
+        "assetId": "0ea33c35b3929aedcbce55be96de6b266f22197c",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep_Crouched.ALS_Props_Pistol_1H_Aim_Sweep_Crouched"
+      },
+      {
+        "assetId": "1770840df822b84d42ac2b693142174ef698e8dc",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep.ALS_Props_Torch_Aim_Sweep"
+      },
+      {
+        "assetId": "179d156aad0a32c44d6bf3ee662d0eebc637f124",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep_Crouched.ALS_Props_Binoculars_Aim_Sweep_Crouched"
+      },
+      {
+        "assetId": "19998bac1f393df801f1e61b60dfd1eb976d396d",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses.ALS_Props_Torch_Poses"
+      },
+      {
+        "assetId": "19c0187833782797fd6364d2d9d59cb306a8cc28",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep_Crouched.ALS_Props_Bow_Aim_Sweep_Crouched"
+      },
+      {
+        "assetId": "1d4bd0f5919851b1d8d6beaad2e9f8495c1c7bd8",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Barrel/ALS_Props_Barrel_Poses.ALS_Props_Barrel_Poses"
+      },
+      {
+        "assetId": "24e8830b43c78b318932dc2fc6680fdf3452b9e2",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses.ALS_Props_Binoculars_Poses"
+      },
+      {
+        "assetId": "40e3e08f95a2620e1712562b618fc361509a2a80",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep.ALS_Props_Pistol_2H_Aim_Sweep"
+      },
+      {
+        "assetId": "4e8bf1b38cd8d67f7b891c447cdb868f11b632c0",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep.ALS_Props_Binoculars_Aim_Sweep"
+      },
+      {
+        "assetId": "4feaf2edfa913aedfa651dac00ec36b9bc5391a3",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep_Crouched.ALS_Props_M4A1_Aim_Sweep_Crouched"
+      },
+      {
+        "assetId": "512d3e7359dd13d89457f90e68cceac1408c940f",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses.ALS_Props_Pistol_2H_Poses"
+      },
+      {
+        "assetId": "5424c7d119568dace5551a83aad3bdbb9c780b78",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Box/ALS_Props_Box_Poses.ALS_Props_Box_Poses"
+      },
+      {
+        "assetId": "57ba9bc36b45aad5fa0a3351b8caf21deb44d08e",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep.ALS_Props_Bow_Aim_Sweep"
+      },
+      {
+        "assetId": "62508043098864e937ab7d1c8d1c30b575b02c23",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Masculine.ALS_StanceVariation_Masculine"
+      },
+      {
+        "assetId": "6720aef9e99e694137281bcbf2a1df9cfb1abd83",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse_Arms.ALS_Props_M4A1_Sprint_F_Impulse_Arms"
+      },
+      {
+        "assetId": "69aee04ffca72356fef27d5183d67578dcad93e6",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Shared/ALS_N_SecondaryMotion.ALS_N_SecondaryMotion"
+      },
+      {
+        "assetId": "6f4c9999621f662d825bc05d9e46263c360fed93",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep.ALS_Props_Pistol_1H_Aim_Sweep"
+      },
+      {
+        "assetId": "74fae9958ca8fc1e28329c581038e55a4840c2c1",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses.ALS_Props_Pistol_1H_Poses"
+      },
+      {
+        "assetId": "7b4cd34c8da5697e4bfa5e23f2330f4998670999",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep_Crouched.ALS_Props_Pistol_2H_Aim_Sweep_Crouched"
+      },
+      {
+        "assetId": "8a6fb8d8eb88047a9b40f43b714967277653b789",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Arms.ALS_Props_M4A1_Sprint_F_Arms"
+      },
+      {
+        "assetId": "b084f74d4087d0fa215618550fadd29ebc2b01a0",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Injured.ALS_StanceVariation_Injured"
+      },
+      {
+        "assetId": "b1b9302cbf29b5978f4b8c5768a94dd227982e40",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Normal.ALS_StanceVariation_Normal"
+      },
+      {
+        "assetId": "bf827e8773890767df2c42df9208d461dc9e3ece",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses.ALS_Props_M4A1_Poses"
+      },
+      {
+        "assetId": "deda874944d28720dda32eac369723b3362af20d",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Feminine.ALS_StanceVariation_Feminine"
+      },
+      {
+        "assetId": "e2d92a77e2e5fd2de0b4f2987652523ec87c061f",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F_Arms.ALS_Props_M4A1_Run_F_Arms"
+      },
+      {
+        "assetId": "e36e48b2b343c7cc6c8f3337af79cb9f453f45fa",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep.ALS_Props_M4A1_Aim_Sweep"
+      },
+      {
+        "assetId": "fdfae8af1f8b9425e630ecd25ad389991e3eb99e",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_HandsTied.ALS_StanceVariation_HandsTied"
+      },
+      {
+        "assetId": "fed8555576fff79dc806356e0ddd96c87a05a733",
+        "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep_Crouched.ALS_Props_Torch_Aim_Sweep_Crouched"
+      }
+    ]
+  },
+  "skeletons": [
+    {
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_Mannequin_Skeleton.ALS_Mannequin_Skeleton",
+      "rawBoneNames": [
+        "root",
+        "Pelvis",
+        "spine_01",
+        "spine_02",
+        "spine_03",
+        "clavicle_l",
+        "UpperArm_L",
+        "lowerarm_l",
+        "Hand_L",
+        "index_01_l",
+        "index_02_l",
+        "index_03_l",
+        "middle_01_l",
+        "middle_02_l",
+        "middle_03_l",
+        "pinky_01_l",
+        "pinky_02_l",
+        "pinky_03_l",
+        "ring_01_l",
+        "ring_02_l",
+        "ring_03_l",
+        "thumb_01_l",
+        "thumb_02_l",
+        "thumb_03_l",
+        "lowerarm_twist_01_l",
+        "upperarm_twist_01_l",
+        "clavicle_r",
+        "UpperArm_R",
+        "lowerarm_r",
+        "hand_r",
+        "index_01_r",
+        "index_02_r",
+        "index_03_r",
+        "middle_01_r",
+        "middle_02_r",
+        "middle_03_r",
+        "pinky_01_r",
+        "pinky_02_r",
+        "pinky_03_r",
+        "ring_01_r",
+        "ring_02_r",
+        "ring_03_r",
+        "thumb_01_r",
+        "thumb_02_r",
+        "thumb_03_r",
+        "lowerarm_twist_01_r",
+        "upperarm_twist_01_r",
+        "neck_01",
+        "head",
+        "Thigh_L",
+        "calf_l",
+        "calf_twist_01_l",
+        "Foot_L",
+        "ball_l",
+        "thigh_twist_01_l",
+        "Thigh_R",
+        "calf_r",
+        "calf_twist_01_r",
+        "Foot_R",
+        "ball_r",
+        "thigh_twist_01_r",
+        "ik_foot_root",
+        "ik_foot_l",
+        "ik_foot_r",
+        "ik_hand_root",
+        "ik_hand_gun",
+        "ik_hand_l",
+        "ik_hand_r"
+      ],
+      "rawParents": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        8,
+        12,
+        13,
+        8,
+        15,
+        16,
+        8,
+        18,
+        19,
+        8,
+        21,
+        22,
+        7,
+        6,
+        4,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        29,
+        33,
+        34,
+        29,
+        36,
+        37,
+        29,
+        39,
+        40,
+        29,
+        42,
+        43,
+        28,
+        27,
+        4,
+        47,
+        1,
+        49,
+        50,
+        50,
+        52,
+        49,
+        1,
+        55,
+        56,
+        56,
+        58,
+        55,
+        0,
+        61,
+        61,
+        0,
+        64,
+        65,
+        65
+      ],
+      "logicalBoneNames": [
+        "root",
+        "Pelvis",
+        "spine_01",
+        "spine_02",
+        "spine_03",
+        "clavicle_l",
+        "UpperArm_L",
+        "lowerarm_l",
+        "Hand_L",
+        "index_01_l",
+        "index_02_l",
+        "index_03_l",
+        "middle_01_l",
+        "middle_02_l",
+        "middle_03_l",
+        "pinky_01_l",
+        "pinky_02_l",
+        "pinky_03_l",
+        "ring_01_l",
+        "ring_02_l",
+        "ring_03_l",
+        "thumb_01_l",
+        "thumb_02_l",
+        "thumb_03_l",
+        "lowerarm_twist_01_l",
+        "upperarm_twist_01_l",
+        "clavicle_r",
+        "UpperArm_R",
+        "lowerarm_r",
+        "hand_r",
+        "index_01_r",
+        "index_02_r",
+        "index_03_r",
+        "middle_01_r",
+        "middle_02_r",
+        "middle_03_r",
+        "pinky_01_r",
+        "pinky_02_r",
+        "pinky_03_r",
+        "ring_01_r",
+        "ring_02_r",
+        "ring_03_r",
+        "thumb_01_r",
+        "thumb_02_r",
+        "thumb_03_r",
+        "lowerarm_twist_01_r",
+        "upperarm_twist_01_r",
+        "neck_01",
+        "head",
+        "Thigh_L",
+        "calf_l",
+        "calf_twist_01_l",
+        "Foot_L",
+        "ball_l",
+        "thigh_twist_01_l",
+        "Thigh_R",
+        "calf_r",
+        "calf_twist_01_r",
+        "Foot_R",
+        "ball_r",
+        "thigh_twist_01_r",
+        "ik_foot_root",
+        "ik_foot_l",
+        "ik_foot_r",
+        "ik_hand_root",
+        "ik_hand_gun",
+        "ik_hand_l",
+        "ik_hand_r",
+        "VB ik_foot_l_Offset",
+        "VB ik_foot_r_Offset",
+        "VB RHS_ik_hand_gun",
+        "VB LHS_ik_hand_gun",
+        "VB RHS_ik_hand_l",
+        "VB LHS_ik_hand_r",
+        "VB ik_knee_target_l",
+        "VB ik_knee_target_r",
+        "VB Curves",
+        "VB foot_target_l",
+        "VB foot_target_r"
+      ],
+      "logicalParents": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        8,
+        12,
+        13,
+        8,
+        15,
+        16,
+        8,
+        18,
+        19,
+        8,
+        21,
+        22,
+        7,
+        6,
+        4,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        29,
+        33,
+        34,
+        29,
+        36,
+        37,
+        29,
+        39,
+        40,
+        29,
+        42,
+        43,
+        28,
+        27,
+        4,
+        47,
+        1,
+        49,
+        50,
+        50,
+        52,
+        49,
+        1,
+        55,
+        56,
+        56,
+        58,
+        55,
+        0,
+        61,
+        61,
+        0,
+        64,
+        65,
+        65,
+        62,
+        63,
+        29,
+        8,
+        70,
+        71,
+        62,
+        63,
+        0,
+        61,
+        61
+      ],
+      "logicalToPhysical": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "translationRetargetModes": [
+        "Animation",
+        "Animation",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Skeleton",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation",
+        "Animation"
+      ],
+      "virtualBones": [
+        {
+          "bone": 68,
+          "source": 62,
+          "target": 62
+        },
+        {
+          "bone": 69,
+          "source": 63,
+          "target": 63
+        },
+        {
+          "bone": 70,
+          "source": 29,
+          "target": 65
+        },
+        {
+          "bone": 71,
+          "source": 8,
+          "target": 65
+        },
+        {
+          "bone": 72,
+          "source": 70,
+          "target": 8
+        },
+        {
+          "bone": 73,
+          "source": 71,
+          "target": 29
+        },
+        {
+          "bone": 74,
+          "source": 62,
+          "target": 50
+        },
+        {
+          "bone": 75,
+          "source": 63,
+          "target": 56
+        },
+        {
+          "bone": 76,
+          "source": 0,
+          "target": 0
+        },
+        {
+          "bone": 77,
+          "source": 61,
+          "target": 62
+        },
+        {
+          "bone": 78,
+          "source": 61,
+          "target": 63
+        }
+      ],
+      "referencePose": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            1.3536841578012896e-28,
+            -1.0561532974243164,
+            96.75060272216797
+          ],
+          "rotation": [
+            0.0012852257350459695,
+            0.7071055769920349,
+            -0.0012852257350459695,
+            -0.7071055769920349
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            10.808877944946289,
+            0.8514151573181152,
+            -6.091093883615895e-13
+          ],
+          "rotation": [
+            4.612972644464733e-33,
+            2.498837972987187e-32,
+            -0.062388576567173004,
+            -0.9980519413948059
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            18.875349044799805,
+            -3.8011586666107178,
+            5.966093397091754e-08
+          ],
+          "rotation": [
+            -3.0987430660636946e-33,
+            2.5220951287182057e-32,
+            0.12241965532302856,
+            -0.9924784302711487
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            13.407328605651855,
+            -0.42047739028930664,
+            -5.575239163564671e-13
+          ],
+          "rotation": [
+            -5.563290032127472e-33,
+            2.4794120472190853e-32,
+            0.02425260841846466,
+            -0.9997058510780334
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            11.883687973022461,
+            2.7320878505706787,
+            -3.7819831371307373
+          ],
+          "rotation": [
+            0.20891791582107544,
+            -0.7294167876243591,
+            0.12304386496543884,
+            -0.6396598219871521
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            15.784872055053711,
+            -1.4317954599718519e-09,
+            6.3591301113774534e-09
+          ],
+          "rotation": [
+            0.11299581080675125,
+            -0.33062976598739624,
+            -0.16141915321350098,
+            -0.922962486743927
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            30.339929580688477,
+            -8.407470275528794e-09,
+            3.197513365194027e-09
+          ],
+          "rotation": [
+            -0.054016515612602234,
+            0.07918272912502289,
+            -0.26340970396995544,
+            -0.9599102139472961
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            26.975143432617188,
+            -1.5729639812889218e-09,
+            -9.620748642191757e-09
+          ],
+          "rotation": [
+            -0.617895245552063,
+            -0.019371984526515007,
+            0.010653295554220676,
+            -0.7859495878219604
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            12.068114280700684,
+            -1.7634615898132324,
+            -2.1093976497650146
+          ],
+          "rotation": [
+            0.13330453634262085,
+            0.003180114319548011,
+            0.22317975759506226,
+            -0.9656140804290771
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.2874979972839355,
+            2.9850326654923265e-08,
+            5.0484132430028694e-09
+          ],
+          "rotation": [
+            0.01204353105276823,
+            0.0029058358632028103,
+            0.10444825887680054,
+            -0.9944531321525574
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.3937902450561523,
+            -1.1695448165482958e-08,
+            -2.3492283673931524e-09
+          ],
+          "rotation": [
+            0.010611144825816154,
+            -0.007850884459912777,
+            -0.08285507559776306,
+            -0.9964741468429565
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            12.244280815124512,
+            -1.293643593788147,
+            0.5711619853973389
+          ],
+          "rotation": [
+            0.028522171080112457,
+            0.05687393248081207,
+            0.19848491251468658,
+            -0.9780365824699402
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.640374183654785,
+            3.648182200777228e-09,
+            1.8308625726604077e-09
+          ],
+          "rotation": [
+            -0.01862887479364872,
+            -0.007972199469804764,
+            0.10711660236120224,
+            -0.9940399527549744
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.64884352684021,
+            1.998945720060874e-08,
+            1.6076349140803359e-09
+          ],
+          "rotation": [
+            0.001621426548808813,
+            0.03886699676513672,
+            -0.13362368941307068,
+            -0.990268349647522
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            10.140665054321289,
+            -2.263151168823242,
+            4.643147945404053
+          ],
+          "rotation": [
+            -0.12953773140907288,
+            0.1878969520330429,
+            0.14421314001083374,
+            -0.9628692865371704
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.5709807872772217,
+            -1.8669879864319228e-08,
+            3.9181813349387085e-10
+          ],
+          "rotation": [
+            0.010359718464314938,
+            0.01051939744502306,
+            0.09774821996688843,
+            -0.9951016306877136
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            2.985630750656128,
+            3.005878568274056e-08,
+            -4.0375400800485295e-09
+          ],
+          "rotation": [
+            0.0035809518303722143,
+            -0.03379638493061066,
+            0.008930303156375885,
+            -0.9993824362754822
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            11.497884750366211,
+            -1.7535265684127808,
+            2.846912384033203
+          ],
+          "rotation": [
+            -0.09548048675060272,
+            0.11676570773124695,
+            0.18851163983345032,
+            -0.9704187512397766
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.430177211761475,
+            -4.666503627959173e-09,
+            -9.40334032861756e-10
+          ],
+          "rotation": [
+            0.004301111213862896,
+            0.01416760217398405,
+            0.1159631535410881,
+            -0.9931431412696838
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.4766523838043213,
+            1.678635896951164e-08,
+            2.768651086171303e-09
+          ],
+          "rotation": [
+            -0.00019882837659679353,
+            -0.026257768273353577,
+            -0.11221285909414291,
+            -0.9933372139930725
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.762036323547363,
+            -2.3749806880950928,
+            -2.5378196239471436
+          ],
+          "rotation": [
+            0.6303090453147888,
+            -0.3715250790119171,
+            -0.07729015499353409,
+            -0.6772782206535339
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            3.8696718215942383,
+            -5.0118700301027275e-09,
+            9.984972848542384e-09
+          ],
+          "rotation": [
+            0.0026046857237815857,
+            -0.08679848909378052,
+            0.13014115393161774,
+            -0.9876854419708252
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            4.062171459197998,
+            -1.072194777407276e-09,
+            -5.127276381244883e-10
+          ],
+          "rotation": [
+            0.02139909379184246,
+            -0.0018833780195564032,
+            -0.10793746262788773,
+            -0.9939255714416504
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            14,
+            3.552713678800501e-15,
+            0
+          ],
+          "rotation": [
+            -2.7755575615628914e-17,
+            2.7755575615628914e-17,
+            -5.551115123125783e-17,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0.5,
+            1.7763568394002505e-15,
+            0
+          ],
+          "rotation": [
+            -3.469446951953614e-17,
+            -1.6250033905767303e-33,
+            -4.683753385137379e-17,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            11.8837890625,
+            2.732102394104004,
+            3.7820026874542236
+          ],
+          "rotation": [
+            0.7294167876243591,
+            0.20891791582107544,
+            -0.6396598219871521,
+            -0.12304386496543884
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -15.784797668457031,
+            7.013959930191049e-06,
+            -1.1171471669513267e-05
+          ],
+          "rotation": [
+            0.11299581080675125,
+            -0.33062976598739624,
+            -0.16141915321350098,
+            -0.922962486743927
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -30.340049743652344,
+            4.085021373612108e-06,
+            1.7513536931801355e-06
+          ],
+          "rotation": [
+            -0.054016515612602234,
+            0.07918272912502289,
+            -0.26340970396995544,
+            -0.9599102139472961
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -26.975244522094727,
+            -2.5634119083406404e-05,
+            -1.1905384553756448e-06
+          ],
+          "rotation": [
+            -0.617895245552063,
+            -0.019371984526515007,
+            0.010653295554220676,
+            -0.7859495878219604
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -12.067941665649414,
+            1.7637253999710083,
+            2.1094281673431396
+          ],
+          "rotation": [
+            0.13330453634262085,
+            0.003180114319548011,
+            0.22317975759506226,
+            -0.9656140804290771
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.287688255310059,
+            -9.245983528671786e-05,
+            -7.426209776895121e-05
+          ],
+          "rotation": [
+            0.01204353105276823,
+            0.0029058358632028103,
+            0.10444825887680054,
+            -0.9944531321525574
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.3937981128692627,
+            -0.0001206969900522381,
+            -1.2407956091919914e-05
+          ],
+          "rotation": [
+            0.010611144825816154,
+            -0.007850884459912777,
+            -0.08285507559776306,
+            -0.9964741468429565
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -12.244112968444824,
+            1.2937241792678833,
+            -0.5711302161216736
+          ],
+          "rotation": [
+            0.028522171080112457,
+            0.05687393248081207,
+            0.19848491251468658,
+            -0.9780365824699402
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.640568733215332,
+            0.00014491056208498776,
+            7.636955160705838e-06
+          ],
+          "rotation": [
+            -0.01862887479364872,
+            -0.007972199469804764,
+            0.10711660236120224,
+            -0.9940399527549744
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.648909091949463,
+            -3.29968097503297e-05,
+            -2.2666431505058426e-06
+          ],
+          "rotation": [
+            0.001621426548808813,
+            0.03886699676513672,
+            -0.13362368941307068,
+            -0.990268349647522
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -10.140592575073242,
+            2.263354778289795,
+            -4.643094539642334
+          ],
+          "rotation": [
+            -0.12953773140907288,
+            0.1878969520330429,
+            0.14421314001083374,
+            -0.9628692865371704
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.571057081222534,
+            7.801967876730487e-05,
+            -8.107984285743441e-06
+          ],
+          "rotation": [
+            0.010359718464314938,
+            0.01051939744502306,
+            0.09774821996688843,
+            -0.9951016306877136
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -2.985419273376465,
+            -0.00031727668829262257,
+            -3.5056928027188405e-05
+          ],
+          "rotation": [
+            0.0035809644032269716,
+            -0.033796388655900955,
+            0.00893030408769846,
+            -0.9993824362754822
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -11.497973442077637,
+            1.7537660598754883,
+            -2.846914768218994
+          ],
+          "rotation": [
+            -0.09548048675060272,
+            0.11676570773124695,
+            0.18851163983345032,
+            -0.9704187512397766
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.429864406585693,
+            -8.44798851176165e-05,
+            -1.837869785958901e-05
+          ],
+          "rotation": [
+            0.004301111213862896,
+            0.01416760217398405,
+            0.1159631535410881,
+            -0.9931431412696838
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.476658821105957,
+            -7.194164209067822e-05,
+            -2.843127731466666e-06
+          ],
+          "rotation": [
+            -0.00019882837659679353,
+            -0.026257768273353577,
+            -0.11221285909414291,
+            -0.9933372139930725
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.762124538421631,
+            2.375119924545288,
+            2.537801742553711
+          ],
+          "rotation": [
+            0.6303090453147888,
+            -0.3715250790119171,
+            -0.07729015499353409,
+            -0.6772782206535339
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -3.8695690631866455,
+            -0.00011357050243532285,
+            5.5954889830900356e-05
+          ],
+          "rotation": [
+            0.002604700857773423,
+            -0.08679849654436111,
+            0.13014116883277893,
+            -0.9876854419708252
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -4.06217622756958,
+            -2.0121733541600406e-06,
+            3.204959284630604e-06
+          ],
+          "rotation": [
+            0.021399078890681267,
+            -0.0018833739450201392,
+            -0.10793746262788773,
+            -0.9939255714416504
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -14,
+            -2.4331944587174803e-05,
+            -6.578326974704396e-06
+          ],
+          "rotation": [
+            -0.11762712150812149,
+            -1.632404232733718e-18,
+            -1.3781446081870406e-17,
+            -0.9930578470230103
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -0.5,
+            3.700793968164362e-06,
+            -1.1559803851923789e-06
+          ],
+          "rotation": [
+            -0.17323486506938934,
+            2.763644010072535e-17,
+            -3.0997381635827322e-18,
+            -0.9848805665969849
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            16.55878257751465,
+            0.3553175628185272,
+            -5.965974025912146e-08
+          ],
+          "rotation": [
+            0,
+            0,
+            -0.20371073484420776,
+            -0.9790310859680176
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            9.283613204956055,
+            -0.3641568720340729,
+            2.9273693708751483e-15
+          ],
+          "rotation": [
+            -3.292063764973974e-33,
+            -2.44310998986661e-32,
+            0.13354197144508362,
+            -0.9910431504249573
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -1.4488286972045898,
+            0.5314235091209412,
+            -9.005809783935547
+          ],
+          "rotation": [
+            0.07370486855506897,
+            0.062138836830854416,
+            -0.008584325201809406,
+            -0.9953052997589111
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -42.57203674316406,
+            -1.707418650909176e-10,
+            -4.667839448302402e-10
+          ],
+          "rotation": [
+            -0.048884253948926926,
+            -0.018863899633288383,
+            -0.06552226841449738,
+            -0.9964744448661804
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -20.476776123046875,
+            -3.552713678800501e-15,
+            0
+          ],
+          "rotation": [
+            0.0028089452534914017,
+            0.0019333207746967673,
+            -0.007612692657858133,
+            -0.9999651908874512
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -40.19668960571289,
+            3.933847025905379e-09,
+            1.8994583683706878e-10
+          ],
+          "rotation": [
+            -0.005885771010071039,
+            -0.03199128806591034,
+            0.07035475224256516,
+            -0.9969915151596069
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -10.453837394714355,
+            16.57785415649414,
+            0.08015594631433487
+          ],
+          "rotation": [
+            8.00762209109962e-05,
+            -2.959302582894452e-05,
+            -0.718633770942688,
+            -0.6953887343406677
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -22.09423828125,
+            2.220446049250313e-16,
+            0
+          ],
+          "rotation": [
+            -0.04744356498122215,
+            -2.1482490410562605e-05,
+            -0.000491108454298228,
+            -0.998873770236969
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -1.4486445188522339,
+            0.5314275622367859,
+            9.005803108215332
+          ],
+          "rotation": [
+            0.062138836830854416,
+            -0.07370486855506897,
+            0.9953052997589111,
+            -0.008584325201809406
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            42.57225036621094,
+            1.6233628912232234e-06,
+            -5.836755576638097e-07
+          ],
+          "rotation": [
+            -0.048884253948926926,
+            -0.018863899633288383,
+            -0.06552226841449738,
+            -0.9964744448661804
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            20.47690773010254,
+            -0.0,
+            3.552713678800501e-15
+          ],
+          "rotation": [
+            0.002807280281558633,
+            0.001933723222464323,
+            -0.007612532936036587,
+            -0.9999651908874512
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            40.19681930541992,
+            -1.6769354260759428e-06,
+            -1.0918018233496696e-05
+          ],
+          "rotation": [
+            -0.005885771010071039,
+            -0.03199128806591034,
+            0.07035475224256516,
+            -0.9969915151596069
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            10.453816413879395,
+            -16.577796936035156,
+            -0.08015844970941544
+          ],
+          "rotation": [
+            8.00762209109962e-05,
+            -2.959302582894452e-05,
+            -0.718633770942688,
+            -0.6953887343406677
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            22.094240188598633,
+            -3.3306690738754696e-16,
+            0
+          ],
+          "rotation": [
+            -0.047445230185985565,
+            -2.1906784240854904e-05,
+            -0.0004911785945296288,
+            -0.9988737106323242
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            -0.0,
+            0
+          ],
+          "rotation": [
+            3.0616171314629196e-17,
+            -0.0,
+            0,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            17.076271057128906,
+            -8.072127342224121,
+            13.465730667114258
+          ],
+          "rotation": [
+            0.0205298513174057,
+            0.7122328281402588,
+            0.011723978444933891,
+            -0.7015450596809387
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -17.0762882232666,
+            -8.072148323059082,
+            13.46557331085205
+          ],
+          "rotation": [
+            -0.7015450596809387,
+            -0.011723978444933891,
+            0.7122328281402588,
+            -0.0205298513174057
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            -0.0,
+            0
+          ],
+          "rotation": [
+            3.0616171314629196e-17,
+            -0.0,
+            0,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -56.64609909057617,
+            -0.33541175723075867,
+            111.67965698242188
+          ],
+          "rotation": [
+            0.6188496947288513,
+            0.06954113394021988,
+            0.3891361653804779,
+            -0.6787946224212646
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            77.88542938232422,
+            69.60191345214844,
+            43.869503021240234
+          ],
+          "rotation": [
+            0.6874741315841675,
+            0.614358127117157,
+            0.38722530007362366,
+            1.857170135315415e-15
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            -0.0,
+            0
+          ],
+          "rotation": [
+            1.1555579666323415e-33,
+            4.163336342344337e-17,
+            2.7755575615628914e-17,
+            -1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            -2.7538735181131813e-17,
+            0,
+            0.9999999987090954
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            0.9999999987090953
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -2.3346792353834336e-06,
+            -4.2165689137321064e-06,
+            -3.0691049099942175e-06
+          ],
+          "rotation": [
+            -1.3857105577580464e-08,
+            -3.5396378605945245e-08,
+            1.9911389204096963e-10,
+            0.9999999771903716
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -77.88535586665441,
+            -69.60192136611279,
+            -43.869636039071324
+          ],
+          "rotation": [
+            -0.6874741241479181,
+            -0.6143580781191609,
+            -0.3872253024500443,
+            -3.1195351520713066e-08
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            77.88543342221095,
+            69.6019209283701,
+            43.86950478855344
+          ],
+          "rotation": [
+            0.6874741241479181,
+            0.6143580781191609,
+            0.3872253024500443,
+            -3.1195351520713066e-08
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            2.3346792627146195e-06,
+            4.216569003354351e-06,
+            3.069105134926007e-06
+          ],
+          "rotation": [
+            1.3857105577580464e-08,
+            3.5396378605945245e-08,
+            -1.9911389204096963e-10,
+            0.9999999771903716
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            39.716485612717435,
+            5.654177573588729,
+            2.530866782438139
+          ],
+          "rotation": [
+            0.005885772725002422,
+            0.031991286966879064,
+            -0.07035474610993217,
+            -0.996991473516807
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -39.71661717643036,
+            -5.654193834527927,
+            -2.5308636747559845
+          ],
+          "rotation": [
+            0.00588577272500241,
+            0.03199128696687903,
+            -0.07035474610993216,
+            -0.9969914735168071
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            17.076271057128906,
+            -8.072127342224121,
+            13.465730667114258
+          ],
+          "rotation": [
+            0.0205298513174057,
+            0.7122328281402588,
+            0.011723978444933891,
+            -0.7015450596809387
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "position": [
+            -17.0762882232666,
+            -8.072148323059082,
+            13.46557331085205
+          ],
+          "rotation": [
+            -0.7015450596809387,
+            -0.011723978444933891,
+            0.7122328281402588,
+            -0.0205298513174057
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "06205e86a4ddf982dcda158c3710fe19d68845ef",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses.ALS_Props_Bow_Poses",
+      "file": "raw_sequences/06205e86a4ddf982dcda158c3710fe19d68845ef.json",
+      "sha256": "2a41e28b50d2c2c9680135eb3a2525e864328822fd49b037c7ce3d9463305e99"
+    },
+    {
+      "assetId": "0ea33c35b3929aedcbce55be96de6b266f22197c",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep_Crouched.ALS_Props_Pistol_1H_Aim_Sweep_Crouched",
+      "file": "raw_sequences/0ea33c35b3929aedcbce55be96de6b266f22197c.json",
+      "sha256": "60dcff26646f3aa353c8e9c0570f1b9192aaebd808c436d9b7bfe35a4043c00c"
+    },
+    {
+      "assetId": "1094fc4ec63926d1188bab751b7ef1b18c28fcfb",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses_NoCurves.ALS_Props_Pistol_1H_Poses_NoCurves",
+      "file": "raw_sequences/1094fc4ec63926d1188bab751b7ef1b18c28fcfb.json",
+      "sha256": "c17f63974986a64793ad86185ae377f55043486f9f9b759d1dff1993e4affb26",
+      "dependencyOf": [
+        "0ea33c35b3929aedcbce55be96de6b266f22197c",
+        "6f4c9999621f662d825bc05d9e46263c360fed93"
+      ]
+    },
+    {
+      "assetId": "15448801e639286305e4da05cfc67925e737e43b",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses_NoCurves.ALS_Props_M4A1_Poses_NoCurves",
+      "file": "raw_sequences/15448801e639286305e4da05cfc67925e737e43b.json",
+      "sha256": "6ec9213ca83ce908e5894df298c08837ce37cbd8fb2ae089560f68756c0b1289",
+      "dependencyOf": [
+        "4feaf2edfa913aedfa651dac00ec36b9bc5391a3",
+        "e36e48b2b343c7cc6c8f3337af79cb9f453f45fa"
+      ]
+    },
+    {
+      "assetId": "1624bfe19eff475cd06a7d3e5b5a445be80bc598",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses_NoCurves.ALS_Props_Binoculars_Poses_NoCurves",
+      "file": "raw_sequences/1624bfe19eff475cd06a7d3e5b5a445be80bc598.json",
+      "sha256": "8398bbc8d1c429a6269cd880025bda9004422272c15c9dce3b64878d24d41ab6",
+      "dependencyOf": [
+        "179d156aad0a32c44d6bf3ee662d0eebc637f124",
+        "4e8bf1b38cd8d67f7b891c447cdb868f11b632c0"
+      ]
+    },
+    {
+      "assetId": "1770840df822b84d42ac2b693142174ef698e8dc",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep.ALS_Props_Torch_Aim_Sweep",
+      "file": "raw_sequences/1770840df822b84d42ac2b693142174ef698e8dc.json",
+      "sha256": "c8723a88b0586f82c5d58412325681e0e8b03e8ba819a911d0c891cc5c3a2e8f"
+    },
+    {
+      "assetId": "179d156aad0a32c44d6bf3ee662d0eebc637f124",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep_Crouched.ALS_Props_Binoculars_Aim_Sweep_Crouched",
+      "file": "raw_sequences/179d156aad0a32c44d6bf3ee662d0eebc637f124.json",
+      "sha256": "14e194b283c8950f7e6df15600ede97f637ba5f42c1f9ef47de236b957bc216e"
+    },
+    {
+      "assetId": "19998bac1f393df801f1e61b60dfd1eb976d396d",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses.ALS_Props_Torch_Poses",
+      "file": "raw_sequences/19998bac1f393df801f1e61b60dfd1eb976d396d.json",
+      "sha256": "2322795a5e90bb0884b103bb1728aa104e19a4a4fe504a561d4189a46655532b"
+    },
+    {
+      "assetId": "19c0187833782797fd6364d2d9d59cb306a8cc28",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep_Crouched.ALS_Props_Bow_Aim_Sweep_Crouched",
+      "file": "raw_sequences/19c0187833782797fd6364d2d9d59cb306a8cc28.json",
+      "sha256": "e5dc74efbf9b5e5000a7715f79052bd2a32115579757d3fc3b679af157c198fe"
+    },
+    {
+      "assetId": "1d4bd0f5919851b1d8d6beaad2e9f8495c1c7bd8",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Barrel/ALS_Props_Barrel_Poses.ALS_Props_Barrel_Poses",
+      "file": "raw_sequences/1d4bd0f5919851b1d8d6beaad2e9f8495c1c7bd8.json",
+      "sha256": "837c3072ca43c0015c24a8af891ef49949dfc5cd804d0c134f6814b8e01c592a"
+    },
+    {
+      "assetId": "24e8830b43c78b318932dc2fc6680fdf3452b9e2",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses.ALS_Props_Binoculars_Poses",
+      "file": "raw_sequences/24e8830b43c78b318932dc2fc6680fdf3452b9e2.json",
+      "sha256": "5667791a87e0bd821f86fb9c020e091de8e817983f924164d11794604d731053"
+    },
+    {
+      "assetId": "40e3e08f95a2620e1712562b618fc361509a2a80",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep.ALS_Props_Pistol_2H_Aim_Sweep",
+      "file": "raw_sequences/40e3e08f95a2620e1712562b618fc361509a2a80.json",
+      "sha256": "56ae21a93074b4a238e8726faa9ef232db9659aadcbc16327690279002ee677c"
+    },
+    {
+      "assetId": "4e8bf1b38cd8d67f7b891c447cdb868f11b632c0",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep.ALS_Props_Binoculars_Aim_Sweep",
+      "file": "raw_sequences/4e8bf1b38cd8d67f7b891c447cdb868f11b632c0.json",
+      "sha256": "c2a9a9d8a27e24778c6849f30c5df59ff58a05c43d8ba668f5df4b68266ba268"
+    },
+    {
+      "assetId": "4feaf2edfa913aedfa651dac00ec36b9bc5391a3",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep_Crouched.ALS_Props_M4A1_Aim_Sweep_Crouched",
+      "file": "raw_sequences/4feaf2edfa913aedfa651dac00ec36b9bc5391a3.json",
+      "sha256": "72c96daaf6657db71ba3ad1e7fc42ce36de1cce5bf339406bc632bf15ceb2819"
+    },
+    {
+      "assetId": "512d3e7359dd13d89457f90e68cceac1408c940f",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses.ALS_Props_Pistol_2H_Poses",
+      "file": "raw_sequences/512d3e7359dd13d89457f90e68cceac1408c940f.json",
+      "sha256": "146d18b45edcd05f211cd707fd3abbe197191f673d768610eaafbbf6f2f61812"
+    },
+    {
+      "assetId": "5424c7d119568dace5551a83aad3bdbb9c780b78",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Box/ALS_Props_Box_Poses.ALS_Props_Box_Poses",
+      "file": "raw_sequences/5424c7d119568dace5551a83aad3bdbb9c780b78.json",
+      "sha256": "0d845ebbd7e725df7662ac60f2c85cfe0d50fbec9753372cff20af5258affd45"
+    },
+    {
+      "assetId": "57ba9bc36b45aad5fa0a3351b8caf21deb44d08e",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep.ALS_Props_Bow_Aim_Sweep",
+      "file": "raw_sequences/57ba9bc36b45aad5fa0a3351b8caf21deb44d08e.json",
+      "sha256": "4748a43759677ddf1b0bf22a1b89a1f5d6ae1ca459c89ac25c0984a5f9ea5ce1"
+    },
+    {
+      "assetId": "621a81bf492cb9120b45cfd91b685854afb7dc75",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose.ALS_N_Pose",
+      "file": "raw_sequences/621a81bf492cb9120b45cfd91b685854afb7dc75.json",
+      "sha256": "c929ec66e0b04c7dd2bea18a6c3f6a1f25fd6fb63dd6a906731c1cbb8d260807",
+      "dependencyOf": [
+        "69aee04ffca72356fef27d5183d67578dcad93e6"
+      ]
+    },
+    {
+      "assetId": "62508043098864e937ab7d1c8d1c30b575b02c23",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Masculine.ALS_StanceVariation_Masculine",
+      "file": "raw_sequences/62508043098864e937ab7d1c8d1c30b575b02c23.json",
+      "sha256": "cfd39e9767cc28ac12667944168d5d92e1be93595d655c6e0cd9d0357feace70"
+    },
+    {
+      "assetId": "6720aef9e99e694137281bcbf2a1df9cfb1abd83",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse_Arms.ALS_Props_M4A1_Sprint_F_Impulse_Arms",
+      "file": "raw_sequences/6720aef9e99e694137281bcbf2a1df9cfb1abd83.json",
+      "sha256": "b78a93c0ccb2c01ecabd04df1b0da886818794f25e8e3e1921723be003916c94"
+    },
+    {
+      "assetId": "69aee04ffca72356fef27d5183d67578dcad93e6",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Shared/ALS_N_SecondaryMotion.ALS_N_SecondaryMotion",
+      "file": "raw_sequences/69aee04ffca72356fef27d5183d67578dcad93e6.json",
+      "sha256": "65f4a6d01c2107f3dc7eef18a9dc351f119ca264d4fe775ae8d3b5fe169a6ea7"
+    },
+    {
+      "assetId": "6aec8ac8ee0999c72a71fc2e74ed4e713f2c1a2e",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses_NoCurves.ALS_Props_Pistol_2H_Poses_NoCurves",
+      "file": "raw_sequences/6aec8ac8ee0999c72a71fc2e74ed4e713f2c1a2e.json",
+      "sha256": "91590cbdab359cea5b16be70e21f289c681697b401cb75b3a5011f64515cc3bd",
+      "dependencyOf": [
+        "40e3e08f95a2620e1712562b618fc361509a2a80",
+        "7b4cd34c8da5697e4bfa5e23f2330f4998670999"
+      ]
+    },
+    {
+      "assetId": "6f4c9999621f662d825bc05d9e46263c360fed93",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep.ALS_Props_Pistol_1H_Aim_Sweep",
+      "file": "raw_sequences/6f4c9999621f662d825bc05d9e46263c360fed93.json",
+      "sha256": "e8a97c5bdba80ea4df372bc84bc4ba3d72b5e6af21260bc9516ef8cecb1fd87d"
+    },
+    {
+      "assetId": "74fae9958ca8fc1e28329c581038e55a4840c2c1",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses.ALS_Props_Pistol_1H_Poses",
+      "file": "raw_sequences/74fae9958ca8fc1e28329c581038e55a4840c2c1.json",
+      "sha256": "e58cc0e9a9e1e69d36444b1b6448d690d022a212d55a54f3918e2e72dc04d0fa"
+    },
+    {
+      "assetId": "7b4cd34c8da5697e4bfa5e23f2330f4998670999",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep_Crouched.ALS_Props_Pistol_2H_Aim_Sweep_Crouched",
+      "file": "raw_sequences/7b4cd34c8da5697e4bfa5e23f2330f4998670999.json",
+      "sha256": "bc701b5e5fdd27156e920edd11e5d3be6b5b935f1afcf50df42ef8fc534f75c7"
+    },
+    {
+      "assetId": "8a6fb8d8eb88047a9b40f43b714967277653b789",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Arms.ALS_Props_M4A1_Sprint_F_Arms",
+      "file": "raw_sequences/8a6fb8d8eb88047a9b40f43b714967277653b789.json",
+      "sha256": "dd84af66d47664ccb8f62b44a195ab63fd82e27a16d58db7575493f1b8c5bad8"
+    },
+    {
+      "assetId": "a3231a9b5f07ddae18cc061ec0aa7c8a0fddd6cd",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses_NoCurves.ALS_Props_Torch_Poses_NoCurves",
+      "file": "raw_sequences/a3231a9b5f07ddae18cc061ec0aa7c8a0fddd6cd.json",
+      "sha256": "cced7b058f94b5ab067444718bf40ae6d74e6bbda841f9b86e0a1be56acb3ff8",
+      "dependencyOf": [
+        "1770840df822b84d42ac2b693142174ef698e8dc",
+        "fed8555576fff79dc806356e0ddd96c87a05a733"
+      ]
+    },
+    {
+      "assetId": "a9130fb81cde85feb0c30091facf77763b15711f",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses_NoCurves.ALS_Props_Bow_Poses_NoCurves",
+      "file": "raw_sequences/a9130fb81cde85feb0c30091facf77763b15711f.json",
+      "sha256": "caf32e3f0995bb68dd03ccae89ab854cbd888b1ebcfc5fbc15222d03e724d0be",
+      "dependencyOf": [
+        "19c0187833782797fd6364d2d9d59cb306a8cc28",
+        "57ba9bc36b45aad5fa0a3351b8caf21deb44d08e"
+      ]
+    },
+    {
+      "assetId": "b084f74d4087d0fa215618550fadd29ebc2b01a0",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Injured.ALS_StanceVariation_Injured",
+      "file": "raw_sequences/b084f74d4087d0fa215618550fadd29ebc2b01a0.json",
+      "sha256": "611324105a5ba59861422945278cd254f5b67d7cfeedb47396842a8c458a9bfa"
+    },
+    {
+      "assetId": "b1b9302cbf29b5978f4b8c5768a94dd227982e40",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Normal.ALS_StanceVariation_Normal",
+      "file": "raw_sequences/b1b9302cbf29b5978f4b8c5768a94dd227982e40.json",
+      "sha256": "04560f74681c7abae3831ac892848a48fb46c431e2e6ef90bd0934e25cc80b11"
+    },
+    {
+      "assetId": "bf827e8773890767df2c42df9208d461dc9e3ece",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses.ALS_Props_M4A1_Poses",
+      "file": "raw_sequences/bf827e8773890767df2c42df9208d461dc9e3ece.json",
+      "sha256": "1aeebb836481050e452aec017102a7e52191af28ecc0370e38889d2efbce8745"
+    },
+    {
+      "assetId": "deda874944d28720dda32eac369723b3362af20d",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Feminine.ALS_StanceVariation_Feminine",
+      "file": "raw_sequences/deda874944d28720dda32eac369723b3362af20d.json",
+      "sha256": "6b7eb83cba77fb0cc4f57b866b422d0fa56fc80fb0a6119232f401d39bee99bb"
+    },
+    {
+      "assetId": "e2d92a77e2e5fd2de0b4f2987652523ec87c061f",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F_Arms.ALS_Props_M4A1_Run_F_Arms",
+      "file": "raw_sequences/e2d92a77e2e5fd2de0b4f2987652523ec87c061f.json",
+      "sha256": "a63ca8b0672141a5846adea13d71a078f1feef7a1cead73f8a70cd21baa4be07"
+    },
+    {
+      "assetId": "e36e48b2b343c7cc6c8f3337af79cb9f453f45fa",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep.ALS_Props_M4A1_Aim_Sweep",
+      "file": "raw_sequences/e36e48b2b343c7cc6c8f3337af79cb9f453f45fa.json",
+      "sha256": "bd4fbb542c6613aa47ef6dc83dc790470d4a01a275f426756c240f583490901d"
+    },
+    {
+      "assetId": "fdfae8af1f8b9425e630ecd25ad389991e3eb99e",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_HandsTied.ALS_StanceVariation_HandsTied",
+      "file": "raw_sequences/fdfae8af1f8b9425e630ecd25ad389991e3eb99e.json",
+      "sha256": "4226ea5fd7bbf261d0e4867bd7a690985237f354334da25392a2140bbc5213b1"
+    },
+    {
+      "assetId": "fed8555576fff79dc806356e0ddd96c87a05a733",
+      "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep_Crouched.ALS_Props_Torch_Aim_Sweep_Crouched",
+      "file": "raw_sequences/fed8555576fff79dc806356e0ddd96c87a05a733.json",
+      "sha256": "2f5cb0431487019766473dc9dd00ba1b9b91e7ce1435700b8204dfa5d65f6156"
+    }
+  ]
+}

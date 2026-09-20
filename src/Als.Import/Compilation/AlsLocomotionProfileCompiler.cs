@@ -24,7 +24,7 @@ public static class AlsLocomotionProfileCompiler
     ];
 
     private static readonly HashSet<string> RequiredPropertySet =
-        new(RequiredProperties, StringComparer.Ordinal);
+        new(RequiredProperties.Append("standingWalkRun"), StringComparer.Ordinal);
 
     private static readonly string[] PresentationProperties =
     [
@@ -109,6 +109,9 @@ public static class AlsLocomotionProfileCompiler
             var landId = ResolveAnimation(animationSet, landStableId, "$.land", skeletonId);
             var (leanSamples, leanBasePoseId) = CompileLeanAdditive(
                 animationSet, leanAdditiveStableId, skeletonId);
+            var standingWalkRun = properties.TryGetValue("standingWalkRun", out var cycleSources)
+                ? CompileStandingWalkRun(cycleSources, animationSet, skeletonId)
+                : [];
 
             var allAnimationIds = new[]
                 {
@@ -120,6 +123,7 @@ public static class AlsLocomotionProfileCompiler
                 .Concat([jumpStartId, fallLoopId, landId])
                 .Concat(leanSamples.Select(sample => sample.AnimationId))
                 .Append(leanBasePoseId)
+                .Concat(standingWalkRun.SelectMany(value => new[] { value.WalkPoseId, value.WalkId, value.RunPoseId, value.RunId }))
                 .Distinct()
                 .OrderBy(id => id)
                 .ToArray();
@@ -137,8 +141,38 @@ public static class AlsLocomotionProfileCompiler
                 landId,
                 leanSamples,
                 leanBasePoseId,
-                allAnimationIds);
+                allAnimationIds) { StandingWalkRun = standingWalkRun };
         }
+    }
+
+    private static AlsStandingWalkRunDefinition[] CompileStandingWalkRun(JsonElement sources,
+        AlsAnimationSetDefinition set, int skeletonId)
+    {
+        if (sources.ValueKind != JsonValueKind.Array || sources.GetArrayLength() != 6)
+            throw Failure("ALSPROFILE027", "$.standingWalkRun", "Expected F, B, LF, LB, RF, RB blend space IDs.");
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        return sources.EnumerateArray().Select((source, index) =>
+        {
+            var path = $"$.standingWalkRun[{index}]";
+            var stableId = ReadStableId(source, path, seen);
+            AlsBlendDefinition blend;
+            try { blend = set.BlendSpaces[set.AssetIndex.GetBlendSpaceId(stableId)]; }
+            catch (KeyNotFoundException) { throw Failure("ALSPROFILE028", path, "Missing WalkRun blend space."); }
+            if (blend.Samples.Length != 4) throw Failure("ALSPROFILE029", path, "WalkRun must have four corners.");
+            var ids = new int[4];
+            Array.Fill(ids, -1);
+            foreach (var sample in blend.Samples)
+            {
+                if (sample.SampleValue.Length < 2 || sample.SampleValue[0] is not (0 or 1) ||
+                    sample.SampleValue[1] is not (0 or 1) || sample.RateScale != 1)
+                    throw Failure("ALSPROFILE030", path, "Unsupported Stride/WalkRun coordinate or rate.");
+                var corner = (int)sample.SampleValue[0] + 2 * (int)sample.SampleValue[1];
+                if (ids[corner] >= 0) throw Failure("ALSPROFILE031", path, "Duplicate WalkRun corner.");
+                RequireSkeleton(set.Animations[sample.AnimationId], skeletonId, path);
+                ids[corner] = sample.AnimationId;
+            }
+            return new AlsStandingWalkRunDefinition(ids[0], ids[1], ids[2], ids[3]);
+        }).ToArray();
     }
 
     private static Dictionary<string, JsonElement> ValidateObject(

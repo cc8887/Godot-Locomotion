@@ -527,10 +527,18 @@ public sealed class AlsFootPlacementModelTests
         }
         else
         {
-            var horizontal = output.LeftFoot.Position;
-            horizontal.Y = 0f;
-            Assert.InRange(Angle(-Vector3.UnitZ, horizontal),
-                0f, settings.MaximumThighAngleRadians + Tolerance);
+            var radius = new Vector2(hitPosition.X, hitPosition.Z).Length();
+            var constrainedLock = new Vector3(
+                radius * MathF.Sin(settings.MaximumThighAngleRadians), settings.FootHeightMeters,
+                -radius * MathF.Cos(settings.MaximumThighAngleRadians));
+            constrainedLock.Y += (settings.FootHeightMeters -
+                Vector3.Dot(currentNormal, constrainedLock - hitPosition)) / currentNormal.Y;
+            var contactNormal = SlopeNormalRadians(settings.MaximumFootAngleRadians);
+            var target = hitPosition + Vector3.UnitY * (settings.FootHeightMeters / contactNormal.Y);
+            var weightedTarget = Vector3.Lerp(target, constrainedLock, lockAmount);
+            var clearanceCorrection = (settings.FootHeightMeters -
+                Vector3.Dot(currentNormal, weightedTarget - hitPosition)) / Vector3.Dot(finalFootUp, currentNormal);
+            AssertVector(weightedTarget + finalFootUp * clearanceCorrection, output.LeftFoot.Position);
         }
     }
 
@@ -1055,6 +1063,30 @@ public sealed class AlsFootPlacementModelTests
         AssertWithinReach(next, output, settings);
     }
 
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(0.0000011f)]
+    [InlineData(0.25f)]
+    [InlineData(0.5f)]
+    [InlineData(1f)]
+    public void ThighConstraintOnlyAffectsWeightedLockTarget(float amount)
+    {
+        var settings = AlsFootPlacementSettings.CreateReference() with
+        {
+            MaximumThighAngleRadians = Degrees(20f),
+        };
+        var position = new Vector3(0.3f, settings.FootHeightMeters, 0.2f);
+        var state = State();
+        state.LeftFootProbeOrigin = position;
+        var input = Input(Hit(position: position - Vector3.UnitY * settings.FootHeightMeters));
+        Assert.True(Evaluate(settings, input, 1f, 0f, 1f, 0f, state,
+            out var locked, out var full, out _));
+        locked.LeftFootLock = locked.LeftFootLock with { Amount = amount };
+        Assert.True(Evaluate(settings, input, 1f, 0f, amount, 0f, locked,
+            out _, out var blended, out _));
+        AssertVector(Vector3.Lerp(position, full.LeftFoot.Position, amount), blended.LeftFoot.Position);
+    }
+
     [Fact]
     public void HeldWorldLockClampsThighAndFootDeltaWithoutChangingStoredTarget()
     {
@@ -1086,6 +1118,28 @@ public sealed class AlsFootPlacementModelTests
         Assert.InRange(Angle(currentForward, outputDirection), 0f, Degrees(20f) + Tolerance);
         Assert.InRange(QuaternionAngle(characterRotation, output.LeftFoot.Rotation),
             0f, Degrees(40f) + Tolerance);
+    }
+
+    [Fact]
+    public void HeldFootOrientationDoesNotFlipAcrossRearThighClampBoundary()
+    {
+        var settings = AlsFootPlacementSettings.CreateReference();
+        var state = State();
+        state.LeftFootProbeOrigin = new Vector3(0f, settings.FootHeightMeters, .05f);
+        var hit = Hit(position: new Vector3(0f, 0f, .05f));
+        Assert.True(Evaluate(settings, Input(hit), 1f, 0f, 1f, 0f, state,
+            out var locked, out _, out _));
+        Quaternion? previous = null;
+        foreach (var x in new[] { -.02f, -.001f, .001f, .02f })
+        {
+            var input = Input(hit) with { CharacterTransform = Matrix4x4.CreateTranslation(x, 0, 0) };
+            Assert.True(Evaluate(settings, input, 1f, 0f, .6f, 0f, locked,
+                out _, out var output, out _));
+            Assert.InRange(QuaternionAngle(Quaternion.Identity, output.LeftFoot.Rotation), 0f, Tolerance);
+            if (previous is { } rotation)
+                Assert.InRange(QuaternionAngle(rotation, output.LeftFoot.Rotation), 0f, Tolerance);
+            previous = output.LeftFoot.Rotation;
+        }
     }
 
     [Fact]

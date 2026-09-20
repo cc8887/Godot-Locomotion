@@ -1,5 +1,6 @@
 using Godot;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Locomotion;
 using NumericsVector2 = System.Numerics.Vector2;
 
 namespace GodotAls.Locomotion;
@@ -11,7 +12,10 @@ public readonly record struct AlsPlayerInputSnapshot(
     bool CrouchTogglePressed,
     bool JumpPressed,
     bool RotationModeTogglePressed,
-    bool AimHeld);
+    bool AimHeld)
+{
+    public AlsOverlayKind Overlay { get; init; }
+}
 
 public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
 {
@@ -22,8 +26,9 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
 
     public long CapturedFrameId => _capturedFrameId;
 
-    public void CaptureGodotFrame(long frameId, float viewYaw, float viewPitch) =>
-        CaptureFrame(frameId, ReadGodotSnapshot(), viewYaw, viewPitch);
+    public void CaptureGodotFrame(long frameId, float viewYaw, float viewPitch,
+        AlsOverlayKind overlay = AlsOverlayKind.Default) =>
+        CaptureFrame(frameId, ReadGodotSnapshot() with { Overlay = overlay }, viewYaw, viewPitch);
 
     public void CaptureFrame(
         long frameId,
@@ -37,6 +42,8 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
                 $"Player input frames must be captured consecutively. Last frame was " +
                 $"{_capturedFrameId}, received {frameId}.");
         }
+        if ((uint)snapshot.Overlay > (uint)AlsOverlayKind.Barrel)
+            throw new ArgumentOutOfRangeException(nameof(snapshot), "Unknown Overlay selection.");
         if (!float.IsFinite(viewYaw) ||
             !float.IsFinite(viewPitch) ||
             !float.IsFinite(snapshot.MovementAxes.X) ||
@@ -80,7 +87,7 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource
             gait,
             _stance,
             snapshot.AimHeld ? AlsRotationMode.Aiming : _rotationMode,
-            snapshot.JumpPressed ? (byte)1 : (byte)0);
+            snapshot.JumpPressed ? (byte)1 : (byte)0) { RequestedOverlay = snapshot.Overlay };
         _capturedFrameId = frameId;
     }
 

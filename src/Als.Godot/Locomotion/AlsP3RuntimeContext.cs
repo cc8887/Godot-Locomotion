@@ -3,6 +3,7 @@ using Godot;
 using GodotAls.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Exchange;
+using GodotAls.Core.Events;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
 using GodotAls.Import.Compilation;
@@ -23,7 +24,12 @@ public readonly record struct AlsP4FootProbeSourceSnapshot(
     AlsP3VisualTransformSnapshot CharacterTransform,
     AlsP3VisualTransformSnapshot SkeletonTransform,
     NumericsVector3 LeftComponentOrigin,
-    NumericsVector3 RightComponentOrigin);
+    NumericsVector3 RightComponentOrigin)
+{
+    public AlsFootIkPoseSample NativeFootPose { get; init; }
+    public AlsFootIkPropertyState NativeFootState { get; init; }
+    public AlsBasedFootLockDiagnostics BasedFootLock { get; init; }
+}
 
 internal readonly record struct AlsP4FootGatherSettings(
     float TraceUpMeters,
@@ -58,6 +64,22 @@ internal sealed class AlsP4FootProbeExchange
 
     private readonly AlsP4FootProbeRequest[] _requests = new AlsP4FootProbeRequest[FootCount];
     private bool _hasRequests;
+    private AlsFootIkPoseSample _native;
+    private bool _hasNative;
+
+    public void CopyNative(in AlsFootIkPoseSample sample)
+    {
+        if (sample.Identity.SlotGeneration == 0) return;
+        _native = sample; _hasNative = true;
+    }
+    public bool TryReadNative(in AlsFrameIdentity identity, out AlsFootIkPoseSample sample)
+    {
+        sample = default;
+        if (!_hasNative || _native.Identity.CharacterId != identity.CharacterId ||
+            _native.Identity.SlotGeneration != identity.SlotGeneration || _native.Identity.FrameId == long.MaxValue ||
+            _native.Identity.FrameId + 1 != identity.FrameId) return false;
+        sample = _native; return true;
+    }
 
     public bool TryCopyFromWorker(
         in AlsFrameIdentity identity,
@@ -111,6 +133,7 @@ internal sealed class AlsP4FootProbeExchange
         _requests[LeftFootIndex] = default;
         _requests[RightFootIndex] = default;
         _hasRequests = false;
+        _native = default; _hasNative = false;
     }
 
     internal bool HasRequests => _hasRequests;
@@ -128,6 +151,9 @@ internal readonly record struct AlsP3VisualCommitCandidate(
     AlsP4FootProbeSourceSnapshot FootProbeSource)
 {
     public AlsP4FootPlacementPoseSnapshot FootPose { get; init; }
+    public AlsCharacterRotationFeedback CharacterRotationFeedback { get; init; }
+    public AlsRefactoredAnimationFeedback RefactoredFeedback { get; init; }
+    public bool PresentationPending { get; init; }
 }
 
 public readonly record struct AlsP4FootPlacementPoseSnapshot(
@@ -206,6 +232,9 @@ public readonly record struct AlsP3FrameDiagnostics(
     AlsP4FootProbeSourceSnapshot FootProbeSource)
 {
     public AlsP4FootPlacementPoseSnapshot FootPose { get; init; }
+    public AlsCharacterRotationFeedback CharacterRotationFeedback { get; init; }
+
+    public bool PresentationPending { get; init; }
 
     public AlsP3FrameDiagnostics(
         AlsFrameIdentity Identity,
@@ -381,6 +410,13 @@ public sealed class AlsP3RuntimeContext
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
         PresentationTransform = AlsP3Presentation.Create(profile.Presentation);
         FootGatherSettings = LoadFootGatherSettings(animationSet, profile);
+        MovementGraph = profile.StandingWalkRun.Length == 6
+            ? AlsMovementGraphDefinition.Load(animationSet, profile) : null;
+        if (MovementGraph is not null && OS.GetCmdlineUserArgs().Contains("--foot-ik-frame"))
+            MovementGraph=MovementGraph.WithSharedRootSources(animationSet);
+        else if (MovementGraph is not null && OS.GetCmdlineUserArgs().Contains("--layered-frame"))
+            MovementGraph=MovementGraph.WithSharedOverlaySources(animationSet);
+        SourceBindings = MovementGraph?.Binding;
         motorSettings.Validate();
         if (mainManagedThreadId <= 0)
         {
@@ -403,6 +439,41 @@ public sealed class AlsP3RuntimeContext
     public AlsAnimationSetDefinition AnimationSet { get; }
 
     public AlsLocomotionAnimationProfile Profile { get; }
+    public AlsP5CoreRuntimeBindingSnapshot? SourceBindings { get; }
+    internal AlsMovementGraphDefinition? MovementGraph { get; }
+
+    public event Action<AlsFrameIdentity, AlsAnimationEvent>? AnimationEventCommitted;
+    public long AnimationEventsDispatched { get; private set; }
+    public long AnimationEventHandlerFailures { get; private set; }
+    internal int SourceEventFailureArmed;
+    internal int RejectedSourceEventCount;
+
+    internal void ThrowIfSourceEventFailureInjected(in AlsFrameResult candidate)
+    {
+        if (candidate.TypedEvents.Count > 0 && Interlocked.CompareExchange(ref SourceEventFailureArmed, 0, 1) == 1)
+        {
+            RejectedSourceEventCount = candidate.TypedEvents.Count;
+            throw new InvalidOperationException("Injected late failure with a nonempty source event candidate.");
+        }
+    }
+
+    internal void DispatchCommittedAnimationEvents(in AlsFrameResult result)
+    {
+        if (System.Environment.CurrentManagedThreadId != MainManagedThreadId)
+            throw new InvalidOperationException("Animation callbacks must run after main-thread commit.");
+        var handler = AnimationEventCommitted;
+        for (var i = 0; i < result.TypedEvents.Count; i++)
+        {
+            AnimationEventsDispatched++;
+            try { handler?.Invoke(result.Identity, result.TypedEvents[i]); }
+            catch (Exception exception)
+            {
+                // Commit has succeeded; external side effects cannot be rolled back as a failed Worker frame.
+                AnimationEventHandlerFailures++;
+                GD.PushError($"ALS committed animation callback failed: {exception}");
+            }
+        }
+    }
 
     public Godot.Transform3D PresentationTransform { get; }
 
@@ -665,6 +736,8 @@ internal sealed class AlsP3CharacterState
     public byte HasCommittedTargetYaw;
 
     public float CommittedTargetYaw;
+    public AlsCharacterRotationFeedback CommittedCharacterRotationFeedback;
+    public AlsRefactoredAnimationFeedback CommittedRefactoredFeedback;
 
     public AlsP3FrameDiagnostics Diagnostics;
 
@@ -751,7 +824,7 @@ internal sealed class AlsP3CharacterState
         AlsP4ReasonCode reasonCode = AlsP4ReasonCode.None)
     {
         var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
-        var failure = new AlsP3WorkerFailure(code, identity, exceptionType, reasonCode);
+        var failure = new AlsP3WorkerFailure(code, identity, exceptionType, reasonCode, exception.ToString());
         var failureIdentity = new AlsP3FailureIdentity(code, identity);
         lock (_failureGate)
         {
@@ -871,6 +944,7 @@ internal sealed class AlsP3CharacterState
     {
         HasCommittedTargetYaw = 0;
         CommittedTargetYaw = 0f;
+        CommittedCharacterRotationFeedback = default;
         FootProbeExchange.Clear();
     }
 
@@ -954,4 +1028,5 @@ internal sealed record AlsP3WorkerFailure(
     string Code,
     AlsFrameIdentity Identity,
     string ExceptionType,
-    AlsP4ReasonCode ReasonCode);
+    AlsP4ReasonCode ReasonCode,
+    string Details = "");

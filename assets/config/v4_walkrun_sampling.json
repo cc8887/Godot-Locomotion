@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "source": "UE UBlendSpace::FilterInput + UpdateBlendSamples; ALS V4",
+  "nativeTraceSha256": "816EECB220D05798E8359988A01C3C2E78A5FBEA3F721FCDF34822C5E8A5396B",
+  "assets": [
+    {
+      "name": "ALS_N_WalkRun_F",
+      "objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_F.ALS_N_WalkRun_F",
+      "grid": true,
+      "sampleWeightSpeed": 0,
+      "axes": [
+        {
+          "mode": "Cubic",
+          "seconds": 0.5848035216331482
+        },
+        {
+          "mode": "Cubic",
+          "seconds": 0.7368062734603882
+        }
+      ],
+      "sampleNames": [
+        "ALS_N_Walk_F",
+        "ALS_N_WalkPose_F",
+        "ALS_N_Run_F",
+        "ALS_N_RunPose_F"
+      ]
+    },
+    {
+      "name": "ALS_N_WalkRun_B",
+      "objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_B.ALS_N_WalkRun_B",
+      "grid": true,
+      "sampleWeightSpeed": 0,
+      "axes": [
+        {
+          "mode": "Cubic",
+          "seconds": 0.5848035216331482
+        },
+        {
+          "mode": "Cubic",
+          "seconds": 0.7368062734603882
+        }
+      ],
+      "sampleNames": [
+        "ALS_N_Walk_B",
+        "ALS_N_WalkPose_F",
+        "ALS_N_Run_B",
+        "ALS_N_RunPose_F"
+      ]
+    },
+    {
+      "name": "ALS_N_WalkRun_FL",
+      "objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_FL.ALS_N_WalkRun_FL",
+      "grid": true,
+      "sampleWeightSpeed": 0,
+      "axes": [
+        {
+          "mode": "Cubic",
+          "seconds": 0.5848035216331482
+        },
+        {
+          "mode": "Cubic",
+          "seconds": 0.7368062734603882
+        }
+      ],
+      "sampleNames": [
+        "ALS_N_Walk_LF",
+        "ALS_N_WalkPose_L",
+        "ALS_N_Run_LF",
+        "ALS_N_RunPose_L"
+      ]
+    },
+    {
+      "name": "ALS_N_WalkRun_BL",
+      "objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_BL.ALS_N_WalkRun_BL",
+      "grid": true,
+      "sampleWeightSpeed": 0,
+      "axes": [
+        {
+          "mode": "Cubic",
+          "seconds": 0.5848035216331482
+        },
+        {
+          "mode": "Cubic",
+          "seconds": 0.7368062734603882
+        }
+      ],
+      "sampleNames": [
+        "ALS_N_Walk_LB",
+        "ALS_N_WalkPose_R",
+        "ALS_N_Run_LB",
+        "ALS_N_RunPose_R"
+      ]
+    },
+    {
+      "name": "ALS_N_WalkRun_FR",
+      "objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_FR.ALS_N_WalkRun_FR",
+      "grid": true,
+      "sampleWeightSpeed": 0,
+      "axes": [
+        {
+          "mode": "Cubic",
+          "seconds": 0.5848035216331482
+        },
+        {
+          "mode": "Cubic",
+          "seconds": 0.7368062734603882
+        }
+      ],
+      "sampleNames": [
+        "ALS_N_Walk_RF",
+        "ALS_N_WalkPose_R",
+        "ALS_N_Run_RF",
+        "ALS_N_RunPose_R"
+      ]
+    },
+    {
+      "name": "ALS_N_WalkRun_BR",
+      "objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_BR.ALS_N_WalkRun_BR",
+      "grid": true,
+      "sampleWeightSpeed": 0,
+      "axes": [
+        {
+          "mode": "Cubic",
+          "seconds": 0.5848035216331482
+        },
+        {
+          "mode": "Cubic",
+          "seconds": 0.7368062734603882
+        }
+      ],
+      "sampleNames": [
+        "ALS_N_Walk_RB",
+        "ALS_N_WalkPose_L",
+        "ALS_N_Run_RB",
+        "ALS_N_RunPose_L"
+      ]
+    }
+  ]
+}

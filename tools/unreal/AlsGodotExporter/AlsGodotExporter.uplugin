@@ -9,6 +9,11 @@
   "CanContainContent": false,
   "EnabledByDefault": true,
   "Installed": false,
+  "Plugins": [
+    { "Name": "ALS", "Enabled": true },
+    { "Name": "ControlRig", "Enabled": true },
+    { "Name": "RigVM", "Enabled": true }
+  ],
   "Modules": [
     {
       "Name": "AlsGodotExporter",

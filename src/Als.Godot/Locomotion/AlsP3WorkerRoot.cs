@@ -27,6 +27,18 @@ public partial class AlsP3WorkerRoot : Node3D
     private AlsAnimationLibraryBuildResult? _library;
     private AlsLocomotionGraphBuildResult? _graph;
     private AlsLocomotionAnimationController? _controller;
+    internal bool UsesCompleteMovement => _controller?.UsesCompleteMovement == true;
+    internal AlsBasedFootLockFrameTrace? CommittedBasedTrace => _controller?.CommittedBasedTrace;
+    internal bool UsesLayeredPose => _controller?.UsesLayeredPose == true;
+    internal AlsFullMovementDiagnostics FullMovementDiagnostics => _controller?.FullMovementDiagnostics ?? default;
+    internal GodotAls.Core.Locomotion.AlsStandingCycleState StandingCycleState => _controller?.StandingCycleState ?? default;
+    internal float RuntimeAnimationPhase => _runtimeState.AnimationPhase;
+    internal AlsStandingMovementInput StandingMovementInput => _controller?.StandingMovementInput ?? default;
+    internal AlsCycleSyncFrame StandingCycleSync => _controller?.StandingSync ?? default;
+    internal AlsBinaryBlendState StandingSprintBlend => _controller?.StandingSprintBlend ?? default;
+    internal float StandingSprintMask => _controller?.StandingSprintMask ?? 0;
+    internal AlsCycleDetailFrame StandingDetail => _controller?.StandingDetail ?? default;
+    internal GodotAls.Core.Animation.AlsP5SourceEventState SourceEventState => _controller?.SourceEventState ?? default;
     private AlsComponentPoseModifier? _poseModifier;
     private AlsPoseAnimationProfile? _poseProfile;
     private AlsTurnRotateSettings _turnRotateSettings;
@@ -124,6 +136,8 @@ public partial class AlsP3WorkerRoot : Node3D
 
         try
         {
+            if (AlsP3FrameStages.SplitFeet && context.Measurement is not null)
+                throw new InvalidOperationException("Split foot dispatch requires a measurement adapter covering both animation halves and main physics queries.");
             _poseProfile = AlsPoseProfileCompiler.Compile(
                 File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)),
                 context.AnimationSet,
@@ -142,10 +156,12 @@ public partial class AlsP3WorkerRoot : Node3D
                 in motorSettings,
                 AlsStance.Crouching);
             CompileCurveSamplers(context.AnimationSet, _poseProfile);
-            _library = AlsAnimationLibraryBuilder.Build(
+            _library = context.MovementGraph is not null ? AlsAnimationLibraryBuilder.BuildP5a(context.AnimationSet, context.SourceBindings!) : AlsAnimationLibraryBuilder.Build(
                 context.AnimationSet,
                 context.Profile,
-                _poseProfile);
+                _poseProfile,
+                sourceProfile: context.MovementGraph?.Sources);
+            if (context.MovementGraph is not null) _library.UseMovementSources(context.AnimationSet, context.MovementGraph.RawSources);
             _visualRoot = _library.Root as Node3D
                 ?? throw new InvalidOperationException("P3 visual library root must be a Node3D.");
             AddChild(_library.Root);
@@ -153,13 +169,17 @@ public partial class AlsP3WorkerRoot : Node3D
                 _library,
                 context.Profile,
                 _poseProfile,
-                context.AnimationSet);
+                context.AnimationSet,
+                context.SourceBindings);
             _controller = new AlsLocomotionAnimationController(
                 _graph,
                 context.Settings,
                 _poseProfile,
                 context.AnimationSet);
             _controller.Warmup();
+            if (context.MovementGraph is not null)
+                _controller.EnableCompleteMovement(context.MovementGraph, _library, context.AnimationSet, _poseProfile,
+                    state.Handle.CharacterId,state.Handle.Generation);
             _skeleton = _graph.TargetSkeleton;
             ConfigureFootProbeSource(context.AnimationSet, _poseProfile);
             var correctedRoot = AlsP3Presentation.Compose(
@@ -194,11 +214,12 @@ public partial class AlsP3WorkerRoot : Node3D
             _poseScales = new Vector3[boneCount];
 
             InitializeFootProbeOrigins(initialLogicalTransform);
+            ConfigureNativeFeet(initialLogicalTransform);
             CapturePose();
             PublishVisualRootVisibility(0);
 
             // Thread ownership is assigned only after the complete visual rig is built and warmed.
-            ProcessThreadGroupOrder = 1;
+            ProcessThreadGroupOrder = AlsP3FrameStages.Visual;
             ProcessThreadGroup = context.Mode == AlsHarnessMode.Parallel
                 ? ProcessThreadGroupEnum.SubThread
                 : ProcessThreadGroupEnum.MainThread;
@@ -235,6 +256,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 frameId,
                 _state.Handle.CharacterId,
                 _state.Handle.Generation);
+            if (UsesRefactoredFeet && HasPublishedSplitResult(identity)) return;
             var measurement = _context.Measurement;
             var measurementIndex = -1;
             var measure = measurement is not null &&
@@ -276,12 +298,12 @@ public partial class AlsP3WorkerRoot : Node3D
             var candidateRuntimeState = runtimeCheckpoint;
             var candidateResult = resultCheckpoint;
             var trackTransactionRollback =
-                _context.IsAnyWorkerFailureInjectionArmed(in identity);
+                _context.IsAnyWorkerFailureInjectionArmed(in identity) || Volatile.Read(ref _context.SourceEventFailureArmed) != 0;
             var resultCheckpointDigest = trackTransactionRollback
                 ? ComputeResultDigest(in resultCheckpoint)
                 : 0UL;
             var controllerCheckpoint = trackTransactionRollback
-                ? _controller!.CaptureTransactionDiagnostics()
+                ? UsesRefactoredFeet ? _splitFoot.Checkpoint : _controller!.CaptureTransactionDiagnostics()
                 : default;
             var workerStageSequence = 0u;
             try
@@ -303,10 +325,14 @@ public partial class AlsP3WorkerRoot : Node3D
                 productionSegmentStartedAt = measure
                     ? Stopwatch.GetTimestamp()
                     : 0L;
-                EvaluateModels(
-                    in input,
-                    out candidateRuntimeState,
-                    out candidateResult);
+                if (UsesRefactoredFeet)
+                {
+                    if (!_splitFoot.Pending || !_splitFoot.Observed || _splitFoot.Queries.Identity != identity)
+                        throw new InvalidOperationException("Visual worker requires this frame's completed foot query stage.");
+                    candidateRuntimeState = _splitFoot.Runtime;
+                    candidateResult = _splitFoot.Result;
+                }
+                else EvaluateModels(in input, out candidateRuntimeState, out candidateResult);
                 AdvanceWorkerStage(ref workerStageSequence, 0u, 1u);
                 if (measure)
                 {
@@ -344,9 +370,20 @@ public partial class AlsP3WorkerRoot : Node3D
                     ? Stopwatch.GetTimestamp()
                     : 0L;
                 var p4AnimationInput = CreateP4AnimationInput(in candidateResult);
-                preparedAnimation = _controller!.PrepareFrame(
-                    in candidateResult, in p4AnimationInput, input.DeltaTime);
+                if (UsesRefactoredFeet)
+                {
+                    preparedAnimation = _splitFoot.Token;
+                    controllerPrepared = true;
+                    // Transfer cancellation to the existing full worker rollback.
+                    _splitFoot.Pending = _splitFoot.Observed = false;
+                    _controller!.ResumeFootQueries(preparedAnimation, _splitFoot.Observations);
+                    SplitResumedFrames++;
+                }
+                else preparedAnimation = _controller!.PrepareFrame(in candidateResult, in p4AnimationInput, in input);
                 controllerPrepared = true;
+                _controller.CompleteSourceTiming(in preparedAnimation, ref candidateRuntimeState, ref candidateResult);
+                _controller.CompleteSourceRotation(in preparedAnimation, in input, ref candidateRuntimeState, ref candidateResult);
+                _controller.CompleteSourceEvents(in preparedAnimation, ref candidateResult);
                 AdvanceWorkerStage(ref workerStageSequence, 0x1u, 2u);
                 if (measure)
                 {
@@ -400,53 +437,60 @@ public partial class AlsP3WorkerRoot : Node3D
                     in input,
                     forcePlatformRelease,
                     in candidateRuntimeState);
-                if (!AlsFootPlacementModel.TryEvaluate(
-                        in footSettings,
-                        in footPlacementInput,
-                        footCurves.LeftIkWeight,
-                        footCurves.RightIkWeight,
-                        footCurves.LeftLockCurve,
-                        footCurves.RightLockCurve,
-                        in terrainOrigins,
-                        in releaseSignals,
-                        in candidateRuntimeState,
-                        out candidateRuntimeState,
-                        out var footPlacement,
-                        out var footReason))
+                if (!_controller.UsesNativeFootIk)
                 {
-                    candidateResult.P4ReasonCode = footReason;
-                    throw new AlsP4EvaluationException(
-                        footReason,
-                        $"P4 foot placement evaluation failed: {footReason}");
+                    if (!AlsFootPlacementModel.TryEvaluate(
+                            in footSettings,
+                            in footPlacementInput,
+                            footCurves.LeftIkWeight,
+                            footCurves.RightIkWeight,
+                            footCurves.LeftLockCurve,
+                            footCurves.RightLockCurve,
+                            in terrainOrigins,
+                            in releaseSignals,
+                            in candidateRuntimeState,
+                            out candidateRuntimeState,
+                            out var footPlacement,
+                            out var footReason))
+                    {
+                        candidateResult.P4ReasonCode = footReason;
+                        throw new AlsP4EvaluationException(
+                            footReason,
+                            $"P4 foot placement evaluation failed: {footReason}");
+                    }
+                    candidateResult.PelvisOffset = footPlacement.PelvisOffset;
+                    candidateResult.LeftFootPose = footPlacement.LeftFoot;
+                    candidateResult.RightFootPose = footPlacement.RightFoot;
+                    candidateResult.LeftFootReleaseReason = footPlacement.LeftReleaseReason;
+                    candidateResult.RightFootReleaseReason = footPlacement.RightReleaseReason;
+                    if (forcePlatformRelease)
+                    {
+                        candidateRuntimeState.LeftFootLock = AlsFootLockState.CreateDefault();
+                        candidateRuntimeState.RightFootLock = AlsFootLockState.CreateDefault();
+                        candidateRuntimeState.LeftFootLocked = 0;
+                        candidateRuntimeState.RightFootLocked = 0;
+                        candidateRuntimeState.PelvisCorrection = default;
+                        var releaseRotation = System.Numerics.Quaternion.Normalize(
+                            System.Numerics.Quaternion.CreateFromRotationMatrix(
+                                input.CharacterTransform));
+                        candidateResult.PelvisOffset = System.Numerics.Vector3.Zero;
+                        candidateResult.LeftFootPose = new AlsFootPoseOutput(
+                            worldOrigins.Left,
+                            releaseRotation,
+                            0f,
+                            -1);
+                        candidateResult.RightFootPose = new AlsFootPoseOutput(
+                            worldOrigins.Right,
+                            releaseRotation,
+                            0f,
+                            -1);
+                        candidateResult.LeftFootIkWeight = 0f;
+                        candidateResult.RightFootIkWeight = 0f;
+                    }
                 }
-                candidateResult.PelvisOffset = footPlacement.PelvisOffset;
-                candidateResult.LeftFootPose = footPlacement.LeftFoot;
-                candidateResult.RightFootPose = footPlacement.RightFoot;
-                candidateResult.LeftFootReleaseReason = footPlacement.LeftReleaseReason;
-                candidateResult.RightFootReleaseReason = footPlacement.RightReleaseReason;
-                if (forcePlatformRelease)
+                else
                 {
-                    candidateRuntimeState.LeftFootLock = AlsFootLockState.CreateDefault();
-                    candidateRuntimeState.RightFootLock = AlsFootLockState.CreateDefault();
-                    candidateRuntimeState.LeftFootLocked = 0;
-                    candidateRuntimeState.RightFootLocked = 0;
-                    candidateRuntimeState.PelvisCorrection = default;
-                    var releaseRotation = System.Numerics.Quaternion.Normalize(
-                        System.Numerics.Quaternion.CreateFromRotationMatrix(
-                            input.CharacterTransform));
-                    candidateResult.PelvisOffset = System.Numerics.Vector3.Zero;
-                    candidateResult.LeftFootPose = new AlsFootPoseOutput(
-                        worldOrigins.Left,
-                        releaseRotation,
-                        0f,
-                        -1);
-                    candidateResult.RightFootPose = new AlsFootPoseOutput(
-                        worldOrigins.Right,
-                        releaseRotation,
-                        0f,
-                        -1);
-                    candidateResult.LeftFootIkWeight = 0f;
-                    candidateResult.RightFootIkWeight = 0f;
+                    candidateResult.PelvisOffset = _controller.CandidateNativePelvisOffset;
                 }
                 candidateResult.PelvisTarget = candidateResult.PelvisOffset;
                 candidateResult.LeftFootTarget = candidateResult.LeftFootPose.Position;
@@ -493,8 +537,30 @@ public partial class AlsP3WorkerRoot : Node3D
                         AlsP4ReasonCode.InvalidRuntimeState,
                         "P4 foot probe source pose or transform was invalid.");
                 }
+                if (_controller.UsesNativeFootIk)
+                {
+                    var nativeFeet = _controller.CandidateNativeFeet;
+                    footProbeSource = footProbeSource with
+                    {
+                        NativeFootPose = CaptureNativeFeet(identity, AlsP3Presentation.ToGodot(input.CharacterTransform), footCurves.LeftIkWeight, footCurves.RightIkWeight),
+                        NativeFootState = nativeFeet,
+                        BasedFootLock = _controller.CandidateBasedFeet,
+                    };
+                    // LockAmount reports the evaluated lock property, not the
+                    // independent Enable_FootIK curve shown in IkWeight.
+                    candidateResult.LeftFootPose = new(ToNumerics(uncorrectedLeftFootWorld.Origin), ToNumericsRotation(uncorrectedLeftFootWorld.Basis), Math.Clamp(_controller.CandidateNativeLeftLock, 0, 1), input.LeftFootHit.PlatformId);
+                    candidateResult.RightFootPose = new(ToNumerics(uncorrectedRightFootWorld.Origin), ToNumericsRotation(uncorrectedRightFootWorld.Basis), Math.Clamp(_controller.CandidateNativeRightLock, 0, 1), input.RightFootHit.PlatformId);
+                    candidateResult.LeftFootTarget = candidateResult.LeftFootPose.Position;
+                    candidateResult.RightFootTarget = candidateResult.RightFootPose.Position;
+                }
                 var uncorrectedPelvisWorld = CaptureBoneWorldTransform(
                     _poseProfile!.FootRig.PelvisBoneId);
+                var leftLockRotation = PrepareFootLockPoseRotation(runtimeCheckpoint.LeftFootLock,
+                    candidateRuntimeState.LeftFootLock, uncorrectedLeftFootWorld, footSettings.MaximumFootAngleRadians,
+                    ref candidateRuntimeState.LeftFootLockPoseRotation);
+                var rightLockRotation = PrepareFootLockPoseRotation(runtimeCheckpoint.RightFootLock,
+                    candidateRuntimeState.RightFootLock, uncorrectedRightFootWorld, footSettings.MaximumFootAngleRadians,
+                    ref candidateRuntimeState.RightFootLockPoseRotation);
                 candidateRuntimeState.LeftFootProbeOrigin =
                     candidateResult.NextLeftFootProbeOrigin;
                 candidateRuntimeState.RightFootProbeOrigin =
@@ -514,11 +580,21 @@ public partial class AlsP3WorkerRoot : Node3D
                     UseAnimatedFootOffsets = true,
                     LeftFootReferenceWorldOrigin = terrainOrigins.Left,
                     RightFootReferenceWorldOrigin = terrainOrigins.Right,
+                    LeftFootLockedWorldRotation = leftLockRotation,
+                    RightFootLockedWorldRotation = rightLockRotation,
                     CharacterWorldRotation = System.Numerics.Quaternion
                         .CreateFromRotationMatrix(input.CharacterTransform),
                     InjectFailure = ResolveModifierFailureInjection(in identity),
                 };
                 var modifierOutput = default(AlsPoseModifierOutput);
+                // The original graph has already applied Aim and upper-body
+                // layering. Keep only foot/pelvis processing in this modifier.
+                if (_controller.UsesLayeredPose)
+                    modifierInput=modifierInput with {HeadWeight=0,SpineWeight=0,UpperBodyWeight=0};
+                // The linked Foot IK layer already produced the final pose.
+                // Retain this pass for publication diagnostics only; no writes.
+                if (_controller.UsesNativeFootIk)
+                    modifierInput=modifierInput with {LeftFootIkWeight=0,RightFootIkWeight=0,PelvisOffset=default};
                 if (!_poseModifier!.TryApply(
                         in modifierInput,
                         ref modifierOutput,
@@ -594,6 +670,9 @@ public partial class AlsP3WorkerRoot : Node3D
                     footProbeSource)
                 {
                     FootPose = footPoseSnapshot,
+                    CharacterRotationFeedback = _controller.PendingCharacterRotationFeedback,
+                    RefactoredFeedback = _controller.PendingRefactoredFeedback,
+                    PresentationPending = _controller.PendingPresentation,
                 };
                 var publication = _state.PrepareResultPublication(
                     in candidateResult,
@@ -611,6 +690,7 @@ public partial class AlsP3WorkerRoot : Node3D
                     ? GC.GetAllocatedBytesForCurrentThread()
                     : 0L;
                 preparedCommit = _controller.PrepareCommit(in preparedAnimation);
+                _context.ThrowIfSourceEventFailureInjected(in candidateResult);
                 _context.ThrowIfWorkerFailureInjected(
                     in identity,
                     AlsP3WorkerFailureInjectionStage.BeforePublish);
@@ -742,7 +822,8 @@ public partial class AlsP3WorkerRoot : Node3D
         }
         finally
         {
-            _state.ExitWorker();
+            try { CancelSplitFootCandidate(); }
+            finally { _state.ExitWorker(); }
         }
     }
 
@@ -803,6 +884,8 @@ public partial class AlsP3WorkerRoot : Node3D
         left.TurnInPlace == right.TurnInPlace &&
         left.RotateInPlace == right.RotateInPlace &&
         left.LeftFootLock == right.LeftFootLock &&
+        left.LeftFootLockPoseRotation == right.LeftFootLockPoseRotation &&
+        left.RightFootLockPoseRotation == right.RightFootLockPoseRotation &&
         left.RightFootLock == right.RightFootLock &&
         left.PelvisCorrection == right.PelvisCorrection &&
         left.LeftFootProbeOrigin == right.LeftFootProbeOrigin &&
@@ -820,6 +903,7 @@ public partial class AlsP3WorkerRoot : Node3D
             return false;
         }
 
+        CancelSplitFootForLifecycle();
         _poseModifier?.Dispose();
         _poseModifier = null;
         _controller?.Dispose();
@@ -1135,6 +1219,32 @@ public partial class AlsP3WorkerRoot : Node3D
         _capturedRootDigest = AlsP3Presentation.ComputeDigest(_capturedRootTransform);
     }
 
+    internal static System.Numerics.Quaternion PrepareFootLockPoseRotation(in AlsFootLockState previous,
+        in AlsFootLockState current, in Transform3D animatedWorld, float maximumAngle,
+        ref System.Numerics.Quaternion storedRotation)
+    {
+        if (current.Locked == 0 || current.Amount <= 0)
+        {
+            storedRotation = default;
+            return default;
+        }
+        var basis = current.PlatformId >= 0 ? current.ProvenanceRotation : System.Numerics.Quaternion.Identity;
+        var rotation = ToNumerics(animatedWorld.Basis.Orthonormalized().GetRotationQuaternion());
+        if (previous.Locked == 0 || storedRotation.LengthSquared() == 0 || current.Amount >= 1 && previous.Amount < 1)
+        {
+            storedRotation = System.Numerics.Quaternion.Normalize(System.Numerics.Quaternion.Conjugate(basis) * rotation);
+        }
+        var worldRotation = System.Numerics.Quaternion.Normalize(basis * storedRotation);
+        var angle = 2 * MathF.Acos(Math.Clamp(MathF.Abs(System.Numerics.Quaternion.Dot(rotation, worldRotation)), 0, 1));
+        if (angle > maximumAngle)
+        {
+            worldRotation = System.Numerics.Quaternion.Normalize(System.Numerics.Quaternion.Slerp(rotation, worldRotation, maximumAngle / angle));
+            // Persist the constrained target, so turning across +/-180 cannot flip the clamp branch.
+            storedRotation = System.Numerics.Quaternion.Normalize(System.Numerics.Quaternion.Conjugate(basis) * worldRotation);
+        }
+        return worldRotation;
+    }
+
     private void EvaluateModels(
         in AlsFrameInput input,
         out AlsRuntimeState candidateState,
@@ -1146,7 +1256,8 @@ public partial class AlsP3WorkerRoot : Node3D
             input,
             ref nextState,
             ref nextResult,
-            _context.Settings);
+            _context.Settings,
+            _controller!.TimingPolicy);
 
         var viewSettings = AlsViewPoseSettings.CreateDefault();
         if (!AlsViewPoseModel.TryEvaluate(
@@ -1160,6 +1271,17 @@ public partial class AlsP3WorkerRoot : Node3D
             throw new AlsP4EvaluationException(
                 viewReason,
                 $"P4 view pose evaluation failed: {viewReason}");
+        }
+        nextResult.AimRelativeYaw = view.AimRelativeYaw;
+        nextResult.AimRelativePitch = view.AimRelativePitch;
+        nextResult.HeadWeight = view.HeadWeight;
+        nextResult.SpineWeight = view.SpineWeight;
+        nextResult.UpperBodyWeight = view.UpperBodyWeight;
+        nextResult.SpineResidualYaw = view.SpineResidualYaw;
+        nextResult.P4ReasonCode = AlsP4ReasonCode.None;
+        if (_controller.UsesCompleteMovement)
+        {
+            candidateState = viewState; candidateResult = nextResult; return;
         }
         if (!AlsTurnRotateModel.TrySelectAndAdvance(
                 in _turnRotateSettings,
@@ -1175,13 +1297,6 @@ public partial class AlsP3WorkerRoot : Node3D
                 $"P4 Turn/Rotate selection failed: {selectionReason}");
         }
 
-        nextResult.AimRelativeYaw = view.AimRelativeYaw;
-        nextResult.AimRelativePitch = view.AimRelativePitch;
-        nextResult.HeadWeight = view.HeadWeight;
-        nextResult.SpineWeight = view.SpineWeight;
-        nextResult.UpperBodyWeight = view.UpperBodyWeight;
-        nextResult.SpineResidualYaw = view.SpineResidualYaw;
-        nextResult.P4ReasonCode = AlsP4ReasonCode.None;
         if (selection.Active == 1)
         {
             if (!TrySampleSelectionCurve(

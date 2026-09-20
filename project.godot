@@ -1,5 +1,10 @@
 ; Engine configuration file.
-; Edit through the editor where practical.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -7,6 +12,7 @@ config_version=5
 
 config/name="Godot ALS"
 run/main_scene="res://scenes/demo/p4_locomotion_demo.tscn"
+config/features=PackedStringArray("4.7", "C#")
 
 [display]
 
@@ -86,10 +92,6 @@ mouse_capture_toggle={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194305,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
-
-[physics]
-
-common/physics_ticks_per_second=60
 
 [rendering]
 

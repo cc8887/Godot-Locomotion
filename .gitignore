@@ -8,6 +8,8 @@ obj/
 .idea/
 *.user
 *.suo
+__pycache__/
+*.py[cod]
 assets/generated/
 artifacts/*
 !artifacts/.gdignore

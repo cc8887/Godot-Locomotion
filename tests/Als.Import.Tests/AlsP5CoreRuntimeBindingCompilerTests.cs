@@ -21,7 +21,8 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
 {
     private const ulong FrozenLayoutDigest = 0xF2336240D749284BUL;
     private const ulong FrozenBindingDigest = 0x40F33E59692DFD38UL;
-    private const ulong FrozenGraphDigest = 0x44403C2869D8F615UL;
+    // Source CDO: ScaleTurnAngle is false for the four crouching turns.
+    private const ulong FrozenGraphDigest = 0xFD59AB9C657B60DDUL;
 
     [Theory]
     [InlineData(CoreOccurrenceKind.Turn)]
@@ -256,7 +257,9 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
     {
         var compiler = typeof(AlsP5CoreRuntimeBindingCompiler);
         Assert.True(compiler.IsPublic && compiler.IsAbstract && compiler.IsSealed);
-        var compile = Assert.Single(compiler.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
+        var compileMethods = compiler.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
+        Assert.Equal(new[] { "Compile", "CompileSourceAware" }, compileMethods.Select(m => m.Name).Order());
+        var compile = Assert.Single(compileMethods, m => m.Name == "Compile");
         Assert.Equal("Compile", compile.Name);
         Assert.Equal(typeof(AlsP5CoreRuntimeBindingSnapshot), compile.ReturnType);
         Assert.Equal(
@@ -264,16 +267,26 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
              typeof(AlsPoseAnimationProfile), typeof(AlsP5aAnimationRuntimeProfile),
              typeof(AlsP5OccurrenceLayout)],
             compile.GetParameters().Select(value => value.ParameterType));
+        var sourceCompile = Assert.Single(compileMethods, m => m.Name == "CompileSourceAware");
+        Assert.Equal(typeof(AlsP5CoreRuntimeBindingSnapshot), sourceCompile.ReturnType);
+        Assert.Equal(compile.GetParameters().Select(p => p.ParameterType).Concat(new[] {
+            typeof(AlsLocomotionSourceProfile), typeof(GodotAls.Import.Inspection.AlsP5SourceInventory) }),
+            sourceCompile.GetParameters().Select(p => p.ParameterType));
 
         var snapshot = typeof(AlsP5CoreRuntimeBindingSnapshot);
         Assert.True(snapshot.IsPublic && snapshot.IsClass && snapshot.IsSealed);
         Assert.Empty(snapshot.GetConstructors(BindingFlags.Public | BindingFlags.Instance));
         Assert.Equal(
-            ["AnimationSetDefinitionDigest", "Digest", "GraphDigest", "LayoutDigest", "Version"],
+            ["AnimationSetDefinitionDigest", "Digest", "GraphDigest", "LayoutDigest", "LayoutVersion",
+             "SourceInventoryDigest", "SourceProfile", "StandingSprint", "UnboundNativeSourceIndices", "Version"],
             snapshot.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 .Select(value => value.Name).Order());
+        var sourceProfile = snapshot.GetProperty("SourceProfile")!;
+        Assert.Equal(typeof(AlsLocomotionSourceProfile), sourceProfile.PropertyType);
+        Assert.Null(sourceProfile.SetMethod);
+        Assert.Throws<InvalidOperationException>(() => Fixture.Create().Compile().SourceProfile);
         Assert.Equal(
-            ["CreateCoreView", "CreateGraphBuildView", "CreateOccurrenceLayoutView"],
+            ["CreateCoreView", "CreateGraphBuildView", "CreateLocomotionSourceView", "CreateOccurrenceLayoutView", "CreateSourceOccurrenceView"],
             snapshot.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 .Where(value => !value.IsSpecialName)
                 .Select(value => value.Name).Order());
@@ -300,7 +313,7 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
                 "JumpStartAnimationId", "FallLoopAnimationId", "LandAnimationId",
                 "LeanAdditiveBaseAnimationId", "StandingSamples", "CrouchingSamples",
                 "LeanSamples", "AllAnimationIds", "Aim", "Turns", "Rotates",
-                "MaskHeaders", "LogicalBoneIds", "NormalizedAnimationIds",
+                "MaskHeaders", "LogicalBoneIds", "NormalizedAnimationIds", "StandingWalkRun", "Sources",
             ],
             graphView.GetFields(BindingFlags.Public | BindingFlags.Instance)
                 .OrderBy(value => value.MetadataToken).Select(value => value.Name));
@@ -543,6 +556,9 @@ public sealed class AlsP5CoreRuntimeBindingCompilerTests(Xunit.Abstractions.ITes
         Assert.Equal(FrozenLayoutDigest, snapshot.LayoutDigest);
         Assert.Equal(FrozenBindingDigest, snapshot.Digest);
         Assert.Equal(FrozenGraphDigest, snapshot.GraphDigest);
+        var previous = GraphDigestInput.Capture(in graph) with
+        { Turns = graph.Turns.ToArray().Select(t => t with { ScaleAngle = 1 }).ToArray() };
+        Assert.Equal(0x44403C2869D8F615UL, ProductionGraphDigest(previous));
     }
 
     [Fact]

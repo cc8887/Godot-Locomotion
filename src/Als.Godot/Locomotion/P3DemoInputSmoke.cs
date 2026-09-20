@@ -37,6 +37,7 @@ public partial class P3DemoInputSmoke : Node
     {
         ValidateActionMap();
         ValidateCommandSemantics();
+        ValidateOverlayCapture();
         var evidence = await ValidateCameraRelativeMovementMatrixAsync();
         ValidateHudSemantics();
         Require(typeof(P3LocomotionDemo).IsSubclassOf(typeof(Node3D)),
@@ -69,6 +70,29 @@ public partial class P3DemoInputSmoke : Node
         RequireKey("rotation_mode_toggle", Key.V);
         RequireMouseButton("aim", MouseButton.Right);
         RequireKey("mouse_capture_toggle", Key.Escape);
+    }
+
+    private static void ValidateOverlayCapture()
+    {
+        var adapter = new AlsPlayerInputAdapter();
+        var snapshot = new AlsPlayerInputSnapshot(NumericsVector2.UnitX, false, false, false, false, false, true);
+        long frame = 0;
+        foreach (var overlay in Enum.GetValues<AlsOverlayKind>())
+        {
+            adapter.CaptureFrame(++frame, snapshot with { Overlay = overlay }, .4f, -.2f);
+            var command = adapter.GetCommand(frame);
+            Require(command.RequestedOverlay == overlay && command == adapter.GetCommand(frame),
+                "Overlay selection was lost or changed within one captured frame.");
+            Require(command.MovementAxes == NumericsVector2.UnitX && command.RequestedRotationMode == AlsRotationMode.Aiming,
+                "Overlay selection changed movement or aiming input.");
+        }
+        var rejected = false;
+        try { adapter.CaptureFrame(frame + 1, snapshot with { Overlay = (AlsOverlayKind)13 }, 0, 0); }
+        catch (ArgumentOutOfRangeException) { rejected = true; }
+        Require(rejected && adapter.CapturedFrameId == frame, "Invalid Overlay advanced the input capture.");
+        adapter.CaptureFrame(++frame, snapshot, 0, 0);
+        Require(adapter.GetCommand(frame).RequestedOverlay == AlsOverlayKind.Default, "Returning to Default retained the equipped Overlay.");
+        GD.Print("OVERLAY_INPUT_CAPTURE_OK selections=13 same_frame_stable=true invalid_retry=true return_default=true");
     }
 
     private static void ValidateCommandSemantics()

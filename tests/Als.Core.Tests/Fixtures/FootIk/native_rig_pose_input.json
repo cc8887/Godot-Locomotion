@@ -1,0 +1,1770 @@
+{
+  "schemaVersion": 1,
+  "source": "Actual UAlsAnimationInstance::GetControlRigInput; transient controlled PoseState/InAirState",
+  "rows": [
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": -0.20000000298023224,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.8999999761581421,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.0,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.0,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.0,
+      "prediction": 0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.0,
+      "prediction": 0.8999999761581421,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.0,
+      "prediction": 1.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.0,
+      "prediction": 1.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.30000001192092896,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.8999999761581421,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.5,
+      "result": 0.050000011920928955
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.75,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.75,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.75,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.75,
+      "prediction": 0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.75,
+      "prediction": 0.8999999761581421,
+      "result": 0.2749999463558197
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.75,
+      "prediction": 1.0,
+      "result": 0.3499999940395355
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 0.75,
+      "prediction": 1.5,
+      "result": 0.7250000238418579
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.0,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.0,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.0,
+      "prediction": 0.5,
+      "result": 0.09999999403953552
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.0,
+      "prediction": 0.8999999761581421,
+      "result": 0.4999999701976776
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.0,
+      "prediction": 1.0,
+      "result": 0.6000000238418579
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.399999976158142,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.399999976158142,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.399999976158142,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.399999976158142,
+      "prediction": 0.5,
+      "result": 0.29999998211860657
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.399999976158142,
+      "prediction": 0.8999999761581421,
+      "result": 0.8600000143051147
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.399999976158142,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": -0.4000000059604645,
+      "airborne": 1.399999976158142,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": -0.20000000298023224,
+      "prediction": -0.5,
+      "result": 0.10000000149011612
+    },
+    {
+      "grounded": 0.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.8999999761581421,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.0,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.0,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.0,
+      "prediction": 0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.0,
+      "prediction": 0.8999999761581421,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.0,
+      "prediction": 1.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.0,
+      "prediction": 1.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.30000001192092896,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.20000000298023224,
+      "result": 0.06000000238418579
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.5,
+      "result": 0.15000000596046448
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.8999999761581421,
+      "result": 0.27000001072883606
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.0,
+      "result": 0.30000001192092896
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.5,
+      "result": 0.45000001788139343
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.75,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.75,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.75,
+      "prediction": 0.20000000298023224,
+      "result": 0.15000000596046448
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.75,
+      "prediction": 0.5,
+      "result": 0.375
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.75,
+      "prediction": 0.8999999761581421,
+      "result": 0.6749999523162842
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.75,
+      "prediction": 1.0,
+      "result": 0.75
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 0.75,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.0,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.0,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.0,
+      "prediction": 0.5,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.0,
+      "prediction": 0.8999999761581421,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.399999976158142,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.20000000298023224,
+      "result": 0.2800000011920929
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.5,
+      "result": 0.699999988079071
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.399999976158142,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.0,
+      "airborne": 1.399999976158142,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": -0.20000000298023224,
+      "prediction": -0.5,
+      "result": 0.30000001192092896
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.0,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.20000000298023224,
+      "result": 0.1599999964237213
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.5,
+      "result": 0.10000000149011612
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.8999999761581421,
+      "result": 0.02000001072883606
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.0,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.0,
+      "prediction": -0.5,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.0,
+      "prediction": 0.0,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.0,
+      "prediction": 0.5,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.0,
+      "prediction": 0.8999999761581421,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.0,
+      "prediction": 1.0,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.0,
+      "prediction": 1.5,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.30000001192092896,
+      "prediction": -0.5,
+      "result": 0.04999999701976776
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.0,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.20000000298023224,
+      "result": 0.25999999046325684
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.5,
+      "result": 0.3500000238418579
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.8999999761581421,
+      "result": 0.4700000286102295
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.5,
+      "result": 0.6500000357627869
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.75,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.75,
+      "prediction": 0.0,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.75,
+      "prediction": 0.20000000298023224,
+      "result": 0.3500000238418579
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.75,
+      "prediction": 0.5,
+      "result": 0.574999988079071
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.75,
+      "prediction": 0.8999999761581421,
+      "result": 0.8749999403953552
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.75,
+      "prediction": 1.0,
+      "result": 0.949999988079071
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 0.75,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.0,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.0,
+      "prediction": 0.0,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.4000000059604645
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.0,
+      "prediction": 0.5,
+      "result": 0.699999988079071
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.0,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.399999976158142,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.399999976158142,
+      "prediction": 0.0,
+      "result": 0.20000000298023224
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.399999976158142,
+      "prediction": 0.20000000298023224,
+      "result": 0.48000001907348633
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.399999976158142,
+      "prediction": 0.5,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.399999976158142,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.399999976158142,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.20000000298023224,
+      "airborne": 1.399999976158142,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": -0.20000000298023224,
+      "prediction": -0.5,
+      "result": 0.6000000238418579
+    },
+    {
+      "grounded": 0.5,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.20000000298023224,
+      "result": 0.46000000834465027
+    },
+    {
+      "grounded": 0.5,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.5,
+      "result": 0.4000000059604645
+    },
+    {
+      "grounded": 0.5,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.8999999761581421,
+      "result": 0.3199999928474426
+    },
+    {
+      "grounded": 0.5,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.0,
+      "result": 0.30000001192092896
+    },
+    {
+      "grounded": 0.5,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.5,
+      "result": 0.19999998807907104
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.0,
+      "prediction": -0.5,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.0,
+      "prediction": 0.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.0,
+      "prediction": 0.5,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.0,
+      "prediction": 0.8999999761581421,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.0,
+      "prediction": 1.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.0,
+      "prediction": 1.5,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.30000001192092896,
+      "prediction": -0.5,
+      "result": 0.3499999940395355
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.20000000298023224,
+      "result": 0.5600000023841858
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.5,
+      "result": 0.6499999761581421
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.8999999761581421,
+      "result": 0.7699999809265137
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.0,
+      "result": 0.800000011920929
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.5,
+      "result": 0.9500000476837158
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.75,
+      "prediction": -0.5,
+      "result": 0.125
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.75,
+      "prediction": 0.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.75,
+      "prediction": 0.20000000298023224,
+      "result": 0.6499999761581421
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.75,
+      "prediction": 0.5,
+      "result": 0.875
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.75,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.75,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 0.75,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.0,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.0,
+      "prediction": 0.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.699999988079071
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.0,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.0,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.399999976158142,
+      "prediction": -0.5,
+      "result": 0.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.399999976158142,
+      "prediction": 0.0,
+      "result": 0.5
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.399999976158142,
+      "prediction": 0.20000000298023224,
+      "result": 0.7799999713897705
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.399999976158142,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.399999976158142,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.399999976158142,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.5,
+      "airborne": 1.399999976158142,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": -0.20000000298023224,
+      "prediction": -0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.0,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.20000000298023224,
+      "result": 0.85999995470047
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.5,
+      "result": 0.7999999523162842
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.8999999761581421,
+      "result": 0.7199999690055847
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.0,
+      "result": 0.699999988079071
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.5,
+      "result": 0.5999999642372131
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.0,
+      "prediction": -0.5,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.0,
+      "prediction": 0.0,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.0,
+      "prediction": 0.20000000298023224,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.0,
+      "prediction": 0.5,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.0,
+      "prediction": 0.8999999761581421,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.0,
+      "prediction": 1.0,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.0,
+      "prediction": 1.5,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.30000001192092896,
+      "prediction": -0.5,
+      "result": 0.75
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.0,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.20000000298023224,
+      "result": 0.9599999785423279
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.75,
+      "prediction": -0.5,
+      "result": 0.5249999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.75,
+      "prediction": 0.0,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.75,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.75,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.75,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.75,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 0.75,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.0,
+      "prediction": -0.5,
+      "result": 0.3999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.0,
+      "prediction": 0.0,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.0,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.0,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.0,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.399999976158142,
+      "prediction": -0.5,
+      "result": 0.19999998807907104
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.399999976158142,
+      "prediction": 0.0,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.399999976158142,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.399999976158142,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.399999976158142,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.399999976158142,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 0.8999999761581421,
+      "airborne": 1.399999976158142,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": -0.20000000298023224,
+      "prediction": -0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.20000000298023224,
+      "result": 0.9599999785423279
+    },
+    {
+      "grounded": 1.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.5,
+      "result": 0.8999999761581421
+    },
+    {
+      "grounded": 1.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.8999999761581421,
+      "result": 0.8199999928474426
+    },
+    {
+      "grounded": 1.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.0,
+      "result": 0.800000011920929
+    },
+    {
+      "grounded": 1.0,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.5,
+      "result": 0.699999988079071
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.0,
+      "prediction": -0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.0,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.0,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.0,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.0,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.30000001192092896,
+      "prediction": -0.5,
+      "result": 0.8500000238418579
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.75,
+      "prediction": -0.5,
+      "result": 0.625
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.75,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.75,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.75,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.75,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.75,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 0.75,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.0,
+      "prediction": -0.5,
+      "result": 0.5
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.0,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.0,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.0,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.0,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.399999976158142,
+      "prediction": -0.5,
+      "result": 0.30000001192092896
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.399999976158142,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.399999976158142,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.0,
+      "airborne": 1.399999976158142,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": -0.20000000298023224,
+      "prediction": -0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": -0.20000000298023224,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": -0.20000000298023224,
+      "prediction": 1.5,
+      "result": 0.9000000357627869
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.0,
+      "prediction": -0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.0,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.0,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.0,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.0,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.30000001192092896,
+      "prediction": -0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.30000001192092896,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.30000001192092896,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.75,
+      "prediction": -0.5,
+      "result": 0.8250000476837158
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.75,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.75,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.75,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.75,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.75,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 0.75,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.0,
+      "prediction": -0.5,
+      "result": 0.7000000476837158
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.0,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.0,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.0,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.0,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.0,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.0,
+      "prediction": 1.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.399999976158142,
+      "prediction": -0.5,
+      "result": 0.5000000596046448
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.399999976158142,
+      "prediction": 0.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.399999976158142,
+      "prediction": 0.20000000298023224,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.399999976158142,
+      "prediction": 0.5,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.399999976158142,
+      "prediction": 0.8999999761581421,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.399999976158142,
+      "prediction": 1.0,
+      "result": 1.0
+    },
+    {
+      "grounded": 1.2000000476837158,
+      "airborne": 1.399999976158142,
+      "prediction": 1.5,
+      "result": 1.0
+    }
+  ]
+}

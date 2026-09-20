@@ -259,6 +259,9 @@ public sealed class AlsTurnRotateModelTests
         Assert.Equal(curveId, selection.CurveId);
         Assert.Equal(nominal, selection.NominalDegrees);
         Assert.Equal(direction, selection.Direction);
+        Assert.Equal(stance == AlsStance.Standing ? (byte)1 : (byte)0, selection.ScaleAngle);
+        Assert.Equal(stance == AlsStance.Standing ? 1.2f * MathF.Abs(yaw) / Degrees(nominal) : 1.2f,
+            selection.YawScale, 4);
     }
 
     [Theory]

@@ -78,7 +78,8 @@ public sealed class AlsP5RuntimeTransactionTests
         var fixture = new Fixture();
 
         Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(version: 1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(version: 3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(version: 4));
+        Assert.Throws<ArgumentException>(() => fixture.CreateBindings(version: AlsP5RuntimeBindings.SourceGraphVersion));
         Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(digest: 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => fixture.CreateBindings(layoutDigest: 0));
     }

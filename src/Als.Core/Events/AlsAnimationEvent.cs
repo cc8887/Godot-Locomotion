@@ -12,6 +12,10 @@ public enum AlsAnimationEventPhase : byte
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public readonly record struct AlsNativeNotifyEventContext(bool Present, int InstanceId, float CurrentAnimationTime,
+    float CallbackSeconds, bool ActiveContext, bool ReachedEnd);
+
+[StructLayout(LayoutKind.Sequential)]
 public readonly record struct AlsAnimationEvent(
     int EventId,
     int SourceAnimationId,
@@ -26,4 +30,9 @@ public readonly record struct AlsAnimationEvent(
     float Weight,
     AlsTimelineEventKind Kind,
     AlsAnimationEventPhase Phase,
-    AlsCompactEventPayload Payload);
+    AlsCompactEventPayload Payload)
+{
+    // Native callbacks occur at frame dispatch; AnimationTime remains the frame-relative offset.
+    // CurrentAnimationTime is the source Tick accumulator (normalized for BlendSpace), not that offset.
+    public AlsNativeNotifyEventContext NativeContext { get; init; }
+}

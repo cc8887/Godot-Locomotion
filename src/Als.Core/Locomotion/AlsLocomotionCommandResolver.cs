@@ -103,6 +103,8 @@ public static class AlsLocomotionCommandResolver
 
     private static void Validate(in AlsLocomotionCommand command, AlsStance actualStance)
     {
+        if ((uint)command.RequestedOverlay > (uint)AlsOverlayKind.Barrel)
+            throw new ArgumentOutOfRangeException(nameof(command), "Unknown Overlay selection.");
         if (!float.IsFinite(command.MovementAxes.X) || !float.IsFinite(command.MovementAxes.Y))
         {
             throw new ArgumentOutOfRangeException(nameof(command), "Movement axes must be finite.");

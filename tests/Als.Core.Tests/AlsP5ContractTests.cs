@@ -50,7 +50,8 @@ public sealed class AlsP5ContractTests
             ("InterruptedByGeneration", 11), ("InterruptedByRuntimeFailure", 12));
         AssertEnum<byte, AlsP5OccurrenceSourceKind>(
             ("Base", 1), ("Turn", 2), ("Rotate", 3),
-            ("Transition", 4), ("ActionMontage", 5), ("ActionSequence", 6));
+            ("Transition", 4), ("ActionMontage", 5), ("ActionSequence", 6),
+            ("SourceSample", 7), ("SourceEvaluator", 8));
     }
 
     [Fact]
@@ -84,7 +85,9 @@ public sealed class AlsP5ContractTests
         AssertPropertyOrder<AlsAnimationEvent>(
             "EventId", "SourceAnimationId", "SourceActionId", "OccurrenceHandleId",
             "PlaybackEpoch", "PlaybackCycle", "OwnerToken", "EventSequence", "BoundaryOrdinal",
-            "AnimationTime", "Weight", "Kind", "Phase", "Payload");
+            "AnimationTime", "Weight", "Kind", "Phase", "Payload", "NativeContext");
+        AssertPropertyOrder<AlsNativeNotifyEventContext>(
+            "Present", "InstanceId", "CurrentAnimationTime", "CallbackSeconds", "ActiveContext", "ReachedEnd");
         AssertPropertyOrder<AlsActionRequest>(
             "RequestId", "Command", "ActionDefinitionId", "StartSectionId", "Priority",
             "SlotGeneration");
@@ -125,7 +128,8 @@ public sealed class AlsP5ContractTests
             ("OwnerToken", typeof(ulong)), ("EventSequence", typeof(long)),
             ("BoundaryOrdinal", typeof(int)), ("AnimationTime", typeof(float)),
             ("Weight", typeof(float)), ("Kind", typeof(AlsTimelineEventKind)),
-            ("Phase", typeof(AlsAnimationEventPhase)), ("Payload", typeof(AlsCompactEventPayload)));
+            ("Phase", typeof(AlsAnimationEventPhase)), ("Payload", typeof(AlsCompactEventPayload)),
+            ("NativeContext", typeof(AlsNativeNotifyEventContext)));
         AssertStorageFieldOrder<AlsActionRequest>(
             ("RequestId", typeof(long)), ("Command", typeof(AlsActionCommand)),
             ("ActionDefinitionId", typeof(int)), ("StartSectionId", typeof(int)),

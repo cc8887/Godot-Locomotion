@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "source": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_AnimBP.ALS_AnimBP",
+  "notifySchemaVersion": 1,
+  "syncAssets": [
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L",
+      "notifies": [
+        {
+          "index": 0,
+          "track": 0,
+          "name": "Footstep_AnimNotify",
+          "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L:Footstep_AnimNotify_C_0",
+          "stateObject": "",
+          "stateBehaviorFlags": 0,
+          "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+          "time": 0.7954649925231934,
+          "duration": 0.0,
+          "triggerOffset": 0.0,
+          "endTriggerOffset": 0.0,
+          "triggerTime": 0.7954649925231934,
+          "endTriggerTime": 0.7954649925231934,
+          "weightThreshold": 0.30000001192092896,
+          "chance": 1.0,
+          "filterType": 0,
+          "filterLod": 0,
+          "tickMode": 0,
+          "filterViaRequest": true,
+          "onDedicatedServer": true,
+          "onFollower": false
+        },
+        {
+          "index": 1,
+          "track": 0,
+          "name": "Footstep_AnimNotify",
+          "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L:Footstep_AnimNotify_C_1",
+          "stateObject": "",
+          "stateBehaviorFlags": 0,
+          "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+          "time": 1.3316349983215332,
+          "duration": 0.0,
+          "triggerOffset": 0.0,
+          "endTriggerOffset": 0.0,
+          "triggerTime": 1.3316349983215332,
+          "endTriggerTime": 1.3316349983215332,
+          "weightThreshold": 0.30000001192092896,
+          "chance": 1.0,
+          "filterType": 0,
+          "filterLod": 0,
+          "tickMode": 0,
+          "filterViaRequest": true,
+          "onDedicatedServer": true,
+          "onFollower": false
+        }
+      ],
+      "rateScale": 1.0,
+      "length": 2.3333332538604736
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.ALS_N_Transition_R",
+      "notifies": [
+        {
+          "index": 0,
+          "track": 0,
+          "name": "Footstep_AnimNotify",
+          "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.ALS_N_Transition_R:Footstep_AnimNotify_C_0",
+          "stateObject": "",
+          "stateBehaviorFlags": 0,
+          "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+          "time": 0.7954649925231934,
+          "duration": 0.0,
+          "triggerOffset": 0.0,
+          "endTriggerOffset": 0.0,
+          "triggerTime": 0.7954649925231934,
+          "endTriggerTime": 0.7954649925231934,
+          "weightThreshold": 0.30000001192092896,
+          "chance": 1.0,
+          "filterType": 0,
+          "filterLod": 0,
+          "tickMode": 0,
+          "filterViaRequest": true,
+          "onDedicatedServer": true,
+          "onFollower": false
+        },
+        {
+          "index": 1,
+          "track": 0,
+          "name": "Footstep_AnimNotify",
+          "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.ALS_N_Transition_R:Footstep_AnimNotify_C_1",
+          "stateObject": "",
+          "stateBehaviorFlags": 0,
+          "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+          "time": 1.3316349983215332,
+          "duration": 0.0,
+          "triggerOffset": 0.0,
+          "endTriggerOffset": 0.0,
+          "triggerTime": 1.3316349983215332,
+          "endTriggerTime": 1.3316349983215332,
+          "weightThreshold": 0.30000001192092896,
+          "chance": 1.0,
+          "filterType": 0,
+          "filterLod": 0,
+          "tickMode": 0,
+          "filterViaRequest": true,
+          "onDedicatedServer": true,
+          "onFollower": false
+        }
+      ],
+      "rateScale": 1.0,
+      "length": 2.3333332538604736
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
+using GodotAls.Import.Compilation;
 using NumericsMatrix4x4 = System.Numerics.Matrix4x4;
 using NumericsQuaternion = System.Numerics.Quaternion;
 using NumericsVector3 = System.Numerics.Vector3;
@@ -21,7 +22,17 @@ internal readonly record struct AlsCharacterMotorLifecycleSnapshot(
     long PreviousLeftFootColliderId,
     CollisionObject3D? PreviousRightFootPlatform,
     int PreviousRightFootPlatformId,
-    long PreviousRightFootColliderId);
+    long PreviousRightFootColliderId,
+    float PreviousControlDegrees)
+{
+    public AlsCharacterRotationHistory RotationHistory { get; init; }
+    public AlsGait RotationGait { get; init; }
+    public float RotationWalkSpeed { get; init; }
+    public float RotationRunSpeed { get; init; }
+    public AlsCharacterMovementHistory MovementHistory { get; init; }
+    public AlsMovementBaseHistory MovementBase { get; init; }
+    public Vector3 WorldVelocity { get; init; }
+}
 
 public partial class AlsCharacterMotor : CharacterBody3D
 {
@@ -37,6 +48,11 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private CapsuleShape3D? _capsuleShape;
     private ShapeCast3D? _standClearance;
     private KinematicCollision3D? _initialFloorProbe;
+    private AlsLandPredictionProbe _landPredictionProbe = null!;
+    private AlsRefactoredGroundPredictionGather? _refactoredPredictionGather;
+    private AlsRefactoredGroundPrediction? _refactoredPrediction;
+    private ulong _refactoredPredictionSerial;
+    private AlsLandPredictionSettings _landPredictionSettings;
     private readonly PhysicsRayQueryParameters3D[] _footQueries =
         new PhysicsRayQueryParameters3D[AlsP4FootProbeExchange.FootCount];
     private AlsP4FootProbeExchange _footProbeExchange = null!;
@@ -45,6 +61,16 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private AlsMotorSettings _settings;
     private AlsStance _actualStance = AlsStance.Standing;
     private NumericsVector3 _previousActualVelocity;
+    private float _previousControlDegrees;
+    private AlsCharacterRotationModel? _characterRotation;
+    private AlsCharacterMovementRuntime? _movementRuntime;
+    private AlsCharacterMovementHistory _movementHistory;
+    internal AlsCharacterMovementHistory MovementHistory => _movementHistory;
+    internal AlsCharacterMovementStep MovementDiagnostics { get; private set; }
+    private AlsCharacterRotationHistory _rotationHistory;
+    private AlsGait _rotationGait;
+    private float _rotationWalkSpeed, _rotationRunSpeed;
+    internal AlsCharacterRotationUpdate RotationDiagnostics { get; private set; }
     private long _lastFrameId = -1;
     private Transform3D _previousGatherTransform;
     private bool _hasPreviousGatherTransform;
@@ -65,6 +91,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private bool _configured;
 
     internal long LastFootGatherManagedAllocations { get; private set; }
+    public bool FirstPersonView { get; set; }
+    internal int LastLandPredictionQueries => _landPredictionProbe.LastQueryCount;
 
     internal NumericsVector3 LifecycleActualVelocity => _previousActualVelocity;
 
@@ -86,14 +114,14 @@ public partial class AlsCharacterMotor : CharacterBody3D
         ProcessThreadGroupOrder = 0;
     }
 
-    public void Configure(in AlsMotorSettings settings, IAlsLocomotionCommandSource source)
+    public void Configure(in AlsMotorSettings settings, IAlsLocomotionCommandSource source, AlsCharacterMovementRuntime? movement = null)
     {
         Configure(
             settings,
             source,
             new AlsP4FootProbeExchange(),
             AlsP4FootGatherSettings.CreateReference(),
-            runtimeContext: null);
+            runtimeContext: null, movement: movement);
     }
 
     internal void Configure(
@@ -101,7 +129,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         IAlsLocomotionCommandSource source,
         AlsP4FootProbeExchange footProbeExchange,
         in AlsP4FootGatherSettings footGatherSettings,
-        AlsP3RuntimeContext? runtimeContext)
+        AlsP3RuntimeContext? runtimeContext, AlsCharacterMovementRuntime? movement = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(footProbeExchange);
@@ -164,6 +192,14 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
 
         _capsuleShape = capsuleShape;
+        _landPredictionProbe = new AlsLandPredictionProbe(this, capsuleShape);
+        if (OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves"))
+        {
+            _refactoredPrediction = AlsRefactoredGroundPredictionCompiler.Compile(Godot.FileAccess.GetFileAsString(
+                "res://assets/config/refactored_ground_prediction_inputs.json")).Model;
+            _refactoredPredictionGather = new(this, new(1, 2, 4), [GetRid()]);
+        }
+        _landPredictionSettings = runtimeContext?.MovementGraph?.LandPrediction.Settings ?? AlsLandPredictionSettings.Reference;
         _footProbeExchange = footProbeExchange;
         _footGatherSettings = footGatherSettings;
         _runtimeContext = runtimeContext;
@@ -173,6 +209,14 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _previousActualVelocity = NumericsVector3.Zero;
         _lastFrameId = -1;
         _previousGatherTransform = GlobalTransform;
+        _previousControlDegrees = 0;
+        _characterRotation = runtimeContext?.MovementGraph?.CharacterRotation;
+        _movementRuntime = movement ?? runtimeContext?.MovementGraph?.CharacterMovementRuntime;
+        _movementHistory = _movementRuntime?.InitialState ?? default;
+        _rotationHistory = AlsCharacterRotationModel.Initialize(-GetCharacterYaw() * (180d / System.Math.PI));
+        _rotationGait = _characterRotation?.InitialGait ?? AlsGait.Walking;
+        _rotationWalkSpeed = _characterRotation?.InitialWalkSpeed ?? 0;
+        _rotationRunSpeed = _characterRotation?.InitialRunSpeed ?? 0;
         _hasPreviousGatherTransform = false;
         _candidateLifecycleFrameId = -1;
         _committedLifecycleFrameId = 0;
@@ -187,6 +231,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         UpDirection = Vector3.Up;
         FloorSnapLength = 0.1f;
         FloorStopOnSlope = true;
+        ConfigureBasedMovement();
         _configured = true;
         _committedLifecycleSnapshot = CaptureLifecycleSnapshot(ProbeInitialFloor());
     }
@@ -197,9 +242,11 @@ public partial class AlsCharacterMotor : CharacterBody3D
         int generation,
         float deltaTime,
         byte hasTargetYaw = 0,
-        float targetYaw = 0f)
+        float targetYaw = 0f,
+        AlsCharacterRotationFeedback rotationFeedback = default, AlsRefactoredAnimationFeedback refactoredFeedback = default)
     {
         ValidateStep(frameId, characterId, generation, deltaTime, hasTargetYaw, targetYaw);
+        rotationFeedback.ValidateForFrame(new AlsFrameIdentity(frameId, (uint)characterId, (uint)generation));
         _publishedVelocityCheckpointPending = false;
         var source = _source!;
         var command = source.GetCommand(frameId);
@@ -210,13 +257,14 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 "JumpPressed must be zero or one.");
         }
 
+        var worldStart = GlobalPosition;
         var currentStanceCommand = AlsLocomotionCommandResolver.Resolve(command, _actualStance);
         var requestedStanceCommand = AlsLocomotionCommandResolver.Resolve(
             command,
             currentStanceCommand.RequestedStance);
         var currentVelocity = Velocity;
         RequireFiniteVector(currentVelocity, nameof(Velocity));
-        if (hasTargetYaw == 1)
+        if (hasTargetYaw == 1 && _characterRotation is null)
         {
             GlobalBasis = new Basis(Vector3.Up, targetYaw);
         }
@@ -227,29 +275,29 @@ public partial class AlsCharacterMotor : CharacterBody3D
             throw new ArgumentOutOfRangeException(nameof(GlobalTransform), "Character yaw must be finite.");
         }
 
-        var currentDesiredSpeed = CalculateDesiredSpeed(currentStanceCommand, movementYaw, _actualStance);
-        var requestedDesiredSpeed = CalculateDesiredSpeed(
+        var currentDesiredSpeed = _movementRuntime is null ? CalculateDesiredSpeed(currentStanceCommand, movementYaw, _actualStance) : 0;
+        var requestedDesiredSpeed = _movementRuntime is null ? CalculateDesiredSpeed(
             requestedStanceCommand,
             movementYaw,
-            currentStanceCommand.RequestedStance);
+            currentStanceCommand.RequestedStance) : 0;
         var currentDesiredVelocity = ToGodot(currentStanceCommand.WorldDirection) * currentDesiredSpeed;
         var requestedDesiredVelocity = ToGodot(requestedStanceCommand.WorldDirection) * requestedDesiredSpeed;
         RequireFiniteVector(currentDesiredVelocity, nameof(currentDesiredVelocity));
         RequireFiniteVector(requestedDesiredVelocity, nameof(requestedDesiredVelocity));
 
         var currentHorizontal = new Vector3(currentVelocity.X, 0f, currentVelocity.Z);
-        var currentStanceHorizontalVelocity = IntegrateHorizontalVelocity(
+        var currentStanceHorizontalVelocity = _movementRuntime is null ? IntegrateHorizontalVelocity(
             currentHorizontal,
             currentDesiredVelocity,
             _settings.MaxAcceleration,
             _settings.MaxBrakingDeceleration,
-            deltaTime);
-        var requestedStanceHorizontalVelocity = IntegrateHorizontalVelocity(
+            deltaTime) : currentHorizontal;
+        var requestedStanceHorizontalVelocity = _movementRuntime is null ? IntegrateHorizontalVelocity(
             currentHorizontal,
             requestedDesiredVelocity,
             _settings.MaxAcceleration,
             _settings.MaxBrakingDeceleration,
-            deltaTime);
+            deltaTime) : currentHorizontal;
 
         var standingRequestBlocked = UpdateStance(currentStanceCommand.RequestedStance);
         var usedRequestedStance = _actualStance == currentStanceCommand.RequestedStance;
@@ -283,11 +331,56 @@ public partial class AlsCharacterMotor : CharacterBody3D
             verticalVelocity -= _settings.Gravity * deltaTime;
         }
 
+        MoveWithNativeBase(groundedBeforeMove, transport: jumpAccepted == 0);
+        var movementStep = default(AlsCharacterMovementStep);
+        if (jumpAccepted == 1 && _movementRuntime is not null)
+        {
+            var inherited = NativeBaseDepartureVelocity();
+            currentHorizontal += new Vector3(inherited.X, 0, inherited.Z);
+            verticalVelocity += inherited.Y;
+        }
+        if (_movementRuntime is not null)
+        {
+            // UE CMC ticks before Character. Saved parameters drive this move;
+            // the new physical speed updates the parameters only after movement.
+            var direction = resolvedCommand.WorldDirection;
+            movementStep = _movementRuntime.Integrate(_movementHistory,
+                new(-currentHorizontal.Z * 100d, currentHorizontal.X * 100d, 0),
+                new(-(double)direction.Z * resolvedCommand.InputAmount, (double)direction.X * resolvedCommand.InputAmount, 0),
+                _actualStance, groundedBeforeMove && jumpAccepted == 0, deltaTime);
+            horizontalVelocity = new((float)(movementStep.Velocity.Y * .01), 0, (float)(-movementStep.Velocity.X * .01));
+            desiredSpeed = movementStep.MaxSpeed * movementStep.Analog * .01f;
+            MovementDiagnostics = movementStep;
+        }
         var nextVelocity = new Vector3(horizontalVelocity.X, verticalVelocity, horizontalVelocity.Z);
         RequireFiniteVector(nextVelocity, nameof(nextVelocity));
         Velocity = nextVelocity;
         MoveAndSlide();
 
+        if (_movementRuntime is not null && groundedBeforeMove && !IsOnFloor() && jumpAccepted == 0)
+            Velocity += NativeBaseDepartureVelocity();
+        WorldMovementVelocity = (GlobalPosition - worldStart) / deltaTime;
+
+        // ALS SetEssentialValues reads APawn::GetVelocity -> CMC.Velocity.
+        // Based movement transports the capsule without adding that displacement
+        // to the locomotion velocity. Godot's real velocity includes transport;
+        // use the collision-adjusted movement velocity for the native ALS path.
+        // This also keeps animation, dynamic movement parameters and foot locking
+        // on the same velocity source. World displacement remains in the transform.
+        var actualVelocity = ToNumerics(_movementRuntime is null ? GetRealVelocity() : Velocity);
+        var grounded = IsOnFloor();
+        if (_movementRuntime is not null)
+        {
+            var acceleration = movementStep.Acceleration;
+            var relativeYaw = System.Math.Atan2(acceleration.Y, acceleration.X) * (180 / System.Math.PI) + command.ViewYaw * (180 / System.Math.PI);
+            var speedCm = System.Math.Sqrt((double)actualVelocity.X * actualVelocity.X + (double)actualVelocity.Z * actualVelocity.Z) * 100;
+            _movementHistory = _movementRuntime.UpdateCharacter(_movementHistory, speedCm, movementStep, _actualStance,
+                resolvedCommand.RotationMode, command.RequestedGait, relativeYaw, grounded, !groundedBeforeMove && grounded, deltaTime);
+            resolvedCommand = resolvedCommand with { MaxAllowedGait = _movementHistory.AllowedGait };
+        }
+        var aimRate = AlsAimYawRate.Gather(command.ViewYaw, _previousControlDegrees, deltaTime);
+        var lastMovementRotation = GlobalBasis.GetRotationQuaternion();
+        var rotationSample = ApplyCharacterRotation(deltaTime, actualVelocity, grounded, resolvedCommand, aimRate, rotationFeedback);
         var characterTransform = GlobalTransform;
         var characterYaw = GetCharacterYaw(characterTransform.Basis);
         if (!float.IsFinite(characterYaw))
@@ -297,23 +390,22 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var identity = new AlsFrameIdentity(frameId, (uint)characterId, (uint)generation);
         var allocatedBeforeFootGather = GC.GetAllocatedBytesForCurrentThread();
         var releaseSignals = CapturePlatformRemovalSignals();
-        GatherFootHits(
-            identity,
-            characterTransform,
-            out var leftFootHit,
-            out var rightFootHit,
-            out var leftFootPlatform,
-            out var rightFootPlatform);
+        AlsFootHit leftFootHit, rightFootHit;
+        CollisionObject3D? leftFootPlatform, rightFootPlatform;
+        var footScene = default(AlsFootIkSceneSample);
+        if (_nativeFootGatherEnabled)
+            footScene = GatherNativeFeet(identity, characterTransform, lastMovementRotation, deltaTime, grounded,
+                out leftFootHit, out rightFootHit, out leftFootPlatform, out rightFootPlatform);
+        else GatherFootHits(identity, characterTransform, out leftFootHit, out rightFootHit, out leftFootPlatform, out rightFootPlatform);
         UpdatePreviousFootPlatforms(
             in releaseSignals,
             in leftFootHit,
             leftFootPlatform,
             in rightFootHit,
             rightFootPlatform);
-        var actualVelocity = ToNumerics(GetRealVelocity());
         var actualAcceleration = (actualVelocity - _previousActualVelocity) / deltaTime;
-        var grounded = IsOnFloor();
         var floor = CreateFloorSample(grounded);
+        SaveNativeBase(grounded);
         if (_releasePlatformOnNextStep)
         {
             leftFootHit = AlsFootHit.Invalid;
@@ -364,18 +456,89 @@ public partial class AlsCharacterMotor : CharacterBody3D
             AnimationQualityTier: AlsAnimationQualityTier.Tier0,
             Command: command,
             CharacterYaw: characterYaw,
-            MaxAcceleration: _settings.MaxAcceleration,
-            MaxBrakingDeceleration: _settings.MaxBrakingDeceleration,
+            MaxAcceleration: _movementRuntime is null ? _settings.MaxAcceleration : _movementHistory.Values.MaxAcceleration * .01f,
+            MaxBrakingDeceleration: _movementRuntime is null ? _settings.MaxBrakingDeceleration :
+                (grounded ? _movementHistory.Values.BrakingDeceleration : _movementRuntime.Settings.AirBraking) * .01f,
             JumpAccepted: jumpAccepted)
         {
             FootPlacementReleaseSignals = releaseSignals,
+            AimYawRateDegrees = aimRate.RateDegrees,
+            FirstPerson = FirstPersonView ? (byte)1 : (byte)0,
+            CharacterRotation = rotationSample,
+            FootIk = footScene,
+            MovementInput = _movementRuntime is null ? default : new(1, (float)movementStep.InputAmount),
+            LandPrediction = _landPredictionProbe.Gather(_collisionNode!.GlobalPosition, actualVelocity, !grounded, _landPredictionSettings),
+            RefactoredGroundPrediction = GatherRefactoredPrediction(identity, actualVelocity, grounded, refactoredFeedback,
+                MathF.Abs(footScene.ComponentToWorld.Scale.Y)),
         };
 
         _previousActualVelocity = actualVelocity;
+        _previousControlDegrees = aimRate.ControlDegrees;
         _lastFrameId = frameId;
         _candidateLifecycleSnapshot = CaptureLifecycleSnapshot(grounded);
         _candidateLifecycleFrameId = frameId;
         return input;
+    }
+
+    internal AlsFrameInput RecaptureRefactoredPrediction(in AlsFrameInput input) => input with
+    {
+        // Replacement animation starts cold; query its current capsule instead
+        // of relabeling the retired generation's request or cached pose history.
+        RefactoredGroundPrediction = GatherRefactoredPrediction(input.Identity, input.ActualVelocity,
+            input.Floor.IsGrounded == 1, default, MathF.Abs(input.FootIk.ComponentToWorld.Scale.Y)),
+    };
+
+    private AlsRefactoredGroundPredictionSample GatherRefactoredPrediction(AlsFrameIdentity identity,
+        NumericsVector3 velocity, bool grounded, AlsRefactoredAnimationFeedback feedback, float componentScale)
+    {
+        if (_refactoredPrediction is null) return default;
+        var prior = feedback.Pose.Identity;
+        if (prior != default && (prior.CharacterId != identity.CharacterId || prior.SlotGeneration != identity.SlotGeneration || prior.FrameId >= identity.FrameId))
+            throw new ArgumentException("Foreign Refactored pose feedback at physics gathering.");
+        var center = _collisionNode!.GlobalPosition;
+        var capsuleScale = _collisionNode.GlobalTransform.Basis.Scale.Abs();
+        var request = _refactoredPrediction.Prepare(new(identity, new(-center.Z * 100d, center.X * 100d, center.Y * 100d),
+            AlsFootIkCoordinates.ToNative(velocity), componentScale,
+            // UCapsuleComponent uses the smaller horizontal component scale.
+            _capsuleShape!.Radius * MathF.Min(capsuleScale.X, capsuleScale.Z) * 100,
+            _capsuleShape.Height * capsuleScale.Y * 50, MathF.Cos(FloorMaxAngle), feedback.GroundPredictionBlock), ++_refactoredPredictionSerial);
+        if (grounded) request = request with { Enabled = false };
+        return new(1, feedback, _refactoredPredictionGather!.Gather(request));
+    }
+
+    public override void _ExitTree()
+    {
+        _refactoredPredictionGather?.Dispose(); _refactoredPredictionGather = null;
+    }
+
+    private AlsCharacterRotationSample ApplyCharacterRotation(float delta, NumericsVector3 velocity, bool grounded,
+        in AlsResolvedLocomotionCommand command, in AlsAimYawRateSample aim, in AlsCharacterRotationFeedback feedback)
+    {
+        if (_characterRotation is null) return default;
+        var speed = (float)System.Math.Sqrt((double)velocity.X * velocity.X + (double)velocity.Z * velocity.Z);
+        if (grounded)
+        {
+            // UE updates actual gait from the current settings before replacing
+            // those settings for a changed stance/rotation mode in this tick.
+            _rotationGait = AlsLocomotionModel.CalculateActualGait(speed, _rotationWalkSpeed, _rotationRunSpeed, command.MaxAllowedGait);
+            var movement = _characterRotation.Movement(command.RotationMode, _actualStance);
+            _rotationWalkSpeed = movement.WalkSpeed; _rotationRunSpeed = movement.RunSpeed;
+        }
+        var before = GetCharacterYaw();
+        var input = new AlsCharacterRotationInput(delta, -before * (180d / System.Math.PI), aim.ControlDegrees,
+            WorldYaw(velocity), WorldYaw(command.WorldDirection), speed, command.InputAmount > 0 && _settings.MaxAcceleration > 0,
+            // This Motor currently applies no animation root motion. Root-motion
+            // drive must supply its actual active state when that drive is added.
+            false, grounded ? AlsMovementStateInput.Grounded : AlsMovementStateInput.InAir,
+            command.RotationMode, _actualStance, _rotationGait, feedback.Action, FirstPersonView, aim.RateDegrees,
+            feedback.YawOffsetPresent ? feedback.YawOffset : 0, feedback.RotationAmountPresent ? feedback.RotationAmount : 0);
+        var rotation = _characterRotation.Evaluate(input, _rotationHistory);
+        var yaw = (float)(-rotation.ActorYaw * (System.Math.PI / 180));
+        GlobalBasis = new Basis(Vector3.Up, yaw);
+        _rotationHistory = rotation.History; RotationDiagnostics = rotation;
+        return new(1, (float)(-rotation.History.TargetYaw * (System.Math.PI / 180)),
+            GodotAls.Core.Math.AlsMath.NormalizeAngleRadians(yaw - before), rotation.Branch, _rotationGait, feedback.Identity);
+        static double WorldYaw(NumericsVector3 value) => System.Math.Atan2(value.X, -value.Z) * (180 / System.Math.PI);
     }
 
     internal void CommitLifecycleFrame(long frameId)
@@ -439,6 +602,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
             ? _settings.StandingHeight
             : _settings.CrouchingHeight;
         _previousActualVelocity = snapshot.PreviousActualVelocity;
+        _previousControlDegrees = snapshot.PreviousControlDegrees;
+        RestoreRotationHistory(snapshot);
         _lastFrameId = snapshot.LastFrameId;
         _previousGatherTransform = snapshot.PreviousGatherTransform;
         _hasPreviousGatherTransform = snapshot.HasPreviousGatherTransform;
@@ -478,6 +643,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
             ? _settings.StandingHeight
             : _settings.CrouchingHeight;
         _previousActualVelocity = snapshot.PreviousActualVelocity;
+        _previousControlDegrees = snapshot.PreviousControlDegrees;
+        RestoreRotationHistory(snapshot);
         _lastFrameId = snapshot.LastFrameId;
         _previousGatherTransform = snapshot.PreviousGatherTransform;
         _hasPreviousGatherTransform = snapshot.HasPreviousGatherTransform;
@@ -503,7 +670,25 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _previousLeftFootColliderId,
         _previousRightFootPlatform,
         _previousRightFootPlatformId,
-        _previousRightFootColliderId);
+        _previousRightFootColliderId,
+        _previousControlDegrees)
+    {
+        RotationHistory = _rotationHistory, RotationGait = _rotationGait,
+        RotationWalkSpeed = _rotationWalkSpeed, RotationRunSpeed = _rotationRunSpeed,
+        MovementHistory = _movementHistory,
+        MovementBase = _movementBase, WorldVelocity = WorldMovementVelocity,
+    };
+
+    private void RestoreRotationHistory(in AlsCharacterMotorLifecycleSnapshot snapshot)
+    {
+        _rotationHistory = snapshot.RotationHistory; _rotationGait = snapshot.RotationGait;
+        _rotationWalkSpeed = snapshot.RotationWalkSpeed; _rotationRunSpeed = snapshot.RotationRunSpeed;
+        RotationDiagnostics = default;
+        _movementHistory = snapshot.MovementHistory;
+        MovementDiagnostics = default;
+        _movementBase = snapshot.MovementBase; WorldMovementVelocity = snapshot.WorldVelocity;
+        BaseTransportDelta = default; BaseTransportBlocked = false;
+    }
 
     private void GatherFootHits(
         in AlsFrameIdentity identity,
@@ -568,6 +753,12 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
         query.From = worldOrigin + (up * _footGatherSettings.TraceUpMeters);
         query.To = worldOrigin - (up * _footGatherSettings.TraceDownMeters);
+        return ReadFootHit(query, up, out platform);
+    }
+
+    private AlsFootHit ReadFootHit(PhysicsRayQueryParameters3D query, Vector3 up, out CollisionObject3D? platform)
+    {
+        platform = null;
         var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
         if (hit.Count == 0 ||
             !hit.TryGetValue(PositionKey, out var positionVariant) ||
@@ -782,6 +973,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 pointVelocity = staticBody.ConstantLinearVelocity +
                     staticBody.ConstantAngularVelocity.Cross(
                         worldPoint - staticBody.GlobalPosition);
+                break;
+            case AlsCharacterMotor motor:
+                pointVelocity = motor.WorldMovementVelocity;
                 break;
             case CharacterBody3D character:
                 pointVelocity = character.GetRealVelocity();
@@ -1060,6 +1254,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     private AlsFloorSample CreateFloorSample(bool grounded)
     {
+        _sampledFloorCollider = null;
         LastFloorSelectionUsedSlideEvidence = false;
         if (!grounded)
         {
@@ -1097,9 +1292,15 @@ public partial class AlsCharacterMotor : CharacterBody3D
             }
 
             var platformTransform = floorCollider.GlobalTransform;
+            _sampledFloorCollider = floorCollider;
             var platformBasis = platformTransform.Basis.Orthonormalized();
             var platformRotation = platformBasis.GetRotationQuaternion().Normalized();
             var angularVelocity = ToNumerics(GetPlatformAngularVelocity());
+            if (_movementRuntime is not null)
+            {
+                ReadBaseVelocity(floorCollider, out _, out var nativeAngular);
+                angularVelocity = ToNumerics(nativeAngular);
+            }
             if (IsFinite(platformTransform.Origin) &&
                 IsFinite(platformBasis) && IsFinite(platformRotation) &&
                 IsFinite(angularVelocity))
@@ -1133,8 +1334,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
         in Vector3 floorNormal,
         out CollisionObject3D collider)
     {
-        // MoveAndSlide owns grounded/platform evidence. TestMove only supplies allocation-free
-        // support candidates for deterministic matching against that evidence.
+        // MoveAndSlide owns grounded evidence. The legacy path matches platform
+        // velocities; native based movement owns transport and selects actual
+        // floor contacts without treating Godot's disabled carrier velocity as evidence.
         collider = null!;
         var platformVelocity = GetPlatformVelocity();
         var platformAngularVelocity = GetPlatformAngularVelocity();
@@ -1300,9 +1502,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
         {
             return false;
         }
-        var velocityError = (candidateVelocity - platformVelocity).LengthSquared();
+        var velocityError = _movementRuntime is null ? (candidateVelocity - platformVelocity).LengthSquared() : 0;
         var angularError =
-            (candidateAngularVelocity - platformAngularVelocity).LengthSquared();
+            _movementRuntime is null ? (candidateAngularVelocity - platformAngularVelocity).LengthSquared() : 0;
         if (!float.IsFinite(velocityError) || !float.IsFinite(angularError) ||
             !float.IsFinite(alignment))
         {
@@ -1310,7 +1512,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
         var movingEligibility = IsMovingPlatform(candidate);
         var colliderId = candidate.GetInstanceId();
-        if (!IsBetterFloorCandidate(
+        var better = _movementRuntime is not null
+            ? IsBetterNativeFloorCandidate(candidate, alignment, colliderId, collider, bestAlignment, bestColliderId)
+            : IsBetterFloorCandidate(
                 velocityError,
                 angularError,
                 movingEligibility,
@@ -1320,7 +1524,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 bestAngularError,
                 bestMovingEligibility,
                 bestAlignment,
-                bestColliderId))
+                bestColliderId);
+        if (!better)
         {
             return false;
         }
@@ -1331,6 +1536,19 @@ public partial class AlsCharacterMotor : CharacterBody3D
         bestColliderId = colliderId;
         collider = candidate;
         return true;
+    }
+
+    private bool IsBetterNativeFloorCandidate(CollisionObject3D candidate, float alignment, ulong id,
+        CollisionObject3D? selected, float selectedAlignment, ulong selectedId)
+    {
+        // Prefer the support matching the solver's actual floor normal. At an
+        // equal-height seam retain the current live base while it still has a
+        // contact, then use stable identity to resolve an otherwise equal tie.
+        if (selected is null || alignment > selectedAlignment + 1e-6f) return true;
+        if (alignment < selectedAlignment - 1e-6f) return false;
+        var current = _movementBase.Collider;
+        if ((candidate == current) != (selected == current)) return candidate == current;
+        return id < selectedId;
     }
 
     private static bool TryGetAngularVelocity(

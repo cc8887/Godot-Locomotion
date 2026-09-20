@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$CaptureDirectory,
-    [string]$BeforeDirectory
+    [string]$BeforeDirectory,
+    [switch]$Strafe
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,7 +24,7 @@ $deltas = for ($index = 1; $index -lt $frames.Count; $index++) {
             Frame = $index + 1
             Foot = $side
             FinalDegrees = [Math]::Round((Get-RotationAngle $frames[$index].FootPose."${side}FootWorldRotation" $frames[$index - 1].FootPose."${side}FootWorldRotation"), 3)
-            AnimationDegrees = [Math]::Round((Get-RotationAngle $frames[$index].FootPose."Uncorrected${side}FootWorldRotation" $frames[$index - 1].FootPose."Uncorrected${side}FootWorldRotation"), 3)
+            ControllerOutputDegrees = [Math]::Round((Get-RotationAngle $frames[$index].FootPose."Uncorrected${side}FootWorldRotation" $frames[$index - 1].FootPose."Uncorrected${side}FootWorldRotation"), 3)
         }
     }
 }
@@ -59,8 +60,28 @@ function Write-ContactSheet([string]$Name, [object[]]$Tiles, [int]$Columns, [boo
 
 $movement = 0..29 | ForEach-Object { @{ Directory = $capturePath; Frame = 186 + $_ * 6; Label = 'After' } }
 Write-ContactSheet 'movement-contact-sheet.png' $movement 6 $true
+if ($Strafe) {
+    $sides = foreach ($frame in @(180, 360, 540)) {
+        @{ Directory = $capturePath; Frame = $frame; Label = 'After' }
+    }
+    Write-ContactSheet 'strafe-directions.png' $sides 3 $true
+    foreach ($window in @(@{ Name = 'startup-contact-sheet.png'; Start = 60 },
+        @{ Name = 'stopping-contact-sheet.png'; Start = 600 })) {
+        $tiles = @(0..11 | ForEach-Object { @{ Directory = $capturePath; Frame = $window.Start + $_ * 6; Label = 'Run' } })
+        if (@($tiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $capturePath ('frame-{0:D4}.png' -f $_.Frame))) }).Count -eq 0) {
+            Write-ContactSheet $window.Name $tiles 6 $true
+        }
+    }
+}
 if ($BeforeDirectory) {
     $beforePath = (Resolve-Path -LiteralPath $BeforeDirectory).Path
+    if ($Strafe) {
+        Write-ContactSheet 'upper-body-before-after.png' @(
+            @{ Directory = $beforePath; Frame = 180; Label = 'Before' },
+            @{ Directory = $capturePath; Frame = 180; Label = 'After' }
+        ) 2 $true
+        return
+    }
     $turns = foreach ($directory in @($beforePath, $capturePath)) {
         foreach ($frame in @(576, 600, 666)) {
             @{ Directory = $directory; Frame = $frame; Label = $(if ($directory -eq $beforePath) { 'Before' } else { 'After' }) }

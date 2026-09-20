@@ -9,6 +9,21 @@ namespace GodotAls.Core.Tests;
 [Collection(AllocationTestCollection.Name)]
 public sealed class AlsLocomotionCommandResolverTests
 {
+    [Fact]
+    public void OverlaySelectionDoesNotChangeMovementAndRejectsUnknownValues()
+    {
+        var original = AlsLocomotionCommand.CreateDefault() with { MovementAxes = new(.7f, -.3f), ViewYaw = .4f };
+        var expected = AlsLocomotionCommandResolver.Resolve(original, AlsStance.Standing);
+        foreach (var overlay in Enum.GetValues<AlsOverlayKind>())
+        {
+            var command = original with { RequestedOverlay = overlay };
+            Assert.Equal(expected, AlsLocomotionCommandResolver.Resolve(command, AlsStance.Standing));
+        }
+        foreach (var invalid in new[] { -1, 13, int.MaxValue })
+            Assert.Throws<ArgumentOutOfRangeException>(() => AlsLocomotionCommandResolver.Resolve(
+                original with { RequestedOverlay = (AlsOverlayKind)invalid }, AlsStance.Standing));
+    }
+
     public static IEnumerable<object[]> DefinedGaits =>
         Enum.GetValues<AlsGait>().Select(value => new object[] { value });
 

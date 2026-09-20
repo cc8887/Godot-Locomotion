@@ -25,6 +25,19 @@ public sealed class ContractLayoutTests
     {
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFrameIdentity>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFrameInput>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsCharacterRotationSample>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsCharacterRotationFeedback>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsLandPredictionSample>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsInAirAnimationInput>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsAnimationInputFeedback>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsGroundedAnimationInput>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsGroundedInputUpdate>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsJumpAnimationInput>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsJumpInputUpdate>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsGroundedControlInput>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsGroundedControlUpdate>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsIdleControlUpdate>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<GodotAls.Core.Locomotion.AlsTurnInPlaceRequest>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsRuntimeState>());
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<AlsFrameResult>());
     }
@@ -58,7 +71,7 @@ public sealed class ContractLayoutTests
     {
         AssertFieldOrder<AlsLocomotionCommand>(
             "MovementAxes", "ViewYaw", "ViewPitch", "AimYaw", "AimPitch", "RequestedGait",
-            "RequestedStance", "RequestedRotationMode", "JumpPressed");
+            "RequestedStance", "RequestedRotationMode", "JumpPressed", "RequestedOverlay");
         AssertFieldOrder<AlsViewPoseState>(
             "RelativeYaw", "RelativePitch", "YawSpeed", "HeadWeight", "SpineWeight",
             "SpineResidualYaw", "LastWorldYaw");
@@ -128,7 +141,7 @@ public sealed class ContractLayoutTests
             "RotationMode", "RequestedAction", "CurrentDriveMode", "RagdollState",
             "AnimationQualityTier", "Command", "CharacterYaw", "MaxAcceleration",
             "MaxBrakingDeceleration", "JumpAccepted", "FootPlacementReleaseSignals",
-            "ActionRequest");
+            "ActionRequest", "LandPrediction", "AimYawRateDegrees", "FirstPerson", "CharacterRotation", "FootIk", "MovementInput", "RefactoredGroundPrediction");
         AssertStorageFieldOrder<AlsRuntimeState>(
             "LocomotionState", "SmoothedVelocity", "SmoothedAcceleration", "Lean",
             "LeftFootLocked", "RightFootLocked", "TurnInPlaceTime", "RotateInPlaceTime",
@@ -139,7 +152,7 @@ public sealed class ContractLayoutTests
             "YawSource", "JumpStartActive", "Initialized", "ViewPose", "TurnInPlace", "RotateInPlace",
             "LeftFootLock", "RightFootLock", "PelvisCorrection", "LeftFootProbeOrigin",
             "RightFootProbeOrigin", "ActionPlayer", "DynamicTransition", "ActionBlendLane",
-            "DynamicTransitionBlendLane");
+            "DynamicTransitionBlendLane", "LeftFootLockPoseRotation", "RightFootLockPoseRotation");
         AssertStorageFieldOrder<AlsFrameResult>(
             "Identity", "ResolvedLocomotionState", "RequestedDriveMode", "ProposedRootMotionDelta",
             "PelvisTarget", "LeftFootTarget", "RightFootTarget", "MovementIntent",

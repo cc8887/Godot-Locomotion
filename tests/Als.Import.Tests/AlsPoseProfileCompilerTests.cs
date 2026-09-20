@@ -51,7 +51,7 @@ public sealed class AlsPoseProfileCompilerTests
         {
             Assert.Equal(1.2f, turn.BasePlayRate);
             Assert.Equal(0.2f, turn.BlendSeconds);
-            Assert.Equal((byte)1, turn.ScaleAngle);
+            Assert.Equal(turn.Stance == AlsPoseStance.Standing ? (byte)1 : (byte)0, turn.ScaleAngle);
             var curve = set.Animations[turn.AnimationId].Curves.Single(value =>
                 value.CanonicalKind == AlsCanonicalCurveKind.RotationYawSpeedRadiansPerSecond);
             Assert.Equal(curve.CurveId, turn.CurveId);

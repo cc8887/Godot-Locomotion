@@ -1,0 +1,7 @@
+{
+	"schemaVersion": 1,
+	"sourceGraph": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_AnimBP.ALS_AnimBP:(N) CycleBlending.AnimGraphNode_StateMachine_1.(N) Directional States",
+	"maxTransitionsPerFrame": 3,
+	"skipFirstUpdateTransition": true,
+	"reinitializeOnBecomingRelevant": true
+}

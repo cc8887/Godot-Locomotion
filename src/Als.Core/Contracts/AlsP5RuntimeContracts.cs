@@ -121,6 +121,8 @@ public enum AlsP5OccurrenceSourceKind : byte
     Transition = 4,
     ActionMontage = 5,
     ActionSequence = 6,
+    SourceSample = 7,
+    SourceEvaluator = 8,
 }
 
 [StructLayout(LayoutKind.Sequential)]

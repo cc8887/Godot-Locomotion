@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 
 namespace GodotAls.Import.Compilation;
 
-public static class AlsP5OccurrenceLayoutCompiler
+public static partial class AlsP5OccurrenceLayoutCompiler
 {
     private const int LayoutVersion = 2;
     private const ulong FnvOffset = 14695981039346656037UL;
@@ -16,6 +16,11 @@ public static class AlsP5OccurrenceLayoutCompiler
         ArgumentNullException.ThrowIfNull(locomotion);
         ArgumentNullException.ThrowIfNull(pose);
         ArgumentNullException.ThrowIfNull(p5a);
+        if (locomotion.StandingWalkRun is not { Length: 0 })
+        {
+            throw new ArgumentException(
+                "The Cycle source graph requires source-aware P5 bindings; the legacy Base22 layout cannot represent it.", nameof(locomotion));
+        }
         if (pose.SkeletonId != locomotion.SkeletonId)
         {
             throw new ArgumentException("P3 and P4 profiles use different skeletons.", nameof(pose));
@@ -39,26 +44,7 @@ public static class AlsP5OccurrenceLayoutCompiler
         AddBank(entries, AlsP5OccurrenceSourceKind.Rotate, pose.Rotates.Length, 0, 2);
         AddEntry(entries, AlsP5OccurrenceSourceKind.Transition, 0, 0, 1);
 
-        for (var actionIndex = 0; actionIndex < actions.Length; actionIndex++)
-        {
-            if (actions[actionIndex].DefinitionId != actionIndex)
-            {
-                throw new ArgumentException("Action definition IDs must be contiguous and ordered.", nameof(p5a));
-            }
-            AddEntry(entries, AlsP5OccurrenceSourceKind.ActionMontage,
-                actionIndex, 0, checked(2 + actionIndex * 2));
-        }
-
-        for (var segmentIndex = 0; segmentIndex < segments.Length; segmentIndex++)
-        {
-            var segment = segments[segmentIndex];
-            if ((uint)segment.ActionDefinitionId >= (uint)actions.Length)
-            {
-                throw new ArgumentException("Action segment has an invalid definition ID.", nameof(p5a));
-            }
-            AddEntry(entries, AlsP5OccurrenceSourceKind.ActionSequence,
-                segmentIndex, 0, checked(3 + segment.ActionDefinitionId * 2));
-        }
+        AddActionEntries(entries, p5a, 2);
 
         var entryArray = entries.ToArray();
         Validate(LayoutVersion, entryArray);
@@ -71,10 +57,35 @@ public static class AlsP5OccurrenceLayoutCompiler
         return new AlsP5OccurrenceLayout(LayoutVersion, digest, entryArray, mappings);
     }
 
+    private static void AddActionEntries(List<AlsP5OccurrenceLayoutEntry> entries, AlsP5aAnimationRuntimeProfile p5a, int firstAuthority)
+    {
+        var actions = p5a.Actions; var segments = p5a.SegmentBindings;
+        for (var actionIndex = 0; actionIndex < actions.Length; actionIndex++)
+        {
+            if (actions[actionIndex].DefinitionId != actionIndex)
+            {
+                throw new ArgumentException("Action definition IDs must be contiguous and ordered.", nameof(p5a));
+            }
+            AddEntry(entries, AlsP5OccurrenceSourceKind.ActionMontage,
+                actionIndex, 0, checked(firstAuthority + actionIndex * 2));
+        }
+
+        for (var segmentIndex = 0; segmentIndex < segments.Length; segmentIndex++)
+        {
+            var segment = segments[segmentIndex];
+            if ((uint)segment.ActionDefinitionId >= (uint)actions.Length)
+            {
+                throw new ArgumentException("Action segment has an invalid definition ID.", nameof(p5a));
+            }
+            AddEntry(entries, AlsP5OccurrenceSourceKind.ActionSequence,
+                segmentIndex, 0, checked(firstAuthority + 1 + segment.ActionDefinitionId * 2));
+        }
+    }
+
     public static void Validate(int version, IReadOnlyList<AlsP5OccurrenceLayoutEntry> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        if (version != LayoutVersion)
+        if (version != LayoutVersion && version != GodotAls.Core.Contracts.AlsP5OccurrenceLayoutContract.SourceGraphVersion)
         {
             throw new ArgumentException("Unsupported P5 occurrence layout version.", nameof(version));
         }
@@ -89,7 +100,7 @@ public static class AlsP5OccurrenceLayoutCompiler
         for (var index = 0; index < entries.Count; index++)
         {
             var entry = entries[index];
-            if (!Enum.IsDefined(entry.SourceKind) || entry.SourceBindingIndex < 0 ||
+            if (!Enum.IsDefined(entry.SourceKind) || version == LayoutVersion && entry.SourceKind > AlsP5OccurrenceSourceKind.ActionSequence || entry.SourceBindingIndex < 0 ||
                 entry.GraphSlotIndex < 0 || entry.OccurrenceHandleId < 0 ||
                 entry.AuthorityGroupId < 0)
             {
@@ -111,6 +122,8 @@ public static class AlsP5OccurrenceLayoutCompiler
         {
             throw new ArgumentException("P5 authority groups must be globally dense.", nameof(entries));
         }
+        if (version != LayoutVersion && !entries.Any(e => e.SourceKind is AlsP5OccurrenceSourceKind.SourceSample or AlsP5OccurrenceSourceKind.SourceEvaluator))
+            throw new ArgumentException("Source-aware layout has no source occurrences.", nameof(entries));
     }
 
     private static int[] BaseAnimationSlots(AlsLocomotionAnimationProfile locomotion) =>
