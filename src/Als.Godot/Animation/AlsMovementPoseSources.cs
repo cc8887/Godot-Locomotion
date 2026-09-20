@@ -45,7 +45,7 @@ internal sealed class AlsMovementPoseSources
                 throw new ArgumentException("Movement physical parent mapping differs.");
         }
         _curveNames = bank.Sources.ToArray().SelectMany(s => s.Policy.FloatCurveNames.ToArray())
-            .Concat(OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves") || OS.GetCmdlineUserArgs().Contains("--refactored-state-curves")
+            .Concat(AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") || AlsAnimationRuntimeOptions.Has("--refactored-state-curves")
                 ? AlsRefactoredV4SourceCurves.TargetNames : [])
             .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToArray();
     }

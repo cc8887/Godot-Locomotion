@@ -412,9 +412,9 @@ public sealed class AlsP3RuntimeContext
         FootGatherSettings = LoadFootGatherSettings(animationSet, profile);
         MovementGraph = profile.StandingWalkRun.Length == 6
             ? AlsMovementGraphDefinition.Load(animationSet, profile) : null;
-        if (MovementGraph is not null && OS.GetCmdlineUserArgs().Contains("--foot-ik-frame"))
+        if (MovementGraph is not null && AlsAnimationRuntimeOptions.Has("--foot-ik-frame"))
             MovementGraph=MovementGraph.WithSharedRootSources(animationSet);
-        else if (MovementGraph is not null && OS.GetCmdlineUserArgs().Contains("--layered-frame"))
+        else if (MovementGraph is not null && AlsAnimationRuntimeOptions.Has("--layered-frame"))
             MovementGraph=MovementGraph.WithSharedOverlaySources(animationSet);
         SourceBindings = MovementGraph?.Binding;
         motorSettings.Validate();

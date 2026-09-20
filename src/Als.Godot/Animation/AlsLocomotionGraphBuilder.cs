@@ -475,7 +475,7 @@ public static class AlsLocomotionGraphBuilder
             if (profile.StandingWalkRun.Length == 6)
             {
                 sourceBindings ??= CompileSourceBindings(animationSet, profile, poseProfile);
-                var refactoredMovementCurves = OS.GetCmdlineUserArgs().Any(a => a is "--refactored-movement-curves" or "--refactored-pose-curves") ?
+                var refactoredMovementCurves = AlsAnimationRuntimeOptions.Has("--refactored-movement-curves") || AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") ?
                     AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/refactored_pose_curve_inputs.json")) : null;
                 standingCycle = new AlsStandingCycleGraph(library, profile, animationSet,
                     poseProfile is null ? "Grounded/Standing" : "Base/Grounded/Standing", ownedResources, sourceBindings, poseProfile, refactoredMovementCurves);

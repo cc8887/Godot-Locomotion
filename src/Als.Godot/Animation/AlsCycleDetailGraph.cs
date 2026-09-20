@@ -77,7 +77,7 @@ internal sealed class AlsCycleDetailGraph : IDisposable
             .Distinct().SelectMany(id => set.Animations[id].Curves).Where(c => c.Provenance == AlsCurveProvenance.SourceCurve).Select(c => c.SourceName).Append("YawOffset")
             .Concat(_standing.ModifiedCurveNames)
             .Concat(refactoredMovementCurves is null ? [] : new[] { "PoseMoving" })
-            .Concat(Godot.OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves") || Godot.OS.GetCmdlineUserArgs().Contains("--refactored-state-curves")
+            .Concat(AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") || AlsAnimationRuntimeOptions.Has("--refactored-state-curves")
                 ? AlsRefactoredV4SourceCurves.TargetNames : [])
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         if (refactoredMovementCurves is not null)

@@ -138,11 +138,11 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         uint character, uint generation)
     {
         _definition = definition; _standing = standing; _skeleton = library.Skeleton;
-        var splitFeet = OS.GetCmdlineUserArgs().Contains("--refactored-foot-frame");
-        var gravityTwist = OS.GetCmdlineUserArgs().Contains("--foot-lock-gravity-twist");
-        var pinFinalContact = OS.GetCmdlineUserArgs().Contains("--foot-lock-final-contact");
-        var correctUnplantedPenetration = OS.GetCmdlineUserArgs().Contains("--foot-ground-clearance");
-        var pinContactToes = OS.GetCmdlineUserArgs().Contains("--foot-contact-toes");
+        var splitFeet = AlsAnimationRuntimeOptions.Has("--refactored-foot-frame");
+        var gravityTwist = AlsAnimationRuntimeOptions.Has("--foot-lock-gravity-twist");
+        var pinFinalContact = AlsAnimationRuntimeOptions.Has("--foot-lock-final-contact");
+        var correctUnplantedPenetration = AlsAnimationRuntimeOptions.Has("--foot-ground-clearance");
+        var pinContactToes = AlsAnimationRuntimeOptions.Has("--foot-contact-toes");
         if (pinContactToes && !pinFinalContact)
             throw new ArgumentException("--foot-contact-toes requires --foot-lock-final-contact.");
         if (correctUnplantedPenetration && !pinFinalContact)
@@ -151,12 +151,12 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             throw new ArgumentException("--foot-lock-final-contact requires --foot-lock-gravity-twist.");
         if (gravityTwist && !splitFeet)
             throw new ArgumentException("--foot-lock-gravity-twist requires --refactored-foot-frame.");
-        if (splitFeet && (!OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves") ||
-            !OS.GetCmdlineUserArgs().Contains("--foot-ik-frame") || !OS.GetCmdlineUserArgs().Contains("--based-foot-lock")))
+        if (splitFeet && (!AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") ||
+            !AlsAnimationRuntimeOptions.Has("--foot-ik-frame") || !AlsAnimationRuntimeOptions.Has("--based-foot-lock")))
             throw new ArgumentException("Refactored foot dispatch requires --refactored-pose-curves --foot-ik-frame --based-foot-lock.");
-        if (OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves") && !OS.GetCmdlineUserArgs().Contains("--foot-ik-frame"))
+        if (AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") && !AlsAnimationRuntimeOptions.Has("--foot-ik-frame"))
             throw new ArgumentException("Refactored production curves require --foot-ik-frame for complete scene/pose inputs.");
-        if (OS.GetCmdlineUserArgs().Contains("--based-foot-lock") && !OS.GetCmdlineUserArgs().Contains("--foot-ik-frame"))
+        if (AlsAnimationRuntimeOptions.Has("--based-foot-lock") && !AlsAnimationRuntimeOptions.Has("--foot-ik-frame"))
             throw new ArgumentException("Based foot locking requires --foot-ik-frame.");
         _component = (Node3D)library.Root; _animatedSpeeds = animatedSpeeds;
         _attachParent = checked((long)_component.GetParent().GetInstanceId());
@@ -164,8 +164,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         if (definition.Sources.RuntimeStamp==definition.OverlaySharedSources.Sources.RuntimeStamp ||
             definition.Sources.RuntimeStamp==definition.RootSharedSources.Sources.RuntimeStamp)
         {
-            _layered=new(definition,library,standing,set,pose,character,generation,OS.GetCmdlineUserArgs().Contains("--foot-ik-frame"),
-                OS.GetCmdlineUserArgs().Contains("--based-foot-lock"), OS.GetCmdlineUserArgs().Contains("--based-foot-lock-trace"), splitFeet,
+            _layered=new(definition,library,standing,set,pose,character,generation,AlsAnimationRuntimeOptions.Has("--foot-ik-frame"),
+                AlsAnimationRuntimeOptions.Has("--based-foot-lock"), OS.GetCmdlineUserArgs().Contains("--based-foot-lock-trace"), splitFeet,
                 gravityTwist ? AlsFootLockBaseRotationMode.GravityTwist : AlsFootLockBaseRotationMode.FullRotation, pinFinalContact, correctUnplantedPenetration, pinContactToes);
             _base=_layered.Base;
         }
@@ -194,7 +194,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _yawOffset = CurveNames.IndexOf("YawOffset");
         _poseMoving = CurveNames.IndexOf("PoseMoving");
         _predictionBlock = CurveNames.IndexOf("GroundPredictionBlock");
-        if (OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves")) _refactoredPoseReader = new(CurveNames);
+        if (AlsAnimationRuntimeOptions.Has("--refactored-pose-curves")) _refactoredPoseReader = new(CurveNames);
         if (_standing.RefactoredMovementCurves is not null && _poseMoving < 0)
             throw new InvalidOperationException("Production root lost the movement cache curve layout.");
     }

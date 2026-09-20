@@ -20,12 +20,15 @@ public partial class P4KeyboardMouseSmoke : Node
     private long _injected, _committed;
     private int _stalledTicks, _mouseEvents, _walkFrames, _releasedWalkFrames, _leftFrames, _rightFrames;
     private int _movingLookingFrames, _rotatedFrames;
+    private int _toePinnedFrames, _lastCaptureFrame;
+    private string? _captureDirectory;
+    private bool _captureSubscribed;
     private AlsFrameIdentity _previousIdentity;
 
     public P4KeyboardMouseSmoke()
     {
         // Production Demo captures actions in group -1, Motor gathers in 0,
-        // animation evaluates in 1 and commits in 2. Inspect the previous
+        // animation uses the configured worker/query/commit groups. Inspect the previous
         // complete frame and send the next frame's events before that chain.
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
         ProcessThreadGroupOrder = -2;
@@ -41,23 +44,38 @@ public partial class P4KeyboardMouseSmoke : Node
             _previousAccumulatedInput = Input.UseAccumulatedInput;
             _ownsInput = true;
             Input.UseAccumulatedInput = false;
-            var scene = ResourceLoader.Load<PackedScene>("res://scenes/demo/p4_locomotion_demo.tscn")
+            var capture = OS.GetCmdlineUserArgs().SingleOrDefault(value => value.StartsWith("--capture-dir=", StringComparison.Ordinal));
+            if (capture is not null)
+            {
+                Require(DisplayServer.GetName() != "headless", "Screenshots require a rendered smoke.");
+                _captureDirectory = ProjectSettings.GlobalizePath(capture["--capture-dir=".Length..]);
+                Require(!Directory.Exists(_captureDirectory), "Capture directory already exists.");
+                Directory.CreateDirectory(_captureDirectory);
+                RenderingServer.FramePostDraw += CaptureFrame;
+                _captureSubscribed = true;
+            }
+            var scene = ResourceLoader.Load<PackedScene>(ProjectSettings.GetSetting("application/run/main_scene").AsString())
                 ?? throw new InvalidOperationException("Production P4 Demo scene is missing.");
-            _demo = scene.Instantiate<P4LocomotionDemo>();
+            var entry = scene.Instantiate<AlsDemoEntry>();
             // Intentionally do not ConfigureForSmoke: the production Demo must
             // call CaptureGodotFrame and read the actual Input singleton.
-            AddChild(_demo);
+            AddChild(entry);
+            _demo = entry.Demo;
             Require(_demo.IsRuntimeReady, "Production Demo did not initialize.");
             var floor = _demo.GetNode<StaticBody3D>("World/StartFloor");
             var size = new Vector3(40f, .5f, 40f);
-            floor.GetNode<CollisionShape3D>("CollisionShape3D").Shape = new BoxShape3D { Size = size };
+            var floorShape = floor.GetNode<CollisionShape3D>("CollisionShape3D");
+            floorShape.Position = Vector3.Zero;
+            floorShape.Shape = new BoxShape3D { Size = size };
+            floor.GetNode<MeshInstance3D>("MeshInstance3D").Position = new Vector3(0, .25f, 0);
             foreach (var terrain in _demo.GetNode<Node3D>("World").GetChildren())
                 if (terrain != floor) DisableTerrain(terrain);
             _demo.OrbitCamera.SetMouseCaptured(true);
             _demo.OrbitCamera.Notification((int)Node.NotificationWMWindowFocusOut);
             Require(!_demo.OrbitCamera.IsMouseCaptured, "Defocus must release the tracked capture state.");
             _demo.OrbitCamera.Notification((int)Node.NotificationWMWindowFocusIn);
-            Require(_demo.OrbitCamera.IsMouseCaptured && Input.MouseMode == Input.MouseModeEnum.Captured,
+            Require(_demo.OrbitCamera.IsMouseCaptured &&
+                (DisplayServer.GetName() == "headless" || Input.MouseMode == Input.MouseModeEnum.Captured),
                 "Refocusing must restore the requested mouse capture.");
         }
         catch (Exception exception) { Fail(exception); }
@@ -83,6 +101,18 @@ public partial class P4KeyboardMouseSmoke : Node
                     character.FullMovementDiagnostics.Feedback.Identity == frame.Identity &&
                     frame.CharacterRotationFeedback.Identity == frame.Identity,
                     "Keyboard/mouse frame did not commit the complete movement graph.");
+                if (!OS.GetCmdlineUserArgs().Contains("--legacy-animation"))
+                {
+                    var movement = character.FullMovementDiagnostics;
+                    Require(character.UsesLayeredPose && movement.UsesRefactoredFeet &&
+                        movement.RootIdentity == frame.Identity && movement.FootPoseIdentity == frame.Identity &&
+                        movement.LockCurveProducersMatch && movement.Overlay == _demo.Overlay,
+                        "Default Demo did not commit layered animation, final foot pose and matching lock curves.");
+                    Require(character.SplitFootDiagnostics.Resumed > 0,
+                        "Default Demo did not execute split foot dispatch.");
+                    if (movement.RefactoredRig.LeftToePinned || movement.RefactoredRig.RightToePinned)
+                        _toePinnedFrames++;
+                }
                 Require(input.Command.MovementAxes == expected.Axes &&
                     input.Command.RequestedGait == (expected.Walk ? AlsGait.Walking : AlsGait.Running),
                     "Physical Alt/A/D events were not reflected in the production command.");
@@ -168,7 +198,7 @@ public partial class P4KeyboardMouseSmoke : Node
         Input.ParseInputEvent(inputEvent);
         Input.FlushBufferedEvents();
         Require(camera.IsMouseCaptured && NearAngle(camera.Yaw, expectedYaw) && MathF.Abs(camera.Pitch - expectedPitch) < 1e-5f,
-            "Mouse event did not traverse the captured camera's unhandled input callback.");
+            "Mouse event did not traverse the captured camera's input callback.");
         _mouseEvents++;
     }
 
@@ -177,6 +207,8 @@ public partial class P4KeyboardMouseSmoke : Node
         Require(_walkFrames == 180 && _releasedWalkFrames == 90 && _leftFrames == 150 && _rightFrames == 120 &&
             _mouseEvents == 4 && _movingLookingFrames >= 180 && _rotatedFrames > 0,
             "Keyboard/mouse replay did not cover walking, Alt release, both strafing directions and actual character rotation.");
+        Require(OS.GetCmdlineUserArgs().Contains("--legacy-animation") || _toePinnedFrames > 0,
+            "Default Demo never applied final toe contact.");
         CleanupInput();
         Require(!Input.IsActionPressed("walk") && !Input.IsActionPressed("move_left") && !Input.IsActionPressed("move_right"),
             "Keyboard/mouse replay left a controlled action held.");
@@ -184,7 +216,7 @@ public partial class P4KeyboardMouseSmoke : Node
         _finished = true;
         GD.Print($"P4_KEYBOARD_MOUSE_OK frames={_committed} physical_keys=Alt,A,D mouse_events={_mouseEvents} " +
             $"walking={_walkFrames} alt_released_moving={_releasedWalkFrames} left={_leftFrames} right={_rightFrames} " +
-            $"moving_looking={_movingLookingFrames} rotated={_rotatedFrames} feedback=previous_committed owner=production");
+            $"moving_looking={_movingLookingFrames} rotated={_rotatedFrames} toes={_toePinnedFrames} feedback=previous_committed owner=production");
         GetTree().Quit();
     }
 
@@ -208,7 +240,26 @@ public partial class P4KeyboardMouseSmoke : Node
         GetTree().Quit(1);
     }
 
-    public override void _ExitTree() => CleanupInput();
+    private void CaptureFrame()
+    {
+        if (_finished || _demo is null || !_demo.IsRuntimeReady || _captureDirectory is null) return;
+        try
+        {
+            var frame = checked((int)_demo.ActiveCharacter.Diagnostics.CommittedFrameId);
+            if (frame < _lastCaptureFrame + 60) return;
+            using var image = GetViewport().GetTexture().GetImage();
+            var error = image.SavePng(Path.Combine(_captureDirectory, $"frame-{frame:D4}.png"));
+            Require(error == Error.Ok, $"Screenshot failed: {error}");
+            _lastCaptureFrame = frame;
+        }
+        catch (Exception exception) { Fail(exception); }
+    }
+
+    public override void _ExitTree()
+    {
+        if (_captureSubscribed) RenderingServer.FramePostDraw -= CaptureFrame;
+        CleanupInput();
+    }
 
     private static void DisableTerrain(Node node)
     {

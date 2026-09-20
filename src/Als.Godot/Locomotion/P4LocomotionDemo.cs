@@ -1,5 +1,6 @@
 using System.Threading;
 using Godot;
+using GodotAls.Animation;
 using GodotAls.Assets;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
@@ -110,7 +111,7 @@ public partial class P4LocomotionDemo : Node3D
                     throw new ArgumentException("Unknown --overlay selection.");
                 Overlay = overlay;
             }
-            if (Overlay != AlsOverlayKind.Default && !OS.GetCmdlineUserArgs().Contains("--layered-frame"))
+            if (Overlay != AlsOverlayKind.Default && !AlsAnimationRuntimeOptions.Has("--layered-frame"))
                 throw new ArgumentException("Overlay selection requires the complete --layered-frame animation entry.");
             _slot = GetNode<AlsP3CharacterSlot>("CharacterSlot");
             _orbitCamera = GetNode<AlsOrbitCamera>("OrbitCamera");

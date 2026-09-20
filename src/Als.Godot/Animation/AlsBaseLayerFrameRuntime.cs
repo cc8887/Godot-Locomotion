@@ -132,7 +132,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         IAlsSharedSourceContributor? contributor = null)
     {
         _requester = definition.BaseLayer.InertializationNodeIndex;
-        var refactoredDefinitions = Godot.OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves") ?
+        var refactoredDefinitions = AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") ?
             AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/refactored_pose_curve_inputs.json")) : null;
         if (refactoredDefinitions is not null)
             _refactoredPredictionModel = AlsRefactoredGroundPredictionCompiler.Compile(Godot.FileAccess.GetFileAsString(

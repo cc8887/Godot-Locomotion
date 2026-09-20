@@ -1,4 +1,5 @@
 using Godot;
+using GodotAls.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Import.Compilation;
@@ -193,7 +194,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
         _capsuleShape = capsuleShape;
         _landPredictionProbe = new AlsLandPredictionProbe(this, capsuleShape);
-        if (OS.GetCmdlineUserArgs().Contains("--refactored-pose-curves"))
+        if (AlsAnimationRuntimeOptions.Has("--refactored-pose-curves"))
         {
             _refactoredPrediction = AlsRefactoredGroundPredictionCompiler.Compile(Godot.FileAccess.GetFileAsString(
                 "res://assets/config/refactored_ground_prediction_inputs.json")).Model;
