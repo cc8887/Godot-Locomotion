@@ -24,6 +24,8 @@ public partial class AnimationFailureRecoverySmoke : Node
     private Input.MouseModeEnum _oldMouse;
     private bool _oldAccumulation;
     private bool _propSwitch;
+    private GodotAls.Core.Actions.AlsMontageRootMotionRange _heldMotionSource;
+    private AlsRootMotionDelta _heldMotion;
 
     public AnimationFailureRecoverySmoke()
     { ProcessThreadGroup = ProcessThreadGroupEnum.MainThread; ProcessThreadGroupOrder = -2; }
@@ -65,6 +67,10 @@ public partial class AnimationFailureRecoverySmoke : Node
             if (_phase == 0 && committed == 12)
             {
                 Require(_accepted == 1 && _character.CommittedAnimation.StateCount == 1, "No active Roll ownership.");
+                _heldMotionSource = _character.Diagnostics.Result.RootMotionSource;
+                _heldMotion = _character.Diagnostics.Result.ProposedRootMotionDelta;
+                Require(_heldMotionSource.HasMotion && _heldMotionSource.Identity.FrameId == 12,
+                    "No committed motion before fault injection.");
                 if (_replacement) Tap(Key.R);
                 if (_propSwitch) _demo.Overlay = GodotAls.Core.Locomotion.AlsOverlayKind.Bow;
                 Arm(); _phase = 1;
@@ -72,6 +78,9 @@ public partial class AnimationFailureRecoverySmoke : Node
             else if (_phase == 1 && _character.AnimationRecoveryAttempts > 0)
             {
                 var attempts = _character.AnimationRecoveryAttempts;
+                Require(_character.Diagnostics.Result.RootMotionSource == _heldMotionSource &&
+                    _character.Diagnostics.Result.ProposedRootMotionDelta == _heldMotion,
+                    "Failed animation published a new motion source or delta.");
                 if (_propSwitch) Require(_character.Props!.Committed.Identity.FrameId == 12 &&
                     _character.Props.Committed.Overlay == GodotAls.Core.Locomotion.AlsOverlayKind.Rifle,
                     "Failed animation published the pending prop switch.");
@@ -99,6 +108,10 @@ public partial class AnimationFailureRecoverySmoke : Node
             }
             else if (_phase == 1 && committed == 13)
             {
+                var source = _character.Diagnostics.Result.RootMotionSource;
+                Require(source.Identity == _character.Diagnostics.Identity && source.InstanceId == _heldMotionSource.InstanceId &&
+                    source.StartSeconds == _heldMotionSource.EndSeconds && source.EndSeconds > source.StartSeconds,
+                    "Recovery lost or advanced the pre-command physical motion range twice.");
                 if (_propSwitch) Require(_character.Props!.Committed.Identity.FrameId == 13 &&
                     _character.Props.Committed.Overlay == GodotAls.Core.Locomotion.AlsOverlayKind.Bow,
                     "Successful recovery did not commit the pending Bow.");

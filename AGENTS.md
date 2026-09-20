@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新进度：`docs/verification/2026-09-20-montage-root-motion.md`。共同 Montage 已提取并发布身份化 Root Motion，Motor 尚未消费，R 仍为原地预览；下一步处理同帧碰撞移动与脚部查询顺序。
+
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。
 - 引擎构建使用 `dotnet build GodotALS.csproj -p:Optimize=true`；包含大型值类型及零分配断言的 Core/Import 回归使用 Release。

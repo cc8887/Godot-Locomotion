@@ -10,7 +10,7 @@ public:
     // Real UE weight/advance/evaluation stages, before any simulated Blueprint request.
     void ProbeTick(float Delta);
     UFUNCTION(BlueprintCallable, Category="ALS Export")
-    static bool ExportTrace(const FString& Output, bool IncludeActions = false);
+    static bool ExportTrace(const FString& Output, bool IncludeActions = false, bool IncludeRootMotion = false);
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportAdditiveTrace(const FString& Output);
 protected:
