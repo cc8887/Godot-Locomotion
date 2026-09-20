@@ -88,7 +88,9 @@ public partial class PhysicsJointReferenceReplay : Node3D
                 b.Inertia=new(.0001f/inv.X,.0001f/inv.Y,.0001f/inv.Z);
             }
         }
-        _joints=new(_bodies,definition,[rig.Settings[joint.Index] with {Index=0}],conditionBodyInertia:_computedConditioning);
+        var nativeAngularMass=OS.GetCmdlineUserArgs().Contains("--native-angular-mass");
+        _joints=new(_bodies,definition,[rig.Settings[joint.Index] with {Index=0}],conditionBodyInertia:_computedConditioning,nativeAngularMass:nativeAngularMass);
+        if(_case==0)GD.Print($"JOINT_REPLAY_ANGULAR_MASS_CONFIG native_angular_mass={nativeAngularMass}");
         if(_joints.BackendConstraintCount!=2)throw new InvalidOperationException("Replay requires independent drive and limit channels.");
         if(_computedConditioning)
         {

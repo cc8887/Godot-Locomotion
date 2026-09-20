@@ -11,6 +11,9 @@ public readonly record struct AlsJointInverseMass(double Mass, AlsDoubleVector I
 // or a shared body's inertia with these constraint-local values.
 public static class AlsJointMassConditioning
 {
+    // Observed in all 144 native scene cases, separately from body conditioning.
+    public const double ReferenceMinParentMassRatio=.2f;
+    public const double ReferenceMaxInertiaRatio=5;
     public static (AlsJointInverseMass Parent, AlsJointInverseMass Child) Apply(
         AlsJointInverseMass parent, AlsJointInverseMass child, double minParentMassRatio, double maxInertiaRatio)
     {

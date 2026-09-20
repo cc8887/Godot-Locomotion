@@ -14,7 +14,7 @@ public partial class PhysicsJointSetSmoke : Node3D
     private readonly List<Case> _cases=[];
     private int _hz,_frame; private bool _done,_highDrop,_noContact,_pair,_alsDrives,_noSoftSolve,_noSelfCollision;
     private int _pairAxis;private float _pairAngle;
-    private bool _assertDampingOnlyRejected,_assertIndependentChannels,_nativeProjection;
+    private bool _assertDampingOnlyRejected,_assertIndependentChannels,_assertDormantTargets,_nativeProjection;
     private float _maxAnchor,_maxSpeed,_finalSpeed,_finalAngularSpeed; private double _maxLimit,_finalLimit;
     private string _finalSpeedBody="none";
     public override void _Ready()
@@ -27,8 +27,9 @@ public partial class PhysicsJointSetSmoke : Node3D
             _noContact=OS.GetCmdlineUserArgs().Contains("--no-contact");
             _assertDampingOnlyRejected=OS.GetCmdlineUserArgs().Contains("--assert-damping-only-rejected");
             _assertIndependentChannels=OS.GetCmdlineUserArgs().Contains("--assert-independent-channels");
-            Require(!_assertDampingOnlyRejected||!_assertIndependentChannels,"Select one channel probe.");
-            _pair=OS.GetCmdlineUserArgs().Contains("--pair")||_assertDampingOnlyRejected||_assertIndependentChannels;
+            _assertDormantTargets=OS.GetCmdlineUserArgs().Contains("--assert-dormant-targets");
+            Require((_assertDampingOnlyRejected?1:0)+(_assertIndependentChannels?1:0)+(_assertDormantTargets?1:0)<=1,"Select one channel probe.");
+            _pair=OS.GetCmdlineUserArgs().Contains("--pair")||_assertDampingOnlyRejected||_assertIndependentChannels||_assertDormantTargets;
             _alsDrives=OS.GetCmdlineUserArgs().Contains("--als-drives");
             _nativeProjection=OS.GetCmdlineUserArgs().Contains("--native-projection");
             GD.Print($"JOINT_PROJECTION_CONFIG native_projection={_nativeProjection}");
@@ -65,7 +66,9 @@ public partial class PhysicsJointSetSmoke : Node3D
                 var bodies=new AlsPhysicsBodySet(this,definition,names,parents,7,1,collisionLayer:_noContact||_pair?0u:2u,collisionMask:mask);
                 bodies.Seed(new(1,7,1),skeleton.GlobalTransform,reference,new(2,_highDrop ? -12:0,0),new(.3f,.7f,-.2f)); bodies.Start();
                 var rawInertia=OS.GetCmdlineUserArgs().Contains("--raw-inertia");
-                var joints=new AlsPhysicsJointSet(bodies,definition,settings,conditionBodyInertia:!rawInertia);
+                var nativeAngularMass=OS.GetCmdlineUserArgs().Contains("--native-angular-mass");
+                var joints=new AlsPhysicsJointSet(bodies,definition,settings,conditionBodyInertia:!rawInertia,nativeAngularMass:nativeAngularMass);
+                GD.Print($"JOINT_ANGULAR_MASS_CONFIG native_angular_mass={nativeAngularMass}");
                 GD.Print($"JOINT_INERTIA_CONFIG mesh={name} computed_conditioning={!rawInertia}");
                 Require(joints.BoundJointCount==definition.Joints.Length-(_pair?0:1),"Free root unexpectedly bound.");
                 Require(joints.BackendConstraintCount==joints.BoundJointCount*2,"Expected independent limit and drive constraints.");
@@ -92,6 +95,15 @@ public partial class PhysicsJointSetSmoke : Node3D
         if(_done)return;
         try
         {
+            if(_assertDormantTargets)
+            {
+                // The first callback precedes Jolt's pending-body insertion.
+                // Test real sleep/wake only after one complete backend step.
+                if(_frame++==0)return;
+                foreach(var c in _cases)c.Joints.VerifyDormantTargets(dt);
+                GD.Print("JOINT_DORMANT_TARGETS_OK meshes=2 unchanged_while_inactive=true stays_asleep=true sleeping_projection_skipped=true reactivation_wakes=true");
+                _done=true;GetTree().Quit();return;
+            }
             if(_assertIndependentChannels)
             {
                 foreach(var c in _cases)c.Joints.VerifyDriveIsolation(dt);

@@ -29,6 +29,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     private readonly AlsProjectionDelta[] _projectionDeltas;
     private readonly AlsProjectionVelocity[] _projectionVelocities;
     private readonly AlsLockedLinearProjection[] _projections;
+    private readonly bool _nativeAngularMass;
     private bool _disposed;
     private double _driveStiffness=-1,_driveDamping=-1;
     internal int BoundJointCount { get; private set; }
@@ -42,7 +43,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         _driveStiffness=stiffness;_driveDamping=damping;
     }
 
-    internal AlsPhysicsJointSet(AlsPhysicsBodySet bodies,AlsRagdollPhysicsDefinition definition,AlsPhysicsJointSettings[] settings,bool conditionBodyInertia=true)
+    internal AlsPhysicsJointSet(AlsPhysicsBodySet bodies,AlsRagdollPhysicsDefinition definition,AlsPhysicsJointSettings[] settings,bool conditionBodyInertia=true,bool nativeAngularMass=false)
     {
         Main();
         if (!bodies.Active || settings.Length!=definition.Joints.Length || bodies.BodyCount!=definition.Bodies.Length)
@@ -51,6 +52,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
             throw new NotSupportedException("This joint transport requires Jolt Physics.");
         foreach(var s in settings)Validate(s);
         _bodies=bodies;_definition=definition;_settings=settings.ToArray();
+        _nativeAngularMass=nativeAngularMass;
         _joints=new Rid[settings.Length];_parentFrames=new Transform3D[settings.Length];_childFrames=new Transform3D[settings.Length];
         _springs=new Rid[settings.Length*2];
         _springCache=Enumerable.Repeat(float.NaN,_springs.Length*9).ToArray();_springEnabled=new bool[_springs.Length*3];
@@ -114,6 +116,16 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     {
         Check();if(!double.IsFinite(dt)||dt<=0||dt>.1)throw new ArgumentOutOfRangeException(nameof(dt));
         if(!_bodies.Active)return;
+        // An inactive island is not solved by Chaos. External transform/velocity
+        // writes would wake it in Jolt even for a tiny residual correction.
+        var awake=false;
+        for(var i=0;i<_bodies.BodyCount;i++)
+        {
+            var body=_bodies.BodyAt(i);
+            if(!body.Freeze&&!PhysicsServer3D.BodyGetState(body.GetRid(),PhysicsServer3D.BodyState.Sleeping).AsBool())
+            {awake=true;break;}
+        }
+        if(!awake)return;
         Array.Clear(_projectionDeltas);Array.Clear(_projectionVelocities);
         for(var i=0;i<_bodies.BodyCount;i++)_projectionPoses[i]=Precise(_bodies.BodyAt(i).GlobalTransform);
         foreach(var j in _definition.Joints)
@@ -161,10 +173,24 @@ internal sealed class AlsPhysicsJointSet : IDisposable
             var frames=Frames(j.Index);var p=frames.Parent.Basis.Orthonormalized().GetRotationQuaternion();var c=frames.Child.Basis.Orthonormalized().GetRotationQuaternion();
             var current=Angles(p,c);
             var predictedP=Predict(p,pBody,dt);var predictedC=Predict(c,cBody,dt);
-            var predicted=Angles(predictedP,predictedC);
+            var predictedParent=Core(predictedP);var predictedChild=Core(predictedC);
+            if(AlsQuaternion.Dot(predictedParent,predictedChild)<0)predictedChild=-predictedChild;
+            var geometry=AlsJointAngularKinematics.Evaluate(predictedParent,predictedChild);
+            var predicted=geometry.Angles;
             var t=s.AngularDrive.Target;var targetRotation=new Quaternion((float)-t.X,(float)t.Y,(float)-t.Z,(float)t.W);
             var driveError=AlsJointAngularKinematics.SwingTwistDriveError(Core(predictedP),Core(predictedC),Core(targetRotation));
             var inverseP=InverseInertia(pBody);var inverseC=InverseInertia(cBody);var childBasis=new Basis(c);
+            if(_nativeAngularMass)
+            {
+                // Experimental coefficient transport only. This does not replace
+                // Jolt's internal Jacobians or per-body impulse distribution.
+                var parentMass=LocalInverseMass(pBody);var childMass=LocalInverseMass(cBody);
+                if(s.MassConditioning)(parentMass,childMass)=AlsJointMassConditioning.Apply(parentMass,childMass,
+                    AlsJointMassConditioning.ReferenceMinParentMassRatio,AlsJointMassConditioning.ReferenceMaxInertiaRatio);
+                inverseP=WorldInverseInertia(pBody,parentMass.Inertia,dt);
+                inverseC=WorldInverseInertia(cBody,childMass.Inertia,dt);
+                childBasis=new Basis(predictedC);
+            }
             var desired=Vector3.Zero;
             for(var axis=0;axis<3;axis++)
             {
@@ -176,10 +202,10 @@ internal sealed class AlsPhysicsJointSet : IDisposable
                 // A body already moving back inside the limit must retain its
                 // momentum; testing the old angle too adds an extra braking row.
                 var limitActive=motion==AlsJointMotion.Limited&&soft.Enabled&&AlsJointRowActivation.SoftLimitActive(next,angleLimit,angleTolerance);
-                var direction=childBasis[axis];var inv=direction.Dot(inverseP*direction+inverseC*direction);
-                var effective=inv>0?1/inv:0;
-                var driveScale=s.AngularDrive.ForceMode==AlsJointForceMode.Acceleration?effective:.0001;
-                var limitScale=s.AngularSoftForceMode==AlsJointForceMode.Acceleration?effective:.0001;
+                var driveAxis=childBasis[axis];
+                var limitAxis=_nativeAngularMass?GodotVector((axis==0?geometry.TwistAxis:axis==1?geometry.PyramidY:geometry.PyramidZ).ToSingle()):driveAxis;
+                var driveScale=s.AngularDrive.ForceMode==AlsJointForceMode.Acceleration?EffectiveInertia(driveAxis,inverseP,inverseC):.0001;
+                var limitScale=s.AngularSoftForceMode==AlsJointForceMode.Acceleration?EffectiveInertia(limitAxis,inverseP,inverseC):.0001;
                 var stiffness=position?(_driveStiffness>=0?_driveStiffness:Component(s.AngularDrive.Stiffness,coefficient)):0;
                 var drag=velocity?(_driveDamping>=0?_driveDamping:Component(s.AngularDrive.Damping,coefficient)):0;
                 var driveActive=AlsJointRowActivation.DriveActive(motion!=AlsJointMotion.Locked,Component(driveError,axis),stiffness,drag,angleTolerance);
@@ -219,6 +245,12 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     }
     private void SetTarget(int spring,Quaternion orientation)
     {
+        // A dormant motor has no target constraint. Updating its unused target
+        // wakes both bodies in Godot/Jolt. Initialize once for readback, then
+        // refresh on activation before the next solve.
+        var firstAxis=spring*3;
+        if(!_springEnabled[firstAxis]&&!_springEnabled[firstAxis+1]&&!_springEnabled[firstAxis+2]&&
+           !float.IsNaN(_springCache[spring*9+2]))return;
         var euler=-new Basis(orientation).GetEuler(EulerOrder.Zyx);
         for(var axis=0;axis<3;axis++)SpringParam(spring,axis,2,PhysicsServer3D.G6DofJointAxisParam.AngularSpringEquilibriumPoint,euler[axis]);
     }
@@ -280,6 +312,45 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         finally{_driveStiffness=previousStiffness;_driveDamping=previousDamping;Step(dt);}
     }
 
+    // Real-backend probe: an inactive target must not wake a sleeping body,
+    // while reactivating a limit must update its target and wake the body.
+    internal void VerifyDormantTargets(double dt)
+    {
+        Check();if(_definition.Joints.Length!=1)throw new InvalidOperationException("Dormant probe requires one pair.");
+        var j=_definition.Joints[0];var body=_bodies.BodyAt(j.ChildBody);
+        var saved=body.GlobalTransform;var linear=body.LinearVelocity;var angular=body.AngularVelocity;
+        var sleeping=body.Sleeping;var k=_driveStiffness;var d=_driveDamping;
+        try
+        {
+            var parent=Frames(0).Parent;var aligned=parent*_childFrames[0].AffineInverse();
+            body.GlobalTransform=aligned;body.LinearVelocity=body.AngularVelocity=Vector3.Zero;
+            SetEffectiveAngularDrive(0,0);Step(dt);VerifySpringReadback();
+            if(LastRowCount!=0)throw new InvalidOperationException("Aligned pair retained motor rows.");
+            var limits=ReadChannelState(Limit);var drives=ReadChannelState(Drive);
+            var turn=new Basis(parent.Basis.X,.01f);
+            body.GlobalTransform=new(turn*aligned.Basis,parent.Origin+turn*(aligned.Origin-parent.Origin));
+            body.Sleeping=true;Step(dt);VerifySpringReadback();
+            if(LastRowCount!=0||!limits.SequenceEqual(ReadChannelState(Limit))||!drives.SequenceEqual(ReadChannelState(Drive))||
+               !PhysicsServer3D.BodyGetState(body.GetRid(),PhysicsServer3D.BodyState.Sleeping).AsBool())
+                throw new InvalidOperationException("Dormant motor target changed or woke its body.");
+            body.GlobalPosition+=new Vector3(.02f,0,0);body.Sleeping=true;
+            var sleepingPose=body.GlobalTransform;Project(dt);
+            if(body.GlobalTransform!=sleepingPose||!PhysicsServer3D.BodyGetState(body.GetRid(),PhysicsServer3D.BodyState.Sleeping).AsBool())
+                throw new InvalidOperationException("Projection changed or woke an inactive island.");
+            turn=new Basis(parent.Basis.X,.6f);
+            body.GlobalTransform=new(turn*aligned.Basis,parent.Origin+turn*(aligned.Origin-parent.Origin));
+            body.Sleeping=true;Step(dt);VerifySpringReadback();
+            if(LastDriveRowCount!=0||LastLimitRowCount==0||limits.SequenceEqual(ReadChannelState(Limit))||
+               PhysicsServer3D.BodyGetState(body.GetRid(),PhysicsServer3D.BodyState.Sleeping).AsBool())
+                throw new InvalidOperationException($"Reactivated limit failed to refresh or wake its body: drive={LastDriveRowCount} limit={LastLimitRowCount} target_unchanged={limits.SequenceEqual(ReadChannelState(Limit))} sleeping={PhysicsServer3D.BodyGetState(body.GetRid(),PhysicsServer3D.BodyState.Sleeping).AsBool()}.");
+        }
+        finally
+        {
+            body.GlobalTransform=saved;body.LinearVelocity=linear;body.AngularVelocity=angular;
+            _driveStiffness=k;_driveDamping=d;Step(dt);body.Sleeping=sleeping;
+        }
+    }
+
     private float[] ReadChannelState(int channel)
     {
         var result=new float[_joints.Length*12];
@@ -326,6 +397,20 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         if(b.Freeze)return new(Vector3.Zero,Vector3.Zero,Vector3.Zero);
         var basis=b.GlobalBasis.Orthonormalized();var i=b.Inertia;
         return basis*Basis.FromScale(new(1/i.X,1/i.Y,1/i.Z))*basis.Transposed();
+    }
+    private static AlsJointInverseMass LocalInverseMass(RigidBody3D body)
+    {
+        if(body.Freeze)return default;
+        var i=body.Inertia;return new(1f/body.Mass,new(1f/i.X,1f/i.Y,1f/i.Z));
+    }
+    private static Basis WorldInverseInertia(RigidBody3D body,AlsDoubleVector inverse,double dt)
+    {
+        var basis=new Basis(Predict(body.GlobalBasis.Orthonormalized().GetRotationQuaternion(),body,dt));
+        return basis*Basis.FromScale(GodotVector(inverse.ToSingle()))*basis.Transposed();
+    }
+    private static float EffectiveInertia(Vector3 axis,Basis parent,Basis child)
+    {
+        var inverse=axis.Dot(parent*axis+child*axis);return inverse>0?1/inverse:0;
     }
     private static Quaternion Advance(Quaternion q,Vector3 w,double dt)
     {var dq=new Quaternion(w.X,w.Y,w.Z,0)*q;var h=(float)dt*.5f;return new Quaternion(q.X+dq.X*h,q.Y+dq.Y*h,q.Z+dq.Z*h,q.W+dq.W*h).Normalized();}
