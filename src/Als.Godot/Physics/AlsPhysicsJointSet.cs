@@ -25,6 +25,10 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     private readonly float[] _springCache;
     private readonly bool[] _springEnabled;
     private readonly Vector3[] _previousInertia;
+    private readonly AlsPrecisePose[] _projectionPoses;
+    private readonly AlsProjectionDelta[] _projectionDeltas;
+    private readonly AlsProjectionVelocity[] _projectionVelocities;
+    private readonly AlsLockedLinearProjection[] _projections;
     private bool _disposed;
     private double _driveStiffness=-1,_driveDamping=-1;
     internal int BoundJointCount { get; private set; }
@@ -51,6 +55,8 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         _springs=new Rid[settings.Length*2];
         _springCache=Enumerable.Repeat(float.NaN,_springs.Length*9).ToArray();_springEnabled=new bool[_springs.Length*3];
         _previousInertia=Enumerable.Range(0,bodies.BodyCount).Select(i=>bodies.BodyAt(i).Inertia).ToArray();
+        _projectionPoses=new AlsPrecisePose[bodies.BodyCount];_projectionDeltas=new AlsProjectionDelta[bodies.BodyCount];
+        _projectionVelocities=new AlsProjectionVelocity[bodies.BodyCount];_projections=new AlsLockedLinearProjection[settings.Length];
         try
         {
             if(conditionBodyInertia)
@@ -100,6 +106,48 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         }
         catch{Dispose();throw;}
     }
+
+    // Experimental post-Jolt projection. Cache the whole chain before applying
+    // any deltas; committing a joint immediately corrupts downstream geometry.
+    // This runs after Jolt's contact pass, not inside its island solver.
+    internal void Project(double dt)
+    {
+        Check();if(!double.IsFinite(dt)||dt<=0||dt>.1)throw new ArgumentOutOfRangeException(nameof(dt));
+        if(!_bodies.Active)return;
+        Array.Clear(_projectionDeltas);Array.Clear(_projectionVelocities);
+        for(var i=0;i<_bodies.BodyCount;i++)_projectionPoses[i]=Precise(_bodies.BodyAt(i).GlobalTransform);
+        foreach(var j in _definition.Joints)
+        {
+            var s=_settings[j.Index];if(!_joints[j.Index].IsValid||!s.Projection.Enabled)continue;
+            if(s.LinearMotion!=new AlsJointMotions(AlsJointMotion.Locked,AlsJointMotion.Locked,AlsJointMotion.Locked)||s.Projection.AngularAlpha!=0)
+                throw new NotSupportedException("Projection requires locked linear axes and zero angular alpha.");
+            var child=_bodies.BodyAt(j.ChildBody);var inertia=child.Inertia;
+            _projections[j.Index]=new(_projectionPoses[j.ParentBody],_projectionPoses[j.ChildBody],
+                Precise(_parentFrames[j.Index]),Precise(_childFrames[j.Index]),child.Freeze?0:1/child.Mass,
+                new(1/inertia.X,1/inertia.Y,1/inertia.Z),(float)s.Stiffness,(float)s.Projection.LinearAlpha,
+                (float)(s.Projection.TeleportDistanceCm*.01));
+        }
+        foreach(var j in _definition.Joints)
+        {
+            if(!_joints[j.Index].IsValid||!_settings[j.Index].Projection.Enabled)continue;
+            var velocity=_projections[j.Index].Apply(_projectionDeltas[j.ParentBody],ref _projectionDeltas[j.ChildBody],
+                dt,AlsLockedLinearProjection.ReferenceVelocityAlpha);
+            var previous=_projectionVelocities[j.ChildBody];
+            _projectionVelocities[j.ChildBody]=new(previous.Linear+velocity.Linear,previous.Angular+velocity.Angular);
+        }
+        for(var i=0;i<_bodies.BodyCount;i++)
+        {
+            var body=_bodies.BodyAt(i);var delta=_projectionDeltas[i];
+            if(body.Freeze||delta==default)continue;
+            var corrected=AlsLockedLinearProjection.Correct(_projectionPoses[i],delta);var q=corrected.Rotation;
+            body.GlobalTransform=new(new Basis(new Quaternion((float)q.X,(float)q.Y,(float)q.Z,(float)q.W)),GodotVector(corrected.Position.ToSingle()));
+            body.LinearVelocity+=GodotVector(_projectionVelocities[i].Linear);
+            body.AngularVelocity+=GodotVector(_projectionVelocities[i].Angular);
+        }
+    }
+    private static AlsPrecisePose Precise(Transform3D t)=>new(new(t.Origin.X,t.Origin.Y,t.Origin.Z),
+        Core(t.Basis.Orthonormalized().GetRotationQuaternion()),AlsDoubleVector.One);
+    private static Vector3 GodotVector(System.Numerics.Vector3 v)=>new(v.X,v.Y,v.Z);
 
     internal void Step(double dt)
     {

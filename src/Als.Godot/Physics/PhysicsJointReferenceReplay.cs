@@ -23,12 +23,15 @@ public partial class PhysicsJointReferenceReplay : Node3D
     private AlsPhysicsBodySet? _bodies;private AlsPhysicsJointSet? _joints;
     private int _case,_frame;private bool _done,_conditionBodies,_computedConditioning,_singleCase,_assertRelease;private string _output="";
     private double _maxRotation,_maxPosition,_maxLinear,_maxAngular;
+    private bool _nativeProjection;
 
     public override void _Ready()
     {
         try
         {
             var args=OS.GetCmdlineUserArgs();_conditionBodies=args.Contains("--body-conditioning");
+            _nativeProjection=args.Contains("--native-projection");
+            GD.Print($"JOINT_REPLAY_PROJECTION_CONFIG native_projection={_nativeProjection}");
             _computedConditioning=args.Contains("--computed-body-conditioning");
             if(_computedConditioning&&_conditionBodies)throw new ArgumentException("Select computed or recorded body conditioning, not both.");
             _output=args.FirstOrDefault(a=>a.StartsWith("--report="))?[9..]??"";
@@ -108,6 +111,7 @@ public partial class PhysicsJointReferenceReplay : Node3D
             if(_bodies is null)StartCase();
             var row=Current;var sample=row.GetProperty("samples")[_frame].GetProperty("child");
             if(Math.Abs(delta-row.GetProperty("dt").GetDouble())>1e-7)throw new InvalidOperationException("Replay step differs from recorded step.");
+            if(_nativeProjection&&_frame>0)_joints!.Project(delta);
             var actual=_bodies!.BodyAt(1);var pose=actual.GlobalTransform*_bodies.BoneToMass(1).AffineInverse();var expected=ReadTransform(sample.GetProperty("world"));
             var dot=pose.Basis.Orthonormalized().GetRotationQuaternion().Dot(expected.Basis.Orthonormalized().GetRotationQuaternion());
             var rotation=2*Math.Acos(Math.Clamp(Math.Abs(dot),0,1));
