@@ -16,6 +16,15 @@ public partial class ActionInputSmoke : Node
     private Vector3 _start;
     private int _motionFrames;
     private float _proposedDistance;
+    private bool _consumeMotion;
+    private bool _wall;
+    private int _blockedMotionFrames;
+    private Vector3 _previousPosition, _forward;
+    private Camera3D? _inspectionCamera;
+    private OmniLight3D? _inspectionLight;
+    private int _motionHoldTicks;
+    private long _motionHoldIntegrations;
+    private bool _motionHoldComplete;
 
     public ActionInputSmoke()
     { ProcessThreadGroup = ProcessThreadGroupEnum.MainThread; ProcessThreadGroupOrder = -2; }
@@ -25,6 +34,9 @@ public partial class ActionInputSmoke : Node
         try
         {
             ValidateAdapter();
+            _consumeMotion = OS.GetCmdlineUserArgs().Contains("--montage-root-motion");
+            _wall = OS.GetCmdlineUserArgs().Contains("--motion-wall");
+            Require(!_wall || _consumeMotion, "Wall test requires root motion consumption.");
             var hz = OS.GetCmdlineUserArgs().SingleOrDefault(a => a.StartsWith("--hz="));
             if (hz is not null) _hz = int.Parse(hz[5..]);
             Require(_hz is 30 or 60 or 120, "Expected 30/60/120 Hz."); Engine.PhysicsTicksPerSecond = _hz;
@@ -33,7 +45,23 @@ public partial class ActionInputSmoke : Node
             var scene = ResourceLoader.Load<PackedScene>(ProjectSettings.GetSetting("application/run/main_scene").AsString());
             var entry = scene.Instantiate<AlsDemoEntry>(); AddChild(entry); _demo = entry.Demo;
             Require(_demo.IsRuntimeReady, "Normal Demo initialization failed.");
+            // The normal spawn faces the demo ramp. Use an open part of the same
+            // floor to isolate free translation from deliberate wall collision.
+            if (_consumeMotion) _demo.ActiveCharacter.MovementAnchor.GlobalPosition = new(10, 1, 10);
             _start = _demo.ActiveCharacter.MovementAnchor.GlobalPosition;
+            _previousPosition = _start; _forward = -_demo.ActiveCharacter.MovementAnchor.GlobalBasis.Z;
+            if (_wall)
+            {
+                var wall = new StaticBody3D { Transform = new(_demo.ActiveCharacter.MovementAnchor.GlobalBasis,
+                    _start + _forward * 1.1f), CollisionLayer = 1, CollisionMask = 1 };
+                wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new(4,4,.2f) } }); AddChild(wall);
+            }
+            if (OS.GetCmdlineUserArgs().Contains("--render-motion"))
+            {
+                Require(_consumeMotion && DisplayServer.GetName() != "headless", "Motion render requires a visible renderer and consumption.");
+                _inspectionCamera = new Camera3D { Fov = 50 }; AddChild(_inspectionCamera); _inspectionCamera.MakeCurrent();
+                _inspectionLight = new OmniLight3D { OmniRange = 10, LightEnergy = 4 }; AddChild(_inspectionLight);
+            }
             _demo.RuntimeContext.ActionOutcomeCommitted += ObserveOutcome;
             _demo.RuntimeContext.AnimationEventCommitted += (_, e) => { if (e.Kind == AlsTimelineEventKind.SetGroundedEntry) _entries++; };
         }
@@ -47,6 +75,12 @@ public partial class ActionInputSmoke : Node
         {
             Require(_demo.IsRuntimeReady && _demo.ErrorCount == 0, "Action preview broke the normal production runtime.");
             var character = _demo.ActiveCharacter; var frame = character.Diagnostics;
+            if (_motionHoldTicks > 0)
+            {
+                Require(character.MotorIntegrationCount == _motionHoldIntegrations, "Motor moved without this frame's montage preparation.");
+                if (--_motionHoldTicks == 0)
+                { character.GetNode<Node>("MontageMotionPrepare").ProcessMode = ProcessModeEnum.Inherit; _motionHoldComplete = true; }
+            }
             if (frame.CommittedFrameId > _committed)
             {
                 Require(frame.CommittedFrameId == _committed + 1 && frame.CommittedFrameId == _injected, "Capture/commit order differs.");
@@ -77,9 +111,49 @@ public partial class ActionInputSmoke : Node
                 }
                 else Require(frame.Result.ProposedRootMotionDelta == AlsRootMotionDelta.Identity, "Unowned motion survived a stop.");
                 var position = character.MovementAnchor.GlobalPosition;
-                Require(new Vector2(position.X - _start.X, position.Z - _start.Z).Length() < .0001f,
-                    "Animation preview unexpectedly applied gameplay translation.");
+                if (!_consumeMotion)
+                    Require(new Vector2(position.X - _start.X, position.Z - _start.Z).Length() < .0001f,
+                        "Animation preview unexpectedly applied gameplay translation.");
+                else
+                {
+                    Require(character.ConsumedRootMotion == motionSource, "Motor and full graph advanced different root motion ranges.");
+                    Require(input.CurrentDriveMode == (motionSource.HasMotion ? AlsDriveMode.AnimationDriven : AlsDriveMode.MotorDriven) &&
+                        frame.Result.RequestedDriveMode == input.CurrentDriveMode, "Root motion drive state was lost.");
+                    if (motionSource.HasMotion)
+                    {
+                        var world = character.RootMotionWorldDelta.Translation;
+                        var moved = position - _previousPosition;
+                        var error = new Vector2(moved.X - world.X, moved.Z - world.Z).Length();
+                        if (_wall)
+                        {
+                            if (error > .0002f) _blockedMotionFrames++;
+                            Require((position - _start).Dot(_forward) <= .66f, "Root motion tunneled through the wall.");
+                        }
+                        else Require(error < .0002f,
+                            $"Unobstructed collision movement differs at {frame.CommittedFrameId}: moved={moved} expected={world} position={position} velocity={input.ActualVelocity} floor={input.Floor.IsGrounded}.");
+                        Require(_forward.Dot(new(world.X, 0, world.Z)) > -.00001f,
+                            $"Roll moved backwards: forward={_forward} delta={world}.");
+                    }
+                }
+                _previousPosition = position;
+                if (_inspectionCamera is not null)
+                {
+                    _inspectionCamera.GlobalPosition = position + new Vector3(3,1.2f,2);
+                    _inspectionCamera.LookAt(position + Vector3.Up * .1f);
+                    _inspectionLight!.GlobalPosition = position + new Vector3(1,2,2);
+                    if (frame.CommittedFrameId >= _hz*2 && frame.CommittedFrameId <= _hz*7/2 && frame.CommittedFrameId % (_hz/5) == 0)
+                    {
+                        using var image = GetViewport().GetTexture().GetImage();
+                        Require(image.SavePng(ProjectSettings.GlobalizePath($"res://artifacts/root-motion-consumption-20260920/roll-{frame.CommittedFrameId:D4}.png")) == Error.Ok,
+                            "Could not save the most recently rendered motion frame.");
+                    }
+                }
                 _committed = frame.CommittedFrameId; _stalled = 0;
+                if (_committed == _hz*2+_hz/3 && OS.GetCmdlineUserArgs().Contains("--hold-motion-stage"))
+                {
+                    character.GetNode<Node>("MontageMotionPrepare").ProcessMode = ProcessModeEnum.Disabled;
+                    _motionHoldTicks = 3; _motionHoldIntegrations = character.MotorIntegrationCount;
+                }
                 if (_committed == _hz * 4) { Complete(); return; }
             }
             else if (++_stalled > _hz * 4) throw new InvalidOperationException("Action input commit stalled.");
@@ -97,6 +171,7 @@ public partial class ActionInputSmoke : Node
 
     private void ObserveOutcome(AlsFrameIdentity identity, AlsActionOutcome outcome)
     {
+        if (_done) return;
         Require(GodotThread.IsMainThread() && _demo!.ActiveCharacter.Diagnostics.Identity == identity,
             "Action outcome was dispatched before Main Commit or on a worker.");
         switch (outcome.ResultCode)
@@ -117,8 +192,11 @@ public partial class ActionInputSmoke : Node
         Require(_demo!.ActiveCharacter.Diagnostics.Result.ActionPlayback.Active == 0 &&
             _demo.ActiveCharacter.FullMovementDiagnostics.MovementNotifies == default &&
             _demo.RuntimeContext.ActionOutcomeHandlerFailures == 0, "Completed preview retained action state or lost callbacks.");
+        if (_wall) Require(_blockedMotionFrames > 20 && (_previousPosition - _start).Dot(_forward) > .4f, "Wall collision was not exercised.");
+        else if (_consumeMotion) Require((_previousPosition - _start).Dot(_forward) > 2, "Root motion did not move the real character forward.");
+        if (OS.GetCmdlineUserArgs().Contains("--hold-motion-stage")) Require(_motionHoldComplete, "Motion-stage hold was not exercised.");
         Cleanup(); _done = true;
-        GD.Print($"ACTION_INPUT_OK hz={_hz} frames={_committed} accepted={_accepted} replaced={_replaced} cancelled={_cancelled} completed={_completed} active_frames={_activeFrames} grounded_entries={_entries} physical_keys=R,X echo=ignored owner=production callbacks=main_commit motion_frames={_motionFrames} proposed_distance_m={_proposedDistance:R} root_motion=extracted_not_applied");
+        GD.Print($"ACTION_INPUT_OK hz={_hz} frames={_committed} accepted={_accepted} replaced={_replaced} cancelled={_cancelled} completed={_completed} active_frames={_activeFrames} grounded_entries={_entries} physical_keys=R,X echo=ignored owner=production callbacks=main_commit motion_frames={_motionFrames} proposed_distance_m={_proposedDistance:R} root_motion={(_consumeMotion ? "collision_consumed" : "extracted_not_applied")} blocked_frames={_blockedMotionFrames} forward_distance_m={(_previousPosition-_start).Dot(_forward):R}");
         GetTree().Quit();
     }
 

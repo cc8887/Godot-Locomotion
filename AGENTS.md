@@ -8,7 +8,7 @@
 
 # 运行和验证
 
-- 最新进度：`docs/verification/2026-09-20-montage-root-motion.md`。共同 Montage 已提取并发布身份化 Root Motion，Motor 尚未消费，R 仍为原地预览；下一步处理同帧碰撞移动与脚部查询顺序。
+- 最新进度：`docs/verification/2026-09-20-root-motion-consumption.md`。共同 Montage 已在 Motor 前同帧准备；`--montage-root-motion` 开启碰撞消费，普通配置 R 仍为原地预览。下一步实现 Refactored Roll 门控、目标转向与落地规则，再接普通入口。
 
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。

@@ -31,7 +31,7 @@ public partial class AlsP3Character : Node3D
     {
         Visible = false;
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-        ProcessThreadGroupOrder = 0;
+        ProcessThreadGroupOrder = AlsP3FrameStages.Gather;
     }
 
     public AlsSlotHandle Handle => _state.Handle;
@@ -87,6 +87,8 @@ public partial class AlsP3Character : Node3D
 
     internal AlsFrameInput LatestMotorInput => _state.MotorInput;
     internal long MotorIntegrationCount => _motor.IntegrationCount;
+    internal GodotAls.Core.Actions.AlsMontageRootMotionRange ConsumedRootMotion => _motor.LastConsumedRootMotion;
+    internal AlsRootMotionDelta RootMotionWorldDelta => _motor.LastRootMotionWorldDelta;
     internal bool UsesCompleteMovement => _worker.UsesCompleteMovement;
     internal bool UsesLayeredPose => _worker.UsesLayeredPose;
     internal GodotAls.Animation.AlsFullMovementDiagnostics FullMovementDiagnostics => _worker.FullMovementDiagnostics;
@@ -264,10 +266,15 @@ public partial class AlsP3Character : Node3D
             _worker.Configure(context, _state, _motor.GlobalTransform);
             if (context.PropProfile is not null) Props = new(this, context);
             if (_worker.UsesNativeFootIk) _motor.ConfigureNativeFeet(_worker.InitialNativeFeet, context.MovementGraph!.FootIkInput.Offset);
+            _motor.ConsumeMontageRootMotion = GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--montage-root-motion");
+            if (_motor.ConsumeMontageRootMotion && !_worker.UsesRefactoredFeet)
+                throw new InvalidOperationException("Root motion consumption requires the complete split animation pipeline.");
 
             if (AlsP3FrameStages.SplitFeet)
             {
                 if (!_worker.UsesRefactoredFeet) throw new InvalidOperationException("Split foot stages require the complete movement graph.");
+                var motion = new AlsP3MotionPrepareStage { Name = "MontageMotionPrepare" };
+                motion.Configure(this, _worker, context.Mode); AddChild(motion);
                 var prepare = new AlsP3FootPrepareStage { Name = "FootAnimationPrepare" };
                 prepare.Configure(_worker, context.Mode); AddChild(prepare);
                 var query = new AlsP3FootQueryStage { Name = "FootPhysicsQuery" };
@@ -285,6 +292,26 @@ public partial class AlsP3Character : Node3D
             DisposeRuntimeCore(allowActive: true);
             throw;
         }
+    }
+
+    // Called only by the earlier motion process group. Reads value state, never
+    // Node transforms, input devices or physics. Pending Motor inputs retain dt.
+    internal bool TryGetMotionPreparation(float delta, out AlsFrameIdentity identity, out float frameDelta)
+    {
+        identity = default; frameDelta = delta;
+        if (!_configured || Volatile.Read(ref _disposed) != 0 || Volatile.Read(ref _state.Active) == 0) return false;
+        var published = Volatile.Read(ref _state.PublishedFrameId);
+        var pending = published > Volatile.Read(ref _state.CommittedFrameId) && published != _discardedCompletedFrame;
+        if (pending)
+        {
+            identity = HandleIdentity(published);
+            if (!_state.Exchange.TryReadInput(identity, out var input)) return false;
+            frameDelta = input.DeltaTime; return true;
+        }
+        if (Volatile.Read(ref _state.GatherSuspended) != 0) return false;
+        identity = HandleIdentity(published + 1);
+        if (_hasStagedReplacementMotorInput) frameDelta = _stagedReplacementMotorInput.DeltaTime;
+        return true;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -312,6 +339,11 @@ public partial class AlsP3Character : Node3D
                 throw new InvalidOperationException("P3 frame sequence reached its supported limit.");
             }
             var frameId = completedFrameId + 1;
+            // A replacement republishes an already integrated Motor input while
+            // its animation is suspended for stale-result classification. It
+            // must not wait for (or consume) a second physical montage tick.
+            if (!_hasStagedReplacementMotorInput && _worker.UsesRefactoredFeet && Volatile.Read(ref _state.WorkerFrozen) == 0 &&
+                _worker.MotorRootMotion.Identity != HandleIdentity(frameId)) return;
             var measurement = _context.Measurement;
             var measurementIndex = -1;
             var measure = measurement is not null &&
@@ -347,7 +379,10 @@ public partial class AlsP3Character : Node3D
                     _state.CommittedTargetYaw,
                     _state.CommittedCharacterRotationFeedback,
                     _resumeRefactoredFeedback.Pose.Identity == HandleIdentity(frameId - 1)
-                        ? _resumeRefactoredFeedback : _state.CommittedRefactoredFeedback);
+                        ? _resumeRefactoredFeedback : _state.CommittedRefactoredFeedback,
+                    _motor.ConsumeMontageRootMotion && _worker.MotorRootMotion.Identity == HandleIdentity(frameId)
+                        ? _worker.MotorRootMotion.Source : default,
+                    _worker.MotorRootMotion.Delta);
             }
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;

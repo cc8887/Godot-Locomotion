@@ -1,5 +1,6 @@
 using Godot;
 using GodotAls.Animation;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Import.Compilation;
@@ -99,6 +100,9 @@ public partial class AlsCharacterMotor : CharacterBody3D
 
     internal bool HasPublishedVelocityCheckpoint => _publishedVelocityCheckpointPending;
     internal long IntegrationCount { get; private set; }
+    internal AlsMontageRootMotionRange LastConsumedRootMotion { get; private set; }
+    internal AlsRootMotionDelta LastRootMotionWorldDelta { get; private set; } = AlsRootMotionDelta.Identity;
+    internal bool ConsumeMontageRootMotion { get; set; }
 
     internal AlsFrameIdentity LastFootGatherRequestIdentity { get; private set; }
 
@@ -245,9 +249,15 @@ public partial class AlsCharacterMotor : CharacterBody3D
         float deltaTime,
         byte hasTargetYaw = 0,
         float targetYaw = 0f,
-        AlsCharacterRotationFeedback rotationFeedback = default, AlsRefactoredAnimationFeedback refactoredFeedback = default)
+        AlsCharacterRotationFeedback rotationFeedback = default, AlsRefactoredAnimationFeedback refactoredFeedback = default,
+        AlsMontageRootMotionRange rootMotionSource = default, AlsRootMotionDelta rootMotion = default)
     {
         ValidateStep(frameId, characterId, generation, deltaTime, hasTargetYaw, targetYaw);
+        var hasRootMotion = rootMotionSource.HasMotion;
+        if (hasRootMotion && (!ConsumeMontageRootMotion || !_nativeFootGatherEnabled ||
+            rootMotionSource.Identity != new AlsFrameIdentity(frameId, (uint)characterId, (uint)generation)))
+            throw new InvalidOperationException("Root motion requires the matching physical frame and configured mesh.");
+        LastConsumedRootMotion = default; LastRootMotionWorldDelta = AlsRootMotionDelta.Identity;
         rotationFeedback.ValidateForFrame(new AlsFrameIdentity(frameId, (uint)characterId, (uint)generation));
         _publishedVelocityCheckpointPending = false;
         var source = _source!;
@@ -353,15 +363,36 @@ public partial class AlsCharacterMotor : CharacterBody3D
             movementStep = _movementRuntime.Integrate(_movementHistory,
                 new(-currentHorizontal.Z * 100d, currentHorizontal.X * 100d, 0),
                 new(-(double)direction.Z * resolvedCommand.InputAmount, (double)direction.X * resolvedCommand.InputAmount, 0),
-                _actualStance, groundedBeforeMove && jumpAccepted == 0, deltaTime);
+                _actualStance, groundedBeforeMove && jumpAccepted == 0, deltaTime, hasRootMotion);
             horizontalVelocity = new((float)(movementStep.Velocity.Y * .01), 0, (float)(-movementStep.Velocity.X * .01));
             desiredSpeed = movementStep.MaxSpeed * movementStep.Analog * .01f;
             MovementDiagnostics = movementStep;
         }
         var nextVelocity = new Vector3(horizontalVelocity.X, verticalVelocity, horizontalVelocity.Z);
+        var rootMotionBasis = GlobalBasis;
+        if (hasRootMotion)
+        {
+            var canonicalToBone = new AlsPrecisePose(default,
+                new(System.Numerics.Quaternion.Conjugate(AlsFootIkCoordinates.FbxToGodotRotation)), AlsDoubleVector.One);
+            var componentToCharacter = AlsPrecisePose.Compose(canonicalToBone, new(_initialNativeFeet.ComponentToCharacter));
+            var world = AlsRootMotionKinematics.ToWorld(rootMotion, componentToCharacter, new(AlsFootIkGodot.Pose(GlobalTransform)));
+            nextVelocity = ToGodot(world.Translation) / deltaTime;
+            // Falling retains gravity; the montage only overrides horizontal velocity.
+            if (!groundedBeforeMove || jumpAccepted == 1) nextVelocity.Y = verticalVelocity;
+            LastRootMotionWorldDelta = world;
+            var q = world.Rotation;
+            rootMotionBasis = new Basis(new Quaternion(q.X, q.Y, q.Z, q.W)) * GlobalBasis;
+            if (rootMotionBasis.Y.Normalized().Dot(Vector3.Up) < .99999f)
+                throw new InvalidOperationException("Root motion cannot tilt the upright character capsule.");
+        }
         RequireFiniteVector(nextVelocity, nameof(nextVelocity));
         Velocity = nextVelocity;
         MoveAndSlide();
+        if (hasRootMotion)
+        {
+            GlobalBasis = rootMotionBasis;
+            LastConsumedRootMotion = rootMotionSource;
+        }
 
         if (_movementRuntime is not null && groundedBeforeMove && !IsOnFloor() && jumpAccepted == 0)
             Velocity += NativeBaseDepartureVelocity();
@@ -386,7 +417,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
         var aimRate = AlsAimYawRate.Gather(command.ViewYaw, _previousControlDegrees, deltaTime);
         var lastMovementRotation = GlobalBasis.GetRotationQuaternion();
-        var rotationSample = ApplyCharacterRotation(deltaTime, actualVelocity, grounded, resolvedCommand, aimRate, rotationFeedback);
+        var rotationSample = ApplyCharacterRotation(deltaTime, actualVelocity, grounded, resolvedCommand, aimRate, rotationFeedback, hasRootMotion);
         var characterTransform = GlobalTransform;
         var characterYaw = GetCharacterYaw(characterTransform.Basis);
         if (!float.IsFinite(characterYaw))
@@ -457,7 +488,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             Stance: _actualStance,
             RotationMode: resolvedCommand.RotationMode,
             RequestedAction: AlsLocomotionAction.None,
-            CurrentDriveMode: AlsDriveMode.MotorDriven,
+            CurrentDriveMode: hasRootMotion ? AlsDriveMode.AnimationDriven : AlsDriveMode.MotorDriven,
             RagdollState: AlsRagdollState.Inactive,
             AnimationQualityTier: AlsAnimationQualityTier.Tier0,
             Command: command,
@@ -520,7 +551,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
     }
 
     private AlsCharacterRotationSample ApplyCharacterRotation(float delta, NumericsVector3 velocity, bool grounded,
-        in AlsResolvedLocomotionCommand command, in AlsAimYawRateSample aim, in AlsCharacterRotationFeedback feedback)
+        in AlsResolvedLocomotionCommand command, in AlsAimYawRateSample aim, in AlsCharacterRotationFeedback feedback, bool hasRootMotion)
     {
         if (_characterRotation is null) return default;
         var speed = (float)System.Math.Sqrt((double)velocity.X * velocity.X + (double)velocity.Z * velocity.Z);
@@ -535,9 +566,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var before = GetCharacterYaw();
         var input = new AlsCharacterRotationInput(delta, -before * (180d / System.Math.PI), aim.ControlDegrees,
             WorldYaw(velocity), WorldYaw(command.WorldDirection), speed, command.InputAmount > 0 && _settings.MaxAcceleration > 0,
-            // This Motor currently applies no animation root motion. Root-motion
-            // drive must supply its actual active state when that drive is added.
-            false, grounded ? AlsMovementStateInput.Grounded : AlsMovementStateInput.InAir,
+            hasRootMotion, grounded ? AlsMovementStateInput.Grounded : AlsMovementStateInput.InAir,
             command.RotationMode, _actualStance, _rotationGait, feedback.Action, FirstPersonView, aim.RateDegrees,
             feedback.YawOffsetPresent ? feedback.YawOffset : 0, feedback.RotationAmountPresent ? feedback.RotationAmount : 0);
         var rotation = _characterRotation.Evaluate(input, _rotationHistory);
