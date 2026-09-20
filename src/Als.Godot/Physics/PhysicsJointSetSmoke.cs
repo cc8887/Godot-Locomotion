@@ -14,7 +14,7 @@ public partial class PhysicsJointSetSmoke : Node3D
     private readonly List<Case> _cases=[];
     private int _hz,_frame; private bool _done,_highDrop,_noContact,_pair,_alsDrives,_noSoftSolve,_noSelfCollision;
     private int _pairAxis;private float _pairAngle;
-    private bool _assertDampingOnlyRejected,_assertIndependentChannels;
+    private bool _assertDampingOnlyRejected,_assertIndependentChannels,_nativeProjection;
     private float _maxAnchor,_maxSpeed,_finalSpeed,_finalAngularSpeed; private double _maxLimit,_finalLimit;
     private string _finalSpeedBody="none";
     public override void _Ready()
@@ -30,6 +30,8 @@ public partial class PhysicsJointSetSmoke : Node3D
             Require(!_assertDampingOnlyRejected||!_assertIndependentChannels,"Select one channel probe.");
             _pair=OS.GetCmdlineUserArgs().Contains("--pair")||_assertDampingOnlyRejected||_assertIndependentChannels;
             _alsDrives=OS.GetCmdlineUserArgs().Contains("--als-drives");
+            _nativeProjection=OS.GetCmdlineUserArgs().Contains("--native-projection");
+            GD.Print($"JOINT_PROJECTION_CONFIG native_projection={_nativeProjection}");
             _noSoftSolve=OS.GetCmdlineUserArgs().Contains("--no-soft-solve");
             _noSelfCollision=OS.GetCmdlineUserArgs().Contains("--no-self-collision");
             _pairAxis=int.Parse(OS.GetCmdlineUserArgs().FirstOrDefault(a=>a.StartsWith("--pair-axis="))?[12..]??"0");
@@ -118,6 +120,7 @@ public partial class PhysicsJointSetSmoke : Node3D
             _frame++; float anchor=0,speed=0,angularSpeed=0; double limit=0;string speedBody="none";
             foreach(var c in _cases)
             {
+                if(_nativeProjection&&_frame>1)c.Joints.Project(dt);
                 foreach(var j in c.Definition.Joints)
                 {
                     if(c.Definition.Bodies[j.ParentBody].Bone=="root")continue;
