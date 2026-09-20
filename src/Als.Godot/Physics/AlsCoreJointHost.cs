@@ -12,11 +12,12 @@ internal sealed class AlsCoreJointHost
 {
     private readonly AlsPhysicsBodySet _proxies;
     private readonly AlsPrecisePose[] _massLocal;
+    private readonly bool _worldSpace;
     internal AlsJointIsland Island { get; }
 
-    internal AlsCoreJointHost(AlsPhysicsBodySet proxies, AlsRagdollPhysicsDefinition definition, AlsJointIsland island)
+    internal AlsCoreJointHost(AlsPhysicsBodySet proxies, AlsRagdollPhysicsDefinition definition, AlsJointIsland island, bool worldSpace = false)
     {
-        _proxies = proxies; Island = island;
+        _proxies = proxies; Island = island; _worldSpace = worldSpace;
         if (proxies.BodyCount != definition.Bodies.Length || island.BodyCount < proxies.BodyCount)
             throw new ArgumentException("Core and proxy body counts differ.");
         _massLocal = definition.Bodies.Select(b => b.MassLocal).ToArray();
@@ -58,7 +59,8 @@ internal sealed class AlsCoreJointHost
     {
         for (var i = 0; i < _proxies.BodyCount; i++)
         {
-            var transform = AlsPhysicsBodySet.NativeToFbx(AlsPrecisePose.Compose(_massLocal[i], Island.BodyAt(i).Actor));
+            var mass = AlsPrecisePose.Compose(_massLocal[i], Island.BodyAt(i).Actor);
+            var transform = _worldSpace ? AlsCorePhysicsPose.ToWorld(mass) : AlsPhysicsBodySet.NativeToFbx(mass);
             var body = _proxies.BodyAt(i);
             body.GlobalTransform = transform;
             PhysicsServer3D.BodySetState(body.GetRid(), PhysicsServer3D.BodyState.Transform, transform);

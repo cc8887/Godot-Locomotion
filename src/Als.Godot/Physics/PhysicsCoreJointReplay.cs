@@ -23,9 +23,16 @@ public partial class PhysicsCoreJointReplay : Node3D
     private int _case, _frame, _hz;
     private bool _done, _chains, _drop, _highDrop, _sleep, _sceneWorld;
     private Node3D? _world;
+    private string _platformMode = "";
+    private AnimatableBody3D? _platform;
+    private Transform3D _platformInitial;
+    private readonly Dictionary<AlsJointIsland, Vector3> _passengerStart = [];
+    private double _platformLag;
+    private int Duration => _platform is null ? 10 : 24;
     private double _floorTop;
     private double _positionError, _angleError, _vError, _wError, _transportError, _anchorCm;
     private string _report = "";
+    private string _anchorSource = "";
     private int _contactPoints;
     private double _finalSpeed, _finalAngularSpeed, _maxLimit, _finalLimit;
     private string _finalLimitSource = "";
@@ -42,6 +49,9 @@ public partial class PhysicsCoreJointReplay : Node3D
             _drop = args.Contains("--drop"); _highDrop = args.Contains("--high-drop");
             _sleep = args.Contains("--sleep"); Require(!_sleep || _drop, "Sleep probe requires --drop.");
             _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
+            _platformMode = args.FirstOrDefault(a => a.StartsWith("--platform="))?[11..] ?? "";
+            Require(_platformMode is "" or "translate" or "rotate", "Unsupported platform mode.");
+            Require(_platformMode == "" || _sceneWorld && _sleep && !_highDrop, "Platform lifecycle requires scene-world, sleep and normal drop.");
             Require(!_drop || _chains, "Drop requires --chains.");
             Require(!_highDrop || _drop, "High drop requires --drop.");
             _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
@@ -55,6 +65,11 @@ public partial class PhysicsCoreJointReplay : Node3D
                 var floor = _world.GetNode<CollisionShape3D>("StartFloor/CollisionShape3D");
                 _floorTop = AlsSceneContactSet.FromWorld(floor.GlobalTransform * new Transform3D(Basis.Identity,
                     new Vector3(0, ((BoxShape3D)floor.Shape).Size.Y * .5f, 0))).Position.Z;
+                if (_platformMode != "")
+                {
+                    _platform = _world.GetNode<AnimatableBody3D>(_platformMode == "translate" ? "TranslatingPlatform" : "RotatingPlatform");
+                    _platform.SyncToPhysics = false; _platformInitial = _platform.GlobalTransform;
+                }
             }
             _reference = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_awake_solver_reference.json"));
             Require(!_reference.RootElement.GetProperty("sleepEnabled").GetBoolean(), "Expected an awake reference.");
@@ -119,9 +134,13 @@ public partial class PhysicsCoreJointReplay : Node3D
             {
                 var world = new AlsPrecisePose(new(0, 0, _floorTop + (_highDrop ? 300 : 100)),
                     AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitX, .35f), AlsDoubleVector.One);
+                if (_platform is not null)
+                    world = AlsSceneContactSet.FromWorld(new(Basis.Identity, _platformInitial.Origin + new Vector3(.5f, 1.2f, 0))) with
+                    { Rotation = AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitX, MathF.PI * .5f) };
                 for (var i = 0; i < states.Length; i++)
                     states[i] = new(AlsPrecisePose.Compose(states[i].Actor, world), definition.Bodies[i].PhysicsType == 1 ? default :
                         new(new(100, 0, _highDrop ? -1000 : 0), new(.3f, .7f, -.2f)));
+                if (_platform is not null) for (var i = 0; i < states.Length; i++) states[i] = states[i] with { Velocity = default };
                 if (_sceneWorld)
                 {
                     scene = new(_world!, bodies.Length);
@@ -155,7 +174,7 @@ public partial class PhysicsCoreJointReplay : Node3D
         try
         {
             bodies.Seed(new(1, 1, 1), Transform3D.Identity, rig.Rest, Vector3.Zero, Vector3.Zero);
-            var host = new AlsCoreJointHost(bodies, rig.Definition, island);
+            var host = new AlsCoreJointHost(bodies, rig.Definition, island, worldSpace: _sceneWorld);
             // Verify that an accidental second integration owner fails before a step.
             var before = island.BodyAt(1); bodies.BodyAt(1).CollisionMask = 1;
             var rejected = false;
@@ -201,8 +220,9 @@ public partial class PhysicsCoreJointReplay : Node3D
             Require(Math.Abs(dt - (_chains ? 1d / _hz : D(Current, "dt"))) < 1e-7, "Physics callback step differs.");
             foreach (var active in _active) CheckTransport(active);
             if (!_chains) CheckReference();
-            if (_frame < (_chains ? _hz * 10 : 12))
+            if (_frame < (_chains ? _hz * Duration : 12))
             {
+                if (_platform is not null) MovePlatform(dt);
                 foreach (var active in _active)
                 {
                     if (_drop)
@@ -218,7 +238,16 @@ public partial class PhysicsCoreJointReplay : Node3D
                         if (active.Contacts.CompletedSteps != epoch) _contactPoints += active.Contacts.LastContactCount;
                     }
                     else active.Host.Step(dt);
-                    if (_sleep) CheckSleeping(active);
+                    if (_platform is not null && _frame >= _hz * 10 && _frame < _hz * 14)
+                    {
+                        Require(!active.Host.Island.IsSleeping, "Moving support did not wake the chain.");
+                        var expected = _platform.GlobalTransform * _passengerStart[active.Host.Island];
+                        var actual = Center(active); var horizontal = actual - expected; horizontal.Y = 0;
+                        _platformLag = Math.Max(_platformLag, horizontal.Length());
+                        Require(horizontal.Length() < .25f && actual.Y > _platform.GlobalPosition.Y + .15f,
+                            $"Platform passenger lost support: mesh={active.Rig.Definition.Mesh} lag={horizontal.Length()} height={actual.Y - _platform.GlobalPosition.Y}");
+                    }
+                    else if (_sleep) CheckSleeping(active);
                 }
                 _frame++; return;
             }
@@ -255,10 +284,12 @@ public partial class PhysicsCoreJointReplay : Node3D
                 max_linear_velocity_cmps = _chains ? (double?)null : _vError,
                 max_angular_velocity_radps = _chains ? (double?)null : _wError, max_transport_m = _transportError,
                 max_anchor_cm = _chains ? (double?)_anchorCm : null,
+                max_anchor_source = _anchorSource,
                 contacts = _drop, gravity = _drop, high_drop = _highDrop, contact_points = _contactPoints,
                 query_shapes = _active.Sum(a => (a.Shapes?.Count ?? 0) + (a.Scene?.ShapeCount ?? 0)),
                 scene_world_geometry = _sceneWorld, environment_bodies_per_rig = _active.FirstOrDefault()?.Scene?.BodyCount ?? (_drop ? 1 : 0),
                 scene_floor_top_cm = _floorTop, scene_material_combination = false, ordinary_ragdoll_connected = false,
+                world_pose_transport = _sceneWorld, platform_mode = _platformMode, max_platform_center_lag_m = _platformLag,
                 final_speed_cmps = _finalSpeed, final_angular_speed_radps = _finalAngularSpeed, max_limit_rad = _maxLimit, final_limit_rad = _finalLimit,
                 final_limit_source = _finalLimitSource,
                 limit_metric = "limited: native pyramid/twist; locked: distance to native R01 component zero",
@@ -318,7 +349,7 @@ public partial class PhysicsCoreJointReplay : Node3D
         for (var i = 0; i < active.Bodies.BodyCount; i++)
         {
             var actual = active.Components[active.BodyBones[i]];
-            var expected = AlsPhysicsBodySet.NativeToFbx(active.Host.Island.BodyAt(i).Actor);
+            var expected = _sceneWorld ? AlsCorePhysicsPose.ToWorld(active.Host.Island.BodyAt(i).Actor) : AlsPhysicsBodySet.NativeToFbx(active.Host.Island.BodyAt(i).Actor);
             var distance = actual.Origin.DistanceTo(expected.Origin); _transportError = Math.Max(_transportError, distance);
             Require(actual.IsFinite() && distance < .00005f, "Skeleton body transport diverged.");
             Require((actual.Basis.X - expected.Basis.X).Length() < .00005f &&
@@ -334,10 +365,10 @@ public partial class PhysicsCoreJointReplay : Node3D
             {
                 var state = active.Host.Island.BodyAt(i);
                 Require(state.Actor.Position.Z > _floorTop - 25, $"Core body fell through floor: {active.Rig.Definition.Mesh}:{i}, frame={_frame} z={state.Actor.Position.Z}");
-                if (_frame == _hz * 2 && active.Rig.Definition.Bodies[i].Bone == "pelvis")
+                if (_platform is null && _frame == _hz * 2 && active.Rig.Definition.Bodies[i].Bone == "pelvis")
                     Require(state.Actor.Position.Z < active.Rig.Definition.Bodies[i].ReferenceComponent.Position.Z + _floorTop + (_highDrop ? 300 : 100) - 50,
                         "Free root unexpectedly anchored the falling pelvis.");
-                if (_frame > _hz * 9)
+                if (_frame > _hz * (Duration - 1))
                 {
                     _finalSpeed = Math.Max(_finalSpeed, state.Velocity.Linear.Length());
                     _finalAngularSpeed = Math.Max(_finalAngularSpeed, state.Velocity.Angular.Length());
@@ -350,7 +381,12 @@ public partial class PhysicsCoreJointReplay : Node3D
             if (active.Rig.Settings[joint.Index].LinearMotion == new AlsJointMotions(AlsJointMotion.Free, AlsJointMotion.Free, AlsJointMotion.Free)) continue;
             var p = AlsPrecisePose.Compose(joint.ParentFrame, active.Host.Island.BodyAt(joint.ParentBody).Actor);
             var c = AlsPrecisePose.Compose(joint.ChildFrame, active.Host.Island.BodyAt(joint.ChildBody).Actor);
-            var distance = Math.Sqrt((p.Position - c.Position).LengthSquared); _anchorCm = Math.Max(_anchorCm, distance);
+            var distance = Math.Sqrt((p.Position - c.Position).LengthSquared);
+            if (distance > _anchorCm)
+            {
+                _anchorCm = distance;
+                _anchorSource = $"mesh={active.Rig.Definition.Mesh} child={active.Rig.Definition.Bodies[joint.ChildBody].Bone} frame={_frame} parent={p.Position} child_position={c.Position}";
+            }
             Require(distance < 10, $"Core chain anchor exceeded 10 cm: {distance}");
             if (_drop)
             {
@@ -365,9 +401,9 @@ public partial class PhysicsCoreJointReplay : Node3D
                     if (motion == AlsJointMotion.Free) continue;
                     var allowed = motion == AlsJointMotion.Locked ? 0 : s.AngularLimitsRad[axis];
                     var excess = motion == AlsJointMotion.Locked ? locks[axis] : Math.Max(0, Math.Abs(angles[axis]) - allowed);
-                    if (_frame > _hz * 9) _legacyFinalLimit = Math.Max(_legacyFinalLimit, Math.Max(0, Math.Abs(angles[axis]) - allowed));
+                    if (_frame > _hz * (Duration - 1)) _legacyFinalLimit = Math.Max(_legacyFinalLimit, Math.Max(0, Math.Abs(angles[axis]) - allowed));
                     _maxLimit = Math.Max(_maxLimit, excess);
-                    if (_frame > _hz * 9 && excess > _finalLimit)
+                    if (_frame > _hz * (Duration - 1) && excess > _finalLimit)
                     {
                         _finalLimit = excess;
                         _finalLimitSource = $"mesh={active.Rig.Definition.Mesh} bone={active.Rig.Definition.Bodies[joint.ChildBody].Bone} axis={axis} motion={motion} frame={_frame} pyramid_angle={angles[axis]:R} allowed={allowed:R} excess={excess:R}";
@@ -375,6 +411,38 @@ public partial class PhysicsCoreJointReplay : Node3D
                 }
             }
         }
+    }
+    private void MovePlatform(double dt)
+    {
+        if (_frame == _hz * 10)
+        {
+            foreach (var active in _active)
+            {
+                GD.Print($"CORE_PLATFORM_START mesh={active.Rig.Definition.Mesh} sleeping={active.Host.Island.IsSleeping} local_center={_platformInitial.AffineInverse() * Center(active)}");
+                if (!active.Host.Island.IsSleeping) foreach (var body in active.Rig.Definition.Bodies.Where(b => b.PhysicsType != 1))
+                {
+                    var metric = active.Host.Island.SleepMetricsAt(body.Index); var state = active.Host.Island.BodyAt(body.Index);
+                    GD.Print($"CORE_PLATFORM_BODY bone={body.Bone} position={AlsCorePhysicsPose.ToWorld(state.Actor).Origin} linear={Math.Sqrt(metric.Linear.LengthSquared):R} angular={Math.Sqrt(metric.Angular.LengthSquared):R} v={state.Velocity.Linear} w={state.Velocity.Angular}");
+                }
+            }
+            Require(_slept.Count == _active.Count && _slept.Values.All(v => _frame - v.Frame >= _hz), "Chains must settle before platform starts.");
+            foreach (var active in _active) _passengerStart.Add(active.Host.Island, _platformInitial.AffineInverse() * Center(active));
+            _slept.Clear();
+        }
+        var elapsed = Math.Clamp((_frame + 1) * dt - 10, 0, 4);
+        _platform!.GlobalTransform = _platformMode == "translate"
+            ? new(_platformInitial.Basis, _platformInitial.Origin + new Vector3((float)elapsed * .25f, 0, 0))
+            : new(new Basis(Vector3.Up, (float)elapsed * .2f) * _platformInitial.Basis, _platformInitial.Origin);
+    }
+    private static Vector3 Center(Active active)
+    {
+        var sum = Vector3.Zero; var mass = 0f;
+        foreach (var body in active.Rig.Definition.Bodies) if (body.PhysicsType != 1)
+        {
+            sum += AlsCorePhysicsPose.ToWorld(AlsPrecisePose.Compose(body.MassLocal, active.Host.Island.BodyAt(body.Index).Actor)).Origin * (float)body.MassKg;
+            mass += (float)body.MassKg;
+        }
+        return sum / mass;
     }
     private static AlsIslandBodyState Initial(JsonElement row, string name)
     {
