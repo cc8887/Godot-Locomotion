@@ -3,6 +3,7 @@ using Godot;
 using GodotAls.Animation;
 using GodotAls.Assets;
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Contracts;
 using GodotAls.Dispatch;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
@@ -48,6 +49,7 @@ public partial class P4LocomotionDemo : Node3D
     internal AlsOrbitCamera OrbitCamera => _orbitCamera;
 
     internal AlsLocomotionHud Hud => _hud;
+    internal AlsP3RuntimeContext RuntimeContext => _context;
 
     internal long PlatformLandingColliderId => checked((long)_platformLanding.GetInstanceId());
 
@@ -146,6 +148,13 @@ public partial class P4LocomotionDemo : Node3D
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: _smokeCommandSource is not null || OS.IsDebugBuild());
             _configureSmokeContext?.Invoke(_context);
+            if (_smokeCommandSource is null && _context.MovementGraph is { } movementGraph)
+            {
+                var preview = movementGraph.ActionPolicies.Single();
+                _playerInput.ConfigureActionPreview(preview.DefinitionId, preview.StartSectionId);
+                _context.ActionOutcomeCommitted += _playerInput.ObserveActionOutcome;
+                _hud.EnableActionPreview();
+            }
 
             IAlsLocomotionCommandSource commandSource =
                 _smokeCommandSource ?? _playerInput;
@@ -185,10 +194,11 @@ public partial class P4LocomotionDemo : Node3D
             }
 
             var nextFrame = _slot.ActiveCharacter.PublishedFrameId + 1;
-            if (_playerInput.CapturedFrameId < nextFrame)
+            if (_playerInput.CapturedFrameId < nextFrame || _playerInput.ActionPreviewEnabled &&
+                _playerInput.CapturedActionIdentity.SlotGeneration != _slot.ActiveCharacter.Handle.Generation)
             {
                 _playerInput.CaptureGodotFrame(
-                    nextFrame,
+                    new AlsFrameIdentity(nextFrame, _slot.ActiveCharacter.Handle.CharacterId, _slot.ActiveCharacter.Handle.Generation),
                     _orbitCamera.Yaw,
                     _orbitCamera.Pitch, Overlay);
             }
@@ -197,6 +207,20 @@ public partial class P4LocomotionDemo : Node3D
         {
             Fail("physics", exception);
         }
+    }
+
+    public override void _UnhandledInput(InputEvent input)
+    {
+        if (!_runtimeConfigured || !_playerInput.ActionPreviewEnabled || _failed) return;
+        var roll = input.IsActionPressed("roll_preview", allowEcho: false);
+        var cancel = input.IsActionPressed("action_cancel", allowEcho: false);
+        if (!roll && !cancel) return;
+        var active = _slot.ActiveCharacter;
+        // Capture can already be one frame ahead while Main Commit is held.
+        // Input arriving now belongs to the next uncaptured frame.
+        var nextCapture = Math.Max(active.PublishedFrameId, _playerInput.CapturedFrameId) + 1;
+        _playerInput.QueueActionPreview(new(nextCapture, active.Handle.CharacterId, active.Handle.Generation), roll, cancel);
+        GetViewport().SetInputAsHandled();
     }
 
     public override void _Process(double delta)
@@ -240,6 +264,7 @@ public partial class P4LocomotionDemo : Node3D
             _slot.DisposeRuntime();
         }
         _runtimeConfigured = false;
+        if (_context is not null) _context.ActionOutcomeCommitted -= _playerInput.ObserveActionOutcome;
     }
 
     public override void _ExitTree()
@@ -299,6 +324,7 @@ public partial class P4LocomotionDemo : Node3D
 
     private long CountErrors(AlsP3Character active) =>
         active.FailureDiagnosticCount +
+        _context.ActionOutcomeHandlerFailures +
         Interlocked.Read(ref _context.MissingResults) +
         Interlocked.Read(ref _context.StaleResults) +
         Interlocked.Read(ref _context.LaggedResults) +

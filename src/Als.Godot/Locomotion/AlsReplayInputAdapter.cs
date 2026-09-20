@@ -7,6 +7,13 @@ public interface IAlsLocomotionCommandSource
     AlsLocomotionCommand GetCommand(long frameId);
 }
 
+// Optional companion to a movement source. Gather copies this value into the
+// same immutable frame; implementations must return the same request on retry.
+public interface IAlsActionRequestSource
+{
+    AlsActionRequest GetActionRequest(AlsFrameIdentity identity);
+}
+
 public sealed class AlsReplayInputAdapter : IAlsLocomotionCommandSource
 {
     private readonly AlsLocomotionCommand[] _commands;

@@ -30,6 +30,7 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public bool LockCurveProducersMatch { get; init; }
     public AlsProductionGraphCapture? GraphCapture { get; init; }
     public AlsOverlayKind Overlay { get; init; }
+    public AlsMovementNotifyState MovementNotifies { get; init; }
 }
 
 // Exclusive production adapter. The Worker retains publication authority; the
@@ -114,7 +115,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     public AlsFrameIdentity Identity => _identity;
     public AlsFullMovementDiagnostics Diagnostics => new(_base.CommittedIdentity, _feedback, _base.CommittedGroundInput,
         _base.CommittedGlobalInput, _evaluation, _base.Movement.CommittedMovement.CurrentState)
-        { RootIdentity = CommittedRootIdentity, RootState = CommittedRoot, Ragdoll = CommittedRagdoll,
+        { RootIdentity = CommittedRootIdentity, RootState = CommittedRoot, Ragdoll = CommittedRagdoll, MovementNotifies = _notifyState,
             StopTransitions = _base.CommittedStopTransitionCount,
             HasPoseMovingChannel = _poseMoving >= 0, PoseMoving = _committedPoseMoving,
             RefactoredFeedback = _committedRefactoredFeedback, RefactoredInputPose = _base.CommittedRefactoredPose,

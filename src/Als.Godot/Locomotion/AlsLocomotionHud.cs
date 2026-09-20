@@ -22,6 +22,12 @@ public partial class AlsLocomotionHud : VBoxContainer
 
     public long LastStateFrame => _lastStateFrame;
 
+    public void EnableActionPreview()
+    {
+        var label = CreateLabel("ActionPreviewHelp");
+        label.Text = "R：原地翻滚动画预览  |  X：取消动作";
+    }
+
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;

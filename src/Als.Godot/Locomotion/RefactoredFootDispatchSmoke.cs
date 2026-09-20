@@ -2,6 +2,7 @@ using Godot;
 using GodotAls.Assets;
 using GodotAls.Animation;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Locomotion;
@@ -18,6 +19,10 @@ public partial class RefactoredFootDispatchSmoke : Node3D
     private AlsP3RuntimeContext _context = null!;
     private readonly List<AlsP3Character> _characters = [];
     private long[] _lastFrames = [], _events = [];
+    private long[] _actionEvents = [];
+    private bool _actionRequests;
+    private int _acceptedActions, _replacedActions, _cancelledActions, _completedActions;
+    private long _pausedActions, _commitActions;
     private int _hz = 60, _count = 1, _tick, _phase, _pauseOwner, _resumeTick, _completedPauses;
     private AlsHarnessMode _mode;
     private AlsFrameInput _pausedInput;
@@ -58,6 +63,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             _overlayCycle=OS.GetCmdlineUserArgs().Contains("--overlay-cycle");
             _contactPlatform=OS.GetCmdlineUserArgs().Contains("--contact-platform");
             _contactStatic=OS.GetCmdlineUserArgs().Contains("--contact-static");
+            _actionRequests=OS.GetCmdlineUserArgs().Contains("--action-requests");
+            Require(!_actionRequests || TestContacts, "Action boundary replay requires the contact schedule.");
             Require(!_contactStatic || !_contactPlatform, "Select one contact surface fixture.");
             Require(!TestContacts || OS.GetCmdlineUserArgs().Contains("--foot-lock-final-contact"),
                 "Contact coverage requires final-contact anchoring.");
@@ -79,9 +86,26 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 settings.Gravity, settings.JumpSpeed, 1, settings.VelocityAngleInterpolationStart, settings.VelocityAngleInterpolationEnd);
             _context = new(_mode, settings, motor, set, profile, System.Environment.CurrentManagedThreadId, true);
             _lastFrames = new long[_count]; _events = new long[_count];
+            _actionEvents = new long[_count];
             _contactOwners = new bool[_count];
             _toeOwners = new bool[_count];
             _context.AnimationEventCommitted += (identity, _) => _events[checked((int)identity.CharacterId)]++;
+            _context.ActionOutcomeCommitted += (identity, outcome) =>
+            {
+                var index = checked((int)identity.CharacterId);
+                Require(GodotThread.IsMainThread() && _characters[index].Diagnostics.Identity == identity,
+                    "Action result escaped Main Commit.");
+                _actionEvents[index]++;
+                switch (outcome.ResultCode)
+                {
+                    case AlsActionResultCode.Accepted:
+                        Require(outcome.RequestId == identity.FrameId, "Action input ID changed at acceptance."); _acceptedActions++; break;
+                    case AlsActionResultCode.InterruptedByReplacement: _replacedActions++; break;
+                    case AlsActionResultCode.InterruptedByExplicitCancel: _cancelledActions++; break;
+                    case AlsActionResultCode.Completed: _completedActions++; break;
+                    default: throw new InvalidOperationException("Unexpected action request rejection.");
+                }
+            };
             PhysicsBody3D floor = _contactPlatform ? new AnimatableBody3D { SyncToPhysics = true } : new StaticBody3D();
             floor.Position = new(0, -.5f, 0); floor.CollisionLayer = floor.CollisionMask = 1;
             floor.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new(200, 1, 200) } });
@@ -90,7 +114,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             {
                 var character = new AlsP3Character { Name = "Character" + i, Position = new(i * 5, motor.StandingHeight * .5f, 0) };
                 AddChild(character); _characters.Add(character);
-                character.Configure(_context, new AlsSlotHandle(checked((uint)i), 1), new Commands(_hz, _overlayCycle, i));
+                character.Configure(_context, new AlsSlotHandle(checked((uint)i), 1), new Commands(_hz, _overlayCycle, i,
+                    _actionRequests ? _context.MovementGraph!.ActionPolicies.Single() : null));
                 character.SetActive(true);
             }
         }
@@ -111,7 +136,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 var paused = _characters[_pauseOwner];
                 Require(!paused.SplitFootDiagnostics.Pending && paused.RuntimeCommittedFrameId == _pausedCommit &&
                     paused.FullMovementDiagnostics.RefactoredRig == _pausedRig && paused.FullMovementDiagnostics.RefactoredLocks == _pausedLocks &&
-                    _pausedBones.SequenceEqual(CaptureBones(_pausedSkeleton!)) && _events[_pauseOwner] == _pausedEvents,
+                    _pausedBones.SequenceEqual(CaptureBones(_pausedSkeleton!)) && _events[_pauseOwner] == _pausedEvents &&
+                    _actionEvents[_pauseOwner] == _pausedActions,
                     "Paused owner advanced its committed pose, history or callbacks.");
                 Require(ReferenceEquals(paused.FullMovementDiagnostics.GraphCapture,_pausedGraph),
                     "Canceled candidate replaced the committed graph snapshot.");
@@ -170,7 +196,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 if (frame.Result.ActualStance == AlsStance.Crouching) _crouch++;
                 if (frame.Result.LeftFootPose.LockAmount > .5f || frame.Result.RightFootPose.LockAmount > .5f) _locked++;
             }
-            Require(_context.AffinityViolations == 0 && _context.AnimationEventHandlerFailures == 0, "Thread affinity/event dispatch violation.");
+            Require(_context.AffinityViolations == 0 && _context.AnimationEventHandlerFailures == 0 && _context.ActionOutcomeHandlerFailures == 0,
+                "Thread affinity/event dispatch violation.");
             if (_phase == 0 && _completedPauses < 2 && _tick == (_completedPauses == 0 ? _hz : TestContacts ? _hz * 11 / 2 : _hz * 3))
             {
                 _pauseOwner = _completedPauses % _count;
@@ -208,6 +235,13 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             Require(!_overlayCycle || _armedFrames > 0 && _characters.All(c => c.FullMovementDiagnostics.Overlay == AlsOverlayKind.Default),
                 "Overlay cycle did not equip and return to Default.");
             if (_overlayCycle) GD.Print($"OVERLAY_DISPATCH_OK armed_frames={_armedFrames} owners={_count} frame_selection_exact=true return_default=true");
+            if (_actionRequests)
+            {
+                Require(_acceptedActions == _count * 5 && _replacedActions == _count * 2 &&
+                    _cancelledActions == _count * 2 && _completedActions == _count &&
+                    _actionEvents.All(count => count == 10), "Action requests were lost or repeated across production boundaries.");
+                GD.Print($"ACTION_REQUEST_DISPATCH_OK owners={_count} accepted={_acceptedActions} replaced={_replacedActions} cancelled={_cancelledActions} completed={_completedActions} cancel_retry=pending_start commit_hold=pending_start");
+            }
             GD.Print($"REFACTORED_FOOT_DISPATCH_OK hz={_hz} characters={_count} mode={_mode} frames={_lastFrames.Sum()} " +
                 $"cancellations={_completedPauses} commit_holds=1 air={_air} crouch={_crouch} locked={_locked} events={_events.Sum()} " +
                 $"rays={_characters.Sum(c => c.SplitFootDiagnostics.Rays)} pose={_poseDigest:X16} root={_rootDigest:X16} result={_resultDigest:X16}");
@@ -228,11 +262,13 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 "Main commit hold did not leave a completed worker result.");
             _commitInput = character.LatestMotorInput; _commitStages = stages;
             _commitGraph=character.FullMovementDiagnostics.GraphCapture;
-            _commitEvents = _events[_commitOwner]; _commitResumeTick = _tick + 2; _commitPhase = 2;
+            _commitEvents = _events[_commitOwner]; _commitActions = _actionEvents[_commitOwner]; _commitResumeTick = _tick + 2; _commitPhase = 2;
+            if (_actionRequests) Require(_commitInput.ActionRequest.Command == AlsActionCommand.Start, "Commit hold did not capture a real action Start.");
             return;
         }
         Require(character.LatestMotorInput.Equals(_commitInput) && stages == _commitStages &&
-            character.FullMovementDiagnostics.FootPoseIdentity == _commitInput.Identity && _events[_commitOwner] == _commitEvents,
+            character.FullMovementDiagnostics.FootPoseIdentity == _commitInput.Identity && _events[_commitOwner] == _commitEvents &&
+            _actionEvents[_commitOwner] == _commitActions,
             "Waiting for main commit advanced motor, animation, queries or callbacks.");
         Require(ReferenceEquals(character.FullMovementDiagnostics.GraphCapture,_commitGraph),
             "Waiting for main commit replaced the completed graph snapshot.");
@@ -265,12 +301,27 @@ public partial class RefactoredFootDispatchSmoke : Node3D
         }
         _pausedGraph=character.FullMovementDiagnostics.GraphCapture;
         _pausedEvents = _events[_pauseOwner];
+        _pausedActions = _actionEvents[_pauseOwner];
+        if (_actionRequests && _completedPauses == 0)
+            Require(_pausedInput.ActionRequest.Command == AlsActionCommand.Start, "Cancellation did not discard a real action Start.");
         character.SetActive(false);
         Require(!character.SplitFootDiagnostics.Pending && !character.Visible, "Deactivation retained a candidate or visible pose.");
         _resumeTick = _tick + 2; _phase = 2;
     }
-    private sealed class Commands(int hz, bool overlayCycle, int owner) : IAlsLocomotionCommandSource
+    private sealed class Commands(int hz, bool overlayCycle, int owner, AlsMontageActionPolicy? action = null)
+        : IAlsLocomotionCommandSource, IAlsActionRequestSource
     {
+        public AlsActionRequest GetActionRequest(AlsFrameIdentity identity)
+        {
+            if (action is not { } policy) return AlsActionRequest.None;
+            var frame = identity.FrameId;
+            if (frame == 1 || frame == hz / 2 || frame == hz + 1 || frame == hz * 2 || frame == hz * 23 / 4 + 1)
+                return new(frame, AlsActionCommand.Start, policy.DefinitionId, policy.StartSectionId, 100, identity.SlotGeneration);
+            if (frame == hz * 3 / 4 || frame == hz * 6 - 2)
+                return new(frame == hz * 3 / 4 ? hz / 2 : hz * 23 / 4 + 1,
+                    AlsActionCommand.Cancel, policy.DefinitionId, -1, 0, identity.SlotGeneration);
+            return AlsActionRequest.None with { SlotGeneration = identity.SlotGeneration };
+        }
         public static AlsOverlayKind OverlayAt(long frame, int hz, bool enabled, int owner) => !enabled || frame < hz || frame >= hz * 5
             ? AlsOverlayKind.Default : (frame < hz * 3) == (owner % 2 == 0) ? AlsOverlayKind.Rifle : AlsOverlayKind.Pistol2H;
         public AlsLocomotionCommand GetCommand(long frame) => AlsLocomotionCommand.CreateDefault() with
