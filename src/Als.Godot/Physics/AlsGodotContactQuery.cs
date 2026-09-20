@@ -63,7 +63,12 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     public int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1);
-        var t0 = ToGodot(world0); var t1 = ToGodot(world1);
+        // Rebase in double precision BEFORE converting to Godot float positions.
+        // Only a common translation is removed; world axes/rotations are kept.
+        // Returned points are converted directly from this pair frame to local
+        // shape space, never round-tripped through large world coordinates.
+        var t0 = ToGodot(world0 with { Position = AlsDoubleVector.Zero });
+        var t1 = ToGodot(world1 with { Position = world1.Position - world0.Position });
         if (!(t0 * a.Bounds).Grow(1e-5f).Intersects((t1 * b.Bounds).Grow(1e-5f))) return 0;
         if (!_bodyHasShape) { PhysicsServer3D.BodyAddShape(_body, b.Shape.GetRid()); _bodyHasShape = true; }
         else PhysicsServer3D.BodySetShape(_body, 0, b.Shape.GetRid());
@@ -72,19 +77,21 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         var pairs = _state.CollideShape(_query, checked(destination.Length + 1)); NarrowPhaseQueries++;
         using var ownedPairs = (Godot.Collections.Array)pairs;
         if (pairs.Count % 2 != 0 || pairs.Count / 2 > destination.Length) throw new InvalidOperationException("Contact query capacity exceeded; manifold was not truncated.");
+        if (pairs.Count == 0) return 0;
+        // A face manifold can include separated points within Jolt's manifold
+        // tolerance. Point1 - Point0 then reverses direction; it is NOT a normal.
+        // This space has exactly one convex target and the query is also convex,
+        // so every point belongs to the one hit returned by GetRestInfo.
+        using var rest = _state.GetRestInfo(_query); NarrowPhaseQueries++;
+        if (rest.Count == 0 || rest["rid"].AsRid() != _body || rest["shape"].AsInt32() != 0)
+            throw new InvalidOperationException("Contact manifold has no matching geometric normal.");
+        var normal = rest["normal"].AsVector3();
+        if (!normal.IsFinite() || Math.Abs(normal.LengthSquared() - 1) > 1e-5f)
+            throw new InvalidOperationException("Invalid contact normal.");
         var inverse0 = t0.AffineInverse(); var inverse1 = t1.AffineInverse();
         for (var i = 0; i < pairs.Count / 2; i++)
         {
-            var p0 = pairs[2 * i]; var p1 = pairs[2 * i + 1]; var separation = p1 - p0;
-            Vector3 normal;
-            if (separation.LengthSquared() > 1e-14f) normal = separation.Normalized();
-            else
-            {
-                using var rest = _state.GetRestInfo(_query);
-                if (rest.Count == 0) throw new InvalidOperationException("Degenerate contact has no geometric normal.");
-                normal = rest["normal"].AsVector3();
-                if (!normal.IsFinite() || normal.LengthSquared() < .999f) throw new InvalidOperationException("Invalid contact normal.");
-            }
+            var p0 = pairs[2 * i]; var p1 = pairs[2 * i + 1];
             destination[i] = new(ToNative(inverse0 * p0).ToSingle(), ToNative(inverse1 * p1).ToSingle(),
                 (ToNative(inverse1.Basis * normal) * .01).ToSingle());
         }
