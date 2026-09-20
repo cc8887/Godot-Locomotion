@@ -133,7 +133,7 @@ public partial class RollingGameplaySmoke : Node
             if (next == _hz * 4 / 5) KeyEvent(Key.Space, true);
             if (next == _hz * 4 / 5 + 1) KeyEvent(Key.Space, false);
             if (next == _hz) Input.ActionRelease("move_left");
-            if (next == _hz * 3) { character.MovementAnchor.GlobalPosition += Vector3.Up * 5; KeyEvent(Key.R, true); }
+            if (next == _hz * 3) { character.MovementAnchor.GlobalPosition += Vector3.Up; KeyEvent(Key.R, true); }
             if (next == _hz * 9 / 2) Input.ActionPress("crouch_toggle");
             if (next == _hz * 9 / 2 + 1) Input.ActionRelease("crouch_toggle");
             if (next == _hz * 5) KeyEvent(Key.R, true);

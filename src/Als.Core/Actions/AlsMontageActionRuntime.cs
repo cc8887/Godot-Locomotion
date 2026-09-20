@@ -54,12 +54,13 @@ public sealed class AlsMontageActionRuntime
     }
 
     public void ApplyRequest(in AlsActionRequest request, bool cancelForRuntimeFailure = false,
-        AlsRollingStartContext? rolling = null)
+        AlsRollingStartContext? rolling = null, AlsMontageActionParameters parameters = default)
     {
         if (_phase != Phase.Preparing || _requestApplied) throw new InvalidOperationException("Action request phase differs.");
         _requestApplied=true;
         try
         {
+            if (!parameters.IsValidFor(request.Command)) throw new ArgumentException("Invalid captured montage start parameters.");
             var canonicalNone = request.Command==AlsActionCommand.None && request.RequestId==-1 &&
                 request.ActionDefinitionId==-1 && request.StartSectionId==-1 && request.Priority==0;
             if ((byte)request.Command>(byte)AlsActionCommand.CancelForRuntimeFailure ||
@@ -89,7 +90,7 @@ public sealed class AlsMontageActionRuntime
                 // Play performs native same-group Stop using the incoming blend-in.
                 // Do not stop the old physical instance again using the cancel duration.
                 if (old.InstanceId>0) { Add(new(old.RequestId,old.DefinitionId,old.InstanceId,AlsActionResultCode.InterruptedByReplacement)); _candidate[index]=default; }
-                if (!_montages.PlayAction(request.ActionDefinitionId,binding.Policy.PlayRate,binding.Policy.StartTime))
+                if (!_montages.PlayAction(request.ActionDefinitionId,parameters.PlayRate > 0 ? parameters.PlayRate : binding.Policy.PlayRate,binding.Policy.StartTime))
                     throw new InvalidOperationException("Compiled action disappeared from the montage bank.");
                 var id=_montages.ActiveActionInstance(request.ActionDefinitionId);
                 if (id<=0) throw new InvalidOperationException("New action has no physical instance.");

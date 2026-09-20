@@ -98,6 +98,7 @@ public struct AlsFrameResult
     // Append extensions so existing field offsets remain unchanged.
     public GodotAls.Core.Actions.AlsMontageRootMotionRange RootMotionSource;
     public GodotAls.Core.Actions.AlsRollingState Rolling;
+    public GodotAls.Core.Actions.AlsMovementActionTransition MovementAction;
 
     public static AlsFrameResult CreateDefault(AlsFrameIdentity identity) => new()
     {

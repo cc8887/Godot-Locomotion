@@ -15,8 +15,9 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 普通输入现已通过 Motor 接入共同动作所有者，主线程提交后发布动作结果。
 主场景支持 R 地面翻滚、X 取消：同帧 Root Motion 经过胶囊碰撞移动，翻滚锁定
 触发方向并使用半衰期转向，重复播放/空中触发受门控。详见
-[地面 Roll 接线记录](docs/verification/2026-09-20-grounded-roll-gameplay.md)。落地自动 Roll
-及翻滚离地转 Ragdoll 尚未实现；`--action-preview` 保留旧原地预览诊断入口。
+[地面 Roll 接线记录](docs/verification/2026-09-20-grounded-roll-gameplay.md)。中等落差现支持
+1.3 倍速自动 Roll，详见[落地动作记录](docs/verification/2026-09-20-landing-action-routing.md)。
+高落差及翻滚离地的真实 Ragdoll 尚未实现；`--action-preview` 保留旧原地预览诊断入口。
 角色永久销毁/换代现会根据主线程已提交记录结束 Notify State 和动作；包含回调内销毁及
 未提交动作隔离。见[退役清理记录](docs/verification/2026-09-20-animation-retirement.md)。
 完整入口现已区分调度暂停与真正停用；停用会清理动作，恢复时保留移动/脚部检查点，

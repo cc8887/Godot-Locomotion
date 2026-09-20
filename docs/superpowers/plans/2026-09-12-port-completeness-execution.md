@@ -1648,3 +1648,12 @@ Overlay gameplay、全流程观感或十分钟性能验收。下一步继续剩�
 `../../verification/2026-09-20-grounded-roll-gameplay.md`。落地自动 Roll（含倍率
 与 Ragdoll 优先级）、翻滚离地 Ragdoll 仍未启用，后续 Mantle、Recovery、Camera
 和完整性能/观感验收保持，不据此关闭整个 P5C。
+
+2026-09-20 后续：普通入口已加入中等落差自动 Roll，采集上一 Character tick
+缓存速度，按 Refactored C++ 默认的 7 / 10 m/s 分界保留 Ragdoll 优先级；落地
+动作独立捕获 1.3 倍率及速度 yaw，共同 Montage 实例执行。高落差和翻滚离地
+输出 Ragdoll 触发记录，但尚不执行物理 Ragdoll。三档频率、双模式、落地故障
+重试和 pending/held/generation 参数清理通过，详见
+`../../verification/2026-09-20-landing-action-routing.md`。下一项明确为原始
+PhysicsAsset 完整几何/质量/关节导出及真实物理骨架，不用数量/连接信息代替。
+Mantle、Get-up/Recovery、Camera、最终观感和性能范围保持。
