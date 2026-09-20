@@ -99,6 +99,13 @@ public partial class AlsP3CommitStage : Node
             _state.ReleaseYawAndFootProbes();
             return;
         }
+        var animationOwnership = _owner.CommittedAnimation;
+        try { animationOwnership.ValidateDispatch(result); }
+        catch (Exception exception)
+        {
+            _state.RecordFailure("animation_commit_ownership", identity, exception);
+            return;
+        }
         if (!TryCopyFootProbeRequests(_state.FootProbeExchange, identity, result))
         {
             Interlocked.Increment(ref _context.InvalidFootProbeRequests);
@@ -140,7 +147,7 @@ public partial class AlsP3CommitStage : Node
             _owner.ShowCommittedVisual(identity);
         }
         // No owner access after callbacks: gameplay may free the character or start a new action.
-        _context.DispatchCommittedAnimationEvents(result);
+        _context.DispatchCommittedAnimationEvents(result, animationOwnership);
         if (measure)
         {
             measurement!.AddCommitAllocations(

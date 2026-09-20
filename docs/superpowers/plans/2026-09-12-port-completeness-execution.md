@@ -1588,3 +1588,11 @@ Main Commit 回调接通。主场景增加 R 原地翻滚预览、X 取消，拒
 `../../verification/2026-09-20-action-input.md`。这是 P5A 预览入口，尚未加入
 Root Motion 位移、Roll 玩法门控或 Mantle。下一项优先闭合完整生产图的生命周期
 Notify/动作所有权清理，再继续 Overlay 道具、Root Motion 及既定后续阶段。
+
+2026-09-20 后续：完整生产提交入口已维护主线程 Notify/动作所有权镜像，永久
+销毁和 generation 退役会从镜像生成唯一 End/Interrupted，并隔离未提交结果。
+原生 Notify State 合并来源时按 InstanceId 跟踪、Tick 更新结束上下文；回调内
+退役会阻止剩余旧事件，结束回调在主线程 deferred 边界派发，避免重入换代操作。
+五种真实 Roll 退役场景、2534 项 Core、旧生命周期、键鼠和十角色双模式通过，
+见 `../../verification/2026-09-20-animation-retirement.md`。可恢复停用仍须区分
+暂停重试与语义中断，故障后的成功帧取消仍未闭合；不能据此关闭整个 P5A 生命周期。
