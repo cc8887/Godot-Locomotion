@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新接触稳定性：`docs/verification/2026-09-21-physics-contact-normal.md`。真实 Godot 红测确认旧点差法向在分离的流形点上翻转，以及大世界 float 坐标导致点数改变；单目标凸对统一读取 GetRestInfo 法向，double 相对原点后再查询。17 项精度、旧六几何/三场景/五睡眠生命周期在三频率通过。两模型普通/高速 30/60/120 Hz 十秒睡眠六项全部通过，原生阈值/迭代次数未变，睡后 pose/epoch 不变；关闭睡眠的六项粗略落地也过。Core 验收锁定轴改测原生 R01 分量的角残差，Limited 保留 pyramid/twist，0.1 rad 门槛不变；报告保留旧 pyramid 指标与原先 60 Hz 0.1055 失败，不能据此重判旧 Jolt。Core 2693、Import 2363/1 旧跳过、Godot 构建及旧 144 对子通过。额外法向查询有 Main 分配/成本，未做最终性能预算。下一步完整原生整链重力/接触对照、运动 kinematic/真实场景接入，再普通 Ragdoll/Get-up/Pose Recovery；普通 demo 与旧 Jolt 失败仍未关闭。
+
 - 最新睡眠进度：`docs/verification/2026-09-21-physics-sleep.md`。Core 可选整组睡眠、显式/外力/接触变更唤醒、失败事务与睡眠期间接触历史保持完成；实际材质阈值来自 40 个原生身体。144 组×60 步原生对子逐帧睡眠/计数一致（3300 睡眠样本、85 次休眠冲量唤醒），重复导出一致，旧参考重导不变。Godot 球体五项睡眠生命周期及旧三场景/六几何检查在 30/60/120 Hz 通过；Core 2689、Import 2363/1 旧跳过、Godot 构建及旧 144 组对子通过。完整角色十秒睡眠门槛三轮均失败：30 Hz Mannequin 左手仍运动，60/120 Hz AnimMan 腿/躯干仍超原生阈值；另一角色入睡后的姿态/epoch 保持通过。不提高阈值或强制定时睡眠。下一步定位接触/流形/共同迭代稳定性并补完整原生重力接触对照与场景接入；普通 Ragdoll/Get-up/Pose Recovery 未完成，普通 demo 未切换，旧 Jolt 失败未关闭。
 
 - 最新重力整链进度：`docs/verification/2026-09-21-physics-gravity-chain.md`。Core Step 接显式重力、加速度/角加速度、冲量速度和原生 drag 顺序，保留 StepForceFree；Godot 从两套实际 PhysicsAsset 绑定 43 个形状，加两地面共 45 形状、42 身体/36 关节，通过冻结代理回写骨架。近法向速度下原生 float 切线残差触发过严断言：仅内部 Gather 接触行允许原生非严格正交结果，直接 row API 仍严格检查。两套角色普通/高速落地 30/60/120 Hz 十秒共六项通过；普通最大锚点 1.485/0.930/0.377 cm，高速 4.841/1.740/0.915 cm，末秒线速度均 <20 cm/s、限位超出 <0.1 rad。仍有角速度、无睡眠/CCD，不是观感或 Chaos 完整轨迹等价；地面厚 1 m，旧 Jolt 失败未关闭。Core 首轮旧 Montage 零分配测试出现 6216 字节，独立与全量复跑通过（2683），原因未定位；Import 2359/1 旧跳过、Godot 构建、144 组原生对子及旧接触探针通过。下一步睡眠/唤醒、持续历史生命周期、完整原生重力/接触对照与场景接入，再普通 Ragdoll/Get-up/Pose Recovery。普通 demo 本批未切换。

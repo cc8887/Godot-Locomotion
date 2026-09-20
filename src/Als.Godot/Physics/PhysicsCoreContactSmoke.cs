@@ -16,6 +16,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _frame, _scenario, _hz, _totalContacts, _queries;
     private int _geometryChecks;
     private int _sleepChecks;
+    private int _precisionChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -59,7 +60,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) { GeometryChecks(); SleepChecks(); }
+            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -79,7 +80,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
             if (_scenario < 3) { StartScenario(); return; }
             Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
             var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
-                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, sleep_checks = _sleepChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -139,6 +140,67 @@ public partial class PhysicsCoreContactSmoke : Node3D
         Require(workerRejected, "Godot collision query ran off Main."); _geometryChecks += 2;
         registry.Remove(mover); hull.Points = hull.Points;
         Require(!query.IsInvalidated, "Removed geometry kept invalidating the remaining world.");
+    }
+
+    private void ContactPrecisionChecks()
+    {
+        var identity = AlsPrecisePose.Identity; var registry = new AlsContactRegistry(2, 2);
+        var mover = registry.Register(new(0, identity, 1, 1)); var floor = registry.Register(new(1, identity, 1, 1));
+        using var box = new BoxShape3D { Size = Vector3.One, Margin = 0 };
+        using var sphere = new SphereShape3D { Radius = .5f, Margin = 0 };
+        using var capsule = new CapsuleShape3D { Radius = .3f, Height = 2, Margin = 0 };
+        using var hull = new ConvexPolygonShape3D { Points = [new(-.5f, -.5f, -.5f), new(.5f, -.5f, -.5f), new(-.5f, .5f, -.5f), new(.5f, .5f, -.5f),
+            new(-.5f, -.5f, .5f), new(.5f, -.5f, .5f), new(-.5f, .5f, .5f), new(.5f, .5f, .5f)], Margin = 0 };
+        using var ground = new BoxShape3D { Size = new(10, .2f, 10), Margin = 0 };
+        using var query = new AlsGodotContactQuery(registry); query.Bind(mover, box); query.Bind(floor, ground);
+        var bottom = identity with { Position = new(0, 0, -10) };
+        var top = identity with { Position = new(0, 0, 49.99), Rotation = AlsQuaternion.FromAxisAngle(NVector.UnitX, .0005f) };
+        var buffer = new AlsDetectedContact[16]; var count = query.Query(mover.Slot, top, floor.Slot, bottom, buffer);
+        Require(count > 1, "Near-tangent box did not produce a manifold.");
+        var minGap = double.PositiveInfinity; var maxGap = double.NegativeInfinity;
+        for (var i = 0; i < count; i++)
+        {
+            Require(buffer[i].Normal1.Z > .999f, "Near-tangent manifold flipped its geometric normal.");
+            var p0 = new AlsDoubleVector(buffer[i].Point0).Rotate(top.Rotation) + top.Position;
+            var p1 = new AlsDoubleVector(buffer[i].Point1).Rotate(bottom.Rotation) + bottom.Position;
+            var gap = AlsDoubleVector.Dot(p0 - p1, new(buffer[i].Normal1));
+            minGap = Math.Min(minGap, gap); maxGap = Math.Max(maxGap, gap);
+        }
+        Require(minGap < -.01 && maxGap > .01, "Regression must retain both penetrating and separated manifold points.");
+        GD.Print($"CORE_CONTACT_PRECISION mixed_gap_cm=[{minGap:R},{maxGap:R}] points={count}");
+        _precisionChecks++;
+        // Equivalent contacts must survive sloping the plane, swapping endpoints,
+        // and translating the entire scene far from the world origin.
+        Shape3D[] shapes = [box, sphere, capsule, hull]; var reference = new AlsDetectedContact[16]; var used = new bool[16];
+        for (var shape = 0; shape < shapes.Length; shape++)
+        {
+            if (shape > 0) { mover = registry.Replace(mover, registry.At(mover.Slot)); query.Bind(mover, shapes[shape]); }
+            foreach (var slope in new[] { 0f, .37f }) foreach (var reverse in new[] { false, true })
+            {
+                var rotation = AlsQuaternion.FromAxisAngle(NVector.UnitX, slope);
+                var plane = identity with { Rotation = rotation };
+                var a = AlsPrecisePose.Compose(identity with { Position = new(0, 0, shape == 2 ? 99.99 : 49.99) }, plane);
+                var b = AlsPrecisePose.Compose(bottom, plane);
+                var nearCount = reverse ? query.Query(floor.Slot, b, mover.Slot, a, reference) : query.Query(mover.Slot, a, floor.Slot, b, reference);
+                Require(nearCount > 0, "Precision probe lost its near-origin contact.");
+                var offset = new AlsDoubleVector(1e7, -2e7, 3e7);
+                a = a with { Position = a.Position + offset }; b = b with { Position = b.Position + offset };
+                var farCount = reverse ? query.Query(floor.Slot, b, mover.Slot, a, buffer) : query.Query(mover.Slot, a, floor.Slot, b, buffer);
+                Require(farCount == nearCount, "World translation changed manifold point count.");
+                Array.Clear(used);
+                for (var i = 0; i < farCount; i++)
+                {
+                    Require((reverse ? -buffer[i].Normal1.Z : buffer[i].Normal1.Z) > .999f, "Sloping/reversed contact normal is wrong.");
+                    var matched = false;
+                    for (var j = 0; j < nearCount; j++)
+                        if (!used[j] && NVector.Distance(buffer[i].Point0, reference[j].Point0) < .002f &&
+                            NVector.Distance(buffer[i].Point1, reference[j].Point1) < .002f &&
+                            NVector.Distance(buffer[i].Normal1, reference[j].Normal1) < .0001f) { matched = true; used[j] = true; break; }
+                    Require(matched, $"World translation changed local contact geometry: shape={shape} slope={slope} reverse={reverse} point={i}.");
+                }
+                _precisionChecks++;
+            }
+        }
     }
 
     private void SleepChecks()

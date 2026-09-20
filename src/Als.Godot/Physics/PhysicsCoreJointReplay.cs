@@ -26,6 +26,8 @@ public partial class PhysicsCoreJointReplay : Node3D
     private string _report = "";
     private int _contactPoints;
     private double _finalSpeed, _finalAngularSpeed, _maxLimit, _finalLimit;
+    private string _finalLimitSource = "";
+    private double _legacyFinalLimit;
     private readonly Dictionary<AlsJointIsland, (int Frame, AlsIslandBodyState[] States, long Epoch)> _slept = [];
     private int _sleepHeldSteps;
     private JsonElement Current => _reference!.RootElement.GetProperty("cases")[_case];
@@ -193,7 +195,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                 GD.Print($"CORE_DROP_BUDGET hz={_hz} high={_highDrop} anchor_cm={_anchorCm} final_speed_cmps={_finalSpeed} final_angular_radps={_finalAngularSpeed} limit_rad={_finalLimit} contacts={_contactPoints}");
                 Require(_contactPoints > 0, "Asset drop did not produce contacts.");
                 Require(_finalSpeed < 20, "Core asset chain did not settle below 20 cm/s.");
-                Require(_finalLimit < .1, "Core asset limits did not settle within 0.1 rad.");
+                Require(_finalLimit < .1, $"Core asset limits did not settle within 0.1 rad: {_finalLimitSource}");
+                GD.Print($"CORE_LIMIT_METRIC native_residual_rad={_finalLimit:R} legacy_pyramid_rad={_legacyFinalLimit:R} source={_finalLimitSource}");
                 if (_sleep)
                 {
                     foreach (var active in _active) if (!active.Host.Island.IsSleeping)
@@ -223,6 +226,9 @@ public partial class PhysicsCoreJointReplay : Node3D
                 contacts = _drop, gravity = _drop, high_drop = _highDrop, contact_points = _contactPoints,
                 query_shapes = _active.Sum(a => a.Shapes?.Count ?? 0),
                 final_speed_cmps = _finalSpeed, final_angular_speed_radps = _finalAngularSpeed, max_limit_rad = _maxLimit, final_limit_rad = _finalLimit,
+                final_limit_source = _finalLimitSource,
+                limit_metric = "limited: native pyramid/twist; locked: distance to native R01 component zero",
+                legacy_final_pyramid_limit_rad = _legacyFinalLimit,
                 sleeping = _sleep, slept_rigs = _slept.Count, sleep_held_steps = _sleepHeldSteps,
                 sleep_frames = _slept.Values.Select(v => v.Frame).ToArray(), native_pair_parity_asserted = !_chains,
                 full_chain_native_parity_asserted = false, frozen_proxy_ownership_asserted = true };
@@ -317,14 +323,21 @@ public partial class PhysicsCoreJointReplay : Node3D
                 var parent = p.Rotation.Normalized(); var child = c.Rotation.Normalized();
                 if (AlsQuaternion.Dot(parent, child) < 0) child = -child;
                 var angles = AlsJointAngularKinematics.Evaluate(parent, child).Angles;
+                var locks = AlsJointAngularKinematics.RotationLockResidualAngles(parent, child);
                 var s = active.Rig.Settings[joint.Index];
                 for (var axis = 0; axis < 3; axis++)
                 {
                     var motion = axis == 0 ? s.AngularMotion.X : axis == 1 ? s.AngularMotion.Y : s.AngularMotion.Z;
                     if (motion == AlsJointMotion.Free) continue;
                     var allowed = motion == AlsJointMotion.Locked ? 0 : s.AngularLimitsRad[axis];
-                    var excess = Math.Max(0, Math.Abs(angles[axis]) - allowed);
-                    _maxLimit = Math.Max(_maxLimit, excess); if (_frame > _hz * 9) _finalLimit = Math.Max(_finalLimit, excess);
+                    var excess = motion == AlsJointMotion.Locked ? locks[axis] : Math.Max(0, Math.Abs(angles[axis]) - allowed);
+                    if (_frame > _hz * 9) _legacyFinalLimit = Math.Max(_legacyFinalLimit, Math.Max(0, Math.Abs(angles[axis]) - allowed));
+                    _maxLimit = Math.Max(_maxLimit, excess);
+                    if (_frame > _hz * 9 && excess > _finalLimit)
+                    {
+                        _finalLimit = excess;
+                        _finalLimitSource = $"mesh={active.Rig.Definition.Mesh} bone={active.Rig.Definition.Bodies[joint.ChildBody].Bone} axis={axis} motion={motion} frame={_frame} pyramid_angle={angles[axis]:R} allowed={allowed:R} excess={excess:R}";
+                    }
                 }
             }
         }

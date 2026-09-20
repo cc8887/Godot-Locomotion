@@ -57,6 +57,19 @@ public readonly record struct AlsJointAngularKinematics(
         return new(2*error.X,-twistAxisError.Z,twistAxisError.Y);
     }
 
+    // Diagnostic angular distance to each cached rotation-lock constraint.
+    // UE InitLockedRotationConstraints constrains the corresponding component
+    // of R01, not a decomposed pyramid angle. For a unit quaternion, the nearest
+    // rotation with component i == 0 is 2*asin(abs(R01[i])) radians away.
+    // These are three independent residuals, not Euler angles or a combined norm.
+    public static AlsDoubleVector RotationLockResidualAngles(AlsQuaternion parent, AlsQuaternion child)
+    {
+        Validate(parent); Validate(child);
+        var relative = (parent.Conjugate() * child).Normalized();
+        static double Residual(double component) => 2 * System.Math.Asin(System.Math.Min(1, System.Math.Abs(component)));
+        return new(Residual(relative.X), Residual(relative.Y), Residual(relative.Z));
+    }
+
     private static void Validate(AlsQuaternion q)
     {
         if (!double.IsFinite(q.LengthSquared) || System.Math.Abs(q.LengthSquared-1) > 1e-6)
