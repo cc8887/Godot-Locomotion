@@ -110,6 +110,13 @@ overlay_next={
 "events": [Object(InputEventKey,"physical_keycode":69)]
 }
 
+[physics]
+
+3d/physics_engine="Jolt Physics"
+; Native hand/neck collision shapes are only a few centimeters thick.
+; Jolt's 2 cm default penetration slop is too large for these shapes.
+jolt_physics_3d/simulation/penetration_slop=0.002
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
