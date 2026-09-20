@@ -11,10 +11,11 @@ internal static class AlsP3FrameStages
 {
     // Initialized during main-thread scene configuration, never during a query.
     internal static readonly bool SplitFeet = AlsAnimationRuntimeOptions.Has("--refactored-foot-frame");
-    internal static int Visual => SplitFeet ? 3 : 1;
-    internal static int Commit => SplitFeet ? 4 : 2;
-    internal static int Lifecycle => SplitFeet ? 5 : 3;
-    internal static int Observe => SplitFeet ? 6 : 4;
+    internal static int Gather => SplitFeet ? 1 : 0;
+    internal static int Visual => SplitFeet ? 4 : 1;
+    internal static int Commit => SplitFeet ? 5 : 2;
+    internal static int Lifecycle => SplitFeet ? 6 : 3;
+    internal static int Observe => SplitFeet ? 7 : 4;
 }
 
 internal readonly record struct AlsP3SplitFootDiagnostics(long Prepared, long Queried, long Resumed, long Rays,
@@ -128,6 +129,8 @@ public partial class AlsP3WorkerRoot
         if (!_state.IsWorkerAdmissionClosed || _state.WorkerInFlightCount != 0)
             throw new InvalidOperationException("Split foot cancellation requires a closed idle owner.");
         CancelSplitFootCandidate();
+        _controller?.DiscardRootMotionPreparation();
+        MotorRootMotion = default;
     }
     internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
     {

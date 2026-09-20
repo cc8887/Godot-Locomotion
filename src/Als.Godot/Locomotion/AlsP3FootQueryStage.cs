@@ -13,7 +13,7 @@ internal partial class AlsP3FootQueryStage : Node
         // the character capsule; the motor floor mask is a separate contract.
         _gather = new(motor, 7, [motor.GetRid()]);
         ProcessThreadGroup = ProcessThreadGroupEnum.MainThread;
-        ProcessThreadGroupOrder = 2;
+        ProcessThreadGroupOrder = 3;
     }
     public override void _PhysicsProcess(double delta) => _worker.GatherSplitFootFrame(_gather!);
     public override void _ExitTree() { _gather?.Dispose(); _gather = null; }

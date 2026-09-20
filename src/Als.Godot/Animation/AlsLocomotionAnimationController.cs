@@ -534,6 +534,15 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         return RegisterMovementCandidate(input, result);
     }
 
+    internal AlsPreparedRootMotion PrepareRootMotion(AlsFrameIdentity identity, float delta)
+    {
+        ThrowIfDisposed();
+        if (!UsesRefactoredFeet || _hasPreparedFrame != 0)
+            throw new InvalidOperationException("Motion preparation requires an idle complete animation owner.");
+        return _fullMovement!.PrepareRootMotion(identity, delta);
+    }
+    internal void DiscardRootMotionPreparation() => _fullMovement?.DiscardRootMotionPreparation();
+
     internal void ResumeFootQueries(in AlsPreparedAnimationFrame prepared, in AlsFootRigObservations observations)
     {
         ThrowIfDisposed(); ValidatePrepared(prepared);

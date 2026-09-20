@@ -111,6 +111,34 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     internal AlsMontageActionRuntime Actions => _actions;
     private readonly AlsMontageActionPlaybackReader _actionPlayback;
     private readonly AlsMontageRootMotionReader _rootMotion;
+    private AlsFrameIdentity _motionPreparation;
+    private float _motionPreparationDelta;
+    private AlsPreparedRootMotion _preparedRootMotion;
+
+    internal AlsPreparedRootMotion PrepareRootMotion(AlsFrameIdentity identity, float delta)
+    {
+        Require(Phase.Idle);
+        if (_motionPreparation != default) throw new InvalidOperationException("A montage tick is already pending.");
+        _actions.Begin(identity, delta);
+        _motionPreparation = identity; _motionPreparationDelta = delta;
+        var source = _montages.RootMotionRange;
+        return _preparedRootMotion = new(identity, source.HasMotion ? source : default, _rootMotion.Read(source));
+    }
+    internal void DiscardRootMotionPreparation()
+    {
+        if (_motionPreparation == default) return;
+        Require(Phase.Idle); _actions.Discard(); _motionPreparation = default; _preparedRootMotion = default;
+    }
+    private void BeginMontageFrame(AlsFrameIdentity identity, float delta)
+    {
+        if (_motionPreparation == default) _actions.Begin(identity, delta);
+        else
+        {
+            if (_motionPreparation != identity || _motionPreparationDelta != delta)
+                throw new InvalidOperationException("Motor and animation must reuse the exact same montage tick.");
+            _motionPreparation = default;
+        }
+    }
 
     public void CompleteEvents(ref AlsFrameResult result)
     {
@@ -128,7 +156,9 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         var motionSource = HasMontageFrame ? _montages.RootMotionRange : default;
         if (motionSource.HasMotion && motionSource.Identity != result.Identity)
             throw new InvalidOperationException("Root motion belongs to a different animation frame.");
-        var motion = _rootMotion.Read(motionSource);
+        var motion = _preparedRootMotion.Identity == result.Identity ? _preparedRootMotion.Delta : _rootMotion.Read(motionSource);
+        if (_preparedRootMotion.Identity == result.Identity && _preparedRootMotion.Source != (motionSource.HasMotion ? motionSource : default))
+            throw new InvalidOperationException("The pre-physics motion source changed during graph evaluation.");
         result.TypedEvents = events; result.ActionOutcomes = outcomes; result.ActionPlayback = playback;
         result.ProposedRootMotionDelta = motion;
         result.RootMotionSource = motionSource.HasMotion ? motionSource : default;
@@ -283,7 +313,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         try
         {
         _identity=frame.Identity; SourceUpdated=false; RequestCount=0; _phase=Phase.GlobalUpdating;
-        _actions.Begin(frame.Identity, frame.DeltaTime);
+        BeginMontageFrame(frame.Identity, frame.DeltaTime);
         _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None, _cancelForRuntimeFailure);
         _failureEpochCount = 0;
         for (var i = 0; i < _actions.Outcomes.Count; i++)
@@ -534,7 +564,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     {
         if (_phase == Phase.Disposed) throw new ObjectDisposedException(nameof(AlsBaseLayerFrameRuntime));
         _movement.Discard(); _tail.Discard(); _actions.Discard(); _turnNotifies.Discard(); StopTransitionCount = 0; _sink = null; _phase = Phase.Idle;
-        _cancelForRuntimeFailure = false; _failureEpochCount = 0;
+        _cancelForRuntimeFailure = false; _failureEpochCount = 0; _motionPreparation = default; _preparedRootMotion = default;
     }
     internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
     {

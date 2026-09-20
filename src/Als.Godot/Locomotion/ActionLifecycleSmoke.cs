@@ -42,7 +42,7 @@ public partial class ActionLifecycleSmoke : Node
         if (_done || _demo is null) return;
         try
         {
-            Require(++_ticks < 240, "Action lifecycle test stalled.");
+            Require(++_ticks < 240, $"Action lifecycle test stalled phase={_phase} published={_demo.ActiveCharacter.PublishedFrameId} committed={_demo.ActiveCharacter.RuntimeCommittedFrameId} generation={_demo.ActiveCharacter.Handle.Generation}.");
             var character = _demo.ActiveCharacter;
             Require(_demo.IsRuntimeReady && !character.IsPoseFrozen && character.FailureDiagnosticCount == 0,
                 "Normal input failed during generation replacement or Commit hold.");

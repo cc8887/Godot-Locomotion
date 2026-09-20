@@ -1631,3 +1631,11 @@ Overlay gameplay、全流程观感或十分钟性能验收。下一步继续剩�
 `../../verification/2026-09-20-montage-root-motion.md`。Motor 尚未消费位移，
 普通 R 仍是原地预览；下一项调整同帧动画推进—Main 碰撞—脚部查询顺序，
 再接 Roll 玩法门控、转向与落地规则，不能据此关闭 P5C。
+
+2026-09-20 后续：完整管线新增 Motor 前的 Worker Montage 准备阶段，后续完整
+动画复用同一次物理推进；Main 使用实际 mesh-to-character 变换和 MoveAndSlide
+消费，再进行脚部查询。`--montage-root-motion` 可启用消费测试，普通默认尚未
+切换。三档频率真实输入、墙体、准备暂停、失败重试/停用/换代，以及开启消费的
+十角色双模式通过；详见 `../../verification/2026-09-20-root-motion-consumption.md`。
+下一项仍为 Refactored Roll 玩法门控、半衰期转向与落地触发及普通入口接线；
+本批未关闭 P5C、复杂地形和最终性能预算。

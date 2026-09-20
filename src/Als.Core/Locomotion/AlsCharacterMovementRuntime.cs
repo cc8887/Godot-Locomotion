@@ -57,7 +57,7 @@ public sealed class AlsCharacterMovementRuntime
     // Vectors use any orthonormal horizontal coordinate pair, in centimeters.
     // Input is the actual consumed movement vector, before CMC scales by MaxAcceleration.
     public AlsCharacterMovementStep Integrate(in AlsCharacterMovementHistory history, AlsDoubleVector velocity,
-        AlsDoubleVector input, AlsStance stance, bool grounded, float delta)
+        AlsDoubleVector input, AlsStance stance, bool grounded, float delta, bool hasAnimationRootMotion = false)
     {
         if (!input.IsFinite || !velocity.IsFinite || (uint)stance > 1) throw new ArgumentException("Invalid movement input.");
         if (input.LengthSquared > 1) input *= 1 / System.Math.Sqrt(input.LengthSquared);
@@ -78,7 +78,7 @@ public sealed class AlsCharacterMovementRuntime
                 appliedAcceleration *= values.MaxAcceleration / System.Math.Sqrt(appliedAcceleration.LengthSquared);
             options = options with { MinAnalogSpeed = 0 };
         }
-        var result = AlsGroundVelocity.Calculate(velocity, appliedAcceleration, delta,
+        var result = hasAnimationRootMotion ? velocity : AlsGroundVelocity.Calculate(velocity, appliedAcceleration, delta,
             grounded ? values.GroundFriction : Settings.AirFriction,
             grounded ? values.BrakingDeceleration : Settings.AirBraking, maxSpeed, analog, options);
         return new(result, acceleration, amount, analog, maxSpeed, values);

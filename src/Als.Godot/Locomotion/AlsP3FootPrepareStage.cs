@@ -13,7 +13,7 @@ internal partial class AlsP3FootPrepareStage : Node
         _worker = worker;
         ProcessThreadGroup = mode == AlsHarnessMode.Single
             ? ProcessThreadGroupEnum.MainThread : ProcessThreadGroupEnum.SubThread;
-        ProcessThreadGroupOrder = 1;
+        ProcessThreadGroupOrder = 2;
     }
     public override void _PhysicsProcess(double delta) => _worker.PrepareSplitFootFrame();
 }

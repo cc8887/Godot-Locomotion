@@ -14,6 +14,16 @@ public sealed class AlsCharacterMovementRuntimeTests
             Read("v4_character_movement_inputs.json"), Read("v4_character_rotation_inputs.json")));
 
     [Fact]
+    public void AnimationRootMotionSkipsVelocityIntegrationButPreservesMovementInputForCharacterUpdate()
+    {
+        var runtime = Compile(); var velocity = new AlsDoubleVector(100,200,0);
+        var motion = runtime.Integrate(runtime.InitialState,velocity,new(1,0,0),AlsStance.Standing,true,1f/60,true);
+        var normal = runtime.Integrate(runtime.InitialState,velocity,new(1,0,0),AlsStance.Standing,true,1f/60);
+        Assert.Equal(velocity,motion.Velocity); Assert.NotEqual(velocity,normal.Velocity);
+        Assert.Equal(normal.Acceleration,motion.Acceleration); Assert.Equal(normal.InputAmount,motion.InputAmount);
+        Assert.Equal(normal.Analog,motion.Analog); Assert.Equal(normal.MaxSpeed,motion.MaxSpeed);
+    }
+    [Fact]
     public void GaitEligibilityMatchesAllNativeBlueprintBoundaries()
     {
         var runtime = Compile();

@@ -104,6 +104,7 @@ public static class AlsLocomotionModel
 
         var nextState = state;
         var nextResult = AlsFrameResult.CreateDefault(input.Identity);
+        nextResult.RequestedDriveMode = input.CurrentDriveMode;
         var previousLocomotionState = state.LocomotionState;
         var currentLocomotionState = input.Floor.IsGrounded == 1
             ? AlsLocomotionState.Grounded
@@ -535,6 +536,8 @@ public static class AlsLocomotionModel
 
     private static void ValidateInput(in AlsFrameInput input)
     {
+        if ((uint)input.CurrentDriveMode > (uint)AlsDriveMode.RecoveryBlend)
+            throw new ArgumentOutOfRangeException(nameof(input), "Drive mode must be defined.");
         if (!float.IsFinite(input.DeltaTime) || input.DeltaTime <= 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(input), "DeltaTime must be positive and finite.");
