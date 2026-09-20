@@ -63,9 +63,12 @@ public sealed class AlsIslandContactCouplingTests
             ReadOnlySpan<AlsIslandBody> bodies, double dt)
         {
             OnGather?.Invoke(); PositionCalls = VelocityCalls = 0;
-            _manifold.Gather([new(Vector3.Zero, Vector3.Zero, Vector3.UnitZ, Vector3.UnitX, Vector3.UnitY,
-                new((float)(predicted[0].Position.Z - predicted[2].Position.Z), 0, 0), 0)],
-                new(0, 0, 0), predicted[0].Rotation, bodies[0].InverseMass, predicted[2].Rotation, bodies[2].InverseMass);
+            _manifold.GatherGeometry([new(Vector3.Zero, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, Vector3.Zero, false, false)],
+                new(0, 0, 0),
+                new(predicted[0], predicted[0].Position, (float)bodies[0].InverseMass.Mass, velocities[0]),
+                predicted[0].Rotation, bodies[0].InverseMass.Inertia,
+                new(predicted[2], predicted[2].Position, (float)bodies[2].InverseMass.Mass, velocities[2]),
+                predicted[2].Rotation, bodies[2].InverseMass.Inertia, new((float)dt, 0, 2000));
         }
         public void SolvePosition(Span<AlsProjectionDelta> bodies, int iteration, int iterationCount)
         {
