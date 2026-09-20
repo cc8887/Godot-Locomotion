@@ -26,7 +26,9 @@
 当前适配层仍每个 Godot physics tick 判断一次；硬限位仍由 Jolt 自身求解。
 实际驱动力仍来自 Jolt 四元数位置电机，不是把 UE 驱动误差公式直接用于求解冲量。
 
-核对后端还发现：Jolt 的 `SpringPart` 在刚度为零时忽略阻尼，按硬速度约束处理。
+后端更正（后续独立通道批次查明）：虽然 `SpringPart` 的零刚度分支是硬约束，
+`SixDOFConstraint` 位置电机会先检查 `HasStiffness()`，零刚度时直接停用，根本不会调用该分支。
+因此在当前位置电机路径上，纯阻尼会被丢弃，而不是转成硬速度约束。
 因此适配层在合并后 `k == 0 && damping > 0` 时明确抛出不支持异常，避免错误接受纯阻尼。
 纯值层保留正确的 UE 语义，不把 Jolt 的限制混进原生启用规则。
 新增 `--assert-damping-only-rejected`，对两套角色的孤立关节对齐连接器、清空角速度，
@@ -49,7 +51,7 @@ Godot 使用官方 4.7.2 Mono `ed1daf0bf`。公开源码固定到这个提交：
 
 - [MotionProperties.inl](https://raw.githubusercontent.com/godotengine/godot/ed1daf0bf/thirdparty/jolt_physics/Jolt/Physics/Body/MotionProperties.inl)：后端同样先按时间步施加角阻尼。
 - [SixDOFConstraint.cpp](https://raw.githubusercontent.com/godotengine/godot/ed1daf0bf/thirdparty/jolt_physics/Jolt/Physics/Constraints/SixDOFConstraint.cpp)：电机使用当前连接器姿态和投影后的四元数误差，并保留 warm-start 冲量。
-- [SpringPart.h](https://raw.githubusercontent.com/godotengine/godot/ed1daf0bf/thirdparty/jolt_physics/Jolt/Physics/Constraints/ConstraintPart/SpringPart.h)：零刚度分支忽略阻尼，不能冒充原生纯阻尼行。
+- [SpringPart.h](https://raw.githubusercontent.com/godotengine/godot/ed1daf0bf/thirdparty/jolt_physics/Jolt/Physics/Constraints/ConstraintPart/SpringPart.h)：底层零刚度分支忽略阻尼；但此位置电机的调用入口会先将它停用，见上文更正。
 
 按 agent-reach 技能查公开源码时，本机 agent-reach 命令不可用，gh 也未登录；
 使用公开源码页面读取作为替代，没有安装工具、更改凭据或下载新的项目副本。

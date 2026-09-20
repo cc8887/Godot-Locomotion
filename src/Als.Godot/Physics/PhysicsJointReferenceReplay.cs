@@ -86,6 +86,7 @@ public partial class PhysicsJointReferenceReplay : Node3D
             }
         }
         _joints=new(_bodies,definition,[rig.Settings[joint.Index] with {Index=0}],conditionBodyInertia:_computedConditioning);
+        if(_joints.BackendConstraintCount!=2)throw new InvalidOperationException("Replay requires independent drive and limit channels.");
         if(_computedConditioning)
         {
             var inverse=Vector(row.GetProperty("bodies")[1].GetProperty("bodyConditionedInverseInertia"));
@@ -127,7 +128,7 @@ public partial class PhysicsJointReferenceReplay : Node3D
                     throw new InvalidOperationException("Inward limit failed to release momentum across the native zero crossing.");
                 GD.Print($"JOINT_REPLAY_TICK frame={_frame} actual_angles={angles} native_angles={row.GetProperty("samples")[_frame].GetProperty("angles")} rotation_error={rotation}");
             }
-            if(_frame++<12){_joints!.Step(delta);return;}
+            if(_frame++<12){_joints!.Step(delta);_joints.VerifySpringReadback();return;}
             _results.Add(new(_case,row.GetProperty("mesh").GetString()!,row.GetProperty("child").GetString()!,Engine.PhysicsTicksPerSecond,
                 row.GetProperty("fullSpeedDrive").GetBoolean(),_conditionBodies||_computedConditioning,_maxRotation,rotation,_maxPosition,_maxLinear,_maxAngular));
             _joints!.Dispose();_bodies.Dispose();_joints=null;_bodies=null;
