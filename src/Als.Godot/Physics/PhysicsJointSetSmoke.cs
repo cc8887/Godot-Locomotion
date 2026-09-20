@@ -58,7 +58,9 @@ public partial class PhysicsJointSetSmoke : Node3D
                 // body mask alone can still match the floor's mask against its layer.
                 var bodies=new AlsPhysicsBodySet(this,definition,names,parents,7,1,collisionLayer:_noContact||_pair?0u:2u,collisionMask:mask);
                 bodies.Seed(new(1,7,1),skeleton.GlobalTransform,reference,new(2,_highDrop ? -12:0,0),new(.3f,.7f,-.2f)); bodies.Start();
-                var joints=new AlsPhysicsJointSet(bodies,definition,settings);
+                var rawInertia=OS.GetCmdlineUserArgs().Contains("--raw-inertia");
+                var joints=new AlsPhysicsJointSet(bodies,definition,settings,conditionBodyInertia:!rawInertia);
+                GD.Print($"JOINT_INERTIA_CONFIG mesh={name} computed_conditioning={!rawInertia}");
                 Require(joints.BoundJointCount==definition.Joints.Length-(_pair?0:1),"Free root unexpectedly bound.");
                 var pelvis=_pair?1:Array.FindIndex(definition.Bodies,b=>b.Bone=="pelvis");
                 var c=new Case(definition,settings,bodies,joints,skeleton,skeleton.GlobalTransform,new AlsLocalPose[names.Length],pelvis,bodies.BodyAt(pelvis).GlobalPosition);
@@ -123,6 +125,7 @@ public partial class PhysicsJointSetSmoke : Node3D
                     c.Joints.SetEffectiveAngularDrive(25000*Math.Clamp(c.Bodies.BodyAt(c.Pelvis).LinearVelocity.Length()/10,0,1)*1.5,0);
                 if(!_noSoftSolve)c.Joints.Step(dt);
                 if(_frame==1&&!_noSoftSolve)c.Joints.VerifySpringReadback();
+                if(_frame==2)c.Joints.VerifyInertiaReadback();
                 if(_frame%_hz==0)GD.Print($"JOINT_SOLVE_DETAIL rows={c.Joints.LastRowCount} pelvis_angular={c.Bodies.BodyAt(c.Pelvis).AngularVelocity}");
             }
             _maxAnchor=Math.Max(_maxAnchor,anchor); _maxLimit=Math.Max(_maxLimit,limit); _maxSpeed=Math.Max(_maxSpeed,speed);
@@ -138,7 +141,16 @@ public partial class PhysicsJointSetSmoke : Node3D
                 GD.Print($"JOINT_FINAL_BUDGET max_anchor={_maxAnchor} max_limit={_maxLimit} final_speed={_finalSpeed} final_speed_body={_finalSpeedBody} final_angular_speed={_finalAngularSpeed} final_limit={_finalLimit}");
                 if(!_noContact)Require(_finalSpeed<.2f,"Joint chain did not settle below 0.2 m/s.");
                 Require(_finalLimit<.1,"Joint chain limits did not settle within 0.1 rad.");
-                foreach(var c in _cases){c.Joints.Dispose();c.Joints.Dispose();c.Bodies.Dispose();}
+                foreach(var c in _cases)
+                {
+                    c.Joints.Dispose();c.Joints.Dispose();
+                    for(var i=0;i<c.Bodies.BodyCount;i++)
+                    {
+                        var raw=c.Definition.Bodies[i].InertiaKgCm2*.0001;
+                        Require(c.Bodies.BodyAt(i).Inertia==new Vector3((float)raw.X,(float)raw.Y,(float)raw.Z),"Joint disposal did not restore original body inertia.");
+                    }
+                    c.Bodies.Dispose();
+                }
                 GD.Print($"PHYSICS_JOINT_SET_OK hz={_hz} pair={_pair} pair_axis={_pairAxis} pair_angle={_pairAngle} high_drop={_highDrop} frames={_frame} bound={(_pair?2:36)} free_root={(_pair?0:2)} max_anchor_m={_maxAnchor} max_limit_rad={_maxLimit} max_speed={_maxSpeed} final_speed={_finalSpeed} final_limit_rad={_finalLimit}");
                 _done=true;GetTree().Quit();
             }

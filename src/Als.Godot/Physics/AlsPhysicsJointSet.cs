@@ -19,6 +19,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     private readonly Rid[] _joints;
     private readonly float[] _springCache;
     private readonly bool[] _springEnabled;
+    private readonly Vector3[] _previousInertia;
     private bool _disposed;
     private double _driveStiffness=-1,_driveDamping=-1;
     internal int BoundJointCount { get; private set; }
@@ -29,7 +30,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         _driveStiffness=stiffness;_driveDamping=damping;
     }
 
-    internal AlsPhysicsJointSet(AlsPhysicsBodySet bodies,AlsRagdollPhysicsDefinition definition,AlsPhysicsJointSettings[] settings)
+    internal AlsPhysicsJointSet(AlsPhysicsBodySet bodies,AlsRagdollPhysicsDefinition definition,AlsPhysicsJointSettings[] settings,bool conditionBodyInertia=true)
     {
         Main();
         if (!bodies.Active || settings.Length!=definition.Joints.Length || bodies.BodyCount!=definition.Bodies.Length)
@@ -40,8 +41,18 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         _bodies=bodies;_definition=definition;_settings=settings.ToArray();
         _joints=new Rid[settings.Length];_parentFrames=new Transform3D[settings.Length];_childFrames=new Transform3D[settings.Length];
         _springCache=Enumerable.Repeat(float.NaN,settings.Length*9).ToArray();_springEnabled=new bool[settings.Length*3];
+        _previousInertia=Enumerable.Range(0,bodies.BodyCount).Select(i=>bodies.BodyAt(i).Inertia).ToArray();
         try
         {
+            if(conditionBodyInertia)
+            {
+                var conditioned=AlsBodyInertiaCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_inertia_reference.json"),definition,settings);
+                for(var i=0;i<conditioned.Length;i++)
+                {
+                    var scale=conditioned[i].InverseInertiaScale;var raw=definition.Bodies[i].InertiaKgCm2;
+                    bodies.BodyAt(i).Inertia=new((float)(raw.X*.0001/scale.X),(float)(raw.Y*.0001/scale.Y),(float)(raw.Z*.0001/scale.Z));
+                }
+            }
             foreach(var j in definition.Joints)
             {
                 var s=settings[j.Index];if(s.Index!=j.Index)throw new InvalidDataException("Joint index differs.");
@@ -148,6 +159,21 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         }
     }
 
+    internal void VerifyInertiaReadback()
+    {
+        Check();
+        for(var i=0;i<_bodies.BodyCount;i++)
+        {
+            var body=_bodies.BodyAt(i);if(body.Freeze)continue;
+            var state=PhysicsServer3D.BodyGetDirectState(body.GetRid())??throw new InvalidOperationException("No backend inertia state.");
+            var axes=state.Transform.Basis.Orthonormalized();var inertia=body.Inertia;
+            var expected=axes*Basis.FromScale(new(1/inertia.X,1/inertia.Y,1/inertia.Z))*axes.Transposed();
+            for(var axis=0;axis<3;axis++)
+                if((expected[axis]-state.InverseInertiaTensor[axis]).Length()/MathF.Max(expected[axis].Length(),1)>1e-4f)
+                    throw new InvalidOperationException("Backend did not accept conditioned principal inertia.");
+        }
+    }
+
     internal (Transform3D Parent,Transform3D Child) Frames(int index)
     {
         Check();var j=_definition.Joints[index];
@@ -178,5 +204,11 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     private static double Component(AlsDoubleVector v,int i)=>i==0?v.X:i==1?v.Y:v.Z;
     private static void Main(){if(!GodotThread.IsMainThread())throw new InvalidOperationException("Joint access requires Main.");}
     private void Check(){Main();ObjectDisposedException.ThrowIf(_disposed,this);}
-    public void Dispose(){Main();if(_disposed)return;_disposed=true;foreach(var rid in _joints)if(rid.IsValid)PhysicsServer3D.FreeRid(rid);BoundJointCount=0;}
+    public void Dispose()
+    {
+        Main();if(_disposed)return;_disposed=true;
+        foreach(var rid in _joints)if(rid.IsValid)PhysicsServer3D.FreeRid(rid);
+        for(var i=0;i<_previousInertia.Length;i++)_bodies.BodyAt(i).Inertia=_previousInertia[i];
+        BoundJointCount=0;
+    }
 }
