@@ -17,6 +17,11 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     private readonly AlsPhysicsJointSettings[] _settings;
     private readonly Transform3D[] _parentFrames,_childFrames;
     private readonly Rid[] _joints;
+    // The limit channel shares the hard constraint, followed by a separate
+    // drive constraint. Never combine targets or accumulated motor impulses.
+    // This lets each Jolt limit motor solve before its point constraint.
+    private const int Drive=0,Limit=1;
+    private readonly Rid[] _springs;
     private readonly float[] _springCache;
     private readonly bool[] _springEnabled;
     private readonly Vector3[] _previousInertia;
@@ -24,6 +29,9 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     private double _driveStiffness=-1,_driveDamping=-1;
     internal int BoundJointCount { get; private set; }
     internal int LastRowCount { get; private set; }
+    internal int LastDriveRowCount { get; private set; }
+    internal int LastLimitRowCount { get; private set; }
+    internal int BackendConstraintCount=>_springs.Count(r=>r.IsValid);
     internal void SetEffectiveAngularDrive(double stiffness,double damping)
     {
         Check();if(!double.IsFinite(stiffness)||stiffness<0||!double.IsFinite(damping)||damping<0)throw new ArgumentOutOfRangeException(nameof(stiffness));
@@ -40,7 +48,8 @@ internal sealed class AlsPhysicsJointSet : IDisposable
         foreach(var s in settings)Validate(s);
         _bodies=bodies;_definition=definition;_settings=settings.ToArray();
         _joints=new Rid[settings.Length];_parentFrames=new Transform3D[settings.Length];_childFrames=new Transform3D[settings.Length];
-        _springCache=Enumerable.Repeat(float.NaN,settings.Length*9).ToArray();_springEnabled=new bool[settings.Length*3];
+        _springs=new Rid[settings.Length*2];
+        _springCache=Enumerable.Repeat(float.NaN,_springs.Length*9).ToArray();_springEnabled=new bool[_springs.Length*3];
         _previousInertia=Enumerable.Range(0,bodies.BodyCount).Select(i=>bodies.BodyAt(i).Inertia).ToArray();
         try
         {
@@ -59,7 +68,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
                 _parentFrames[j.Index]=bodies.BoneToMass(j.ParentBody).AffineInverse()*AlsPhysicsBodySet.NativeToFbx(j.ParentFrame);
                 _childFrames[j.Index]=bodies.BoneToMass(j.ChildBody).AffineInverse()*AlsPhysicsBodySet.NativeToFbx(j.ChildFrame);
                 if(Unconstrained(s))continue;
-                var rid=PhysicsServer3D.JointCreate();_joints[j.Index]=rid;
+                var rid=PhysicsServer3D.JointCreate();_joints[j.Index]=rid;_springs[j.Index*2+Limit]=rid;
                 PhysicsServer3D.JointMakeGeneric6Dof(rid,bodies.BodyAt(j.ParentBody).GetRid(),_parentFrames[j.Index],bodies.BodyAt(j.ChildBody).GetRid(),_childFrames[j.Index]);
                 for(var axis=0;axis<3;axis++)
                 {
@@ -74,7 +83,19 @@ internal sealed class AlsPhysicsJointSet : IDisposable
                         motion==AlsJointMotion.Locked || (motion==AlsJointMotion.Limited&&!soft.Enabled));
                 }
                 var excluded=definition.DisabledCollisions.Any(pair=>pair.A==Math.Min(j.ParentBody,j.ChildBody)&&pair.B==Math.Max(j.ParentBody,j.ChildBody));
-                PhysicsServer3D.JointDisableCollisionsBetweenBodies(rid,excluded||!s.CollisionEnabled);BoundJointCount++;
+                PhysicsServer3D.JointDisableCollisionsBetweenBodies(rid,excluded||!s.CollisionEnabled);
+                {
+                    var spring=PhysicsServer3D.JointCreate();_springs[j.Index*2+Drive]=spring;
+                    PhysicsServer3D.JointMakeGeneric6Dof(spring,bodies.BodyAt(j.ParentBody).GetRid(),_parentFrames[j.Index],bodies.BodyAt(j.ChildBody).GetRid(),_childFrames[j.Index]);
+                    for(var axis=0;axis<3;axis++)
+                    {
+                        var a=(Vector3.Axis)axis;
+                        PhysicsServer3D.Generic6DofJointSetFlag(spring,a,PhysicsServer3D.G6DofJointAxisFlag.EnableLinearLimit,false);
+                        PhysicsServer3D.Generic6DofJointSetFlag(spring,a,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularLimit,false);
+                    }
+                    PhysicsServer3D.JointDisableCollisionsBetweenBodies(spring,excluded||!s.CollisionEnabled);
+                }
+                BoundJointCount++;
             }
         }
         catch{Dispose();throw;}
@@ -83,7 +104,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     internal void Step(double dt)
     {
         Check();if(!double.IsFinite(dt)||dt<=0||dt>.1)throw new ArgumentOutOfRangeException(nameof(dt));
-        LastRowCount=0;if(!_bodies.Active)return;
+        LastRowCount=LastDriveRowCount=LastLimitRowCount=0;if(!_bodies.Active)return;
         var angleTolerance=AlsJointRowActivation.AngleTolerance(dt);
         foreach(var j in _definition.Joints)
         {
@@ -94,13 +115,12 @@ internal sealed class AlsPhysicsJointSet : IDisposable
             var predictedP=Predict(p,pBody,dt);var predictedC=Predict(c,cBody,dt);
             var predicted=Angles(predictedP,predictedC);
             var t=s.AngularDrive.Target;var targetRotation=new Quaternion((float)-t.X,(float)t.Y,(float)-t.Z,(float)t.W);
-            var target=Angles(Quaternion.Identity,targetRotation);
             var driveError=AlsJointAngularKinematics.SwingTwistDriveError(Core(predictedP),Core(predictedC),Core(targetRotation));
             var inverseP=InverseInertia(pBody);var inverseC=InverseInertia(cBody);var childBasis=new Basis(c);
             var desired=Vector3.Zero;
             for(var axis=0;axis<3;axis++)
             {
-                var a=(Vector3.Axis)axis;var motion=Motion(s.AngularMotion,axis);var soft=axis==0?s.TwistSoftLimit:s.SwingSoftLimit;
+                var motion=Motion(s.AngularMotion,axis);var soft=axis==0?s.TwistSoftLimit:s.SwingSoftLimit;
                 var position=axis==0?s.AngularDrive.TwistPosition:s.AngularDrive.SwingPosition;
                 var velocity=axis==0?s.AngularDrive.TwistVelocity:s.AngularDrive.SwingVelocity;
                 var coefficient=axis==0?0:2;var value=Component(current,axis);var next=Component(predicted,axis);var angleLimit=Component(s.AngularLimitsRad,axis);
@@ -118,56 +138,117 @@ internal sealed class AlsPhysicsJointSet : IDisposable
                 var kd=driveActive?stiffness*driveScale:0;
                 var cd=driveActive?drag*driveScale:0;
                 var kl=limitActive?soft.Stiffness*limitScale:0;var cl=limitActive?soft.Damping*limitScale:0;
-                var k=kd+kl;var damping=cd+cl;
-                // Jolt SpringPart treats k == 0 as a hard velocity constraint
-                // and ignores damping. Do not silently turn a native damper
-                // into a hard motor (or drop that row).
-                if(k==0&&damping>0)throw new NotSupportedException("Jolt position motors cannot represent damping-only rows.");
                 var boundary=Math.CopySign(angleLimit,next);
-                desired[axis]=(float)(k>0?(kd*Component(target,axis)+kl*boundary)/k:value);
-                var enabled=motion!=AlsJointMotion.Locked&&k>0;
-                SpringParam(j.Index,axis,0,PhysicsServer3D.G6DofJointAxisParam.AngularSpringStiffness,(float)k);
-                SpringParam(j.Index,axis,1,PhysicsServer3D.G6DofJointAxisParam.AngularSpringDamping,(float)damping);
-                if(_springEnabled[j.Index*3+axis]!=enabled)
-                {
-                    PhysicsServer3D.Generic6DofJointSetFlag(rid,a,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularSpring,enabled);
-                    _springEnabled[j.Index*3+axis]=enabled;
-                }
-                if(enabled)LastRowCount++;
+                desired[axis]=(float)(limitActive?boundary:value);
+                if(ConfigureSpring(j.Index*2+Drive,axis,kd,cd))LastDriveRowCount++;
+                if(ConfigureSpring(j.Index*2+Limit,axis,kl,cl))LastLimitRowCount++;
             }
             // Reconstruct the target from native stereographic swing angles and
             // twist. The Godot 6DOF equilibrium API uses negated ZYX Euler angles.
             var y=Math.Tan(desired.Y*.25);var z=Math.Tan(desired.Z*.25);var denominator=1+y*y+z*z;
             var swing=new Quaternion(0,(float)(2*y/denominator),(float)(2*z/denominator),(float)((1-y*y-z*z)/denominator));
             var orientation=swing*new Quaternion(Vector3.Right,desired.X);
-            var euler=-new Basis(orientation).GetEuler(EulerOrder.Zyx);
-            for(var axis=0;axis<3;axis++)SpringParam(j.Index,axis,2,PhysicsServer3D.G6DofJointAxisParam.AngularSpringEquilibriumPoint,euler[axis]);
+            SetTarget(j.Index*2+Drive,targetRotation);
+            SetTarget(j.Index*2+Limit,orientation);
         }
+        LastRowCount=LastDriveRowCount+LastLimitRowCount;
     }
 
-    private void SpringParam(int joint,int axis,int field,PhysicsServer3D.G6DofJointAxisParam key,float value)
+    private bool ConfigureSpring(int spring,int axis,double stiffness,double damping)
     {
-        var index=joint*9+axis*3+field;
+        // Jolt's SixDOF position motor is deactivated at zero stiffness. Check
+        // each channel even if the other has positive stiffness.
+        if(stiffness==0&&damping>0)throw new NotSupportedException("Jolt position motors cannot represent damping-only rows.");
+        var enabled=stiffness>0;
+        SpringParam(spring,axis,0,PhysicsServer3D.G6DofJointAxisParam.AngularSpringStiffness,(float)stiffness);
+        SpringParam(spring,axis,1,PhysicsServer3D.G6DofJointAxisParam.AngularSpringDamping,(float)damping);
+        if(_springEnabled[spring*3+axis]!=enabled)
+        {
+            PhysicsServer3D.Generic6DofJointSetFlag(_springs[spring],(Vector3.Axis)axis,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularSpring,enabled);
+            _springEnabled[spring*3+axis]=enabled;
+        }
+        return enabled;
+    }
+    private void SetTarget(int spring,Quaternion orientation)
+    {
+        var euler=-new Basis(orientation).GetEuler(EulerOrder.Zyx);
+        for(var axis=0;axis<3;axis++)SpringParam(spring,axis,2,PhysicsServer3D.G6DofJointAxisParam.AngularSpringEquilibriumPoint,euler[axis]);
+    }
+    private void SpringParam(int spring,int axis,int field,PhysicsServer3D.G6DofJointAxisParam key,float value)
+    {
+        var index=spring*9+axis*3+field;
         if(_springCache[index]==value)return;
-        Param(_joints[joint],(Vector3.Axis)axis,key,value);_springCache[index]=value;
+        Param(_springs[spring],(Vector3.Axis)axis,key,value);_springCache[index]=value;
     }
 
     internal void VerifySpringReadback()
     {
         Check();
-        for(var j=0;j<_joints.Length;j++)if(_joints[j].IsValid)
+        for(var j=0;j<_springs.Length;j++)if(_springs[j].IsValid)
         for(var axis=0;axis<3;axis++)
         {
             var a=(Vector3.Axis)axis;
-            if(PhysicsServer3D.Generic6DofJointGetFlag(_joints[j],a,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularSpring)!=_springEnabled[j*3+axis])
+            if(j%2==Drive&&(PhysicsServer3D.Generic6DofJointGetFlag(_springs[j],a,PhysicsServer3D.G6DofJointAxisFlag.EnableLinearLimit)||
+               PhysicsServer3D.Generic6DofJointGetFlag(_springs[j],a,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularLimit)))
+                throw new InvalidOperationException("Spring channel must not duplicate hard constraints.");
+            if(j%2==Limit)
+            {
+                var s=_settings[j/2];var motion=Motion(s.AngularMotion,axis);var soft=axis==0?s.TwistSoftLimit:s.SwingSoftLimit;
+                var linear=Motion(s.LinearMotion,axis)==AlsJointMotion.Locked;
+                var angular=motion==AlsJointMotion.Locked||(motion==AlsJointMotion.Limited&&!soft.Enabled);
+                if(PhysicsServer3D.Generic6DofJointGetFlag(_springs[j],a,PhysicsServer3D.G6DofJointAxisFlag.EnableLinearLimit)!=linear||
+                   PhysicsServer3D.Generic6DofJointGetFlag(_springs[j],a,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularLimit)!=angular)
+                    throw new InvalidOperationException("Limit channel lost its authored hard constraints.");
+            }
+            if(PhysicsServer3D.Generic6DofJointGetFlag(_springs[j],a,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularSpring)!=_springEnabled[j*3+axis])
                 throw new InvalidOperationException("Backend did not accept angular spring flag.");
             for(var field=0;field<3;field++)
             {
                 var key=field==0?PhysicsServer3D.G6DofJointAxisParam.AngularSpringStiffness:field==1?PhysicsServer3D.G6DofJointAxisParam.AngularSpringDamping:PhysicsServer3D.G6DofJointAxisParam.AngularSpringEquilibriumPoint;
-                if(PhysicsServer3D.Generic6DofJointGetParam(_joints[j],a,key)!=_springCache[j*9+axis*3+field])
+                if(PhysicsServer3D.Generic6DofJointGetParam(_springs[j],a,key)!=_springCache[j*9+axis*3+field])
                     throw new InvalidOperationException("Backend did not accept angular spring value.");
             }
         }
+    }
+
+    // Fixture probe: no physics step runs between these drive changes. The
+    // backend limit channel must retain its own coefficients and target.
+    internal void VerifyDriveIsolation(double dt)
+    {
+        Check();var previousStiffness=_driveStiffness;var previousDamping=_driveDamping;
+        try
+        {
+            SetEffectiveAngularDrive(75,1.5);Step(dt);VerifySpringReadback();
+            if(LastDriveRowCount==0||LastLimitRowCount==0)
+                throw new InvalidOperationException("Isolation probe requires simultaneous drive and limit rows.");
+            var limits=ReadChannelState(Limit);var drives=ReadChannelState(Drive);
+            SetEffectiveAngularDrive(37500,0);Step(dt);VerifySpringReadback();
+            if(!limits.SequenceEqual(ReadChannelState(Limit))||drives.SequenceEqual(ReadChannelState(Drive)))
+                throw new InvalidOperationException("Drive update changed limits or failed to reach its own channel.");
+            SetEffectiveAngularDrive(0,0);Step(dt);VerifySpringReadback();
+            if(LastDriveRowCount!=0||LastLimitRowCount==0||!limits.SequenceEqual(ReadChannelState(Limit)))
+                throw new InvalidOperationException("Disabling drives disturbed active limits.");
+        }
+        finally{_driveStiffness=previousStiffness;_driveDamping=previousDamping;Step(dt);}
+    }
+
+    private float[] ReadChannelState(int channel)
+    {
+        var result=new float[_joints.Length*12];
+        for(var joint=0;joint<_joints.Length;joint++)
+        {
+            var rid=_springs[joint*2+channel];if(!rid.IsValid)continue;
+            if(rid==_springs[joint*2+1-channel])throw new InvalidOperationException("Drive and limit share a backend constraint.");
+            for(var axis=0;axis<3;axis++)
+            {
+                var a=(Vector3.Axis)axis;var offset=joint*12+axis*4;
+                result[offset]=PhysicsServer3D.Generic6DofJointGetParam(rid,a,PhysicsServer3D.G6DofJointAxisParam.AngularSpringStiffness);
+                result[offset+1]=PhysicsServer3D.Generic6DofJointGetParam(rid,a,PhysicsServer3D.G6DofJointAxisParam.AngularSpringDamping);
+                result[offset+2]=PhysicsServer3D.Generic6DofJointGetParam(rid,a,PhysicsServer3D.G6DofJointAxisParam.AngularSpringEquilibriumPoint);
+                result[offset+3]=PhysicsServer3D.Generic6DofJointGetFlag(rid,a,PhysicsServer3D.G6DofJointAxisFlag.EnableAngularSpring)?1:0;
+            }
+        }
+        return result;
     }
 
     internal void VerifyInertiaReadback()
@@ -226,7 +307,8 @@ internal sealed class AlsPhysicsJointSet : IDisposable
     public void Dispose()
     {
         Main();if(_disposed)return;_disposed=true;
-        foreach(var rid in _joints)if(rid.IsValid)PhysicsServer3D.FreeRid(rid);
+        foreach(var rid in _springs)if(rid.IsValid)PhysicsServer3D.FreeRid(rid);
+        Array.Clear(_springs);Array.Clear(_joints);
         for(var i=0;i<_previousInertia.Length;i++)_bodies.BodyAt(i).Inertia=_previousInertia[i];
         BoundJointCount=0;
     }

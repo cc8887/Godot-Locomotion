@@ -14,7 +14,7 @@ public partial class PhysicsJointSetSmoke : Node3D
     private readonly List<Case> _cases=[];
     private int _hz,_frame; private bool _done,_highDrop,_noContact,_pair,_alsDrives,_noSoftSolve,_noSelfCollision;
     private int _pairAxis;private float _pairAngle;
-    private bool _assertDampingOnlyRejected;
+    private bool _assertDampingOnlyRejected,_assertIndependentChannels;
     private float _maxAnchor,_maxSpeed,_finalSpeed,_finalAngularSpeed; private double _maxLimit,_finalLimit;
     private string _finalSpeedBody="none";
     public override void _Ready()
@@ -26,7 +26,9 @@ public partial class PhysicsJointSetSmoke : Node3D
             _highDrop=OS.GetCmdlineUserArgs().Contains("--high-drop");
             _noContact=OS.GetCmdlineUserArgs().Contains("--no-contact");
             _assertDampingOnlyRejected=OS.GetCmdlineUserArgs().Contains("--assert-damping-only-rejected");
-            _pair=OS.GetCmdlineUserArgs().Contains("--pair")||_assertDampingOnlyRejected;
+            _assertIndependentChannels=OS.GetCmdlineUserArgs().Contains("--assert-independent-channels");
+            Require(!_assertDampingOnlyRejected||!_assertIndependentChannels,"Select one channel probe.");
+            _pair=OS.GetCmdlineUserArgs().Contains("--pair")||_assertDampingOnlyRejected||_assertIndependentChannels;
             _alsDrives=OS.GetCmdlineUserArgs().Contains("--als-drives");
             _noSoftSolve=OS.GetCmdlineUserArgs().Contains("--no-soft-solve");
             _noSelfCollision=OS.GetCmdlineUserArgs().Contains("--no-self-collision");
@@ -64,6 +66,7 @@ public partial class PhysicsJointSetSmoke : Node3D
                 var joints=new AlsPhysicsJointSet(bodies,definition,settings,conditionBodyInertia:!rawInertia);
                 GD.Print($"JOINT_INERTIA_CONFIG mesh={name} computed_conditioning={!rawInertia}");
                 Require(joints.BoundJointCount==definition.Joints.Length-(_pair?0:1),"Free root unexpectedly bound.");
+                Require(joints.BackendConstraintCount==joints.BoundJointCount*2,"Expected independent limit and drive constraints.");
                 var pelvis=_pair?1:Array.FindIndex(definition.Bodies,b=>b.Bone=="pelvis");
                 var c=new Case(definition,settings,bodies,joints,skeleton,skeleton.GlobalTransform,new AlsLocalPose[names.Length],pelvis,bodies.BodyAt(pelvis).GlobalPosition);
                 _cases.Add(c);
@@ -87,6 +90,12 @@ public partial class PhysicsJointSetSmoke : Node3D
         if(_done)return;
         try
         {
+            if(_assertIndependentChannels)
+            {
+                foreach(var c in _cases)c.Joints.VerifyDriveIsolation(dt);
+                GD.Print("JOINT_INDEPENDENT_CHANNELS_OK meshes=2 drive_updates=75,37500,0 limits_unchanged=true");
+                _done=true;GetTree().Quit();return;
+            }
             if(_assertDampingOnlyRejected)
             {
                 foreach(var c in _cases)
@@ -147,7 +156,7 @@ public partial class PhysicsJointSetSmoke : Node3D
                 if(!_noSoftSolve)c.Joints.Step(dt);
                 if(_frame==1&&!_noSoftSolve)c.Joints.VerifySpringReadback();
                 if(_frame==2)c.Joints.VerifyInertiaReadback();
-                if(_frame%_hz==0)GD.Print($"JOINT_SOLVE_DETAIL rows={c.Joints.LastRowCount} pelvis_angular={c.Bodies.BodyAt(c.Pelvis).AngularVelocity}");
+                if(_frame%_hz==0)GD.Print($"JOINT_SOLVE_DETAIL rows={c.Joints.LastRowCount} drive_rows={c.Joints.LastDriveRowCount} limit_rows={c.Joints.LastLimitRowCount} pelvis_angular={c.Bodies.BodyAt(c.Pelvis).AngularVelocity}");
             }
             _maxAnchor=Math.Max(_maxAnchor,anchor); _maxLimit=Math.Max(_maxLimit,limit); _maxSpeed=Math.Max(_maxSpeed,speed);
             if(_frame>_hz*9)
@@ -165,6 +174,7 @@ public partial class PhysicsJointSetSmoke : Node3D
                 foreach(var c in _cases)
                 {
                     c.Joints.Dispose();c.Joints.Dispose();
+                    Require(c.Joints.BackendConstraintCount==0,"Joint channels retained released handles.");
                     for(var i=0;i<c.Bodies.BodyCount;i++)
                     {
                         var raw=c.Definition.Bodies[i].InertiaKgCm2*.0001;
