@@ -21,7 +21,7 @@ public partial class PhysicsJointReferenceReplay : Node3D
     private readonly List<Result> _results=[];
     private JsonDocument? _reference;
     private AlsPhysicsBodySet? _bodies;private AlsPhysicsJointSet? _joints;
-    private int _case,_frame;private bool _done,_conditionBodies,_singleCase,_assertRelease;private string _output="";
+    private int _case,_frame;private bool _done,_conditionBodies,_computedConditioning,_singleCase,_assertRelease;private string _output="";
     private double _maxRotation,_maxPosition,_maxLinear,_maxAngular;
 
     public override void _Ready()
@@ -29,6 +29,8 @@ public partial class PhysicsJointReferenceReplay : Node3D
         try
         {
             var args=OS.GetCmdlineUserArgs();_conditionBodies=args.Contains("--body-conditioning");
+            _computedConditioning=args.Contains("--computed-body-conditioning");
+            if(_computedConditioning&&_conditionBodies)throw new ArgumentException("Select computed or recorded body conditioning, not both.");
             _output=args.FirstOrDefault(a=>a.StartsWith("--report="))?[9..]??"";
             if(!System.IO.Path.IsPathFullyQualified(_output)||System.IO.File.Exists(_output))throw new ArgumentException("Replay requires a new absolute --report path.");
             _reference=JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_joint_solver_reference.json"));
@@ -83,7 +85,14 @@ public partial class PhysicsJointReferenceReplay : Node3D
                 b.Inertia=new(.0001f/inv.X,.0001f/inv.Y,.0001f/inv.Z);
             }
         }
-        _joints=new(_bodies,definition,[rig.Settings[joint.Index] with {Index=0}]);
+        _joints=new(_bodies,definition,[rig.Settings[joint.Index] with {Index=0}],conditionBodyInertia:_computedConditioning);
+        if(_computedConditioning)
+        {
+            var inverse=Vector(row.GetProperty("bodies")[1].GetProperty("bodyConditionedInverseInertia"));
+            var expected=new Vector3(.0001f/inverse.X,.0001f/inverse.Y,.0001f/inverse.Z);
+            if((_bodies.BodyAt(1).Inertia-expected).Length()>expected.Length()*1e-5f)
+                throw new InvalidOperationException("Computed body inertia differs from native pair.");
+        }
         if(row.GetProperty("fullSpeedDrive").GetBoolean())_joints.SetEffectiveAngularDrive(37500,0);
         _frame=0;_maxRotation=_maxPosition=_maxLinear=_maxAngular=0;
     }
@@ -106,6 +115,7 @@ public partial class PhysicsJointReferenceReplay : Node3D
             var angular=Vector(sample.GetProperty("angularVelocity"))*new Vector3(-1,1,-1);
             _maxLinear=Math.Max(_maxLinear,actual.LinearVelocity.DistanceTo(linear));_maxAngular=Math.Max(_maxAngular,actual.AngularVelocity.DistanceTo(angular));
             if(!pose.IsFinite()||!double.IsFinite(_maxRotation+_maxPosition+_maxLinear+_maxAngular))throw new InvalidOperationException("Nonfinite replay state.");
+            if(_frame==1)_joints!.VerifyInertiaReadback();
             if(_frame==0&&(_maxRotation>.001||_maxPosition>.0001||_maxLinear>.0001||_maxAngular>.0001))
                 throw new InvalidOperationException($"Initial body state differs at case {_case}: rotation={_maxRotation} position={_maxPosition} linear={_maxLinear} angular={_maxAngular}.");
             if(_singleCase)
@@ -119,12 +129,12 @@ public partial class PhysicsJointReferenceReplay : Node3D
             }
             if(_frame++<12){_joints!.Step(delta);return;}
             _results.Add(new(_case,row.GetProperty("mesh").GetString()!,row.GetProperty("child").GetString()!,Engine.PhysicsTicksPerSecond,
-                row.GetProperty("fullSpeedDrive").GetBoolean(),_conditionBodies,_maxRotation,rotation,_maxPosition,_maxLinear,_maxAngular));
+                row.GetProperty("fullSpeedDrive").GetBoolean(),_conditionBodies||_computedConditioning,_maxRotation,rotation,_maxPosition,_maxLinear,_maxAngular));
             _joints!.Dispose();_bodies.Dispose();_joints=null;_bodies=null;
             if(++_case<_reference!.RootElement.GetProperty("cases").GetArrayLength()&&!_singleCase)
             {Engine.PhysicsTicksPerSecond=Current.GetProperty("hz").GetInt32();return;}
             using(var file=Godot.FileAccess.Open(_output,Godot.FileAccess.ModeFlags.Write))file.StoreString(JsonSerializer.Serialize(_results,new JsonSerializerOptions{WriteIndented=true}));
-            GD.Print($"JOINT_REFERENCE_REPLAY_RECORDED cases={_results.Count} body_conditioning={_conditionBodies} max_rotation_error_rad={_results.Max(r=>r.MaxRotationErrorRad)} max_position_error_m={_results.Max(r=>r.MaxPositionErrorM)} parity_asserted=false");
+            GD.Print($"JOINT_REFERENCE_REPLAY_RECORDED cases={_results.Count} body_conditioning={_conditionBodies} computed_conditioning={_computedConditioning} max_rotation_error_rad={_results.Max(r=>r.MaxRotationErrorRad)} max_position_error_m={_results.Max(r=>r.MaxPositionErrorM)} parity_asserted=false");
             if(_assertRelease)GD.Print("JOINT_LIMIT_RELEASE_OK native_zero_crossing_frame=3");
             _done=true;GetTree().Quit();
         }
