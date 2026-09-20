@@ -26,6 +26,17 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private PhysicsDirectSpaceState3D _state = null!;
     private bool _bodyHasShape, _disposed;
     public int NarrowPhaseQueries { get; private set; }
+    public bool IsInvalidated
+    {
+        get
+        {
+            Check();
+            for (var i = 0; i < _bindings.Length; i++)
+                if (_registry.Present(i) && (_bindings[i] is not { } binding || binding.Dirty ||
+                    binding.Revision != _registry.Key(i).Revision || !GodotObject.IsInstanceValid(binding.Shape))) return true;
+            return false;
+        }
+    }
     internal AlsGodotContactQuery(AlsContactRegistry registry)
     {
         Main(); _registry = registry; _bindings = new Binding[registry.Capacity];

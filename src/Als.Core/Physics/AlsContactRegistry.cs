@@ -18,6 +18,7 @@ public sealed class AlsContactRegistry
     public int Capacity => _shapes.Length;
     public int BodyCount => _bodyGenerations.Length;
     public bool IsLocked => _locked;
+    public long ChangeVersion { get; private set; }
     public AlsContactRegistry(int bodies, int shapeCapacity)
     {
         if (bodies <= 0 || shapeCapacity <= 0) throw new ArgumentOutOfRangeException(nameof(bodies));
@@ -33,19 +34,19 @@ public sealed class AlsContactRegistry
     {
         Mutable(); Validate(shape);
         for (var i = 0; i < Capacity; i++) if (!_present[i])
-        { var revision = checked(_revisions[i] + 1); _shapes[i] = shape; _revisions[i] = revision; _present[i] = true; return new(i, revision); }
+        { var revision = checked(_revisions[i] + 1); Changed(); _shapes[i] = shape; _revisions[i] = revision; _present[i] = true; return new(i, revision); }
         throw new InvalidOperationException("Contact shape registry is full.");
     }
     public AlsContactShapeHandle Replace(AlsContactShapeHandle handle, AlsRegisteredContactShape shape)
     {
         Mutable(); Check(handle); Validate(shape); var revision = checked(_revisions[handle.Slot] + 1);
-        _shapes[handle.Slot] = shape; _revisions[handle.Slot] = revision; return new(handle.Slot, revision);
+        Changed(); _shapes[handle.Slot] = shape; _revisions[handle.Slot] = revision; return new(handle.Slot, revision);
     }
-    public void Remove(AlsContactShapeHandle handle) { Mutable(); Check(handle); _present[handle.Slot] = false; }
+    public void Remove(AlsContactShapeHandle handle) { Mutable(); Check(handle); Changed(); _present[handle.Slot] = false; }
     public void RebindBody(int body)
-    { Mutable(); Body(body); _bodyGenerations[body] = checked(_bodyGenerations[body] + 1); }
+    { Mutable(); Body(body); var generation = checked(_bodyGenerations[body] + 1); Changed(); _bodyGenerations[body] = generation; }
     public void DisableBodyPair(int a, int b, bool disabled)
-    { Mutable(); Body(a); Body(b); _disabledPairs[a * BodyCount + b] = _disabledPairs[b * BodyCount + a] = disabled; }
+    { Mutable(); Body(a); Body(b); if (_disabledPairs[a * BodyCount + b] == disabled) return; Changed(); _disabledPairs[a * BodyCount + b] = _disabledPairs[b * BodyCount + a] = disabled; }
     public bool Allows(int a, int b)
     {
         if (!Present(a) || !Present(b)) return false;
@@ -56,6 +57,7 @@ public sealed class AlsContactRegistry
     internal void Enter() { Mutable(); _locked = true; }
     internal void Leave() => _locked = false;
     private void Mutable() { if (_locked) throw new InvalidOperationException("Contact registry is locked during a physics step."); }
+    private void Changed() => ChangeVersion = checked(ChangeVersion + 1);
     private void Body(int body) { if ((uint)body >= BodyCount) throw new ArgumentOutOfRangeException(nameof(body)); }
     private void Check(AlsContactShapeHandle handle)
     { if (!Present(handle.Slot) || _revisions[handle.Slot] != handle.Revision) throw new ArgumentException("Stale contact shape handle."); }

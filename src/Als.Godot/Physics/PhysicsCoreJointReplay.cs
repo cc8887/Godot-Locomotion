@@ -21,11 +21,13 @@ public partial class PhysicsCoreJointReplay : Node3D
     private readonly List<Active> _active = [];
     private JsonDocument? _reference;
     private int _case, _frame, _hz;
-    private bool _done, _chains, _drop, _highDrop;
+    private bool _done, _chains, _drop, _highDrop, _sleep;
     private double _positionError, _angleError, _vError, _wError, _transportError, _anchorCm;
     private string _report = "";
     private int _contactPoints;
     private double _finalSpeed, _finalAngularSpeed, _maxLimit, _finalLimit;
+    private readonly Dictionary<AlsJointIsland, (int Frame, AlsIslandBodyState[] States, long Epoch)> _slept = [];
+    private int _sleepHeldSteps;
     private JsonElement Current => _reference!.RootElement.GetProperty("cases")[_case];
 
     public override void _Ready()
@@ -34,6 +36,7 @@ public partial class PhysicsCoreJointReplay : Node3D
         {
             var args = OS.GetCmdlineUserArgs(); _chains = args.Contains("--chains");
             _drop = args.Contains("--drop"); _highDrop = args.Contains("--high-drop");
+            _sleep = args.Contains("--sleep"); Require(!_sleep || _drop, "Sleep probe requires --drop.");
             Require(!_drop || _chains, "Drop requires --chains.");
             Require(!_highDrop || _drop, "High drop requires --drop.");
             _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
@@ -114,7 +117,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                 var actor = states[spine].Actor;
                 states[spine] = states[spine] with { Actor = actor with { Rotation = (AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitY, .6f) * actor.Rotation).Normalized() } };
             }
-            Add(rig, new(bodies, joints, states));
+            var sleep = _sleep ? AlsSleepSettingsCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_sleep_reference.json"), definition) : null;
+            Add(rig, new(bodies, joints, states, sleepSettings: sleep is null ? [] : [.. sleep.Bodies, default], sleepSmoothing: sleep?.Smoothing ?? .3f));
         }
     }
 
@@ -173,8 +177,14 @@ public partial class PhysicsCoreJointReplay : Node3D
             {
                 foreach (var active in _active)
                 {
-                    if (_drop) { active.Host.Step(dt, new(0, 0, -980), active.Contacts!); _contactPoints += active.Contacts!.LastContactCount; }
+                    if (_drop)
+                    {
+                        var epoch = active.Contacts!.CompletedSteps;
+                        active.Host.Step(dt, new(0, 0, -980), active.Contacts);
+                        if (active.Contacts.CompletedSteps != epoch) _contactPoints += active.Contacts.LastContactCount;
+                    }
                     else active.Host.Step(dt);
+                    if (_sleep) CheckSleeping(active);
                 }
                 _frame++; return;
             }
@@ -184,6 +194,17 @@ public partial class PhysicsCoreJointReplay : Node3D
                 Require(_contactPoints > 0, "Asset drop did not produce contacts.");
                 Require(_finalSpeed < 20, "Core asset chain did not settle below 20 cm/s.");
                 Require(_finalLimit < .1, "Core asset limits did not settle within 0.1 rad.");
+                if (_sleep)
+                {
+                    foreach (var active in _active) if (!active.Host.Island.IsSleeping)
+                        foreach (var body in active.Rig.Definition.Bodies.Where(b => b.PhysicsType != 1))
+                        {
+                            var m = active.Host.Island.SleepMetricsAt(body.Index);
+                            GD.Print($"CORE_SLEEP_METRIC mesh={active.Rig.Definition.Mesh} bone={body.Bone} linear={Math.Sqrt(m.Linear.LengthSquared):R} angular={Math.Sqrt(m.Angular.LengthSquared):R} counter={m.ParticleCounter}");
+                        }
+                    Require(_slept.Count == _active.Count && _slept.Values.All(v => _frame - v.Frame >= _hz),
+                        "Both asset chains must each sleep and hold unchanged for at least one second.");
+                }
             }
             if (!_chains)
             {
@@ -202,7 +223,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                 contacts = _drop, gravity = _drop, high_drop = _highDrop, contact_points = _contactPoints,
                 query_shapes = _active.Sum(a => a.Shapes?.Count ?? 0),
                 final_speed_cmps = _finalSpeed, final_angular_speed_radps = _finalAngularSpeed, max_limit_rad = _maxLimit, final_limit_rad = _finalLimit,
-                sleeping = false, native_pair_parity_asserted = !_chains,
+                sleeping = _sleep, slept_rigs = _slept.Count, sleep_held_steps = _sleepHeldSteps,
+                sleep_frames = _slept.Values.Select(v => v.Frame).ToArray(), native_pair_parity_asserted = !_chains,
                 full_chain_native_parity_asserted = false, frozen_proxy_ownership_asserted = true };
             using (var file = new System.IO.FileStream(_report, FileMode.CreateNew, System.IO.FileAccess.Write))
                 JsonSerializer.Serialize(file, result, new JsonSerializerOptions { WriteIndented = true });
@@ -226,6 +248,22 @@ public partial class PhysicsCoreJointReplay : Node3D
             _positionError = Math.Max(_positionError, position); _angleError = Math.Max(_angleError, angle); _vError = Math.Max(_vError, v); _wError = Math.Max(_wError, w);
             Require(position < 2e-5 && angle < 1e-6 && v < 1e-4 && w < 2e-5,
                 $"Native case {_case} frame {_frame} body {i}: position={position} angle={angle} v={v} w={w}");
+        }
+    }
+
+    private void CheckSleeping(Active active)
+    {
+        var island = active.Host.Island;
+        if (_slept.TryGetValue(island, out var saved))
+        {
+            Require(island.IsSleeping && active.Contacts!.CompletedSteps == saved.Epoch, "Sleeping island queried/advanced its history.");
+            for (var i = 0; i < island.BodyCount; i++) Require(island.BodyAt(i) == saved.States[i], "Sleeping pose or velocity drifted.");
+            _sleepHeldSteps++;
+        }
+        else if (island.IsSleeping)
+        {
+            _slept.Add(island, (_frame + 1, Enumerable.Range(0, island.BodyCount).Select(island.BodyAt).ToArray(), active.Contacts!.CompletedSteps));
+            GD.Print($"CORE_SLEEP_ENTER mesh={active.Rig.Definition.Mesh} frame={_frame + 1}");
         }
     }
 

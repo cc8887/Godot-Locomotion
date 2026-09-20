@@ -14,9 +14,10 @@ public readonly record struct AlsIslandJoint(int Parent, int Child, AlsPrecisePo
 
 // A single-owner, preallocated group of joints, not a collision world. All joints
 // share one DP/DQ and velocity entry per body. No Godot/UE objects or global state.
-// Awake bodies only. An optional contact owner shares the iteration buffers.
+// An optional contact owner shares the iteration buffers. Optional resolved
+// sleep settings apply to this entire preassembled group, including wake input.
 // Step accepts explicit gravity and per-step acceleration/impulse inputs;
-// moving kinematics, sleep and island discovery remain separate work.
+// moving kinematics, partial sleeping and island discovery remain separate work.
 public sealed class AlsJointIsland
 {
     private readonly AlsIslandBody[] _bodies;
@@ -28,13 +29,21 @@ public sealed class AlsJointIsland
     private readonly AlsCachedJoint[] _cached;
     private readonly AlsLockedLinearProjection[] _projections;
     private readonly int _positionIterations, _velocityIterations;
+    private readonly AlsIslandSleep? _sleep;
+    private bool _wakeRequested;
+    private AlsDoubleVector _lastGravity;
+    private IAlsIslandContacts? _lastContacts;
     private bool _stepping;
     public int BodyCount => _bodies.Length;
     public int JointCount => _joints.Length;
     public AlsIslandBodyState BodyAt(int index) => _states[index];
+    public bool IsSleeping => _sleep?.Sleeping ?? false;
+    public int SleepCounter => _sleep?.Counter ?? 0;
+    public AlsSleepMetrics SleepMetricsAt(int index) => _sleep?.At(index) ?? throw new InvalidOperationException("Sleeping is not configured.");
 
     public AlsJointIsland(ReadOnlySpan<AlsIslandBody> bodies, ReadOnlySpan<AlsIslandJoint> joints,
-        ReadOnlySpan<AlsIslandBodyState> initial, int positionIterations = 8, int velocityIterations = 2)
+        ReadOnlySpan<AlsIslandBodyState> initial, int positionIterations = 8, int velocityIterations = 2,
+        ReadOnlySpan<AlsSleepBodySettings> sleepSettings = default, float sleepSmoothing = .3f)
     {
         if (bodies.Length == 0 || bodies.Length != initial.Length)
             throw new ArgumentException("An island requires one initial state per body.");
@@ -72,6 +81,7 @@ public sealed class AlsJointIsland
         }
         // Validate every constraint before accepting a runnable island.
         Gather(1d / 60);
+        if (!sleepSettings.IsEmpty) _sleep = new(_bodies, sleepSettings, _states, sleepSmoothing);
     }
 
     public void Reset(ReadOnlySpan<AlsIslandBodyState> states)
@@ -80,6 +90,15 @@ public sealed class AlsJointIsland
         if (states.Length != _states.Length) throw new ArgumentException("Body state count differs.");
         for (var i = 0; i < states.Length; i++) ValidateState(i, states[i]);
         states.CopyTo(_states);
+        _sleep?.Reset(states); _wakeRequested = false; _lastGravity = default; _lastContacts = null;
+    }
+
+    // Request is consumed only by a successful step. Solver failure leaves the
+    // sleeping state and request intact, so the same inputs can be retried.
+    public void RequestWake()
+    {
+        if (_stepping) throw new InvalidOperationException("Cannot request wake during a physics step.");
+        _wakeRequested = true;
     }
 
     public void StepForceFree(double dt)
@@ -89,7 +108,7 @@ public sealed class AlsJointIsland
         => Step(dt, default, default, contacts);
 
     public void Step(double dt, AlsDoubleVector gravity, ReadOnlySpan<AlsBodyStepForces> forces = default,
-        IAlsIslandContacts? contacts = null, bool dragBeforeIntegration = false)
+        IAlsIslandContacts? contacts = null, bool dragBeforeIntegration = false, bool allowSleep = true)
     {
         if (_stepping) throw new InvalidOperationException("Island stepping is not reentrant.");
         if (!double.IsFinite(dt) || dt <= 0 || !float.IsFinite(1 / (float)dt) || (float)dt == float.PositiveInfinity)
@@ -97,14 +116,17 @@ public sealed class AlsJointIsland
         if (!gravity.IsFinite) throw new ArgumentException("Gravity must be finite.");
         if (!forces.IsEmpty && forces.Length != BodyCount) throw new ArgumentException("One force input per body is required.");
         foreach (var force in forces) force.Validate();
+        var wake = !allowSleep || _wakeRequested || gravity != _lastGravity || !ReferenceEquals(contacts, _lastContacts) || (contacts?.RequiresWake ?? false);
+        if (!forces.IsEmpty) for (var i = 0; i < forces.Length; i++) if (Dynamic(i) && forces[i] != default) wake = true;
+        if (IsSleeping && !wake) return;
         _stepping = true;
-        try { Solve(dt, gravity, forces, contacts, dragBeforeIntegration); }
-        catch { contacts?.Abort(); throw; }
+        try { Solve(dt, gravity, forces, contacts, dragBeforeIntegration, wake, allowSleep); _lastGravity = gravity; _lastContacts = contacts; _wakeRequested = false; }
+        catch { _sleep?.Abort(); contacts?.Abort(); throw; }
         finally { _stepping = false; }
     }
 
     private void Solve(double dt, AlsDoubleVector gravity, ReadOnlySpan<AlsBodyStepForces> forces,
-        IAlsIslandContacts? contacts, bool dragBeforeIntegration)
+        IAlsIslandContacts? contacts, bool dragBeforeIntegration, bool wake, bool allowSleep)
     {
         Gather(dt, gravity, forces, dragBeforeIntegration);
         contacts?.Gather(_predicted, _velocities, _bodies, dt);
@@ -155,7 +177,10 @@ public sealed class AlsJointIsland
             ValidateState(i, _next[i]);
         }
         contacts?.StageCommit();
+        if (_sleep?.Stage(_states, _next, dt, wake, forces, allowSleep) == true)
+            for (var i = 0; i < _next.Length; i++) if (Dynamic(i)) _next[i] = _next[i] with { Velocity = default };
         contacts?.Commit();
+        _sleep?.Publish();
         _next.AsSpan().CopyTo(_states);
     }
 

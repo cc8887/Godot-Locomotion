@@ -15,6 +15,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private AlsJointIsland _island = null!;
     private int _frame, _scenario, _hz, _totalContacts, _queries;
     private int _geometryChecks;
+    private int _sleepChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -58,7 +59,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) GeometryChecks();
+            if (_scenario == 0 && _frame == 0) { GeometryChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -78,7 +79,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
             if (_scenario < 3) { StartScenario(); return; }
             Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
             var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
-                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, sleep_checks = _sleepChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -123,16 +124,53 @@ public partial class PhysicsCoreContactSmoke : Node3D
             Require(overflow, "Contact capacity overflow was silently truncated."); _geometryChecks++;
         }
         hull.Points = hull.Points; // Resource changes require a registry revision and rebind.
+        Require(query.IsInvalidated, "Changed geometry did not invalidate sleeping contacts.");
         var rejected = false;
         try { query.Query(mover.Slot, identity, floor.Slot, bottom, buffer); }
         catch (InvalidOperationException) { rejected = true; }
         Require(rejected, "Changed shape resource reused stale query bounds.");
         mover = registry.Replace(mover, registry.At(mover.Slot)); query.Bind(mover, hull);
+        Require(!query.IsInvalidated, "Rebinding did not clear geometry invalidation.");
         var workerRejected = System.Threading.Tasks.Task.Run(() =>
         {
             try { query.Query(mover.Slot, identity, floor.Slot, bottom, buffer); return false; }
             catch (InvalidOperationException) { return true; }
         }).GetAwaiter().GetResult();
         Require(workerRejected, "Godot collision query ran off Main."); _geometryChecks += 2;
+        registry.Remove(mover); hull.Points = hull.Points;
+        Require(!query.IsInvalidated, "Removed geometry kept invalidating the remaining world.");
+    }
+
+    private void SleepChecks()
+    {
+        var identity = AlsPrecisePose.Identity; var registry = new AlsContactRegistry(2, 2);
+        var ball = registry.Register(new(0, identity, 1, 1, true)); var floor = registry.Register(new(1, identity, 1, 1));
+        using var sphere = new SphereShape3D { Radius = .5f }; using var ground = new BoxShape3D { Size = new(10, .2f, 10) };
+        using var query = new AlsGodotContactQuery(registry); query.Bind(ball, sphere); query.Bind(floor, ground);
+        var contacts = new AlsWorldContacts(registry, query, new(.7f, .7f, .7f), new(1f / _hz, 0, 2000));
+        var initial = new[] { new AlsIslandBodyState(identity with { Position = new(0, 0, 50) }, default),
+            new AlsIslandBodyState(identity with { Position = new(0, 0, -10) }, default) };
+        var island = new AlsJointIsland([new(identity, new(1, new(.001, .001, .001))), new(identity, default)], [], initial,
+            sleepSettings: [new(1, .05f, 4), default]);
+        var gravity = new AlsDoubleVector(0, 0, -980); var dt = 1d / _hz;
+        void Settle()
+        {
+            for (var i = 0; i < _hz * 2 && !island.IsSleeping; i++) island.Step(dt, gravity, contacts: contacts);
+            Require(island.IsSleeping, "Simple sphere could not reach sleep.");
+        }
+        Settle(); var state = island.BodyAt(0); var epoch = contacts.CompletedSteps; var queries = query.NarrowPhaseQueries;
+        for (var i = 0; i < _hz; i++) island.Step(dt, gravity, contacts: contacts);
+        Require(island.BodyAt(0) == state && contacts.CompletedSteps == epoch && query.NarrowPhaseQueries == queries, "Sleeping sphere moved or queried geometry.");
+        island.Step(dt, gravity, [new(default, LinearImpulseVelocity: new(0, 0, 100)), default], contacts);
+        Require(!island.IsSleeping && island.BodyAt(0).Velocity.Linear.Z > 0, "Sphere impulse failed to wake and integrate.");
+        island.Reset(initial); contacts.Reset(); Settle(); state = island.BodyAt(0); epoch = contacts.CompletedSteps;
+        ground.Size = ground.Size; var rejected = false;
+        try { island.Step(dt, gravity, contacts: contacts); } catch (InvalidOperationException) { rejected = true; }
+        Require(rejected && island.IsSleeping && island.BodyAt(0) == state && contacts.CompletedSteps == epoch, "Dirty sleeping geometry was ignored or partially published.");
+        floor = registry.Replace(floor, registry.At(floor.Slot)); query.Bind(floor, ground); island.Step(dt, gravity, contacts: contacts);
+        Require(!island.IsSleeping && contacts.CompletedSteps == epoch + 1, "Valid geometry rebind did not resume the island.");
+        Settle(); registry.Remove(floor); island.Step(dt, gravity, contacts: contacts);
+        Require(!island.IsSleeping && island.BodyAt(0).Velocity.Linear.Z < 0, "Removed floor did not wake gravity.");
+        _sleepChecks = 5;
     }
 }

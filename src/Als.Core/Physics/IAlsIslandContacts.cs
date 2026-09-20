@@ -9,6 +9,8 @@ namespace GodotAls.Core.Physics;
 // provider's responsibility. This interface does not supply a collision world.
 public interface IAlsIslandContacts
 {
+    // World/geometry edits must wake a suspended island before skipping queries.
+    bool RequiresWake => false;
     void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt);
     void SolvePosition(Span<AlsProjectionDelta> bodies, int iteration, int iterationCount);
