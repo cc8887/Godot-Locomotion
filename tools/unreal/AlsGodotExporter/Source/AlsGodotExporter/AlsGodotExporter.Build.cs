@@ -24,6 +24,7 @@ public class AlsGodotExporter : ModuleRules
             "Json",
             "JsonUtilities",
             "PhysicsCore",
+            "Chaos",
             "RenderCore",
             "Renderer",
             "SSL",

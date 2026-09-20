@@ -27,6 +27,14 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsJointOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsJointReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Joint reference export failed: %s"), *Error); return 11; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_JOINT_REFERENCE_OK meshes=2 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsAssetOutput="), PhysicsOutput))
     {
         FString Error;
