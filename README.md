@@ -1,13 +1,15 @@
 # Godot ALS
 
 这是一个面向 Godot 4.7.2 .NET 的 ALS 示例项目。当前主场景是
-`res://scenes/demo/p4_locomotion_demo.tscn`，已经接入真实 Mannequin、P3
+`res://scenes/demo/als_demo.tscn`，已经接入真实 Mannequin、P3
 locomotion、AimOffset、上半身分层、Turn/Rotate In Place、Foot IK、Foot Lock、
 pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 
-P4 功能、focused 短时门禁和 Task 17 clean-worktree 完整自动门禁已经通过，
-P4 自动实现闭环已完成。Godot Editor 八项手工观感验收仍未签收，P7 的 10 分钟
-Release 性能认证也不属于当前阶段证书，不能用本次自动闭环替代。
+主目录统一为 `.`，后续在这里的 `main` 分支继续开发。
+2026-09-20 已合入此前 P5A 工作目录的实现、数据和验证记录，并同步本地生成资产。
+普通入口默认启用完整分层、Aim、Refactored 脚部调度及最终接触策略，不再依赖一串诊断参数。
+这仍是开发中的 Demo：地形全程接触、起停滑步、换髋和上下身观感、P5A 收尾及后续玩法尚未全部验收。
+历史 P4 证书不代表当前完整链路已验收；P7 十分钟性能认证也未完成。
 
 ## 运行
 
@@ -18,8 +20,14 @@ Release 性能认证也不属于当前阶段证书，不能用本次自动闭环
 直接启动 Demo：
 
 ```powershell
-& '<Godot-4.7.2-console.exe>' --path . res://scenes/demo/p4_locomotion_demo.tscn
+Set-Location .
+dotnet build GodotALS.csproj -p:Optimize=true
+& '<Godot-4.7.2-console.exe>' --path .
 ```
+
+Editor 使用 F5 运行项目；单独运行旧的 `p4_locomotion_demo.tscn` 是历史诊断入口。
+需要复查旧链路时，在普通启动命令末尾加 `-- --legacy-animation`。
+可用 `-- --overlay=Rifle` 检查指定 Overlay 姿势；道具装备和切换玩法仍待接线。
 
 键鼠：
 
@@ -38,9 +46,10 @@ Release 性能认证也不属于当前阶段证书，不能用本次自动闭环
 ## 资产边界
 
 UE 5.9 批次锁定了 267 个 ALS 资产、141 个正式文件和 126 个动画，包含
-Mannequin、Overlay 与道具模型；导出审计为 0 error / 0 warning。资产 lock
-schema 为 1，manifest SHA-256 为
-`F12C56C705F05C7C55E77955BD14A3729A2E96D5FAA669FDBD759702B0EA846E`。
+Mannequin、Overlay 与道具模型。最初 P2 批次的审计为 0 error / 0 warning；
+后续追加了原始采样和曲线数据，不能沿用旧 manifest 哈希认证当前批次。
+本次同步的 manifest SHA-256 为
+`5D942E8566C9C8DE0FBBF015E02C6235AC2DEEF51C8C54446A56302A1D35BFD0`。
 音频按既定范围未导出，也不阻塞当前动画示例。
 
 生成资产位于 ignored 的 `assets/generated/als_v4/**`，不应提交导入缓存、
@@ -56,29 +65,25 @@ schema 为 1，manifest SHA-256 为
 
 ## 验证
 
-日常开发使用的 focused 门禁：
+当前普通入口的键鼠/完整姿势回归：
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-p4.ps1 `
-  -GodotExecutable '<Godot-4.7.2-console.exe>' `
-  -Focused
+& '<Godot-4.7.2-console.exe>' --path . --rendering-method gl_compatibility `
+  res://scenes/tests/p4_keyboard_mouse_smoke.tscn
 ```
 
-它包含 P4 focused Import/Core、Pose/Feet、正式 Demo 和正式四格 Matrix，但跳过
-全库回归、非 Skip P3B、Release 和仓库 closure。诊断及各子门禁证据可以正常
-输出，但唯一顶层/终态成功标记只能是
-`P4_FOCUSED_VERIFICATION_OK regression=skipped`，绝不能出现 full marker
-`P4_VERIFICATION_OK`，也不能作为完整 P4 完成证书。Task 17 的正式完整命令为：
+覆盖 360 帧 Alt 行走、鼠标转向、左右横移、完整分层、最终脚部身份和锁脚曲线。
+末尾添加 `-- --capture-dir=res://artifacts/<新名称>` 可保存逐段截图。
+这是平地回归，不替代完整地形及人工输入验收。
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-p4.ps1 `
-  -GodotExecutable '<Godot-4.7.2-console.exe>'
+dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj -c Release
+dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 ```
 
-只有完整命令在 clean worktree 上完成全部 P0-P4、P3B 子链、Release 测试和
-locked-base closure，并唯一输出整行 `P4_VERIFICATION_OK`，才构成 P4 自动闭环。
-当前 Task 17 已取得该完整证书；复跑仍必须使用同一默认命令，不能用 focused
-marker 冒充 full 成功。
+当前 Core 全库仍有未关闭的旧 P4 蹲姿转身 oracle 和 P5A 冻结计划回归失败。
+本次结果及限制见[主目录整合记录](docs/verification/2026-09-20-main-consolidation-and-demo-entry.md)。
+原 `verify-p4.ps1` 保留用于历史阶段复查，其旧成功记录不能作为当前版本的新证书。
 
 ## 文档
 
@@ -92,8 +97,9 @@ marker 冒充 full 成功。
 
 | 阶段 | 状态 | 范围 |
 | --- | --- | --- |
-| P5A | 待实施 | 通用 Curve/Notify/Notify State、Sync Runtime、ActionPlayer |
-| P5B | 待实施 | Overlay gameplay、装备/切换和道具生命周期 |
-| P5C | 待实施 | Mantle、Roll、碰撞安全 Root Motion |
-| P6 | 待实施 | Ragdoll、Get-up、Pose Recovery、完整 ALS Camera |
+| P3/P4 完整性 | 实现与整体验收中 | 默认完整入口已接通；地形、起停滑步、换髋与上下身联合验收未关闭 |
+| P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage 所有者已实现多项；玩法消费者、摘要及冻结计划回归待完成 |
+| P5B | 动画数据/姿势已有，玩法待实施 | Overlay 装备/切换和道具生命周期 |
+| P5C | Roll 播放组件已有，玩法待实施 | Mantle、Roll、碰撞安全 Root Motion |
+| P6 | 基础组件已有，完整功能待实施 | Ragdoll、Get-up、Pose Recovery、完整 ALS Camera |
 | P7 | 待实施 | 30 秒热身、10 分钟 Release 最终性能认证 |

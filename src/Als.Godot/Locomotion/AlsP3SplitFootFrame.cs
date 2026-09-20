@@ -10,7 +10,7 @@ namespace GodotAls.Locomotion;
 internal static class AlsP3FrameStages
 {
     // Initialized during main-thread scene configuration, never during a query.
-    internal static readonly bool SplitFeet = OS.GetCmdlineUserArgs().Contains("--refactored-foot-frame");
+    internal static readonly bool SplitFeet = AlsAnimationRuntimeOptions.Has("--refactored-foot-frame");
     internal static int Visual => SplitFeet ? 3 : 1;
     internal static int Commit => SplitFeet ? 4 : 2;
     internal static int Lifecycle => SplitFeet ? 5 : 3;

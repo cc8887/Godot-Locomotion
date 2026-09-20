@@ -1556,3 +1556,8 @@ Mantle/Roll、P6 Ragdoll/Get-up/Pose Recovery/Camera 和 P7 十分钟性能预�
 
 持续进度沿用 `2026-09-10-locomotion-completeness-recovery.md`，这份文件说明
 面向最终效果的修复依赖，不替代原 P3–P7 设计，也不引入第二套玩法范围。
+
+2026-09-20：后续实现及数据已整合到 `.` / `main`，普通主场景已接通
+完整分层与脚部动画入口。Import Release 全库、普通入口键鼠回放、十角色双模式回归通过；
+旧 P4 蹲姿转身 oracle、P5A 冻结计划回归、地形/人工观感与后续玩法仍未关闭。
+详见 `../../verification/2026-09-20-main-consolidation-and-demo-entry.md`。后续在主目录继续，不再逐次新建工作目录。
