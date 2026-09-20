@@ -230,7 +230,7 @@ public partial class AlsP3CharacterSlot : Node
                 commandSource,
                 _exchangeSlot,
                 _footProbeExchange);
-            character.SetActive(active);
+            character.SetSchedulingActive(active);
             return character;
         }
         catch
@@ -474,7 +474,7 @@ public partial class AlsP3CharacterSlot : Node
         }
         if (!character.LifecycleDiagnostics.IsDisposed)
         {
-            character.SetActive(false);
+            character.SetSchedulingActive(false);
         }
     }
 
@@ -490,7 +490,7 @@ public partial class AlsP3CharacterSlot : Node
         {
             if (lifecycle.IsActive)
             {
-                character.SetActive(false);
+                character.SetSchedulingActive(false);
             }
             character.DisposeRuntime();
         }

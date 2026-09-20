@@ -319,6 +319,15 @@ public sealed class AlsMontageRuntime
         _committedCount = _count; _committedSerial = _serial; CommittedIdentity = identity; _prepared = false;
     }
     public void Discard() { _prepared = false; _count = _evaluationCount = _traversalCount = 0; _frame.Count = 0; _frame.Identity = default; }
+    public void ClearForLifecycle()
+    {
+        if (_prepared) throw new InvalidOperationException("Discard the montage candidate before lifecycle cleanup.");
+        Array.Clear(_committed); Array.Clear(_candidate);
+        _committedCount = _count = _evaluationCount = _traversalCount = 0;
+        _committedFrame.Count = _frame.Count = 0;
+        // Keep the frame boundary and serial allocator: resuming this generation
+        // must never reuse a physical playback identity.
+    }
     private void RequirePrepared() { if (!_prepared) throw new InvalidOperationException("No prepared montage frame."); }
     private void Ensure(int count)
     {

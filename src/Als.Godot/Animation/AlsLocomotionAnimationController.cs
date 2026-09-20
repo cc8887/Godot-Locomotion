@@ -1021,6 +1021,12 @@ public sealed class AlsLocomotionAnimationController : IDisposable
         _sourceTimingPending = false;
         _preparedTransactionState = 0;
     }
+    internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
+    {
+        ThrowIfDisposed();
+        if (_hasPreparedFrame != 0) throw new InvalidOperationException("Animation candidate is still prepared.");
+        _fullMovement?.ClearAnimationOwnershipForLifecycle(abandonedInput);
+    }
 
     private void ValidatePrepared(in AlsPreparedAnimationFrame prepared)
     {

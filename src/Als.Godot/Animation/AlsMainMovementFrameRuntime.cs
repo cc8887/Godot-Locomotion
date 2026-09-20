@@ -502,6 +502,12 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
         if (_phase == Phase.Disposed) throw new ObjectDisposedException(nameof(AlsMainMovementFrameRuntime));
         _grounded.Discard(); _phase = Phase.Idle;
     }
+    internal void ClearNotifyOwnershipForLifecycle()
+    {
+        Require(Phase.Idle);
+        _committedEvents.ActiveCount = 0; _committedEvents.ActiveStates = default;
+        // Preserve the native allocator/RNG and source history on same-generation resume.
+    }
     private void Require(Phase phase)
     { if (_phase != phase) throw new InvalidOperationException($"Main Movement phase is {_phase}; expected {phase}."); }
     public void Dispose()

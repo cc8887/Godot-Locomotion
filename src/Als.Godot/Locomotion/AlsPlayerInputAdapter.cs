@@ -100,6 +100,12 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource, IAlsAct
 
     public AlsActionRequest GetActionRequest(AlsFrameIdentity identity) => ActionPreviewEnabled
         ? _actions.Read(identity) : AlsActionRequest.None;
+    public void DiscardUnpublishedActions(long publishedFrame)
+    {
+        _actions.DiscardUnpublished(publishedFrame);
+        _pendingRoll = _pendingCancel = false;
+        _previewOwnerRequest = _previewOwnerEpoch = 0;
+    }
 
     private static bool SameOwner(AlsFrameIdentity a, AlsFrameIdentity b) => a.SlotGeneration != 0 &&
         a.CharacterId == b.CharacterId && a.SlotGeneration == b.SlotGeneration;

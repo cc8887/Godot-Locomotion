@@ -513,6 +513,12 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         if (_phase == Phase.Disposed) throw new ObjectDisposedException(nameof(AlsBaseLayerFrameRuntime));
         _movement.Discard(); _tail.Discard(); _actions.Discard(); _turnNotifies.Discard(); StopTransitionCount = 0; _sink = null; _phase = Phase.Idle;
     }
+    internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
+    {
+        Require(Phase.Idle);
+        _actions.ClearForLifecycle(abandonedInput);
+        _movement.ClearNotifyOwnershipForLifecycle();
+    }
     public void RequestInertialization(in AlsPoseUpdateContext context, float seconds)
     {
         RequireUpdate();

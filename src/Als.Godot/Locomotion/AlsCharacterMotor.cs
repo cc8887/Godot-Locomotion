@@ -98,6 +98,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
     internal NumericsVector3 LifecycleActualVelocity => _previousActualVelocity;
 
     internal bool HasPublishedVelocityCheckpoint => _publishedVelocityCheckpointPending;
+    internal long IntegrationCount { get; private set; }
 
     internal AlsFrameIdentity LastFootGatherRequestIdentity { get; private set; }
 
@@ -483,6 +484,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _lastFrameId = frameId;
         _candidateLifecycleSnapshot = CaptureLifecycleSnapshot(grounded);
         _candidateLifecycleFrameId = frameId;
+        IntegrationCount++;
         return input;
     }
 

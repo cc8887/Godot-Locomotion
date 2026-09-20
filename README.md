@@ -17,7 +17,9 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 [最新接线记录](docs/verification/2026-09-20-action-input.md)。碰撞安全 Root Motion 仍待实现，当前预览不驱动胶囊翻滚位移。
 角色永久销毁/换代现会根据主线程已提交记录结束 Notify State 和动作；包含回调内销毁及
 未提交动作隔离。见[退役清理记录](docs/verification/2026-09-20-animation-retirement.md)。
-可恢复停用和 Worker 故障取消的完整接线仍待继续。
+完整入口现已区分调度暂停与真正停用；停用会清理动作，恢复时保留移动/脚部检查点，
+不会继续播放旧动作。见[停用恢复记录](docs/verification/2026-09-20-animation-deactivation.md)。
+Worker 故障后的成功帧取消仍待接线。
 
 ## 运行
 
