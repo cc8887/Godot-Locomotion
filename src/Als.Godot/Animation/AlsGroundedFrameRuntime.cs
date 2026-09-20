@@ -63,6 +63,8 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
     private IAlsGroundedFrameRuntimeSink? _sink;
     private AlsGroundedMachineEvent[] _stopNotifies = new AlsGroundedMachineEvent[32];
     private int _stopNotifyCount;
+    private readonly int _groundedEntryResetNotify;
+    internal bool ResetGroundedEntry { get; private set; }
 
     public AlsMainGroundedCachedGraphDefinition Definition => _definition;
     public ReadOnlySpan<string> CurveNames => _evaluation.CurveNames;
@@ -95,11 +97,13 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
 
     public AlsGroundedFrameRuntime(AlsAnimationLibraryBuildResult library, AlsStandingCycleGraph standing,
         AlsAnimationSetDefinition set, AlsLocomotionSourceProfile sources, AlsMainGroundedCachedGraphProfile profile,
-        AlsCrouchingCycleProfile cycles, AlsGroundedPoseDependencies dependencies, AlsPoseAnimationProfile pose)
+        AlsCrouchingCycleProfile cycles, AlsGroundedPoseDependencies dependencies, AlsPoseAnimationProfile pose,
+        int groundedEntryResetNotify = -1)
     {
         if (standing.SourceBindings.Sources.Stamp != sources.RuntimeStamp || profile.SkeletonId != sources.SkeletonId)
             throw new ArgumentException("Grounded runtime and source owner differ.");
         _standing = standing; _definition = profile.Runtime; _cycleProfile = cycles;
+        _groundedEntryResetNotify = groundedEntryResetNotify;
         _main = new(_definition); _mainSources = new(sources, profile.MainPose);
         _cycles = new(cycles.Runtime); _crouch = new(sources, _definition.Crouching, cycles.Lean);
         _stanceCurve = dependencies.ChangeStance;
@@ -141,7 +145,7 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
             throw new ArgumentException("Grounded graph received a foreign global input.");
         if (inputs.GlobalControl.HasValue && inputs.GlobalControl.Value.Identity != result.Identity)
             throw new ArgumentException("Grounded graph received a foreign control input.");
-        _result = result; _movement = movement; _inputs = inputs; _sink = sink; _stopNotifyCount = 0;
+        _result = result; _movement = movement; _inputs = inputs; _sink = sink; _stopNotifyCount = 0; ResetGroundedEntry = false;
         _phase = Phase.Begun;
         try
         {
@@ -294,7 +298,7 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
         (_cache, _committedCache) = (_committedCache, _cache);
         (_bones, _committedBones) = (_committedBones, _bones);
         _committedMain = _update.State; _committedCycle = _cycle.State; _committedStanding = _prepared;
-        _sink = null; _stopNotifyCount = 0; _phase = Phase.Idle;
+        _sink = null; _stopNotifyCount = 0; ResetGroundedEntry = false; _phase = Phase.Idle;
     }
     internal void ValidateCommit(AlsFrameIdentity identity)
     {
@@ -306,7 +310,7 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
     {
         if (_phase == Phase.Disposed) throw new ObjectDisposedException(nameof(AlsGroundedFrameRuntime));
         try { if (_evaluationBegun) EndEvaluation(); }
-        finally { _sink = null; _stopNotifyCount = 0; _phase = Phase.Idle; }
+        finally { _sink = null; _stopNotifyCount = 0; ResetGroundedEntry = false; _phase = Phase.Idle; }
     }
 
     private void ObserveCrouching(in AlsCycleSyncFrame shared)
@@ -335,6 +339,7 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
         {
             _initializedMain = _main.InitializeMainSource(_initializedMain, out var initialized);
             _bones.ObserveInitialization(AlsMainBoneMachine.Main, initialized);
+            CollectMainNotifies(initialized);
         }
         else if (cache == _definition.Standing.CycleCacheIndex)
             _standing.InitializeCycleSources(ref _crouch.Frame, _result.PlayRate);
@@ -350,7 +355,16 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
         _cycle = _cycles.Prepare(_cycle.State, _rules, _inputs.CrouchingStrideInput, _inputs.Cycles.Velocity,
             context, this, _inputs.Cycles.DiagonalAlpha);
     public void UseCycleCache(int read, in AlsPoseUpdateContext context) => throw new InvalidOperationException("Main owns the cache queue.");
-    public void UpdateMainSources(in AlsGroundedMachineUpdate update, in AlsPoseUpdateContext context) => _bones.Observe(AlsMainBoneMachine.Main, update);
+    public void UpdateMainSources(in AlsGroundedMachineUpdate update, in AlsPoseUpdateContext context)
+    {
+        _bones.Observe(AlsMainBoneMachine.Main, update); CollectMainNotifies(update);
+    }
+    private void CollectMainNotifies(in AlsGroundedMachineUpdate update)
+    {
+        if (_groundedEntryResetNotify < 0) return;
+        for (var i = 0; i < update.EventCount; i++)
+            if (update.GetEvent(i).NotifyIndex == _groundedEntryResetNotify) ResetGroundedEntry = true;
+    }
     public void UpdateGroundedSlot(int slot, in AlsSlotWeights weights, in AlsSlotSourceUpdate source, in AlsPoseUpdateContext context) =>
         _sink!.UpdateGroundedSlot(slot, weights, source, context);
     public void UpdateStandingSources(in AlsGroundedMachineUpdate update, in AlsPoseUpdateContext context) => _bones.Observe(AlsMainBoneMachine.Standing, update);

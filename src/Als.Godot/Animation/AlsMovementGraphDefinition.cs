@@ -21,6 +21,7 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
     AlsMontageNotifyBinding MontageNotifies)
 {
     public AlsMontageActionPlaybackReader ActionPlayback { get; init; } = null!;
+    public AlsGroundedEntryNotifyProfile GroundedEntryNotify { get; init; } = null!;
     public AlsCharacterAnimationBridgeSettings CharacterBridge { get; init; }
     public AlsCharacterRotationModel CharacterRotation { get; init; } = null!;
     public AlsCharacterMovementModel CharacterMovement { get; init; } = null!;
@@ -156,7 +157,9 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
         var rootSources = AlsRootSharedSourceCompiler.Compile(sharedSources, definition.RagdollPose, ragdollFrame, set);
         definition = definition with { RagdollFrame = ragdollFrame, MannequinMeshId = locomotion.MannequinMeshId,
             RootSharedSources = rootSources, RootSharedBinding = AlsLocomotionGraphBuilder.CompileSourceBindings(set, locomotion, pose, rootSources.Sources) };
-        definition = definition.WithActionPlayback(set);
+        definition = definition.WithActionPlayback(set) with { GroundedEntryNotify = AlsGroundedEntryNotifyCompiler.Compile(
+            Read("v4_grounded_notify_semantics.json"), Read("v4_overlay_transition_inputs.json"), set,
+            AlsGroundedMachineCompiler.CompileMovement(json), actionProfile) };
         if (!loadRawSources) return definition;
         var rawSources = AlsRawAnimationSourceLoader.Load(set, definition);
         var aimSources = AlsRawAnimationSourceLoader.LoadAim(set, definition.AimSampling).ReuseResourcesFrom(rawSources);
