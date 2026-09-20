@@ -89,7 +89,10 @@ internal sealed class AlsPhysicsJointSet : IDisposable
                 var position=axis==0?s.AngularDrive.TwistPosition:s.AngularDrive.SwingPosition;
                 var velocity=axis==0?s.AngularDrive.TwistVelocity:s.AngularDrive.SwingVelocity;
                 var coefficient=axis==0?0:2;var value=Component(current,axis);var next=Component(predicted,axis);var angleLimit=Component(s.AngularLimitsRad,axis);
-                var limitActive=motion==AlsJointMotion.Limited&&soft.Enabled&&(Math.Abs(value)>angleLimit||Math.Abs(next)>angleLimit);
+                // Chaos builds these rows from predicted connector rotations.
+                // A body already moving back inside the limit must retain its
+                // momentum; testing the old angle too adds an extra braking row.
+                var limitActive=motion==AlsJointMotion.Limited&&soft.Enabled&&Math.Abs(next)>angleLimit;
                 var direction=childBasis[axis];var inv=direction.Dot(inverseP*direction+inverseC*direction);
                 var effective=inv>0?1/inv:0;
                 var driveScale=s.AngularDrive.ForceMode==AlsJointForceMode.Acceleration?effective:.0001;
@@ -98,7 +101,7 @@ internal sealed class AlsPhysicsJointSet : IDisposable
                 var cd=velocity?(_driveDamping>=0?_driveDamping:Component(s.AngularDrive.Damping,coefficient))*driveScale:0;
                 var kl=limitActive?soft.Stiffness*limitScale:0;var cl=limitActive?soft.Damping*limitScale:0;
                 var k=kd+kl;var damping=cd+cl;
-                var boundary=Math.CopySign(angleLimit,Math.Abs(value)>angleLimit?value:next);
+                var boundary=Math.CopySign(angleLimit,next);
                 desired[axis]=(float)(k>0?(kd*Component(target,axis)+kl*boundary)/k:value);
                 var enabled=motion!=AlsJointMotion.Locked&&k>0;
                 SpringParam(j.Index,axis,0,PhysicsServer3D.G6DofJointAxisParam.AngularSpringStiffness,(float)k);

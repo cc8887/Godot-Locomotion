@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Actual isolated native joint scene steps and effective global solver settings. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportPhysicsJointSolverReference(const FString& OutputPath);
+
     /** Live Chaos joint settings and native angular utility observations. No assets saved. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportPhysicsJointReference(const FString& OutputPath);

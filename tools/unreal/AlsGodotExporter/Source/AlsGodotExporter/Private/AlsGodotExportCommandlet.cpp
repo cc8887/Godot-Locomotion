@@ -27,6 +27,14 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsJointSolverOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsJointSolverReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Joint solver export failed: %s"), *Error); return 12; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_JOINT_SOLVER_REFERENCE_OK cases=144 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsJointOutput="), PhysicsOutput))
     {
         FString Error;
