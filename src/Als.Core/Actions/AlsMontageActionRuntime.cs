@@ -128,6 +128,16 @@ public sealed class AlsMontageActionRuntime
         _history=_nextHistory; CommittedIdentity=identity; _phase=Phase.Idle;
     }
     public void Discard() { _montages.Discard(); _phase=Phase.Idle; _outcomes=default; }
+    public void ClearForLifecycle(in AlsActionRequest abandonedInput)
+    {
+        if (_phase != Phase.Idle) throw new InvalidOperationException("Discard the action candidate before lifecycle cleanup.");
+        _montages.ClearForLifecycle(); Array.Clear(_committed); Array.Clear(_candidate); _outcomes = default;
+        if (abandonedInput.Command == AlsActionCommand.Start && abandonedInput.RequestId > _history.LastRequestId)
+            _history = _history with { LastRequestId = abandonedInput.RequestId };
+        if (abandonedInput.Command == AlsActionCommand.Cancel)
+            _history = _history with { LastCommand = AlsActionCommand.Cancel, LastCommandRequestId = abandonedInput.RequestId };
+        _nextHistory = _history;
+    }
 
     private void Reconcile()
     {

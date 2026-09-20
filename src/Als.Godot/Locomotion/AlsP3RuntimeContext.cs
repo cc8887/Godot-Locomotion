@@ -496,10 +496,11 @@ public sealed class AlsP3RuntimeContext
 
     private void DispatchAnimationCallbacks(in AlsFrameResult result, AlsCommittedAnimationLifecycle? ownership)
     {
+        var revision = ownership?.Revision;
         var actionHandler = ActionOutcomeCommitted;
         for (var i = 0; i < result.ActionOutcomes.Count; i++)
         {
-            if (ownership?.Closed == true) return;
+            if (ownership?.Closed == true || ownership?.Revision != revision) return;
             ownership?.Observe(result.ActionOutcomes[i]);
             ActionOutcomesDispatched++;
             try { actionHandler?.Invoke(result.Identity, result.ActionOutcomes[i]); }
@@ -512,7 +513,7 @@ public sealed class AlsP3RuntimeContext
         var handler = AnimationEventCommitted;
         for (var i = 0; i < result.TypedEvents.Count; i++)
         {
-            if (ownership?.Closed == true) return;
+            if (ownership?.Closed == true || ownership?.Revision != revision) return;
             ownership?.Observe(result.TypedEvents[i]);
             AnimationEventsDispatched++;
             try { handler?.Invoke(result.Identity, result.TypedEvents[i]); }

@@ -144,7 +144,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 if (_tick == _resumeTick)
                 {
                     paused.GetNode<Node>("FootPhysicsQuery").ProcessMode = ProcessModeEnum.Inherit;
-                    paused.SetActive(true); _phase = 3;
+                    paused.SetSchedulingActive(true); _phase = 3;
                 }
             }
 
@@ -304,7 +304,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
         _pausedActions = _actionEvents[_pauseOwner];
         if (_actionRequests && _completedPauses == 0)
             Require(_pausedInput.ActionRequest.Command == AlsActionCommand.Start, "Cancellation did not discard a real action Start.");
-        character.SetActive(false);
+        character.SetSchedulingActive(false);
         Require(!character.SplitFootDiagnostics.Pending && !character.Visible, "Deactivation retained a candidate or visible pose.");
         _resumeTick = _tick + 2; _phase = 2;
     }

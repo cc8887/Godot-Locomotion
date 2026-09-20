@@ -11,6 +11,7 @@ public sealed class AlsCommittedAnimationLifecycle
     private AlsActionOutcomeBuffer _actions;
     public AlsFrameIdentity Identity { get; private set; }
     public bool Closed { get; private set; }
+    public long Revision { get; private set; }
     public int StateCount => _states.Count;
     public int ActionCount => _actions.Count;
 
@@ -59,8 +60,15 @@ public sealed class AlsCommittedAnimationLifecycle
         for (var i = 0; i < _actions.Count; i++)
             if (!result.ActionOutcomes.TryAdd(_actions[i] with { ResultCode = reason }))
                 throw new InvalidOperationException("Committed action teardown overflow.");
-        _states = states; _actions.Clear(); Closed = true;
+        _states = states; _actions.Clear(); Closed = true; Revision++;
         return result;
+    }
+
+    public void Reopen()
+    {
+        if (!Closed) return;
+        if (_states.Count != 0 || _actions.Count != 0) throw new InvalidOperationException("Uncleared animation ownership.");
+        Closed = false; Revision++;
     }
 
     private static void Apply(ref AlsCommittedNotifyStateBuffer states, in AlsAnimationEvent item)

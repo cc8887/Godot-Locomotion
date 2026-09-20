@@ -34,4 +34,12 @@ public sealed class AlsCapturedActionRequests
 
     public AlsActionRequest Read(AlsFrameIdentity identity) => Identity.SlotGeneration != 0 && identity == Identity
         ? _request : throw new InvalidOperationException("Action input was not captured for this exact frame, character and generation.");
+
+    // A semantic deactivation discards input that has not reached Gather.
+    // Already published frame copies remain immutable and are fenced by the worker.
+    public void DiscardUnpublished(long publishedFrame)
+    {
+        if (publishedFrame < 0) throw new ArgumentOutOfRangeException(nameof(publishedFrame));
+        if (Identity.FrameId > publishedFrame) _request = AlsActionRequest.None with { SlotGeneration = Identity.SlotGeneration };
+    }
 }

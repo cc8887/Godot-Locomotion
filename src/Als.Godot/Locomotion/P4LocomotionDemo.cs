@@ -38,6 +38,8 @@ public partial class P4LocomotionDemo : Node3D
     private bool _smokeTeleportApplied;
     private bool _runtimeConfigured;
     private bool _failed;
+    private long _inputLifecycleRevision;
+    private uint _inputLifecycleGeneration;
 
     internal bool IsRuntimeReady => _runtimeConfigured && !_failed;
 
@@ -193,6 +195,8 @@ public partial class P4LocomotionDemo : Node3D
                 return;
             }
 
+            SynchronizeInputLifecycle();
+            if (!_slot.ActiveCharacter.LifecycleDiagnostics.IsActive) return;
             var nextFrame = _slot.ActiveCharacter.PublishedFrameId + 1;
             if (_playerInput.CapturedFrameId < nextFrame || _playerInput.ActionPreviewEnabled &&
                 _playerInput.CapturedActionIdentity.SlotGeneration != _slot.ActiveCharacter.Handle.Generation)
@@ -216,11 +220,23 @@ public partial class P4LocomotionDemo : Node3D
         var cancel = input.IsActionPressed("action_cancel", allowEcho: false);
         if (!roll && !cancel) return;
         var active = _slot.ActiveCharacter;
+        SynchronizeInputLifecycle();
+        if (!active.LifecycleDiagnostics.IsActive) return;
         // Capture can already be one frame ahead while Main Commit is held.
         // Input arriving now belongs to the next uncaptured frame.
         var nextCapture = Math.Max(active.PublishedFrameId, _playerInput.CapturedFrameId) + 1;
         _playerInput.QueueActionPreview(new(nextCapture, active.Handle.CharacterId, active.Handle.Generation), roll, cancel);
         GetViewport().SetInputAsHandled();
+    }
+
+    private void SynchronizeInputLifecycle()
+    {
+        var active = _slot.ActiveCharacter;
+        if (_inputLifecycleGeneration == active.Handle.Generation && _inputLifecycleRevision == active.AnimationLifecycleRevision) return;
+        if (active.AnimationLifecycleRevision != 0)
+            _playerInput.DiscardUnpublishedActions(active.PublishedFrameId);
+        _inputLifecycleGeneration = active.Handle.Generation;
+        _inputLifecycleRevision = active.AnimationLifecycleRevision;
     }
 
     public override void _Process(double delta)

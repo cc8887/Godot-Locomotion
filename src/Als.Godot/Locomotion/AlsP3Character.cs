@@ -4,6 +4,7 @@ using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Events;
+using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Locomotion;
 
@@ -19,6 +20,11 @@ public partial class AlsP3Character : Node3D
     private bool _configured;
     private int _disposed;
     internal AlsCommittedAnimationLifecycle CommittedAnimation { get; private set; } = null!;
+    internal long AnimationLifecycleRevision { get; private set; }
+    private bool _animationDeactivated;
+    private long _discardedCompletedFrame = -1;
+    private AlsFootIkPoseSample _resumeFootPose;
+    private AlsRefactoredAnimationFeedback _resumeRefactoredFeedback;
 
     public AlsP3Character()
     {
@@ -78,6 +84,7 @@ public partial class AlsP3Character : Node3D
         _state.WorkerTransactionRollbackDiagnostics;
 
     internal AlsFrameInput LatestMotorInput => _state.MotorInput;
+    internal long MotorIntegrationCount => _motor.IntegrationCount;
     internal bool UsesCompleteMovement => _worker.UsesCompleteMovement;
     internal bool UsesLayeredPose => _worker.UsesLayeredPose;
     internal GodotAls.Animation.AlsFullMovementDiagnostics FullMovementDiagnostics => _worker.FullMovementDiagnostics;
@@ -295,7 +302,7 @@ public partial class AlsP3Character : Node3D
             // identity expected by foot/curve/source history. Frozen failure
             // handling retains the existing motor/recovery policy.
             if (_worker.UsesRefactoredFeet && Volatile.Read(ref _state.WorkerFrozen) == 0 &&
-                completedFrameId > Volatile.Read(ref _state.CommittedFrameId)) return;
+                completedFrameId > Volatile.Read(ref _state.CommittedFrameId) && completedFrameId != _discardedCompletedFrame) return;
             if (completedFrameId >= AlsP3VisualRootVisibilityObservation.MaximumWorkerFrameId)
             {
                 throw new InvalidOperationException("P3 frame sequence reached its supported limit.");
@@ -334,7 +341,9 @@ public partial class AlsP3Character : Node3D
                     checked((float)delta),
                     _state.HasCommittedTargetYaw,
                     _state.CommittedTargetYaw,
-                    _state.CommittedCharacterRotationFeedback, _state.CommittedRefactoredFeedback);
+                    _state.CommittedCharacterRotationFeedback,
+                    _resumeRefactoredFeedback.Pose.Identity == HandleIdentity(frameId - 1)
+                        ? _resumeRefactoredFeedback : _state.CommittedRefactoredFeedback);
             }
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;
@@ -351,6 +360,8 @@ public partial class AlsP3Character : Node3D
                     GC.GetAllocatedBytesForCurrentThread() - allocatedBeforeExchange);
             }
             Volatile.Write(ref _state.PublishedFrameId, frameId);
+            _discardedCompletedFrame = -1;
+            _resumeRefactoredFeedback = default;
             if (measure)
             {
                 measurement!.RecordGatherEnd(
@@ -374,9 +385,38 @@ public partial class AlsP3Character : Node3D
 
     public void SetActive(bool active)
     {
+        EnsureMainThread(); ThrowIfDisposed(); EnsureConfigured();
+        if (!_worker.UsesCompleteMovement) { SetSchedulingActive(active); return; }
+        if (active)
+        {
+            if (_animationDeactivated) { CommittedAnimation.Reopen(); _animationDeactivated = false; }
+            SetSchedulingActive(true);
+            return;
+        }
+        SetSchedulingActive(false);
+        if (_animationDeactivated) return;
+        _worker.ClearAnimationOwnershipForLifecycle(_state.MotorInput.ActionRequest);
+        var published = Volatile.Read(ref _state.PublishedFrameId);
+        if (published > Volatile.Read(ref _state.CommittedFrameId) &&
+            _state.ExchangeSlot.TryGetPublishedIdentity(out var resultIdentity) && resultIdentity == HandleIdentity(published))
+        {
+            // Worker history already advanced. Discard this uncommitted publication
+            // and resume at the next input; do not integrate this Motor frame twice.
+            _state.Exchange.TryConsumeResult(resultIdentity, out _);
+            _discardedCompletedFrame = published;
+        }
+        _animationDeactivated = true; AnimationLifecycleRevision++;
+        _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByLifecycle);
+    }
+
+    // Stage suspension is not a gameplay interruption: pending input retries and
+    // committed animation ownership survive until scheduling resumes.
+    internal void SetSchedulingActive(bool active)
+    {
         EnsureMainThread();
         ThrowIfDisposed();
         EnsureConfigured();
+        if (active && _animationDeactivated) throw new InvalidOperationException("Reactivate gameplay before scheduling a deactivated actor.");
         if (active && Volatile.Read(ref _state.Active) != 0)
         {
             return;
@@ -389,6 +429,14 @@ public partial class AlsP3Character : Node3D
         {
             CloseWorkerAdmissionForDeactivation();
             _worker.CancelSplitFootForLifecycle();
+            // Closed-admission checkpoint for same-generation resume. This is
+            // animation history, not permission to dispatch an uncommitted result.
+            var checkpoint = _state.VisualCommitCandidate;
+            if (checkpoint.Identity.SlotGeneration != 0)
+            {
+                _resumeFootPose = checkpoint.FootProbeSource.NativeFootPose;
+                _resumeRefactoredFeedback = checkpoint.RefactoredFeedback;
+            }
         }
         Volatile.Write(ref _state.Active, active ? 1 : 0);
         ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
@@ -406,6 +454,7 @@ public partial class AlsP3Character : Node3D
         else
         {
             _state.OpenWorkerAdmission();
+            _state.FootProbeExchange.CopyNative(_resumeFootPose);
         }
     }
 
@@ -529,7 +578,7 @@ public partial class AlsP3Character : Node3D
     {
         EnsureMainThread();
         ThrowIfDisposed();
-        SetActive(false);
+        SetSchedulingActive(false);
         Volatile.Write(ref _state.GatherSuspended, 1);
         Volatile.Write(ref _state.WorkerSuspended, 1);
         Volatile.Write(ref _state.CommitSuspended, 1);

@@ -1596,3 +1596,12 @@ Notify/动作所有权清理，再继续 Overlay 道具、Root Motion 及既定�
 五种真实 Roll 退役场景、2534 项 Core、旧生命周期、键鼠和十角色双模式通过，
 见 `../../verification/2026-09-20-animation-retirement.md`。可恢复停用仍须区分
 暂停重试与语义中断，故障后的成功帧取消仍未闭合；不能据此关闭整个 P5A 生命周期。
+
+2026-09-20 后续：完整生产入口的 `SetActive(false)` 现执行语义停用；内部
+`SetSchedulingActive` 保留调度暂停/重试合同。停用清空 Montage/Notify 所有权，
+保留分配器和闭合 Worker 调度后的恢复检查点；候选帧原输入重试时屏蔽旧请求，
+已完成但未 Main Commit 的帧放弃发布，下一帧继续 Motor。五种恢复边界、2539
+项 Core、十角色双模式及原键鼠/生命周期回归通过，见
+`../../verification/2026-09-20-animation-deactivation.md`。下一项是运行时故障的
+成功帧取消；后续 Notify gameplay、Overlay 道具、Roll/Mantle Root Motion、
+Ragdoll/Recovery/Camera 与最终性能/观感验收范围保持。

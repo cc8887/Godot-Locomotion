@@ -420,6 +420,12 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         try { if (_applied) WritePhysicalPose(_rollbackPose); }
         finally { if (_layered is null) _base.Discard(); else _layered.Discard(); _nextGraphCapture = null; _prepared = _applied = _queriesPending = false; }
     }
+    internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
+    {
+        if (_prepared || _queriesPending) throw new InvalidOperationException("Production candidate still owns animation state.");
+        _base.ClearAnimationOwnershipForLifecycle(abandonedInput);
+        _notifyState = _nextNotifyState = default;
+    }
 
     private float Curve(int index) => index >= 0 && Curves[index].Present ? Curves[index].Value : 0;
     private AlsLocalPose ReadBone(int bone) => new(ToNumerics(_skeleton.GetBonePosePosition(bone)),

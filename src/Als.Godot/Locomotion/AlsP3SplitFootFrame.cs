@@ -128,4 +128,10 @@ public partial class AlsP3WorkerRoot
             throw new InvalidOperationException("Split foot cancellation requires a closed idle owner.");
         CancelSplitFootCandidate();
     }
+    internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
+    {
+        if (!_state.IsWorkerAdmissionClosed || _state.WorkerInFlightCount != 0)
+            throw new InvalidOperationException("Animation cleanup requires closed idle worker admission.");
+        _controller?.ClearAnimationOwnershipForLifecycle(abandonedInput);
+    }
 }
