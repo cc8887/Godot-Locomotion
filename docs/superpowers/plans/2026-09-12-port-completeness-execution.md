@@ -1614,3 +1614,12 @@ Ragdoll/Recovery/Camera 与最终性能/观感验收范围保持。
 `../../verification/2026-09-20-animation-failure-recovery.md`。后续继续 Notify
 gameplay/Overlay 道具生命周期及原定 Root Motion、Ragdoll、Camera 和最终验收；
 物理查询、Gather/Main 错误不因此自动放行，移动平台上的同代故障恢复仍须专项认证。
+
+2026-09-20 后续：普通完整图已接入原生 Overlay 道具规则及 Bow_Draw 曲线采样。
+Q / E 切换全部 13 种 Overlay；8 种持物状态缓存 7 个不同模型，按最终虚拟骨
+挂接，并在 Main 成功提交后同步模型和弓姿态。原生执行表、24 骨 × 9 时间点
+Bow oracle、双模式 1600 帧、失败保持/成功切换、带弓停用和换代、十角色双模式
+与键鼠回归通过；具体范围和首错见 `../../verification/2026-09-20-overlay-props.md`。
+Ragdoll 开始清物/结束重新装备仍随真实 Ragdoll 玩法接入；未把本批等同完整
+Overlay gameplay、全流程观感或十分钟性能验收。下一步继续剩余 Notify gameplay
+及 Roll/Mantle 碰撞安全 Root Motion，后续 Ragdoll/Recovery/Camera 范围不变。

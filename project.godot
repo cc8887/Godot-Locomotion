@@ -101,6 +101,15 @@ action_cancel={
 "events": [Object(InputEventKey,"physical_keycode":88)]
 }
 
+overlay_previous={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":81)]
+}
+overlay_next={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":69)]
+}
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

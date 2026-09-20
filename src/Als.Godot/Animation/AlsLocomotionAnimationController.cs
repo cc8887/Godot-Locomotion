@@ -157,6 +157,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     internal AlsCharacterRotationFeedback PendingCharacterRotationFeedback => _fullMovement?.CandidateRotationFeedback ?? default;
     internal AlsRefactoredAnimationFeedback PendingRefactoredFeedback => _fullMovement?.CandidateRefactoredFeedback ?? default;
     internal bool PendingPresentation => _fullMovement?.CandidatePresentationPending == true;
+    internal Transform3D PendingPropAttachment(int bone) => _fullMovement!.PropAttachment(bone);
+    internal float PendingPropDraw(string curve) => _fullMovement!.PropDraw(curve);
     internal AlsFullMovementDiagnostics FullMovementDiagnostics => _fullMovement?.Diagnostics ?? default;
     internal AlsStandingCycleState StandingCycleState => _fullMovement?.Base.Grounded.CommittedStanding.State ?? _committedPrepared.Cycle.State;
     internal AlsTransitionStackState StandingTransitions => _fullMovement?.Base.Grounded.CommittedStanding.Transitions ?? _committedPrepared.Cycle.Transitions;

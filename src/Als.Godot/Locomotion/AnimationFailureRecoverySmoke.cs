@@ -23,6 +23,7 @@ public partial class AnimationFailureRecoverySmoke : Node
     private Vector3 _position;
     private Input.MouseModeEnum _oldMouse;
     private bool _oldAccumulation;
+    private bool _propSwitch;
 
     public AnimationFailureRecoverySmoke()
     { ProcessThreadGroup = ProcessThreadGroupEnum.MainThread; ProcessThreadGroupOrder = -2; }
@@ -32,6 +33,7 @@ public partial class AnimationFailureRecoverySmoke : Node
         try
         {
             var args = OS.GetCmdlineUserArgs();
+            _propSwitch = args.Contains("--prop-switch");
             _mode = args.Contains("--single") ? AlsHarnessMode.Single : AlsHarnessMode.Parallel;
             _replacement = args.Contains("--replacement"); _debug = args.Contains("--debug-policy");
             _failures = int.Parse(args.FirstOrDefault(a => a.StartsWith("--failures="))?[11..] ?? "2");
@@ -41,7 +43,9 @@ public partial class AnimationFailureRecoverySmoke : Node
             _ownsInput = true; Input.UseAccumulatedInput = false;
             AlsAnimationRuntimeOptions.ConfigureDemo();
             var scene = ResourceLoader.Load<PackedScene>("res://scenes/demo/p4_locomotion_demo.tscn");
-            _demo = scene.Instantiate<P4LocomotionDemo>(); _demo.ConfigureRuntimePolicyForSmoke(_mode, _debug); AddChild(_demo);
+            _demo = scene.Instantiate<P4LocomotionDemo>();
+            if (_propSwitch) _demo.Overlay = GodotAls.Core.Locomotion.AlsOverlayKind.Rifle;
+            _demo.ConfigureRuntimePolicyForSmoke(_mode, _debug); AddChild(_demo);
             Require(_demo.IsRuntimeReady, "Production Demo initialization failed.");
             _context = _demo.RuntimeContext; _character = _demo.ActiveCharacter;
             _context.ActionOutcomeCommitted += Outcome; _context.AnimationEventCommitted += Event;
@@ -62,11 +66,15 @@ public partial class AnimationFailureRecoverySmoke : Node
             {
                 Require(_accepted == 1 && _character.CommittedAnimation.StateCount == 1, "No active Roll ownership.");
                 if (_replacement) Tap(Key.R);
+                if (_propSwitch) _demo.Overlay = GodotAls.Core.Locomotion.AlsOverlayKind.Bow;
                 Arm(); _phase = 1;
             }
             else if (_phase == 1 && _character.AnimationRecoveryAttempts > 0)
             {
                 var attempts = _character.AnimationRecoveryAttempts;
+                if (_propSwitch) Require(_character.Props!.Committed.Identity.FrameId == 12 &&
+                    _character.Props.Committed.Overlay == GodotAls.Core.Locomotion.AlsOverlayKind.Rifle,
+                    "Failed animation published the pending prop switch.");
                 Require(committed == 12 && _character.PublishedFrameId == 13 && _character.ResultPublishedFrameId == 12 &&
                     _accepted == 1 && _interrupted == 0 && _ends == 0 &&
                     _character.CommittedAnimation.ActionCount == 1 && _character.CommittedAnimation.StateCount == 1 &&
@@ -91,6 +99,9 @@ public partial class AnimationFailureRecoverySmoke : Node
             }
             else if (_phase == 1 && committed == 13)
             {
+                if (_propSwitch) Require(_character.Props!.Committed.Identity.FrameId == 13 &&
+                    _character.Props.Committed.Overlay == GodotAls.Core.Locomotion.AlsOverlayKind.Bow,
+                    "Successful recovery did not commit the pending Bow.");
                 Require(_character.AnimationRecoveryAttempts == 0 && !_character.IsPoseFrozen && _interrupted == 1 && _ends == 1 &&
                     _accepted == (_replacement ? 2 : 1) && _character.MotorIntegrationCount == _integrations &&
                     _character.MovementAnchor.GlobalPosition == _position &&

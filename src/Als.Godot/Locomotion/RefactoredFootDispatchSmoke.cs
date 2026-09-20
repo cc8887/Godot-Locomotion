@@ -184,6 +184,12 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                     _phase = 0; _completedPauses++;
                 }
                 _lastFrames[i] = frame.CommittedFrameId;
+                if (character.Props is not null)
+                {
+                    var prop = character.Props.Committed;
+                    Require(prop.Identity == frame.Identity && prop.Overlay == character.LatestMotorInput.Command.RequestedOverlay,
+                        "Prop selection crossed a character/frame/generation boundary.");
+                }
                 _poseDigest = unchecked((_poseDigest ^ frame.FullPoseDigest) * 1099511628211UL);
                 _rootDigest = unchecked((_rootDigest ^ frame.RootDigest) * 1099511628211UL);
                 AlsResultDigest.Append(ref _resultDigest, frame.Result);
@@ -288,7 +294,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             "Cancellation occurred on the wrong side of the physical query.");
         _pausedInput = character.LatestMotorInput; _pausedSerial = split.Request.RequestSerial;
         _pausedCommit = character.RuntimeCommittedFrameId;
-        _pausedSkeleton = character.FindChildren("*", "Skeleton3D", true, false).OfType<Skeleton3D>().Single();
+        _pausedSkeleton = character.GetNode<Node>("VisualWorker").FindChildren("*", "Skeleton3D", true, false).OfType<Skeleton3D>().Single();
         _pausedBones = CaptureBones(_pausedSkeleton);
         _pausedRig = character.FullMovementDiagnostics.RefactoredRig; _pausedLocks = character.FullMovementDiagnostics.RefactoredLocks;
         if (TestContacts && _completedPauses == 1)

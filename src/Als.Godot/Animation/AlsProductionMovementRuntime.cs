@@ -40,6 +40,19 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     private readonly AlsBaseLayerFrameRuntime _base;
     private readonly AlsLayeredAnimationFrameRuntime? _layered;
     public bool UsesLayeredPose => _layered is not null;
+    public Transform3D PropAttachment(int logicalBone)
+    {
+        RequirePrepared();
+        if (_layered is null || !_applied) throw new InvalidOperationException("Props require the applied layered pose.");
+        var parent = _propParents[logicalBone];
+        if (parent < 0) throw new ArgumentException("Prop socket requires a physical parent.");
+        var pose = _layered.Pose[logicalBone];
+        var local = new Transform3D(new Basis(new Quaternion(pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z, pose.Rotation.W))
+            .ScaledLocal(new Vector3(pose.Scale.X, pose.Scale.Y, pose.Scale.Z)), new Vector3(pose.Position.X, pose.Position.Y, pose.Position.Z));
+        return _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(parent) * local;
+    }
+    public float PropDraw(string curve) { RequirePrepared(); return Curve(CurveNames.IndexOf(curve)); }
+    private readonly int[] _propParents;
     public bool UsesNativeFootIk => _layered?.UsesNativeFootIk == true;
     public bool UsesRefactoredFeet => _layered?.UsesRefactoredFeet == true;
     public bool CandidatePresentationPending
@@ -183,6 +196,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         }
         var poseSources = library.MovementSources(set, pose.SkeletonId);
         _godotToLogical = poseSources.GodotToLogical; _logicalBoneCount = poseSources.BoneCount;
+        _propParents = set.Skeletons[pose.SkeletonId].LogicalBones
+            .Select(b => Array.IndexOf(_godotToLogical, b.ParentLogicalId)).ToArray();
         _rollbackPose = new AlsLocalPose[_skeleton.GetBoneCount()];
         _leftIk = CurveNames.IndexOf(splitFeet ? "FootLeftIk" : "Enable_FootIK_L");
         _rightIk = CurveNames.IndexOf(splitFeet ? "FootRightIk" : "Enable_FootIK_R");

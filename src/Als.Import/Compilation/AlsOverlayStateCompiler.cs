@@ -23,6 +23,8 @@ public static class AlsOverlayStateCompiler
         ["NewEnumerator6"] = AlsOverlayKind.Bow, ["NewEnumerator7"] = AlsOverlayKind.Torch,
         ["NewEnumerator8"] = AlsOverlayKind.Binoculars, ["NewEnumerator9"] = AlsOverlayKind.Box, ["NewEnumerator11"] = AlsOverlayKind.Barrel
     };
+    internal static AlsOverlayKind ParseOverlayLiteral(string value) => OverlayLiterals.TryGetValue(value, out var kind)
+        ? kind : throw new ArgumentException("Unknown native Overlay literal.");
 
     public static AlsOverlayStateGraph Compile(string layeringJson, string overlayJson, AlsAnimationSetDefinition set, AlsOverlaySourceProfile sources)
     {

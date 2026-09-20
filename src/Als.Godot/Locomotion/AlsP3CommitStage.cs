@@ -100,7 +100,7 @@ public partial class AlsP3CommitStage : Node
             return;
         }
         var animationOwnership = _owner.CommittedAnimation;
-        try { animationOwnership.ValidateDispatch(result); }
+        try { animationOwnership.ValidateDispatch(result); _owner.Props?.Validate(candidate.Prop, identity); }
         catch (Exception exception)
         {
             _state.RecordFailure("animation_commit_ownership", identity, exception);
@@ -114,6 +114,7 @@ public partial class AlsP3CommitStage : Node
         }
 
         _state.FootProbeExchange.CopyNative(candidate.FootProbeSource.NativeFootPose);
+        _owner.Props?.Commit(candidate.Prop);
         _owner.CommitMotorLifecycleFrame(frameId);
         _state.HasCommittedTargetYaw = 1;
         _state.CommittedTargetYaw = result.TargetYaw;
