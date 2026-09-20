@@ -68,6 +68,27 @@ public sealed class AlsMontageActionRuntimeTests
         owner.Begin(Id(3),.1f); owner.ApplyRequest(AlsActionRequest.None); owner.Complete(); Assert.Equal(0,owner.Outcomes.Count);
     }
     [Fact]
+    public void FailureCancellationWinsOverPhysicalCompletionOnTheRecoveryFrame()
+    {
+        var (bank, owner) = Create(); var reachedEnd = false;
+        for (var frame = 1; frame <= 50; frame++)
+        {
+            owner.Begin(Id(frame), .05f);
+            var terminal = bank.Traversal.ToArray().Any(t => t.InstanceId == 1 && t.Terminated);
+            owner.ApplyRequest(frame == 1 ? Start(1) : AlsActionRequest.None, terminal);
+            owner.Complete();
+            if (terminal)
+            {
+                Assert.Equal(1, owner.Outcomes.Count);
+                Assert.Equal(AlsActionResultCode.InterruptedByRuntimeFailure, owner.Outcomes[0].ResultCode);
+                reachedEnd = true;
+            }
+            owner.Commit(Id(frame));
+        }
+        Assert.True(reachedEnd);
+    }
+
+    [Fact]
     public void RecoveryPrecedesNormalRequestAndBothRemainTransactional()
     {
         var (bank,owner)=Create(); owner.Begin(Id(1),.1f); owner.ApplyRequest(Start(1)); owner.Complete(); owner.Commit(Id(1));

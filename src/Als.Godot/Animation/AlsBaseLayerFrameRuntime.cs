@@ -31,6 +31,12 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     private readonly AlsMontageActionRuntime _actions;
     private readonly AlsMontageNotifyBinding _turnNotifyBinding;
     private readonly AlsMontageNotifyRuntime _turnNotifies;
+    private bool _cancelForRuntimeFailure;
+    private readonly long[] _failureEpochs = new long[AlsActionOutcomeBuffer.Capacity];
+    private int _failureEpochCount;
+
+    internal void SetRuntimeFailureCancellation(bool cancel)
+    { Require(Phase.Idle); _cancelForRuntimeFailure = cancel; _failureEpochCount = 0; }
     private readonly AlsBaseLayerActionSlot _actionSlot;
     private readonly AlsGroundedMontageSlot _groundedSlot;
     private readonly AlsOverlayTransitionDefinition _overlayTransitions;
@@ -269,8 +275,13 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         {
         _identity=frame.Identity; SourceUpdated=false; RequestCount=0; _phase=Phase.GlobalUpdating;
         _actions.Begin(frame.Identity, frame.DeltaTime);
-        _turnNotifies.Begin(frame.Identity, _montages.Traversal);
-        _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None);
+        _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None, _cancelForRuntimeFailure);
+        _failureEpochCount = 0;
+        for (var i = 0; i < _actions.Outcomes.Count; i++)
+            if (_actions.Outcomes[i].ResultCode == AlsActionResultCode.InterruptedByRuntimeFailure)
+                _failureEpochs[_failureEpochCount++] = _actions.Outcomes[i].PlaybackEpoch;
+        _turnNotifies.Begin(frame.Identity, _montages.Traversal,
+            interruptedInstances: _failureEpochs.AsSpan(0, _failureEpochCount));
         _candidateJumpInput = _jumpInput.Evaluate(frame, _committedGlobalInput.Speed, _committedJumpInput);
         // Blueprint-global aiming updates before movement graph relevance gates.
         // The enclosing Aim/LayerBlending pose graph will consume this candidate.
@@ -367,7 +378,8 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             }
             else _movement.PrepareHidden(_identity,_mappedInputs.Grounded.Delta,true);
             _turnNotifies.Complete(0);
-            _movement.PrepareEvents(_turnNotifyBinding,_turnNotifies.Notifies,_turnNotifies.DirectNotifies);
+            _movement.PrepareEvents(_turnNotifyBinding,_turnNotifies.Notifies,_turnNotifies.DirectNotifies,
+                _failureEpochs.AsSpan(0, _failureEpochCount));
             _phase=Phase.Unvisited;
         }
         catch { _phase=Phase.Faulted; throw; }
@@ -410,7 +422,8 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
                     (_authoredActions==true && _montages.SlotWeights(AlsMontageSlot.BaseLayer).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 4 : 0) |
                     (visitedGround && _montages.SlotWeights(AlsMontageSlot.Grounded).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 8 : 0);
                 _turnNotifies.Complete((byte)relevant);
-                _movement.PrepareEvents(_turnNotifyBinding, _turnNotifies.Notifies, _turnNotifies.DirectNotifies);
+                _movement.PrepareEvents(_turnNotifyBinding, _turnNotifies.Notifies, _turnNotifies.DirectNotifies,
+                    _failureEpochs.AsSpan(0, _failureEpochCount));
             }
             _phase = Phase.Prepared;
         }
@@ -452,7 +465,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         }
         if (HasMontageFrame) { _actions.Commit(identity); _turnNotifies.Commit(identity); }
         CommittedStopTransitionCount = StopTransitionCount;
-        CommittedIdentity=identity; _sink = null; _phase = Phase.Idle;
+        CommittedIdentity=identity; _sink = null; _phase = Phase.Idle; _cancelForRuntimeFailure = false; _failureEpochCount = 0;
     }
     internal void ValidateCommit(AlsFrameIdentity identity)
     {
@@ -512,6 +525,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     {
         if (_phase == Phase.Disposed) throw new ObjectDisposedException(nameof(AlsBaseLayerFrameRuntime));
         _movement.Discard(); _tail.Discard(); _actions.Discard(); _turnNotifies.Discard(); StopTransitionCount = 0; _sink = null; _phase = Phase.Idle;
+        _cancelForRuntimeFailure = false; _failureEpochCount = 0;
     }
     internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
     {

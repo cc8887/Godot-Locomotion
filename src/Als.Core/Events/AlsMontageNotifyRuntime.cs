@@ -27,7 +27,7 @@ public sealed class AlsMontageNotifyRuntime
     public AlsMontageNotifyRuntime(AlsMontageNotifyBinding binding) => _binding = binding;
 
     public void Begin(AlsFrameIdentity identity, ReadOnlySpan<AlsMontageTraversal> traversal,
-        bool dedicatedServer = false, int predictedLod = 0)
+        bool dedicatedServer = false, int predictedLod = 0, ReadOnlySpan<long> interruptedInstances = default)
     {
         if (_phase != Phase.Idle || identity.SlotGeneration == 0 || identity.FrameId < 0 ||
             Committed.Identity != default && (identity.CharacterId != Committed.Identity.CharacterId ||
@@ -44,7 +44,7 @@ public sealed class AlsMontageNotifyRuntime
         {
             foreach (var tick in traversal)
             {
-                if (tick.Interrupted) continue;
+                if (tick.Interrupted || interruptedInstances.Contains(tick.InstanceId)) continue;
                 if (tick.InstanceId <= 0 || (uint)tick.Slot.Id > 3 || !float.IsFinite(tick.NotifyWeight) || tick.NotifyWeight < 0)
                     throw new ArgumentException("Invalid montage notify traversal.");
                 var found = false;

@@ -509,26 +509,26 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     }
 
     internal AlsPreparedAnimationFrame PrepareFrame(in AlsFrameResult result, in AlsP4AnimationInput p4Input,
-        in AlsFrameInput input)
+        in AlsFrameInput input, bool cancelForRuntimeFailure = false)
     {
         if (input.Identity != result.Identity) throw new ArgumentException("Animation input/result identity mismatch.", nameof(input));
         if (_fullMovement is not null)
         {
             ThrowIfDisposed();
             if (_hasPreparedFrame != 0) throw new InvalidOperationException("A movement candidate is already pending.");
-            _fullMovement.Prepare(input, result);
+            _fullMovement.Prepare(input, result, cancelForRuntimeFailure);
             return RegisterMovementCandidate(input, result);
         }
         return PrepareFrame(result, p4Input, input.DeltaTime, _graph.StandingCycle?.CreateMovementInput(input));
     }
 
     internal AlsPreparedAnimationFrame PrepareFootQueries(in AlsFrameInput input, in AlsFrameResult result,
-        in AlsLocalPose component, out AlsFootRigQueries queries)
+        in AlsLocalPose component, out AlsFootRigQueries queries, bool cancelForRuntimeFailure = false)
     {
         ThrowIfDisposed();
         if (!UsesRefactoredFeet || _hasPreparedFrame != 0)
             throw new InvalidOperationException("Split movement preparation requires an idle Refactored owner.");
-        queries = _fullMovement!.PrepareFootQueries(input, result, component);
+        queries = _fullMovement!.PrepareFootQueries(input, result, component, cancelForRuntimeFailure);
         return RegisterMovementCandidate(input, result);
     }
 

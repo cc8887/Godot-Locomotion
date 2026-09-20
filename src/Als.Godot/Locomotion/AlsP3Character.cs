@@ -46,6 +46,7 @@ public partial class AlsP3Character : Node3D
         Volatile.Read(ref _state.FailureDiagnosticCount);
 
     internal long ResultPublishedFrameId => _state.ResultPublishedFrameId;
+    internal int AnimationRecoveryAttempts => _state.AnimationRecovery.FailedAttempts;
     internal AlsP3SplitFootDiagnostics SplitFootDiagnostics => _worker.SplitFootDiagnostics;
 
     internal AlsP4ReasonCode LastFailureReasonCode =>
@@ -296,6 +297,7 @@ public partial class AlsP3Character : Node3D
         try
         {
             var completedFrameId = Volatile.Read(ref _state.PublishedFrameId);
+            if (_state.AnimationRecovery.Pending) return; // Retry the captured Motor frame without another integration.
             // A split animation frame may be canceled while later process
             // groups are suspended. Keep its already-integrated motor input
             // until that frame commits; advancing again would skip the next

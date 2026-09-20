@@ -19,7 +19,8 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 未提交动作隔离。见[退役清理记录](docs/verification/2026-09-20-animation-retirement.md)。
 完整入口现已区分调度暂停与真正停用；停用会清理动作，恢复时保留移动/脚部检查点，
 不会继续播放旧动作。见[停用恢复记录](docs/verification/2026-09-20-animation-deactivation.md)。
-Worker 故障后的成功帧取消仍待接线。
+Worker 在 Release 策略下完成回滚后，现可沿用原帧输入重试；成功提交才取消旧动作
+和结束 Notify，不重复积分移动。见[故障恢复记录](docs/verification/2026-09-20-animation-failure-recovery.md)。
 
 ## 运行
 
