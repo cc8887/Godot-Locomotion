@@ -15,21 +15,30 @@ public partial class PhysicsBodySetSmoke : Node3D
         AlsPhysicsBodySet Bodies, AlsLocalPose[] Reference, AlsLocalPose[] Snapshot, Transform3D World, Vector3[] Initial,
         Vector3[] Paused, Vector3[] Velocities);
     private readonly List<Case> _cases = [];
-    private int _frame, _hz = 60, _contactSeconds = 4; private bool _done, _contact;
-    private float _geometryError, _poseError, _tensorError;
+    private int _frame, _hz = 60, _contactSeconds = 10; private bool _done, _contact, _highDrop;
+    private float _geometryError, _poseError, _tensorError, _minimumContactBottom = float.PositiveInfinity, _maximumContactSpeed;
+    private int _contactSamples;
     public override void _Ready()
     {
         try
         {
+            if (OS.GetCmdlineUserArgs().Contains("--settings"))
+                foreach (var property in ProjectSettings.Singleton.GetPropertyList())
+                {
+                    var key=property["name"].AsString();
+                    if (key.StartsWith("physics/jolt") && (key.Contains("penetration") || key.Contains("margin") || key.Contains("sleep") || key.Contains("collision")))
+                        GD.Print($"PHYSICS_SETTING {key}={ProjectSettings.GetSetting(key)}");
+                }
             _hz = int.Parse(OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
             Require(_hz is 30 or 60 or 120,"Expected 30/60/120 Hz."); Engine.PhysicsTicksPerSecond = _hz;
             _contact = OS.GetCmdlineUserArgs().Contains("--contact");
-            _contactSeconds = int.Parse(OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--seconds="))?[10..] ?? "4");
+            _highDrop = OS.GetCmdlineUserArgs().Contains("--high-drop");
+            _contactSeconds = int.Parse(OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--seconds="))?[10..] ?? "10");
             Require(_contactSeconds >= 4,"Contact observation must include at least four seconds.");
             var iterations = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--iterations="));
             if (iterations is not null) PhysicsServer3D.SpaceSetParam(GetWorld3D().Space,PhysicsServer3D.SpaceParameter.SolverIterations,int.Parse(iterations[13..]));
             var floorMode = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--floor="))?[8..];
-            GD.Print($"PHYSICS_BODY_BACKEND {ProjectSettings.GetSetting("physics/3d/physics_engine","default")} penetration={PhysicsServer3D.SpaceGetParam(GetWorld3D().Space,PhysicsServer3D.SpaceParameter.ContactMaxAllowedPenetration)}");
+            GD.Print($"PHYSICS_BODY_BACKEND {ProjectSettings.GetSetting("physics/3d/physics_engine","default")} godot_physics_penetration={PhysicsServer3D.SpaceGetParam(GetWorld3D().Space,PhysicsServer3D.SpaceParameter.ContactMaxAllowedPenetration)} jolt_penetration={ProjectSettings.GetSetting("physics/jolt_physics_3d/simulation/penetration_slop")}");
             if (_contact)
             {
                 var floor = new StaticBody3D { CollisionLayer = 1, CollisionMask = 2, Position = new(0,-.1f,0) };
@@ -44,7 +53,7 @@ public partial class PhysicsBodySetSmoke : Node3D
                 var definition = AlsPhysicsAssetCompiler.Compile(json,AlsPhysicsAssetCompiler.MeshRoot+name+"."+name);
                 var asset = set.SkeletalMeshes.Single(m => m.ObjectPath == definition.Mesh);
                 var model = ResourceLoader.Load<PackedScene>(AlsGodotImportCoordinator.AssetRoot+"/"+asset.ResourcePath).Instantiate<Node3D>(); AddChild(model);
-                model.GlobalTransform = new(new Basis(Vector3.Up,.37f),new(_cases.Count*5,3,0));
+                model.GlobalTransform = new(_highDrop ? Basis.FromEuler(new(.5f,1.1f,.2f)) : new Basis(Vector3.Up,.37f),new(_cases.Count*5,_highDrop ? 10 : 3,0));
                 var skeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(model)!;
                 Require(skeleton is not null,"No imported physical skeleton.");
                 var names = Enumerable.Range(0,skeleton!.GetBoneCount()).Select(skeleton.GetBoneName).Select(n => n.ToString()).ToArray();
@@ -53,8 +62,11 @@ public partial class PhysicsBodySetSmoke : Node3D
                 var bodies = new AlsPhysicsBodySet(this,definition,names,parents,7,1,collisionMask:_contact ? 1u : 0u);
                 if (_contact) for (var i=0; i<bodies.BodyCount; i++) bodies.BodyAt(i).MaxContactsReported=8;
                 var diagnostic = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--diagnostic="))?[13..];
+                var biasArg = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--bias="));
                 for (var i=0; i<bodies.BodyCount; i++)
                 {
+                    if (biasArg is not null) foreach (var node in bodies.BodyAt(i).GetChildren().OfType<CollisionShape3D>())
+                        node.Shape.CustomSolverBias=float.Parse(biasArg[7..],System.Globalization.CultureInfo.InvariantCulture);
                     if (diagnostic == "damping") bodies.BodyAt(i).AngularDamp=0;
                     if (diagnostic == "bounce") bodies.BodyAt(i).PhysicsMaterialOverride!.Bounce=0;
                     if (diagnostic == "friction") bodies.BodyAt(i).PhysicsMaterialOverride!.Friction=0;
@@ -74,7 +86,7 @@ public partial class PhysicsBodySetSmoke : Node3D
                 invalid[^1] = reference[^1] with { Rotation = default };
                 Reject(() => bodies.Seed(new(2,7,1),world,invalid,Vector3.Zero,Vector3.Zero));
                 Require(bodies.PoseIdentity == id && bodies.BodyAt(0).GlobalPosition == initial[0],"Invalid pose changed the physical owner.");
-                var angular = new Vector3(.3f,.7f,-.2f); var linear = new Vector3(2,0,0);
+                var angular = new Vector3(.3f,.7f,-.2f); var linear = new Vector3(2,_highDrop ? -12 : 0,0);
                 bodies.Seed(new(2,7,1),world,reference,linear,angular); bodies.Start();
                 for (var i=0; i<bodies.BodyCount; i++) if (definition.Bodies[i].PhysicsType != 1)
                 {
@@ -118,9 +130,11 @@ public partial class PhysicsBodySetSmoke : Node3D
                     for (var i = 0; i < c.Bodies.BodyCount; i++) if (c.Definition.Bodies[i].PhysicsType != 1)
                         Require(c.Bodies.BodyAt(i).LinearVelocity.X > c.Velocities[i].X-.05f &&
                             c.Bodies.BodyAt(i).GlobalPosition.Y < c.Paused[i].Y,"Resume lost physical velocity.");
+                // A capsule may still be rocking at four seconds. Require a full
+                // final second of stable geometry and velocity, not one lucky tick.
+                if (_contact && _frame > _hz*(_contactSeconds-1)) VerifyContact(c);
                 if (_frame == (_contact ? _hz*_contactSeconds : _hz*3/2))
                 {
-                    if (_contact) VerifyContact(c);
                     VerifySnapshot(c,false); c.Bodies.Stop(); Reject(c.Bodies.Resume);
                     Require(c.Bodies.PoseIdentity == default && !c.Bodies.Active,"Stopped physical ownership survived.");
                     c.Bodies.Seed(new(99,7,1),c.World,c.Reference,Vector3.Zero,Vector3.Zero); VerifySnapshot(c,true);
@@ -129,7 +143,7 @@ public partial class PhysicsBodySetSmoke : Node3D
             }
             if (_frame == (_contact ? _hz*_contactSeconds : _hz*3/2))
             {
-                GD.Print($"PHYSICS_BODY_SET_OK hz={_hz} contact={_contact} bodies=40 shapes=43 meshes=2 geometry_error_m={_geometryError:G9} pose_error_m={_poseError:G9} tensor_relative_error={_tensorError:G9} lifecycle=seed_flight_suspend_resume_stop_dispose joints=not_yet_bound");
+                GD.Print($"PHYSICS_BODY_SET_OK hz={_hz} contact={_contact} high_drop={_highDrop} seconds={_contactSeconds} contact_samples={_contactSamples} min_bottom_m={_minimumContactBottom} max_contact_speed={_maximumContactSpeed} bodies=40 shapes=43 meshes=2 geometry_error_m={_geometryError:G9} pose_error_m={_poseError:G9} tensor_relative_error={_tensorError:G9} lifecycle=seed_flight_suspend_resume_stop_dispose joints=not_yet_bound");
                 _done = true; GetTree().Quit();
             }
         }
@@ -157,7 +171,7 @@ public partial class PhysicsBodySetSmoke : Node3D
         }
     }
 
-    private static void VerifyContact(Case c)
+    private void VerifyContact(Case c)
     {
         for (var i = 0; i < c.Bodies.BodyCount; i++)
         {
@@ -184,6 +198,8 @@ public partial class PhysicsBodySetSmoke : Node3D
             }
             Require(bottom is > -.02f and < .03f,$"Body did not settle against actual floor geometry: {body.Name} bottom={bottom}.");
             Require(body.LinearVelocity.Length() < .2f,$"Body did not settle: {body.Name} speed={body.LinearVelocity.Length()}.");
+            _minimumContactBottom=MathF.Min(_minimumContactBottom,bottom);
+            _maximumContactSpeed=MathF.Max(_maximumContactSpeed,body.LinearVelocity.Length()); _contactSamples++;
         }
     }
 

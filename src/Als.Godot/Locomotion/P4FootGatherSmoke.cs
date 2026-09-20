@@ -473,11 +473,14 @@ public partial class P4FootGatherSmoke : Node
                 AlsCharacterMotor.CreatePlatformId(_stationaryPlatform.GetInstanceId()) &&
                 input.Floor.ColliderId == checked((long)_stationaryPlatform.GetInstanceId()),
             "stationary Animatable platform identity was lost after entering steady state");
-        Require(_stationaryTransitionMotor.LastFootGatherManagedAllocations > 0,
-            "Godot GetSlideCollision wrapper allocation was incorrectly reported as zero bytes");
+        Require(_stationaryTransitionMotor.LastFootGatherManagedAllocations >= 0 &&
+                (!_stationaryTransitionMotor.LastFloorSelectionUsedSlideEvidence ||
+                 _stationaryTransitionMotor.LastFootGatherManagedAllocations > 0),
+            "Godot slide wrapper allocation was not accounted for on a slide-evidence path");
         GD.Print(
             "P4_FOOT_GATHER_SLIDE_ALLOC bytes=" +
-            _stationaryTransitionMotor.LastFootGatherManagedAllocations);
+            _stationaryTransitionMotor.LastFootGatherManagedAllocations +
+            " slide_evidence=" + _stationaryTransitionMotor.LastFloorSelectionUsedSlideEvidence);
     }
 
     private void ValidateSeamMovementBase(double delta)

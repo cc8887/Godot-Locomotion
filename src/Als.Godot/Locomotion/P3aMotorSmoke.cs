@@ -391,7 +391,6 @@ public partial class P3aMotorSmoke : Node
             CollisionLayer = 1,
             CollisionMask = 1,
             SyncToPhysics = true,
-            ConstantAngularVelocity = new Vector3(0f, 2f, 0f),
         };
         _movingPlatform.AddChild(new CollisionShape3D
         {
@@ -817,6 +816,9 @@ public partial class P3aMotorSmoke : Node
 
     private void UpdateMovingPlatform()
     {
+        // Both physics backends derive kinematic angular velocity from motion.
+        // Jolt does not add StaticBody's conveyor velocity to an AnimatableBody.
+        _movingPlatform.RotateY(2f * DeltaTime);
         if (_frameId is >= 20 and <= 30)
         {
             _movingPlatform.GlobalPosition += Vector3.Right * (2f * DeltaTime);
@@ -825,7 +827,8 @@ public partial class P3aMotorSmoke : Node
 
     private void ObserveMovingPlatform(in AlsFrameInput input)
     {
-        if (!_platformTupleChecked && input.Floor.IsGrounded == 1)
+        // SyncToPhysics publishes the requested transform on the following tick.
+        if (!_platformTupleChecked && _frameId >= 3 && input.Floor.IsGrounded == 1)
         {
             var platformTransform = _movingPlatform.GlobalTransform;
             var platformRotation = platformTransform.Basis.Orthonormalized()
@@ -855,7 +858,7 @@ public partial class P3aMotorSmoke : Node
                     float.IsFinite(expectedAngular.X) &&
                     float.IsFinite(expectedAngular.Y) &&
                     float.IsFinite(expectedAngular.Z) &&
-                    actualAngular.DistanceTo(_movingPlatform.ConstantAngularVelocity) <= Tolerance,
+                    actualAngular.DistanceTo(new Vector3(0f, 2f, 0f)) <= Tolerance,
                 "P3A moving-platform angular velocity was incomplete or non-finite");
             _platformTupleChecked = true;
         }
