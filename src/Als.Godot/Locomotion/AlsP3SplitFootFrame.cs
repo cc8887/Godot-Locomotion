@@ -75,6 +75,7 @@ public partial class AlsP3WorkerRoot
             _splitFoot.Checkpoint = _controller!.CaptureTransactionDiagnostics();
             EvaluateModels(input, out _splitFoot.Runtime, out _splitFoot.Result);
             var root = AlsP3Presentation.Compose(input.CharacterTransform, _context.PresentationTransform);
+            root.Origin += Vector3.Up * input.MeshHeightOffset;
             AlsP3Presentation.ThrowIfNonFinite(root);
             var rotation = root.Basis.GetRotationQuaternion(); var scale = root.Basis.Scale;
             var component = new AlsLocalPose(new(root.Origin.X, root.Origin.Y, root.Origin.Z),

@@ -119,6 +119,7 @@ public partial class AlsP3CommitStage : Node
         _state.HasCommittedTargetYaw = 1;
         _state.CommittedTargetYaw = result.TargetYaw;
         _state.CommittedCharacterRotationFeedback = candidate.CharacterRotationFeedback;
+        _state.CommittedRolling = result.Rolling;
         _state.CommittedRefactoredFeedback = candidate.RefactoredFeedback;
         _state.Diagnostics = new AlsP3FrameDiagnostics(
             candidate.Identity,

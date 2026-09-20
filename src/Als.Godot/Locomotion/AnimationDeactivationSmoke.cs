@@ -37,9 +37,10 @@ public partial class AnimationDeactivationSmoke : Node
             var entry = scene.Instantiate<AlsDemoEntry>(); AddChild(entry); _demo = entry.Demo;
             Require(_demo.IsRuntimeReady, "Normal Demo failed to initialize.");
             _context = _demo.RuntimeContext; _character = _demo.ActiveCharacter; _generation = _character.Handle.Generation;
+            if (GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) RollingGameplaySmoke.PlaceOnOpenFloor(_demo);
             _context.ActionOutcomeCommitted += Outcome;
             _context.AnimationEventCommitted += Event;
-            Tap(Key.R);
+            if (!GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) Tap(Key.R);
         }
         catch (Exception error) { Fail(error); }
     }
@@ -52,6 +53,7 @@ public partial class AnimationDeactivationSmoke : Node
             Require(++_ticks < 240 && _demo.IsRuntimeReady && _demo.ErrorCount == 0,
                 $"Deactivation failed or stalled phase={_phase} tick={_ticks} errors={_demo.ErrorCount} published={_character.PublishedFrameId} committed={_character.RuntimeCommittedFrameId}.");
             var committed = _character.Diagnostics.CommittedFrameId;
+            if (committed == 2 && GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) Tap(Key.R);
             if (_phase == 0 && !_mode.StartsWith("callback") && committed == 12)
             {
                 if (_mode == "committed") Stop();
@@ -88,6 +90,7 @@ public partial class AnimationDeactivationSmoke : Node
                     _character.FullMovementDiagnostics.MovementNotifies.Action == AlsTimelineAction.None &&
                     _character.CommittedAnimation.ActionCount == 0,
                     "Resume revived a cleared action, skipped its proper frame, or changed generation.");
+                Require(!_character.Diagnostics.Result.Rolling.Active, "Resume revived the retired Roll gameplay state.");
                 Require(_character.MotorIntegrationCount == _stoppedIntegrations + (_mode == "pending" ? 0 : 1),
                     "Resume integrated the old Motor frame twice.");
                 // The pending-frame trial already captured the following input

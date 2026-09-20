@@ -36,10 +36,11 @@ public partial class AnimationRetirementSmoke : Node
             var entry = scene.Instantiate<AlsDemoEntry>(); AddChild(entry); _demo = entry.Demo;
             Require(_demo.IsRuntimeReady, "Normal Demo failed to initialize.");
             _context = _demo.RuntimeContext; _old = _demo.ActiveCharacter.CommittedAnimation;
+            if (GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) RollingGameplaySmoke.PlaceOnOpenFloor(_demo);
             _context.ActionOutcomeCommitted += Outcome;
             _context.AnimationEventCommitted += Event;
             _context.AnimationEventCommitted += SecondSubscriber;
-            TapRoll();
+            if (!GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) TapRoll();
         }
         catch (Exception error) { Fail(error); }
     }
@@ -52,6 +53,7 @@ public partial class AnimationRetirementSmoke : Node
             Require(++_ticks < 180, "Animation retirement stalled.");
             if (_disposedDemo) { Complete(); return; }
             var character = _demo.ActiveCharacter;
+            if (character.Diagnostics.CommittedFrameId == 2 && GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) TapRoll();
             Require(_demo.IsRuntimeReady && !character.IsPoseFrozen, "Production runtime failed.");
             if (_phase == 0 && _mode != "callback" && character.Diagnostics.CommittedFrameId == 12)
             {

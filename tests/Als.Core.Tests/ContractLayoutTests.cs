@@ -141,7 +141,7 @@ public sealed class ContractLayoutTests
             "RotationMode", "RequestedAction", "CurrentDriveMode", "RagdollState",
             "AnimationQualityTier", "Command", "CharacterYaw", "MaxAcceleration",
             "MaxBrakingDeceleration", "JumpAccepted", "FootPlacementReleaseSignals",
-            "ActionRequest", "LandPrediction", "AimYawRateDegrees", "FirstPerson", "CharacterRotation", "FootIk", "MovementInput", "RefactoredGroundPrediction");
+            "ActionRequest", "LandPrediction", "AimYawRateDegrees", "FirstPerson", "CharacterRotation", "FootIk", "MovementInput", "RefactoredGroundPrediction", "GameplayAction", "MeshHeightOffset");
         AssertStorageFieldOrder<AlsRuntimeState>(
             "LocomotionState", "SmoothedVelocity", "SmoothedAcceleration", "Lean",
             "LeftFootLocked", "RightFootLocked", "TurnInPlaceTime", "RotateInPlaceTime",
@@ -168,7 +168,7 @@ public sealed class ContractLayoutTests
             "LeftFootIkWeight", "RightFootIkWeight", "LeftFootLockCurve", "RightFootLockCurve",
             "NextLeftFootProbeOrigin", "NextRightFootProbeOrigin",
             "P4ModifierOperationTicks", "P4ReasonCode", "Sync", "DynamicTransition",
-            "ActionPlayback", "ActionOutcomes", "P5FailureCode", "RootMotionSource");
+            "ActionPlayback", "ActionOutcomes", "P5FailureCode", "RootMotionSource", "Rolling");
     }
 
     [Fact]

@@ -267,6 +267,9 @@ public partial class AlsP3Character : Node3D
             if (context.PropProfile is not null) Props = new(this, context);
             if (_worker.UsesNativeFootIk) _motor.ConfigureNativeFeet(_worker.InitialNativeFeet, context.MovementGraph!.FootIkInput.Offset);
             _motor.ConsumeMontageRootMotion = GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--montage-root-motion");
+            _motor.RollingGameplay = GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay");
+            if (_motor.RollingGameplay && !_motor.ConsumeMontageRootMotion)
+                throw new InvalidOperationException("Rolling gameplay requires montage root motion consumption.");
             if (_motor.ConsumeMontageRootMotion && !_worker.UsesRefactoredFeet)
                 throw new InvalidOperationException("Root motion consumption requires the complete split animation pipeline.");
 
@@ -382,7 +385,7 @@ public partial class AlsP3Character : Node3D
                         ? _resumeRefactoredFeedback : _state.CommittedRefactoredFeedback,
                     _motor.ConsumeMontageRootMotion && _worker.MotorRootMotion.Identity == HandleIdentity(frameId)
                         ? _worker.MotorRootMotion.Source : default,
-                    _worker.MotorRootMotion.Delta);
+                    _worker.MotorRootMotion.Delta, _state.CommittedRolling);
             }
             _state.CommandFrameId = frameId;
             _state.MotorSnapshotFrameId = input.Identity.FrameId;

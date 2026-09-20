@@ -34,6 +34,9 @@ public partial class ActionInputSmoke : Node
         try
         {
             ValidateAdapter();
+            // This fixture tests the replaceable montage transport. Grounded
+            // gameplay and the ordinary defaults have their own Roll fixture.
+            GodotAls.Animation.AlsAnimationRuntimeOptions.ConfigureDemo(actionPreview: true);
             _consumeMotion = OS.GetCmdlineUserArgs().Contains("--montage-root-motion");
             _wall = OS.GetCmdlineUserArgs().Contains("--motion-wall");
             Require(!_wall || _consumeMotion, "Wall test requires root motion consumption.");

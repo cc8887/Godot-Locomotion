@@ -1639,3 +1639,12 @@ Overlay gameplay、全流程观感或十分钟性能验收。下一步继续剩�
 十角色双模式通过；详见 `../../verification/2026-09-20-root-motion-consumption.md`。
 下一项仍为 Refactored Roll 玩法门控、半衰期转向与落地触发及普通入口接线；
 本批未关闭 P5C、复杂地形和最终性能预算。
+
+2026-09-20 后续：普通 Demo 的 R 已接通地面 Roll：按 active Montage lookup
+拒绝重复触发、捕获输入方向并使用 Refactored 0.1 秒半衰期转向、翻滚中蹲伏与
+禁止起跳、完成后恢复用户期望姿态。补齐 UE 胶囊缩矮时的网格高度补偿，展示、
+脚部查询与 Root Motion 变换共用；状态经 Worker 候选和 Main Commit 交接。
+三档频率、单/多线程、故障/停用/换代及键鼠回归见
+`../../verification/2026-09-20-grounded-roll-gameplay.md`。落地自动 Roll（含倍率
+与 Ragdoll 优先级）、翻滚离地 Ragdoll 仍未启用，后续 Mantle、Recovery、Camera
+和完整性能/观感验收保持，不据此关闭整个 P5C。

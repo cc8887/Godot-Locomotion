@@ -800,6 +800,7 @@ internal sealed class AlsP3CharacterState
 
     public float CommittedTargetYaw;
     public AlsCharacterRotationFeedback CommittedCharacterRotationFeedback;
+    public GodotAls.Core.Actions.AlsRollingState CommittedRolling;
     public AlsRefactoredAnimationFeedback CommittedRefactoredFeedback;
 
     public AlsP3FrameDiagnostics Diagnostics;
@@ -1010,6 +1011,7 @@ internal sealed class AlsP3CharacterState
         HasCommittedTargetYaw = 0;
         CommittedTargetYaw = 0f;
         CommittedCharacterRotationFeedback = default;
+        CommittedRolling = default;
         FootProbeExchange.Clear();
     }
 

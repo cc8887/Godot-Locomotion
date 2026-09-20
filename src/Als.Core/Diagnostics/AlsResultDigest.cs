@@ -29,6 +29,13 @@ public static class AlsResultDigest
             Append(ref digest, result.RootMotionSource.StartSeconds);
             Append(ref digest, result.RootMotionSource.EndSeconds);
         }
+        if (result.Rolling.Active)
+        {
+            Append(ref digest, 0x524F4C4C);
+            Append(ref digest, result.Rolling.RequestId);
+            Append(ref digest, result.Rolling.InstanceId);
+            Append(ref digest, result.Rolling.TargetYawDegrees);
+        }
         Append(ref digest, result.PelvisTarget);
         Append(ref digest, result.LeftFootTarget);
         Append(ref digest, result.RightFootTarget);

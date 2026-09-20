@@ -277,6 +277,17 @@ public sealed class AlsMontageRuntime
         return 0;
     }
 
+    // UAnimInstance::Montage_IsPlaying uses the active asset lookup, not every
+    // still-playing outgoing fade. Automatic blend-out removes that lookup.
+    public bool IsActionPlaying(int definitionId)
+    {
+        var id = ActiveActionInstance(definitionId);
+        if (id == 0) return false;
+        for (var i = 0; i < _count; i++)
+            if (_candidate[i].InstanceId == id) return _candidate[i].Playing;
+        return false;
+    }
+
     private void Play(in AlsAuthoredMontageAsset asset, float playRate, float startTime, bool stopGroup)
     {
         if (_serial == long.MaxValue) throw new InvalidOperationException("Montage instance identity exhausted.");

@@ -97,6 +97,7 @@ public struct AlsFrameResult
     public AlsP5FailureCode P5FailureCode;
     // Append extensions so existing field offsets remain unchanged.
     public GodotAls.Core.Actions.AlsMontageRootMotionRange RootMotionSource;
+    public GodotAls.Core.Actions.AlsRollingState Rolling;
 
     public static AlsFrameResult CreateDefault(AlsFrameIdentity identity) => new()
     {
