@@ -16,12 +16,14 @@ public partial class PhysicsCoreJointReplay : Node3D
         string[] Names, int[] Parents, AlsLocalPose[] Rest);
     private sealed record Active(Rig Rig, AlsPhysicsBodySet Bodies, AlsCoreJointHost Host,
         AlsLocalPose[] Pose, Transform3D[] Components, int[] BodyBones,
-        AlsPhysicsContactShapes? Shapes, AlsGodotContactQuery? Query, AlsWorldContacts? Contacts);
+        AlsPhysicsContactShapes? Shapes, AlsGodotContactQuery? Query, AlsWorldContacts? Contacts, AlsSceneContactSet? Scene);
     private readonly Dictionary<string, Rig> _rigs = [];
     private readonly List<Active> _active = [];
     private JsonDocument? _reference;
     private int _case, _frame, _hz;
-    private bool _done, _chains, _drop, _highDrop, _sleep;
+    private bool _done, _chains, _drop, _highDrop, _sleep, _sceneWorld;
+    private Node3D? _world;
+    private double _floorTop;
     private double _positionError, _angleError, _vError, _wError, _transportError, _anchorCm;
     private string _report = "";
     private int _contactPoints;
@@ -39,12 +41,21 @@ public partial class PhysicsCoreJointReplay : Node3D
             var args = OS.GetCmdlineUserArgs(); _chains = args.Contains("--chains");
             _drop = args.Contains("--drop"); _highDrop = args.Contains("--high-drop");
             _sleep = args.Contains("--sleep"); Require(!_sleep || _drop, "Sleep probe requires --drop.");
+            _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
             Require(!_drop || _chains, "Drop requires --chains.");
             Require(!_highDrop || _drop, "High drop requires --drop.");
             _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
             Require(_hz is 30 or 60 or 120, "Expected 30/60/120 Hz.");
             _report = args.FirstOrDefault(a => a.StartsWith("--report="))?[9..] ?? "";
             Require(System.IO.Path.IsPathFullyQualified(_report) && !System.IO.File.Exists(_report), "Require a new absolute --report path.");
+            if (_sceneWorld)
+            {
+                var demo = ResourceLoader.Load<PackedScene>("res://scenes/demo/p4_locomotion_demo.tscn").Instantiate<Node3D>();
+                _world = demo.GetNode<Node3D>("World"); demo.RemoveChild(_world); demo.Free(); AddChild(_world);
+                var floor = _world.GetNode<CollisionShape3D>("StartFloor/CollisionShape3D");
+                _floorTop = AlsSceneContactSet.FromWorld(floor.GlobalTransform * new Transform3D(Basis.Identity,
+                    new Vector3(0, ((BoxShape3D)floor.Shape).Size.Y * .5f, 0))).Position.Z;
+            }
             _reference = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_awake_solver_reference.json"));
             Require(!_reference.RootElement.GetProperty("sleepEnabled").GetBoolean(), "Expected an awake reference.");
             var set = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath).LoadDefinition();
@@ -91,6 +102,7 @@ public partial class PhysicsCoreJointReplay : Node3D
         foreach (var rig in _rigs.Values)
         {
             var definition = rig.Definition;
+            AlsSceneContactSet? scene = null;
             var conditioning = AlsBodyInertiaCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_inertia_reference.json"), definition, rig.Settings);
             var bodies = definition.Bodies.Select(b => new AlsIslandBody(b.MassLocal, b.PhysicsType == 1 ? default : new((float)(1 / b.MassKg),
                 new AlsDoubleVector(new System.Numerics.Vector3((float)(1 / b.InertiaKgCm2.X), (float)(1 / b.InertiaKgCm2.Y), (float)(1 / b.InertiaKgCm2.Z)) * conditioning[b.Index].InverseInertiaScale)),
@@ -105,13 +117,22 @@ public partial class PhysicsCoreJointReplay : Node3D
             // equilibrium rest pose. No reference trajectory drives this mode.
             if (_drop)
             {
-                var world = new AlsPrecisePose(new(0, 0, _highDrop ? 300 : 100),
+                var world = new AlsPrecisePose(new(0, 0, _floorTop + (_highDrop ? 300 : 100)),
                     AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitX, .35f), AlsDoubleVector.One);
                 for (var i = 0; i < states.Length; i++)
                     states[i] = new(AlsPrecisePose.Compose(states[i].Actor, world), definition.Bodies[i].PhysicsType == 1 ? default :
                         new(new(100, 0, _highDrop ? -1000 : 0), new(.3f, .7f, -.2f)));
-                bodies = [.. bodies, new(AlsPrecisePose.Identity, default)];
-                states = [.. states, new(AlsPrecisePose.Identity with { Position = new(0, 0, -50) }, default)];
+                if (_sceneWorld)
+                {
+                    scene = new(_world!, bodies.Length);
+                    Array.Resize(ref bodies, bodies.Length + scene.BodyCount);
+                    Array.Resize(ref states, bodies.Length); scene.InitializeBodies(bodies, states);
+                }
+                else
+                {
+                    bodies = [.. bodies, new(AlsPrecisePose.Identity, default)];
+                    states = [.. states, new(AlsPrecisePose.Identity with { Position = new(0, 0, -50) }, default)];
+                }
             }
             else
             {
@@ -120,11 +141,14 @@ public partial class PhysicsCoreJointReplay : Node3D
                 states[spine] = states[spine] with { Actor = actor with { Rotation = (AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitY, .6f) * actor.Rotation).Normalized() } };
             }
             var sleep = _sleep ? AlsSleepSettingsCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_sleep_reference.json"), definition) : null;
-            Add(rig, new(bodies, joints, states, sleepSettings: sleep is null ? [] : [.. sleep.Bodies, default], sleepSmoothing: sleep?.Smoothing ?? .3f));
+            var sleepSettings = sleep is null ? [] : new AlsSleepBodySettings[bodies.Length];
+            if (sleep is not null) sleep.Bodies.CopyTo(sleepSettings, 0);
+            try { Add(rig, new(bodies, joints, states, sleepSettings: sleepSettings, sleepSmoothing: sleep?.Smoothing ?? .3f), scene); }
+            catch { scene?.Dispose(); throw; }
         }
     }
 
-    private void Add(Rig rig, AlsJointIsland island)
+    private void Add(Rig rig, AlsJointIsland island, AlsSceneContactSet? scene = null)
     {
         var bodies = new AlsPhysicsBodySet(this, rig.Definition, rig.Names, rig.Parents, 1, 1, collisionLayer: 0, collisionMask: 0);
         AlsPhysicsContactShapes? shapes = null; AlsGodotContactQuery? query = null;
@@ -141,10 +165,12 @@ public partial class PhysicsCoreJointReplay : Node3D
             AlsWorldContacts? contacts = null;
             if (_drop)
             {
-                var registry = new AlsContactRegistry(island.BodyCount, rig.Definition.Bodies.Sum(b => b.Shapes.Length) + 1);
+                var registry = new AlsContactRegistry(island.BodyCount, rig.Definition.Bodies.Sum(b => b.Shapes.Length) + (scene?.ShapeCount ?? 1));
                 query = new(registry); shapes = new(); shapes.Bind(rig.Definition, registry, query);
-                shapes.BindFloor(rig.Definition.Bodies.Length, registry, query);
-                // The diagnostic floor explicitly uses the same material as the rig.
+                if (scene is null) shapes.BindFloor(rig.Definition.Bodies.Length, registry, query);
+                else scene.Bind(registry, query);
+                // Geometry/motion acceptance uses an explicitly homogeneous rig
+                // material. Scene material combine is not implemented here.
                 var material = rig.Definition.Bodies[0].Material;
                 var friction = material.GetProperty("friction").GetSingle();
                 var staticFriction = Math.Max(friction, material.GetProperty("staticFriction").GetSingle());
@@ -161,9 +187,9 @@ public partial class PhysicsCoreJointReplay : Node3D
                         !body.Defaults.GetProperty("bGyroscopicTorqueEnabled").GetBoolean(), "Drop needs homogeneous default material, gravity group zero and no gyroscopic torque.");
                 contacts = new(registry, query, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16);
             }
-            _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names), shapes, query, contacts));
+            _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names), shapes, query, contacts, scene));
         }
-        catch { query?.Dispose(); shapes?.Dispose(); bodies.Dispose(); throw; }
+        catch { scene?.Dispose(); query?.Dispose(); shapes?.Dispose(); bodies.Dispose(); throw; }
     }
 
     public override void _PhysicsProcess(double dt)
@@ -182,7 +208,13 @@ public partial class PhysicsCoreJointReplay : Node3D
                     if (_drop)
                     {
                         var epoch = active.Contacts!.CompletedSteps;
-                        active.Host.Step(dt, new(0, 0, -980), active.Contacts);
+                        if (active.Scene is null) active.Host.Step(dt, new(0, 0, -980), active.Contacts);
+                        else
+                        {
+                            var targets = active.Scene.Capture(active.Host.Island, dt);
+                            active.Host.StepScene(dt, new(0, 0, -980), active.Contacts, targets);
+                            active.Scene.CommitCapture(active.Host.Island);
+                        }
                         if (active.Contacts.CompletedSteps != epoch) _contactPoints += active.Contacts.LastContactCount;
                     }
                     else active.Host.Step(dt);
@@ -224,7 +256,9 @@ public partial class PhysicsCoreJointReplay : Node3D
                 max_angular_velocity_radps = _chains ? (double?)null : _wError, max_transport_m = _transportError,
                 max_anchor_cm = _chains ? (double?)_anchorCm : null,
                 contacts = _drop, gravity = _drop, high_drop = _highDrop, contact_points = _contactPoints,
-                query_shapes = _active.Sum(a => a.Shapes?.Count ?? 0),
+                query_shapes = _active.Sum(a => (a.Shapes?.Count ?? 0) + (a.Scene?.ShapeCount ?? 0)),
+                scene_world_geometry = _sceneWorld, environment_bodies_per_rig = _active.FirstOrDefault()?.Scene?.BodyCount ?? (_drop ? 1 : 0),
+                scene_floor_top_cm = _floorTop, scene_material_combination = false, ordinary_ragdoll_connected = false,
                 final_speed_cmps = _finalSpeed, final_angular_speed_radps = _finalAngularSpeed, max_limit_rad = _maxLimit, final_limit_rad = _finalLimit,
                 final_limit_source = _finalLimitSource,
                 limit_metric = "limited: native pyramid/twist; locked: distance to native R01 component zero",
@@ -299,9 +333,9 @@ public partial class PhysicsCoreJointReplay : Node3D
             if (_drop && active.Rig.Definition.Bodies[i].PhysicsType != 1)
             {
                 var state = active.Host.Island.BodyAt(i);
-                Require(state.Actor.Position.Z > -25, $"Core body fell through floor: {active.Rig.Definition.Mesh}:{i}, frame={_frame} z={state.Actor.Position.Z}");
+                Require(state.Actor.Position.Z > _floorTop - 25, $"Core body fell through floor: {active.Rig.Definition.Mesh}:{i}, frame={_frame} z={state.Actor.Position.Z}");
                 if (_frame == _hz * 2 && active.Rig.Definition.Bodies[i].Bone == "pelvis")
-                    Require(state.Actor.Position.Z < active.Rig.Definition.Bodies[i].ReferenceComponent.Position.Z + (_highDrop ? 300 : 100) - 50,
+                    Require(state.Actor.Position.Z < active.Rig.Definition.Bodies[i].ReferenceComponent.Position.Z + _floorTop + (_highDrop ? 300 : 100) - 50,
                         "Free root unexpectedly anchored the falling pelvis.");
                 if (_frame > _hz * 9)
                 {
@@ -355,7 +389,7 @@ public partial class PhysicsCoreJointReplay : Node3D
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private void Release()
     {
-        foreach (var active in _active) { active.Query?.Dispose(); active.Shapes?.Dispose(); active.Bodies.Dispose(); }
+        foreach (var active in _active) { active.Scene?.Dispose(); active.Query?.Dispose(); active.Shapes?.Dispose(); active.Bodies.Dispose(); }
         _active.Clear();
     }
     private void Fail(Exception e) { GD.PushError($"CORE_JOINT_REPLAY_FAILED frame={_frame} " + e); _done = true; GetTree().Quit(1); }

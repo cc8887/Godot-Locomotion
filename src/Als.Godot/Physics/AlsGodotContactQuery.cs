@@ -104,7 +104,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             throw new InvalidOperationException("Query shape is missing, stale or changed; replace and rebind it.");
         return binding;
     }
-    private static Aabb Bounds(Shape3D shape)
+    internal static Aabb Bounds(Shape3D shape)
     {
         ArgumentNullException.ThrowIfNull(shape);
         var half = shape switch
