@@ -74,10 +74,15 @@ public static partial class AlsP5CoreRuntimeBindingCompiler
         return CompileInternal(animationSet, locomotion, pose, p5a, layout, sources, inventory);
     }
 
+    internal static AlsP5CoreRuntimeBindingSnapshot CompileHistoricalTurnScaling(
+        AlsAnimationSetDefinition animationSet, AlsLocomotionAnimationProfile locomotion,
+        AlsPoseAnimationProfile pose, AlsP5aAnimationRuntimeProfile p5a, AlsP5OccurrenceLayout layout) =>
+        CompileInternal(animationSet, locomotion, pose, p5a, layout, null, null, historicalTurnScaling: true);
+
     private static AlsP5CoreRuntimeBindingSnapshot CompileInternal(
         AlsAnimationSetDefinition animationSet, AlsLocomotionAnimationProfile locomotion,
         AlsPoseAnimationProfile pose, AlsP5aAnimationRuntimeProfile p5a, AlsP5OccurrenceLayout layout,
-        AlsLocomotionSourceProfile? sources, AlsP5SourceInventory? inventory)
+        AlsLocomotionSourceProfile? sources, AlsP5SourceInventory? inventory, bool historicalTurnScaling = false)
     {
         ArgumentNullException.ThrowIfNull(animationSet);
         ArgumentNullException.ThrowIfNull(locomotion);
@@ -102,6 +107,13 @@ public static partial class AlsP5CoreRuntimeBindingCompiler
         var (occurrenceEntries, importEntries) = CompileOccurrenceEntries(layout);
         var baseAnimationIds = BaseAnimationIds(locomotion);
         var turns = pose.Turns;
+        if (historicalTurnScaling)
+        {
+            // Only the frozen P5A v1 replay compiler selects this historical graph.
+            // Pose and all production inputs have already passed current validation.
+            for (var i = 0; i < turns.Length; i++)
+                turns[i] = turns[i] with { ScaleAngle = 1 };
+        }
         var rotates = pose.Rotates;
         var eventSemantics = CompileEventSemantics(p5a.EventSemantics);
 

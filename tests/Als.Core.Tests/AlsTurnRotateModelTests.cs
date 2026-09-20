@@ -265,6 +265,27 @@ public sealed class AlsTurnRotateModelTests
     }
 
     [Theory]
+    [InlineData(-60f, 90)]
+    [InlineData(60f, 90)]
+    [InlineData(-150f, 180)]
+    [InlineData(150f, 180)]
+    public void RefactoredTraceAndV4CrouchingUseTheirOwnAngleScaling(float yawDegrees, int nominal)
+    {
+        var yaw = Degrees(yawDegrees);
+        var v4 = AlsTurnRotateSettings.CreateReference() with { TurnDelayAtThreshold = 0, TurnDelayAtPi = 0 };
+        var reference = AlsTurnRotateSettings.CreateRefactoredReference() with { TurnDelayAtThreshold = 0, TurnDelayAtPi = 0 };
+        var input = Input(1f / 60f, stance: AlsStance.Crouching);
+        Assert.True(Evaluate(v4, input, View(yaw), State(yaw), out _, out var actualV4, out _));
+        Assert.True(Evaluate(reference, input, View(yaw), State(yaw), out _, out var actualReference, out _));
+        Assert.Equal(actualV4.AnimationId, actualReference.AnimationId);
+        Assert.Equal(actualV4.CurrentPhase, actualReference.CurrentPhase);
+        Assert.Equal(actualV4.PhasePlayRate, actualReference.PhasePlayRate);
+        Assert.Equal(actualV4.PhasePlayRate, actualV4.YawScale);
+        Assert.Equal(actualReference.PhasePlayRate * MathF.Abs(yaw) / Degrees(nominal), actualReference.YawScale, 5);
+        Assert.NotEqual(actualV4.YawScale, actualReference.YawScale);
+    }
+
+    [Theory]
     [InlineData(0.10001f, 0f, true, AlsRotationMode.LookingDirection)]
     [InlineData(0f, 0.10001f, true, AlsRotationMode.LookingDirection)]
     [InlineData(0f, 0f, false, AlsRotationMode.LookingDirection)]

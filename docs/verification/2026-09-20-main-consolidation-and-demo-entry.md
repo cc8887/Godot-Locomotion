@@ -85,3 +85,6 @@ Core 仍不能宣称全绿：
 后续按原范围推进：先核对这些冻结回归、完整地形接触与上下身/起停换髋联合观感，
 再收尾 P5A 的玩法消费者和动作摘要，继续 P5B 道具/Overlay gameplay、P5C Mantle/Roll/Root Motion、
 P6 Ragdoll/Get-up/Pose Recovery/完整 Camera，最后 P7 十分钟预算。音频继续暂缓。
+
+后续修复及复验见 [冻结回放修复记录](2026-09-20-frozen-reference-replay.md)。
+上文保留本批当时的失败证据，不用后续结果覆盖历史记录。

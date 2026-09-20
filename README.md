@@ -81,8 +81,10 @@ dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj -c Release
 dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 ```
 
-当前 Core 全库仍有未关闭的旧 P4 蹲姿转身 oracle 和 P5A 冻结计划回归失败。
-本次结果及限制见[主目录整合记录](docs/verification/2026-09-20-main-consolidation-and-demo-entry.md)。
+旧 P4 蹲姿转身 oracle 和 P5A 冻结计划已使用各自锁定的历史配置回放，
+正式 V4 配置保持原生资产的蹲姿转身规则。验证结果及限制见
+[冻结回放修复记录](docs/verification/2026-09-20-frozen-reference-replay.md)；
+入口与生成资产的整合记录见[主目录整合记录](docs/verification/2026-09-20-main-consolidation-and-demo-entry.md)。
 原 `verify-p4.ps1` 保留用于历史阶段复查，其旧成功记录不能作为当前版本的新证书。
 
 ## 文档
@@ -98,7 +100,7 @@ dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 | 阶段 | 状态 | 范围 |
 | --- | --- | --- |
 | P3/P4 完整性 | 实现与整体验收中 | 默认完整入口已接通；地形、起停滑步、换髋与上下身联合验收未关闭 |
-| P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage 所有者已实现多项；玩法消费者、摘要及冻结计划回归待完成 |
+| P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage 所有者已实现多项；历史配置回放已分离，玩法消费者、动作摘要及当前完整图验收待完成 |
 | P5B | 动画数据/姿势已有，玩法待实施 | Overlay 装备/切换和道具生命周期 |
 | P5C | Roll 播放组件已有，玩法待实施 | Mantle、Roll、碰撞安全 Root Motion |
 | P6 | 基础组件已有，完整功能待实施 | Ragdoll、Get-up、Pose Recovery、完整 ALS Camera |

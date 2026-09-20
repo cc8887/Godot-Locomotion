@@ -4,6 +4,7 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Core.Tests;
 
+[Collection(AllocationTestCollection.Name)]
 public sealed class AlsSharedMontageOwnerTests
 {
     [Fact]
