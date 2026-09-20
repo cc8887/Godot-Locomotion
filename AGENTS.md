@@ -8,7 +8,7 @@
 
 # 运行和验证
 
-- 最新进度：`docs/verification/2026-09-20-landing-action-routing.md`。普通入口已有地面 Roll 和中等落差自动 Roll（缓存速度判定、1.3 倍率、速度朝向）；高落差/翻滚离地的 Ragdoll 判定仅接通路由，物理模拟尚未实现。下一步补原始 PhysicsAsset 几何/质量/关节数据及物理所有权切换，再接真实 Ragdoll/Get-up。`--action-preview` 保留旧预览；P5C/P6 未整体验收。
+- 最新进度：`docs/verification/2026-09-20-physics-asset-export.md`。两套原始 PhysicsAsset 几何/质量/惯量/关节及排除对已导出并建立导入定义；下一步创建 Godot 物理骨架与所有权切换，再接真实 Ragdoll/Get-up。普通入口已有地面与中等落差自动 Roll；高落差/翻滚离地的 Ragdoll 仅接通触发判定，物理模拟尚未实现。`--action-preview` 保留旧预览；P5C/P6 未整体验收。
 
 - 正常入口是 `scenes/demo/als_demo.tscn`，在实例化角色之前配置完整动画链路。旧 `p4_locomotion_demo.tscn` 仍供诊断场景复用。
 - 验证必须在主目录执行，并记录失败和覆盖范围；旧阶段证书不自动适用于新的主分支。

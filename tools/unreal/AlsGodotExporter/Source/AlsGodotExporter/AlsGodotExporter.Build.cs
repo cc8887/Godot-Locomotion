@@ -23,6 +23,7 @@ public class AlsGodotExporter : ModuleRules
             "AssetRegistry",
             "Json",
             "JsonUtilities",
+            "PhysicsCore",
             "RenderCore",
             "Renderer",
             "SSL",
