@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Text.Json;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Physics;
+using GodotAls.Import.Compilation;
 using static GodotAls.Import.Tests.AlsPhysicsJointStepReferenceTests;
 
 namespace GodotAls.Import.Tests;
@@ -25,26 +26,20 @@ public sealed class AlsNativeJointTrajectoryTests(Xunit.Abstractions.ITestOutput
             var body=row.GetProperty("bodies")[1];var massLocal=Pose(body.GetProperty("massLocal"));
             // Static/kinematic bodies use actor space in Chaos's solver; only
             // the dynamic child's connector is transformed into mass space.
-            var pf=Pose(row.GetProperty("parentFrame"));var cf=AlsPrecisePose.Relative(Pose(row.GetProperty("childFrame")),massLocal);
+            var pf=Pose(row.GetProperty("parentFrame"));
             var inv=new AlsJointInverseMass((float)(1/D(body,"massKg")),V(body,"bodyConditionedInverseInertia"));
-            var velocity=default(AlsProjectionVelocity);var parentVelocity=default(AlsProjectionVelocity);
+            var solverSettings=row.GetProperty("solverSettings");
+            Assert.Equal(settings,AlsCachedJointSettingsCompiler.Angular(j,solverSettings));
+            var island=new AlsJointIsland([
+                new(Pose(row.GetProperty("bodies")[0].GetProperty("massLocal")),default),
+                new(massLocal,inv,D(body,"linearDamping"),D(body,"angularDamping"))],
+                [new(0,1,pf,Pose(row.GetProperty("childFrame")),settings,AlsCachedJointSettingsCompiler.Projection(j,solverSettings))],
+                [new(parent,default),new(actor,default)],row.GetProperty("positionIterations").GetInt32(),row.GetProperty("velocityIterations").GetInt32());
             for(var frame=1;frame<=12;frame++)
             {
-                var initial=AlsPrecisePose.Compose(massLocal,actor);
-                var predicted=AlsRigidBodyIntegration.Predict(actor,massLocal,velocity,D(body,"linearDamping"),D(body,"angularDamping"),dt);
-                velocity=predicted.Velocity;
-                var joint=new AlsCachedJoint(new(parent,parent,pf,default),new(initial,predicted.MassPose,cf,inv),settings,dt);
-                var dp=default(AlsProjectionDelta);var dc=default(AlsProjectionDelta);
-                for(var it=0;it<row.GetProperty("positionIterations").GetInt32();it++)joint.SolvePosition(ref dp,ref dc);
-                velocity=AlsCachedJoint.AddImplicitVelocity(velocity,dc,dt,true);
-                for(var it=0;it<row.GetProperty("velocityIterations").GetInt32();it++)joint.SolveVelocity(ref parentVelocity,ref velocity);
-                var corrected=AlsLockedLinearProjection.Correct(predicted.MassPose,dc);
-                var projection=new AlsLockedLinearProjection(parent,corrected,pf,cf,(float)inv.Mass,inv.Inertia.ToSingle(),
-                    (float)settings.HardStiffness,(float)D(j,"LinearProjection"),(float)D(j,"TeleportDistance"),B(j,"bProjectionEnabled"));
-                dc=default;var projectedVelocity=projection.Apply(default,ref dc,dt,AlsLockedLinearProjection.ReferenceVelocityAlpha);
-                velocity=new(velocity.Linear+projectedVelocity.Linear,velocity.Angular+projectedVelocity.Angular);
-                corrected=AlsLockedLinearProjection.Correct(corrected,dc);
-                actor=AlsRigidBodyIntegration.StoreActor(corrected,massLocal);
+                island.StepForceFree(dt);
+                actor=island.BodyAt(1).Actor;var velocity=island.BodyAt(1).Velocity;
+                Assert.Equal(new AlsIslandBodyState(parent,default),island.BodyAt(0));
                 var expected=row.GetProperty("samples")[frame].GetProperty("child");var pose=Pose(expected.GetProperty("world"));
                 Assert.True(B(expected,"awake"));
                 var position=System.Math.Sqrt((actor.Position-pose.Position).LengthSquared);

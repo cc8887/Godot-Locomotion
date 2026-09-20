@@ -21,6 +21,7 @@ public sealed class AlsPhysicsJointStepReferenceTests(Xunit.Abstractions.ITestOu
             Assert.True(ids.Add(id));var initial=row.GetProperty("initial");var seed=row.GetProperty("seed");
             var parent=Input(row,initial,"parent");var child=Input(row,initial,"child");
             var settings=Settings(row);var solver=new AlsCachedJoint(parent,child,settings,D(row,"dt"));
+            Assert.Equal(settings,GodotAls.Import.Compilation.AlsCachedJointSettingsCompiler.Angular(row.GetProperty("jointSettings"),row.GetProperty("solverSettings")));
             var dp=Delta(seed.GetProperty("parent"));var dc=Delta(seed.GetProperty("child"));
             var vp=Velocity(initial.GetProperty("parent"));var vc=Velocity(initial.GetProperty("child"));
             var samples=row.GetProperty("positionSamples");Assert.Equal(8,samples.GetArrayLength());var iteration=0;

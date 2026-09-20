@@ -12,6 +12,7 @@ internal sealed class AlsPhysicsBodySet : IDisposable
     private readonly Node3D _root;
     private readonly AlsRagdollPhysicsDefinition _definition;
     private readonly RigidBody3D[] _bodies;
+    private readonly List<Resource> _ownedResources = [];
     private readonly Transform3D[] _massLocal, _components, _seedLocal;
     private readonly Vector3[] _savedLinear, _savedAngular;
     private readonly int[] _boneToBody, _parents, _bodyToBone;
@@ -55,6 +56,9 @@ internal sealed class AlsPhysicsBodySet : IDisposable
     {
         var source = _definition.Bodies[index]; _massLocal[index] = NativeToFbx(source.MassLocal);
         var material = source.Material;
+        var physicsMaterial = new PhysicsMaterial { Friction = material.GetProperty("friction").GetSingle(),
+            Bounce = material.GetProperty("restitution").GetSingle() };
+        _ownedResources.Add(physicsMaterial);
         var body = new RigidBody3D
         {
             Name = source.Bone, Freeze = true, FreezeMode = RigidBody3D.FreezeModeEnum.Static,
@@ -70,8 +74,7 @@ internal sealed class AlsPhysicsBodySet : IDisposable
             // Explicit Godot transport policy: discrete 30 Hz bodies can cross a
             // thin floor. The original UE CCD flag remains in the source definition.
             ContinuousCd = _continuousCollisionDetection || source.Defaults.GetProperty("bUseCCD").GetBoolean(),
-            PhysicsMaterialOverride = new PhysicsMaterial { Friction = material.GetProperty("friction").GetSingle(),
-                Bounce = material.GetProperty("restitution").GetSingle() },
+            PhysicsMaterialOverride = physicsMaterial,
         };
         _bodies[index] = body; _root.AddChild(body);
         foreach (var sourceShape in source.Shapes)
@@ -98,6 +101,7 @@ internal sealed class AlsPhysicsBodySet : IDisposable
                     local = new Transform3D(local.Basis.Orthonormalized(),local.Origin); break;
                 default: throw new NotSupportedException("Unmapped physics shape: " + sourceShape.Type);
             }
+            _ownedResources.Add(shape);
             // RestOffset and Godot collision margin have different semantics.
             // These assets author zero rest offset; nonzero requires an adapter.
             if (sourceShape.RestOffsetCm != 0) throw new NotSupportedException("Nonzero UE rest offset requires a contact adapter.");
@@ -215,5 +219,10 @@ internal sealed class AlsPhysicsBodySet : IDisposable
     {
         Main(); if (_disposed) return; _disposed = true; _active = false; PoseIdentity = default;
         if (GodotObject.IsInstanceValid(_root)) _root.Free();
+        // Freeing nodes removes native references, but C# Resource wrappers can
+        // retain a reference until a later GC. Release this owner's resources
+        // explicitly, after all its bodies, including on partial construction.
+        foreach (var resource in _ownedResources) resource.Dispose();
+        _ownedResources.Clear();
     }
 }
