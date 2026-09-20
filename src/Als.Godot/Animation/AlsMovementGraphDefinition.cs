@@ -20,6 +20,7 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
     AlsTurnNotifyBinding TurnNotifies, AlsAuthoredMontageAsset[] AuthoredMontageAssets, AlsMontageActionPolicy[] ActionPolicies,
     AlsMontageNotifyBinding MontageNotifies)
 {
+    public AlsMontageActionPlaybackReader ActionPlayback { get; init; } = null!;
     public AlsCharacterAnimationBridgeSettings CharacterBridge { get; init; }
     public AlsCharacterRotationModel CharacterRotation { get; init; } = null!;
     public AlsCharacterMovementModel CharacterMovement { get; init; } = null!;
@@ -68,11 +69,13 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
         WithSharedSources(set, RootSharedSources.Sources, RootSharedBinding);
     private AlsMovementGraphDefinition WithSharedSources(AlsAnimationSetDefinition set, AlsLocomotionSourceProfile sources, AlsP5CoreRuntimeBindingSnapshot binding)
     {
-        return this with { Sources = sources, Binding = binding,
+        return (this with { Sources = sources, Binding = binding,
             TurnNotifies = AlsTurnNotifyCompiler.Compile(Read("v4_turn_notify_inputs.json"), set, sources, binding, TurnMontageAssets),
             MontageNotifies = AlsMontageNotifyCompiler.Compile(Read("v4_action_notify_inputs.json"), Read("v4_turn_notify_inputs.json"),
-                set, sources, binding, TurnMontageAssets, AuthoredMontageAssets, GroundedTransitionAssets, GroundedTransitionNotifyJson) };
+                set, sources, binding, TurnMontageAssets, AuthoredMontageAssets, GroundedTransitionAssets, GroundedTransitionNotifyJson) }).WithActionPlayback(set);
     }
+    private AlsMovementGraphDefinition WithActionPlayback(AlsAnimationSetDefinition set) => this with
+    { ActionPlayback = AlsMontageActionPlaybackCompiler.Compile(set, AuthoredMontageAssets, MontageNotifies) };
     public static AlsMovementGraphDefinition Load(AlsAnimationSetDefinition set,
         AlsLocomotionAnimationProfile locomotion, AlsPoseAnimationProfile? pose = null, bool loadRawSources = true)
     {
@@ -153,6 +156,7 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
         var rootSources = AlsRootSharedSourceCompiler.Compile(sharedSources, definition.RagdollPose, ragdollFrame, set);
         definition = definition with { RagdollFrame = ragdollFrame, MannequinMeshId = locomotion.MannequinMeshId,
             RootSharedSources = rootSources, RootSharedBinding = AlsLocomotionGraphBuilder.CompileSourceBindings(set, locomotion, pose, rootSources.Sources) };
+        definition = definition.WithActionPlayback(set);
         if (!loadRawSources) return definition;
         var rawSources = AlsRawAnimationSourceLoader.Load(set, definition);
         var aimSources = AlsRawAnimationSourceLoader.LoadAim(set, definition.AimSampling).ReuseResourcesFrom(rawSources);

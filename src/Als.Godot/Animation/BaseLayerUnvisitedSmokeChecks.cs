@@ -139,6 +139,10 @@ public partial class BaseLayerFrameSmoke
                     if(nextAim.SmoothedRotation!=priorAim.SmoothedRotation)hiddenAim++;
                     hiddenFrames++;
                 }
+                var published = AlsFrameResult.CreateDefault(id); owner.CompleteEvents(ref published);
+                if (hide) Require(published.ActionPlayback.EffectiveWeight == 0, "Unvisited BaseLayer published visible action weight.");
+                if (owner.Actions.CandidateOwners.ToArray().Any(o => o.InstanceId > 0))
+                    Require(published.ActionPlayback.Active == 1, "Unvisited graph lost a live action owner.");
                 owner.Discard(); CheckOld();
                 Prepare();
                 Require(owner.CandidateGroundInput==nextGround && owner.CandidateGlobalInput==nextAir && owner.CandidateControlInput==nextControl &&
@@ -147,6 +151,8 @@ public partial class BaseLayerFrameSmoke
                     "Unvisited/global transaction changed on retry.");
                 for(var e=0;e<events.Count;e++)Require(owner.SourceEvents[e]==events[e],"Unvisited notify retirement changed on retry.");
                 if(!hide)Require(owner.Pose.SequenceEqual(output) && owner.Curves.SequenceEqual(curves),"Ordinary branch resumed differently on retry.");
+                var retryPublished = AlsFrameResult.CreateDefault(id); owner.CompleteEvents(ref retryPublished);
+                Require(retryPublished.ActionPlayback == published.ActionPlayback, "Unvisited action summary changed on retry.");
                 owner.Commit(id);
                 Require(owner.CommittedIdentity==id && owner.Movement.CommittedIdentity==id && owner.CommittedAimingInput==nextAim &&
                     owner.CommittedGlobalInput==nextAir,"Global and shared-source identities did not commit on an unvisited frame.");
