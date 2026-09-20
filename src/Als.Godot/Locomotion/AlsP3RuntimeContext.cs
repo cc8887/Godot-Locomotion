@@ -704,6 +704,7 @@ internal readonly record struct AlsP3VisualRootVisibilityObservation(
 
 internal sealed class AlsP3CharacterState
 {
+    internal readonly GodotAls.Core.Actions.AlsAnimationFailureRecovery AnimationRecovery = new();
     private const int WorkerAdmissionClosedValue = -1;
     private readonly object _failureGate = new();
     private readonly Queue<AlsP3WorkerFailure> _failures = new();
@@ -872,8 +873,10 @@ internal sealed class AlsP3CharacterState
         string code,
         AlsFrameIdentity identity,
         Exception exception,
-        AlsP4ReasonCode reasonCode = AlsP4ReasonCode.None)
+        AlsP4ReasonCode reasonCode = AlsP4ReasonCode.None,
+        bool canRetryAnimation = false)
     {
+        if (!canRetryAnimation) AnimationRecovery.Block();
         var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
         var failure = new AlsP3WorkerFailure(code, identity, exceptionType, reasonCode, exception.ToString());
         var failureIdentity = new AlsP3FailureIdentity(code, identity);

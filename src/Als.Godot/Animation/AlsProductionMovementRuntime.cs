@@ -199,23 +199,25 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             throw new InvalidOperationException("Production root lost the movement cache curve layout.");
     }
 
-    public void Prepare(in AlsFrameInput input, in AlsFrameResult result)
+    public void Prepare(in AlsFrameInput input, in AlsFrameResult result, bool cancelForRuntimeFailure = false)
     {
         if (UsesRefactoredFeet) throw new InvalidOperationException("Refactored feet require split production dispatch.");
         var transform = _component.GlobalTransform;
         var componentPose = new AlsLocalPose(ToNumerics(transform.Origin), ToNumerics(transform.Basis.GetRotationQuaternion()), ToNumerics(transform.Basis.Scale));
-        PrepareCore(input, result, componentPose);
+        PrepareCore(input, result, componentPose, cancelForRuntimeFailure);
     }
 
     // Pure first half: the owning worker supplies its future root transform as a
     // value snapshot. No Skeleton/Node access is allowed across this boundary.
-    public AlsFootRigQueries PrepareFootQueries(in AlsFrameInput input, in AlsFrameResult result, in AlsLocalPose componentPose)
+    public AlsFootRigQueries PrepareFootQueries(in AlsFrameInput input, in AlsFrameResult result, in AlsLocalPose componentPose,
+        bool cancelForRuntimeFailure = false)
     {
         if (!UsesRefactoredFeet) throw new InvalidOperationException("No split foot dispatcher.");
-        return PrepareCore(input, result, componentPose);
+        return PrepareCore(input, result, componentPose, cancelForRuntimeFailure);
     }
 
-    private AlsFootRigQueries PrepareCore(in AlsFrameInput input, in AlsFrameResult result, in AlsLocalPose componentPose)
+    private AlsFootRigQueries PrepareCore(in AlsFrameInput input, in AlsFrameResult result, in AlsLocalPose componentPose,
+        bool cancelForRuntimeFailure)
     {
         if (_prepared || _queriesPending) throw new InvalidOperationException("A production movement candidate is already pending.");
         if (input.Identity != result.Identity || !AlsLocomotionModel.HasPendingSourceTiming(result))
@@ -243,6 +245,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             new(0, 0), new(0, 0), _nextEvaluation);
         try
         {
+            _base.SetRuntimeFailureCancellation(cancelForRuntimeFailure);
             var parent = _attachParent;
             if (_layered is null)
             {

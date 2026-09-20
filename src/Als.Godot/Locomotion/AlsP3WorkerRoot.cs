@@ -298,10 +298,7 @@ public partial class AlsP3WorkerRoot : Node3D
             var candidateRuntimeState = runtimeCheckpoint;
             var candidateResult = resultCheckpoint;
             var trackTransactionRollback =
-                _context.IsAnyWorkerFailureInjectionArmed(in identity) || Volatile.Read(ref _context.SourceEventFailureArmed) != 0;
-            var resultCheckpointDigest = trackTransactionRollback
-                ? ComputeResultDigest(in resultCheckpoint)
-                : 0UL;
+                UsesCompleteMovement || _context.IsAnyWorkerFailureInjectionArmed(in identity) || Volatile.Read(ref _context.SourceEventFailureArmed) != 0;
             var controllerCheckpoint = trackTransactionRollback
                 ? UsesRefactoredFeet ? _splitFoot.Checkpoint : _controller!.CaptureTransactionDiagnostics()
                 : default;
@@ -379,7 +376,8 @@ public partial class AlsP3WorkerRoot : Node3D
                     _controller!.ResumeFootQueries(preparedAnimation, _splitFoot.Observations);
                     SplitResumedFrames++;
                 }
-                else preparedAnimation = _controller!.PrepareFrame(in candidateResult, in p4AnimationInput, in input);
+                else preparedAnimation = _controller!.PrepareFrame(in candidateResult, in p4AnimationInput, in input,
+                    _state.AnimationRecovery.RequiresCancellation(identity));
                 controllerPrepared = true;
                 _controller.CompleteSourceTiming(in preparedAnimation, ref candidateRuntimeState, ref candidateResult);
                 _controller.CompleteSourceRotation(in preparedAnimation, in input, ref candidateRuntimeState, ref candidateResult);
@@ -715,6 +713,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 _runtimeState = candidateRuntimeState;
                 _result = candidateResult;
                 _state.PublishPreparedResult(in publication);
+                _state.AnimationRecovery.Commit(identity);
                 if (measure)
                 {
                     measurement!.AddExchangeAllocations(
@@ -803,10 +802,19 @@ public partial class AlsP3WorkerRoot : Node3D
                         _state.WorkerTransactionRollbackDiagnostics = new(
                             identity,
                             RuntimeStatesEqual(in _runtimeState, in runtimeCheckpoint),
-                            ComputeResultDigest(in _result) == resultCheckpointDigest,
+                            ComputeResultDigest(in _result) == ComputeResultDigest(in resultCheckpoint),
                             controllerRestored,
                             p4BanksRestored);
                     }
+                    // Only a proven whole-frame rollback may retry in place.
+                    // Main publication errors, Gather/query errors and failed
+                    // restoration retain the existing frozen/replacement path.
+                    var canRetryAnimation = !_context.HeadlessOrDebug && UsesCompleteMovement && restoreException is null &&
+                        controllerRestored && poseCaptured && Volatile.Read(ref _state.RollbackVerified) != 0 &&
+                        resultCheckpoint.Identity.FrameId == Volatile.Read(ref _state.CommittedFrameId);
+                    if (canRetryAnimation)
+                        _state.AnimationRecovery.RecordRolledBackFailure(identity,
+                            new(resultCheckpoint.Identity.FrameId, identity.CharacterId, identity.SlotGeneration));
                     _state.RecordFailure(
                         "worker_evaluate",
                         identity,
@@ -816,7 +824,7 @@ public partial class AlsP3WorkerRoot : Node3D
                                 "Worker evaluation and pose restoration both failed.",
                                 exception,
                                 restoreException),
-                        failureReason);
+                        failureReason, canRetryAnimation);
                 }
             }
         }

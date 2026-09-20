@@ -22,6 +22,14 @@ public partial class P4LocomotionDemo : Node3D
     private readonly AlsPlayerInputAdapter _playerInput = new();
     private IAlsLocomotionCommandSource? _smokeCommandSource;
     private Action<AlsP3RuntimeContext>? _configureSmokeContext;
+    private (AlsHarnessMode Mode, bool HeadlessOrDebug)? _smokeRuntimePolicy;
+
+    internal void ConfigureRuntimePolicyForSmoke(AlsHarnessMode mode, bool headlessOrDebug)
+    {
+        if (IsInsideTree() || _smokeRuntimePolicy.HasValue)
+            throw new InvalidOperationException("Runtime smoke policy must be selected before scene initialization.");
+        _smokeRuntimePolicy = (mode, headlessOrDebug);
+    }
     private AlsP3RuntimeContext _context = null!;
     private AlsP3CharacterSlot _slot = null!;
     private AlsOrbitCamera _orbitCamera = null!;
@@ -142,13 +150,13 @@ public partial class P4LocomotionDemo : Node3D
                 Godot.FileAccess.GetFileAsString(SettingsPath));
             var motorSettings = CreateMotorSettings(settings);
             _context = new AlsP3RuntimeContext(
-                AlsHarnessMode.Parallel,
+                _smokeRuntimePolicy?.Mode ?? AlsHarnessMode.Parallel,
                 settings,
                 motorSettings,
                 animationSet,
                 profile,
                 System.Environment.CurrentManagedThreadId,
-                headlessOrDebug: _smokeCommandSource is not null || OS.IsDebugBuild());
+                headlessOrDebug: _smokeRuntimePolicy?.HeadlessOrDebug ?? (_smokeCommandSource is not null || OS.IsDebugBuild()));
             _configureSmokeContext?.Invoke(_context);
             if (_smokeCommandSource is null && _context.MovementGraph is { } movementGraph)
             {

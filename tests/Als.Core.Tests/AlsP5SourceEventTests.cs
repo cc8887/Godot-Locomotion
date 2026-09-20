@@ -12,6 +12,50 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsP5SourceEventTests
 {
     [Fact]
+    public void FailureEndsOldNativeOwnershipBeforeMergingANewPlaybackOfTheSameClass()
+    {
+        var f = new Fixture(); var binding = new MontageStateBinding(f.Policies);
+        var old = MontageStateInput(55) with { NoMergeOnConcurrentPlay = false };
+        var fresh = MontageStateInput(77) with { NoMergeOnConcurrentPlay = false };
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(1,0,1),.1f,[],0,default,
+            out var first,out _,out _,montageBinding:binding,montageDirectNotifies:[old]));
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,first,
+            out var next,out var events,out _,montageBinding:binding,montageDirectNotifies:[fresh],runtimeFailureEpochs:[55]));
+        Assert.Equal(3, events.Count);
+        Assert.Equal(AlsAnimationEventPhase.End, events[0].Phase);
+        Assert.Equal(AlsActionResultCode.InterruptedByRuntimeFailure, events[0].Payload.TerminationReason);
+        Assert.Equal(55, events[0].PlaybackEpoch); Assert.False(events[0].NativeContext.ReachedEnd);
+        Assert.Equal(AlsAnimationEventPhase.Begin, events[1].Phase); Assert.Equal(77, events[1].PlaybackEpoch);
+        Assert.NotEqual(first.ActiveStates[0].InstanceId, next.ActiveStates[0].InstanceId);
+        Assert.Equal(AlsAnimationEventPhase.Tick, events[2].Phase);
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,first,
+            out var retry,out var retryEvents,out _,montageBinding:binding,montageDirectNotifies:[fresh],runtimeFailureEpochs:[55]));
+        SameState(next,retry); SameEvents(events,retryEvents);
+    }
+
+    [Fact]
+    public void RecoveryEndOverflowKeepsCommittedOwnershipAndRejectsCanceledTraversal()
+    {
+        var f = new Fixture(); var binding = new MontageStateBinding(f.Policies);
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(1,0,1),.1f,[],0,default,
+            out var first,out _,out _,montageBinding:binding,montageDirectNotifies:[MontageStateInput(55)]));
+        var over = Enumerable.Range(0,16).Select(_=>MontageInstantInput(77)).ToArray();
+        Assert.False(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,first,
+            out var failed,out var events,out var failure,montageBinding:binding,montageDirectNotifies:over,runtimeFailureEpochs:[55]));
+        Assert.Equal(AlsP5FailureCode.EventBufferOverflow,failure); Assert.False(failed.Initialized); Assert.Equal(0,events.Count);
+        Assert.False(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,first,
+            out _,out _,out failure,montageBinding:binding,montageDirectNotifies:[MontageStateInput(55)],runtimeFailureEpochs:[55]));
+        Assert.Equal(AlsP5FailureCode.InvalidBinding, failure);
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,first,
+            out var next,out var ends,out _,montageBinding:binding,runtimeFailureEpochs:[55]));
+        Assert.Equal(0,next.ActiveCount); Assert.Equal(1,ends.Count);
+        Assert.Equal(AlsActionResultCode.InterruptedByRuntimeFailure,ends[0].Payload.TerminationReason);
+        first.ActiveStates[0] = first.ActiveStates[0] with { Input = MontageStateInput(55) with { EffectiveWeight = float.NaN } };
+        Assert.False(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,first,
+            out _,out _,out _,montageBinding:binding,runtimeFailureEpochs:[55]));
+    }
+
+    [Fact]
     public void DirectMontageThenProxyThenSlotRetainsFirstStateContextAndActionIdentity()
     {
         var f = new Fixture(); var binding = new MontageStateBinding(f.Policies);

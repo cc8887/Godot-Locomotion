@@ -1605,3 +1605,12 @@ Notify/动作所有权清理，再继续 Overlay 道具、Root Motion 及既定�
 `../../verification/2026-09-20-animation-deactivation.md`。下一项是运行时故障的
 成功帧取消；后续 Notify gameplay、Overlay 道具、Roll/Mantle Root Motion、
 Ragdoll/Recovery/Camera 与最终性能/观感验收范围保持。
+
+2026-09-20 后续：完整生产图已接上故障恢复取消。Release 策略只在确认整帧
+恢复成功后重试原 Gather 输入，失败不派发结束事件、不重复积分 Motor；成功
+帧先发布旧动作的 `InterruptedByRuntimeFailure`，再处理普通请求，原生 Notify
+按播放身份结束且禁止旧队列泄漏。同代连续错误最多自动重试三次，Debug 仍即错
+退出。2545 项 Core、完整图单/多线程故障专项、十角色双模式摘要通过，详见
+`../../verification/2026-09-20-animation-failure-recovery.md`。后续继续 Notify
+gameplay/Overlay 道具生命周期及原定 Root Motion、Ragdoll、Camera 和最终验收；
+物理查询、Gather/Main 错误不因此自动放行，移动平台上的同代故障恢复仍须专项认证。

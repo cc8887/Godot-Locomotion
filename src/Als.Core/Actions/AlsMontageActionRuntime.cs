@@ -51,7 +51,6 @@ public sealed class AlsMontageActionRuntime
         _montages.Begin(identity,delta);
         _identity=identity; _committed.CopyTo(_candidate,0); _nextHistory=_history; _outcomes=default; _requestApplied=false;
         _phase=Phase.Preparing;
-        try { Reconcile(); } catch { _phase=Phase.Faulted; throw; }
     }
 
     public void ApplyRequest(in AlsActionRequest request, bool cancelForRuntimeFailure = false)
@@ -67,6 +66,9 @@ public sealed class AlsMontageActionRuntime
                 throw new ArgumentException("Malformed action command.");
             if (cancelForRuntimeFailure)
                 for (var i=0;i<_candidate.Length;i++) if (_candidate[i].InstanceId>0) Close(i,AlsActionResultCode.InterruptedByRuntimeFailure);
+            // Recovery owns the old action even if this frame's physical tick
+            // reaches its terminal boundary. Do not report Completed first.
+            Reconcile();
             if (canonicalNone) return;
             if (request.Command==AlsActionCommand.Start && request.RequestId>0)
             {
@@ -165,7 +167,13 @@ public sealed class AlsMontageActionRuntime
         var owner=_candidate[index]; var policy=_policies[owner.DefinitionId].Policy;
         _montages.TryGetActionAsset(owner.DefinitionId,out var asset);
         if(!_montages.StopInstance(owner.InstanceId,policy.CancelBlendSeconds,asset.Lifecycle.BlendOutOption))
-            throw new InvalidOperationException("Cannot cancel a missing physical action.");
+        {
+            var terminated = false;
+            if (reason == AlsActionResultCode.InterruptedByRuntimeFailure)
+                foreach (var tick in _montages.Traversal)
+                    if (tick.InstanceId == owner.InstanceId && tick.Terminated) terminated = true;
+            if (!terminated) throw new InvalidOperationException("Cannot cancel a missing physical action.");
+        }
         Add(new(owner.RequestId,owner.DefinitionId,owner.InstanceId,reason)); _candidate[index]=default;
     }
     private void Record(in AlsActionRequest request,bool updateHighWatermark) => _nextHistory =

@@ -78,7 +78,8 @@ public partial class AlsP3WorkerRoot
             var rotation = root.Basis.GetRotationQuaternion(); var scale = root.Basis.Scale;
             var component = new AlsLocalPose(new(root.Origin.X, root.Origin.Y, root.Origin.Z),
                 new(rotation.X, rotation.Y, rotation.Z, rotation.W), new(scale.X, scale.Y, scale.Z));
-            _splitFoot.Token = _controller.PrepareFootQueries(input, _splitFoot.Result, component, out _splitFoot.Queries);
+            _splitFoot.Token = _controller.PrepareFootQueries(input, _splitFoot.Result, component, out _splitFoot.Queries,
+                _state.AnimationRecovery.RequiresCancellation(identity));
             _splitFoot.Pending = true;
             SplitPreparedFrames++;
         }

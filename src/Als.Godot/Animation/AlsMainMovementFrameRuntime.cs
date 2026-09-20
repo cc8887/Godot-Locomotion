@@ -340,7 +340,8 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
 
     internal void PrepareEvents(IAlsMontageNotifyBinding? montageBinding = null,
         ReadOnlySpan<AlsAssetNotifyDispatchInput> montageNotifies = default,
-        ReadOnlySpan<AlsAssetNotifyDispatchInput> montageDirectNotifies = default)
+        ReadOnlySpan<AlsAssetNotifyDispatchInput> montageDirectNotifies = default,
+        ReadOnlySpan<long> runtimeFailureEpochs = default)
     {
         if (_eventsPrepared || _phase is not (Phase.Prepared or Phase.Hidden))
             throw new InvalidOperationException("Main Movement notify phase differs.");
@@ -348,7 +349,7 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
         if (!AlsP5Runtime.TryPrepareSourceEvents(_binding.CreateCoreView(), _identity, _eventDelta,
             hidden ? [] : ((ReadOnlySpan<AlsP5SourceNotifyTick>)_sources.NotifyTicks)[.._sources.NotifyTickCount], hidden ? 0 : 1,
             _committedEvents, out _events, out _sourceEvents, out var failure, montageBinding: montageBinding,
-            montageNotifies: montageNotifies, montageDirectNotifies: montageDirectNotifies))
+            montageNotifies: montageNotifies, montageDirectNotifies: montageDirectNotifies, runtimeFailureEpochs: runtimeFailureEpochs))
         { _phase = Phase.Faulted; throw new InvalidOperationException($"Main Movement events failed: {failure}."); }
         _groundedEntryNotify?.Apply(ref _sourceEvents);
         _eventsPrepared = true;

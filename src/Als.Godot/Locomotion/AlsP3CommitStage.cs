@@ -38,7 +38,7 @@ public partial class AlsP3CommitStage : Node
         }
         if (Volatile.Read(ref _state.WorkerFrozen) != 0)
         {
-            _state.FootProbeExchange.Clear();
+            if (!TryResumeFailedAnimation()) _state.FootProbeExchange.Clear();
             return;
         }
 
@@ -161,7 +161,9 @@ public partial class AlsP3CommitStage : Node
 
     private void PublishFailure(AlsP3WorkerFailure failure)
     {
-        _state.ReleaseYawAndFootProbes();
+        var retry = !_context.HeadlessOrDebug && _state.AnimationRecovery.CanRetry &&
+            _state.AnimationRecovery.PendingIdentity == failure.Identity;
+        if (!retry) _state.ReleaseYawAndFootProbes();
         var details =
             $"code={failure.Code} frame={failure.Identity.FrameId} " +
             $"character={failure.Identity.CharacterId} generation={failure.Identity.SlotGeneration} " +
@@ -173,9 +175,19 @@ public partial class AlsP3CommitStage : Node
         }
         else
         {
-            GD.Print($"GODOT_ALS_P3B_DIAGNOSTIC {details} pose=frozen motor=continuing");
+            GD.Print($"GODOT_ALS_P3B_DIAGNOSTIC {details} " +
+                (retry ? "pose=rolled_back motor=held animation=retry_pending" :
+                    _state.AnimationRecovery.Pending ? "pose=frozen motor=held animation=recovery_blocked" : "pose=frozen motor=continuing"));
         }
         Interlocked.Increment(ref _state.FailureDiagnosticCount);
+        if (retry) TryResumeFailedAnimation();
+    }
+
+    private bool TryResumeFailedAnimation()
+    {
+        if (_context.HeadlessOrDebug || !_state.AnimationRecovery.CanRetry) return false;
+        Volatile.Write(ref _state.WorkerFrozen, 0);
+        return true;
     }
 
     internal static bool TryCopyFootProbeRequests(

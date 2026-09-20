@@ -103,9 +103,13 @@ public static partial class AlsP5Runtime
         in AlsP5SourceEventState current, out AlsP5SourceEventState candidate, out AlsEventBuffer events,
         out AlsP5FailureCode failure, bool dedicatedServer = false, int predictedLod = 0,
         IAlsMontageNotifyBinding? montageBinding = null, ReadOnlySpan<AlsAssetNotifyDispatchInput> montageNotifies = default,
-        ReadOnlySpan<AlsAssetNotifyDispatchInput> montageDirectNotifies = default)
+        ReadOnlySpan<AlsAssetNotifyDispatchInput> montageDirectNotifies = default,
+        ReadOnlySpan<long> runtimeFailureEpochs = default)
     {
         candidate = default; events = default; failure = AlsP5FailureCode.InvalidBinding;
+        if (runtimeFailureEpochs.Length > AlsActionOutcomeBuffer.Capacity) return false;
+        for (var i = 0; i < runtimeFailureEpochs.Length; i++)
+            if (runtimeFailureEpochs[i] <= 0 || runtimeFailureEpochs[..i].Contains(runtimeFailureEpochs[i])) return false;
         if (!ValidSourceEventBindings(bindings) || identity.FrameId < 0 || identity.SlotGeneration == 0 ||
             ticks.Length > AlsSyncRuntime.MaxAssetSyncBatchSamples || current.ActiveCount < 0 || current.ActiveCount > AlsEventBuffer.Capacity ||
             current.Initialized && (current.SourceStamp != bindings.Sources.Stamp || current.BindingDigest != bindings.Digest ||
@@ -200,10 +204,30 @@ public static partial class AlsP5Runtime
         Span<AlsAssetNotifyCallback> callbacks = stackalloc AlsAssetNotifyCallback[AlsEventBuffer.Capacity];
         ReadOnlySpan<AlsAssetNotifyActiveState> active = current.ActiveStates;
         Span<AlsAssetNotifyActiveState> destination = next.ActiveStates;
-        if (!AlsTimelineRuntime.TryAdvanceAssetNotifyStates(policies, active[..current.ActiveCount], dispatch[..queueCount],
+        // Separate failed action ownership before native state-object merging.
+        // A new playback of the same notify class must receive a fresh Begin.
+        Span<AlsAssetNotifyActiveState> retained = stackalloc AlsAssetNotifyActiveState[AlsEventBuffer.Capacity];
+        Span<AlsAssetNotifyActiveState> interrupted = stackalloc AlsAssetNotifyActiveState[AlsEventBuffer.Capacity];
+        var retainedCount = 0; var interruptedCount = 0; var recoveryEnds = 0;
+        for (var i = 0; i < current.ActiveCount; i++)
+        {
+            var state = active[i];
+            if (state.Input.SourceKind == AlsAssetNotifySourceKind.Montage && runtimeFailureEpochs.Contains(state.Input.PlaybackEpoch))
+                interrupted[interruptedCount++] = state;
+            else retained[retainedCount++] = state;
+        }
+        if (interruptedCount > 0 && !AlsTimelineRuntime.TryAdvanceAssetNotifyStates(policies, interrupted[..interruptedCount], [],
+            new(AlsAssetNotifyDispatchMode.EndAll, delta), current.NextInstanceId,
+            new(remaining, nextStates, begins, callbackScratch), [], callbacks,
+            out _, out recoveryEnds, out _, out failure)) return false;
+        for (var i = 0; i < queueCount; i++)
+            if (dispatch[i].SourceKind == AlsAssetNotifySourceKind.Montage && runtimeFailureEpochs.Contains(dispatch[i].PlaybackEpoch))
+            { failure = AlsP5FailureCode.InvalidBinding; return false; } // A canceled traversal cannot enter this frame's queue.
+        if (!AlsTimelineRuntime.TryAdvanceAssetNotifyStates(policies, retained[..retainedCount], dispatch[..queueCount],
             new(AlsAssetNotifyDispatchMode.ForceAllSources, delta), current.NextInstanceId,
-            new(remaining, nextStates, begins, callbackScratch), destination, callbacks,
+            new(remaining, nextStates, begins, callbackScratch), destination, callbacks[recoveryEnds..],
             out var activeCount, out var callbackCount, out var allocator, out failure)) return false;
+        callbackCount += recoveryEnds;
         var output = new AlsEventBuffer();
         failure = AlsP5FailureCode.InvalidBinding;
         for (var i = 0; i < callbackCount; i++)
@@ -218,8 +242,10 @@ public static partial class AlsP5Runtime
                 _ => AlsAnimationEventPhase.End };
             var item = new AlsAnimationEvent(definition.EventId, definition.SourceAnimationId, definition.SourceActionId, reference.OccurrenceHandleId,
                 input.PlaybackEpoch, 0, (ulong)callback.State.InstanceId + 1, i, definition.BoundaryOrdinal, delta,
-                input.EffectiveWeight, definition.Kind, phase, definition.Payload)
-            { NativeContext = new(true, callback.State.InstanceId, reference.CurrentTime, callback.Seconds, reference.ActiveContext, reference.ReachedEnd) };
+                input.EffectiveWeight, definition.Kind, phase, i < recoveryEnds
+                    ? definition.Payload with { TerminationReason = AlsActionResultCode.InterruptedByRuntimeFailure } : definition.Payload)
+            { NativeContext = new(true, callback.State.InstanceId, reference.CurrentTime, callback.Seconds, reference.ActiveContext,
+                i >= recoveryEnds && reference.ReachedEnd) };
             if (!output.TryAdd(item)) { failure = AlsP5FailureCode.EventBufferOverflow; return false; }
         }
         destination[activeCount..].Clear(); next.ActiveCount = activeCount; next.NextInstanceId = allocator; next.RandomSeed = seed;
