@@ -73,7 +73,7 @@ public sealed class AlsPhysicsJointSolverReferenceTests
         {
             var s=row.GetProperty("solverSettings");
             Assert.Equal((double).2f,D(s,"MinParentMassRatio"));Assert.Equal(5,D(s,"MaxInertiaRatio"));
-            Assert.Equal((double).025f,D(s,"PositionTolerance"));Assert.Equal((double).001f,D(s,"AngleTolerance"));
+            Assert.Equal((double).025f,D(s,"PositionTolerance"));Assert.Equal(AlsJointRowActivation.ReferenceAngleTolerance,D(s,"AngleTolerance"));
             Assert.True(s.GetProperty("bUseSimd").GetBoolean());Assert.True(s.GetProperty("bSolvePositionLast").GetBoolean());
             Assert.True(s.GetProperty("bUsePositionBasedDrives").GetBoolean());
             Assert.True(row.GetProperty("positionIterations").GetInt32()>0);
