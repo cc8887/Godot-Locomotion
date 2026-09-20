@@ -15,6 +15,9 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 普通输入现已通过 Motor 接入共同动作所有者，主线程提交后发布动作结果。
 主场景支持 R 原地翻滚动画预览、X 取消，详见
 [最新接线记录](docs/verification/2026-09-20-action-input.md)。碰撞安全 Root Motion 仍待实现，当前预览不驱动胶囊翻滚位移。
+角色永久销毁/换代现会根据主线程已提交记录结束 Notify State 和动作；包含回调内销毁及
+未提交动作隔离。见[退役清理记录](docs/verification/2026-09-20-animation-retirement.md)。
+可恢复停用和 Worker 故障取消的完整接线仍待继续。
 
 ## 运行
 

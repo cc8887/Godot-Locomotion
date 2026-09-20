@@ -135,6 +135,9 @@ public struct AlsCommittedNotifyStateBuffer
                 AnimationTime = 0f,
                 Phase = AlsAnimationEventPhase.End,
                 Payload = payload,
+                NativeContext = entry.NativeContext.Present
+                    ? entry.NativeContext with { CallbackSeconds = 0, ReachedEnd = false }
+                    : entry.NativeContext,
             };
             if (!candidate.TryAdd(syntheticEnd))
             {
@@ -144,6 +147,31 @@ public struct AlsCommittedNotifyStateBuffer
 
         destination = candidate;
         Clear();
+        return true;
+    }
+
+    // Native State objects can retain their dispatch InstanceId while the source
+    // occurrence/epoch changes. Tick supplies the current native End context.
+    public bool TryApplyNative(in AlsAnimationEvent animationEvent)
+    {
+        if (!animationEvent.NativeContext.Present || animationEvent.NativeContext.InstanceId < 0 ||
+            animationEvent.OwnerToken != (ulong)animationEvent.NativeContext.InstanceId + 1 ||
+            !HasValidOwnerIdentity(animationEvent) || Count < 0 || Count > Capacity) return false;
+        var match = -1;
+        for (var i = 0; i < Count; i++)
+            if (_storage[i].NativeContext.Present &&
+                _storage[i].NativeContext.InstanceId == animationEvent.NativeContext.InstanceId) { match = i; break; }
+        if (animationEvent.Phase == AlsAnimationEventPhase.Begin)
+            return match < 0 && TryApply(animationEvent);
+        if (match < 0) return false;
+        if (animationEvent.Phase == AlsAnimationEventPhase.Tick)
+        {
+            _storage[match] = animationEvent with { Phase = AlsAnimationEventPhase.Begin };
+            return true;
+        }
+        if (animationEvent.Phase != AlsAnimationEventPhase.End) return false;
+        for (var i = match; i + 1 < Count; i++) _storage[i] = _storage[i + 1];
+        _storage[--Count] = default;
         return true;
     }
 

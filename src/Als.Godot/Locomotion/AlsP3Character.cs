@@ -3,6 +3,7 @@ using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Exchange;
+using GodotAls.Core.Events;
 
 namespace GodotAls.Locomotion;
 
@@ -17,6 +18,7 @@ public partial class AlsP3Character : Node3D
     private bool _hasStagedReplacementMotorInput;
     private bool _configured;
     private int _disposed;
+    internal AlsCommittedAnimationLifecycle CommittedAnimation { get; private set; } = null!;
 
     public AlsP3Character()
     {
@@ -235,6 +237,7 @@ public partial class AlsP3Character : Node3D
         }
 
         _context = context;
+        CommittedAnimation = new(handle.CharacterId, handle.Generation);
         _state = new AlsP3CharacterState(handle, exchangeSlot, footProbeExchange);
         try
         {
@@ -530,6 +533,7 @@ public partial class AlsP3Character : Node3D
         Volatile.Write(ref _state.GatherSuspended, 1);
         Volatile.Write(ref _state.WorkerSuspended, 1);
         Volatile.Write(ref _state.CommitSuspended, 1);
+        _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByGeneration);
     }
 
     internal void StartReplacementClassification(long completedFrameId)
@@ -611,6 +615,7 @@ public partial class AlsP3Character : Node3D
 
         Volatile.Write(ref _state.Active, 0);
         DisableRuntimeNodes();
+        _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByLifecycle);
     }
 
     private void DisableRuntimeNodes()

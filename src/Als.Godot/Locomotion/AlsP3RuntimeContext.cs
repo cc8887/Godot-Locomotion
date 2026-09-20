@@ -448,6 +448,8 @@ public sealed class AlsP3RuntimeContext
     public long ActionOutcomeHandlerFailures { get; private set; }
     public long AnimationEventsDispatched { get; private set; }
     public long AnimationEventHandlerFailures { get; private set; }
+    private bool _retirementDispatchScheduled;
+    private readonly Queue<AlsFrameResult> _retirementCallbacks = new(4);
     internal int SourceEventFailureArmed;
     internal int RejectedSourceEventCount;
 
@@ -460,13 +462,45 @@ public sealed class AlsP3RuntimeContext
         }
     }
 
-    internal void DispatchCommittedAnimationEvents(in AlsFrameResult result)
+    internal void DispatchCommittedAnimationEvents(in AlsFrameResult result, AlsCommittedAnimationLifecycle ownership)
     {
         if (System.Environment.CurrentManagedThreadId != MainManagedThreadId)
             throw new InvalidOperationException("Animation callbacks must run after main-thread commit.");
+        ownership.BeginDispatch(result);
+        DispatchAnimationCallbacks(result, ownership);
+    }
+
+    internal void DispatchAnimationRetirement(AlsCommittedAnimationLifecycle ownership, AlsActionResultCode reason)
+    {
+        if (System.Environment.CurrentManagedThreadId != MainManagedThreadId)
+            throw new InvalidOperationException("Animation retirement requires the main thread.");
+        var closing = ownership.Close(reason); // Clear before any callback can reenter teardown.
+        if (closing.TypedEvents.Count == 0 && closing.ActionOutcomes.Count == 0) return;
+        // Defer callbacks until lifecycle mutation has returned. A subscriber
+        // may free the slot or its parent; it must not reenter registry release,
+        // replacement activation or the original Begin's subscriber list.
+        _retirementCallbacks.Enqueue(closing);
+        if (_retirementDispatchScheduled) return;
+        _retirementDispatchScheduled = true;
+        Callable.From(FlushAnimationRetirements).CallDeferred();
+    }
+
+    private void FlushAnimationRetirements()
+    {
+        try
+        {
+            while (_retirementCallbacks.TryDequeue(out var closing)) DispatchAnimationCallbacks(closing, null);
+        }
+        finally { _retirementDispatchScheduled = false; }
+    }
+
+    private void DispatchAnimationCallbacks(in AlsFrameResult result, AlsCommittedAnimationLifecycle? ownership)
+    {
         var actionHandler = ActionOutcomeCommitted;
         for (var i = 0; i < result.ActionOutcomes.Count; i++)
         {
+            if (ownership?.Closed == true) return;
+            ownership?.Observe(result.ActionOutcomes[i]);
             ActionOutcomesDispatched++;
             try { actionHandler?.Invoke(result.Identity, result.ActionOutcomes[i]); }
             catch (Exception exception)
@@ -478,6 +512,8 @@ public sealed class AlsP3RuntimeContext
         var handler = AnimationEventCommitted;
         for (var i = 0; i < result.TypedEvents.Count; i++)
         {
+            if (ownership?.Closed == true) return;
+            ownership?.Observe(result.TypedEvents[i]);
             AnimationEventsDispatched++;
             try { handler?.Invoke(result.Identity, result.TypedEvents[i]); }
             catch (Exception exception)
