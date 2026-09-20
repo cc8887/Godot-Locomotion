@@ -33,6 +33,10 @@ internal sealed class AlsCoreJointHost
     {
         CheckOwnership(); Island.Step(dt, gravity, contacts: contacts); Publish();
     }
+    internal void Step(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts, ReadOnlySpan<AlsBodyStepForces> forces)
+    {
+        CheckOwnership(); Island.Step(dt, gravity, forces, contacts); Publish();
+    }
 
     private void CheckOwnership()
     {

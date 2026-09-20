@@ -4,12 +4,14 @@ namespace GodotAls.Core.Physics;
 
 public interface IAlsContactGeometrySource
 {
+    bool IsInvalidated => false;
     // Complete shape-local manifold, normal in shape 1 space. Throw on capacity
     // overflow; never silently truncate. World poses use native cm coordinates.
     int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination);
 }
 
-// Fixed-topology awake contact owner. Every eligible pair shares the island's
+// Fixed-topology contact owner. A sleeping island holds this owner's epoch and
+// histories until it resumes. Every eligible pair shares the island's
 // body buffers; geometry queries never own integration. Homogeneous resolved
 // material/settings are explicit inputs; material-combine rules are not guessed.
 public sealed class AlsWorldContacts : IAlsIslandContacts
@@ -24,10 +26,12 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     private readonly AlsContactGatherSettings _settings;
     private int _count, _contactCount;
     private long _epoch;
+    private long _committedRegistryVersion = -1;
     private bool _pending, _staged;
     public int LastContactCount { get; private set; }
     public int LastActivePairs { get; private set; }
     public long CompletedSteps => _epoch;
+    public bool RequiresWake => _committedRegistryVersion != _registry.ChangeVersion || _source.IsInvalidated;
     public AlsWorldContacts(AlsContactRegistry registry, IAlsContactGeometrySource source,
         AlsContactMaterial material, AlsContactGatherSettings settings, int pointsPerPair = 8)
     {
@@ -98,7 +102,8 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         Pending(); if (!_staged) throw new InvalidOperationException("Stage all contacts before publishing.");
         var active = 0;
         for (var i = 0; i < _count; i++) { var pair = _pairs[_prepared[i]]; if (pair.SolverCount > 0) active++; pair.PublishCommit(); }
-        LastContactCount = _contactCount; LastActivePairs = active; _epoch++; _pending = _staged = false; _registry.Leave();
+        LastContactCount = _contactCount; LastActivePairs = active; _epoch++; _committedRegistryVersion = _registry.ChangeVersion;
+        _pending = _staged = false; _registry.Leave();
     }
     public void Abort()
     {
@@ -109,7 +114,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     public void Reset()
     {
         if (_pending) throw new InvalidOperationException("Abort contact step before resetting.");
-        foreach (var pair in _pairs) pair.Reset(); _epoch = 0; LastActivePairs = LastContactCount = 0;
+        foreach (var pair in _pairs) pair.Reset(); _epoch = 0; LastActivePairs = LastContactCount = 0; _committedRegistryVersion = -1;
     }
     private void Pending() { if (!_pending) throw new InvalidOperationException("Gather world contacts first."); }
 }

@@ -27,6 +27,14 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsSleepOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsJointSolverReference(PhysicsOutput, Error, false, true))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Sleep reference export failed: %s"), *Error); return 21; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_SLEEP_OK cases=144 steps=60 wake_frame=31 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsContactHistoryOutput="), PhysicsOutput))
     {
         FString Error;

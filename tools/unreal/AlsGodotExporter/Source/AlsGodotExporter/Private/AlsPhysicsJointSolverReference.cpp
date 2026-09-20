@@ -2,6 +2,7 @@
 #include "AlsAnimationGraphLibrary.h"
 #include "Chaos/PBDJointConstraintData.h"
 #include "Chaos/PBDJointConstraintUtilities.h"
+#include "Chaos/Island/IslandManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/SkeletalMesh.h"
@@ -53,13 +54,22 @@ TSharedRef<FJsonObject> SolverSettings(const Chaos::FPBDJointSolverSettings& S)
 #undef B
     return J;
 }
-TSharedRef<FJsonObject> Body(FBodyInstance& B)
+TSharedRef<FJsonObject> Body(FBodyInstance& B, const bool SleepDiagnostics = false)
 {
     auto J=MakeShared<FJsonObject>();
     J->SetObjectField(TEXT("world"),T(B.GetUnrealWorldTransform()));
     J->SetArrayField(TEXT("linearVelocity"),V(B.GetUnrealWorldVelocity()));
     J->SetArrayField(TEXT("angularVelocity"),V(B.GetUnrealWorldAngularVelocityInRadians()));
     J->SetBoolField(TEXT("awake"),B.IsInstanceAwake());
+    if(SleepDiagnostics)
+    {
+        const auto* P=B.GetPhysicsActorHandle()->GetHandle_LowLevel()->CastToRigidParticle();
+        J->SetArrayField(TEXT("smoothLinear"),V(FVector(P->VSmooth())));
+        J->SetArrayField(TEXT("smoothAngular"),V(FVector(P->WSmooth())));
+        J->SetNumberField(TEXT("particleSleepCounter"),P->SleepCounter());
+        J->SetObjectField(TEXT("particleX"),T(FTransform(FQuat(P->GetR()),FVector(P->GetX()))));
+        J->SetObjectField(TEXT("particleP"),T(FTransform(FQuat(P->GetQ()),FVector(P->GetP()))));
+    }
     return J;
 }
 bool Step(FPhysScene* Scene,float Dt)
@@ -84,7 +94,7 @@ TSharedRef<FJsonObject> Condition(double InvMP,double InvMC,const Chaos::FVec3& 
 }
 }
 
-bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,bool DisableSleep)
+bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,bool DisableSleep,bool SleepDiagnostics)
 {
     using namespace AlsJointSolverReference; using namespace Chaos;
     const auto Fail=[&](const FString& Message){Error=Message;return false;};
@@ -103,8 +113,25 @@ bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,b
     Root->SetStringField(TEXT("engine"),FEngineVersion::Current().ToString());
     Root->SetStringField(TEXT("coordinates"),TEXT("UE world bone transforms; cm, kg, radians; force kg*cm/s^2, torque kg*cm^2/s^2"));
     Root->SetStringField(TEXT("observation"),TEXT("Actual synchronous Chaos scene steps; isolated fixed-parent native pair; no contact, gravity, animation tick or saved assets"));
-    Root->SetNumberField(TEXT("stepsPerCase"),12);
+    const int32 Steps=SleepDiagnostics?60:12;
+    Root->SetNumberField(TEXT("stepsPerCase"),Steps);
     if(DisableSleep)Root->SetBoolField(TEXT("sleepEnabled"),false);
+    if(SleepDiagnostics)
+    {
+        if(DisableSleep||SleepVar->GetInt()!=1)return Fail(TEXT("Sleep diagnostics require native sleeping enabled."));
+        Root->SetBoolField(TEXT("sleepEnabled"),true);
+        Root->SetNumberField(TEXT("wakeFrame"),31);
+        Root->SetArrayField(TEXT("wakeImpulseVelocity"),V(FVector(20,-10,30)));
+        auto SleepSettings=MakeShared<FJsonObject>();
+        for(const TCHAR* Key:{TEXT("p.Chaos.Solver.Sleep.PartialIslandSleep"),TEXT("p.Chaos.SmoothedPositionLerpRate"),
+            TEXT("p.Chaos.Solver.Sleep.AngularSleepThresholdSize")})
+        {
+            const auto* Var=IConsoleManager::Get().FindConsoleVariable(Key);
+            if(!Var)return Fail(TEXT("Missing sleep CVar."));
+            SleepSettings->SetNumberField(Key,Var->GetFloat());
+        }
+        Root->SetObjectField(TEXT("sleepSettings"),SleepSettings);
+    }
     auto CVars=MakeShared<FJsonObject>();
     for(const TCHAR* Name:{TEXT("p.Chaos.Solver.InertiaConditioning.Enabled"),TEXT("p.Chaos.Solver.InertiaConditioning.Distance"),
         TEXT("p.Chaos.Solver.InertiaConditioning.RotationRatio"),TEXT("p.Chaos.Solver.InertiaConditioning.MaxInvInertiaComponentRatio"),
@@ -116,6 +143,8 @@ bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,b
     }
     Root->SetObjectField(TEXT("bodyInertiaConditioningCVars"),CVars);
     TArray<TSharedPtr<FJsonValue>> Cases;
+    TSet<FString> SleepMeshes;
+    TArray<TSharedPtr<FJsonValue>> SleepRigs;
     // Reuse one preview world. Allocating a renderer scene per case queues many
     // large GPU reservations before the Editor can service its render thread.
     // Bodies and constraints are still recreated and checked for each case.
@@ -164,6 +193,28 @@ bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,b
         const float Dt=1.f/Hz;
         if(!Step(Scene,Dt))return Fail(TEXT("Warmup did not advance exactly one native step."));
         if(Parent->IsInstanceSimulatingPhysics()||!Child->IsInstanceSimulatingPhysics())return Fail(TEXT("Pair is not fixed-parent/dynamic-child."));
+        if(SleepDiagnostics&&!SleepMeshes.Contains(MeshPath))
+        {
+            auto Rig=MakeShared<FJsonObject>();Rig->SetStringField(TEXT("mesh"),MeshPath);
+            Rig->SetStringField(TEXT("physicsAsset"),Asset->GetPathName());
+            TArray<TSharedPtr<FJsonValue>> SleepBodies;
+            for(const USkeletalBodySetup* Setup:Asset->SkeletalBodySetups)
+            {
+                auto* Instance=Component->GetBodyInstance(Setup->BoneName);
+                const auto* Particle=Instance->GetPhysicsActorHandle()->GetHandle_LowLevel()->CastToRigidParticle();
+                const auto* Material=Particle?Solver->GetEvolution()->GetFirstPhysicsMaterial(Particle):nullptr;
+                if(!Material)return Fail(TEXT("Rig sleep material missing."));
+                auto Entry=MakeShared<FJsonObject>();Entry->SetNumberField(TEXT("index"),SleepBodies.Num());
+                Entry->SetStringField(TEXT("bone"),Setup->BoneName.ToString());
+                Entry->SetNumberField(TEXT("sleepLinearThreshold"),Material->SleepingLinearThreshold);
+                Entry->SetNumberField(TEXT("sleepAngularThreshold"),Material->SleepingAngularThreshold);
+                Entry->SetNumberField(TEXT("sleepCounterThreshold"),Material->SleepCounterThreshold);
+                Entry->SetNumberField(TEXT("sleepThresholdMultiplier"),Particle->SleepThresholdMultiplier());
+                Entry->SetNumberField(TEXT("sleepType"),static_cast<int32>(Particle->SleepType()));
+                SleepBodies.Add(MakeShared<FJsonValueObject>(Entry));
+            }
+            Rig->SetArrayField(TEXT("bodies"),SleepBodies);SleepRigs.Add(MakeShared<FJsonValueObject>(Rig));SleepMeshes.Add(MeshPath);
+        }
         const FTransform ParentFrame=Joint->GetRefFrame(EConstraintFrame::Frame2)*Parent->GetUnrealWorldTransform();
         FTransform ChildWorld=Child->GetUnrealWorldTransform();
         const FVector Direction=ParentFrame.GetRotation().RotateVector(FVector(Axis==0,Axis==1,Axis==2));
@@ -193,6 +244,16 @@ bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,b
             M->SetArrayField(TEXT("bodyInverseInertiaScale"),V(FVector(Particle->InvIConditioning())));
             M->SetArrayField(TEXT("bodyConditionedInverseInertia"),V(FVector(Particle->ConditionedInvI())));
             M->SetBoolField(TEXT("bodyInertiaConditioningEnabled"),Particle->InertiaConditioningEnabled());
+            if(SleepDiagnostics)
+            {
+                const auto* Material=Solver->GetEvolution()->GetFirstPhysicsMaterial(Particle);
+                if(!Material)return Fail(TEXT("Sleep diagnostics require a resolved native material."));
+                M->SetNumberField(TEXT("sleepLinearThreshold"),Material->SleepingLinearThreshold);
+                M->SetNumberField(TEXT("sleepAngularThreshold"),Material->SleepingAngularThreshold);
+                M->SetNumberField(TEXT("sleepCounterThreshold"),Material->SleepCounterThreshold);
+                M->SetNumberField(TEXT("sleepThresholdMultiplier"),Particle->SleepThresholdMultiplier());
+                M->SetNumberField(TEXT("sleepType"),static_cast<int32>(Particle->SleepType()));
+            }
             Masses.Add(MakeShared<FJsonValueObject>(M));
         }
         Row->SetArrayField(TEXT("bodies"),Masses);
@@ -225,11 +286,18 @@ bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,b
         }
         TArray<TSharedPtr<FJsonValue>> Samples;
         const double InitialTime=Solver->GetSolverTime();
-        for(int32 Frame=0;Frame<=12;++Frame)
+        for(int32 Frame=0;Frame<=Steps;++Frame)
         {
+            if(SleepDiagnostics&&Frame==31)Child->AddImpulse(FVector(20,-10,30),true);
             if(Frame>0&&!Step(Scene,Dt))return Fail(TEXT("Reference scene did not advance exactly one step."));
             auto Sample=MakeShared<FJsonObject>();Sample->SetNumberField(TEXT("frame"),Frame);Sample->SetNumberField(TEXT("time"),Solver->GetSolverTime()-InitialTime);
-            Sample->SetObjectField(TEXT("parent"),Body(*Parent));Sample->SetObjectField(TEXT("child"),Body(*Child));
+            Sample->SetObjectField(TEXT("parent"),Body(*Parent,SleepDiagnostics));Sample->SetObjectField(TEXT("child"),Body(*Child,SleepDiagnostics));
+            if(SleepDiagnostics)
+            {
+                const auto* Island=Evolution->GetIslandManager().GetParticleIsland(Child->GetPhysicsActorHandle()->GetHandle_LowLevel());
+                if(!Island)return Fail(TEXT("Native pair was not assigned to an island."));
+                Sample->SetNumberField(TEXT("islandSleepCounter"),Island->GetSleepCounter());
+            }
             FVector Force=FVector::ZeroVector,Torque=FVector::ZeroVector;
             // Frame zero is a teleport, so the previous warmup force is stale.
             if(Frame>0)Joint->GetConstraintForce(Force,Torque);
@@ -244,6 +312,7 @@ bool ExportAlsPhysicsJointSolverReference(const FString& Output,FString& Error,b
         Row->SetArrayField(TEXT("samples"),Samples);Cases.Add(MakeShared<FJsonValueObject>(Row));
         Owner->Destroy();
     }
+    if(SleepDiagnostics)Root->SetArrayField(TEXT("rigs"),SleepRigs);
     Root->SetArrayField(TEXT("cases"),Cases);FString Json;
     if(!FJsonSerializer::Serialize(Root,TJsonWriterFactory<>::Create(&Json)))return Fail(TEXT("Cannot encode solver reference."));
     IFileManager::Get().MakeDirectory(*FPaths::GetPath(Output),true);
