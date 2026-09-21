@@ -35,6 +35,47 @@ public sealed class AlsPolygonQueryCacheTests
         Assert.Equal(saved.WitnessA.ToArray(),Snapshot(owner,Key).WitnessA.ToArray());
         owner.Reset();Assert.Equal(0,owner.CachedPairs);Assert.Equal(0,owner.CompletedSteps);
     }
+    [Fact]
+    public void ParticleSeparationRetiresWithoutQueryButFailedAttemptPreservesCache()
+    {
+        var registry=new AlsContactRegistry(2,2);
+        registry.Register(new(0,AlsPrecisePose.Identity,1,1));registry.Register(new(1,AlsPrecisePose.Identity,1,1));
+        var owner=new AlsPolygonQueryCache(2);owner.PrepareStep();Query(owner,Key);Commit(owner);
+        var saved=Snapshot(owner,Key);
+        AlsContactBounds?[] bounds=[new(new(-1,-1,-1),new(1,1,1)),new(new(10,10,10),new(11,11,11))];
+        owner.PrepareStep();owner.RetireSeparatedPairs(registry,bounds);owner.StageCommit();owner.Abort();
+        Assert.Equal(saved.WitnessA.ToArray(),Snapshot(owner,Key).WitnessA.ToArray());Assert.Equal(1,owner.CachedPairs);
+        owner.PrepareStep();owner.RetireSeparatedPairs(registry,bounds);Commit(owner);
+        Assert.Equal(0,owner.CachedPairs);Assert.False(owner.CopyCommitted(Key,new()));
+        owner.PrepareStep();Query(owner,Key);Commit(owner);
+        var cold=new AlsPolygonQueryCache(2);cold.PrepareStep();Query(cold,Key);Commit(cold);
+        Assert.Equal(Snapshot(cold,Key).WitnessA.ToArray(),Snapshot(owner,Key).WitnessA.ToArray());
+        Assert.Equal(Snapshot(cold,Key).Weights.ToArray(),Snapshot(owner,Key).Weights.ToArray());
+    }
+    [Fact]
+    public void OverlappingParticleBoundsPreserveOmittedShapeQueriesAndTouchingBounds()
+    {
+        var registry=new AlsContactRegistry(2,2);
+        registry.Register(new(0,AlsPrecisePose.Identity,1,1));registry.Register(new(1,AlsPrecisePose.Identity,1,1));
+        var owner=new AlsPolygonQueryCache(2);owner.PrepareStep();Query(owner,Key);Commit(owner);
+        AlsContactBounds?[] bounds=[new(new(-1,-1,-1),new(1,1,1)),new(new(1,-1,-1),new(3,1,1))];
+        owner.PrepareStep();owner.RetireSeparatedPairs(registry,bounds);Commit(owner);
+        Assert.Equal(1,owner.CachedPairs);Assert.True(owner.CopyCommitted(Key,new()));
+        registry.RebindBody(0);owner.PrepareStep();owner.RetireSeparatedPairs(registry,bounds);Commit(owner);
+        Assert.Equal(0,owner.CachedPairs);
+    }
+    [Fact]
+    public void RemovedShapesRetireAndInvalidBoundsDoNotPartiallyPrune()
+    {
+        var registry=new AlsContactRegistry(2,2);
+        var a=registry.Register(new(0,AlsPrecisePose.Identity,1,1));registry.Register(new(1,AlsPrecisePose.Identity,1,1));
+        var owner=new AlsPolygonQueryCache(2);owner.PrepareStep();Query(owner,Key);Commit(owner);
+        owner.PrepareStep();
+        Assert.Throws<ArgumentException>(()=>owner.RetireSeparatedPairs(registry,[default,new(new(2,0,0),default)]));
+        owner.Abort();Assert.Equal(1,owner.CachedPairs);
+        registry.Remove(a);owner.PrepareStep();owner.RetireSeparatedPairs(registry,[default,default]);Commit(owner);
+        Assert.Equal(0,owner.CachedPairs);
+    }
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

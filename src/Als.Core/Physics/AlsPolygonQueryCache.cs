@@ -67,6 +67,29 @@ public sealed class AlsPolygonQueryCache
         if(!exists||current!=key)return;
         entry=Touch(slot);entry.ProposedExists=false;entry.Proposed.Reset();
     }
+    // Native PruneExpiredMidPhases destroys an awake particle pair when its
+    // broadphase bounds no longer overlap. Shape separation alone does not
+    // destroy it: retain caches while the owning particle bounds overlap,
+    // including steps where manifold restoration bypasses Query entirely.
+    // The fixed-island owner skips this callback while the whole island sleeps.
+    public void RetireSeparatedPairs(AlsContactRegistry registry, ReadOnlySpan<AlsContactBounds?> bodyBounds)
+    {
+        Writable(); ArgumentNullException.ThrowIfNull(registry);
+        if (registry.Capacity != _shapeCapacity || bodyBounds.Length != registry.BodyCount)
+            throw new ArgumentException("Bounds and registry must match the polygon owner.");
+        foreach (var bounds in bodyBounds) bounds?.Validate();
+        for (var slot=0;slot<_entries.Length;slot++)
+        {
+            var entry=_entries[slot];if(entry is null)continue;
+            var exists=entry.Touched?entry.ProposedExists:entry.Exists;if(!exists)continue;
+            var key=entry.Touched?entry.ProposedKey:entry.Key;
+            var a=(int)key.Shape0.Shape;var b=(int)key.Shape1.Shape;
+            var valid=registry.Present(a)&&registry.Present(b)&&registry.Key(a)==key.Shape0&&registry.Key(b)==key.Shape1;
+            if(valid && bodyBounds[registry.At(a).Body] is { } bounds0 &&
+                bodyBounds[registry.At(b).Body] is { } bounds1 && bounds0.Intersects(bounds1)) continue;
+            Release(key);
+        }
+    }
     public void StageCommit()
     {
         if(!Pending||_faulted)throw new InvalidOperationException("Prepare successful polygon queries before staging.");

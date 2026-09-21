@@ -138,6 +138,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         _nativePolygonChecks+=4;
         NativeMarginChecks();
         NativeCullChecks();
+        NativeMidphaseRetirementChecks();
         NativeCapsuleCullChecks();
         PrimitiveBindingChecks();
         NativeSphereBoxChecks();
@@ -147,6 +148,36 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeCapsuleRuntimeChecks();
         NativeRawGatherChecks();
         CapsuleDegenerateStepChecks();
+    }
+
+    private void NativeMidphaseRetirementChecks()
+    {
+        var identity=AlsPrecisePose.Identity;var registry=new AlsContactRegistry(2,2);
+        using var box=new BoxShape3D {Size=new(.2f,.2f,.2f),Margin=0};
+        using var query=new AlsGodotContactQuery(registry,new(3,.01f,1,1,3));
+        query.Bind(registry.Register(new(0,identity,1,1)),box,nativeHalf:new(10,10,10));
+        query.Bind(registry.Register(new(1,identity,1,1)),box,nativeHalf:new(10,10,10));
+        query.BindBodyBounds(0,20);
+        var trace=new AlsContactTrace(query,registry,"retirement",["a","b"],()=>0,1,1,[]);
+        var contacts=new AlsWorldContacts(registry,trace,new(0,0,0),new(1f/_hz,0,2000));
+        var bodies=new[]{new AlsIslandBody(identity,new(1,AlsDoubleVector.One)),new AlsIslandBody(identity,default)};
+        var poses=new[]{identity with {Position=new(0,0,19)},identity};var velocities=new AlsProjectionVelocity[2];
+        var previous=new[]{new AlsIslandBodyState(poses[0],default),new AlsIslandBodyState(identity,default)};
+        void Gather()=>contacts.Gather(poses,velocities,bodies,1d/_hz,previous);
+        void Commit(){contacts.StageCommit();contacts.Commit();}
+        Gather();Commit();Require(query.NativeCachedPairs==1,"Overlapping particle pair did not create native cache.");
+        var queries=query.NativePolygonQueries;
+        Gather();Commit();Require(contacts.LastRestoredPairs==1&&query.NativePolygonQueries==queries&&query.NativeCachedPairs==1,
+            "Manifold restore incorrectly retired an unqueried native cache.");
+        poses[0]=poses[0] with {Position=new(0,0,100)};
+        Gather();contacts.StageCommit();contacts.Abort();
+        Require(query.NativeCachedPairs==1,"Aborted separation destroyed committed native cache.");
+        Gather();Commit();Require(query.NativeCachedPairs==0&&contacts.LastContactCount==0&&query.NativePolygonQueries==queries,
+            "Separated particle pair was retained or queried after broadphase rejection.");
+        poses[0]=poses[0] with {Position=new(0,0,19)};
+        Gather();Commit();Require(query.NativeCachedPairs==1&&contacts.LastRestoredPairs==0&&query.NativePolygonQueries==queries+1,
+            "Particle re-entry reused retired geometry or failed to recreate its cache.");
+        _nativePolygonChecks+=5;
     }
 
     private void CapsuleDegenerateStepChecks()
