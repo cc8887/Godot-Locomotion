@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新低频原生基线：`docs/verification/2026-09-22-physics-low-frequency.md`。相同实际初态/13静态盒体，原生普通30Hz也未达十秒休眠：AnimMan159睡/保持142，Mannequin300帧仍18动态身体醒着，末秒V6.98827/W.403521；Core同样M未睡，V7.43992/W.428579。冷重导字节一致，新fixture逐帧重算睡眠/速度并保留原生失败；新旧world两项默认/roll-forward各通过。未改生产/UE/门槛，未重跑全量或其他矩阵，仍9/12；不能仅以此睡眠失败判定移植遗漏，也不能宣称轨迹等价。下一步平台30启动前固定阶段原生同初态，再最早分歧/更长稳定性；普通角色总目标及旧Editor异常仍未完成。
+
 - 最新完整原生世界：`docs/verification/2026-09-22-physics-native-world.md`。真实初态/13 静态盒体重建独立 Chaos，普通60/高速120两模型均满足休眠，冷重导字节一致；非 Core 轨迹等价。发现并补回两套 root→pelvis 全自由无驱动关节图边：ConnectivityOnly 不求解/不投影但参与排序，38连接。Core2837/Import2427+1旧skip、Godot优化构建/三频率smoke通过。整链最新 **9/12**：普通60/高速120恢复，普通30新增休眠回归，平台30两项启动前AnimMan未睡。UE全Editor审计/DataValidation过，Editor13304加载成功但退出0xC0000005，两旧Condition failed未修。普通demo未接。下一步失败30Hz完整原生初态基线与最早分歧，核对float dt/particle/岛调度；新38关节coupled捕获需先适配旧严格测试工具。再三失败及普通Ragdoll/Get-up/Pose Recovery、Mantle、相机、十分钟预算等总目标。所有最终代码留主目录。
 
 - Actual history批次普通Editor16452加载成功/原生退出0/DLL释放，两旧Condition failed与间歇AV未修；本批详细范围见下条。

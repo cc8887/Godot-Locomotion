@@ -7,19 +7,22 @@ namespace GodotAls.Import.Tests;
 // Validates the independently simulated target, not Core trajectory parity.
 public sealed class AlsPhysicsWorldReferenceTests(Xunit.Abstractions.ITestOutputHelper output)
 {
-    [Fact]
-    public void CompleteNativeAssetsContactCapturedSceneAndMeetSleepBudget()
+    [Theory]
+    [InlineData("v4_physics_world_reference.json", 4, false)]
+    [InlineData("v4_physics_world_low_frequency_reference.json", 2, true)]
+    public void CompleteNativeAssetsContactCapturedSceneAndPreserveObservedSleepBudget(string file, int caseCount, bool lowFrequency)
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_world_reference.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/" + file)));
         var source = File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_asset_inputs.json"));
-        var cases = doc.RootElement.GetProperty("cases"); Assert.Equal(4, cases.GetArrayLength());
+        var cases = doc.RootElement.GetProperty("cases"); Assert.Equal(caseCount, cases.GetArrayLength());
         var ids = new HashSet<string>(); double maxQComponent = 0, maxInertia = 0;
         foreach (var row in cases.EnumerateArray())
         {
             var setup = row.GetProperty("setup"); var mesh = setup.GetProperty("mesh").GetString()!;
             var definition = AlsPhysicsAssetCompiler.Compile(source, mesh);
             var hz = setup.GetProperty("hz").GetInt32(); var steps = setup.GetProperty("steps").GetInt32();
-            Assert.True(ids.Add($"{mesh}/{hz}")); Assert.Equal(hz == 120, B(setup, "highDrop")); Assert.True(hz is 60 or 120);
+            Assert.True(ids.Add($"{mesh}/{hz}")); Assert.Equal(hz == 120, B(setup, "highDrop"));
+            Assert.True(lowFrequency ? hz == 30 : hz is 60 or 120);
             Assert.Equal((double)(1f / hz), D(row, "dtUsed")); Assert.Equal(10 * hz, steps);
             var input = setup.GetProperty("bodies"); var samples = row.GetProperty("samples");
             Assert.Equal(definition.Bodies.Length, input.GetArrayLength()); Assert.Equal(steps + 1, samples.GetArrayLength());
@@ -58,8 +61,28 @@ public sealed class AlsPhysicsWorldReferenceTests(Xunit.Abstractions.ITestOutput
                 if (awake == 0) { if (held == 0) firstHeld = frame; held++; } else { held = 0; firstHeld = -1; }
             }
             Assert.True(contactSeen); Assert.Equal(held, row.GetProperty("heldSleepingFrames").GetInt32());
-            Assert.Equal(firstHeld, row.GetProperty("allSleepFrame").GetInt32()); Assert.True(held >= hz); Assert.True(B(row, "oneSecondSleepBudget"));
-            Assert.Equal(0, D(row, "lastSecondMaxLinear")); Assert.Equal(0, D(row, "lastSecondMaxAngular"));
+            Assert.Equal(firstHeld, row.GetProperty("allSleepFrame").GetInt32());
+            Assert.Equal(held >= hz, B(row, "oneSecondSleepBudget"));
+            // Preserve the native failure as evidence; do not make a ten-second
+            // sleep expectation true by filtering out the still-awake asset.
+            var nativeFailure = lowFrequency && mesh.EndsWith(".Mannequin", StringComparison.Ordinal);
+            Assert.Equal(!nativeFailure, held >= hz);
+            double lastV = 0, lastW = 0;
+            for (var frame = steps - hz; frame <= steps; frame++)
+                foreach (var body in samples[frame].GetProperty("bodies").EnumerateArray())
+                {
+                    lastV = Math.Max(lastV, Math.Sqrt(V(body, "linearVelocity").LengthSquared));
+                    lastW = Math.Max(lastW, Math.Sqrt(V(body, "angularVelocity").LengthSquared));
+                }
+            Assert.InRange(Math.Abs(lastV - D(row, "lastSecondMaxLinear")), 0, 1e-12);
+            Assert.InRange(Math.Abs(lastW - D(row, "lastSecondMaxAngular")), 0, 1e-12);
+            if (nativeFailure)
+            {
+                Assert.Equal(-1, firstHeld); Assert.Equal(0, held);
+                Assert.Equal(18, samples[steps].GetProperty("awakeBodies").GetInt32());
+                Assert.InRange(lastV, 6.98, 7.00); Assert.InRange(lastW, .40, .41);
+            }
+            else { Assert.Equal(0, lastV); Assert.Equal(0, lastW); }
             output.WriteLine($"NATIVE_WORLD mesh={mesh.Split('.').Last()} hz={hz} sleep={firstHeld} held={held} joints={definition.Joints.Length}");
         }
         // Native particle quaternion storage is float; positions and linear
