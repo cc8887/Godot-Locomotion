@@ -56,4 +56,41 @@ public sealed class AlsConvexTopologyTests
         v[0] = new(.1f);
         Assert.Throws<ArgumentException>(() => new AlsConvexTopology(v, p, i, 0));
     }
+    [Fact]
+    public void VertexPlaneCacheIsImmutableAndPreservesProvidedOrder()
+    {
+        var (v,p,i)=Box();
+        var cache=Enumerable.Range(0,v.Length).Select(vertex=>
+        {
+            var faces=Enumerable.Range(0,p.Length).Where(face=>i.AsSpan(p[face].FirstVertex,p[face].VertexCount).Contains(vertex)).ToArray();
+            return new AlsConvexVertexPlanes(3,faces[2],faces[0],faces[1]);
+        }).ToArray();
+        var hull=new AlsConvexTopology(v,p,i,0,cache);var expected=cache[0];cache[0]=default;
+        Assert.True(hull.HasNativeVertexPlanes);Assert.Equal(expected,hull.VertexPlanesAt(0));
+        Assert.Equal(2,hull.VertexPlanesAt(0).PlaneAt(0));
+        Assert.Throws<InvalidOperationException>(()=>new AlsConvexTopology(v,p,i,0).VertexPlanesAt(0));
+    }
+    [Fact]
+    public void UnusedNativeSentinelsArePreservedWithoutReconstructingAdjacency()
+    {
+        var(v,p,i)=Box();var cache=new AlsConvexVertexPlanes[v.Length];
+        cache[0]=new(1,2,255,255);
+        var hull=new AlsConvexTopology(v,p,i,0,cache);
+        Assert.Equal(cache[0],hull.VertexPlanesAt(0));Assert.Equal(0,hull.VertexPlanesAt(1).Count);
+    }
+    [Theory]
+    [InlineData("size")] [InlineData("negative")] [InlineData("range")] [InlineData("duplicate")] [InlineData("incident")]
+    public void InvalidActiveNativeCacheIsRejected(string fault)
+    {
+        var(v,p,i)=Box();var cache=new AlsConvexVertexPlanes[v.Length];
+        switch(fault)
+        {
+            case "size":cache=new AlsConvexVertexPlanes[1];break;
+            case "negative":cache[0]=new(-1,0,0,0);break;
+            case "range":cache[0]=new(1,99,0,0);break;
+            case "duplicate":cache[0]=new(2,0,0,0);break;
+            case "incident":cache[0]=new(1,3,0,0);break;
+        }
+        Assert.Throws<ArgumentException>(()=>new AlsConvexTopology(v,p,i,0,cache));
+    }
 }

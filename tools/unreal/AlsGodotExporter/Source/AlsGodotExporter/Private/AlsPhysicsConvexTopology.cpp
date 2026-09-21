@@ -18,7 +18,7 @@ bool ExportAlsPhysicsConvexTopology(const FString& Output,FString& Error)
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
     if(Output.IsEmpty()||FPaths::IsRelative(Output)||IFileManager::Get().FileExists(*Output))
         return Fail(TEXT("Convex topology requires a new absolute output."));
-    auto Root=MakeShared<FJsonObject>();Root->SetNumberField(TEXT("schemaVersion"),1);
+    auto Root=MakeShared<FJsonObject>();Root->SetNumberField(TEXT("schemaVersion"),2);
     Root->SetStringField(TEXT("engine"),FEngineVersion::Current().ToString());
     Root->SetStringField(TEXT("coordinates"),TEXT("UE unscaled convex-local centimeters; native cooked float vertices and planes; element transform separate"));
     Root->SetStringField(TEXT("observation"),TEXT("FKConvexElem GetChaosConvexMesh after CreatePhysicsMeshes; native face loops in original order; no inferred triangle merging; no simulation or saved assets"));
@@ -62,6 +62,17 @@ bool ExportAlsPhysicsConvexTopology(const FString& Output,FString& Error)
                     }
                     Plane->SetArrayField(TEXT("vertices"),Loop);Faces.Add(MakeShared<FJsonValueObject>(Plane));
                 }
+                TArray<TSharedPtr<FJsonValue>> VertexPlanes;
+                for(int32 Vertex=0;Vertex<Hull->NumVertices();++Vertex)
+                {
+                    int32 P0=INDEX_NONE,P1=INDEX_NONE,P2=INDEX_NONE;
+                    const int32 Count=Hull->GetVertexPlanes3(Vertex,P0,P1,P2);
+                    auto Cached=MakeShared<FJsonObject>();Cached->SetNumberField(TEXT("count"),Count);
+                    TArray<TSharedPtr<FJsonValue>> Slots;
+                    for(int32 Plane:{P0,P1,P2})Slots.Add(MakeShared<FJsonValueNumber>(Plane));
+                    Cached->SetArrayField(TEXT("planes"),Slots);VertexPlanes.Add(MakeShared<FJsonValueObject>(Cached));
+                }
+                Row->SetArrayField(TEXT("vertexPlanes"),VertexPlanes);
                 Row->SetArrayField(TEXT("sourceVertices"),SourceVertices);Row->SetArrayField(TEXT("sourceIndices"),SourceIndices);
                 Row->SetArrayField(TEXT("vertices"),Vertices);Row->SetArrayField(TEXT("faces"),Faces);Shapes.Add(MakeShared<FJsonValueObject>(Row));
             }

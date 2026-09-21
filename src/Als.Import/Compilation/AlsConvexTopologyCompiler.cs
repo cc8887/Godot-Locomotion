@@ -19,7 +19,7 @@ public static class AlsConvexTopologyCompiler
     private static AlsBoundConvexTopology[] CompileDocument(string json, AlsRagdollPhysicsDefinition definition)
     {
         using var doc = JsonDocument.Parse(json); var root = doc.RootElement;
-        Require(root.GetProperty("schemaVersion").GetInt32() == 1 && root.GetProperty("coordinates").GetString() == Coordinates, "Topology schema/units differ.");
+        Require(root.GetProperty("schemaVersion").GetInt32() == 2 && root.GetProperty("coordinates").GetString() == Coordinates, "Topology schema/units differ.");
         var rig = root.GetProperty("rigs").EnumerateArray().Single(r => r.GetProperty("mesh").GetString() == definition.Mesh);
         Require(rig.GetProperty("physicsAsset").GetString() == definition.PhysicsAsset, "Physics asset differs.");
         var result = new List<AlsBoundConvexTopology>(); var identities = new HashSet<(int, int)>();
@@ -46,7 +46,13 @@ public static class AlsConvexTopologyCompiler
                 planes.Add(new(V(face.GetProperty("normal")).ToSingle(), V(face.GetProperty("point")).ToSingle(), indices.Count, loop.Length));
                 indices.AddRange(loop);
             }
-            result.Add(new(bodyIndex, shapeIndex, new(vertices, planes.ToArray(), indices.ToArray(), row.GetProperty("margin").GetSingle())));
+            var cached = row.GetProperty("vertexPlanes").EnumerateArray().Select(p =>
+            {
+                var slots = p.GetProperty("planes"); Require(slots.GetArrayLength() == 3, "Invalid native cache slots.");
+                return new AlsConvexVertexPlanes(p.GetProperty("count").GetInt32(), slots[0].GetInt32(), slots[1].GetInt32(), slots[2].GetInt32());
+            }).ToArray();
+            Require(cached.Length == vertices.Length, "Missing native vertex-plane cache.");
+            result.Add(new(bodyIndex, shapeIndex, new(vertices, planes.ToArray(), indices.ToArray(), row.GetProperty("margin").GetSingle(), cached)));
         }
         Require(result.Count == definition.Bodies.Sum(b => b.Shapes.Count(s => s.Type == "convex")), "Missing convex topology.");
         return result.ToArray();

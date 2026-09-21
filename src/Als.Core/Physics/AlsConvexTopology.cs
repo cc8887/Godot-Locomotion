@@ -3,6 +3,10 @@ using System.Numerics;
 namespace GodotAls.Core.Physics;
 
 public readonly record struct AlsConvexPlane(Vector3 Normal, Vector3 Point, int FirstVertex, int VertexCount);
+public readonly record struct AlsConvexVertexPlanes(int Count, int Plane0, int Plane1, int Plane2)
+{
+    public int PlaneAt(int index) => index switch { 0 => Plane0, 1 => Plane1, 2 => Plane2, _ => throw new ArgumentOutOfRangeException(nameof(index)) };
+}
 
 // Immutable cooked geometry in native convex-local cm. Construction validates
 // face ranges and geometry; it never merges triangles or reorders faces.
@@ -11,6 +15,13 @@ public sealed class AlsConvexTopology
     private readonly Vector3[] _vertices;
     private readonly AlsConvexPlane[] _planes;
     private readonly int[] _indices;
+    private readonly AlsConvexVertexPlanes[] _vertexPlanes;
+    public bool HasNativeVertexPlanes => _vertexPlanes.Length != 0;
+    public AlsConvexVertexPlanes VertexPlanesAt(int vertex)
+    {
+        if (!HasNativeVertexPlanes) throw new InvalidOperationException("Native vertex-plane cache is unavailable; do not infer it from face loops.");
+        return _vertexPlanes[vertex];
+    }
     public float Margin { get; }
     public int VertexCount => _vertices.Length;
     public int PlaneCount => _planes.Length;
@@ -23,7 +34,7 @@ public sealed class AlsConvexTopology
     { var p = _planes[plane]; return _indices.AsSpan(p.FirstVertex, p.VertexCount); }
 
     public AlsConvexTopology(ReadOnlySpan<Vector3> vertices, ReadOnlySpan<AlsConvexPlane> planes,
-        ReadOnlySpan<int> indices, float margin)
+        ReadOnlySpan<int> indices, float margin, ReadOnlySpan<AlsConvexVertexPlanes> vertexPlanes = default)
     {
         if (vertices.Length < 4 || planes.Length < 4 || !float.IsFinite(margin) || margin < 0)
             throw new ArgumentException("Invalid cooked convex dimensions or margin.");
@@ -57,6 +68,24 @@ public sealed class AlsConvexTopology
         }
         if (offset != _indices.Length) throw new ArgumentException("Unused convex face indices.");
         HasClosedOrientedEdges = edges.Values.All(e => e.Count == 2 && e.Winding == 0);
+        if (vertexPlanes.Length != 0 && vertexPlanes.Length != _vertices.Length)
+            throw new ArgumentException("Native vertex-plane cache size differs from cooked vertices.");
+        _vertexPlanes = vertexPlanes.ToArray();
+        for (var vertex = 0; vertex < _vertexPlanes.Length; vertex++)
+        {
+            var cached = _vertexPlanes[vertex];
+            if (cached.Count < 0 || cached.Count > _planes.Length) throw new ArgumentException("Invalid native plane count.");
+            for (var slot = 0; slot < System.Math.Min(cached.Count, 3); slot++)
+            {
+                var plane = cached.PlaneAt(slot);
+                if ((uint)plane >= _planes.Length || !FaceVertices(plane).Contains(vertex))
+                    throw new ArgumentException("Native cached plane is not incident on its vertex.");
+                for (var previous = 0; previous < slot; previous++)
+                    if (cached.PlaneAt(previous) == plane) throw new ArgumentException("Repeated native cached plane.");
+            }
+            // Unused native slots can contain index-type-specific sentinels.
+            // Preserve them; neither interpret nor validate them as active planes.
+        }
     }
     private static bool Finite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 }
