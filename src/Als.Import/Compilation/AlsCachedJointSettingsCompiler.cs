@@ -8,6 +8,25 @@ namespace GodotAls.Import.Compilation;
 // Unsupported native features are errors, never silently replaced by defaults.
 public static class AlsCachedJointSettingsCompiler
 {
+    public static AlsIslandJoint IslandJoint(int parent, int child, in AlsPrecisePose parentFrame,
+        in AlsPrecisePose childFrame, JsonElement joint, JsonElement solver)
+    {
+        Require(B(joint, "bUseLinearSolver"), "Nonlinear joints are unsupported.");
+        var free = joint.GetProperty("LinearMotionTypes").EnumerateArray().All(e => e.GetInt32() == 0) &&
+            joint.GetProperty("AngularMotionTypes").EnumerateArray().All(e => e.GetInt32() == 0);
+        var driven = joint.GetProperty("bLinearPositionDriveEnabled").EnumerateArray().Any(e => e.GetBoolean()) ||
+            joint.GetProperty("bLinearVelocityDriveEnabled").EnumerateArray().Any(e => e.GetBoolean()) ||
+            new[] { "bAngularTwistPositionDriveEnabled", "bAngularTwistVelocityDriveEnabled", "bAngularSwingPositionDriveEnabled",
+                "bAngularSwingVelocityDriveEnabled", "bAngularSLerpPositionDriveEnabled", "bAngularSLerpVelocityDriveEnabled" }.Any(name => B(joint, name));
+        foreach (var name in new[] { "LinearMotionTypes", "AngularMotionTypes", "bLinearPositionDriveEnabled", "bLinearVelocityDriveEnabled" })
+            Require(joint.GetProperty(name).GetArrayLength() == 3, "Invalid joint axis count.");
+        // Native ShouldBeInGraph does not remove an enabled all-free joint.
+        // Such a joint has no rows/projection, but still supplies graph support.
+        return free && !driven
+            ? new(parent, child, RigidConnector(parentFrame), RigidConnector(childFrame), default, default, true)
+            : new(parent, child, RigidConnector(parentFrame), RigidConnector(childFrame), Angular(joint, solver), Projection(joint, solver));
+    }
+
     public static AlsPrecisePose RigidConnector(in AlsPrecisePose exported)
     {
         // GetRefFrame reconstructs scale from float axes. Chaos consumes the

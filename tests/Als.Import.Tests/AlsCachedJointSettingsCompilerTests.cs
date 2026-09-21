@@ -7,6 +7,25 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsCachedJointSettingsCompilerTests
 {
+    [Fact]
+    public void BothAssetsKeepTheirFreePelvisRootConnectionAndRejectLostDriveRows()
+    {
+        using var source = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_joint_reference.json")));
+        var solver = Element(Source()["solverSettings"]!); var count = 0;
+        foreach (var mesh in source.RootElement.GetProperty("meshes").EnumerateArray())
+        foreach (var row in mesh.GetProperty("joints").EnumerateArray())
+        {
+            var settings = row.GetProperty("settings");
+            if (settings.GetProperty("LinearMotionTypes").EnumerateArray().Any(e => e.GetInt32() != 0)) continue;
+            Assert.Equal("pelvis", row.GetProperty("child").GetString()); Assert.Equal("root", row.GetProperty("parent").GetString());
+            var joint = AlsCachedJointSettingsCompiler.IslandJoint(0, 1, AlsPrecisePose.Identity, AlsPrecisePose.Identity, settings, solver);
+            Assert.True(joint.ConnectivityOnly); Assert.Equal(default, joint.Angular); Assert.False(joint.Projection.Enabled); count++;
+            var changed = JsonNode.Parse(settings.GetRawText())!; changed["bAngularTwistPositionDriveEnabled"] = true;
+            Assert.Throws<InvalidDataException>(() => AlsCachedJointSettingsCompiler.IslandJoint(0, 1, AlsPrecisePose.Identity, AlsPrecisePose.Identity, Element(changed), solver));
+        }
+        Assert.Equal(2, count);
+    }
+
     [Theory]
     [InlineData("bAngularSLerpPositionDriveEnabled", "true")]
     [InlineData("bAngularSLerpVelocityDriveEnabled", "true")]

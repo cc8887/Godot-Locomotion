@@ -37,6 +37,7 @@ public partial class PhysicsCoreJointReplay : Node3D
     private string[] _traceBones = [];
     private HashSet<int> _captureFrames = [];
     private string _captureDirectory = "";
+    private string? _setupDirectory;
     private int _contactPoints, _restoredPairs;
     private double _finalSpeed, _finalAngularSpeed, _maxLimit, _finalLimit;
     private string _finalLimitSource = "";
@@ -54,6 +55,10 @@ public partial class PhysicsCoreJointReplay : Node3D
             _sleep = args.Contains("--sleep"); Require(!_sleep || _drop, "Sleep probe requires --drop.");
             _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
             _platformMode = args.FirstOrDefault(a => a.StartsWith("--platform="))?[11..] ?? "";
+            _setupDirectory = args.FirstOrDefault(a => a.StartsWith("--capture-setup="))?[16..];
+            if (_setupDirectory is not null)
+                Require(_drop && _sceneWorld && _platformMode == "" && Path.IsPathFullyQualified(_setupDirectory) && Directory.Exists(_setupDirectory),
+                    "Native setup capture needs a fixed scene-world drop and an existing absolute directory.");
             var trace = args.FirstOrDefault(a => a.StartsWith("--trace-frames="))?[15..];
             var capture = args.FirstOrDefault(a => a.StartsWith("--capture-step="))?[15..];
             if (capture is not null)
@@ -142,10 +147,8 @@ public partial class PhysicsCoreJointReplay : Node3D
             var bodies = definition.Bodies.Select(b => new AlsIslandBody(b.MassLocal, b.PhysicsType == 1 ? default : new((float)(1 / b.MassKg),
                 new AlsDoubleVector(new System.Numerics.Vector3((float)(1 / b.InertiaKgCm2.X), (float)(1 / b.InertiaKgCm2.Y), (float)(1 / b.InertiaKgCm2.Z)) * conditioning[b.Index].InverseInertiaScale)),
                 D(b.Defaults, "linearDamping"), D(b.Defaults, "angularDamping"), b.Defaults.GetProperty("bEnableGravity").GetBoolean())).ToArray();
-            var joints = definition.Joints.Where(j => rig.Settings[j.Index].LinearMotion != new AlsJointMotions(AlsJointMotion.Free, AlsJointMotion.Free, AlsJointMotion.Free))
-                .Select(j => new AlsIslandJoint(j.ParentBody, j.ChildBody, AlsCachedJointSettingsCompiler.RigidConnector(j.ParentFrame), AlsCachedJointSettingsCompiler.RigidConnector(j.ChildFrame),
-                    AlsCachedJointSettingsCompiler.Angular(rig.Settings[j.Index].NativeSettings, solver),
-                    AlsCachedJointSettingsCompiler.Projection(rig.Settings[j.Index].NativeSettings, solver))).ToArray();
+            var joints = definition.Joints.Select(j => AlsCachedJointSettingsCompiler.IslandJoint(j.ParentBody, j.ChildBody,
+                j.ParentFrame, j.ChildFrame, rig.Settings[j.Index].NativeSettings, solver)).ToArray();
             var states = definition.Bodies.Select(b => new AlsIslandBodyState(b.ReferenceComponent,
                 b.PhysicsType == 1 ? default : new(new(200, 0, 0), new(.3f, .7f, -.2f)))).ToArray();
             // Exercise the shared chain with a perturbed spine, not just an
@@ -182,6 +185,22 @@ public partial class PhysicsCoreJointReplay : Node3D
             var sleep = _sleep ? AlsSleepSettingsCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_sleep_reference.json"), definition) : null;
             var sleepSettings = sleep is null ? [] : new AlsSleepBodySettings[bodies.Length];
             if (sleep is not null) sleep.Bodies.CopyTo(sleepSettings, 0);
+            if (_setupDirectory is not null)
+            {
+                static double[] V(AlsDoubleVector v) => [v.X, v.Y, v.Z];
+                static float[] F(System.Numerics.Vector3 v) => [v.X, v.Y, v.Z];
+                static object P(AlsPrecisePose p) => new { position = V(p.Position), rotation = new[] { p.Rotation.X, p.Rotation.Y, p.Rotation.Z, p.Rotation.W } };
+                var initial = definition.Bodies.Select(b => new { name = b.Bone, actor = P(states[b.Index].Actor),
+                    v = F(states[b.Index].Velocity.Linear), w = F(states[b.Index].Velocity.Angular), dynamic = bodies[b.Index].InverseMass.Mass > 0,
+                    inverseMass = bodies[b.Index].InverseMass.Mass, inverseInertia = V(bodies[b.Index].InverseMass.Inertia),
+                    gravity = bodies[b.Index].GravityEnabled }).ToArray();
+                var path = Path.Combine(_setupDirectory, $"{definition.Mesh.Split('.').Last()}-{(_highDrop ? "high" : "normal")}-{_hz}.json");
+                using var file = new FileStream(path, FileMode.CreateNew, System.IO.FileAccess.Write);
+                JsonSerializer.Serialize(file, new { schemaVersion = 1, mesh = definition.Mesh, hz = _hz, steps = _hz * Duration,
+                    highDrop = _highDrop, gravity = new[] { 0, 0, -980 }, bodies = initial,
+                    material = definition.Bodies[0].Material, environment = scene!.ExportNativeEnvironment() }, new JsonSerializerOptions { WriteIndented = true });
+                GD.Print($"CORE_WORLD_SETUP mesh={definition.Mesh} output={path}");
+            }
             try { Add(rig, new(bodies, joints, states, sleepSettings: sleepSettings, sleepSmoothing: sleep?.Smoothing ?? .3f), scene); }
             catch { scene?.Dispose(); throw; }
         }

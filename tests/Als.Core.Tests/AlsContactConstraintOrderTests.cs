@@ -34,6 +34,23 @@ public sealed class AlsContactConstraintOrderTests
         new AlsProjectionVelocity[island.BodyCount], Enumerable.Range(0, island.BodyCount).Select(island.BodyDefinitionAt).ToArray(), 1d / 60);
 
     [Fact]
+    public void FreeJointSuppliesGraphSupportWithoutPullingOrProjectingTheBody()
+    {
+        var identity = AlsPrecisePose.Identity;
+        var initial = new AlsIslandBodyState(identity with { Position = new(100, 0, 0) }, new(new(2, 3, 4), new(.1f, .2f, .3f)));
+        var bodies = new AlsIslandBody[] { new(identity, default), new(identity, new(1, AlsDoubleVector.One)), new(identity, new(1, AlsDoubleVector.One)) };
+        var states = new[] { new AlsIslandBodyState(identity, default), initial, initial with { Actor = identity with { Position = new(200, 0, 0) } } };
+        var free = new AlsIslandJoint(0, 1, identity, identity, default, default, true);
+        var island = new AlsJointIsland(bodies, [free, free with { Parent = 1, Child = 2 }], states); var control = new AlsJointIsland(bodies, [], states);
+        var registry = new AlsContactRegistry(3, 3); var contacts = new AlsWorldContacts(registry, new Surface(), new(0, 0, 0), new(1f / 60, 0, 0), island: island);
+        Gather(island, contacts); var order = new int[2]; contacts.PrepareConstraintOrder(island, order);
+        Assert.Equal(new[] { 0, 1 }, order); Assert.Equal(1, contacts.PreparedBodyLevelAt(1)); Assert.Equal(2, contacts.PreparedBodyLevelAt(2)); contacts.Abort();
+        for (var i = 0; i < 60; i++)
+        { island.StepForceFree(1d / 60, contacts); control.StepForceFree(1d / 60); Assert.Equal(control.BodyAt(1), island.BodyAt(1)); Assert.Equal(control.BodyAt(2), island.BodyAt(2)); }
+        Assert.Throws<ArgumentException>(() => new AlsJointIsland(bodies, [free with { Projection = new(true) }], states));
+    }
+
+    [Fact]
     public void ChangingSupportReordersJointsAndLosingSupportRestoresInsertionOrder()
     {
         var (island, contacts, _, source) = Create(); var order = new int[2];
