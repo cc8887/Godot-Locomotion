@@ -14,6 +14,8 @@ internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsConta
     public bool IsInvalidated => source.IsInvalidated;
     public void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt) => source.PrepareStep(previous, velocities, bodies, dt);
+    public void PrepareBounds(ReadOnlySpan<AlsPrecisePose> shapeWorld) => source.PrepareBounds(shapeWorld);
+    public bool AllowsPair(int a, int b) => source.AllowsPair(a, b);
     public void StageCommit() => source.StageCommit();
     public void PublishCommit() => source.PublishCommit();
     public void Abort() => source.Abort();

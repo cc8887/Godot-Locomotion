@@ -25,6 +25,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         public AlsConvexTopology? Cooked;
         public AlsConvexProperties? ConvexProperties;
         public AlsDoubleVector? NativeHalf;
+        public AlsContactBounds? NativeBounds;
         public AlsDoubleVector NativeScale = AlsDoubleVector.One;
         public float NativeMargin;
         public string? TraceFingerprint;
@@ -38,6 +39,9 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private readonly bool[] _dynamicBodies;
     private readonly AlsContactDetectorSettings? _detector;
     private readonly NVector[] _preVelocity;
+    private readonly NVector[] _integratedVelocity;
+    private readonly AlsContactBounds?[] _worldBounds;
+    private bool _boundsPrepared;
     private readonly double[] _bodyBounds;
     private readonly uint[] _boundsGeneration;
     private double _dt;
@@ -78,6 +82,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         _dynamicBodies=new bool[registry.BodyCount];
         detector?.Validate();_detector=detector;
         _preVelocity=new NVector[registry.BodyCount];_bodyBounds=new double[registry.BodyCount];_boundsGeneration=new uint[registry.BodyCount];
+        _integratedVelocity=new NVector[registry.BodyCount];_worldBounds=new AlsContactBounds?[registry.BodyCount];
         try
         {
             _space = PhysicsServer3D.SpaceCreate(); PhysicsServer3D.SpaceSetActive(_space, false);
@@ -90,7 +95,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     internal void Bind(AlsContactShapeHandle handle, Shape3D shape, AlsConvexTopology? cooked = null,
         AlsDoubleVector? nativeHalf = null, AlsDoubleVector? nativeScale = null, float nativeMargin=0,
         AlsCapsuleGeometry? nativeCapsule = null, AlsPrecisePose? proxyLocal = null, float? nativeSphereRadius = null,
-        AlsConvexProperties? convexProperties = null)
+        AlsConvexProperties? convexProperties = null, AlsContactBounds? nativeBounds = null)
     {
         Check(); if (_registry.IsLocked) throw new InvalidOperationException("Cannot bind query geometry during a solve.");
         if (nativeCapsule.HasValue)
@@ -118,12 +123,13 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if(!float.IsFinite(nativeMargin)||nativeMargin<0||(nativeMargin!=0&&cooked is null&&!nativeHalf.HasValue))
             throw new ArgumentException("Native polygon margin requires explicit geometry.");
         convexProperties?.Validate();
+        nativeBounds?.Validate();
         if (convexProperties.HasValue && cooked is null) throw new ArgumentException("Convex properties require cooked geometry.");
         var bounds = Bounds(shape); var old = _bindings[handle.Slot];
         if (old is not null && old.Revision == handle.Revision) throw new ArgumentException("Replace registry shape before rebinding geometry.");
         var binding = new Binding { Shape = shape, Bounds = bounds, Revision = handle.Revision, Changed = null!,
             Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One,NativeMargin=nativeMargin,
-            NativeCapsule=nativeCapsule,ProxyLocal=proxy,NativeSphereRadius=nativeSphereRadius,ConvexProperties=convexProperties };
+            NativeCapsule=nativeCapsule,ProxyLocal=proxy,NativeSphereRadius=nativeSphereRadius,ConvexProperties=convexProperties,NativeBounds=nativeBounds };
         binding.Changed = () => binding.Dirty = true;
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
@@ -147,12 +153,61 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if(_detector.HasValue&&(previous.Length!=bodies.Length||velocities.Length!=bodies.Length))
             throw new ArgumentException("Native detector requires previous body states and predicted velocities.");
         _polygonCache.PrepareStep();
+        _boundsPrepared=false;
         _dt=dt;
         for(var i=0;i<bodies.Length;i++)
         {
             _dynamicBodies[i]=bodies[i].InverseMass.Mass>0;
-            if(_detector.HasValue)_preVelocity[i]=AlsContactCullDistance.PreVelocity(bodies[i],previous[i],velocities[i]);
+            if(_detector.HasValue)
+            {
+                _preVelocity[i]=AlsContactCullDistance.PreVelocity(bodies[i],previous[i],velocities[i]);
+                _integratedVelocity[i]=velocities[i].Linear;
+            }
         }
+    }
+    public void PrepareBounds(ReadOnlySpan<AlsPrecisePose> shapeWorld)
+    {
+        Check();
+        if (_detector is not { } detector) return;
+        if (!_polygonCache.Pending || shapeWorld.Length != _registry.Capacity)
+            throw new InvalidOperationException("Bounds require a complete pending shape context.");
+        Array.Clear(_worldBounds);
+        // Include every registered shape, even if its simulation filter is off:
+        // native particle bounds union shapes before pair filtering.
+        for (var i=0;i<_registry.Capacity;i++) if (_registry.Present(i))
+        {
+            var binding=BindingAt(i); var pose=shapeWorld[i]; AlsContactBounds bounds;
+            if (binding.NativeCapsule is { } capsule)
+            {
+                var a=new AlsDoubleVector(capsule.Endpoint0).Rotate(pose.Rotation)+pose.Position;
+                var b=new AlsDoubleVector(capsule.Endpoint0+capsule.Axis*capsule.Height).Rotate(pose.Rotation)+pose.Position;
+                bounds=AlsContactBounds.Segment(a,b,capsule.Radius);
+            }
+            else if (binding.NativeSphereRadius is { } radius)
+            {
+                var center=binding.ProxyLocal.Position.Rotate(pose.Rotation)+pose.Position;
+                bounds=AlsContactBounds.Segment(center,center,radius);
+            }
+            else if (binding.NativeBounds is { } native) bounds=native.Transform(pose);
+            else if (binding.NativeHalf is { } half) bounds=new AlsContactBounds(half * -1,half).Transform(pose);
+            else
+            {
+                // Non-asset scene geometry uses its explicit Godot proxy bounds.
+                var a=ToNative(binding.Bounds.Position);var b=ToNative(binding.Bounds.End);
+                bounds=AlsContactBounds.Segment(a,b,0).Transform(AlsPrecisePose.Compose(binding.ProxyLocal,pose));
+            }
+            var body=_registry.At(i).Body;
+            _worldBounds[body]=_worldBounds[body] is { } prior?prior.Union(bounds):bounds;
+        }
+        for(var i=0;i<_worldBounds.Length;i++) if(_worldBounds[i] is { } bounds)
+            _worldBounds[i]=bounds.Expand(_dynamicBodies[i],_integratedVelocity[i],_dt,detector);
+        _boundsPrepared=true;
+    }
+    public bool AllowsPair(int shape0,int shape1)
+    {
+        Check();if(!_detector.HasValue)return true;
+        if(!_boundsPrepared||!_polygonCache.Pending)throw new InvalidOperationException("Prepare whole-particle bounds before pair filtering.");
+        return _worldBounds[_registry.At(shape0).Body]!.Value.Intersects(_worldBounds[_registry.At(shape1).Body]!.Value);
     }
     public void StageCommit() => _polygonCache.StageCommit();
     public void PublishCommit() => _polygonCache.PublishCommit();

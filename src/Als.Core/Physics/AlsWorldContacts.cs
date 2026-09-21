@@ -10,6 +10,10 @@ public interface IAlsContactGeometrySource
     // provider must reject that absence instead of substituting predicted V.
     void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt) { }
+    // Shape-slot indexed predicted world poses. Missing registry slots are not
+    // meaningful. Build whole-particle bounds before testing individual pairs.
+    void PrepareBounds(ReadOnlySpan<AlsPrecisePose> shapeWorld) { }
+    bool AllowsPair(int shape0, int shape1) => true;
     // All fallible work belongs in PrepareStep/Query/StageCommit. PublishCommit
     // and Abort must not throw. Abort also follows a partially failed PrepareStep.
     // Callbacks occur under the registry lock; Reset occurs only while idle.
@@ -153,12 +157,17 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
                     ? AlsPrecisePose.Relative(s.ActorLocal, bodies[s.Body].MassLocal) : s.ActorLocal;
                 _shapeWorld[i] = AlsPrecisePose.Compose(local, predicted[s.Body]);
             }
+            _source.PrepareBounds(_shapeWorld);
             var slot = 0;
             for (var a = 0; a < _registry.Capacity; a++) for (var b = a + 1; b < _registry.Capacity; b++, slot++)
             {
                 if (!_registry.Allows(a, b)) continue;
                 var sa = _registry.At(a); var sb = _registry.At(b); var ia = sa.Body; var ib = sb.Body;
                 if (bodies[ia].InverseMass.Mass <= 0 && bodies[ib].InverseMass.Mass <= 0) continue;
+                // Reject before restoring either geometry or friction history.
+                // A committed skipped epoch invalidates both on re-entry;
+                // an aborted attempt leaves the previous histories intact.
+                if (!_source.AllowsPair(a, b)) continue;
                 _identities[slot] = new(_registry.Key(a), _registry.Key(b));
                 // Include the slot before any provider callback or proposal so
                 // exceptions roll back geometry and friction history together.
