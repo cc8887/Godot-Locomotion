@@ -8,6 +8,11 @@
 
 # 运行和验证
 
+- Native mixed批次最终Import串行2422通过/1既有跳过；普通Editor28076加载后0xC0000005退出/DLL释放，两旧Condition failed与间歇AV未修，普通重启门禁失败。其余覆盖见下条。
+
+- 最新native mixed trace与运行时修复：`docs/verification/2026-09-22-physics-native-capsule-mixed.md`。旧高120失败246capsule pair（30活跃36点）+114capsule-convex（全无点）原生重放，实际dynamic/凸包fingerprint-scale-margin严格匹配。查明Godot宿主.NET9.0.17与默认测试.NET8的Vector3.Cross差异；胶囊内显式float叉积后Core原生差0，保留修复前source偏差证据。三个频率Godot内各246实际输入精确回放，旧smoke全过；.NET9定向4及ReferenceTests41通过，Core2834。整链仍8/12，八成功报告都有数值变化，普通60 M595睡太迟/高120 A未睡 M869/平移30/旋转30失败未关。后续核对其他Gather/contact/linear浮点叉积与历史，再完整角色目标。普通demo未接。
+- 诊断trace和整链matrix必须使用独立日志名；本批临时high-120 trace被后续矩阵同名日志覆盖，受检360条原始source在新参考JSON完整保留，详见验证文档。
+
 - Native capsule trace批次UE最终全Editor审计/重导/DataValidation通过；Editor33244原生退出0/DLL释放，但两旧Condition failed及间歇AV未修，其他证据与范围见下条。
 
 - 最新actual capsule trace：`docs/verification/2026-09-22-physics-native-capsule-trace.md`。trace补局部点/法向/NativePhi/实际cull；新exporter从真实身体精确匹配并复制FCapsule，避免重构轴浮点变化。高120失败1140–1145帧726查询中270capsule-box（24活跃54点）原始Godot输出及Core重放与UE均精确一致；456其他类型明确跳过，非完整轨迹证明。冷重导一致、两负例拒绝且无输出、定向4通过、Godot构建通过；Core/Import生产逻辑未改未重跑全量。高120仍失败且诊断指标不变，矩阵沿用8/12。继续同批246capsule-pair/114capsule-convex及历史/Gather，再四失败与完整角色目标，普通demo未切换。
