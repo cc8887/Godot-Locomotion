@@ -236,11 +236,13 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if (a.Shape is CapsuleShape3D capsule && capsule.Height > 2 * capsule.Radius && b.Shape is BoxShape3D box)
         {
             Span<AlsDetectedContact> native = stackalloc AlsDetectedContact[3];
-            // Keep the current overlap-only discovery contract. Native cull
-            // distance and persistent separated manifolds are separate work.
+            // The proven capsule-face region supports separated manifolds.
+            // Use the same particle bounds/PreV detector context as polygons;
+            // unsupported edge/deep contacts below still use the old query.
             if (AlsCapsuleBoxManifold.TryInteriorFace((double)capsule.Radius * 100,
                 ((double)capsule.Height - 2 * capsule.Radius) * 100, world0,
-                new((double)box.Size.Z * 50, (double)box.Size.X * 50, (double)box.Size.Y * 50), world1, 0, native, out var count,
+                new((double)box.Size.Z * 50, (double)box.Size.X * 50, (double)box.Size.Y * 50), world1,
+                CullDistance(shape0, shape1), native, out var count,
                 (double)box.Margin * 100))
             {
                 if (count > destination.Length) throw new InvalidOperationException("Contact query capacity exceeded; manifold was not truncated.");
