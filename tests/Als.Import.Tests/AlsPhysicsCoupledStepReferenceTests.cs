@@ -13,6 +13,7 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
     [InlineData("v4_physics_coupled_step_reference.json", 6)]
     [InlineData("v4_physics_coupled_shock_reference.json", 5)]
     [InlineData("v4_physics_high_drop_coupled_reference.json", 6)]
+    [InlineData("v4_physics_resting_coupled_reference.json", 6)]
     public void FullChainSharedContactJointAndProjectionStagesMatchNativeContainers(string file, int caseCount)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
@@ -47,9 +48,9 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
                     V(p, "u").ToSingle(), V(p, "v").ToSingle(), V(p, "error").ToSingle(), (float)D(p, "targetVelocity"),
                     B(p, "disablePosition"), B(p, "disableVelocity"), B(p, "disableFriction"))).ToArray();
                 var manifold = new AlsCachedContactManifold(points.Length);
-                manifold.Gather(points, new((float)D(m, "staticFriction"), (float)D(m, "dynamicFriction"), (float)D(m, "velocityFriction"),
+                manifold.GatherRows(points, new((float)D(m, "staticFriction"), (float)D(m, "dynamicFriction"), (float)D(m, "velocityFriction"),
                     (float)D(m, "minFrictionPushOut"), (float)D(m, "stiffness"), (float)D(m, "positionFrictionStiffness"),
-                    (float)D(m, "velocityFrictionStiffness")), predicted[a].Rotation, mass[a], predicted[b].Rotation, mass[b]);
+                    (float)D(m, "velocityFrictionStiffness")), predicted[a].Rotation, mass[a], predicted[b].Rotation, mass[b], fromNativeGather: true);
                 return (a, b, manifold);
             }).ToArray();
             var samples = fixture.GetProperty("nativeSamples"); Assert.Equal(24, samples.GetArrayLength()); var sampleIndex = 0;
