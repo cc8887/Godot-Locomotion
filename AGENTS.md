@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新midphase退役：`docs/verification/2026-09-22-physics-midphase-retirement.md`。按原生PruneExpiredMidPhases在whole-particle bounds分离时事务Release旧GJK；保留仅shape分离/restore绕过Query时缓存，Abort不发布，形状移除/revision/generation退役。Core2854、定向11/.NET9 11、优化构建/三频率smoke新增5过。矩阵仍8/12，四项休眠失败未修，普通120V2.227/W.269835未变。八个成功报告除高30/普通60缓存10→9外字段均与上批相同，不能声称轨迹改善。无UE/Import改动或新导出/重启，旧AV/Condition未修。已核对下一遗漏DoBoundsOverlap逐shape AABB、球球distance、两侧OBB-to-AABB（只在上一帧未碰撞时），需独立native参考及last-used epoch，勿每帧无条件OBB或按shape分离销毁GJK。普通demo未接，总目标及用户P4修改保留。
+
 - 最新粗碰撞：`docs/verification/2026-09-22-physics-bounds.md`。whole-particle 世界bounds合并所有注册形状；dynamic基础扩张+本帧积分V反向按轴clamp，static/非CCD kinematic不扩张；PrepareBounds/AllowsPair在restore前，trace转发，跳步重入失效与失败回滚测试。A19速度差37.524→.00087249，M19 15.218→.00315657；连续60步首次>0.1cm/s在A52/M51，非完整等价。Core2851、roll-forward新增7、优化构建/三频率smoke/60场景过。矩阵现8/12：普通120新增M休眠失败，另普通/平台30旧失败；勿沿用9/12。A普通30于142睡、120于687睡，M两者未睡。无新UE导出/Import全量/UE重启；胶囊重建端点末位与独立bounds参考仍待验证，CCD/MACD未做，旧AV/Condition未修。下一步120回归及40–60帧几何/缓存/midphase，再普通Ragdoll/Get-up等完整目标；普通demo未接，用户P4文档保留。
 
 - 最新落地窗口：`docs/verification/2026-09-22-physics-landing-window.md`。修正之前contact-settings结论：external粒子-1经FPBDRigidsSolver marshalling取solver DepenetrationVelocity=1e10，不能直接交Setup变0。Core ResolveParticle+Import转换保留显式0，完整原生frame12..21约束验证。A15 V差21.70255→.00067244cm/s，前18步<.00072，A19仍37.5242/M19仍15.2185。新证据：M19 lowerarm_r/spine_01原生膨胀bounds仍高于地面，无接触；Core仅cull生成多余接触。A18已有额外pelvis、A19额外前臂。下一步whole-particle bounds/预测姿态/动态反向速度扩张/static-kinematic的粗碰撞，须在restore前过滤，不能只Query过滤。Core2844/Import2441+1skip，roll-forward设置/窗口3、优化构建/三频率smoke过；矩阵仍9/12三个30休眠失败，普通30A139睡M未睡。原生冷重导一致、全Editor审计/DataValidation过；普通Editor29224标记成功后0xC0000005/DLL释放，两旧Condition仍在，本轮重启门禁失败。普通demo未接，完整角色总目标保留，所有实现主目录main。

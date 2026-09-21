@@ -201,6 +201,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         }
         for(var i=0;i<_worldBounds.Length;i++) if(_worldBounds[i] is { } bounds)
             _worldBounds[i]=bounds.Expand(_dynamicBodies[i],_integratedVelocity[i],_dt,detector);
+        _polygonCache.RetireSeparatedPairs(_registry,_worldBounds);
         _boundsPrepared=true;
     }
     public bool AllowsPair(int shape0,int shape1)
