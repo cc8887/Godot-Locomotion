@@ -6,7 +6,7 @@ using NVector = System.Numerics.Vector3;
 namespace GodotAls.Physics;
 
 // Explicit native polygon bindings use Core GJK/EPA and transactional caches;
-// native sphere/box and capsule/box bindings use their one-shot Core manifolds.
+// native sphere/box, capsule/box and capsule pairs use one-shot Core manifolds.
 // Other pairs use guarded capsule/box faces or a geometry-only Jolt query space.
 // That space contains exactly one target shape, so every
 // CollideShape point pair has an unambiguous registry identity. A hull/box wholly
@@ -55,6 +55,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     internal int NativePolygonQueries { get; private set; }
     internal int NativeSphereBoxQueries { get; private set; }
     internal int NativeCapsuleBoxQueries { get; private set; }
+    internal int NativeCapsulePairQueries { get; private set; }
     internal int NativeCachedPairs => _polygonCache.CachedPairs;
     internal long NativeCacheSteps => _polygonCache.CompletedSteps;
     public bool IsInvalidated
@@ -205,6 +206,13 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination,cull);
             else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination,cull);
             NativePolygonQueries++;return result.Count;
+        }
+        if (a.NativeCapsule.HasValue && b.NativeCapsule.HasValue)
+        {
+            if (!_polygonCache.Pending) throw new InvalidOperationException("Capsule pair requires prepared dynamic body ownership.");
+            var count = AlsCapsuleCapsuleManifold.Build(a.NativeCapsule.Value, world0, _dynamicBodies[_registry.At(shape0).Body],
+                b.NativeCapsule.Value, world1, _dynamicBodies[_registry.At(shape1).Body], CullDistance(shape0, shape1), destination);
+            NativeCapsulePairQueries++; return count;
         }
         if ((a.NativeCapsule.HasValue && b.NativeHalf.HasValue) ||
             (b.NativeCapsule.HasValue && a.NativeHalf.HasValue))

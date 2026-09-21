@@ -25,6 +25,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _primitiveChecks;
     private int _sphereBoxChecks;
     private int _fullCapsuleBoxChecks;
+    private int _capsulePairChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -91,6 +92,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
                 narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, capsule_cull_checks = _capsuleCullChecks, primitive_binding_checks = _primitiveChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 native_sphere_box_checks = _sphereBoxChecks,
                 native_capsule_box_checks = _fullCapsuleBoxChecks,
+                native_capsule_pair_checks = _capsulePairChecks,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -132,6 +134,57 @@ public partial class PhysicsCoreContactSmoke : Node3D
         PrimitiveBindingChecks();
         NativeSphereBoxChecks();
         NativeFullCapsuleBoxChecks();
+        NativeCapsulePairChecks();
+    }
+
+    private void NativeCapsulePairChecks()
+    {
+        var identity = AlsPrecisePose.Identity;
+        using var capsuleA = new CapsuleShape3D { Radius = .02f, Height = .24f, Margin = 0 };
+        using var capsuleB = new CapsuleShape3D { Radius = .07f, Height = .34f, Margin = 0 };
+        var nativeA = new AlsCapsuleGeometry(new(7, -3, -8), NVector.UnitZ, 20, 2);
+        var nativeB = new AlsCapsuleGeometry(new(-2, 1, -7), NVector.UnitZ, 20, 7);
+        var centerA = new AlsDoubleVector(7, -3, 2); var centerB = new AlsDoubleVector(-2, 1, 3);
+        foreach (var dynamicA in new[] { false, true }) foreach (var reversed in new[] { false, true })
+        {
+            var registry = new AlsContactRegistry(2, 2); using var query = new AlsGodotContactQuery(registry, new(3, .01f, 1, 1, 3));
+            query.Bind(registry.Register(new(0, identity, 1, 1, true)), capsuleA, nativeCapsule: nativeA, proxyLocal: identity with { Position = centerA });
+            query.Bind(registry.Register(new(1, identity, 1, 1, true)), capsuleB, nativeCapsule: nativeB, proxyLocal: identity with { Position = centerB });
+            query.BindBodyBounds(0, 24); query.BindBodyBounds(1, 34);
+            var bodies = new[] { new AlsIslandBody(identity, dynamicA ? new(1, AlsDoubleVector.One) : default), new AlsIslandBody(identity, new(1, AlsDoubleVector.One)) };
+            var previous = new[] { new AlsIslandBodyState(identity, default), new AlsIslandBodyState(identity, default) };
+            var velocities = new AlsProjectionVelocity[2]; var points = new AlsDetectedContact[3];
+            var poses = new[] { identity with { Position = centerA * -1 }, identity with { Position = centerB * -1 } };
+            var a = reversed ? 1 : 0; var b = 1 - a;
+            var rejected = false;
+            try { query.Query(a, poses[a], b, poses[b], points); } catch (InvalidOperationException) { rejected = true; }
+            Require(rejected, "Capsule pair accepted missing dynamic body ownership."); _capsulePairChecks++;
+            query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+            Require(query.Query(a, poses[a], b, poses[b], points) > 0, "Coincident native capsules produced no contact.");
+            var sign = dynamicA ? 1 : -1; if (reversed) sign = -sign;
+            Require(points[0].Normal1 == NVector.UnitZ * sign, "Capsule overlap normal ignored dynamic radius ownership.");
+            query.Abort(); _capsulePairChecks++;
+            poses[0] = poses[0] with { Position = new AlsDoubleVector(0, 8, 0) - centerA };
+            query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+            var count = query.Query(a, poses[a], b, poses[b], points); Require(count >= 2, "Aligned capsules lost additional native support.");
+            for (var i = 0; i < count; i++)
+            {
+                var p0 = new AlsDoubleVector(points[i].Point0) + poses[a].Position; var p1 = new AlsDoubleVector(points[i].Point1) + poses[b].Position;
+                Require(Math.Abs(AlsDoubleVector.Dot(p0 - p1, new(points[i].Normal1)) - points[i].NativePhi!.Value) < 1e-4,
+                    "Capsule pair did not return original leaf coordinates.");
+            }
+            query.Abort(); _capsulePairChecks++;
+            poses[0] = poses[0] with { Position = new AlsDoubleVector(0, 13, 0) - centerA };
+            query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+            Require(query.Query(a, poses[a], b, poses[b], points) == 0, "Capsule pair retained beyond stationary cull."); query.Abort(); _capsulePairChecks++;
+            previous[1] = previous[1] with { Velocity = new(new(10000, 0, 0), default) };
+            var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 1000));
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            var queries = query.NativeCapsulePairQueries;
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            Require(contacts.LastContactCount > 0 && contacts.LastRestoredPairs == 0 && query.NativeCapsulePairQueries == queries + 1 && query.NarrowPhaseQueries == 0,
+                "Capsule pair lost velocity-expanded cull, restored polygon geometry or fell back to Jolt."); _capsulePairChecks++;
+        }
     }
 
     private void NativeFullCapsuleBoxChecks()
@@ -253,7 +306,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         var proxy = new AlsPrecisePose(new(17, -3, 2), new AlsQuaternion(0, 1, 0, 1).Normalized(), AlsDoubleVector.One);
         query.Bind(registry.Register(new(0, identity, 1, 1, true)), capsule, nativeCapsule: native, proxyLocal: proxy);
         query.Bind(registry.Register(new(1, identity, 1, 1)), box, nativeHalf: new(100, 100, 10));
-        query.Bind(registry.Register(new(2, identity, 1, 1, true)), capsule, nativeCapsule: native, proxyLocal: proxy);
+        query.Bind(registry.Register(new(2, identity, 1, 1, true)), capsule, proxyLocal: proxy);
         var pose = identity with { Position = new(0, 0, 12.8) }; var points = new AlsDetectedContact[4];
         Require(query.Query(0, pose, 1, identity, points) == 2 && points[0].Point0 == new NVector(7, -3, -3) &&
             points[1].Point0 == new NVector(27, -3, -3), "Native capsule binding lost baked endpoint coordinates."); _primitiveChecks++;
