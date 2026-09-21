@@ -4,31 +4,34 @@ using GodotAls.Core.Locomotion;
 namespace GodotAls.Core.Physics;
 
 // Raw and wrapped FConvex retain different selection/edge precision. This
-// adapter only accepts zero inner/pair margin; a box partner may have margin.
+// adapter accepts zero inner margin and an explicitly resolved pair margin.
 public readonly struct AlsConvexPolygonShape : IAlsPolygonShape
 {
     public AlsConvexTopology Topology { get; }
     public AlsDoubleVector Scale { get; }
     public bool IsScaled { get; }
-    public float Margin => 0;
+    public float Margin { get; }
     public int Winding => (Scale.X<0?-1:1)*(Scale.Y<0?-1:1)*(Scale.Z<0?-1:1);
 
-    public AlsConvexPolygonShape(AlsConvexTopology topology)
-    { Topology=topology; Scale=AlsDoubleVector.One; IsScaled=false; }
-    public AlsConvexPolygonShape(AlsConvexTopology topology, AlsDoubleVector scale)
-    { Topology=topology; Scale=AlsScaledConvexGeometry.ResolveScale(scale); IsScaled=true; }
+    public AlsConvexPolygonShape(AlsConvexTopology topology,float margin=0)
+    { Topology=topology; Scale=AlsDoubleVector.One; IsScaled=false; Margin=margin; }
+    public AlsConvexPolygonShape(AlsConvexTopology topology, AlsDoubleVector scale,float margin=0)
+    { Topology=topology; Scale=AlsScaledConvexGeometry.ResolveScale(scale); IsScaled=true; Margin=margin; }
     public void Validate()
     {
         ArgumentNullException.ThrowIfNull(Topology);
-        if (!Topology.HasNativeVertexPlanes || Topology.Margin != 0)
-            throw new ArgumentException("Convex polygon requires zero margin and native plane adjacency.");
+        if (!Topology.HasNativeVertexPlanes || Topology.Margin != 0 || !float.IsFinite(Margin) || Margin<0)
+            throw new ArgumentException("Convex polygon requires zero inner margin, valid pair margin and native plane adjacency.");
         new AlsGjkConvexShape(Topology,Scale).Validate();
     }
     public AlsDoubleVector Support(AlsDoubleVector direction, out int vertex, out double delta)
-    { delta=0; return AlsConvexSupport.ZeroMargin(Topology,direction,Scale,out vertex); }
+    { delta=0; return SupportWithDelta(direction,out vertex,ref delta); }
+    public AlsDoubleVector SupportWithDelta(AlsDoubleVector direction,out int vertex,ref double delta)
+    { return Margin==0?AlsConvexSupport.ZeroMargin(Topology,direction,Scale,out vertex):
+        AlsConvexMarginSupport.Support(Topology,direction,Margin,Scale,IsScaled,ref delta,out vertex); }
     public int SelectPlane(AlsDoubleVector point, AlsDoubleVector direction, int vertex, float minimumDistance)
-        => IsScaled ? AlsScaledConvexGeometry.SelectPlane(Topology,Scale,point,direction,0,vertex,minimumDistance)
-            : AlsConvexPlaneSelection.Unscaled(Topology,point,direction,0,vertex,minimumDistance);
+        => IsScaled ? AlsScaledConvexGeometry.SelectPlane(Topology,Scale,point,direction,Margin,vertex,minimumDistance)
+            : AlsConvexPlaneSelection.Unscaled(Topology,point,direction,Margin,vertex,minimumDistance);
     public void Plane(int plane, out AlsDoubleVector normal, out AlsDoubleVector point)
     {
         var p=Topology.PlaneAt(plane);

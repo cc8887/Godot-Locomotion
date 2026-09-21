@@ -14,6 +14,8 @@ public readonly record struct AlsBoxPolygonShape(AlsDoubleVector Half, float Mar
         [0,1,2, 1,3,2, 0,2,4, 2,3,4, 0,5,1, 1,5,3, 0,4,5, 3,5,4];
     public int Winding => 1;
     public void Validate() => new AlsGjkBoxShape(Half,Margin).Validate();
+    public AlsDoubleVector SupportWithDelta(AlsDoubleVector direction,out int vertex,ref double delta)
+        =>Support(direction,out vertex,out delta);
     public AlsDoubleVector Support(AlsDoubleVector direction, out int vertex, out double delta)
         => new AlsGjkBoxShape(Half,Margin).Support(direction,out vertex,out delta);
     public AlsConvexVertexPlanes VertexPlanes(int vertex)

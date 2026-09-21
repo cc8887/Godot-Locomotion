@@ -7,6 +7,8 @@ public interface IAlsGjkShape
     float Margin { get; }
     void Validate();
     AlsDoubleVector Support(AlsDoubleVector direction, out int vertex, out double supportDelta);
+    AlsDoubleVector SupportWithDelta(AlsDoubleVector direction, out int vertex, ref double supportDelta)
+        =>Support(direction,out vertex,out supportDelta);
 }
 
 public readonly record struct AlsGjkConvexShape(AlsConvexTopology Topology, AlsDoubleVector Scale) : IAlsGjkShape
@@ -19,10 +21,14 @@ public readonly record struct AlsGjkConvexShape(AlsConvexTopology Topology, AlsD
     }
     public AlsDoubleVector Support(AlsDoubleVector direction, out int vertex, out double supportDelta)
     { supportDelta = 0; return AlsConvexSupport.ZeroMargin(Topology, direction, Scale, out vertex); }
+    public AlsDoubleVector SupportWithDelta(AlsDoubleVector direction,out int vertex,ref double supportDelta)
+        =>AlsConvexSupport.ZeroMargin(Topology,direction,Scale,out vertex);
 }
 
 public readonly record struct AlsGjkBoxShape(AlsDoubleVector Half, float Margin = 0) : IAlsGjkShape
 {
+    public AlsDoubleVector SupportWithDelta(AlsDoubleVector direction,out int vertex,ref double supportDelta)
+        =>Support(direction,out vertex,out supportDelta);
     public void Validate()
     {
         if (!Half.IsFinite || Half.X <= 0 || Half.Y <= 0 || Half.Z <= 0 || !float.IsFinite(Margin) || Margin < 0 ||
@@ -86,11 +92,12 @@ public static class AlsGjkSearch
         }
         var restoredCount = count; var normal = v * -1; var needsEpa = false; var stopped = false; var limit = false;
         var iterations = 0; var vertexA = -1; var vertexB = -1; var maximumDelta = 0d;
+        double deltaA=0,deltaB=0;
         while (!needsEpa && !stopped)
         {
             if (++iterations >= 32) { limit = true; break; }
-            var supportA = shapeA.Support(v * -1, out vertexA, out var deltaA);
-            var supportB = shapeB.Support(v.Rotate(inverse), out vertexB, out var deltaB);
+            var supportA = shapeA.SupportWithDelta(v * -1, out vertexA, ref deltaA);
+            var supportB = shapeB.SupportWithDelta(v.Rotate(inverse), out vertexB, ref deltaB);
             if (!supportA.IsFinite || !supportB.IsFinite || !double.IsFinite(deltaA) || !double.IsFinite(deltaB) || vertexA < 0 || vertexB < 0)
                 throw new InvalidOperationException("Invalid GJK support; cache was not committed.");
             maximumDelta = System.Math.Max(deltaA, deltaB); // Native overwrites, not a running maximum.

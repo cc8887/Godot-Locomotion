@@ -13,10 +13,11 @@ public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestO
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
+    [InlineData(3)]
     public void RealFootPairsProduceTheNativeInitialManifoldInTheSameOrder(int mode)
     {
         var scaled=mode==1;
-        using var doc=JsonDocument.Parse(Read(mode==2?"v4_physics_box_pair_reference":scaled?"v4_physics_scaled_convex_pair_reference":"v4_physics_convex_pair_reference"));var root=doc.RootElement;
+        using var doc=JsonDocument.Parse(Read(mode==3?"v4_physics_convex_margin_pair_reference":mode==2?"v4_physics_box_pair_reference":scaled?"v4_physics_scaled_convex_pair_reference":"v4_physics_convex_pair_reference"));var root=doc.RootElement;
         var definition=AlsPhysicsAssetCompiler.Compile(Read("v4_physics_asset_inputs"),AlsPhysicsAssetCompiler.MeshRoot+"AnimMan.AnimMan");
         var hulls=AlsConvexTopologyCompiler.Compile(Read("v4_physics_convex_topology"),definition).ToDictionary(t=>definition.Bodies[t.Body].Bone,t=>t.Topology);
         if(mode==2)
@@ -35,7 +36,7 @@ public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestO
         foreach(var row in root.GetProperty("cases").EnumerateArray())
         {
             cache.Reset();var pose=Pose(row.GetProperty("shape1To0"));
-            var result=mode==2?BoxPair(hulls,row,root,cache,work,points):scaled?AlsScaledConvexManifold.Build(hulls[row.GetProperty("bone0").GetString()!],V(row,"scale0"),hulls[row.GetProperty("bone1").GetString()!],V(row,"scale1"),pose,cache,work,points,
+            var result=mode>=2?BoxPair(hulls,row,root,cache,work,points):scaled?AlsScaledConvexManifold.Build(hulls[row.GetProperty("bone0").GetString()!],V(row,"scale0"),hulls[row.GetProperty("bone1").GetString()!],V(row,"scale1"),pose,cache,work,points,
                 D(row,"cullDistance"),D(root,"gjkEpsilon"),D(root,"epaEpsilon"),root.GetProperty("minimumFaceSearchDistance").GetSingle(),root.GetProperty("planeNormalEpsilon").GetSingle(),root.GetProperty("forceEdgeZeroCull").GetBoolean()):
                 AlsRawConvexManifold.Build(hulls[row.GetProperty("bone0").GetString()!],hulls[row.GetProperty("bone1").GetString()!],pose,cache,work,points,
                 D(row,"cullDistance"),D(root,"gjkEpsilon"),D(root,"epaEpsilon"),root.GetProperty("minimumFaceSearchDistance").GetSingle(),root.GetProperty("planeNormalEpsilon").GetSingle(),root.GetProperty("forceEdgeZeroCull").GetBoolean());
@@ -66,7 +67,7 @@ public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestO
             index++;
         }
         output.WriteLine($"RAW_CONVEX_MANIFOLD cases={index} empty={empty} edge={edge} reference0={face0} reference1={face1} max_point_cm={maxPoint:R} max_normal={maxNormal:R} max_reconstructed_phi_cm={maxPhi:R}");
-        Assert.Equal(mode==2?6480:scaled?5184:1296,index);Assert.True(errors.Count==0,string.Join(Environment.NewLine,errors.Take(30)));
+        Assert.Equal(mode==3?11664:mode==2?6480:scaled?5184:1296,index);Assert.True(errors.Count==0,string.Join(Environment.NewLine,errors.Take(30)));
         Assert.True(empty>0&&edge>0&&face0>0&&face1>0);
         if(mode==2)
         {
@@ -81,10 +82,14 @@ public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestO
         var a=new AlsBoxPolygonShape(V(row,"half"),row.GetProperty("margin0").GetSingle());
         var b=new AlsBoxPolygonShape(V(row,"half"),row.GetProperty("margin1").GetSingle());
         if(box0&&box1)return Build(a,b,row,root,cache,work,points);
-        var side=box0?"1":"0";Assert.Equal(0,row.GetProperty("margin"+side).GetSingle());
-        var topology=hulls[row.GetProperty("bone"+side).GetString()!];
-        var convex=row.GetProperty("kind"+side).GetString()=="raw"?new AlsConvexPolygonShape(topology):new AlsConvexPolygonShape(topology,V(row,"scale"));
-        return box0?Build(a,convex,row,root,cache,work,points):Build(convex,b,row,root,cache,work,points);
+        if(box0)return Build(a,Convex("1",hulls,row),row,root,cache,work,points);
+        if(box1)return Build(Convex("0",hulls,row),b,row,root,cache,work,points);
+        return Build(Convex("0",hulls,row),Convex("1",hulls,row),row,root,cache,work,points);
+    }
+    private static AlsConvexPolygonShape Convex(string side,Dictionary<string,AlsConvexTopology> hulls,JsonElement row)
+    {
+        var topology=hulls[row.GetProperty("bone"+side).GetString()!];var margin=row.GetProperty("margin"+side).GetSingle();
+        return row.GetProperty("kind"+side).GetString()=="raw"?new(topology,margin):new(topology,V(row,"scale"),margin);
     }
     private static AlsConvexManifoldResult Build<TA,TB>(TA a,TB b,JsonElement row,JsonElement root,
         AlsGjkCache cache,AlsConvexManifoldWorkspace work,Span<AlsDetectedContact> points)
