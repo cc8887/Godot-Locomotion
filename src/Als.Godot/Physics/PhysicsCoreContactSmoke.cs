@@ -23,6 +23,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _nativePolygonChecks;
     private int _capsuleCullChecks;
     private int _primitiveChecks;
+    private int _sphereBoxChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -87,6 +88,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
             Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
             var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
                 narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, capsule_cull_checks = _capsuleCullChecks, primitive_binding_checks = _primitiveChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                native_sphere_box_checks = _sphereBoxChecks,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -126,6 +128,67 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeCullChecks();
         NativeCapsuleCullChecks();
         PrimitiveBindingChecks();
+        NativeSphereBoxChecks();
+    }
+
+    private void NativeSphereBoxChecks()
+    {
+        var identity = AlsPrecisePose.Identity;
+        using var sphere = new SphereShape3D { Radius = .05f, Margin = 0 };
+        using var box = new BoxShape3D { Size = new(.2f, .2f, .2f), Margin = 0 };
+        var center = new AlsDoubleVector(7, -3, 2);
+        foreach (var rotated in new[] { false, true }) foreach (var reverse in new[] { false, true })
+        {
+            var registry = new AlsContactRegistry(2, 2);
+            using var query = new AlsGodotContactQuery(registry, new(3, .01f, 1, 1, 3));
+            query.Bind(registry.Register(new(0, identity, 1, 1, true)), sphere,
+                proxyLocal: identity with { Position = center }, nativeSphereRadius: 5);
+            query.Bind(registry.Register(new(1, identity, 1, 1)), box, nativeHalf: new(10, 10, 10));
+            query.BindBodyBounds(0, 10);
+            var boxPose = rotated ? identity with { Position = new(1e6, -2e6, 3e6),
+                Rotation = AlsQuaternion.FromAxisAngle(NVector.Normalize(new(1, 2, 3)), .43f) } : identity;
+            var rotation = rotated ? AlsQuaternion.FromAxisAngle(NVector.Normalize(new(2, -1, 3)), .71f) : identity.Rotation;
+            var bodies = new[] { new AlsIslandBody(identity, new(1, AlsDoubleVector.One)), new AlsIslandBody(identity, default) };
+            var previous = new[] { new AlsIslandBodyState(identity, default), new AlsIslandBodyState(identity, default) };
+            var velocities = new AlsProjectionVelocity[2]; var points = new AlsDetectedContact[4];
+            var poses = new[] { identity, boxPose }; var a = reverse ? 1 : 0; var b = 1 - a;
+            foreach (var local in new[] { new AlsDoubleVector(0, 0, 0), new(11, 0, 0), new(11, 11, 0),
+                new(11, 11, 11), new(17, 0, 0), new(19, 0, 0) })
+            {
+                poses[0] = identity with { Rotation = rotation,
+                    Position = boxPose.Position + local.Rotate(boxPose.Rotation) - center.Rotate(rotation) };
+                query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+                var count = query.Query(a, poses[a], b, poses[b], points);
+                Require(count == (local.X == 19 ? 0 : 1), "Native sphere-box face/edge/corner/interior/cull count changed.");
+                if (count != 0)
+                {
+                    var p0 = new AlsDoubleVector(points[0].Point0).Rotate(poses[a].Rotation) + poses[a].Position;
+                    var p1 = new AlsDoubleVector(points[0].Point1).Rotate(poses[b].Rotation) + poses[b].Position;
+                    var n = new AlsDoubleVector(points[0].Normal1).Rotate(poses[b].Rotation);
+                    Require(Math.Abs(AlsDoubleVector.Dot(p0 - p1, n) - points[0].NativePhi!.Value) < 1e-4,
+                        "Sphere-box endpoint reversal lost leaf-space points/normal.");
+                    Require(Math.Abs((new AlsDoubleVector(reverse ? points[0].Point1 : points[0].Point0) - center).LengthSquared - 25) < 1e-4,
+                        "Sphere contact was not returned in original native leaf space.");
+                }
+                query.Abort(); _sphereBoxChecks++;
+            }
+            // Strict cull equality is unambiguous in the unrotated frame.
+            if (!rotated)
+            {
+                poses[0] = identity with { Position = new AlsDoubleVector(18, 0, 0) - center };
+                query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+                Require(query.Query(a, poses[a], b, poses[b], points) == 0, "Sphere-box cull equality retained contact.");
+                query.Abort(); _sphereBoxChecks++;
+            }
+            poses[0] = identity with { Rotation = rotation,
+                Position = boxPose.Position + new AlsDoubleVector(17, 0, 0).Rotate(boxPose.Rotation) - center.Rotate(rotation) };
+            var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 1000));
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            var queries = query.NativeSphereBoxQueries;
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            Require(contacts.LastContactCount == 1 && contacts.LastRestoredPairs == 0 && query.NativeSphereBoxQueries == queries + 1 &&
+                query.NarrowPhaseQueries == 0, "Sphere-box bypassed native query or restored polygon geometry."); _sphereBoxChecks++;
+        }
     }
 
     private void PrimitiveBindingChecks()
