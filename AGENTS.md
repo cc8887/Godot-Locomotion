@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Native capsule trace批次UE最终全Editor审计/重导/DataValidation通过；Editor33244原生退出0/DLL释放，但两旧Condition failed及间歇AV未修，其他证据与范围见下条。
+
+- 最新actual capsule trace：`docs/verification/2026-09-22-physics-native-capsule-trace.md`。trace补局部点/法向/NativePhi/实际cull；新exporter从真实身体精确匹配并复制FCapsule，避免重构轴浮点变化。高120失败1140–1145帧726查询中270capsule-box（24活跃54点）原始Godot输出及Core重放与UE均精确一致；456其他类型明确跳过，非完整轨迹证明。冷重导一致、两负例拒绝且无输出、定向4通过、Godot构建通过；Core/Import生产逻辑未改未重跑全量。高120仍失败且诊断指标不变，矩阵沿用8/12。继续同批246capsule-pair/114capsule-convex及历史/Gather，再四失败与完整角色目标，普通demo未切换。
+
 - Capsule-convex批次最终Import Release固定JIT串行全量2419通过/1既有跳过/0失败，退出0；Core未修改未重跑，其他覆盖及边界见下条。
 
 - 最新capsule-convex：`docs/verification/2026-09-22-physics-capsule-convex.md`。真实两脚raw/instanced/scaled及实际margin共4320原生样本，全部点数/点序/点/法向/Phi精确一致、冷重导字节一致；Core通用公式未改。显式capsule/cooked绑定接Core零support margin路径与实际detector、反序，每步查询不恢复polygon。优化构建/三频率新增各48及全部旧smoke通过。整链仍8/12，普通30仅接触累计11219→11220其余字段不变，另外七成功报告字节一致；普通60/高120/平移30/旋转30四失败未修。UE全Editor审计/重导/DataValidation通过，Editor33892本次原生退出0/DLL释放，但两旧Condition failed与间歇AV未修。普通demo未接，继续sphere混合/actual trace及四失败，再完整角色目标。

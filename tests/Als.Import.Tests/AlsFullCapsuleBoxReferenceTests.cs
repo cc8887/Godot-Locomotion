@@ -11,6 +11,7 @@ public sealed class AlsFullCapsuleBoxReferenceTests(Xunit.Abstractions.ITestOutp
     [Theory]
     [InlineData("v4_physics_capsule_geometry_reference.json", 744)]
     [InlineData("v4_physics_capsule_box_reference.json", 8640)]
+    [InlineData("v4_physics_native_capsule_trace_reference.json", 270)]
     public void EveryCapturedCapsuleBoxPairMatchesNative(string file, int expectedCases)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/" + file)));

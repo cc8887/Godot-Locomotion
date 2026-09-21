@@ -233,7 +233,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                     var names = rig.Definition.Bodies.Select(b => b.Bone).Concat(scene is null ? ["floor"] :
                         Enumerable.Range(0, scene.BodyCount).Select(i => scene.BodyAt(i).Name.ToString())).ToArray();
                     source = new AlsContactTrace(query, registry, rig.Definition.Mesh, names, () => _frame, _traceFirst, _traceLast, _traceBones,
-                        OS.GetCmdlineUserArgs().Contains("--trace-geometry") ? query.Describe : null);
+                        OS.GetCmdlineUserArgs().Contains("--trace-geometry") ? query.Describe : null, query.CullDistance);
                 }
                 var contactSettings = AlsContactRuntimeSettingsCompiler.Compile(
                     Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_contact_settings.json"), rig.Definition);

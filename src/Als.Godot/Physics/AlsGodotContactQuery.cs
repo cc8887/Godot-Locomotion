@@ -161,7 +161,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         settings = new(.1f * Math.Min(Size(a.Bounds), Size(b.Bounds)),
             a.NativePolygon&&b.NativePolygon?CullDistance(shape0,shape1):0); return true;
     }
-    private float CullDistance(int shape0,int shape1)
+    internal float CullDistance(int shape0,int shape1)
     {
         if(_detector is not { } d)return 0;
         if(!_polygonCache.Pending)throw new InvalidOperationException("Native detector requires a pending geometry step.");
