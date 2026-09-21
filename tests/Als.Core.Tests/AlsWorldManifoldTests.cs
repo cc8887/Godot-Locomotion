@@ -56,8 +56,25 @@ public sealed class AlsWorldManifoldTests
     private sealed class Source : IAlsContactGeometrySource
     {
         public int Calls;
-        public bool TryGetManifoldSettings(int a, int b, out AlsContactManifoldSettings settings) { settings = new(2); return true; }
+        public float Cull;
+        public float? Phi;
+        public bool TryGetManifoldSettings(int a, int b, out AlsContactManifoldSettings settings) { settings = new(2, Cull); return true; }
         public int Query(int a, in AlsPrecisePose p, int b, in AlsPrecisePose q, Span<AlsDetectedContact> destination)
-        { Calls++; if (p.Position.Z > 0) return 0; destination[0] = new(Vector3.Zero, new((float)p.Position.X, 0, 0), Vector3.UnitZ); return 1; }
+        { Calls++; if (p.Position.Z > 0 && !Phi.HasValue) return 0; destination[0] = new(Vector3.Zero, new((float)p.Position.X, 0, 0), Vector3.UnitZ) { NativePhi = Phi }; return 1; }
+    }
+
+    [Theory]
+    [InlineData(3f, 1)]
+    [InlineData(3.000001f, 0)]
+    public void InitialActivationUsesOriginalPhiAndIncludesExactCullBoundary(float phi, int active)
+    {
+        var (world, source, registry) = Create(); source.Cull = 3; source.Phi = phi;
+        // Rounded local points deliberately imply penetration, not native phi.
+        Gather(world); world.StageCommit(); world.Abort();
+        Assert.Equal(0, world.CompletedSteps); Assert.False(registry.IsLocked);
+        Gather(world); Commit(world); Assert.Equal(active, world.LastActivePairs);
+        Assert.Equal(2, source.Calls);
+        Gather(world); Commit(world);
+        Assert.Equal(active == 0 ? 3 : 2, source.Calls);
     }
 }

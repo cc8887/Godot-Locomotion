@@ -57,8 +57,9 @@ public static class AlsPolygonManifold
                 { cache.CopyFrom(work.Staged); return new(0,AlsConvexContactFeature.None,plane0,plane1); }
                 point0 = (edge1+normal1*edgePhi).Rotate(shape1To0.Rotation)+shape1To0.Position;
                 point1 = edge1;
+                phi = edgePhi;
             }
-            var result = new AlsDetectedContact(point0.ToSingle(),point1.ToSingle(),normal1.ToSingle());
+            var result = new AlsDetectedContact(point0.ToSingle(),point1.ToSingle(),normal1.ToSingle()) {NativePhi=(float)phi};
             cache.CopyFrom(work.Staged); destination[0] = result;
             return new(1,AlsConvexContactFeature.EdgeEdge,plane0,plane1);
         }

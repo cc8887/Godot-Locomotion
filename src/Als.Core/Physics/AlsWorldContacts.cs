@@ -158,6 +158,11 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
                     if ((uint)count > _points.Length) throw new ArgumentException("Geometry source returned an invalid contact count.");
                     cache.PrepareNew(_identities[slot], _epoch, _shapeWorld[a], _shapeWorld[b],
                         enabled ? manifold.CollisionTolerance : 0, enabled ? _points.AsSpan(0, count) : []);
+                    if(enabled&&cache.MinimumPhi>manifold.CullDistance)
+                    {
+                        cache.Abort();count=0;
+                        cache.PrepareNew(_identities[slot],_epoch,_shapeWorld[a],_shapeWorld[b],manifold.CollisionTolerance,[]);
+                    }
                 }
                 _pairs[slot].Gather(_identities[slot], _epoch, _points.AsSpan(0, count),
                     new(sa.Quadratic, sb.Quadratic), _material,

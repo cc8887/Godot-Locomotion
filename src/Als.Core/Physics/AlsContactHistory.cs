@@ -8,7 +8,12 @@ public readonly record struct AlsContactShapeKey(ulong Body, uint Generation, ui
 public readonly record struct AlsContactPairKey(AlsContactShapeKey Shape0, AlsContactShapeKey Shape1);
 public readonly record struct AlsDetectedContact(Vector3 Point0, Vector3 Point1, Vector3 Normal1,
     bool Disabled = false, float TargetPhi = 0,
-    bool DisablePosition = false, bool DisableVelocity = false, bool DisableFriction = false);
+    bool DisablePosition = false, bool DisableVelocity = false, bool DisableFriction = false)
+{
+    // Native narrow-phase phi is rounded independently from stored points.
+    // Preserve it for activation at exact cull boundaries.
+    public float? NativePhi { get; init; }
+}
 public readonly record struct AlsContactMatchSettings(bool Quadratic0, bool Quadratic1,
     bool SimpleAssignment = true, bool RestoreFriction = true, float ExactTolerance = .2f, float NearTolerance = 1);
 public readonly record struct AlsPreparedContact(AlsContactGeometry Geometry, bool Disabled, int SavedIndex);

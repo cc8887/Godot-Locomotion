@@ -5,7 +5,12 @@ using GodotAls.Core.Physics;
 
 namespace GodotAls.Import.Compilation;
 
-public readonly record struct AlsConditionedBodyInertia(AlsDoubleVector ExtentsCm,Vector3 InverseInertiaScale);
+public readonly record struct AlsConditionedBodyInertia(AlsDoubleVector ExtentsCm,Vector3 InverseInertiaScale)
+{
+    // Full actor-local geometry bounds, before COM rotation and connector
+    // enlargement; collision midphase scaling must not use inertia extents.
+    public double NativeBoundsSize { get; init; }
+}
 
 public static class AlsBodyInertiaCompiler
 {
@@ -32,7 +37,10 @@ public static class AlsBodyInertiaCompiler
             var native=bodies[body.Bone];
             Require(native.GetProperty("nativeMassKg").GetDouble()==body.MassKg&&V(native.GetProperty("nativeInertiaKgCm2"))==body.InertiaKgCm2,
                 "Inertia geometry reference mass differs from body definition.");
-            var extents=AlsBodyInertiaConditioning.CollisionExtents(V(native.GetProperty("localBoundsMin")),V(native.GetProperty("localBoundsMax")),body.MassLocal.Rotation);
+            var boundsMin=V(native.GetProperty("localBoundsMin"));var boundsMax=V(native.GetProperty("localBoundsMax"));
+            var full=boundsMax-boundsMin;
+            Require(full.IsFinite&&full.X>0&&full.Y>0&&full.Z>0,"Invalid native particle bounds.");
+            var extents=AlsBodyInertiaConditioning.CollisionExtents(boundsMin,boundsMax,body.MassLocal.Rotation);
             foreach(var joint in definition.Joints)
             {
                 Require(joints[joint.Index].Index==joint.Index,"Inertia joint identity differs.");
@@ -44,7 +52,7 @@ public static class AlsBodyInertiaCompiler
             var inverse=new Vector3((float)(1/body.InertiaKgCm2.X),(float)(1/body.InertiaKgCm2.Y),(float)(1/body.InertiaKgCm2.Z));
             var enabled=settings.Enabled&&body.Defaults.GetProperty("bInertiaConditioning").GetBoolean();
             var scale=body.PhysicsType==1?Vector3.One:AlsBodyInertiaConditioning.Calculate((float)(1/body.MassKg),inverse,extents.ToSingle(),settings with{Enabled=enabled});
-            result[body.Index]=new(extents,scale);
+            result[body.Index]=new(extents,scale){NativeBoundsSize=System.Math.Max(full.X,System.Math.Max(full.Y,full.Z))};
         }
         return result;
     }

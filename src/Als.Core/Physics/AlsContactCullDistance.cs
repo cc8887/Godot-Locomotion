@@ -2,6 +2,16 @@ using System.Numerics;
 
 namespace GodotAls.Core.Physics;
 
+public readonly record struct AlsContactDetectorSettings(double BaseDistance,float InverseReferenceSize,
+    float MinimumScale,double VelocityInflation,double MaximumVelocityExpansion)
+{
+    public void Validate()
+    {
+        var scale=AlsContactCullDistance.Scale(0,0,InverseReferenceSize,MinimumScale);
+        _=AlsContactCullDistance.Calculate(BaseDistance,scale,0,Vector3.Zero,Vector3.Zero,VelocityInflation,MaximumVelocityExpansion);
+    }
+}
+
 // ParticlePairMidPhase::InitThresholds/GenerateCollisions, non-MACD path.
 // Caller supplies whole-particle local full extents for dynamic bounded bodies,
 // zero for other bodies, and native PreV (not gravity-integrated solver V).
