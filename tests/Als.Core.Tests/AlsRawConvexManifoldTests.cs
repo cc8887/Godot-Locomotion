@@ -17,6 +17,32 @@ public sealed class AlsRawConvexManifoldTests
         return new(vertices,planes,indices,0,cache);
     }
     [Fact]
+    public void ScaledConvexRoundsScaleAndRepairsTinyNegativeComponentsLikeNative()
+    {
+        var scale=AlsScaledConvexGeometry.ResolveScale(new(1.3,-1e-9,0));
+        Assert.Equal((double)1.3f,scale.X);
+        Assert.Equal((double)1e-6f,scale.Y);
+        Assert.Equal((double)1e-6f,scale.Z);
+        Assert.Throws<ArgumentException>(()=>AlsScaledConvexGeometry.ResolveScale(new(double.MaxValue,1,1)));
+    }
+    [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public void ReflectedScaledFaceRetainsFourContactsAndCullBoundary(int sign)
+    {
+        var hull=Cube();var cache=new AlsGjkCache();var work=new AlsConvexManifoldWorkspace();
+        var points=new AlsDetectedContact[4];var scale=new AlsDoubleVector(sign*2,1,3);
+        var pose=AlsPrecisePose.Identity with {Position=new(0,0,7)};
+        var result=AlsScaledConvexManifold.Build(hull,scale,hull,scale,pose,cache,work,points,1,1e-6,1e-6,1,.001f);
+        Assert.Equal(4,result.Count);
+        foreach(var p in points){Assert.Equal(3,p.Point0.Z);Assert.Equal(-3,p.Point1.Z);Assert.Equal(-Vector3.UnitZ,p.Normal1);}
+        Assert.Equal(4,points.Select(p=>p.Point0).Distinct().Count());
+        Assert.Equal(0,AlsScaledConvexManifold.Build(hull,scale,hull,scale,pose,cache,work,points,.99,1e-6,1e-6,1,.001f).Count);
+        var saved=points.ToArray();var witnesses=cache.WitnessA.ToArray();var weights=cache.Weights.ToArray();
+        Assert.Throws<ArgumentException>(()=>AlsScaledConvexManifold.Build(hull,new(double.NaN,1,1),hull,scale,pose,cache,work,points,1,1e-6,1e-6,1,.001f));
+        Assert.Equal(saved,points);Assert.Equal(witnesses,cache.WitnessA.ToArray());Assert.Equal(weights,cache.Weights.ToArray());
+    }
+    [Fact]
     public void FaceContactUsesSecondReferenceBiasAndHonorsSeparatedCullBoundary()
     {
         var hull=Cube();var cache=new AlsGjkCache();var work=new AlsConvexManifoldWorkspace();Span<AlsDetectedContact> output=stackalloc AlsDetectedContact[4];

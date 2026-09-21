@@ -1,5 +1,6 @@
 #include "AlsPhysicsAssetExport.h"
 #include "Chaos/Convex.h"
+#include "Chaos/ImplicitObjectScaled.h"
 #include "Chaos/CollisionResolution.h"
 #include "Chaos/PBDCollisionConstraints.h"
 #include "Chaos/PBDRigidsSOAs.h"
@@ -14,7 +15,7 @@
 #include "Serialization/JsonSerializer.h"
 namespace AlsJointSolverReference { TArray<TSharedPtr<FJsonValue>> V(const FVector& P); TSharedRef<FJsonObject> T(const FTransform& P); }
 
-bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error)
+bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bool Scaled)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
@@ -39,18 +40,22 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error)
     Root->SetBoolField(TEXT("forceEdgeZeroCull"),ForceZero->GetBool());
     auto* Mesh=LoadObject<USkeletalMesh>(nullptr,TEXT("/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/AnimMan.AnimMan"));
     auto* Asset=Mesh?Mesh->GetPhysicsAsset():nullptr;if(!Asset)return Fail(TEXT("Missing AnimMan physics asset."));
-    struct FShape{FString Bone;FImplicitObjectPtr Geometry;};TArray<FShape> Shapes;
+    if(Scaled)Root->SetStringField(TEXT("observation"),TEXT("Actual UpdateConstraint initial manifolds; scaled zero-margin cooked AnimMan feet; identity, uniform, nonuniform and reflected scales"));
+    struct FShape{FString Bone;FConvexPtr Hull;FImplicitObjectPtr Geometry;};TArray<FShape> Shapes;
     for(auto Setup:Asset->SkeletalBodySetups)
     {
         Setup->CreatePhysicsMeshes();
         for(const auto& Element:Setup->AggGeom.ConvexElems)
         {
             const auto& Hull=Element.GetChaosConvexMesh();if(!Hull||Hull->GetMargin()!=0)return Fail(TEXT("Expected zero-margin cooked hull."));
-            Shapes.Add({Setup->BoneName.ToString(),FImplicitObjectPtr(Hull.GetReference())});
+            Shapes.Add({Setup->BoneName.ToString(),Hull,FImplicitObjectPtr(Hull.GetReference())});
         }
     }
     if(Shapes.Num()!=2)return Fail(TEXT("Expected two cooked feet."));
     TArray<TSharedPtr<FJsonValue>> Rows;
+    const FVec3 Scales0[]={FVec3(1),FVec3(2),FVec3(.5,1.5,.75),FVec3(-1,1,1)};
+    const FVec3 Scales1[]={FVec3(1),FVec3(1.5,.8,1.2),FVec3(2,.75,1.3),FVec3(1,-.8,1.2)};
+    for(int32 Mode=0;Mode<(Scaled?4:1);++Mode)
     for(int32 A=0;A<2;++A)for(int32 B=0;B<2;++B)for(int32 Axis=0;Axis<3;++Axis)for(int32 Sign:{-1,1})
     for(double Distance:{0.,8.,16.,24.,40.,60.})for(double Angle:{0.,.13,.6})for(double Cull:{0.,3.,6.})
     {
@@ -58,7 +63,13 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error)
         const FRigidTransform3 Pose0=FRigidTransform3::Identity;
         const FRigidTransform3 Pose1(Position,FRotation3::FromAxisAngle(FVec3(1,2,3).GetSafeNormal(),Angle));
         FParticleUniqueIndicesMultithreaded Unique;FPBDRigidsSOAs Particles(Unique);auto P=Particles.CreateDynamicParticles(2);
-        P[0]->SetGeometry(Shapes[A].Geometry);P[1]->SetGeometry(Shapes[B].Geometry);
+        FImplicitObjectPtr Geometry0=Shapes[A].Geometry,Geometry1=Shapes[B].Geometry;
+        if(Scaled)
+        {
+            Geometry0=MakeImplicitObjectPtr<TImplicitObjectScaled<FConvex>>(Shapes[A].Hull,Scales0[Mode]);
+            Geometry1=MakeImplicitObjectPtr<TImplicitObjectScaled<FConvex>>(Shapes[B].Hull,Scales1[Mode]);
+        }
+        P[0]->SetGeometry(Geometry0);P[1]->SetGeometry(Geometry1);
         for(auto* Body:P){Body->SetX(FVec3(0));Body->SetR(FRotation3::Identity);}
         TArrayCollectionArray<bool> Collided;TArrayCollectionArray<TSerializablePtr<FChaosPhysicsMaterial>> Materials;
         TArrayCollectionArray<TUniquePtr<FChaosPhysicsMaterial>> PerParticle;
@@ -66,13 +77,19 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error)
         FPBDCollisionConstraints Constraints(Particles,Collided,Materials,PerParticle,nullptr);
         auto& Allocator=Constraints.GetConstraintAllocator();Allocator.SetMaxContexts(1);Allocator.BeginDetectCollisions();
         auto* Context=Allocator.GetContextAllocator(0);
-        auto Constraint=Context->CreateConstraint(P[0],Shapes[A].Geometry.GetReference(),P[0]->ShapesArray()[0].Get(),nullptr,FRigidTransform3::Identity,
-            P[1],Shapes[B].Geometry.GetReference(),P[1]->ShapesArray()[0].Get(),nullptr,FRigidTransform3::Identity,Cull,true,EContactShapesType::GenericConvexConvex);
+        auto Constraint=Context->CreateConstraint(P[0],Geometry0.GetReference(),P[0]->ShapesArray()[0].Get(),nullptr,FRigidTransform3::Identity,
+            P[1],Geometry1.GetReference(),P[1]->ShapesArray()[0].Get(),nullptr,FRigidTransform3::Identity,Cull,true,EContactShapesType::GenericConvexConvex);
         Context->ActivateConstraint(Constraint.Get());Allocator.EndDetectCollisions();
         if(Constraint->GetCollisionMargin0()!=0||Constraint->GetCollisionMargin1()!=0)return Fail(TEXT("Expected zero pair margins."));
         Constraint->SetShapeWorldTransforms(Pose0,Pose1);Collisions::UpdateConstraint(*Constraint,Pose0,Pose1,1./60.);
         auto Row=MakeShared<FJsonObject>();Row->SetStringField(TEXT("bone0"),Shapes[A].Bone);Row->SetStringField(TEXT("bone1"),Shapes[B].Bone);
         Row->SetObjectField(TEXT("shape1To0"),T(FTransform(Pose1)));Row->SetNumberField(TEXT("cullDistance"),Cull);
+        if(Scaled)
+        {
+            Row->SetNumberField(TEXT("scaleMode"),Mode);
+            Row->SetArrayField(TEXT("scale0"),V(Geometry0->GetObjectChecked<TImplicitObjectScaled<FConvex>>().GetScale()));
+            Row->SetArrayField(TEXT("scale1"),V(Geometry1->GetObjectChecked<TImplicitObjectScaled<FConvex>>().GetScale()));
+        }
         TArray<TSharedPtr<FJsonValue>> Points;
         for(int32 I=0;I<Constraint->NumManifoldPoints();++I)
         {

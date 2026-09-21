@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新缩放凸包：`docs/verification/2026-09-21-physics-scaled-convex.md`。新增双方零margin scaled FConvex流形，float缩放/逆缩放与候选面、double裁剪平面、负缩放绕序。5184真实两脚缩放组合全部对齐点数/序/类型，法向差0、点最大差3.8444e-6cm（非逐位一致）；重导字节一致，旧raw1296点/法向仍0且原生重导不变。Core2787、Import2390+1旧跳过、Godot/UE全目标审计/DataValidation通过。普通Editor标记成功、原生退出码查询0，但启动器WaitForExit卡住后仅结束启动器；两旧Condition failed/既往AV未解决，不称重启全门禁通过。未接运行时、未重跑整链，最新9/12。下一步mixed/box/非零margin边投影、查询owner缓存与分离cull，再三旧失败及普通Ragdoll等完整目标；极端缩放fallback/EPA退化原生覆盖仍缺。
+
 - 原始凸包组合批次最终全量：Core串行2784通过，Import串行2389通过/1既有跳过，均退出0。普通Editor本次退出0，两旧Condition failed与既往间歇退出AV未解决；范围见下条。
 
 - 最新原始凸包组合：`docs/verification/2026-09-21-physics-convex-pair.md`。Core新增unscaled原生候选面/fallback，RawConvexManifold串联GJK/EPA、cull、第二侧.002f偏置、边接触与面裁剪，整阶段暂存缓存/输出。1296真实两脚有序组合的原生UpdateConstraint初次流形全部对齐：853空/87边/94第一侧参考/262第二侧参考，点/法向差0，重算Phi最大1.1971e-6cm；重导一致。首轮错误ConvexConvex枚举触发原生ensure空输出，改GenericConvexConvex完整重建后通过，失败产物保留。Core2784、Godot构建、UE全目标审计/DataValidation通过。仅未包装零margin凸包冷初次流形，scaled/box/非零margin边投影/持久owner未接；未改运行时、未重跑整链，最新9/12。继续这些适配/分离cull/三旧失败，再普通Ragdoll等完整目标。

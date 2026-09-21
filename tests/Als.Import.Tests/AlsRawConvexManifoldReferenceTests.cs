@@ -9,10 +9,12 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     private static string Read(string name)=>File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/"+name+".json"));
-    [Fact]
-    public void RealFootPairsProduceTheNativeInitialManifoldInTheSameOrder()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RealFootPairsProduceTheNativeInitialManifoldInTheSameOrder(bool scaled)
     {
-        using var doc=JsonDocument.Parse(Read("v4_physics_convex_pair_reference"));var root=doc.RootElement;
+        using var doc=JsonDocument.Parse(Read(scaled?"v4_physics_scaled_convex_pair_reference":"v4_physics_convex_pair_reference"));var root=doc.RootElement;
         var definition=AlsPhysicsAssetCompiler.Compile(Read("v4_physics_asset_inputs"),AlsPhysicsAssetCompiler.MeshRoot+"AnimMan.AnimMan");
         var hulls=AlsConvexTopologyCompiler.Compile(Read("v4_physics_convex_topology"),definition).ToDictionary(t=>definition.Bodies[t.Body].Bone,t=>t.Topology);
         var work=new AlsConvexManifoldWorkspace();var cache=new AlsGjkCache();var errors=new List<string>();
@@ -20,7 +22,9 @@ public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestO
         foreach(var row in root.GetProperty("cases").EnumerateArray())
         {
             cache.Reset();var pose=Pose(row.GetProperty("shape1To0"));
-            var result=AlsRawConvexManifold.Build(hulls[row.GetProperty("bone0").GetString()!],hulls[row.GetProperty("bone1").GetString()!],pose,cache,work,points,
+            var result=scaled?AlsScaledConvexManifold.Build(hulls[row.GetProperty("bone0").GetString()!],V(row,"scale0"),hulls[row.GetProperty("bone1").GetString()!],V(row,"scale1"),pose,cache,work,points,
+                D(row,"cullDistance"),D(root,"gjkEpsilon"),D(root,"epaEpsilon"),root.GetProperty("minimumFaceSearchDistance").GetSingle(),root.GetProperty("planeNormalEpsilon").GetSingle(),root.GetProperty("forceEdgeZeroCull").GetBoolean()):
+                AlsRawConvexManifold.Build(hulls[row.GetProperty("bone0").GetString()!],hulls[row.GetProperty("bone1").GetString()!],pose,cache,work,points,
                 D(row,"cullDistance"),D(root,"gjkEpsilon"),D(root,"epaEpsilon"),root.GetProperty("minimumFaceSearchDistance").GetSingle(),root.GetProperty("planeNormalEpsilon").GetSingle(),root.GetProperty("forceEdgeZeroCull").GetBoolean());
             var expected=row.GetProperty("points");
             if(result.Count!=expected.GetArrayLength())errors.Add($"row={index} count={result.Count}/{expected.GetArrayLength()} planes={result.Plane0}/{result.Plane1}");
@@ -38,7 +42,7 @@ public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestO
             index++;
         }
         output.WriteLine($"RAW_CONVEX_MANIFOLD cases={index} empty={empty} edge={edge} reference0={face0} reference1={face1} max_point_cm={maxPoint:R} max_normal={maxNormal:R} max_reconstructed_phi_cm={maxPhi:R}");
-        Assert.Equal(1296,index);Assert.True(errors.Count==0,string.Join(Environment.NewLine,errors.Take(30)));
+        Assert.Equal(scaled?5184:1296,index);Assert.True(errors.Count==0,string.Join(Environment.NewLine,errors.Take(30)));
         Assert.True(empty>0&&edge>0&&face0>0&&face1>0);
     }
     private static double Error(AlsDoubleVector a,AlsDoubleVector b)=>System.Math.Sqrt((a-b).LengthSquared);
