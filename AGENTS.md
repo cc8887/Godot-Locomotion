@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 完整capsule-box批次最终Import Release固定JIT串行全量2416通过/1既有条件跳过，退出0；其他验证与剩余五失败见下条。
+
+- 最新完整capsule-box：`docs/verification/2026-09-22-physics-full-capsule-box.md`。冷同空间box/segment GJK/EPA+半径+原生轴线裁剪/endcap/去重，显式native绑定接入原leaf/反序/实际detector；旧744（含原排除300）+新8640独立参考全部有序点/法向/Phi精确一致，冷重导字节一致。Core2829、优化构建、三频率smoke新增各24项及旧项过。整链 **7/12**：高60恢复（M161/A289睡，末秒V/W0，anchor1.798296cm），其他旧成功保留；普通30/60、高120、平移30、旋转30五失败未修。UE全Editor审计/导出/DataValidation过；普通Editor34476标记成功后0xC0000005，两旧Condition failed，普通重启门禁失败。普通demo未接；generic Core不代表capsule-convex已验证。继续混合对、原始native_capsule实际pair trace适配及五失败，再普通Ragdoll/Get-up等总目标。
+
 - Sphere-box 批次最终 Import Release 固定JIT串行全量：2414通过/1既有条件跳过，退出0；其他验证和旧失败边界见下条。
 
 - 最新 sphere-box 完整窄相：`docs/verification/2026-09-22-physics-sphere-box.md`。原生8064例/6516有接触，点数/点/法向/Phi精确一致、冷重导字节一致。保留内部平局/极近表面回退；double Phi严格<cull后存float，接触点乘法double。显式sphere/box绑定接Godot原leaf中心、反序和实际detector，每步查询不恢复polygon。Core2826、优化构建、三频率smoke新增各30项+旧项过；整链仍6/12，六成功JSON与上批字节一致，原六失败未关闭。UE全Editor审计/冷重导/DataValidation过，普通Editor33988加载标记成功但退出0xC0000005，两旧Condition failed仍在，DLL释放；普通重启门禁失败。普通demo未接。下一步capsule边缘/深穿透/混合及actual pair trace适配，再六失败、普通Ragdoll/Get-up等总目标。
