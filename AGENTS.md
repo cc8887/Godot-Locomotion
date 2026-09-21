@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新原生查询接入：`docs/verification/2026-09-21-physics-native-query.md`。实验后端 box/convex 接 Core GJK/EPA 和原始有序流形；源拓扑/尺寸/缩放绑定，精确单位缩放用 instanced 内层几何分支。新增事务式 GJK owner cache、revision/generation/margin 冷启动、失败拒绝提交、显式 Release；尚未接完整 native midphase 退役。Core2806、Import定向4、Godot构建、三频率smoke各551/9/5/5/3/4及60Hz场景检查通过。整链最新 **8/12**，替代旧9/12：新增30平移停止后休眠回归，30旋转提前到启动前失败；另普通30、高速120仍失败，未放宽门槛。当前查询代理margin0/cull0，cooked margin0不能证明实际UE wrapper margin0。下一步导出实际wrapper/margin、非零FConvex SupportCore、pair解析与分离cull，再四项整链失败及普通Ragdoll等完整目标。普通demo未接，无本批UE改动，旧Editor AV未解决。
+
 - 最新几何事务前置：`docs/verification/2026-09-21-physics-geometry-transaction.md`。IAlsContactGeometrySource新增StageCommit/PublishCommit/Abort/Reset，WorldContacts统一驱动，Prepare失败/空步骤/恢复绕过Query均闭合事务；发布与Abort须无异常。修正AlsContactTrace漏转PrepareStep并转发所有生命周期。真实polygon/GJK缓存失败回滚与重试对照、reset/restore测试通过；Core2798、Godot优化构建、60Hz实际smoke（545精度/9几何/5流形/5睡眠/3新增事务）通过。未改UE、未重跑Import或整链；最新9/12，普通demo未接，旧Editor AV未解决。下一步保留query原生几何绑定，实现revision/generation和事务下的GJK缓存，再polygon接管/pair margin/分离cull及三旧失败/普通Ragdoll等完整目标。
 
 - 最新盒体/凸包组合：`docs/verification/2026-09-21-physics-box-pair.md`。统一值类型polygon初次流形，box原生面/邻接顺序、非零box pair margin、双方边投影与二次cull。6480完整原生对照通过，219带margin边/3投影cull，点/法向0差；旧raw1296/scaled5184仍通过且均0差，修正float左乘的缩放顶点与最近边精度。三套点/法向断言收紧精确相等。Core2792、Import2391+1旧跳过、Godot/UE完整构建审计/DataValidation通过，重导一致。普通Editor marker成功但退出0xC0000005，两旧Condition failed仍在；上批PID3632残留DLL通过原生终止释放，不把此前exitcode0当资源已释放。本批退出后无DLL占用。未接运行时/未重跑整链，最新9/12。下一步保留query绑定的cooked拓扑与源尺寸/缩放、原始pair次序，补geometry提交回滚生命周期/pair margin/分离cull后整链；非零margin FConvex、quadratic完整路径、普通Ragdoll等仍缺。

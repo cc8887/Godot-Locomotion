@@ -30,7 +30,8 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
                 var local = AlsCachedJointSettingsCompiler.RigidConnector(source.Type == "convex"
                     ? source.Local with { Scale = AlsDoubleVector.One } : source.Local);
                 var handle = registry.Register(new(body.Index, local, 1, 1, source.Type is "sphere" or "capsule", source.CollisionEnabled != 0));
-                query.Bind(handle, shape);
+                query.Bind(handle, shape,topology,source.Type=="box"?source.SizeCm*.5:null,
+                    source.Type=="convex"?source.Local.Scale:null);
             }
         }
         foreach (var (a, b) in definition.DisabledCollisions) registry.DisableBodyPair(a, b, true);
@@ -38,7 +39,7 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
     internal void BindFloor(int body, AlsContactRegistry registry, AlsGodotContactQuery query)
     {
         var floor = new BoxShape3D { Size = new(40, 1, 40), Margin = 0 }; _resources.Add(floor);
-        query.Bind(registry.Register(new(body, AlsPrecisePose.Identity, 1, 1)), floor);
+        query.Bind(registry.Register(new(body, AlsPrecisePose.Identity, 1, 1)), floor,nativeHalf:new(2000,2000,50));
     }
     internal static Shape3D Create(AlsPhysicsShape source, AlsConvexTopology? topology = null) => source.Type switch
     {

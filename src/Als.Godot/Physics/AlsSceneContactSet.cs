@@ -84,7 +84,7 @@ internal sealed class AlsSceneContactSet : IDisposable
             foreach (var entry in _entries)
             {
                 entry.Registered = Definition(entry); entry.Handle = registry.Register(entry.Registered); entry.Present = true;
-                query.Bind(entry.Handle, entry.Shape); Observe(entry);
+                BindQuery(query,entry.Handle,entry.Shape); Observe(entry);
             }
         }
         catch { Dispose(); throw; }
@@ -157,7 +157,7 @@ internal sealed class AlsSceneContactSet : IDisposable
                 if (GodotObject.IsInstanceValid(entry.Shape) && entry.Changed is not null) entry.Shape.Changed -= entry.Changed;
                 entry.Shape = shape; entry.Registered = definition;
                 entry.Handle = entry.Present ? _registry.Replace(entry.Handle, definition) : _registry.Register(definition);
-                entry.Present = true; _query!.Bind(entry.Handle, shape); Observe(entry);
+                entry.Present = true; BindQuery(_query!,entry.Handle,shape); Observe(entry);
             }
         }
         _capturedIsland = island; return _targets;
@@ -189,6 +189,9 @@ internal sealed class AlsSceneContactSet : IDisposable
         return new(ToNative(transform.Origin), new(q.Z, -q.X, -q.Y, q.W), AlsDoubleVector.One);
     }
     private static AlsDoubleVector ToNative(Vector3 v) => AlsFootIkCoordinates.ToNative(new NVector(v.X, v.Y, v.Z));
+    private static void BindQuery(AlsGodotContactQuery query,AlsContactShapeHandle handle,Shape3D shape)
+        =>query.Bind(handle,shape,nativeHalf:shape is BoxShape3D box
+            ?new AlsDoubleVector((double)box.Size.Z*50,(double)box.Size.X*50,(double)box.Size.Y*50):null);
     private static NVector AngularToNative(Vector3 v) => new(v.Z, -v.X, -v.Y);
     private static bool Live(StaticBody3D body) => GodotObject.IsInstanceValid(body) && body.IsInsideTree();
     private static void Main() { if (!GodotThread.IsMainThread()) throw new InvalidOperationException("Scene contact capture requires Main."); }
