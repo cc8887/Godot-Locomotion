@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 凸包批次最终计数：Core串行2750通过，Import串行2377通过/1既有跳过，均退出0；普通Editor退出门禁失败与整链9/12边界见下条和对应文档。
+
+- 最新原生烘焙凸包：`docs/verification/2026-09-21-physics-convex-topology.md`。AnimMan 两脚原先误用225/227源顶点；原生cooked均128顶点/215面/margin0。现导出原生面环与完整绑定、Core不可变拓扑、Import严格源资产匹配，Core查询改用cooked顶点，旧冻结代理不变。原生面环存在近似共面和未配对边，显式HasClosedOrientedEdges=false，不能当严格闭合面图。冷重导一致；三频率各545精度/9几何/5流形/5睡眠/3动态通过。整链仍9/12，三旧失败未关闭，30旋转末角速度增大。Core2750通过；Godot优化构建、UE全目标审计和DataValidation通过，但普通Editor两次加载标记成功后退出均0xC0000005，未解决，不能称全门禁通过。普通demo未接新后端。下一步原生凸包首次点序/裁剪、分离几何与cull，再剩余整链失败和普通Ragdoll/Get-up等完整目标。
+
 - 盒体初次流形批次最终全量计数：Core串行2743通过，Import串行2371通过/1既有跳过，均退出0；详细证据与9/12整链结果见下条。本批没有关闭剩余三项休眠失败。
 
 - 最新盒体初次流形：`docs/verification/2026-09-21-physics-box-manifold.md`。Core接管完整位于另一盒面内的box-box四点/原生对角次序，边缘/深穿透/incident face平局回退。432原生场景中216支持、144有点，逐点同序最大点差0；冷重导一致。Godot144规范化正反传输通过，三频率各545精度/7几何/5流形/5睡眠/3动态通过。整链现9/12（平台5/6、落地4/6）：30平移回归与普通120旧失败关闭；剩30旋转停后AnimMan不睡、普通30 Mannequin不睡、高速120睡太迟。cull仍0，凸包面拓扑/边缘裁剪/原始反序reference bias/分离发现未齐。Core串行2743通过，UE全目标审计/冷重导/普通重启/DataValidation通过，重启两条旧Condition failed未解决；完整记录见文档。普通demo仍未切换，后续继续分离几何/三项失败，再普通Ragdoll/Get-up/Pose Recovery及完整目标。

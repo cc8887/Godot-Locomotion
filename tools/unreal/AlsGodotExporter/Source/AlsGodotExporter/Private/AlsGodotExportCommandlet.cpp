@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsConvexTopologyOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsConvexTopology(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Convex topology failed: %s"), *Error); return 29; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CONVEX_TOPOLOGY_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsBoxGeometryOutput="), PhysicsOutput))
     {
         FString Error;
