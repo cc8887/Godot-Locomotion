@@ -35,11 +35,23 @@ public sealed class AlsCapsuleCapsuleManifoldTests
         Assert.Throws<ArgumentException>(() => AlsCapsuleCapsuleManifold.Build(A, Identity, true, B, Identity, true, -1, points));
         Assert.Equal(snapshot, points);
         Assert.Throws<ArgumentException>(() => AlsCapsuleCapsuleManifold.Build(A, Identity, true, B, Identity, true, 3, points.AsSpan(0, 2)));
-        // The supplemental surface point exactly on the other axis has no
-        // usable normal. Preserve transactional failure instead of publishing NaN.
-        Assert.Throws<InvalidOperationException>(() => AlsCapsuleCapsuleManifold.Build(A,
-            Identity with { Position = new(0, 2, 0) }, true, B, Identity, true, 3, points));
-        Assert.Equal(snapshot, points);
+    }
+    [Fact]
+    public void UndefinedSupplementIsOmittedWithoutDiscardingValidClosestContactOrNeighbors()
+    {
+        var points = new AlsDetectedContact[3];
+        foreach (var offset in new[] { -1e-5, 0, 1e-5 })
+        {
+            var count = AlsCapsuleCapsuleManifold.Build(A, Identity with { Position = new(0, 2 + offset, 0) }, true, B, Identity, true, 3, points);
+            Assert.Equal(offset == 0 ? 1 : 2, count);
+            Assert.Equal(Vector3.UnitY, points[0].Normal1);
+            for (var i = 0; i < count; i++)
+            {
+                Assert.True(new AlsDoubleVector(points[i].Point0).IsFinite && new AlsDoubleVector(points[i].Point1).IsFinite);
+                Assert.InRange(points[i].Normal1.LengthSquared(), .99999f, 1.00001f);
+                Assert.True(float.IsFinite(points[i].NativePhi!.Value));
+            }
+        }
     }
     [Fact]
     public void WarmedContactGenerationDoesNotAllocate()

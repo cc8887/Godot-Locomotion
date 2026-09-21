@@ -6,8 +6,9 @@ namespace GodotAls.Core.Physics;
 public static class AlsCapsuleCapsuleManifold
 {
     // Native one-shot float pair space, including dynamic radius ownership.
-    // Nonfinite supplemental contacts are rejected atomically, not published
-    // into the solver (native exact zero-distance degeneracies need separate handling).
+    // A supplemental point exactly on the other segment axis has no normal.
+    // Omit only that undefined point; retain the native closest contact and
+    // all other finite supports so the solver can resolve the overlap.
     public static int Build(in AlsCapsuleGeometry a, in AlsPrecisePose poseA, bool dynamicA,
         in AlsCapsuleGeometry b, in AlsPrecisePose poseB, bool dynamicB, float cull, Span<AlsDetectedContact> destination,
         float alignedThreshold = .8f, float deepFraction = .05f, float radialFraction = .25f)
@@ -70,7 +71,9 @@ public static class AlsCapsuleCapsuleManifold
     {
         var first = firstCenter + (t * firstHalf) * firstAxis + orthogonal * firstRadius;
         var second = ClosestLine(secondCenter - secondHalf * secondAxis, secondCenter + secondHalf * secondAxis, first);
-        var delta = first - second; var distance = MathF.Sqrt(Dot(delta, delta)); var direction = delta * (1f / distance);
+        var delta = first - second; var distance = MathF.Sqrt(Dot(delta, delta));
+        if (distance == 0) return; // Native divides by zero here and publishes NaN.
+        var direction = delta * (1f / distance);
         var phi = distance - secondRadius;
         if (!(phi < cull)) return;
         var contact = second + secondRadius * direction;
