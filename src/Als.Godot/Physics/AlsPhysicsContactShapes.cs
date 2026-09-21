@@ -16,6 +16,8 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
         var cooked = AlsConvexTopologyCompiler.Compile(Godot.FileAccess.GetFileAsString(
             "res://assets/config/v4_physics_convex_topology.json"), definition)
             .ToDictionary(s => (s.Body, s.Shape), s => s.Topology);
+        var properties = AlsConvexPropertiesCompiler.Compile(Godot.FileAccess.GetFileAsString(
+            "res://assets/config/v4_physics_convex_properties.json"), definition, cooked);
         var runtime = AlsRuntimeShapeCompiler.Compile(
             Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"),
             Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), definition.Mesh)
@@ -44,7 +46,8 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
                 query.Bind(handle, shape,topology,source.Type=="box"?primitive!.Value.BoxHalf:null,
                     source.Type=="convex"?observed.Scale:null,source.Type is "box" or "convex"?observed.MarginCm:0,
                     nativeCapsule:primitive?.Capsule, proxyLocal:primitive?.ProxyLocal,
-                    nativeSphereRadius:source.Type=="sphere"?primitive!.Value.Radius:null);
+                    nativeSphereRadius:source.Type=="sphere"?primitive!.Value.Radius:null,
+                    convexProperties:source.Type=="convex"?properties[(body.Index,shapeIndex)]:null);
             }
         }
         foreach (var (a, b) in definition.DisabledCollisions) registry.DisableBodyPair(a, b, true);
