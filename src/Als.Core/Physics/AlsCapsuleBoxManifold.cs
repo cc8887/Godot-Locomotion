@@ -1,6 +1,17 @@
 using GodotAls.Core.Locomotion;
+using System.Numerics;
 
 namespace GodotAls.Core.Physics;
+
+public readonly record struct AlsCapsuleGeometry(Vector3 Endpoint0, Vector3 Axis, float Height, float Radius)
+{
+    public void Validate()
+    {
+        if (!new AlsDoubleVector(Endpoint0).IsFinite || !new AlsDoubleVector(Axis).IsFinite ||
+            MathF.Abs(Axis.LengthSquared() - 1) > 1e-5f || !float.IsFinite(Height) || Height <= 0 ||
+            !float.IsFinite(Radius) || Radius <= 0) throw new ArgumentException("Invalid native capsule geometry.");
+    }
+}
 
 // Native capsule/convex manifold rules for a proven box-face interior. The
 // capsule axis must lie outside that face and its complete radius-expanded
@@ -13,7 +24,18 @@ public static class AlsCapsuleBoxManifold
         AlsDoubleVector boxHalf, in AlsPrecisePose box, double cullDistance,
         Span<AlsDetectedContact> destination, out int count, double edgeInset = 0)
     {
-        count = 0; capsule.Validate(1e-5); box.Validate(1e-5);
+        if (!double.IsFinite(radius) || radius <= 0 || !double.IsFinite(length) || length <= 0)
+            throw new ArgumentException("Invalid capsule dimensions.");
+        return TryInteriorFace(new(new(0, 0, (float)(-.5 * (float)length)), Vector3.UnitZ, (float)length, (float)radius),
+            capsule, boxHalf, box, cullDistance, destination, out count, edgeInset);
+    }
+
+    public static bool TryInteriorFace(in AlsCapsuleGeometry geometry, in AlsPrecisePose capsule,
+        AlsDoubleVector boxHalf, in AlsPrecisePose box, double cullDistance,
+        Span<AlsDetectedContact> destination, out int count, double edgeInset = 0)
+    {
+        count = 0; geometry.Validate(); capsule.Validate(1e-5); box.Validate(1e-5);
+        double radius = geometry.Radius, length = geometry.Height;
         if (!double.IsFinite(radius) || radius <= 0 || !double.IsFinite(length) || length <= 0 ||
             !boxHalf.IsFinite || boxHalf.X <= 0 || boxHalf.Y <= 0 || boxHalf.Z <= 0 ||
             !double.IsFinite(cullDistance) || cullDistance < 0 || !double.IsFinite(edgeInset) || edgeInset < 0 ||
@@ -25,8 +47,8 @@ public static class AlsCapsuleBoxManifold
         // geometry remains double, including large common world translations.
         radius = (float)radius; length = (float)length;
         var relative = AlsPrecisePose.Relative(capsule, box);
-        var axis = new AlsDoubleVector(0, 0, 1).Rotate(relative.Rotation);
-        var start = new AlsDoubleVector(0, 0, (float)(-.5 * length)).Rotate(relative.Rotation) + relative.Position;
+        var axis = new AlsDoubleVector(geometry.Axis).Rotate(relative.Rotation);
+        var start = new AlsDoubleVector(geometry.Endpoint0).Rotate(relative.Rotation) + relative.Position;
         var end = start + axis * length;
         var normal = AlsDoubleVector.Zero; var plane = AlsDoubleVector.Zero; var found = false;
         for (var a = 0; a < 3 && !found; a++) for (var sign = -1; sign <= 1 && !found; sign += 2)

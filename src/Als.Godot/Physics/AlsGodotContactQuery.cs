@@ -25,6 +25,9 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         public AlsDoubleVector? NativeHalf;
         public AlsDoubleVector NativeScale = AlsDoubleVector.One;
         public float NativeMargin;
+        public AlsCapsuleGeometry? NativeCapsule;
+        public float? NativeSphereRadius;
+        public AlsPrecisePose ProxyLocal = AlsPrecisePose.Identity;
         public bool NativePolygon => Cooked is not null || NativeHalf.HasValue;
     }
     private readonly AlsContactRegistry _registry;
@@ -77,9 +80,20 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         catch { Dispose(); throw; }
     }
     internal void Bind(AlsContactShapeHandle handle, Shape3D shape, AlsConvexTopology? cooked = null,
-        AlsDoubleVector? nativeHalf = null, AlsDoubleVector? nativeScale = null, float nativeMargin=0)
+        AlsDoubleVector? nativeHalf = null, AlsDoubleVector? nativeScale = null, float nativeMargin=0,
+        AlsCapsuleGeometry? nativeCapsule = null, AlsPrecisePose? proxyLocal = null, float? nativeSphereRadius = null)
     {
         Check(); if (_registry.IsLocked) throw new InvalidOperationException("Cannot bind query geometry during a solve.");
+        if (nativeCapsule.HasValue)
+        {
+            nativeCapsule.Value.Validate();
+            if (shape is not CapsuleShape3D) throw new ArgumentException("Native capsule requires a capsule proxy.");
+        }
+        if (nativeSphereRadius.HasValue && (shape is not SphereShape3D || !float.IsFinite(nativeSphereRadius.Value) || nativeSphereRadius.Value <= 0))
+            throw new ArgumentException("Native sphere radius requires a valid sphere proxy.");
+        var proxy = proxyLocal ?? AlsPrecisePose.Identity; proxy.Validate(1e-5);
+        if (proxy.Scale != AlsDoubleVector.One || (proxy != AlsPrecisePose.Identity && shape is not (CapsuleShape3D or SphereShape3D)))
+            throw new ArgumentException("Only quadratic proxies support a rigid local offset.");
         if (!_registry.Present(handle.Slot) || _registry.Key(handle.Slot).Revision != handle.Revision) throw new ArgumentException("Stale shape binding.");
         if(cooked is not null)
         {
@@ -97,7 +111,8 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         var bounds = Bounds(shape); var old = _bindings[handle.Slot];
         if (old is not null && old.Revision == handle.Revision) throw new ArgumentException("Replace registry shape before rebinding geometry.");
         var binding = new Binding { Shape = shape, Bounds = bounds, Revision = handle.Revision, Changed = null!,
-            Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One,NativeMargin=nativeMargin };
+            Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One,NativeMargin=nativeMargin,
+            NativeCapsule=nativeCapsule,ProxyLocal=proxy,NativeSphereRadius=nativeSphereRadius };
         binding.Changed = () => binding.Dirty = true;
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
@@ -239,9 +254,10 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             // The proven capsule-face region supports separated manifolds.
             // Use the same particle bounds/PreV detector context as polygons;
             // unsupported edge/deep contacts below still use the old query.
-            if (AlsCapsuleBoxManifold.TryInteriorFace((double)capsule.Radius * 100,
-                ((double)capsule.Height - 2 * capsule.Radius) * 100, world0,
-                new((double)box.Size.Z * 50, (double)box.Size.X * 50, (double)box.Size.Y * 50), world1,
+            var length = (float)(((double)capsule.Height - 2 * capsule.Radius) * 100);
+            var geometry = a.NativeCapsule ?? new AlsCapsuleGeometry(new(0, 0, -.5f * length), NVector.UnitZ, length, (float)((double)capsule.Radius * 100));
+            if (AlsCapsuleBoxManifold.TryInteriorFace(geometry, world0,
+                b.NativeHalf ?? new((double)box.Size.Z * 50, (double)box.Size.X * 50, (double)box.Size.Y * 50), world1,
                 CullDistance(shape0, shape1), native, out var count,
                 (double)box.Margin * 100))
             {
@@ -253,8 +269,8 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         // Only a common translation is removed; world axes/rotations are kept.
         // Returned points are converted directly from this pair frame to local
         // shape space, never round-tripped through large world coordinates.
-        var t0 = ToGodot(world0 with { Position = AlsDoubleVector.Zero });
-        var t1 = ToGodot(world1 with { Position = world1.Position - world0.Position });
+        var t0 = ToGodot(AlsPrecisePose.Compose(a.ProxyLocal, world0 with { Position = AlsDoubleVector.Zero }));
+        var t1 = ToGodot(AlsPrecisePose.Compose(b.ProxyLocal, world1 with { Position = world1.Position - world0.Position }));
         if (!(t0 * a.Bounds).Grow(1e-5f).Intersects((t1 * b.Bounds).Grow(1e-5f))) return 0;
         Shape3D target = b.Shape;
         if (TryInteriorFace(a, t0, b, t1, out var face)) { _interiorPlane.Plane = face; target = _interiorPlane; InteriorFaceQueries++; }
@@ -280,8 +296,9 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         for (var i = 0; i < pairs.Count / 2; i++)
         {
             var p0 = pairs[2 * i]; var p1 = pairs[2 * i + 1];
-            destination[i] = new(ToNative(inverse0 * p0).ToSingle(), ToNative(inverse1 * p1).ToSingle(),
-                (ToNative(inverse1.Basis * normal) * .01).ToSingle());
+            destination[i] = new((ToNative(inverse0 * p0).Rotate(a.ProxyLocal.Rotation) + a.ProxyLocal.Position).ToSingle(),
+                (ToNative(inverse1 * p1).Rotate(b.ProxyLocal.Rotation) + b.ProxyLocal.Position).ToSingle(),
+                (ToNative(inverse1.Basis * normal) * .01).Rotate(b.ProxyLocal.Rotation).ToSingle());
         }
         return pairs.Count / 2;
     }
@@ -324,7 +341,15 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     // internally substitutes a proven box-face plane. Units/axes are native.
     internal object Describe(int index)
     {
-        Check(); var shape = BindingAt(index).Shape;
+        Check(); var binding = BindingAt(index); var shape = binding.Shape;
+        // Original native leaf coordinates are not the old centered-Z capsule
+        // trace contract. Use an explicit type so old exporters cannot silently
+        // replay this as different geometry.
+        if (binding.NativeCapsule is { } c) return new { type = "native_capsule", radius = c.Radius, length = c.Height,
+            endpoint0 = new[] { c.Endpoint0.X, c.Endpoint0.Y, c.Endpoint0.Z }, axis = new[] { c.Axis.X, c.Axis.Y, c.Axis.Z } };
+        if (binding.NativeHalf is { } half) return new { type = "box", size = new[] { half.X * 2, half.Y * 2, half.Z * 2 } };
+        if (binding.NativeSphereRadius is { } radius) return new { type = "native_sphere", radius,
+            center = new[] { binding.ProxyLocal.Position.X, binding.ProxyLocal.Position.Y, binding.ProxyLocal.Position.Z } };
         return shape switch
         {
             CapsuleShape3D capsule => new { type = "capsule", radius = (double)capsule.Radius * 100,

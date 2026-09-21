@@ -22,6 +22,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _geometryTransactionChecks;
     private int _nativePolygonChecks;
     private int _capsuleCullChecks;
+    private int _primitiveChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -85,7 +86,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
             if (_scenario < 3) { StartScenario(); return; }
             Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
             var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
-                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, capsule_cull_checks = _capsuleCullChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, capsule_cull_checks = _capsuleCullChecks, primitive_binding_checks = _primitiveChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -124,6 +125,28 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeMarginChecks();
         NativeCullChecks();
         NativeCapsuleCullChecks();
+        PrimitiveBindingChecks();
+    }
+
+    private void PrimitiveBindingChecks()
+    {
+        var identity = AlsPrecisePose.Identity; var registry = new AlsContactRegistry(3, 3);
+        using var capsule = new CapsuleShape3D { Radius = .05f, Height = .3f, Margin = 0 };
+        using var box = new BoxShape3D { Size = new(2, .2f, 2), Margin = 0 };
+        using var query = new AlsGodotContactQuery(registry);
+        var native = new AlsCapsuleGeometry(new(7, -3, 2), NVector.UnitX, 20, 5);
+        var proxy = new AlsPrecisePose(new(17, -3, 2), new AlsQuaternion(0, 1, 0, 1).Normalized(), AlsDoubleVector.One);
+        query.Bind(registry.Register(new(0, identity, 1, 1, true)), capsule, nativeCapsule: native, proxyLocal: proxy);
+        query.Bind(registry.Register(new(1, identity, 1, 1)), box, nativeHalf: new(100, 100, 10));
+        query.Bind(registry.Register(new(2, identity, 1, 1, true)), capsule, nativeCapsule: native, proxyLocal: proxy);
+        var pose = identity with { Position = new(0, 0, 12.8) }; var points = new AlsDetectedContact[4];
+        Require(query.Query(0, pose, 1, identity, points) == 2 && points[0].Point0 == new NVector(7, -3, -3) &&
+            points[1].Point0 == new NVector(27, -3, -3), "Native capsule binding lost baked endpoint coordinates."); _primitiveChecks++;
+        var count = query.Query(0, identity, 2, identity with { Position = new(0, 8, 0) }, points);
+        Require(count > 0 && query.NarrowPhaseQueries > 0, "Mixed capsule proxy fallback was not exercised.");
+        for (var i = 0; i < count; i++) Require(MathF.Abs(points[i].Point0.Y - 2) < 1e-4f &&
+            MathF.Abs(points[i].Point1.Y + 8) < 1e-4f && (points[i].Normal1 + NVector.UnitY).LengthSquared() < 1e-8f,
+            "Proxy fallback failed to return original native leaf points/normal."); _primitiveChecks++;
     }
 
     private void NativeCapsuleCullChecks()

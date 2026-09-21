@@ -30,6 +30,21 @@ public sealed class AlsCapsuleBoxManifoldTests
     }
 
     [Fact]
+    public void BakedEndpointAndAxisRemainInOriginalLeafCoordinates()
+    {
+        var geometry = new AlsCapsuleGeometry(new(7, -3, 2), Vector3.UnitX, 20, 5);
+        var pose = AlsPrecisePose.Identity with { Position = new(0, 0, 15.2) };
+        var points = new AlsDetectedContact[3];
+        Assert.True(AlsCapsuleBoxManifold.TryInteriorFace(geometry, pose, Half, AlsPrecisePose.Identity, 3, points, out var count));
+        Assert.Equal(2, count);
+        Assert.Equal(new Vector3(7, -3, -3), points[0].Point0);
+        Assert.Equal(new Vector3(27, -3, -3), points[1].Point0);
+        Assert.Equal(new Vector3(7, -3, 10), points[0].Point1);
+        Assert.Equal(new Vector3(27, -3, 10), points[1].Point1);
+        Assert.All(points.Take(count), p => Assert.Equal(Vector3.UnitZ, p.Normal1));
+    }
+
+    [Fact]
     public void RoundedEdgeInsetExcludesItsUnprovenRegion()
     {
         var points = new AlsDetectedContact[3]; var pose = Pose(x: 84);

@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsPrimitiveGeometryOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsAssets(PhysicsOutput, Error, true, true))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Primitive geometry failed: %s"), *Error); return 41; }
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsContactSettingsOutput="), PhysicsOutput))
     {
         FString Error;
