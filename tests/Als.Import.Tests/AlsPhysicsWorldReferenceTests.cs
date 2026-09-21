@@ -8,9 +8,10 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsPhysicsWorldReferenceTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     [Theory]
-    [InlineData("v4_physics_world_reference.json", 4, false)]
-    [InlineData("v4_physics_world_low_frequency_reference.json", 2, true)]
-    public void CompleteNativeAssetsContactCapturedSceneAndPreserveObservedSleepBudget(string file, int caseCount, bool lowFrequency)
+    [InlineData("v4_physics_world_reference.json", 4, false, false)]
+    [InlineData("v4_physics_world_low_frequency_reference.json", 2, true, false)]
+    [InlineData("v4_physics_world_platform_settle_reference.json", 4, true, true)]
+    public void CompleteNativeAssetsContactCapturedSceneAndPreserveObservedSleepBudget(string file, int caseCount, bool lowFrequency, bool platform)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/" + file)));
         var source = File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_asset_inputs.json"));
@@ -21,7 +22,16 @@ public sealed class AlsPhysicsWorldReferenceTests(Xunit.Abstractions.ITestOutput
             var setup = row.GetProperty("setup"); var mesh = setup.GetProperty("mesh").GetString()!;
             var definition = AlsPhysicsAssetCompiler.Compile(source, mesh);
             var hz = setup.GetProperty("hz").GetInt32(); var steps = setup.GetProperty("steps").GetInt32();
-            Assert.True(ids.Add($"{mesh}/{hz}")); Assert.Equal(hz == 120, B(setup, "highDrop"));
+            var mode = platform ? setup.GetProperty("platformMode").GetString()! : "";
+            Assert.True(ids.Add($"{mesh}/{hz}/{mode}")); Assert.Equal(hz == 120, B(setup, "highDrop"));
+            if (platform)
+            {
+                Assert.True(mode is "translate" or "rotate");
+                Assert.Equal("platform-pre-motion", setup.GetProperty("phase").GetString());
+                Assert.Equal(new[] { "RotatingPlatform", "TranslatingPlatform" },
+                    setup.GetProperty("environment").EnumerateArray().Where(e => B(e, "kinematic"))
+                        .Select(e => e.GetProperty("name").GetString()).OrderBy(n => n, StringComparer.Ordinal));
+            }
             Assert.True(lowFrequency ? hz == 30 : hz is 60 or 120);
             Assert.Equal((double)(1f / hz), D(row, "dtUsed")); Assert.Equal(10 * hz, steps);
             var input = setup.GetProperty("bodies"); var samples = row.GetProperty("samples");
@@ -65,7 +75,7 @@ public sealed class AlsPhysicsWorldReferenceTests(Xunit.Abstractions.ITestOutput
             Assert.Equal(held >= hz, B(row, "oneSecondSleepBudget"));
             // Preserve the native failure as evidence; do not make a ten-second
             // sleep expectation true by filtering out the still-awake asset.
-            var nativeFailure = lowFrequency && mesh.EndsWith(".Mannequin", StringComparison.Ordinal);
+            var nativeFailure = platform || lowFrequency && mesh.EndsWith(".Mannequin", StringComparison.Ordinal);
             Assert.Equal(!nativeFailure, held >= hz);
             double lastV = 0, lastW = 0;
             for (var frame = steps - hz; frame <= steps; frame++)
@@ -79,8 +89,9 @@ public sealed class AlsPhysicsWorldReferenceTests(Xunit.Abstractions.ITestOutput
             if (nativeFailure)
             {
                 Assert.Equal(-1, firstHeld); Assert.Equal(0, held);
-                Assert.Equal(18, samples[steps].GetProperty("awakeBodies").GetInt32());
-                Assert.InRange(lastV, 6.98, 7.00); Assert.InRange(lastW, .40, .41);
+                Assert.Equal(input.EnumerateArray().Count(b => B(b, "dynamic")), samples[steps].GetProperty("awakeBodies").GetInt32());
+                if (platform) { Assert.True(lastV > 0); Assert.True(lastW > 0); }
+                else { Assert.InRange(lastV, 6.98, 7.00); Assert.InRange(lastW, .40, .41); }
             }
             else { Assert.Equal(0, lastV); Assert.Equal(0, lastW); }
             output.WriteLine($"NATIVE_WORLD mesh={mesh.Split('.').Last()} hz={hz} sleep={firstHeld} held={held} joints={definition.Joints.Length}");

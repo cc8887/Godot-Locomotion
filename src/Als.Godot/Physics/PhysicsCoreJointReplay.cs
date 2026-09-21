@@ -57,8 +57,8 @@ public partial class PhysicsCoreJointReplay : Node3D
             _platformMode = args.FirstOrDefault(a => a.StartsWith("--platform="))?[11..] ?? "";
             _setupDirectory = args.FirstOrDefault(a => a.StartsWith("--capture-setup="))?[16..];
             if (_setupDirectory is not null)
-                Require(_drop && _sceneWorld && _platformMode == "" && Path.IsPathFullyQualified(_setupDirectory) && Directory.Exists(_setupDirectory),
-                    "Native setup capture needs a fixed scene-world drop and an existing absolute directory.");
+                Require(_drop && _sceneWorld && Path.IsPathFullyQualified(_setupDirectory) && Directory.Exists(_setupDirectory),
+                    "Native setup capture needs a scene-world drop and an existing absolute directory.");
             var trace = args.FirstOrDefault(a => a.StartsWith("--trace-frames="))?[15..];
             var capture = args.FirstOrDefault(a => a.StartsWith("--capture-step="))?[15..];
             if (capture is not null)
@@ -194,9 +194,12 @@ public partial class PhysicsCoreJointReplay : Node3D
                     v = F(states[b.Index].Velocity.Linear), w = F(states[b.Index].Velocity.Angular), dynamic = bodies[b.Index].InverseMass.Mass > 0,
                     inverseMass = bodies[b.Index].InverseMass.Mass, inverseInertia = V(bodies[b.Index].InverseMass.Inertia),
                     gravity = bodies[b.Index].GravityEnabled }).ToArray();
-                var path = Path.Combine(_setupDirectory, $"{definition.Mesh.Split('.').Last()}-{(_highDrop ? "high" : "normal")}-{_hz}.json");
+                var mode = _platformMode == "" ? (_highDrop ? "high" : "normal") : _platformMode + "-settle";
+                var path = Path.Combine(_setupDirectory, $"{definition.Mesh.Split('.').Last()}-{mode}-{_hz}.json");
                 using var file = new FileStream(path, FileMode.CreateNew, System.IO.FileAccess.Write);
-                JsonSerializer.Serialize(file, new { schemaVersion = 1, mesh = definition.Mesh, hz = _hz, steps = _hz * Duration,
+                // Platform setup covers only its stationary first ten seconds.
+                JsonSerializer.Serialize(file, new { schemaVersion = 1, mesh = definition.Mesh, hz = _hz, steps = _hz * 10,
+                    phase = _platformMode == "" ? "fixed-drop" : "platform-pre-motion", platformMode = _platformMode,
                     highDrop = _highDrop, gravity = new[] { 0, 0, -980 }, bodies = initial,
                     material = definition.Bodies[0].Material, environment = scene!.ExportNativeEnvironment() }, new JsonSerializerOptions { WriteIndented = true });
                 GD.Print($"CORE_WORLD_SETUP mesh={definition.Mesh} output={path}");

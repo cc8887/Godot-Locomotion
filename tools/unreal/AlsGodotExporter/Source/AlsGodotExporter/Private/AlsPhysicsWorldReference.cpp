@@ -75,6 +75,7 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
         // not just a guessed infinite floor. Their material matches Core's
         // homogeneous resolved material contract for this diagnostic.
         TArray<TStrongObjectPtr<UBodySetup>> EnvironmentSetups;TArray<TUniquePtr<FBodyInstance>> EnvironmentBodies;
+        TArray<bool> EnvironmentKinematic;
         struct FTermEnvironment{TArray<TUniquePtr<FBodyInstance>>& B;~FTermEnvironment(){for(auto& P:B)P->TermBody();}} TermEnvironment{EnvironmentBodies};
         for(const auto& Value:Input->GetArrayField(TEXT("environment")))
         {
@@ -91,9 +92,10 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             else return Fail(TEXT("Unsupported captured environment shape."));
             Setup->CreatePhysicsMeshes();auto Instance=MakeUnique<FBodyInstance>();
             Instance->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);Instance->SetObjectType(ECC_WorldStatic);Instance->SetResponseToAllChannels(ECR_Block);
-            Instance->InitBody(Setup,FTransform(ReadT(E->GetObjectField(TEXT("world")))),nullptr,Scene,FInitBodySpawnParams(true,false));
+            bool Kinematic=false;E->TryGetBoolField(TEXT("kinematic"),Kinematic);
+            Instance->InitBody(Setup,FTransform(ReadT(E->GetObjectField(TEXT("world")))),nullptr,Scene,FInitBodySpawnParams(!Kinematic,false));
             if(!Instance->IsValidBodyInstance())return Fail(TEXT("Native environment body missing."));
-            Instance->SetPhysMaterialOverride(Bodies[0]->GetSimplePhysicalMaterial());EnvironmentBodies.Add(MoveTemp(Instance));
+            Instance->SetPhysMaterialOverride(Bodies[0]->GetSimplePhysicalMaterial());EnvironmentBodies.Add(MoveTemp(Instance));EnvironmentKinematic.Add(Kinematic);
         }
         TArray<TSharedPtr<FJsonValue>> Samples;int32 AllSleepFrame=INDEX_NONE,Held=0;double LastMaxV=0,LastMaxW=0;
         for(int32 Frame=0;Frame<=Steps;++Frame)
@@ -103,6 +105,12 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                 const double Before=Solver->GetSolverTime();Scene->SetUpForFrame(&Gravity,Dt,0,Dt,Dt,1,false);
                 Scene->StartFrame();Scene->WaitPhysScenes();Scene->EndFrame();
                 if(!FMath::IsNearlyEqual(Solver->GetSolverTime()-Before,static_cast<double>(Dt),1.e-6))return Fail(TEXT("Native scene step duration differs."));
+                for(int32 I=0;I<EnvironmentBodies.Num();++I)
+                {
+                    const auto* Particle=EnvironmentBodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel();
+                    if(Particle->ObjectState()!=(EnvironmentKinematic[I]?EObjectStateType::Kinematic:EObjectStateType::Static))
+                        return Fail(TEXT("Native environment motion type differs."));
+                }
             }
             auto Sample=MakeShared<FJsonObject>();Sample->SetNumberField(TEXT("frame"),Frame);TArray<TSharedPtr<FJsonValue>> States;
             int32 Awake=0;
