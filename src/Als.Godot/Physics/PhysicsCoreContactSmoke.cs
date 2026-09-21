@@ -21,6 +21,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _manifoldChecks;
     private int _geometryTransactionChecks;
     private int _nativePolygonChecks;
+    private int _capsuleCullChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -84,7 +85,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
             if (_scenario < 3) { StartScenario(); return; }
             Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
             var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
-                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, capsule_cull_checks = _capsuleCullChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -122,6 +123,52 @@ public partial class PhysicsCoreContactSmoke : Node3D
         _nativePolygonChecks+=4;
         NativeMarginChecks();
         NativeCullChecks();
+        NativeCapsuleCullChecks();
+    }
+
+    private void NativeCapsuleCullChecks()
+    {
+        var identity = AlsPrecisePose.Identity;
+        using var capsule = new CapsuleShape3D { Radius = .05f, Height = .3f, Margin = 0 };
+        using var box = new BoxShape3D { Size = new(2, .2f, 2), Margin = 0 };
+        var poses = new[] { identity with { Position = new(0, 0, 17), Rotation = AlsQuaternion.FromAxisAngle(NVector.UnitY, MathF.PI / 2) }, identity };
+        foreach (var reverse in new[] { false, true })
+        {
+            var registry = new AlsContactRegistry(2, 2);
+            using var query = new AlsGodotContactQuery(registry, new(3, .01f, 1, 1, 3));
+            var cap = registry.Register(new(0, identity, 1, 1, true)); var floor = registry.Register(new(1, identity, 1, 1));
+            query.Bind(cap, capsule); query.Bind(floor, box, nativeHalf: new(100, 100, 10)); query.BindBodyBounds(0, 30);
+            var bodies = new[] { new AlsIslandBody(identity, new(1, AlsDoubleVector.One)), new AlsIslandBody(identity, default) };
+            var previous = new[] { new AlsIslandBodyState(poses[0], default), new AlsIslandBodyState(identity, default) };
+            var velocities = new AlsProjectionVelocity[2]; var points = new AlsDetectedContact[4];
+            var a = reverse ? 1 : 0; var b = 1 - a;
+            query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+            var count = query.Query(a, poses[a], b, poses[b], points);
+            Require(count == 2 && query.NarrowPhaseQueries == 0, "Separated capsule face did not use the native path."); _capsuleCullChecks++;
+            for (var i = 0; i < count; i++)
+            {
+                var p0 = new AlsDoubleVector(points[i].Point0).Rotate(poses[a].Rotation) + poses[a].Position;
+                var p1 = new AlsDoubleVector(points[i].Point1).Rotate(poses[b].Rotation) + poses[b].Position;
+                var n = new AlsDoubleVector(points[i].Normal1).Rotate(poses[b].Rotation);
+                Require(Math.Abs(AlsDoubleVector.Dot(p0 - p1, n) - 2) < 1e-4 &&
+                    (n - new AlsDoubleVector(0, 0, reverse ? -1 : 1)).LengthSquared < 1e-10,
+                    "Separated capsule points/normal changed with endpoint order.");
+            }
+            query.Abort(); _capsuleCullChecks++;
+            poses[0] = poses[0] with { Position = new(0, 0, 19) };
+            query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+            Require(query.Query(a, poses[a], b, poses[b], points) == 0, "Capsule outside stationary cull was retained."); query.Abort(); _capsuleCullChecks++;
+            previous[0] = previous[0] with { Velocity = new(new(10000, 0, 0), default) };
+            query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+            Require(query.Query(a, poses[a], b, poses[b], points) == 2, "Capsule did not use velocity-expanded cull."); query.Abort(); _capsuleCullChecks++;
+            var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 1000));
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            var queries = query.CapsuleFaceQueries;
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            Require(contacts.LastActivePairs == 1 && contacts.LastContactCount == 2 && contacts.LastRestoredPairs == 0 &&
+                query.CapsuleFaceQueries == queries + 1, "Quadratic pair incorrectly restored polygon geometry or lost separated contacts."); _capsuleCullChecks++;
+            poses[0] = poses[0] with { Position = new(0, 0, 17) };
+        }
     }
 
     private void NativeCullChecks()
