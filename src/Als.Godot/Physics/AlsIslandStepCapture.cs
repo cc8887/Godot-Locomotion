@@ -14,6 +14,8 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
     private readonly List<object> _samples = [];
     private object? _input;
     private int _capturedFrame;
+    private readonly List<object> _historyInputs = [];
+    private readonly List<int> _historyPairs = [];
     public bool Enabled => frames.Contains(frame());
     public void Begin(double dt, int positionIterations, int velocityIterations, ReadOnlySpan<AlsIslandBody> bodies, ReadOnlySpan<AlsIslandJoint> joints,
         ReadOnlySpan<AlsPrecisePose> initial, ReadOnlySpan<AlsPrecisePose> predicted,
@@ -21,6 +23,30 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
     {
         if (!Godot.GodotThread.IsMainThread()) throw new InvalidOperationException("Step export requires Main.");
         _samples.Clear(); _capturedFrame = frame(); var bodyInputs = new object[bodies.Length];
+        _historyInputs.Clear(); _historyPairs.Clear();
+        for (var i = 0; i < contacts.HistoryPairCount; i++)
+        {
+            var count = contacts.HistoryPointCountAt(i); var savedCount = contacts.HistorySavedCountAt(i);
+            if (count == 0 && savedCount == 0) continue;
+            var saved = new object[savedCount]; var detected = new object[count]; var assigned = new object[count];
+            for (var p = 0; p < savedCount; p++)
+            {
+                var s = contacts.HistorySavedAt(i, p);
+                saved[p] = new { anchor0 = V(s.Anchor0), anchor1 = V(s.Anchor1), initialPhi = s.InitialPhi };
+            }
+            for (var p = 0; p < count; p++)
+            {
+                var a = contacts.HistoryPreparedAt(i, p); var g = a.Geometry;
+                detected[p] = new { point0 = V(g.Point0), point1 = V(g.Point1), normal1 = V(g.Normal1), disabled = a.Disabled };
+                assigned[p] = new { anchor0 = V(g.Anchor0), anchor1 = V(g.Anchor1), initialPhi = g.InitialPhi,
+                    hasAnchor = g.HasAnchor, initialContact = g.InitialContact, savedIndex = a.SavedIndex };
+            }
+            var settings = contacts.HistoryGatherAt(i).Settings;
+            _historyPairs.Add(i);
+            _historyInputs.Add(new { key = contacts.HistoryKeyAt(i), epoch = contacts.CompletedSteps,
+                matching = contacts.HistoryMatchingAt(i), initialManifold = settings.InitialManifold,
+                priorMinInitialPhi = settings.MinInitialPhi, saved, detected, assigned });
+        }
         for (var i = 0; i < bodies.Length; i++) bodyInputs[i] = new
         {
             name = i < definition.Bodies.Length ? definition.Bodies[i].Bone : $"environment_{i}",
@@ -70,9 +96,23 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
     }
     public void Complete()
     {
+        // Complete is before StageCommit; these are actual solver results to be
+        // committed, not a claim that the surrounding island has published.
+        var historyResults = new object[_historyPairs.Count];
+        for (var i = 0; i < _historyPairs.Count; i++)
+        {
+            var pair = _historyPairs[i]; var results = new object[contacts.HistoryPointCountAt(pair)];
+            for (var p = 0; p < results.Length; p++)
+            {
+                var r = contacts.HistoryResultAt(pair, p);
+                results[p] = new { ratio = r.FrictionRatio, initialPhi = r.InitialPhi };
+            }
+            historyResults[i] = results;
+        }
         var path = Path.Combine(directory, $"{definition.Mesh.Split('.').Last()}-{_capturedFrame}.json");
         using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
-        JsonSerializer.Serialize(file, new { schemaVersion = 1, input = _input, coreSamples = _samples },
+        JsonSerializer.Serialize(file, new { schemaVersion = 1, input = _input, coreSamples = _samples,
+            historyInputs = _historyInputs, historyResults },
             new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true });
         Godot.GD.Print($"CORE_STEP_CAPTURE mesh={definition.Mesh} frame={_capturedFrame} stages={_samples.Count} output={path}");
     }

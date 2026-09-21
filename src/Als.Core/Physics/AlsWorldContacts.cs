@@ -81,6 +81,23 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     public AlsContactGatherSnapshot PreparedGatherAt(int pair) => _pairs[PreparedSlot(pair)].GatherSnapshot;
     public AlsContactGeometry PreparedGeometryAt(int pair, int point) => _pairs[PreparedSlot(pair)].GeometryAt(point);
     public float PreparedInitialPhiAt(int pair, int point) => _pairs[PreparedSlot(pair)].GatheredInitialPhiAt(point);
+    // History diagnostics include empty/inactive pairs; solver order alone loses
+    // the frame in which a contact disappears and its saved anchors are cleared.
+    public int HistoryPairCount { get { Pending(); return _count; } }
+    public AlsContactPairKey HistoryKeyAt(int pair) => _identities[HistorySlot(pair)];
+    public int HistoryPointCountAt(int pair) => _pairs[HistorySlot(pair)].HistoryPointCount;
+    public int HistorySavedCountAt(int pair) => _pairs[HistorySlot(pair)].SavedCount;
+    public AlsSavedContact HistorySavedAt(int pair, int point) => _pairs[HistorySlot(pair)].SavedAt(point);
+    public AlsPreparedContact HistoryPreparedAt(int pair, int point) => _pairs[HistorySlot(pair)].PreparedAt(point);
+    public AlsContactMatchSettings HistoryMatchingAt(int pair) => _pairs[HistorySlot(pair)].Matching;
+    public AlsContactGatherSnapshot HistoryGatherAt(int pair) => _pairs[HistorySlot(pair)].GatherSnapshot;
+    public AlsContactHistoryResult HistoryResultAt(int pair, int point) => _pairs[HistorySlot(pair)].HistoryResultAt(point);
+    private int HistorySlot(int pair)
+    {
+        Pending();
+        if ((uint)pair >= _count) throw new ArgumentOutOfRangeException(nameof(pair));
+        return _prepared[pair];
+    }
     private int PreparedSlot(int index)
     {
         if ((uint)index >= PreparedPairCount) throw new ArgumentOutOfRangeException(nameof(index));
