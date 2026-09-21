@@ -8,7 +8,8 @@ namespace GodotAls.Physics;
 // Opt-in diagnostic decorator: records exactly what the geometry provider gave
 // the solver. It never edits, reorders or drops contacts.
 internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsContactRegistry registry,
-    string mesh, string[] names, Func<int> frame, int first, int last, string[] bones) : IAlsContactGeometrySource
+    string mesh, string[] names, Func<int> frame, int first, int last, string[] bones,
+    Func<int, object>? geometry = null) : IAlsContactGeometrySource
 {
     public bool IsInvalidated => source.IsInvalidated;
     public int Query(int a, in AlsPrecisePose p, int b, in AlsPrecisePose q, Span<AlsDetectedContact> points)
@@ -16,7 +17,7 @@ internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsConta
         var count = source.Query(a, p, b, q, points); var step = frame();
         var body0 = names[registry.At(a).Body]; var body1 = names[registry.At(b).Body];
         if (step < first || step > last || !bones.Contains(body0) && !bones.Contains(body1)) return count;
-        if (count == 0) return count;
+        if (count == 0 && geometry is null) return count;
         var contacts = new object[count];
         for (var i = 0; i < count; i++)
         {
@@ -27,7 +28,8 @@ internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsConta
                 gap = System.Numerics.Vector3.Dot((p0 - p1).ToSingle(), normal.ToSingle()) };
         }
         GD.Print("CORE_CONTACT_TRACE " + JsonSerializer.Serialize(new { frame = step, mesh, body0, body1, shape0 = a, shape1 = b,
-            center0 = V(p.Position), center1 = V(q.Position), rotation0 = Q(p.Rotation), rotation1 = Q(q.Rotation), contacts }));
+            center0 = V(p.Position), center1 = V(q.Position), rotation0 = Q(p.Rotation), rotation1 = Q(q.Rotation),
+            geometry0 = geometry?.Invoke(a), geometry1 = geometry?.Invoke(b), contacts }));
         return count;
     }
     private static double[] V(AlsDoubleVector p) => [p.X, p.Y, p.Z];

@@ -5,7 +5,8 @@ using NVector = System.Numerics.Vector3;
 
 namespace GodotAls.Physics;
 
-// Geometry-only Jolt query space. It contains exactly one target shape, so every
+// Core generates guarded capsule/box-face manifolds; other pairs use a geometry-
+// only Jolt query space. It contains exactly one target shape, so every
 // CollideShape point pair has an unambiguous registry identity. A hull wholly
 // inside a box face can use that exact local half-space. Core alone owns
 // dynamic response. Convex input shapes only; no CCD or native Chaos
@@ -29,6 +30,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private bool _bodyHasShape, _disposed;
     public int NarrowPhaseQueries { get; private set; }
     internal int InteriorFaceQueries { get; private set; }
+    internal int CapsuleFaceQueries { get; private set; }
     public bool IsInvalidated
     {
         get
@@ -66,10 +68,10 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     public int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check();
-        // Keep the convex hull as the query and the box as the target so the
-        // proven face-interior case below has one ordering. Return the original
+        // Keep the hull/capsule as the query and the box as the target so the
+        // proven face-interior cases below have one ordering. Return the original
         // body order and shape-local normal to the contact owner.
-        if (BindingAt(shape0).Shape is BoxShape3D && BindingAt(shape1).Shape is ConvexPolygonShape3D)
+        if (BindingAt(shape0).Shape is BoxShape3D && BindingAt(shape1).Shape is ConvexPolygonShape3D or CapsuleShape3D)
         {
             var count = QueryOrdered(shape1, world1, shape0, world0, destination);
             for (var i = 0; i < count; i++)
@@ -85,6 +87,20 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private int QueryOrdered(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1);
+        if (a.Shape is CapsuleShape3D capsule && capsule.Height > 2 * capsule.Radius && b.Shape is BoxShape3D box)
+        {
+            Span<AlsDetectedContact> native = stackalloc AlsDetectedContact[3];
+            // Keep the current overlap-only discovery contract. Native cull
+            // distance and persistent separated manifolds are separate work.
+            if (AlsCapsuleBoxManifold.TryInteriorFace((double)capsule.Radius * 100,
+                ((double)capsule.Height - 2 * capsule.Radius) * 100, world0,
+                new((double)box.Size.Z * 50, (double)box.Size.X * 50, (double)box.Size.Y * 50), world1, 0, native, out var count,
+                (double)box.Margin * 100))
+            {
+                if (count > destination.Length) throw new InvalidOperationException("Contact query capacity exceeded; manifold was not truncated.");
+                native[..count].CopyTo(destination); CapsuleFaceQueries++; return count;
+            }
+        }
         // Rebase in double precision BEFORE converting to Godot float positions.
         // Only a common translation is removed; world axes/rotations are kept.
         // Returned points are converted directly from this pair frame to local
@@ -152,6 +168,21 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             binding.Dirty || !GodotObject.IsInstanceValid(binding.Shape))
             throw new InvalidOperationException("Query shape is missing, stale or changed; replace and rebind it.");
         return binding;
+    }
+    // Opt-in trace metadata describes the ORIGINAL shape, even when the query
+    // internally substitutes a proven box-face plane. Units/axes are native.
+    internal object Describe(int index)
+    {
+        Check(); var shape = BindingAt(index).Shape;
+        return shape switch
+        {
+            CapsuleShape3D capsule => new { type = "capsule", radius = (double)capsule.Radius * 100,
+                length = ((double)capsule.Height - 2 * capsule.Radius) * 100 },
+            BoxShape3D box => new { type = "box", size = new[] { (double)box.Size.Z * 100, (double)box.Size.X * 100, (double)box.Size.Y * 100 } },
+            SphereShape3D sphere => (object)new { type = "sphere", radius = (double)sphere.Radius * 100 },
+            ConvexPolygonShape3D => new { type = "convex" },
+            _ => throw new NotSupportedException("Unmapped trace geometry.")
+        };
     }
     internal static Aabb Bounds(Shape3D shape)
     {

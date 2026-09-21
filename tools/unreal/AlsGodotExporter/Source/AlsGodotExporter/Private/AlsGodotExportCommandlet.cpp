@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsCapsuleGeometryOutput="), PhysicsOutput))
+    {
+        FString Input, Error; FParse::Value(*Params, TEXT("PhysicsCapsuleGeometryInput="), Input);
+        if (!ExportAlsPhysicsCapsuleGeometryReference(Input, PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Capsule geometry export failed: %s"), *Error); return 24; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CAPSULE_GEOMETRY_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsCoupledOutput="), PhysicsOutput))
     {
         FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsCoupledInputs="), Inputs);

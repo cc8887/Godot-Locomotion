@@ -229,7 +229,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                 {
                     var names = rig.Definition.Bodies.Select(b => b.Bone).Concat(scene is null ? ["floor"] :
                         Enumerable.Range(0, scene.BodyCount).Select(i => scene.BodyAt(i).Name.ToString())).ToArray();
-                    source = new AlsContactTrace(query, registry, rig.Definition.Mesh, names, () => _frame, _traceFirst, _traceLast, _traceBones);
+                    source = new AlsContactTrace(query, registry, rig.Definition.Mesh, names, () => _frame, _traceFirst, _traceLast, _traceBones,
+                        OS.GetCmdlineUserArgs().Contains("--trace-geometry") ? query.Describe : null);
                 }
                 contacts = new(registry, source, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16, island);
                 if (_captureFrames.Count > 0) island.SetStepObserver(new AlsIslandStepCapture(rig.Definition, rig.Settings,
