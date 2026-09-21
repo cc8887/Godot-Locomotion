@@ -8,6 +8,12 @@
 
 # 运行和验证
 
+- Capsule退化批次最终Import Release固定JIT串行全量2418通过/1既有跳过/0失败，退出0；整链8/12及Editor旧退出异常边界见下条。
+
+- Capsule退化批次普通Editor33572加载标记成功后0xC0000005退出，DLL释放，两旧Condition failed仍在；普通重启门禁失败。其他进展见下条。
+
+- 最新capsule退化修复：`docs/verification/2026-09-22-physics-capsule-degenerate.md`。原生9072样本确认140组各一NaN补点；Core只省略distance恰0的无定义补点，保留最近点/其他有效点，邻居不放宽epsilon。全部有限点逐序/点/法向/Phi精确一致，旧7056精确且旧原生重导字节不变，新重导一致。关闭上一批原子拒绝导致整步中断的缺口；明确为原生未定义值稳定处理，不称复制NaN。Core2834、优化构建、三频率各120步动态/固定连续求解及旧smoke全过。整链仍8/12且八成功JSON字节一致，普通60/高120/平移30/旋转30四失败未修。UE全Editor审计/冷重导/DataValidation过；普通demo未接。继续capsule-convex/sphere混合、actual trace及四失败，再完整角色目标。
+
 - Capsule pair批次最终Import Release固定JIT串行全量2417通过/1既有条件跳过，退出0；原子退化拒绝与8/12边界见下条。
 
 - 最新capsule pair：`docs/verification/2026-09-22-physics-capsule-pair.md`。float相对空间、动态半径归属、同向化/最近点/深穿透和对齐补点；原生7056有序点数/点/法向/Phi精确一致、重导字节一致，修正共用reciprocal计算差。显式native pair必须PrepareStep提供动态归属，共用cull每帧查。Core2833+退化定向4、优化构建、三频率smoke新增各20及旧项过。整链 **8/12**：普通30恢复M82/A138睡；普通60（M596才睡，比上批574晚）、高120、平移30/旋转30四失败未修。已知补点恰落另一轴distance0：Core原子拒绝非有限法向，未有专门UE对照/未修，不能声称全输入稳定。UE全Editor审计/重导/DataValidation过，普通Editor2032本次退出0/DLL释放，两旧Condition failed/既往AV未修。普通demo未接。继续该退化、capsule-convex及sphere混合/actual trace，再四失败和完整角色总目标。

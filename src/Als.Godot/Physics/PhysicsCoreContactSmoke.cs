@@ -26,6 +26,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _sphereBoxChecks;
     private int _fullCapsuleBoxChecks;
     private int _capsulePairChecks;
+    private int _capsuleDegenerateSteps;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -93,6 +94,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
                 native_sphere_box_checks = _sphereBoxChecks,
                 native_capsule_box_checks = _fullCapsuleBoxChecks,
                 native_capsule_pair_checks = _capsulePairChecks,
+                capsule_degenerate_steps = _capsuleDegenerateSteps,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -135,6 +137,40 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeSphereBoxChecks();
         NativeFullCapsuleBoxChecks();
         NativeCapsulePairChecks();
+        CapsuleDegenerateStepChecks();
+    }
+
+    private void CapsuleDegenerateStepChecks()
+    {
+        var identity = AlsPrecisePose.Identity;
+        using var shapeA = new CapsuleShape3D { Radius = .02f, Height = .24f, Margin = 0 };
+        using var shapeB = new CapsuleShape3D { Radius = .07f, Height = .34f, Margin = 0 };
+        foreach (var dynamicB in new[] { false, true })
+        {
+            var registry = new AlsContactRegistry(2, 2); using var query = new AlsGodotContactQuery(registry, new(3, .01f, 1, 1, 3));
+            query.Bind(registry.Register(new(0, identity, 1, 1, true)), shapeA, nativeCapsule: new(new(0, 0, -10), NVector.UnitZ, 20, 2));
+            query.Bind(registry.Register(new(1, identity, 1, 1, dynamicB)), shapeB, nativeCapsule: new(new(0, 0, -10), NVector.UnitZ, 20, 7));
+            query.BindBodyBounds(0, 24); query.BindBodyBounds(1, 34);
+            var bodies = new[] { new AlsIslandBody(identity, new(1, new(.001, .001, .001))),
+                new AlsIslandBody(identity, dynamicB ? new(1, new(.001, .001, .001)) : default) };
+            var states = new[] { new AlsIslandBodyState(identity with { Position = new(0, 2, 0) }, default), new AlsIslandBodyState(identity, default) };
+            var island = new AlsJointIsland(bodies, [], states);
+            var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 1000));
+            for (var step = 0; step < 60; step++)
+            {
+                island.StepForceFree(1d / _hz, contacts);
+                if (step == 0) Require(contacts.LastContactCount == 1, "Degenerate supplement dropped the valid closest contact or reached the solver.");
+                for (var body = 0; body < 2; body++)
+                {
+                    var state = island.BodyAt(body); state.Actor.Validate(1e-5);
+                    Require(new AlsDoubleVector(state.Velocity.Linear).IsFinite && new AlsDoubleVector(state.Velocity.Angular).IsFinite,
+                        "Degenerate capsule overlap produced nonfinite solver output.");
+                }
+                if (!dynamicB) Require(island.BodyAt(1).Actor == identity, "Degenerate pair moved the fixed body.");
+                _capsuleDegenerateSteps++;
+            }
+            Require(query.NativeCapsulePairQueries > 0 && query.NarrowPhaseQueries == 0, "Degenerate steps bypassed the native pair path.");
+        }
     }
 
     private void NativeCapsulePairChecks()

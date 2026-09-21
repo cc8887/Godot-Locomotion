@@ -10,7 +10,7 @@
 #include "Misc/Paths.h"
 #include "Serialization/JsonSerializer.h"
 namespace AlsJointSolverReference { TArray<TSharedPtr<FJsonValue>> V(const FVector& P); TSharedRef<FJsonObject> T(const FTransform& P); }
-bool ExportAlsPhysicsCapsulePairReference(const FString& Output,FString& Error)
+bool ExportAlsPhysicsCapsulePairReference(const FString& Output,FString& Error,bool DegenerateOnly)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;
     const auto Fail=[&](const TCHAR* M){Error=M;return false;};
@@ -22,7 +22,11 @@ bool ExportAlsPhysicsCapsulePairReference(const FString& Output,FString& Error)
         if(!CVar)return Fail(TEXT("Missing capsule manifold CVar."));Root->SetNumberField(Name,CVar->GetFloat());
     }
     TArray<TSharedPtr<FJsonValue>> Cases;
-    const TArray<FVec3> Positions={FVec3(0),FVec3(0,8,0),FVec3(0,12,0),FVec3(0,13,0),FVec3(0,13.0001,0),FVec3(0,5,20),FVec3(0,0,25)};
+    TArray<FVec3> Positions={FVec3(0),FVec3(0,8,0),FVec3(0,12,0),FVec3(0,13,0),FVec3(0,13.0001,0),FVec3(0,5,20),FVec3(0,0,25)};
+    if(DegenerateOnly){
+        Root->SetStringField(TEXT("observation"),TEXT("Native CapsuleCapsule supplemental surface point on the other segment axis and +/-1e-5 cm neighbors; nonfinite native point fields explicitly flagged, never encoded as JSON numbers; no solver trajectory parity"));
+        Positions.Reset();for(double Radius:{2.,5.,7.})for(double Offset:{-.00001,0.,.00001})Positions.Add(FVec3(0,Radius+Offset,0));
+    }
     for(int32 PoseMode=0;PoseMode<3;++PoseMode)for(int32 CenterMode=0;CenterMode<2;++CenterMode)for(int32 Motion=0;Motion<3;++Motion)
     for(int32 RadiusMode=0;RadiusMode<2;++RadiusMode)for(double Height:{1.,20.})for(double Cull:{0.,3.})
     for(double Tilt:{0.,.009,.65,1.2,UE_DOUBLE_PI*.5,UE_DOUBLE_PI,2.5})for(const auto& Position:Positions)
@@ -56,6 +60,12 @@ bool ExportAlsPhysicsCapsulePairReference(const FString& Output,FString& Error)
         Row->SetNumberField(TEXT("cull"),Cull);Row->SetObjectField(TEXT("poseA"),T(FTransform(PoseA)));Row->SetObjectField(TEXT("poseB"),T(FTransform(PoseB)));
         TArray<TSharedPtr<FJsonValue>> Points;
         for(int32 I=0;I<C->NumManifoldPoints();++I){const auto& Point=C->GetManifoldPoint(I).ContactPoint;auto J=MakeShared<FJsonObject>();
+            if(DegenerateOnly){
+                const bool Point0Finite=!Point.ShapeContactPoints[0].ContainsNaN(),Point1Finite=!Point.ShapeContactPoints[1].ContainsNaN(),NormalFinite=!Point.ShapeContactNormal.ContainsNaN();
+                const bool Finite=Point0Finite&&Point1Finite&&NormalFinite&&FMath::IsFinite(Point.Phi);J->SetBoolField(TEXT("finite"),Finite);
+                if(!Finite){J->SetBoolField(TEXT("point0Finite"),Point0Finite);J->SetBoolField(TEXT("point1Finite"),Point1Finite);J->SetBoolField(TEXT("normalFinite"),NormalFinite);
+                    if(FMath::IsFinite(Point.Phi))J->SetNumberField(TEXT("phi"),Point.Phi);Points.Add(MakeShared<FJsonValueObject>(J));continue;}
+            }
             J->SetArrayField(TEXT("point0"),V(FVec3(Point.ShapeContactPoints[0])));J->SetArrayField(TEXT("point1"),V(FVec3(Point.ShapeContactPoints[1])));
             J->SetArrayField(TEXT("normal1"),V(FVec3(Point.ShapeContactNormal)));J->SetNumberField(TEXT("phi"),Point.Phi);Points.Add(MakeShared<FJsonValueObject>(J));}
         Row->SetArrayField(TEXT("points"),Points);Cases.Add(MakeShared<FJsonValueObject>(Row));
