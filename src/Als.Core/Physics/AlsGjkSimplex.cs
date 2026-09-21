@@ -48,8 +48,9 @@ public static class AlsGjkSimplex
         var x0 = p[i0]; var x1 = p[i1]; var x2 = p[i2];
         var normal = AlsDoubleVector.Cross(x1 - x0, x2 - x0); var squared = normal.LengthSquared;
         if ((x0 * MinimumNormal).LengthSquared >= squared) { n = 2; return Line(p, ids, ref n, w); }
-        // Preserve component division before the dot (not reciprocal multiplication).
-        var divided = new AlsDoubleVector(normal.X / squared, normal.Y / squared, normal.Z / squared);
+        // Reciprocal multiplication matches the captured /fp:fast UE build;
+        // component division can change zero-direction support ties in GJK.
+        var divided = normal * (1 / squared);
         var projection = normal * AlsDoubleVector.Dot(x0, divided);
         var determinant = 0d; var bestU = -1; var bestV = 0; var maximum = 0d; var u = 1; var v = 2;
         for (var axis = 0; axis < 3; axis++)

@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- GJK 搜索批次最终全量：Core 串行2762通过，Import串行2381通过/1既有跳过，均退出0；普通Editor退出异常与整链9/12边界见下条。
+
+- 最新 GJK 搜索：`docs/verification/2026-09-21-physics-gjk-search.md`。Core 新增 indexed warm-startable 搜索、当前相对姿态缓存恢复、局部 witness 持久化及失败不发布/暂存复制；凸包零 margin、盒体显式 margin。528 原生连续帧缓存点/点序一致，187 恢复，210 无 EPA 帧距离/法向/点差 0、编号一致；318 需 EPA 帧仅验 GJK 缓存，穿透未完成。倒数乘法修正当前 UE /fp:fast 对照的数值分歧，旧576 simplex点差降0，1024支持点/编号仍一致。冷重导字节一致；Core2762、Godot优化构建通过。UE全目标审计/DataValidation通过，普通Editor加载标记成功后仍0xC0000005退出，两旧Condition failed未修复，不能称全门禁通过。未接运行时、未重跑整链，最新仍9/12。下一步EPA、实际pair margin、原生vertex-plane邻接/选面，再凸包接管/分离cull/三旧失败及普通Ragdoll等完整目标。
+
 - 最新 GJK 底层：`docs/verification/2026-09-21-physics-gjk-primitives.md`。Core移植indexed double线段/三角形/四面体约简和witness同步压紧，支持真实cooked凸包零margin支持点/float顶点身份。576原生simplex有效点/身份一致，最近点最大差9.60e-10 cm，权重3.33e-16；1024两脚支持点/编号精确一致，重导一致。冷导UseGJK2=false、GJK/EPA epsilon均float1e-6。Core2757/Import2380+1旧跳过、Godot优化构建通过。UE全目标审计/重导/DataValidation/普通重启退出0；两条旧Condition failed和既往间歇退出访问冲突未解决。未接运行时、未重跑整链，最新仍上批9/12；下一步完整warm-startable GJK循环/缓存恢复、EPA、实际pair margin、vertex-plane邻接/选面，再凸包接管/分离cull/三旧失败/普通Ragdoll等完整目标。
 
 - 面裁剪批次最终全量：Core串行2754通过，Import串行2378通过/1既有跳过，退出0；整链9/12和普通Editor退出异常边界见下条。
