@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsContactShockOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsContactReference(PhysicsOutput, Error, false, true))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Contact shock export failed: %s"), *Error); return 26; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CONTACT_SHOCK_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsManifoldRestoreOutput="), PhysicsOutput))
     {
         FString Error;

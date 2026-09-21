@@ -15,6 +15,15 @@ public interface IAlsContactGeometrySource
 }
 
 public readonly record struct AlsPreparedContactPair(int Body0, int Body1, int PointCount, AlsContactMaterial Material);
+public readonly record struct AlsContactShockSettings(int PositionIterations, int VelocityIterations, float PositionScale, float VelocityScale)
+{
+    public static AlsContactShockSettings Native => new(3, 2, .77f, .77f);
+    internal void Validate()
+    {
+        if (PositionIterations < 0 || VelocityIterations < 0 || !float.IsFinite(PositionScale) || !float.IsFinite(VelocityScale) ||
+            PositionScale < 0 || PositionScale > 1 || VelocityScale < 0 || VelocityScale > 1) throw new ArgumentException("Invalid contact shock settings.");
+    }
+}
 
 // Fixed-topology contact owner. A sleeping island holds this owner's epoch and
 // histories until it resumes. Every eligible pair shares the island's
@@ -34,6 +43,9 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     private readonly AlsDetectedContact[] _points;
     private readonly AlsContactMaterial _material;
     private readonly AlsContactGatherSettings _settings;
+    public AlsContactShockSettings ShockSettings { get; }
+    public bool UsesGraphLevels => _order is not null;
+    public int PreparedBodyLevelAt(int body) { Pending(); return _order?.BodyLevelAt(body) ?? 0; }
     private int _count, _contactCount, _activeCount, _restoredCount;
     private long _epoch;
     private long _committedRegistryVersion = -1;
@@ -55,11 +67,13 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         return _order?.ContactSlotAt(index) ?? _active[index];
     }
     public AlsWorldContacts(AlsContactRegistry registry, IAlsContactGeometrySource source,
-        AlsContactMaterial material, AlsContactGatherSettings settings, int pointsPerPair = 8, AlsJointIsland? island = null)
+        AlsContactMaterial material, AlsContactGatherSettings settings, int pointsPerPair = 8, AlsJointIsland? island = null,
+        AlsContactShockSettings? shockSettings = null)
     {
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(source);
         if (pointsPerPair <= 0) throw new ArgumentOutOfRangeException(nameof(pointsPerPair));
         _registry = registry; _source = source; _material = material; _settings = settings;
+        ShockSettings = shockSettings ?? AlsContactShockSettings.Native; ShockSettings.Validate();
         var capacity = checked(registry.Capacity * (registry.Capacity - 1) / 2);
         _pairs = new AlsPersistentContactPair[capacity]; for (var i = 0; i < capacity; i++) _pairs[i] = new(pointsPerPair);
         _manifolds = new AlsContactManifoldCache[capacity]; for (var i = 0; i < capacity; i++) _manifolds[i] = new(pointsPerPair);
@@ -142,12 +156,27 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     public void SolvePosition(Span<AlsProjectionDelta> bodies, int iteration, int iterationCount)
     {
         Pending();
-        for (var i = 0; i < (_order?.Count ?? _count); i++) { var slot = _order?.ContactSlotAt(i) ?? _prepared[i]; _pairs[slot].SolvePosition(ref bodies[_body0[slot]], ref bodies[_body1[slot]], iteration >= iterationCount - 4); }
+        for (var i = 0; i < (_order?.Count ?? _count); i++)
+        {
+            var slot = _order?.ContactSlotAt(i) ?? _prepared[i];
+            SetShock(slot, iteration >= iterationCount - ShockSettings.PositionIterations ? ShockSettings.PositionScale : 1);
+            _pairs[slot].SolvePosition(ref bodies[_body0[slot]], ref bodies[_body1[slot]], iteration >= iterationCount - 4);
+        }
     }
     public void SolveVelocity(Span<AlsProjectionVelocity> bodies, int iteration, int iterationCount, double dt)
     {
         Pending();
-        for (var i = 0; i < (_order?.Count ?? _count); i++) { var slot = _order?.ContactSlotAt(i) ?? _prepared[i]; _pairs[slot].SolveVelocity(ref bodies[_body0[slot]], ref bodies[_body1[slot]], (float)dt, iteration == iterationCount - 1); }
+        for (var i = 0; i < (_order?.Count ?? _count); i++)
+        {
+            var slot = _order?.ContactSlotAt(i) ?? _prepared[i];
+            SetShock(slot, iteration >= iterationCount - ShockSettings.VelocityIterations ? ShockSettings.VelocityScale : 1);
+            _pairs[slot].SolveVelocity(ref bodies[_body0[slot]], ref bodies[_body1[slot]], (float)dt, iteration == iterationCount - 1);
+        }
+    }
+    private void SetShock(int slot, float scale)
+    {
+        // Legacy isolated providers have no graph and do not invent levels.
+        if (_order is not null) _pairs[slot].SetShockPropagation(_order.BodyLevelAt(_body0[slot]), _order.BodyLevelAt(_body1[slot]), scale);
     }
     public void PrepareConstraintOrder(AlsJointIsland island, Span<int> jointOrder)
     { Pending(); _order?.Prepare(island, _active.AsSpan(0, _activeCount), _body0, _body1, _identities, jointOrder); }

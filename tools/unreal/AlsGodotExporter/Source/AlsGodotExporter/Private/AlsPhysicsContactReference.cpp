@@ -19,11 +19,11 @@ TArray<TSharedPtr<FJsonValue>> V(const FVector& P);
 TSharedRef<FJsonObject> T(const FTransform& P);
 }
 
-bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool GatherGeometry)
+bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool GatherGeometry,bool ShockPropagation)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
-    if(Output.IsEmpty()||FPaths::IsRelative(Output)||IFileManager::Get().FileExists(*Output))
+    if((GatherGeometry&&ShockPropagation)||Output.IsEmpty()||FPaths::IsRelative(Output)||IFileManager::Get().FileExists(*Output))
         return Fail(TEXT("Contact reference requires a new absolute file."));
     auto Root=MakeShared<FJsonObject>();Root->SetNumberField(TEXT("schemaVersion"),1);
     Root->SetStringField(TEXT("engine"),FEngineVersion::Current().ToString());
@@ -44,6 +44,17 @@ bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool 
         Vars->SetNumberField(Entry.Key,CVar->GetFloat());
     }
     Root->SetObjectField(TEXT("cvars"),Vars);TArray<TSharedPtr<FJsonValue>> Rows;
+    if(ShockPropagation)
+    {
+        Root->SetNumberField(TEXT("schemaVersion"),3);
+        Root->SetStringField(TEXT("observation"),TEXT("Native collision container shock propagation: supplied body levels, normal-only mass updates with persistent tangent cache/lambdas; position/velocity switches; no geometry or full trajectory equivalence"));
+        for(const auto* Name:{TEXT("p.Chaos.PBDCollisionSolver.Position.MinInvMassScale"),TEXT("p.Chaos.PBDCollisionSolver.Velocity.MinInvMassScale")})
+        {
+            const auto* Var=IConsoleManager::Get().FindConsoleVariable(Name);
+            if(!Var||Var->GetFloat()!=.77f)return Fail(TEXT("Native shock scale differs."));
+            Vars->SetNumberField(Name,Var->GetFloat());
+        }
+    }
     if(GatherGeometry)
     {
         Root->SetNumberField(TEXT("schemaVersion"),2);
@@ -57,7 +68,8 @@ bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool 
         }
     }
     for(int32 Hz:{30,60,120})for(int32 Mode=0;Mode<3;++Mode)for(int32 Count:{1,4})
-    for(int32 Scenario=0;Scenario<(GatherGeometry?12:8);++Scenario)for(bool Seeded:{false,true})
+    for(int32 Scenario=0;Scenario<(GatherGeometry?12:ShockPropagation?2:8);++Scenario)for(bool Seeded:{false,true})
+    for(int32 LevelMode=0;LevelMode<(ShockPropagation?3:1);++LevelMode)for(int32 Timing=0;Timing<(ShockPropagation?3:1);++Timing)
     {
         const double Dt=static_cast<double>(1.f/Hz);
         FParticleUniqueIndicesMultithreaded Unique;FPBDRigidsSOAs Particles(Unique);const auto Pair=Particles.CreateDynamicParticles(2);
@@ -76,6 +88,11 @@ bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool 
         Collided.Resize(2);Materials.Resize(2);PerParticleMaterials.Resize(2);
         FPBDCollisionConstraints Constraints(Particles,Collided,Materials,PerParticleMaterials,nullptr);
         FPBDCollisionSolverSettings Settings;Settings.NumPositionShockPropagationIterations=Settings.NumVelocityShockPropagationIterations=0;
+        if(ShockPropagation)
+        {
+            Settings.NumPositionShockPropagationIterations=Timing==2?0:3;
+            Settings.NumVelocityShockPropagationIterations=Timing==1?1:2;
+        }
         Settings.NumPositionFrictionIterations=4;Settings.NumVelocityFrictionIterations=1;
         Settings.MaxPushOutVelocity=Scenario==7?3:0;Constraints.SetSolverSettings(Settings);
         const_cast<FCollisionDetectorSettings&>(Constraints.GetDetectorSettings()).bDeferNarrowPhase=false;
@@ -130,6 +147,7 @@ bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool 
             Body.SetX(FVec3(0,0,Index==0?1:-2));Body.SetP(Body.X());Body.SetR(Q);Body.SetQ(Q);
             if(GatherGeometry){Body.SetX(Origin+FVec3(0,0,Index==0?1:-2));Body.SetP(Body.X());}
             Body.SetInvM((Mode==1&&Index==1)||(Mode==2&&Index==0)?0:Index==0?.5:.2);
+            if(ShockPropagation)Body.SetLevel(LevelMode==2?2:(Index==LevelMode?2:3));
             const_cast<FSolverVec3&>(Body.InvILocal())=Index==0?FSolverVec3(.03,.02,.01):FSolverVec3(.01,.04,.02);
             Body.SetInvI(Utilities::ComputeWorldSpaceInertia(Q,FVec3(Body.InvILocal())));
             Body.SetV(Index==0?FVec3(Scenario==1?.01:30,Scenario==1?.02:4,-80):FVec3(2,-1,3));
@@ -172,12 +190,19 @@ bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool 
         auto Row=MakeShared<FJsonObject>();Row->SetNumberField(TEXT("hz"),Hz);Row->SetNumberField(TEXT("dt"),Dt);
         if(GatherGeometry)Row->SetObjectField(TEXT("geometry"),Geometry);
         Row->SetNumberField(TEXT("bodyMode"),Mode);Row->SetNumberField(TEXT("scenario"),Scenario);Row->SetBoolField(TEXT("seeded"),Seeded);
+        if(ShockPropagation)
+        {
+            Row->SetNumberField(TEXT("levelMode"),LevelMode); Row->SetNumberField(TEXT("timing"),Timing);
+            Row->SetNumberField(TEXT("positionShockIterations"),Settings.NumPositionShockPropagationIterations);
+            Row->SetNumberField(TEXT("velocityShockIterations"),Settings.NumVelocityShockPropagationIterations);
+        }
         Row->SetNumberField(TEXT("stiffness"),Constraint->GetStiffness());Row->SetNumberField(TEXT("staticFriction"),Native.GetStaticFriction());
         Row->SetNumberField(TEXT("dynamicFriction"),Native.GetDynamicFriction());Row->SetNumberField(TEXT("velocityFriction"),Native.GetVelocityFriction());
         Row->SetNumberField(TEXT("minFrictionPushOut"),Constraint->GetMinFrictionPushOut());
         TArray<TSharedPtr<FJsonValue>> Inputs,BodyInputs;
         for(int32 I=0;I<2;++I){auto O=MakeShared<FJsonObject>();O->SetObjectField(TEXT("pose"),T(FTransform(B[I]->Q(),B[I]->P())));
-            O->SetNumberField(TEXT("inverseMass"),B[I]->InvM());O->SetArrayField(TEXT("inverseInertia"),V(FVec3(B[I]->InvILocal())));BodyInputs.Add(MakeShared<FJsonValueObject>(O));}
+            O->SetNumberField(TEXT("inverseMass"),B[I]->InvM());O->SetArrayField(TEXT("inverseInertia"),V(FVec3(B[I]->InvILocal())));
+            if(ShockPropagation)O->SetNumberField(TEXT("level"),B[I]->Level()); BodyInputs.Add(MakeShared<FJsonValueObject>(O));}
         Row->SetArrayField(TEXT("bodies"),BodyInputs);
         for(int32 I=0;I<Count;++I)
         {
@@ -201,6 +226,7 @@ bool ExportAlsPhysicsContactReference(const FString& Output,FString& Error,bool 
             for(int32 I=0;I<Count;++I){const auto& P=Native.GetManifoldPoint(I);auto O=MakeShared<FJsonObject>();
                 O->SetArrayField(TEXT("pushOut"),V(FVec3(P.NetPushOutNormal,P.NetPushOutTangentU,P.NetPushOutTangentV)));
                 O->SetArrayField(TEXT("impulse"),V(FVec3(P.NetImpulseNormal,P.NetImpulseTangentU,P.NetImpulseTangentV)));
+                if(ShockPropagation)O->SetArrayField(TEXT("mass"),V(FVec3(P.ContactMassNormal,P.ContactMassTangentU,P.ContactMassTangentV)));
                 O->SetNumberField(TEXT("frictionRatio"),P.StaticFrictionRatio);Points.Add(MakeShared<FJsonValueObject>(O));}
             S->SetArrayField(TEXT("bodies"),States);S->SetArrayField(TEXT("points"),Points);return S;
         };

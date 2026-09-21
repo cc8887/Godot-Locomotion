@@ -53,6 +53,8 @@ public sealed class AlsPersistentContactPair
 
     public void SolvePosition(ref AlsProjectionDelta body0, ref AlsProjectionDelta body1, bool friction)
     { RequirePending(); _solver.SolvePosition(ref body0, ref body1, friction); }
+    public void SetShockPropagation(int level0, int level1, float scale)
+    { RequirePending(); _solver.SetShockPropagation(level0, level1, scale); }
     public void SolveVelocity(ref AlsProjectionVelocity body0, ref AlsProjectionVelocity body1, float dt, bool friction)
     { RequirePending(); _solver.SolveVelocity(ref body0, ref body1, dt, friction); }
     public void Commit()

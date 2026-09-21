@@ -13,18 +13,21 @@ public readonly record struct AlsContactMaterial(float StaticFriction, float Dyn
     float VelocityFriction, float MinFrictionPushOut = 0, float Stiffness = 1,
     float PositionFrictionStiffness = .5f, float VelocityFrictionStiffness = 1);
 
-// Chaos Gauss-Seidel hard-contact rows. No split impulse, soft shell, shock
-// propagation, average-point restitution or one-dimensional friction. The owner
+// Chaos Gauss-Seidel hard-contact rows. No split impulse, soft shell,
+// average-point restitution or one-dimensional friction. The owner
 // solves ALL normals in a manifold before ALL position-friction rows; velocity
 // rows visit points in order. Cache once per step; each instance owns its lambda.
 public struct AlsCachedContactPoint
 {
     private readonly record struct Axis(Vector3 Direction, Vector3 Cross0, Vector3 Cross1,
         Vector3 Response0, Vector3 Response1, float Mass);
-    private readonly Axis _n, _u, _v;
+    private Axis _n;
+    private readonly Axis _u, _v;
     private readonly AlsContactPointInput _input;
     private readonly AlsContactMaterial _material;
-    private readonly float _inverseMass0, _inverseMass1;
+    private float _inverseMass0, _inverseMass1, _scale0, _scale1;
+    private readonly float _baseMass0, _baseMass1;
+    private readonly AlsJointInertiaTensor _tensor0, _tensor1;
     public Vector3 PushOut { get; private set; }
     public Vector3 Impulse { get; private set; }
     public float StaticFrictionRatio { get; private set; }
@@ -45,13 +48,33 @@ public struct AlsCachedContactPoint
         Validate(input, fromNativeGather); Validate(material); Validate(rotation0); Validate(rotation1);
         _ = AlsJointMassConditioning.Apply(mass0, mass1, 0, 0);
         _inverseMass0 = InverseMass(mass0.Mass); _inverseMass1 = InverseMass(mass1.Mass);
+        _baseMass0 = _inverseMass0; _baseMass1 = _inverseMass1; _scale0 = _scale1 = 1;
         var tensor0 = AlsJointInertiaTensor.World(rotation0, _inverseMass0 > 0 ? mass0 : default);
         var tensor1 = AlsJointInertiaTensor.World(rotation1, _inverseMass1 > 0 ? mass1 : default);
+        _tensor0 = tensor0; _tensor1 = tensor1;
         _n = MakeAxis(input.Normal, input.Arm0, input.Arm1, tensor0, tensor1, _inverseMass0, _inverseMass1);
         _u = MakeAxis(input.TangentU, input.Arm0, input.Arm1, tensor0, tensor1, _inverseMass0, _inverseMass1);
         _v = MakeAxis(input.TangentV, input.Arm0, input.Arm1, tensor0, tensor1, _inverseMass0, _inverseMass1);
         _input = input; _material = material;
     }
+
+    public void SetShockPropagation(int level0, int level1, float scale)
+    {
+        if (!float.IsFinite(scale) || scale < 0 || scale > 1) throw new ArgumentOutOfRangeException(nameof(scale));
+        var a = 1f; var b = 1f;
+        if (_baseMass0 > 0 && _baseMass1 > 0 && level0 != level1)
+        { if (level0 < level1) a = scale; else b = scale; }
+        if (a == _scale0 && b == _scale1) return;
+        _scale0 = a; _scale1 = b;
+        _inverseMass0 = InverseMass(a * _baseMass0); _inverseMass1 = InverseMass(b * _baseMass1);
+        // Native UpdateMassNormal updates per-contact linear inverse masses and
+        // normal angular response/mass ONLY. Tangent mass/angular response and
+        // accumulated pushout/impulse deliberately survive the switch.
+        _n = MakeAxis(_input.Normal, _input.Arm0, _input.Arm1,
+            ScaleTensor(_tensor0, a), ScaleTensor(_tensor1, b), _inverseMass0, _inverseMass1);
+    }
+    private static AlsJointInertiaTensor ScaleTensor(AlsJointInertiaTensor tensor, float scale) =>
+        new(new(tensor.X.ToSingle() * scale), new(tensor.Y.ToSingle() * scale), new(tensor.Z.ToSingle() * scale));
 
     public void SolvePositionNormal(ref AlsProjectionDelta body0, ref AlsProjectionDelta body1)
     {

@@ -7,7 +7,7 @@ namespace GodotAls.Physics;
 
 // Core generates guarded capsule/box-face manifolds; other pairs use a geometry-
 // only Jolt query space. It contains exactly one target shape, so every
-// CollideShape point pair has an unambiguous registry identity. A hull wholly
+// CollideShape point pair has an unambiguous registry identity. A hull/box wholly
 // inside a box face can use that exact local half-space. Core alone owns
 // dynamic response. Convex input shapes only; no CCD or native Chaos
 // narrow-phase parity is claimed. Godot's returned arrays allocate on Main.
@@ -75,10 +75,14 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     public int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check();
-        // Keep the hull/capsule as the query and the box as the target so the
+        // Keep the hull/capsule (or proven interior box) as the query so the
         // proven face-interior cases below have one ordering. Return the original
         // body order and shape-local normal to the contact owner.
-        if (BindingAt(shape0).Shape is BoxShape3D && BindingAt(shape1).Shape is ConvexPolygonShape3D or CapsuleShape3D)
+        var a = BindingAt(shape0); var b = BindingAt(shape1);
+        var reverseBoxFace = a.Shape is BoxShape3D && b.Shape is BoxShape3D &&
+            TryInteriorFace(b, ToGodot(world1 with { Position = AlsDoubleVector.Zero }),
+                a, ToGodot(world0 with { Position = world0.Position - world1.Position }), out _);
+        if (a.Shape is BoxShape3D && (b.Shape is ConvexPolygonShape3D or CapsuleShape3D || reverseBoxFace))
         {
             var count = QueryOrdered(shape1, world1, shape0, world0, destination);
             for (var i = 0; i < count; i++)
@@ -147,7 +151,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private static bool TryInteriorFace(Binding a, Transform3D t0, Binding b, Transform3D t1, out Plane face)
     {
         face = default;
-        if (a.Shape is not ConvexPolygonShape3D || b.Shape is not BoxShape3D box) return false;
+        if (a.Shape is not (ConvexPolygonShape3D or BoxShape3D) || b.Shape is not BoxShape3D box) return false;
         // A bounding box is conservative for the actual hull. Within an escape
         // distance of this face, the whole hull must remain inside the flat face
         // and clear of its rounded edges. Only then is this plane locally EXACT,
@@ -158,8 +162,11 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         for (var axis = 0; axis < 3; axis++) for (var sign = -1; sign <= 1; sign += 2)
         {
             var depth = sign > 0 ? half[axis] - min[axis] : half[axis] + max[axis];
-            if (depth < 0 || depth >= best) continue;
-            var clearance = depth + box.Margin + .001f;
+            if (depth >= best) continue;
+            // A nearly touching shape can be microscopically outside this
+            // face after float conversion. Keep the separating face eligible;
+            // skipping negative depth would select the opposite box face.
+            var clearance = Math.Max(depth, 0) + box.Margin + .001f;
             var inside = true;
             for (var tangent = 0; tangent < 3; tangent++) if (tangent != axis)
                 inside &= min[tangent] > -half[tangent] + clearance && max[tangent] < half[tangent] - clearance;

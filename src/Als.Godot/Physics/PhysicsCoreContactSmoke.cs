@@ -62,7 +62,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); ManifoldChecks(); SleepChecks(); }
+            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); AssetCalfFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); ManifoldChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -164,6 +164,38 @@ public partial class PhysicsCoreContactSmoke : Node3D
         Require(!failed, "Captured foot query selected the bottom face instead of the nearby top face.");
     }
 
+    private void AssetCalfFaceChecks()
+    {
+        var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + "Mannequin.Mannequin");
+        var source = definition.Bodies.Single(b => b.Bone == "calf_r").Shapes.Single(s => s.Type == "box");
+        using var calf = AlsPhysicsContactShapes.Create(source); calf.Margin = 0;
+        using var floor = new BoxShape3D { Size = new(83.17676f, .5f, 63.723648f) };
+        var registry = new AlsContactRegistry(2, 2); using var query = new AlsGodotContactQuery(registry);
+        query.Bind(registry.Register(new(0, AlsPrecisePose.Identity, 1, 1)), calf);
+        query.Bind(registry.Register(new(1, AlsPrecisePose.Identity, 1, 1)), floor);
+        var p = new AlsPrecisePose(new(1.7322910306742516, 13.8289798215876, -37.73688540148525),
+            new(-.6516145783634439, -.24759583758669163, .7168167496635921, .016385645080278788), AlsDoubleVector.One);
+        var q = AlsPrecisePose.Identity with { Position = new(793.5523986816406, -139.2822265625, -68.39840412139893) };
+        var points = new AlsDetectedContact[16]; var failed = false;
+        var variants = new[] { AlsPrecisePose.Identity,
+            new AlsPrecisePose(new(13, -8, 7), AlsQuaternion.FromAxisAngle(NVector.UnitZ, .83f), AlsDoubleVector.One),
+            new AlsPrecisePose(new(1e7, -2e7, 3e7), AlsQuaternion.FromAxisAngle(NVector.Normalize(new(.3f, .8f, .2f)), .31f), AlsDoubleVector.One) };
+        for (var variant = 0; variant < variants.Length; variant++) foreach (var reverse in new[] { false, true })
+        {
+            var a = AlsPrecisePose.Compose(p, variants[variant]); var b = AlsPrecisePose.Compose(q, variants[variant]);
+            var count = reverse ? query.Query(1, b, 0, a, points) : query.Query(0, a, 1, b, points);
+            Require(count > 0, "Captured calf box contact disappeared."); var minimum = 1d; var error = 0d;
+            for (var i = 0; i < count; i++)
+            {
+                var n = reverse ? (new AlsDoubleVector(points[i].Normal1).Rotate(a.Rotation) * -1).Rotate(b.Rotation.Conjugate()) : new AlsDoubleVector(points[i].Normal1);
+                minimum = Math.Min(minimum, n.Z); error = Math.Max(error, Math.Abs((reverse ? points[i].Point0 : points[i].Point1).Z - 25));
+            }
+            GD.Print($"CORE_ASSET_CALF_FACE variant={variant} reversed={reverse} points={count} min_normal_z={minimum:R} floor_face_error_cm={error:R}");
+            failed |= minimum < .999 || error > .002; _precisionChecks++;
+        }
+        Require(!failed, "Captured calf box query selected bottom face instead of nearby top face.");
+    }
+
     private void CapsuleFaceChecks()
     {
         using var doc = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_capsule_geometry_reference.json"));
@@ -213,24 +245,40 @@ public partial class PhysicsCoreContactSmoke : Node3D
         using var hull = new ConvexPolygonShape3D { Margin = 0, Points = Enumerable.Range(0, 8).Select(i =>
             new Vector3((i & 1) == 0 ? -.25f : .25f, (i & 2) == 0 ? -.25f : .25f, (i & 4) == 0 ? -.25f : .25f)).ToArray() };
         using var box = new BoxShape3D { Size = Vector3.One * 4 };
+        using var smallBox = new BoxShape3D { Size = Vector3.One * .5f, Margin = 0 };
         using var query = new AlsGodotContactQuery(registry);
-        query.Bind(registry.Register(new(0, identity, 1, 1)), hull); query.Bind(registry.Register(new(1, identity, 1, 1)), box);
+        var mover = registry.Register(new(0, identity, 1, 1)); query.Bind(registry.Register(new(1, identity, 1, 1)), box);
         var points = new AlsDetectedContact[16];
-        for (var axis = 0; axis < 3; axis++) for (var sign = -1; sign <= 1; sign += 2)
+        foreach (var shape in new Shape3D[] { hull, smallBox })
         {
-            var position = NVector.Zero; position[axis] = sign * 224;
-            var before = query.InteriorFaceQueries;
-            var count = query.Query(0, identity with { Position = new(position) }, 1, identity, points);
-            Require(count > 0 && query.InteriorFaceQueries == before + 1, "Flat box face was not queried.");
-            for (var i = 0; i < count; i++) Require(points[i].Normal1[axis] * sign > .999f &&
-                Math.Abs(points[i].Point1[axis] - sign * 200) < .002, "Wrong box face or normal.");
-            _precisionChecks++;
+            if (shape == smallBox) mover = registry.Replace(mover, registry.At(mover.Slot));
+            query.Bind(mover, shape);
+            for (var axis = 0; axis < 3; axis++) for (var sign = -1; sign <= 1; sign += 2) foreach (var reverse in new[] { false, true })
+            {
+                var position = NVector.Zero; position[axis] = sign * 224;
+                var before = query.InteriorFaceQueries;
+                var pose = identity with { Position = new(position) };
+                var count = reverse ? query.Query(1, identity, 0, pose, points) : query.Query(0, pose, 1, identity, points);
+                Require(count > 0 && query.InteriorFaceQueries == before + 1, "Flat box face was not queried.");
+                for (var i = 0; i < count; i++) Require(points[i].Normal1[axis] * sign * (reverse ? -1 : 1) > .999f &&
+                    Math.Abs((reverse ? points[i].Point0 : points[i].Point1)[axis] - sign * 200) < .002, "Wrong box face or normal.");
+                _precisionChecks++;
+            }
+            var faceQueries = query.InteriorFaceQueries;
+            query.Query(0, identity with { Position = new(224, 224, 0) }, 1, identity, points);
+            Require(query.InteriorFaceQueries == faceQueries, "Box edge was replaced with an infinite face."); _precisionChecks++;
+            var outside = query.Query(0, identity with { Position = new(224, 300, 0) }, 1, identity, points);
+            Require(outside == 0 && query.InteriorFaceQueries == faceQueries, "Finite box footprint was lost."); _precisionChecks++;
+            foreach (var separation in new[] { 0d, .0005d }) foreach (var reverse in new[] { false, true })
+            {
+                var pose = identity with { Position = new(0, 0, 225 + separation) };
+                var count = reverse ? query.Query(1, identity, 0, pose, points) : query.Query(0, pose, 1, identity, points);
+                for (var i = 0; i < count; i++) Require(points[i].Normal1.Z * (reverse ? -1 : 1) > .999f &&
+                    Math.Abs((reverse ? points[i].Point0 : points[i].Point1).Z - 200) < .002,
+                    "Touching/separated bounds selected the distant opposite box face.");
+                _precisionChecks++;
+            }
         }
-        var faceQueries = query.InteriorFaceQueries;
-        query.Query(0, identity with { Position = new(224, 224, 0) }, 1, identity, points);
-        Require(query.InteriorFaceQueries == faceQueries, "Box edge was replaced with an infinite face."); _precisionChecks++;
-        var outside = query.Query(0, identity with { Position = new(224, 300, 0) }, 1, identity, points);
-        Require(outside == 0 && query.InteriorFaceQueries == faceQueries, "Finite box footprint was lost."); _precisionChecks++;
     }
 
     private void GeometryChecks()
