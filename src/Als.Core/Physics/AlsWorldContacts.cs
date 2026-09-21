@@ -20,11 +20,14 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     private readonly IAlsContactGeometrySource _source;
     private readonly AlsPersistentContactPair[] _pairs;
     private readonly int[] _prepared, _body0, _body1;
+    private readonly int[] _active;
+    private readonly AlsContactPairKey[] _identities;
+    private readonly AlsContactConstraintOrder? _order;
     private readonly AlsPrecisePose[] _shapeWorld;
     private readonly AlsDetectedContact[] _points;
     private readonly AlsContactMaterial _material;
     private readonly AlsContactGatherSettings _settings;
-    private int _count, _contactCount;
+    private int _count, _contactCount, _activeCount;
     private long _epoch;
     private long _committedRegistryVersion = -1;
     private bool _pending, _staged;
@@ -33,7 +36,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     public long CompletedSteps => _epoch;
     public bool RequiresWake => _committedRegistryVersion != _registry.ChangeVersion || _source.IsInvalidated;
     public AlsWorldContacts(AlsContactRegistry registry, IAlsContactGeometrySource source,
-        AlsContactMaterial material, AlsContactGatherSettings settings, int pointsPerPair = 8)
+        AlsContactMaterial material, AlsContactGatherSettings settings, int pointsPerPair = 8, AlsJointIsland? island = null)
     {
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(source);
         if (pointsPerPair <= 0) throw new ArgumentOutOfRangeException(nameof(pointsPerPair));
@@ -41,6 +44,12 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         var capacity = checked(registry.Capacity * (registry.Capacity - 1) / 2);
         _pairs = new AlsPersistentContactPair[capacity]; for (var i = 0; i < capacity; i++) _pairs[i] = new(pointsPerPair);
         _prepared = new int[capacity]; _body0 = new int[capacity]; _body1 = new int[capacity];
+        _active = new int[capacity]; _identities = new AlsContactPairKey[capacity];
+        if (island is not null)
+        {
+            if (island.BodyCount != registry.BodyCount) throw new ArgumentException("Ordering island and registry body counts differ.");
+            _order = new(island, capacity);
+        }
         _shapeWorld = new AlsPrecisePose[registry.Capacity]; _points = new AlsDetectedContact[pointsPerPair];
     }
     public void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
@@ -52,7 +61,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         if (predicted.Length != _registry.BodyCount || velocities.Length != predicted.Length || bodies.Length != predicted.Length)
             throw new ArgumentException("Contact registry and island body counts differ.");
         if (_epoch == long.MaxValue) throw new InvalidOperationException("Contact epoch exhausted.");
-        _registry.Enter(); _pending = true; _staged = false; _count = _contactCount = 0;
+        _registry.Enter(); _pending = true; _staged = false; _count = _contactCount = _activeCount = 0;
         try
         {
             for (var i = 0; i < _registry.Capacity; i++) if (_registry.Present(i))
@@ -69,7 +78,8 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
                 if (bodies[ia].InverseMass.Mass <= 0 && bodies[ib].InverseMass.Mass <= 0) continue;
                 var count = _source.Query(a, _shapeWorld[a], b, _shapeWorld[b], _points);
                 if ((uint)count > _points.Length) throw new ArgumentException("Geometry source returned an invalid contact count.");
-                _pairs[slot].Gather(new(_registry.Key(a), _registry.Key(b)), _epoch, _points.AsSpan(0, count),
+                _identities[slot] = new(_registry.Key(a), _registry.Key(b));
+                _pairs[slot].Gather(_identities[slot], _epoch, _points.AsSpan(0, count),
                     new(sa.Quadratic, sb.Quadratic), _material,
                     new(_shapeWorld[a], predicted[ia].Position, (float)bodies[ia].InverseMass.Mass, velocities[ia]), predicted[ia].Rotation, bodies[ia].InverseMass.Inertia,
                     new(_shapeWorld[b], predicted[ib].Position, (float)bodies[ib].InverseMass.Mass, velocities[ib]), predicted[ib].Rotation, bodies[ib].InverseMass.Inertia,
@@ -77,6 +87,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
                         (bodies[ia].InverseMass.Mass > 0 && bodies[ib].InverseMass.Mass > 0) });
                 _body0[slot] = ia; _body1[slot] = ib; _prepared[_count++] = slot;
                 _contactCount += _pairs[slot].SolverCount;
+                if (_pairs[slot].SolverCount > 0) _active[_activeCount++] = slot;
             }
         }
         catch { Abort(); throw; }
@@ -84,16 +95,19 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     public void SolvePosition(Span<AlsProjectionDelta> bodies, int iteration, int iterationCount)
     {
         Pending();
-        for (var i = 0; i < _count; i++) { var slot = _prepared[i]; _pairs[slot].SolvePosition(ref bodies[_body0[slot]], ref bodies[_body1[slot]], iteration >= iterationCount - 4); }
+        for (var i = 0; i < (_order?.Count ?? _count); i++) { var slot = _order?.ContactSlotAt(i) ?? _prepared[i]; _pairs[slot].SolvePosition(ref bodies[_body0[slot]], ref bodies[_body1[slot]], iteration >= iterationCount - 4); }
     }
     public void SolveVelocity(Span<AlsProjectionVelocity> bodies, int iteration, int iterationCount, double dt)
     {
         Pending();
-        for (var i = 0; i < _count; i++) { var slot = _prepared[i]; _pairs[slot].SolveVelocity(ref bodies[_body0[slot]], ref bodies[_body1[slot]], (float)dt, iteration == iterationCount - 1); }
+        for (var i = 0; i < (_order?.Count ?? _count); i++) { var slot = _order?.ContactSlotAt(i) ?? _prepared[i]; _pairs[slot].SolveVelocity(ref bodies[_body0[slot]], ref bodies[_body1[slot]], (float)dt, iteration == iterationCount - 1); }
     }
+    public void PrepareConstraintOrder(AlsJointIsland island, Span<int> jointOrder)
+    { Pending(); _order?.Prepare(island, _active.AsSpan(0, _activeCount), _body0, _body1, _identities, jointOrder); }
     public void StageCommit()
     {
         Pending(); _staged = false;
+        if (_order is not null) _ = _order.Count;
         for (var i = 0; i < _count; i++) _pairs[_prepared[i]].StageCommit();
         _staged = true;
     }
@@ -103,18 +117,21 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         var active = 0;
         for (var i = 0; i < _count; i++) { var pair = _pairs[_prepared[i]]; if (pair.SolverCount > 0) active++; pair.PublishCommit(); }
         LastContactCount = _contactCount; LastActivePairs = active; _epoch++; _committedRegistryVersion = _registry.ChangeVersion;
+        _order?.Commit();
         _pending = _staged = false; _registry.Leave();
     }
     public void Abort()
     {
         if (!_pending) return;
         for (var i = 0; i < _count; i++) _pairs[_prepared[i]].Abort();
+        _order?.Abort();
         _pending = _staged = false; _registry.Leave();
     }
     public void Reset()
     {
         if (_pending) throw new InvalidOperationException("Abort contact step before resetting.");
         foreach (var pair in _pairs) pair.Reset(); _epoch = 0; LastActivePairs = LastContactCount = 0; _committedRegistryVersion = -1;
+        _order?.Reset();
     }
     private void Pending() { if (!_pending) throw new InvalidOperationException("Gather world contacts first."); }
 }
