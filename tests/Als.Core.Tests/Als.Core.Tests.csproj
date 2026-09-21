@@ -27,6 +27,8 @@
           CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures/FootIk/*.json"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/Physics/*.json"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures/P5A/*.json"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- EPA 批次最终全量：Core 串行2767通过，Import串行2382通过/1既有跳过，均退出0；Godot优化构建通过。边界见下条。
+
+- 最新 EPA：`docs/verification/2026-09-21-physics-epa.md`。Core新增原生indexed EPA初始化/面邻接/可见边界扩展/收敛与GJK统一入口，缓存跨GJK+EPA暂存发布，异常不发布可重试，预热盒体零分配。旧原生参考528帧完整contact/身份/缓存对照通过，其中318 EPA帧深度/点/法向差0，最大队列12；256组同MSVC实际STL排序参考覆盖0–1024长度/重复值/分区/堆回退，逐索引一致且重导一致。特殊Degenerate/MaxIterations尚无专门原生对照；点触碰fallback有Core测试。Godot优化构建通过，未改UE插件/未重跑普通重启，上一批0xC0000005及两旧Condition failed保留。尚未接运行时/未重跑整链，最新9/12。下一步退化原生参考、实际pair margin、顶点原生邻接/选面，组合凸包流形并接分离cull，再三旧失败及普通Ragdoll等完整目标。
+
 - GJK 搜索批次最终全量：Core 串行2762通过，Import串行2381通过/1既有跳过，均退出0；普通Editor退出异常与整链9/12边界见下条。
 
 - 最新 GJK 搜索：`docs/verification/2026-09-21-physics-gjk-search.md`。Core 新增 indexed warm-startable 搜索、当前相对姿态缓存恢复、局部 witness 持久化及失败不发布/暂存复制；凸包零 margin、盒体显式 margin。528 原生连续帧缓存点/点序一致，187 恢复，210 无 EPA 帧距离/法向/点差 0、编号一致；318 需 EPA 帧仅验 GJK 缓存，穿透未完成。倒数乘法修正当前 UE /fp:fast 对照的数值分歧，旧576 simplex点差降0，1024支持点/编号仍一致。冷重导字节一致；Core2762、Godot优化构建通过。UE全目标审计/DataValidation通过，普通Editor加载标记成功后仍0xC0000005退出，两旧Condition failed未修复，不能称全门禁通过。未接运行时、未重跑整链，最新仍9/12。下一步EPA、实际pair margin、原生vertex-plane邻接/选面，再凸包接管/分离cull/三旧失败及普通Ragdoll等完整目标。
