@@ -50,7 +50,8 @@ internal sealed class AlsSceneContactSet : IDisposable
                 ConvexPolygonShape3D convex => new { type = "convex", vertices = convex.Points.Select(p => V(ToNative(p))).ToArray() },
                 _ => throw new NotSupportedException("Native world baseline currently supports environment boxes and convex hulls.")
             };
-            return (object)new { name = e.Body.Name.ToString(), body = e.BodyIndex, world = Pose(world), geometry };
+            return (object)new { name = e.Body.Name.ToString(), body = e.BodyIndex, world = Pose(world), geometry,
+                kinematic = e.Body is AnimatableBody3D };
         }).ToArray();
     }
 
