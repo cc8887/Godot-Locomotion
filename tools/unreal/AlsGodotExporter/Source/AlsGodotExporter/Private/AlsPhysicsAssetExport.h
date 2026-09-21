@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+bool ExportAlsPhysicsSphereBoxReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsConvexMarginSupport(const FString& Output, FString& Error);
 
 // Read authored data and native mass properties in an isolated reference-pose world.

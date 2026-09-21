@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Sphere-box 批次最终 Import Release 固定JIT串行全量：2414通过/1既有条件跳过，退出0；其他验证和旧失败边界见下条。
+
+- 最新 sphere-box 完整窄相：`docs/verification/2026-09-22-physics-sphere-box.md`。原生8064例/6516有接触，点数/点/法向/Phi精确一致、冷重导字节一致。保留内部平局/极近表面回退；double Phi严格<cull后存float，接触点乘法double。显式sphere/box绑定接Godot原leaf中心、反序和实际detector，每步查询不恢复polygon。Core2826、优化构建、三频率smoke新增各30项+旧项过；整链仍6/12，六成功JSON与上批字节一致，原六失败未关闭。UE全Editor审计/冷重导/DataValidation过，普通Editor33988加载标记成功但退出0xC0000005，两旧Condition failed仍在，DLL释放；普通重启门禁失败。普通demo未接。下一步capsule边缘/深穿透/混合及actual pair trace适配，再六失败、普通Ragdoll/Get-up等总目标。
+
 - 最新primitive真实几何：`docs/verification/2026-09-22-physics-primitive-geometry.md`。原生32capsule/2sphere/7box的端点/轴/半径/box bounds导出并严格绑定旧runtime快照，重复字节一致且旧runtime重导不变。胶囊局部变换已烘入float端点；registry统一observed leaf，Core接原生起点/轴/高度/半径，Godot代理单独居中转向并回写原leaf点/法向，box用native half。trace类型native_capsule/native_sphere避免旧centered-Z导出器误读；旧capsule trace exporter未支持新类型。Core2823、Import2413+1旧跳过、优化构建及三频率smoke旧检查+2primitive通过；最后高30trace报告字节一致。整链仍 **6/12** 无新失败，高30M77/A88睡；普通30/60、高60/120、平移30、旋转30未过。UE全Editor审计/冷重导/DataValidation过，普通Editor20896本次退出0/DLL释放但两旧Condition failed和既往间歇AV未修。下一步sphere-box完整窄相、胶囊边缘/深穿透/混合与实际pair原生对照、六失败，再普通Ragdoll/Get-up等总目标；普通demo未接。
 
 - 最新胶囊分离接入：`docs/verification/2026-09-22-physics-capsule-cull.md`。Godot已有guarded capsule-box算法由固定cull0改用实际detector/whole-body bounds/PreV；正反序、静止拒绝/速度扩展及quadratic每帧查询新增10检查，三频率smoke各通过（旧551/9/68/3/5/5保留）；既有744原生参考定向1测试通过（444支持/300排除）。未改Core/Import/UE，未重跑全量/UE门禁。整链最新 **6/12**：高30恢复（M79/A127睡，末秒V/W0，anchor5.01755cm）；普通60/M572、高60/M561睡太迟新增两回归，另普通30/高120/平移30/旋转30未过。日志final_speed是末秒最大值，不能误称睡后瞬时速度。下一步实际primitive尺寸/变换、sphere-box完整窄相和capsule边缘/混合分离、历史/tolerance及六失败，再普通Ragdoll/Get-up等完整目标。普通demo未接，旧Editor AV与两Condition failed未修。

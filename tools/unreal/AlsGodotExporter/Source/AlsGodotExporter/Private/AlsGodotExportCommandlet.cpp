@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsSphereBoxOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsSphereBoxReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Sphere-box reference failed: %s"), *Error); return 42; }
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsPrimitiveGeometryOutput="), PhysicsOutput))
     {
         FString Error;

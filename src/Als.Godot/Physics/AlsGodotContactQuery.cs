@@ -51,6 +51,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     internal int CapsuleFaceQueries { get; private set; }
     internal int BoxFaceQueries { get; private set; }
     internal int NativePolygonQueries { get; private set; }
+    internal int NativeSphereBoxQueries { get; private set; }
     internal int NativeCachedPairs => _polygonCache.CachedPairs;
     internal long NativeCacheSteps => _polygonCache.CompletedSteps;
     public bool IsInvalidated
@@ -201,6 +202,25 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination,cull);
             else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination,cull);
             NativePolygonQueries++;return result.Count;
+        }
+        if ((a.NativeSphereRadius.HasValue && b.NativeHalf.HasValue) ||
+            (b.NativeSphereRadius.HasValue && a.NativeHalf.HasValue))
+        {
+            var reverse = b.NativeSphereRadius.HasValue;
+            var sphere = reverse ? b : a; var box = reverse ? a : b;
+            var spherePose = reverse ? world1 : world0; var boxPose = reverse ? world0 : world1;
+            var half = box.NativeHalf!.Value;
+            var found = AlsSphereBoxManifold.Build(sphere.ProxyLocal.Position.ToSingle(), sphere.NativeSphereRadius!.Value,
+                spherePose, half * -1, half, boxPose, CullDistance(shape0, shape1), out var point);
+            NativeSphereBoxQueries++;
+            if (!found) return 0;
+            if (destination.IsEmpty) throw new InvalidOperationException("Contact query capacity exceeded; manifold was not truncated.");
+            if (reverse)
+            {
+                var normal = (new AlsDoubleVector(point.Normal1).Rotate(world0.Rotation) * -1).Rotate(world1.Rotation.Conjugate());
+                point = point with { Point0 = point.Point1, Point1 = point.Point0, Normal1 = normal.ToSingle() };
+            }
+            destination[0] = point; return 1;
         }
         var reverseBoxFace = a.Shape is BoxShape3D && b.Shape is BoxShape3D &&
             TryInteriorFace(b, ToGodot(world1 with { Position = AlsDoubleVector.Zero }),
