@@ -27,6 +27,7 @@ public static class AlsContactRuntimeSettingsCompiler
             var enabled = cvars.GetProperty("p.Chaos.PBDCollisionSolver.EnableInitialDepenetration").GetInt32();
             Require(enabled is 0 or 1, "Invalid initial overlap toggle.");
             var push = solver.GetProperty("maxPushOutVelocity").GetSingle(); var restitution = solver.GetProperty("restitutionThreshold").GetSingle();
+            var solverOverlap = solver.GetProperty("depenetrationVelocity").GetSingle();
             Require(float.IsFinite(push) && push >= 0 && float.IsFinite(restitution) && restitution >= 0, "Invalid contact settings.");
             var rig = root.GetProperty("rigs").EnumerateArray().Single(r => r.GetProperty("mesh").GetString() == definition.Mesh);
             Require(rig.GetProperty("physicsAsset").GetString() == definition.PhysicsAsset, "Contact physics asset differs.");
@@ -39,11 +40,10 @@ public static class AlsContactRuntimeSettingsCompiler
                     row.GetProperty("override").GetBoolean() == body.Defaults.GetProperty("bOverrideMaxDepenetrationVelocity").GetBoolean() &&
                     row.GetProperty("authoredVelocity").GetSingle() == body.Defaults.GetProperty("maxDepenetrationVelocity").GetSingle(),
                     "Observed contact body/defaults differ.");
-                velocities[body.Index] = row.GetProperty("particleVelocity").GetSingle();
-                _ = AlsInitialOverlapSettings.Resolve(velocities[body.Index], 0);
+                velocities[body.Index] = AlsInitialOverlapSettings.ResolveParticle(row.GetProperty("particleVelocity").GetSingle(), solverOverlap);
             }
-            // Legacy solver depenetrationVelocity is observed but is not used
-            // by FPBDCollisionConstraint::Setup; use actual particle values.
+            // The fixture observes external particles before marshalling. UE
+            // resolves their negative overrides before constraint Setup sees them.
             return new(push, restitution, enabled == 1, velocities);
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or ArgumentException or FormatException or OverflowException or IndexOutOfRangeException)

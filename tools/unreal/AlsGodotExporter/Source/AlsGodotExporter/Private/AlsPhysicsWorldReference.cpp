@@ -27,11 +27,11 @@ Chaos::FVec3 ReadV(const TSharedPtr<FJsonObject>& J,const TCHAR* Name);
 Chaos::FRigidTransform3 ReadT(const TSharedPtr<FJsonObject>& J);
 }
 
-bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,FString& Error,int32 ContactFrames)
+bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,FString& Error,int32 ContactFrames,int32 ContactStart)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;using namespace AlsCoupledStepReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
-    if(ContactFrames<0||ContactFrames>10)return Fail(TEXT("Contact diagnostics must cover 0..10 initial frames."));
+    if(ContactFrames<0||ContactFrames>10||ContactStart<1||ContactStart>1200)return Fail(TEXT("Invalid contact diagnostic window."));
     if(FPaths::IsRelative(Inputs)||!IFileManager::Get().DirectoryExists(*Inputs)||Output.IsEmpty()||FPaths::IsRelative(Output)||IFileManager::Get().FileExists(*Output))
         return Fail(TEXT("World reference needs a capture directory and new absolute output."));
     const auto* Sleep=IConsoleManager::Get().FindConsoleVariable(TEXT("p.Chaos.Solver.Sleep.Enabled"));
@@ -46,6 +46,7 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             !Input.IsValid()||Input->GetIntegerField(TEXT("schemaVersion"))!=1)return Fail(TEXT("Invalid world setup."));
         const int32 Hz=Input->GetIntegerField(TEXT("hz")),Steps=Input->GetIntegerField(TEXT("steps"));
         if((Hz!=30&&Hz!=60&&Hz!=120)||Steps!=Hz*10)return Fail(TEXT("Expected fixed ten-second world setup."));
+        if(ContactFrames>0&&ContactStart+ContactFrames-1>Steps)return Fail(TEXT("Contact window exceeds world setup."));
         const float Dt=1.f/Hz;const FVector Gravity=ReadV(Input,TEXT("gravity"));
         const auto Init=UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).RequiresHitProxies(false)
             .CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(true).EnableTraceCollision(true).SetTransactional(false);
@@ -126,7 +127,7 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                     State->SetArrayField(TEXT("conditionedInverseInertia"),V(FVector(Particle->ConditionedInvI())));
                     const auto* Island=Solver->GetEvolution()->GetIslandManager().GetParticleIsland(Particle);
                     State->SetNumberField(TEXT("islandSleepCounter"),Island?Island->GetSleepCounter():-1);
-                    if(Frame<=ContactFrames)
+                    if(Frame>=ContactStart&&Frame<ContactStart+ContactFrames)
                     {
                         State->SetNumberField(TEXT("objectState"),static_cast<int32>(Particle->ObjectState()));
                         State->SetArrayField(TEXT("inflatedBoundsMin"),V(Particle->WorldSpaceInflatedBounds().Min()));
@@ -151,7 +152,7 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             }
             if(Frame>0&&Awake==0){if(AllSleepFrame==INDEX_NONE)AllSleepFrame=Frame;Held++;}else if(Frame>0){AllSleepFrame=INDEX_NONE;Held=0;}
             Sample->SetNumberField(TEXT("awakeBodies"),Awake);
-            if(Frame>0&&Frame<=ContactFrames)
+            if(Frame>=ContactStart&&Frame<ContactStart+ContactFrames)
             {
                 const auto BodyName=[&](const FGeometryParticleHandle* Particle)->FString
                 {
@@ -162,14 +163,25 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                     return TEXT("unknown");
                 };
                 TArray<TSharedPtr<FJsonValue>> Contacts;
+                Sample->SetNumberField(TEXT("collisionSolverType"),static_cast<int32>(Solver->GetEvolution()->GetCollisionConstraints().GetSolverType()));
                 for(const auto* C:Solver->GetEvolution()->GetCollisionConstraints().GetConstraints())
                 {
                     auto R=MakeShared<FJsonObject>();const auto A=BodyName(C->GetParticle0()),B=BodyName(C->GetParticle1());
                     if(A==TEXT("unknown")||B==TEXT("unknown"))return Fail(TEXT("Unmapped native contact particle."));
                     R->SetStringField(TEXT("body0"),A);R->SetStringField(TEXT("body1"),B);
+                    const auto ShapeIndex=[](const FGeometryParticleHandle* P,const FShapeInstance* S)->int32
+                    {for(int32 I=0;I<P->ShapesArray().Num();++I)if(P->ShapesArray()[I].Get()==S)return I;return INDEX_NONE;};
+                    const auto S0=ShapeIndex(C->GetParticle0(),C->GetShape0()),S1=ShapeIndex(C->GetParticle1(),C->GetShape1());
+                    if(S0==INDEX_NONE||S1==INDEX_NONE)return Fail(TEXT("Unmapped native contact shape."));
+                    R->SetNumberField(TEXT("shape0"),S0);R->SetNumberField(TEXT("shape1"),S1);
                     R->SetBoolField(TEXT("disabled"),C->GetDisabled());R->SetBoolField(TEXT("probe"),C->GetIsProbe());
                     R->SetNumberField(TEXT("shapeType"),static_cast<int32>(C->GetShapesType()));
                     R->SetNumberField(TEXT("cull"),C->GetCullDistance());
+                    R->SetBoolField(TEXT("restored"),C->WasManifoldRestored());
+                    R->SetBoolField(TEXT("initialContact"),C->IsInitialContact());
+                    R->SetBoolField(TEXT("perContactInitialPhi"),C->UsePerContactInitialPhi());
+                    R->SetNumberField(TEXT("minInitialPhi"),C->GetMinInitialPhi());
+                    R->SetNumberField(TEXT("depenetrationVelocity"),C->GetInitialOverlapDepenetrationVelocity());
                     TArray<TSharedPtr<FJsonValue>> Points;
                     for(int32 I=0;I<C->NumManifoldPoints();++I)
                     {
@@ -178,6 +190,11 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                         J->SetArrayField(TEXT("point1"),V(FVec3(P.ShapeContactPoints[1])));J->SetArrayField(TEXT("normal1"),V(FVec3(P.ShapeContactNormal)));
                         J->SetNumberField(TEXT("phi"),P.Phi);J->SetNumberField(TEXT("initialPhi"),M.InitialPhi);
                         J->SetBoolField(TEXT("disabled"),M.Flags.bDisabled);J->SetBoolField(TEXT("active"),C->IsManifoldPointActive(I));
+                        J->SetBoolField(TEXT("initialContact"),M.Flags.bInitialContact);
+                        J->SetBoolField(TEXT("hasAnchor"),M.Flags.bHasStaticFrictionAnchor);
+                        J->SetBoolField(TEXT("restored"),M.Flags.bWasRestored);
+                        J->SetArrayField(TEXT("anchor0"),V(FVec3(M.ShapeAnchorPoints[0])));
+                        J->SetArrayField(TEXT("anchor1"),V(FVec3(M.ShapeAnchorPoints[1])));
                         J->SetBoolField(TEXT("resultValid"),Result.bIsValid);
                         J->SetArrayField(TEXT("pushOut"),V(FVec3(Result.NetPushOut)));J->SetArrayField(TEXT("impulse"),V(FVec3(Result.NetImpulse)));
                         Points.Add(MakeShared<FJsonValueObject>(J));
