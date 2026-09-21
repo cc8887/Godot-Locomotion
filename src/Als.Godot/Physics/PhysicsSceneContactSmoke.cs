@@ -181,6 +181,9 @@ public partial class PhysicsSceneContactSmoke : Node3D
         public bool RequiresWake => contacts.RequiresWake;
         public void Gather(ReadOnlySpan<AlsPrecisePose> p, ReadOnlySpan<AlsProjectionVelocity> v, ReadOnlySpan<AlsIslandBody> b, double dt)
         { contacts.Gather(p, v, b, dt); DuringGather?.Invoke(); }
+        public void Gather(ReadOnlySpan<AlsPrecisePose> p, ReadOnlySpan<AlsProjectionVelocity> v, ReadOnlySpan<AlsIslandBody> b,
+            double dt, ReadOnlySpan<AlsIslandBodyState> previous)
+        { contacts.Gather(p, v, b, dt, previous); DuringGather?.Invoke(); }
         public void SolvePosition(Span<AlsProjectionDelta> b, int i, int n) => contacts.SolvePosition(b, i, n);
         public void SolveVelocity(Span<AlsProjectionVelocity> b, int i, int n, double dt) => contacts.SolveVelocity(b, i, n, dt);
         public void StageCommit() { contacts.StageCommit(); if (Fail) throw new InvalidOperationException("Injected scene-contact failure."); }

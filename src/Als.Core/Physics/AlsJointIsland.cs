@@ -150,7 +150,7 @@ public sealed class AlsJointIsland
         IAlsIslandContacts? contacts, bool dragBeforeIntegration, bool wake, bool allowSleep)
     {
         Gather(dt, gravity, forces, dragBeforeIntegration);
-        contacts?.Gather(_predicted, _velocities, _bodies, dt);
+        contacts?.Gather(_predicted, _velocities, _bodies, dt, _states);
         for (var j = 0; j < _jointOrder.Length; j++) _jointOrder[j] = j;
         contacts?.PrepareConstraintOrder(this, _jointOrder);
         var observer = _observer?.Enabled == true ? _observer : null;
