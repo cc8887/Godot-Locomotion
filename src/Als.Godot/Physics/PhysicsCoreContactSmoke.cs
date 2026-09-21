@@ -25,6 +25,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _primitiveChecks;
     private int _sphereBoxChecks;
     private int _fullCapsuleBoxChecks;
+    private int _capsuleConvexChecks;
     private int _capsulePairChecks;
     private int _capsuleDegenerateSteps;
     private double _maxMomentum;
@@ -93,6 +94,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
                 narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, capsule_cull_checks = _capsuleCullChecks, primitive_binding_checks = _primitiveChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 native_sphere_box_checks = _sphereBoxChecks,
                 native_capsule_box_checks = _fullCapsuleBoxChecks,
+                native_capsule_convex_checks = _capsuleConvexChecks,
                 native_capsule_pair_checks = _capsulePairChecks,
                 capsule_degenerate_steps = _capsuleDegenerateSteps,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
@@ -136,6 +138,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         PrimitiveBindingChecks();
         NativeSphereBoxChecks();
         NativeFullCapsuleBoxChecks();
+        NativeCapsuleConvexChecks();
         NativeCapsulePairChecks();
         CapsuleDegenerateStepChecks();
     }
@@ -220,6 +223,64 @@ public partial class PhysicsCoreContactSmoke : Node3D
             contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
             Require(contacts.LastContactCount > 0 && contacts.LastRestoredPairs == 0 && query.NativeCapsulePairQueries == queries + 1 && query.NarrowPhaseQueries == 0,
                 "Capsule pair lost velocity-expanded cull, restored polygon geometry or fell back to Jolt."); _capsulePairChecks++;
+        }
+    }
+
+    private void NativeCapsuleConvexChecks()
+    {
+        var identity = AlsPrecisePose.Identity;
+        using var capsule = new CapsuleShape3D { Radius = .05f, Height = .3f, Margin = 0 };
+        var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + "AnimMan.AnimMan");
+        var cooked = AlsConvexTopologyCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_convex_topology.json"), definition);
+        var runtime = AlsRuntimeShapeCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"),
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), definition.Mesh);
+        var native = new AlsCapsuleGeometry(new(7, -3, -8), NVector.UnitZ, 20, 5);
+        var center = new AlsDoubleVector(7, -3, 2);
+        foreach (var binding in cooked)
+        foreach (var rotated in new[] { false, true }) foreach (var reverse in new[] { false, true })
+        {
+            var observed = runtime.Single(r => r.Body == binding.Body && r.Shape == binding.Shape);
+            using var box = AlsPhysicsContactShapes.Create(definition.Bodies[binding.Body].Shapes[binding.Shape], binding.Topology, observed);
+            var middle = AlsDoubleVector.Zero;
+            for (var v = 0; v < binding.Topology.VertexCount; v++) middle += new AlsDoubleVector(binding.Topology.VertexAt(v)) * observed.Scale;
+            middle *= 1d / binding.Topology.VertexCount;
+            var registry = new AlsContactRegistry(2, 2);
+            using var query = new AlsGodotContactQuery(registry, new(3, .01f, 1, 1, 3));
+            query.Bind(registry.Register(new(0, identity, 1, 1, true)), capsule, nativeCapsule: native,
+                proxyLocal: identity with { Position = center });
+            query.Bind(registry.Register(new(1, identity, 1, 1)), box, binding.Topology, nativeScale: observed.Scale, nativeMargin: observed.MarginCm); query.BindBodyBounds(0, 30);
+            var boxPose = rotated ? identity with { Position = new(1e6, -2e6, 3e6),
+                Rotation = AlsQuaternion.FromAxisAngle(NVector.Normalize(new(1, 2, 3)), .43f) } : identity;
+            var rotation = boxPose.Rotation;
+            var bodies = new[] { new AlsIslandBody(identity, new(1, AlsDoubleVector.One)), new AlsIslandBody(identity, default) };
+            var previous = new[] { new AlsIslandBodyState(identity, default), new AlsIslandBodyState(identity, default) };
+            var velocities = new AlsProjectionVelocity[2]; var points = new AlsDetectedContact[4];
+            var poses = new[] { identity, boxPose }; var a = reverse ? 1 : 0; var b = 1 - a;
+            foreach (var local in new[] { new AlsDoubleVector(0, 0, 0), new(11, 11, 0), new(11, 11, 11), new(17, 0, 0), new(100, 0, 0) })
+            {
+                poses[0] = identity with { Rotation = rotation,
+                    Position = boxPose.Position + (middle + local).Rotate(rotation) - center.Rotate(rotation) };
+                query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+                var count = query.Query(a, poses[a], b, poses[b], points);
+                Require(local.X == 100 ? count == 0 : local == AlsDoubleVector.Zero ? count > 0 : true, "Capsule-foot missed deep contact or failed cull.");
+                for (var i = 0; i < count; i++)
+                {
+                    var p0 = new AlsDoubleVector(points[i].Point0).Rotate(poses[a].Rotation) + poses[a].Position;
+                    var p1 = new AlsDoubleVector(points[i].Point1).Rotate(poses[b].Rotation) + poses[b].Position;
+                    var n = new AlsDoubleVector(points[i].Normal1).Rotate(poses[b].Rotation);
+                    Require(Math.Abs(AlsDoubleVector.Dot(p0 - p1, n) - points[i].NativePhi!.Value) < 1e-4,
+                        "Full capsule endpoint reversal changed native points/normal/Phi.");
+                }
+                query.Abort(); _capsuleConvexChecks++;
+            }
+            poses[0] = identity with { Rotation = rotation,
+                Position = boxPose.Position + middle.Rotate(rotation) - center.Rotate(rotation) };
+            var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 1000));
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            var queries = query.NativeCapsuleConvexQueries;
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            Require(contacts.LastContactCount > 0 && contacts.LastRestoredPairs == 0 && query.NativeCapsuleConvexQueries == queries + 1 &&
+                query.NarrowPhaseQueries == 0, "Full capsule pair restored polygon geometry or fell back to Jolt."); _capsuleConvexChecks++;
         }
     }
 
