@@ -8,6 +8,12 @@
 
 # 运行和验证
 
+- 顶点邻接批次最终全量：Core串行2780通过，Import串行2388通过/1既有跳过，均退出0；普通Editor失败边界见下条。
+
+- 顶点邻接批次普通Editor：exporter加载标记成功后退出0xC0000005，两旧Condition failed保留。旧间歇退出异常未修复，本批普通重启门禁失败；具体见下条文档。
+
+- 最新原生顶点邻接：`docs/verification/2026-09-21-physics-vertex-planes.md`。cooked拓扑schema2新增GetVertexPlanes3计数/前三槽位，Core不可变保存、有效面关联验证、未用哨兵保留；Import拒绝旧schema/缺缓存。256顶点逐槽一致，7个原生计数不同于扫描面环，禁止反推代替。旧顶点/面/绑定逐字段未变，冷重导一致；576 simplex/1024支持/528 GJK/318 EPA旧对照仍通过。Core2780、Godot优化构建、UE完整构建审计/DataValidation通过。尚未实现选面算法或接入流形，未改变运行时查询/未重跑整链，最新9/12。下一步unscaled/scaled选面与完整流形原生对照，再查询接管/分离cull/三旧失败及普通Ragdoll等总目标。
+
 - 碰撞margin批次最终全量：Core串行2773通过，Import串行2383通过/1既有跳过，均退出0；运行时未接入与旧异常边界见下条。
 
 - 最新碰撞margin：`docs/verification/2026-09-21-physics-margins.md`。Core按双方quadratic/运动状态解析float pair margin，Sleeping仍Dynamic，保留双方零margin时只给第二侧最小值的原生次序。1568实际constraint Setup对照逐值精确相等（含真实两脚），最小margin原生观察0，0/.05进程内扫值、重导一致。Core2773、Godot构建通过；UE完整Editor构建/插件审计/DataValidation/普通重启退出0，两旧Condition failed与既往间歇退出AV未解决。CollisionTolerance未纳入本批，owner参数映射未接，未改运行时/未重跑整链，最新9/12。下一步原生GetVertexPlanes3邻接/选面与GJK/EPA/margin/裁剪衔接，再分离cull/退化对照/三旧失败及普通Ragdoll等完整目标。
