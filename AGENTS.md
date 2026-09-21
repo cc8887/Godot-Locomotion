@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Capsule pair批次最终Import Release固定JIT串行全量2417通过/1既有条件跳过，退出0；原子退化拒绝与8/12边界见下条。
+
+- 最新capsule pair：`docs/verification/2026-09-22-physics-capsule-pair.md`。float相对空间、动态半径归属、同向化/最近点/深穿透和对齐补点；原生7056有序点数/点/法向/Phi精确一致、重导字节一致，修正共用reciprocal计算差。显式native pair必须PrepareStep提供动态归属，共用cull每帧查。Core2833+退化定向4、优化构建、三频率smoke新增各20及旧项过。整链 **8/12**：普通30恢复M82/A138睡；普通60（M596才睡，比上批574晚）、高120、平移30/旋转30四失败未修。已知补点恰落另一轴distance0：Core原子拒绝非有限法向，未有专门UE对照/未修，不能声称全输入稳定。UE全Editor审计/重导/DataValidation过，普通Editor2032本次退出0/DLL释放，两旧Condition failed/既往AV未修。普通demo未接。继续该退化、capsule-convex及sphere混合/actual trace，再四失败和完整角色总目标。
+
 - 完整capsule-box批次最终Import Release固定JIT串行全量2416通过/1既有条件跳过，退出0；其他验证与剩余五失败见下条。
 
 - 最新完整capsule-box：`docs/verification/2026-09-22-physics-full-capsule-box.md`。冷同空间box/segment GJK/EPA+半径+原生轴线裁剪/endcap/去重，显式native绑定接入原leaf/反序/实际detector；旧744（含原排除300）+新8640独立参考全部有序点/法向/Phi精确一致，冷重导字节一致。Core2829、优化构建、三频率smoke新增各24项及旧项过。整链 **7/12**：高60恢复（M161/A289睡，末秒V/W0，anchor1.798296cm），其他旧成功保留；普通30/60、高120、平移30、旋转30五失败未修。UE全Editor审计/导出/DataValidation过；普通Editor34476标记成功后0xC0000005，两旧Condition failed，普通重启门禁失败。普通demo未接；generic Core不代表capsule-convex已验证。继续混合对、原始native_capsule实际pair trace适配及五失败，再普通Ragdoll/Get-up等总目标。

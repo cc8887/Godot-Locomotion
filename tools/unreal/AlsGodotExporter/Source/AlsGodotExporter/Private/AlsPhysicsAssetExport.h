@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+bool ExportAlsPhysicsCapsulePairReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCapsuleBoxReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsSphereBoxReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsConvexMarginSupport(const FString& Output, FString& Error);
