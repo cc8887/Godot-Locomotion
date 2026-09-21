@@ -35,6 +35,8 @@ public partial class PhysicsCoreJointReplay : Node3D
     private string _anchorSource = "";
     private int _traceFirst = -1, _traceLast = -1;
     private string[] _traceBones = [];
+    private HashSet<int> _captureFrames = [];
+    private string _captureDirectory = "";
     private int _contactPoints;
     private double _finalSpeed, _finalAngularSpeed, _maxLimit, _finalLimit;
     private string _finalLimitSource = "";
@@ -53,6 +55,14 @@ public partial class PhysicsCoreJointReplay : Node3D
             _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
             _platformMode = args.FirstOrDefault(a => a.StartsWith("--platform="))?[11..] ?? "";
             var trace = args.FirstOrDefault(a => a.StartsWith("--trace-frames="))?[15..];
+            var capture = args.FirstOrDefault(a => a.StartsWith("--capture-step="))?[15..];
+            if (capture is not null)
+            {
+                _captureFrames = capture.Split(',').Select(int.Parse).ToHashSet();
+                _captureDirectory = args.FirstOrDefault(a => a.StartsWith("--capture-directory="))?[20..] ?? "";
+                Require(_drop && _captureFrames.All(f => f >= 0) && System.IO.Path.IsPathFullyQualified(_captureDirectory) &&
+                    Directory.Exists(_captureDirectory), "Step capture requires drop, nonnegative frames and an existing absolute directory.");
+            }
             if (trace is not null)
             {
                 var range = trace.Split(':'); Require(range.Length == 2, "Trace range must be first:last.");
@@ -222,6 +232,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                     source = new AlsContactTrace(query, registry, rig.Definition.Mesh, names, () => _frame, _traceFirst, _traceLast, _traceBones);
                 }
                 contacts = new(registry, source, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16, island);
+                if (_captureFrames.Count > 0) island.SetStepObserver(new AlsIslandStepCapture(rig.Definition, rig.Settings,
+                    _reference!.RootElement.GetProperty("cases")[0].GetProperty("solverSettings"), contacts, () => _frame, _captureFrames, _captureDirectory));
             }
             _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names), shapes, query, contacts, scene));
         }

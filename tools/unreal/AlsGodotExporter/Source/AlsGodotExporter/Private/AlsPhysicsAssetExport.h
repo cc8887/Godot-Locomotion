@@ -12,3 +12,4 @@ bool ExportAlsPhysicsJointStepReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsContactReference(const FString& Output, FString& Error, bool GatherGeometry = false);
 bool ExportAlsPhysicsContactHistoryReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGraphReference(const FString& Output, FString& Error);
+bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs, const FString& Output, FString& Error);

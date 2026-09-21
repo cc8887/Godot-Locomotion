@@ -39,6 +39,12 @@ public sealed class AlsJointIsland
     private AlsDoubleVector _lastGravity;
     private IAlsIslandContacts? _lastContacts;
     private bool _stepping;
+    private IAlsIslandStepObserver? _observer;
+    public void SetStepObserver(IAlsIslandStepObserver? observer)
+    {
+        if (_stepping) throw new InvalidOperationException("Cannot replace the observer during a step.");
+        _observer = observer;
+    }
     public int BodyCount => _bodies.Length;
     public int JointCount => _joints.Length;
     public AlsIslandBodyState BodyAt(int index) => _states[index];
@@ -147,29 +153,37 @@ public sealed class AlsJointIsland
         contacts?.Gather(_predicted, _velocities, _bodies, dt);
         for (var j = 0; j < _jointOrder.Length; j++) _jointOrder[j] = j;
         contacts?.PrepareConstraintOrder(this, _jointOrder);
+        var observer = _observer?.Enabled == true ? _observer : null;
+        observer?.Begin(dt, _positionIterations, _velocityIterations, _bodies, _joints, _initial, _predicted, _velocities, _jointOrder);
         for (var iteration = 0; iteration < _positionIterations; iteration++)
         {
             // UE default equal priorities are stable-sorted by container order:
             // collisions are registered before linear joints in the evolution.
             contacts?.SolvePosition(_deltas, iteration, _positionIterations);
+            observer?.Capture("position_contacts", iteration, _predicted, _deltas, _velocities);
             foreach (var j in _jointOrder)
             {
                 var joint = _joints[j];
                 _cached[j].SolvePosition(ref _deltas[joint.Parent], ref _deltas[joint.Child]);
             }
+            observer?.Capture("position_joints", iteration, _predicted, _deltas, _velocities);
         }
         for (var i = 0; i < _bodies.Length; i++)
             _velocities[i] = AlsCachedJoint.AddImplicitVelocity(_velocities[i], _deltas[i], dt, Dynamic(i));
+        observer?.Capture("implicit", 0, _predicted, _deltas, _velocities);
         for (var iteration = 0; iteration < _velocityIterations; iteration++)
         {
             contacts?.SolveVelocity(_velocities, iteration, _velocityIterations, dt);
+            observer?.Capture("velocity_contacts", iteration, _predicted, _deltas, _velocities);
             foreach (var j in _jointOrder)
             {
                 var joint = _joints[j];
                 _cached[j].SolveVelocity(ref _velocities[joint.Parent], ref _velocities[joint.Child]);
             }
+            observer?.Capture("velocity_joints", iteration, _predicted, _deltas, _velocities);
         }
         CommitCorrections();
+        observer?.Capture("projection_input", 0, _predicted, _deltas, _velocities);
         // Native container caches ALL projection rows before any projection writes.
         foreach (var j in _jointOrder)
         {
@@ -185,7 +199,10 @@ public sealed class AlsJointIsland
             ref var velocity = ref _velocities[joint.Child];
             velocity = new(velocity.Linear + added.Linear, velocity.Angular + added.Angular);
         }
+        observer?.Capture("projection", 0, _predicted, _deltas, _velocities);
         CommitCorrections();
+        observer?.Capture("corrected", 0, _predicted, _deltas, _velocities);
+        observer?.Complete();
         // Publish as one batch. A failed step leaves all externally visible states
         // unchanged, and the next Gather overwrites every temporary and lambda.
         for (var i = 0; i < _bodies.Length; i++)
