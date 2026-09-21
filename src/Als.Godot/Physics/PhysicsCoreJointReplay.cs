@@ -235,7 +235,13 @@ public partial class PhysicsCoreJointReplay : Node3D
                     source = new AlsContactTrace(query, registry, rig.Definition.Mesh, names, () => _frame, _traceFirst, _traceLast, _traceBones,
                         OS.GetCmdlineUserArgs().Contains("--trace-geometry") ? query.Describe : null);
                 }
-                contacts = new(registry, source, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16, island);
+                var contactSettings = AlsContactRuntimeSettingsCompiler.Compile(
+                    Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_contact_settings.json"), rig.Definition);
+                var overlapVelocities = new float[island.BodyCount];
+                contactSettings.BodyOverlapVelocities.CopyTo(overlapVelocities, 0);
+                contacts = new(registry, source, new(staticFriction, friction, friction),
+                    new(1f / _hz, restitution, contactSettings.RestitutionThreshold, contactSettings.MaxPushOutVelocity), 16, island,
+                    bodyOverlapVelocities: contactSettings.EnableInitialDepenetration ? overlapVelocities : []);
                 if (_captureFrames.Count > 0) island.SetStepObserver(new AlsIslandStepCapture(rig.Definition, rig.Settings,
                     _reference!.RootElement.GetProperty("cases")[0].GetProperty("solverSettings"), contacts, () => _frame, _captureFrames, _captureDirectory));
             }

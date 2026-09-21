@@ -1,0 +1,701 @@
+{
+	"schemaVersion": 1,
+	"engine": "5.9.0-0+UE5",
+	"observation": "Project isolated world after tick: collision solver settings; actual asset external particle overlap settings after creation; synthetic native constraint setup/activation, not geometry or trajectory parity",
+	"solver":
+	{
+		"maxPushOutVelocity": 1000,
+		"depenetrationVelocity": 10000000000,
+		"restitutionThreshold": 1000,
+		"positionFrictionIterations": 4,
+		"velocityFrictionIterations": 1,
+		"positionShockIterations": 3,
+		"velocityShockIterations": 2,
+		"splitImpulse": false
+	},
+	"cvars":
+	{
+		"p.Chaos.PBDCollisionSolver.EnableInitialDepenetration": 1,
+		"p.Chaos.PBDCollisionSolver.RestitutionUsePreIntegrateVelocity": 0
+	},
+	"rigs": [
+		{
+			"mesh": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Mannequin.Mannequin",
+			"physicsAsset": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/Mannequin_PhysicsAsset.Mannequin_PhysicsAsset",
+			"bodies": [
+				{
+					"index": 0,
+					"bone": "pelvis",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 1,
+					"bone": "spine_01",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 2,
+					"bone": "spine_02",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 3,
+					"bone": "spine_03",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 4,
+					"bone": "neck_01",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 5,
+					"bone": "head",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 6,
+					"bone": "thigh_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 7,
+					"bone": "thigh_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 8,
+					"bone": "calf_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 9,
+					"bone": "calf_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 10,
+					"bone": "clavicle_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 11,
+					"bone": "clavicle_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 12,
+					"bone": "upperarm_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 13,
+					"bone": "upperarm_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 14,
+					"bone": "lowerarm_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 15,
+					"bone": "lowerarm_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 16,
+					"bone": "hand_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 17,
+					"bone": "hand_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 18,
+					"bone": "root",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				}
+			]
+		},
+		{
+			"mesh": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/AnimMan.AnimMan",
+			"physicsAsset": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/AnimMan_PhysicsAsset.AnimMan_PhysicsAsset",
+			"bodies": [
+				{
+					"index": 0,
+					"bone": "pelvis",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 1,
+					"bone": "spine_01",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 2,
+					"bone": "spine_02",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 3,
+					"bone": "spine_03",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 4,
+					"bone": "neck_01",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 5,
+					"bone": "head",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 6,
+					"bone": "thigh_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 7,
+					"bone": "thigh_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 8,
+					"bone": "calf_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 9,
+					"bone": "calf_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 10,
+					"bone": "clavicle_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 11,
+					"bone": "clavicle_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 12,
+					"bone": "upperarm_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 13,
+					"bone": "upperarm_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 14,
+					"bone": "lowerarm_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 15,
+					"bone": "lowerarm_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 16,
+					"bone": "hand_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 17,
+					"bone": "hand_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 18,
+					"bone": "root",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 19,
+					"bone": "foot_l",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				},
+				{
+					"index": 20,
+					"bone": "foot_r",
+					"override": false,
+					"authoredVelocity": 0,
+					"particleVelocity": -1
+				}
+			]
+		}
+	],
+	"cases": [
+		{
+			"mode": 0,
+			"body0": -1,
+			"body1": -1,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": -1,
+			"body1": 0,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": -1,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": -1,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0,
+			"body1": -1,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0,
+			"body1": 0,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0.30000001192092896,
+			"body1": -1,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0.30000001192092896,
+			"body1": 0,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0.30000001192092896,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 0.30000001192092896,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 100,
+			"body1": -1,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 100,
+			"body1": 0,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 100,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": true
+		},
+		{
+			"mode": 0,
+			"body0": 100,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": true
+		},
+		{
+			"mode": 1,
+			"body0": -1,
+			"body1": -1,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": -1,
+			"body1": 0,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": -1,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": -1,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0,
+			"body1": -1,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0,
+			"body1": 0,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0.30000001192092896,
+			"body1": -1,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0.30000001192092896,
+			"body1": 0,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0.30000001192092896,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 0.30000001192092896,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 100,
+			"body1": -1,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 100,
+			"body1": 0,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 100,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 1,
+			"body0": 100,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": -1,
+			"body1": -1,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": -1,
+			"body1": 0,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": -1,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": -1,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0,
+			"body1": -1,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0,
+			"body1": 0,
+			"setupVelocity": 0,
+			"activatedVelocity": 0,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0.30000001192092896,
+			"body1": -1,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0.30000001192092896,
+			"body1": 0,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0.30000001192092896,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 0.30000001192092896,
+			"activatedVelocity": 0.30000001192092896,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 0.30000001192092896,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 100,
+			"body1": -1,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 100,
+			"body1": 0,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 100,
+			"body1": 0.30000001192092896,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		},
+		{
+			"mode": 2,
+			"body0": 100,
+			"body1": 100,
+			"setupVelocity": 100,
+			"activatedVelocity": 100,
+			"perContact": false
+		}
+	]
+}

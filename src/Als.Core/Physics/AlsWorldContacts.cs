@@ -55,6 +55,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     private readonly AlsDetectedContact[] _points;
     private readonly AlsContactMaterial _material;
     private readonly AlsContactGatherSettings _settings;
+    private readonly float[]? _bodyOverlapVelocities;
     public AlsContactShockSettings ShockSettings { get; }
     public bool UsesGraphLevels => _order is not null;
     public int PreparedBodyLevelAt(int body) { Pending(); return _order?.BodyLevelAt(body) ?? 0; }
@@ -80,11 +81,17 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     }
     public AlsWorldContacts(AlsContactRegistry registry, IAlsContactGeometrySource source,
         AlsContactMaterial material, AlsContactGatherSettings settings, int pointsPerPair = 8, AlsJointIsland? island = null,
-        AlsContactShockSettings? shockSettings = null)
+        AlsContactShockSettings? shockSettings = null, ReadOnlySpan<float> bodyOverlapVelocities = default)
     {
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(source);
         if (pointsPerPair <= 0) throw new ArgumentOutOfRangeException(nameof(pointsPerPair));
         _registry = registry; _source = source; _material = material; _settings = settings;
+        if (!bodyOverlapVelocities.IsEmpty)
+        {
+            if (bodyOverlapVelocities.Length != registry.BodyCount) throw new ArgumentException("Overlap body count differs.");
+            foreach (var value in bodyOverlapVelocities) _ = AlsInitialOverlapSettings.Resolve(value, 0);
+            _bodyOverlapVelocities = bodyOverlapVelocities.ToArray();
+        }
         ShockSettings = shockSettings ?? AlsContactShockSettings.Native; ShockSettings.Validate();
         var capacity = checked(registry.Capacity * (registry.Capacity - 1) / 2);
         _pairs = new AlsPersistentContactPair[capacity]; for (var i = 0; i < capacity; i++) _pairs[i] = new(pointsPerPair);
@@ -168,7 +175,10 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
                     new(sa.Quadratic, sb.Quadratic), _material,
                     new(_shapeWorld[a], predicted[ia].Position, (float)bodies[ia].InverseMass.Mass, velocities[ia]), predicted[ia].Rotation, bodies[ia].InverseMass.Inertia,
                     new(_shapeWorld[b], predicted[ib].Position, (float)bodies[ib].InverseMass.Mass, velocities[ib]), predicted[ib].Rotation, bodies[ib].InverseMass.Inertia,
-                    _settings with { Dt = (float)dt, PerContactInitialPhi = sa.Quadratic || sb.Quadratic ||
+                    _settings with { Dt = (float)dt,
+                        MaxDepenetrationVelocity = _bodyOverlapVelocities is null ? _settings.MaxDepenetrationVelocity :
+                            AlsInitialOverlapSettings.Resolve(_bodyOverlapVelocities[ia], _bodyOverlapVelocities[ib]),
+                        PerContactInitialPhi = sa.Quadratic || sb.Quadratic ||
                         (bodies[ia].InverseMass.Mass > 0 && bodies[ib].InverseMass.Mass > 0) });
                 _contactCount += _pairs[slot].SolverCount;
                 if (_pairs[slot].SolverCount > 0) _active[_activeCount++] = slot;
