@@ -36,6 +36,23 @@ internal sealed class AlsSceneContactSet : IDisposable
     internal StaticBody3D BodyAt(int index) { Check(); return _bodies[index]; }
     internal AlsContactShapeHandle ShapeAt(int index) { Check(); return _entries[index].Handle; }
     internal AlsRegisteredContactShape ShapeDefinitionAt(int index) { Check(); return _entries[index].Registered; }
+    internal object[] ExportNativeEnvironment()
+    {
+        Check();
+        static double[] V(AlsDoubleVector v) => [v.X, v.Y, v.Z];
+        static object Pose(AlsPrecisePose p) => new { position = V(p.Position), rotation = new[] { p.Rotation.X, p.Rotation.Y, p.Rotation.Z, p.Rotation.W } };
+        return _entries.Select(e =>
+        {
+            var world = FromWorld(e.Body.GlobalTransform * e.Body.ShapeOwnerGetTransform(e.Owner));
+            object geometry = e.Shape switch
+            {
+                BoxShape3D box => new { type = "box", size = new[] { (double)box.Size.Z * 100, (double)box.Size.X * 100, (double)box.Size.Y * 100 } },
+                ConvexPolygonShape3D convex => new { type = "convex", vertices = convex.Points.Select(p => V(ToNative(p))).ToArray() },
+                _ => throw new NotSupportedException("Native world baseline currently supports environment boxes and convex hulls.")
+            };
+            return (object)new { name = e.Body.Name.ToString(), body = e.BodyIndex, world = Pose(world), geometry };
+        }).ToArray();
+    }
 
     internal AlsSceneContactSet(Node root, int firstBody)
     {

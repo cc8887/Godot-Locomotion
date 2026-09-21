@@ -13,7 +13,7 @@ public readonly record struct AlsIslandProjection(bool Enabled, float LinearAlph
 // Connector transforms are actor-local on input. Dynamic bodies solve in COM space;
 // fixed bodies solve in actor space, even when the asset has an offset COM.
 public readonly record struct AlsIslandJoint(int Parent, int Child, AlsPrecisePose ParentFrame,
-    AlsPrecisePose ChildFrame, AlsAngularJointSettings Angular, AlsIslandProjection Projection);
+    AlsPrecisePose ChildFrame, AlsAngularJointSettings Angular, AlsIslandProjection Projection, bool ConnectivityOnly = false);
 
 // A single-owner, preallocated group of joints, not a collision world. All joints
 // share one DP/DQ and velocity entry per body. No Godot/UE objects or global state.
@@ -85,6 +85,8 @@ public sealed class AlsJointIsland
             if ((uint)joint.Parent >= _bodies.Length || (uint)joint.Child >= _bodies.Length || joint.Parent == joint.Child)
                 throw new ArgumentException("A joint must reference two distinct island bodies.");
             ValidatePose(joint.ParentFrame); ValidatePose(joint.ChildFrame);
+            if (joint.ConnectivityOnly && (joint.Angular != default || joint.Projection != default))
+                throw new ArgumentException("Connectivity-only joints must not discard solver settings.");
             var projection = joint.Projection;
             if (projection.Enabled && !joint.Angular.UseSimd)
                 throw new NotSupportedException("Only SIMD linear projection has been verified.");
@@ -164,7 +166,7 @@ public sealed class AlsJointIsland
             foreach (var j in _jointOrder)
             {
                 var joint = _joints[j];
-                _cached[j].SolvePosition(ref _deltas[joint.Parent], ref _deltas[joint.Child]);
+                if (!joint.ConnectivityOnly) _cached[j].SolvePosition(ref _deltas[joint.Parent], ref _deltas[joint.Child]);
             }
             observer?.Capture("position_joints", iteration, _predicted, _deltas, _velocities);
         }
@@ -178,7 +180,7 @@ public sealed class AlsJointIsland
             foreach (var j in _jointOrder)
             {
                 var joint = _joints[j];
-                _cached[j].SolveVelocity(ref _velocities[joint.Parent], ref _velocities[joint.Child]);
+                if (!joint.ConnectivityOnly) _cached[j].SolveVelocity(ref _velocities[joint.Parent], ref _velocities[joint.Child]);
             }
             observer?.Capture("velocity_joints", iteration, _predicted, _deltas, _velocities);
         }
@@ -188,6 +190,7 @@ public sealed class AlsJointIsland
         foreach (var j in _jointOrder)
         {
             var joint = _joints[j]; var child = _bodies[joint.Child].InverseMass; var p = joint.Projection;
+            if (joint.ConnectivityOnly) continue;
             _projections[j] = new(_predicted[joint.Parent], _predicted[joint.Child], joint.ParentFrame,
                 joint.ChildFrame, (float)child.Mass, child.Inertia.ToSingle(), (float)joint.Angular.HardStiffness,
                 p.LinearAlpha, p.TeleportDistance, p.Enabled);
@@ -195,6 +198,7 @@ public sealed class AlsJointIsland
         foreach (var j in _jointOrder)
         {
             var joint = _joints[j];
+            if (joint.ConnectivityOnly) continue;
             var added = _projections[j].Apply(_deltas[joint.Parent], ref _deltas[joint.Child], dt, joint.Projection.VelocityAlpha);
             ref var velocity = ref _velocities[joint.Child];
             velocity = new(velocity.Linear + added.Linear, velocity.Angular + added.Angular);
@@ -236,6 +240,7 @@ public sealed class AlsJointIsland
         for (var j = 0; j < _joints.Length; j++)
         {
             var joint = _joints[j];
+            if (joint.ConnectivityOnly) continue;
             _cached[j] = new(Input(joint.Parent, joint.ParentFrame), Input(joint.Child, joint.ChildFrame), joint.Angular, dt);
         }
     }
