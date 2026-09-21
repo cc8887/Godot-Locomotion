@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新完整自由关节共同求解：`docs/verification/2026-09-22-physics-free-coupled.md`。重放工具适配ConnectivityOnly；当前30Hz两模型0/1/2/6/7/8/12–16帧22样本528阶段，完整20/18连接各1自由，10样本有地面接触，55异层动态contact。新参考冷重导字节一致，新旧5组默认/roll-forward均过原容差；Godot捕获最大DP1.07288e-6cm/V6.1065e-5cm/s/W3.02769e-6rad/s，非逐位等价。未改生产/UE/阈值，捕获仍原睡眠失败，矩阵沿用9/12；无全量/重启新声明。下一步首帧积分/particle存储原生世界对照和更长稳定性，Gather后输入/顺序仍来自捕获，不证明整条世界。普通角色总目标及旧Editor异常保留。
+
 - 最新平台原生基线：`docs/verification/2026-09-22-physics-platform-baseline.md`。setup支持平台前十秒/显式phase，保留场景两个kinematic，原生每帧验证ObjectState；平台未开始运动。两模型×平移/旋转30Hz原生全未睡（V8.45–8.97cm/s），Core则M已睡/A未睡；不能称轨迹等价，亦不能仅凭十秒休眠失败断言移植遗漏。新参考冷重导一致，旧普通30输入重导字节不变；旧输入无kinematic仍静态化远处平台，边界保留。三组参考默认/roll-forward各3通过，Godot构建/60smoke/UE全Editor审计/DataValidation过；Editor28676本次退出0/DLL释放，两旧Condition和间歇AV未修。未改Core/阈值，矩阵仍9/12，普通demo未接。下一步更长原生/Core稳定性和最早分歧，coupled自由关节适配；普通角色完整总目标仍未完成。
 
 - 最新低频原生基线：`docs/verification/2026-09-22-physics-low-frequency.md`。相同实际初态/13静态盒体，原生普通30Hz也未达十秒休眠：AnimMan159睡/保持142，Mannequin300帧仍18动态身体醒着，末秒V6.98827/W.403521；Core同样M未睡，V7.43992/W.428579。冷重导字节一致，新fixture逐帧重算睡眠/速度并保留原生失败；新旧world两项默认/roll-forward各通过。未改生产/UE/门槛，未重跑全量或其他矩阵，仍9/12；不能仅以此睡眠失败判定移植遗漏，也不能宣称轨迹等价。下一步平台30启动前固定阶段原生同初态，再最早分歧/更长稳定性；普通角色总目标及旧Editor异常仍未完成。
