@@ -8,6 +8,13 @@ namespace GodotAls.Core.Physics;
 // Detector settings are explicit: no assumption about project CVar defaults.
 public static class AlsContactCullDistance
 {
+    // GBF Integrate saves dynamic PreV before forces; ApplyKinematicTargets
+    // replaces kinematic PreV with THIS tick's prescribed velocity. Static
+    // particles return zero through FConstGenericParticleHandle::GetPreVf.
+    public static Vector3 PreVelocity(in AlsIslandBody body, in AlsIslandBodyState previous,
+        in AlsProjectionVelocity predicted) => body.InverseMass.Mass > 0 ? previous.Velocity.Linear :
+        body.ExternallyDriven ? predicted.Linear : Vector3.Zero;
+
     public static float Scale(double dynamicBoundsSize0, double dynamicBoundsSize1,
         float inverseReferenceSize, float minimumScale)
     {

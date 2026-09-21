@@ -7,6 +7,21 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsContactCullDistanceTests
 {
     [Fact]
+    public void DynamicUsesPreviousButMovingAndStoppingKinematicUseCurrentTarget()
+    {
+        var identity = AlsPrecisePose.Identity;
+        var previous = new AlsIslandBodyState(identity, new(new(50, 0, 0), Vector3.Zero));
+        var current = new AlsProjectionVelocity(new(100, 0, -10), Vector3.Zero);
+        var dynamic = new AlsIslandBody(identity, new(1, AlsDoubleVector.One));
+        var kinematic = new AlsIslandBody(identity, default, ExternallyDriven: true);
+        var fixedBody = new AlsIslandBody(identity, default);
+        Assert.Equal(previous.Velocity.Linear, AlsContactCullDistance.PreVelocity(dynamic, previous, current));
+        Assert.Equal(current.Linear, AlsContactCullDistance.PreVelocity(kinematic, previous, current));
+        Assert.Equal(Vector3.Zero, AlsContactCullDistance.PreVelocity(kinematic, previous, default));
+        Assert.Equal(Vector3.Zero, AlsContactCullDistance.PreVelocity(fixedBody, previous, current));
+    }
+
+    [Fact]
     public void ParticleSizeAndVelocityExpansionUseIndependentNativeFloatBoundaries()
     {
         Assert.Equal(1, AlsContactCullDistance.Scale(27, 0, .01f, 1));
