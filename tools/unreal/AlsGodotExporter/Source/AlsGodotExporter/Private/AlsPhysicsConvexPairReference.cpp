@@ -1,5 +1,6 @@
 #include "AlsPhysicsAssetExport.h"
 #include "Chaos/Convex.h"
+#include "Chaos/Box.h"
 #include "Chaos/ImplicitObjectScaled.h"
 #include "Chaos/CollisionResolution.h"
 #include "Chaos/PBDCollisionConstraints.h"
@@ -15,7 +16,7 @@
 #include "Serialization/JsonSerializer.h"
 namespace AlsJointSolverReference { TArray<TSharedPtr<FJsonValue>> V(const FVector& P); TSharedRef<FJsonObject> T(const FTransform& P); }
 
-bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bool Scaled)
+bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bool Scaled,bool BoxPairs)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
@@ -52,13 +53,38 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bo
         }
     }
     if(Shapes.Num()!=2)return Fail(TEXT("Expected two cooked feet."));
+    if(BoxPairs)
+    {
+        Root->SetStringField(TEXT("observation"),TEXT("Actual generic convex UpdateConstraint initial manifolds; raw/scaled feet against boxes and box pairs, actual zero/nonzero pair margins"));
+        for(int32 I=0;I<2;++I)
+        {
+            const auto Bone=Shapes[I].Bone;const auto Hull=Shapes[I].Hull;
+            Shapes.Add({Bone,Hull,MakeImplicitObjectPtr<TImplicitObjectScaled<FConvex>>(Hull,FVec3(1.5,.8,1.2))});
+        }
+        for(double Margin:{0.,.2})Shapes.Add({TEXT("box"),FConvexPtr(),MakeImplicitObjectPtr<FImplicitBox3>(FVec3(-8,-5,-3),FVec3(8,5,3),Margin)});
+        // TBox::SStructureData is not DLL-exported. Run its exact Box.cpp
+        // construction through the native half-edge factory instead.
+        const TArray<TArray<int32>> BoxFaces={{0,4,6,2},{0,1,5,4},{0,2,3,1},{1,3,7,5},{2,6,7,3},{4,5,7,6}};
+        const auto BoxStructure=FConvexHalfEdgeStructureDataS16::MakePlaneVertices(BoxFaces,8);
+        Root->SetStringField(TEXT("boxVertexPlanesObservation"),TEXT("Native half-edge factory using exact Box.cpp static face definition; private TBox static not directly exported"));
+        TArray<TSharedPtr<FJsonValue>> VertexPlanes;
+        for(int32 I=0;I<8;++I)
+        {
+            int32 P0,P1,P2;const int32 Count=BoxStructure.GetVertexPlanes3(I,P0,P1,P2);
+            auto Row=MakeShared<FJsonObject>();Row->SetNumberField(TEXT("count"),Count);
+            Row->SetArrayField(TEXT("planes"),{MakeShared<FJsonValueNumber>(P0),MakeShared<FJsonValueNumber>(P1),MakeShared<FJsonValueNumber>(P2)});
+            VertexPlanes.Add(MakeShared<FJsonValueObject>(Row));
+        }
+        Root->SetArrayField(TEXT("boxVertexPlanes"),VertexPlanes);
+    }
     TArray<TSharedPtr<FJsonValue>> Rows;
     const FVec3 Scales0[]={FVec3(1),FVec3(2),FVec3(.5,1.5,.75),FVec3(-1,1,1)};
     const FVec3 Scales1[]={FVec3(1),FVec3(1.5,.8,1.2),FVec3(2,.75,1.3),FVec3(1,-.8,1.2)};
     for(int32 Mode=0;Mode<(Scaled?4:1);++Mode)
-    for(int32 A=0;A<2;++A)for(int32 B=0;B<2;++B)for(int32 Axis=0;Axis<3;++Axis)for(int32 Sign:{-1,1})
+    for(int32 A=0;A<Shapes.Num();++A)for(int32 B=0;B<Shapes.Num();++B)for(int32 Axis=0;Axis<3;++Axis)for(int32 Sign:{-1,1})
     for(double Distance:{0.,8.,16.,24.,40.,60.})for(double Angle:{0.,.13,.6})for(double Cull:{0.,3.,6.})
     {
+        if(BoxPairs&&A<4&&B<4)continue;
         FVec3 Position(.137,-.231,.179);Position[Axis]+=Sign*Distance;
         const FRigidTransform3 Pose0=FRigidTransform3::Identity;
         const FRigidTransform3 Pose1(Position,FRotation3::FromAxisAngle(FVec3(1,2,3).GetSafeNormal(),Angle));
@@ -80,10 +106,19 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bo
         auto Constraint=Context->CreateConstraint(P[0],Geometry0.GetReference(),P[0]->ShapesArray()[0].Get(),nullptr,FRigidTransform3::Identity,
             P[1],Geometry1.GetReference(),P[1]->ShapesArray()[0].Get(),nullptr,FRigidTransform3::Identity,Cull,true,EContactShapesType::GenericConvexConvex);
         Context->ActivateConstraint(Constraint.Get());Allocator.EndDetectCollisions();
-        if(Constraint->GetCollisionMargin0()!=0||Constraint->GetCollisionMargin1()!=0)return Fail(TEXT("Expected zero pair margins."));
+        if(!BoxPairs&&(Constraint->GetCollisionMargin0()!=0||Constraint->GetCollisionMargin1()!=0))return Fail(TEXT("Expected zero pair margins."));
         Constraint->SetShapeWorldTransforms(Pose0,Pose1);Collisions::UpdateConstraint(*Constraint,Pose0,Pose1,1./60.);
         auto Row=MakeShared<FJsonObject>();Row->SetStringField(TEXT("bone0"),Shapes[A].Bone);Row->SetStringField(TEXT("bone1"),Shapes[B].Bone);
         Row->SetObjectField(TEXT("shape1To0"),T(FTransform(Pose1)));Row->SetNumberField(TEXT("cullDistance"),Cull);
+        if(BoxPairs)
+        {
+            Row->SetStringField(TEXT("kind0"),A<2?TEXT("raw"):A<4?TEXT("scaled"):TEXT("box"));
+            Row->SetStringField(TEXT("kind1"),B<2?TEXT("raw"):B<4?TEXT("scaled"):TEXT("box"));
+            Row->SetNumberField(TEXT("margin0"),Constraint->GetCollisionMargin0());
+            Row->SetNumberField(TEXT("margin1"),Constraint->GetCollisionMargin1());
+            Row->SetArrayField(TEXT("half"),V(FVec3(8,5,3)));
+            Row->SetArrayField(TEXT("scale"),V(FVec3(FVec3f(1.5f,.8f,1.2f))));
+        }
         if(Scaled)
         {
             Row->SetNumberField(TEXT("scaleMode"),Mode);

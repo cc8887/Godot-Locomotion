@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新盒体/凸包组合：`docs/verification/2026-09-21-physics-box-pair.md`。统一值类型polygon初次流形，box原生面/邻接顺序、非零box pair margin、双方边投影与二次cull。6480完整原生对照通过，219带margin边/3投影cull，点/法向0差；旧raw1296/scaled5184仍通过且均0差，修正float左乘的缩放顶点与最近边精度。三套点/法向断言收紧精确相等。Core2792、Import2391+1旧跳过、Godot/UE完整构建审计/DataValidation通过，重导一致。普通Editor marker成功但退出0xC0000005，两旧Condition failed仍在；上批PID3632残留DLL通过原生终止释放，不把此前exitcode0当资源已释放。本批退出后无DLL占用。未接运行时/未重跑整链，最新9/12。下一步保留query绑定的cooked拓扑与源尺寸/缩放、原始pair次序，补geometry提交回滚生命周期/pair margin/分离cull后整链；非零margin FConvex、quadratic完整路径、普通Ragdoll等仍缺。
+
 - 最新缩放凸包：`docs/verification/2026-09-21-physics-scaled-convex.md`。新增双方零margin scaled FConvex流形，float缩放/逆缩放与候选面、double裁剪平面、负缩放绕序。5184真实两脚缩放组合全部对齐点数/序/类型，法向差0、点最大差3.8444e-6cm（非逐位一致）；重导字节一致，旧raw1296点/法向仍0且原生重导不变。Core2787、Import2390+1旧跳过、Godot/UE全目标审计/DataValidation通过。普通Editor标记成功、原生退出码查询0，但启动器WaitForExit卡住后仅结束启动器；两旧Condition failed/既往AV未解决，不称重启全门禁通过。未接运行时、未重跑整链，最新9/12。下一步mixed/box/非零margin边投影、查询owner缓存与分离cull，再三旧失败及普通Ragdoll等完整目标；极端缩放fallback/EPA退化原生覆盖仍缺。
 
 - 原始凸包组合批次最终全量：Core串行2784通过，Import串行2389通过/1既有跳过，均退出0。普通Editor本次退出0，两旧Condition failed与既往间歇退出AV未解决；范围见下条。
