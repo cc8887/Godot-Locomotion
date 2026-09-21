@@ -21,3 +21,4 @@ bool ExportAlsPhysicsConvexTopology(const FString& Output, FString& Error);
 bool ExportAlsPhysicsFaceClipReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGjkPrimitivesReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGjkSearchReference(const FString& Output, FString& Error);
+bool ExportAlsPhysicsMarginReference(const FString& Output, FString& Error);

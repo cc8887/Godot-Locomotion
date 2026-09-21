@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 碰撞margin批次最终全量：Core串行2773通过，Import串行2383通过/1既有跳过，均退出0；运行时未接入与旧异常边界见下条。
+
+- 最新碰撞margin：`docs/verification/2026-09-21-physics-margins.md`。Core按双方quadratic/运动状态解析float pair margin，Sleeping仍Dynamic，保留双方零margin时只给第二侧最小值的原生次序。1568实际constraint Setup对照逐值精确相等（含真实两脚），最小margin原生观察0，0/.05进程内扫值、重导一致。Core2773、Godot构建通过；UE完整Editor构建/插件审计/DataValidation/普通重启退出0，两旧Condition failed与既往间歇退出AV未解决。CollisionTolerance未纳入本批，owner参数映射未接，未改运行时/未重跑整链，最新9/12。下一步原生GetVertexPlanes3邻接/选面与GJK/EPA/margin/裁剪衔接，再分离cull/退化对照/三旧失败及普通Ragdoll等完整目标。
+
 - EPA 批次最终全量：Core 串行2767通过，Import串行2382通过/1既有跳过，均退出0；Godot优化构建通过。边界见下条。
 
 - 最新 EPA：`docs/verification/2026-09-21-physics-epa.md`。Core新增原生indexed EPA初始化/面邻接/可见边界扩展/收敛与GJK统一入口，缓存跨GJK+EPA暂存发布，异常不发布可重试，预热盒体零分配。旧原生参考528帧完整contact/身份/缓存对照通过，其中318 EPA帧深度/点/法向差0，最大队列12；256组同MSVC实际STL排序参考覆盖0–1024长度/重复值/分区/堆回退，逐索引一致且重导一致。特殊Degenerate/MaxIterations尚无专门原生对照；点触碰fallback有Core测试。Godot优化构建通过，未改UE插件/未重跑普通重启，上一批0xC0000005及两旧Condition failed保留。尚未接运行时/未重跑整链，最新9/12。下一步退化原生参考、实际pair margin、顶点原生邻接/选面，组合凸包流形并接分离cull，再三旧失败及普通Ragdoll等完整目标。
