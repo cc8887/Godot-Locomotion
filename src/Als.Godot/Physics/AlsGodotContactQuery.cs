@@ -5,8 +5,9 @@ using NVector = System.Numerics.Vector3;
 
 namespace GodotAls.Physics;
 
-// Core generates guarded capsule and box face manifolds; other pairs use a geometry-
-// only Jolt query space. It contains exactly one target shape, so every
+// Explicit native polygon bindings use Core GJK/EPA and transactional caches.
+// Other pairs use guarded capsule/box faces or a geometry-only Jolt query space.
+// That space contains exactly one target shape, so every
 // CollideShape point pair has an unambiguous registry identity. A hull/box wholly
 // inside a box face can use that exact local half-space. Core alone owns
 // dynamic response. Convex input shapes only; no CCD or native Chaos
@@ -20,8 +21,15 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         public required uint Revision;
         public required Action Changed;
         public bool Dirty;
+        public AlsConvexTopology? Cooked;
+        public AlsDoubleVector? NativeHalf;
+        public AlsDoubleVector NativeScale = AlsDoubleVector.One;
+        public bool NativePolygon => Cooked is not null || NativeHalf.HasValue;
     }
     private readonly AlsContactRegistry _registry;
+    private readonly AlsPolygonQueryCache _polygonCache;
+    private readonly AlsGjkCache _directCache = new();
+    private readonly AlsConvexManifoldWorkspace _directWorkspace = new();
     private readonly Binding?[] _bindings;
     private readonly PhysicsShapeQueryParameters3D _query = new() { CollisionMask = 1, CollideWithBodies = true, CollideWithAreas = false, Margin = 0 };
     private readonly WorldBoundaryShape3D _interiorPlane = new();
@@ -32,6 +40,9 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     internal int InteriorFaceQueries { get; private set; }
     internal int CapsuleFaceQueries { get; private set; }
     internal int BoxFaceQueries { get; private set; }
+    internal int NativePolygonQueries { get; private set; }
+    internal int NativeCachedPairs => _polygonCache.CachedPairs;
+    internal long NativeCacheSteps => _polygonCache.CompletedSteps;
     public bool IsInvalidated
     {
         get
@@ -45,7 +56,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     }
     internal AlsGodotContactQuery(AlsContactRegistry registry)
     {
-        Main(); _registry = registry; _bindings = new Binding[registry.Capacity];
+        Main(); _registry = registry; _bindings = new Binding[registry.Capacity]; _polygonCache = new(registry.Capacity);
         try
         {
             _space = PhysicsServer3D.SpaceCreate(); PhysicsServer3D.SpaceSetActive(_space, false);
@@ -55,17 +66,37 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         }
         catch { Dispose(); throw; }
     }
-    internal void Bind(AlsContactShapeHandle handle, Shape3D shape)
+    internal void Bind(AlsContactShapeHandle handle, Shape3D shape, AlsConvexTopology? cooked = null,
+        AlsDoubleVector? nativeHalf = null, AlsDoubleVector? nativeScale = null)
     {
         Check(); if (_registry.IsLocked) throw new InvalidOperationException("Cannot bind query geometry during a solve.");
         if (!_registry.Present(handle.Slot) || _registry.Key(handle.Slot).Revision != handle.Revision) throw new ArgumentException("Stale shape binding.");
+        if(cooked is not null)
+        {
+            if(shape is not ConvexPolygonShape3D || nativeHalf.HasValue)throw new ArgumentException("Cooked geometry needs a convex binding.");
+            new AlsConvexPolygonShape(cooked,nativeScale??AlsDoubleVector.One).Validate();
+        }
+        if(nativeHalf.HasValue)
+        {
+            if(shape is not BoxShape3D || nativeScale.HasValue)throw new ArgumentException("Native box dimensions need a box binding.");
+            new AlsBoxPolygonShape(nativeHalf.Value).Validate();
+        }
+        if(nativeScale.HasValue&&cooked is null)throw new ArgumentException("Native convex scale needs cooked topology.");
         var bounds = Bounds(shape); var old = _bindings[handle.Slot];
         if (old is not null && old.Revision == handle.Revision) throw new ArgumentException("Replace registry shape before rebinding geometry.");
-        var binding = new Binding { Shape = shape, Bounds = bounds, Revision = handle.Revision, Changed = null! };
+        var binding = new Binding { Shape = shape, Bounds = bounds, Revision = handle.Revision, Changed = null!,
+            Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One };
         binding.Changed = () => binding.Dirty = true;
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
     }
+    public void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous,ReadOnlySpan<AlsProjectionVelocity> velocities,
+        ReadOnlySpan<AlsIslandBody> bodies,double dt)
+    { Check();_polygonCache.PrepareStep(); }
+    public void StageCommit() => _polygonCache.StageCommit();
+    public void PublishCommit() => _polygonCache.PublishCommit();
+    public void Abort() => _polygonCache.Abort();
+    public void Reset() => _polygonCache.Reset();
     public bool TryGetManifoldSettings(int shape0, int shape1, out AlsContactManifoldSettings settings)
     {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1); settings = default;
@@ -80,6 +111,22 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         // proven face-interior cases below have one ordering. Return the original
         // body order and shape-local normal to the contact owner.
         var a = BindingAt(shape0); var b = BindingAt(shape1);
+        // Native polygons retain the original owner order. The legacy face
+        // adapter below may swap shapes; that is not the native reference bias.
+        if(a.NativePolygon&&b.NativePolygon)
+        {
+            var relative=AlsPrecisePose.Relative(world1,world0);
+            var key=new AlsContactPairKey(_registry.Key(shape0),_registry.Key(shape1));
+            AlsConvexManifoldResult result;
+            if(a.NativeHalf.HasValue&&b.NativeHalf.HasValue)
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value),new AlsBoxPolygonShape(b.NativeHalf.Value),key,relative,destination);
+            else if(a.NativeHalf.HasValue)
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value),Convex(b),key,relative,destination);
+            else if(b.NativeHalf.HasValue)
+                result=Native(Convex(a),new AlsBoxPolygonShape(b.NativeHalf.Value),key,relative,destination);
+            else result=Native(Convex(a),Convex(b),key,relative,destination);
+            NativePolygonQueries++;return result.Count;
+        }
         var reverseBoxFace = a.Shape is BoxShape3D && b.Shape is BoxShape3D &&
             TryInteriorFace(b, ToGodot(world1 with { Position = AlsDoubleVector.Zero }),
                 a, ToGodot(world0 with { Position = world0.Position - world1.Position }), out _);
@@ -96,6 +143,23 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         }
         return QueryOrdered(shape0, world0, shape1, world1, destination);
     }
+    private AlsConvexManifoldResult Native<TA,TB>(TA a,TB b,AlsContactPairKey key,in AlsPrecisePose relative,Span<AlsDetectedContact> destination)
+        where TA:struct,IAlsPolygonShape where TB:struct,IAlsPolygonShape
+    {
+        // Current Godot query proxies explicitly use zero margins. Actual UE
+        // wrapper margins still need transport; cooked margin alone is not
+        // evidence that those are zero. Keep overlap-only discovery until the
+        // detector's velocity-based cull is connected.
+        if(_polygonCache.Pending)
+            return _polygonCache.Query(key,a,b,relative,destination,0,(double)1e-6f,(double)1e-6f,1,.001f);
+        // Direct diagnostic queries have no surrounding island transaction.
+        _directCache.Reset();
+        return AlsPolygonManifold.Build(a,b,relative,_directCache,_directWorkspace,destination,0,(double)1e-6f,(double)1e-6f,1,.001f);
+    }
+    // UE CreateGeometry selects instanced FConvex for exact unit NetScale;
+    // its zero-margin geometry methods delegate to the unscaled inner hull.
+    private static AlsConvexPolygonShape Convex(Binding binding)
+        =>binding.NativeScale==AlsDoubleVector.One?new(binding.Cooked!):new(binding.Cooked!,binding.NativeScale);
     private int QueryOrdered(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1);
@@ -243,7 +307,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private static void Main() { if (!GodotThread.IsMainThread()) throw new InvalidOperationException("Physics geometry queries require Main."); }
     public void Dispose()
     {
-        Main(); if (_disposed) return; _disposed = true;
+        Main(); if (_disposed) return; _disposed = true; _polygonCache.Abort(); _polygonCache.Reset();
         foreach (var binding in _bindings) if (binding is not null && GodotObject.IsInstanceValid(binding.Shape)) binding.Shape.Changed -= binding.Changed;
         _query.Dispose();
         if (_body.IsValid) PhysicsServer3D.FreeRid(_body);

@@ -318,6 +318,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                 max_anchor_source = _anchorSource,
                 contacts = _drop, gravity = _drop, high_drop = _highDrop, contact_points = _contactPoints,
                 restored_polygonal_pairs = _restoredPairs,
+                native_polygon_queries = _active.Sum(a => a.Query?.NativePolygonQueries ?? 0),
+                native_cached_pairs = _active.Sum(a => a.Query?.NativeCachedPairs ?? 0),
                 query_shapes = _active.Sum(a => (a.Shapes?.Count ?? 0) + (a.Scene?.ShapeCount ?? 0)),
                 scene_world_geometry = _sceneWorld, environment_bodies_per_rig = _active.FirstOrDefault()?.Scene?.BodyCount ?? (_drop ? 1 : 0),
                 scene_floor_top_cm = _floorTop, scene_material_combination = false, ordinary_ragdoll_connected = false,

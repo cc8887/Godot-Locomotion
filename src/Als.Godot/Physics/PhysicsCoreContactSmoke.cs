@@ -20,6 +20,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _precisionChecks;
     private int _manifoldChecks;
     private int _geometryTransactionChecks;
+    private int _nativePolygonChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -63,7 +64,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) { TraceLifecycleChecks(); GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); AssetCalfFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); BoxFaceChecks(); ManifoldChecks(); SleepChecks(); }
+            if (_scenario == 0 && _frame == 0) { NativePolygonChecks(); TraceLifecycleChecks(); GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); AssetCalfFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); BoxFaceChecks(); ManifoldChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -83,7 +84,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
             if (_scenario < 3) { StartScenario(); return; }
             Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
             var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
-                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -97,6 +98,29 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private void Fail(Exception e) { GD.PushError("CORE_CONTACT_WORLD_FAILED " + e); _done = true; Cleanup(); GetTree().Quit(1); }
     public override void _ExitTree() => Cleanup();
+
+    private void NativePolygonChecks()
+    {
+        var identity=AlsPrecisePose.Identity;var registry=new AlsContactRegistry(2,2);
+        using var shape=new BoxShape3D {Size=new(2,2,2),Margin=0};
+        using var query=new AlsGodotContactQuery(registry);
+        query.Bind(registry.Register(new(0,identity,1,1)),shape,nativeHalf:new(100,100,100));
+        query.Bind(registry.Register(new(1,identity,1,1)),shape,nativeHalf:new(100,100,100));
+        var other=identity with {Position=new(0,0,199)};
+        Span<AlsDetectedContact> points=stackalloc AlsDetectedContact[4];
+        Require(query.Query(0,identity,1,other,points)==4,"Native box binding did not generate four contacts.");
+        foreach(var p in points)Require(p.Point0.Z==100&&p.Point1.Z==-100&&p.Normal1==-NVector.UnitZ,"Native box local geometry changed.");
+        Require(query.NativePolygonQueries==1&&query.NarrowPhaseQueries==0&&query.NativeCachedPairs==0,"Direct native query contaminated persistent cache.");
+        var contacts=new AlsWorldContacts(registry,query,new(0,0,0),new(1f/_hz,0,2000));
+        var bodies=new[]{new AlsIslandBody(identity,new(1,AlsDoubleVector.One)),new AlsIslandBody(identity,default)};
+        var poses=new[]{identity,other};var velocities=new AlsProjectionVelocity[2];
+        contacts.Gather(poses,velocities,bodies,1d/_hz);contacts.StageCommit();contacts.Abort();
+        Require(query.NativeCachedPairs==0&&query.NativeCacheSteps==0,"Aborted native query published cache.");
+        contacts.Gather(poses,velocities,bodies,1d/_hz);contacts.StageCommit();contacts.Commit();
+        Require(query.NativeCachedPairs==1&&query.NativeCacheSteps==1,"Native query cache did not publish.");
+        contacts.Reset();Require(query.NativeCachedPairs==0,"Native reset retained cache.");
+        _nativePolygonChecks+=4;
+    }
 
     private void TraceLifecycleChecks()
     {
@@ -189,14 +213,21 @@ public partial class PhysicsCoreContactSmoke : Node3D
         var p = new AlsPrecisePose(new(62.337376960394174, -13.16448096873292, -31.806653818699232),
             new(.0250642728060484, -.7160341143608093, -.07232434302568436, .6938560009002686), AlsDoubleVector.One);
         var q = AlsPrecisePose.Identity with { Position = new(793.5523986816406, -139.2822265625, -68.39840412139893) };
+        using var nativeQuery=new AlsGodotContactQuery(registry);
+        nativeQuery.Bind(new(0,registry.Key(0).Revision),foot,
+            cooked.Single(c=>definition.Bodies[c.Body].Bone=="foot_l").Topology,nativeScale:source.Local.Scale);
+        nativeQuery.Bind(new(1,registry.Key(1).Revision),floor,
+            nativeHalf:new((double)floor.Size.Z*50,(double)floor.Size.X*50,(double)floor.Size.Y*50));
         var points = new AlsDetectedContact[16]; var failed = false;
         var variants = new[] { AlsPrecisePose.Identity,
             new AlsPrecisePose(new(13, -8, 7), AlsQuaternion.FromAxisAngle(NVector.UnitZ, .83f), AlsDoubleVector.One),
             new AlsPrecisePose(new(1e7, -2e7, 3e7), AlsQuaternion.FromAxisAngle(NVector.Normalize(new(.3f, .8f, .2f)), .31f), AlsDoubleVector.One) };
+        foreach(var useNative in new[]{false,true})
         for (var variant = 0; variant < variants.Length; variant++) foreach (var reversed in new[] { false, true })
         {
             var world0 = AlsPrecisePose.Compose(p, variants[variant]); var world1 = AlsPrecisePose.Compose(q, variants[variant]);
-            var count = reversed ? query.Query(1, world1, 0, world0, points) : query.Query(0, world0, 1, world1, points);
+            var selectedQuery=useNative?nativeQuery:query;
+            var count = reversed ? selectedQuery.Query(1, world1, 0, world0, points) : selectedQuery.Query(0, world0, 1, world1, points);
             Require(count > 0, "Captured asset foot contact disappeared.");
             var normalMin = 1d; var faceError = 0d;
             for (var i = 0; i < count; i++)
@@ -205,10 +236,11 @@ public partial class PhysicsCoreContactSmoke : Node3D
                 var floorPoint = reversed ? points[i].Point0 : points[i].Point1;
                 normalMin = Math.Min(normalMin, normal.Z); faceError = Math.Max(faceError, Math.Abs(floorPoint.Z - 25));
             }
-            GD.Print($"CORE_ASSET_FOOT_FACE variant={variant} reversed={reversed} points={count} min_normal_z={normalMin:R} floor_face_error_cm={faceError:R}");
+            GD.Print($"CORE_ASSET_FOOT_FACE native={useNative} variant={variant} reversed={reversed} points={count} min_normal_z={normalMin:R} floor_face_error_cm={faceError:R}");
             failed |= normalMin < .999 || faceError > .002; _precisionChecks++;
         }
         Require(!failed, "Captured foot query selected the bottom face instead of the nearby top face.");
+        Require(nativeQuery.NativePolygonQueries==6&&nativeQuery.NarrowPhaseQueries==0,"Native foot binding fell back to Jolt.");
     }
 
     private void AssetCalfFaceChecks()
