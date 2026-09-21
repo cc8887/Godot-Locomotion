@@ -37,7 +37,7 @@ public partial class PhysicsCoreJointReplay : Node3D
     private string[] _traceBones = [];
     private HashSet<int> _captureFrames = [];
     private string _captureDirectory = "";
-    private int _contactPoints;
+    private int _contactPoints, _restoredPairs;
     private double _finalSpeed, _finalAngularSpeed, _maxLimit, _finalLimit;
     private string _finalLimitSource = "";
     private double _legacyFinalLimit;
@@ -265,7 +265,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                             active.Host.StepScene(dt, new(0, 0, -980), active.Contacts, targets);
                             active.Scene.CommitCapture(active.Host.Island);
                         }
-                        if (active.Contacts.CompletedSteps != epoch) _contactPoints += active.Contacts.LastContactCount;
+                        if (active.Contacts.CompletedSteps != epoch)
+                        { _contactPoints += active.Contacts.LastContactCount; _restoredPairs += active.Contacts.LastRestoredPairs; }
                     }
                     else active.Host.Step(dt);
                     if (_platform is not null && _frame >= _hz * 10 && _frame < _hz * 14)
@@ -316,6 +317,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                 max_anchor_cm = _chains ? (double?)_anchorCm : null,
                 max_anchor_source = _anchorSource,
                 contacts = _drop, gravity = _drop, high_drop = _highDrop, contact_points = _contactPoints,
+                restored_polygonal_pairs = _restoredPairs,
                 query_shapes = _active.Sum(a => (a.Shapes?.Count ?? 0) + (a.Scene?.ShapeCount ?? 0)),
                 scene_world_geometry = _sceneWorld, environment_bodies_per_rig = _active.FirstOrDefault()?.Scene?.BodyCount ?? (_drop ? 1 : 0),
                 scene_floor_top_cm = _floorTop, scene_material_combination = false, ordinary_ragdoll_connected = false,

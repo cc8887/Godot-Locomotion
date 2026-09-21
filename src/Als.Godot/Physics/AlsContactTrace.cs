@@ -5,13 +5,14 @@ using GodotAls.Core.Physics;
 
 namespace GodotAls.Physics;
 
-// Opt-in diagnostic decorator: records exactly what the geometry provider gave
-// the solver. It never edits, reorders or drops contacts.
+// Opt-in diagnostic decorator: records fresh geometry queries. Restored
+// manifolds bypass the provider; capture the island step to inspect solver input.
 internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsContactRegistry registry,
     string mesh, string[] names, Func<int> frame, int first, int last, string[] bones,
     Func<int, object>? geometry = null) : IAlsContactGeometrySource
 {
     public bool IsInvalidated => source.IsInvalidated;
+    public bool TryGetManifoldSettings(int a, int b, out AlsContactManifoldSettings settings) => source.TryGetManifoldSettings(a, b, out settings);
     public int Query(int a, in AlsPrecisePose p, int b, in AlsPrecisePose q, Span<AlsDetectedContact> points)
     {
         var count = source.Query(a, p, b, q, points); var step = frame();
