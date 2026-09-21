@@ -12,6 +12,7 @@ public sealed class AlsPersistentContactPair
     private readonly AlsContactGeometry[] _geometry;
     private readonly int[] _sourceIndices;
     private readonly AlsContactHistoryResult[] _results;
+    private AlsContactGatherSnapshot _gatherSnapshot;
     public bool Pending => _history.Pending;
     public int SolverCount => Pending ? _solver.Count : 0;
     public int SavedCount => _history.SavedCount;
@@ -19,6 +20,14 @@ public sealed class AlsPersistentContactPair
     public AlsSavedContact SavedAt(int index) => _history.SavedAt(index);
     public AlsPreparedContact PreparedAt(int index) => _history.PreparedAt(index);
     internal AlsContactPointInput SolverInputAt(int index) { RequirePending(); return _solver.PointAt(index).Input; }
+    internal AlsContactGatherSnapshot GatherSnapshot { get { RequirePending(); return _gatherSnapshot; } }
+    internal AlsContactGeometry GeometryAt(int index)
+    {
+        RequirePending();
+        if ((uint)index >= _solver.Count) throw new ArgumentOutOfRangeException(nameof(index));
+        return _geometry[index];
+    }
+    internal float GatheredInitialPhiAt(int index) { RequirePending(); return _solver.InitialPhiAt(index); }
 
     public AlsPersistentContactPair(int capacity)
     {
@@ -44,9 +53,11 @@ public sealed class AlsPersistentContactPair
                 if (point.Disabled) continue;
                 _geometry[count] = point.Geometry; _sourceIndices[count++] = i;
             }
+            var effectiveSettings = settings with
+                { InitialManifold = _history.PreparedInitialManifold, MinInitialPhi = _history.PreparedMinInitialPhi };
             _solver.GatherGeometry(_geometry.AsSpan(0, count), material, body0, rotation0, inverseInertia0,
-                body1, rotation1, inverseInertia1, settings with
-                { InitialManifold = _history.PreparedInitialManifold, MinInitialPhi = _history.PreparedMinInitialPhi });
+                body1, rotation1, inverseInertia1, effectiveSettings);
+            _gatherSnapshot = new(body0, body1, effectiveSettings);
         }
         catch { _history.Abort(); throw; }
     }

@@ -20,6 +20,7 @@ bool ExportAlsPhysicsContactReference(const FString& Output, FString& Error, boo
 bool ExportAlsPhysicsContactHistoryReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGraphReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs, const FString& Output, FString& Error);
+bool ExportAlsPhysicsRawGatherReference(const FString& Inputs, const FString& Output, FString& Error);
 bool ExportAlsPhysicsCapsuleGeometryReference(const FString& Input, const FString& Output, FString& Error);
 bool ExportAlsPhysicsManifoldRestoreReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCullReference(const FString& Output, FString& Error);

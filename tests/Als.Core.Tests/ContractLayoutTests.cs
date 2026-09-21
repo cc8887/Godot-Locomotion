@@ -250,14 +250,16 @@ public sealed class ContractLayoutTests
     }
 
     [Fact]
-    public void CoreInternalsAreVisibleOnlyToCoreTests()
+    public void CoreInternalsAreVisibleOnlyToCoreAndNativeReferenceTests()
     {
         var friendAssemblies = typeof(AlsTurnRotateSelection).Assembly
             .GetCustomAttributes<InternalsVisibleToAttribute>()
             .Select(attribute => attribute.AssemblyName)
             .ToArray();
 
-        Assert.Equal(new[] { "Als.Core.Tests" }, friendAssemblies);
+        // Native row replay needs the same internal Gather validation path as
+        // production geometry; neither runtime adapter is a friend assembly.
+        Assert.Equal(new[] { "Als.Core.Tests", "Als.Import.Tests" }, friendAssemblies);
     }
 
     [Fact]
