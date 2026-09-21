@@ -192,7 +192,7 @@ internal sealed class AlsSceneContactSet : IDisposable
     private static AlsRegisteredContactShape Definition(Entry entry) => new(entry.BodyIndex,
         FromWorld(entry.Body.ShapeOwnerGetTransform(entry.Owner)), entry.Body.CollisionLayer, entry.Body.CollisionMask,
         entry.Body.ShapeOwnerGetShape(entry.Owner, entry.ShapeIndex) is SphereShape3D or CapsuleShape3D,
-        !entry.Body.IsShapeOwnerDisabled(entry.Owner));
+        !entry.Body.IsShapeOwnerDisabled(entry.Owner), AlsSimulationFilter.WorldStatic);
     private static void ValidateShape(Shape3D shape)
     {
         if (shape is not (SphereShape3D or BoxShape3D or CapsuleShape3D or ConvexPolygonShape3D))
