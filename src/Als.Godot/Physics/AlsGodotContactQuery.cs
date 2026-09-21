@@ -5,7 +5,8 @@ using NVector = System.Numerics.Vector3;
 
 namespace GodotAls.Physics;
 
-// Explicit native polygon bindings use Core GJK/EPA and transactional caches.
+// Explicit native polygon bindings use Core GJK/EPA and transactional caches;
+// native sphere/box and capsule/box bindings use their one-shot Core manifolds.
 // Other pairs use guarded capsule/box faces or a geometry-only Jolt query space.
 // That space contains exactly one target shape, so every
 // CollideShape point pair has an unambiguous registry identity. A hull/box wholly
@@ -39,6 +40,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private readonly uint[] _boundsGeneration;
     private double _dt;
     private readonly AlsGjkCache _directCache = new();
+    private readonly AlsCapsuleManifoldWorkspace _capsuleWorkspace = new();
     private readonly AlsConvexManifoldWorkspace _directWorkspace = new();
     private readonly Binding?[] _bindings;
     private readonly PhysicsShapeQueryParameters3D _query = new() { CollisionMask = 1, CollideWithBodies = true, CollideWithAreas = false, Margin = 0 };
@@ -52,6 +54,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     internal int BoxFaceQueries { get; private set; }
     internal int NativePolygonQueries { get; private set; }
     internal int NativeSphereBoxQueries { get; private set; }
+    internal int NativeCapsuleBoxQueries { get; private set; }
     internal int NativeCachedPairs => _polygonCache.CachedPairs;
     internal long NativeCacheSteps => _polygonCache.CompletedSteps;
     public bool IsInvalidated
@@ -202,6 +205,23 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination,cull);
             else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination,cull);
             NativePolygonQueries++;return result.Count;
+        }
+        if ((a.NativeCapsule.HasValue && b.NativeHalf.HasValue) ||
+            (b.NativeCapsule.HasValue && a.NativeHalf.HasValue))
+        {
+            var reverse = b.NativeCapsule.HasValue;
+            var capsule = reverse ? b : a; var box = reverse ? a : b;
+            var capsulePose = reverse ? world1 : world0; var boxPose = reverse ? world0 : world1;
+            var count = AlsCapsuleConvexManifold.Build(capsule.NativeCapsule!.Value, AlsPrecisePose.Relative(capsulePose, boxPose),
+                new AlsBoxPolygonShape(box.NativeHalf!.Value), _capsuleWorkspace, destination, CullDistance(shape0, shape1));
+            NativeCapsuleBoxQueries++;
+            if (reverse) for (var i = 0; i < count; i++)
+            {
+                var point = destination[i];
+                var normal = (new AlsDoubleVector(point.Normal1).Rotate(world0.Rotation) * -1).Rotate(world1.Rotation.Conjugate());
+                destination[i] = point with { Point0 = point.Point1, Point1 = point.Point0, Normal1 = normal.ToSingle() };
+            }
+            return count;
         }
         if ((a.NativeSphereRadius.HasValue && b.NativeHalf.HasValue) ||
             (b.NativeSphereRadius.HasValue && a.NativeHalf.HasValue))

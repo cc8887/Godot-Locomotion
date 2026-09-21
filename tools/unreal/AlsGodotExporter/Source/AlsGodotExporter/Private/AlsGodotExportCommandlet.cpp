@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsCapsuleBoxOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsCapsuleBoxReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Full capsule-box reference failed: %s"), *Error); return 43; }
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsSphereBoxOutput="), PhysicsOutput))
     {
         FString Error;
