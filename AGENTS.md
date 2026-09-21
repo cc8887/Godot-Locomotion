@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 盒体初次流形批次最终全量计数：Core串行2743通过，Import串行2371通过/1既有跳过，均退出0；详细证据与9/12整链结果见下条。本批没有关闭剩余三项休眠失败。
+
+- 最新盒体初次流形：`docs/verification/2026-09-21-physics-box-manifold.md`。Core接管完整位于另一盒面内的box-box四点/原生对角次序，边缘/深穿透/incident face平局回退。432原生场景中216支持、144有点，逐点同序最大点差0；冷重导一致。Godot144规范化正反传输通过，三频率各545精度/7几何/5流形/5睡眠/3动态通过。整链现9/12（平台5/6、落地4/6）：30平移回归与普通120旧失败关闭；剩30旋转停后AnimMan不睡、普通30 Mannequin不睡、高速120睡太迟。cull仍0，凸包面拓扑/边缘裁剪/原始反序reference bias/分离发现未齐。Core串行2743通过，UE全目标审计/冷重导/普通重启/DataValidation通过，重启两条旧Condition failed未解决；完整记录见文档。普通demo仍未切换，后续继续分离几何/三项失败，再普通Ragdoll/Get-up/Pose Recovery及完整目标。
+
 - 当前验证计数（原生检测距离批次）：Core 串行2739通过；Import串行2370通过/1既有跳过；Godot优化构建通过。日志在 `artifacts/physics-cull-reference-20260921/`。本批未重跑整链，不将这些结果当五项休眠失败已关闭。
 
 - 最新原生检测距离：`docs/verification/2026-09-21-physics-cull-reference.md`。新增原生 FParticlePairMidPhase 观察导出，324组scale/distance与Core逐值精确相等；两次冷导字节一致。项目隔离世界推进后实际detector为基础3 cm、速度倍率1、额外最多3 cm，allowMACD=true但对照明确非MACD。既有40身体完整原生bounds最大边长均<100 cm，scale=1。源码继续确认动态PreV取上帧，kinematic在ApplyKinematicTargets后PreV等于本帧目标速度，静态为0；新增选择helper，尚未用于Godot query。UE全目标构建/插件审计/重导/DataValidation通过；普通Editor重启退出0但两条旧Condition failed仍保留。十二项整链未重跑，最新仍7/12；普通demo未切换。下一步接入分离几何、距离驱动的激活/失效，并补盒/凸包首次点序，再关闭五项整链失败及继续Ragdoll/Get-up等完整目标。

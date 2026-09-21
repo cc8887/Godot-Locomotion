@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsBoxGeometryOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsBoxGeometryReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Box geometry failed: %s"), *Error); return 28; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_BOX_GEOMETRY_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsCullOutput="), PhysicsOutput))
     {
         FString Error;

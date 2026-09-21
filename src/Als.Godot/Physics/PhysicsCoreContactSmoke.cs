@@ -62,7 +62,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); AssetCalfFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); ManifoldChecks(); SleepChecks(); }
+            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); AssetCalfFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); BoxFaceChecks(); ManifoldChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -235,6 +235,46 @@ public partial class PhysicsCoreContactSmoke : Node3D
         GD.Print($"CORE_CAPSULE_FACE_OK checks={checks} max_point_cm={maxPoint:R} max_normal={maxNormal:R}");
         static AlsDoubleVector V(JsonElement e, string field)
         { var a = e.GetProperty(field); return new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble()); }
+        static AlsPrecisePose P(JsonElement e)
+        { var a = e.GetProperty("rotation"); return new(V(e, "position"), new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble(), a[3].GetDouble()), AlsDoubleVector.One); }
+    }
+
+    private void BoxFaceChecks()
+    {
+        using var doc = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_box_geometry_reference.json"));
+        var checks = 0; double maxPoint = 0, maxNormal = 0; var points = new AlsDetectedContact[8];
+        foreach (var row in doc.RootElement.GetProperty("cases").EnumerateArray())
+        {
+            if (!row.GetProperty("interior").GetBoolean() || row.GetProperty("cullDistance").GetDouble() != 0) continue;
+            var p = P(row.GetProperty("pose0")); var q = P(row.GetProperty("pose1"));
+            using var a = new BoxShape3D { Size = Size(V(row, "half0")), Margin = 0 };
+            using var b = new BoxShape3D { Size = Size(V(row, "half1")) };
+            var registry = new AlsContactRegistry(2, 2); using var query = new AlsGodotContactQuery(registry);
+            query.Bind(registry.Register(new(0, AlsPrecisePose.Identity, 1, 1)), a);
+            query.Bind(registry.Register(new(1, AlsPrecisePose.Identity, 1, 1)), b);
+            var expected = row.GetProperty("points");
+            foreach (var reverse in new[] { false, true })
+            {
+                var before = query.BoxFaceQueries;
+                var count = reverse ? query.Query(1, q, 0, p, points) : query.Query(0, p, 1, q, points);
+                Require(query.BoxFaceQueries == before + 1 && count == expected.GetArrayLength(), "Native box face path/count differs.");
+                for (var i = 0; i < count; i++)
+                {
+                    var point = points[i]; var e = expected[i];
+                    var n = reverse ? (new AlsDoubleVector(point.Normal1).Rotate(p.Rotation) * -1).Rotate(q.Rotation.Conjugate()).ToSingle() : point.Normal1;
+                    maxPoint = Math.Max(maxPoint, NVector.Distance(reverse ? point.Point1 : point.Point0, V(e, "point0").ToSingle()));
+                    maxPoint = Math.Max(maxPoint, NVector.Distance(reverse ? point.Point0 : point.Point1, V(e, "point1").ToSingle()));
+                    maxNormal = Math.Max(maxNormal, NVector.Distance(n, V(e, "normal1").ToSingle()));
+                }
+                checks++;
+            }
+        }
+        Require(checks == 144 && maxPoint < .002 && maxNormal < 1e-5, "Box face transport/order differs from native canonical reference.");
+        _precisionChecks += checks;
+        GD.Print($"CORE_BOX_FACE_OK checks={checks} max_point_cm={maxPoint:R} max_normal={maxNormal:R}");
+        static AlsDoubleVector V(JsonElement e, string field)
+        { var a = e.GetProperty(field); return new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble()); }
+        static Vector3 Size(AlsDoubleVector h) => new((float)(h.Y * .02), (float)(h.Z * .02), (float)(h.X * .02));
         static AlsPrecisePose P(JsonElement e)
         { var a = e.GetProperty("rotation"); return new(V(e, "position"), new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble(), a[3].GetDouble()), AlsDoubleVector.One); }
     }
