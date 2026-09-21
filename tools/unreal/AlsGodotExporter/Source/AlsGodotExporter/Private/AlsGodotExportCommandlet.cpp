@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsCapsuleConvexOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsCapsuleConvexReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Capsule convex reference failed: %s"), *Error); return 46; }
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsCapsulePairDegenerateOutput="), PhysicsOutput))
     {
         FString Error;

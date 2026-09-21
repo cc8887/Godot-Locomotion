@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 bool ExportAlsPhysicsCapsulePairReference(const FString& Output, FString& Error, bool DegenerateOnly = false);
 bool ExportAlsPhysicsCapsuleBoxReference(const FString& Output, FString& Error);
+bool ExportAlsPhysicsCapsuleConvexReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsSphereBoxReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsConvexMarginSupport(const FString& Output, FString& Error);
 

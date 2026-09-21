@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Capsule-convex批次最终Import Release固定JIT串行全量2419通过/1既有跳过/0失败，退出0；Core未修改未重跑，其他覆盖及边界见下条。
+
+- 最新capsule-convex：`docs/verification/2026-09-22-physics-capsule-convex.md`。真实两脚raw/instanced/scaled及实际margin共4320原生样本，全部点数/点序/点/法向/Phi精确一致、冷重导字节一致；Core通用公式未改。显式capsule/cooked绑定接Core零support margin路径与实际detector、反序，每步查询不恢复polygon。优化构建/三频率新增各48及全部旧smoke通过。整链仍8/12，普通30仅接触累计11219→11220其余字段不变，另外七成功报告字节一致；普通60/高120/平移30/旋转30四失败未修。UE全Editor审计/重导/DataValidation通过，Editor33892本次原生退出0/DLL释放，但两旧Condition failed与间歇AV未修。普通demo未接，继续sphere混合/actual trace及四失败，再完整角色目标。
+
 - Capsule退化批次最终Import Release固定JIT串行全量2418通过/1既有跳过/0失败，退出0；整链8/12及Editor旧退出异常边界见下条。
 
 - Capsule退化批次普通Editor33572加载标记成功后0xC0000005退出，DLL释放，两旧Condition failed仍在；普通重启门禁失败。其他进展见下条。

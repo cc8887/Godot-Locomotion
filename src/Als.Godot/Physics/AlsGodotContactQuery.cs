@@ -6,7 +6,7 @@ using NVector = System.Numerics.Vector3;
 namespace GodotAls.Physics;
 
 // Explicit native polygon bindings use Core GJK/EPA and transactional caches;
-// native sphere/box, capsule/box and capsule pairs use one-shot Core manifolds.
+// native sphere/box, capsule/polygon and capsule pairs use one-shot Core manifolds.
 // Other pairs use guarded capsule/box faces or a geometry-only Jolt query space.
 // That space contains exactly one target shape, so every
 // CollideShape point pair has an unambiguous registry identity. A hull/box wholly
@@ -55,6 +55,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     internal int NativePolygonQueries { get; private set; }
     internal int NativeSphereBoxQueries { get; private set; }
     internal int NativeCapsuleBoxQueries { get; private set; }
+    internal int NativeCapsuleConvexQueries { get; private set; }
     internal int NativeCapsulePairQueries { get; private set; }
     internal int NativeCachedPairs => _polygonCache.CachedPairs;
     internal long NativeCacheSteps => _polygonCache.CompletedSteps;
@@ -214,15 +215,22 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 b.NativeCapsule.Value, world1, _dynamicBodies[_registry.At(shape1).Body], CullDistance(shape0, shape1), destination);
             NativeCapsulePairQueries++; return count;
         }
-        if ((a.NativeCapsule.HasValue && b.NativeHalf.HasValue) ||
-            (b.NativeCapsule.HasValue && a.NativeHalf.HasValue))
+        if ((a.NativeCapsule.HasValue && b.NativePolygon) ||
+            (b.NativeCapsule.HasValue && a.NativePolygon))
         {
             var reverse = b.NativeCapsule.HasValue;
             var capsule = reverse ? b : a; var box = reverse ? a : b;
             var capsulePose = reverse ? world1 : world0; var boxPose = reverse ? world0 : world1;
-            var count = AlsCapsuleConvexManifold.Build(capsule.NativeCapsule!.Value, AlsPrecisePose.Relative(capsulePose, boxPose),
-                new AlsBoxPolygonShape(box.NativeHalf!.Value), _capsuleWorkspace, destination, CullDistance(shape0, shape1));
-            NativeCapsuleBoxQueries++;
+            var relative = AlsPrecisePose.Relative(capsulePose, boxPose);
+            var cull = CullDistance(shape0, shape1);
+            // Capsule-convex uses TGJKShape full-hull support, independent of
+            // wrapper/pair margin. Native polygon-polygon resolves margins separately.
+            var count = box.NativeHalf.HasValue
+                ? AlsCapsuleConvexManifold.Build(capsule.NativeCapsule!.Value, relative,
+                    new AlsBoxPolygonShape(box.NativeHalf.Value), _capsuleWorkspace, destination, cull)
+                : AlsCapsuleConvexManifold.Build(capsule.NativeCapsule!.Value, relative,
+                    Convex(box, 0), _capsuleWorkspace, destination, cull);
+            if (box.NativeHalf.HasValue) NativeCapsuleBoxQueries++; else NativeCapsuleConvexQueries++;
             if (reverse) for (var i = 0; i < count; i++)
             {
                 var point = destination[i];
