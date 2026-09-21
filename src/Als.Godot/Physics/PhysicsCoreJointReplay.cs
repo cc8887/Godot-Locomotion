@@ -221,7 +221,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                         Enumerable.Range(0, scene.BodyCount).Select(i => scene.BodyAt(i).Name.ToString())).ToArray();
                     source = new AlsContactTrace(query, registry, rig.Definition.Mesh, names, () => _frame, _traceFirst, _traceLast, _traceBones);
                 }
-                contacts = new(registry, source, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16);
+                contacts = new(registry, source, new(staticFriction, friction, friction), new(1f / _hz, restitution, 2000), 16, island);
             }
             _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names), shapes, query, contacts, scene));
         }

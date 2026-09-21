@@ -13,6 +13,9 @@ public interface IAlsIslandContacts
     bool RequiresWake => false;
     void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt);
+    // Called after Gather, before any iteration. A stateful provider stages the
+    // contact/joint schedule and publishes it only with its successful Commit.
+    void PrepareConstraintOrder(AlsJointIsland island, Span<int> jointOrder) { }
     void SolvePosition(Span<AlsProjectionDelta> bodies, int iteration, int iterationCount);
     void SolveVelocity(Span<AlsProjectionVelocity> bodies, int iteration, int iterationCount, double dt);
     // Stage validates every history update before any body state is published.

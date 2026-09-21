@@ -32,6 +32,7 @@ public sealed class AlsJointIsland
     private readonly AlsProjectionVelocity[] _velocities;
     private readonly AlsCachedJoint[] _cached;
     private readonly AlsLockedLinearProjection[] _projections;
+    private readonly int[] _jointOrder;
     private readonly int _positionIterations, _velocityIterations;
     private readonly AlsIslandSleep? _sleep;
     private bool _wakeRequested;
@@ -41,6 +42,8 @@ public sealed class AlsJointIsland
     public int BodyCount => _bodies.Length;
     public int JointCount => _joints.Length;
     public AlsIslandBodyState BodyAt(int index) => _states[index];
+    public AlsIslandBody BodyDefinitionAt(int index) => _bodies[index];
+    public AlsIslandJoint JointDefinitionAt(int index) => _joints[index];
     public bool IsSleeping => _sleep?.Sleeping ?? false;
     public int SleepCounter => _sleep?.Counter ?? 0;
     public AlsSleepMetrics SleepMetricsAt(int index) => _sleep?.At(index) ?? throw new InvalidOperationException("Sleeping is not configured.");
@@ -60,6 +63,7 @@ public sealed class AlsJointIsland
         _initial = new AlsPrecisePose[bodies.Length]; _predicted = new AlsPrecisePose[bodies.Length];
         _deltas = new AlsProjectionDelta[bodies.Length]; _velocities = new AlsProjectionVelocity[bodies.Length];
         _cached = new AlsCachedJoint[joints.Length]; _projections = new AlsLockedLinearProjection[joints.Length];
+        _jointOrder = new int[joints.Length];
         for (var i = 0; i < _bodies.Length; i++)
         {
             var body = _bodies[i]; ValidatePose(body.MassLocal); ValidateState(i, _states[i]);
@@ -141,12 +145,14 @@ public sealed class AlsJointIsland
     {
         Gather(dt, gravity, forces, dragBeforeIntegration);
         contacts?.Gather(_predicted, _velocities, _bodies, dt);
+        for (var j = 0; j < _jointOrder.Length; j++) _jointOrder[j] = j;
+        contacts?.PrepareConstraintOrder(this, _jointOrder);
         for (var iteration = 0; iteration < _positionIterations; iteration++)
         {
             // UE default equal priorities are stable-sorted by container order:
             // collisions are registered before linear joints in the evolution.
             contacts?.SolvePosition(_deltas, iteration, _positionIterations);
-            for (var j = 0; j < _joints.Length; j++)
+            foreach (var j in _jointOrder)
             {
                 var joint = _joints[j];
                 _cached[j].SolvePosition(ref _deltas[joint.Parent], ref _deltas[joint.Child]);
@@ -157,7 +163,7 @@ public sealed class AlsJointIsland
         for (var iteration = 0; iteration < _velocityIterations; iteration++)
         {
             contacts?.SolveVelocity(_velocities, iteration, _velocityIterations, dt);
-            for (var j = 0; j < _joints.Length; j++)
+            foreach (var j in _jointOrder)
             {
                 var joint = _joints[j];
                 _cached[j].SolveVelocity(ref _velocities[joint.Parent], ref _velocities[joint.Child]);
@@ -165,14 +171,14 @@ public sealed class AlsJointIsland
         }
         CommitCorrections();
         // Native container caches ALL projection rows before any projection writes.
-        for (var j = 0; j < _joints.Length; j++)
+        foreach (var j in _jointOrder)
         {
             var joint = _joints[j]; var child = _bodies[joint.Child].InverseMass; var p = joint.Projection;
             _projections[j] = new(_predicted[joint.Parent], _predicted[joint.Child], joint.ParentFrame,
                 joint.ChildFrame, (float)child.Mass, child.Inertia.ToSingle(), (float)joint.Angular.HardStiffness,
                 p.LinearAlpha, p.TeleportDistance, p.Enabled);
         }
-        for (var j = 0; j < _joints.Length; j++)
+        foreach (var j in _jointOrder)
         {
             var joint = _joints[j];
             var added = _projections[j].Apply(_deltas[joint.Parent], ref _deltas[joint.Child], dt, joint.Projection.VelocityAlpha);
