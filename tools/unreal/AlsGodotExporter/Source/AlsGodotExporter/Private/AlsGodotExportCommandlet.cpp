@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsGjkSearchOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsGjkSearchReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("GJK search failed: %s"), *Error); return 32; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_GJK_SEARCH_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsGjkPrimitivesOutput="), PhysicsOutput))
     {
         FString Error;
