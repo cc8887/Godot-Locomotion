@@ -1,5 +1,8 @@
 #include "AlsPhysicsAssetExport.h"
 #include "AlsAnimationGraphLibrary.h"
+#include "Chaos/ImplicitObjectScaled.h"
+#include "Chaos/ShapeInstance.h"
+#include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/SkeletalMesh.h"
@@ -46,7 +49,7 @@ TSharedRef<FJsonObject> Shape(const FKShapeElem& Element, const TCHAR* Type)
 }
 }
 
-bool ExportAlsPhysicsAssets(const FString& Output, FString& Error)
+bool ExportAlsPhysicsAssets(const FString& Output, FString& Error, bool ObserveRuntimeShapes)
 {
     using namespace AlsPhysicsExport;
     const auto Fail = [&](const FString& Message) { Error = Message; return false; };
@@ -68,6 +71,8 @@ bool ExportAlsPhysicsAssets(const FString& Output, FString& Error)
     Root->SetStringField(TEXT("engine"), FEngineVersion::Current().ToString());
     Root->SetStringField(TEXT("coordinates"), TEXT("UE mesh-local, centimeters, kilograms, degrees; inertia kg*cm^2"));
     Root->SetStringField(TEXT("massObservation"), TEXT("Reference pose, identity component transform, native FBodyInstance after physics creation, no simulation tick"));
+    if (ObserveRuntimeShapes)
+        Root->SetStringField(TEXT("shapeObservation"), TEXT("External game-thread particle shapes after physics creation; leaf wrapper and margin observed, authored index matched by shape user-data identity; no simulation tick"));
     const FString CharacterPath = TEXT("/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_AnimMan_CharacterBP.ALS_AnimMan_CharacterBP_C");
     auto* Class = LoadClass<ACharacter>(nullptr, *CharacterPath);
     const auto* Defaults = Class ? Class->GetDefaultObject<ACharacter>() : nullptr;
@@ -143,6 +148,72 @@ bool ExportAlsPhysicsAssets(const FString& Output, FString& Error)
             for (const auto& S : Geometry.TaperedCapsuleElems)
             { auto J = Shape(S, TEXT("taperedCapsule")); J->SetNumberField(TEXT("radius0Cm"), S.Radius0); J->SetNumberField(TEXT("radius1Cm"), S.Radius1); J->SetNumberField(TEXT("cylinderLengthCm"), S.Length); Shapes.Add(MakeShared<FJsonValueObject>(J)); }
             if (Shapes.Num() != Geometry.GetElementCount()) return Fail(TEXT("Unsupported physics geometry; export cannot omit shapes."));
+            if (ObserveRuntimeShapes)
+            {
+                // Do not assume Chaos shape order matches the authored export order.
+                TArray<const FKShapeElem*> Elements;
+                for (const auto& S : Geometry.SphereElems) Elements.Add(&S);
+                for (const auto& S : Geometry.BoxElems) Elements.Add(&S);
+                for (const auto& S : Geometry.SphylElems) Elements.Add(&S);
+                for (const auto& S : Geometry.ConvexElems) Elements.Add(&S);
+                for (const auto& S : Geometry.TaperedCapsuleElems) Elements.Add(&S);
+                const auto* Actor = Instance->GetPhysicsActorHandle();
+                if (!Actor) return Fail(TEXT("Missing external physics actor."));
+                const auto& NativeShapes = Actor->GetGameThreadAPI().ShapesArray();
+                if (NativeShapes.Num() != Elements.Num()) return Fail(TEXT("Runtime/authored shape count mismatch."));
+                TSet<int32> Seen; TArray<TSharedPtr<FJsonValue>> Observations;
+                for (int32 NativeIndex = 0; NativeIndex < NativeShapes.Num(); ++NativeIndex)
+                {
+                    const auto& S = NativeShapes[NativeIndex];
+                    int32 AuthoredIndex = INDEX_NONE;
+                    for (int32 K = 0; K < Elements.Num(); ++K)
+                        if (S->GetUserData() == Elements[K]->GetUserData())
+                        {
+                            if (AuthoredIndex != INDEX_NONE) return Fail(TEXT("Ambiguous authored shape identity."));
+                            AuthoredIndex = K;
+                        }
+                    if (AuthoredIndex == INDEX_NONE || Seen.Contains(AuthoredIndex))
+                        return Fail(TEXT("Unmatched or repeated native shape identity."));
+                    Seen.Add(AuthoredIndex);
+                    const auto* Leaf = S->GetLeafGeometry();
+                    if (!Leaf) return Fail(TEXT("Missing native leaf geometry."));
+                    auto J = MakeShared<FJsonObject>();
+                    J->SetNumberField(TEXT("nativeIndex"), NativeIndex);
+                    J->SetNumberField(TEXT("authoredIndex"), AuthoredIndex);
+                    J->SetStringField(TEXT("type"), Leaf->GetTypeName().ToString());
+                    J->SetNumberField(TEXT("typeCode"), static_cast<uint8>(Leaf->GetType()));
+                    J->SetNumberField(TEXT("marginCm"), Leaf->GetMarginf());
+                    J->SetObjectField(TEXT("leafLocal"), T(FTransform(S->GetLeafRelativeTransform())));
+                    J->SetArrayField(TEXT("boundsMinCm"), V(FVector(Leaf->BoundingBox().Min())));
+                    J->SetArrayField(TEXT("boundsMaxCm"), V(FVector(Leaf->BoundingBox().Max())));
+                    const Chaos::FImplicitObject* Inner = nullptr;
+                    if (Chaos::IsScaled(Leaf->GetType()))
+                    {
+                        const auto* Scaled = static_cast<const Chaos::FImplicitObjectScaled*>(Leaf);
+                        J->SetStringField(TEXT("wrapper"), TEXT("scaled"));
+                        J->SetArrayField(TEXT("scale"), V(FVector(Scaled->GetScale())));
+                        Inner = Scaled->GetInnerObject().Get();
+                    }
+                    else if (Chaos::IsInstanced(Leaf->GetType()))
+                    {
+                        J->SetStringField(TEXT("wrapper"), TEXT("instanced"));
+                        J->SetArrayField(TEXT("scale"), V(FVector::OneVector));
+                        Inner = static_cast<const Chaos::FImplicitObjectInstanced*>(Leaf)->GetInnerObject().Get();
+                    }
+                    else
+                    {
+                        J->SetStringField(TEXT("wrapper"), TEXT("plain"));
+                        J->SetArrayField(TEXT("scale"), V(FVector::OneVector));
+                    }
+                    if (Inner)
+                    {
+                        J->SetStringField(TEXT("innerType"), Inner->GetTypeName().ToString());
+                        J->SetNumberField(TEXT("innerMarginCm"), Inner->GetMarginf());
+                    }
+                    Observations.Add(MakeShared<FJsonValueObject>(J));
+                }
+                Body->SetArrayField(TEXT("runtimeShapes"), Observations);
+            }
             Body->SetArrayField(TEXT("shapes"), Shapes); Bodies.Add(MakeShared<FJsonValueObject>(Body));
         }
         Row->SetArrayField(TEXT("bodies"), Bodies);

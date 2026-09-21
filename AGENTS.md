@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 运行时形状批次最终回归：Import Release 固定JIT串行全量2402通过/1既有跳过；旧PhysicsAssetOutput冷重导与原始输入字节一致。整链仍8/12及高速30穿地回归，详见下一条。
+
+- 最新运行时形状：`docs/verification/2026-09-21-physics-runtime-shapes.md`。真实外部particle导出43形状，按userdata绑定；两脚outer margin约.61782cm、inner0，左脚scaled Z=.9999998807907104，右脚instanced；leafLocal均identity。修正实验后端对已烘焙凸包重复应用FKConvexElem缩放/平移，改用实际wrapper scale/leafLocal，Import严格资产快照绑定与bounds验证。定向11、Godot构建、三频率smoke通过；整链仍8/12：30平移恢复，但30高速第9帧AnimMan身体19穿地新增失败，另普通30/旋转30/高速120未过。非零margin与cull仍未接，其他primitive实际几何传输待核对。UE全目标审计/冷重导/DataValidation通过，普通Editor本次退出0且DLL释放，两旧Condition failed和既往间歇AV未修复。普通demo未接，继续实际margin/FConvex支持/分离cull与四项整链失败，再完整ALS目标。
+
 - 最新原生查询接入：`docs/verification/2026-09-21-physics-native-query.md`。实验后端 box/convex 接 Core GJK/EPA 和原始有序流形；源拓扑/尺寸/缩放绑定，精确单位缩放用 instanced 内层几何分支。新增事务式 GJK owner cache、revision/generation/margin 冷启动、失败拒绝提交、显式 Release；尚未接完整 native midphase 退役。Core2806、Import定向4、Godot构建、三频率smoke各551/9/5/5/3/4及60Hz场景检查通过。整链最新 **8/12**，替代旧9/12：新增30平移停止后休眠回归，30旋转提前到启动前失败；另普通30、高速120仍失败，未放宽门槛。当前查询代理margin0/cull0，cooked margin0不能证明实际UE wrapper margin0。下一步导出实际wrapper/margin、非零FConvex SupportCore、pair解析与分离cull，再四项整链失败及普通Ragdoll等完整目标。普通demo未接，无本批UE改动，旧Editor AV未解决。
 
 - 最新几何事务前置：`docs/verification/2026-09-21-physics-geometry-transaction.md`。IAlsContactGeometrySource新增StageCommit/PublishCommit/Abort/Reset，WorldContacts统一驱动，Prepare失败/空步骤/恢复绕过Query均闭合事务；发布与Abort须无异常。修正AlsContactTrace漏转PrepareStep并转发所有生命周期。真实polygon/GJK缓存失败回滚与重试对照、reset/restore测试通过；Core2798、Godot优化构建、60Hz实际smoke（545精度/9几何/5流形/5睡眠/3新增事务）通过。未改UE、未重跑Import或整链；最新9/12，普通demo未接，旧Editor AV未解决。下一步保留query原生几何绑定，实现revision/generation和事务下的GJK缓存，再polygon接管/pair margin/分离cull及三旧失败/普通Ragdoll等完整目标。
