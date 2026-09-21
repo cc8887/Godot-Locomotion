@@ -28,6 +28,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _capsuleConvexChecks;
     private int _capsulePairChecks;
     private int _capsuleDegenerateSteps;
+    private int _capsuleRuntimeChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -94,6 +95,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
                 narrow_phase_queries = _queries, geometry_checks = _geometryChecks, native_polygon_checks = _nativePolygonChecks, capsule_cull_checks = _capsuleCullChecks, primitive_binding_checks = _primitiveChecks, geometry_transaction_checks = _geometryTransactionChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 native_sphere_box_checks = _sphereBoxChecks,
                 native_capsule_box_checks = _fullCapsuleBoxChecks,
+                native_capsule_runtime_checks = _capsuleRuntimeChecks, runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
                 native_capsule_convex_checks = _capsuleConvexChecks,
                 native_capsule_pair_checks = _capsulePairChecks,
                 capsule_degenerate_steps = _capsuleDegenerateSteps,
@@ -140,6 +142,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeFullCapsuleBoxChecks();
         NativeCapsuleConvexChecks();
         NativeCapsulePairChecks();
+        NativeCapsuleRuntimeChecks();
         CapsuleDegenerateStepChecks();
     }
 
@@ -174,6 +177,29 @@ public partial class PhysicsCoreContactSmoke : Node3D
             }
             Require(query.NativeCapsulePairQueries > 0 && query.NarrowPhaseQueries == 0, "Degenerate steps bypassed the native pair path.");
         }
+    }
+
+    private void NativeCapsuleRuntimeChecks()
+    {
+        using var doc = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_native_capsule_mixed_reference.json"));
+        static AlsDoubleVector V(JsonElement j, string name) { var a = j.GetProperty(name); return new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble()); }
+        static AlsPrecisePose Pose(JsonElement j) { var q = j.GetProperty("rotation"); return new(V(j, "position"), new(q[0].GetDouble(), q[1].GetDouble(), q[2].GetDouble(), q[3].GetDouble()), AlsDoubleVector.One); }
+        static AlsCapsuleGeometry Geometry(JsonElement j) => new(V(j, "endpoint0").ToSingle(), V(j, "axis").ToSingle(), j.GetProperty("length").GetSingle(), j.GetProperty("radius").GetSingle());
+        var points = new AlsDetectedContact[3];
+        foreach (var row in doc.RootElement.GetProperty("cases").EnumerateArray())
+        {
+            if (row.GetProperty("kind").GetString() != "capsule_pair") continue;
+            var source = row.GetProperty("source"); var a = source.GetProperty("geometry0"); var b = source.GetProperty("geometry1");
+            var count = AlsCapsuleCapsuleManifold.Build(Geometry(a), Pose(row.GetProperty("pose0")), a.GetProperty("dynamic").GetBoolean(),
+                Geometry(b), Pose(row.GetProperty("pose1")), b.GetProperty("dynamic").GetBoolean(), row.GetProperty("cullDistance").GetSingle(), points);
+            var expected = row.GetProperty("points");
+            Require(count == expected.GetArrayLength(), "Godot runtime changed the recorded native capsule count.");
+            for (var i = 0; i < count; i++) Require(points[i].Point0 == V(expected[i], "point0").ToSingle() &&
+                points[i].Point1 == V(expected[i], "point1").ToSingle() && points[i].Normal1 == V(expected[i], "normal1").ToSingle() &&
+                points[i].NativePhi == expected[i].GetProperty("phi").GetSingle(), "Godot runtime differs from native capsule rounding.");
+            _capsuleRuntimeChecks++;
+        }
+        Require(_capsuleRuntimeChecks == 246, "Actual failing-frame capsule coverage changed.");
     }
 
     private void NativeCapsulePairChecks()

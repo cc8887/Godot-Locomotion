@@ -49,7 +49,7 @@ public static class AlsCapsuleCapsuleManifold
         Vector3 secondCenter, Vector3 secondAxis, float secondHalf, float secondRadius, Vector3 closestNormal, float dot,
         bool swap, Quaternion rotation, Vector3 translation, float cull, float radial, Span<AlsDetectedContact> points, ref int count)
     {
-        var orthogonal = Vector3.Cross(firstAxis, Vector3.Cross(firstAxis, closestNormal)); var squared = Dot(orthogonal, orthogonal);
+        var orthogonal = Cross(firstAxis, Cross(firstAxis, closestNormal)); var squared = Dot(orthogonal, orthogonal);
         if (!(squared > .35f * .35f)) return;
         orthogonal *= 1f / MathF.Sqrt(squared);
         if (Dot(orthogonal, secondCenter - firstCenter) < 0) orthogonal = -orthogonal;
@@ -88,9 +88,12 @@ public static class AlsCapsuleCapsuleManifold
     }
     private static Vector3 Rotate(Vector3 v, Quaternion q)
     {
-        var xyz = new Vector3(q.X, q.Y, q.Z); var twice = 2f * Vector3.Cross(xyz, v);
-        return v + q.W * twice + Vector3.Cross(xyz, twice);
+        var xyz = new Vector3(q.X, q.Y, q.Z); var twice = 2f * Cross(xyz, v);
+        return v + q.W * twice + Cross(xyz, twice);
     }
+    // Vector3.Cross changes its intrinsic evaluation across runtime versions.
+    // Preserve the native scalar product/subtraction rounding on both net8/net9.
+    private static Vector3 Cross(Vector3 a, Vector3 b) => new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
     private static float Dot(Vector3 a, Vector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
     // UE comparison semantics matter when clipping perpendicular axes yields NaN.
     private static float Min(float a, float b) => a < b ? a : b;

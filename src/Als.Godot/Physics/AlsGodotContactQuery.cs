@@ -26,6 +26,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         public AlsDoubleVector? NativeHalf;
         public AlsDoubleVector NativeScale = AlsDoubleVector.One;
         public float NativeMargin;
+        public string? TraceFingerprint;
         public AlsCapsuleGeometry? NativeCapsule;
         public float? NativeSphereRadius;
         public AlsPrecisePose ProxyLocal = AlsPrecisePose.Identity;
@@ -401,8 +402,11 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         // Original native leaf coordinates are not the old centered-Z capsule
         // trace contract. Use an explicit type so old exporters cannot silently
         // replay this as different geometry.
-        if (binding.NativeCapsule is { } c) return new { type = "native_capsule", radius = c.Radius, length = c.Height,
+        if (binding.NativeCapsule is { } c) return new { type = "native_capsule", dynamic = _dynamicBodies[_registry.At(index).Body], radius = c.Radius, length = c.Height,
             endpoint0 = new[] { c.Endpoint0.X, c.Endpoint0.Y, c.Endpoint0.Z }, axis = new[] { c.Axis.X, c.Axis.Y, c.Axis.Z } };
+        if (binding.Cooked is { } cooked) return new { type = "native_convex", dynamic = _dynamicBodies[_registry.At(index).Body],
+            scale = new[] { binding.NativeScale.X, binding.NativeScale.Y, binding.NativeScale.Z }, margin = binding.NativeMargin,
+            fingerprint = binding.TraceFingerprint ??= ConvexFingerprint(cooked) };
         if (binding.NativeHalf is { } half) return new { type = "box", size = new[] { half.X * 2, half.Y * 2, half.Z * 2 } };
         if (binding.NativeSphereRadius is { } radius) return new { type = "native_sphere", radius,
             center = new[] { binding.ProxyLocal.Position.X, binding.ProxyLocal.Position.Y, binding.ProxyLocal.Position.Z } };
@@ -415,6 +419,28 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             ConvexPolygonShape3D => new { type = "convex" },
             _ => throw new NotSupportedException("Unmapped trace geometry.")
         };
+    }
+    // Diagnostic identity only: FNV-1a over little-endian uint32 words for the
+    // exact cooked vertices, planes, face order and native adjacency. No tolerance.
+    private static string ConvexFingerprint(AlsConvexTopology hull)
+    {
+        ulong hash = 14695981039346656037UL;
+        void Word(uint value) { for (var i = 0; i < 4; i++) { hash = unchecked((hash ^ (byte)value) * 1099511628211UL); value >>= 8; } }
+        void Scalar(float value) => Word(BitConverter.SingleToUInt32Bits(value));
+        void Vector(NVector value) { Scalar(value.X); Scalar(value.Y); Scalar(value.Z); }
+        Word((uint)hull.VertexCount); Word((uint)hull.PlaneCount); Scalar(hull.Margin);
+        for (var i = 0; i < hull.VertexCount; i++) Vector(hull.VertexAt(i));
+        for (var i = 0; i < hull.PlaneCount; i++)
+        {
+            var plane = hull.PlaneAt(i); Vector(plane.Normal); Vector(plane.Point); Word((uint)plane.VertexCount);
+            foreach (var vertex in hull.FaceVertices(i)) Word((uint)vertex);
+        }
+        for (var i = 0; i < hull.VertexCount; i++)
+        {
+            var planes = hull.VertexPlanesAt(i); Word((uint)planes.Count);
+            for (var j = 0; j < 3; j++) Word(unchecked((uint)planes.PlaneAt(j)));
+        }
+        return hash.ToString("x16");
     }
     internal static Aabb Bounds(Shape3D shape)
     {
