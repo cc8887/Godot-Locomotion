@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsContactSettingsOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsContactSettings(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Contact settings failed: %s"), *Error); return 40; }
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsConvexMarginPairOutput="), PhysicsOutput))
     {
         FString Error;
