@@ -16,3 +16,4 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs, const FString& 
 bool ExportAlsPhysicsCapsuleGeometryReference(const FString& Input, const FString& Output, FString& Error);
 bool ExportAlsPhysicsManifoldRestoreReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCullReference(const FString& Output, FString& Error);
+bool ExportAlsPhysicsBoxGeometryReference(const FString& Output, FString& Error);

@@ -5,7 +5,7 @@ using NVector = System.Numerics.Vector3;
 
 namespace GodotAls.Physics;
 
-// Core generates guarded capsule/box-face manifolds; other pairs use a geometry-
+// Core generates guarded capsule and box face manifolds; other pairs use a geometry-
 // only Jolt query space. It contains exactly one target shape, so every
 // CollideShape point pair has an unambiguous registry identity. A hull/box wholly
 // inside a box face can use that exact local half-space. Core alone owns
@@ -31,6 +31,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     public int NarrowPhaseQueries { get; private set; }
     internal int InteriorFaceQueries { get; private set; }
     internal int CapsuleFaceQueries { get; private set; }
+    internal int BoxFaceQueries { get; private set; }
     public bool IsInvalidated
     {
         get
@@ -98,6 +99,18 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private int QueryOrdered(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1);
+        if (a.Shape is BoxShape3D incidentBox && b.Shape is BoxShape3D referenceBox)
+        {
+            Span<AlsDetectedContact> native = stackalloc AlsDetectedContact[4];
+            if (AlsBoxFaceManifold.TryInteriorFace(
+                new((double)incidentBox.Size.Z * 50, (double)incidentBox.Size.X * 50, (double)incidentBox.Size.Y * 50), world0,
+                new((double)referenceBox.Size.Z * 50, (double)referenceBox.Size.X * 50, (double)referenceBox.Size.Y * 50), world1,
+                0, native, out var count, (double)referenceBox.Margin * 100))
+            {
+                if (count > destination.Length) throw new InvalidOperationException("Contact query capacity exceeded; manifold was not truncated.");
+                native[..count].CopyTo(destination); BoxFaceQueries++; InteriorFaceQueries++; return count;
+            }
+        }
         if (a.Shape is CapsuleShape3D capsule && capsule.Height > 2 * capsule.Radius && b.Shape is BoxShape3D box)
         {
             Span<AlsDetectedContact> native = stackalloc AlsDetectedContact[3];
