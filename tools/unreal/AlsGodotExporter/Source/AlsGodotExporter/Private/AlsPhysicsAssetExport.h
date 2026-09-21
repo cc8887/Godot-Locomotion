@@ -9,7 +9,7 @@ bool ExportAlsPhysicsInertiaReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsProjectionReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsAngularRowReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsJointStepReference(const FString& Output, FString& Error);
-bool ExportAlsPhysicsContactReference(const FString& Output, FString& Error, bool GatherGeometry = false);
+bool ExportAlsPhysicsContactReference(const FString& Output, FString& Error, bool GatherGeometry = false, bool ShockPropagation = false);
 bool ExportAlsPhysicsContactHistoryReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGraphReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs, const FString& Output, FString& Error);

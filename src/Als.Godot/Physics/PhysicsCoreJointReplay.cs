@@ -419,7 +419,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                 _anchorCm = distance;
                 _anchorSource = $"mesh={active.Rig.Definition.Mesh} child={active.Rig.Definition.Bodies[joint.ChildBody].Bone} frame={_frame} parent={p.Position} child_position={c.Position}";
             }
-            Require(distance < 10, $"Core chain anchor exceeded 10 cm: {distance}");
+            Require(distance < 10, $"Core chain anchor exceeded 10 cm: {distance}; {_anchorSource}");
             if (_drop)
             {
                 var parent = p.Rotation.Normalized(); var child = c.Rotation.Normalized();

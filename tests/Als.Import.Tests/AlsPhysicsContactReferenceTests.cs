@@ -10,10 +10,12 @@ public sealed class AlsPhysicsContactReferenceTests(Xunit.Abstractions.ITestOutp
     [Theory]
     [InlineData("v4_physics_contact_reference.json", false)]
     [InlineData("v4_physics_contact_gather_reference.json", true)]
+    [InlineData("v4_physics_contact_shock_reference.json", false)]
     public void NativeManifoldMassesPositionFrictionImplicitVelocityAndVelocityRowsMatch(string file, bool gatherGeometry)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/" + file)));
-        Assert.Equal(gatherGeometry ? 2 : 1, doc.RootElement.GetProperty("schemaVersion").GetInt32());
+        var shock = file == "v4_physics_contact_shock_reference.json";
+        Assert.Equal(gatherGeometry ? 2 : shock ? 3 : 1, doc.RootElement.GetProperty("schemaVersion").GetInt32());
         Assert.Equal("UE world COM contact offsets; cm, kg, radians; normal points from body1 to body0", doc.RootElement.GetProperty("coordinates").GetString());
         var cvars = doc.RootElement.GetProperty("cvars");
         Assert.Equal(.5, D(cvars, "p.Chaos.PBDCollisionSolver.Position.StaticFriction.Stiffness"));
@@ -25,7 +27,12 @@ public sealed class AlsPhysicsContactReferenceTests(Xunit.Abstractions.ITestOutp
             Assert.Equal(1, D(cvars, "p.Chaos.PBDCollisionSolver.EnableInitialDepenetration"));
             Assert.Equal(0, D(cvars, "p.Chaos.PBDCollisionSolver.RestitutionUsePreIntegrateVelocity"));
         }
-        var cases = doc.RootElement.GetProperty("cases"); Assert.Equal(gatherGeometry ? 432 : 288, cases.GetArrayLength());
+        var cases = doc.RootElement.GetProperty("cases"); Assert.Equal(gatherGeometry ? 432 : shock ? 648 : 288, cases.GetArrayLength());
+        if (shock)
+        {
+            Assert.Equal(.77f, (float)D(cvars, "p.Chaos.PBDCollisionSolver.Position.MinInvMassScale"));
+            Assert.Equal(.77f, (float)D(cvars, "p.Chaos.PBDCollisionSolver.Velocity.MinInvMassScale"));
+        }
         var ids = new HashSet<string>(); float maxMass = 0, maxDP = 0, maxDQ = 0, maxV = 0, maxW = 0, maxPush = 0, maxImpulse = 0, maxRatio = 0;
         float maxGather = 0;
         var negativeImpulse = false; var sliding = false; var sticking = false;
@@ -33,6 +40,7 @@ public sealed class AlsPhysicsContactReferenceTests(Xunit.Abstractions.ITestOutp
         {
             var points = row.GetProperty("points"); var count = points.GetArrayLength();
             var id = $"{row.GetProperty("hz")}/{row.GetProperty("bodyMode")}/{row.GetProperty("scenario")}/{row.GetProperty("seeded")}/{count}";
+            if (shock) id += $"/{row.GetProperty("levelMode")}/{row.GetProperty("timing")}";
             Assert.True(ids.Add(id)); var dt = (float)D(row, "dt");
             var p = row.GetProperty("bodies")[0]; var c = row.GetProperty("bodies")[1];
             var mass0 = new AlsJointInverseMass(D(p, "inverseMass"), V(p, "inverseInertia"));
@@ -78,12 +86,19 @@ public sealed class AlsPhysicsContactReferenceTests(Xunit.Abstractions.ITestOutp
             var d0 = new AlsProjectionDelta(Vec(seed[0], "dp"), Vec(seed[0], "dq")); var d1 = new AlsProjectionDelta(Vec(seed[1], "dp"), Vec(seed[1], "dq"));
             var v0 = new AlsProjectionVelocity(Vec(seed[0], "v"), Vec(seed[0], "w")); var v1 = new AlsProjectionVelocity(Vec(seed[1], "v"), Vec(seed[1], "w"));
             var positions = row.GetProperty("positionSamples"); Assert.Equal(8, positions.GetArrayLength());
-            for (var it = 0; it < 8; it++) { manifold.SolvePosition(ref d0, ref d1, it >= 4); Check(positions[it], $"position {it}"); }
+            for (var it = 0; it < 8; it++)
+            { SetShock(it, 8, "positionShockIterations"); manifold.SolvePosition(ref d0, ref d1, it >= 4); Check(positions[it], $"position {it}"); }
             v0 = AlsCachedJoint.AddImplicitVelocity(v0, d0, D(row, "dt"), mass0.Mass > 0);
             v1 = AlsCachedJoint.AddImplicitVelocity(v1, d1, D(row, "dt"), mass1.Mass > 0);
             Check(row.GetProperty("implicit"), "implicit");
             var velocities = row.GetProperty("velocitySamples"); Assert.Equal(2, velocities.GetArrayLength());
-            for (var it = 0; it < 2; it++) { manifold.SolveVelocity(ref v0, ref v1, dt, it == 1); Check(velocities[it], $"velocity {it}"); }
+            for (var it = 0; it < 2; it++)
+            { SetShock(it, 2, "velocityShockIterations"); manifold.SolveVelocity(ref v0, ref v1, dt, it == 1); Check(velocities[it], $"velocity {it}"); }
+            void SetShock(int iteration, int total, string field)
+            {
+                if (shock) manifold.SetShockPropagation(p.GetProperty("level").GetInt32(), c.GetProperty("level").GetInt32(),
+                    iteration >= total - row.GetProperty(field).GetInt32() ? .77f : 1);
+            }
             // A fresh Gather clears per-step lambdas, even after a full solve.
             manifold.Gather(input, material, Pose(p.GetProperty("pose")).Rotation, mass0, Pose(c.GetProperty("pose")).Rotation, mass1);
             for (var i = 0; i < count; i++) { Assert.Equal(Vector3.Zero, manifold.PointAt(i).PushOut); Assert.Equal(Vector3.Zero, manifold.PointAt(i).Impulse); }
@@ -95,6 +110,7 @@ public sealed class AlsPhysicsContactReferenceTests(Xunit.Abstractions.ITestOutp
                 for (var i = 0; i < count; i++)
                 {
                     var e = expected.GetProperty("points")[i]; var a = manifold.PointAt(i);
+                    if (shock) maxMass = MathF.Max(maxMass, Near(a.ContactMass, Vec(e, "mass"), 2e-5f, context + " switched mass"));
                     maxPush = MathF.Max(maxPush, Near(a.PushOut, Vec(e, "pushOut"), 2e-5f, context + " pushout"));
                     maxImpulse = MathF.Max(maxImpulse, Near(a.Impulse, Vec(e, "impulse"), .001f, context + " impulse"));
                     var ratio = MathF.Abs(a.StaticFrictionRatio - (float)D(e, "frictionRatio")); maxRatio = MathF.Max(maxRatio, ratio);

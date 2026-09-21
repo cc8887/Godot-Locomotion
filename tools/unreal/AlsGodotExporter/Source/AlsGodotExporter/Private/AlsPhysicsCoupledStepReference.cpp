@@ -80,7 +80,7 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& O
         if (!Var || Var->GetFloat()!=Entry.Value) return Fail(TEXT("Coupled replay CVar differs from captured contract."));
     }
     auto Root=MakeShared<FJsonObject>(); Root->SetNumberField(TEXT("schemaVersion"),1); Root->SetStringField(TEXT("engine"),FEngineVersion::Current().ToString());
-    Root->SetStringField(TEXT("observation"),TEXT("Native contact + cached joint containers share solver bodies; captured gathered rows and order are inputs; no narrow phase, integration, sleeping or shock propagation; outputs never read from capture"));
+    Root->SetStringField(TEXT("observation"),TEXT("Native contact + cached joint containers share solver bodies; captured gathered rows/order/optional contact shock levels are inputs; no narrow phase, integration or sleeping; outputs never read from capture"));
     TArray<TSharedPtr<FJsonValue>> Cases;
     for (const auto& File:Files)
     {
@@ -124,6 +124,19 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& O
         Collided.Resize(Count); Materials.Resize(Count); PerParticleMaterials.Resize(Count);
         FPBDCollisionConstraints Collisions(Particles,Collided,Materials,PerParticleMaterials,nullptr);
         FPBDCollisionSolverSettings ContactSettings; ContactSettings.NumPositionShockPropagationIterations=ContactSettings.NumVelocityShockPropagationIterations=0;
+        if(Input->HasField(TEXT("contactShock")))
+        {
+            const auto Shock=Input->GetObjectField(TEXT("contactShock"));
+            ContactSettings.NumPositionShockPropagationIterations=Shock->GetIntegerField(TEXT("positionIterations"));
+            ContactSettings.NumVelocityShockPropagationIterations=Shock->GetIntegerField(TEXT("velocityIterations"));
+            for(const auto& Entry:TArray<TPair<FString,FString>>{
+                {TEXT("p.Chaos.PBDCollisionSolver.Position.MinInvMassScale"),TEXT("positionScale")},
+                {TEXT("p.Chaos.PBDCollisionSolver.Velocity.MinInvMassScale"),TEXT("velocityScale")}})
+            {
+                const auto* Var=IConsoleManager::Get().FindConsoleVariable(*Entry.Key);
+                if(!Var||Var->GetFloat()!=float(Shock->GetNumberField(Entry.Value)))return Fail(TEXT("Captured shock settings differ from native CVars."));
+            }
+        }
         ContactSettings.NumPositionFrictionIterations=4; ContactSettings.NumVelocityFrictionIterations=1; Collisions.SetSolverSettings(ContactSettings);
         const_cast<FCollisionDetectorSettings&>(Collisions.GetDetectorSettings()).bDeferNarrowPhase=false;
         auto& Allocator=Collisions.GetConstraintAllocator(); Allocator.SetMaxContexts(1); Allocator.BeginDetectCollisions(); auto* Context=Allocator.GetContextAllocator(0);
@@ -163,6 +176,7 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& O
             Body.SetInvM(In->GetNumberField(TEXT("inverseMass"))); const_cast<FSolverVec3&>(Body.InvILocal())=FSolverVec3(ReadV(In,TEXT("inverseInertia")));
             Body.SetInvI(Utilities::ComputeWorldSpaceInertia(Body.Q(),FVec3(Body.InvILocal())));
             Body.SetV(ReadV(In,TEXT("v"))); Body.SetW(ReadV(In,TEXT("w")));
+            if(Input->HasField(TEXT("contactShock")))Body.SetLevel(In->GetIntegerField(TEXT("level")));
         }
         ContactSolver->GatherInput(Dt); JointSolver->GatherInput(Dt);
         auto* Container=static_cast<FPBDCollisionContainerSolver*>(ContactSolver.Get());

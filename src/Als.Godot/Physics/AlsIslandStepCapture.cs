@@ -25,6 +25,7 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
         {
             name = i < definition.Bodies.Length ? definition.Bodies[i].Bone : $"environment_{i}",
             inverseMass = bodies[i].InverseMass.Mass, inverseInertia = V(bodies[i].InverseMass.Inertia),
+            level = contacts.PreparedBodyLevelAt(i),
             initial = Pose(initial[i]), predicted = Pose(predicted[i]), v = V(velocity[i].Linear), w = V(velocity[i].Angular)
         };
         var jointInputs = new object[order.Length];
@@ -48,7 +49,8 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
             contactInputs[i] = new { body0 = pair.Body0, body1 = pair.Body1, material = pair.Material, points };
         }
         _input = new { mesh = definition.Mesh, frame = _capturedFrame, dt, positionIterations, velocityIterations,
-            solverSettings, bodies = bodyInputs, joints = jointInputs, contacts = contactInputs };
+            solverSettings, contactShock = contacts.UsesGraphLevels ? contacts.ShockSettings : new AlsContactShockSettings(0, 0, 1, 1),
+            bodies = bodyInputs, joints = jointInputs, contacts = contactInputs };
     }
     public void Capture(string stage, int iteration, ReadOnlySpan<AlsPrecisePose> predicted,
         ReadOnlySpan<AlsProjectionDelta> delta, ReadOnlySpan<AlsProjectionVelocity> velocity)

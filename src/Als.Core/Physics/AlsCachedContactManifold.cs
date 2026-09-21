@@ -49,6 +49,11 @@ public sealed class AlsCachedContactManifold
         for (var i = 0; i < Count; i++) _points[i].SolvePositionNormal(ref body0, ref body1);
         if (friction) for (var i = 0; i < Count; i++) _points[i].SolvePositionFriction(ref body0, ref body1);
     }
+    public void SetShockPropagation(int level0, int level1, float scale)
+    {
+        if (!float.IsFinite(scale) || scale < 0 || scale > 1) throw new ArgumentOutOfRangeException(nameof(scale));
+        for (var i = 0; i < Count; i++) _points[i].SetShockPropagation(level0, level1, scale);
+    }
     public void SolveVelocity(ref AlsProjectionVelocity body0, ref AlsProjectionVelocity body1, float dt, bool friction)
     {
         if (!float.IsFinite(dt) || dt <= 0 || !float.IsFinite(1 / dt)) throw new ArgumentOutOfRangeException(nameof(dt));

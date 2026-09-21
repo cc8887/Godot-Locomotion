@@ -18,6 +18,7 @@ internal sealed class AlsContactConstraintOrder
     private bool _pending;
     public int Count => _pending ? _nextCount : throw new InvalidOperationException("Prepare the constraint order before solving.");
     public int ContactSlotAt(int index) => _nextContacts[index];
+    public int BodyLevelAt(int body) => _pending ? _graph.BodyLevelAt(body) : throw new InvalidOperationException("Prepare graph levels first.");
 
     public AlsContactConstraintOrder(AlsJointIsland island, int capacity)
     {
