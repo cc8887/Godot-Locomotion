@@ -9,7 +9,7 @@ namespace GodotAls.Physics;
 // manifolds bypass the provider; capture the island step to inspect solver input.
 internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsContactRegistry registry,
     string mesh, string[] names, Func<int> frame, int first, int last, string[] bones,
-    Func<int, object>? geometry = null) : IAlsContactGeometrySource
+    Func<int, object>? geometry = null, Func<int, int, float>? cullDistance = null) : IAlsContactGeometrySource
 {
     public bool IsInvalidated => source.IsInvalidated;
     public void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous, ReadOnlySpan<AlsProjectionVelocity> velocities,
@@ -32,11 +32,12 @@ internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsConta
             var p1 = new AlsDoubleVector(c.Point1).Rotate(q.Rotation) + q.Position;
             var normal = new AlsDoubleVector(c.Normal1).Rotate(q.Rotation);
             contacts[i] = new { point0 = V(p0), point1 = V(p1), normal = V(normal),
+                localPoint0 = V(new(c.Point0)), localPoint1 = V(new(c.Point1)), localNormal1 = V(new(c.Normal1)), nativePhi = c.NativePhi,
                 gap = System.Numerics.Vector3.Dot((p0 - p1).ToSingle(), normal.ToSingle()) };
         }
         GD.Print("CORE_CONTACT_TRACE " + JsonSerializer.Serialize(new { frame = step, mesh, body0, body1, shape0 = a, shape1 = b,
             center0 = V(p.Position), center1 = V(q.Position), rotation0 = Q(p.Rotation), rotation1 = Q(q.Rotation),
-            geometry0 = geometry?.Invoke(a), geometry1 = geometry?.Invoke(b), contacts }));
+            geometry0 = geometry?.Invoke(a), geometry1 = geometry?.Invoke(b), cullDistance = cullDistance?.Invoke(a, b), contacts }));
         return count;
     }
     private static double[] V(AlsDoubleVector p) => [p.X, p.Y, p.Z];

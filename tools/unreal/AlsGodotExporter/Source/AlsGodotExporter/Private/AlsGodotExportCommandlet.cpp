@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsNativeCapsuleTraceOutput="), PhysicsOutput))
+    {
+        FString Input, Error; FParse::Value(*Params, TEXT("PhysicsNativeCapsuleTraceInput="), Input);
+        if (!ExportAlsPhysicsNativeCapsuleTrace(Input, PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Native capsule trace failed: %s"), *Error); return 47; }
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsCapsuleConvexOutput="), PhysicsOutput))
     {
         FString Error;
