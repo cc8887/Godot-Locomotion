@@ -12,6 +12,12 @@ internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsConta
     Func<int, object>? geometry = null) : IAlsContactGeometrySource
 {
     public bool IsInvalidated => source.IsInvalidated;
+    public void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous, ReadOnlySpan<AlsProjectionVelocity> velocities,
+        ReadOnlySpan<AlsIslandBody> bodies, double dt) => source.PrepareStep(previous, velocities, bodies, dt);
+    public void StageCommit() => source.StageCommit();
+    public void PublishCommit() => source.PublishCommit();
+    public void Abort() => source.Abort();
+    public void Reset() => source.Reset();
     public bool TryGetManifoldSettings(int a, int b, out AlsContactManifoldSettings settings) => source.TryGetManifoldSettings(a, b, out settings);
     public int Query(int a, in AlsPrecisePose p, int b, in AlsPrecisePose q, Span<AlsDetectedContact> points)
     {
