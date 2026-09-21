@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsFaceClipOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsFaceClipReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Face clipping reference failed: %s"), *Error); return 30; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_FACE_CLIP_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsConvexTopologyOutput="), PhysicsOutput))
     {
         FString Error;

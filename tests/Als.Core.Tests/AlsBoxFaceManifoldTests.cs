@@ -38,4 +38,23 @@ public sealed class AlsBoxFaceManifoldTests
         for (var i = 0; i < 2048; i++) AlsBoxFaceManifold.TryInteriorFace(Small, pose, Large, AlsPrecisePose.Identity, 3, points, out _);
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
     }
+    [Fact]
+    public void UnclippedVerticesKeepExactLocalCoordinatesAtFloatMidpoints()
+    {
+        var half = new AlsDoubleVector((double).075f * 50, (double).27f * 50, (double).11f * 50);
+        Span<AlsDetectedContact> points = stackalloc AlsDetectedContact[4];
+        for (var frame = 0; frame < 200; frame++)
+        {
+            var pose = new AlsPrecisePose(new(.137, -.263, 15),
+                AlsQuaternion.FromAxisAngle(Vector3.Normalize(new(1,2,3)), frame * .002f), AlsDoubleVector.One);
+            Assert.True(AlsBoxFaceManifold.TryInteriorFace(half, pose, Large, AlsPrecisePose.Identity, 3, points, out var count));
+            Assert.Equal(4, count);
+            foreach (var point in points)
+            {
+                Assert.Equal((float)half.X, System.Math.Abs(point.Point0.X));
+                Assert.Equal((float)half.Y, System.Math.Abs(point.Point0.Y));
+                Assert.Equal((float)half.Z, System.Math.Abs(point.Point0.Z));
+            }
+        }
+    }
 }

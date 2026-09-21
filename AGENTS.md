@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 面裁剪批次最终全量：Core串行2754通过，Import串行2378通过/1既有跳过，退出0；整链9/12和普通Editor退出异常边界见下条。
+
+- 最新面裁剪：`docs/verification/2026-09-21-physics-face-clipping.md`。Core新增已选reference/incident面后的逐边裁剪、32点缓冲、原生四点缩减与对角次序，盒体内部面复用。648原生prism-box场景，360已选面组逐点同序差0（240缩减，最大32点），288其他GJK结果明确排除；六方向均覆盖，重导一致。盒体未裁剪局部点保留精确值，修复逆变换舍入造成的本批30平台初始休眠回归。最终整链仍9/12，九成功报告与上批字节一致；三频率接触各545/9/5/5/3通过，Core2754通过。UE全目标审计/DataValidation通过，但普通Editor加载标记成功后仍0xC0000005退出，两条旧Condition failed保留。脚凸包仍Jolt查询，GJK/EPA支持点、vertex-plane邻接/选面、分离cull待补，再三旧失败及普通Ragdoll/Get-up等总清单。不得把本批面处理对照当完整凸包或轨迹等价。
+
 - 凸包批次最终计数：Core串行2750通过，Import串行2377通过/1既有跳过，均退出0；普通Editor退出门禁失败与整链9/12边界见下条和对应文档。
 
 - 最新原生烘焙凸包：`docs/verification/2026-09-21-physics-convex-topology.md`。AnimMan 两脚原先误用225/227源顶点；原生cooked均128顶点/215面/margin0。现导出原生面环与完整绑定、Core不可变拓扑、Import严格源资产匹配，Core查询改用cooked顶点，旧冻结代理不变。原生面环存在近似共面和未配对边，显式HasClosedOrientedEdges=false，不能当严格闭合面图。冷重导一致；三频率各545精度/9几何/5流形/5睡眠/3动态通过。整链仍9/12，三旧失败未关闭，30旋转末角速度增大。Core2750通过；Godot优化构建、UE全目标审计和DataValidation通过，但普通Editor两次加载标记成功后退出均0xC0000005，未解决，不能称全门禁通过。普通demo未接新后端。下一步原生凸包首次点序/裁剪、分离几何与cull，再剩余整链失败和普通Ragdoll/Get-up等完整目标。
