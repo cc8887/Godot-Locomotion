@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新首步分歧：`docs/verification/2026-09-22-physics-first-divergence.md`。新增只读saved world/coupled速度比较工具，22步两次报告字节一致。AnimMan第1步V差.000153cm/s、第2步foot_r突增105.3558cm/s/W4.76537；Mannequin采样至17步仍V差<.000533。Core第2步root→foot_r是sphere-convex，该组合仍走Jolt回退！下一步优先移植UE SphereConvexContactPoint/GJKDistance及大球补点，真实第2步输入+扫描原生对照后接运行时/矩阵；不能直接用零长capsule/GJKPenetration替代，也尚不能断言为唯一原因。未改生产/UE/测试程序集、无全量或矩阵新声明，仍9/12，普通demo及全部角色总目标保留。
+
 - 最新完整自由关节共同求解：`docs/verification/2026-09-22-physics-free-coupled.md`。重放工具适配ConnectivityOnly；当前30Hz两模型0/1/2/6/7/8/12–16帧22样本528阶段，完整20/18连接各1自由，10样本有地面接触，55异层动态contact。新参考冷重导字节一致，新旧5组默认/roll-forward均过原容差；Godot捕获最大DP1.07288e-6cm/V6.1065e-5cm/s/W3.02769e-6rad/s，非逐位等价。未改生产/UE/阈值，捕获仍原睡眠失败，矩阵沿用9/12；无全量/重启新声明。下一步首帧积分/particle存储原生世界对照和更长稳定性，Gather后输入/顺序仍来自捕获，不证明整条世界。普通角色总目标及旧Editor异常保留。
 
 - 最新平台原生基线：`docs/verification/2026-09-22-physics-platform-baseline.md`。setup支持平台前十秒/显式phase，保留场景两个kinematic，原生每帧验证ObjectState；平台未开始运动。两模型×平移/旋转30Hz原生全未睡（V8.45–8.97cm/s），Core则M已睡/A未睡；不能称轨迹等价，亦不能仅凭十秒休眠失败断言移植遗漏。新参考冷重导一致，旧普通30输入重导字节不变；旧输入无kinematic仍静态化远处平台，边界保留。三组参考默认/roll-forward各3通过，Godot构建/60smoke/UE全Editor审计/DataValidation过；Editor28676本次退出0/DLL释放，两旧Condition和间歇AV未修。未改Core/阈值，矩阵仍9/12，普通demo未接。下一步更长原生/Core稳定性和最早分歧，coupled自由关节适配；普通角色完整总目标仍未完成。
