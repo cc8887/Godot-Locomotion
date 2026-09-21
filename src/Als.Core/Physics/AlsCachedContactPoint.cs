@@ -29,6 +29,7 @@ public struct AlsCachedContactPoint
     public Vector3 Impulse { get; private set; }
     public float StaticFrictionRatio { get; private set; }
     public readonly Vector3 ContactMass => new(_n.Mass, _u.Mass, _v.Mass);
+    public readonly AlsContactPointInput Input => _input;
 
     public AlsCachedContactPoint(in AlsContactPointInput input, in AlsContactMaterial material,
         AlsQuaternion rotation0, AlsJointInverseMass mass0, AlsQuaternion rotation1, AlsJointInverseMass mass1)

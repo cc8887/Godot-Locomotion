@@ -10,6 +10,8 @@ public interface IAlsContactGeometrySource
     int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination);
 }
 
+public readonly record struct AlsPreparedContactPair(int Body0, int Body1, int PointCount, AlsContactMaterial Material);
+
 // Fixed-topology contact owner. A sleeping island holds this owner's epoch and
 // histories until it resumes. Every eligible pair shares the island's
 // body buffers; geometry queries never own integration. Homogeneous resolved
@@ -35,6 +37,17 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     public int LastActivePairs { get; private set; }
     public long CompletedSteps => _epoch;
     public bool RequiresWake => _committedRegistryVersion != _registry.ChangeVersion || _source.IsInvalidated;
+    public int PreparedPairCount { get { Pending(); return _order?.Count ?? _activeCount; } }
+    public AlsPreparedContactPair PreparedPairAt(int index)
+    {
+        var slot = PreparedSlot(index); return new(_body0[slot], _body1[slot], _pairs[slot].SolverCount, _material);
+    }
+    public AlsContactPointInput PreparedPointAt(int pair, int point) => _pairs[PreparedSlot(pair)].SolverInputAt(point);
+    private int PreparedSlot(int index)
+    {
+        if ((uint)index >= PreparedPairCount) throw new ArgumentOutOfRangeException(nameof(index));
+        return _order?.ContactSlotAt(index) ?? _active[index];
+    }
     public AlsWorldContacts(AlsContactRegistry registry, IAlsContactGeometrySource source,
         AlsContactMaterial material, AlsContactGatherSettings settings, int pointsPerPair = 8, AlsJointIsland? island = null)
     {

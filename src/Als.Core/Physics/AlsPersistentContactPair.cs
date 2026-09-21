@@ -18,6 +18,7 @@ public sealed class AlsPersistentContactPair
     public float MinInitialPhi => _history.MinInitialPhi;
     public AlsSavedContact SavedAt(int index) => _history.SavedAt(index);
     public AlsPreparedContact PreparedAt(int index) => _history.PreparedAt(index);
+    internal AlsContactPointInput SolverInputAt(int index) { RequirePending(); return _solver.PointAt(index).Input; }
 
     public AlsPersistentContactPair(int capacity)
     {
