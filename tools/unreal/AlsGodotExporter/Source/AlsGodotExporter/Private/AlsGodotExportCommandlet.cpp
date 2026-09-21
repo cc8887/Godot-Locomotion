@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsRuntimeShapesOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsAssets(PhysicsOutput, Error, true))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Runtime shape export failed: %s"), *Error); return 37; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_RUNTIME_SHAPES_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsBoxPairOutput="), PhysicsOutput))
     {
         FString Error;

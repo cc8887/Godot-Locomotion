@@ -189,15 +189,18 @@ public partial class PhysicsCoreContactSmoke : Node3D
         var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + "AnimMan.AnimMan");
         var source = definition.Bodies.Single(b => b.Bone == "foot_l").Shapes.Single();
         var cooked = AlsConvexTopologyCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_convex_topology.json"), definition);
+        var runtime=AlsRuntimeShapeCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"),
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"),definition.Mesh);
         foreach (var binding in cooked)
         {
             var convex = definition.Bodies[binding.Body].Shapes[binding.Shape];
-            using var transported = (ConvexPolygonShape3D)AlsPhysicsContactShapes.Create(convex, binding.Topology);
+            var observed=runtime.Single(r=>r.Body==binding.Body&&r.Shape==binding.Shape);
+            using var transported = (ConvexPolygonShape3D)AlsPhysicsContactShapes.Create(convex, binding.Topology, observed);
             var vertices = transported.Points;
             Require(vertices.Length == binding.Topology.VertexCount, "Cooked convex vertex count changed.");
             for (var i = 0; i < vertices.Length; i++)
             {
-                var expected = AlsFootIkCoordinates.FromNative(new AlsDoubleVector(binding.Topology.VertexAt(i)) * convex.Local.Scale);
+                var expected = AlsFootIkCoordinates.FromNative(new AlsDoubleVector(binding.Topology.VertexAt(i)) * observed.Scale);
                 Require(vertices[i] == new Vector3(expected.X, expected.Y, expected.Z), "Cooked convex vertex transport changed.");
             }
             _geometryChecks++;
