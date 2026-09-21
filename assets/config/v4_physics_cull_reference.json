@@ -1,0 +1,9742 @@
+{
+	"schemaVersion": 1,
+	"engine": "5.9.0-0+UE5",
+	"observation": "Actual isolated project world detector settings after tick; native FParticlePairMidPhase Init/GenerateCollisions observed before narrow phase; synthetic particle bounds and PreV; non-MACD, no geometry/trajectory parity",
+	"detector":
+	{
+		"boundsExpansion": 3,
+		"velocityInflation": 1,
+		"maximumVelocityExpansion": 3,
+		"allowMacd": true
+	},
+	"cvars":
+	{
+		"p.Chaos.Collision.CullDistanceReferenceSize": 0.0099999997764825821,
+		"p.Chaos.Collision.MinCullDistanceScale": 1,
+		"p.Chaos.Solver.Collision.CullDistance": -1,
+		"p.Chaos.Solver.Collision.VelocityBoundsMultiplier": 1,
+		"p.Chaos.Solver.Collision.MaxVelocityBoundsExpansion": 3
+	},
+	"cases": [
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.03334045410156
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 151.33332824707031
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.03334045410156
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 151.33332824707031
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.03334045410156
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 151.33332824707031
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3.0333333015441895
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 4.3333334922790527
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 6
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5333333015441895
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 8.8333330154418945
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 10.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30.033332824707031
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 31.333333969116211
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 33
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.03334045410156
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 151.33332824707031
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.03334045410156
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 151.33332824707031
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.03334045410156
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 151.33332824707031
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.033333333333333333,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.01666259765625
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.66667175292969
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.01666259765625
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.66667175292969
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.01666259765625
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.66667175292969
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3.0166666507720947
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3.6666667461395264
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 6
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5166668891906738
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 8.1666669845581055
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 10.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30.016666412353516
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30.666666030883789
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 33
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.01666259765625
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.66667175292969
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.01666259765625
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.66667175292969
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.01666259765625
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.66667175292969
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.016666666666666666,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.00833129882812
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.33332824707031
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.00833129882812
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.33332824707031
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.00833129882812
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.33332824707031
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3.0083334445953369
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3.3333332538604736
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 6
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 1,
+			"distance": 3
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5083332061767578
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.8333334922790527
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 10.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 2.5,
+			"distance": 7.5
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30.008333206176758
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30.333333969116211
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 33
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 10,
+			"distance": 30
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.00833129882812
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.33332824707031
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 27,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.00833129882812
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.33332824707031
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 250,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.00833129882812
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						1,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150.33332824707031
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						40,
+						-40,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 153
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 0,
+			"maximumVelocityExpansion": 3,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		},
+		{
+			"dt": 0.0083333333333333332,
+			"baseDistance": 3,
+			"velocityInflation": 1,
+			"maximumVelocityExpansion": 0,
+			"bodies": [
+				{
+					"dynamic": false,
+					"hasBounds": true,
+					"boundsSize": 1000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				},
+				{
+					"dynamic": true,
+					"hasBounds": true,
+					"boundsSize": 5000,
+					"preV": [
+						10000,
+						0,
+						0
+					]
+				}
+			],
+			"scale": 50,
+			"distance": 150
+		}
+	]
+}

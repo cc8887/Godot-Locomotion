@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 当前验证计数（原生检测距离批次）：Core 串行2739通过；Import串行2370通过/1既有跳过；Godot优化构建通过。日志在 `artifacts/physics-cull-reference-20260921/`。本批未重跑整链，不将这些结果当五项休眠失败已关闭。
+
+- 最新原生检测距离：`docs/verification/2026-09-21-physics-cull-reference.md`。新增原生 FParticlePairMidPhase 观察导出，324组scale/distance与Core逐值精确相等；两次冷导字节一致。项目隔离世界推进后实际detector为基础3 cm、速度倍率1、额外最多3 cm，allowMACD=true但对照明确非MACD。既有40身体完整原生bounds最大边长均<100 cm，scale=1。源码继续确认动态PreV取上帧，kinematic在ApplyKinematicTargets后PreV等于本帧目标速度，静态为0；新增选择helper，尚未用于Godot query。UE全目标构建/插件审计/重导/DataValidation通过；普通Editor重启退出0但两条旧Condition failed仍保留。十二项整链未重跑，最新仍7/12；普通demo未切换。下一步接入分离几何、距离驱动的激活/失效，并补盒/凸包首次点序，再关闭五项整链失败及继续Ragdoll/Get-up等完整目标。
+
 - 最新分离检测前置接入：`docs/verification/2026-09-21-physics-contact-cull-context.md`。Island→WorldContacts→Geometry PrepareStep 传递已提交身体状态，不用本帧重力后的 V 代替 PreV；旧 Gather 缺失 previous 时明确为空，依赖该输入的 provider 应拒绝。失败注入包装器同步转发。新增 whole-particle bounds 缩放/非MACD速度扩展 helper，尚未接 Godot query、尚无新 UE 运行时参考。Core 串行全量2738通过；并行旧流形零分配断言1656 bytes失败原因仍未定位。Godot构建和实际世界60 Hz三场景/13几何/9生命周期通过。最新整链仍上批7/12，五项失败未关闭；下一步导出实际detector参数、完整body bounds与kinematic PreV映射，接分离几何及缓存激活/失效，再整链验收。普通demo未切换，完整目标仍未完成。
 
 - 最新接触 shock 与盒面修复：`docs/verification/2026-09-21-physics-contact-shock.md`。按原生图层级在末 3 次位置/末 2 次速度迭代缩放低层动态端质量/惯量（0.77），只刷新 normal mass，保留切线缓存与累计量；不修改共享刚体质量。648 组原生接触和 5 状态/120 阶段整链对照通过，重导字节一致。实际小腿盒体误选地板底面及微分离跳过近面已复现并修复；三频率各 401 精度/7 几何/5 流形/5 睡眠/3 动态检查通过。最终整链 7/12：平台 4/6，落地 3/6；30/60 Hz 高速落地旧失败关闭，但 30 Hz 平移休眠回归，30 Hz 旋转及普通30/120、高速120仍失败。最终产物 current-*，普通120用separator-normal-120，不能用过程结果替代。Core2736通过；Import串行2369通过/1旧跳过，并行零分配偶发失败仍未定位。Godot/UE构建审计、重导、普通重启、DataValidation通过，重启两条旧Condition failed仍保留。下一步优先30 Hz平台回归、原生分离发现/cull与首次盒/凸包点序；普通demo未接新后端，Ragdoll/Get-up/Pose Recovery、Mantle、完整Camera及十分钟性能预算未完成。
