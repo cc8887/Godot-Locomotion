@@ -61,7 +61,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); InteriorFaceChecks(); SleepChecks(); }
+            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -133,6 +133,49 @@ public partial class PhysicsCoreContactSmoke : Node3D
         Require(!failed, "Captured foot query selected the bottom face instead of the nearby top face.");
     }
 
+    private void CapsuleFaceChecks()
+    {
+        using var doc = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_capsule_geometry_reference.json"));
+        var checks = 0; double maxPoint = 0, maxNormal = 0;
+        var points = new AlsDetectedContact[16];
+        foreach (var row in doc.RootElement.GetProperty("cases").EnumerateArray())
+        {
+            if (row.GetProperty("cullDistance").GetDouble() != 0) continue;
+            var expected = row.GetProperty("points"); var source = row.GetProperty("source");
+            if (source.GetProperty("mesh").GetString() != "synthetic" && expected.GetArrayLength() == 0) continue;
+            var radius = row.GetProperty("radius").GetDouble(); var length = row.GetProperty("length").GetDouble();
+            var half = V(row, "boxHalf"); var p = P(row.GetProperty("capsulePose")); var q = P(row.GetProperty("boxPose"));
+            using var capsule = new CapsuleShape3D { Radius = (float)(radius * .01), Height = (float)((length + 2 * radius) * .01), Margin = 0 };
+            using var box = new BoxShape3D { Size = new((float)(half.Y * .02), (float)(half.Z * .02), (float)(half.X * .02)) };
+            var registry = new AlsContactRegistry(2, 2); using var query = new AlsGodotContactQuery(registry);
+            query.Bind(registry.Register(new(0, AlsPrecisePose.Identity, 1, 1, true)), capsule);
+            query.Bind(registry.Register(new(1, AlsPrecisePose.Identity, 1, 1)), box);
+            foreach (var reverse in new[] { false, true })
+            {
+                var before = query.CapsuleFaceQueries;
+                var count = reverse ? query.Query(1, q, 0, p, points) : query.Query(0, p, 1, q, points);
+                Require(query.CapsuleFaceQueries == before + 1, "Native capsule face path was bypassed.");
+                Require(count == expected.GetArrayLength(), "Native capsule face count differs.");
+                for (var i = 0; i < count; i++)
+                {
+                    var e = expected[i]; var a = points[i];
+                    var n = reverse ? (new AlsDoubleVector(a.Normal1).Rotate(p.Rotation) * -1).Rotate(q.Rotation.Conjugate()).ToSingle() : a.Normal1;
+                    maxPoint = Math.Max(maxPoint, NVector.Distance(reverse ? a.Point1 : a.Point0, V(e, "point0").ToSingle()));
+                    maxPoint = Math.Max(maxPoint, NVector.Distance(reverse ? a.Point0 : a.Point1, V(e, "point1").ToSingle()));
+                    maxNormal = Math.Max(maxNormal, NVector.Distance(n, V(e, "normal1").ToSingle()));
+                }
+                checks++;
+            }
+        }
+        Require(checks == 336 && maxPoint < .002 && maxNormal < 1e-5, "Capsule face transport/order differs from native.");
+        _precisionChecks += checks;
+        GD.Print($"CORE_CAPSULE_FACE_OK checks={checks} max_point_cm={maxPoint:R} max_normal={maxNormal:R}");
+        static AlsDoubleVector V(JsonElement e, string field)
+        { var a = e.GetProperty(field); return new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble()); }
+        static AlsPrecisePose P(JsonElement e)
+        { var a = e.GetProperty("rotation"); return new(V(e, "position"), new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble(), a[3].GetDouble()), AlsDoubleVector.One); }
+    }
+
     private void InteriorFaceChecks()
     {
         var registry = new AlsContactRegistry(2, 2); var identity = AlsPrecisePose.Identity;
@@ -166,17 +209,18 @@ public partial class PhysicsCoreContactSmoke : Node3D
         using var sphere = new SphereShape3D { Radius = .5f };
         using var box = new BoxShape3D { Size = Vector3.One };
         using var capsule = new CapsuleShape3D { Radius = .3f, Height = 2 };
+        using var capsuleSphere = new CapsuleShape3D { Radius = .5f, Height = 1 };
         using var hull = new ConvexPolygonShape3D { Points = [new(-.5f, -.5f, -.5f), new(.5f, -.5f, -.5f), new(-.5f, .5f, -.5f), new(.5f, .5f, -.5f),
             new(-.5f, -.5f, .5f), new(.5f, -.5f, .5f), new(-.5f, .5f, .5f), new(.5f, .5f, .5f)] };
         using var ground = new BoxShape3D { Size = new(10, .2f, 10) };
         using var query = new AlsGodotContactQuery(registry); query.Bind(floor, ground);
         var bottom = identity with { Position = new(0, 0, -10) }; var buffer = new AlsDetectedContact[16];
-        Shape3D[] shapes = [sphere, box, capsule, hull];
+        Shape3D[] shapes = [sphere, box, capsule, capsuleSphere, hull];
         for (var i = 0; i < shapes.Length; i++)
         {
             if (i > 0) mover = registry.Replace(mover, registry.At(mover.Slot));
             query.Bind(mover, shapes[i]);
-            var top = identity with { Position = new(0, 0, i == 2 ? 80 : 40), Rotation = i == 1 || i == 3 ? AlsQuaternion.FromAxisAngle(NVector.UnitX, .3f) : AlsQuaternion.Identity };
+            var top = identity with { Position = new(0, 0, i == 2 ? 80 : 40), Rotation = shapes[i] is BoxShape3D or ConvexPolygonShape3D ? AlsQuaternion.FromAxisAngle(NVector.UnitX, .3f) : AlsQuaternion.Identity };
             var count = query.Query(mover.Slot, top, floor.Slot, bottom, buffer); Require(count > 0, "Shape did not produce contact geometry.");
             for (var j = 0; j < count; j++)
             {
