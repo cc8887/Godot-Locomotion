@@ -14,6 +14,7 @@ public interface IAlsContactGeometrySource
     // meaningful. Build whole-particle bounds before testing individual pairs.
     void PrepareBounds(ReadOnlySpan<AlsPrecisePose> shapeWorld) { }
     bool AllowsPair(int shape0, int shape1) => true;
+    bool AllowsPair(int shape0, int shape1, bool collidedLastStep) => AllowsPair(shape0, shape1);
     // All fallible work belongs in PrepareStep/Query/StageCommit. PublishCommit
     // and Abort must not throw. Abort also follows a partially failed PrepareStep.
     // Callbacks occur under the registry lock; Reset occurs only while idle.
@@ -58,6 +59,8 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     private readonly int[] _prepared, _body0, _body1;
     private readonly int[] _active;
     private readonly AlsContactPairKey[] _identities;
+    private readonly AlsContactPairKey[] _lastActiveIdentity;
+    private readonly long[] _lastActiveEpoch;
     private readonly AlsContactConstraintOrder? _order;
     private readonly AlsPrecisePose[] _shapeWorld;
     private readonly AlsDetectedContact[] _points;
@@ -126,6 +129,8 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         _manifolds = new AlsContactManifoldCache[capacity]; for (var i = 0; i < capacity; i++) _manifolds[i] = new(pointsPerPair);
         _prepared = new int[capacity]; _body0 = new int[capacity]; _body1 = new int[capacity];
         _active = new int[capacity]; _identities = new AlsContactPairKey[capacity];
+        _lastActiveIdentity = new AlsContactPairKey[capacity]; _lastActiveEpoch = new long[capacity];
+        Array.Fill(_lastActiveEpoch, -1);
         if (island is not null)
         {
             if (island.BodyCount != registry.BodyCount) throw new ArgumentException("Ordering island and registry body counts differ.");
@@ -167,8 +172,10 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
                 // Reject before restoring either geometry or friction history.
                 // A committed skipped epoch invalidates both on re-entry;
                 // an aborted attempt leaves the previous histories intact.
-                if (!_source.AllowsPair(a, b)) continue;
-                _identities[slot] = new(_registry.Key(a), _registry.Key(b));
+                var identity = new AlsContactPairKey(_registry.Key(a), _registry.Key(b));
+                var collidedLastStep = _epoch > 0 && _lastActiveEpoch[slot] == _epoch - 1 && _lastActiveIdentity[slot] == identity;
+                if (!_source.AllowsPair(a, b, collidedLastStep)) continue;
+                _identities[slot] = identity;
                 // Include the slot before any provider callback or proposal so
                 // exceptions roll back geometry and friction history together.
                 _body0[slot] = ia; _body1[slot] = ib; _prepared[_count++] = slot;
@@ -263,7 +270,13 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         Pending(); if (!_staged) throw new InvalidOperationException("Stage all contacts before publishing.");
         _source.PublishCommit();
         var active = 0;
-        for (var i = 0; i < _count; i++) { var slot = _prepared[i]; var pair = _pairs[slot]; if (pair.SolverCount > 0) active++; pair.PublishCommit(); _manifolds[slot].Publish(); }
+        for (var i = 0; i < _count; i++)
+        {
+            var slot = _prepared[i]; var pair = _pairs[slot];
+            if (pair.SolverCount > 0)
+            { active++; _lastActiveEpoch[slot] = _epoch; _lastActiveIdentity[slot] = _identities[slot]; }
+            pair.PublishCommit(); _manifolds[slot].Publish();
+        }
         LastContactCount = _contactCount; LastActivePairs = active; LastRestoredPairs = _restoredCount;
         _epoch++; _committedRegistryVersion = _registry.ChangeVersion;
         _order?.Commit();
@@ -283,6 +296,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         _source.Reset();
         foreach (var pair in _pairs) pair.Reset(); _epoch = 0; LastActivePairs = LastContactCount = 0; _committedRegistryVersion = -1;
         foreach (var cache in _manifolds) cache.Reset(); LastRestoredPairs = 0;
+        Array.Fill(_lastActiveEpoch, -1); Array.Clear(_lastActiveIdentity);
         _order?.Reset();
     }
     private void Pending() { if (!_pending) throw new InvalidOperationException("Gather world contacts first."); }
