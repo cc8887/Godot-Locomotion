@@ -64,7 +64,7 @@ public static class AlsScaledConvexManifold
         AlsConvexTopology hull1,AlsDoubleVector scale1,in AlsPrecisePose shape1To0,AlsGjkCache cache,
         AlsConvexManifoldWorkspace work,Span<AlsDetectedContact> destination,double cullDistance,double gjkEpsilon,double epaEpsilon,
         float minimumFaceSearchDistance,float planeNormalEpsilon,bool forceEdgeZeroCull=false,bool warmStart=true)
-        =>AlsRawConvexManifold.BuildCore(hull0,hull1,shape1To0,cache,work,destination,cullDistance,gjkEpsilon,epaEpsilon,
-            minimumFaceSearchDistance,planeNormalEpsilon,forceEdgeZeroCull,warmStart,true,
-            AlsScaledConvexGeometry.ResolveScale(scale0),AlsScaledConvexGeometry.ResolveScale(scale1));
+        =>AlsPolygonManifold.Build(new AlsConvexPolygonShape(hull0,scale0),new AlsConvexPolygonShape(hull1,scale1),
+            shape1To0,cache,work,destination,cullDistance,gjkEpsilon,epaEpsilon,
+            minimumFaceSearchDistance,planeNormalEpsilon,forceEdgeZeroCull,warmStart);
 }

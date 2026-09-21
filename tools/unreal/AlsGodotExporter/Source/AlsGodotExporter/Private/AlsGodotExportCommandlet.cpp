@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsBoxPairOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsConvexPairReference(PhysicsOutput, Error, false, true))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Box pair reference failed: %s"), *Error); return 36; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_BOX_PAIR_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsScaledConvexPairOutput="), PhysicsOutput))
     {
         FString Error;
