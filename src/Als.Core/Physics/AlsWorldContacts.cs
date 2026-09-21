@@ -27,6 +27,10 @@ public interface IAlsContactGeometrySource
 }
 
 public readonly record struct AlsPreparedContactPair(int Body0, int Body1, int PointCount, AlsContactMaterial Material);
+// Values copied at the actual Gather boundary, before implicit velocity or solving.
+// Geometry is read separately in solver order (disabled history points omitted).
+public readonly record struct AlsContactGatherSnapshot(AlsContactGatherBody Body0, AlsContactGatherBody Body1,
+    AlsContactGatherSettings Settings);
 public readonly record struct AlsContactShockSettings(int PositionIterations, int VelocityIterations, float PositionScale, float VelocityScale)
 {
     public static AlsContactShockSettings Native => new(3, 2, .77f, .77f);
@@ -74,6 +78,9 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         var slot = PreparedSlot(index); return new(_body0[slot], _body1[slot], _pairs[slot].SolverCount, _material);
     }
     public AlsContactPointInput PreparedPointAt(int pair, int point) => _pairs[PreparedSlot(pair)].SolverInputAt(point);
+    public AlsContactGatherSnapshot PreparedGatherAt(int pair) => _pairs[PreparedSlot(pair)].GatherSnapshot;
+    public AlsContactGeometry PreparedGeometryAt(int pair, int point) => _pairs[PreparedSlot(pair)].GeometryAt(point);
+    public float PreparedInitialPhiAt(int pair, int point) => _pairs[PreparedSlot(pair)].GatheredInitialPhiAt(point);
     private int PreparedSlot(int index)
     {
         if ((uint)index >= PreparedPairCount) throw new ArgumentOutOfRangeException(nameof(index));

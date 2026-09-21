@@ -33,6 +33,34 @@ public sealed class AlsPersistentContactPairTests
     }
 
     [Fact]
+    public void GatherSnapshotPreservesRawHistoryAndSolverOrderUntilCommitOrAbort()
+    {
+        var pair = new AlsPersistentContactPair(4);
+        Assert.Throws<InvalidOperationException>(() => pair.GatherSnapshot);
+        var disabled = Contact with { Disabled = true, Point0 = new(4, 0, -.2f), Point1 = new(4, 0, 0) };
+        Gather(pair, 0, [disabled, Contact]);
+        var raw = pair.GatherSnapshot; var geometry = pair.GeometryAt(0);
+        Assert.Equal(Contact.Point0, geometry.Point0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => pair.GeometryAt(1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => pair.GeometryAt(-1));
+        Assert.True(raw.Settings.InitialManifold);
+        var replay = AlsContactGather.Gather(geometry, raw.Body0, raw.Body1, raw.Settings);
+        Assert.Equal(pair.SolverInputAt(0), replay.Point);
+        Assert.Equal(pair.GatheredInitialPhiAt(0), replay.InitialPhi);
+        var a = default(AlsProjectionDelta); var b = default(AlsProjectionDelta);
+        pair.SolvePosition(ref a, ref b, true);
+        Assert.Equal(raw, pair.GatherSnapshot); Assert.Equal(geometry, pair.GeometryAt(0));
+        pair.Commit();
+        Assert.Throws<InvalidOperationException>(() => pair.GeometryAt(0));
+        Gather(pair, 1, [Contact]);
+        Assert.False(pair.GatherSnapshot.Settings.InitialManifold);
+        Assert.True(pair.GeometryAt(0).HasAnchor);
+        Assert.Equal(pair.PreparedAt(0).Geometry, pair.GeometryAt(0));
+        pair.Abort();
+        Assert.Throws<InvalidOperationException>(() => pair.GatherSnapshot);
+    }
+
+    [Fact]
     public void GatherFailureAbortsPendingHistoryAndDoesNotConsumeTheStep()
     {
         var pair = new AlsPersistentContactPair(2); Gather(pair, 0, [Contact]); pair.Commit(); var previous = pair.SavedAt(0);

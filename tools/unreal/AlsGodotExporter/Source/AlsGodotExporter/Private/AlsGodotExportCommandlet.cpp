@@ -202,6 +202,13 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         { UE_LOG(LogAlsGodotExporter, Error, TEXT("Capsule geometry export failed: %s"), *Error); return 24; }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CAPSULE_GEOMETRY_OK assets_saved=0")); return 0;
     }
+    if (FParse::Value(*Params, TEXT("PhysicsRawGatherOutput="), PhysicsOutput))
+    {
+        FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsRawGatherInputs="), Inputs);
+        if (!ExportAlsPhysicsRawGatherReference(Inputs, PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Raw Gather export failed: %s"), *Error); return 49; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_RAW_GATHER_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsCoupledOutput="), PhysicsOutput))
     {
         FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsCoupledInputs="), Inputs);

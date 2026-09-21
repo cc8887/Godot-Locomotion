@@ -6,8 +6,8 @@ using NVector = System.Numerics.Vector3;
 
 namespace GodotAls.Physics;
 
-// Opt-in Main diagnostic. Input contains gathered contact rows, not a claimed
-// native narrow-phase result. Native replay must recompute every solver output.
+// Opt-in Main diagnostic. Raw inputs are after history preparation, before Gather;
+// this does not claim native narrow-phase or history matching equivalence.
 internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definition, AlsPhysicsJointSettings[] settings,
     JsonElement solverSettings, AlsWorldContacts contacts, Func<int> frame, HashSet<int> frames, string directory) : IAlsIslandStepObserver
 {
@@ -39,14 +39,22 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
         for (var i = 0; i < contactInputs.Length; i++)
         {
             var pair = contacts.PreparedPairAt(i); var points = new object[pair.PointCount];
+            var raw = contacts.PreparedGatherAt(i); var geometry = new object[pair.PointCount];
             for (var p = 0; p < points.Length; p++)
             {
                 var c = contacts.PreparedPointAt(i, p);
                 points[p] = new { arm0 = V(c.Arm0), arm1 = V(c.Arm1), normal = V(c.Normal), u = V(c.TangentU), v = V(c.TangentV),
                     error = V(c.Error), targetVelocity = c.TargetVelocity, disablePosition = c.DisablePosition,
-                    disableVelocity = c.DisableVelocity, disableFriction = c.DisableFriction };
+                    disableVelocity = c.DisableVelocity, disableFriction = c.DisableFriction,
+                    initialPhi = contacts.PreparedInitialPhiAt(i, p) };
+                var g = contacts.PreparedGeometryAt(i, p);
+                geometry[p] = new { point0 = V(g.Point0), point1 = V(g.Point1), normal1 = V(g.Normal1),
+                    anchor0 = V(g.Anchor0), anchor1 = V(g.Anchor1), hasAnchor = g.HasAnchor, initialContact = g.InitialContact,
+                    initialPhi = g.InitialPhi, targetPhi = g.TargetPhi, disablePosition = g.DisablePosition,
+                    disableVelocity = g.DisableVelocity, disableFriction = g.DisableFriction };
             }
-            contactInputs[i] = new { body0 = pair.Body0, body1 = pair.Body1, material = pair.Material, points };
+            contactInputs[i] = new { body0 = pair.Body0, body1 = pair.Body1, material = pair.Material, points,
+                gather = new { body0 = GatherBody(raw.Body0), body1 = GatherBody(raw.Body1), settings = raw.Settings, points = geometry } };
         }
         _input = new { mesh = definition.Mesh, frame = _capturedFrame, dt, positionIterations, velocityIterations,
             solverSettings, contactShock = contacts.UsesGraphLevels ? contacts.ShockSettings : new AlsContactShockSettings(0, 0, 1, 1),
@@ -69,6 +77,8 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
         Godot.GD.Print($"CORE_STEP_CAPTURE mesh={definition.Mesh} frame={_capturedFrame} stages={_samples.Count} output={path}");
     }
     private static object Pose(AlsPrecisePose p) => new { position = V(p.Position), rotation = new[] { p.Rotation.X, p.Rotation.Y, p.Rotation.Z, p.Rotation.W } };
+    private static object GatherBody(AlsContactGatherBody b) => new { shapeWorld = Pose(b.ShapeWorld),
+        centerOfMass = V(b.CenterOfMass), inverseMass = b.InverseMass, v = V(b.Velocity.Linear), w = V(b.Velocity.Angular) };
     private static double[] V(AlsDoubleVector v) => [v.X, v.Y, v.Z];
     private static float[] V(NVector v) => [v.X, v.Y, v.Z];
 }

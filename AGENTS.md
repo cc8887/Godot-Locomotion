@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Raw Gather批次最终Import Release固定JIT串行全量2424通过/1既有跳过，退出0；其他本批范围及旧失败见下条。
+
+- 最新raw Gather：`docs/verification/2026-09-22-physics-raw-gather.md`。六个失败静止帧156对369点（全已有锚点，27对共享initialPhi）捕获真实post-history/pre-Gather输入，UE独立Gather冷重导字节一致。查明.NET9 Vector3.Cross舍入；显式float叉积后.NET8/9及Godot三个频率各369点原生差0，保留旧捕获1.0662403e-6偏差。Core2835通过（并修上一批friend契约遗漏），.NET9相关8通过，Godot旧smoke全过。整链仍8/12，八成功报告均改变；普通60 M600才睡/高120 M881 A未睡/平台30两失败未关。全Editor审计与DataValidation过，普通Editor34788加载后0xC0000005/DLL释放，两旧Condition failed未修。下一步真实历史准备前/首次落地/平台低频帧间对照，普通demo未切换，全部角色总目标保留。Import全量结果见验证文档后续记录。
+
 - Resting coupled批次Editor9288加载标记后原生退出0/DLL释放；两旧Condition failed和间歇AV未修。完整Editor审计与本批对照范围见下条。
 
 - 最新resting coupled：`docs/verification/2026-09-22-physics-resting-coupled.md`。捕获高120 AnimMan1140–1142/普通60 Mannequin540–542六帧144共同阶段，原生冷重导一致。.NET8/9四套coupled各4通过；新实测.NET9/Godot最大DP1.1452e-7cm、V4.1587e-6cm/s、W5.1555e-7rad/s，非逐位相等。测试原先错误用严格手工行接口拒绝已Gather的NdotU残差，现内部GatherRows配合Import.Tests friend保留生产语义；公共Gather仍严格，测试验证失败不发布。Core相关87、优化构建、60Hz完整smoke通过；未重跑全量/矩阵，基线仍Core2834/Import2422+1skip/8of12。两失败采集诊断与上批一致，四失败未关。下一步补Gather前几何/锚点/initialPhi/shape姿态/速度快照，让UE重新Gather；本批对照不证明历史/Gather正确。普通demo未切换。

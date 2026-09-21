@@ -32,18 +32,18 @@ public static class AlsContactGather
         var common = (p0 * body0.InverseMass + p1 * body1.InverseMass) * (1 / sumMass);
         var arm0 = (common - body0.CenterOfMass).ToSingle(); var arm1 = (common - body1.CenterOfMass).ToSingle();
         var normal = new AlsDoubleVector(geometry.Normal1).Rotate(body1.ShapeWorld.Rotation).ToSingle();
-        var u = Vector3.Cross(Vector3.UnitY, normal);
-        if (!Normalize(ref u)) { u = Vector3.Cross(Vector3.UnitX, normal); u *= 1 / MathF.Sqrt(u.LengthSquared()); }
+        var u = Cross(Vector3.UnitY, normal);
+        if (!Normalize(ref u)) { u = Cross(Vector3.UnitX, normal); u *= 1 / MathF.Sqrt(u.LengthSquared()); }
         var contactVelocity = Vector3.Zero; var normalVelocity = 0f;
         if (!geometry.HasAnchor || settings.Restitution > 0 || geometry.InitialContact)
         {
-            var v0 = body0.Velocity.Linear + Vector3.Cross(body0.Velocity.Angular, arm0);
-            var v1 = body1.Velocity.Linear + Vector3.Cross(body1.Velocity.Angular, arm1);
+            var v0 = body0.Velocity.Linear + Cross(body0.Velocity.Angular, arm0);
+            var v1 = body1.Velocity.Linear + Cross(body1.Velocity.Angular, arm1);
             contactVelocity = v0 - v1; normalVelocity = Vector3.Dot(contactVelocity, normal);
             var sliding = contactVelocity - normalVelocity * normal;
             if (Normalize(ref sliding)) u = sliding;
         }
-        var v = Vector3.Cross(normal, u);
+        var v = Cross(normal, u);
         var frictionDelta = geometry.HasAnchor
             ? (Transform(body0.ShapeWorld, geometry.Anchor0) - Transform(body1.ShapeWorld, geometry.Anchor1)).ToSingle()
             : contactVelocity * settings.Dt;
@@ -80,6 +80,10 @@ public static class AlsContactGather
         return new(point, initialPhi);
     }
 
+    // Keep native separate float products/subtractions. Vector3.Cross changes
+    // rounding on the .NET 9 host used by Godot (actual resting-frame reference).
+    private static Vector3 Cross(Vector3 a, Vector3 b) =>
+        new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
     private static AlsDoubleVector Transform(in AlsPrecisePose pose, Vector3 point) =>
         new AlsDoubleVector(point).Rotate(pose.Rotation) + pose.Position;
     private static bool Normalize(ref Vector3 value)

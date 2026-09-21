@@ -29,6 +29,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _capsulePairChecks;
     private int _capsuleDegenerateSteps;
     private int _capsuleRuntimeChecks;
+    private int _rawGatherChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -96,6 +97,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
                 native_sphere_box_checks = _sphereBoxChecks,
                 native_capsule_box_checks = _fullCapsuleBoxChecks,
                 native_capsule_runtime_checks = _capsuleRuntimeChecks, runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+                native_raw_gather_checks = _rawGatherChecks,
                 native_capsule_convex_checks = _capsuleConvexChecks,
                 native_capsule_pair_checks = _capsulePairChecks,
                 capsule_degenerate_steps = _capsuleDegenerateSteps,
@@ -143,6 +145,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeCapsuleConvexChecks();
         NativeCapsulePairChecks();
         NativeCapsuleRuntimeChecks();
+        NativeRawGatherChecks();
         CapsuleDegenerateStepChecks();
     }
 
@@ -177,6 +180,39 @@ public partial class PhysicsCoreContactSmoke : Node3D
             }
             Require(query.NativeCapsulePairQueries > 0 && query.NarrowPhaseQueries == 0, "Degenerate steps bypassed the native pair path.");
         }
+    }
+
+    private void NativeRawGatherChecks()
+    {
+        using var doc = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_raw_gather_reference.json"));
+        static float F(JsonElement e, string n) => e.GetProperty(n).GetSingle();
+        static bool B(JsonElement e, string n) => e.GetProperty(n).GetBoolean();
+        static AlsDoubleVector V(JsonElement e, string n) { var a = e.GetProperty(n); return new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble()); }
+        static NVector Vec(JsonElement e, string n) => V(e, n).ToSingle();
+        static AlsPrecisePose Pose(JsonElement e) { var q = e.GetProperty("rotation"); return new(V(e, "position"), new(q[0].GetDouble(), q[1].GetDouble(), q[2].GetDouble(), q[3].GetDouble()), AlsDoubleVector.One); }
+        static AlsContactGatherBody Body(JsonElement e) => new(Pose(e.GetProperty("shapeWorld")), V(e, "centerOfMass"), F(e, "inverseMass"), new(Vec(e, "v"), Vec(e, "w")));
+        foreach (var row in doc.RootElement.GetProperty("cases").EnumerateArray())
+        {
+            var g = row.GetProperty("capture").GetProperty("gather"); var s = g.GetProperty("settings");
+            var settings = new AlsContactGatherSettings(F(s, "dt"), F(s, "restitution"), F(s, "restitutionThreshold"),
+                F(s, "maxPushOutVelocity"), F(s, "maxDepenetrationVelocity"), B(s, "perContactInitialPhi"), B(s, "initialManifold"), F(s, "minInitialPhi"));
+            var b0 = Body(g.GetProperty("body0")); var b1 = Body(g.GetProperty("body1")); var points = g.GetProperty("points");
+            var native = row.GetProperty("nativePoints"); Require(points.GetArrayLength() == native.GetArrayLength(), "Raw Gather count differs.");
+            for (var i = 0; i < points.GetArrayLength(); i++)
+            {
+                var r = points[i]; var expected = native[i];
+                var raw = new AlsContactGeometry(Vec(r, "point0"), Vec(r, "point1"), Vec(r, "normal1"), Vec(r, "anchor0"), Vec(r, "anchor1"),
+                    B(r, "hasAnchor"), B(r, "initialContact"), F(r, "initialPhi"), F(r, "targetPhi"), B(r, "disablePosition"), B(r, "disableVelocity"), B(r, "disableFriction"));
+                var result = AlsContactGather.Gather(raw, b0, b1, settings); var actual = result.Point;
+                Require(actual.Arm0 == Vec(expected, "arm0") && actual.Arm1 == Vec(expected, "arm1") && actual.Normal == Vec(expected, "normal") &&
+                    actual.TangentU == Vec(expected, "u") && actual.TangentV == Vec(expected, "v") && actual.Error == Vec(expected, "error") &&
+                    actual.TargetVelocity == F(expected, "targetVelocity") && result.InitialPhi == F(expected, "initialPhi") &&
+                    actual.DisablePosition == B(expected, "disablePosition") && actual.DisableVelocity == B(expected, "disableVelocity") &&
+                    actual.DisableFriction == B(expected, "disableFriction"), "Native raw Gather differs on Godot runtime.");
+                _rawGatherChecks++;
+            }
+        }
+        Require(_rawGatherChecks == 369, "Expected 369 actual resting Gather points.");
     }
 
     private void NativeCapsuleRuntimeChecks()
