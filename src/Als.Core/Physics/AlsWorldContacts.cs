@@ -10,6 +10,13 @@ public interface IAlsContactGeometrySource
     // provider must reject that absence instead of substituting predicted V.
     void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt) { }
+    // All fallible work belongs in PrepareStep/Query/StageCommit. PublishCommit
+    // and Abort must not throw. Abort also follows a partially failed PrepareStep.
+    // Callbacks occur under the registry lock; Reset occurs only while idle.
+    void StageCommit() { }
+    void PublishCommit() { }
+    void Abort() { }
+    void Reset() { }
     // Opt-in for polygonal pairs only. The provider supplies the native size-
     // based tolerance and its actual discovery/culling distance in cm.
     bool TryGetManifoldSettings(int shape0, int shape1, out AlsContactManifoldSettings settings)
@@ -200,11 +207,13 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
             if (!_manifolds[_prepared[i]].Pending) throw new InvalidOperationException("Missing manifold proposal.");
             _pairs[_prepared[i]].StageCommit();
         }
+        _source.StageCommit();
         _staged = true;
     }
     public void Commit()
     {
         Pending(); if (!_staged) throw new InvalidOperationException("Stage all contacts before publishing.");
+        _source.PublishCommit();
         var active = 0;
         for (var i = 0; i < _count; i++) { var slot = _prepared[i]; var pair = _pairs[slot]; if (pair.SolverCount > 0) active++; pair.PublishCommit(); _manifolds[slot].Publish(); }
         LastContactCount = _contactCount; LastActivePairs = active; LastRestoredPairs = _restoredCount;
@@ -217,11 +226,13 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         if (!_pending) return;
         for (var i = 0; i < _count; i++) { _pairs[_prepared[i]].Abort(); _manifolds[_prepared[i]].Abort(); }
         _order?.Abort();
-        _pending = _staged = false; _registry.Leave();
+        try { _source.Abort(); }
+        finally { _pending = _staged = false; _registry.Leave(); }
     }
     public void Reset()
     {
         if (_pending) throw new InvalidOperationException("Abort contact step before resetting.");
+        _source.Reset();
         foreach (var pair in _pairs) pair.Reset(); _epoch = 0; LastActivePairs = LastContactCount = 0; _committedRegistryVersion = -1;
         foreach (var cache in _manifolds) cache.Reset(); LastRestoredPairs = 0;
         _order?.Reset();
