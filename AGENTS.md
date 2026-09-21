@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 GJK 底层：`docs/verification/2026-09-21-physics-gjk-primitives.md`。Core移植indexed double线段/三角形/四面体约简和witness同步压紧，支持真实cooked凸包零margin支持点/float顶点身份。576原生simplex有效点/身份一致，最近点最大差9.60e-10 cm，权重3.33e-16；1024两脚支持点/编号精确一致，重导一致。冷导UseGJK2=false、GJK/EPA epsilon均float1e-6。Core2757/Import2380+1旧跳过、Godot优化构建通过。UE全目标审计/重导/DataValidation/普通重启退出0；两条旧Condition failed和既往间歇退出访问冲突未解决。未接运行时、未重跑整链，最新仍上批9/12；下一步完整warm-startable GJK循环/缓存恢复、EPA、实际pair margin、vertex-plane邻接/选面，再凸包接管/分离cull/三旧失败/普通Ragdoll等完整目标。
+
 - 面裁剪批次最终全量：Core串行2754通过，Import串行2378通过/1既有跳过，退出0；整链9/12和普通Editor退出异常边界见下条。
 
 - 最新面裁剪：`docs/verification/2026-09-21-physics-face-clipping.md`。Core新增已选reference/incident面后的逐边裁剪、32点缓冲、原生四点缩减与对角次序，盒体内部面复用。648原生prism-box场景，360已选面组逐点同序差0（240缩减，最大32点），288其他GJK结果明确排除；六方向均覆盖，重导一致。盒体未裁剪局部点保留精确值，修复逆变换舍入造成的本批30平台初始休眠回归。最终整链仍9/12，九成功报告与上批字节一致；三频率接触各545/9/5/5/3通过，Core2754通过。UE全目标审计/DataValidation通过，但普通Editor加载标记成功后仍0xC0000005退出，两条旧Condition failed保留。脚凸包仍Jolt查询，GJK/EPA支持点、vertex-plane邻接/选面、分离cull待补，再三旧失败及普通Ragdoll/Get-up等总清单。不得把本批面处理对照当完整凸包或轨迹等价。
