@@ -27,6 +27,13 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsMarginOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsMarginReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Margin reference failed: %s"), *Error); return 33; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_MARGIN_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsGjkSearchOutput="), PhysicsOutput))
     {
         FString Error;
