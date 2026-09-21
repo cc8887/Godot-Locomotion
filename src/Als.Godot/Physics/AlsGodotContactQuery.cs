@@ -26,6 +26,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         public AlsConvexProperties? ConvexProperties;
         public AlsDoubleVector? NativeHalf;
         public AlsContactBounds? NativeBounds;
+        public AlsShapeBoundsGeometry BoundsGeometry;
         public AlsDoubleVector NativeScale = AlsDoubleVector.One;
         public float NativeMargin;
         public string? TraceFingerprint;
@@ -41,6 +42,8 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private readonly NVector[] _preVelocity;
     private readonly NVector[] _integratedVelocity;
     private readonly AlsContactBounds?[] _worldBounds;
+    private readonly AlsContactBounds[] _shapeBounds;
+    private readonly AlsPrecisePose[] _shapePoses;
     private bool _boundsPrepared;
     private readonly double[] _bodyBounds;
     private readonly uint[] _boundsGeneration;
@@ -83,6 +86,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         detector?.Validate();_detector=detector;
         _preVelocity=new NVector[registry.BodyCount];_bodyBounds=new double[registry.BodyCount];_boundsGeneration=new uint[registry.BodyCount];
         _integratedVelocity=new NVector[registry.BodyCount];_worldBounds=new AlsContactBounds?[registry.BodyCount];
+        _shapeBounds=new AlsContactBounds[registry.Capacity];_shapePoses=new AlsPrecisePose[registry.Capacity];
         try
         {
             _space = PhysicsServer3D.SpaceCreate(); PhysicsServer3D.SpaceSetActive(_space, false);
@@ -130,6 +134,19 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         var binding = new Binding { Shape = shape, Bounds = bounds, Revision = handle.Revision, Changed = null!,
             Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One,NativeMargin=nativeMargin,
             NativeCapsule=nativeCapsule,ProxyLocal=proxy,NativeSphereRadius=nativeSphereRadius,ConvexProperties=convexProperties,NativeBounds=nativeBounds };
+        if(nativeCapsule is { } cap)
+            binding.BoundsGeometry=AlsShapeBoundsGeometry.Capsule(new(cap.Endpoint0),new(cap.Endpoint0+cap.Axis*cap.Height),cap.Radius);
+        else if(shape is SphereShape3D sphere)
+            binding.BoundsGeometry=AlsShapeBoundsGeometry.Sphere(proxy.Position,nativeSphereRadius??(float)(100d*sphere.Radius));
+        else if(shape is CapsuleShape3D capsule)
+        {
+            var half=100d*(capsule.Height*.5-capsule.Radius);
+            var a=new AlsDoubleVector(0,0,-half).Rotate(proxy.Rotation)+proxy.Position;
+            var b=new AlsDoubleVector(0,0,half).Rotate(proxy.Rotation)+proxy.Position;
+            binding.BoundsGeometry=AlsShapeBoundsGeometry.Capsule(a,b,(float)(100d*capsule.Radius));
+        }
+        else binding.BoundsGeometry=AlsShapeBoundsGeometry.Polygon(nativeBounds??
+            (nativeHalf is { } half?new(half * -1,half):AlsContactBounds.Segment(ToNative(bounds.Position),ToNative(bounds.End),0)));
         binding.Changed = () => binding.Dirty = true;
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
@@ -176,26 +193,9 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         // native particle bounds union shapes before pair filtering.
         for (var i=0;i<_registry.Capacity;i++) if (_registry.Present(i))
         {
-            var binding=BindingAt(i); var pose=shapeWorld[i]; AlsContactBounds bounds;
-            if (binding.NativeCapsule is { } capsule)
-            {
-                var a=new AlsDoubleVector(capsule.Endpoint0).Rotate(pose.Rotation)+pose.Position;
-                var b=new AlsDoubleVector(capsule.Endpoint0+capsule.Axis*capsule.Height).Rotate(pose.Rotation)+pose.Position;
-                bounds=AlsContactBounds.Segment(a,b,capsule.Radius);
-            }
-            else if (binding.NativeSphereRadius is { } radius)
-            {
-                var center=binding.ProxyLocal.Position.Rotate(pose.Rotation)+pose.Position;
-                bounds=AlsContactBounds.Segment(center,center,radius);
-            }
-            else if (binding.NativeBounds is { } native) bounds=native.Transform(pose);
-            else if (binding.NativeHalf is { } half) bounds=new AlsContactBounds(half * -1,half).Transform(pose);
-            else
-            {
-                // Non-asset scene geometry uses its explicit Godot proxy bounds.
-                var a=ToNative(binding.Bounds.Position);var b=ToNative(binding.Bounds.End);
-                bounds=AlsContactBounds.Segment(a,b,0).Transform(AlsPrecisePose.Compose(binding.ProxyLocal,pose));
-            }
+            var binding=BindingAt(i); var pose=shapeWorld[i];
+            var bounds=binding.BoundsGeometry.Transform(pose);
+            _shapeBounds[i]=bounds;_shapePoses[i]=pose;
             var body=_registry.At(i).Body;
             _worldBounds[body]=_worldBounds[body] is { } prior?prior.Union(bounds):bounds;
         }
@@ -209,6 +209,13 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         Check();if(!_detector.HasValue)return true;
         if(!_boundsPrepared||!_polygonCache.Pending)throw new InvalidOperationException("Prepare whole-particle bounds before pair filtering.");
         return _worldBounds[_registry.At(shape0).Body]!.Value.Intersects(_worldBounds[_registry.At(shape1).Body]!.Value);
+    }
+    public bool AllowsPair(int shape0,int shape1,bool collidedLastStep)
+    {
+        if(!AllowsPair(shape0,shape1))return false;
+        if(!_detector.HasValue)return true;
+        return AlsShapeBoundsGeometry.Allows(BindingAt(shape0).BoundsGeometry,_shapePoses[shape0],_shapeBounds[shape0],
+            BindingAt(shape1).BoundsGeometry,_shapePoses[shape1],_shapeBounds[shape1],CullDistance(shape0,shape1),collidedLastStep);
     }
     public void StageCommit() => _polygonCache.StageCommit();
     public void PublishCommit() => _polygonCache.PublishCommit();

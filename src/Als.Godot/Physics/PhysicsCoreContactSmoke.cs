@@ -139,6 +139,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeMarginChecks();
         NativeCullChecks();
         NativeMidphaseRetirementChecks();
+        NativeShapeBoundsChecks();
         NativeCapsuleCullChecks();
         PrimitiveBindingChecks();
         NativeSphereBoxChecks();
@@ -148,6 +149,26 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeCapsuleRuntimeChecks();
         NativeRawGatherChecks();
         CapsuleDegenerateStepChecks();
+    }
+
+    private void NativeShapeBoundsChecks()
+    {
+        var identity=AlsPrecisePose.Identity;var registry=new AlsContactRegistry(2,2);
+        using var box=new BoxShape3D {Size=new(.005f,.005f,.2f),Margin=0};
+        using var query=new AlsGodotContactQuery(registry,new(3,.01f,1,1,3));
+        query.Bind(registry.Register(new(0,identity,1,1)),box,nativeHalf:new(10,.25,.25));
+        query.Bind(registry.Register(new(1,identity,1,1)),box,nativeHalf:new(10,.25,.25));
+        query.BindBodyBounds(0,20);
+        var a=identity with {Rotation=AlsQuaternion.FromAxisAngle(NVector.UnitZ,MathF.PI/4)};
+        var b=a with {Position=new AlsDoubleVector(0,4,0).Rotate(a.Rotation)};
+        var bodies=new[]{new AlsIslandBody(identity,new(1,AlsDoubleVector.One)),new AlsIslandBody(identity,default)};
+        var previous=new[]{new AlsIslandBodyState(a,default),new AlsIslandBodyState(b,default)};
+        query.PrepareStep(previous,new AlsProjectionVelocity[2],bodies,1d/_hz);query.PrepareBounds([a,b]);
+        var trace=new AlsContactTrace(query,registry,"shape-bounds",["a","b"],()=>0,1,1,[]);
+        Require(query.AllowsPair(0,1),"Thin box fixture did not overlap whole-particle bounds.");
+        Require(!trace.AllowsPair(0,1,false)&&trace.AllowsPair(0,1,true),"Trace lost prior contact activity or OBB gating.");
+        Require(!trace.AllowsPair(1,0,false)&&trace.AllowsPair(1,0,true),"OBB bounds changed with endpoint order.");
+        query.Abort();_nativePolygonChecks+=3;
     }
 
     private void NativeMidphaseRetirementChecks()

@@ -39,11 +39,36 @@ public sealed class AlsWorldContactBoundsTests
         Gather(contacts);contacts.Abort();source.Allow=true;Step(contacts);
         Assert.Equal(1,source.Queries);Assert.Equal(1,contacts.LastRestoredPairs);
     }
+    [Fact]
+    public void PriorActivityTracksOnlyCommittedConsecutiveMatchingIdentity()
+    {
+        var (contacts,source,registry)=Create();
+        Step(contacts);Assert.False(source.LastCollision);
+        Gather(contacts);Assert.True(source.LastCollision);contacts.Abort();
+        source.Allow=false;Step(contacts);Assert.True(source.LastCollision);
+        source.Allow=true;Step(contacts);Assert.False(source.LastCollision);
+        Step(contacts);Assert.True(source.LastCollision);
+        registry.RebindBody(0);Gather(contacts);Assert.False(source.LastCollision);contacts.Abort();
+        Step(contacts);Assert.False(source.LastCollision);
+        Step(contacts);Assert.True(source.LastCollision);
+        contacts.Reset();Step(contacts);Assert.False(source.LastCollision);
+    }
     private static (AlsWorldContacts,Source,AlsContactRegistry) Create()
     {
         var registry=new AlsContactRegistry(2,2);
         registry.Register(new(0,AlsPrecisePose.Identity,1,1));registry.Register(new(1,AlsPrecisePose.Identity,1,1));
         var source=new Source();return(new(registry,source,new(0,0,0),new(1f/60,0,2000)),source,registry);
+    }
+    [Fact]
+    public void EmptyQueryAndShapeReplacementCannotCarryForwardActivity()
+    {
+        var (contacts,source,registry)=Create();Step(contacts);
+        source.Empty=true;Step(contacts);Assert.True(source.LastCollision);Assert.Equal(0,contacts.LastContactCount);
+        Step(contacts);Assert.False(source.LastCollision);
+        source.Empty=false;Step(contacts);Assert.False(source.LastCollision);
+        Step(contacts);Assert.True(source.LastCollision);
+        registry.Replace(new(0,registry.Key(0).Revision),registry.At(0));
+        Step(contacts);Assert.False(source.LastCollision);
     }
     private static void Gather(AlsWorldContacts contacts)=>contacts.Gather(
         [AlsPrecisePose.Identity with {Position=new(0,0,-.1)},AlsPrecisePose.Identity],
@@ -52,7 +77,7 @@ public sealed class AlsWorldContactBoundsTests
     private static void Step(AlsWorldContacts contacts){Gather(contacts);contacts.StageCommit();contacts.Commit();}
     private sealed class Source:IAlsContactGeometrySource
     {
-        public bool Allow=true,FailPrepare,FailPair;public int Queries,Aborts;private bool _prepared;
+        public bool Allow=true,FailPrepare,FailPair,LastCollision,Empty;public int Queries,Aborts;private bool _prepared;
         public void PrepareBounds(ReadOnlySpan<AlsPrecisePose> poses)
         {
             Assert.Equal(2,poses.Length);Assert.Equal(-.1,poses[0].Position.Z);_prepared=true;
@@ -60,9 +85,11 @@ public sealed class AlsWorldContactBoundsTests
         }
         public bool AllowsPair(int a,int b)
         {Assert.True(_prepared);if(FailPair)throw new InvalidOperationException("Injected pair failure.");return Allow;}
-        public bool TryGetManifoldSettings(int a,int b,out AlsContactManifoldSettings settings){settings=new(2,3);return true;}
+        public bool AllowsPair(int a,int b,bool collidedLastStep)
+        {LastCollision=collidedLastStep;return AllowsPair(a,b);}
+        public bool TryGetManifoldSettings(int a,int b,out AlsContactManifoldSettings settings){settings=new(2,3);return !Empty;}
         public int Query(int a,in AlsPrecisePose p,int b,in AlsPrecisePose q,Span<AlsDetectedContact> points)
-        {Queries++;points[0]=new(Vector3.Zero,Vector3.Zero,Vector3.UnitZ);return 1;}
+        {Queries++;if(Empty)return 0;points[0]=new(Vector3.Zero,Vector3.Zero,Vector3.UnitZ);return 1;}
         public void Abort(){Aborts++;_prepared=false;}
     }
 }
