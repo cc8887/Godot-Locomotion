@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Actual history批次普通Editor16452加载成功/原生退出0/DLL释放，两旧Condition failed与间歇AV未修；本批详细范围见下条。
+
+- 最新actual history：`docs/verification/2026-09-22-physics-actual-history.md`。主目录只读pending诊断补旧saved/检测点/assigned/求解后ratio，包含空活跃对；51帧573对1007点，UE独立Activate/SetSolverResults重导字节一致。.NET8/9锚点差0、410相邻发布一致，含57新点24滑动3空流形。Core相关30/Import相关10各运行时通过，Godot构建与60smoke通过，三失败采集诊断与上批一致；未重跑全量/十二矩阵，基线仍2835/2424+1skip/8of12。本批不改公式。原生资格判定和摩擦结果仍是捕获输入，非世界等价；下一步相同实际资产/初态完整UE落地休眠基线，核对四失败与岛/调度。UE全Editor审计与DataValidation通过；普通demo未切换，全部角色剩余目标保留。
+
 - Raw Gather批次最终Import Release固定JIT串行全量2424通过/1既有跳过，退出0；其他本批范围及旧失败见下条。
 
 - 最新raw Gather：`docs/verification/2026-09-22-physics-raw-gather.md`。六个失败静止帧156对369点（全已有锚点，27对共享initialPhi）捕获真实post-history/pre-Gather输入，UE独立Gather冷重导字节一致。查明.NET9 Vector3.Cross舍入；显式float叉积后.NET8/9及Godot三个频率各369点原生差0，保留旧捕获1.0662403e-6偏差。Core2835通过（并修上一批friend契约遗漏），.NET9相关8通过，Godot旧smoke全过。整链仍8/12，八成功报告均改变；普通60 M600才睡/高120 M881 A未睡/平台30两失败未关。全Editor审计与DataValidation过，普通Editor34788加载后0xC0000005/DLL释放，两旧Condition failed未修。下一步真实历史准备前/首次落地/平台低频帧间对照，普通demo未切换，全部角色总目标保留。Import全量结果见验证文档后续记录。

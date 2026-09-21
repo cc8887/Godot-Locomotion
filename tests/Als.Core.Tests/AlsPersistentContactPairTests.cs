@@ -45,6 +45,11 @@ public sealed class AlsPersistentContactPairTests
         Assert.Throws<ArgumentOutOfRangeException>(() => pair.GeometryAt(-1));
         Assert.True(raw.Settings.InitialManifold);
         var replay = AlsContactGather.Gather(geometry, raw.Body0, raw.Body1, raw.Settings);
+        Assert.Equal(2, pair.HistoryPointCount);
+        Assert.Equal(new AlsContactMatchSettings(false, false), pair.Matching);
+        Assert.Equal(new AlsContactHistoryResult(0, pair.PreparedAt(0).Geometry.InitialPhi), pair.HistoryResultAt(0));
+        Assert.Equal(replay.InitialPhi, pair.HistoryResultAt(1).InitialPhi);
+        Assert.Throws<ArgumentOutOfRangeException>(() => pair.HistoryResultAt(2));
         Assert.Equal(pair.SolverInputAt(0), replay.Point);
         Assert.Equal(pair.GatheredInitialPhiAt(0), replay.InitialPhi);
         var a = default(AlsProjectionDelta); var b = default(AlsProjectionDelta);
@@ -58,6 +63,7 @@ public sealed class AlsPersistentContactPairTests
         Assert.Equal(pair.PreparedAt(0).Geometry, pair.GeometryAt(0));
         pair.Abort();
         Assert.Throws<InvalidOperationException>(() => pair.GatherSnapshot);
+        Assert.Throws<InvalidOperationException>(() => pair.HistoryResultAt(0));
     }
 
     [Fact]

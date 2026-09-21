@@ -13,6 +13,7 @@ public sealed class AlsPersistentContactPair
     private readonly int[] _sourceIndices;
     private readonly AlsContactHistoryResult[] _results;
     private AlsContactGatherSnapshot _gatherSnapshot;
+    private AlsContactMatchSettings _matching;
     public bool Pending => _history.Pending;
     public int SolverCount => Pending ? _solver.Count : 0;
     public int SavedCount => _history.SavedCount;
@@ -28,6 +29,16 @@ public sealed class AlsPersistentContactPair
         return _geometry[index];
     }
     internal float GatheredInitialPhiAt(int index) { RequirePending(); return _solver.InitialPhiAt(index); }
+    internal int HistoryPointCount { get { RequirePending(); return _history.PreparedCount; } }
+    internal AlsContactMatchSettings Matching { get { RequirePending(); return _matching; } }
+    internal AlsContactHistoryResult HistoryResultAt(int index)
+    {
+        RequirePending();
+        var prepared = _history.PreparedAt(index);
+        for (var i = 0; i < _solver.Count; i++)
+            if (_sourceIndices[i] == index) return new(_solver.PointAt(i).StaticFrictionRatio, _solver.InitialPhiAt(i));
+        return new(0, prepared.Geometry.InitialPhi);
+    }
 
     public AlsPersistentContactPair(int capacity)
     {
@@ -58,6 +69,7 @@ public sealed class AlsPersistentContactPair
             _solver.GatherGeometry(_geometry.AsSpan(0, count), material, body0, rotation0, inverseInertia0,
                 body1, rotation1, inverseInertia1, effectiveSettings);
             _gatherSnapshot = new(body0, body1, effectiveSettings);
+            _matching = matching;
         }
         catch { _history.Abort(); throw; }
     }

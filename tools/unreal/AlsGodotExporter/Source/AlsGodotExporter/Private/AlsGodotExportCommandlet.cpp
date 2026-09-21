@@ -202,6 +202,13 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         { UE_LOG(LogAlsGodotExporter, Error, TEXT("Capsule geometry export failed: %s"), *Error); return 24; }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CAPSULE_GEOMETRY_OK assets_saved=0")); return 0;
     }
+    if (FParse::Value(*Params, TEXT("PhysicsActualHistoryOutput="), PhysicsOutput))
+    {
+        FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsActualHistoryInputs="), Inputs);
+        if (!ExportAlsPhysicsActualHistoryReference(Inputs, PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Actual history export failed: %s"), *Error); return 50; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_ACTUAL_HISTORY_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsRawGatherOutput="), PhysicsOutput))
     {
         FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsRawGatherInputs="), Inputs);

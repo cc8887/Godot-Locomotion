@@ -28,6 +28,33 @@ public sealed class AlsWorldContactsTests
         Assert.InRange(MathF.Abs(a.Velocity.Linear.X - b.Velocity.Linear.X), 0, 1e-5f);
     }
     [Fact]
+    public void HistoryDiagnosticsIncludeTheInactiveFrameThatClearsSavedAnchors()
+    {
+        var (_, _, contacts, _) = Create();
+        var poses = new[] { Identity, Identity with { Position = new(1.8, 0, 0) }, Identity with { Position = new(10, 0, 0) } };
+        var velocities = new AlsProjectionVelocity[3];
+        var bodies = Enumerable.Repeat(new AlsIslandBody(Identity, new(1, AlsDoubleVector.One)), 3).ToArray();
+        Assert.Throws<InvalidOperationException>(() => contacts.HistoryPairCount);
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(3, contacts.HistoryPairCount); Assert.Equal(1, contacts.PreparedPairCount);
+        Assert.Equal(1, contacts.HistoryPointCountAt(0)); Assert.Equal(0, contacts.HistorySavedCountAt(0));
+        var key = contacts.HistoryKeyAt(0); contacts.StageCommit(); contacts.Commit();
+        Assert.Throws<InvalidOperationException>(() => contacts.HistorySavedAt(0, 0));
+        poses[1] = Identity with { Position = new(20, 0, 0) };
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(0, contacts.PreparedPairCount); Assert.Equal(3, contacts.HistoryPairCount);
+        Assert.Equal(key, contacts.HistoryKeyAt(0)); Assert.Equal(0, contacts.HistoryPointCountAt(0));
+        Assert.Equal(1, contacts.HistorySavedCountAt(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => contacts.HistoryKeyAt(3));
+        contacts.Abort();
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(1, contacts.HistorySavedCountAt(0)); contacts.StageCommit(); contacts.Commit();
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(0, contacts.HistorySavedCountAt(0));
+        Assert.True(contacts.HistoryGatherAt(0).Settings.InitialManifold); contacts.Abort();
+    }
+
+    [Fact]
     public void QueryFailureRollsBackEarlierPairsAndUnlocksRegistry()
     {
         var (island, registry, contacts, source) = Create(); var control = Create(); source.ThrowOnSecond = true;
