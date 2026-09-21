@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 原始凸包组合批次最终全量：Core串行2784通过，Import串行2389通过/1既有跳过，均退出0。普通Editor本次退出0，两旧Condition failed与既往间歇退出AV未解决；范围见下条。
+
+- 最新原始凸包组合：`docs/verification/2026-09-21-physics-convex-pair.md`。Core新增unscaled原生候选面/fallback，RawConvexManifold串联GJK/EPA、cull、第二侧.002f偏置、边接触与面裁剪，整阶段暂存缓存/输出。1296真实两脚有序组合的原生UpdateConstraint初次流形全部对齐：853空/87边/94第一侧参考/262第二侧参考，点/法向差0，重算Phi最大1.1971e-6cm；重导一致。首轮错误ConvexConvex枚举触发原生ensure空输出，改GenericConvexConvex完整重建后通过，失败产物保留。Core2784、Godot构建、UE全目标审计/DataValidation通过。仅未包装零margin凸包冷初次流形，scaled/box/非零margin边投影/持久owner未接；未改运行时、未重跑整链，最新9/12。继续这些适配/分离cull/三旧失败，再普通Ragdoll等完整目标。
+
 - 顶点邻接批次最终全量：Core串行2780通过，Import串行2388通过/1既有跳过，均退出0；普通Editor失败边界见下条。
 
 - 顶点邻接批次普通Editor：exporter加载标记成功后退出0xC0000005，两旧Condition failed保留。旧间歇退出异常未修复，本批普通重启门禁失败；具体见下条文档。
