@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新有效过滤：`docs/verification/2026-09-22-physics-simulation-filters.md`。原生前3帧无root→foot_r：root simulation/query启用但BlockChannels=0。独立64位channel/block绑定runtimeShapes哈希和形状身份；保留Godot路由/禁碰，环境按WorldStatic/BlockAll，query mask不用于simulation NarrowFilter。AnimMan第2步V差105.352降4.8377e-5cm/s；连续20步已定位下一分歧：A前14步<.000345，第15步foot_l 21.70255；M第18步.000306，第19步lowerarm_r15.21846。Core2839/Import2439+1skip，最终Core2及Import9默认/roll-forward过，优化构建/三频率smoke/60场景过。矩阵仍9/12（普通及平台30休眠失败），普通30A204睡、M未睡。原生冷重导一致/全Editor审计/DataValidation过；Editor30704退出0/DLL释放，两旧Condition及间歇AV未修。下一步扩展A15/M19原生完整接触窗口而非重复早期测试，再三失败及普通Ragdoll/Get-up等全部目标；普通demo未接。工作继续主目录main，保留用户P4规划修改。
+
 - 最新sphere-convex：`docs/verification/2026-09-22-physics-sphere-convex.md`。Core原生GJKDistance点核/深接触平面回退/大球最多4补点；凸包质心+bounds原生导出严格有序顶点绑定，scaled属性验证，Godot正反序接入替换Jolt。3240记录=1080独立几何各3重复，点/法向/Phi0差、冷重导一致，float球心加法舍入修正。Core2837/Import2431+1skip、优化构建/三频率旧smoke通过，矩阵仍9/12（普通/平台30失败）。重要：AnimMan第2步V差仍105.352cm/s，第1步从.000153增至.021499；缺口补齐但未解突变，不宣称唯一原因。下一步原生完整world第1–3步实际接触对/点/禁用状态，核过滤/历史/激活，不再仅同Gather输入比较。UE全Editor审计/DataValidation过，Editor7208本次退出0/DLL释放，两旧Condition和间歇AV未修。普通demo未接，完整角色总目标保留。
 
 - 最新首步分歧：`docs/verification/2026-09-22-physics-first-divergence.md`。新增只读saved world/coupled速度比较工具，22步两次报告字节一致。AnimMan第1步V差.000153cm/s、第2步foot_r突增105.3558cm/s/W4.76537；Mannequin采样至17步仍V差<.000533。Core第2步root→foot_r是sphere-convex，该组合仍走Jolt回退！下一步优先移植UE SphereConvexContactPoint/GJKDistance及大球补点，真实第2步输入+扫描原生对照后接运行时/矩阵；不能直接用零长capsule/GJKPenetration替代，也尚不能断言为唯一原因。未改生产/UE/测试程序集、无全量或矩阵新声明，仍9/12，普通demo及全部角色总目标保留。

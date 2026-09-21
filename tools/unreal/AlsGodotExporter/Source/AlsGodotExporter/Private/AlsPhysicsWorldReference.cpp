@@ -27,10 +27,11 @@ Chaos::FVec3 ReadV(const TSharedPtr<FJsonObject>& J,const TCHAR* Name);
 Chaos::FRigidTransform3 ReadT(const TSharedPtr<FJsonObject>& J);
 }
 
-bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,FString& Error)
+bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,FString& Error,int32 ContactFrames)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;using namespace AlsCoupledStepReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
+    if(ContactFrames<0||ContactFrames>10)return Fail(TEXT("Contact diagnostics must cover 0..10 initial frames."));
     if(FPaths::IsRelative(Inputs)||!IFileManager::Get().DirectoryExists(*Inputs)||Output.IsEmpty()||FPaths::IsRelative(Output)||IFileManager::Get().FileExists(*Output))
         return Fail(TEXT("World reference needs a capture directory and new absolute output."));
     const auto* Sleep=IConsoleManager::Get().FindConsoleVariable(TEXT("p.Chaos.Solver.Sleep.Enabled"));
@@ -125,11 +126,66 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                     State->SetArrayField(TEXT("conditionedInverseInertia"),V(FVector(Particle->ConditionedInvI())));
                     const auto* Island=Solver->GetEvolution()->GetIslandManager().GetParticleIsland(Particle);
                     State->SetNumberField(TEXT("islandSleepCounter"),Island?Island->GetSleepCounter():-1);
+                    if(Frame<=ContactFrames)
+                    {
+                        State->SetNumberField(TEXT("objectState"),static_cast<int32>(Particle->ObjectState()));
+                        State->SetArrayField(TEXT("inflatedBoundsMin"),V(Particle->WorldSpaceInflatedBounds().Min()));
+                        State->SetArrayField(TEXT("inflatedBoundsMax"),V(Particle->WorldSpaceInflatedBounds().Max()));
+                        TArray<TSharedPtr<FJsonValue>> Shapes;
+                        for(const auto& Shape:Particle->ShapesArray())
+                        {
+                            auto S=MakeShared<FJsonObject>();S->SetBoolField(TEXT("simulation"),Shape->GetSimEnabled());
+                            S->SetBoolField(TEXT("query"),Shape->GetQueryEnabled());
+                            S->SetStringField(TEXT("filter"),Shape->GetCombinedShapeFilterData().GetShapeFilterData().ToString());
+                            const auto& Filter=Shape->GetCombinedShapeFilterData().GetShapeFilterData();
+                            S->SetNumberField(TEXT("channel"),Filter.GetCollisionChannelIndex());
+                            S->SetStringField(TEXT("blockChannels"),FString::Printf(TEXT("%016llX"),Filter.GetBlockChannels()));
+                            S->SetStringField(TEXT("overlapChannels"),FString::Printf(TEXT("%016llX"),Filter.GetOverlapChannels()));
+                            S->SetNumberField(TEXT("maskFilter"),Filter.GetMaskFilter());
+                            Shapes.Add(MakeShared<FJsonValueObject>(S));
+                        }
+                        State->SetArrayField(TEXT("shapeFilters"),Shapes);
+                    }
                 }
                 States.Add(MakeShared<FJsonValueObject>(State));
             }
             if(Frame>0&&Awake==0){if(AllSleepFrame==INDEX_NONE)AllSleepFrame=Frame;Held++;}else if(Frame>0){AllSleepFrame=INDEX_NONE;Held=0;}
             Sample->SetNumberField(TEXT("awakeBodies"),Awake);
+            if(Frame>0&&Frame<=ContactFrames)
+            {
+                const auto BodyName=[&](const FGeometryParticleHandle* Particle)->FString
+                {
+                    for(int32 I=0;I<Bodies.Num();++I)if(Bodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
+                        return BodyInputs[I]->AsObject()->GetStringField(TEXT("name"));
+                    for(int32 I=0;I<EnvironmentBodies.Num();++I)if(EnvironmentBodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
+                        return FString::Printf(TEXT("environment_%d"),I);
+                    return TEXT("unknown");
+                };
+                TArray<TSharedPtr<FJsonValue>> Contacts;
+                for(const auto* C:Solver->GetEvolution()->GetCollisionConstraints().GetConstraints())
+                {
+                    auto R=MakeShared<FJsonObject>();const auto A=BodyName(C->GetParticle0()),B=BodyName(C->GetParticle1());
+                    if(A==TEXT("unknown")||B==TEXT("unknown"))return Fail(TEXT("Unmapped native contact particle."));
+                    R->SetStringField(TEXT("body0"),A);R->SetStringField(TEXT("body1"),B);
+                    R->SetBoolField(TEXT("disabled"),C->GetDisabled());R->SetBoolField(TEXT("probe"),C->GetIsProbe());
+                    R->SetNumberField(TEXT("shapeType"),static_cast<int32>(C->GetShapesType()));
+                    R->SetNumberField(TEXT("cull"),C->GetCullDistance());
+                    TArray<TSharedPtr<FJsonValue>> Points;
+                    for(int32 I=0;I<C->NumManifoldPoints();++I)
+                    {
+                        const auto& M=C->GetManifoldPoint(I);const auto& P=M.ContactPoint;const auto& Result=C->GetManifoldPointResult(I);
+                        auto J=MakeShared<FJsonObject>();J->SetArrayField(TEXT("point0"),V(FVec3(P.ShapeContactPoints[0])));
+                        J->SetArrayField(TEXT("point1"),V(FVec3(P.ShapeContactPoints[1])));J->SetArrayField(TEXT("normal1"),V(FVec3(P.ShapeContactNormal)));
+                        J->SetNumberField(TEXT("phi"),P.Phi);J->SetNumberField(TEXT("initialPhi"),M.InitialPhi);
+                        J->SetBoolField(TEXT("disabled"),M.Flags.bDisabled);J->SetBoolField(TEXT("active"),C->IsManifoldPointActive(I));
+                        J->SetBoolField(TEXT("resultValid"),Result.bIsValid);
+                        J->SetArrayField(TEXT("pushOut"),V(FVec3(Result.NetPushOut)));J->SetArrayField(TEXT("impulse"),V(FVec3(Result.NetImpulse)));
+                        Points.Add(MakeShared<FJsonValueObject>(J));
+                    }
+                    R->SetArrayField(TEXT("points"),Points);Contacts.Add(MakeShared<FJsonValueObject>(R));
+                }
+                Sample->SetArrayField(TEXT("contactsAfterSolve"),Contacts);
+            }
             Sample->SetNumberField(TEXT("contactPairs"),Solver->GetEvolution()->GetCollisionConstraints().NumConstraints());
             Sample->SetNumberField(TEXT("linearJoints"),Solver->GetEvolution()->GetJointCombinedConstraints().LinearConstraints.NumConstraints());
             Sample->SetNumberField(TEXT("nonlinearJoints"),Solver->GetEvolution()->GetJointCombinedConstraints().NonLinearConstraints.NumConstraints());

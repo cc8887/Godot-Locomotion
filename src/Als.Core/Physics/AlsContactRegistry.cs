@@ -4,7 +4,7 @@ namespace GodotAls.Core.Physics;
 
 public readonly record struct AlsContactShapeHandle(int Slot, uint Revision);
 public readonly record struct AlsRegisteredContactShape(int Body, AlsPrecisePose ActorLocal,
-    uint Layer, uint Mask, bool Quadratic = false, bool Enabled = true);
+    uint Layer, uint Mask, bool Quadratic = false, bool Enabled = true, AlsSimulationFilter? SimulationFilter = null);
 
 // Stable slots for one fixed body topology. Shape mutation invalidates handles;
 // body reuse explicitly advances its generation. Mutations are forbidden during
@@ -52,7 +52,8 @@ public sealed class AlsContactRegistry
         if (!Present(a) || !Present(b)) return false;
         var x = _shapes[a]; var y = _shapes[b];
         return x.Body != y.Body && x.Enabled && y.Enabled && !_disabledPairs[x.Body * BodyCount + y.Body] &&
-            (x.Layer & y.Mask) != 0 && (y.Layer & x.Mask) != 0;
+            (x.Layer & y.Mask) != 0 && (y.Layer & x.Mask) != 0 &&
+            (x.SimulationFilter ?? AlsSimulationFilter.Unrestricted).Allows(y.SimulationFilter ?? AlsSimulationFilter.Unrestricted);
     }
     internal void Enter() { Mutable(); _locked = true; }
     internal void Leave() => _locked = false;

@@ -26,6 +26,10 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
             Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_primitive_geometry.json"),
             Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"), definition.Mesh)
             .ToDictionary(s => (s.Body, s.Shape));
+        var filters = AlsSimulationFilterCompiler.Compile(
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_simulation_filters.json"),
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"),
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), definition.Mesh);
         foreach (var body in definition.Bodies)
         {
             if (body.Defaults.GetProperty("collisionEnabled").GetString() != "QueryAndPhysics")
@@ -42,7 +46,9 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
                 // transform. Only the actual runtime leaf wrapper is applied.
                 var shape = Create(source, topology, observed, primitive); _resources.Add(shape); shape.Margin = 0;
                 var local = AlsCachedJointSettingsCompiler.RigidConnector(observed.LeafLocal);
-                var handle = registry.Register(new(body.Index, local, 1, 1, source.Type is "sphere" or "capsule", source.CollisionEnabled != 0));
+                var filter = filters[(body.Index, shapeIndex)];
+                var handle = registry.Register(new(body.Index, local, 1, 1, source.Type is "sphere" or "capsule",
+                    filter.Simulation, filter.Filter));
                 query.Bind(handle, shape,topology,source.Type=="box"?primitive!.Value.BoxHalf:null,
                     source.Type=="convex"?observed.Scale:null,source.Type is "box" or "convex"?observed.MarginCm:0,
                     nativeCapsule:primitive?.Capsule, proxyLocal:primitive?.ProxyLocal,
@@ -55,7 +61,7 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
     internal void BindFloor(int body, AlsContactRegistry registry, AlsGodotContactQuery query)
     {
         var floor = new BoxShape3D { Size = new(40, 1, 40), Margin = 0 }; _resources.Add(floor);
-        query.Bind(registry.Register(new(body, AlsPrecisePose.Identity, 1, 1)), floor,nativeHalf:new(2000,2000,50));
+        query.Bind(registry.Register(new(body, AlsPrecisePose.Identity, 1, 1, SimulationFilter: AlsSimulationFilter.WorldStatic)), floor,nativeHalf:new(2000,2000,50));
     }
     // Optional observation preserves explicitly authored synthetic diagnostic
     // shapes. Production asset Bind always supplies the native observation.

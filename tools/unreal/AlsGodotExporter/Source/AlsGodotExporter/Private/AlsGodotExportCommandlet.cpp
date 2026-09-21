@@ -205,7 +205,8 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
     if (FParse::Value(*Params, TEXT("PhysicsWorldOutput="), PhysicsOutput))
     {
         FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsWorldInputs="), Inputs);
-        if (!ExportAlsPhysicsWorldReference(Inputs, PhysicsOutput, Error))
+        int32 ContactFrames=0; FParse::Value(*Params, TEXT("PhysicsWorldContactFrames="), ContactFrames);
+        if (!ExportAlsPhysicsWorldReference(Inputs, PhysicsOutput, Error, ContactFrames))
         { UE_LOG(LogAlsGodotExporter, Error, TEXT("World reference export failed: %s"), *Error); return 51; }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_WORLD_OK assets_saved=0")); return 0;
     }
