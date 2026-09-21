@@ -20,9 +20,15 @@ public sealed class AlsCachedContactManifold
     }
     public void Gather(ReadOnlySpan<AlsContactPointInput> points, in AlsContactMaterial material,
         AlsQuaternion rotation0, AlsJointInverseMass mass0, AlsQuaternion rotation1, AlsJointInverseMass mass1)
+        => GatherRows(points, material, rotation0, mass0, rotation1, mass1, false);
+
+    // Reference replay of rows already produced by native-style Gather must
+    // retain its float cancellation residue. Public authored rows remain strict.
+    internal void GatherRows(ReadOnlySpan<AlsContactPointInput> points, in AlsContactMaterial material,
+        AlsQuaternion rotation0, AlsJointInverseMass mass0, AlsQuaternion rotation1, AlsJointInverseMass mass1, bool fromNativeGather)
     {
         if (points.Length > _points.Length) throw new ArgumentException("Contact manifold capacity exceeded.");
-        for (var i = 0; i < points.Length; i++) { _scratch[i] = new(points[i], material, rotation0, mass0, rotation1, mass1); _scratchPhi[i] = 0; }
+        for (var i = 0; i < points.Length; i++) { _scratch[i] = new(points[i], material, rotation0, mass0, rotation1, mass1, fromNativeGather); _scratchPhi[i] = 0; }
         (_points, _scratch) = (_scratch, _points); Count = points.Length;
         (_initialPhi, _scratchPhi) = (_scratchPhi, _initialPhi);
     }

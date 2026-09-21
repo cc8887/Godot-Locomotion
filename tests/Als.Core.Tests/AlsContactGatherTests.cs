@@ -27,6 +27,17 @@ public sealed class AlsContactGatherTests
         var a = new AlsProjectionDelta(); var b = new AlsProjectionDelta();
         manifold.SolvePosition(ref a, ref b, true);
         Assert.True(new AlsDoubleVector(manifold.PointAt(0).PushOut).IsFinite);
+        var replay = new AlsCachedContactManifold(2);
+        var mass = new AlsJointInverseMass(1, AlsDoubleVector.One);
+        replay.GatherRows([point], new(.7f, .7f, .7f), AlsQuaternion.Identity, mass, AlsQuaternion.Identity, mass, true);
+        Assert.Equal(point, replay.PointAt(0).Input);
+        var replayA = new AlsProjectionDelta(); var replayB = new AlsProjectionDelta();
+        replay.SolvePosition(ref replayA, ref replayB, true);
+        Assert.Equal(a, replayA); Assert.Equal(b, replayB);
+        Assert.Throws<ArgumentException>(() => replay.Gather([point], new(.7f, .7f, .7f), AlsQuaternion.Identity, mass, AlsQuaternion.Identity, mass));
+        Assert.Throws<ArgumentException>(() => replay.GatherRows([point, point with { TargetVelocity = float.NaN }],
+            new(.7f, .7f, .7f), AlsQuaternion.Identity, mass, AlsQuaternion.Identity, mass, true));
+        Assert.Equal(1, replay.Count); Assert.Equal(point, replay.PointAt(0).Input);
         // Direct row callers retain the explicit orthonormal-basis contract.
         Assert.Throws<ArgumentException>(() => new AlsCachedContactPoint(point, new(.7f, .7f, .7f),
             AlsQuaternion.Identity, new(1, AlsDoubleVector.One), AlsQuaternion.Identity, new(1, AlsDoubleVector.One)));

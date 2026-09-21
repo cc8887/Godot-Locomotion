@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Resting coupled批次Editor9288加载标记后原生退出0/DLL释放；两旧Condition failed和间歇AV未修。完整Editor审计与本批对照范围见下条。
+
+- 最新resting coupled：`docs/verification/2026-09-22-physics-resting-coupled.md`。捕获高120 AnimMan1140–1142/普通60 Mannequin540–542六帧144共同阶段，原生冷重导一致。.NET8/9四套coupled各4通过；新实测.NET9/Godot最大DP1.1452e-7cm、V4.1587e-6cm/s、W5.1555e-7rad/s，非逐位相等。测试原先错误用严格手工行接口拒绝已Gather的NdotU残差，现内部GatherRows配合Import.Tests friend保留生产语义；公共Gather仍严格，测试验证失败不发布。Core相关87、优化构建、60Hz完整smoke通过；未重跑全量/矩阵，基线仍Core2834/Import2422+1skip/8of12。两失败采集诊断与上批一致，四失败未关。下一步补Gather前几何/锚点/initialPhi/shape姿态/速度快照，让UE重新Gather；本批对照不证明历史/Gather正确。普通demo未切换。
+
 - Native mixed批次最终Import串行2422通过/1既有跳过；普通Editor28076加载后0xC0000005退出/DLL释放，两旧Condition failed与间歇AV未修，普通重启门禁失败。其余覆盖见下条。
 
 - 最新native mixed trace与运行时修复：`docs/verification/2026-09-22-physics-native-capsule-mixed.md`。旧高120失败246capsule pair（30活跃36点）+114capsule-convex（全无点）原生重放，实际dynamic/凸包fingerprint-scale-margin严格匹配。查明Godot宿主.NET9.0.17与默认测试.NET8的Vector3.Cross差异；胶囊内显式float叉积后Core原生差0，保留修复前source偏差证据。三个频率Godot内各246实际输入精确回放，旧smoke全过；.NET9定向4及ReferenceTests41通过，Core2834。整链仍8/12，八成功报告都有数值变化，普通60 M595睡太迟/高120 A未睡 M869/平移30/旋转30失败未关。后续核对其他Gather/contact/linear浮点叉积与历史，再完整角色目标。普通demo未接。
