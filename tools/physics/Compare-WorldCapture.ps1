@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$WorldReference,
-    [Parameter(Mandatory=$true)][string]$CoupledReference,
+    [Parameter(Mandatory=$true,ParameterSetName='Coupled')][string]$CoupledReference,
+    [Parameter(Mandatory=$true,ParameterSetName='Captures')][string]$CaptureDirectory,
     [Parameter(Mandatory=$true)][string]$Report
 )
 $ErrorActionPreference='Stop'
@@ -8,14 +9,24 @@ if(-not [IO.Path]::IsPathFullyQualified($Report) -or (Test-Path -LiteralPath $Re
     throw 'Report must be a new absolute file.'
 }
 $world=[System.Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText((Resolve-Path -LiteralPath $WorldReference)))
-$coupled=[System.Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText((Resolve-Path -LiteralPath $CoupledReference)))
+$coupled=$null
+$captureDocuments=[Collections.Generic.List[System.Text.Json.JsonDocument]]::new()
 try {
+    if($PSCmdlet.ParameterSetName -eq 'Coupled') {
+        $coupled=[System.Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText((Resolve-Path -LiteralPath $CoupledReference)))
+        $captures=@($coupled.RootElement.GetProperty('cases').EnumerateArray() | ForEach-Object { $_.GetProperty('capture') })
+    } else {
+        $captureFiles=@(Get-ChildItem -LiteralPath $CaptureDirectory -File -Filter '*.json' | Sort-Object Name)
+        if($captureFiles.Count -eq 0) { throw 'Capture directory is empty.' }
+        foreach($file in $captureFiles) { $captureDocuments.Add([System.Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText($file.FullName))) }
+        $captures=@($captureDocuments | ForEach-Object { $_.RootElement })
+    }
     $rows=@()
     foreach($case in $world.RootElement.GetProperty('cases').EnumerateArray()) {
         $setup=$case.GetProperty('setup');$mesh=$setup.GetProperty('mesh').GetString()
         $hz=$setup.GetProperty('hz').GetInt32();$seen=[Collections.Generic.HashSet[int]]::new()
-        foreach($fixture in $coupled.RootElement.GetProperty('cases').EnumerateArray()) {
-            $capture=$fixture.GetProperty('capture');$input=$capture.GetProperty('input')
+        foreach($capture in $captures) {
+            $input=$capture.GetProperty('input')
             if($input.GetProperty('mesh').GetString() -ne $mesh) { continue }
             if([Math]::Abs($input.GetProperty('dt').GetDouble()-1.0/$hz) -gt 1e-12) { continue }
             $frame=$input.GetProperty('frame').GetInt32()
@@ -44,11 +55,12 @@ try {
         if($seen.Count -eq 0) { throw "No matching captures for $mesh/$hz." }
     }
     $result=[ordered]@{schemaVersion=1;observation='Saved world velocity differences, no trajectory parity asserted. Caller must supply matching initial conditions.';
-        worldSha256=(Get-FileHash -LiteralPath $WorldReference).Hash;coupledSha256=(Get-FileHash -LiteralPath $CoupledReference).Hash;
+        worldSha256=(Get-FileHash -LiteralPath $WorldReference).Hash;coupledSha256=$(if($coupled){(Get-FileHash -LiteralPath $CoupledReference).Hash}else{$null});
         samples=@($rows | Sort-Object mesh,completedStep)}
+    if(-not $coupled) { $result.captureSources=@($captureFiles | ForEach-Object { [ordered]@{file=$_.Name;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash} }) }
     $stream=[IO.File]::Open($Report,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write)
     try { $bytes=[Text.UTF8Encoding]::new($false).GetBytes(($result | ConvertTo-Json -Depth 8));$stream.Write($bytes,0,$bytes.Length) }
     finally { $stream.Dispose() }
     Write-Output "Compared $($rows.Count) saved steps; report=$Report"
 }
-finally { $world.Dispose();$coupled.Dispose() }
+finally { $world.Dispose();if($coupled){$coupled.Dispose()};foreach($document in $captureDocuments){$document.Dispose()} }

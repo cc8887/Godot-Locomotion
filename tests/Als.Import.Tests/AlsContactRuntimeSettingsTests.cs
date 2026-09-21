@@ -18,7 +18,7 @@ public sealed class AlsContactRuntimeSettingsTests
             var settings = AlsContactRuntimeSettingsCompiler.Compile(json, definition);
             Assert.Equal(1000, settings.MaxPushOutVelocity); Assert.Equal(1000, settings.RestitutionThreshold);
             Assert.True(settings.EnableInitialDepenetration);
-            Assert.All(settings.BodyOverlapVelocities, value => Assert.Equal(-1, value)); count += settings.BodyOverlapVelocities.Length;
+            Assert.All(settings.BodyOverlapVelocities, value => Assert.Equal(1e10f, value)); count += settings.BodyOverlapVelocities.Length;
             var changed = JsonNode.Parse(json)!; changed["solver"]!["splitImpulse"] = true;
             Assert.Throws<InvalidDataException>(() => AlsContactRuntimeSettingsCompiler.Compile(changed.ToJsonString(), definition));
             Assert.Throws<InvalidDataException>(() => AlsContactRuntimeSettingsCompiler.Compile(json, definition with { PhysicsAsset = "/Wrong" }));
