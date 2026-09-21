@@ -20,6 +20,10 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
             Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"),
             Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), definition.Mesh)
             .ToDictionary(s => (s.Body, s.Shape));
+        var primitives = AlsPrimitiveGeometryCompiler.Compile(
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_primitive_geometry.json"),
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"), definition.Mesh)
+            .ToDictionary(s => (s.Body, s.Shape));
         foreach (var body in definition.Bodies)
         {
             if (body.Defaults.GetProperty("collisionEnabled").GetString() != "QueryAndPhysics")
@@ -31,14 +35,16 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
                     throw new NotSupportedException("Asset contact mode/rest offset is not supported.");
                 cooked.TryGetValue((body.Index, shapeIndex), out var topology);
                 var observed = runtime[(body.Index, shapeIndex)];
+                var primitive = primitives.TryGetValue((body.Index, shapeIndex), out var value) ? (AlsPrimitiveGeometry?)value : null;
                 // Cooked convex vertices already bake FKConvexElem's local
                 // transform. Only the actual runtime leaf wrapper is applied.
-                var shape = Create(source, topology, observed); _resources.Add(shape); shape.Margin = 0;
-                var local = AlsCachedJointSettingsCompiler.RigidConnector(source.Type == "convex"
-                    ? observed.LeafLocal : source.Local);
+                var shape = Create(source, topology, observed, primitive); _resources.Add(shape); shape.Margin = 0;
+                var local = AlsCachedJointSettingsCompiler.RigidConnector(observed.LeafLocal);
                 var handle = registry.Register(new(body.Index, local, 1, 1, source.Type is "sphere" or "capsule", source.CollisionEnabled != 0));
-                query.Bind(handle, shape,topology,source.Type=="box"?source.SizeCm*.5:null,
-                    source.Type=="convex"?observed.Scale:null,source.Type is "box" or "convex"?observed.MarginCm:0);
+                query.Bind(handle, shape,topology,source.Type=="box"?primitive!.Value.BoxHalf:null,
+                    source.Type=="convex"?observed.Scale:null,source.Type is "box" or "convex"?observed.MarginCm:0,
+                    nativeCapsule:primitive?.Capsule, proxyLocal:primitive?.ProxyLocal,
+                    nativeSphereRadius:source.Type=="sphere"?primitive!.Value.Radius:null);
             }
         }
         foreach (var (a, b) in definition.DisabledCollisions) registry.DisableBodyPair(a, b, true);
@@ -51,17 +57,19 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
     // Optional observation preserves explicitly authored synthetic diagnostic
     // shapes. Production asset Bind always supplies the native observation.
     internal static Shape3D Create(AlsPhysicsShape source, AlsConvexTopology? topology = null,
-        AlsRuntimeShape? observed = null) => source.Type switch
+        AlsRuntimeShape? observed = null, AlsPrimitiveGeometry? primitive = null) => source.Type switch
     {
-        "sphere" => new SphereShape3D { Radius = (float)(source.RadiusCm * .01) },
-        "box" => new BoxShape3D { Size = new((float)(source.SizeCm.Y * .01), (float)(source.SizeCm.Z * .01), (float)(source.SizeCm.X * .01)) },
+        "sphere" => new SphereShape3D { Radius = (float)((primitive?.Radius ?? source.RadiusCm) * .01) },
+        "box" => Box(primitive.HasValue ? primitive.Value.BoxHalf * 2 : source.SizeCm),
         // Native local Z maps directly to Godot local Y; no extra 90° rotation.
-        "capsule" => new CapsuleShape3D { Radius = (float)(source.RadiusCm * .01), Height = (float)((source.CylinderLengthCm + 2 * source.RadiusCm) * .01) },
+        "capsule" => new CapsuleShape3D { Radius = (float)((primitive?.Radius ?? source.RadiusCm) * .01),
+            Height = (float)(((primitive?.Capsule?.Height ?? source.CylinderLengthCm) + 2 * (primitive?.Radius ?? source.RadiusCm)) * .01) },
         "convex" => CreateConvex(observed.HasValue
             ? source with { Local = observed.Value.LeafLocal with { Scale = observed.Value.Scale } } : source,
             topology ?? throw new InvalidDataException("Cooked convex topology is required.")),
         _ => throw new NotSupportedException("Unmapped contact shape: " + source.Type)
     };
+    private static BoxShape3D Box(AlsDoubleVector size) => new() { Size = new((float)(size.Y * .01), (float)(size.Z * .01), (float)(size.X * .01)) };
     private static ConvexPolygonShape3D CreateConvex(AlsPhysicsShape source, AlsConvexTopology topology)
     {
         if (topology.Margin != 0) throw new NotSupportedException("Nonzero native convex margin needs explicit transport.");

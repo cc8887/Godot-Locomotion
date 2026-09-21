@@ -2,6 +2,9 @@
 #include "AlsAnimationGraphLibrary.h"
 #include "Chaos/ImplicitObjectScaled.h"
 #include "Chaos/ShapeInstance.h"
+#include "Chaos/Sphere.h"
+#include "Chaos/Capsule.h"
+#include "Chaos/Box.h"
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
@@ -49,7 +52,7 @@ TSharedRef<FJsonObject> Shape(const FKShapeElem& Element, const TCHAR* Type)
 }
 }
 
-bool ExportAlsPhysicsAssets(const FString& Output, FString& Error, bool ObserveRuntimeShapes)
+bool ExportAlsPhysicsAssets(const FString& Output, FString& Error, bool ObserveRuntimeShapes, bool ObservePrimitives)
 {
     using namespace AlsPhysicsExport;
     const auto Fail = [&](const FString& Message) { Error = Message; return false; };
@@ -71,6 +74,8 @@ bool ExportAlsPhysicsAssets(const FString& Output, FString& Error, bool ObserveR
     Root->SetStringField(TEXT("engine"), FEngineVersion::Current().ToString());
     Root->SetStringField(TEXT("coordinates"), TEXT("UE mesh-local, centimeters, kilograms, degrees; inertia kg*cm^2"));
     Root->SetStringField(TEXT("massObservation"), TEXT("Reference pose, identity component transform, native FBodyInstance after physics creation, no simulation tick"));
+    if (ObservePrimitives)
+        Root->SetStringField(TEXT("primitiveObservation"), TEXT("Actual unwrapped sphere center/radius, capsule endpoints/axis/height/radius and box bounds in leaf-local space; no inferred authored dimensions or simulation tick"));
     if (ObserveRuntimeShapes)
         Root->SetStringField(TEXT("shapeObservation"), TEXT("External game-thread particle shapes after physics creation; leaf wrapper and margin observed, authored index matched by shape user-data identity; no simulation tick"));
     const FString CharacterPath = TEXT("/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_AnimMan_CharacterBP.ALS_AnimMan_CharacterBP_C");
@@ -209,6 +214,31 @@ bool ExportAlsPhysicsAssets(const FString& Output, FString& Error, bool ObserveR
                     {
                         J->SetStringField(TEXT("innerType"), Inner->GetTypeName().ToString());
                         J->SetNumberField(TEXT("innerMarginCm"), Inner->GetMarginf());
+                    }
+                    if (ObservePrimitives && !Inner)
+                    {
+                        auto P = MakeShared<FJsonObject>();
+                        if (const auto* Sphere = Leaf->GetObject<Chaos::FSphere>())
+                        {
+                            P->SetArrayField(TEXT("center"), V(FVector(Sphere->GetCenterf())));
+                            P->SetNumberField(TEXT("radius"), Sphere->GetRadiusf());
+                        }
+                        else if (const auto* Capsule = Leaf->GetObject<Chaos::FCapsule>())
+                        {
+                            P->SetArrayField(TEXT("center"), V(FVector(Capsule->GetCenterf())));
+                            P->SetArrayField(TEXT("endpoint0"), V(FVector(Capsule->GetX1f())));
+                            P->SetArrayField(TEXT("endpoint1"), V(FVector(Capsule->GetX2f())));
+                            P->SetArrayField(TEXT("axis"), V(FVector(Capsule->GetAxis())));
+                            P->SetNumberField(TEXT("height"), Capsule->GetHeightf());
+                            P->SetNumberField(TEXT("radius"), Capsule->GetRadiusf());
+                        }
+                        else if (const auto* Box = Leaf->GetObject<Chaos::FImplicitBox3>())
+                        {
+                            P->SetArrayField(TEXT("min"), V(FVector(Box->Min())));
+                            P->SetArrayField(TEXT("max"), V(FVector(Box->Max())));
+                        }
+                        else return Fail(TEXT("Unsupported unwrapped primitive."));
+                        J->SetObjectField(TEXT("primitiveGeometry"), P);
                     }
                     Observations.Add(MakeShared<FJsonValueObject>(J));
                 }
