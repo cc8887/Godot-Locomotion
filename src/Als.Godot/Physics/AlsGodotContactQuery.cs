@@ -65,6 +65,13 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
     }
+    public bool TryGetManifoldSettings(int shape0, int shape1, out AlsContactManifoldSettings settings)
+    {
+        Check(); var a = BindingAt(shape0); var b = BindingAt(shape1); settings = default;
+        if (a.Shape is not (BoxShape3D or ConvexPolygonShape3D) || b.Shape is not (BoxShape3D or ConvexPolygonShape3D)) return false;
+        static float Size(Aabb bounds) => (float)(100d * Math.Max(bounds.Size.X, Math.Max(bounds.Size.Y, bounds.Size.Z)));
+        settings = new(.1f * Math.Min(Size(a.Bounds), Size(b.Bounds)), 0); return true;
+    }
     public int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check();

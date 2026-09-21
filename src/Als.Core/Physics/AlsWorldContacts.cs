@@ -5,6 +5,10 @@ namespace GodotAls.Core.Physics;
 public interface IAlsContactGeometrySource
 {
     bool IsInvalidated => false;
+    // Opt-in for polygonal pairs only. The provider supplies the native size-
+    // based tolerance and its actual discovery/culling distance in cm.
+    bool TryGetManifoldSettings(int shape0, int shape1, out AlsContactManifoldSettings settings)
+    { settings = default; return false; }
     // Complete shape-local manifold, normal in shape 1 space. Throw on capacity
     // overflow; never silently truncate. World poses use native cm coordinates.
     int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination);
@@ -21,6 +25,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     private readonly AlsContactRegistry _registry;
     private readonly IAlsContactGeometrySource _source;
     private readonly AlsPersistentContactPair[] _pairs;
+    private readonly AlsContactManifoldCache[] _manifolds;
     private readonly int[] _prepared, _body0, _body1;
     private readonly int[] _active;
     private readonly AlsContactPairKey[] _identities;
@@ -29,12 +34,13 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     private readonly AlsDetectedContact[] _points;
     private readonly AlsContactMaterial _material;
     private readonly AlsContactGatherSettings _settings;
-    private int _count, _contactCount, _activeCount;
+    private int _count, _contactCount, _activeCount, _restoredCount;
     private long _epoch;
     private long _committedRegistryVersion = -1;
     private bool _pending, _staged;
     public int LastContactCount { get; private set; }
     public int LastActivePairs { get; private set; }
+    public int LastRestoredPairs { get; private set; }
     public long CompletedSteps => _epoch;
     public bool RequiresWake => _committedRegistryVersion != _registry.ChangeVersion || _source.IsInvalidated;
     public int PreparedPairCount { get { Pending(); return _order?.Count ?? _activeCount; } }
@@ -56,6 +62,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         _registry = registry; _source = source; _material = material; _settings = settings;
         var capacity = checked(registry.Capacity * (registry.Capacity - 1) / 2);
         _pairs = new AlsPersistentContactPair[capacity]; for (var i = 0; i < capacity; i++) _pairs[i] = new(pointsPerPair);
+        _manifolds = new AlsContactManifoldCache[capacity]; for (var i = 0; i < capacity; i++) _manifolds[i] = new(pointsPerPair);
         _prepared = new int[capacity]; _body0 = new int[capacity]; _body1 = new int[capacity];
         _active = new int[capacity]; _identities = new AlsContactPairKey[capacity];
         if (island is not null)
@@ -74,7 +81,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         if (predicted.Length != _registry.BodyCount || velocities.Length != predicted.Length || bodies.Length != predicted.Length)
             throw new ArgumentException("Contact registry and island body counts differ.");
         if (_epoch == long.MaxValue) throw new InvalidOperationException("Contact epoch exhausted.");
-        _registry.Enter(); _pending = true; _staged = false; _count = _contactCount = _activeCount = 0;
+        _registry.Enter(); _pending = true; _staged = false; _count = _contactCount = _activeCount = _restoredCount = 0;
         try
         {
             for (var i = 0; i < _registry.Capacity; i++) if (_registry.Present(i))
@@ -89,16 +96,43 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
                 if (!_registry.Allows(a, b)) continue;
                 var sa = _registry.At(a); var sb = _registry.At(b); var ia = sa.Body; var ib = sb.Body;
                 if (bodies[ia].InverseMass.Mass <= 0 && bodies[ib].InverseMass.Mass <= 0) continue;
-                var count = _source.Query(a, _shapeWorld[a], b, _shapeWorld[b], _points);
-                if ((uint)count > _points.Length) throw new ArgumentException("Geometry source returned an invalid contact count.");
                 _identities[slot] = new(_registry.Key(a), _registry.Key(b));
+                // Include the slot before any provider callback or proposal so
+                // exceptions roll back geometry and friction history together.
+                _body0[slot] = ia; _body1[slot] = ib; _prepared[_count++] = slot;
+                var cache = _manifolds[slot];
+                var enabled = _source.TryGetManifoldSettings(a, b, out var manifold) && !sa.Quadratic && !sb.Quadratic;
+                if (enabled && (!float.IsFinite(manifold.CollisionTolerance) || manifold.CollisionTolerance < 0 ||
+                    !float.IsFinite(manifold.CullDistance) || manifold.CullDistance < 0))
+                    throw new ArgumentException("Invalid manifold settings.");
+                var restored = enabled && cache.TryRestore(_identities[slot], _epoch, _shapeWorld[a], _shapeWorld[b],
+                    manifold.CollisionTolerance, _points, out _);
+                int count;
+                if (restored)
+                {
+                    count = cache.Count;
+                    // Native midphase activates only within cull distance. An
+                    // inactive pair has no reusable manifold on the next tick.
+                    if (cache.MinimumPhi > manifold.CullDistance)
+                    {
+                        cache.Abort(); count = 0;
+                        cache.PrepareNew(_identities[slot], _epoch, _shapeWorld[a], _shapeWorld[b], manifold.CollisionTolerance, []);
+                    }
+                    else _restoredCount++;
+                }
+                else
+                {
+                    count = _source.Query(a, _shapeWorld[a], b, _shapeWorld[b], _points);
+                    if ((uint)count > _points.Length) throw new ArgumentException("Geometry source returned an invalid contact count.");
+                    cache.PrepareNew(_identities[slot], _epoch, _shapeWorld[a], _shapeWorld[b],
+                        enabled ? manifold.CollisionTolerance : 0, enabled ? _points.AsSpan(0, count) : []);
+                }
                 _pairs[slot].Gather(_identities[slot], _epoch, _points.AsSpan(0, count),
                     new(sa.Quadratic, sb.Quadratic), _material,
                     new(_shapeWorld[a], predicted[ia].Position, (float)bodies[ia].InverseMass.Mass, velocities[ia]), predicted[ia].Rotation, bodies[ia].InverseMass.Inertia,
                     new(_shapeWorld[b], predicted[ib].Position, (float)bodies[ib].InverseMass.Mass, velocities[ib]), predicted[ib].Rotation, bodies[ib].InverseMass.Inertia,
                     _settings with { Dt = (float)dt, PerContactInitialPhi = sa.Quadratic || sb.Quadratic ||
                         (bodies[ia].InverseMass.Mass > 0 && bodies[ib].InverseMass.Mass > 0) });
-                _body0[slot] = ia; _body1[slot] = ib; _prepared[_count++] = slot;
                 _contactCount += _pairs[slot].SolverCount;
                 if (_pairs[slot].SolverCount > 0) _active[_activeCount++] = slot;
             }
@@ -121,22 +155,27 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     {
         Pending(); _staged = false;
         if (_order is not null) _ = _order.Count;
-        for (var i = 0; i < _count; i++) _pairs[_prepared[i]].StageCommit();
+        for (var i = 0; i < _count; i++)
+        {
+            if (!_manifolds[_prepared[i]].Pending) throw new InvalidOperationException("Missing manifold proposal.");
+            _pairs[_prepared[i]].StageCommit();
+        }
         _staged = true;
     }
     public void Commit()
     {
         Pending(); if (!_staged) throw new InvalidOperationException("Stage all contacts before publishing.");
         var active = 0;
-        for (var i = 0; i < _count; i++) { var pair = _pairs[_prepared[i]]; if (pair.SolverCount > 0) active++; pair.PublishCommit(); }
-        LastContactCount = _contactCount; LastActivePairs = active; _epoch++; _committedRegistryVersion = _registry.ChangeVersion;
+        for (var i = 0; i < _count; i++) { var slot = _prepared[i]; var pair = _pairs[slot]; if (pair.SolverCount > 0) active++; pair.PublishCommit(); _manifolds[slot].Publish(); }
+        LastContactCount = _contactCount; LastActivePairs = active; LastRestoredPairs = _restoredCount;
+        _epoch++; _committedRegistryVersion = _registry.ChangeVersion;
         _order?.Commit();
         _pending = _staged = false; _registry.Leave();
     }
     public void Abort()
     {
         if (!_pending) return;
-        for (var i = 0; i < _count; i++) _pairs[_prepared[i]].Abort();
+        for (var i = 0; i < _count; i++) { _pairs[_prepared[i]].Abort(); _manifolds[_prepared[i]].Abort(); }
         _order?.Abort();
         _pending = _staged = false; _registry.Leave();
     }
@@ -144,6 +183,7 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     {
         if (_pending) throw new InvalidOperationException("Abort contact step before resetting.");
         foreach (var pair in _pairs) pair.Reset(); _epoch = 0; LastActivePairs = LastContactCount = 0; _committedRegistryVersion = -1;
+        foreach (var cache in _manifolds) cache.Reset(); LastRestoredPairs = 0;
         _order?.Reset();
     }
     private void Pending() { if (!_pending) throw new InvalidOperationException("Gather world contacts first."); }

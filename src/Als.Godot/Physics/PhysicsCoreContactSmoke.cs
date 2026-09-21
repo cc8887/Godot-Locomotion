@@ -18,6 +18,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _geometryChecks;
     private int _sleepChecks;
     private int _precisionChecks;
+    private int _manifoldChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -61,7 +62,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         try
         {
             // Run in real physics callbacks; no Jolt dynamic bodies in the query space.
-            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); SleepChecks(); }
+            if (_scenario == 0 && _frame == 0) { GeometryChecks(); ContactPrecisionChecks(); AssetFootFaceChecks(); InteriorFaceChecks(); CapsuleFaceChecks(); ManifoldChecks(); SleepChecks(); }
             _island.StepForceFree(delta, _contacts); _totalContacts += _contacts.LastContactCount; _frame++;
             if (_scenario == 1)
             {
@@ -81,7 +82,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
             if (_scenario < 3) { StartScenario(); return; }
             Require(_totalContacts > 0 && _queries > 0, "No actual collision geometry was queried.");
             var result = new { hz = _hz, scenarios = _scenario, steps_per_scenario = 60, contacts = _totalContacts,
-                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, max_dynamic_momentum_cmps = _maxMomentum,
+                narrow_phase_queries = _queries, geometry_checks = _geometryChecks, contact_precision_checks = _precisionChecks, sleep_checks = _sleepChecks, manifold_checks = _manifoldChecks, max_dynamic_momentum_cmps = _maxMomentum,
                 geometry = "Godot Jolt CollideShape", solver = "Core shared contacts", gravity = false, sleeping = false,
                 chaos_narrow_phase_parity = false, ordinary_character_connected = false };
             var json = JsonSerializer.Serialize(result); using var stream = new System.IO.FileStream(_report, System.IO.FileMode.CreateNew);
@@ -95,6 +96,36 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private void Fail(Exception e) { GD.PushError("CORE_CONTACT_WORLD_FAILED " + e); _done = true; Cleanup(); GetTree().Quit(1); }
     public override void _ExitTree() => Cleanup();
+
+    private void ManifoldChecks()
+    {
+        var identity = AlsPrecisePose.Identity; var registry = new AlsContactRegistry(2, 2);
+        using var box = new BoxShape3D { Size = new(.2f, .2f, .2f), Margin = 0 };
+        using var floor = new BoxShape3D { Size = new(10, .2f, 10), Margin = 0 };
+        using var sphere = new SphereShape3D { Radius = .1f };
+        using var capsule = new CapsuleShape3D { Radius = .1f, Height = .4f };
+        using var query = new AlsGodotContactQuery(registry);
+        var a = registry.Register(new(0, identity, 1, 1)); var b = registry.Register(new(1, identity, 1, 1));
+        query.Bind(a, box); query.Bind(b, floor);
+        Require(query.TryGetManifoldSettings(a.Slot, b.Slot, out var settings) && Math.Abs(settings.CollisionTolerance - 2) < 1e-6f && settings.CullDistance == 0,
+            "Polygonal tolerance did not use native smaller full extent."); _manifoldChecks++;
+        var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 2000), 16);
+        AlsIslandBody[] bodies = [new(identity, new(1, AlsDoubleVector.One)), new(identity, default)];
+        AlsPrecisePose[] poses = [identity with { Position = new(0, 0, 19.9) }, identity];
+        var velocities = new AlsProjectionVelocity[2];
+        contacts.Gather(poses, velocities, bodies, 1d / _hz); contacts.StageCommit(); contacts.Commit();
+        Require(contacts.LastActivePairs == 1 && contacts.LastRestoredPairs == 0, "Fresh box manifold missing.");
+        var before = query.NarrowPhaseQueries; poses[0] = poses[0] with { Position = new(.1, 0, 19.9) };
+        contacts.Gather(poses, velocities, bodies, 1d / _hz); contacts.StageCommit(); contacts.Commit();
+        Require(contacts.LastRestoredPairs == 1 && query.NarrowPhaseQueries == before, "Box manifold did not bypass narrow phase."); _manifoldChecks++;
+        box.Size = new(.21f, .2f, .2f); var rejected = false;
+        try { contacts.Gather(poses, velocities, bodies, 1d / _hz); } catch (InvalidOperationException) { rejected = true; }
+        Require(rejected && !registry.IsLocked && contacts.CompletedSteps == 2, "Restoration bypassed dirty shape validation."); _manifoldChecks++;
+        a = registry.Replace(a, registry.At(a.Slot) with { Quadratic = true }); query.Bind(a, sphere);
+        Require(!query.TryGetManifoldSettings(a.Slot, b.Slot, out _), "Sphere enabled native manifold restoration."); _manifoldChecks++;
+        a = registry.Replace(a, registry.At(a.Slot)); query.Bind(a, capsule);
+        Require(!query.TryGetManifoldSettings(a.Slot, b.Slot, out _), "Capsule enabled native manifold restoration."); _manifoldChecks++;
+    }
 
     private void AssetFootFaceChecks()
     {
