@@ -131,7 +131,21 @@ public partial class PhysicsCoreContactSmoke : Node3D
     {
         var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + "AnimMan.AnimMan");
         var source = definition.Bodies.Single(b => b.Bone == "foot_l").Shapes.Single();
-        using var foot = AlsPhysicsContactShapes.Create(source); foot.Margin = 0;
+        var cooked = AlsConvexTopologyCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_convex_topology.json"), definition);
+        foreach (var binding in cooked)
+        {
+            var convex = definition.Bodies[binding.Body].Shapes[binding.Shape];
+            using var transported = (ConvexPolygonShape3D)AlsPhysicsContactShapes.Create(convex, binding.Topology);
+            var vertices = transported.Points;
+            Require(vertices.Length == binding.Topology.VertexCount, "Cooked convex vertex count changed.");
+            for (var i = 0; i < vertices.Length; i++)
+            {
+                var expected = AlsFootIkCoordinates.FromNative(new AlsDoubleVector(binding.Topology.VertexAt(i)) * convex.Local.Scale);
+                Require(vertices[i] == new Vector3(expected.X, expected.Y, expected.Z), "Cooked convex vertex transport changed.");
+            }
+            _geometryChecks++;
+        }
+        using var foot = AlsPhysicsContactShapes.Create(source, cooked.Single(c => definition.Bodies[c.Body].Bone == "foot_l").Topology); foot.Margin = 0;
         using var floor = new BoxShape3D { Size = new(83.17676f, .5f, 63.723648f) };
         var registry = new AlsContactRegistry(2, 2);
         using var query = new AlsGodotContactQuery(registry);

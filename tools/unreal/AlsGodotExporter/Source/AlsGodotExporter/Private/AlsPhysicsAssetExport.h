@@ -17,3 +17,4 @@ bool ExportAlsPhysicsCapsuleGeometryReference(const FString& Input, const FStrin
 bool ExportAlsPhysicsManifoldRestoreReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCullReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsBoxGeometryReference(const FString& Output, FString& Error);
+bool ExportAlsPhysicsConvexTopology(const FString& Output, FString& Error);
