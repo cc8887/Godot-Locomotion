@@ -281,6 +281,9 @@ public partial class PhysicsCoreContactSmoke : Node3D
             previous[1] = previous[1] with { Velocity = new(new(10000, 0, 0), default) };
             var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 1000));
             contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            Require((contacts.LastContactCount > 0) == dynamicA, "Capsule broadphase ignored dynamic versus static expansion."); _capsulePairChecks++;
+            velocities[1]=new(new(0,-10000,0),default);
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
             var queries = query.NativeCapsulePairQueries;
             contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
             Require(contacts.LastContactCount > 0 && contacts.LastRestoredPairs == 0 && query.NativeCapsulePairQueries == queries + 1 && query.NarrowPhaseQueries == 0,
@@ -513,6 +516,13 @@ public partial class PhysicsCoreContactSmoke : Node3D
             Require(query.Query(a, poses[a], b, poses[b], points) == 2, "Capsule did not use velocity-expanded cull."); query.Abort(); _capsuleCullChecks++;
             var contacts = new AlsWorldContacts(registry, query, new(0, 0, 0), new(1f / _hz, 0, 1000));
             contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            Require(contacts.LastActivePairs == 0, "Narrow-phase cull bypassed separated particle bounds."); _capsuleCullChecks++;
+            // Positive integrated Z sweeps the predicted bounds backwards
+            // toward the floor; previous horizontal V only expands cull.
+            velocities[0]=new(new(0,0,10000),default);
+            contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
+            Require(contacts.LastActivePairs == 1, "Integrated velocity did not expand dynamic bounds backwards."); _capsuleCullChecks++;
+            velocities[0]=default;poses[0]=poses[0] with {Position=new(0,0,17)};
             var queries = query.CapsuleFaceQueries;
             contacts.Gather(poses, velocities, bodies, 1d / _hz, previous); contacts.StageCommit(); contacts.Commit();
             Require(contacts.LastActivePairs == 1 && contacts.LastContactCount == 2 && contacts.LastRestoredPairs == 0 &&

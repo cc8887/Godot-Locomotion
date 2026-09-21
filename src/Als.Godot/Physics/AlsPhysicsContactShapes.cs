@@ -53,7 +53,8 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
                     source.Type=="convex"?observed.Scale:null,source.Type is "box" or "convex"?observed.MarginCm:0,
                     nativeCapsule:primitive?.Capsule, proxyLocal:primitive?.ProxyLocal,
                     nativeSphereRadius:source.Type=="sphere"?primitive!.Value.Radius:null,
-                    convexProperties:source.Type=="convex"?properties[(body.Index,shapeIndex)]:null);
+                    convexProperties:source.Type=="convex"?properties[(body.Index,shapeIndex)]:null,
+                    nativeBounds:new(observed.BoundsMinCm,observed.BoundsMaxCm));
             }
         }
         foreach (var (a, b) in definition.DisabledCollisions) registry.DisableBodyPair(a, b, true);
