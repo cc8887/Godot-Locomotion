@@ -53,7 +53,7 @@ public sealed class AlsContactManifoldCache
             var lateral = delta - normal * phi;
             if (lateral.LengthSquared < threshold)
             {
-                _next[i] = point with { Point1 = (p0 - normal * phi).ToSingle() };
+                _next[i] = point with { Point1 = (p0 - normal * phi).ToSingle(), NativePhi=(float)phi };
                 minimum = MathF.Min(minimum, (float)phi);
             }
             else { _next[i] = point with { Disabled = true }; active--; }
@@ -71,13 +71,22 @@ public sealed class AlsContactManifoldCache
         if (points.Length > _next.Length) throw new ArgumentException("Manifold capacity exceeded.");
         foreach (var point in points)
             if (!new AlsDoubleVector(point.Point0).IsFinite || !new AlsDoubleVector(point.Point1).IsFinite ||
-                !new AlsDoubleVector(point.Normal1).IsFinite || MathF.Abs(point.Normal1.LengthSquared() - 1) > 1e-5f)
+                !new AlsDoubleVector(point.Normal1).IsFinite || MathF.Abs(point.Normal1.LengthSquared() - 1) > 1e-5f ||
+                (point.NativePhi.HasValue&&!float.IsFinite(point.NativePhi.Value)))
                 throw new ArgumentException("Invalid manifold point.");
         _nextPositionDelta = (shape0.Position - shape1.Position).ToSingle();
         if (!new AlsDoubleVector(_nextPositionDelta).IsFinite) throw new ArgumentException("Relative translation exceeds native float storage.");
         _nextRotationDelta = new((shape0.Rotation.Conjugate() * shape1.Rotation).ToSingle());
         points.CopyTo(_next); _nextKey = key; _nextStep = step; _nextCount = points.Length; _nextTolerance = tolerance;
         _newManifold = true; Pending = true; MinimumPhi = float.MaxValue;
+        var relative=AlsPrecisePose.Relative(shape0,shape1);
+        foreach(var point in points)if(!point.Disabled)
+        {
+            var phi=point.NativePhi??(float)AlsDoubleVector.Dot(
+                new AlsDoubleVector(point.Point0).Rotate(relative.Rotation)+relative.Position-new AlsDoubleVector(point.Point1),
+                new(point.Normal1));
+            MinimumPhi=MathF.Min(MinimumPhi,phi);
+        }
     }
     // All validation occurs during Prepare. The owner stages every participant
     // before reaching this no-callback publication path.

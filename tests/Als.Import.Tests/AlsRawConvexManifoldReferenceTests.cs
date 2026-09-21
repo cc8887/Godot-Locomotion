@@ -58,6 +58,7 @@ public sealed class AlsRawConvexManifoldReferenceTests(Xunit.Abstractions.ITestO
                 var point0in1=(new AlsDoubleVector(points[i].Point0)-pose.Position).Rotate(pose.Rotation.Conjugate());
                 var phi=AlsDoubleVector.Dot(point0in1-new AlsDoubleVector(points[i].Point1),new(points[i].Normal1));
                 var phiError=System.Math.Abs(phi-D(p,"phi"));maxPhi=System.Math.Max(maxPhi,phiError);
+                Assert.Equal(p.GetProperty("phi").GetSingle(),points[i].NativePhi);
                 // These fixtures now reproduce the stored float contacts
                 // exactly; keep rounding-boundary regressions visible.
                 if(pe!=0||ne!=0||phiError>1e-5||p.GetProperty("feature").GetString()!=result.Feature.ToString())

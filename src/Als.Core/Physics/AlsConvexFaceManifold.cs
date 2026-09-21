@@ -51,6 +51,8 @@ public static class AlsConvexFaceManifold
             destination[i] = referenceIsShape0
                 ? new(projected.ToSingle(), incident.ToSingle(), normal1.ToSingle())
                 : new(incident.ToSingle(), projected.ToSingle(), normal1.ToSingle());
+            var phiNormal=referenceIsShape0?normal1.Rotate(incidentToReference.Rotation):normal1*-1;
+            destination[i]=destination[i] with {NativePhi=(float)AlsDoubleVector.Dot(projected-p,phiNormal)};
         }
         return count;
     }

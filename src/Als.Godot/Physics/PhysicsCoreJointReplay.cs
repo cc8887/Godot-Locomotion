@@ -205,7 +205,10 @@ public partial class PhysicsCoreJointReplay : Node3D
             if (_drop)
             {
                 var registry = new AlsContactRegistry(island.BodyCount, rig.Definition.Bodies.Sum(b => b.Shapes.Length) + (scene?.ShapeCount ?? 1));
-                query = new(registry); shapes = new(); shapes.Bind(rig.Definition, registry, query);
+                query = new(registry,AlsContactDetectorCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_cull_reference.json")));
+                shapes = new(); shapes.Bind(rig.Definition, registry, query);
+                var conditioning = AlsBodyInertiaCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_inertia_reference.json"), rig.Definition, rig.Settings);
+                foreach(var body in rig.Definition.Bodies)query.BindBodyBounds(body.Index,conditioning[body.Index].NativeBoundsSize);
                 if (scene is null) shapes.BindFloor(rig.Definition.Bodies.Length, registry, query);
                 else scene.Bind(registry, query);
                 // Geometry/motion acceptance uses an explicitly homogeneous rig

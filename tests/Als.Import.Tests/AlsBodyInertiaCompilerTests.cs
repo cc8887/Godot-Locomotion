@@ -57,6 +57,9 @@ public sealed class AlsBodyInertiaCompilerTests
             foreach(var body in definition.Bodies)
             {
                 var native=rig.GetProperty("bodies").EnumerateArray().Single(b=>b.GetProperty("bone").GetString()==body.Bone);
+                var bounds = V(native.GetProperty("localBoundsMax")) - V(native.GetProperty("localBoundsMin"));
+                Assert.Equal(Math.Max(bounds.X, Math.Max(bounds.Y, bounds.Z)), result[body.Index].NativeBoundsSize);
+                Assert.InRange(result[body.Index].NativeBoundsSize, double.Epsilon, 100);
                 Assert.True((result[body.Index].ExtentsCm-V(native.GetProperty("constraintExtents"))).NearlyZero(1e-4));
                 Assert.InRange(Vector3.Distance(result[body.Index].InverseInertiaScale,V(native.GetProperty("actualScale")).ToSingle()),0,1e-5f);
                 checkedBodies++;

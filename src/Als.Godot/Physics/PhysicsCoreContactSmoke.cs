@@ -121,6 +121,44 @@ public partial class PhysicsCoreContactSmoke : Node3D
         contacts.Reset();Require(query.NativeCachedPairs==0,"Native reset retained cache.");
         _nativePolygonChecks+=4;
         NativeMarginChecks();
+        NativeCullChecks();
+    }
+
+    private void NativeCullChecks()
+    {
+        var identity = AlsPrecisePose.Identity; var registry = new AlsContactRegistry(2, 2);
+        using var box = new BoxShape3D { Size = new(2, 2, 2), Margin = 0 };
+        using var query = new AlsGodotContactQuery(registry, new(3, .01f, 1, 1, 3));
+        query.Bind(registry.Register(new(0, identity, 1, 1)), box, nativeHalf: new(100, 100, 100));
+        query.Bind(registry.Register(new(1, identity, 1, 1)), box, nativeHalf: new(100, 100, 100));
+        var bodies = new[] { new AlsIslandBody(identity, new(1, AlsDoubleVector.One)), new AlsIslandBody(identity, default) };
+        var previous = new[] { new AlsIslandBodyState(identity, default), new AlsIslandBodyState(identity, default) };
+        var velocities = new[] { new AlsProjectionVelocity(new(10000, 0, 0), default), new AlsProjectionVelocity(new(10000, 0, 0), default) };
+        var rejected = false;
+        try { query.PrepareStep([], velocities, bodies, 1d / _hz); } catch (ArgumentException) { rejected = true; }
+        Require(rejected, "Configured detector accepted missing previous states."); _nativePolygonChecks++;
+        query.PrepareStep(previous, velocities, bodies, 1d / _hz); rejected = false;
+        try { query.TryGetManifoldSettings(0, 1, out _); } catch (InvalidOperationException) { rejected = true; }
+        query.Abort(); Require(rejected, "Configured detector accepted missing particle bounds."); _nativePolygonChecks++;
+        query.BindBodyBounds(0, 50); query.BindBodyBounds(1, 100000);
+        query.PrepareStep(previous, velocities, bodies, 1d / _hz);
+        query.TryGetManifoldSettings(0, 1, out var settings);
+        Require(settings.CullDistance == 3, "Detector used gravity-integrated/static velocity or static bounds."); _nativePolygonChecks++;
+        var points = new AlsDetectedContact[4];
+        Require(query.Query(0, identity, 1, identity with { Position = new(0, 0, 202) }, points) == 4,
+            "Native polygon query missed separated contacts inside cull."); _nativePolygonChecks++;
+        Require(query.Query(0, identity, 1, identity with { Position = new(0, 0, 204) }, points) == 0,
+            "Native polygon query kept contacts outside cull."); _nativePolygonChecks++;
+        query.Abort(); Require(query.NativeCachedPairs == 0, "Separated contact abort published GJK history."); _nativePolygonChecks++;
+        previous[0] = previous[0] with { Velocity = new(new(_hz, 0, 0), default) };
+        query.PrepareStep(previous, velocities, bodies, 1d / _hz); query.TryGetManifoldSettings(0, 1, out settings);
+        Require(settings.CullDistance == 4, "Detector did not use dynamic previous velocity."); query.Abort(); _nativePolygonChecks++;
+        bodies[1] = bodies[1] with { ExternallyDriven = true };
+        query.PrepareStep(previous, velocities, bodies, 1d / _hz); query.TryGetManifoldSettings(0, 1, out settings);
+        Require(settings.CullDistance == 6, "Kinematic current velocity did not reach native expansion cap."); query.Abort(); _nativePolygonChecks++;
+        registry.RebindBody(0); query.PrepareStep(previous, velocities, bodies, 1d / _hz); rejected = false;
+        try { query.TryGetManifoldSettings(0, 1, out _); } catch (InvalidOperationException) { rejected = true; }
+        query.Abort(); Require(rejected, "Rebound body reused stale particle bounds."); _nativePolygonChecks++;
     }
 
     private void NativeMarginChecks()

@@ -30,6 +30,11 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private readonly AlsContactRegistry _registry;
     private readonly AlsPolygonQueryCache _polygonCache;
     private readonly bool[] _dynamicBodies;
+    private readonly AlsContactDetectorSettings? _detector;
+    private readonly NVector[] _preVelocity;
+    private readonly double[] _bodyBounds;
+    private readonly uint[] _boundsGeneration;
+    private double _dt;
     private readonly AlsGjkCache _directCache = new();
     private readonly AlsConvexManifoldWorkspace _directWorkspace = new();
     private readonly Binding?[] _bindings;
@@ -56,10 +61,12 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             return false;
         }
     }
-    internal AlsGodotContactQuery(AlsContactRegistry registry)
+    internal AlsGodotContactQuery(AlsContactRegistry registry,AlsContactDetectorSettings? detector=null)
     {
         Main(); _registry = registry; _bindings = new Binding[registry.Capacity]; _polygonCache = new(registry.Capacity);
         _dynamicBodies=new bool[registry.BodyCount];
+        detector?.Validate();_detector=detector;
+        _preVelocity=new NVector[registry.BodyCount];_bodyBounds=new double[registry.BodyCount];_boundsGeneration=new uint[registry.BodyCount];
         try
         {
             _space = PhysicsServer3D.SpaceCreate(); PhysicsServer3D.SpaceSetActive(_space, false);
@@ -94,14 +101,32 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         binding.Changed = () => binding.Dirty = true;
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
+        _boundsGeneration[_registry.At(handle.Slot).Body]=0;
+    }
+    internal void BindBodyBounds(int body,double fullBoundsSize)
+    {
+        Check();
+        if(_registry.IsLocked||!double.IsFinite(fullBoundsSize)||fullBoundsSize<=0||(uint)body>=_bodyBounds.Length)
+            throw new ArgumentException("Native particle bounds require an idle registered body.");
+        var slot=-1;for(var i=0;i<_registry.Capacity;i++)
+            if(_registry.Present(i)&&_registry.At(i).Body==body){BindingAt(i);slot=i;}
+        if(slot<0)throw new ArgumentException("Register and bind geometry before particle bounds.");
+        _bodyBounds[body]=fullBoundsSize;_boundsGeneration[body]=_registry.Key(slot).Generation;
     }
     public void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous,ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies,double dt)
     {
         Check();
         if(bodies.Length!=_dynamicBodies.Length)throw new ArgumentException("Polygon margin body context differs.");
+        if(_detector.HasValue&&(previous.Length!=bodies.Length||velocities.Length!=bodies.Length))
+            throw new ArgumentException("Native detector requires previous body states and predicted velocities.");
         _polygonCache.PrepareStep();
-        for(var i=0;i<bodies.Length;i++)_dynamicBodies[i]=bodies[i].InverseMass.Mass>0;
+        _dt=dt;
+        for(var i=0;i<bodies.Length;i++)
+        {
+            _dynamicBodies[i]=bodies[i].InverseMass.Mass>0;
+            if(_detector.HasValue)_preVelocity[i]=AlsContactCullDistance.PreVelocity(bodies[i],previous[i],velocities[i]);
+        }
     }
     public void StageCommit() => _polygonCache.StageCommit();
     public void PublishCommit() => _polygonCache.PublishCommit();
@@ -112,7 +137,23 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1); settings = default;
         if (a.Shape is not (BoxShape3D or ConvexPolygonShape3D) || b.Shape is not (BoxShape3D or ConvexPolygonShape3D)) return false;
         static float Size(Aabb bounds) => (float)(100d * Math.Max(bounds.Size.X, Math.Max(bounds.Size.Y, bounds.Size.Z)));
-        settings = new(.1f * Math.Min(Size(a.Bounds), Size(b.Bounds)), 0); return true;
+        settings = new(.1f * Math.Min(Size(a.Bounds), Size(b.Bounds)),
+            a.NativePolygon&&b.NativePolygon?CullDistance(shape0,shape1):0); return true;
+    }
+    private float CullDistance(int shape0,int shape1)
+    {
+        if(_detector is not { } d)return 0;
+        if(!_polygonCache.Pending)throw new InvalidOperationException("Native detector requires a pending geometry step.");
+        var a=_registry.At(shape0).Body;var b=_registry.At(shape1).Body;
+        var scale=AlsContactCullDistance.Scale(Size(shape0,a),Size(shape1,b),d.InverseReferenceSize,d.MinimumScale);
+        return AlsContactCullDistance.Calculate(d.BaseDistance,scale,_dt,_preVelocity[a],_preVelocity[b],d.VelocityInflation,d.MaximumVelocityExpansion);
+        double Size(int shape,int body)
+        {
+            if(!_dynamicBodies[body])return 0;
+            if(_boundsGeneration[body]!=_registry.Key(shape).Generation)
+                throw new InvalidOperationException("Native detector particle bounds are missing or stale.");
+            return _bodyBounds[body];
+        }
     }
     public int Query(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
@@ -126,6 +167,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if(a.NativePolygon&&b.NativePolygon)
         {
             var relative=AlsPrecisePose.Relative(world1,world0);
+            var cull=CullDistance(shape0,shape1);
             var key=new AlsContactPairKey(_registry.Key(shape0),_registry.Key(shape1));
             if(!_polygonCache.Pending&&(a.NativeMargin!=0||b.NativeMargin!=0))
                 throw new InvalidOperationException("Nonzero shape margins require a prepared body motion context.");
@@ -137,12 +179,12 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 new(b.NativeMargin,false,_dynamicBodies[_registry.At(shape1).Body]?AlsCollisionMotionState.Dynamic:AlsCollisionMotionState.Static),0);
             AlsConvexManifoldResult result;
             if(a.NativeHalf.HasValue&&b.NativeHalf.HasValue)
-                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination);
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination,cull);
             else if(a.NativeHalf.HasValue)
-                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination);
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination,cull);
             else if(b.NativeHalf.HasValue)
-                result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination);
-            else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination);
+                result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination,cull);
+            else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination,cull);
             NativePolygonQueries++;return result.Count;
         }
         var reverseBoxFace = a.Shape is BoxShape3D && b.Shape is BoxShape3D &&
@@ -161,16 +203,16 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         }
         return QueryOrdered(shape0, world0, shape1, world1, destination);
     }
-    private AlsConvexManifoldResult Native<TA,TB>(TA a,TB b,AlsContactPairKey key,in AlsPrecisePose relative,Span<AlsDetectedContact> destination)
+    private AlsConvexManifoldResult Native<TA,TB>(TA a,TB b,AlsContactPairKey key,in AlsPrecisePose relative,Span<AlsDetectedContact> destination,float cull)
         where TA:struct,IAlsPolygonShape where TB:struct,IAlsPolygonShape
     {
         // Pair margins are resolved above from actual wrapper metadata and
-        // body motion. Separation discovery still awaits native detector cull.
+        // body motion; cull uses the configured native detector's step context.
         if(_polygonCache.Pending)
-            return _polygonCache.Query(key,a,b,relative,destination,0,(double)1e-6f,(double)1e-6f,1,.001f);
+            return _polygonCache.Query(key,a,b,relative,destination,cull,(double)1e-6f,(double)1e-6f,1,.001f);
         // Direct diagnostic queries have no surrounding island transaction.
         _directCache.Reset();
-        return AlsPolygonManifold.Build(a,b,relative,_directCache,_directWorkspace,destination,0,(double)1e-6f,(double)1e-6f,1,.001f);
+        return AlsPolygonManifold.Build(a,b,relative,_directCache,_directWorkspace,destination,cull,(double)1e-6f,(double)1e-6f,1,.001f);
     }
     // UE CreateGeometry selects instanced FConvex for exact unit NetScale;
     // its geometry methods delegate to the unscaled inner hull.

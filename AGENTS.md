@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 polygon 分离距离：`docs/verification/2026-09-21-physics-polygon-cull.md`。严格导入既有原生 detector 与完整 particle bounds，动态步前/kinematic当前/static零速度驱动 cull；显式 box/convex 查询和恢复共用距离，新接触以原始 NativePhi<=cull 激活并随事务提交。24624 原生 polygon case 新增 Phi 精确相等；Core2819、Import2406+1旧跳过、Godot优化构建及三频率 smoke（551/9/68polygon/3事务/5流形/5睡眠）通过。整链最新 **8/12**：高速120新增 Mannequin 休眠回归，另普通30/旋转30休眠和高速30第9帧穿地未修，不能沿用上批9/12。普通demo未接；quadratic分离/CCD/MACD/完整midphase退役/native tolerance未齐。下一步观察并传输实际 Gather 初始重叠/solver设置：UE constraint Setup 将双方初始穿透速度与0取max，当前默认-1禁用尚未对齐，勿用同Gather后输入对照证明完整链正确。再四失败/普通Ragdoll/Get-up等总目标。无UE改动/新导出/重启，本批未修旧Editor AV和两Condition failed。
+
 - 最新非零凸包margin：`docs/verification/2026-09-21-physics-convex-margin.md`。原生8960支持点/编号/delta精确一致，11664非零instanced/scaled/box流形点/法向0差；GJK保留每侧delta跨fallback，polygon支持解析后margin。实验query绑定实际wrapper margin并按PrepareStep inverse mass解析动/静pair，ConvexZeroMargin观察值0，cull仍0。Core2816、Import全量2404+1旧跳过、后加高速coupled定向3通过，三频率smoke551/9/5/5/3/59通过。整链 **9/12**：高速120恢复，剩普通30/旋转30休眠及高速30第9帧穿地。高速30第7/8帧有正确上表面3点，6状态144共同求解阶段原生对照通过，不能据此证明Gather/发现/历史正确；捕获在artifacts/physics-convex-margin-20260921/high30-capture。下一步分离cull、历史/Gather初始输入及其他primitive实际几何，再三失败/普通Ragdoll等完整目标。UE完整构建审计/重导/DataValidation过，普通Editor marker成功但0xC0000005退出、两旧Condition failed未修复，DLL已释放。普通demo未接。
 
 - 运行时形状批次最终回归：Import Release 固定JIT串行全量2402通过/1既有跳过；旧PhysicsAssetOutput冷重导与原始输入字节一致。整链仍8/12及高速30穿地回归，详见下一条。

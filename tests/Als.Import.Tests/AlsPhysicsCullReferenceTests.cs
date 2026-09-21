@@ -1,11 +1,25 @@
 using System.Numerics;
 using System.Text.Json;
 using GodotAls.Core.Physics;
+using GodotAls.Import.Compilation;
 
 namespace GodotAls.Import.Tests;
 
 public sealed class AlsPhysicsCullReferenceTests
 {
+    [Fact]
+    public void CompilerTransportsObservedDetectorAndRejectsInvalidParameters()
+    {
+        var json = File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_cull_reference.json"));
+        var settings = AlsContactDetectorCompiler.Compile(json);
+        Assert.Equal(new AlsContactDetectorSettings(3, .01f, 1, 1, 3), settings);
+        var root = System.Text.Json.Nodes.JsonNode.Parse(json)!;
+        root["detector"]!["boundsExpansion"] = -1;
+        Assert.Throws<InvalidDataException>(() => AlsContactDetectorCompiler.Compile(root.ToJsonString()));
+        root["detector"]!["boundsExpansion"] = 3;
+        root["schemaVersion"] = 2;
+        Assert.Throws<InvalidDataException>(() => AlsContactDetectorCompiler.Compile(root.ToJsonString()));
+    }
     [Fact]
     public void NativeMidphaseSizeScaleAndPreVelocityDistanceMatch()
     {

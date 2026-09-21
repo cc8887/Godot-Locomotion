@@ -76,4 +76,19 @@ public sealed class AlsContactManifoldCacheTests
         for (var i = 257; i <= 2304; i++) { cache.TryRestore(Key, i, Pose(), Identity, 2, points, out _); cache.Publish(); }
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
     }
+
+    [Fact]
+    public void OriginalPhiIgnoresDisabledPointsAndRestoreRecomputesCurrentSeparation()
+    {
+        var cache = new AlsContactManifoldCache(4); var points = new AlsDetectedContact[4];
+        cache.PrepareNew(Key, 0, Pose(), Identity, 2,
+            [Point with { NativePhi = 3 }, Point with { NativePhi = -100, Disabled = true }]);
+        Assert.Equal(3, cache.MinimumPhi); cache.Abort();
+        cache.PrepareNew(Key, 0, Pose(), Identity, 2, [Point with { NativePhi = 3 }]); cache.Publish();
+        Assert.True(cache.TryRestore(Key, 1, Pose(z: .1), Identity, 2, points, out _));
+        Assert.Equal(.1f, cache.MinimumPhi); Assert.Equal(.1f, points[0].NativePhi); cache.Abort();
+        Assert.Throws<ArgumentException>(() => cache.PrepareNew(Key, 1, Pose(), Identity, 2,
+            [Point with { NativePhi = float.NaN }]));
+        Assert.False(cache.Pending);
+    }
 }
