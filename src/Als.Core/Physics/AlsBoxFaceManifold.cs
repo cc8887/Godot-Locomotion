@@ -21,7 +21,7 @@ public static class AlsBoxFaceManifold
         Span<AlsDoubleVector> vertices = stackalloc AlsDoubleVector[8];
         for (var i = 0; i < 8; i++) vertices[i] = Vertex(half0, i).Rotate(relative.Rotation) + relative.Position;
         var best = double.PositiveInfinity; var normal = AlsDoubleVector.Zero;
-        var plane = AlsDoubleVector.Zero;
+        var plane = AlsDoubleVector.Zero; var referenceFace = 0;
         for (var axis = 0; axis < 3; axis++) for (var sign = -1; sign <= 1; sign += 2)
         {
             if (sign * relative.Position[axis] <= half1[axis]) continue;
@@ -36,6 +36,7 @@ public static class AlsBoxFaceManifold
             if (!inside) continue;
             best = depth; normal = axis == 0 ? new(sign, 0, 0) : axis == 1 ? new(0, sign, 0) : new(0, 0, sign);
             plane = normal * half1[axis];
+            referenceFace = axis + (sign > 0 ? 3 : 0);
         }
         if (!double.IsFinite(best)) return false;
         if (-best > cullDistance) return true;
@@ -49,16 +50,23 @@ public static class AlsBoxFaceManifold
             System.Math.Abs(System.Math.Abs(localNormal[axis]) - System.Math.Abs(localNormal[incidentAxis])) < 1e-6) return false;
         var face = incidentAxis + (localNormal[incidentAxis] < 0 ? 3 : 0);
         ReadOnlySpan<int> faceVertices = [0,4,6,2, 0,1,5,4, 0,2,3,1, 1,3,7,5, 2,6,7,3, 4,5,7,6];
-        // Native clipping leaves an interior face in cyclic order, then swaps
-        // vertices 1/2 so the solver visits opposite corners consecutively.
+        Span<AlsDoubleVector> incident = stackalloc AlsDoubleVector[4];
+        Span<AlsDoubleVector> reference = stackalloc AlsDoubleVector[4];
         for (var i = 0; i < 4; i++)
         {
-            var order = i == 1 ? 2 : i == 2 ? 1 : i;
-            var vertex = faceVertices[face * 4 + order]; var p = vertices[vertex];
-            var q = p - normal * AlsDoubleVector.Dot(p - plane, normal);
-            destination[i] = new(Vertex(half0, vertex).ToSingle(), q.ToSingle(), normal.ToSingle());
+            incident[i] = Vertex(half0, faceVertices[face * 4 + i]);
+            reference[i] = Vertex(half1, faceVertices[referenceFace * 4 + i]);
         }
-        count = 4; return true;
+        count = AlsConvexFaceManifold.Build(reference, incident, relative, normal, plane, normal, false, destination, out _);
+        // This guarded case never clips the incident face. Keep its exact local
+        // vertices: inverse-transforming them adds rounding noise at the cm
+        // double-to-float boundary (Godot dimensions can lie on float midpoints).
+        for (var i = 0; i < count; i++)
+        {
+            var order = i == 1 ? 2 : i == 2 ? 1 : i;
+            destination[i] = destination[i] with { Point0 = incident[order].ToSingle() };
+        }
+        return true;
     }
     private static AlsDoubleVector Vertex(AlsDoubleVector half, int index) =>
         new((index & 1) == 0 ? -half.X : half.X, (index & 2) == 0 ? -half.Y : half.Y, (index & 4) == 0 ? -half.Z : half.Z);
