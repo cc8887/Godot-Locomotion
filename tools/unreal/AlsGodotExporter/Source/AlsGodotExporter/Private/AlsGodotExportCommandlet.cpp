@@ -223,6 +223,13 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         { UE_LOG(LogAlsGodotExporter, Error, TEXT("Raw Gather export failed: %s"), *Error); return 49; }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_RAW_GATHER_OK assets_saved=0")); return 0;
     }
+    if (FParse::Value(*Params, TEXT("PhysicsSphereConvexOutput="), PhysicsOutput))
+    {
+        FString Properties, Error; FParse::Value(*Params, TEXT("PhysicsConvexPropertiesOutput="), Properties);
+        if (!ExportAlsPhysicsSphereConvexReference(PhysicsOutput, Properties, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Sphere-convex export failed: %s"), *Error); return 52; }
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsCoupledOutput="), PhysicsOutput))
     {
         FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsCoupledInputs="), Inputs);

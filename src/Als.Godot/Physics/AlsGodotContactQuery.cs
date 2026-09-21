@@ -23,6 +23,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         public required Action Changed;
         public bool Dirty;
         public AlsConvexTopology? Cooked;
+        public AlsConvexProperties? ConvexProperties;
         public AlsDoubleVector? NativeHalf;
         public AlsDoubleVector NativeScale = AlsDoubleVector.One;
         public float NativeMargin;
@@ -88,7 +89,8 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     }
     internal void Bind(AlsContactShapeHandle handle, Shape3D shape, AlsConvexTopology? cooked = null,
         AlsDoubleVector? nativeHalf = null, AlsDoubleVector? nativeScale = null, float nativeMargin=0,
-        AlsCapsuleGeometry? nativeCapsule = null, AlsPrecisePose? proxyLocal = null, float? nativeSphereRadius = null)
+        AlsCapsuleGeometry? nativeCapsule = null, AlsPrecisePose? proxyLocal = null, float? nativeSphereRadius = null,
+        AlsConvexProperties? convexProperties = null)
     {
         Check(); if (_registry.IsLocked) throw new InvalidOperationException("Cannot bind query geometry during a solve.");
         if (nativeCapsule.HasValue)
@@ -115,11 +117,13 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if(nativeScale.HasValue&&cooked is null)throw new ArgumentException("Native convex scale needs cooked topology.");
         if(!float.IsFinite(nativeMargin)||nativeMargin<0||(nativeMargin!=0&&cooked is null&&!nativeHalf.HasValue))
             throw new ArgumentException("Native polygon margin requires explicit geometry.");
+        convexProperties?.Validate();
+        if (convexProperties.HasValue && cooked is null) throw new ArgumentException("Convex properties require cooked geometry.");
         var bounds = Bounds(shape); var old = _bindings[handle.Slot];
         if (old is not null && old.Revision == handle.Revision) throw new ArgumentException("Replace registry shape before rebinding geometry.");
         var binding = new Binding { Shape = shape, Bounds = bounds, Revision = handle.Revision, Changed = null!,
             Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One,NativeMargin=nativeMargin,
-            NativeCapsule=nativeCapsule,ProxyLocal=proxy,NativeSphereRadius=nativeSphereRadius };
+            NativeCapsule=nativeCapsule,ProxyLocal=proxy,NativeSphereRadius=nativeSphereRadius,ConvexProperties=convexProperties };
         binding.Changed = () => binding.Dirty = true;
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
@@ -258,6 +262,23 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 point = point with { Point0 = point.Point1, Point1 = point.Point0, Normal1 = normal.ToSingle() };
             }
             destination[0] = point; return 1;
+        }
+        if ((a.NativeSphereRadius.HasValue && b.Cooked is not null) || (b.NativeSphereRadius.HasValue && a.Cooked is not null))
+        {
+            var reverse = b.NativeSphereRadius.HasValue;
+            var sphere = reverse ? b : a; var hull = reverse ? a : b;
+            var relative = AlsPrecisePose.Relative(reverse ? world1 : world0, reverse ? world0 : world1);
+            var convex = Convex(hull, 0);
+            var properties = (hull.ConvexProperties ?? throw new InvalidOperationException("Sphere-convex requires native hull properties.")).Resolve(convex);
+            var count = AlsSphereConvexManifold.Build(sphere.ProxyLocal.Position.ToSingle(), sphere.NativeSphereRadius!.Value,
+                relative, convex, properties.Center, properties.Extents, destination, CullDistance(shape0, shape1));
+            if (reverse) for (var i = 0; i < count; i++)
+            {
+                var point = destination[i];
+                var normal = (new AlsDoubleVector(point.Normal1).Rotate(world0.Rotation) * -1).Rotate(world1.Rotation.Conjugate());
+                destination[i] = point with { Point0 = point.Point1, Point1 = point.Point0, Normal1 = normal.ToSingle() };
+            }
+            return count;
         }
         var reverseBoxFace = a.Shape is BoxShape3D && b.Shape is BoxShape3D &&
             TryInteriorFace(b, ToGodot(world1 with { Position = AlsDoubleVector.Zero }),
