@@ -38,7 +38,7 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
                     ? observed.LeafLocal : source.Local);
                 var handle = registry.Register(new(body.Index, local, 1, 1, source.Type is "sphere" or "capsule", source.CollisionEnabled != 0));
                 query.Bind(handle, shape,topology,source.Type=="box"?source.SizeCm*.5:null,
-                    source.Type=="convex"?observed.Scale:null);
+                    source.Type=="convex"?observed.Scale:null,source.Type is "box" or "convex"?observed.MarginCm:0);
             }
         }
         foreach (var (a, b) in definition.DisabledCollisions) registry.DisableBodyPair(a, b, true);

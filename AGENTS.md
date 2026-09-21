@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新非零凸包margin：`docs/verification/2026-09-21-physics-convex-margin.md`。原生8960支持点/编号/delta精确一致，11664非零instanced/scaled/box流形点/法向0差；GJK保留每侧delta跨fallback，polygon支持解析后margin。实验query绑定实际wrapper margin并按PrepareStep inverse mass解析动/静pair，ConvexZeroMargin观察值0，cull仍0。Core2816、Import全量2404+1旧跳过、后加高速coupled定向3通过，三频率smoke551/9/5/5/3/59通过。整链 **9/12**：高速120恢复，剩普通30/旋转30休眠及高速30第9帧穿地。高速30第7/8帧有正确上表面3点，6状态144共同求解阶段原生对照通过，不能据此证明Gather/发现/历史正确；捕获在artifacts/physics-convex-margin-20260921/high30-capture。下一步分离cull、历史/Gather初始输入及其他primitive实际几何，再三失败/普通Ragdoll等完整目标。UE完整构建审计/重导/DataValidation过，普通Editor marker成功但0xC0000005退出、两旧Condition failed未修复，DLL已释放。普通demo未接。
+
 - 运行时形状批次最终回归：Import Release 固定JIT串行全量2402通过/1既有跳过；旧PhysicsAssetOutput冷重导与原始输入字节一致。整链仍8/12及高速30穿地回归，详见下一条。
 
 - 最新运行时形状：`docs/verification/2026-09-21-physics-runtime-shapes.md`。真实外部particle导出43形状，按userdata绑定；两脚outer margin约.61782cm、inner0，左脚scaled Z=.9999998807907104，右脚instanced；leafLocal均identity。修正实验后端对已烘焙凸包重复应用FKConvexElem缩放/平移，改用实际wrapper scale/leafLocal，Import严格资产快照绑定与bounds验证。定向11、Godot构建、三频率smoke通过；整链仍8/12：30平移恢复，但30高速第9帧AnimMan身体19穿地新增失败，另普通30/旋转30/高速120未过。非零margin与cull仍未接，其他primitive实际几何传输待核对。UE全目标审计/冷重导/DataValidation通过，普通Editor本次退出0且DLL释放，两旧Condition failed和既往间歇AV未修复。普通demo未接，继续实际margin/FConvex支持/分离cull与四项整链失败，再完整ALS目标。

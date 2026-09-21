@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+bool ExportAlsPhysicsConvexMarginSupport(const FString& Output, FString& Error);
 
 // Read authored data and native mass properties in an isolated reference-pose world.
 bool ExportAlsPhysicsAssets(const FString& Output, FString& Error, bool ObserveRuntimeShapes = false);
@@ -22,4 +23,4 @@ bool ExportAlsPhysicsFaceClipReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGjkPrimitivesReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGjkSearchReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsMarginReference(const FString& Output, FString& Error);
-bool ExportAlsPhysicsConvexPairReference(const FString& Output, FString& Error, bool Scaled = false, bool BoxPairs = false);
+bool ExportAlsPhysicsConvexPairReference(const FString& Output, FString& Error, bool Scaled = false, bool BoxPairs = false, bool MarginPairs = false);

@@ -120,6 +120,42 @@ public partial class PhysicsCoreContactSmoke : Node3D
         Require(query.NativeCachedPairs==1&&query.NativeCacheSteps==1,"Native query cache did not publish.");
         contacts.Reset();Require(query.NativeCachedPairs==0,"Native reset retained cache.");
         _nativePolygonChecks+=4;
+        NativeMarginChecks();
+    }
+
+    private void NativeMarginChecks()
+    {
+        var identity=AlsPrecisePose.Identity;var registry=new AlsContactRegistry(2,2);
+        using var box=new BoxShape3D {Size=new(.1f,.06f,.16f),Margin=0};
+        using var query=new AlsGodotContactQuery(registry);
+        query.Bind(registry.Register(new(0,identity,1,1)),box,nativeHalf:new(8,5,3),nativeMargin:.5f);
+        query.Bind(registry.Register(new(1,identity,1,1)),box,nativeHalf:new(8,5,3),nativeMargin:.2f);
+        var actual=new AlsDetectedContact[4];var expected=new AlsDetectedContact[4];var baseline=new AlsDetectedContact[4];
+        var rejected=false;try{query.Query(0,identity,1,identity,actual);}catch(InvalidOperationException){rejected=true;}
+        Require(rejected,"Nonzero native margin accepted missing motion context.");_nativePolygonChecks++;
+        var work=new AlsConvexManifoldWorkspace();var cache=new AlsGjkCache();var changed=0;
+        foreach(var dynamicB in new[]{false,true})foreach(var distance in new[]{0d,8d,16d})
+        foreach(var axis in new[]{NVector.UnitX,NVector.UnitY,NVector.UnitZ})foreach(var angle in new[]{0f,.13f,.6f})
+        {
+            var pose=identity with {Position=new AlsDoubleVector(axis)*distance+new AlsDoubleVector(.137,-.231,.179),
+                Rotation=AlsQuaternion.FromAxisAngle(NVector.Normalize(new(1,2,3)),angle)};
+            var bodies=new[]{new AlsIslandBody(identity,new(1,AlsDoubleVector.One)),
+                new AlsIslandBody(identity,dynamicB?new(1,AlsDoubleVector.One):default)};
+            query.PrepareStep([],new AlsProjectionVelocity[2],bodies,1d/_hz);
+            var count=query.Query(0,identity,1,pose,actual);query.Abort();
+            cache.Reset();var result=AlsPolygonManifold.Build(new AlsBoxPolygonShape(new(8,5,3),dynamicB?.2f:.5f),
+                new AlsBoxPolygonShape(new(8,5,3),dynamicB?.2f:0),AlsPrecisePose.Relative(pose,identity),
+                cache,work,expected,0,(double)1e-6f,(double)1e-6f,1,.001f);
+            Require(count==result.Count,"Resolved runtime pair margin changed contact count.");
+            for(var i=0;i<count;i++)Require(actual[i]==expected[i],"Runtime pair margin transport changed contact geometry.");
+            cache.Reset();var zero=AlsPolygonManifold.Build(new AlsBoxPolygonShape(new(8,5,3)),
+                new AlsBoxPolygonShape(new(8,5,3)),AlsPrecisePose.Relative(pose,identity),
+                cache,work,baseline,0,(double)1e-6f,(double)1e-6f,1,.001f);
+            if(zero.Count!=count||!baseline.AsSpan(0,count).SequenceEqual(actual.AsSpan(0,count)))changed++;
+            _nativePolygonChecks++;
+        }
+        Require(changed>0&&query.NarrowPhaseQueries==0&&query.NativeCachedPairs==0,
+            "Margin checks did not distinguish zero-margin geometry or leaked provisional cache.");
     }
 
     private void TraceLifecycleChecks()

@@ -24,10 +24,12 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         public AlsConvexTopology? Cooked;
         public AlsDoubleVector? NativeHalf;
         public AlsDoubleVector NativeScale = AlsDoubleVector.One;
+        public float NativeMargin;
         public bool NativePolygon => Cooked is not null || NativeHalf.HasValue;
     }
     private readonly AlsContactRegistry _registry;
     private readonly AlsPolygonQueryCache _polygonCache;
+    private readonly bool[] _dynamicBodies;
     private readonly AlsGjkCache _directCache = new();
     private readonly AlsConvexManifoldWorkspace _directWorkspace = new();
     private readonly Binding?[] _bindings;
@@ -57,6 +59,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     internal AlsGodotContactQuery(AlsContactRegistry registry)
     {
         Main(); _registry = registry; _bindings = new Binding[registry.Capacity]; _polygonCache = new(registry.Capacity);
+        _dynamicBodies=new bool[registry.BodyCount];
         try
         {
             _space = PhysicsServer3D.SpaceCreate(); PhysicsServer3D.SpaceSetActive(_space, false);
@@ -67,7 +70,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         catch { Dispose(); throw; }
     }
     internal void Bind(AlsContactShapeHandle handle, Shape3D shape, AlsConvexTopology? cooked = null,
-        AlsDoubleVector? nativeHalf = null, AlsDoubleVector? nativeScale = null)
+        AlsDoubleVector? nativeHalf = null, AlsDoubleVector? nativeScale = null, float nativeMargin=0)
     {
         Check(); if (_registry.IsLocked) throw new InvalidOperationException("Cannot bind query geometry during a solve.");
         if (!_registry.Present(handle.Slot) || _registry.Key(handle.Slot).Revision != handle.Revision) throw new ArgumentException("Stale shape binding.");
@@ -82,17 +85,24 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             new AlsBoxPolygonShape(nativeHalf.Value).Validate();
         }
         if(nativeScale.HasValue&&cooked is null)throw new ArgumentException("Native convex scale needs cooked topology.");
+        if(!float.IsFinite(nativeMargin)||nativeMargin<0||(nativeMargin!=0&&cooked is null&&!nativeHalf.HasValue))
+            throw new ArgumentException("Native polygon margin requires explicit geometry.");
         var bounds = Bounds(shape); var old = _bindings[handle.Slot];
         if (old is not null && old.Revision == handle.Revision) throw new ArgumentException("Replace registry shape before rebinding geometry.");
         var binding = new Binding { Shape = shape, Bounds = bounds, Revision = handle.Revision, Changed = null!,
-            Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One };
+            Cooked=cooked,NativeHalf=nativeHalf,NativeScale=nativeScale??AlsDoubleVector.One,NativeMargin=nativeMargin };
         binding.Changed = () => binding.Dirty = true;
         if (old is not null && GodotObject.IsInstanceValid(old.Shape)) old.Shape.Changed -= old.Changed;
         _bindings[handle.Slot] = binding; shape.Changed += binding.Changed;
     }
     public void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous,ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies,double dt)
-    { Check();_polygonCache.PrepareStep(); }
+    {
+        Check();
+        if(bodies.Length!=_dynamicBodies.Length)throw new ArgumentException("Polygon margin body context differs.");
+        _polygonCache.PrepareStep();
+        for(var i=0;i<bodies.Length;i++)_dynamicBodies[i]=bodies[i].InverseMass.Mass>0;
+    }
     public void StageCommit() => _polygonCache.StageCommit();
     public void PublishCommit() => _polygonCache.PublishCommit();
     public void Abort() => _polygonCache.Abort();
@@ -117,14 +127,22 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         {
             var relative=AlsPrecisePose.Relative(world1,world0);
             var key=new AlsContactPairKey(_registry.Key(shape0),_registry.Key(shape1));
+            if(!_polygonCache.Pending&&(a.NativeMargin!=0||b.NativeMargin!=0))
+                throw new InvalidOperationException("Nonzero shape margins require a prepared body motion context.");
+            // Fixed island mass distinguishes dynamic (including sleeping)
+            // from external static/kinematic bodies; the latter both use zero
+            // polygon margin. Native observed ConvexZeroMargin is zero.
+            var margins=AlsCollisionMargins.Resolve(
+                new(a.NativeMargin,false,_dynamicBodies[_registry.At(shape0).Body]?AlsCollisionMotionState.Dynamic:AlsCollisionMotionState.Static),
+                new(b.NativeMargin,false,_dynamicBodies[_registry.At(shape1).Body]?AlsCollisionMotionState.Dynamic:AlsCollisionMotionState.Static),0);
             AlsConvexManifoldResult result;
             if(a.NativeHalf.HasValue&&b.NativeHalf.HasValue)
-                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value),new AlsBoxPolygonShape(b.NativeHalf.Value),key,relative,destination);
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination);
             else if(a.NativeHalf.HasValue)
-                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value),Convex(b),key,relative,destination);
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination);
             else if(b.NativeHalf.HasValue)
-                result=Native(Convex(a),new AlsBoxPolygonShape(b.NativeHalf.Value),key,relative,destination);
-            else result=Native(Convex(a),Convex(b),key,relative,destination);
+                result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination);
+            else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination);
             NativePolygonQueries++;return result.Count;
         }
         var reverseBoxFace = a.Shape is BoxShape3D && b.Shape is BoxShape3D &&
@@ -146,10 +164,8 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     private AlsConvexManifoldResult Native<TA,TB>(TA a,TB b,AlsContactPairKey key,in AlsPrecisePose relative,Span<AlsDetectedContact> destination)
         where TA:struct,IAlsPolygonShape where TB:struct,IAlsPolygonShape
     {
-        // Current Godot query proxies explicitly use zero margins. Actual UE
-        // wrapper margins still need transport; cooked margin alone is not
-        // evidence that those are zero. Keep overlap-only discovery until the
-        // detector's velocity-based cull is connected.
+        // Pair margins are resolved above from actual wrapper metadata and
+        // body motion. Separation discovery still awaits native detector cull.
         if(_polygonCache.Pending)
             return _polygonCache.Query(key,a,b,relative,destination,0,(double)1e-6f,(double)1e-6f,1,.001f);
         // Direct diagnostic queries have no surrounding island transaction.
@@ -157,9 +173,9 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         return AlsPolygonManifold.Build(a,b,relative,_directCache,_directWorkspace,destination,0,(double)1e-6f,(double)1e-6f,1,.001f);
     }
     // UE CreateGeometry selects instanced FConvex for exact unit NetScale;
-    // its zero-margin geometry methods delegate to the unscaled inner hull.
-    private static AlsConvexPolygonShape Convex(Binding binding)
-        =>binding.NativeScale==AlsDoubleVector.One?new(binding.Cooked!):new(binding.Cooked!,binding.NativeScale);
+    // its geometry methods delegate to the unscaled inner hull.
+    private static AlsConvexPolygonShape Convex(Binding binding,float margin)
+        =>binding.NativeScale==AlsDoubleVector.One?new(binding.Cooked!,margin):new(binding.Cooked!,binding.NativeScale,margin);
     private int QueryOrdered(int shape0, in AlsPrecisePose world0, int shape1, in AlsPrecisePose world1, Span<AlsDetectedContact> destination)
     {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1);

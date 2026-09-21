@@ -12,6 +12,7 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
     [Theory]
     [InlineData("v4_physics_coupled_step_reference.json", 6)]
     [InlineData("v4_physics_coupled_shock_reference.json", 5)]
+    [InlineData("v4_physics_high_drop_coupled_reference.json", 6)]
     public void FullChainSharedContactJointAndProjectionStagesMatchNativeContainers(string file, int caseCount)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(

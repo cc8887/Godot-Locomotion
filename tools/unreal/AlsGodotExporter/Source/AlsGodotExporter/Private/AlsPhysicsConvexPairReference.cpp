@@ -16,7 +16,7 @@
 #include "Serialization/JsonSerializer.h"
 namespace AlsJointSolverReference { TArray<TSharedPtr<FJsonValue>> V(const FVector& P); TSharedRef<FJsonObject> T(const FTransform& P); }
 
-bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bool Scaled,bool BoxPairs)
+bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bool Scaled,bool BoxPairs,bool MarginPairs)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
@@ -59,7 +59,8 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bo
         for(int32 I=0;I<2;++I)
         {
             const auto Bone=Shapes[I].Bone;const auto Hull=Shapes[I].Hull;
-            Shapes.Add({Bone,Hull,MakeImplicitObjectPtr<TImplicitObjectScaled<FConvex>>(Hull,FVec3(1.5,.8,1.2))});
+            Shapes.Add({Bone,Hull,MakeImplicitObjectPtr<TImplicitObjectScaled<FConvex>>(Hull,FVec3(1.5,.8,1.2),MarginPairs?.6178215742111206:0.)});
+            if(MarginPairs)Shapes[I].Geometry=MakeImplicitObjectPtr<TImplicitObjectInstanced<FConvex>>(Hull,.6178215742111206);
         }
         for(double Margin:{0.,.2})Shapes.Add({TEXT("box"),FConvexPtr(),MakeImplicitObjectPtr<FImplicitBox3>(FVec3(-8,-5,-3),FVec3(8,5,3),Margin)});
         // TBox::SStructureData is not DLL-exported. Run its exact Box.cpp
@@ -76,6 +77,7 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bo
             VertexPlanes.Add(MakeShared<FJsonValueObject>(Row));
         }
         Root->SetArrayField(TEXT("boxVertexPlanes"),VertexPlanes);
+        if(MarginPairs)Root->SetStringField(TEXT("observation"),TEXT("Actual generic convex UpdateConstraint initial manifolds; nonzero instanced/scaled foot wrapper margins, boxes and all ordered combinations; actual resolved pair margins"));
     }
     TArray<TSharedPtr<FJsonValue>> Rows;
     const FVec3 Scales0[]={FVec3(1),FVec3(2),FVec3(.5,1.5,.75),FVec3(-1,1,1)};
@@ -84,7 +86,7 @@ bool ExportAlsPhysicsConvexPairReference(const FString& Output,FString& Error,bo
     for(int32 A=0;A<Shapes.Num();++A)for(int32 B=0;B<Shapes.Num();++B)for(int32 Axis=0;Axis<3;++Axis)for(int32 Sign:{-1,1})
     for(double Distance:{0.,8.,16.,24.,40.,60.})for(double Angle:{0.,.13,.6})for(double Cull:{0.,3.,6.})
     {
-        if(BoxPairs&&A<4&&B<4)continue;
+        if(BoxPairs&&!MarginPairs&&A<4&&B<4)continue;
         FVec3 Position(.137,-.231,.179);Position[Axis]+=Sign*Distance;
         const FRigidTransform3 Pose0=FRigidTransform3::Identity;
         const FRigidTransform3 Pose1(Position,FRotation3::FromAxisAngle(FVec3(1,2,3).GetSafeNormal(),Angle));

@@ -27,6 +27,20 @@ UAlsGodotExportCommandlet::UAlsGodotExportCommandlet()
 int32 UAlsGodotExportCommandlet::Main(const FString& Params)
 {
     FString PhysicsOutput;
+    if (FParse::Value(*Params, TEXT("PhysicsConvexMarginPairOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsConvexPairReference(PhysicsOutput, Error, false, true, true))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Convex margin pair failed: %s"), *Error); return 39; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CONVEX_MARGIN_PAIR_OK assets_saved=0")); return 0;
+    }
+    if (FParse::Value(*Params, TEXT("PhysicsConvexMarginSupportOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsConvexMarginSupport(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Convex margin support failed: %s"), *Error); return 38; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CONVEX_MARGIN_SUPPORT_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsRuntimeShapesOutput="), PhysicsOutput))
     {
         FString Error;
