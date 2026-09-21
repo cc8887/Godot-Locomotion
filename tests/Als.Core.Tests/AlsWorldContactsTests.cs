@@ -98,6 +98,8 @@ public sealed class AlsWorldContactsTests
     private sealed class FailAfterStage(AlsWorldContacts inner) : IAlsIslandContacts
     {
         public void Gather(ReadOnlySpan<AlsPrecisePose> p, ReadOnlySpan<AlsProjectionVelocity> v, ReadOnlySpan<AlsIslandBody> b, double dt) => inner.Gather(p, v, b, dt);
+        public void Gather(ReadOnlySpan<AlsPrecisePose> p, ReadOnlySpan<AlsProjectionVelocity> v, ReadOnlySpan<AlsIslandBody> b,
+            double dt, ReadOnlySpan<AlsIslandBodyState> previous) => inner.Gather(p, v, b, dt, previous);
         public void SolvePosition(Span<AlsProjectionDelta> b, int i, int n) => inner.SolvePosition(b, i, n);
         public void SolveVelocity(Span<AlsProjectionVelocity> b, int i, int n, double dt) => inner.SolveVelocity(b, i, n, dt);
         public void StageCommit() { inner.StageCommit(); throw new InvalidOperationException("Injected failure after staging."); }

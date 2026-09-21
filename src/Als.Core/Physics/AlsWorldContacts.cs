@@ -5,6 +5,11 @@ namespace GodotAls.Core.Physics;
 public interface IAlsContactGeometrySource
 {
     bool IsInvalidated => false;
+    // Per-attempt borrowed context, before any geometry/restoration callbacks.
+    // Legacy direct Gather supplies an empty previous span; a velocity-aware
+    // provider must reject that absence instead of substituting predicted V.
+    void PrepareStep(ReadOnlySpan<AlsIslandBodyState> previous, ReadOnlySpan<AlsProjectionVelocity> velocities,
+        ReadOnlySpan<AlsIslandBody> bodies, double dt) { }
     // Opt-in for polygonal pairs only. The provider supplies the native size-
     // based tolerance and its actual discovery/culling distance in cm.
     bool TryGetManifoldSettings(int shape0, int shape1, out AlsContactManifoldSettings settings)
@@ -88,16 +93,22 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     }
     public void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt)
+        => Gather(predicted, velocities, bodies, dt, default);
+    public void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
+        ReadOnlySpan<AlsIslandBody> bodies, double dt, ReadOnlySpan<AlsIslandBodyState> previous)
     {
         if (_pending) throw new InvalidOperationException("World contacts already have a pending step.");
         if (!double.IsFinite(dt) || dt <= 0 || !float.IsFinite((float)dt) || !float.IsFinite(1 / (float)dt))
             throw new ArgumentOutOfRangeException(nameof(dt));
         if (predicted.Length != _registry.BodyCount || velocities.Length != predicted.Length || bodies.Length != predicted.Length)
             throw new ArgumentException("Contact registry and island body counts differ.");
+        if (!previous.IsEmpty && previous.Length != predicted.Length)
+            throw new ArgumentException("Previous body state count differs from the island.");
         if (_epoch == long.MaxValue) throw new InvalidOperationException("Contact epoch exhausted.");
         _registry.Enter(); _pending = true; _staged = false; _count = _contactCount = _activeCount = _restoredCount = 0;
         try
         {
+            _source.PrepareStep(previous, velocities, bodies, dt);
             for (var i = 0; i < _registry.Capacity; i++) if (_registry.Present(i))
             {
                 var s = _registry.At(i); var local = bodies[s.Body].InverseMass.Mass > 0
