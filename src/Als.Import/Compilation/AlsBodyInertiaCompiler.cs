@@ -10,6 +10,10 @@ public readonly record struct AlsConditionedBodyInertia(AlsDoubleVector ExtentsC
     // Full actor-local geometry bounds, before COM rotation and connector
     // enlargement; collision midphase scaling must not use inertia extents.
     public double NativeBoundsSize { get; init; }
+    // UE stores I and InvI independently from the original double tensor.
+    // Taking a reciprocal of exported float I loses the original InvI bits.
+    public Vector3 RawInverseInertia { get; init; }
+    public Vector3 ConditionedInverseInertia => RawInverseInertia * InverseInertiaScale;
 }
 
 public static class AlsBodyInertiaCompiler
@@ -49,10 +53,15 @@ public static class AlsBodyInertiaCompiler
                 if(joint.ParentBody==body.Index)extents=AlsBodyInertiaConditioning.IncludeConnector(extents,joint.ParentFrame.Position,body.MassLocal);
                 if(joint.ChildBody==body.Index)extents=AlsBodyInertiaConditioning.IncludeConnector(extents,joint.ChildFrame.Position,body.MassLocal);
             }
-            var inverse=new Vector3((float)(1/body.InertiaKgCm2.X),(float)(1/body.InertiaKgCm2.Y),(float)(1/body.InertiaKgCm2.Z));
+            var inverse=V(native.GetProperty("inverseInertia")).ToSingle();
+            Require(native.GetProperty("dynamic").GetBoolean()?float.IsFinite(inverse.X)&&float.IsFinite(inverse.Y)&&float.IsFinite(inverse.Z)&&
+                inverse.X>0&&inverse.Y>0&&inverse.Z>0&&
+                Math.Abs(inverse.X*body.InertiaKgCm2.X-1)<1e-6&&Math.Abs(inverse.Y*body.InertiaKgCm2.Y-1)<1e-6&&
+                Math.Abs(inverse.Z*body.InertiaKgCm2.Z-1)<1e-6:inverse==Vector3.Zero&&body.PhysicsType==1,
+                "Invalid native stored inverse inertia.");
             var enabled=settings.Enabled&&body.Defaults.GetProperty("bInertiaConditioning").GetBoolean();
             var scale=body.PhysicsType==1?Vector3.One:AlsBodyInertiaConditioning.Calculate((float)(1/body.MassKg),inverse,extents.ToSingle(),settings with{Enabled=enabled});
-            result[body.Index]=new(extents,scale){NativeBoundsSize=System.Math.Max(full.X,System.Math.Max(full.Y,full.Z))};
+            result[body.Index]=new(extents,scale){NativeBoundsSize=System.Math.Max(full.X,System.Math.Max(full.Y,full.Z)),RawInverseInertia=inverse};
         }
         return result;
     }

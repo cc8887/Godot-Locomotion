@@ -325,6 +325,14 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_PROJECTION_REFERENCE_OK cases=262 assets_saved=0"));
         return 0;
     }
+    if (FParse::Value(*Params, TEXT("PhysicsJointFramesOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsJointFrameInputs(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Joint frames export failed: %s"), *Error); return 13; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_JOINT_FRAMES_OK rigs=2 assets_saved=0"));
+        return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsInertiaOutput="), PhysicsOutput))
     {
         FString Error;

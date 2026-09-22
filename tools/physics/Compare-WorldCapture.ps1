@@ -45,8 +45,10 @@ try {
                 if($name -ne $bodies[$i].GetProperty('name').GetString()) { throw 'Body order differs.' }
                 $v=0.0;$w=0.0
                 for($axis=0;$axis -lt 3;$axis++) {
-                    $v+=[Math]::Pow($expected[$i].GetProperty('linearVelocity')[$axis].GetDouble()-$actual[$i].GetProperty('v')[$axis].GetDouble(),2)
-                    $w+=[Math]::Pow($expected[$i].GetProperty('angularVelocity')[$axis].GetDouble()-$actual[$i].GetProperty('w')[$axis].GetDouble(),2)
+                    # Restore the stored float values before promoting for error
+                    # measurement; JSON round-trip literals can differ in length.
+                    $v+=[Math]::Pow([double]$expected[$i].GetProperty('linearVelocity')[$axis].GetSingle()-[double]$actual[$i].GetProperty('v')[$axis].GetSingle(),2)
+                    $w+=[Math]::Pow([double]$expected[$i].GetProperty('angularVelocity')[$axis].GetSingle()-[double]$actual[$i].GetProperty('w')[$axis].GetSingle(),2)
                 }
                 if([Math]::Sqrt($v) -gt $maxV) { $maxV=[Math]::Sqrt($v);$vBone=$name }
                 if([Math]::Sqrt($w) -gt $maxW) { $maxW=[Math]::Sqrt($w);$wBone=$name }

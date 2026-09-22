@@ -19,7 +19,9 @@ public static class AlsBodyInertiaConditioning
             throw new ArgumentOutOfRangeException(nameof(inverseMass));
         if(!settings.Enabled||inverseMass<=settings.InverseMassTolerance||Min(inverseInertia)<=settings.InverseInertiaTolerance||Min(extents)<=settings.ExtentToleranceCm)
             return Vector3.One;
-        var sq=extents*extents;var ratio=inverseInertia/inverseMass;
+        // FVector / scalar computes one float reciprocal, then multiplies
+        // every component. Vector3 / scalar performs direct SIMD division.
+        var sq=extents*extents;var ratio=inverseInertia*(1f/inverseMass);
         var rotationRatio=new Vector3(MathF.Max(sq.Y*ratio.X,sq.Z*ratio.X),MathF.Max(sq.X*ratio.Y,sq.Z*ratio.Y),MathF.Max(sq.X*ratio.Z,sq.Y*ratio.Z));
         var allowed=settings.MaxRotationRatio;
         if(settings.MaxDistanceCm>0)allowed*=MathF.Min(Max(extents)/settings.MaxDistanceCm,1);
