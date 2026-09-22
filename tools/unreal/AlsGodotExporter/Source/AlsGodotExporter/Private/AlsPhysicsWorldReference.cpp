@@ -1,5 +1,6 @@
 #include "AlsPhysicsAssetExport.h"
 #include "Chaos/Island/IslandManager.h"
+#include "Chaos/ShapeInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/SkeletalMesh.h"
@@ -22,6 +23,7 @@ namespace AlsJointSolverReference {
 TArray<TSharedPtr<FJsonValue>> V(const FVector& P);
 TSharedRef<FJsonObject> Body(FBodyInstance& B,bool SleepDiagnostics);
 }
+namespace AlsPhysicsExport { TSharedRef<FJsonObject> T(const FTransform& Transform); }
 namespace AlsCoupledStepReference {
 Chaos::FVec3 ReadV(const TSharedPtr<FJsonObject>& J,const TCHAR* Name);
 Chaos::FRigidTransform3 ReadT(const TSharedPtr<FJsonObject>& J);
@@ -136,6 +138,15 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                         for(const auto& Shape:Particle->ShapesArray())
                         {
                             auto S=MakeShared<FJsonObject>();S->SetBoolField(TEXT("simulation"),Shape->GetSimEnabled());
+                            // Observe the actual simulation leaf, not authored dimensions or
+                            // the external asset-export proxy. This is read-only diagnostics.
+                            const auto* Leaf=Shape->GetLeafGeometry();
+                            if(!Leaf)return Fail(TEXT("Missing world diagnostic leaf geometry."));
+                            S->SetStringField(TEXT("leafType"),Leaf->GetTypeName().ToString());
+                            S->SetNumberField(TEXT("leafMargin"),Leaf->GetMarginf());
+                            S->SetArrayField(TEXT("leafBoundsMin"),V(FVector(Leaf->BoundingBox().Min())));
+                            S->SetArrayField(TEXT("leafBoundsMax"),V(FVector(Leaf->BoundingBox().Max())));
+                            S->SetObjectField(TEXT("leafLocal"),AlsPhysicsExport::T(FTransform(Shape->GetLeafRelativeTransform())));
                             S->SetBoolField(TEXT("query"),Shape->GetQueryEnabled());
                             S->SetStringField(TEXT("filter"),Shape->GetCombinedShapeFilterData().GetShapeFilterData().ToString());
                             const auto& Filter=Shape->GetCombinedShapeFilterData().GetShapeFilterData();
