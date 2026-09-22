@@ -7,10 +7,13 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsPhysicsActualHistoryReferenceTests(Xunit.Abstractions.ITestOutputHelper output)
 {
-    [Fact]
-    public void ActualAnchorsMatchingScatterAndAdjacentPublishedHistoryMatchNative()
+    [Theory]
+    [InlineData("v4_physics_actual_history_reference.json", 573, 51, 1007, 410, 3, 57, 24)]
+    [InlineData("v4_physics_window_history_reference.json", 848, 40, 2055, 804, 0, 14, 198)]
+    public void ActualAnchorsMatchingScatterAndAdjacentPublishedHistoryMatchNative(string file, int pairCount,
+        int frameCount, int pointCount, int adjacentCount, int emptyCount, int freshCount, int slidingCount)
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_actual_history_reference.json")));
+        using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/" + file)));
         Assert.Equal(1, doc.RootElement.GetProperty("schemaVersion").GetInt32());
         var previous = new Dictionary<string, (long Epoch, AlsSavedContact[] Saved, float Minimum)>();
         var rows = doc.RootElement.GetProperty("cases").EnumerateArray().OrderBy(r => r.GetProperty("scenario").GetString())
@@ -60,8 +63,8 @@ public sealed class AlsPhysicsActualHistoryReferenceTests(Xunit.Abstractions.ITe
             previous[id] = (epoch, actualSaved, history.MinInitialPhi);
         }
         output.WriteLine($"ACTUAL_HISTORY runtime={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription} pairs={rows.Length} frames={frames.Count} points={points} adjacent={adjacent} empty={empty} fresh={fresh} sliding={sliding} maxAnchor={maximum:R}");
-        Assert.Equal(573, rows.Length); Assert.Equal(51, frames.Count); Assert.Equal(1007, points);
-        Assert.Equal(410, adjacent); Assert.Equal(3, empty); Assert.Equal(57, fresh); Assert.Equal(24, sliding);
+        Assert.Equal(pairCount, rows.Length); Assert.Equal(frameCount, frames.Count); Assert.Equal(pointCount, points);
+        Assert.Equal(adjacentCount, adjacent); Assert.Equal(emptyCount, empty); Assert.Equal(freshCount, fresh); Assert.Equal(slidingCount, sliding);
         Assert.Equal(0, maximum);
         void Check(Vector3 a, Vector3 b) => maximum = MathF.Max(maximum, Vector3.Distance(a, b));
         void CheckSaved(AlsSavedContact a, AlsSavedContact b) { Check(a.Anchor0, b.Anchor0); Check(a.Anchor1, b.Anchor1); Assert.Equal(b.InitialPhi, a.InitialPhi); }

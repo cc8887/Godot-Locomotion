@@ -15,6 +15,7 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
     [InlineData("v4_physics_high_drop_coupled_reference.json", 6)]
     [InlineData("v4_physics_resting_coupled_reference.json", 6)]
     [InlineData("v4_physics_free_coupled_reference.json", 22)]
+    [InlineData("v4_physics_window_coupled_reference.json", 8)]
     public void FullChainSharedContactJointAndProjectionStagesMatchNativeContainers(string file, int caseCount)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
@@ -45,7 +46,7 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
                 Pose(j.GetProperty("parentFrame")), Pose(j.GetProperty("childFrame")), j.GetProperty("jointSettings"), settings)).ToArray();
             var joints = jointRows.Select((j, i) => definitions[i].ConnectivityOnly ? default :
                 new AlsCachedJoint(Body(j, "parent"), Body(j, "child"), definitions[i].Angular, dt)).ToArray();
-            if (file == "v4_physics_free_coupled_reference.json")
+            if (file is "v4_physics_free_coupled_reference.json" or "v4_physics_window_coupled_reference.json")
             {
                 Assert.Single(definitions, j => j.ConnectivityOnly);
                 Assert.Equal(input.GetProperty("mesh").GetString()!.EndsWith(".AnimMan", StringComparison.Ordinal) ? 20 : 18, joints.Length);
@@ -152,6 +153,7 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
         output.WriteLine($"CAPTURED_COUPLED_STEP shock_pairs={shockPairs} max_dp={maxCapturedDp:R} max_dq={maxCapturedDq:R} max_v={maxCapturedV:R} max_w={maxCapturedW:R}");
         if (file == "v4_physics_coupled_shock_reference.json") Assert.True(shockPairs > 0, "Real captures must exercise dynamic contacts at different graph levels.");
         if (file == "v4_physics_free_coupled_reference.json") Assert.Equal(10, environmentCases);
+        if (file == "v4_physics_window_coupled_reference.json") Assert.Equal(caseCount, environmentCases);
         Assert.True(errors.Count == 0, string.Join(Environment.NewLine, errors));
     }
 }
