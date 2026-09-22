@@ -19,11 +19,17 @@ public static class AlsPolygonManifold
     public static AlsConvexManifoldResult Build<TA, TB>(in TA a, in TB b,
         in AlsPrecisePose shape1To0, AlsGjkCache cache, AlsConvexManifoldWorkspace work,
         Span<AlsDetectedContact> destination, double cullDistance, double gjkEpsilon, double epaEpsilon,
-        float minimumFaceSearchDistance, float planeNormalEpsilon, bool forceEdgeZeroCull = false, bool warmStart = true)
+        float minimumFaceSearchDistance, float planeNormalEpsilon, bool forceEdgeZeroCull = false, bool warmStart = true,
+        AlsPrecisePose? shape0To1 = null)
         where TA : struct, IAlsPolygonShape where TB : struct, IAlsPolygonShape
     {
         ArgumentNullException.ThrowIfNull(cache); ArgumentNullException.ThrowIfNull(work);
         a.Validate(); b.Validate();
+        if (shape0To1 is { } reverse)
+        {
+            reverse.Validate(1e-5);
+            if (reverse.Scale != AlsDoubleVector.One) throw new ArgumentException("Polygon transforms must be rigid.");
+        }
         if (destination.Length < 4 || !double.IsFinite(cullDistance) || cullDistance < 0 ||
             !float.IsFinite(minimumFaceSearchDistance) || minimumFaceSearchDistance < 0 ||
             !float.IsFinite(planeNormalEpsilon) || planeNormalEpsilon < 0)
@@ -64,7 +70,11 @@ public static class AlsPolygonManifold
             return new(1,AlsConvexContactFeature.EdgeEdge,plane0,plane1);
         }
         var inverse = shape1To0.Rotation.Conjugate();
-        var transform = reference0 ? shape1To0 :
+        // Native computes the reverse relative transform from the two WORLD
+        // poses. Inverting the forward result is not equivalent after particle
+        // quaternion float storage, especially far from the shape origin.
+        // Relative-only callers model shape 0 at identity; world owners pass both.
+        var transform = reference0 ? shape1To0 : shape0To1 ??
             new AlsPrecisePose((shape1To0.Position * -1).Rotate(inverse),inverse,AlsDoubleVector.One);
         Span<AlsDetectedContact> staged = stackalloc AlsDetectedContact[4];
         var count = reference0

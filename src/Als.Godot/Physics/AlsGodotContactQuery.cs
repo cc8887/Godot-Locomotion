@@ -256,6 +256,7 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         if(a.NativePolygon&&b.NativePolygon)
         {
             var relative=AlsPrecisePose.Relative(world1,world0);
+            var reverse=AlsPrecisePose.Relative(world0,world1);
             var cull=CullDistance(shape0,shape1);
             var key=new AlsContactPairKey(_registry.Key(shape0),_registry.Key(shape1));
             if(!_polygonCache.Pending&&(a.NativeMargin!=0||b.NativeMargin!=0))
@@ -268,12 +269,12 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
                 new(b.NativeMargin,false,_dynamicBodies[_registry.At(shape1).Body]?AlsCollisionMotionState.Dynamic:AlsCollisionMotionState.Static),0);
             AlsConvexManifoldResult result;
             if(a.NativeHalf.HasValue&&b.NativeHalf.HasValue)
-                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination,cull);
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,reverse,destination,cull);
             else if(a.NativeHalf.HasValue)
-                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination,cull);
+                result=Native(new AlsBoxPolygonShape(a.NativeHalf.Value,margins.Margin0),Convex(b,margins.Margin1),key,relative,reverse,destination,cull);
             else if(b.NativeHalf.HasValue)
-                result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,destination,cull);
-            else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,destination,cull);
+                result=Native(Convex(a,margins.Margin0),new AlsBoxPolygonShape(b.NativeHalf.Value,margins.Margin1),key,relative,reverse,destination,cull);
+            else result=Native(Convex(a,margins.Margin0),Convex(b,margins.Margin1),key,relative,reverse,destination,cull);
             NativePolygonQueries++;return result.Count;
         }
         if (a.NativeCapsule.HasValue && b.NativeCapsule.HasValue)
@@ -359,16 +360,16 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         }
         return QueryOrdered(shape0, world0, shape1, world1, destination);
     }
-    private AlsConvexManifoldResult Native<TA,TB>(TA a,TB b,AlsContactPairKey key,in AlsPrecisePose relative,Span<AlsDetectedContact> destination,float cull)
+    private AlsConvexManifoldResult Native<TA,TB>(TA a,TB b,AlsContactPairKey key,in AlsPrecisePose relative,in AlsPrecisePose reverse,Span<AlsDetectedContact> destination,float cull)
         where TA:struct,IAlsPolygonShape where TB:struct,IAlsPolygonShape
     {
         // Pair margins are resolved above from actual wrapper metadata and
         // body motion; cull uses the configured native detector's step context.
         if(_polygonCache.Pending)
-            return _polygonCache.Query(key,a,b,relative,destination,cull,(double)1e-6f,(double)1e-6f,1,.001f);
+            return _polygonCache.Query(key,a,b,relative,destination,cull,(double)1e-6f,(double)1e-6f,1,.001f,shape0To1:reverse);
         // Direct diagnostic queries have no surrounding island transaction.
         _directCache.Reset();
-        return AlsPolygonManifold.Build(a,b,relative,_directCache,_directWorkspace,destination,cull,(double)1e-6f,(double)1e-6f,1,.001f);
+        return AlsPolygonManifold.Build(a,b,relative,_directCache,_directWorkspace,destination,cull,(double)1e-6f,(double)1e-6f,1,.001f,shape0To1:reverse);
     }
     // UE CreateGeometry selects instanced FConvex for exact unit NetScale;
     // its geometry methods delegate to the unscaled inner hull.

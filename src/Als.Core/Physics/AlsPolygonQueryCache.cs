@@ -40,7 +40,8 @@ public sealed class AlsPolygonQueryCache
     }
     public AlsConvexManifoldResult Query<TA,TB>(AlsContactPairKey key,in TA a,in TB b,in AlsPrecisePose shape1To0,
         Span<AlsDetectedContact> destination,double cullDistance,double gjkEpsilon,double epaEpsilon,
-        float minimumFaceSearchDistance,float planeNormalEpsilon,bool forceEdgeZeroCull=false,bool warmStart=true)
+        float minimumFaceSearchDistance,float planeNormalEpsilon,bool forceEdgeZeroCull=false,bool warmStart=true,
+        AlsPrecisePose? shape0To1=null)
         where TA:struct,IAlsPolygonShape where TB:struct,IAlsPolygonShape
     {
         Writable();
@@ -52,7 +53,7 @@ public sealed class AlsPolygonQueryCache
         try
         {
             return AlsPolygonManifold.Build(a,b,shape1To0,entry.Proposed,_workspace,destination,cullDistance,
-                gjkEpsilon,epaEpsilon,minimumFaceSearchDistance,planeNormalEpsilon,forceEdgeZeroCull,warmStart);
+                gjkEpsilon,epaEpsilon,minimumFaceSearchDistance,planeNormalEpsilon,forceEdgeZeroCull,warmStart,shape0To1);
         }
         catch { _faulted=true;throw; }
     }
