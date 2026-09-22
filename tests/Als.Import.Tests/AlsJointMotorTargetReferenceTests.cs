@@ -19,6 +19,11 @@ public sealed class AlsJointMotorTargetReferenceTests(Xunit.Abstractions.ITestOu
             var authored = AlsPhysicsAssetCompiler.Compile(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
                 "assets/config/v4_physics_asset_inputs.json")), rig.GetProperty("mesh").GetString()!);
             Assert.Equal(authored.PhysicsAsset, rig.GetProperty("physicsAsset").GetString());
+            var settings = AlsPhysicsJointCompiler.Compile(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
+                "assets/config/v4_physics_joint_reference.json")), authored);
+            var inputs = new AlsRagdollMotorInputs(authored, settings, 1.5f, 1.5f);
+            var targets = settings.Select(s => s.AngularDrive.Target).ToArray();
+            var submitted = new AlsIslandAngularDrive[inputs.OutputCount];
             var posesSeen = new HashSet<string>();
             foreach (var sample in rig.GetProperty("motorSamples").EnumerateArray())
             {
@@ -29,6 +34,8 @@ public sealed class AlsJointMotorTargetReferenceTests(Xunit.Abstractions.ITestOu
                 Assert.Equal(authored.Bones.Select(b => b.Name), names);
                 Assert.Equal(authored.Bones.Select(b => b.Parent), parents);
                 var locals = bones.EnumerateArray().Select(b => Transform(b.GetProperty("local"))).ToArray();
+                inputs.EvaluateParameters(locals, targets, (float)D(sample, "spring"), (float)D(sample, "damping"), submitted);
+                var submittedIndex = 0;
                 foreach (var motor in sample.GetProperty("motors").EnumerateArray())
                 {
                     total++;
@@ -39,6 +46,18 @@ public sealed class AlsJointMotorTargetReferenceTests(Xunit.Abstractions.ITestOu
                     Assert.Equal(AlsDoubleVector.One * (1.5 * D(sample, "spring")), k);
                     Assert.Equal(AlsDoubleVector.One * (1.5 * D(sample, "damping")), c);
                     Assert.Equal(B(motor, "twistPosition") || B(motor, "swingPosition"), B(motor, "orientationEnabled"));
+                    if (B(motor, "twistPosition") || B(motor, "swingPosition") || B(motor, "twistVelocity") || B(motor, "swingVelocity"))
+                    {
+                        var step = submitted[submittedIndex++];
+                        Assert.Equal(motor.GetProperty("index").GetInt32(), step.Joint);
+                        Assert.Equal(new AlsDoubleVector(B(motor,"twistPosition") ? k.X : 0,
+                            B(motor,"swingPosition") ? k.Y : 0, B(motor,"swingPosition") ? k.Z : 0), step.Stiffness);
+                        Assert.Equal(new AlsDoubleVector(B(motor,"twistVelocity") ? c.X : 0,
+                            B(motor,"swingVelocity") ? c.Y : 0, B(motor,"swingVelocity") ? c.Z : 0), step.Damping);
+                        var nativeTarget = Transform(motor.GetProperty("target")).Rotation;
+                        Assert.InRange(System.Math.Abs(AlsQuaternion.Dot(step.Target, nativeTarget) - 1), 0, 1e-12);
+                        targets[step.Joint] = step.Target;
+                    }
                     if (!B(motor, "orientationEnabled")) continue;
                     var joint = rig.GetProperty("joints")[motor.GetProperty("index").GetInt32()];
                     var definition = authored.Joints[motor.GetProperty("index").GetInt32()];
@@ -55,6 +74,7 @@ public sealed class AlsJointMotorTargetReferenceTests(Xunit.Abstractions.ITestOu
                         System.Math.Max(System.Math.Abs(delta.Z), System.Math.Abs(delta.W))));
                     checkedTargets++; if (parents[child] != parent) intermediateParents++;
                 }
+                Assert.Equal(inputs.OutputCount, submittedIndex);
             }
             Assert.True(posesSeen.Count >= 3, "Native Flail sampling did not change its animation pose.");
         }

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新电机输入组装：`docs/verification/2026-09-22-physics-motor-inputs.md`。AlsRagdollMotorInputs绑定原始帧/父链/启用轴，已提交动画locals+独立committed targets→有序部分drive，完全停用root省略；速度cm/s按ALS float clamp×25000、运行时阻尼0，显式scale按Chaos double乘法。预分配候选全成功才覆盖output，6项NET8/9及Optimize过；真实Flail参考逐输出K/C/target通过，后部失败/重试/2048零分配/小数缩放覆盖。无新native导出/全量/矩阵；尚无Godot生产调用，下一步实际pose交接与逐步绑定/生命周期。普通Ragdoll及全部剩余目标保留，最近9/12三30旧失败；main/用户P4保留。
+
 - 最新动画电机目标：`docs/verification/2026-09-22-physics-motor-targets.md`。真实Flail两模型各五姿态，190motor/180启用目标，Core原始帧与图形父链矩阵计算最大分量差3.33e-16；native K/C观测当前1.5缩放、flags独立。资产绑定严格；真实中间父链0，解析测试覆盖而非native golden。Core新3项/Import定向10在.NET8/9过，Optimize过，无新全量/矩阵。冻结658300字节SHA C5E087DFBCB2929A61FB355582F9AE8945BAE66570DD9DE4302E9574B2CF8320冷复导同，旧frame字节不变。UE完整Editor审计fingerprint7AB92D790C696EB95D9D41A2511BABF54B6EFEC49AF7F0A3EECF6854D017B417/DataValidation过；Editor24296加载退出0，两旧Condition/间歇AV未修。新helper尚无生产调用；下一步独立动画pose→target、轴启用/速度强度→逐步drive，再普通Ragdoll生命周期与恢复。最近矩阵9/12三30旧失败，普通demo未接，全部剩余目标保留；main/用户P4保留。
 
 - 最新逐步驱动：`docs/verification/2026-09-22-physics-runtime-drives.md`。按本地ALS C++确认普通Ragdoll须Flail关节目标+骨盆速度强度，非只放开刚体。Core新增有序部分angularDrives输入，预分配候选、solver新行、失败时设置/身体不发布、休眠保留设置不自动wake；host三入口转发。五新测试；Core2878既定过滤/Import2477+1旧skip、NET9 Core25/Import9过。Godot --runtime-drives 创建零驱动后每步提交native输入，144×12/1728提交与固定路径报告除计数相同，P5.68e-14/V4.55e-13/W5.68e-14，角6.66e-8。首次case72切频fail；--fixed-fps15修前case12稳定失败，经官方ed1daf0bf Main::iteration确认同catch-up批次缓存dt，改首次/切频停用probe物理处理，在idle设置rate并启用，新批次才开始案例；无放宽dt/少帧/跳案例。两模式15FPS和普通runtime回放全过，12频率边界。Optimize/三频率smoke/scene60过；最终普通120 A635/M1004睡与上批既有字段全同；本批无新全矩阵，最近9/12三30旧fail。未改UE/导出，旧AV/Condition未修。下一步动画父链/原始约束帧目标+drive scale/骨盆速度强度的独立原生验证，再普通角色最后已提交pose交接、胶囊停用、物理展示/恢复；勿用物理输出代Flail目标。普通demo仍未接，全部Get-up/PoseRecovery/Mantle/Camera/十分钟目标保留，main/用户P4保留。
