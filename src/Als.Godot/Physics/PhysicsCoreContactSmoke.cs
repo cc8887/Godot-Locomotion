@@ -30,6 +30,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     private int _capsuleDegenerateSteps;
     private int _capsuleRuntimeChecks;
     private int _rawGatherChecks;
+    private int _pairOrderChecks;
     private double _maxMomentum;
     private string _report = "";
     private bool _done;
@@ -97,7 +98,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
                 native_sphere_box_checks = _sphereBoxChecks,
                 native_capsule_box_checks = _fullCapsuleBoxChecks,
                 native_capsule_runtime_checks = _capsuleRuntimeChecks, runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-                native_raw_gather_checks = _rawGatherChecks,
+                native_raw_gather_checks = _rawGatherChecks, native_pair_order_checks = _pairOrderChecks,
                 native_capsule_convex_checks = _capsuleConvexChecks,
                 native_capsule_pair_checks = _capsulePairChecks,
                 capsule_degenerate_steps = _capsuleDegenerateSteps,
@@ -140,6 +141,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
         NativeCullChecks();
         NativeMidphaseRetirementChecks();
         NativeShapeBoundsChecks();
+        NativeEndpointOrderChecks();
         NativeCapsuleCullChecks();
         PrimitiveBindingChecks();
         NativeSphereBoxChecks();
@@ -199,6 +201,32 @@ public partial class PhysicsCoreContactSmoke : Node3D
         Gather();Commit();Require(query.NativeCachedPairs==1&&contacts.LastRestoredPairs==0&&query.NativePolygonQueries==queries+1,
             "Particle re-entry reused retired geometry or failed to recreate its cache.");
         _nativePolygonChecks+=5;
+    }
+
+    private void NativeEndpointOrderChecks()
+    {
+        var identity = AlsPrecisePose.Identity; var registry = new AlsContactRegistry(2, 2);
+        using var capsule = new CapsuleShape3D { Radius = .02f, Height = .14f };
+        using var query = new AlsGodotContactQuery(registry);
+        var geometry = new AlsCapsuleGeometry(new(0, 0, -5), NVector.UnitZ, 10, 2);
+        query.Bind(registry.Register(new(0, identity, 1, 1, true)), capsule, nativeCapsule: geometry);
+        query.Bind(registry.Register(new(1, identity, 1, 1, true)), capsule, nativeCapsule: geometry);
+        var trace = new AlsContactTrace(query, registry, "endpoint-order", ["a", "b"], () => 0, 1, 1, []);
+        var contacts = new AlsWorldContacts(registry, trace, new(0, 0, 0), new(1f / _hz, 0, 2000));
+        var bodies = new[] { new AlsIslandBody(identity, new(1, AlsDoubleVector.One)), new AlsIslandBody(identity, new(1, AlsDoubleVector.One)) };
+        var poses = new[] { identity, identity with { Position = new(1, 0, 0) } }; var velocities = new AlsProjectionVelocity[2];
+        void Gather() => contacts.Gather(poses, velocities, bodies, 1d / _hz);
+        Gather();
+        Require(contacts.PreparedPairAt(0).Body0 == 1 && contacts.PreparedGatherAt(0).Body0.ShapeWorld == poses[1] &&
+            contacts.HistoryKeyAt(0).Shape0.Shape == 1, "Native endpoint order did not reach query, Gather and history through trace.");
+        _pairOrderChecks++; contacts.StageCommit(); contacts.Commit();
+        registry.RebindBody(0); Gather();
+        Require(contacts.PreparedPairAt(0).Body0 == 0 && contacts.PreparedGatherAt(0).Settings.InitialManifold &&
+            !contacts.HistoryPreparedAt(0, 0).Geometry.HasAnchor, "Reused particle kept its old order or incompatible friction anchor.");
+        _pairOrderChecks++; contacts.Abort();
+        bodies[0] = new(identity, default); Gather();
+        Require(contacts.PreparedPairAt(0).Body0 == 1, "Dynamic capsule was not first against the later static particle.");
+        _pairOrderChecks++; contacts.Abort();
     }
 
     private void CapsuleDegenerateStepChecks()

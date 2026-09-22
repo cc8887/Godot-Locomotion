@@ -92,7 +92,7 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
             }
             var before=new AlsGjkCache();var after=new AlsGjkCache();
             var queried=query.CopyPendingPolygonQuery(contacts.PreparedKeyAt(i),before,after);
-            contactInputs[i] = new { body0 = pair.Body0, body1 = pair.Body1, material = pair.Material, points,
+            contactInputs[i] = new { key = contacts.PreparedKeyAt(i), body0 = pair.Body0, body1 = pair.Body1, material = pair.Material, points,
                 polygonQuery = queried ? new { before=Cache(before),after=Cache(after) } : null,
                 gather = new { body0 = GatherBody(raw.Body0), body1 = GatherBody(raw.Body1), settings = raw.Settings, points = geometry } };
         }

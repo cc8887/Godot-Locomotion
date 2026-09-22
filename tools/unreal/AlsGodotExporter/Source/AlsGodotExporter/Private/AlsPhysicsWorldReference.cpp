@@ -125,13 +125,16 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                 if(Frame>=Steps-Hz){LastMaxV=FMath::Max(LastMaxV,Instance->GetUnrealWorldVelocity().Size());LastMaxW=FMath::Max(LastMaxW,Instance->GetUnrealWorldAngularVelocityInRadians().Size());}
                 if(Frame>0)
                 {
-                    const auto* Particle=Instance->GetPhysicsActorHandle()->GetHandle_LowLevel()->CastToRigidParticle();
+                    auto* Particle=Instance->GetPhysicsActorHandle()->GetHandle_LowLevel()->CastToRigidParticle();
                     State->SetArrayField(TEXT("conditionedInverseInertia"),V(FVector(Particle->ConditionedInvI())));
                     const auto* Island=Solver->GetEvolution()->GetIslandManager().GetParticleIsland(Particle);
                     State->SetNumberField(TEXT("islandSleepCounter"),Island?Island->GetSleepCounter():-1);
                     if(Frame>=ContactStart&&Frame<ContactStart+ContactFrames)
                     {
                         State->SetNumberField(TEXT("objectState"),static_cast<int32>(Particle->ObjectState()));
+                        State->SetNumberField(TEXT("particleGlobalId"),Particle->ParticleID().GlobalID);
+                        State->SetNumberField(TEXT("particleLocalId"),Particle->ParticleID().LocalID);
+                        State->SetNumberField(TEXT("graphLevel"),Solver->GetEvolution()->GetIslandManager().GetParticleLevel(Particle));
                         State->SetArrayField(TEXT("inflatedBoundsMin"),V(Particle->WorldSpaceInflatedBounds().Min()));
                         State->SetArrayField(TEXT("inflatedBoundsMax"),V(Particle->WorldSpaceInflatedBounds().Max()));
                         TArray<TSharedPtr<FJsonValue>> Shapes;
@@ -189,6 +192,19 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                     R->SetNumberField(TEXT("shapeType"),static_cast<int32>(C->GetShapesType()));
                     R->SetNumberField(TEXT("cull"),C->GetCullDistance());
                     R->SetBoolField(TEXT("restored"),C->WasManifoldRestored());
+                    // This is the island graph order, not the allocator's array
+                    // order or a claim about a later colored solver partition.
+                    const auto* Edge=C->GetConstraintGraphEdge();
+                    auto& Graph=Solver->GetEvolution()->GetIslandManager();
+                    R->SetBoolField(TEXT("inGraph"),Edge!=nullptr);
+                    if(Edge)
+                    {
+                        R->SetNumberField(TEXT("graphOrder"),Graph.GetIslandArrayIndex(Edge));
+                        R->SetNumberField(TEXT("graphLevel"),Graph.GetConstraintLevel(Edge));
+                        R->SetNumberField(TEXT("graphColor"),Graph.GetConstraintColor(Edge));
+                        R->SetNumberField(TEXT("graphInsertionKey"),static_cast<uint32>(Edge->GetSortKey()));
+                        R->SetBoolField(TEXT("graphSleeping"),Edge->IsSleeping());
+                    }
                     R->SetBoolField(TEXT("initialContact"),C->IsInitialContact());
                     R->SetBoolField(TEXT("perContactInitialPhi"),C->UsePerContactInitialPhi());
                     R->SetNumberField(TEXT("minInitialPhi"),C->GetMinInitialPhi());
