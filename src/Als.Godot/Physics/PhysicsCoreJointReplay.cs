@@ -102,6 +102,7 @@ public partial class PhysicsCoreJointReplay : Node3D
             foreach (var name in new[] { "Mannequin", "AnimMan" })
             {
                 var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + name + "." + name);
+                definition = AlsPhysicsJointFrameCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_joint_frame_inputs.json"), definition);
                 var settings = AlsPhysicsJointCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_joint_reference.json"), definition);
                 var asset = set.SkeletalMeshes.Single(m => m.ObjectPath == definition.Mesh);
                 var model = ResourceLoader.Load<PackedScene>(AlsGodotImportCoordinator.AssetRoot + "/" + asset.ResourcePath).Instantiate<Node3D>(); AddChild(model);
@@ -145,7 +146,7 @@ public partial class PhysicsCoreJointReplay : Node3D
             AlsSceneContactSet? scene = null;
             var conditioning = AlsBodyInertiaCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_inertia_reference.json"), definition, rig.Settings);
             var bodies = definition.Bodies.Select(b => new AlsIslandBody(b.MassLocal, b.PhysicsType == 1 ? default : new((float)(1 / b.MassKg),
-                new AlsDoubleVector(new System.Numerics.Vector3((float)(1 / b.InertiaKgCm2.X), (float)(1 / b.InertiaKgCm2.Y), (float)(1 / b.InertiaKgCm2.Z)) * conditioning[b.Index].InverseInertiaScale)),
+                new AlsDoubleVector(conditioning[b.Index].ConditionedInverseInertia)),
                 D(b.Defaults, "linearDamping"), D(b.Defaults, "angularDamping"), b.Defaults.GetProperty("bEnableGravity").GetBoolean())).ToArray();
             var joints = definition.Joints.Select(j => AlsCachedJointSettingsCompiler.IslandJoint(j.ParentBody, j.ChildBody,
                 j.ParentFrame, j.ChildFrame, rig.Settings[j.Index].NativeSettings, solver)).ToArray();

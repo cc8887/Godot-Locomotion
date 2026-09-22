@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Physics;
 using GodotAls.Import.Compilation;
@@ -60,6 +61,8 @@ public sealed class AlsBodyInertiaCompilerTests
                 var bounds = V(native.GetProperty("localBoundsMax")) - V(native.GetProperty("localBoundsMin"));
                 Assert.Equal(Math.Max(bounds.X, Math.Max(bounds.Y, bounds.Z)), result[body.Index].NativeBoundsSize);
                 Assert.InRange(result[body.Index].NativeBoundsSize, double.Epsilon, 100);
+                if (string.IsNullOrEmpty(child))
+                    Assert.Equal(V(native.GetProperty("inverseInertia")).ToSingle(), result[body.Index].RawInverseInertia);
                 Assert.True((result[body.Index].ExtentsCm-V(native.GetProperty("constraintExtents"))).NearlyZero(1e-4));
                 Assert.InRange(Vector3.Distance(result[body.Index].InverseInertiaScale,V(native.GetProperty("actualScale")).ToSingle()),0,1e-5f);
                 checkedBodies++;
@@ -88,6 +91,15 @@ public sealed class AlsBodyInertiaCompilerTests
         Assert.Throws<InvalidDataException>(()=>AlsBodyInertiaCompiler.Compile(json,definition with{PhysicsAsset="/Game/Wrong"},settings));
         var bodies=definition.Bodies.ToArray();bodies[1]=bodies[1] with{MassKg=bodies[1].MassKg*2};
         Assert.Throws<InvalidDataException>(()=>AlsBodyInertiaCompiler.Compile(json,definition with{Bodies=bodies},settings));
+    }
+    [Theory]
+    [InlineData(1, 0)] [InlineData(1, -1)] [InlineData(1, 2)] [InlineData(0, 1)]
+    public void InvalidStoredInverseInertiaIsRejected(int body, double value)
+    {
+        var json=Read("v4_physics_inertia_reference");var definition=AlsPhysicsAssetCompiler.Compile(Read("v4_physics_asset_inputs"),AlsPhysicsAssetCompiler.MeshRoot+"Mannequin.Mannequin");
+        var settings=AlsPhysicsJointCompiler.Compile(Read("v4_physics_joint_reference"),definition);
+        var node=JsonNode.Parse(json)!;node["rigs"]![0]!["bodies"]![body]!["inverseInertia"]![0]=value;
+        Assert.Throws<InvalidDataException>(()=>AlsBodyInertiaCompiler.Compile(node.ToJsonString(),definition,settings));
     }
     private static AlsDoubleVector V(JsonElement e)=>new(e[0].GetDouble(),e[1].GetDouble(),e[2].GetDouble());
     private static AlsPrecisePose Pose(JsonElement e){var q=e.GetProperty("rotation");return new(V(e.GetProperty("position")),new(q[0].GetDouble(),q[1].GetDouble(),q[2].GetDouble(),q[3].GetDouble()),AlsDoubleVector.One);}
