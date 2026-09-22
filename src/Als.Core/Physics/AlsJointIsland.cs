@@ -8,6 +8,11 @@ public readonly record struct AlsIslandBodyState(AlsPrecisePose Actor, AlsProjec
 // Sorted, unique, zero-inverse-mass inputs captured by the world owner. Velocity
 // is prescribed at the actor origin (cm/s, rad/s), not integrated a second time.
 public readonly record struct AlsIslandKinematicTarget(int Body, AlsIslandBodyState State);
+// Resolved swing/twist drive inputs: X twist, Y swing2, Z swing1. Disabled
+// channels have zero coefficients. Target is connector-relative; no torque cap
+// or nonzero target angular velocity is supported by this solver yet.
+public readonly record struct AlsIslandAngularDrive(int Joint, AlsQuaternion Target,
+    AlsDoubleVector Stiffness, AlsDoubleVector Damping);
 public readonly record struct AlsIslandProjection(bool Enabled, float LinearAlpha = 1,
     float TeleportDistance = 5, float VelocityAlpha = AlsLockedLinearProjection.ReferenceVelocityAlpha);
 // Connector transforms are actor-local on input. Dynamic bodies solve in COM space;
@@ -25,7 +30,7 @@ public readonly record struct AlsIslandJoint(int Parent, int Child, AlsPrecisePo
 public sealed class AlsJointIsland
 {
     private readonly AlsIslandBody[] _bodies;
-    private readonly AlsIslandJoint[] _joints;
+    private readonly AlsIslandJoint[] _joints, _stepJoints;
     private readonly AlsIslandBodyState[] _states, _next, _external;
     private readonly AlsPrecisePose[] _initial, _predicted, _predictedActors;
     private readonly AlsProjectionDelta[] _deltas;
@@ -64,6 +69,7 @@ public sealed class AlsJointIsland
             throw new ArgumentOutOfRangeException(nameof(positionIterations));
         _positionIterations = positionIterations; _velocityIterations = velocityIterations;
         _bodies = bodies.ToArray(); _joints = joints.ToArray(); _states = initial.ToArray();
+        _stepJoints = new AlsIslandJoint[joints.Length];
         _next = new AlsIslandBodyState[bodies.Length];
         _external = new AlsIslandBodyState[bodies.Length];
         _initial = new AlsPrecisePose[bodies.Length]; _predicted = new AlsPrecisePose[bodies.Length];
@@ -100,6 +106,7 @@ public sealed class AlsJointIsland
                 ChildFrame = SolverFrame(joint.Child, joint.ChildFrame) };
         }
         // Validate every constraint before accepting a runnable island.
+        _joints.AsSpan().CopyTo(_stepJoints);
         PrepareExternal(default, out _);
         Gather(1d / 60);
         if (!sleepSettings.IsEmpty) _sleep = new(_bodies, sleepSettings, _states, sleepSmoothing);
@@ -130,7 +137,8 @@ public sealed class AlsJointIsland
 
     public void Step(double dt, AlsDoubleVector gravity, ReadOnlySpan<AlsBodyStepForces> forces = default,
         IAlsIslandContacts? contacts = null, bool dragBeforeIntegration = false, bool allowSleep = true,
-        ReadOnlySpan<AlsIslandKinematicTarget> kinematicTargets = default)
+        ReadOnlySpan<AlsIslandKinematicTarget> kinematicTargets = default,
+        ReadOnlySpan<AlsIslandAngularDrive> angularDrives = default)
     {
         if (_stepping) throw new InvalidOperationException("Island stepping is not reentrant.");
         if (!double.IsFinite(dt) || dt <= 0 || !float.IsFinite(1 / (float)dt) || (float)dt == float.PositiveInfinity)
@@ -138,14 +146,17 @@ public sealed class AlsJointIsland
         if (!gravity.IsFinite) throw new ArgumentException("Gravity must be finite.");
         if (!forces.IsEmpty && forces.Length != BodyCount) throw new ArgumentException("One force input per body is required.");
         foreach (var force in forces) force.Validate();
+        PrepareDrives(angularDrives);
         var externalChanged = PrepareExternal(kinematicTargets, out var externalMoving);
         allowSleep &= !externalMoving;
         var wake = !allowSleep || _wakeRequested || gravity != _lastGravity || !ReferenceEquals(contacts, _lastContacts) || (contacts?.RequiresWake ?? false);
         wake |= externalChanged;
         if (!forces.IsEmpty) for (var i = 0; i < forces.Length; i++) if (Dynamic(i) && forces[i] != default) wake = true;
-        if (IsSleeping && !wake) return;
+        // Native joint settings updates do not wake bodies. The world/gameplay
+        // owner requests wake separately. Retain new settings even while asleep.
+        if (IsSleeping && !wake) { _stepJoints.AsSpan().CopyTo(_joints); return; }
         _stepping = true;
-        try { Solve(dt, gravity, forces, contacts, dragBeforeIntegration, wake, allowSleep); _lastGravity = gravity; _lastContacts = contacts; _wakeRequested = false; }
+        try { Solve(dt, gravity, forces, contacts, dragBeforeIntegration, wake, allowSleep); _stepJoints.AsSpan().CopyTo(_joints); _lastGravity = gravity; _lastContacts = contacts; _wakeRequested = false; }
         catch { _sleep?.Abort(); contacts?.Abort(); throw; }
         finally { _stepping = false; }
     }
@@ -158,7 +169,7 @@ public sealed class AlsJointIsland
         for (var j = 0; j < _jointOrder.Length; j++) _jointOrder[j] = j;
         contacts?.PrepareConstraintOrder(this, _jointOrder);
         var observer = _observer?.Enabled == true ? _observer : null;
-        observer?.Begin(dt, _positionIterations, _velocityIterations, _bodies, _joints, _initial, _predicted, _velocities, _jointOrder);
+        observer?.Begin(dt, _positionIterations, _velocityIterations, _bodies, _stepJoints, _initial, _predicted, _velocities, _jointOrder);
         for (var iteration = 0; iteration < _positionIterations; iteration++)
         {
             // UE default equal priorities are stable-sorted by container order:
@@ -243,7 +254,26 @@ public sealed class AlsJointIsland
         {
             var joint = _joints[j];
             if (joint.ConnectivityOnly) continue;
-            _cached[j] = new(Input(joint.Parent, joint.ParentFrame), Input(joint.Child, joint.ChildFrame), joint.Angular, dt);
+            _cached[j] = new(Input(joint.Parent, joint.ParentFrame), Input(joint.Child, joint.ChildFrame), _stepJoints[j].Angular, dt);
+        }
+    }
+    private void PrepareDrives(ReadOnlySpan<AlsIslandAngularDrive> drives)
+    {
+        _joints.AsSpan().CopyTo(_stepJoints);
+        var previous = -1;
+        foreach (var drive in drives)
+        {
+            if (drive.Joint <= previous || (uint)drive.Joint >= _joints.Length || _joints[drive.Joint].ConnectivityOnly)
+                throw new ArgumentException("Drive updates require sorted unique solver joint indices.");
+            if (!double.IsFinite(drive.Target.LengthSquared) || System.Math.Abs(drive.Target.LengthSquared - 1) > 1e-5 ||
+                !drive.Stiffness.IsFinite || drive.Stiffness.IsNegative || !drive.Damping.IsFinite || drive.Damping.IsNegative)
+                throw new ArgumentException("Invalid angular drive target or coefficients.");
+            var joint = _joints[drive.Joint]; var angular = joint.Angular;
+            _stepJoints[drive.Joint] = joint with { Angular = angular with { DriveTarget = drive.Target,
+                X = angular.X with { DriveStiffness = drive.Stiffness.X, DriveDamping = drive.Damping.X },
+                Y = angular.Y with { DriveStiffness = drive.Stiffness.Y, DriveDamping = drive.Damping.Y },
+                Z = angular.Z with { DriveStiffness = drive.Stiffness.Z, DriveDamping = drive.Damping.Z } } };
+            previous = drive.Joint;
         }
     }
     private AlsJointBodyInput Input(int body, AlsPrecisePose connector) =>

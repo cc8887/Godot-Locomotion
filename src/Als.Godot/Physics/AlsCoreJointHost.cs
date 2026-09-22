@@ -28,24 +28,30 @@ internal sealed class AlsCoreJointHost
     {
         CheckOwnership(); Island.StepForceFree(AlsPhysicsStepTime.FromEngineSeconds(dt)); Publish();
     }
+    internal void Step(double dt, ReadOnlySpan<AlsIslandAngularDrive> angularDrives)
+    {
+        CheckOwnership(); Island.Step(AlsPhysicsStepTime.FromEngineSeconds(dt), default, angularDrives: angularDrives); Publish();
+    }
 
     // Registered environment bodies may follow the contiguous asset-body prefix.
     internal void Step(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts)
     {
         CheckOwnership(); Island.Step(AlsPhysicsStepTime.FromEngineSeconds(dt), gravity, contacts: contacts); Publish();
     }
-    internal void Step(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts, ReadOnlySpan<AlsBodyStepForces> forces)
+    internal void Step(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts, ReadOnlySpan<AlsBodyStepForces> forces,
+        ReadOnlySpan<AlsIslandAngularDrive> angularDrives = default)
     {
-        CheckOwnership(); Island.Step(AlsPhysicsStepTime.FromEngineSeconds(dt), gravity, forces, contacts); Publish();
+        CheckOwnership(); Island.Step(AlsPhysicsStepTime.FromEngineSeconds(dt), gravity, forces, contacts, angularDrives: angularDrives); Publish();
     }
-    internal void StepScene(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts, AlsSceneContactSet scene)
+    internal void StepScene(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts, AlsSceneContactSet scene,
+        ReadOnlySpan<AlsIslandAngularDrive> angularDrives = default)
     {
         CheckOwnership();
         var seconds = AlsPhysicsStepTime.FromEngineSeconds(dt);
         // Capture prescribed velocity using exactly the duration passed to the
         // solver. A failed solve must leave the scene capture uncommitted.
         var targets = scene.Capture(Island, seconds);
-        Island.Step(seconds, gravity, contacts: contacts, kinematicTargets: targets);
+        Island.Step(seconds, gravity, contacts: contacts, kinematicTargets: targets, angularDrives: angularDrives);
         Publish(); scene.CommitCapture(Island);
     }
 

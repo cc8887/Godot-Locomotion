@@ -22,6 +22,10 @@ public partial class PhysicsCoreJointReplay : Node3D
     private JsonDocument? _reference;
     private int _case, _frame, _hz;
     private bool _done, _chains, _drop, _highDrop, _sleep, _sceneWorld;
+    private bool _runtimeDrives;
+    private AlsIslandAngularDrive _pairDrive;
+    private int _driveUpdates;
+    private int _pendingRate, _rateBoundaries;
     private Node3D? _world;
     private string _platformMode = "";
     private AnimatableBody3D? _platform;
@@ -51,6 +55,8 @@ public partial class PhysicsCoreJointReplay : Node3D
         try
         {
             var args = OS.GetCmdlineUserArgs(); _chains = args.Contains("--chains");
+            _runtimeDrives = args.Contains("--runtime-drives");
+            Require(!_runtimeDrives || !_chains, "Runtime drive replay uses the independent native pair references.");
             _drop = args.Contains("--drop"); _highDrop = args.Contains("--high-drop");
             _sleep = args.Contains("--sleep"); Require(!_sleep || _drop, "Sleep probe requires --drop.");
             _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
@@ -112,9 +118,25 @@ public partial class PhysicsCoreJointReplay : Node3D
                     Enumerable.Range(0, names.Length).Select(i => AlsPhysicsBodySet.Pose(skeleton.GetBoneRest(i))).ToArray()));
                 model.Free();
             }
-            Engine.PhysicsTicksPerSecond = _chains ? _hz : Current.GetProperty("hz").GetInt32();
+            BeginPhysicsRate(_chains ? _hz : Current.GetProperty("hz").GetInt32());
         }
         catch (Exception e) { Fail(e); }
+    }
+
+    private void BeginPhysicsRate(int rate)
+    {
+        // Main::iteration snapshots physics_step before its catch-up loop.
+        // Suspend this probe until idle processing ends that entire batch;
+        // CallDeferred alone can still run between old-frequency substeps.
+        SetPhysicsProcess(false); _pendingRate = rate; SetProcess(true);
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_done || _pendingRate == 0) return;
+        Engine.PhysicsTicksPerSecond = _pendingRate;
+        _pendingRate = 0; _rateBoundaries++;
+        SetProcess(false); SetPhysicsProcess(true);
     }
 
     private void StartPair()
@@ -126,13 +148,21 @@ public partial class PhysicsCoreJointReplay : Node3D
         var body = row.GetProperty("bodies")[1]; var j = row.GetProperty("jointSettings"); var s = row.GetProperty("solverSettings");
         Require(row.GetProperty("projectionIterations").GetInt32() == 1, "Expected one native projection iteration.");
         var states = new[] { Initial(row, "parent"), Initial(row, "child") };
+        var angular = AlsCachedJointSettingsCompiler.Angular(j, s);
+        _pairDrive = new(0, angular.DriveTarget,
+            new(angular.X.DriveStiffness, angular.Y.DriveStiffness, angular.Z.DriveStiffness),
+            new(angular.X.DriveDamping, angular.Y.DriveDamping, angular.Z.DriveDamping));
+        if (_runtimeDrives) angular = angular with { DriveTarget = AlsQuaternion.Identity,
+            X = angular.X with { DriveStiffness = 0, DriveDamping = 0 },
+            Y = angular.Y with { DriveStiffness = 0, DriveDamping = 0 },
+            Z = angular.Z with { DriveStiffness = 0, DriveDamping = 0 } };
         // In this isolated-pair reference the conditioned inertia is an exported
         // input. Full-chain mode below recomputes it from asset geometry/topology.
         var island = new AlsJointIsland([
             new(definition.Bodies[0].MassLocal, default),
             new(definition.Bodies[1].MassLocal, new((float)(1 / D(body, "massKg")), V(body, "bodyConditionedInverseInertia")), D(body, "linearDamping"), D(body, "angularDamping"))],
             [new(0, 1, Pose(row.GetProperty("parentFrame")), Pose(row.GetProperty("childFrame")),
-                AlsCachedJointSettingsCompiler.Angular(j, s), AlsCachedJointSettingsCompiler.Projection(j, s))], states,
+                angular, AlsCachedJointSettingsCompiler.Projection(j, s))], states,
             row.GetProperty("positionIterations").GetInt32(), row.GetProperty("velocityIterations").GetInt32());
         Add(rig with { Definition = definition }, island); _frame = 0;
     }
@@ -278,6 +308,7 @@ public partial class PhysicsCoreJointReplay : Node3D
         if (_done) return;
         try
         {
+            Require(_pendingRate == 0, "Physics probe ran before its rate boundary completed.");
             if (_active.Count == 0) { if (_chains) StartChains(); else StartPair(); }
             var expectedDt = _chains ? 1d / _hz : D(Current, "dt");
             Require(Math.Abs(dt - expectedDt) < 1e-7,
@@ -301,6 +332,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                         if (active.Contacts.CompletedSteps != epoch)
                         { _contactPoints += active.Contacts.LastContactCount; _restoredPairs += active.Contacts.LastRestoredPairs; }
                     }
+                    else if (_runtimeDrives) { active.Host.Step(dt, [_pairDrive]); _driveUpdates++; }
                     else active.Host.Step(dt);
                     if (_platform is not null && _frame >= _hz * 10 && _frame < _hz * 14)
                     {
@@ -338,9 +370,16 @@ public partial class PhysicsCoreJointReplay : Node3D
             {
                 Release(); _case++;
                 if (_case < _reference!.RootElement.GetProperty("cases").GetArrayLength())
-                { Engine.PhysicsTicksPerSecond = Current.GetProperty("hz").GetInt32(); return; }
+                {
+                    var nextRate = Current.GetProperty("hz").GetInt32();
+                    if (nextRate != Engine.PhysicsTicksPerSecond) BeginPhysicsRate(nextRate);
+                    return;
+                }
             }
+            if (_runtimeDrives) Require(_driveUpdates == _case * 12, "Missing runtime drive submissions.");
             var result = new { mode = _drop ? "drop_chains" : _chains ? "chains" : "native_pairs", cases = _chains ? 2 : _case,
+                runtime_drive_updates = _driveUpdates,
+                physics_rate_boundaries = _rateBoundaries,
                 hz = _chains ? _hz : 0, frames_per_case = _chains ? _frame : 12,
                 bodies = _chains ? _active.Sum(a => a.Host.Island.BodyCount) : 2,
                 joints = _chains ? _active.Sum(a => a.Host.Island.JointCount) : 1,
