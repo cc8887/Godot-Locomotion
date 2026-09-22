@@ -14,6 +14,8 @@ public sealed class AlsContactRegistry
     private readonly AlsRegisteredContactShape[] _shapes;
     private readonly bool[] _present, _disabledPairs;
     private readonly uint[] _revisions, _bodyGenerations;
+    private readonly ulong[] _particleOrder;
+    private ulong _nextParticleOrder;
     private bool _locked;
     public int Capacity => _shapes.Length;
     public int BodyCount => _bodyGenerations.Length;
@@ -24,9 +26,15 @@ public sealed class AlsContactRegistry
         if (bodies <= 0 || shapeCapacity <= 0) throw new ArgumentOutOfRangeException(nameof(bodies));
         _shapes = new AlsRegisteredContactShape[shapeCapacity]; _present = new bool[shapeCapacity];
         _revisions = new uint[shapeCapacity]; _bodyGenerations = new uint[bodies]; Array.Fill(_bodyGenerations, 1u);
+        _particleOrder = new ulong[bodies];
+        for (var i = 0; i < bodies; i++) _particleOrder[i] = (ulong)i;
+        _nextParticleOrder = (ulong)bodies;
         _disabledPairs = new bool[checked(bodies * bodies)];
     }
     public bool Present(int slot) => (uint)slot < Capacity && _present[slot];
+    // Fixed topology bodies are created in definition order. Reusing a body
+    // slot gives the new particle a later order without changing its stable slot.
+    public ulong ParticleOrderAt(int body) { Body(body); return _particleOrder[body]; }
     public AlsRegisteredContactShape At(int slot) => Present(slot) ? _shapes[slot] : throw new ArgumentOutOfRangeException(nameof(slot));
     public AlsContactShapeKey Key(int slot)
     { var shape = At(slot); return new((ulong)shape.Body + 1, _bodyGenerations[shape.Body], (uint)slot, _revisions[slot]); }
@@ -44,7 +52,11 @@ public sealed class AlsContactRegistry
     }
     public void Remove(AlsContactShapeHandle handle) { Mutable(); Check(handle); Changed(); _present[handle.Slot] = false; }
     public void RebindBody(int body)
-    { Mutable(); Body(body); var generation = checked(_bodyGenerations[body] + 1); Changed(); _bodyGenerations[body] = generation; }
+    {
+        Mutable(); Body(body); var generation = checked(_bodyGenerations[body] + 1);
+        var nextOrder = checked(_nextParticleOrder + 1);
+        Changed(); _bodyGenerations[body] = generation; _particleOrder[body] = _nextParticleOrder; _nextParticleOrder = nextOrder;
+    }
     public void DisableBodyPair(int a, int b, bool disabled)
     { Mutable(); Body(a); Body(b); if (_disabledPairs[a * BodyCount + b] == disabled) return; Changed(); _disabledPairs[a * BodyCount + b] = _disabledPairs[b * BodyCount + a] = disabled; }
     public bool Allows(int a, int b)

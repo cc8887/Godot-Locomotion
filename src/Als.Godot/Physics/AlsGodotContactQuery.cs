@@ -242,6 +242,17 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
         settings = new(.1f * Math.Min(Size(a), Size(b)),
             a.NativePolygon&&b.NativePolygon?CullDistance(shape0,shape1):0); return true;
     }
+    public bool ShouldReversePair(int shape0, int shape1)
+    {
+        Check();
+        if (!_polygonCache.Pending) throw new InvalidOperationException("Pair ordering requires prepared body motion.");
+        var a = BindingAt(shape0); var b = BindingAt(shape1);
+        static bool Native(Binding binding) => binding.NativePolygon || binding.NativeCapsule.HasValue || binding.NativeSphereRadius.HasValue;
+        if (!Native(a) || !Native(b)) return false;
+        var body0 = _registry.At(shape0).Body; var body1 = _registry.At(shape1).Body;
+        return AlsCollisionPairOrder.ShouldReverse(a.BoundsGeometry.Kind, _registry.ParticleOrderAt(body0), _dynamicBodies[body0],
+            b.BoundsGeometry.Kind, _registry.ParticleOrderAt(body1), _dynamicBodies[body1]);
+    }
     internal float CullDistance(int shape0,int shape1)
     {
         if(_detector is not { } d)return 0;

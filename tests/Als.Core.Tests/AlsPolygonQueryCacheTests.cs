@@ -17,6 +17,25 @@ public sealed class AlsPolygonQueryCacheTests
     private static AlsGjkCache Snapshot(AlsPolygonQueryCache owner,AlsContactPairKey key)
     {var result=new AlsGjkCache();Assert.True(owner.CopyCommitted(key,result));return result;}
     [Fact]
+    public void EndpointReversalUsesOneSlotButNeverReusesOppositeWitnessCoordinates()
+    {
+        var owner = new AlsPolygonQueryCache(2, captureQueries: true);
+        var reverse = new AlsContactPairKey(Key.Shape1, Key.Shape0);
+        owner.PrepareStep(); Query(owner, Key); Commit(owner);
+        owner.PrepareStep(); Query(owner, reverse);
+        var before = new AlsGjkCache(); var after = new AlsGjkCache();
+        Assert.True(owner.CopyPendingQuery(reverse, before, after)); Assert.Equal(0, before.Count);
+        owner.Abort(); Assert.True(owner.CopyCommitted(Key, new())); Assert.False(owner.CopyCommitted(reverse, new()));
+        owner.PrepareStep(); Query(owner, reverse); Commit(owner);
+        Assert.Equal(1, owner.CachedPairs); Assert.False(owner.CopyCommitted(Key, new()));
+        var cold = new AlsPolygonQueryCache(2); cold.PrepareStep(); Query(cold, reverse); Commit(cold);
+        Assert.Equal(Snapshot(cold, reverse).WitnessA.ToArray(), Snapshot(owner, reverse).WitnessA.ToArray());
+        Assert.Equal(Snapshot(cold, reverse).Weights.ToArray(), Snapshot(owner, reverse).Weights.ToArray());
+        owner.PrepareStep(); owner.Release(Key); Commit(owner);
+        Assert.True(owner.CopyCommitted(reverse, new()));
+        owner.PrepareStep(); owner.Release(reverse); Commit(owner); Assert.Equal(0, owner.CachedPairs);
+    }
+    [Fact]
     public void QueryAndReleaseAreProvisionalUntilPublication()
     {
         var owner=new AlsPolygonQueryCache(3);owner.PrepareStep();Assert.True(Query(owner,Key).Count>0);
@@ -118,7 +137,7 @@ public sealed class AlsPolygonQueryCacheTests
         var owner=new AlsPolygonQueryCache(3);
         Assert.Throws<InvalidOperationException>(()=>Query(owner,Key));
         owner.PrepareStep();
-        Assert.Throws<ArgumentException>(()=>Query(owner,new(Key.Shape1,Key.Shape0)));
+        Assert.Throws<ArgumentException>(()=>Query(owner,new(Key.Shape0,Key.Shape1 with { Shape=Key.Shape0.Shape })));
         Query(owner,Key);owner.StageCommit();
         Assert.Throws<InvalidOperationException>(()=>Query(owner,Key));Assert.Throws<InvalidOperationException>(()=>owner.Reset());
         owner.PublishCommit();

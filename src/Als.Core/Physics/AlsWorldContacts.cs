@@ -15,6 +15,9 @@ public interface IAlsContactGeometrySource
     void PrepareBounds(ReadOnlySpan<AlsPrecisePose> shapeWorld) { }
     bool AllowsPair(int shape0, int shape1) => true;
     bool AllowsPair(int shape0, int shape1, bool collidedLastStep) => AllowsPair(shape0, shape1);
+    // Called after PrepareStep, before bounds/restoration/query. Storage remains
+    // an unordered registry pair; geometry, history and solver endpoints use this order.
+    bool ShouldReversePair(int shape0, int shape1) => false;
     // All fallible work belongs in PrepareStep/Query/StageCommit. PublishCommit
     // and Abort must not throw. Abort also follows a partially failed PrepareStep.
     // Callbacks occur under the registry lock; Reset occurs only while idle.
@@ -169,11 +172,13 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
             }
             _source.PrepareBounds(_shapeWorld);
             var slot = 0;
-            for (var a = 0; a < _registry.Capacity; a++) for (var b = a + 1; b < _registry.Capacity; b++, slot++)
+            for (var first = 0; first < _registry.Capacity; first++) for (var second = first + 1; second < _registry.Capacity; second++, slot++)
             {
+                var a = first; var b = second;
                 if (!_registry.Allows(a, b)) continue;
+                if (bodies[_registry.At(a).Body].InverseMass.Mass <= 0 && bodies[_registry.At(b).Body].InverseMass.Mass <= 0) continue;
+                if (_source.ShouldReversePair(a, b)) (a, b) = (b, a);
                 var sa = _registry.At(a); var sb = _registry.At(b); var ia = sa.Body; var ib = sb.Body;
-                if (bodies[ia].InverseMass.Mass <= 0 && bodies[ib].InverseMass.Mass <= 0) continue;
                 // Reject before restoring either geometry or friction history.
                 // A committed skipped epoch invalidates both on re-entry;
                 // an aborted attempt leaves the previous histories intact.

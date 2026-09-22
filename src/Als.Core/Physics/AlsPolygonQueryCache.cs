@@ -3,7 +3,7 @@ using GodotAls.Core.Locomotion;
 namespace GodotAls.Core.Physics;
 
 // One sequential query owner's persistent GJK state. Keys use registry slots
-// in original ascending order. Geometry/scale changes MUST advance revision;
+// with explicit endpoint orientation. Geometry/scale changes MUST advance revision;
 // resolved pair margin changes are detected separately. An omitted query does
 // not imply destruction: the midphase owner must explicitly Release a pair.
 public sealed class AlsPolygonQueryCache
@@ -165,8 +165,11 @@ public sealed class AlsPolygonQueryCache
     private int Slot(AlsContactPairKey key)
     {
         var a=key.Shape0.Shape;var b=key.Shape1.Shape;
-        if(a>=b||b>=_shapeCapacity||(key.Shape0.Body==key.Shape1.Body&&key.Shape0.Generation==key.Shape1.Generation))
-            throw new ArgumentException("Polygon query key must retain distinct bodies and ascending registry slots.");
+        if(a==b||a>=_shapeCapacity||b>=_shapeCapacity||(key.Shape0.Body==key.Shape1.Body&&key.Shape0.Generation==key.Shape1.Generation))
+            throw new ArgumentException("Polygon query key must retain distinct bodies and valid distinct registry slots.");
+        // Opposite orientations share storage, but remain different cache
+        // identities: witness coordinates cannot survive an endpoint reversal.
+        if(a>b)(a,b)=(b,a);
         return checked((int)((long)a*(2L*_shapeCapacity-a-1)/2+b-a-1));
     }
 }

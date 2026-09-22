@@ -17,6 +17,7 @@ internal sealed class AlsContactTrace(IAlsContactGeometrySource source, AlsConta
     public void PrepareBounds(ReadOnlySpan<AlsPrecisePose> shapeWorld) => source.PrepareBounds(shapeWorld);
     public bool AllowsPair(int a, int b) => source.AllowsPair(a, b);
     public bool AllowsPair(int a, int b, bool collidedLastStep) => source.AllowsPair(a, b, collidedLastStep);
+    public bool ShouldReversePair(int a, int b) => source.ShouldReversePair(a, b);
     public void StageCommit() => source.StageCommit();
     public void PublishCommit() => source.PublishCommit();
     public void Abort() => source.Abort();

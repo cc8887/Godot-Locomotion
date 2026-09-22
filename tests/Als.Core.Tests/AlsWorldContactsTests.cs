@@ -18,6 +18,42 @@ public sealed class AlsWorldContactsTests
         return (island, registry, contacts, source);
     }
     [Fact]
+    public void ProviderOrderingAppliesToGeometryGatherIdentityAndHistory()
+    {
+        var (_, _, contacts, source) = Create(); source.Reverse = true;
+        var poses = new[] { Identity, Identity with { Position = new(1.8, 0, 0) }, Identity with { Position = new(10, 0, 0) } };
+        var velocities = new AlsProjectionVelocity[3];
+        var bodies = Enumerable.Repeat(new AlsIslandBody(Identity, new(1, AlsDoubleVector.One)), 3).ToArray();
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(1, contacts.PreparedPairAt(0).Body0); Assert.Equal(0, contacts.PreparedPairAt(0).Body1);
+        Assert.Equal(poses[1], contacts.PreparedGatherAt(0).Body0.ShapeWorld);
+        Assert.Equal(poses[0], contacts.PreparedGatherAt(0).Body1.ShapeWorld);
+        Assert.Equal(1u, contacts.HistoryKeyAt(0).Shape0.Shape);
+        contacts.StageCommit(); contacts.Commit();
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(1, contacts.HistorySavedCountAt(0)); contacts.Abort();
+        source.Reverse = false;
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(0, contacts.PreparedPairAt(0).Body0);
+        Assert.Equal(1, contacts.HistorySavedCountAt(0)); // Still exposes committed input, not eligible matching state.
+        Assert.Equal(-1, contacts.HistoryPreparedAt(0, 0).SavedIndex);
+        Assert.False(contacts.HistoryPreparedAt(0, 0).Geometry.HasAnchor);
+        Assert.True(contacts.PreparedGatherAt(0).Settings.InitialManifold); contacts.Abort();
+        source.Reverse = true;
+        contacts.Gather(poses, velocities, bodies, 1d / 60);
+        Assert.Equal(1, contacts.HistorySavedCountAt(0)); contacts.Abort();
+    }
+    [Fact]
+    public void PairOrderingFailureAbortsAndUnlocksTheAttempt()
+    {
+        var (island, registry, contacts, source) = Create(); var control = Create();
+        source.ThrowOnOrder = true;
+        Assert.Throws<InvalidOperationException>(() => island.StepForceFree(1d / 60, contacts));
+        Assert.False(registry.IsLocked); Assert.Equal(0, contacts.CompletedSteps);
+        source.ThrowOnOrder = false; island.StepForceFree(1d / 60, contacts); control.Island.StepForceFree(1d / 60, control.Contacts);
+        for (var i = 0; i < 3; i++) Assert.Equal(control.Island.BodyAt(i), island.BodyAt(i));
+    }
+    [Fact]
     public void DynamicPairUsesBothMassesAndOneSharedVelocityBuffer()
     {
         var (island, _, contacts, _) = Create(); island.StepForceFree(1d / 60, contacts);
@@ -91,6 +127,8 @@ public sealed class AlsWorldContactsTests
     private sealed class Spheres : IAlsContactGeometrySource
     {
         public int Calls; public bool ThrowOnSecond; public Action? OnQuery;
+        public bool Reverse, ThrowOnOrder;
+        public bool ShouldReversePair(int a, int b) => ThrowOnOrder ? throw new InvalidOperationException("Injected ordering failure.") : Reverse;
         public AlsPrecisePose Last0, Last1;
         public int Query(int a, in AlsPrecisePose p0, int b, in AlsPrecisePose p1, Span<AlsDetectedContact> destination)
         {
