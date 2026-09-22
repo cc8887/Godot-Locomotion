@@ -17,6 +17,7 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
     [InlineData("v4_physics_free_coupled_reference.json", 22)]
     [InlineData("v4_physics_window_coupled_reference.json", 8)]
     [InlineData("v4_physics_first_steps_coupled_reference.json", 6)]
+    [InlineData("v4_physics_touchdown_coupled_reference.json", 2)]
     public void FullChainSharedContactJointAndProjectionStagesMatchNativeContainers(string file, int caseCount)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
@@ -38,6 +39,8 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
             var dt = D(input, "dt"); var settings = input.GetProperty("solverSettings");
             var id = $"{input.GetProperty("mesh")}/{input.GetProperty("frame")}/{dt:R}";
             string? firstJointDifference = null;
+            string? firstVelocityDifference = null;
+            string? firstPositionDifference = null;
             var tracedJoints = 0;
             var initial = bodyRows.Select(b => Pose(b.GetProperty("initial"))).ToArray();
             var predicted = bodyRows.Select(b => Pose(b.GetProperty("predicted"))).ToArray();
@@ -124,6 +127,10 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
                 velocity[child] = new(velocity[child].Linear + added.Linear, velocity[child].Angular + added.Angular);
             }
             Check("projection", 0); Correct(); Check("corrected", 0); Assert.Equal(24, sampleIndex);
+            if (file == "v4_physics_first_steps_coupled_reference.json")
+                output.WriteLine($"NATIVE_FIRST_VELOCITY_DIFFERENCE {firstVelocityDifference ?? id + " exact"}");
+            if (file == "v4_physics_touchdown_coupled_reference.json")
+                output.WriteLine($"NATIVE_FIRST_POSITION_DIFFERENCE {firstPositionDifference ?? id + " exact"}");
             if (fixture.TryGetProperty("firstIterationJoints", out var jointTrace))
             {
                 Assert.Equal(joints.Length, jointTrace.GetArrayLength()); Assert.Equal(joints.Length, tracedJoints);
@@ -151,6 +158,12 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
                 for (var b = 0; b < count; b++)
                 {
                     var e = states[b]; var context = $"{id} {stage}/{iteration} {bodyRows[b].GetProperty("name")}";
+                    if (firstPositionDifference is null &&
+                        (delta[b].Position != V(e, "dp").ToSingle() || delta[b].Rotation != V(e, "dq").ToSingle()))
+                        firstPositionDifference = $"{context} DP={Vector3.Distance(delta[b].Position, V(e, "dp").ToSingle()):R} DQ={Vector3.Distance(delta[b].Rotation, V(e, "dq").ToSingle()):R}";
+                    if (firstVelocityDifference is null &&
+                        (velocity[b].Linear != V(e, "v").ToSingle() || velocity[b].Angular != V(e, "w").ToSingle()))
+                        firstVelocityDifference = $"{context} V={Vector3.Distance(velocity[b].Linear, V(e, "v").ToSingle()):R} W={Vector3.Distance(velocity[b].Angular, V(e, "w").ToSingle()):R}";
                     Compare(Vector3.Distance(delta[b].Position, V(e, "dp").ToSingle()), 2e-5, "DP", ref maxDp);
                     Compare(Vector3.Distance(delta[b].Rotation, V(e, "dq").ToSingle()), 3e-6, "DQ", ref maxDq);
                     Compare(Vector3.Distance(velocity[b].Linear, V(e, "v").ToSingle()), 3e-3, "V", ref maxV);
@@ -181,13 +194,11 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
         if (file == "v4_physics_coupled_shock_reference.json") Assert.True(shockPairs > 0, "Real captures must exercise dynamic contacts at different graph levels.");
         if (file == "v4_physics_free_coupled_reference.json") Assert.Equal(10, environmentCases);
         if (file == "v4_physics_window_coupled_reference.json") Assert.Equal(caseCount, environmentCases);
-        if (file == "v4_physics_first_steps_coupled_reference.json")
-        {
-            // Keep the independent first-step reference sensitive enough to catch
-            // .NET 9 fused Cross rounding. Historical captures remain unchanged;
-            // these limits apply to the fresh production-kernel replay above.
-            Assert.InRange(maxDp, 0, 1e-8); Assert.InRange(maxW, 0, 4e-7);
-        }
+        // Same inputs reproduce all 61 cases / 1464 native stages exactly in
+        // these channels on both supported runtimes. Historical captures remain
+        // unchanged; these assertions cover the fresh production replay.
+        Assert.Equal(0, maxDp); Assert.Equal(0, maxDq);
+        Assert.Equal(0, maxV); Assert.Equal(0, maxW); Assert.Equal(0, maxPosition);
         Assert.True(errors.Count == 0, string.Join(Environment.NewLine, errors));
     }
 }

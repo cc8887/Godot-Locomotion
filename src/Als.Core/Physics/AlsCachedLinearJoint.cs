@@ -51,7 +51,9 @@ public struct AlsCachedLinearJoint
             var cx=(c.Position-p.Position)+(Cross(c.Rotation,_childArm.ToSingle())-Cross(p.Rotation,_parentArm.ToSingle()));
             var dp=default(AlsProjectionDelta);var dc=default(AlsProjectionDelta);
             PositionSingle(ref _x,cx,ref dp,ref dc);PositionSingle(ref _y,cx,ref dp,ref dc);PositionSingle(ref _z,cx,ref dp,ref dc);
-            p=Add(p,dp);c=Add(c,dc);
+            // The reference Win64 kernel factors parent mass after summing all
+            // three impulses. Child position uses three scaled subtractions.
+            p=Add(p,new(dp.Position*(float)_parentMass,dp.Rotation));c=Add(c,dc);
         }
         else {PositionDouble(ref _x,ref p,ref c);PositionDouble(ref _y,ref p,ref c);PositionDouble(ref _z,ref p,ref c);}
     }
@@ -65,7 +67,9 @@ public struct AlsCachedLinearJoint
             var cv=(c.Linear+Cross(c.Angular,_childArm.ToSingle()))-(p.Linear+Cross(p.Angular,_parentArm.ToSingle()));
             var dp=default(AlsProjectionDelta);var dc=default(AlsProjectionDelta);
             VelocitySingle(_x,cv,ref dp,ref dc);VelocitySingle(_y,cv,ref dp,ref dc);VelocitySingle(_z,cv,ref dp,ref dc);
-            p=new(p.Linear+dp.Position,p.Angular+dp.Rotation);c=new(c.Linear+dc.Position,c.Angular+dc.Rotation);
+            // Both velocity responses sum first, then scale; unlike child DP.
+            p=new(p.Linear+dp.Position*(float)_parentMass,p.Angular+dp.Rotation);
+            c=new(c.Linear+dc.Position*-(float)_childMass,c.Angular+dc.Rotation);
         }
         else {VelocityDouble(_x,ref p,ref c);VelocityDouble(_y,ref p,ref c);VelocityDouble(_z,ref p,ref c);}
     }
@@ -112,7 +116,7 @@ public struct AlsCachedLinearJoint
     {
         if (r.InverseMass<=0) return;
         var lambda=(float)_stiffness*Vector3.Dot(cv,r.Axis.ToSingle())/(float)r.InverseMass;
-        ApplySingle(r,lambda,ref p,ref c);
+        ApplySingle(r,lambda,ref p,ref c,velocity:true);
     }
     private readonly void ApplyDouble(in Row r,double lambda,ref AlsProjectionDelta p,ref AlsProjectionDelta c)
     {
@@ -120,11 +124,11 @@ public struct AlsCachedLinearJoint
         p=new(p.Position+(impulse*_parentMass).ToSingle(),p.Rotation+(r.ParentResponse*lambda).ToSingle());
         c=new(c.Position+(impulse*-_childMass).ToSingle(),c.Rotation+(r.ChildResponse*lambda).ToSingle());
     }
-    private readonly void ApplySingle(in Row r,float lambda,ref AlsProjectionDelta p,ref AlsProjectionDelta c)
+    private readonly void ApplySingle(in Row r,float lambda,ref AlsProjectionDelta p,ref AlsProjectionDelta c,bool velocity=false)
     {
         var impulse=r.Axis.ToSingle()*lambda;
-        p=new(p.Position+impulse*(float)_parentMass,p.Rotation+r.ParentResponse.ToSingle()*lambda);
-        c=new(c.Position-impulse*(float)_childMass,c.Rotation+r.ChildResponse.ToSingle()*lambda);
+        p=new(p.Position+impulse,p.Rotation+r.ParentResponse.ToSingle()*lambda);
+        c=new(velocity?c.Position+impulse:c.Position-impulse*(float)_childMass,c.Rotation+r.ChildResponse.ToSingle()*lambda);
     }
     private static AlsProjectionDelta Add(AlsProjectionDelta a,AlsProjectionDelta b)=>new(a.Position+b.Position,a.Rotation+b.Rotation);
     // Match the reference engine's separate float products/subtraction on both

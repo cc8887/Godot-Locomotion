@@ -5,6 +5,7 @@
 #include "Chaos/Evolution/SolverBodyContainer.h"
 #include "Chaos/PBDCollisionConstraints.h"
 #include "Chaos/PBDJointConstraints.h"
+#include "Chaos/PBDJointConstraintUtilities.h"
 #include "Chaos/PBDRigidsSOAs.h"
 #include "Chaos/Utilities.h"
 #include "HAL/FileManager.h"
@@ -56,7 +57,7 @@ FPBDJointSettings ReadJoint(const TSharedPtr<FJsonObject>& J)
 }
 }
 
-bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& Output,FString& Error,bool bTraceFirstJointIteration)
+bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& Output,FString& Error,bool bTraceFirstJointIteration,bool bObserveJointGather)
 {
     using namespace Chaos; using namespace AlsCoupledStepReference; using namespace AlsJointSolverReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
@@ -179,6 +180,70 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& O
             if(Input->HasField(TEXT("contactShock")))Body.SetLevel(In->GetIntegerField(TEXT("level")));
         }
         ContactSolver->GatherInput(Dt); JointSolver->GatherInput(Dt);
+        TArray<TSharedPtr<FJsonValue>> JointGather;
+        if(bObserveJointGather)
+        {
+            for(int32 J=0;J<JointInputs.Num();++J)
+            {
+                const auto In=JointInputs[J]->AsObject();
+                const int32 ParentIndex=In->GetIntegerField(TEXT("parent")),ChildIndex=In->GetIntegerField(TEXT("child"));
+                auto Settings=Joints.GetConstraintSettings(J);
+                FReal InvMass[2]={B[ParentIndex]->InvM(),B[ChildIndex]->InvM()};
+                FVec3 InvLocal[2]={FVec3(B[ParentIndex]->InvILocal()),FVec3(B[ChildIndex]->InvILocal())};
+                if(Settings.bMassConditioningEnabled)
+                    FPBDJointUtilities::ConditionInverseMassAndInertia(InvMass[0],InvMass[1],InvLocal[0],InvLocal[1],
+                        JointSettings.MinParentMassRatio,JointSettings.MaxInertiaRatio);
+                const auto MassState=[&](int32 Index)
+                {
+                    auto State=MakeShared<FJsonObject>();State->SetNumberField(TEXT("inverseMass"),InvMass[Index]);
+                    const FMatrix33 Tensor=InvMass[Index]>0?Utilities::ComputeWorldSpaceInertia(
+                        B[Index==0?ParentIndex:ChildIndex]->Q(),InvLocal[Index]):FMatrix33(0);
+                    TArray<TSharedPtr<FJsonValue>> Columns;
+                    for(int32 Axis=0;Axis<3;++Axis) Columns.Add(MakeShared<FJsonValueArray>(
+                        V(FVector(Tensor.M[Axis][0],Tensor.M[Axis][1],Tensor.M[Axis][2]))));
+                    State->SetArrayField(TEXT("inverseInertia"),Columns);return State;
+                };
+                auto Row=MakeShared<FJsonObject>();Row->SetNumberField(TEXT("jointIndex"),J);
+                Row->SetObjectField(TEXT("parentMass"),MassState(0));Row->SetObjectField(TEXT("childMass"),MassState(1));
+                // The kernel's Init/Apply methods are not DLL exports. Use an
+                // independent native container with copied solver bodies instead.
+                // Mass/tensor above call the exact native utilities used by Init.
+                Settings.AngularMotionTypes=TVec3<EJointMotionType>(EJointMotionType::Free);
+                Settings.bAngularTwistPositionDriveEnabled=Settings.bAngularTwistVelocityDriveEnabled=false;
+                Settings.bAngularSwingPositionDriveEnabled=Settings.bAngularSwingVelocityDriveEnabled=false;
+                Settings.bAngularSLerpPositionDriveEnabled=Settings.bAngularSLerpVelocityDriveEnabled=false;
+                // Each container needs independent particle SolverBodyIndex cookies.
+                FParticleUniqueIndicesMultithreaded ProbeUnique;FPBDRigidsSOAs ProbeParticles(ProbeUnique);
+                const auto Proxies=ProbeParticles.CreateDynamicParticles(2);
+                for(int32 I=0;I<2;++I)
+                {
+                    Proxies[I]->SetX(FVec3(0));Proxies[I]->SetR(FRotation3::Identity);
+                    Proxies[I]->SetCenterOfMass(FVec3(0));Proxies[I]->SetRotationOfMass(FRotation3::Identity);
+                    if(InvMass[I]==0)Proxies[I]->SetObjectStateLowLevel(EObjectStateType::Kinematic);
+                }
+                FPBDJointConstraints Probe;Probe.SetUseLinearSolver(true);Probe.SetSettings(JointSettings);
+                Probe.AddConstraint({Proxies[1],Proxies[0]},Settings);
+                auto ProbeSolver=Probe.CreateSceneSolver(0);ProbeSolver->AddConstraints();
+                FSolverBodyContainer ProbeBodies;ProbeBodies.Reset(2);ProbeSolver->AddBodies(ProbeBodies);
+                if(ProbeBodies.Num()!=2 || ProbeSolver->GetNumConstraints()!=1) return Fail(TEXT("Isolated joint binding failed."));
+                FSolverBody* Parent=nullptr;FSolverBody* Child=nullptr;
+                for(int32 I=0;I<ProbeBodies.Num();++I)
+                {
+                    const bool bParent=ProbeBodies.GetParticle(I)==Proxies[0];
+                    auto& Body=ProbeBodies.GetSolverBody(I);Body=*B[bParent?ParentIndex:ChildIndex];
+                    if(bParent) Parent=&Body;else Child=&Body;
+                }
+                if(!Parent||!Child)return Fail(TEXT("Missing isolated joint bodies."));
+                ProbeSolver->GatherInput(Dt);ProbeSolver->ApplyPositionConstraints(Dt,0,8);
+                const auto Delta=[&](const FSolverBody& Body)
+                {
+                    auto State=MakeShared<FJsonObject>();State->SetArrayField(TEXT("dp"),V(FVector(Body.DP())));
+                    State->SetArrayField(TEXT("dq"),V(FVector(Body.DQ())));return State;
+                };
+                Row->SetObjectField(TEXT("parentLinearDelta"),Delta(*Parent));Row->SetObjectField(TEXT("childLinearDelta"),Delta(*Child));
+                JointGather.Add(MakeShared<FJsonValueObject>(Row));
+            }
+        }
         auto* Container=static_cast<FPBDCollisionContainerSolver*>(ContactSolver.Get());
         if (Container->GetNumConstraints()!=ContactInputs.Num()) return Fail(TEXT("Native contact count changed."));
         for (int32 I=0;I<ContactInputs.Num();++I)
@@ -239,6 +304,7 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& O
         for (auto* Body:B) Body->ApplyCorrections(); Snapshot(TEXT("corrected"),0);
         auto Case=MakeShared<FJsonObject>(); Case->SetObjectField(TEXT("capture"),Capture); Case->SetArrayField(TEXT("nativeSamples"),Samples);
         if(bTraceFirstJointIteration) Case->SetArrayField(TEXT("firstIterationJoints"),JointSamples);
+        if(bObserveJointGather) Case->SetArrayField(TEXT("jointGather"),JointGather);
         Cases.Add(MakeShared<FJsonValueObject>(Case));
     }
     Root->SetArrayField(TEXT("cases"),Cases); FString Text;

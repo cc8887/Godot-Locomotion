@@ -104,7 +104,9 @@ public struct AlsCachedAngularJoint
     private readonly void SolveVelocity(in Row r,ref Vector3 p,ref Vector3 c)
     {
         if (!r.Active||r.Soft||M.Abs(r.Lambda)<=1e-8f) return;
-        var delta=_hardStiffness*AlsDoubleVector.Dot(new(c-p),r.Axis)/r.InverseMass;
+        // Native W() promotes each stored float velocity to FVec3 before CW
+        // subtraction. Subtracting Vector3 first loses low bits of that delta.
+        var delta=_hardStiffness*AlsDoubleVector.Dot(new AlsDoubleVector(c)-new AlsDoubleVector(p),r.Axis)/r.InverseMass;
         p+=(r.ParentResponse*delta).ToSingle(); c+=(r.ChildResponse*delta).ToSingle();
     }
 

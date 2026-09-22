@@ -82,13 +82,13 @@ public struct AlsCachedContactPoint
         var delta = 0f;
         if (_inverseMass0 > 0 && _inverseMass1 > 0)
         {
-            delta += Vector3.Dot(body0.Position - body1.Position, _n.Direction);
-            delta += Vector3.Dot(body0.Rotation, _n.Cross0); delta -= Vector3.Dot(body1.Rotation, _n.Cross1);
+            delta += DotZxy(body0.Position - body1.Position, _n.Direction);
+            delta += DotZxy(body0.Rotation, _n.Cross0); delta -= DotYxz(body1.Rotation, _n.Cross1);
         }
         else if (_inverseMass0 > 0)
-        { delta += Vector3.Dot(body0.Rotation, _n.Cross0); delta += Vector3.Dot(body0.Position, _n.Direction); }
+        { delta += DotZxy(body0.Rotation, _n.Cross0); delta += DotZxy(body0.Position, _n.Direction); }
         else if (_inverseMass1 > 0)
-        { delta -= Vector3.Dot(body1.Rotation, _n.Cross1); delta -= Vector3.Dot(body1.Position, _n.Direction); }
+        { delta -= DotYxz(body1.Rotation, _n.Cross1); delta -= DotYxz(body1.Position, _n.Direction); }
         var error = _input.Error.X + delta;
         if (error >= 0 && PushOut.X <= 1e-8f) return;
         var push = -_material.Stiffness * error * _n.Mass;
@@ -132,19 +132,22 @@ public struct AlsCachedContactPoint
         var normalActive = PushOut.X > 0 || _input.DisablePosition;
         var frictionActive = applyFriction && _material.VelocityFriction > 0 && !_input.DisableFriction && (normalActive || _input.Error.X < 0);
         if (!normalActive && !frictionActive) return;
-        var minimum = MathF.Min(0, -PushOut.X / dt);
-        var error = normalActive ? VelocityError(_n, -_input.TargetVelocity, body0, body1) : 0;
-        var dn = -(_material.Stiffness * _n.Mass) * error;
+        // Native /fp:fast shares the rounded reciprocal for these pushout to
+        // impulse conversions. Dividing each numerator gives different clamps.
+        var inverseDt = 1 / dt;
+        var minimum = MathF.Min(0, PushOut.X * -inverseDt);
+        var correction = normalActive ? NormalVelocityCorrection(body0, body1) : 0;
+        var dn = (_material.Stiffness * _n.Mass) * correction;
         if (Impulse.X + dn < minimum) dn = minimum - Impulse.X;
         var nextN = Impulse.X + dn; var du = 0f; var dv = 0f;
         if (frictionActive)
         {
             var frictionStiffness = _material.Stiffness * _material.VelocityFrictionStiffness;
-            du = -frictionStiffness * _u.Mass * VelocityError(_u, 0, body0, body1);
-            dv = -frictionStiffness * _v.Mass * VelocityError(_v, 0, body0, body1);
-            var totalN = nextN + PushOut.X / dt;
-            var maximum = _material.VelocityFriction * MathF.Max(_material.MinFrictionPushOut / dt, totalN);
-            var totalU = Impulse.Y + PushOut.Y / dt; var totalV = Impulse.Z + PushOut.Z / dt;
+            du = frictionStiffness * _u.Mass * TangentVelocityCorrection(_u, body0, body1);
+            dv = frictionStiffness * _v.Mass * TangentVelocityCorrection(_v, body0, body1);
+            var totalN = nextN + PushOut.X * inverseDt;
+            var maximum = _material.VelocityFriction * MathF.Max(_material.MinFrictionPushOut * inverseDt, totalN);
+            var totalU = Impulse.Y + PushOut.Y * inverseDt; var totalV = Impulse.Z + PushOut.Z * inverseDt;
             var sizeSquared = (totalU + du) * (totalU + du) + (totalV + dv) * (totalV + dv);
             if (sizeSquared > maximum * maximum + 1e-8f)
             {
@@ -157,38 +160,63 @@ public struct AlsCachedContactPoint
         var impulse = dn * _n.Direction;
         if (frictionActive) impulse += du * _u.Direction + dv * _v.Direction;
         if (_inverseMass0 > 0) body0 = new(body0.Linear + _inverseMass0 * impulse,
-            body0.Angular + (_n.Response0 * dn + _u.Response0 * du + _v.Response0 * dv));
+            (body0.Angular + _n.Response0 * dn) + (_u.Response0 * du + _v.Response0 * dv));
         if (_inverseMass1 > 0) body1 = new(body1.Linear + -_inverseMass1 * impulse,
-            body1.Angular + (_n.Response1 * -dn + _u.Response1 * -du + _v.Response1 * -dv));
+            (body1.Angular + _n.Response1 * -dn) + (_u.Response1 * -du + _v.Response1 * -dv));
     }
 
     private readonly float TangentError(in Axis axis, float error, in AlsProjectionDelta b0, in AlsProjectionDelta b1)
     {
+        // Preserve the reference Win64 Chaos /fp:fast reduction, including where
+        // the initial error joins the sum. A Dot followed by += changes rounding
+        // on the first friction pass (the normal-only passes do not exercise it).
         if (_inverseMass0 > 0 && _inverseMass1 > 0)
         {
-            error += Vector3.Dot(b0.Position - b1.Position, axis.Direction);
-            error += Vector3.Dot(b0.Rotation, axis.Cross0); error -= Vector3.Dot(b1.Rotation, axis.Cross1);
+            var p = (b0.Position - b1.Position) * axis.Direction;
+            var r0 = b0.Rotation * axis.Cross0; var r1 = b1.Rotation * axis.Cross1;
+            error = (p.X + p.Y) + (p.Z + error);
+            error += (r0.Z + r0.X) + r0.Y;
+            error -= (r1.Y + r1.X) + r1.Z;
         }
         else if (_inverseMass0 > 0)
-        { error += Vector3.Dot(b0.Position, axis.Direction); error += Vector3.Dot(b0.Rotation, axis.Cross0); }
+        {
+            var p = b0.Position * axis.Direction; var r = b0.Rotation * axis.Cross0;
+            error = ((p.X + p.Z) + p.Y) + ((r.X + r.Z) + (r.Y + error));
+        }
         else if (_inverseMass1 > 0)
-        { error -= Vector3.Dot(b1.Position, axis.Direction); error -= Vector3.Dot(b1.Rotation, axis.Cross1); }
+        {
+            var p = b1.Position * axis.Direction; var r = b1.Rotation * axis.Cross1;
+            error -= (p.Y + p.X) + p.Z; error -= (r.Y + r.X) + r.Z;
+        }
         return error;
     }
-    private static float VelocityError(in Axis axis, float error, in AlsProjectionVelocity b0, in AlsProjectionVelocity b1)
+    private readonly float NormalVelocityCorrection(in AlsProjectionVelocity b0, in AlsProjectionVelocity b1)
     {
-        error += Vector3.Dot(b0.Linear - b1.Linear, axis.Direction);
-        error += Vector3.Dot(b0.Angular, axis.Cross0); error -= Vector3.Dot(b1.Angular, axis.Cross1); return error;
+        var r0 = b0.Angular * _n.Cross0;
+        var relative = DotYxz(b0.Linear - b1.Linear, _n.Direction) - _input.TargetVelocity;
+        relative += r0.Z; relative += r0.X + r0.Y;
+        return DotYxz(b1.Angular, _n.Cross1) - relative;
+    }
+    private static float TangentVelocityCorrection(in Axis axis, in AlsProjectionVelocity b0, in AlsProjectionVelocity b1)
+    {
+        var p = (b0.Linear - b1.Linear) * axis.Direction;
+        return DotYxz(b1.Angular, axis.Cross1) - (DotZxy(b0.Angular, axis.Cross0) + ((p.Y + p.Z) + p.X));
     }
     private static Axis MakeAxis(Vector3 axis, Vector3 arm0, Vector3 arm1, AlsJointInertiaTensor tensor0, AlsJointInertiaTensor tensor1, float mass0, float mass1)
     {
-        var cross0 = Vector3.Cross(arm0, axis); var cross1 = Vector3.Cross(arm1, axis);
+        var cross0 = Cross(arm0, axis); var cross1 = Cross(arm1, axis);
         var response0 = Transform(tensor0, cross0); var response1 = Transform(tensor1, cross1); var inverse = 0f;
         if (mass0 > 0) inverse += Vector3.Dot(cross0, response0) + mass0;
         if (mass1 > 0) inverse += Vector3.Dot(cross1, response1) + mass1;
         return new(axis, cross0, cross1, response0, response1, inverse > 1e-8f ? 1 / inverse : 0);
     }
     private static Vector3 Transform(AlsJointInertiaTensor tensor, Vector3 v) => tensor.X.ToSingle() * v.X + tensor.Y.ToSingle() * v.Y + tensor.Z.ToSingle() * v.Z;
+    // Native scalar contact rows reduce body 0 in Z/X/Y order and body 1
+    // in Y/X/Z order. Keep products separate, including across .NET versions.
+    private static float DotZxy(Vector3 a, Vector3 b) => (a.Z * b.Z + a.X * b.X) + a.Y * b.Y;
+    private static float DotYxz(Vector3 a, Vector3 b) => (a.Y * b.Y + a.X * b.X) + a.Z * b.Z;
+    private static Vector3 Cross(Vector3 a, Vector3 b) => new(
+        a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
     private static float InverseMass(double value)
     {
         var result = (float)value;

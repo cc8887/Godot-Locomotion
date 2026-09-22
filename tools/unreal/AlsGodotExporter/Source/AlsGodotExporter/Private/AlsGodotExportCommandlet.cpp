@@ -249,7 +249,8 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
     if (FParse::Value(*Params, TEXT("PhysicsCoupledOutput="), PhysicsOutput))
     {
         FString Inputs, Error; FParse::Value(*Params, TEXT("PhysicsCoupledInputs="), Inputs);
-        if (!ExportAlsPhysicsCoupledStepReference(Inputs, PhysicsOutput, Error, FParse::Param(*Params, TEXT("PhysicsCoupledJointTrace"))))
+        if (!ExportAlsPhysicsCoupledStepReference(Inputs, PhysicsOutput, Error, FParse::Param(*Params, TEXT("PhysicsCoupledJointTrace")),
+            FParse::Param(*Params, TEXT("PhysicsCoupledJointGather"))))
         { UE_LOG(LogAlsGodotExporter, Error, TEXT("Coupled reference export failed: %s"), *Error); return 23; }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_COUPLED_OK assets_saved=0")); return 0;
     }
