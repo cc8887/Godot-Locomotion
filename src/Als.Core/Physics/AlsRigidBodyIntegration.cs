@@ -2,7 +2,7 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Core.Physics;
 
-public readonly record struct AlsPredictedRigidBody(AlsPrecisePose MassPose,AlsProjectionVelocity Velocity);
+public readonly record struct AlsPredictedRigidBody(AlsPrecisePose MassPose,AlsProjectionVelocity Velocity,AlsPrecisePose ActorPose);
 // Explicit per-step inputs, already converted from force/torque to world-space
 // acceleration and impulse velocity. Units: cm/s², rad/s², cm/s and rad/s.
 // The caller resubmits continuous acceleration each step and impulses only once.
@@ -55,7 +55,7 @@ public static class AlsRigidBodyIntegration
         // Native SetTransformPQCom stores the actor quaternion in float, then
         // Gather reconstructs COM from that particle. Preserve that boundary.
         var predicted=StoreActor(mass,massLocal);
-        return new(AlsPrecisePose.Compose(massLocal,predicted),new(v.ToSingle(),w.ToSingle()));
+        return new(AlsPrecisePose.Compose(massLocal,predicted),new(v.ToSingle(),w.ToSingle()),predicted);
     }
 
     public static AlsPrecisePose StoreActor(in AlsPrecisePose mass,in AlsPrecisePose massLocal)

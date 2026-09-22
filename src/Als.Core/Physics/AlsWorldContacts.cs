@@ -151,6 +151,10 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
         => Gather(predicted, velocities, bodies, dt, default);
     public void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt, ReadOnlySpan<AlsIslandBodyState> previous)
+        => Gather(predicted, velocities, bodies, dt, previous, default);
+    public void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
+        ReadOnlySpan<AlsIslandBody> bodies, double dt, ReadOnlySpan<AlsIslandBodyState> previous,
+        ReadOnlySpan<AlsPrecisePose> predictedActors)
     {
         if (_pending) throw new InvalidOperationException("World contacts already have a pending step.");
         if (!double.IsFinite(dt) || dt <= 0 || !float.IsFinite((float)dt) || !float.IsFinite(1 / (float)dt))
@@ -159,6 +163,8 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
             throw new ArgumentException("Contact registry and island body counts differ.");
         if (!previous.IsEmpty && previous.Length != predicted.Length)
             throw new ArgumentException("Previous body state count differs from the island.");
+        if (!predictedActors.IsEmpty && predictedActors.Length != predicted.Length)
+            throw new ArgumentException("Predicted actor count differs from the island.");
         if (_epoch == long.MaxValue) throw new InvalidOperationException("Contact epoch exhausted.");
         _registry.Enter(); _pending = true; _staged = false; _count = _contactCount = _activeCount = _restoredCount = 0;
         try
@@ -166,9 +172,13 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
             _source.PrepareStep(previous, velocities, bodies, dt);
             for (var i = 0; i < _registry.Capacity; i++) if (_registry.Present(i))
             {
-                var s = _registry.At(i); var local = bodies[s.Body].InverseMass.Mass > 0
-                    ? AlsPrecisePose.Relative(s.ActorLocal, bodies[s.Body].MassLocal) : s.ActorLocal;
-                _shapeWorld[i] = AlsPrecisePose.Compose(local, predicted[s.Body]);
+                var s = _registry.At(i);
+                // Native leaf transforms compose directly with the stored actor.
+                // The island supplies it before any COM reconstruction. Direct
+                // COM-only diagnostic calls reconstruct their particle here.
+                var actor = !predictedActors.IsEmpty ? predictedActors[s.Body] : bodies[s.Body].InverseMass.Mass > 0
+                    ? AlsRigidBodyIntegration.StoreActor(predicted[s.Body], bodies[s.Body].MassLocal) : predicted[s.Body];
+                _shapeWorld[i] = AlsPrecisePose.Compose(s.ActorLocal, actor);
             }
             _source.PrepareBounds(_shapeWorld);
             var slot = 0;

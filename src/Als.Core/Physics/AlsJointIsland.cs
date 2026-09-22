@@ -27,7 +27,7 @@ public sealed class AlsJointIsland
     private readonly AlsIslandBody[] _bodies;
     private readonly AlsIslandJoint[] _joints;
     private readonly AlsIslandBodyState[] _states, _next, _external;
-    private readonly AlsPrecisePose[] _initial, _predicted;
+    private readonly AlsPrecisePose[] _initial, _predicted, _predictedActors;
     private readonly AlsProjectionDelta[] _deltas;
     private readonly AlsProjectionVelocity[] _velocities;
     private readonly AlsCachedJoint[] _cached;
@@ -67,6 +67,7 @@ public sealed class AlsJointIsland
         _next = new AlsIslandBodyState[bodies.Length];
         _external = new AlsIslandBodyState[bodies.Length];
         _initial = new AlsPrecisePose[bodies.Length]; _predicted = new AlsPrecisePose[bodies.Length];
+        _predictedActors = new AlsPrecisePose[bodies.Length];
         _deltas = new AlsProjectionDelta[bodies.Length]; _velocities = new AlsProjectionVelocity[bodies.Length];
         _cached = new AlsCachedJoint[joints.Length]; _projections = new AlsLockedLinearProjection[joints.Length];
         _jointOrder = new int[joints.Length];
@@ -153,7 +154,7 @@ public sealed class AlsJointIsland
         IAlsIslandContacts? contacts, bool dragBeforeIntegration, bool wake, bool allowSleep)
     {
         Gather(dt, gravity, forces, dragBeforeIntegration);
-        contacts?.Gather(_predicted, _velocities, _bodies, dt, _states);
+        contacts?.Gather(_predicted, _velocities, _bodies, dt, _states, _predictedActors);
         for (var j = 0; j < _jointOrder.Length; j++) _jointOrder[j] = j;
         contacts?.PrepareConstraintOrder(this, _jointOrder);
         var observer = _observer?.Enabled == true ? _observer : null;
@@ -235,8 +236,8 @@ public sealed class AlsJointIsland
             var force = forces.IsEmpty ? default : forces[i];
             if (body.GravityEnabled) force = force with { Acceleration = force.Acceleration + gravity };
             var result = Dynamic(i) ? AlsRigidBodyIntegration.Predict(state.Actor, body.MassLocal,
-                state.Velocity, body.LinearDamping, body.AngularDamping, dt, force, dragBeforeIntegration) : new AlsPredictedRigidBody(_external[i].Actor, _external[i].Velocity);
-            _predicted[i] = result.MassPose; _velocities[i] = result.Velocity;
+                state.Velocity, body.LinearDamping, body.AngularDamping, dt, force, dragBeforeIntegration) : new AlsPredictedRigidBody(_external[i].Actor, _external[i].Velocity, _external[i].Actor);
+            _predicted[i] = result.MassPose; _velocities[i] = result.Velocity; _predictedActors[i] = result.ActorPose;
         }
         for (var j = 0; j < _joints.Length; j++)
         {
