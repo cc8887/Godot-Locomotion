@@ -7,11 +7,14 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsPhysicsRawGatherReferenceTests(Xunit.Abstractions.ITestOutputHelper output)
 {
-    [Fact]
-    public void FailedChainRawInputsRegenerateNativeContactRows()
+    [Theory]
+    [InlineData("v4_physics_raw_gather_reference.json", 6, 156, 369, 369, 27, 1.0662403e-6f)]
+    [InlineData("v4_physics_window_raw_gather_reference.json", 40, 848, 2055, 2041, 160, 0f)]
+    public void FailedChainRawInputsRegenerateNativeContactRows(string file, int frameCount, int pairCount,
+        int pointCount, int anchoredCount, int globalCount, float capturedDifference)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
-            "assets/config/v4_physics_raw_gather_reference.json")));
+            "assets/config/" + file)));
         Assert.Equal(1, doc.RootElement.GetProperty("schemaVersion").GetInt32());
         var frames = new HashSet<string>(); var ids = new HashSet<string>();
         var count = 0; var anchored = 0; var fresh = 0; var global = 0;
@@ -40,11 +43,11 @@ public sealed class AlsPhysicsRawGatherReferenceTests(Xunit.Abstractions.ITestOu
             }
         }
         output.WriteLine($"runtime={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription} frames={frames.Count} pairs={ids.Count} points={count} anchored={anchored} fresh={fresh} global={global} maxCore={maxCore:R} maxCaptured={maxCaptured:R}");
-        Assert.Equal(6, frames.Count); Assert.Equal(156, ids.Count); Assert.Equal(369, count);
-        Assert.Equal(369, anchored); Assert.Equal(0, fresh); Assert.Equal(27, global);
+        Assert.Equal(frameCount, frames.Count); Assert.Equal(pairCount, ids.Count); Assert.Equal(pointCount, count);
+        Assert.Equal(anchoredCount, anchored); Assert.Equal(pointCount - anchoredCount, fresh); Assert.Equal(globalCount, global);
         // Current Core must reproduce native floats on both .NET 8 and .NET 9.
         // The immutable pre-fix Godot capture retains the actual regression.
-        Assert.Equal(0, maxCore); Assert.Equal(1.0662403e-6f, maxCaptured);
+        Assert.Equal(0, maxCore); Assert.Equal(capturedDifference, maxCaptured);
     }
     private static float Difference(AlsContactPointInput a, float phiA, AlsContactPointInput b, float phiB)
     {
