@@ -28,6 +28,7 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs, const FString& Output
 bool ExportAlsPhysicsCapsuleGeometryReference(const FString& Input, const FString& Output, FString& Error);
 bool ExportAlsPhysicsManifoldRestoreReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCullReference(const FString& Output, FString& Error);
+bool ExportAlsPhysicsShapeBoundsReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsContactSettings(const FString& Output, FString& Error);
 bool ExportAlsPhysicsBoxGeometryReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsConvexTopology(const FString& Output, FString& Error);
