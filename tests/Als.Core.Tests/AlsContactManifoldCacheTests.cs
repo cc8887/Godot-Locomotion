@@ -11,6 +11,35 @@ public sealed class AlsContactManifoldCacheTests
     private static readonly AlsDetectedContact Point = new(Vector3.Zero, Vector3.Zero, Vector3.UnitZ);
     private static AlsPrecisePose Pose(double x = 0, double z = -.1) => Identity with { Position = new(x, 0, z) };
     [Fact]
+    public void RetainedSnapshotKeepsCommittedPointsAndOriginalReferenceUntilPublication()
+    {
+        var cache = new AlsContactManifoldCache(4); var destination = new AlsDetectedContact[4];
+        Assert.Equal(-1, cache.RetainedState.Epoch);
+        Assert.Throws<ArgumentOutOfRangeException>(() => cache.RetainedPointAt(0));
+        cache.PrepareNew(Key, 0, Pose(), Identity, 2, [Point]);
+        Assert.Equal(0, cache.RetainedState.Count); cache.Publish();
+        var original = cache.RetainedState; var point = cache.RetainedPointAt(0);
+        Assert.Equal(Key, original.Key); Assert.Equal(0, original.Epoch); Assert.Equal(2, original.Tolerance);
+        Assert.Equal(new Vector3(0, 0, -.1f), original.PositionDelta);
+        Assert.True(cache.TryRestore(Key, 1, Pose(.2), Identity, 2, destination, out _));
+        Assert.Equal(original, cache.RetainedState); Assert.Equal(point, cache.RetainedPointAt(0));
+        cache.Publish();
+        var restored = cache.RetainedPointAt(0);
+        Assert.Equal(.2f, restored.Contact.Point1.X);
+        Assert.Equal(point.Initial0, restored.Initial0); Assert.Equal(point.Initial1, restored.Initial1);
+        Assert.Equal(original.PositionDelta, cache.RetainedState.PositionDelta);
+        Assert.Equal(original.RotationDelta, cache.RetainedState.RotationDelta);
+        Assert.Equal(1, cache.RetainedState.Epoch);
+        cache.PrepareNew(Key, 2, Pose(5), Identity, 2, [Point with { Point0 = Vector3.One }]);
+        Assert.Equal(restored, cache.RetainedPointAt(0)); cache.Abort();
+        Assert.Equal(restored, cache.RetainedPointAt(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => cache.RetainedPointAt(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => cache.RetainedPointAt(1));
+        cache.Reset(); Assert.Equal(0, cache.RetainedState.Count); Assert.Equal(-1, cache.RetainedState.Epoch);
+        Assert.Throws<ArgumentOutOfRangeException>(() => cache.RetainedPointAt(0));
+        Assert.Equal(Vector3.Zero, point.Contact.Point1); // Earlier value snapshot remains independent.
+    }
+    [Fact]
     public void RestoredPointsStayRelativeToLastNarrowPhaseNotPreviousTick()
     {
         var cache = new AlsContactManifoldCache(4); var points = new AlsDetectedContact[4];

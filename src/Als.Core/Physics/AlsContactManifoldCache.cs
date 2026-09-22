@@ -4,6 +4,9 @@ using GodotAls.Core.Locomotion;
 namespace GodotAls.Core.Physics;
 
 public readonly record struct AlsContactManifoldSettings(float CollisionTolerance, float CullDistance = 0);
+public readonly record struct AlsRetainedManifoldState(AlsContactPairKey Key, long Epoch, int Count, float Tolerance,
+    Vector3 PositionDelta, AlsQuaternion RotationDelta);
+public readonly record struct AlsRetainedManifoldPoint(AlsDetectedContact Contact, Vector3 Initial0, Vector3 Initial1);
 
 // Native persistent polygonal manifold restoration, separate from saved friction
 // anchors. The world owner handles eligibility and culling. Geometry/history
@@ -22,6 +25,11 @@ public sealed class AlsContactManifoldCache
     public bool Pending { get; private set; }
     public float MinimumPhi { get; private set; }
     public int Count => _count;
+    // Value copies of committed state remain available while a new step is
+    // pending. Initial points/reference deltas belong to the last narrow phase.
+    public AlsRetainedManifoldState RetainedState => new(_key, _step, _count, _tolerance, _positionDelta, _rotationDelta);
+    public AlsRetainedManifoldPoint RetainedPointAt(int point) => (uint)point < (uint)_count
+        ? new(_points[point], _initial0[point], _initial1[point]) : throw new ArgumentOutOfRangeException(nameof(point));
     public bool PreparedRestored => Pending ? !_newManifold : throw new InvalidOperationException("No prepared manifold.");
     public float PreparedTolerance => Pending ? _nextTolerance : throw new InvalidOperationException("No prepared manifold.");
     public AlsContactManifoldCache(int capacity)

@@ -95,6 +95,8 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     public AlsContactPairKey HistoryKeyAt(int pair) => _identities[HistorySlot(pair)];
     public bool HistoryRestoredAt(int pair) => _manifolds[HistorySlot(pair)].PreparedRestored;
     public float HistoryToleranceAt(int pair) => _manifolds[HistorySlot(pair)].PreparedTolerance;
+    public AlsRetainedManifoldState HistoryRetainedStateAt(int pair) => _manifolds[HistorySlot(pair)].RetainedState;
+    public AlsRetainedManifoldPoint HistoryRetainedPointAt(int pair, int point) => _manifolds[HistorySlot(pair)].RetainedPointAt(point);
     public int HistoryPointCountAt(int pair) => _pairs[HistorySlot(pair)].HistoryPointCount;
     public int HistorySavedCountAt(int pair) => _pairs[HistorySlot(pair)].SavedCount;
     public AlsSavedContact HistorySavedAt(int pair, int point) => _pairs[HistorySlot(pair)].SavedAt(point);
