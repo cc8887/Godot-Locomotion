@@ -15,7 +15,7 @@ bool ExportAlsPhysicsAssets(const FString& Output, FString& Error, bool ObserveR
 bool ExportAlsPhysicsJointReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsJointSolverReference(const FString& Output, FString& Error, bool DisableSleep = false, bool SleepDiagnostics = false);
 bool ExportAlsPhysicsInertiaReference(const FString& Output, FString& Error);
-bool ExportAlsPhysicsJointFrameInputs(const FString& Output, FString& Error);
+bool ExportAlsPhysicsJointFrameInputs(const FString& Output, FString& Error, bool MotorTargets = false);
 bool ExportAlsPhysicsProjectionReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsAngularRowReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsJointStepReference(const FString& Output, FString& Error);
