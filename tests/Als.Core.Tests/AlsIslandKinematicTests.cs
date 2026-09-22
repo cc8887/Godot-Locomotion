@@ -28,6 +28,22 @@ public sealed class AlsIslandKinematicTests
     }
 
     [Fact]
+    public void ExternalQuaternionUsesParticlePrecisionAndRejectsBeforePublishing()
+    {
+        var island = Island();
+        var rotation = AlsQuaternion.FromAxisAngle(Vector3.UnitZ, .314159f);
+        var target = new AlsIslandBodyState(Identity with { Position = new(1.234567890123, 2, 3), Rotation = rotation }, default);
+        var stored = target with { Actor = target.Actor with { Rotation = new(rotation.ToSingle()) } };
+        Assert.NotEqual(target.Actor.Rotation, stored.Actor.Rotation);
+        island.Step(.1, default, kinematicTargets: [new(1, target)]);
+        Assert.Equal(stored, island.BodyAt(1));
+        Assert.Throws<ArgumentException>(() => island.Step(.1, default, kinematicTargets:
+            [new(1, target with { Actor = target.Actor with { Position = new(7, 8, 9) } }), new(1, target)]));
+        Assert.Equal(stored, island.BodyAt(1));
+        island.Step(.1, default, kinematicTargets: [new(1, target)]);
+        Assert.Equal(stored, island.BodyAt(1));
+    }
+    [Fact]
     public void PrescribedPoseAndVelocityAreNotIntegratedTwiceAndStopWithoutAnotherTarget()
     {
         var island = Island();

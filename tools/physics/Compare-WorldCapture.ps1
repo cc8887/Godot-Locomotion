@@ -25,17 +25,19 @@ try {
     foreach($case in $world.RootElement.GetProperty('cases').EnumerateArray()) {
         $setup=$case.GetProperty('setup');$mesh=$setup.GetProperty('mesh').GetString()
         $hz=$setup.GetProperty('hz').GetInt32();$seen=[Collections.Generic.HashSet[int]]::new()
+        $nativeDt=$case.GetProperty('dtUsed').GetDouble()
         foreach($capture in $captures) {
-            $input=$capture.GetProperty('input')
-            if($input.GetProperty('mesh').GetString() -ne $mesh) { continue }
-            if([Math]::Abs($input.GetProperty('dt').GetDouble()-1.0/$hz) -gt 1e-12) { continue }
-            $frame=$input.GetProperty('frame').GetInt32()
+            $captureInput=$capture.GetProperty('input')
+            if($captureInput.GetProperty('mesh').GetString() -ne $mesh) { continue }
+            $captureDt=$captureInput.GetProperty('dt').GetDouble()
+            if([Math]::Abs($captureDt-1.0/$hz) -gt 1e-12 -and $captureDt -ne $nativeDt) { continue }
+            $frame=$captureInput.GetProperty('frame').GetInt32()
             if(-not $seen.Add($frame)) { throw 'Ambiguous capture frame.' }
             $samples=$case.GetProperty('samples')
             if($frame+1 -ge $samples.GetArrayLength()) { throw 'Capture exceeds native trajectory.' }
             $stages=$capture.GetProperty('coreSamples');$last=$stages[$stages.GetArrayLength()-1]
             if($last.GetProperty('stage').GetString() -ne 'corrected') { throw 'Missing final solver stage.' }
-            $actual=$last.GetProperty('bodies');$bodies=$input.GetProperty('bodies')
+            $actual=$last.GetProperty('bodies');$bodies=$captureInput.GetProperty('bodies')
             $expected=$samples[$frame+1].GetProperty('bodies')
             $maxV=0.0;$maxW=0.0;$vBone='';$wBone=''
             for($i=0;$i -lt $expected.GetArrayLength();$i++) {
@@ -49,7 +51,8 @@ try {
                 if([Math]::Sqrt($v) -gt $maxV) { $maxV=[Math]::Sqrt($v);$vBone=$name }
                 if([Math]::Sqrt($w) -gt $maxW) { $maxW=[Math]::Sqrt($w);$wBone=$name }
             }
-            $rows += [pscustomobject]@{mesh=$mesh;hz=$hz;completedStep=$frame+1;maxLinearDifferenceCmPerSecond=$maxV;
+            $rows += [pscustomobject]@{mesh=$mesh;hz=$hz;completedStep=$frame+1;nativeDt=$nativeDt;capturedDt=$captureDt;
+                sameStepDuration=($nativeDt -eq $captureDt);maxLinearDifferenceCmPerSecond=$maxV;
                 linearBone=$vBone;maxAngularDifferenceRadPerSecond=$maxW;angularBone=$wBone}
         }
         if($seen.Count -eq 0) { throw "No matching captures for $mesh/$hz." }
