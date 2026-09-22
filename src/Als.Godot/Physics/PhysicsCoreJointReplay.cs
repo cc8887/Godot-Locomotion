@@ -279,6 +279,7 @@ public partial class PhysicsCoreJointReplay : Node3D
         {
             if (_active.Count == 0) { if (_chains) StartChains(); else StartPair(); }
             Require(Math.Abs(dt - (_chains ? 1d / _hz : D(Current, "dt"))) < 1e-7, "Physics callback step differs.");
+            dt = AlsPhysicsStepTime.FromEngineSeconds(dt);
             foreach (var active in _active) CheckTransport(active);
             if (!_chains) CheckReference();
             if (_frame < (_chains ? _hz * Duration : 12))
@@ -292,9 +293,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                         if (active.Scene is null) active.Host.Step(dt, new(0, 0, -980), active.Contacts);
                         else
                         {
-                            var targets = active.Scene.Capture(active.Host.Island, dt);
-                            active.Host.StepScene(dt, new(0, 0, -980), active.Contacts, targets);
-                            active.Scene.CommitCapture(active.Host.Island);
+                            active.Host.StepScene(dt, new(0, 0, -980), active.Contacts, active.Scene);
                         }
                         if (active.Contacts.CompletedSteps != epoch)
                         { _contactPoints += active.Contacts.LastContactCount; _restoredPairs += active.Contacts.LastRestoredPairs; }
@@ -494,7 +493,9 @@ public partial class PhysicsCoreJointReplay : Node3D
             foreach (var active in _active) _passengerStart.Add(active.Host.Island, _platformInitial.AffineInverse() * Center(active));
             _slept.Clear();
         }
-        var elapsed = Math.Clamp((_frame + 1) * dt - 10, 0, 4);
+        // Anchor elapsed time to the phase's start frame. Accumulating float dt
+        // from frame zero can otherwise move on the last stationary frame.
+        var elapsed = Math.Clamp((_frame - _hz * 10 + 1) * dt, 0, 4);
         _platform!.GlobalTransform = _platformMode == "translate"
             ? new(_platformInitial.Basis, _platformInitial.Origin + new Vector3((float)elapsed * .25f, 0, 0))
             : new(new Basis(Vector3.Up, (float)elapsed * .2f) * _platformInitial.Basis, _platformInitial.Origin);

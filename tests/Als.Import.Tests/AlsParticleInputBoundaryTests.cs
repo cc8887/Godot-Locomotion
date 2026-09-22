@@ -7,6 +7,22 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsParticleInputBoundaryTests(Xunit.Abstractions.ITestOutputHelper output)
 {
+    [Theory]
+    [InlineData("v4_physics_world_reference.json")]
+    [InlineData("v4_physics_world_low_frequency_reference.json")]
+    public void EngineStepMatchesIndependentlyObservedNativeSceneDuration(string file)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/" + file)));
+        foreach (var row in doc.RootElement.GetProperty("cases").EnumerateArray())
+        {
+            var callback = 1d / row.GetProperty("setup").GetProperty("hz").GetInt32();
+            var native = D(row, "dtUsed");
+            Assert.NotEqual(callback, native);
+            var step = AlsPhysicsStepTime.FromEngineSeconds(callback);
+            Assert.Equal(native, step);
+            Assert.Equal(step, AlsPhysicsStepTime.FromEngineSeconds(step));
+        }
+    }
     [Fact]
     public void CreationAndResetMatchIndependentlyStoredNativeWorldInputs()
     {
