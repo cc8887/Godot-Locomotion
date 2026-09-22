@@ -24,7 +24,7 @@ bool ExportAlsPhysicsBoxCaptureReference(const FString& Input,const FString& Out
     if(!FFileHelper::LoadFileToString(Text,*Input)||!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Root)||
         !Root.IsValid()||Root->GetIntegerField(TEXT("schemaVersion"))!=1)return Fail(TEXT("Invalid box capture input."));
     const auto& Inputs=Root->GetArrayField(TEXT("cases"));if(Inputs.IsEmpty()||Inputs.Num()>256)return Fail(TEXT("Expected 1..256 poses."));
-    TArray<TSharedPtr<FJsonValue>> Cases;
+    TArray<TSharedPtr<FJsonValue>> Cases;bool Seeded=false;
     for(const auto& Value:Inputs)
     {
         const auto In=Value->AsObject();const FVec3 Half0=ReadV(In,TEXT("half0")),Half1=ReadV(In,TEXT("half1"));
@@ -46,9 +46,17 @@ bool ExportAlsPhysicsBoxCaptureReference(const FString& Input,const FString& Out
             P[1],Geometry1.GetReference(),P[1]->ShapesArray()[0].Get(),nullptr,FRigidTransform3::Identity,6,true,EContactShapesType::BoxBox);
         Context->ActivateConstraint(Constraint.Get());Allocator.EndDetectCollisions();
         if(Constraint->GetCollisionMargin0()!=Margin0||Constraint->GetCollisionMargin1()!=0)return Fail(TEXT("Pair margins differ."));
+        const bool HasSeed=In->HasTypedField<EJson::Array>(TEXT("cacheBefore"));Seeded|=HasSeed;
+        if(HasSeed)
+        {
+            const auto& Seed=In->GetArrayField(TEXT("cacheBefore"));if(Seed.Num()>4)return Fail(TEXT("Invalid GJK seed count."));
+            auto& Cache=Constraint->GetGJKWarmStartData();Cache.NumVerts=Seed.Num();
+            for(int32 I=0;I<Seed.Num();++I)
+            {const auto SeedRow=Seed[I]->AsObject();Cache.As[I]=ReadV(SeedRow,TEXT("a"));Cache.Bs[I]=ReadV(SeedRow,TEXT("b"));Cache.Barycentric[I]=SeedRow->GetNumberField(TEXT("weight"));}
+        }
         auto Row=MakeShared<FJsonObject>();Row->SetObjectField(TEXT("input"),In);
         Row->SetObjectField(TEXT("shape1To0"),T(FTransform(Pose1.GetRelativeTransformNoScale(Pose0))));
-        TArray<TSharedPtr<FJsonValue>> Passes;
+        TArray<TSharedPtr<FJsonValue>> Passes,Caches;
         for(int32 Pass=0;Pass<2;++Pass)
         {
             // Re-run narrow phase with the same pose. Pass 1 keeps the GJK
@@ -65,11 +73,19 @@ bool ExportAlsPhysicsBoxCaptureReference(const FString& Input,const FString& Out
                 Points.Add(MakeShared<FJsonValueObject>(J));
             }
             Passes.Add(MakeShared<FJsonValueArray>(Points));
+            if(HasSeed)
+            {
+                TArray<TSharedPtr<FJsonValue>> Saved;const auto& Cache=Constraint->GetGJKWarmStartData();
+                for(int32 I=0;I<Cache.NumVerts;++I)
+                {auto J=MakeShared<FJsonObject>();J->SetArrayField(TEXT("a"),V(Cache.As[I]));J->SetArrayField(TEXT("b"),V(Cache.Bs[I]));J->SetNumberField(TEXT("weight"),Cache.Barycentric[I]);Saved.Add(MakeShared<FJsonValueObject>(J));}
+                Caches.Add(MakeShared<FJsonValueArray>(Saved));
+            }
         }
-        Row->SetArrayField(TEXT("passes"),Passes);Cases.Add(MakeShared<FJsonValueObject>(Row));
+        Row->SetArrayField(TEXT("passes"),Passes);if(HasSeed)Row->SetArrayField(TEXT("caches"),Caches);Cases.Add(MakeShared<FJsonValueObject>(Row));
     }
     auto Result=MakeShared<FJsonObject>();Result->SetNumberField(TEXT("schemaVersion"),1);
     Result->SetStringField(TEXT("observation"),TEXT("Native BoxBox UpdateConstraint at captured world poses, cull 6 cm, cold then same-pose GJK warm start; no actual trajectory cache or manifold restore replay"));
+    if(Seeded)Result->SetStringField(TEXT("observation"),TEXT("Native BoxBox UpdateConstraint from captured poses and actual Core query input GJK caches, cull 6 cm; native recalculates points/cache, no manifold restore or full-world lifecycle replay"));
     Result->SetObjectField(TEXT("provenance"),Root->GetObjectField(TEXT("provenance")));Result->SetArrayField(TEXT("cases"),Cases);
     return (FJsonSerializer::Serialize(Result,TJsonWriterFactory<>::Create(&Text))&&
         FFileHelper::SaveStringToFile(Text,*Output,FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))||Fail(TEXT("Box capture write failed."));

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新真实query cache：`docs/verification/2026-09-22-physics-query-cache.md`。可选查询前（身份/margin重置后）/后GJK快照，恢复跳过Query明确null；读取复制，Release/Abort/省略/跨步不暴露旧查询。46捕获筛8次手地重建（6非空seed），native重算64点/法向/Phi全0差、cache点0/权重1.11e-16，旧45姿态重导hash不变，新参考冷重导一致。M142重建、143..152恢复、153重建，native旧窗口143..152也恢复；优先真实恢复几何和周围接触对，勿仅重复手部GJK。18重叠捕获×24阶段完全不变，普通120仍A658睡M未睡/V2.242934/W.271093；矩阵未重跑仍8/12。Core定向20/Import3在.NET8/9过，Optimize/60smoke过；UE变量遮蔽修正后全Editor审计/DataValidation过、Editor22956退出0，两旧Condition/间歇AV未修。无新全量声明（沿用2860/2448+1skip），普通demo未接，全目标及用户P4保留。
+
 - 最新polygon反向变换修复：`docs/verification/2026-09-22-physics-box-capture.md`。原生参考面在shape1时从world0/world1独立求反向相对姿态；旧Core只对forward求逆，float粒子非严格单位q下不等价。Godot→PolygonQueryCache→PolygonManifold现传双向姿态。45实际手/地板姿态冷+同姿态warm共360点：旧point7.19756e-5cm/Phi8.58307e-6，修复后point/normal/Phi全0（.NET8/9），旧4套polygon过，独立重导字节一致。Core既有过滤串行2860/Import2448+1旧skip/优化构建/三频率smoke通过。完整矩阵仍8/12四旧休眠失败；普通120 A687→658睡、M未睡，末秒V2.242934/W.271093。M147误差.11575→.04826、150仍1.4929、1601.6324→.09952；A159 .06779→.14303退化，不声称整段轨迹改善。UE完整构建审计/DataValidation过、Editor11668本次退出0；两旧Condition/间歇AV未修。下一步真实跨帧GJK缓存与流形恢复决策，再稳定性及普通Ragdoll等完整目标。普通demo未接，主目录main、用户P4保持。
 
 - 最新world leaf：`docs/verification/2026-09-22-physics-world-leaf.md`。原生world接触诊断增加实际simulation shape leaf类型/margin/bounds/local观测；两模型普通120第71..80步43形状×10=430次与既有RuntimeShapeCompiler产物逐值一致。关闭“世界与资产不同几何”疑点；48040身体样本姿态/速度/awake与旧native基线一致。Core右手首次地面接触77步；原生71..76无/77出现，更早逐对历史未连续观测，77..79原生每帧重建4点；point0最多4.768e-7cm，point1约8.63e-5..1.53e-4cm，但两边姿态不同，不能认定公式错。新窗口fixture冷重导源hash D1969040AE8F2338D3F487D8FD22CF6332BC6A6202785D171B4D26E40F53FBF4一致，18相关测试.NET8/9通过；完整Editor构建审计/DataValidation过，普通Editor18932加载标记后0xC0000005退出，两旧Condition仍在，重启门禁失败。无生产C#改动/无新全量或矩阵，仍8/12，普通120采集仍M未睡；下一步77帧同姿态/GJK缓存原生几何对照，再整体稳定与普通Ragdoll等完整目标。主目录main，用户P4保持。
