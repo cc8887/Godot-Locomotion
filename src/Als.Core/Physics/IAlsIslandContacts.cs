@@ -18,6 +18,12 @@ public interface IAlsIslandContacts
     void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt, ReadOnlySpan<AlsIslandBodyState> previous) =>
         Gather(predicted, velocities, bodies, dt);
+    // Detection uses the stored particle actor pose, while solving uses COM.
+    // Carry both from integration: converting shape locals through COM introduces
+    // rounding from the float actor quaternion. Borrow actors only for this call.
+    void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
+        ReadOnlySpan<AlsIslandBody> bodies, double dt, ReadOnlySpan<AlsIslandBodyState> previous,
+        ReadOnlySpan<AlsPrecisePose> predictedActors) => Gather(predicted, velocities, bodies, dt, previous);
     // Called after Gather, before any iteration. A stateful provider stages the
     // contact/joint schedule and publishes it only with its successful Commit.
     void PrepareConstraintOrder(AlsJointIsland island, Span<int> jointOrder) { }

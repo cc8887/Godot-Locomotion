@@ -143,6 +143,8 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                 {
                     for(int32 I=0;I<Bodies.Num();++I)if(Bodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
                         return BodyInputs[I]->AsObject()->GetStringField(TEXT("name"));
+                    for(int32 I=0;I<EnvironmentBodies.Num();++I)if(EnvironmentBodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
+                        return FString::Printf(TEXT("environment_%d"),I);
                     return TEXT("unknown");
                 };
                 const auto& Constraints=Evolution->GetJointCombinedConstraints().LinearConstraints;
@@ -170,6 +172,40 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                     Joints.Add(MakeShared<FJsonValueObject>(J));
                 }
                 Observation->SetArrayField(TEXT("joints"),Joints);
+                // Observe the actual collision-detection inputs before Gather
+                // and Scatter can update the friction anchors. Do not rebuild
+                // shape transforms from solver COM frames for this reference.
+                TArray<TSharedPtr<FJsonValue>> Contacts;
+                for(const auto* C:Evolution->GetCollisionConstraints().GetConstraints())
+                {
+                    auto R=MakeShared<FJsonObject>();R->SetStringField(TEXT("body0"),BodyName(C->GetParticle0()));
+                    R->SetStringField(TEXT("body1"),BodyName(C->GetParticle1()));
+                    const auto ShapeIndex=[](const FGeometryParticleHandle* P,const FShapeInstance* S)->int32
+                    {for(int32 I=0;I<P->ShapesArray().Num();++I)if(P->ShapesArray()[I].Get()==S)return I;return INDEX_NONE;};
+                    R->SetNumberField(TEXT("shape0"),ShapeIndex(C->GetParticle0(),C->GetShape0()));
+                    R->SetNumberField(TEXT("shape1"),ShapeIndex(C->GetParticle1(),C->GetShape1()));
+                    R->SetObjectField(TEXT("shapeRelative0"),T(FTransform(C->GetShapeRelativeTransform0())));
+                    R->SetObjectField(TEXT("shapeRelative1"),T(FTransform(C->GetShapeRelativeTransform1())));
+                    R->SetObjectField(TEXT("shapeWorld0"),T(FTransform(C->GetShapeWorldTransform0())));
+                    R->SetObjectField(TEXT("shapeWorld1"),T(FTransform(C->GetShapeWorldTransform1())));
+                    R->SetBoolField(TEXT("disabled"),C->GetDisabled());R->SetBoolField(TEXT("restored"),C->WasManifoldRestored());
+                    R->SetBoolField(TEXT("initialContact"),C->IsInitialContact());
+                    R->SetNumberField(TEXT("restitution"),C->GetRestitution());
+                    R->SetNumberField(TEXT("restitutionThreshold"),C->GetRestitutionThreshold());
+                    TArray<TSharedPtr<FJsonValue>> Points;
+                    for(int32 I=0;I<C->NumManifoldPoints();++I)
+                    {
+                        const auto& M=C->GetManifoldPoint(I);const auto& P=M.ContactPoint;
+                        auto J=MakeShared<FJsonObject>();J->SetArrayField(TEXT("point0"),V(FVec3(P.ShapeContactPoints[0])));
+                        J->SetArrayField(TEXT("point1"),V(FVec3(P.ShapeContactPoints[1])));J->SetArrayField(TEXT("normal1"),V(FVec3(P.ShapeContactNormal)));
+                        J->SetArrayField(TEXT("anchor0"),V(FVec3(M.ShapeAnchorPoints[0])));J->SetArrayField(TEXT("anchor1"),V(FVec3(M.ShapeAnchorPoints[1])));
+                        J->SetBoolField(TEXT("hasAnchor"),M.Flags.bHasStaticFrictionAnchor);J->SetBoolField(TEXT("disabled"),M.Flags.bDisabled);
+                        J->SetBoolField(TEXT("initialContact"),M.Flags.bInitialContact);J->SetNumberField(TEXT("initialPhi"),M.InitialPhi);
+                        Points.Add(MakeShared<FJsonValueObject>(J));
+                    }
+                    R->SetArrayField(TEXT("points"),Points);Contacts.Add(MakeShared<FJsonValueObject>(R));
+                }
+                Observation->SetArrayField(TEXT("contacts"),Contacts);
             }
             StepObservations.Add(MakeShared<FJsonValueObject>(Observation));
         };
