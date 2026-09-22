@@ -61,7 +61,7 @@ public readonly struct AlsLockedLinearProjection
         }
         if(_alpha>0)
         {
-            var cx=child.Position-parent.Position+Vector3.Cross(child.Rotation,_childArm)-Vector3.Cross(parent.Rotation,_parentArm);
+            var cx=child.Position-parent.Position+Cross(child.Rotation,_childArm)-Cross(parent.Rotation,_parentArm);
             var dp=Vector3.Zero;var dq=Vector3.Zero;
             Solve(_x,cx,ref dp,ref dq);Solve(_y,cx,ref dp,ref dq);Solve(_z,cx,ref dp,ref dq);
             child=new(child.Position+dp,child.Rotation+dq);
@@ -78,7 +78,7 @@ public readonly struct AlsLockedLinearProjection
     }
     private static Row MakeRow(AlsDoubleVector axis,double error,Vector3 arm,float inverseMass,float inverseI)
     {
-        var a=(axis*(error<0?-1:1)).ToSingle();var angular=Vector3.Cross(arm,a);var rotationAxis=-angular*inverseI;
+        var a=(axis*(error<0?-1:1)).ToSingle();var angular=Cross(arm,a);var rotationAxis=-angular*inverseI;
         return new(a,rotationAxis,(float)System.Math.Abs(error),inverseMass-Vector3.Dot(angular,rotationAxis));
     }
     private static Vector3 Teleport(in Row row,float threshold)=>row.Error>threshold?row.Axis*(-row.Error):Vector3.Zero;
@@ -88,4 +88,7 @@ public readonly struct AlsLockedLinearProjection
         dp+=(-_alpha*_inverseMass)*(row.Axis*lambda);
         dq+=(_alpha*row.RotationAxis)*lambda;
     }
+    // Preserve the reference engine's separate float products on .NET 9 too.
+    private static Vector3 Cross(Vector3 a,Vector3 b)=>
+        new(a.Y*b.Z-a.Z*b.Y,a.Z*b.X-a.X*b.Z,a.X*b.Y-a.Y*b.X);
 }

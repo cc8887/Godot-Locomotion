@@ -279,7 +279,9 @@ public partial class PhysicsCoreJointReplay : Node3D
         try
         {
             if (_active.Count == 0) { if (_chains) StartChains(); else StartPair(); }
-            Require(Math.Abs(dt - (_chains ? 1d / _hz : D(Current, "dt"))) < 1e-7, "Physics callback step differs.");
+            var expectedDt = _chains ? 1d / _hz : D(Current, "dt");
+            Require(Math.Abs(dt - expectedDt) < 1e-7,
+                $"Physics callback step differs: case={_case} frame={_frame} actual={dt:R} expected={expectedDt:R} configured_hz={Engine.PhysicsTicksPerSecond}.");
             dt = AlsPhysicsStepTime.FromEngineSeconds(dt);
             foreach (var active in _active) CheckTransport(active);
             if (!_chains) CheckReference();

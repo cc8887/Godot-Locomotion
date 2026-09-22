@@ -22,7 +22,7 @@ bool ExportAlsPhysicsJointStepReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsContactReference(const FString& Output, FString& Error, bool GatherGeometry = false, bool ShockPropagation = false);
 bool ExportAlsPhysicsContactHistoryReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsGraphReference(const FString& Output, FString& Error);
-bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs, const FString& Output, FString& Error, bool bTraceFirstJointIteration = false);
+bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs, const FString& Output, FString& Error, bool bTraceFirstJointIteration = false, bool bObserveJointGather = false);
 bool ExportAlsPhysicsRawGatherReference(const FString& Inputs, const FString& Output, FString& Error);
 bool ExportAlsPhysicsActualHistoryReference(const FString& Inputs, const FString& Output, FString& Error);
 bool ExportAlsPhysicsWorldReference(const FString& Inputs, const FString& Output, FString& Error, int32 ContactFrames = 0, int32 ContactStart = 1);
