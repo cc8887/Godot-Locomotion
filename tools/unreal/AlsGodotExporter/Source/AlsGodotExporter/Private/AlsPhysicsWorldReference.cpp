@@ -1,6 +1,7 @@
 #include "AlsPhysicsAssetExport.h"
 #include "Chaos/Island/IslandManager.h"
 #include "Chaos/Framework/Parallel.h"
+#include "Chaos/PBDJointConstraints.h"
 #include "Chaos/ShapeInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
@@ -23,8 +24,10 @@
 namespace AlsJointSolverReference {
 TArray<TSharedPtr<FJsonValue>> V(const FVector& P);
 TSharedRef<FJsonObject> T(const FTransform& P);
+TSharedRef<FJsonObject> SolverSettings(const Chaos::FPBDJointSolverSettings& S);
 TSharedRef<FJsonObject> Body(FBodyInstance& B,bool SleepDiagnostics);
 }
+namespace AlsJointReference { TSharedRef<FJsonObject> Settings(const Chaos::FPBDJointSettings& S); }
 namespace AlsPhysicsExport { TSharedRef<FJsonObject> T(const FTransform& Transform); }
 namespace AlsCoupledStepReference {
 Chaos::FVec3 ReadV(const TSharedPtr<FJsonObject>& J,const TCHAR* Name);
@@ -133,18 +136,54 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                 S->SetNumberField(TEXT("inverseMass"),P->InvM());S->SetArrayField(TEXT("conditionedInverseInertia"),V(FVector(P->ConditionedInvI())));
                 BodyStates.Add(MakeShared<FJsonValueObject>(S));
             }
-            Observation->SetArrayField(TEXT("bodies"),BodyStates);StepObservations.Add(MakeShared<FJsonValueObject>(Observation));
+            Observation->SetArrayField(TEXT("bodies"),BodyStates);
+            if(FCString::Strcmp(Stage,TEXT("preSolve"))==0)
+            {
+                const auto BodyName=[&](const FGeometryParticleHandle* Particle)->FString
+                {
+                    for(int32 I=0;I<Bodies.Num();++I)if(Bodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
+                        return BodyInputs[I]->AsObject()->GetStringField(TEXT("name"));
+                    return TEXT("unknown");
+                };
+                const auto& Constraints=Evolution->GetJointCombinedConstraints().LinearConstraints;
+                Observation->SetObjectField(TEXT("jointSolverSettings"),SolverSettings(Constraints.GetSettings()));
+                auto& Graph=Evolution->GetIslandManager();TArray<TSharedPtr<FJsonValue>> Joints;
+                for(const auto* Joint:Constraints.GetConstConstraintHandles())
+                {
+                    const auto Pair=Joint->GetConstrainedParticles();const auto& Settings=Joint->GetSettings();
+                    FGenericParticleHandle Child(Pair[0]),Parent(Pair[1]);
+                    auto J=MakeShared<FJsonObject>();J->SetNumberField(TEXT("containerIndex"),Joint->GetConstraintIndex());
+                    J->SetStringField(TEXT("child"),BodyName(Pair[0]));J->SetStringField(TEXT("parent"),BodyName(Pair[1]));
+                    J->SetObjectField(TEXT("childActorFrame"),T(FTransform(Settings.ConnectorTransforms[0])));
+                    J->SetObjectField(TEXT("parentActorFrame"),T(FTransform(Settings.ConnectorTransforms[1])));
+                    J->SetObjectField(TEXT("childComFrame"),T(FTransform(Child->GetComRelativeTransform(Settings.ConnectorTransforms[0]))));
+                    J->SetObjectField(TEXT("parentComFrame"),T(FTransform(Parent->GetComRelativeTransform(Settings.ConnectorTransforms[1]))));
+                    J->SetObjectField(TEXT("settings"),AlsJointReference::Settings(Settings));
+                    const auto* Edge=Joint->GetConstraintGraphEdge();J->SetBoolField(TEXT("inGraph"),Edge!=nullptr);
+                    if(Edge)
+                    {
+                        J->SetNumberField(TEXT("graphOrder"),Graph.GetIslandArrayIndex(Edge));
+                        J->SetNumberField(TEXT("graphLevel"),Graph.GetConstraintLevel(Edge));
+                        J->SetNumberField(TEXT("graphColor"),Graph.GetConstraintColor(Edge));
+                        J->SetBoolField(TEXT("graphSleeping"),Edge->IsSleeping());
+                    }
+                    Joints.Add(MakeShared<FJsonValueObject>(J));
+                }
+                Observation->SetArrayField(TEXT("joints"),Joints);
+            }
+            StepObservations.Add(MakeShared<FJsonValueObject>(Observation));
         };
         struct FClearStepCallbacks
         {
             FPBDRigidsEvolutionGBF* E;
-            ~FClearStepCallbacks(){E->SetPreIntegrateCallback(nullptr);E->SetPostIntegrateCallback(nullptr);E->SetPreSolveCallback(nullptr);}
+            ~FClearStepCallbacks(){E->SetPreIntegrateCallback(nullptr);E->SetPostIntegrateCallback(nullptr);E->SetPreSolveCallback(nullptr);E->SetPostSolveCallback(nullptr);}
         } ClearStepCallbacks{Evolution};
         if(ContactFrames>0)
         {
             Evolution->SetPreIntegrateCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("preIntegrate"));});
             Evolution->SetPostIntegrateCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("postIntegrate"));});
             Evolution->SetPreSolveCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("preSolve"));});
+            Evolution->SetPostSolveCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("postSolve"));});
         }
         TArray<TSharedPtr<FJsonValue>> Samples;int32 AllSleepFrame=INDEX_NONE,Held=0;double LastMaxV=0,LastMaxW=0;
         for(int32 Frame=0;Frame<=Steps;++Frame)
@@ -214,7 +253,7 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             Sample->SetNumberField(TEXT("awakeBodies"),Awake);
             if(Frame>=ContactStart&&Frame<ContactStart+ContactFrames)
             {
-                if(StepObservations.Num()!=3)return Fail(TEXT("Expected exactly three native step observations."));
+                if(StepObservations.Num()!=4)return Fail(TEXT("Expected exactly four native step observations."));
                 Sample->SetArrayField(TEXT("stepObservations"),StepObservations);
                 const auto BodyName=[&](const FGeometryParticleHandle* Particle)->FString
                 {

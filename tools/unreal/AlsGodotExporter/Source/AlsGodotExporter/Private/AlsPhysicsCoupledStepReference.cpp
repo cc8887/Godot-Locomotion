@@ -56,7 +56,7 @@ FPBDJointSettings ReadJoint(const TSharedPtr<FJsonObject>& J)
 }
 }
 
-bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& Output,FString& Error)
+bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& Output,FString& Error,bool bTraceFirstJointIteration)
 {
     using namespace Chaos; using namespace AlsCoupledStepReference; using namespace AlsJointSolverReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
@@ -196,8 +196,8 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& O
             }
             Native.FinalizeManifold();
         }
-        TArray<TSharedPtr<FJsonValue>> Samples;
-        const auto Snapshot=[&](const TCHAR* Stage,int32 Iteration)
+        TArray<TSharedPtr<FJsonValue>> Samples,JointSamples;
+        const auto Snapshot=[&](const TCHAR* Stage,int32 Iteration,int32 JointIndex=INDEX_NONE)
         {
             auto Sample=MakeShared<FJsonObject>(); Sample->SetStringField(TEXT("stage"),Stage); Sample->SetNumberField(TEXT("iteration"),Iteration);
             TArray<TSharedPtr<FJsonValue>> States;
@@ -207,15 +207,39 @@ bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs,const FString& O
                 O->SetArrayField(TEXT("dp"),V(FVec3(Body->DP()))); O->SetArrayField(TEXT("dq"),V(FVec3(Body->DQ())));
                 O->SetArrayField(TEXT("v"),V(FVec3(Body->V()))); O->SetArrayField(TEXT("w"),V(FVec3(Body->W()))); States.Add(MakeShared<FJsonValueObject>(O));
             }
-            Sample->SetArrayField(TEXT("bodies"),States); Samples.Add(MakeShared<FJsonValueObject>(Sample));
+            Sample->SetArrayField(TEXT("bodies"),States);
+            if(JointIndex==INDEX_NONE) Samples.Add(MakeShared<FJsonValueObject>(Sample));
+            else
+            {
+                Sample->SetNumberField(TEXT("jointIndex"),JointIndex);
+                JointSamples.Add(MakeShared<FJsonValueObject>(Sample));
+            }
         };
-        for (int32 I=0;I<8;++I) { ContactSolver->ApplyPositionConstraints(Dt,I,8); Snapshot(TEXT("position_contacts"),I); JointSolver->ApplyPositionConstraints(Dt,I,8); Snapshot(TEXT("position_joints"),I); }
+        for (int32 I=0;I<8;++I)
+        {
+            ContactSolver->ApplyPositionConstraints(Dt,I,8); Snapshot(TEXT("position_contacts"),I);
+            if(bTraceFirstJointIteration && I==0)
+            {
+                if(JointSolver->GetNumConstraints()!=JointInputs.Num()) return Fail(TEXT("Native joint count changed."));
+                // The public range overload uses the same prepared solver and order.
+                // Only the first iteration is split; Gather/projection are unchanged.
+                for(int32 J=0;J<JointSolver->GetNumConstraints();++J)
+                {
+                    JointSolver->ApplyPositionConstraints(Dt,I,8,J,J+1);
+                    Snapshot(TEXT("position_joints"),I,J);
+                }
+            }
+            else JointSolver->ApplyPositionConstraints(Dt,I,8);
+            Snapshot(TEXT("position_joints"),I);
+        }
         for (auto* Body:B) Body->SetImplicitVelocity(Dt); Snapshot(TEXT("implicit"),0);
         for (int32 I=0;I<2;++I) { ContactSolver->ApplyVelocityConstraints(Dt,I,2); Snapshot(TEXT("velocity_contacts"),I); JointSolver->ApplyVelocityConstraints(Dt,I,2); Snapshot(TEXT("velocity_joints"),I); }
         for (auto* Body:B) Body->ApplyCorrections(); Snapshot(TEXT("projection_input"),0);
         JointSolver->PreApplyProjectionConstraints(Dt); JointSolver->ApplyProjectionConstraints(Dt,0,1); Snapshot(TEXT("projection"),0);
         for (auto* Body:B) Body->ApplyCorrections(); Snapshot(TEXT("corrected"),0);
-        auto Case=MakeShared<FJsonObject>(); Case->SetObjectField(TEXT("capture"),Capture); Case->SetArrayField(TEXT("nativeSamples"),Samples); Cases.Add(MakeShared<FJsonValueObject>(Case));
+        auto Case=MakeShared<FJsonObject>(); Case->SetObjectField(TEXT("capture"),Capture); Case->SetArrayField(TEXT("nativeSamples"),Samples);
+        if(bTraceFirstJointIteration) Case->SetArrayField(TEXT("firstIterationJoints"),JointSamples);
+        Cases.Add(MakeShared<FJsonValueObject>(Case));
     }
     Root->SetArrayField(TEXT("cases"),Cases); FString Text;
     if (!FJsonSerializer::Serialize(Root,TJsonWriterFactory<>::Create(&Text)) || !FFileHelper::SaveStringToFile(Text,*Output,FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
