@@ -1,5 +1,6 @@
 #include "AlsPhysicsAssetExport.h"
 #include "Chaos/Island/IslandManager.h"
+#include "Chaos/Framework/Parallel.h"
 #include "Chaos/ShapeInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
@@ -21,6 +22,7 @@
 
 namespace AlsJointSolverReference {
 TArray<TSharedPtr<FJsonValue>> V(const FVector& P);
+TSharedRef<FJsonObject> T(const FTransform& P);
 TSharedRef<FJsonObject> Body(FBodyInstance& B,bool SleepDiagnostics);
 }
 namespace AlsPhysicsExport { TSharedRef<FJsonObject> T(const FTransform& Transform); }
@@ -101,9 +103,53 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             if(!Instance->IsValidBodyInstance())return Fail(TEXT("Native environment body missing."));
             Instance->SetPhysMaterialOverride(Bodies[0]->GetSimplePhysicalMaterial());EnvironmentBodies.Add(MoveTemp(Instance));EnvironmentKinematic.Add(Kinematic);
         }
+        // The diagnostic callbacks must observe completed inline integration.
+        // Do not change scheduling CVars to make a reference pass this guard.
+        if(ContactFrames>0&&ShouldExecuteTasks(Bodies.Num()+EnvironmentBodies.Num()))
+            return Fail(TEXT("Step observations require inline particle integration."));
+        int32 ObservedFrame=0;TArray<TSharedPtr<FJsonValue>> StepObservations;
+        auto* Evolution=Solver->GetEvolution();
+        const auto ObserveStep=[&](const FReal StepDt,const TCHAR* Stage)
+        {
+            if(ObservedFrame<ContactStart||ObservedFrame>=ContactStart+ContactFrames)return;
+            auto Observation=MakeShared<FJsonObject>();Observation->SetStringField(TEXT("stage"),Stage);
+            Observation->SetNumberField(TEXT("dt"),StepDt);TArray<TSharedPtr<FJsonValue>> BodyStates;
+            for(int32 I=0;I<Bodies.Num();++I)
+            {
+                const auto* P=Bodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()->CastToRigidParticle();
+                auto S=MakeShared<FJsonObject>();S->SetStringField(TEXT("name"),BodyInputs[I]->AsObject()->GetStringField(TEXT("name")));
+                S->SetNumberField(TEXT("objectState"),static_cast<int32>(P->ObjectState()));
+                S->SetObjectField(TEXT("initialActor"),T(FTransform(FQuat(P->GetR()),FVector(P->GetX()))));
+                S->SetObjectField(TEXT("predictedActor"),T(FTransform(FQuat(P->GetQ()),FVector(P->GetP()))));
+                S->SetObjectField(TEXT("initialCom"),T(FTransform(P->GetTransformXRCom())));
+                S->SetObjectField(TEXT("predictedCom"),T(FTransform(P->GetTransformPQCom())));
+                S->SetObjectField(TEXT("massLocal"),T(FTransform(FQuat(P->RotationOfMass()),FVector(P->CenterOfMass()))));
+                S->SetArrayField(TEXT("v"),V(FVector(P->GetV())));S->SetArrayField(TEXT("w"),V(FVector(P->GetW())));
+                S->SetArrayField(TEXT("acceleration"),V(FVector(P->Acceleration())));
+                S->SetArrayField(TEXT("angularAcceleration"),V(FVector(P->AngularAcceleration())));
+                S->SetArrayField(TEXT("linearImpulseVelocity"),V(FVector(P->LinearImpulseVelocity())));
+                S->SetArrayField(TEXT("angularImpulseVelocity"),V(FVector(P->AngularImpulseVelocity())));
+                S->SetNumberField(TEXT("linearDamping"),P->LinearEtherDrag());S->SetNumberField(TEXT("angularDamping"),P->AngularEtherDrag());
+                S->SetNumberField(TEXT("inverseMass"),P->InvM());S->SetArrayField(TEXT("conditionedInverseInertia"),V(FVector(P->ConditionedInvI())));
+                BodyStates.Add(MakeShared<FJsonValueObject>(S));
+            }
+            Observation->SetArrayField(TEXT("bodies"),BodyStates);StepObservations.Add(MakeShared<FJsonValueObject>(Observation));
+        };
+        struct FClearStepCallbacks
+        {
+            FPBDRigidsEvolutionGBF* E;
+            ~FClearStepCallbacks(){E->SetPreIntegrateCallback(nullptr);E->SetPostIntegrateCallback(nullptr);E->SetPreSolveCallback(nullptr);}
+        } ClearStepCallbacks{Evolution};
+        if(ContactFrames>0)
+        {
+            Evolution->SetPreIntegrateCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("preIntegrate"));});
+            Evolution->SetPostIntegrateCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("postIntegrate"));});
+            Evolution->SetPreSolveCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("preSolve"));});
+        }
         TArray<TSharedPtr<FJsonValue>> Samples;int32 AllSleepFrame=INDEX_NONE,Held=0;double LastMaxV=0,LastMaxW=0;
         for(int32 Frame=0;Frame<=Steps;++Frame)
         {
+            ObservedFrame=Frame;StepObservations.Reset();
             if(Frame>0)
             {
                 const double Before=Solver->GetSolverTime();Scene->SetUpForFrame(&Gravity,Dt,0,Dt,Dt,1,false);
@@ -168,6 +214,8 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             Sample->SetNumberField(TEXT("awakeBodies"),Awake);
             if(Frame>=ContactStart&&Frame<ContactStart+ContactFrames)
             {
+                if(StepObservations.Num()!=3)return Fail(TEXT("Expected exactly three native step observations."));
+                Sample->SetArrayField(TEXT("stepObservations"),StepObservations);
                 const auto BodyName=[&](const FGeometryParticleHandle* Particle)->FString
                 {
                     for(int32 I=0;I<Bodies.Num();++I)if(Bodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
