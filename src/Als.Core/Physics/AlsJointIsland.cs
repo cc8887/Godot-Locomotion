@@ -73,6 +73,7 @@ public sealed class AlsJointIsland
         for (var i = 0; i < _bodies.Length; i++)
         {
             var body = _bodies[i]; ValidatePose(body.MassLocal); ValidateState(i, _states[i]);
+            _states[i] = StoreParticleState(_states[i]);
             if (body.ExternallyDriven && Dynamic(i)) throw new ArgumentException("External motion cannot replace a dynamic integration owner.");
             _ = AlsJointMassConditioning.Apply(body.InverseMass, default, 0, 0);
             if (!double.IsFinite(body.LinearDamping) || body.LinearDamping < 0 ||
@@ -108,8 +109,8 @@ public sealed class AlsJointIsland
         if (_stepping) throw new InvalidOperationException("Cannot reset an island during a step.");
         if (states.Length != _states.Length) throw new ArgumentException("Body state count differs.");
         for (var i = 0; i < states.Length; i++) ValidateState(i, states[i]);
-        states.CopyTo(_states);
-        _sleep?.Reset(states); _wakeRequested = false; _lastGravity = default; _lastContacts = null;
+        for (var i = 0; i < states.Length; i++) _states[i] = StoreParticleState(states[i]);
+        _sleep?.Reset(_states); _wakeRequested = false; _lastGravity = default; _lastContacts = null;
     }
 
     // Request is consumed only by a successful step. Solver failure leaves the
@@ -257,7 +258,7 @@ public sealed class AlsJointIsland
         {
             if (target.Body <= previous || (uint)target.Body >= BodyCount || !_bodies[target.Body].ExternallyDriven)
                 throw new ArgumentException("Kinematic targets must be sorted, unique and reference externally driven bodies.");
-            ValidateState(target.Body, target.State); _external[target.Body] = target.State; previous = target.Body;
+            ValidateState(target.Body, target.State); _external[target.Body] = StoreParticleState(target.State); previous = target.Body;
         }
         var changed = false; moving = false;
         for (var i = 0; i < BodyCount; i++) if (_bodies[i].ExternallyDriven)
@@ -285,6 +286,11 @@ public sealed class AlsJointIsland
         if (!Dynamic(body) && !_bodies[body].ExternallyDriven && state.Velocity != default)
             throw new NotSupportedException("Moving kinematics require a separate integration contract.");
     }
+    // Native SetR/SetQ stores actor rotation as float before the first Gather,
+    // reset or external target. Preserve double position and do not normalize
+    // after rounding: that would undo the particle storage boundary.
+    private static AlsIslandBodyState StoreParticleState(in AlsIslandBodyState state) =>
+        state with { Actor = state.Actor with { Rotation = new(state.Actor.Rotation.ToSingle()) } };
     private static void ValidatePose(in AlsPrecisePose pose)
     {
         if (!pose.Position.IsFinite || pose.Scale != AlsDoubleVector.One ||
