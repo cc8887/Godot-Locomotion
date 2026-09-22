@@ -689,6 +689,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
 
     private void ManifoldChecks()
     {
+        NativeManifoldToleranceChecks();
         var identity = AlsPrecisePose.Identity; var registry = new AlsContactRegistry(2, 2);
         using var box = new BoxShape3D { Size = new(.2f, .2f, .2f), Margin = 0 };
         using var floor = new BoxShape3D { Size = new(10, .2f, 10), Margin = 0 };
@@ -715,6 +716,32 @@ public partial class PhysicsCoreContactSmoke : Node3D
         Require(!query.TryGetManifoldSettings(a.Slot, b.Slot, out _), "Sphere enabled native manifold restoration."); _manifoldChecks++;
         a = registry.Replace(a, registry.At(a.Slot)); query.Bind(a, capsule);
         Require(!query.TryGetManifoldSettings(a.Slot, b.Slot, out _), "Capsule enabled native manifold restoration."); _manifoldChecks++;
+    }
+
+    private void NativeManifoldToleranceChecks()
+    {
+        using var data = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"));
+        foreach (var mesh in data.RootElement.GetProperty("meshes").EnumerateArray())
+        foreach (var body in mesh.GetProperty("bodies").EnumerateArray())
+        foreach (var shape in body.GetProperty("runtimeShapes").EnumerateArray())
+        {
+            if (shape.GetProperty("type").GetString() != "Box") continue;
+            static AlsDoubleVector V(JsonElement p, string field)
+            { var a = p.GetProperty(field); return new(a[0].GetDouble(), a[1].GetDouble(), a[2].GetDouble()); }
+            var minimum = V(shape, "boundsMinCm"); var maximum = V(shape, "boundsMaxCm"); var size = maximum - minimum;
+            var tolerance = .1f * (float)Math.Max(size.X, Math.Max(size.Y, size.Z));
+            using var proxy = new BoxShape3D { Size = new((float)(size.Y * .01), (float)(size.Z * .01), (float)(size.X * .01)) };
+            using var floor = new BoxShape3D { Size = new(20, .5f, 20) };
+            var registry = new AlsContactRegistry(2, 2);
+            using var query = new AlsGodotContactQuery(registry);
+            var a = registry.Register(new(0, AlsPrecisePose.Identity, 1, 1));
+            var b = registry.Register(new(1, AlsPrecisePose.Identity, 1, 1));
+            query.Bind(a, proxy, nativeHalf: maximum, nativeBounds: new(minimum, maximum));
+            query.Bind(b, floor, nativeHalf: new(1000, 1000, 25));
+            Require(query.TryGetManifoldSettings(a.Slot, b.Slot, out var settings) && settings.CollisionTolerance == tolerance,
+                $"Native manifold tolerance passed through proxy rounding: {body.GetProperty("bone")} expected={tolerance:R} actual={settings.CollisionTolerance:R}");
+            _manifoldChecks++;
+        }
     }
 
     private void AssetFootFaceChecks()

@@ -42,9 +42,19 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
                     hasAnchor = g.HasAnchor, initialContact = g.InitialContact, savedIndex = a.SavedIndex };
             }
             var settings = contacts.HistoryGatherAt(i).Settings;
+            var state=contacts.HistoryRetainedStateAt(i);var retainedPoints=new object[state.Count];
+            for(var p=0;p<retainedPoints.Length;p++)
+            {
+                var s=contacts.HistoryRetainedPointAt(i,p);var c=s.Contact;
+                retainedPoints[p]=new {point0=V(c.Point0),point1=V(c.Point1),normal1=V(c.Normal1),initial0=V(s.Initial0),initial1=V(s.Initial1),disabled=c.Disabled,phi=c.NativePhi};
+            }
+            var key=contacts.HistoryKeyAt(i);
             _historyPairs.Add(i);
             _historyInputs.Add(new { key = contacts.HistoryKeyAt(i), epoch = contacts.CompletedSteps,
                 restored = contacts.HistoryRestoredAt(i), manifoldTolerance = contacts.HistoryToleranceAt(i),
+                cullDistance=query.CullDistance((int)key.Shape0.Shape,(int)key.Shape1.Shape),
+                retained=new {key=state.Key,epoch=state.Epoch,tolerance=state.Tolerance,positionDelta=V(state.PositionDelta),
+                    rotationDelta=new[]{state.RotationDelta.X,state.RotationDelta.Y,state.RotationDelta.Z,state.RotationDelta.W},points=retainedPoints},
                 matching = contacts.HistoryMatchingAt(i), initialManifold = settings.InitialManifold,
                 priorMinInitialPhi = settings.MinInitialPhi, saved, detected, assigned });
         }

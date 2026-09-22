@@ -227,8 +227,19 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
     {
         Check(); var a = BindingAt(shape0); var b = BindingAt(shape1); settings = default;
         if (a.Shape is not (BoxShape3D or ConvexPolygonShape3D) || b.Shape is not (BoxShape3D or ConvexPolygonShape3D)) return false;
-        static float Size(Aabb bounds) => (float)(100d * Math.Max(bounds.Size.X, Math.Max(bounds.Size.Y, bounds.Size.Z)));
-        settings = new(.1f * Math.Min(Size(a.Bounds), Size(b.Bounds)),
+        static float Size(Binding binding)
+        {
+            if (binding.NativePolygon)
+            {
+                // Chaos uses the original leaf bounds in centimetres. A round
+                // trip through the float metre proxy changes restoration thresholds.
+                var bounds = binding.BoundsGeometry.LocalBounds; var size = bounds.Max - bounds.Min;
+                return (float)Math.Max(size.X, Math.Max(size.Y, size.Z));
+            }
+            var proxy = binding.Bounds.Size;
+            return (float)(100d * Math.Max(proxy.X, Math.Max(proxy.Y, proxy.Z)));
+        }
+        settings = new(.1f * Math.Min(Size(a), Size(b)),
             a.NativePolygon&&b.NativePolygon?CullDistance(shape0,shape1):0); return true;
     }
     internal float CullDistance(int shape0,int shape1)
