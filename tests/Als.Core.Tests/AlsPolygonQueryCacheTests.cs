@@ -126,6 +126,24 @@ public sealed class AlsPolygonQueryCacheTests
         Assert.True(Snapshot(owner,Key).Count>0);
     }
     [Fact]
+    public void QuerySnapshotsIncludeResetAndCannotExposeOmittedOrAbortedQueries()
+    {
+        var owner=new AlsPolygonQueryCache(2,true);var before=new AlsGjkCache();var after=new AlsGjkCache();
+        owner.PrepareStep();Query(owner,Key);
+        Assert.True(owner.CopyPendingQuery(Key,before,after));Assert.Equal(0,before.Count);Assert.True(after.Count>0);
+        var saved=after.WitnessA.ToArray();after.Reset();
+        Assert.True(owner.CopyPendingQuery(Key,before,after));Assert.Equal(saved,after.WitnessA.ToArray());
+        Commit(owner);owner.PrepareStep();
+        Assert.False(owner.CopyPendingQuery(Key,before,after));Assert.Equal(0,after.Count);
+        Query(owner,Key);Assert.True(owner.CopyPendingQuery(Key,before,after));Assert.Equal(saved,before.WitnessA.ToArray());
+        owner.Abort();Assert.Throws<InvalidOperationException>(()=>owner.CopyPendingQuery(Key,before,after));
+        owner.PrepareStep();Query(owner,Key,.2f);
+        Assert.True(owner.CopyPendingQuery(Key,before,after));Assert.Equal(0,before.Count);
+        owner.Release(Key);Assert.False(owner.CopyPendingQuery(Key,before,after));owner.Abort();
+        var disabled=new AlsPolygonQueryCache(2);disabled.PrepareStep();Query(disabled,Key);
+        Assert.False(disabled.CopyPendingQuery(Key,before,after));disabled.Abort();
+    }
+    [Fact]
     public void WarmOwnerQueriesAllocateNothingAfterWarmup()
     {
         var owner=new AlsPolygonQueryCache(2);

@@ -11,11 +11,14 @@ public sealed class AlsPolygonQueryCache
     private sealed class Entry
     {
         internal readonly AlsGjkCache Committed = new(), Proposed = new();
+        internal AlsGjkCache? QueryInput;
+        internal bool Queried;
         internal AlsContactPairKey Key, ProposedKey;
         internal float Margin0, Margin1, ProposedMargin0, ProposedMargin1;
         internal bool Exists, ProposedExists, Touched;
     }
     private readonly int _shapeCapacity;
+    private readonly bool _captureQueries;
     private readonly Entry?[] _entries;
     private readonly int[] _touched;
     private readonly AlsConvexManifoldWorkspace _workspace = new();
@@ -25,10 +28,11 @@ public sealed class AlsPolygonQueryCache
     public long CompletedSteps { get; private set; }
     public int CachedPairs { get; private set; }
 
-    public AlsPolygonQueryCache(int shapeCapacity)
+    public AlsPolygonQueryCache(int shapeCapacity, bool captureQueries = false)
     {
         if(shapeCapacity<1)throw new ArgumentOutOfRangeException(nameof(shapeCapacity));
         _shapeCapacity=shapeCapacity;
+        _captureQueries=captureQueries;
         var capacity=checked(shapeCapacity*(shapeCapacity-1)/2);
         _entries=new Entry?[capacity];_touched=new int[capacity];
     }
@@ -50,10 +54,12 @@ public sealed class AlsPolygonQueryCache
         if(!entry.ProposedExists||entry.ProposedKey!=key||entry.ProposedMargin0!=a.Margin||entry.ProposedMargin1!=b.Margin)
             entry.Proposed.Reset();
         entry.ProposedKey=key;entry.ProposedMargin0=a.Margin;entry.ProposedMargin1=b.Margin;entry.ProposedExists=true;
+        if(_captureQueries)(entry.QueryInput??=new()).CopyFrom(entry.Proposed);
         try
         {
-            return AlsPolygonManifold.Build(a,b,shape1To0,entry.Proposed,_workspace,destination,cullDistance,
+            var result=AlsPolygonManifold.Build(a,b,shape1To0,entry.Proposed,_workspace,destination,cullDistance,
                 gjkEpsilon,epaEpsilon,minimumFaceSearchDistance,planeNormalEpsilon,forceEdgeZeroCull,warmStart,shape0To1);
+            entry.Queried=true;return result;
         }
         catch { _faulted=true;throw; }
     }
@@ -131,6 +137,17 @@ public sealed class AlsPolygonQueryCache
         if(entry is null||!entry.Exists||entry.Key!=key){destination.Reset();return false;}
         destination.CopyFrom(entry.Committed);return true;
     }
+    // Opt-in snapshots include resets caused by identity/margin changes. Copy
+    // only successful queries in this pending step, never a stale prior query.
+    public bool CopyPendingQuery(AlsContactPairKey key,AlsGjkCache before,AlsGjkCache after)
+    {
+        Writable();ArgumentNullException.ThrowIfNull(before);ArgumentNullException.ThrowIfNull(after);
+        if(ReferenceEquals(before,after))throw new ArgumentException("Query snapshots need distinct destinations.");
+        var entry=_entries[Slot(key)];
+        if(!_captureQueries||entry is null||!entry.Touched||!entry.Queried||!entry.ProposedExists||entry.ProposedKey!=key)
+        {before.Reset();after.Reset();return false;}
+        before.CopyFrom(entry.QueryInput!);after.CopyFrom(entry.Proposed);return true;
+    }
     private Entry Touch(int slot)
     {
         var entry=_entries[slot]??=new Entry();
@@ -139,6 +156,7 @@ public sealed class AlsPolygonQueryCache
             entry.Proposed.CopyFrom(entry.Committed);entry.ProposedKey=entry.Key;
             entry.ProposedMargin0=entry.Margin0;entry.ProposedMargin1=entry.Margin1;
             entry.ProposedExists=entry.Exists;entry.Touched=true;_touched[_count++]=slot;
+            entry.Queried=false;
         }
         return entry;
     }

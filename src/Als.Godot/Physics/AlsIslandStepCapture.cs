@@ -9,7 +9,7 @@ namespace GodotAls.Physics;
 // Opt-in Main diagnostic. Raw inputs are after history preparation, before Gather;
 // this does not claim native narrow-phase or history matching equivalence.
 internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definition, AlsPhysicsJointSettings[] settings,
-    JsonElement solverSettings, AlsWorldContacts contacts, Func<int> frame, HashSet<int> frames, string directory) : IAlsIslandStepObserver
+    JsonElement solverSettings, AlsWorldContacts contacts, AlsGodotContactQuery query, Func<int> frame, HashSet<int> frames, string directory) : IAlsIslandStepObserver
 {
     private readonly List<object> _samples = [];
     private object? _input;
@@ -44,6 +44,7 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
             var settings = contacts.HistoryGatherAt(i).Settings;
             _historyPairs.Add(i);
             _historyInputs.Add(new { key = contacts.HistoryKeyAt(i), epoch = contacts.CompletedSteps,
+                restored = contacts.HistoryRestoredAt(i), manifoldTolerance = contacts.HistoryToleranceAt(i),
                 matching = contacts.HistoryMatchingAt(i), initialManifold = settings.InitialManifold,
                 priorMinInitialPhi = settings.MinInitialPhi, saved, detected, assigned });
         }
@@ -79,7 +80,10 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
                     initialPhi = g.InitialPhi, targetPhi = g.TargetPhi, disablePosition = g.DisablePosition,
                     disableVelocity = g.DisableVelocity, disableFriction = g.DisableFriction };
             }
+            var before=new AlsGjkCache();var after=new AlsGjkCache();
+            var queried=query.CopyPendingPolygonQuery(contacts.PreparedKeyAt(i),before,after);
             contactInputs[i] = new { body0 = pair.Body0, body1 = pair.Body1, material = pair.Material, points,
+                polygonQuery = queried ? new { before=Cache(before),after=Cache(after) } : null,
                 gather = new { body0 = GatherBody(raw.Body0), body1 = GatherBody(raw.Body1), settings = raw.Settings, points = geometry } };
         }
         _input = new { mesh = definition.Mesh, frame = _capturedFrame, dt, positionIterations, velocityIterations,
@@ -117,6 +121,12 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
         Godot.GD.Print($"CORE_STEP_CAPTURE mesh={definition.Mesh} frame={_capturedFrame} stages={_samples.Count} output={path}");
     }
     private static object Pose(AlsPrecisePose p) => new { position = V(p.Position), rotation = new[] { p.Rotation.X, p.Rotation.Y, p.Rotation.Z, p.Rotation.W } };
+    private static object[] Cache(AlsGjkCache cache)
+    {
+        var rows=new object[cache.Count];
+        for(var i=0;i<rows.Length;i++)rows[i]=new {a=V(cache.WitnessA[i]),b=V(cache.WitnessB[i]),weight=cache.Weights[i]};
+        return rows;
+    }
     private static object GatherBody(AlsContactGatherBody b) => new { shapeWorld = Pose(b.ShapeWorld),
         centerOfMass = V(b.CenterOfMass), inverseMass = b.InverseMass, v = V(b.Velocity.Linear), w = V(b.Velocity.Angular) };
     private static double[] V(AlsDoubleVector v) => [v.X, v.Y, v.Z];

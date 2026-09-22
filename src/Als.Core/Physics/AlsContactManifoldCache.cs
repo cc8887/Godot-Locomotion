@@ -22,6 +22,8 @@ public sealed class AlsContactManifoldCache
     public bool Pending { get; private set; }
     public float MinimumPhi { get; private set; }
     public int Count => _count;
+    public bool PreparedRestored => Pending ? !_newManifold : throw new InvalidOperationException("No prepared manifold.");
+    public float PreparedTolerance => Pending ? _nextTolerance : throw new InvalidOperationException("No prepared manifold.");
     public AlsContactManifoldCache(int capacity)
     {
         if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));

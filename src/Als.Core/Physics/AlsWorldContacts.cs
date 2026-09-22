@@ -86,12 +86,15 @@ public sealed class AlsWorldContacts : IAlsIslandContacts
     }
     public AlsContactPointInput PreparedPointAt(int pair, int point) => _pairs[PreparedSlot(pair)].SolverInputAt(point);
     public AlsContactGatherSnapshot PreparedGatherAt(int pair) => _pairs[PreparedSlot(pair)].GatherSnapshot;
+    public AlsContactPairKey PreparedKeyAt(int pair) => _identities[PreparedSlot(pair)];
     public AlsContactGeometry PreparedGeometryAt(int pair, int point) => _pairs[PreparedSlot(pair)].GeometryAt(point);
     public float PreparedInitialPhiAt(int pair, int point) => _pairs[PreparedSlot(pair)].GatheredInitialPhiAt(point);
     // History diagnostics include empty/inactive pairs; solver order alone loses
     // the frame in which a contact disappears and its saved anchors are cleared.
     public int HistoryPairCount { get { Pending(); return _count; } }
     public AlsContactPairKey HistoryKeyAt(int pair) => _identities[HistorySlot(pair)];
+    public bool HistoryRestoredAt(int pair) => _manifolds[HistorySlot(pair)].PreparedRestored;
+    public float HistoryToleranceAt(int pair) => _manifolds[HistorySlot(pair)].PreparedTolerance;
     public int HistoryPointCountAt(int pair) => _pairs[HistorySlot(pair)].HistoryPointCount;
     public int HistorySavedCountAt(int pair) => _pairs[HistorySlot(pair)].SavedCount;
     public AlsSavedContact HistorySavedAt(int pair, int point) => _pairs[HistorySlot(pair)].SavedAt(point);

@@ -79,9 +79,9 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             return false;
         }
     }
-    internal AlsGodotContactQuery(AlsContactRegistry registry,AlsContactDetectorSettings? detector=null)
+    internal AlsGodotContactQuery(AlsContactRegistry registry,AlsContactDetectorSettings? detector=null,bool captureQueries=false)
     {
-        Main(); _registry = registry; _bindings = new Binding[registry.Capacity]; _polygonCache = new(registry.Capacity);
+        Main(); _registry = registry; _bindings = new Binding[registry.Capacity]; _polygonCache = new(registry.Capacity,captureQueries);
         _dynamicBodies=new bool[registry.BodyCount];
         detector?.Validate();_detector=detector;
         _preVelocity=new NVector[registry.BodyCount];_bodyBounds=new double[registry.BodyCount];_boundsGeneration=new uint[registry.BodyCount];
@@ -218,6 +218,8 @@ internal sealed class AlsGodotContactQuery : IAlsContactGeometrySource, IDisposa
             BindingAt(shape1).BoundsGeometry,_shapePoses[shape1],_shapeBounds[shape1],CullDistance(shape0,shape1),collidedLastStep);
     }
     public void StageCommit() => _polygonCache.StageCommit();
+    internal bool CopyPendingPolygonQuery(AlsContactPairKey key,AlsGjkCache before,AlsGjkCache after)
+    {Check();return _polygonCache.CopyPendingQuery(key,before,after);}
     public void PublishCommit() => _polygonCache.PublishCommit();
     public void Abort() => _polygonCache.Abort();
     public void Reset() => _polygonCache.Reset();

@@ -227,7 +227,7 @@ public partial class PhysicsCoreJointReplay : Node3D
             if (_drop)
             {
                 var registry = new AlsContactRegistry(island.BodyCount, rig.Definition.Bodies.Sum(b => b.Shapes.Length) + (scene?.ShapeCount ?? 1));
-                query = new(registry,AlsContactDetectorCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_cull_reference.json")));
+                query = new(registry,AlsContactDetectorCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_cull_reference.json")),_captureFrames.Count>0);
                 shapes = new(); shapes.Bind(rig.Definition, registry, query);
                 var conditioning = AlsBodyInertiaCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_inertia_reference.json"), rig.Definition, rig.Settings);
                 foreach(var body in rig.Definition.Bodies)query.BindBodyBounds(body.Index,conditioning[body.Index].NativeBoundsSize);
@@ -265,7 +265,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                     new(1f / _hz, restitution, contactSettings.RestitutionThreshold, contactSettings.MaxPushOutVelocity), 16, island,
                     bodyOverlapVelocities: contactSettings.EnableInitialDepenetration ? overlapVelocities : []);
                 if (_captureFrames.Count > 0) island.SetStepObserver(new AlsIslandStepCapture(rig.Definition, rig.Settings,
-                    _reference!.RootElement.GetProperty("cases")[0].GetProperty("solverSettings"), contacts, () => _frame, _captureFrames, _captureDirectory));
+                    _reference!.RootElement.GetProperty("cases")[0].GetProperty("solverSettings"), contacts, query, () => _frame, _captureFrames, _captureDirectory));
             }
             _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names), shapes, query, contacts, scene));
         }
