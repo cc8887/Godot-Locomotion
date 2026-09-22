@@ -160,6 +160,12 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     internal Transform3D PendingPropAttachment(int bone) => _fullMovement!.PropAttachment(bone);
     internal float PendingPropDraw(string curve) => _fullMovement!.PropDraw(curve);
     internal AlsFullMovementDiagnostics FullMovementDiagnostics => _fullMovement?.Diagnostics ?? default;
+    internal int AnimationPoseBoneCount => _fullMovement?.AnimationPoseBoneCount ?? 0;
+    internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
+    {
+        if (_fullMovement is null) throw new InvalidOperationException("Complete animation runtime is unavailable.");
+        _fullMovement.CopyCommittedAnimationPose(identity, destination);
+    }
     internal AlsStandingCycleState StandingCycleState => _fullMovement?.Base.Grounded.CommittedStanding.State ?? _committedPrepared.Cycle.State;
     internal AlsTransitionStackState StandingTransitions => _fullMovement?.Base.Grounded.CommittedStanding.Transitions ?? _committedPrepared.Cycle.Transitions;
     internal AlsCycleSyncFrame StandingSync => _fullMovement?.Base.CommittedSources ?? _committedPrepared.Cycle.Sync;

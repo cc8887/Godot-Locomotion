@@ -93,6 +93,18 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     private readonly NVector3 _animatedSpeeds;
     private readonly Dictionary<int, AlsTurnProfile> _turnProfiles;
     private readonly AlsLocalPose[] _rollbackPose;
+    // Final logical FBX pose for entry handoff, independent of live skeleton
+    // writes. During ragdoll this may contain snapshot blending; it is NOT the
+    // independent Flail source that must feed continuous motor targets.
+    private readonly AlsLocalPose[] _candidateAnimationPose, _committedAnimationPose;
+    private AlsFrameIdentity _committedAnimationIdentity;
+    internal int AnimationPoseBoneCount => _logicalBoneCount;
+    internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
+    {
+        if (identity.FrameId <= 0 || identity != _committedAnimationIdentity || destination.Length != _logicalBoneCount)
+            throw new InvalidOperationException("Animation pose handoff requires the exact committed frame and skeleton layout.");
+        _committedAnimationPose.AsSpan().CopyTo(destination);
+    }
     private readonly int[] _godotToLogical;
     private readonly int _logicalBoneCount;
     private readonly int _leftIk, _rightIk, _leftLock, _rightLock, _rotationAmount, _yawOffset;
@@ -201,6 +213,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _propParents = set.Skeletons[pose.SkeletonId].LogicalBones
             .Select(b => Array.IndexOf(_godotToLogical, b.ParentLogicalId)).ToArray();
         _rollbackPose = new AlsLocalPose[_skeleton.GetBoneCount()];
+        _candidateAnimationPose = new AlsLocalPose[_logicalBoneCount];
+        _committedAnimationPose = new AlsLocalPose[_logicalBoneCount];
         _leftIk = CurveNames.IndexOf(splitFeet ? "FootLeftIk" : "Enable_FootIK_L");
         _rightIk = CurveNames.IndexOf(splitFeet ? "FootRightIk" : "Enable_FootIK_R");
         _leftLock = CurveNames.IndexOf(splitFeet ? "FootLeftLock" : "FootLock_L");
@@ -415,7 +429,12 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         if (_applied) throw new InvalidOperationException("Movement pose was already applied.");
         // Capture only on the visual worker immediately before its first write.
         for (var bone = 0; bone < _rollbackPose.Length; bone++) _rollbackPose[bone] = ReadBone(bone);
-        try { WriteLogicalPose(_layered is null ? _base.Pose : _layered.Pose); _applied = true; }
+        try
+        {
+            var pose = _layered is null ? _base.Pose : _layered.Pose;
+            pose.CopyTo(_candidateAnimationPose);
+            WriteLogicalPose(pose); _applied = true;
+        }
         catch { WritePhysicalPose(_rollbackPose); throw; }
     }
     public void Commit()
@@ -434,6 +453,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _committedRefactoredFeedback = _nextRefactoredFeedback;
         _committedGraphCapture = _nextGraphCapture; _nextGraphCapture = null;
         _notifyState = _nextNotifyState; _prepared = _applied = false;
+        _candidateAnimationPose.AsSpan().CopyTo(_committedAnimationPose);
+        _committedAnimationIdentity = _identity;
     }
     public void Discard()
     {

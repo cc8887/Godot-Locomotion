@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新动画姿态交接：`docs/verification/2026-09-22-animation-pose-handoff.md`。生产Apply候选缓冲、Commit独立保存最终逻辑FBX pose+identity；角色Main/身份/代次/提交帧/销毁检查，复制输出不暴露数组。完整图Single两故障、Parallel替换两故障、四故障冻结均过；断言12帧保持、caller修改隔离、恢复13可读/旧帧拒绝，Optimize过。仅测试消费尚未Seed；最终pose可含ragdoll snapshot，禁止当独立Flail motor target。下一步独立Flail/native转换及逐步物理/生命周期；无新Core/Import全量/UE/物理矩阵，最近9/12三30旧fail，普通Ragdoll及全部剩余目标保留；main/用户P4保留。
+
 - 最新电机输入组装：`docs/verification/2026-09-22-physics-motor-inputs.md`。AlsRagdollMotorInputs绑定原始帧/父链/启用轴，已提交动画locals+独立committed targets→有序部分drive，完全停用root省略；速度cm/s按ALS float clamp×25000、运行时阻尼0，显式scale按Chaos double乘法。预分配候选全成功才覆盖output，6项NET8/9及Optimize过；真实Flail参考逐输出K/C/target通过，后部失败/重试/2048零分配/小数缩放覆盖。无新native导出/全量/矩阵；尚无Godot生产调用，下一步实际pose交接与逐步绑定/生命周期。普通Ragdoll及全部剩余目标保留，最近9/12三30旧失败；main/用户P4保留。
 
 - 最新动画电机目标：`docs/verification/2026-09-22-physics-motor-targets.md`。真实Flail两模型各五姿态，190motor/180启用目标，Core原始帧与图形父链矩阵计算最大分量差3.33e-16；native K/C观测当前1.5缩放、flags独立。资产绑定严格；真实中间父链0，解析测试覆盖而非native golden。Core新3项/Import定向10在.NET8/9过，Optimize过，无新全量/矩阵。冻结658300字节SHA C5E087DFBCB2929A61FB355582F9AE8945BAE66570DD9DE4302E9574B2CF8320冷复导同，旧frame字节不变。UE完整Editor审计fingerprint7AB92D790C696EB95D9D41A2511BABF54B6EFEC49AF7F0A3EECF6854D017B417/DataValidation过；Editor24296加载退出0，两旧Condition/间歇AV未修。新helper尚无生产调用；下一步独立动画pose→target、轴启用/速度强度→逐步drive，再普通Ragdoll生命周期与恢复。最近矩阵9/12三30旧失败，普通demo未接，全部剩余目标保留；main/用户P4保留。
