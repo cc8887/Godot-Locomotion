@@ -48,7 +48,7 @@ public struct AlsCachedLinearJoint
     {
         if (_simultaneous)
         {
-            var cx=(c.Position-p.Position)+(Vector3.Cross(c.Rotation,_childArm.ToSingle())-Vector3.Cross(p.Rotation,_parentArm.ToSingle()));
+            var cx=(c.Position-p.Position)+(Cross(c.Rotation,_childArm.ToSingle())-Cross(p.Rotation,_parentArm.ToSingle()));
             var dp=default(AlsProjectionDelta);var dc=default(AlsProjectionDelta);
             PositionSingle(ref _x,cx,ref dp,ref dc);PositionSingle(ref _y,cx,ref dp,ref dc);PositionSingle(ref _z,cx,ref dp,ref dc);
             p=Add(p,dp);c=Add(c,dc);
@@ -62,7 +62,7 @@ public struct AlsCachedLinearJoint
         {
             // Native SIMD tests ANY accumulated row, then solves all three.
             if (System.Math.Abs(_x.Lambda)<=1e-8f&&System.Math.Abs(_y.Lambda)<=1e-8f&&System.Math.Abs(_z.Lambda)<=1e-8f) return;
-            var cv=(c.Linear+Vector3.Cross(c.Angular,_childArm.ToSingle()))-(p.Linear+Vector3.Cross(p.Angular,_parentArm.ToSingle()));
+            var cv=(c.Linear+Cross(c.Angular,_childArm.ToSingle()))-(p.Linear+Cross(p.Angular,_parentArm.ToSingle()));
             var dp=default(AlsProjectionDelta);var dc=default(AlsProjectionDelta);
             VelocitySingle(_x,cv,ref dp,ref dc);VelocitySingle(_y,cv,ref dp,ref dc);VelocitySingle(_z,cv,ref dp,ref dc);
             p=new(p.Linear+dp.Position,p.Angular+dp.Rotation);c=new(c.Linear+dc.Position,c.Angular+dc.Rotation);
@@ -77,7 +77,7 @@ public struct AlsCachedLinearJoint
         if (_simultaneous)
         {
             axis=new(axis.ToSingle());error=(float)error;
-            a0=new(Vector3.Cross(_parentArm.ToSingle(),axis.ToSingle()));a1=new(Vector3.Cross(_childArm.ToSingle(),axis.ToSingle()));
+            a0=new(Cross(_parentArm.ToSingle(),axis.ToSingle()));a1=new(Cross(_childArm.ToSingle(),axis.ToSingle()));
         }
         else {a0=AlsDoubleVector.Cross(_parentArm,axis);a1=AlsDoubleVector.Cross(_childArm,axis);}
         var pr=pi.Multiply(a0,_simultaneous);var cr=ci.Multiply(a1,_simultaneous)*-1;
@@ -127,4 +127,8 @@ public struct AlsCachedLinearJoint
         c=new(c.Position-impulse*(float)_childMass,c.Rotation+r.ChildResponse.ToSingle()*lambda);
     }
     private static AlsProjectionDelta Add(AlsProjectionDelta a,AlsProjectionDelta b)=>new(a.Position+b.Position,a.Rotation+b.Rotation);
+    // Match the reference engine's separate float products/subtraction on both
+    // .NET 8 and the .NET 9 Godot host (Vector3.Cross may fuse its operations).
+    private static Vector3 Cross(Vector3 a,Vector3 b)=>
+        new(a.Y*b.Z-a.Z*b.Y,a.Z*b.X-a.X*b.Z,a.X*b.Y-a.Y*b.X);
 }

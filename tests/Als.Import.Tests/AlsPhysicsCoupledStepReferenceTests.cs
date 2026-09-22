@@ -16,6 +16,7 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
     [InlineData("v4_physics_resting_coupled_reference.json", 6)]
     [InlineData("v4_physics_free_coupled_reference.json", 22)]
     [InlineData("v4_physics_window_coupled_reference.json", 8)]
+    [InlineData("v4_physics_first_steps_coupled_reference.json", 6)]
     public void FullChainSharedContactJointAndProjectionStagesMatchNativeContainers(string file, int caseCount)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
@@ -36,6 +37,8 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
                 environmentCases++;
             var dt = D(input, "dt"); var settings = input.GetProperty("solverSettings");
             var id = $"{input.GetProperty("mesh")}/{input.GetProperty("frame")}/{dt:R}";
+            string? firstJointDifference = null;
+            var tracedJoints = 0;
             var initial = bodyRows.Select(b => Pose(b.GetProperty("initial"))).ToArray();
             var predicted = bodyRows.Select(b => Pose(b.GetProperty("predicted"))).ToArray();
             var mass = bodyRows.Select(b => new AlsJointInverseMass(D(b, "inverseMass"), V(b, "inverseInertia"))).ToArray();
@@ -71,8 +74,27 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
             {
                 foreach (var c in contacts) { SetShock(c, iteration, 8, "position"); c.manifold.SolvePosition(ref delta[c.a], ref delta[c.b], iteration >= 4); }
                 Check("position_contacts", iteration);
-                for (var j = 0; j < joints.Length; j++) if (!definitions[j].ConnectivityOnly)
-                    joints[j].SolvePosition(ref delta[Index(j, "parent")], ref delta[Index(j, "child")]);
+                for (var j = 0; j < joints.Length; j++)
+                {
+                    if (!definitions[j].ConnectivityOnly)
+                        joints[j].SolvePosition(ref delta[Index(j, "parent")], ref delta[Index(j, "child")]);
+                    if (iteration == 0 && fixture.TryGetProperty("firstIterationJoints", out var trace))
+                    {
+                        var step = trace[j]; Assert.Equal(j, step.GetProperty("jointIndex").GetInt32());
+                        Assert.Equal("position_joints", step.GetProperty("stage").GetString());
+                        Assert.Equal(0, step.GetProperty("iteration").GetInt32());
+                        double dp = 0, dq = 0;
+                        for (var b = 0; b < count; b++)
+                        {
+                            dp = Math.Max(dp, Vector3.Distance(delta[b].Position, V(step.GetProperty("bodies")[b], "dp").ToSingle()));
+                            dq = Math.Max(dq, Vector3.Distance(delta[b].Rotation, V(step.GetProperty("bodies")[b], "dq").ToSingle()));
+                        }
+                        Assert.InRange(dp, 0, 2e-8); Assert.InRange(dq, 0, 3e-9);
+                        tracedJoints++;
+                        if (firstJointDifference is null && (dp != 0 || dq != 0))
+                            firstJointDifference = $"{id} joint={j} child={bodyRows[Index(j, "child")].GetProperty("name")} dp={dp:R} dq={dq:R}";
+                    }
+                }
                 Check("position_joints", iteration);
             }
             for (var b = 0; b < count; b++) velocity[b] = AlsCachedJoint.AddImplicitVelocity(velocity[b], delta[b], dt, mass[b].Mass > 0);
@@ -102,6 +124,11 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
                 velocity[child] = new(velocity[child].Linear + added.Linear, velocity[child].Angular + added.Angular);
             }
             Check("projection", 0); Correct(); Check("corrected", 0); Assert.Equal(24, sampleIndex);
+            if (fixture.TryGetProperty("firstIterationJoints", out var jointTrace))
+            {
+                Assert.Equal(joints.Length, jointTrace.GetArrayLength()); Assert.Equal(joints.Length, tracedJoints);
+                output.WriteLine($"NATIVE_FIRST_JOINT_DIFFERENCE {firstJointDifference ?? id + " exact"}");
+            }
 
             int Index(int j, string name) => jointRows[j].GetProperty(name).GetInt32();
             void SetShock((int a, int b, AlsCachedContactManifold manifold) c, int iteration, int total, string phase)
@@ -154,6 +181,13 @@ public sealed class AlsPhysicsCoupledStepReferenceTests(Xunit.Abstractions.ITest
         if (file == "v4_physics_coupled_shock_reference.json") Assert.True(shockPairs > 0, "Real captures must exercise dynamic contacts at different graph levels.");
         if (file == "v4_physics_free_coupled_reference.json") Assert.Equal(10, environmentCases);
         if (file == "v4_physics_window_coupled_reference.json") Assert.Equal(caseCount, environmentCases);
+        if (file == "v4_physics_first_steps_coupled_reference.json")
+        {
+            // Keep the independent first-step reference sensitive enough to catch
+            // .NET 9 fused Cross rounding. Historical captures remain unchanged;
+            // these limits apply to the fresh production-kernel replay above.
+            Assert.InRange(maxDp, 0, 1e-8); Assert.InRange(maxW, 0, 4e-7);
+        }
         Assert.True(errors.Count == 0, string.Join(Environment.NewLine, errors));
     }
 }
