@@ -20,6 +20,7 @@ public partial class AnimationFailureRecoverySmoke : Node
     private int _oldDefinition = -1;
     private ulong _oldToken;
     private AlsFrameInput _failedInput;
+    private GodotAls.Core.Locomotion.AlsLocalPose[] _heldAnimationPose = [], _readAnimationPose = [];
     private Vector3 _position;
     private Input.MouseModeEnum _oldMouse;
     private bool _oldAccumulation;
@@ -68,6 +69,14 @@ public partial class AnimationFailureRecoverySmoke : Node
             if (committed == 2 && AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) Tap(Key.R);
             if (_phase == 0 && committed == 12)
             {
+                _heldAnimationPose = new GodotAls.Core.Locomotion.AlsLocalPose[_character.AnimationPoseBoneCount];
+                _readAnimationPose = new GodotAls.Core.Locomotion.AlsLocalPose[_heldAnimationPose.Length];
+                Require(_heldAnimationPose.Length > 0, "No committed animation pose layout.");
+                _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _heldAnimationPose);
+                _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
+                _readAnimationPose[0] = default;
+                _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
+                Require(_heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose), "Caller mutation changed stored animation pose.");
                 Require(_accepted == 1 && _character.CommittedAnimation.StateCount == 1, "No active Roll ownership.");
                 _heldMotionSource = _character.Diagnostics.Result.RootMotionSource;
                 _heldMotion = _character.Diagnostics.Result.ProposedRootMotionDelta;
@@ -81,6 +90,8 @@ public partial class AnimationFailureRecoverySmoke : Node
             }
             else if (_phase == 1 && _character.AnimationRecoveryAttempts > 0)
             {
+                _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
+                Require(_heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose), "Failed candidate replaced animation handoff pose.");
                 var attempts = _character.AnimationRecoveryAttempts;
                 Require(_character.Diagnostics.Result.RootMotionSource == _heldMotionSource &&
                     _character.Diagnostics.Result.ProposedRootMotionDelta == _heldMotion,
@@ -114,6 +125,11 @@ public partial class AnimationFailureRecoverySmoke : Node
             }
             else if (_phase == 1 && committed == 13)
             {
+                _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
+                var rejected = false;
+                try { _character.CopyCommittedAnimationPose(_character.HandleIdentity(12), _readAnimationPose); }
+                catch (InvalidOperationException) { rejected = true; }
+                Require(rejected, "Old animation frame remained readable after recovery committed.");
                 var source = _character.Diagnostics.Result.RootMotionSource;
                 Require(source.Identity == _character.Diagnostics.Identity && source.InstanceId == _heldMotionSource.InstanceId &&
                     source.StartSeconds == _heldMotionSource.EndSeconds && source.EndSeconds > source.StartSeconds,

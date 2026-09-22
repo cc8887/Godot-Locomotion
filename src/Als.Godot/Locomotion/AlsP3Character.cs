@@ -92,6 +92,15 @@ public partial class AlsP3Character : Node3D
     internal bool UsesCompleteMovement => _worker.UsesCompleteMovement;
     internal bool UsesLayeredPose => _worker.UsesLayeredPose;
     internal GodotAls.Animation.AlsFullMovementDiagnostics FullMovementDiagnostics => _worker.FullMovementDiagnostics;
+    internal int AnimationPoseBoneCount => _worker.AnimationPoseBoneCount;
+    internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<GodotAls.Core.Locomotion.AlsLocalPose> destination)
+    {
+        if (!GodotThread.IsMainThread() || identity.FrameId != RuntimeCommittedFrameId ||
+            identity.CharacterId != Handle.CharacterId || identity.SlotGeneration != Handle.Generation ||
+            Volatile.Read(ref _disposed) != 0)
+            throw new InvalidOperationException("Animation pose handoff requires the live character's main-thread committed frame.");
+        _worker.CopyCommittedAnimationPose(identity, destination);
+    }
     internal GodotAls.Core.Locomotion.AlsRefactoredAnimationFeedback CommittedRefactoredFeedback => _state.CommittedRefactoredFeedback;
     internal GodotAls.Core.Locomotion.AlsBasedFootLockFrameTrace? BasedFootLockTrace => _worker.CommittedBasedTrace;
     internal GodotAls.Core.Locomotion.AlsStandingCycleState StandingCycleState => _worker.StandingCycleState;

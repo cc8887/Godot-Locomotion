@@ -32,6 +32,12 @@ public partial class AlsP3WorkerRoot : Node3D
     internal AlsBasedFootLockFrameTrace? CommittedBasedTrace => _controller?.CommittedBasedTrace;
     internal bool UsesLayeredPose => _controller?.UsesLayeredPose == true;
     internal AlsFullMovementDiagnostics FullMovementDiagnostics => _controller?.FullMovementDiagnostics ?? default;
+    internal int AnimationPoseBoneCount => _controller?.AnimationPoseBoneCount ?? 0;
+    internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
+    {
+        if (_controller is null) throw new InvalidOperationException("Animation controller is unavailable.");
+        _controller.CopyCommittedAnimationPose(identity, destination);
+    }
     internal GodotAls.Core.Locomotion.AlsStandingCycleState StandingCycleState => _controller?.StandingCycleState ?? default;
     internal float RuntimeAnimationPhase => _runtimeState.AnimationPhase;
     internal AlsStandingMovementInput StandingMovementInput => _controller?.StandingMovementInput ?? default;
