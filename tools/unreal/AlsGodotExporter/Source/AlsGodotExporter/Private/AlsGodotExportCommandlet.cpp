@@ -181,6 +181,13 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         { UE_LOG(LogAlsGodotExporter, Error, TEXT("Cull export failed: %s"), *Error); return 27; }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_CULL_OK assets_saved=0")); return 0;
     }
+    if (FParse::Value(*Params, TEXT("PhysicsShapeBoundsOutput="), PhysicsOutput))
+    {
+        FString Error;
+        if (!ExportAlsPhysicsShapeBoundsReference(PhysicsOutput, Error))
+        { UE_LOG(LogAlsGodotExporter, Error, TEXT("Shape bounds export failed: %s"), *Error); return 52; }
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("ALS_PHYSICS_SHAPE_BOUNDS_OK assets_saved=0")); return 0;
+    }
     if (FParse::Value(*Params, TEXT("PhysicsContactShockOutput="), PhysicsOutput))
     {
         FString Error;
