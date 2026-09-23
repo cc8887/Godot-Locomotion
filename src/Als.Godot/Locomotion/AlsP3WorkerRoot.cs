@@ -33,6 +33,8 @@ public partial class AlsP3WorkerRoot : Node3D
     internal bool UsesLayeredPose => _controller?.UsesLayeredPose == true;
     internal AlsFullMovementDiagnostics FullMovementDiagnostics => _controller?.FullMovementDiagnostics ?? default;
     internal int AnimationPoseBoneCount => _controller?.AnimationPoseBoneCount ?? 0;
+    internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
+        _controller is not null && _controller.TryCopyCommittedFlail(identity, destination);
     internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
     {
         if (_controller is null) throw new InvalidOperationException("Animation controller is unavailable.");

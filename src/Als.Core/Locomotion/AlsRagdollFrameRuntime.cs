@@ -60,6 +60,15 @@ public sealed class AlsRagdollFrameRuntime
     private readonly uint _character, _generation;
     private readonly AlsRagdollSharedSourceBinding? _shared;
     private readonly AlsLocalPose[] _pose;
+    private readonly AlsLocalPose[] _committedFlail;
+    public AlsFrameIdentity CommittedFlailIdentity { get; private set; }
+    public bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
+    {
+        if (destination.Length != _committedFlail.Length) throw new ArgumentException("Flail skeleton layout differs.");
+        if (identity.FrameId <= 0 || identity != CommittedFlailIdentity) return false;
+        _committedFlail.AsSpan().CopyTo(destination);
+        return true;
+    }
     private readonly AlsInertialCurve[] _curves;
     private AlsRagdollFrameState _committed, _candidate;
     private AlsPoseUpdateContext _sourceContext;
@@ -91,6 +100,7 @@ public sealed class AlsRagdollFrameRuntime
         _shared = shared;
         _definition = definition; _snapshot = snapshot; _character = character; _generation = generation;
         _pose = new AlsLocalPose[bones]; _curves = new AlsInertialCurve[curves];
+        _committedFlail = new AlsLocalPose[bones];
     }
 
     public void Prepare(AlsMovementStateInput movement, AlsDoubleVector rootPhysicsVelocityCm,
@@ -215,6 +225,18 @@ public sealed class AlsRagdollFrameRuntime
         if (!_pending || identity != _candidate.Traversal.Identity || _visited && !_evaluated || _shared is not null && !_sourceCompleted)
             throw new InvalidOperationException("Incomplete Ragdoll frame commit.");
     }
-    public void Commit(AlsFrameIdentity identity) { ValidateCommit(identity); _committed = _candidate; Cancel(); }
+    public void Commit(AlsFrameIdentity identity)
+    {
+        ValidateCommit(identity);
+        // Preserve the source before root blending or physical display can
+        // replace it. Snapshot/hidden commits invalidate the previous target.
+        if (_visited && _evaluated && _candidate.Machine.CurrentState == 0)
+        {
+            _pose.AsSpan().CopyTo(_committedFlail);
+            CommittedFlailIdentity = identity;
+        }
+        else CommittedFlailIdentity = default;
+        _committed = _candidate; Cancel();
+    }
     public void Cancel() { _pending = _visited = _evaluated = false; }
 }

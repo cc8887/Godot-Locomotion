@@ -50,6 +50,37 @@ public sealed class AlsRagdollFrameTests
     }
 
     [Fact]
+    public void FlailHandoffSurvivesFailedCandidateAndRejectsSnapshotHiddenAndForeignFrames()
+    {
+        var runtime=Create(); var source=new Source(); var frame=Next(default,1);
+        var output=new AlsLocalPose[1];
+        Assert.False(runtime.TryCopyCommittedFlail(frame.Identity,output));
+        Prepare(runtime,frame,AlsMovementStateInput.Ragdoll); runtime.Evaluate(source,null);
+        var expected=runtime.Pose.ToArray();
+        Assert.False(runtime.TryCopyCommittedFlail(frame.Identity,output));
+        runtime.Commit(frame.Identity);
+        Assert.True(runtime.TryCopyCommittedFlail(frame.Identity,output)); Assert.Equal(expected,output);
+        output[0]=default;
+        Assert.True(runtime.TryCopyCommittedFlail(frame.Identity,output)); Assert.Equal(expected,output);
+        var next=Next(frame,2); source.Fail=true;
+        Prepare(runtime,next,AlsMovementStateInput.Ragdoll);
+        Assert.Throws<InvalidOperationException>(()=>runtime.Evaluate(source,null));
+        Assert.True(runtime.TryCopyCommittedFlail(frame.Identity,output)); Assert.Equal(expected,output);
+        Assert.False(runtime.TryCopyCommittedFlail(new(1,4,1),output));
+        Assert.False(runtime.TryCopyCommittedFlail(new(1,3,2),output));
+        source.Fail=false;
+        Prepare(runtime,next,AlsMovementStateInput.Grounded); runtime.Evaluate(source,null); runtime.Commit(next.Identity);
+        Assert.Equal(default,runtime.CommittedFlailIdentity);
+        Assert.False(runtime.TryCopyCommittedFlail(frame.Identity,output));
+        Assert.False(runtime.TryCopyCommittedFlail(next.Identity,output));
+        frame=Next(next,3); Prepare(runtime,frame,AlsMovementStateInput.Ragdoll);
+        runtime.Evaluate(source,null); runtime.Commit(frame.Identity);
+        Assert.True(runtime.TryCopyCommittedFlail(frame.Identity,output));
+        next=Next(frame,4); Prepare(runtime,next,AlsMovementStateInput.Ragdoll,visit:false); runtime.Commit(next.Identity);
+        Assert.False(runtime.TryCopyCommittedFlail(frame.Identity,output));
+    }
+
+    [Fact]
     public void SameInitializationCounterWithDifferentGlobalStampPreservesFlailEpochAndTime()
     {
         var runtime=Create(); var source=new Source(); var frame=Next(default,1);

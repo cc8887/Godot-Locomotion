@@ -64,6 +64,7 @@ public partial class RagdollFrameSmoke : Node
             using var normal = new AlsMovementAnimationSource(normalSource, definition.RawSources, set, names, false);
             var normalPose = new AlsLocalPose[skeleton.LogicalBoneCount]; var normalCurves = new AlsInertialCurve[names.Length];
             var previousPose = skeleton.ReferencePose.ToArray();
+            var flailHandoff = new AlsLocalPose[skeleton.LogicalBoneCount];
             var traversal = default(AlsAnimationGraphFrame); var previousState = AlsMovementStateInput.Grounded;
             AlsNamedPoseSnapshot? snapshot = null;
             var flail = 0; var snapshots = 0; var blends = 0;
@@ -89,6 +90,8 @@ public partial class RagdollFrameSmoke : Node
                 for (var i = 0; i < names.Length; i++) normalCurves[i] = normal.Curve(time % normal.Length, names[i]);
                 PrepareAndEvaluate();
                 var candidate = runtime.Candidate;
+                var expectedFlail = candidate.PlayerTicked && root.Visits(1) && candidate.Machine.CurrentState == 0
+                    ? runtime.Pose.ToArray() : null;
                 if (retry)
                 {
                     var committed = runtime.Committed; var committedRoot = root.CommittedState;
@@ -114,6 +117,10 @@ public partial class RagdollFrameSmoke : Node
                 clockBits[2] = BitConverter.SingleToInt32Bits(candidate.Time); clockBits[3] = BitConverter.DoubleToInt64Bits(candidate.FlailRate);
                 hash.AppendData(MemoryMarshal.AsBytes(clockBits)); root.Pose.CopyTo(previousPose);
                 root.ValidateCommit(identity); runtime.ValidateCommit(identity); root.Commit(identity); runtime.Commit(identity);
+                Require(runtime.TryCopyCommittedFlail(identity, flailHandoff) == (expectedFlail is not null),
+                    "Flail handoff availability does not match the committed source state.");
+                if (expectedFlail is not null) Require(flailHandoff.AsSpan().SequenceEqual(expectedFlail),
+                    "Flail handoff contains root blend or snapshot output.");
                 sharedCommitted = sharedCandidate; collector?.Discard();
                 previousState = movement;
                 void PrepareAndEvaluate()
