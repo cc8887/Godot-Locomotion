@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Flail岛重建：`docs/verification/2026-09-23-flail-island-rebuild.md`。补UE删除边后ProcessIslandSplits的持久节点邻接swap/DFS重建与事务回滚，修AnimMan64支持shape反转导致65首差；捕获改用候选drive target/启用K/C。两模型60各600帧、120各1200帧P/Q/V/W逐值同独立native，A60第220睡、120第1087睡，M120第476睡；30 M300帧同，A20首差仍待查。Flail门槛现0/3（原1/3）：30A/60M原生也不睡、120A保持不足1秒，未放宽；30A仍轨迹不等。静态矩阵9/12三30旧fail。新测试先红后绿含Abort/Reset/2048零分配；Core Release2884既定过滤、Import2485+1旧skip，定向17.NET9，Optimize/60接触及场景smoke过。初轮误用Debug广测两个零分配fail已中止并留日志；无UE源码/冻结资产改动，启动审计过。下一步30A20与普通Ragdoll生命周期及全部剩余目标；普通demo仍未接，main/用户P4保留。
+
 - 最新Flail精度修复：`docs/verification/2026-09-23-flail-precision.md`。补UE FinalizePoseEvaluationResult归一化，double源/候选/committed Flail保留到native motor，float显示同采样无新时钟；无double源不伪发布。180target差从9.12e-8→3.33e-16。60Hz全600帧Mannequin身体P/Q/V/W逐值同native；AnimMan前64帧同、65首差P1.19e-4/V.003299、输入时间/rate/pelvis/K同，后期Core209/native220睡。Flail矩阵仍1/3但改为30过A147/M163睡；60与nativeM同未稳V20.743444；120回归M476/A1087睡但A不足一秒，未放宽。Core18/Import8.NET8/9、Optimize、共享三频率动画digest旧同及精确物理单/并行逐步故障重试过。无新UE/全量/静态矩阵；下一步AnimMan65接触与120native，再全部普通目标；main/用户P4保留。
 
 - 最新原生Flail世界：`docs/verification/2026-09-23-flail-native-world.md`。可选PhysicsWorldFlail真实SingleNode/UpdateRBJointMotors+同步场景、同Core新捕获60Hz初态；原生A220睡，M十秒未睡末秒V20.743444/W1.790171，Core A206睡/M残差更大V49.817822/W2.840357。不能把60失败全归移植，差距仍需修。首步time/rate/pelvis/K同、target4.408e-8差，M输出V1.669e-5；60帧位置2.43e-5cm→120帧.047718→600帧2.371663，反馈后期分化。Core可选flail-capture失败仍存、CompareFlailWorld工具；native两冷导SHA56459DCBB0FE86D9C5639CA2B0EFF45D57C4565E81ED5AA14F86261DD761B434一致，未开Flail两case完整samples与旧冻结同。UE全Editor审计fingerprint625DDD11E57D578A238D805D1A20E19BCB98560C6E5401C455FA7C3BBCF565F1/DataValidation过，Editor28512退出0两旧Condition/AV保留；Optimize过。下一步首目标精度/早期接触，Flail1/3静态9/12及全部普通目标保留，main/用户P4保留。

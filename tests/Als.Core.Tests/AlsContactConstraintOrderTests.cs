@@ -6,6 +6,43 @@ namespace GodotAls.Core.Tests;
 
 public sealed class AlsContactConstraintOrderTests
 {
+    [Fact]
+    public void RemovingContactsRebuildsSupportFromPersistentNodeEdgesAndAbortPreservesIt()
+    {
+        // Native ProcessIslandSplits rebuilds even if the joint chain still
+        // connects every body. Removing early node edges swaps the later floor
+        // shape ahead of the older floor shape (AnimMan frame 64).
+        var (island, _, _, _) = Create();
+        var graph = new AlsContactConstraintOrder(island, 4);
+        int[] body0 = [1, 1, 1, 1], body1 = [2, 3, 0, 0];
+        var identities = new AlsContactPairKey[4]; var joints = new int[2];
+        graph.Prepare(island, [0, 1, 2], body0, body1, identities, joints); graph.Commit();
+        graph.Prepare(island, [0, 1, 2, 3], body0, body1, identities, joints); graph.Commit();
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            graph.Prepare(island, [2, 3], body0, body1, identities, joints);
+            Assert.Equal(3, graph.ContactSlotAt(0));
+            Assert.Equal(2, graph.ContactSlotAt(1));
+            if (attempt == 0) graph.Abort(); else graph.Commit();
+        }
+        graph.Prepare(island, [2, 3], body0, body1, identities, joints);
+        Assert.Equal(3, graph.ContactSlotAt(0)); graph.Abort();
+        graph.Reset();
+        graph.Prepare(island, [0, 1, 2], body0, body1, identities, joints);
+        Assert.Equal(2, graph.ContactSlotAt(0)); graph.Commit();
+        int[] all = [0, 1, 2, 3], surviving = [2, 3];
+        void Cycle()
+        {
+            graph.Prepare(island, all, body0, body1, identities, joints); graph.Commit();
+            graph.Prepare(island, surviving, body0, body1, identities, joints); graph.Abort();
+            graph.Prepare(island, surviving, body0, body1, identities, joints); graph.Commit();
+        }
+        for (var i = 0; i < 64; i++) Cycle();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 2048; i++) Cycle();
+        Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+    }
+
     private sealed class Surface : IAlsContactGeometrySource
     {
         public int Supported = 3;
