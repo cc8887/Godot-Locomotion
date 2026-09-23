@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Godot;
 using GodotAls.Assets;
+using GodotAls.Animation;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Physics;
 using GodotAls.Import;
@@ -23,6 +24,10 @@ public partial class PhysicsCoreJointReplay : Node3D
     private int _case, _frame, _hz;
     private bool _done, _chains, _drop, _highDrop, _sleep, _sceneWorld;
     private bool _runtimeDrives;
+    private bool _flailDrive;
+    private AlsMovementGraphDefinition? _flailGraph;
+    private AlsAnimationSetDefinition? _animationSet;
+    private readonly Dictionary<AlsJointIsland,AlsFlailPhysicsRuntime> _flail=[];
     private AlsIslandAngularDrive _pairDrive;
     private int _driveUpdates;
     private int _pendingRate, _rateBoundaries;
@@ -60,6 +65,8 @@ public partial class PhysicsCoreJointReplay : Node3D
             _drop = args.Contains("--drop"); _highDrop = args.Contains("--high-drop");
             _sleep = args.Contains("--sleep"); Require(!_sleep || _drop, "Sleep probe requires --drop.");
             _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
+            _flailDrive=args.Contains("--flail-drive");
+            Require(!_flailDrive || _sceneWorld && _chains,"Flail contact replay requires scene-world chains.");
             _platformMode = args.FirstOrDefault(a => a.StartsWith("--platform="))?[11..] ?? "";
             _setupDirectory = args.FirstOrDefault(a => a.StartsWith("--capture-setup="))?[16..];
             if (_setupDirectory is not null)
@@ -105,6 +112,12 @@ public partial class PhysicsCoreJointReplay : Node3D
             _reference = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_awake_solver_reference.json"));
             Require(!_reference.RootElement.GetProperty("sleepEnabled").GetBoolean(), "Expected an awake reference.");
             var set = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath).LoadDefinition();
+            if(_flailDrive)
+            {
+                _animationSet=set;
+                _flailGraph=AlsMovementGraphDefinition.Load(set,AlsLocomotionProfileCompiler.Compile(
+                    Godot.FileAccess.GetFileAsString("res://assets/config/p4_cycle_locomotion_profile.json"),set));
+            }
             foreach (var name in new[] { "Mannequin", "AnimMan" })
             {
                 var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), AlsPhysicsAssetCompiler.MeshRoot + name + "." + name);
@@ -298,6 +311,11 @@ public partial class PhysicsCoreJointReplay : Node3D
                 if (_captureFrames.Count > 0) island.SetStepObserver(new AlsIslandStepCapture(rig.Definition, rig.Settings,
                     _reference!.RootElement.GetProperty("cases")[0].GetProperty("solverSettings"), contacts, query, () => _frame, _captureFrames, _captureDirectory));
             }
+            if(_flailDrive)
+            {
+                var authored=AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"),rig.Definition.Mesh);
+                _flail.Add(island,new(_flailGraph!,_animationSet!,authored,rig.Settings,island,checked((uint)_active.Count+1)));
+            }
             _active.Add(new(rig, bodies, host, new AlsLocalPose[rig.Names.Length], new Transform3D[rig.Names.Length], rig.Definition.Bind(rig.Names), shapes, query, contacts, scene));
         }
         catch { scene?.Dispose(); query?.Dispose(); shapes?.Dispose(); bodies.Dispose(); throw; }
@@ -327,7 +345,8 @@ public partial class PhysicsCoreJointReplay : Node3D
                         if (active.Scene is null) active.Host.Step(dt, new(0, 0, -980), active.Contacts);
                         else
                         {
-                            active.Host.StepScene(dt, new(0, 0, -980), active.Contacts, active.Scene);
+                            if(_flailDrive) _flail[active.Host.Island].Step(dt,active.Host,active.Contacts,active.Scene);
+                            else active.Host.StepScene(dt, new(0, 0, -980), active.Contacts, active.Scene);
                         }
                         if (active.Contacts.CompletedSteps != epoch)
                         { _contactPoints += active.Contacts.LastContactCount; _restoredPairs += active.Contacts.LastRestoredPairs; }
@@ -395,6 +414,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                 query_shapes = _active.Sum(a => (a.Shapes?.Count ?? 0) + (a.Scene?.ShapeCount ?? 0)),
                 scene_world_geometry = _sceneWorld, environment_bodies_per_rig = _active.FirstOrDefault()?.Scene?.BodyCount ?? (_drop ? 1 : 0),
                 scene_floor_top_cm = _floorTop, scene_material_combination = false, ordinary_ragdoll_connected = false,
+                flail_drive = _flailDrive, flail_steps = _flail.Values.Select(f=>f.Steps).ToArray(), flail_times = _flail.Values.Select(f=>f.Time).ToArray(),
                 world_pose_transport = _sceneWorld, platform_mode = _platformMode, max_platform_center_lag_m = _platformLag,
                 final_speed_cmps = _finalSpeed, final_angular_speed_radps = _finalAngularSpeed, max_limit_rad = _maxLimit, final_limit_rad = _finalLimit,
                 final_limit_source = _finalLimitSource,
@@ -565,6 +585,7 @@ public partial class PhysicsCoreJointReplay : Node3D
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private void Release()
     {
+        foreach(var flail in _flail.Values) flail.Dispose(); _flail.Clear();
         foreach (var active in _active) { active.Scene?.Dispose(); active.Query?.Dispose(); active.Shapes?.Dispose(); active.Bodies.Dispose(); }
         _active.Clear();
     }
