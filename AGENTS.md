@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新普通激活候选：`docs/verification/2026-09-23-ragdoll-character-activation.md`。BodyHistory PrepareActivation组合当前committed pose与独立completed物理V/W，固定体零速、pending teleport零速，进入限速+八刷新预算；私有候选后复制，重复准备不消耗历史/teleport/预算。完整Demo四恢复场景覆盖真实Commit回调动画13/历史12边界、姿态世界核对/限速/无效输出不变，Optimize过，最终verified日志见文档。仍仅回归消费者，普通动态owner/胶囊/Flail/跟随退出未接；无新Core/Import全量/UE/矩阵，静态9/12、Flail0/3和全部后续目标保留。main/用户P4保留。
+
 - 最新普通角色历史：`docs/verification/2026-09-23-character-body-history.md`。完整图默认Main Commit后Lifecycle建立真实PhysicsAsset身体历史，动画/物理身份分离，失败保持位置且无target清速；停用清除、恢复零初速但物理序号持续，销毁停用。连续运行发现IK足root非物理缩放被误拒；bridge只限物理祖先刚体并保留其他local TRS，已验证刚体链派生world正交化修head约1e-6数值漂移，真实身体缩放仍拒绝。四恢复/三停用边界与真实8姿态160速度/192回写/48拒绝验证，最终日志见文档；Optimize过。尚未动态Ragdoll/胶囊，MarkTeleport调用方/pending激活仍待接，非全性能验收。无Core/Import全量/UE/矩阵，静态9/12/Flail0/3全部剩余目标保留；main/用户P4保留。
 
 - 最新pending激活：`docs/verification/2026-09-23-ragdoll-activation-state.md`。History CopyPendingActivation输出新actor+已完成V/W，teleport立即零，返回独立速度来源identity；仅读不提交。Godot SeedWithBodyVelocities验证全前缀后逐值继承native动态V/W、不加COM杠杆臂，固定体零/环境后缀保持。Core五项.NET8/9过、Optimize过、真实两模型八姿态160速度/192回写/40拒绝过。尚无普通owner调用；无新UE/全量/矩阵，静态9/12/Flail0/3保留。继续实际角色历史时序与激活/胶囊/Flail/骨盆跟随/显示退出和全部剩余目标，main/用户P4保留。

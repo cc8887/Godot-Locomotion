@@ -16,6 +16,8 @@ public partial class AlsCharacterBodyHistory : Node
     private AlsCorePhysicsPose _bridge = null!;
     private AlsLocalPose[] _pose = [];
     private AlsIslandBodyState[] _seed = [];
+    private AlsIslandBodyState[] _activation = [], _completed = [];
+    private AlsProjectionVelocity[] _velocities = [];
     private AlsPrecisePose[] _actors = [];
     private string[] _names = [];
     private AlsKinematicBodyHistory? _history;
@@ -40,6 +42,9 @@ public partial class AlsCharacterBodyHistory : Node
             skeleton.LogicalBones.Select(b => b.ParentLogicalId).ToArray(), owner.Handle.CharacterId, owner.Handle.Generation);
         _pose = new AlsLocalPose[skeleton.LogicalBones.Length];
         _seed = new AlsIslandBodyState[definition.Bodies.Length];
+        _activation = new AlsIslandBodyState[_seed.Length];
+        _completed = new AlsIslandBodyState[_seed.Length];
+        _velocities = new AlsProjectionVelocity[_seed.Length];
         _actors = new AlsPrecisePose[_seed.Length];
     }
 
@@ -58,6 +63,28 @@ public partial class AlsCharacterBodyHistory : Node
         if (_history is null || Failure is not null) throw new InvalidOperationException("No completed character body history.");
         _history.CopyCommitted(_history.CommittedIdentity, destination);
         return _history.CommittedIdentity;
+    }
+
+    // Read-only preparation: accepted animation can be newer than the last
+    // completed physical step. Never derive entry velocity from that pending pose.
+    // All work is private until validation and the initial clamp have succeeded.
+    internal AlsRagdollActivationFrame PrepareActivation(AlsFrameIdentity identity,
+        bool limitInitialSpeed, Span<AlsIslandBodyState> destination)
+    {
+        Main();
+        if (_history is null || Failure is not null || !_owner.BodyHistoryActive)
+            throw new InvalidOperationException("Activation requires a live completed body history.");
+        if (destination.Length != BodyCount)
+            throw new ArgumentException("Activation requires the exact body layout.");
+        var entry = _owner.CopyCommittedRagdollEntry(identity, _pose);
+        var velocityIdentity = CopyCompleted(_completed);
+        for (var i = 0; i < BodyCount; i++)
+            _velocities[i] = _teleport ? default : _completed[i].Velocity;
+        _bridge.SeedWithBodyVelocities(identity, entry.SkeletonToWorld, _pose, _velocities, _activation);
+        var limit = AlsRagdollSpeedLimit.Begin(limitInitialSpeed,
+            new AlsDoubleVector(AlsCorePhysicsPose.LinearToNative(entry.CharacterVelocity)), _activation);
+        _activation.AsSpan().CopyTo(destination);
+        return new(entry, velocityIdentity, limit, _teleport);
     }
 
     public override void _PhysicsProcess(double delta)
