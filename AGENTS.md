@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Flail实际积分：`docs/verification/2026-09-23-animated-joint-step.md`。AlsAnimatedJointInputs绑定岛拓扑/dynamic pelvis，每步读committed target/真实pelvis速度→转换/drive，无独立历史提前提交；host提供StepAnimatedScene但未有普通调用。真实Mannequin --motor-physics私有/共享源30/60/120Hz四owner单/并行，69/138/276步过，速度反馈播放/刚度；每步Gather故障身体/joint保持、重新Prepare同，无故障与重试物理P/Q/V/W digest同。Optimize过。仅无重力/接触/睡眠受控全链，hidden阶段不积分，非native轨迹/普通生命周期验收。下一步场景接触和Seed/胶囊/骨盆跟随/限速/展示恢复；最近落地9/12三30旧fail，全部剩余目标保留，main/用户P4保留。
+
 - 最新native motor pose：`docs/verification/2026-09-23-native-motor-pose.md`。AlsNativeMotorPose按名字/直接父链绑定，FBX local→UE cm/q反射保留scale，候选全验证后复制。真实共享RagdollFrame回放串已提交Flail→转换→motor inputs，三频率四owner单/并行retry过、旧digest同；尚未调用物理Step。两模型虚拟插入重排/父链拒绝/失败原子/2048零分配，Import定向8在.NET8/9、Optimize过。float转换不能声明恢复double精度，尚无完整采样target native等价。下一步host提交/骨盆反馈/Seed和普通生命周期；最近矩阵9/12三30旧fail、全部剩余目标保留，main/用户P4保留。
 
 - 最新独立Flail提交：`docs/verification/2026-09-23-flail-pose-handoff.md`。RagdollFrame成功访问Flail状态后复制源pose+identity，失败/Cancel保留，Snapshot/隐藏提交失效；生产layered至角色转发Main/身份检查接口。Core17项.NET8/9、Optimize、真实资源私有/共享各30/60/120Hz四owner单线程/并行逐帧retry过，已提交源逐值等于root混合前pose，两模式digest同。尚无native转换/物理step消费者，下一步骨骼绑定/坐标转换→motor inputs→普通生命周期；无新UE/全量/矩阵，最近9/12三30旧fail，全部剩余目标保留；main/用户P4保留。

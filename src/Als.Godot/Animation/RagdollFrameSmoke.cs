@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Godot;
 using GodotAls.Assets;
 using GodotAls.Core.Contracts;
@@ -14,6 +15,14 @@ namespace GodotAls.Animation;
 // This does not pretend to simulate the character's physical ragdoll bodies.
 public partial class RagdollFrameSmoke : Node
 {
+    private sealed class InjectedPhysicsFailure : Exception { }
+    private sealed class FailingContacts : IAlsIslandContacts
+    {
+        public void Gather(ReadOnlySpan<AlsPrecisePose> p,ReadOnlySpan<AlsProjectionVelocity> v,ReadOnlySpan<AlsIslandBody> b,double dt)
+            => throw new InjectedPhysicsFailure();
+        public void SolvePosition(Span<AlsProjectionDelta> b,int i,int count) { }
+        public void SolveVelocity(Span<AlsProjectionVelocity> b,int i,int count,double dt) { }
+    }
     private sealed record Result(string Digest, int Frames, int Flail, int Snapshot, int Blends, long Epoch);
     public override void _Ready()
     {
@@ -27,6 +36,7 @@ public partial class RagdollFrameSmoke : Node
         var locomotion = AlsLocomotionProfileCompiler.Compile(Read("p4_cycle_locomotion_profile.json"), set);
         var definition = AlsMovementGraphDefinition.Load(set, locomotion);
         var sharedMode = OS.GetCmdlineUserArgs().Contains("--shared-source");
+        var motorPhysics = OS.GetCmdlineUserArgs().Contains("--motor-physics");
         if (sharedMode)
         {
             var overlay = definition.WithSharedRootSources(set).WithSharedOverlaySources(set);
@@ -74,6 +84,25 @@ public partial class RagdollFrameSmoke : Node
             var motors = new AlsRagdollMotorInputs(physics, settings, 1.5f, 1.5f);
             var drives = new AlsIslandAngularDrive[motors.OutputCount];
             var targets = settings.Select(s=>s.AngularDrive.Target).ToArray();
+            AlsAnimatedJointInputs? animated = null;
+            if (motorPhysics)
+            {
+                var adjusted=AlsPhysicsJointFrameCompiler.Compile(Read("v4_physics_joint_frame_inputs.json"),physics);
+                var inertia=AlsBodyInertiaCompiler.Compile(Read("v4_physics_inertia_reference.json"),adjusted,settings);
+                using var reference=JsonDocument.Parse(Read("v4_physics_awake_solver_reference.json"));
+                var solver=reference.RootElement.GetProperty("cases")[0].GetProperty("solverSettings");
+                var bodies=adjusted.Bodies.Select(b=>new AlsIslandBody(b.MassLocal,b.PhysicsType==1?default:
+                    new((float)(1/b.MassKg),new AlsDoubleVector(inertia[b.Index].ConditionedInverseInertia)),
+                    b.Defaults.GetProperty("linearDamping").GetDouble(),b.Defaults.GetProperty("angularDamping").GetDouble())).ToArray();
+                var joints=adjusted.Joints.Select(j=>AlsCachedJointSettingsCompiler.IslandJoint(j.ParentBody,j.ChildBody,
+                    j.ParentFrame,j.ChildFrame,settings[j.Index].NativeSettings,solver)).ToArray();
+                var states=adjusted.Bodies.Select(b=>new AlsIslandBodyState(b.ReferenceComponent,
+                    b.PhysicsType==1?default:new(new(100,0,400),default))).ToArray();
+                animated=new(physics,settings,skeleton.LogicalBoneNames,skeleton.LogicalParents,
+                    new AlsJointIsland(bodies,joints,states),1.5f,1.5f);
+            }
+            var physicalSteps=0; var physicalBits=new double[13];
+            var failingContacts=new FailingContacts();
             var traversal = default(AlsAnimationGraphFrame); var previousState = AlsMovementStateInput.Grounded;
             AlsNamedPoseSnapshot? snapshot = null;
             var flail = 0; var snapshots = 0; var blends = 0;
@@ -94,7 +123,7 @@ public partial class RagdollFrameSmoke : Node
                     snapshot = new(identity, definition.RagdollPose.SnapshotName, "ALS_Mesh", skeleton.RawBoneNames, physical);
                 }
                 var context = new AlsPoseUpdateContext(identity, 1, 1f / hz);
-                var velocity = new AlsDoubleVector(100 + character * 20, 0, 400 + (frame % 7) * 30);
+                var velocity = animated?.PelvisVelocity ?? new AlsDoubleVector(100 + character * 20, 0, 400 + (frame % 7) * 30);
                 normal.Sample(skeleton.ReferencePose, time % normal.Length, normalPose);
                 for (var i = 0; i < names.Length; i++) normalCurves[i] = normal.Curve(time % normal.Length, names[i]);
                 PrepareAndEvaluate();
@@ -140,6 +169,39 @@ public partial class RagdollFrameSmoke : Node
                             "Invalid actual Flail motor target.");
                         targets[drive.Joint]=drive.Target;
                     }
+                    if (animated is not null)
+                    {
+                        var stepDrives=animated.Prepare(flailHandoff);
+                        if(retry)
+                        {
+                            var before=Enumerable.Range(0,animated.Island.BodyCount).Select(animated.Island.BodyAt).ToArray();
+                            var beforeJoints=Enumerable.Range(0,animated.Island.JointCount).Select(animated.Island.JointDefinitionAt).ToArray();
+                            var expectedDrives=stepDrives.ToArray(); var failed=false;
+                            try { animated.Island.Step(AlsPhysicsStepTime.FromEngineSeconds(1.0/hz),default,
+                                contacts:failingContacts,angularDrives:stepDrives); }
+                            catch(InjectedPhysicsFailure) { failed=true; }
+                            Require(failed,"Expected injected physical failure.");
+                            for(var i=0;i<before.Length;i++) Require(animated.Island.BodyAt(i)==before[i],"Failed physics published a body.");
+                            for(var i=0;i<beforeJoints.Length;i++) Require(animated.Island.JointDefinitionAt(i)==beforeJoints[i],"Failed physics published a drive.");
+                            stepDrives=animated.Prepare(flailHandoff);
+                            Require(stepDrives.SequenceEqual(expectedDrives),"Retry read uncommitted targets or pelvis velocity.");
+                        }
+                        animated.Island.Step(AlsPhysicsStepTime.FromEngineSeconds(1.0/hz),default,angularDrives:stepDrives);
+                        physicalSteps++;
+                        foreach(var drive in stepDrives)
+                            Require(animated.Island.JointDefinitionAt(drive.Joint).Angular.DriveTarget==drive.Target,
+                                "Successful physics step did not publish animated target.");
+                        for(var i=0;i<animated.Island.BodyCount;i++)
+                        {
+                            var b=animated.Island.BodyAt(i); var p=b.Actor.Position; var q=b.Actor.Rotation;
+                            physicalBits[0]=p.X; physicalBits[1]=p.Y; physicalBits[2]=p.Z;
+                            physicalBits[3]=q.X; physicalBits[4]=q.Y; physicalBits[5]=q.Z; physicalBits[6]=q.W;
+                            physicalBits[7]=b.Velocity.Linear.X; physicalBits[8]=b.Velocity.Linear.Y; physicalBits[9]=b.Velocity.Linear.Z;
+                            physicalBits[10]=b.Velocity.Angular.X; physicalBits[11]=b.Velocity.Angular.Y; physicalBits[12]=b.Velocity.Angular.Z;
+                            Require(physicalBits.All(double.IsFinite),"Nonfinite animated physics output.");
+                            hash.AppendData(MemoryMarshal.AsBytes(physicalBits.AsSpan()));
+                        }
+                    }
                 }
                 sharedCommitted = sharedCandidate; collector?.Discard();
                 previousState = movement;
@@ -170,6 +232,8 @@ public partial class RagdollFrameSmoke : Node
             }
             Require(flail > hz && snapshots > 0 && blends > 0 && runtime.Committed.PlayerEpoch >= 3, "Incomplete Ragdoll lifecycle coverage.");
             Require(!sharedMode || independentClocks > hz, "Jump and Ragdoll aliased their Flail clock.");
+            Require(!motorPhysics || physicalSteps==flail,"Missing animated physical steps.");
+            if(motorPhysics && !retry && character==0) GD.Print($"FLAIL_PHYSICS_STEPS_OK hz={hz} steps={physicalSteps} gravity=false contacts=false");
             return new(Convert.ToHexString(hash.GetHashAndReset()), hz * 4, flail, snapshots, blends, runtime.Committed.PlayerEpoch);
         }
     }
