@@ -109,6 +109,17 @@ public partial class PhysicsWorldPoseSmoke : Node3D
                             Compare(AlsCorePhysicsPose.ToWorld(saved[i].Actor), AlsCorePhysicsPose.ToWorld(states[i].Actor));
                             _nativeVelocityHandoffs++;
                         }
+                        var scaled = pose.ToArray(); var ikRoot = Array.IndexOf(names, "ik_foot_root");
+                        Require(ikRoot >= 0 && !physical.Contains(ikRoot), "Missing nonphysical IK branch.");
+                        scaled[ikRoot] = scaled[ikRoot] with { Scale = new(1.2f, .8f, 1) };
+                        bridge.SeedWithBodyVelocities(new(150 + variant, 7, 3), world, scaled, inherited, states);
+                        var scaledIsland = new AlsJointIsland(bodies, [], states.AsSpan(0, bodies.Length));
+                        bridge.Capture(scaledIsland, world, snapshot);
+                        Require(snapshot[ikRoot] == scaled[ikRoot], "Physics capture lost unrelated IK branch scale.");
+                        for (var i = 0; i < bodies.Length; i++) Compare(
+                            AlsCorePhysicsPose.ToWorld(saved[i].Actor), AlsCorePhysicsPose.ToWorld(states[i].Actor));
+                        var scaledRoot = pose.ToArray(); scaledRoot[0] = scaledRoot[0] with { Scale = new(1.2f, 1, 1) };
+                        Reject(() => bridge.SeedWithBodyVelocities(new(199, 7, 3), world, scaledRoot, inherited, states));
                         var held = states.ToArray(); var heldIdentity = bridge.SeedIdentity;
                         inherited[^1] = new(new(float.NaN, 0, 0), default);
                         Reject(() => bridge.SeedWithBodyVelocities(new(200 + variant, 7, 3), world, pose, inherited, states));

@@ -18,7 +18,9 @@ internal sealed class AlsCorePhysicsPose
         new Vector3(0, 0, -1), new Vector3(-1, 0, 0), new Vector3(0, 1, 0)), Vector3.Zero);
     private readonly AlsRagdollPhysicsDefinition _definition;
     private readonly int[] _parents, _bodyToBone, _boneToBody;
-    private readonly Transform3D[] _components, _seedLocal;
+    private readonly Transform3D[] _components;
+    private readonly AlsLocalPose[] _seedPose;
+    private readonly bool[] _rigidBone;
     private readonly AlsLocalPose[] _poseScratch;
     private readonly AlsIslandBodyState[] _states;
     private readonly uint _character, _generation;
@@ -33,7 +35,10 @@ internal sealed class AlsCorePhysicsPose
         for (var i = 0; i < parents.Length; i++) if (parents[i] < -1 || parents[i] >= i) throw new ArgumentException("Skeleton must be parent-first.");
         _bodyToBone = definition.Bind(names); _boneToBody = Enumerable.Repeat(-1, names.Count).ToArray();
         for (var i = 0; i < _bodyToBone.Length; i++) _boneToBody[_bodyToBone[i]] = i;
-        _components = new Transform3D[names.Count]; _seedLocal = new Transform3D[names.Count];
+        _rigidBone = new bool[names.Count];
+        foreach (var bone in _bodyToBone)
+            for (var ancestor = bone; ancestor >= 0; ancestor = _parents[ancestor]) _rigidBone[ancestor] = true;
+        _components = new Transform3D[names.Count]; _seedPose = new AlsLocalPose[names.Count];
         _poseScratch = new AlsLocalPose[names.Count]; _states = new AlsIslandBodyState[definition.Bodies.Length];
     }
 
@@ -52,12 +57,20 @@ internal sealed class AlsCorePhysicsPose
             var p = pose[i];
             if (!float.IsFinite(p.Rotation.LengthSquared()) || MathF.Abs(p.Rotation.LengthSquared() - 1) > .00001f)
                 throw new ArgumentException("Physical pose requires unit rotations.");
-            var local = AlsPhysicsBodySet.Local(p); Rigid(local);
+            var local = AlsPhysicsBodySet.Local(p);
+            if (!local.IsFinite()) throw new ArgumentException("Nonfinite animation transform.");
+            // IK/virtual branches can carry animation scale without scaling any
+            // physical body. Enforce rigidity only along physical ancestor chains.
+            if (_rigidBone[i]) Rigid(local);
             _components[i] = _parents[i] < 0 ? local : _components[_parents[i]] * local;
         }
         for (var i = 0; i < _states.Length; i++)
         {
             var actorWorld = componentToWorld * _components[_bodyToBone[i]];
+            // Every transform on this physical ancestor chain was validated as
+            // rigid above. Float Basis products can still drift by ~1e-6 along
+            // a long chain; reconstruct the rotation before native transport.
+            actorWorld = actorWorld.Orthonormalized();
             var actor = FromWorld(actorWorld);
             var massWorld = actorWorld * AlsPhysicsBodySet.NativeToFbx(_definition.Bodies[i].MassLocal);
             var velocity = linearVelocity + angularVelocity.Cross(massWorld.Origin - componentToWorld.Origin);
@@ -69,7 +82,7 @@ internal sealed class AlsCorePhysicsPose
         }
         // No externally visible mutation before every pose and velocity validates.
         _states.AsSpan().CopyTo(destination);
-        for (var i = 0; i < pose.Length; i++) _seedLocal[i] = AlsPhysicsBodySet.Local(pose[i]);
+        pose.CopyTo(_seedPose);
         SeedIdentity = identity;
     }
 
@@ -106,9 +119,10 @@ internal sealed class AlsCorePhysicsPose
             }
             else
             {
-                local = _seedLocal[i]; _components[i] = parent < 0 ? local : _components[parent] * local;
+                local = AlsPhysicsBodySet.Local(_seedPose[i]); _components[i] = parent < 0 ? local : _components[parent] * local;
             }
-            Rigid(local); _poseScratch[i] = AlsPhysicsBodySet.Pose(local);
+            if (body >= 0) { Rigid(local); _poseScratch[i] = AlsPhysicsBodySet.Pose(local); }
+            else _poseScratch[i] = _seedPose[i];
         }
         _poseScratch.AsSpan().CopyTo(destination);
     }
