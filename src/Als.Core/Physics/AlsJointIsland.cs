@@ -8,6 +8,9 @@ public readonly record struct AlsIslandBodyState(AlsPrecisePose Actor, AlsProjec
 // Sorted, unique, zero-inverse-mass inputs captured by the world owner. Velocity
 // is prescribed at the actor origin (cm/s, rad/s), not integrated a second time.
 public readonly record struct AlsIslandKinematicTarget(int Body, AlsIslandBodyState State);
+// Explicit pre-integration COM velocity edits, staged with the whole step.
+// Sorted dynamic bodies only; these are replacements, not additional impulses.
+public readonly record struct AlsIslandVelocityOverride(int Body, AlsProjectionVelocity Velocity);
 // Resolved swing/twist drive inputs: X twist, Y swing2, Z swing1. Disabled
 // channels have zero coefficients. Target is connector-relative; no torque cap
 // or nonzero target angular velocity is supported by this solver yet.
@@ -31,7 +34,7 @@ public sealed class AlsJointIsland
 {
     private readonly AlsIslandBody[] _bodies;
     private readonly AlsIslandJoint[] _joints, _stepJoints;
-    private readonly AlsIslandBodyState[] _states, _next, _external;
+    private readonly AlsIslandBodyState[] _states, _next, _external, _stepStates;
     private readonly AlsPrecisePose[] _initial, _predicted, _predictedActors;
     private readonly AlsProjectionDelta[] _deltas;
     private readonly AlsProjectionVelocity[] _velocities;
@@ -72,6 +75,7 @@ public sealed class AlsJointIsland
         _stepJoints = new AlsIslandJoint[joints.Length];
         _next = new AlsIslandBodyState[bodies.Length];
         _external = new AlsIslandBodyState[bodies.Length];
+        _stepStates = new AlsIslandBodyState[bodies.Length];
         _initial = new AlsPrecisePose[bodies.Length]; _predicted = new AlsPrecisePose[bodies.Length];
         _predictedActors = new AlsPrecisePose[bodies.Length];
         _deltas = new AlsProjectionDelta[bodies.Length]; _velocities = new AlsProjectionVelocity[bodies.Length];
@@ -138,7 +142,8 @@ public sealed class AlsJointIsland
     public void Step(double dt, AlsDoubleVector gravity, ReadOnlySpan<AlsBodyStepForces> forces = default,
         IAlsIslandContacts? contacts = null, bool dragBeforeIntegration = false, bool allowSleep = true,
         ReadOnlySpan<AlsIslandKinematicTarget> kinematicTargets = default,
-        ReadOnlySpan<AlsIslandAngularDrive> angularDrives = default)
+        ReadOnlySpan<AlsIslandAngularDrive> angularDrives = default,
+        ReadOnlySpan<AlsIslandVelocityOverride> velocityOverrides = default)
     {
         if (_stepping) throw new InvalidOperationException("Island stepping is not reentrant.");
         if (!double.IsFinite(dt) || dt <= 0 || !float.IsFinite(1 / (float)dt) || (float)dt == float.PositiveInfinity)
@@ -146,11 +151,12 @@ public sealed class AlsJointIsland
         if (!gravity.IsFinite) throw new ArgumentException("Gravity must be finite.");
         if (!forces.IsEmpty && forces.Length != BodyCount) throw new ArgumentException("One force input per body is required.");
         foreach (var force in forces) force.Validate();
+        var velocitiesChanged = PrepareVelocities(velocityOverrides);
         PrepareDrives(angularDrives);
         var externalChanged = PrepareExternal(kinematicTargets, out var externalMoving);
         allowSleep &= !externalMoving;
         var wake = !allowSleep || _wakeRequested || gravity != _lastGravity || !ReferenceEquals(contacts, _lastContacts) || (contacts?.RequiresWake ?? false);
-        wake |= externalChanged;
+        wake |= externalChanged || velocitiesChanged;
         if (!forces.IsEmpty) for (var i = 0; i < forces.Length; i++) if (Dynamic(i) && forces[i] != default) wake = true;
         // Native joint settings updates do not wake bodies. The world/gameplay
         // owner requests wake separately. Retain new settings even while asleep.
@@ -164,8 +170,8 @@ public sealed class AlsJointIsland
     private void Solve(double dt, AlsDoubleVector gravity, ReadOnlySpan<AlsBodyStepForces> forces,
         IAlsIslandContacts? contacts, bool dragBeforeIntegration, bool wake, bool allowSleep)
     {
-        Gather(dt, gravity, forces, dragBeforeIntegration);
-        contacts?.Gather(_predicted, _velocities, _bodies, dt, _states, _predictedActors);
+        Gather(dt, gravity, forces, dragBeforeIntegration, useStepStates: true);
+        contacts?.Gather(_predicted, _velocities, _bodies, dt, _stepStates, _predictedActors);
         for (var j = 0; j < _jointOrder.Length; j++) _jointOrder[j] = j;
         contacts?.PrepareConstraintOrder(this, _jointOrder);
         var observer = _observer?.Enabled == true ? _observer : null;
@@ -228,7 +234,7 @@ public sealed class AlsJointIsland
             ValidateState(i, _next[i]);
         }
         contacts?.StageCommit();
-        if (_sleep?.Stage(_states, _next, dt, wake, forces, allowSleep) == true)
+        if (_sleep?.Stage(_stepStates, _next, dt, wake, forces, allowSleep) == true)
             for (var i = 0; i < _next.Length; i++) if (Dynamic(i)) _next[i] = _next[i] with { Velocity = default };
         contacts?.Commit();
         _sleep?.Publish();
@@ -236,11 +242,11 @@ public sealed class AlsJointIsland
     }
 
     private void Gather(double dt, AlsDoubleVector gravity = default, ReadOnlySpan<AlsBodyStepForces> forces = default,
-        bool dragBeforeIntegration = false)
+        bool dragBeforeIntegration = false, bool useStepStates = false)
     {
         for (var i = 0; i < _bodies.Length; i++)
         {
-            var body = _bodies[i]; var state = _states[i]; _deltas[i] = default;
+            var body = _bodies[i]; var state = useStepStates ? _stepStates[i] : _states[i]; _deltas[i] = default;
             // UE applies kinematic targets before gathering solver bodies, so
             // both X/R and P/Q already contain the prescribed transform.
             _initial[i] = Dynamic(i) ? AlsPrecisePose.Compose(body.MassLocal, state.Actor) : _external[i].Actor;
@@ -279,6 +285,21 @@ public sealed class AlsJointIsland
     private AlsJointBodyInput Input(int body, AlsPrecisePose connector) =>
         new(_initial[body], _predicted[body], connector, _bodies[body].InverseMass);
     private bool Dynamic(int body) => _bodies[body].InverseMass.Mass > 0;
+    private bool PrepareVelocities(ReadOnlySpan<AlsIslandVelocityOverride> overrides)
+    {
+        _states.AsSpan().CopyTo(_stepStates);
+        var previous = -1; var changed = false;
+        foreach (var item in overrides)
+        {
+            if (item.Body <= previous || (uint)item.Body >= BodyCount || !Dynamic(item.Body) ||
+                !new AlsDoubleVector(item.Velocity.Linear).IsFinite || !new AlsDoubleVector(item.Velocity.Angular).IsFinite)
+                throw new ArgumentException("Velocity overrides require sorted unique dynamic bodies and finite velocities.");
+            changed |= item.Velocity != _states[item.Body].Velocity;
+            _stepStates[item.Body] = _states[item.Body] with { Velocity = item.Velocity };
+            previous = item.Body;
+        }
+        return changed;
+    }
     private bool PrepareExternal(ReadOnlySpan<AlsIslandKinematicTarget> targets, out bool moving)
     {
         // No new target means hold pose and reset velocity on the next step.

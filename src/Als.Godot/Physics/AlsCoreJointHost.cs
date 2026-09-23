@@ -13,6 +13,8 @@ internal sealed class AlsCoreJointHost
     private readonly AlsPhysicsBodySet _proxies;
     private readonly AlsPrecisePose[] _massLocal;
     private readonly bool _worldSpace;
+    private readonly AlsIslandBodyState[] _speedCandidates;
+    private readonly AlsIslandVelocityOverride[] _speedOverrides;
     internal AlsJointIsland Island { get; }
 
     internal AlsCoreJointHost(AlsPhysicsBodySet proxies, AlsRagdollPhysicsDefinition definition, AlsJointIsland island, bool worldSpace = false)
@@ -21,6 +23,8 @@ internal sealed class AlsCoreJointHost
         if (proxies.BodyCount != definition.Bodies.Length || island.BodyCount < proxies.BodyCount)
             throw new ArgumentException("Core and proxy body counts differ.");
         _massLocal = definition.Bodies.Select(b => b.MassLocal).ToArray();
+        _speedCandidates = new AlsIslandBodyState[proxies.BodyCount];
+        _speedOverrides = new AlsIslandVelocityOverride[proxies.BodyCount];
         CheckOwnership(); Publish();
     }
 
@@ -61,6 +65,27 @@ internal sealed class AlsCoreJointHost
         CheckOwnership();
         if (!ReferenceEquals(animation.Island,Island)) throw new ArgumentException("Animation belongs to a different physics island.");
         StepScene(dt,gravity,contacts,scene,animation.Prepare(committedFlail));
+    }
+
+    // Caller seeds entry once with Begin. Each successful scene step consumes
+    // one refresh; solver failures publish neither velocities nor the counter.
+    internal void StepRagdollScene(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts,
+        AlsSceneContactSet scene, ReadOnlySpan<AlsIslandAngularDrive> angularDrives,
+        ref AlsRagdollSpeedLimit speedLimit)
+    {
+        CheckOwnership();
+        var seconds = AlsPhysicsStepTime.FromEngineSeconds(dt);
+        for (var i = 0; i < _speedCandidates.Length; i++) _speedCandidates[i] = Island.BodyAt(i);
+        var candidateLimit = speedLimit.Refresh(_speedCandidates);
+        var count = 0;
+        for (var i = 0; i < _speedCandidates.Length; i++)
+            if (_speedCandidates[i].Velocity != Island.BodyAt(i).Velocity && Island.BodyDefinitionAt(i).InverseMass.Mass > 0)
+                _speedOverrides[count++] = new(i, _speedCandidates[i].Velocity);
+        var targets = scene.Capture(Island, seconds);
+        Island.Step(seconds, gravity, contacts: contacts, kinematicTargets: targets,
+            angularDrives: angularDrives, velocityOverrides: _speedOverrides.AsSpan(0, count));
+        speedLimit = candidateLimit;
+        Publish(); scene.CommitCapture(Island);
     }
 
     private void CheckOwnership()
