@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 原生入口普通Editor复跑：确认首轮已退出后，PID27288加载标记成功/退出0；两旧Condition仍在，首轮24068退出访问冲突仍未解决，完整证据见下条文档。
+
+- 最新原生入口：`docs/verification/2026-09-23-ragdoll-native-entry.md`。新增PhysicsEntryOutput，真实两模型×QueryOnly/QueryAndPhysics、五同步阶段，240身体切换后V/W与独立seed逐值同；不能据通用collision源码断言骨架必重置初速。ALS蓝图默认QueryOnly/defer=false，需逐身体kinematic历史，角色速度仅限速输入。两冷导SHA3E7C814110BD7D3EF369F23B149B6BCA645DA440AB868DA8ACADB35260821177一致，verifier通过；全Editor审计fingerprint64F98753DA631762A2647943DF4957D2B07808BED0D9C7C3DF0C04FDDDE5B0D0、DataValidation0/3旧warn。Editor24068加载成功但退出0xC0000005/两旧Condition，未修复。同步受控ACharacter参考，无动画/物理tick/PIE，非完整ALS入口轨迹。无C#变更/矩阵；最近Core2892/静态9/12/Flail0/3。继续原生历史/初速和全部普通目标，main/用户P4保留。
+
 - 最新限速物理步：`docs/verification/2026-09-23-ragdoll-speed-step.md`。Island可选dynamic COM速度替换暂存于step-start，积分/接触PreV/睡眠同源，失败不发布、不Reset历史；Host StepRagdollScene资产前缀限速→Step成功后计数更新。新增四项+前批四项.NET8/9过，Core既定过滤串行2892过、Optimize过、实际scene60三场景/13几何/9生命周期过。宿主新接口尚未运行场景验收或普通调用，Core组合已验证；无UE/Import全量/落地矩阵，静态9/12/Flail0/3保留，非完整原生速度设置等价。继续初速/激活/胶囊/Flail/跟随显示退出及全部目标；main/用户P4保留。
 
 - 最新Ragdoll限速状态：`docs/verification/2026-09-23-ragdoll-speed-limit.md`。按本机ALS源码进入立即一次+后续八刷新，max(200cm/s,float角色3D速度)，只限身体线速度、不改角速度/低速值；不可变候选计数与全前缀校验支持失败重试。Core四项Release在.NET8/9过、Optimize零警告/错误。尚无gameplay调用或native运行时新oracle，未重跑全量/矩阵；静态9/12、Flail0/3保持。下一步原生初速历史、owner限速事务、胶囊/Flail/骨盆跟随/显示退出与全部剩余目标，main/用户P4保留。

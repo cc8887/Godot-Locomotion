@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+bool ExportAlsPhysicsEntryReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsSphereConvexReference(const FString& Output, const FString& PropertiesOutput, FString& Error);
 bool ExportAlsPhysicsNativeCapsuleMixedTrace(const FString& Input, const FString& Output, FString& Error);
 bool ExportAlsPhysicsNativeCapsuleTrace(const FString& Input, const FString& Output, FString& Error);
