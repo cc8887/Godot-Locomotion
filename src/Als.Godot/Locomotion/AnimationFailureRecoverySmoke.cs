@@ -30,6 +30,8 @@ public partial class AnimationFailureRecoverySmoke : Node
     private GodotAls.Physics.AlsRagdollEntryFrame _heldEntry;
     private GodotAls.Core.Physics.AlsIslandBodyState[] _heldBodies = [], _bodyRead = [];
     private AlsFrameIdentity _heldPhysicsIdentity;
+    private bool[] _fixedBodies = [];
+    private int _pendingActivations;
 
     private void CheckBodyHistory(bool failed)
     {
@@ -44,6 +46,7 @@ public partial class AnimationFailureRecoverySmoke : Node
             _heldPhysicsIdentity = history.CopyCompleted(_heldBodies);
         }
         var identity = history.CopyCompleted(_bodyRead);
+        CheckActivation(history, identity);
         if (!failed) return;
         Require(identity.FrameId > _heldPhysicsIdentity.FrameId, "Physical history stopped with the failed animation clock.");
         for (var i = 0; i < _bodyRead.Length; i++)
@@ -51,7 +54,59 @@ public partial class AnimationFailureRecoverySmoke : Node
                 "Failed animation moved physical targets or retained velocity without a new target.");
     }
 
-    private void VerifyEntryBodyPoses(GodotAls.Physics.AlsRagdollEntryFrame entry)
+    private void CheckActivation(GodotAls.Physics.AlsCharacterBodyHistory history, AlsFrameIdentity physicalIdentity)
+    {
+        var bodies = new GodotAls.Core.Physics.AlsIslandBodyState[history.BodyCount];
+        var identity = _character.Diagnostics.Identity;
+        var activation = history.PrepareActivation(identity, false, bodies);
+        Require(activation.Entry == ReadEntry() && activation.VelocitySourceIdentity == physicalIdentity &&
+            activation.SpeedLimit.RefreshesRemaining == 0 && !activation.Teleported,
+            "Activation mixed pose/velocity provenance or enabled an unwanted limit.");
+        for (var i = 0; i < bodies.Length; i++)
+            Require(bodies[i].Velocity == (_fixedBodies[i] ? default : _bodyRead[i].Velocity),
+                "Activation replaced inherited per-body linear/angular velocity.");
+        var original = bodies.ToArray();
+        VerifyEntryBodyPoses(activation.Entry, original);
+        var limited = history.PrepareActivation(identity, true, bodies);
+        var speed = activation.Entry.CharacterVelocity;
+        var expectedLimit = Math.Max(200f, (float)(100 * Math.Sqrt((double)speed.X * speed.X +
+            (double)speed.Y * speed.Y + (double)speed.Z * speed.Z)));
+        Require(limited.SpeedLimit.RefreshesRemaining == 8 && Math.Abs(limited.SpeedLimit.SpeedLimit - expectedLimit) < .001f,
+            "Entry did not apply ALS initial speed policy.");
+        for (var i = 0; i < bodies.Length; i++)
+            Require(bodies[i].Actor == original[i].Actor && bodies[i].Velocity.Angular == original[i].Velocity.Angular &&
+                bodies[i].Velocity.Linear.Length() <= expectedLimit + .001f,
+                "Entry clamp changed pose/angular velocity or exceeded the speed limit.");
+        var first = bodies.ToArray();
+        Require(history.PrepareActivation(identity, true, bodies) == limited && first.AsSpan().SequenceEqual(bodies),
+            "Preparing activation twice consumed history or the refresh budget.");
+        foreach (var bad in new[] { new AlsFrameIdentity(identity.FrameId + 1, identity.CharacterId, identity.SlotGeneration),
+            new AlsFrameIdentity(identity.FrameId, identity.CharacterId, identity.SlotGeneration + 1) })
+        {
+            var rejected = false;
+            try { history.PrepareActivation(bad, true, bodies); }
+            catch (InvalidOperationException) { rejected = true; }
+            Require(rejected && first.AsSpan().SequenceEqual(bodies), "Rejected activation modified the destination.");
+        }
+        var shortRejected = false;
+        try { history.PrepareActivation(identity, true, bodies.AsSpan(1)); }
+        catch (ArgumentException) { shortRejected = true; }
+        Require(shortRejected && first.AsSpan().SequenceEqual(bodies), "Wrong body layout changed activation output.");
+        if (identity.FrameId == 13)
+        {
+            history.MarkTeleport();
+            var teleported = history.PrepareActivation(identity, true, bodies);
+            Require(teleported.Teleported && bodies.All(b => b.Velocity == default), "Pending teleport inherited stale velocity.");
+            Require(history.PrepareActivation(identity, true, bodies) == teleported,
+                "Preparing activation consumed the pending teleport.");
+        }
+        var completed = new GodotAls.Core.Physics.AlsIslandBodyState[history.BodyCount];
+        Require(history.CopyCompleted(completed) == physicalIdentity && completed.AsSpan().SequenceEqual(_bodyRead),
+            "Activation preparation changed completed physical history.");
+    }
+
+    private void VerifyEntryBodyPoses(GodotAls.Physics.AlsRagdollEntryFrame entry,
+        GodotAls.Core.Physics.AlsIslandBodyState[]? activationBodies = null)
     {
         var skeleton = _context.AnimationSet.Skeletons[_context.Profile.SkeletonId];
         var mesh = _context.AnimationSet.SkeletalMeshes[_context.Profile.MannequinMeshId];
@@ -74,7 +129,7 @@ public partial class AnimationFailureRecoverySmoke : Node
         for (var i = 0; i < bodies.Length; i++)
         {
             var expected = entry.SkeletonToWorld * components[mapping[i]];
-            var actual = GodotAls.Physics.AlsCorePhysicsPose.ToWorld(bodies[i].Actor);
+            var actual = GodotAls.Physics.AlsCorePhysicsPose.ToWorld((activationBodies ?? bodies)[i].Actor);
             Require(actual.Origin.DistanceTo(expected.Origin) < .0001f &&
                 actual.Basis.X.DistanceTo(expected.Basis.X) < .0001f &&
                 actual.Basis.Y.DistanceTo(expected.Basis.Y) < .0001f &&
@@ -140,6 +195,10 @@ public partial class AnimationFailureRecoverySmoke : Node
             _demo.ConfigureRuntimePolicyForSmoke(_mode, _debug); AddChild(_demo);
             Require(_demo.IsRuntimeReady, "Production Demo initialization failed.");
             _context = _demo.RuntimeContext; _character = _demo.ActiveCharacter;
+            var mesh = _context.AnimationSet.SkeletalMeshes[_context.Profile.MannequinMeshId];
+            var physics = GodotAls.Import.Compilation.AlsPhysicsAssetCompiler.Compile(
+                Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), mesh.ObjectPath);
+            _fixedBodies = physics.Bodies.Select(b => b.PhysicsType == 1).ToArray();
             if (AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) RollingGameplaySmoke.PlaceOnOpenFloor(_demo);
             _context.ActionOutcomeCommitted += Outcome; _context.AnimationEventCommitted += Event;
             if (!AlsAnimationRuntimeOptions.Has("--rolling-gameplay")) Tap(Key.R);
@@ -280,6 +339,23 @@ public partial class AnimationFailureRecoverySmoke : Node
     private void Outcome(AlsFrameIdentity identity, AlsActionOutcome outcome)
     {
         Require(GodotThread.IsMainThread() && identity.SlotGeneration == 1, "Wrong callback thread/generation.");
+        if (!_done && identity.FrameId == 13 && _character.BodyHistory is { } history)
+        {
+            Require(history.SourceAnimationIdentity.FrameId == 12, "Callback did not observe the pre-physics activation boundary.");
+            var completed = new GodotAls.Core.Physics.AlsIslandBodyState[history.BodyCount];
+            var candidate = new GodotAls.Core.Physics.AlsIslandBodyState[history.BodyCount];
+            var source = history.CopyCompleted(completed);
+            var activation = history.PrepareActivation(identity, false, candidate);
+            _character.CopyCommittedAnimationPose(identity, _readAnimationPose);
+            VerifyEntryBodyPoses(activation.Entry, candidate);
+            Require(activation.Entry.Identity == identity && activation.VelocitySourceIdentity == source &&
+                history.PhysicsIdentity == source && history.SourceAnimationIdentity.FrameId == 12,
+                "Pending activation advanced or mixed physical and animation identities.");
+            for (var i = 0; i < candidate.Length; i++)
+                Require(candidate[i].Velocity == (_fixedBodies[i] ? default : completed[i].Velocity),
+                    "Pending animation target supplied velocity before its physical step.");
+            _pendingActivations++;
+        }
         if (_debug && outcome.ResultCode == AlsActionResultCode.InterruptedByLifecycle) return; // Expected fatal-exit teardown.
         if (outcome.ResultCode == AlsActionResultCode.Accepted)
         {
@@ -314,9 +390,10 @@ public partial class AnimationFailureRecoverySmoke : Node
     }
     private void Succeed(string result)
     {
+        Require(result == "bounded_frozen" || _pendingActivations > 0, "Missing pre-physics activation coverage.");
         _done = true;
         GD.Print($"ANIMATION_FAILURE_RECOVERY_OK mode={_mode} failures={_failures} replacement={_replacement} result={result} " +
-            $"accepted={_accepted} interrupted={_interrupted} end={_ends} diagnostics={_character.FailureDiagnosticCount} motor=not_reintegrated entry=coherent body_history=coherent");
+            $"accepted={_accepted} interrupted={_interrupted} end={_ends} diagnostics={_character.FailureDiagnosticCount} motor=not_reintegrated entry=coherent body_history=coherent activation=coherent pending_activations={_pendingActivations}");
         Cleanup(); GetTree().Quit();
     }
     private void Cleanup()

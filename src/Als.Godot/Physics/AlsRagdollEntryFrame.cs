@@ -8,3 +8,9 @@ namespace GodotAls.Physics;
 // must not silently replace the native kinematic-to-dynamic velocity policy.
 internal readonly record struct AlsRagdollEntryFrame(AlsFrameIdentity Identity,
     Transform3D CharacterToWorld, Transform3D SkeletonToWorld, Vector3 CharacterVelocity);
+
+// Pose and inherited velocity have separate provenance. Preparation neither
+// advances physical history nor consumes the teleport flag or refresh budget.
+internal readonly record struct AlsRagdollActivationFrame(AlsRagdollEntryFrame Entry,
+    AlsFrameIdentity VelocitySourceIdentity, GodotAls.Core.Physics.AlsRagdollSpeedLimit SpeedLimit,
+    bool Teleported);
