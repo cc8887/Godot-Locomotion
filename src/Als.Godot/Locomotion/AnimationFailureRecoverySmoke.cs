@@ -28,6 +28,28 @@ public partial class AnimationFailureRecoverySmoke : Node
     private GodotAls.Core.Actions.AlsMontageRootMotionRange _heldMotionSource;
     private AlsRootMotionDelta _heldMotion;
     private GodotAls.Physics.AlsRagdollEntryFrame _heldEntry;
+    private GodotAls.Core.Physics.AlsIslandBodyState[] _heldBodies = [], _bodyRead = [];
+    private AlsFrameIdentity _heldPhysicsIdentity;
+
+    private void CheckBodyHistory(bool failed)
+    {
+        var history = _character.BodyHistory ?? throw new InvalidOperationException("Ordinary character body history is missing.");
+        Require(history.Failure is null && history.SourceAnimationIdentity == _character.Diagnostics.Identity,
+            "Body history failed or consumed an uncommitted animation frame.");
+        if (_bodyRead.Length == 0)
+        {
+            Require(history.BodyCount > 0, "Empty physical body layout.");
+            _bodyRead = new GodotAls.Core.Physics.AlsIslandBodyState[history.BodyCount];
+            _heldBodies = new GodotAls.Core.Physics.AlsIslandBodyState[history.BodyCount];
+            _heldPhysicsIdentity = history.CopyCompleted(_heldBodies);
+        }
+        var identity = history.CopyCompleted(_bodyRead);
+        if (!failed) return;
+        Require(identity.FrameId > _heldPhysicsIdentity.FrameId, "Physical history stopped with the failed animation clock.");
+        for (var i = 0; i < _bodyRead.Length; i++)
+            Require(_bodyRead[i].Actor == _heldBodies[i].Actor && _bodyRead[i].Velocity == default,
+                "Failed animation moved physical targets or retained velocity without a new target.");
+    }
 
     private void VerifyEntryBodyPoses(GodotAls.Physics.AlsRagdollEntryFrame entry)
     {
@@ -130,6 +152,7 @@ public partial class AnimationFailureRecoverySmoke : Node
         if (_done || _demo is null) return;
         try
         {
+            Require(_character.BodyHistory?.Failure is null, "Ordinary body history failed: " + _character.BodyHistory?.Failure);
             Require(++_ticks < 180 && _demo.IsRuntimeReady && _demo.ErrorCount == _character.FailureDiagnosticCount,
                 $"Recovery stalled or unexpected diagnostic: phase={_phase} frame={_character.RuntimeCommittedFrameId} errors={_demo.ErrorCount}.");
             var committed = _character.RuntimeCommittedFrameId;
@@ -145,6 +168,7 @@ public partial class AnimationFailureRecoverySmoke : Node
                 _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
                 Require(_heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose), "Caller mutation changed stored animation pose.");
                 _heldEntry = ReadEntry();
+                CheckBodyHistory(failed: false);
                 VerifyEntryBodyPoses(_heldEntry);
                 RejectEntry(new(12, _heldEntry.Identity.CharacterId + 1, _heldEntry.Identity.SlotGeneration));
                 RejectEntry(new(12, _heldEntry.Identity.CharacterId, _heldEntry.Identity.SlotGeneration + 1));
@@ -166,6 +190,7 @@ public partial class AnimationFailureRecoverySmoke : Node
                 Require(_heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose), "Failed candidate replaced animation handoff pose.");
                 Require(ReadEntry() == _heldEntry && _heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose),
                     "Failed candidate mixed entry metadata and pose frames.");
+                CheckBodyHistory(failed: true);
                 RejectEntry(_character.HandleIdentity(13));
                 var attempts = _character.AnimationRecoveryAttempts;
                 Require(_character.Diagnostics.Result.RootMotionSource == _heldMotionSource &&
@@ -208,6 +233,7 @@ public partial class AnimationFailureRecoverySmoke : Node
                 var recoveredEntry = ReadEntry();
                 Require(recoveredEntry.Identity.FrameId == 13, "Recovery did not publish entry frame 13.");
                 VerifyEntryBodyPoses(recoveredEntry);
+                CheckBodyHistory(failed: false);
                 RejectEntry(_heldEntry.Identity);
                 var source = _character.Diagnostics.Result.RootMotionSource;
                 Require(source.Identity == _character.Diagnostics.Identity && source.InstanceId == _heldMotionSource.InstanceId &&
@@ -290,7 +316,7 @@ public partial class AnimationFailureRecoverySmoke : Node
     {
         _done = true;
         GD.Print($"ANIMATION_FAILURE_RECOVERY_OK mode={_mode} failures={_failures} replacement={_replacement} result={result} " +
-            $"accepted={_accepted} interrupted={_interrupted} end={_ends} diagnostics={_character.FailureDiagnosticCount} motor=not_reintegrated entry=coherent");
+            $"accepted={_accepted} interrupted={_interrupted} end={_ends} diagnostics={_character.FailureDiagnosticCount} motor=not_reintegrated entry=coherent body_history=coherent");
         Cleanup(); GetTree().Quit();
     }
     private void Cleanup()

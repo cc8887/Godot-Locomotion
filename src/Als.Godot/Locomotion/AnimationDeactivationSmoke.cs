@@ -13,6 +13,7 @@ public partial class AnimationDeactivationSmoke : Node
     private int _phase, _ticks, _resumeTick, _accepted, _interrupted, _cancelled, _syntheticEnds, _begins;
     private long _stoppedFrame, _firstResume, _newRequest, _oldEpoch;
     private long _stoppedIntegrations;
+    private long _stoppedPhysics;
     private ulong _oldToken;
     private Vector3 _stoppedPosition;
     private uint _generation;
@@ -85,6 +86,12 @@ public partial class AnimationDeactivationSmoke : Node
             }
             else if (_phase == 3 && committed >= _firstResume)
             {
+                var history = _character.BodyHistory!;
+                Require(history.Failure is null && history.SourceAnimationIdentity == _character.Diagnostics.Identity &&
+                    history.PhysicsIdentity.FrameId > _stoppedPhysics, "Resume reused an old physical identity.");
+                var bodies = new GodotAls.Core.Physics.AlsIslandBodyState[history.BodyCount];
+                history.CopyCompleted(bodies);
+                Require(bodies.All(b => b.Velocity == default), "Resume inferred velocity across a scheduling gap.");
                 Require(committed == _firstResume && _character.Handle.Generation == _generation &&
                     _character.Diagnostics.Result.ActionPlayback.Active == 0 && _accepted == 1 &&
                     _character.FullMovementDiagnostics.MovementNotifies.Action == AlsTimelineAction.None &&
@@ -121,7 +128,9 @@ public partial class AnimationDeactivationSmoke : Node
         _stoppedPosition = _character.MovementAnchor.GlobalPosition;
         _stoppedIntegrations = _character.MotorIntegrationCount;
         _firstResume = _mode == "pending" ? _stoppedFrame : _stoppedFrame + 1;
+        _stoppedPhysics = _character.BodyHistory!.PhysicsIdentity.FrameId;
         _character.SetActive(false); _character.SetActive(false);
+        Require(_character.BodyHistory!.PhysicsIdentity == default, "Inactive character retained physical history.");
         Require(_character.CommittedAnimation.Closed && _character.FullMovementDiagnostics.MovementNotifies == default,
             "Deactivation retained worker or main animation ownership.");
         _resumeTick = _ticks + 3; _phase = 2;
