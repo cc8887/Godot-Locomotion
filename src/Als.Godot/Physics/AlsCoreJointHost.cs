@@ -75,6 +75,14 @@ internal sealed class AlsCoreJointHost
         }
     }
 
+    internal void StepAnimatedScene(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts,
+        AlsSceneContactSet scene, AlsAnimatedJointInputs animation, ReadOnlySpan<AlsPrecisePose> committedFlail)
+    {
+        CheckOwnership();
+        if (!ReferenceEquals(animation.Island,Island)) throw new ArgumentException("Animation belongs to a different physics island.");
+        StepScene(dt,gravity,contacts,scene,animation.Prepare(committedFlail));
+    }
+
     private void Publish()
     {
         for (var i = 0; i < _proxies.BodyCount; i++)

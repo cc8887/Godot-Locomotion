@@ -101,6 +101,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     internal int AnimationPoseBoneCount => _logicalBoneCount;
     internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
         identity == _committedAnimationIdentity && _layered is not null && _layered.TryCopyCommittedFlail(identity, destination);
+    internal bool TryCopyCommittedPreciseFlail(AlsFrameIdentity identity, Span<AlsPrecisePose> destination) =>
+        identity == _committedAnimationIdentity && _layered is not null && _layered.TryCopyCommittedPreciseFlail(identity, destination);
     internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
     {
         if (identity.FrameId <= 0 || identity != _committedAnimationIdentity || destination.Length != _logicalBoneCount)

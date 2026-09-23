@@ -78,6 +78,7 @@ public partial class RagdollFrameSmoke : Node
             var normalPose = new AlsLocalPose[skeleton.LogicalBoneCount]; var normalCurves = new AlsInertialCurve[names.Length];
             var previousPose = skeleton.ReferencePose.ToArray();
             var flailHandoff = new AlsLocalPose[skeleton.LogicalBoneCount];
+            var preciseHandoff = new AlsPrecisePose[skeleton.LogicalBoneCount];
             var physics = AlsPhysicsAssetCompiler.Compile(Read("v4_physics_asset_inputs.json"),
                 AlsPhysicsAssetCompiler.MeshRoot + "Mannequin.Mannequin");
             var settings = AlsPhysicsJointCompiler.Compile(Read("v4_physics_joint_reference.json"), physics);
@@ -132,6 +133,7 @@ public partial class RagdollFrameSmoke : Node
                 var candidate = runtime.Candidate;
                 var expectedFlail = candidate.PlayerTicked && root.Visits(1) && candidate.Machine.CurrentState == 0
                     ? runtime.Pose.ToArray() : null;
+                var expectedPrecise = expectedFlail is not null ? runtime.PreciseFlailPose.ToArray() : null;
                 if (retry)
                 {
                     var committed = runtime.Committed; var committedRoot = root.CommittedState;
@@ -159,6 +161,9 @@ public partial class RagdollFrameSmoke : Node
                 root.ValidateCommit(identity); runtime.ValidateCommit(identity); root.Commit(identity); runtime.Commit(identity);
                 Require(runtime.TryCopyCommittedFlail(identity, flailHandoff) == (expectedFlail is not null),
                     "Flail handoff availability does not match the committed source state.");
+                Require(runtime.TryCopyCommittedPreciseFlail(identity,preciseHandoff)==(expectedPrecise is not null),
+                    "Precise Flail handoff availability differs.");
+                if(expectedPrecise is not null) Require(preciseHandoff.AsSpan().SequenceEqual(expectedPrecise),"Precise Flail publication changed source values.");
                 if (expectedFlail is not null) Require(flailHandoff.AsSpan().SequenceEqual(expectedFlail),
                     "Flail handoff contains root blend or snapshot output.");
                 if (expectedFlail is not null)
@@ -173,7 +178,7 @@ public partial class RagdollFrameSmoke : Node
                     }
                     if (animated is not null)
                     {
-                        var stepDrives=animated.Prepare(flailHandoff);
+                        var stepDrives=animated.Prepare(preciseHandoff);
                         if(retry)
                         {
                             var before=Enumerable.Range(0,animated.Island.BodyCount).Select(animated.Island.BodyAt).ToArray();
@@ -185,7 +190,7 @@ public partial class RagdollFrameSmoke : Node
                             Require(failed,"Expected injected physical failure.");
                             for(var i=0;i<before.Length;i++) Require(animated.Island.BodyAt(i)==before[i],"Failed physics published a body.");
                             for(var i=0;i<beforeJoints.Length;i++) Require(animated.Island.JointDefinitionAt(i)==beforeJoints[i],"Failed physics published a drive.");
-                            stepDrives=animated.Prepare(flailHandoff);
+                            stepDrives=animated.Prepare(preciseHandoff);
                             Require(stepDrives.SequenceEqual(expectedDrives),"Retry read uncommitted targets or pelvis velocity.");
                         }
                         animated.Island.Step(AlsPhysicsStepTime.FromEngineSeconds(1.0/hz),default,angularDrives:stepDrives);

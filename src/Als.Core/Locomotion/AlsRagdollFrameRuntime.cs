@@ -21,6 +21,11 @@ public interface IAlsRagdollPoseSource
     void Sample(float seconds, Span<AlsLocalPose> pose, Span<AlsInertialCurve> curves);
 }
 
+public interface IAlsPreciseRagdollPoseSource : IAlsRagdollPoseSource
+{
+    void SamplePrecise(float seconds, Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves);
+}
+
 // Explicit values avoid ValueType.Equals traversing InlineArray state storage,
 // which newer .NET runtimes intentionally reject. The supported machine has no
 // active transitions after its zero-duration update.
@@ -61,6 +66,16 @@ public sealed class AlsRagdollFrameRuntime
     private readonly AlsRagdollSharedSourceBinding? _shared;
     private readonly AlsLocalPose[] _pose;
     private readonly AlsLocalPose[] _committedFlail;
+    private readonly AlsPrecisePose[] _precisePose, _committedPreciseFlail;
+    private bool _preciseEvaluated, _preciseCommitted;
+    public ReadOnlySpan<AlsPrecisePose> PreciseFlailPose => _evaluated && _preciseEvaluated && _candidate.Machine.CurrentState==0
+        ? _precisePose : throw new InvalidOperationException("Precise Flail source is unavailable.");
+    public bool TryCopyCommittedPreciseFlail(AlsFrameIdentity identity, Span<AlsPrecisePose> destination)
+    {
+        if(destination.Length!=_committedPreciseFlail.Length) throw new ArgumentException("Flail skeleton layout differs.");
+        if(!_preciseCommitted || identity.FrameId<=0 || identity!=CommittedFlailIdentity) return false;
+        _committedPreciseFlail.AsSpan().CopyTo(destination);return true;
+    }
     public AlsFrameIdentity CommittedFlailIdentity { get; private set; }
     public bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
     {
@@ -101,6 +116,7 @@ public sealed class AlsRagdollFrameRuntime
         _definition = definition; _snapshot = snapshot; _character = character; _generation = generation;
         _pose = new AlsLocalPose[bones]; _curves = new AlsInertialCurve[curves];
         _committedFlail = new AlsLocalPose[bones];
+        _precisePose=new AlsPrecisePose[bones];_committedPreciseFlail=new AlsPrecisePose[bones];
     }
 
     public void Prepare(AlsMovementStateInput movement, AlsDoubleVector rootPhysicsVelocityCm,
@@ -211,7 +227,13 @@ public sealed class AlsRagdollFrameRuntime
             if (_candidate.Machine.CurrentState == 0)
             {
                 if (!_candidate.PlayerTicked) throw new InvalidOperationException("Flail pose has no candidate source tick.");
-                source.Sample(_candidate.Time, _pose, _curves);
+                if(source is IAlsPreciseRagdollPoseSource precise)
+                {
+                    precise.SamplePrecise(_candidate.Time,_precisePose,_curves);
+                    for(var i=0;i<_pose.Length;i++) { _precisePose[i].Validate();_pose[i]=_precisePose[i].ToSingle(); }
+                    _preciseEvaluated=true;
+                }
+                else source.Sample(_candidate.Time, _pose, _curves);
             }
             else _snapshot.Evaluate(_candidate.Traversal.Identity, snapshot, _pose, _curves);
             foreach (var bone in _pose) new AlsPrecisePose(bone).Validate();
@@ -233,10 +255,12 @@ public sealed class AlsRagdollFrameRuntime
         if (_visited && _evaluated && _candidate.Machine.CurrentState == 0)
         {
             _pose.AsSpan().CopyTo(_committedFlail);
+            if(_preciseEvaluated) _precisePose.AsSpan().CopyTo(_committedPreciseFlail);
+            _preciseCommitted=_preciseEvaluated;
             CommittedFlailIdentity = identity;
         }
-        else CommittedFlailIdentity = default;
+        else { CommittedFlailIdentity = default; _preciseCommitted=false; }
         _committed = _candidate; Cancel();
     }
-    public void Cancel() { _pending = _visited = _evaluated = false; }
+    public void Cancel() { _pending = _visited = _evaluated = _preciseEvaluated = false; }
 }

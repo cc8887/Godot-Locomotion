@@ -38,6 +38,15 @@ public sealed class AlsNativeMotorPoseTests
         var before=GC.GetAllocatedBytesForCurrentThread();
         for(var i=0;i<2048;i++) adapter.Convert(local,native);
         Assert.Equal(0,GC.GetAllocatedBytesForCurrentThread()-before);
+        var precise=local.Select(p=>new AlsPrecisePose(p)).ToArray();
+        precise[0]=precise[0] with { Position=new(1.0000000000001,0,0),Rotation=new AlsQuaternion(.1,0,0,Math.Sqrt(.99))*1.0000001 };
+        adapter.Convert(precise,native);
+        Assert.Equal(precise[0].Position.X*100,native[0].Position.X);
+        Assert.InRange(Math.Abs(native[0].Rotation.LengthSquared-1),0,1e-15);
+        Assert.NotEqual(precise[0].Rotation.LengthSquared,native[0].Rotation.LengthSquared);
+        precise[0]=precise[0] with { Rotation=default };
+        saved=native.ToArray();
+        Assert.Throws<ArgumentException>(()=>adapter.Convert(precise,native));Assert.Equal(saved,native);
         parents[^1]=-1;
         Assert.Throws<ArgumentException>(()=>new AlsNativeMotorPose(definition,names.ToArray(),parents.ToArray()));
     }
