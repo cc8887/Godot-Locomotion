@@ -271,6 +271,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             {
                 AlsLocomotionState.Grounded => AlsMovementStateInput.Grounded,
                 AlsLocomotionState.InAir => AlsMovementStateInput.InAir,
+                AlsLocomotionState.Ragdoll => AlsMovementStateInput.Ragdoll,
                 _ => throw new InvalidOperationException("Movement graph has no pose owner for this locomotion state."),
             },
             HasMovementInput = movement.HasMovementInput, Speed = movement.Speed,
@@ -292,7 +293,9 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             {
                 _layered.PrepareFromFrame(input,result,movement,rules,ground,new(input.Identity,1,input.DeltaTime),this,
                     componentPose,parent,_definition.ComponentTeleportDistance,overlayKind:input.Command.RequestedOverlay,
-                    meshVerticalScale:MathF.Abs(componentPose.Scale.Y));
+                    meshVerticalScale:MathF.Abs(componentPose.Scale.Y),
+                    ragdollObservation: input.RagdollPhysics.Identity.FrameId > 0
+                        ? new AlsRagdollFrameObservation(input.Identity, input.RagdollPhysics.PelvisVelocityCm, null) : null);
                 if (UsesRefactoredFeet)
                 {
                     var queries = _layered.PrepareFootQueries(componentPose, parent, _definition.ComponentTeleportDistance);
@@ -348,7 +351,13 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         var ground = _base.CandidateGroundInput;
         var rate = result.ActualStance == AlsStance.Crouching ? ground.CrouchingPlayRate : ground.StandingPlayRate;
         var phase = _base.Grounded.StandingFrame.State.Phase;
-        if (result.ResolvedLocomotionState == AlsLocomotionState.InAir)
+        if (result.ResolvedLocomotionState == AlsLocomotionState.Ragdoll)
+        {
+            var ragdoll = _layered!.CandidateRagdoll;
+            rate = (float)ragdoll.FlailRate;
+            phase = AlsLocomotionSourceTiming.NormalizeLoopingPhase(ragdoll.Time / _definition.RagdollFrame.Sequence.DurationSeconds);
+        }
+        else if (result.ResolvedLocomotionState == AlsLocomotionState.InAir)
         {
             rate = _base.CandidateJumpInput.Frame.PlayRate;
             phase = RelevantSourcePhase();

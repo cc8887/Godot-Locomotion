@@ -17,6 +17,17 @@ public partial class AlsP3Character : Node3D
     private AlsP3CommitStage _commit = null!;
     internal AlsOverlayPropRuntime? Props { get; private set; }
     internal GodotAls.Physics.AlsCharacterBodyHistory? BodyHistory { get; private set; }
+    internal GodotAls.Physics.AlsCharacterRagdollSimulation? RagdollSimulation { get; private set; }
+    internal void BeginRagdoll(Node environment)
+    {
+        EnsureMainThread(); EnsureConfigured(); ThrowIfDisposed();
+        if (!BodyHistoryActive || RagdollSimulation is not null || !_worker.UsesRefactoredFeet ||
+            PublishedFrameId != RuntimeCommittedFrameId || CommittedAnimation.ActionCount != 0)
+            throw new InvalidOperationException("Ragdoll activation requires an idle committed complete character; active montage interruption is not connected yet.");
+        var simulation = GodotAls.Physics.AlsCharacterRagdollSimulation.Create(this, environment, this, _context);
+        _motor.CollisionLayer = 0; _motor.CollisionMask = 0;
+        RagdollSimulation = simulation;
+    }
     internal bool BodyHistoryActive => _configured && Volatile.Read(ref _disposed) == 0 &&
         Volatile.Read(ref _state.Active) != 0 && Volatile.Read(ref _state.VisualReady) != 0;
     private AlsFrameInput _stagedReplacementMotorInput;
@@ -426,6 +437,14 @@ public partial class AlsP3Character : Node3D
                 _stagedReplacementMotorInput = default;
                 _hasStagedReplacementMotorInput = false;
             }
+            else if (RagdollSimulation is { } simulation)
+            {
+                var identity = HandleIdentity(frameId);
+                input = _motor.StepPhysicsDriven(identity, checked((float)delta), _state.MotorInput,
+                    new(identity, simulation.Activation.Entry.Identity, simulation.CompletedSteps, simulation.PelvisVelocity),
+                    _resumeRefactoredFeedback.Pose.Identity == HandleIdentity(frameId - 1)
+                        ? _resumeRefactoredFeedback : _state.CommittedRefactoredFeedback);
+            }
             else
             {
                 input = _motor.Step(
@@ -540,8 +559,8 @@ public partial class AlsP3Character : Node3D
         Volatile.Write(ref _state.Active, active ? 1 : 0);
         ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _motor.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
-        _motor.CollisionLayer = active ? 1u : 0u;
-        _motor.CollisionMask = active ? _context.MotorSettings.CollisionMask : 0u;
+        _motor.CollisionLayer = active && RagdollSimulation is null ? 1u : 0u;
+        _motor.CollisionMask = active && RagdollSimulation is null ? _context.MotorSettings.CollisionMask : 0u;
         _worker.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         _commit.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
         Volatile.Write(ref _state.ProcessingEnabled, active ? 1 : 0);
@@ -765,6 +784,7 @@ public partial class AlsP3Character : Node3D
         DisableRuntimeNodes();
         BodyHistory?.ResetHistory();
         BodyHistory?.SetPhysicsProcess(false);
+        RagdollSimulation?.Dispose(); RagdollSimulation = null;
         Props?.Dispose(); Props = null;
         _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByLifecycle);
     }

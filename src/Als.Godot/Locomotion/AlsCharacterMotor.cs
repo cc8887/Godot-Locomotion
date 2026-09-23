@@ -556,6 +556,51 @@ public partial class AlsCharacterMotor : CharacterBody3D
         return input;
     }
 
+    internal AlsFrameInput StepPhysicsDriven(AlsFrameIdentity identity, float delta,
+        in AlsFrameInput previous, in AlsRagdollPhysicsSample physics, AlsRefactoredAnimationFeedback feedback)
+    {
+        ValidateStep(identity.FrameId, checked((int)identity.CharacterId), checked((int)identity.SlotGeneration), delta, 0, 0);
+        physics.Validate(identity);
+        if (CollisionLayer != 0 || CollisionMask != 0)
+            throw new InvalidOperationException("Physical drive requires a disabled movement capsule.");
+        var command = _source!.GetCommand(identity.FrameId);
+        var action = _source is IAlsActionRequestSource actions ? actions.GetActionRequest(identity) : AlsActionRequest.None;
+        var aim = AlsAimYawRate.Gather(command.ViewYaw, _previousControlDegrees, delta);
+        var transform = GlobalTransform;
+        var feet = GatherNativeFeet(identity, transform, transform.Basis.GetRotationQuaternion(), delta, false,
+            out _, out _, out _, out _);
+        LastConsumedRootMotion = default; LastRootMotionWorldDelta = AlsRootMotionDelta.Identity;
+        _publishedVelocityCheckpointPending = false;
+        _hasRestoredGroundedState = false;
+        Velocity = Vector3.Zero; // CharacterMovement is disabled; physics owns velocity.
+        SaveNativeBase(false);
+        var input = previous with
+        {
+            Identity = identity, DeltaTime = delta, CharacterTransform = ToNumerics(transform),
+            // UE MOVE_None clears CharacterMovement velocity. Keep locomotion
+            // globals separate from the physical pelvis observation used by Flail.
+            ActualVelocity = NumericsVector3.Zero, ActualAcceleration = -_previousActualVelocity / delta,
+            InputDirection = NumericsVector3.Zero, DesiredSpeed = 0, Command = command,
+            ViewRotation = NumericsQuaternion.CreateFromYawPitchRoll(command.ViewYaw, command.ViewPitch, 0),
+            AimRotation = NumericsQuaternion.CreateFromYawPitchRoll(command.AimYaw, command.AimPitch, 0),
+            Floor = new(0, NumericsVector3.UnitY, -1, NumericsMatrix4x4.Identity, NumericsVector3.Zero),
+            LeftFootHit = AlsFootHit.Invalid, RightFootHit = AlsFootHit.Invalid,
+            CurrentDriveMode = AlsDriveMode.PhysicsDriven, RagdollState = AlsRagdollState.Active,
+            RequestedAction = AlsLocomotionAction.None, ActionRequest = action,
+            GameplayAction = AlsTimelineAction.Ragdolling, MovementAction = default, ActionParameters = default,
+            CharacterYaw = GetCharacterYaw(), JumpAccepted = 0, MovementInput = new(1, 0),
+            CharacterRotation = new(1, GetCharacterYaw(), 0, AlsCharacterRotationBranch.Hold, _rotationGait, default),
+            AimYawRateDegrees = aim.RateDegrees, FirstPerson = FirstPersonView ? (byte)1 : (byte)0,
+            FootIk = feet, FootPlacementReleaseSignals = AlsFootPlacementReleaseSignals.CreateDefault(),
+            LandPrediction = default, RagdollPhysics = physics,
+            RefactoredGroundPrediction = GatherRefactoredPrediction(identity, NumericsVector3.Zero, false, feedback,
+                MathF.Abs(feet.ComponentToWorld.Scale.Y), suppressQuery: true),
+        };
+        _previousActualVelocity = input.ActualVelocity; _previousControlDegrees = aim.ControlDegrees; _lastFrameId = identity.FrameId;
+        _candidateLifecycleSnapshot = CaptureLifecycleSnapshot(false); _candidateLifecycleFrameId = identity.FrameId;
+        return input; // No movement integration and no root-motion consumption.
+    }
+
     internal AlsFrameInput RecaptureRefactoredPrediction(in AlsFrameInput input) => input with
     {
         // Replacement animation starts cold; query its current capsule instead
@@ -565,7 +610,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
     };
 
     private AlsRefactoredGroundPredictionSample GatherRefactoredPrediction(AlsFrameIdentity identity,
-        NumericsVector3 velocity, bool grounded, AlsRefactoredAnimationFeedback feedback, float componentScale)
+        NumericsVector3 velocity, bool grounded, AlsRefactoredAnimationFeedback feedback, float componentScale, bool suppressQuery = false)
     {
         if (_refactoredPrediction is null) return default;
         var prior = feedback.Pose.Identity;
@@ -578,7 +623,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             // UCapsuleComponent uses the smaller horizontal component scale.
             _capsuleShape!.Radius * MathF.Min(capsuleScale.X, capsuleScale.Z) * 100,
             _capsuleShape.Height * capsuleScale.Y * 50, MathF.Cos(FloorMaxAngle), feedback.GroundPredictionBlock), ++_refactoredPredictionSerial);
-        if (grounded) request = request with { Enabled = false };
+        if (grounded || suppressQuery) request = request with { Enabled = false };
         return new(1, feedback, _refactoredPredictionGather!.Gather(request));
     }
 
