@@ -4,6 +4,7 @@ using Godot;
 using GodotAls.Assets;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Physics;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
 
@@ -65,6 +66,14 @@ public partial class RagdollFrameSmoke : Node
             var normalPose = new AlsLocalPose[skeleton.LogicalBoneCount]; var normalCurves = new AlsInertialCurve[names.Length];
             var previousPose = skeleton.ReferencePose.ToArray();
             var flailHandoff = new AlsLocalPose[skeleton.LogicalBoneCount];
+            var physics = AlsPhysicsAssetCompiler.Compile(Read("v4_physics_asset_inputs.json"),
+                AlsPhysicsAssetCompiler.MeshRoot + "Mannequin.Mannequin");
+            var settings = AlsPhysicsJointCompiler.Compile(Read("v4_physics_joint_reference.json"), physics);
+            var nativePose = new AlsNativeMotorPose(physics, skeleton.LogicalBoneNames, skeleton.LogicalParents);
+            var nativeLocals = new AlsPrecisePose[physics.Bones.Length];
+            var motors = new AlsRagdollMotorInputs(physics, settings, 1.5f, 1.5f);
+            var drives = new AlsIslandAngularDrive[motors.OutputCount];
+            var targets = settings.Select(s=>s.AngularDrive.Target).ToArray();
             var traversal = default(AlsAnimationGraphFrame); var previousState = AlsMovementStateInput.Grounded;
             AlsNamedPoseSnapshot? snapshot = null;
             var flail = 0; var snapshots = 0; var blends = 0;
@@ -121,6 +130,17 @@ public partial class RagdollFrameSmoke : Node
                     "Flail handoff availability does not match the committed source state.");
                 if (expectedFlail is not null) Require(flailHandoff.AsSpan().SequenceEqual(expectedFlail),
                     "Flail handoff contains root blend or snapshot output.");
+                if (expectedFlail is not null)
+                {
+                    nativePose.Convert(flailHandoff,nativeLocals);
+                    motors.Evaluate(nativeLocals,targets,velocity,drives);
+                    foreach (var drive in drives)
+                    {
+                        Require(double.IsFinite(drive.Target.LengthSquared) && Math.Abs(drive.Target.LengthSquared-1)<.001,
+                            "Invalid actual Flail motor target.");
+                        targets[drive.Joint]=drive.Target;
+                    }
+                }
                 sharedCommitted = sharedCandidate; collector?.Discard();
                 previousState = movement;
                 void PrepareAndEvaluate()
