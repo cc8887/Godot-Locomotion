@@ -56,7 +56,7 @@ internal sealed class AlsFlailPhysicsRuntime : IDisposable
             var rate=(float)_frame.Candidate.FlailRate;
             // Validated animation commit cannot fail after the solver publishes.
             // A failed scene step discards the candidate clock and target pose.
-            host.StepAnimatedScene(dt,new(0,0,-980),contacts,scene,_inputs,_frame.Pose);
+            host.StepAnimatedScene(dt,new(0,0,-980),contacts,scene,_inputs,_frame.PreciseFlailPose);
             _frame.Commit(identity); _traversal=next; Steps++;
             _inputVelocity=velocity; _inputRate=rate;
         }

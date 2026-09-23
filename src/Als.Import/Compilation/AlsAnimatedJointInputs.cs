@@ -41,6 +41,15 @@ public sealed class AlsAnimatedJointInputs
     public ReadOnlySpan<AlsIslandAngularDrive> Prepare(ReadOnlySpan<AlsLocalPose> committedFlail)
     {
         _pose.Convert(committedFlail,_locals);
+        return Evaluate();
+    }
+    public ReadOnlySpan<AlsIslandAngularDrive> Prepare(ReadOnlySpan<AlsPrecisePose> committedFlail)
+    {
+        _pose.Convert(committedFlail,_locals);
+        return Evaluate();
+    }
+    private ReadOnlySpan<AlsIslandAngularDrive> Evaluate()
+    {
         for(var i=0;i<_targets.Length;i++) _targets[i]=Island.JointDefinitionAt(i).Angular.DriveTarget;
         _motors.Evaluate(_locals,_targets,PelvisVelocity,_drives);
         return _drives;

@@ -33,10 +33,26 @@ public sealed class AlsNativeMotorPose
             throw new ArgumentException("Motor pose layout differs.");
         for (var i=0;i<_mapping.Length;i++)
         {
-            var p=logical[_mapping[i]]; var q=p.Rotation;
+            var p=logical[_mapping[i]];new AlsPrecisePose(p).Validate(); var q=p.Rotation;
+            // USkeletalMeshComponent::FinalizePoseEvaluationResult normalizes
+            // bone-space rotations before UpdateRBJointMotors reads them.
             var converted=new AlsPrecisePose(new((double)p.Position.X*100, -(double)p.Position.Y*100, (double)p.Position.Z*100),
-                new(-q.X,q.Y,-q.Z,q.W), new(p.Scale));
+                new AlsQuaternion(-q.X,q.Y,-q.Z,q.W).Normalized(), new(p.Scale));
             converted.Validate(); _candidate[i]=converted;
+        }
+        _candidate.AsSpan().CopyTo(native);
+    }
+
+    public void Convert(ReadOnlySpan<AlsPrecisePose> logical, Span<AlsPrecisePose> native)
+    {
+        if (logical.Length != _logicalCount || native.Length != _mapping.Length)
+            throw new ArgumentException("Motor pose layout differs.");
+        for (var i=0;i<_mapping.Length;i++)
+        {
+            var p=logical[_mapping[i]];p.Validate();var q=p.Rotation;
+            var converted=new AlsPrecisePose(new(p.Position.X*100,-p.Position.Y*100,p.Position.Z*100),
+                new AlsQuaternion(-q.X,q.Y,-q.Z,q.W).Normalized(),p.Scale);
+            converted.Validate();_candidate[i]=converted;
         }
         _candidate.AsSpan().CopyTo(native);
     }

@@ -15,6 +15,8 @@ internal static class NativeFlailMotorReference
         var skeleton=graph.RagdollRawSources.GetSkeleton(graph.RagdollPose.SkeletonId);
         using var source=new AlsRagdollAnimationSource(graph,set,[]);
         var logical=new AlsLocalPose[skeleton.LogicalBoneCount];
+        var precise=new AlsPrecisePose[skeleton.LogicalBoneCount];
+        var usePrecise=OS.GetCmdlineUserArgs().Contains("--precise-flail");
         double maxPosition=0,maxRotation=0,maxTarget=0; var samples=0; var targetsChecked=0;
         foreach(var rig in document.RootElement.GetProperty("rigs").EnumerateArray())
         {
@@ -29,8 +31,10 @@ internal static class NativeFlailMotorReference
             var output=new AlsIslandAngularDrive[motors.OutputCount];
             foreach(var sample in rig.GetProperty("motorSamples").EnumerateArray())
             {
-                var time=sample.GetProperty("time").GetSingle(); source.Sample(time,logical,[]); converter.Convert(logical,locals);
-                double p=0,q=0,t=0; var worst="";
+                var time=sample.GetProperty("time").GetSingle();
+                if(usePrecise) { source.SamplePrecise(time,precise);converter.Convert(precise,locals); }
+                else { source.Sample(time,logical,[]); converter.Convert(logical,locals); }
+                double p=0,q=0,t=0,actualLength=0,nativeLength=0; var worst="";
                 var bones=sample.GetProperty("bones");
                 for(var i=0;i<locals.Length;i++)
                 {
@@ -41,7 +45,7 @@ internal static class NativeFlailMotorReference
                     var delta=locals[i].Position-new AlsDoubleVector(v[0].GetDouble(),v[1].GetDouble(),v[2].GetDouble());
                     p=Math.Max(p,Math.Sqrt(delta.LengthSquared));
                     var error=Error(locals[i].Rotation,Q(expected.GetProperty("rotation")));
-                    if(error>q) { q=error; worst=definition.Bones[i].Name; }
+                    if(error>q) { q=error; worst=definition.Bones[i].Name;actualLength=locals[i].Rotation.LengthSquared;nativeLength=Q(expected.GetProperty("rotation")).LengthSquared; }
                 }
                 motors.EvaluateParameters(locals,targets,sample.GetProperty("spring").GetSingle(),sample.GetProperty("damping").GetSingle(),output);
                 foreach(var motor in output)
@@ -49,13 +53,13 @@ internal static class NativeFlailMotorReference
                     var expected=sample.GetProperty("motors")[motor.Joint].GetProperty("target").GetProperty("rotation");
                     t=Math.Max(t,Error(motor.Target,Q(expected))); targets[motor.Joint]=motor.Target; targetsChecked++;
                 }
-                GD.Print($"FLAIL_NATIVE_SAMPLE mesh={definition.Mesh} time={time:R} position_cm={p:R} rotation_component={q:R} target_component={t:R} worst_bone={worst}");
+                GD.Print($"FLAIL_NATIVE_SAMPLE mesh={definition.Mesh} time={time:R} position_cm={p:R} rotation_component={q:R} target_component={t:R} worst_bone={worst} actual_length2={actualLength:R} native_length2={nativeLength:R}");
                 maxPosition=Math.Max(maxPosition,p); maxRotation=Math.Max(maxRotation,q); maxTarget=Math.Max(maxTarget,t); samples++;
             }
         }
         GD.Print($"FLAIL_NATIVE_SUMMARY samples={samples} targets={targetsChecked} position_cm={maxPosition:R} rotation_component={maxRotation:R} target_component={maxTarget:R}");
         if(samples!=10 || targetsChecked!=180 || !double.IsFinite(maxPosition) || !double.IsFinite(maxRotation) ||
-            !double.IsFinite(maxTarget) || maxPosition>2e-5 || maxRotation>2e-7 || maxTarget>2e-7)
+            !double.IsFinite(maxTarget) || maxPosition>2e-5 || maxRotation>(usePrecise?1e-12:2e-7) || maxTarget>(usePrecise?1e-12:2e-7))
             throw new InvalidOperationException("Actual sampled Flail rotations/targets differ from native reference.");
     }
     private static AlsQuaternion Q(JsonElement q)=>new(q[0].GetDouble(),q[1].GetDouble(),q[2].GetDouble(),q[3].GetDouble());

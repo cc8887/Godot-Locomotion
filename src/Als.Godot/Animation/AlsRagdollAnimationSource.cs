@@ -5,7 +5,7 @@ namespace GodotAls.Animation;
 
 // The original SequencePlayer has its own identity even though Jump can also
 // sample ALS_Flail. Only the immutable raw asset is shared between those nodes.
-internal sealed class AlsRagdollAnimationSource : IAlsRagdollPoseSource, IDisposable
+internal sealed class AlsRagdollAnimationSource : IAlsPreciseRagdollPoseSource, IDisposable
 {
     private readonly AlsMovementAnimationSource _source;
     private readonly AlsRawAnimationSkeletonDefinition _skeleton;
@@ -29,4 +29,12 @@ internal sealed class AlsRagdollAnimationSource : IAlsRagdollPoseSource, IDispos
         for (var i = 0; i < curves.Length; i++) curves[i] = _source.Curve(seconds, _names[i]);
     }
     public void Dispose() => _source.Dispose();
+    internal void SamplePrecise(float seconds, Span<AlsPrecisePose> pose) =>
+        _source.SampleSourceSeconds(_skeleton.PreciseReferencePose, seconds, _duration, pose);
+    public void SamplePrecise(float seconds, Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
+    {
+        if(curves.Length!=_names.Length) throw new ArgumentException("Ragdoll curve layout differs.");
+        SamplePrecise(seconds,pose);
+        for(var i=0;i<curves.Length;i++) curves[i]=_source.Curve(seconds,_names[i]);
+    }
 }

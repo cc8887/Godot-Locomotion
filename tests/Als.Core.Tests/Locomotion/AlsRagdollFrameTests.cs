@@ -48,6 +48,34 @@ public sealed class AlsRagdollFrameTests
         }
         Assert.InRange(MathF.Abs(runtime.Committed.Time - .5f), 0, 1e-6f); Assert.Equal(hz, source.Calls);
     }
+    private sealed class PreciseSource : IAlsPreciseRagdollPoseSource
+    {
+        internal bool Fail;
+        internal AlsPrecisePose Value=AlsPrecisePose.Identity with { Position=new(1.0000000000001,0,0) };
+        public void Sample(float seconds,Span<AlsLocalPose> pose,Span<AlsInertialCurve> curves) =>
+            throw new InvalidOperationException("Precise owner must not sample through float.");
+        public void SamplePrecise(float seconds,Span<AlsPrecisePose> pose,Span<AlsInertialCurve> curves)
+        { pose[0]=Value;curves[0]=new(.8f);if(Fail)throw new InvalidOperationException("Injected precise failure"); }
+    }
+    [Fact]
+    public void PreciseFlailCommitRetainsDoubleAndFailedOrLegacySourceCannotPublishIt()
+    {
+        var runtime=Create();var source=new PreciseSource();var frame=Next(default,1);
+        var output=new AlsPrecisePose[1];
+        Prepare(runtime,frame,AlsMovementStateInput.Ragdoll);runtime.Evaluate(source,null);
+        Assert.Equal(source.Value,runtime.PreciseFlailPose[0]);
+        Assert.NotEqual(source.Value.Position.X,(double)runtime.Pose[0].Position.X);
+        Assert.False(runtime.TryCopyCommittedPreciseFlail(frame.Identity,output));
+        runtime.Commit(frame.Identity);
+        Assert.True(runtime.TryCopyCommittedPreciseFlail(frame.Identity,output));Assert.Equal(source.Value,output[0]);
+        var next=Next(frame,2);source.Fail=true;
+        Prepare(runtime,next,AlsMovementStateInput.Ragdoll);
+        Assert.Throws<InvalidOperationException>(()=>runtime.Evaluate(source,null));
+        Assert.True(runtime.TryCopyCommittedPreciseFlail(frame.Identity,output));Assert.Equal(source.Value,output[0]);
+        Prepare(runtime,next,AlsMovementStateInput.Ragdoll);runtime.Evaluate(new Source(),null);runtime.Commit(next.Identity);
+        Assert.False(runtime.TryCopyCommittedPreciseFlail(next.Identity,output));
+        Assert.False(runtime.TryCopyCommittedPreciseFlail(frame.Identity,output));
+    }
 
     [Fact]
     public void FlailHandoffSurvivesFailedCandidateAndRejectsSnapshotHiddenAndForeignFrames()
