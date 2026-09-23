@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新native motor pose：`docs/verification/2026-09-23-native-motor-pose.md`。AlsNativeMotorPose按名字/直接父链绑定，FBX local→UE cm/q反射保留scale，候选全验证后复制。真实共享RagdollFrame回放串已提交Flail→转换→motor inputs，三频率四owner单/并行retry过、旧digest同；尚未调用物理Step。两模型虚拟插入重排/父链拒绝/失败原子/2048零分配，Import定向8在.NET8/9、Optimize过。float转换不能声明恢复double精度，尚无完整采样target native等价。下一步host提交/骨盆反馈/Seed和普通生命周期；最近矩阵9/12三30旧fail、全部剩余目标保留，main/用户P4保留。
+
 - 最新独立Flail提交：`docs/verification/2026-09-23-flail-pose-handoff.md`。RagdollFrame成功访问Flail状态后复制源pose+identity，失败/Cancel保留，Snapshot/隐藏提交失效；生产layered至角色转发Main/身份检查接口。Core17项.NET8/9、Optimize、真实资源私有/共享各30/60/120Hz四owner单线程/并行逐帧retry过，已提交源逐值等于root混合前pose，两模式digest同。尚无native转换/物理step消费者，下一步骨骼绑定/坐标转换→motor inputs→普通生命周期；无新UE/全量/矩阵，最近9/12三30旧fail，全部剩余目标保留；main/用户P4保留。
 
 - 最新动画姿态交接：`docs/verification/2026-09-22-animation-pose-handoff.md`。生产Apply候选缓冲、Commit独立保存最终逻辑FBX pose+identity；角色Main/身份/代次/提交帧/销毁检查，复制输出不暴露数组。完整图Single两故障、Parallel替换两故障、四故障冻结均过；断言12帧保持、caller修改隔离、恢复13可读/旧帧拒绝，Optimize过。仅测试消费尚未Seed；最终pose可含ragdoll snapshot，禁止当独立Flail motor target。下一步独立Flail/native转换及逐步物理/生命周期；无新Core/Import全量/UE/物理矩阵，最近9/12三30旧fail，普通Ragdoll及全部剩余目标保留；main/用户P4保留。
