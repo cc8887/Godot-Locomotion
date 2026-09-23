@@ -63,6 +63,8 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
     public AlsRagdollFrameDiagnostics CandidateRagdoll => _ragdoll?.Candidate.Diagnostics ?? default;
     public float? FlailRate => _ragdoll is null ? null : (float)_ragdoll.Candidate.FlailRate;
     public AlsRagdollFrameDiagnostics CommittedRagdoll => _ragdoll?.Committed.Diagnostics ?? default;
+    internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
+        _ragdoll is not null && _ragdoll.TryCopyCommittedFlail(identity, destination);
     public AlsBinaryBlendState CommittedRoot => _root?.CommittedState ?? default;
     public AlsFrameIdentity CommittedRootIdentity => _root?.CommittedIdentity ?? default;
     public bool UsesNativeFootIk => _feet is not null || _refactoredFeet is not null;

@@ -161,6 +161,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     internal float PendingPropDraw(string curve) => _fullMovement!.PropDraw(curve);
     internal AlsFullMovementDiagnostics FullMovementDiagnostics => _fullMovement?.Diagnostics ?? default;
     internal int AnimationPoseBoneCount => _fullMovement?.AnimationPoseBoneCount ?? 0;
+    internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
+        _fullMovement is not null && _fullMovement.TryCopyCommittedFlail(identity, destination);
     internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<AlsLocalPose> destination)
     {
         if (_fullMovement is null) throw new InvalidOperationException("Complete animation runtime is unavailable.");

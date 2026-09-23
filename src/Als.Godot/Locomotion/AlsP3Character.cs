@@ -93,6 +93,13 @@ public partial class AlsP3Character : Node3D
     internal bool UsesLayeredPose => _worker.UsesLayeredPose;
     internal GodotAls.Animation.AlsFullMovementDiagnostics FullMovementDiagnostics => _worker.FullMovementDiagnostics;
     internal int AnimationPoseBoneCount => _worker.AnimationPoseBoneCount;
+    internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<GodotAls.Core.Locomotion.AlsLocalPose> destination)
+    {
+        if (!GodotThread.IsMainThread()) throw new InvalidOperationException("Flail handoff requires Main.");
+        return identity.FrameId == RuntimeCommittedFrameId && identity.CharacterId == Handle.CharacterId &&
+            identity.SlotGeneration == Handle.Generation && Volatile.Read(ref _disposed) == 0 &&
+            _worker.TryCopyCommittedFlail(identity, destination);
+    }
     internal void CopyCommittedAnimationPose(AlsFrameIdentity identity, Span<GodotAls.Core.Locomotion.AlsLocalPose> destination)
     {
         if (!GodotThread.IsMainThread() || identity.FrameId != RuntimeCommittedFrameId ||
