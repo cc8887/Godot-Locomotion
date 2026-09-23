@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Ragdoll限速状态：`docs/verification/2026-09-23-ragdoll-speed-limit.md`。按本机ALS源码进入立即一次+后续八刷新，max(200cm/s,float角色3D速度)，只限身体线速度、不改角速度/低速值；不可变候选计数与全前缀校验支持失败重试。Core四项Release在.NET8/9过、Optimize零警告/错误。尚无gameplay调用或native运行时新oracle，未重跑全量/矩阵；静态9/12、Flail0/3保持。下一步原生初速历史、owner限速事务、胶囊/Flail/骨盆跟随/显示退出与全部剩余目标，main/用户P4保留。
+
 - 最新普通入口交接：`docs/verification/2026-09-23-ragdoll-entry-handoff.md`。角色Main接口同帧复制最终FBX pose、character/skeleton world、committed实际速度，拒绝未提交/错身份/停用/未展示/非法输入；不取已推进候选motor。普通完整图Single恢复、Parallel替换、四故障冻结、实际Roll位移四场景通过，真实12/13帧Seed身体世界姿态核对通过（零测试速度，仅姿态传输）。Optimize零警告/错误，无Core/Import/UE/矩阵重跑；静态9/12、Flail0/3仍保留。尚未激活普通Ragdoll，角色速度不能冒充原生逐骨初速；下一步初速/限速、胶囊/Flail/骨盆跟随/显示退出和全部剩余目标。main/用户P4修改保留。
 
 - 最新Flail精确环境：`docs/verification/2026-09-23-flail-exact-environment.md`。30A20差来自native参考FKBoxElem float尺寸损失：半宽3186.182403564453→3186.182373046875cm，非Core求解错误。UE创建环境后外部API设精确double box union，实际leaf bounds/margin硬验证并记录environmentGeometry；新增只读GJK缓存、CompareFlailWorld可RequireExactBoxGeometry，旧参考拒绝。三频率两模型共4200帧P/Q/V/W逐值一致，30A20差已消除。30冷复导SHA163DE0DD5360667C3938318B5801183DA46836D6C844E9CBB8296EDB9A6AAC07同；全Editor构建审计fingerprintFA297529B2E8EB2013A2BA58910212F4512AD8498C1CB30836080415AA1E7660、DataValidation0/3旧warn、Editor18144退出0两旧Condition。无Core运行时/冻结数据变更，无新C#全量/静态矩阵；最近Core2884/Import2485+1skip、静态9/12。Flail仍0/3且原生同失败，不等于稳定性已达标。下一步直接普通Ragdoll生命周期Seed/速度/胶囊/Flail/跟随限速/显示退出，再全部剩余目标；main/用户P4保留。
