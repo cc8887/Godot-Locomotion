@@ -115,6 +115,30 @@ public partial class AlsP3Character : Node3D
             throw new InvalidOperationException("Animation pose handoff requires the live character's main-thread committed frame.");
         _worker.CopyCommittedAnimationPose(identity, destination);
     }
+    internal GodotAls.Physics.AlsRagdollEntryFrame CopyCommittedRagdollEntry(
+        AlsFrameIdentity identity, Span<AlsLocalPose> destination)
+    {
+        EnsureMainThread(); EnsureConfigured(); ThrowIfDisposed();
+        var committed = _state.Diagnostics;
+        if (identity.FrameId <= 0 || identity != committed.Identity ||
+            identity.FrameId != RuntimeCommittedFrameId || identity.CharacterId != Handle.CharacterId ||
+            identity.SlotGeneration != Handle.Generation || committed.FootProbeSource.Identity != identity ||
+            committed.PresentationPending || Volatile.Read(ref _state.Active) == 0)
+            throw new InvalidOperationException("Ragdoll entry requires one live, fully presented committed frame.");
+        var character = Transform(committed.FootProbeSource.CharacterTransform);
+        var skeleton = Transform(committed.FootProbeSource.SkeletonTransform);
+        var v = committed.ActualVelocity; var velocity = new Vector3(v.X, v.Y, v.Z);
+        // Validate all metadata before the caller's pose buffer can change.
+        _ = GodotAls.Physics.AlsSceneContactSet.FromWorld(character);
+        _ = GodotAls.Physics.AlsCorePhysicsPose.FromWorld(skeleton);
+        if (!velocity.IsFinite()) throw new InvalidOperationException("Nonfinite committed character velocity.");
+        CopyCommittedAnimationPose(identity, destination);
+        return new(identity, character, skeleton, velocity);
+
+        static Transform3D Transform(AlsP3VisualTransformSnapshot p) => new(new Basis(
+            new(p.BasisX.X, p.BasisX.Y, p.BasisX.Z), new(p.BasisY.X, p.BasisY.Y, p.BasisY.Z),
+            new(p.BasisZ.X, p.BasisZ.Y, p.BasisZ.Z)), new(p.Origin.X, p.Origin.Y, p.Origin.Z));
+    }
     internal GodotAls.Core.Locomotion.AlsRefactoredAnimationFeedback CommittedRefactoredFeedback => _state.CommittedRefactoredFeedback;
     internal GodotAls.Core.Locomotion.AlsBasedFootLockFrameTrace? BasedFootLockTrace => _worker.CommittedBasedTrace;
     internal GodotAls.Core.Locomotion.AlsStandingCycleState StandingCycleState => _worker.StandingCycleState;

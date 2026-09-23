@@ -27,6 +27,73 @@ public partial class AnimationFailureRecoverySmoke : Node
     private bool _propSwitch;
     private GodotAls.Core.Actions.AlsMontageRootMotionRange _heldMotionSource;
     private AlsRootMotionDelta _heldMotion;
+    private GodotAls.Physics.AlsRagdollEntryFrame _heldEntry;
+
+    private void VerifyEntryBodyPoses(GodotAls.Physics.AlsRagdollEntryFrame entry)
+    {
+        var skeleton = _context.AnimationSet.Skeletons[_context.Profile.SkeletonId];
+        var mesh = _context.AnimationSet.SkeletalMeshes[_context.Profile.MannequinMeshId];
+        var definition = GodotAls.Import.Compilation.AlsPhysicsAssetCompiler.Compile(
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), mesh.ObjectPath);
+        var names = skeleton.LogicalBones.Select(b => b.Name).ToArray();
+        var parents = skeleton.LogicalBones.Select(b => b.ParentLogicalId).ToArray();
+        var bridge = new GodotAls.Physics.AlsCorePhysicsPose(definition, names, parents,
+            entry.Identity.CharacterId, entry.Identity.SlotGeneration);
+        var bodies = new GodotAls.Core.Physics.AlsIslandBodyState[definition.Bodies.Length];
+        // This checks pose transport only. Zero test velocity is not a gameplay entry policy.
+        bridge.Seed(entry.Identity, entry.SkeletonToWorld, _readAnimationPose, Vector3.Zero, Vector3.Zero, bodies);
+        var components = new Transform3D[names.Length];
+        for (var i = 0; i < components.Length; i++)
+        {
+            var local = GodotAls.Physics.AlsPhysicsBodySet.Local(_readAnimationPose[i]);
+            components[i] = parents[i] < 0 ? local : components[parents[i]] * local;
+        }
+        var mapping = definition.Bind(names);
+        for (var i = 0; i < bodies.Length; i++)
+        {
+            var expected = entry.SkeletonToWorld * components[mapping[i]];
+            var actual = GodotAls.Physics.AlsCorePhysicsPose.ToWorld(bodies[i].Actor);
+            Require(actual.Origin.DistanceTo(expected.Origin) < .0001f &&
+                actual.Basis.X.DistanceTo(expected.Basis.X) < .0001f &&
+                actual.Basis.Y.DistanceTo(expected.Basis.Y) < .0001f &&
+                actual.Basis.Z.DistanceTo(expected.Basis.Z) < .0001f,
+                "Real committed animation seeded a different physical world pose.");
+        }
+        Require(bridge.SeedIdentity == entry.Identity, "Body seed lost entry identity.");
+    }
+
+    private GodotAls.Physics.AlsRagdollEntryFrame ReadEntry()
+    {
+        var diagnostics = _character.Diagnostics;
+        var integrations = _character.MotorIntegrationCount;
+        var position = _character.MovementAnchor.GlobalPosition;
+        var entry = _character.CopyCommittedRagdollEntry(diagnostics.Identity, _readAnimationPose);
+        Require(entry.Identity == diagnostics.Identity && entry.CharacterVelocity == new Vector3(
+            diagnostics.ActualVelocity.X, diagnostics.ActualVelocity.Y, diagnostics.ActualVelocity.Z),
+            "Entry velocity/identity did not come from committed diagnostics.");
+        Require(Matches(entry.CharacterToWorld, diagnostics.FootProbeSource.CharacterTransform) &&
+            Matches(entry.SkeletonToWorld, diagnostics.FootProbeSource.SkeletonTransform),
+            "Entry transforms did not come from committed diagnostics.");
+        Require(integrations == _character.MotorIntegrationCount && position == _character.MovementAnchor.GlobalPosition,
+            "Reading entry changed movement.");
+        return entry;
+
+        static bool Matches(Transform3D actual, AlsP3VisualTransformSnapshot expected) =>
+            actual.Origin == V(expected.Origin) && actual.Basis.X == V(expected.BasisX) &&
+            actual.Basis.Y == V(expected.BasisY) && actual.Basis.Z == V(expected.BasisZ);
+        static Vector3 V(System.Numerics.Vector3 value) => new(value.X, value.Y, value.Z);
+    }
+
+    private void RejectEntry(AlsFrameIdentity identity, bool shortBuffer = false)
+    {
+        var before = _readAnimationPose.ToArray();
+        var rejected = false;
+        try { _character.CopyCommittedRagdollEntry(identity, shortBuffer ? _readAnimationPose.AsSpan(1) : _readAnimationPose); }
+        catch (InvalidOperationException) { rejected = true; }
+        catch (ArgumentException) { rejected = true; }
+        Require(rejected && before.AsSpan().SequenceEqual(_readAnimationPose),
+            "Invalid entry was accepted or changed caller pose.");
+    }
 
     public AnimationFailureRecoverySmoke()
     { ProcessThreadGroup = ProcessThreadGroupEnum.MainThread; ProcessThreadGroupOrder = -2; }
@@ -77,6 +144,11 @@ public partial class AnimationFailureRecoverySmoke : Node
                 _readAnimationPose[0] = default;
                 _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
                 Require(_heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose), "Caller mutation changed stored animation pose.");
+                _heldEntry = ReadEntry();
+                VerifyEntryBodyPoses(_heldEntry);
+                RejectEntry(new(12, _heldEntry.Identity.CharacterId + 1, _heldEntry.Identity.SlotGeneration));
+                RejectEntry(new(12, _heldEntry.Identity.CharacterId, _heldEntry.Identity.SlotGeneration + 1));
+                RejectEntry(_heldEntry.Identity, shortBuffer: true);
                 Require(_accepted == 1 && _character.CommittedAnimation.StateCount == 1, "No active Roll ownership.");
                 _heldMotionSource = _character.Diagnostics.Result.RootMotionSource;
                 _heldMotion = _character.Diagnostics.Result.ProposedRootMotionDelta;
@@ -92,6 +164,9 @@ public partial class AnimationFailureRecoverySmoke : Node
             {
                 _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
                 Require(_heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose), "Failed candidate replaced animation handoff pose.");
+                Require(ReadEntry() == _heldEntry && _heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose),
+                    "Failed candidate mixed entry metadata and pose frames.");
+                RejectEntry(_character.HandleIdentity(13));
                 var attempts = _character.AnimationRecoveryAttempts;
                 Require(_character.Diagnostics.Result.RootMotionSource == _heldMotionSource &&
                     _character.Diagnostics.Result.ProposedRootMotionDelta == _heldMotion,
@@ -130,6 +205,10 @@ public partial class AnimationFailureRecoverySmoke : Node
                 try { _character.CopyCommittedAnimationPose(_character.HandleIdentity(12), _readAnimationPose); }
                 catch (InvalidOperationException) { rejected = true; }
                 Require(rejected, "Old animation frame remained readable after recovery committed.");
+                var recoveredEntry = ReadEntry();
+                Require(recoveredEntry.Identity.FrameId == 13, "Recovery did not publish entry frame 13.");
+                VerifyEntryBodyPoses(recoveredEntry);
+                RejectEntry(_heldEntry.Identity);
                 var source = _character.Diagnostics.Result.RootMotionSource;
                 Require(source.Identity == _character.Diagnostics.Identity && source.InstanceId == _heldMotionSource.InstanceId &&
                     source.StartSeconds == _heldMotionSource.EndSeconds && source.EndSeconds > source.StartSeconds,
@@ -211,7 +290,7 @@ public partial class AnimationFailureRecoverySmoke : Node
     {
         _done = true;
         GD.Print($"ANIMATION_FAILURE_RECOVERY_OK mode={_mode} failures={_failures} replacement={_replacement} result={result} " +
-            $"accepted={_accepted} interrupted={_interrupted} end={_ends} diagnostics={_character.FailureDiagnosticCount} motor=not_reintegrated");
+            $"accepted={_accepted} interrupted={_interrupted} end={_ends} diagnostics={_character.FailureDiagnosticCount} motor=not_reintegrated entry=coherent");
         Cleanup(); GetTree().Quit();
     }
     private void Cleanup()

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新普通入口交接：`docs/verification/2026-09-23-ragdoll-entry-handoff.md`。角色Main接口同帧复制最终FBX pose、character/skeleton world、committed实际速度，拒绝未提交/错身份/停用/未展示/非法输入；不取已推进候选motor。普通完整图Single恢复、Parallel替换、四故障冻结、实际Roll位移四场景通过，真实12/13帧Seed身体世界姿态核对通过（零测试速度，仅姿态传输）。Optimize零警告/错误，无Core/Import/UE/矩阵重跑；静态9/12、Flail0/3仍保留。尚未激活普通Ragdoll，角色速度不能冒充原生逐骨初速；下一步初速/限速、胶囊/Flail/骨盆跟随/显示退出和全部剩余目标。main/用户P4修改保留。
+
 - 最新Flail精确环境：`docs/verification/2026-09-23-flail-exact-environment.md`。30A20差来自native参考FKBoxElem float尺寸损失：半宽3186.182403564453→3186.182373046875cm，非Core求解错误。UE创建环境后外部API设精确double box union，实际leaf bounds/margin硬验证并记录environmentGeometry；新增只读GJK缓存、CompareFlailWorld可RequireExactBoxGeometry，旧参考拒绝。三频率两模型共4200帧P/Q/V/W逐值一致，30A20差已消除。30冷复导SHA163DE0DD5360667C3938318B5801183DA46836D6C844E9CBB8296EDB9A6AAC07同；全Editor构建审计fingerprintFA297529B2E8EB2013A2BA58910212F4512AD8498C1CB30836080415AA1E7660、DataValidation0/3旧warn、Editor18144退出0两旧Condition。无Core运行时/冻结数据变更，无新C#全量/静态矩阵；最近Core2884/Import2485+1skip、静态9/12。Flail仍0/3且原生同失败，不等于稳定性已达标。下一步直接普通Ragdoll生命周期Seed/速度/胶囊/Flail/跟随限速/显示退出，再全部剩余目标；main/用户P4保留。
 
 - 最新Flail岛重建：`docs/verification/2026-09-23-flail-island-rebuild.md`。补UE删除边后ProcessIslandSplits的持久节点邻接swap/DFS重建与事务回滚，修AnimMan64支持shape反转导致65首差；捕获改用候选drive target/启用K/C。两模型60各600帧、120各1200帧P/Q/V/W逐值同独立native，A60第220睡、120第1087睡，M120第476睡；30 M300帧同，A20首差仍待查。Flail门槛现0/3（原1/3）：30A/60M原生也不睡、120A保持不足1秒，未放宽；30A仍轨迹不等。静态矩阵9/12三30旧fail。新测试先红后绿含Abort/Reset/2048零分配；Core Release2884既定过滤、Import2485+1旧skip，定向17.NET9，Optimize/60接触及场景smoke过。初轮误用Debug广测两个零分配fail已中止并留日志；无UE源码/冻结资产改动，启动审计过。下一步30A20与普通Ragdoll生命周期及全部剩余目标；普通demo仍未接，main/用户P4保留。
