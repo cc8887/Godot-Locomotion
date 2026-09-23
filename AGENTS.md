@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新真实Flail采样对照：`docs/verification/2026-09-23-flail-native-sampling.md`。--native-motor-reference从生产源采样→native转换→target对独立UE五时刻×两模型，10样本180目标；P最大1.19522e-5cm、localQ1.11479e-7、targetQ9.11748e-8，最终门槛2e-5/2e-7/2e-7独立复跑过、Optimize过，原参考SHA不变。仅排除采样点明显轴向/绑定错，非完整轨迹等价/微差无影响。未改生产/新矩阵，Flail1/3(60新不稳/30睡眠fail)、静态9/12保留。下一步UE同条件完整驱动时间/pelvis/刚度/target与求解阶段对照，再普通生命周期及全部目标；main/用户P4保留。
+
 - 最新Flail场景接触：`docs/verification/2026-09-23-flail-scene-contact.md`。独立验收owner准备/验证动画→StepAnimatedScene重力接触→成功提交时钟，失败Cancel，普通角色不得第二时钟。--flail-drive十秒三频率1/3：120 M493/A1078睡，各1200步、末秒V/W0、锚点.451326cm；60 A206睡/M不稳末秒V49.817822/W2.840357，30 M167睡/A未睡V9.270002/W.912999。门槛未改，失败保留。不带Flail60独立基线过，故60是新增驱动路径问题、未定位/未修；静态目标最近矩阵仍9/12不能混计。Optimize过，无新原生动画物理golden/全量；下一步同条件native动画目标/速度/强度与时序定位，再普通Seed/胶囊/跟随/限速/显示/恢复及全部目标。main/用户P4保留。
 
 - 最新Flail实际积分：`docs/verification/2026-09-23-animated-joint-step.md`。AlsAnimatedJointInputs绑定岛拓扑/dynamic pelvis，每步读committed target/真实pelvis速度→转换/drive，无独立历史提前提交；host提供StepAnimatedScene但未有普通调用。真实Mannequin --motor-physics私有/共享源30/60/120Hz四owner单/并行，69/138/276步过，速度反馈播放/刚度；每步Gather故障身体/joint保持、重新Prepare同，无故障与重试物理P/Q/V/W digest同。Optimize过。仅无重力/接触/睡眠受控全链，hidden阶段不积分，非native轨迹/普通生命周期验收。下一步场景接触和Seed/胶囊/骨盆跟随/限速/展示恢复；最近落地9/12三30旧fail，全部剩余目标保留，main/用户P4保留。

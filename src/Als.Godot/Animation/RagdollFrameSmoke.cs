@@ -35,6 +35,8 @@ public partial class RagdollFrameSmoke : Node
         var set = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath).LoadDefinition();
         var locomotion = AlsLocomotionProfileCompiler.Compile(Read("p4_cycle_locomotion_profile.json"), set);
         var definition = AlsMovementGraphDefinition.Load(set, locomotion);
+        if(OS.GetCmdlineUserArgs().Contains("--native-motor-reference"))
+        { NativeFlailMotorReference.Run(definition,set); return; }
         var sharedMode = OS.GetCmdlineUserArgs().Contains("--shared-source");
         var motorPhysics = OS.GetCmdlineUserArgs().Contains("--motor-physics");
         if (sharedMode)
