@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$Native,[Parameter(Mandatory)][string]$Core,[switch]$AllFrames)
+param([Parameter(Mandatory)][string]$Native,[Parameter(Mandatory)][string]$Core,[switch]$AllFrames,[switch]$RequireExactBoxGeometry)
 $ErrorActionPreference='Stop'
 $nativeData=Get-Content -LiteralPath $Native -Raw | ConvertFrom-Json
 $coreData=Get-Content -LiteralPath $Core -Raw | ConvertFrom-Json
@@ -17,6 +17,19 @@ function QuatDelta($a,$b) {
  return MaxDelta $a $b
 }
 foreach($case in $nativeData.cases) {
+ if($RequireExactBoxGeometry) {
+  $environment=@($case.setup.environment);$geometry=@($case.environmentGeometry)
+  if($environment.Count -eq 0 -or $environment.Count -ne $geometry.Count){throw 'Missing native environment geometry observations'}
+  for($i=0;$i -lt $environment.Count;$i++) {
+   $expected=$environment[$i].geometry;$actual=$geometry[$i]
+   if($expected.type -cne 'box' -or $actual.type -cne 'Box' -or $actual.index -ne $i -or
+      $actual.simulation -ne $true -or $actual.margin -ne 0 -or $actual.min.Count -ne 3 -or $actual.max.Count -ne 3){throw 'Unverified native environment box'}
+   for($axis=0;$axis -lt 3;$axis++) {
+    $half=[double]$expected.size[$axis]*0.5
+    if(-not [double]::IsFinite($half) -or $half -le 0 -or $actual.min[$axis] -ne -$half -or $actual.max[$axis] -ne $half){throw 'Native box dimensions differ from captured setup'}
+   }
+  }
+ }
  $rows=@($coreData.samples|Where-Object mesh -EQ $case.setup.mesh)
  $steps=[int]$case.setup.steps
  if($rows.Count -ne $steps -or $case.samples.Count -ne $steps+1){throw 'Incomplete capture'}

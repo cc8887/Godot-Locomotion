@@ -1,5 +1,7 @@
 #include "AlsPhysicsAssetExport.h"
 #include "Animation/AnimSequence.h"
+#include "Chaos/Box.h"
+#include "Chaos/ImplicitObjectUnion.h"
 #include "Chaos/PBDJointConstraintData.h"
 #include "Chaos/Island/IslandManager.h"
 #include "Chaos/Framework/Parallel.h"
@@ -107,6 +109,18 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             bool Kinematic=false;E->TryGetBoolField(TEXT("kinematic"),Kinematic);
             Instance->InitBody(Setup,FTransform(ReadT(E->GetObjectField(TEXT("world")))),nullptr,Scene,FInitBodySpawnParams(!Kinematic,false));
             if(!Instance->IsValidBodyInstance())return Fail(TEXT("Native environment body missing."));
+            if(G->GetStringField(TEXT("type"))==TEXT("box"))
+            {
+                // FKBoxElem dimensions are float. Captured Godot metres expanded
+                // to native centimetres are double; going through the authored
+                // box element silently changes the support shape. Keep the body
+                // and its filter/material setup, but supply the exact solver box.
+                const FVec3 Half=ReadV(G,TEXT("size"))*.5;
+                TArray<FImplicitObjectPtr> Leaves;
+                Leaves.Add(MakeImplicitObjectPtr<FImplicitBox3>(-Half,Half,0));
+                Instance->GetPhysicsActorHandle()->GetGameThreadAPI().SetGeometry(
+                    MakeImplicitObjectPtr<FImplicitObjectUnion>(MoveTemp(Leaves)));
+            }
             Instance->SetPhysMaterialOverride(Bodies[0]->GetSimplePhysicalMaterial());EnvironmentBodies.Add(MoveTemp(Instance));EnvironmentKinematic.Add(Kinematic);
         }
         // The diagnostic callbacks must observe completed inline integration.
@@ -209,6 +223,40 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                     R->SetArrayField(TEXT("points"),Points);Contacts.Add(MakeShared<FJsonValueObject>(R));
                 }
                 Observation->SetArrayField(TEXT("contacts"),Contacts);
+            }
+            if(FCString::Strcmp(Stage,TEXT("preIntegrate"))==0||FCString::Strcmp(Stage,TEXT("preSolve"))==0)
+            {
+                const auto BodyName=[&](const FGeometryParticleHandle* Particle)->FString
+                {
+                    for(int32 I=0;I<Bodies.Num();++I)if(Bodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
+                        return BodyInputs[I]->AsObject()->GetStringField(TEXT("name"));
+                    for(int32 I=0;I<EnvironmentBodies.Num();++I)if(EnvironmentBodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel()==Particle)
+                        return FString::Printf(TEXT("environment_%d"),I);
+                    return TEXT("unknown");
+                };
+                const auto ShapeIndex=[](const FGeometryParticleHandle* P,const FShapeInstance* S)->int32
+                {for(int32 I=0;I<P->ShapesArray().Num();++I)if(P->ShapesArray()[I].Get()==S)return I;return INDEX_NONE;};
+                TArray<TSharedPtr<FJsonValue>> Caches;
+                for(const auto* C:Evolution->GetCollisionConstraints().GetConstraints())
+                {
+                    // The public cache accessor has no const overload. Observe
+                    // existing witnesses only; never seed or modify the world.
+                    const auto& Cache=const_cast<FPBDCollisionConstraint*>(C)->GetGJKWarmStartData();
+                    if(Cache.NumVerts==0)continue;
+                    auto R=MakeShared<FJsonObject>();R->SetStringField(TEXT("body0"),BodyName(C->GetParticle0()));
+                    R->SetStringField(TEXT("body1"),BodyName(C->GetParticle1()));
+                    R->SetNumberField(TEXT("shape0"),ShapeIndex(C->GetParticle0(),C->GetShape0()));
+                    R->SetNumberField(TEXT("shape1"),ShapeIndex(C->GetParticle1(),C->GetShape1()));
+                    TArray<TSharedPtr<FJsonValue>> Vertices;
+                    for(int32 I=0;I<Cache.NumVerts;++I)
+                    {
+                        auto Vertex=MakeShared<FJsonObject>();Vertex->SetArrayField(TEXT("a"),V(Cache.As[I]));
+                        Vertex->SetArrayField(TEXT("b"),V(Cache.Bs[I]));Vertex->SetNumberField(TEXT("weight"),Cache.Barycentric[I]);
+                        Vertices.Add(MakeShared<FJsonValueObject>(Vertex));
+                    }
+                    R->SetArrayField(TEXT("vertices"),Vertices);Caches.Add(MakeShared<FJsonValueObject>(R));
+                }
+                Observation->SetArrayField(TEXT("gjkCaches"),Caches);
             }
             StepObservations.Add(MakeShared<FJsonValueObject>(Observation));
         };
@@ -402,6 +450,28 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             Sample->SetArrayField(TEXT("bodies"),States);Samples.Add(MakeShared<FJsonValueObject>(Sample));
         }
         auto Case=MakeShared<FJsonObject>();Case->SetObjectField(TEXT("setup"),Input);Case->SetNumberField(TEXT("dtUsed"),Dt);
+        TArray<TSharedPtr<FJsonValue>> EnvironmentGeometry;
+        for(int32 I=0;I<EnvironmentBodies.Num();++I)
+        {
+            const auto* Particle=EnvironmentBodies[I]->GetPhysicsActorHandle()->GetHandle_LowLevel();
+            if(Particle->ShapesArray().Num()!=1)return Fail(TEXT("Expected one captured environment leaf."));
+            const auto& Shape=Particle->ShapesArray()[0];const auto* Leaf=Shape->GetLeafGeometry();
+            if(!Leaf)return Fail(TEXT("Missing environment geometry."));
+            const auto G=Input->GetArrayField(TEXT("environment"))[I]->AsObject()->GetObjectField(TEXT("geometry"));
+            if(G->GetStringField(TEXT("type"))==TEXT("box"))
+            {
+                const FVec3 Half=ReadV(G,TEXT("size"))*.5;
+                if(Leaf->BoundingBox().Min()!=-Half||Leaf->BoundingBox().Max()!=Half||Leaf->GetMarginf()!=0)
+                    return Fail(TEXT("Native box geometry differs from captured dimensions."));
+            }
+            auto R=MakeShared<FJsonObject>();R->SetNumberField(TEXT("index"),I);
+            R->SetStringField(TEXT("type"),Leaf->GetTypeName().ToString());
+            R->SetNumberField(TEXT("margin"),Leaf->GetMarginf());
+            R->SetArrayField(TEXT("min"),V(Leaf->BoundingBox().Min()));R->SetArrayField(TEXT("max"),V(Leaf->BoundingBox().Max()));
+            R->SetBoolField(TEXT("simulation"),Shape->GetSimEnabled());
+            EnvironmentGeometry.Add(MakeShared<FJsonValueObject>(R));
+        }
+        Case->SetArrayField(TEXT("environmentGeometry"),EnvironmentGeometry);
         Case->SetNumberField(TEXT("allSleepFrame"),AllSleepFrame);Case->SetNumberField(TEXT("heldSleepingFrames"),Held);
         Case->SetBoolField(TEXT("oneSecondSleepBudget"),Held>=Hz);Case->SetNumberField(TEXT("lastSecondMaxLinear"),LastMaxV);Case->SetNumberField(TEXT("lastSecondMaxAngular"),LastMaxW);
         Case->SetArrayField(TEXT("samples"),Samples);Cases.Add(MakeShared<FJsonValueObject>(Case));
