@@ -94,6 +94,11 @@ public partial class AlsCharacterBodyHistory : Node
         if (diagnostics.Identity.FrameId <= 0 || diagnostics.PresentationPending) return;
         try
         {
+            if (_owner.RagdollSimulation is { } simulation)
+            {
+                simulation.StepCharacterAnimation(delta);
+                return;
+            }
             var fresh = diagnostics.Identity != SourceAnimationIdentity;
             if (fresh)
             {

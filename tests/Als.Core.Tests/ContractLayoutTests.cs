@@ -141,7 +141,7 @@ public sealed class ContractLayoutTests
             "RotationMode", "RequestedAction", "CurrentDriveMode", "RagdollState",
             "AnimationQualityTier", "Command", "CharacterYaw", "MaxAcceleration",
             "MaxBrakingDeceleration", "JumpAccepted", "FootPlacementReleaseSignals",
-            "ActionRequest", "LandPrediction", "AimYawRateDegrees", "FirstPerson", "CharacterRotation", "FootIk", "MovementInput", "RefactoredGroundPrediction", "GameplayAction", "MeshHeightOffset", "ActionParameters", "MovementAction");
+            "ActionRequest", "LandPrediction", "AimYawRateDegrees", "FirstPerson", "CharacterRotation", "FootIk", "MovementInput", "RefactoredGroundPrediction", "GameplayAction", "MeshHeightOffset", "ActionParameters", "MovementAction", "RagdollPhysics");
         AssertStorageFieldOrder<AlsRuntimeState>(
             "LocomotionState", "SmoothedVelocity", "SmoothedAcceleration", "Lean",
             "LeftFootLocked", "RightFootLocked", "TurnInPlaceTime", "RotateInPlaceTime",

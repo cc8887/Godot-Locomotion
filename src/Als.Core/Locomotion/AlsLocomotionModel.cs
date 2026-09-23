@@ -101,12 +101,18 @@ public static class AlsLocomotionModel
         ValidateInput(input);
         ValidateResolvedCommand(resolvedCommand);
         ValidateState(state);
+        if (input.RagdollState == AlsRagdollState.Active)
+        {
+            if (timingPolicy != AlsLocomotionTimingPolicy.CompleteMovementGraph || input.CurrentDriveMode != AlsDriveMode.PhysicsDriven)
+                throw new ArgumentException("Active Ragdoll requires physical drive and the complete movement graph.");
+            input.RagdollPhysics.Validate(input.Identity);
+        }
 
         var nextState = state;
         var nextResult = AlsFrameResult.CreateDefault(input.Identity);
         nextResult.RequestedDriveMode = input.CurrentDriveMode;
         var previousLocomotionState = state.LocomotionState;
-        var currentLocomotionState = input.Floor.IsGrounded == 1
+        var currentLocomotionState = input.RagdollState == AlsRagdollState.Active ? AlsLocomotionState.Ragdoll : input.Floor.IsGrounded == 1
             ? AlsLocomotionState.Grounded
             : AlsLocomotionState.InAir;
         var landed = previousLocomotionState == AlsLocomotionState.InAir &&
@@ -317,6 +323,13 @@ public static class AlsLocomotionModel
         AlsLocomotionSettings settings,
         ref AlsRuntimeState nextState)
     {
+        if (currentLocomotionState == AlsLocomotionState.Ragdoll)
+        {
+            nextState.JumpStartActive = 0; nextState.LandingRecoveryTime = 0;
+            // Legacy locomotion-branch metadata; the complete graph owns the
+            // Ragdoll root and its independent Flail source timing.
+            return AlsAnimationState.Grounded;
+        }
         if (currentLocomotionState == AlsLocomotionState.InAir)
         {
             nextState.LandingRecoveryTime = 0f;

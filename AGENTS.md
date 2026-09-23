@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- 共享Flail最终补充：普通 locomotion 速度不能用骨盆速度替代；本机 UE MOVE_None 清 CMC velocity、APawn::GetVelocity读 CMC，现 ActualVelocity=0/首次差分减速，Flail 独立原生骨盆样本。最终四组 *-verified 日志通过。Core2901、Import2485+1旧Editor skip（首轮日志缺结论，独立TRX复跑确认）、Optimize与普通Roll通过；详见下一条文档。
+
+- 最新普通共享Flail：`docs/verification/2026-09-23-character-ragdoll-flail.md`。内部BeginRagdoll创建owner后禁碰胶囊，Gather纯值物理样本/双身份步数，Core显式Ragdoll优先floor且限定完整图；生产root/Flail rate/time接通，Main Lifecycle消费同一committed precise源，无第二时钟。修首次切入缺Refactored prediction/history：保留身份反馈但禁射线。Single60/Parallel30/120两秒及Parallel60动画故障+3回调暂停恢复过，120动画/121物理、epoch1、capsule积分0；普通Roll回归、Core既定过滤2901、定向24 LatestMajor、Optimize过，Import见文档/日志。尚无普通自动/手动触发；active action入口拒绝待原生中断。当前显示Flail非物理、胶囊未跟随，下一步物理最终显示/当前非物理基底→跟随→动作中断/触发/退出恢复；静态9/12、Flail0/3/全部后续目标保留，main/用户P4保留。
+
 - 最新角色动态物理对象：`docs/verification/2026-09-23-character-ragdoll-simulation.md`。新增Simulation从普通行走角色真实激活初态创建Core岛/13场景身体/接触/睡眠/冻结代理，StepRagdollScene实际消费八次限速并Capture；共享Flail入口无第二时钟，新帧缺Flail拒绝。两秒Single60/Parallel30/60/120 held-entry正常与故障重试逐体一致，求解中释放拒绝、构造失败/线程/地面/接触/释放检查，Optimize过，verified日志见文档。尚未普通触发/胶囊/Flail成功帧/物理显示；Capture非物理骨骼沿用entry，最终当前动画基底待接，均一材质和创建性能边界见文档。无Core/Import全量/UE/旧矩阵，静态9/12、Flail0/3及全部目标保留，main/用户P4保留。
 
 - 最新普通激活候选：`docs/verification/2026-09-23-ragdoll-character-activation.md`。BodyHistory PrepareActivation组合当前committed pose与独立completed物理V/W，固定体零速、pending teleport零速，进入限速+八刷新预算；私有候选后复制，重复准备不消耗历史/teleport/预算。完整Demo四恢复场景覆盖真实Commit回调动画13/历史12边界、姿态世界核对/限速/无效输出不变，Optimize过，最终verified日志见文档。仍仅回归消费者，普通动态owner/胶囊/Flail/跟随退出未接；无新Core/Import全量/UE/矩阵，静态9/12、Flail0/3和全部后续目标保留。main/用户P4保留。
