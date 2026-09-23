@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Flail场景接触：`docs/verification/2026-09-23-flail-scene-contact.md`。独立验收owner准备/验证动画→StepAnimatedScene重力接触→成功提交时钟，失败Cancel，普通角色不得第二时钟。--flail-drive十秒三频率1/3：120 M493/A1078睡，各1200步、末秒V/W0、锚点.451326cm；60 A206睡/M不稳末秒V49.817822/W2.840357，30 M167睡/A未睡V9.270002/W.912999。门槛未改，失败保留。不带Flail60独立基线过，故60是新增驱动路径问题、未定位/未修；静态目标最近矩阵仍9/12不能混计。Optimize过，无新原生动画物理golden/全量；下一步同条件native动画目标/速度/强度与时序定位，再普通Seed/胶囊/跟随/限速/显示/恢复及全部目标。main/用户P4保留。
+
 - 最新Flail实际积分：`docs/verification/2026-09-23-animated-joint-step.md`。AlsAnimatedJointInputs绑定岛拓扑/dynamic pelvis，每步读committed target/真实pelvis速度→转换/drive，无独立历史提前提交；host提供StepAnimatedScene但未有普通调用。真实Mannequin --motor-physics私有/共享源30/60/120Hz四owner单/并行，69/138/276步过，速度反馈播放/刚度；每步Gather故障身体/joint保持、重新Prepare同，无故障与重试物理P/Q/V/W digest同。Optimize过。仅无重力/接触/睡眠受控全链，hidden阶段不积分，非native轨迹/普通生命周期验收。下一步场景接触和Seed/胶囊/骨盆跟随/限速/展示恢复；最近落地9/12三30旧fail，全部剩余目标保留，main/用户P4保留。
 
 - 最新native motor pose：`docs/verification/2026-09-23-native-motor-pose.md`。AlsNativeMotorPose按名字/直接父链绑定，FBX local→UE cm/q反射保留scale，候选全验证后复制。真实共享RagdollFrame回放串已提交Flail→转换→motor inputs，三频率四owner单/并行retry过、旧digest同；尚未调用物理Step。两模型虚拟插入重排/父链拒绝/失败原子/2048零分配，Import定向8在.NET8/9、Optimize过。float转换不能声明恢复double精度，尚无完整采样target native等价。下一步host提交/骨盆反馈/Seed和普通生命周期；最近矩阵9/12三30旧fail、全部剩余目标保留，main/用户P4保留。
