@@ -55,6 +55,14 @@ internal sealed class AlsCoreJointHost
         Publish(); scene.CommitCapture(Island);
     }
 
+    internal void StepAnimatedScene(double dt, AlsDoubleVector gravity, IAlsIslandContacts contacts,
+        AlsSceneContactSet scene, AlsAnimatedJointInputs animation, ReadOnlySpan<AlsLocalPose> committedFlail)
+    {
+        CheckOwnership();
+        if (!ReferenceEquals(animation.Island,Island)) throw new ArgumentException("Animation belongs to a different physics island.");
+        StepScene(dt,gravity,contacts,scene,animation.Prepare(committedFlail));
+    }
+
     private void CheckOwnership()
     {
         if (!GodotThread.IsMainThread()) throw new InvalidOperationException("Physics proxy access requires Main.");
