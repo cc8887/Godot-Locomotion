@@ -13,8 +13,9 @@ public interface IAlsIslandContacts
     bool RequiresWake => false;
     void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt);
-    // Committed states precede this tick's gravity, impulses and damping. Borrow
-    // only during Gather; failed steps must never become next tick's PreV.
+    // Step-start states include staged explicit velocity replacements, before
+    // this tick's gravity, impulses and damping. Borrow only during Gather;
+    // failed steps must never become next tick's PreV.
     void Gather(ReadOnlySpan<AlsPrecisePose> predicted, ReadOnlySpan<AlsProjectionVelocity> velocities,
         ReadOnlySpan<AlsIslandBody> bodies, double dt, ReadOnlySpan<AlsIslandBodyState> previous) =>
         Gather(predicted, velocities, bodies, dt);

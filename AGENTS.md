@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新限速物理步：`docs/verification/2026-09-23-ragdoll-speed-step.md`。Island可选dynamic COM速度替换暂存于step-start，积分/接触PreV/睡眠同源，失败不发布、不Reset历史；Host StepRagdollScene资产前缀限速→Step成功后计数更新。新增四项+前批四项.NET8/9过，Core既定过滤串行2892过、Optimize过、实际scene60三场景/13几何/9生命周期过。宿主新接口尚未运行场景验收或普通调用，Core组合已验证；无UE/Import全量/落地矩阵，静态9/12/Flail0/3保留，非完整原生速度设置等价。继续初速/激活/胶囊/Flail/跟随显示退出及全部目标；main/用户P4保留。
+
 - 最新Ragdoll限速状态：`docs/verification/2026-09-23-ragdoll-speed-limit.md`。按本机ALS源码进入立即一次+后续八刷新，max(200cm/s,float角色3D速度)，只限身体线速度、不改角速度/低速值；不可变候选计数与全前缀校验支持失败重试。Core四项Release在.NET8/9过、Optimize零警告/错误。尚无gameplay调用或native运行时新oracle，未重跑全量/矩阵；静态9/12、Flail0/3保持。下一步原生初速历史、owner限速事务、胶囊/Flail/骨盆跟随/显示退出与全部剩余目标，main/用户P4保留。
 
 - 最新普通入口交接：`docs/verification/2026-09-23-ragdoll-entry-handoff.md`。角色Main接口同帧复制最终FBX pose、character/skeleton world、committed实际速度，拒绝未提交/错身份/停用/未展示/非法输入；不取已推进候选motor。普通完整图Single恢复、Parallel替换、四故障冻结、实际Roll位移四场景通过，真实12/13帧Seed身体世界姿态核对通过（零测试速度，仅姿态传输）。Optimize零警告/错误，无Core/Import/UE/矩阵重跑；静态9/12、Flail0/3仍保留。尚未激活普通Ragdoll，角色速度不能冒充原生逐骨初速；下一步初速/限速、胶囊/Flail/骨盆跟随/显示退出和全部剩余目标。main/用户P4修改保留。
