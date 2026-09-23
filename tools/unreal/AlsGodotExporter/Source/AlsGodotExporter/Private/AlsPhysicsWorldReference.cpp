@@ -1,4 +1,6 @@
 #include "AlsPhysicsAssetExport.h"
+#include "Animation/AnimSequence.h"
+#include "Chaos/PBDJointConstraintData.h"
 #include "Chaos/Island/IslandManager.h"
 #include "Chaos/Framework/Parallel.h"
 #include "Chaos/PBDJointConstraints.h"
@@ -16,6 +18,7 @@
 #include "Physics/Experimental/PhysScene_Chaos.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/PhysicsConstraintTemplate.h"
 #include "PhysicsEngine/SkeletalBodySetup.h"
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "Serialization/JsonSerializer.h"
@@ -34,7 +37,7 @@ Chaos::FVec3 ReadV(const TSharedPtr<FJsonObject>& J,const TCHAR* Name);
 Chaos::FRigidTransform3 ReadT(const TSharedPtr<FJsonObject>& J);
 }
 
-bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,FString& Error,int32 ContactFrames,int32 ContactStart)
+bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,FString& Error,int32 ContactFrames,int32 ContactStart,bool FlailDrive)
 {
     using namespace Chaos;using namespace AlsJointSolverReference;using namespace AlsCoupledStepReference;
     const auto Fail=[&](const TCHAR* Message){Error=Message;return false;};
@@ -221,12 +224,51 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
             Evolution->SetPreSolveCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("preSolve"));});
             Evolution->SetPostSolveCallback([&](FReal StepDt){ObserveStep(StepDt,TEXT("postSolve"));});
         }
+        FBodyInstance* Pelvis=nullptr;
+        if(FlailDrive)
+        {
+            auto* Animation=LoadObject<UAnimSequence>(nullptr,TEXT("/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_Flail.ALS_Flail"));
+            Pelvis=Component->GetBodyInstance(TEXT("pelvis"));
+            if(!Animation||!Pelvis)return Fail(TEXT("Missing native Flail/pelvis."));
+            Component->SetDisablePostProcessBlueprint(true);
+            Component->KinematicBonesUpdateType=EKinematicBonesUpdateToPhysics::SkipAllBones;
+            Component->bUpdateJointsFromAnimation=false;
+            Component->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+            Component->SetAnimation(Animation);Component->Play(true);Component->SetPosition(0.f,false);
+        }
         TArray<TSharedPtr<FJsonValue>> Samples;int32 AllSleepFrame=INDEX_NONE,Held=0;double LastMaxV=0,LastMaxW=0;
         for(int32 Frame=0;Frame<=Steps;++Frame)
         {
             ObservedFrame=Frame;StepObservations.Reset();
+            TSharedPtr<FJsonObject> Flail;
             if(Frame>0)
             {
+                if(FlailDrive)
+                {
+                    const FVector Velocity=Pelvis->GetUnrealWorldVelocity();
+                    const float Rate=FMath::Clamp(static_cast<float>(Velocity.Size()/1000.f),0.f,1.f);
+                    const float Spring=Rate*25000.f;
+                    Component->SetPlayRate(Rate);Component->TickAnimation(Dt,false);Component->RefreshBoneTransforms();
+                    const auto BoneLocals=Component->GetBoneSpaceTransforms();
+                    Component->SetAllMotorsAngularDriveParams(Spring,0.f,0.f);
+                    Component->bUpdateJointsFromAnimation=true;Component->UpdateRBJointMotors();Component->bUpdateJointsFromAnimation=false;
+                    Flail=MakeShared<FJsonObject>();Flail->SetNumberField(TEXT("time"),Component->GetPosition());
+                    Flail->SetNumberField(TEXT("rate"),Rate);Flail->SetNumberField(TEXT("spring"),Spring);Flail->SetArrayField(TEXT("pelvisVelocity"),V(Velocity));
+                    TArray<TSharedPtr<FJsonValue>> Motors;
+                    for(int32 I=0;I<Asset->ConstraintSetup.Num();++I)
+                    {
+                        auto* Instance=Component->FindConstraintInstance(Asset->ConstraintSetup[I]->DefaultInstance.JointName);
+                        if(!Instance||!Instance->GetPhysicsConstraintRef().IsValid())return Fail(TEXT("Missing Flail constraint."));
+                        FPBDJointSettings Settings;
+                        FPhysicsCommand::ExecuteRead(Instance->GetPhysicsConstraintRef(),[&](const FPhysicsConstraintHandle& Handle)
+                        {Settings=static_cast<const FJointConstraint*>(Handle.Constraint)->GetJointSettings();});
+                        auto M=MakeShared<FJsonObject>();M->SetNumberField(TEXT("index"),I);
+                        M->SetObjectField(TEXT("target"),T(FTransform(FQuat(Settings.AngularDrivePositionTarget))));
+                        M->SetArrayField(TEXT("stiffness"),V(FVector(Settings.AngularDriveStiffness)));
+                        M->SetArrayField(TEXT("damping"),V(FVector(Settings.AngularDriveDamping)));Motors.Add(MakeShared<FJsonValueObject>(M));
+                    }
+                    Flail->SetArrayField(TEXT("motors"),Motors);
+                }
                 const double Before=Solver->GetSolverTime();Scene->SetUpForFrame(&Gravity,Dt,0,Dt,Dt,1,false);
                 Scene->StartFrame();Scene->WaitPhysScenes();Scene->EndFrame();
                 if(!FMath::IsNearlyEqual(Solver->GetSolverTime()-Before,static_cast<double>(Dt),1.e-6))return Fail(TEXT("Native scene step duration differs."));
@@ -238,6 +280,7 @@ bool ExportAlsPhysicsWorldReference(const FString& Inputs,const FString& Output,
                 }
             }
             auto Sample=MakeShared<FJsonObject>();Sample->SetNumberField(TEXT("frame"),Frame);TArray<TSharedPtr<FJsonValue>> States;
+            if(Flail.IsValid())Sample->SetObjectField(TEXT("flail"),Flail);
             int32 Awake=0;
             for(int32 I=0;I<Bodies.Num();++I)
             {

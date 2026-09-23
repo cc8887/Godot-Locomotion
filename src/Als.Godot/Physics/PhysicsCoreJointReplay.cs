@@ -28,6 +28,8 @@ public partial class PhysicsCoreJointReplay : Node3D
     private AlsMovementGraphDefinition? _flailGraph;
     private AlsAnimationSetDefinition? _animationSet;
     private readonly Dictionary<AlsJointIsland,AlsFlailPhysicsRuntime> _flail=[];
+    private readonly List<object> _flailSamples=[];
+    private string? _flailCapture;
     private AlsIslandAngularDrive _pairDrive;
     private int _driveUpdates;
     private int _pendingRate, _rateBoundaries;
@@ -67,6 +69,9 @@ public partial class PhysicsCoreJointReplay : Node3D
             _sceneWorld = args.Contains("--scene-world"); Require(!_sceneWorld || _drop, "Scene world requires --drop.");
             _flailDrive=args.Contains("--flail-drive");
             Require(!_flailDrive || _sceneWorld && _chains,"Flail contact replay requires scene-world chains.");
+            _flailCapture=args.FirstOrDefault(a=>a.StartsWith("--flail-capture="))?[16..];
+            Require(_flailCapture is null || _flailDrive && Path.IsPathFullyQualified(_flailCapture) && !File.Exists(_flailCapture),
+                "Flail capture needs a new absolute path and Flail drive.");
             _platformMode = args.FirstOrDefault(a => a.StartsWith("--platform="))?[11..] ?? "";
             _setupDirectory = args.FirstOrDefault(a => a.StartsWith("--capture-setup="))?[16..];
             if (_setupDirectory is not null)
@@ -345,7 +350,11 @@ public partial class PhysicsCoreJointReplay : Node3D
                         if (active.Scene is null) active.Host.Step(dt, new(0, 0, -980), active.Contacts);
                         else
                         {
-                            if(_flailDrive) _flail[active.Host.Island].Step(dt,active.Host,active.Contacts,active.Scene);
+                            if(_flailDrive)
+                            {
+                                var flail=_flail[active.Host.Island];flail.Step(dt,active.Host,active.Contacts,active.Scene);
+                                if(_flailCapture is not null) _flailSamples.Add(new { mesh=active.Rig.Definition.Mesh,sample=flail.CaptureSample() });
+                            }
                             else active.Host.StepScene(dt, new(0, 0, -980), active.Contacts, active.Scene);
                         }
                         if (active.Contacts.CompletedSteps != epoch)
@@ -585,6 +594,12 @@ public partial class PhysicsCoreJointReplay : Node3D
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private void Release()
     {
+        if(_flailCapture is not null && _flailSamples.Count>0)
+        {
+            using var file=new FileStream(_flailCapture,FileMode.CreateNew,System.IO.FileAccess.Write);
+            JsonSerializer.Serialize(file,new { hz=_hz,samples=_flailSamples });
+            _flailCapture=null;
+        }
         foreach(var flail in _flail.Values) flail.Dispose(); _flail.Clear();
         foreach (var active in _active) { active.Scene?.Dispose(); active.Query?.Dispose(); active.Shapes?.Dispose(); active.Bodies.Dispose(); }
         _active.Clear();

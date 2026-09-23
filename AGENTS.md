@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新原生Flail世界：`docs/verification/2026-09-23-flail-native-world.md`。可选PhysicsWorldFlail真实SingleNode/UpdateRBJointMotors+同步场景、同Core新捕获60Hz初态；原生A220睡，M十秒未睡末秒V20.743444/W1.790171，Core A206睡/M残差更大V49.817822/W2.840357。不能把60失败全归移植，差距仍需修。首步time/rate/pelvis/K同、target4.408e-8差，M输出V1.669e-5；60帧位置2.43e-5cm→120帧.047718→600帧2.371663，反馈后期分化。Core可选flail-capture失败仍存、CompareFlailWorld工具；native两冷导SHA56459DCBB0FE86D9C5639CA2B0EFF45D57C4565E81ED5AA14F86261DD761B434一致，未开Flail两case完整samples与旧冻结同。UE全Editor审计fingerprint625DDD11E57D578A238D805D1A20E19BCB98560C6E5401C455FA7C3BBCF565F1/DataValidation过，Editor28512退出0两旧Condition/AV保留；Optimize过。下一步首目标精度/早期接触，Flail1/3静态9/12及全部普通目标保留，main/用户P4保留。
+
 - 最新真实Flail采样对照：`docs/verification/2026-09-23-flail-native-sampling.md`。--native-motor-reference从生产源采样→native转换→target对独立UE五时刻×两模型，10样本180目标；P最大1.19522e-5cm、localQ1.11479e-7、targetQ9.11748e-8，最终门槛2e-5/2e-7/2e-7独立复跑过、Optimize过，原参考SHA不变。仅排除采样点明显轴向/绑定错，非完整轨迹等价/微差无影响。未改生产/新矩阵，Flail1/3(60新不稳/30睡眠fail)、静态9/12保留。下一步UE同条件完整驱动时间/pelvis/刚度/target与求解阶段对照，再普通生命周期及全部目标；main/用户P4保留。
 
 - 最新Flail场景接触：`docs/verification/2026-09-23-flail-scene-contact.md`。独立验收owner准备/验证动画→StepAnimatedScene重力接触→成功提交时钟，失败Cancel，普通角色不得第二时钟。--flail-drive十秒三频率1/3：120 M493/A1078睡，各1200步、末秒V/W0、锚点.451326cm；60 A206睡/M不稳末秒V49.817822/W2.840357，30 M167睡/A未睡V9.270002/W.912999。门槛未改，失败保留。不带Flail60独立基线过，故60是新增驱动路径问题、未定位/未修；静态目标最近矩阵仍9/12不能混计。Optimize过，无新原生动画物理golden/全量；下一步同条件native动画目标/速度/强度与时序定位，再普通Seed/胶囊/跟随/限速/显示/恢复及全部目标。main/用户P4保留。
