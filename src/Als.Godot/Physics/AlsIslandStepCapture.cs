@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Physics;
 using GodotAls.Import.Compilation;
@@ -70,7 +71,7 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
         {
             var j = joints[order[i]]; var assetJoint = definition.Joints.Single(a => a.ParentBody == j.Parent && a.ChildBody == j.Child);
             jointInputs[i] = new { id = order[i], parent = j.Parent, child = j.Child, parentFrame = Pose(j.ParentFrame),
-                childFrame = Pose(j.ChildFrame), jointSettings = settings[assetJoint.Index].NativeSettings, projection = j.Projection };
+                childFrame = Pose(j.ChildFrame), jointSettings = StepSettings(settings[assetJoint.Index].NativeSettings, j), projection = j.Projection };
         }
         var contactInputs = new object[contacts.PreparedPairCount];
         for (var i = 0; i < contactInputs.Length; i++)
@@ -131,6 +132,28 @@ internal sealed class AlsIslandStepCapture(AlsRagdollPhysicsDefinition definitio
         Godot.GD.Print($"CORE_STEP_CAPTURE mesh={definition.Mesh} frame={_capturedFrame} stages={_samples.Count} output={path}");
     }
     private static object Pose(AlsPrecisePose p) => new { position = V(p.Position), rotation = new[] { p.Rotation.X, p.Rotation.Y, p.Rotation.Z, p.Rotation.W } };
+    private static JsonObject StepSettings(JsonElement authored, AlsIslandJoint joint)
+    {
+        var result = JsonNode.Parse(authored.GetRawText())!.AsObject();
+        if (joint.ConnectivityOnly) return result;
+        // Begin receives the candidate joints actually used by this step. The
+        // immutable asset JSON otherwise replays a static target and old K/C.
+        var angular = joint.Angular;
+        var target = angular.DriveTarget;
+        result["AngularDrivePositionTarget"] = JsonSerializer.SerializeToNode(new[] { target.X, target.Y, target.Z, target.W });
+        ReadOnlySpan<AlsAngularAxisSettings> axes = [angular.X, angular.Y, angular.Z];
+        for (var i = 0; i < axes.Length; i++)
+        {
+            var name = i == 0 ? "Twist" : "Swing";
+            // Disabled coefficients are not retained by Core; keep the asset
+            // metadata on those axes, whose flags exclude them from replay.
+            if (authored.GetProperty($"bAngular{name}PositionDriveEnabled").GetBoolean())
+                result["AngularDriveStiffness"]![i] = axes[i].DriveStiffness;
+            if (authored.GetProperty($"bAngular{name}VelocityDriveEnabled").GetBoolean())
+                result["AngularDriveDamping"]![i] = axes[i].DriveDamping;
+        }
+        return result;
+    }
     private static object[] Cache(AlsGjkCache cache)
     {
         var rows=new object[cache.Count];
