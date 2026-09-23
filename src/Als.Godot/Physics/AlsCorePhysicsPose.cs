@@ -73,6 +73,23 @@ internal sealed class AlsCorePhysicsPose
         SeedIdentity = identity;
     }
 
+    // Already-resolved native per-body velocities are inherited verbatim. They
+    // are not a component velocity field and must not get another COM offset.
+    internal void SeedWithBodyVelocities(AlsFrameIdentity identity, Transform3D componentToWorld,
+        ReadOnlySpan<AlsLocalPose> pose, ReadOnlySpan<AlsProjectionVelocity> nativeVelocities,
+        Span<AlsIslandBodyState> destination)
+    {
+        Main();
+        if (nativeVelocities.Length != _states.Length) throw new ArgumentException("One native velocity per asset body is required.");
+        foreach (var velocity in nativeVelocities)
+            if (!new AlsDoubleVector(velocity.Linear).IsFinite || !new AlsDoubleVector(velocity.Angular).IsFinite)
+                throw new ArgumentException("Native body velocity must be finite.");
+        Seed(identity, componentToWorld, pose, Vector3.Zero, Vector3.Zero, destination);
+        // Everything that can reject input has completed before these writes.
+        for (var i = 0; i < _states.Length; i++)
+            destination[i] = destination[i] with { Velocity = _definition.Bodies[i].PhysicsType == 1 ? default : nativeVelocities[i] };
+    }
+
     internal void Capture(AlsJointIsland island, Transform3D componentToWorld, Span<AlsLocalPose> destination)
     {
         Main(); Rigid(componentToWorld);

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新pending激活：`docs/verification/2026-09-23-ragdoll-activation-state.md`。History CopyPendingActivation输出新actor+已完成V/W，teleport立即零，返回独立速度来源identity；仅读不提交。Godot SeedWithBodyVelocities验证全前缀后逐值继承native动态V/W、不加COM杠杆臂，固定体零/环境后缀保持。Core五项.NET8/9过、Optimize过、真实两模型八姿态160速度/192回写/40拒绝过。尚无普通owner调用；无新UE/全量/矩阵，静态9/12/Flail0/3保留。继续实际角色历史时序与激活/胶囊/Flail/骨盆跟随/显示退出和全部剩余目标，main/用户P4保留。
+
 - kinematic历史最终Editor：33448加载成功但退出0xC0000005，确认终止后独立复跑4976加载/退出0；两旧Condition和间歇退出异常未修复。原生主目录/UE镜像SHA D0C4EE31B14A88B7C4C0D94895678EAD6F0F60F31D15E17F39FA021CC1E0E6CE一致。
 
 - 最新kinematic历史：`docs/verification/2026-09-23-ragdoll-kinematic-history.md`。Core新增completed-physics单owner候选/提交/取消历史，Target/无Target/Teleport/身份连续性；四项.NET8/9过、Optimize过。扩展native同步实际步80身体V/W与Core PositionTarget差0，目标排入时尚无新速度、step后产生并被模拟切换继承；无target下一步零；非零V/W后瞬移GT立即零/PT下一步零。类只表示已完成物理步，普通入口仍需pending teleport与GT/PT时序，尚无普通调用。两冷导SHA38ED5F9AF9C4C5F002A1C834BCC5462F258884F18CA201AFA17751224A80AD9C同，旧240切换检查过；全Editor审计fingerprint1CFC5657A618E30F849577D7EA003062B54DB04B41EF728389B91D449D0DF5E3、DV0/3旧warn。无全量/矩阵，静态9/12/Flail0/3和全部普通目标保留；main/用户P4保留。

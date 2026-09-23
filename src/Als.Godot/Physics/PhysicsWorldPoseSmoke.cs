@@ -10,7 +10,7 @@ namespace GodotAls.Physics;
 
 public partial class PhysicsWorldPoseSmoke : Node3D
 {
-    private int _cases, _bodies, _captures, _rejections;
+    private int _cases, _bodies, _captures, _rejections, _nativeVelocityHandoffs;
     private float _positionError, _basisError, _velocityError;
     public override void _Ready()
     {
@@ -98,6 +98,22 @@ public partial class PhysicsWorldPoseSmoke : Node3D
                             for (var i = 0; i < definition.Bodies.Length; i++) Compare(component * components[mapping[i]], AlsCorePhysicsPose.ToWorld(island.BodyAt(i).Actor));
                             _captures++;
                         }
+                        var inherited = Enumerable.Range(0, definition.Bodies.Length).Select(i =>
+                            new AlsProjectionVelocity(new(600 + i, 40 - i, -80), new(.1f + i * .01f, .2f, -.3f))).ToArray();
+                        bridge.SeedWithBodyVelocities(new(100 + variant, 7, 3), world, pose, inherited, states);
+                        Require(states[^1] == sentinel, "Per-body velocity seed overwrote environment.");
+                        for (var i = 0; i < inherited.Length; i++)
+                        {
+                            Require(states[i].Velocity == (definition.Bodies[i].PhysicsType == 1 ? default : inherited[i]),
+                                "Inherited native velocity was converted or given an extra COM lever arm.");
+                            Compare(AlsCorePhysicsPose.ToWorld(saved[i].Actor), AlsCorePhysicsPose.ToWorld(states[i].Actor));
+                            _nativeVelocityHandoffs++;
+                        }
+                        var held = states.ToArray(); var heldIdentity = bridge.SeedIdentity;
+                        inherited[^1] = new(new(float.NaN, 0, 0), default);
+                        Reject(() => bridge.SeedWithBodyVelocities(new(200 + variant, 7, 3), world, pose, inherited, states));
+                        Require(states.SequenceEqual(held) && bridge.SeedIdentity == heldIdentity,
+                            "Invalid last native velocity partially changed entry state.");
                         _cases++; _bodies += definition.Bodies.Length;
                     }
                 }
@@ -105,6 +121,7 @@ public partial class PhysicsWorldPoseSmoke : Node3D
             }
             var result = new { cases = _cases, body_handoffs = _bodies, captures = _captures, rejected_inputs = _rejections,
                 max_position_m = _positionError, max_basis_error = _basisError, max_velocity_mps = _velocityError,
+                native_velocity_handoffs = _nativeVelocityHandoffs,
                 native_world_and_fbx_local = true, ordinary_ragdoll_connected = false };
             using var file = new System.IO.FileStream(report, FileMode.CreateNew);
             JsonSerializer.Serialize(file, result); GD.Print("CORE_WORLD_POSE_OK " + JsonSerializer.Serialize(result)); GetTree().Quit();
