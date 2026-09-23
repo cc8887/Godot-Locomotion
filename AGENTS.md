@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新角色动态物理对象：`docs/verification/2026-09-23-character-ragdoll-simulation.md`。新增Simulation从普通行走角色真实激活初态创建Core岛/13场景身体/接触/睡眠/冻结代理，StepRagdollScene实际消费八次限速并Capture；共享Flail入口无第二时钟，新帧缺Flail拒绝。两秒Single60/Parallel30/60/120 held-entry正常与故障重试逐体一致，求解中释放拒绝、构造失败/线程/地面/接触/释放检查，Optimize过，verified日志见文档。尚未普通触发/胶囊/Flail成功帧/物理显示；Capture非物理骨骼沿用entry，最终当前动画基底待接，均一材质和创建性能边界见文档。无Core/Import全量/UE/旧矩阵，静态9/12、Flail0/3及全部目标保留，main/用户P4保留。
+
 - 最新普通激活候选：`docs/verification/2026-09-23-ragdoll-character-activation.md`。BodyHistory PrepareActivation组合当前committed pose与独立completed物理V/W，固定体零速、pending teleport零速，进入限速+八刷新预算；私有候选后复制，重复准备不消耗历史/teleport/预算。完整Demo四恢复场景覆盖真实Commit回调动画13/历史12边界、姿态世界核对/限速/无效输出不变，Optimize过，最终verified日志见文档。仍仅回归消费者，普通动态owner/胶囊/Flail/跟随退出未接；无新Core/Import全量/UE/矩阵，静态9/12、Flail0/3和全部后续目标保留。main/用户P4保留。
 
 - 最新普通角色历史：`docs/verification/2026-09-23-character-body-history.md`。完整图默认Main Commit后Lifecycle建立真实PhysicsAsset身体历史，动画/物理身份分离，失败保持位置且无target清速；停用清除、恢复零初速但物理序号持续，销毁停用。连续运行发现IK足root非物理缩放被误拒；bridge只限物理祖先刚体并保留其他local TRS，已验证刚体链派生world正交化修head约1e-6数值漂移，真实身体缩放仍拒绝。四恢复/三停用边界与真实8姿态160速度/192回写/48拒绝验证，最终日志见文档；Optimize过。尚未动态Ragdoll/胶囊，MarkTeleport调用方/pending激活仍待接，非全性能验收。无Core/Import全量/UE/矩阵，静态9/12/Flail0/3全部剩余目标保留；main/用户P4保留。
