@@ -25,7 +25,7 @@ bool ExportAlsPhysicsGraphReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCoupledStepReference(const FString& Inputs, const FString& Output, FString& Error, bool bTraceFirstJointIteration = false, bool bObserveJointGather = false);
 bool ExportAlsPhysicsRawGatherReference(const FString& Inputs, const FString& Output, FString& Error);
 bool ExportAlsPhysicsActualHistoryReference(const FString& Inputs, const FString& Output, FString& Error);
-bool ExportAlsPhysicsWorldReference(const FString& Inputs, const FString& Output, FString& Error, int32 ContactFrames = 0, int32 ContactStart = 1);
+bool ExportAlsPhysicsWorldReference(const FString& Inputs, const FString& Output, FString& Error, int32 ContactFrames = 0, int32 ContactStart = 1, bool FlailDrive = false);
 bool ExportAlsPhysicsCapsuleGeometryReference(const FString& Input, const FString& Output, FString& Error);
 bool ExportAlsPhysicsManifoldRestoreReference(const FString& Output, FString& Error);
 bool ExportAlsPhysicsCullReference(const FString& Output, FString& Error);
