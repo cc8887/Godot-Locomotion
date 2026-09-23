@@ -11,6 +11,30 @@ public sealed class AlsKinematicBodyHistoryTests
     private static AlsPrecisePose Pose(double x) => AlsPrecisePose.Identity with { Position = new(x, 0, 0) };
 
     [Fact]
+    public void PendingActivationUsesNewPoseButOldVelocityAndTeleportClearsImmediately()
+    {
+        var history = new AlsKinematicBodyHistory(Id(1), [Pose(0)]);
+        history.PrepareTargets(Id(2), [Pose(3)], .02); history.Commit(Id(2));
+        var output = new AlsIslandBodyState[1];
+        history.PrepareTargets(Id(3), [Pose(20)], .02);
+        Assert.Equal(Id(2), history.CopyPendingActivation(Id(3), output));
+        Assert.Equal(Pose(20), output[0].Actor);
+        Assert.Equal(150, output[0].Velocity.Linear.X); // Not the pending 850 cm/s.
+        history.CopyCommitted(Id(2), output); Assert.Equal(Pose(3), output[0].Actor);
+        history.Cancel();
+        Assert.Throws<ArgumentException>(() => history.CopyPendingActivation(Id(3), output));
+        history.PrepareTargets(Id(3), [Pose(10000)], .02, teleport: true);
+        history.CopyPendingActivation(Id(3), output);
+        Assert.Equal(Pose(10000), output[0].Actor); Assert.Equal(default, output[0].Velocity);
+        history.CopyCommitted(Id(2), output); Assert.Equal(150, output[0].Velocity.Linear.X);
+        var saved = output.ToArray();
+        Assert.Throws<ArgumentException>(() => history.CopyPendingActivation(new(3, 7, 4), output));
+        Assert.Equal(saved, output);
+        history.Commit(Id(3));
+        Assert.Throws<ArgumentException>(() => history.CopyPendingActivation(Id(3), output));
+    }
+
+    [Fact]
     public void QueuedTargetDoesNotPublishUntilPhysicalStepCommits()
     {
         var history = new AlsKinematicBodyHistory(Id(1), [Pose(0), Pose(10)]);
