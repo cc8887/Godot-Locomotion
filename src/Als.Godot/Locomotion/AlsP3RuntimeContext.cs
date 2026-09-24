@@ -390,6 +390,8 @@ internal readonly record struct AlsP4LifecyclePublicationDiagnostics(
 
 public sealed class AlsP3RuntimeContext
 {
+    // Main-thread scene owner used only after an automatic action edge commits.
+    internal Node? AutomaticRagdollEnvironment { get; set; }
     private readonly object _workerFailureInjectionGate = new();
     private int _workerFailureInjectionStage;
     private long _workerFailureInjectionFrameId;
