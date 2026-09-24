@@ -75,10 +75,11 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
     FString Text;TSharedPtr<FJsonObject> Request;
     if(!FFileHelper::LoadFileToString(Text,*RequestPath)||!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Request))return false;
     FString Kind=TEXT("Default");Request->TryGetStringField(TEXT("overlay"),Kind);
-    if(Kind!=TEXT("Default")&&Kind!=TEXT("Feminine")&&Kind!=TEXT("Masculine")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel"))return false;
+    if(Kind!=TEXT("Default")&&Kind!=TEXT("Feminine")&&Kind!=TEXT("Masculine")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel")&&Kind!=TEXT("Binoculars")&&Kind!=TEXT("Torch"))return false;
     const bool Box=Kind==TEXT("Box");
     const bool Hands=Kind==TEXT("HandsTied"),Injured=Kind==TEXT("Injured"),Barrel=Kind==TEXT("Barrel");
-    const bool Cached=Hands||Injured||Barrel,HasActions=Box||Cached;
+    const bool Binoculars=Kind==TEXT("Binoculars"),Torch=Kind==TEXT("Torch"),Prop=Binoculars||Torch;
+    const bool Cached=Hands||Injured||Barrel,HasActions=Box||Cached||Prop;
     const FString BlueprintPath=FString::Printf(TEXT("/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_%s.AB_Als_%s"),*Kind,*Kind);
     auto* Blueprint=LoadObject<UAnimBlueprint>(nullptr,*BlueprintPath);
     auto* Generated=Blueprint?Cast<UAnimBlueprintGeneratedClass>(Blueprint->GeneratedClass):nullptr;
@@ -109,16 +110,19 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
         Initialize();
         auto& Proxy=FOverlayInstanceAccess::Proxy(Instance.Get());
         const auto& Properties=Generated->GetAnimNodeProperties();
-        const int32 IdleIndex=Hands?19:Injured?13:Box||Barrel?9:11;
-        const int32 ActionIndex=Hands?2:Injured?14:Barrel?10:13;
+        const int32 IdleIndex=Binoculars?5:Torch?6:Hands?19:Injured?13:Box||Barrel?9:11;
+        const int32 ActionIndex=Binoculars?24:Torch?23:Hands?2:Injured?14:Barrel?10:13;
+        const int32 AimIndex=Binoculars?6:7;
         const int32 PredictionIndex=Hands?11:Injured||!HasActions?4:INDEX_NONE;
         const int32 CacheIndex=Hands?17:Injured?10:5;
-        if(Properties.Num()!=(Hands||Injured?22:Barrel?18:Box?17:14)||Properties[IdleIndex]->Struct!=FAnimNode_SequencePlayer::StaticStruct())return false;
+        if(Properties.Num()!=(Binoculars?28:Torch?26:Hands||Injured?22:Barrel?18:Box?17:14)||Properties[IdleIndex]->Struct!=FAnimNode_SequencePlayer::StaticStruct())return false;
+        if(Prop&&Properties[AimIndex]->Struct!=FAlsAnimNode_GameplayTagsBlend::StaticStruct())return false;
         if(HasActions&&Properties[ActionIndex]->Struct!=FAlsAnimNode_GameplayTagsBlend::StaticStruct())return false;
         if(PredictionIndex!=INDEX_NONE&&Properties[PredictionIndex]->Struct!=FAnimNode_TwoWayBlend::StaticStruct())return false;
         if(Cached&&Properties[CacheIndex]->Struct!=FAnimNode_SaveCachedPose::StaticStruct())return false;
         auto* Prediction=PredictionIndex==INDEX_NONE?nullptr:Properties[PredictionIndex]->ContainerPtrToValuePtr<FAnimNode_TwoWayBlend>(Instance.Get());
         auto* Actions=HasActions?Properties[ActionIndex]->ContainerPtrToValuePtr<FAlsAnimNode_GameplayTagsBlend>(Instance.Get()):nullptr;
+        auto* Aim=Prop?Properties[AimIndex]->ContainerPtrToValuePtr<FAlsAnimNode_GameplayTagsBlend>(Instance.Get()):nullptr;
         auto* Cache=Cached?Properties[CacheIndex]->ContainerPtrToValuePtr<FAnimNode_SaveCachedPose>(Instance.Get()):nullptr;
         auto* Idle=Properties[IdleIndex]->ContainerPtrToValuePtr<FAnimNode_SequencePlayer>(Instance.Get());
         TArray<TSharedPtr<FJsonValue>> Frames;
@@ -137,6 +141,14 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
                 const auto Tag=Frame->GetStringField(TEXT("action"));
                 *Property->ContainerPtrToValuePtr<FGameplayTag>(Parent.Get())=Tag.IsEmpty()?FGameplayTag():FGameplayTag::RequestGameplayTag(FName(*Tag),false);
             }
+            if(Prop)
+            {
+                if(!SetState(Parent.Get(),TEXT("ViewState"),Frame->GetObjectField(TEXT("viewState"))))return false;
+                auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("RotationMode"));
+                if(!Property||Property->Struct!=FGameplayTag::StaticStruct())return false;
+                const auto Tag=Frame->GetStringField(TEXT("rotationMode"));
+                *Property->ContainerPtrToValuePtr<FGameplayTag>(Parent.Get())=Tag.IsEmpty()?FGameplayTag():FGameplayTag::RequestGameplayTag(FName(*Tag),false);
+            }
             FOverlayProxyAccess::Pre(Proxy,Instance.Get(),Delta);
             FOverlayProxyAccess::UpdateRoot(Proxy);Proxy.FlipBufferWriteIndex();FOverlayProxyAccess::Post(Proxy,Instance.Get());
             FPoseContext Pose(&Proxy,true);FBlendedHeapCurve Curve;UE::Anim::FHeapAttributeContainer Attributes;
@@ -146,6 +158,7 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             const auto Row=MakeShared<FJsonObject>();Row->SetObjectField(TEXT("input"),Frame);Row->SetArrayField(TEXT("pose"),Atoms);Row->SetObjectField(TEXT("curves"),Curves);
             if(Prediction)Row->SetNumberField(TEXT("predictionAlpha"),FOverlayBlendAccess::Alpha(*Prediction));
             if(Actions)Row->SetArrayField(TEXT("actionWeights"),FOverlayActionBlendAccess::Weights(*Actions));
+            if(Aim)Row->SetArrayField(TEXT("aimWeights"),FOverlayActionBlendAccess::Weights(*Aim));
             if(Cache)Row->SetNumberField(TEXT("cacheWeight"),Cache->GlobalWeight);
             Row->SetNumberField(TEXT("idleTime"),Idle->GetAccumulatedTime());Row->SetNumberField(TEXT("idleWeight"),Idle->GetCachedBlendWeight());
             Frames.Add(MakeShared<FJsonValueObject>(Row));++Total;

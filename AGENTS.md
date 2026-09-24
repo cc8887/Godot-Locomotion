@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新道具 Overlay 更新：`docs/verification/2026-09-25-refactored-prop-overlay-update.md`。Binoculars/Torch 外动作线性.5/.2/0/.2、内瞄准Hermite .75/.2、Idle .5更新路径；隐藏保持/旧分支零权重tick/隐藏reset pending/事务source输入。实际两图3Hz1680帧更新权重/有效Idle时间差0，612隐藏/6零更新；新8/相关Import47/Optimize0/0。原生完整pose/curve已导出但C#尚未组合或比较，整图姿态进度仍7/13。UE完整4actions审计7B77EF...冷/普通43268实际exit0字节同E40F38.../7DDEB2...，旧Default/Box重导不变；DV0/3旧warn，普通两旧Condition五类warn保留，无新失败/全量/Godot/性能/打包。下一步两图完整Aim mesh/stance/固定秒采样/动作曲线→四武器状态机及全部旧缺口；Torch未瞄准walking两源实际都frame0勿猜改。普通Demo未切，Ragdoll未整体验收，用户文件/暂缓项保留。
+
 - 最新基础 Overlay 变体：`docs/verification/2026-09-25-refactored-basic-overlays.md`。实际Feminine/Masculine均14节点，严格具体图/源校验，共用Default算法但独立profile/候选，Idle比例.5/1（Default仍.75）。新增两图3Hz1260帧99540骨，maxP9.238e-14cm/Q5.552e-16，scale/curve/pred/time差0，更新权重同；新8/相关Import44/Optimize0/0，无新失败。UE完整4actions审计0206D2...冷三图实际0，普通2624/20360实际0新两份字节同353ABD.../CFC8E6...，Default重导B385B2不变；DV0/3旧warn、普通各两旧Condition五类warn保留。无Godot场景/全量/性能/打包；现7/13原Overlay连续证据，余Binoculars/Torch双tag+mesh加法与四武器状态机、移动状态机/统一宿主及全部旧缺口待做。普通Demo未切，Ragdoll未整体验收，用户修改/暂缓项保留。
 
 - 最新缓存 Overlay：`docs/verification/2026-09-25-refactored-cached-overlays.md`。HandsTied/Injured/Barrel 实际22/22/18节点，SaveCachedPose延迟最大消费者权重更新一次、动作曲线副本隔离、.5/.5/.25 Idle、前两图空中预测；事务/同帧播放owner隔离/更新不求值。3图×3Hz2520帧199080骨，maxP7.394e-14cm/Q5.552e-16/S2.221e-16，curve/weight/time/pred差0；每图402多消费者/98三消费者。新增13/相关Import36/Optimize0/0。初authored缓存名/Barrel帧引脚假设错误已纠正并保留失败日志。UE完整4actions审计2C9B5B...冷/普通7140实际exit0三文件字节同；旧Default/Box重导字节不变，DV0/3旧warn、普通两旧Condition五类warn保留。无Godot/全量/性能/打包；现5/13原Overlay连续对照，余8图/移动状态机/统一宿主及全部旧缺口待做，普通Demo未切、Ragdoll未整体验收、用户修改及暂缓项保留。
