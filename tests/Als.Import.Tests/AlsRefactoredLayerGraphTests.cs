@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Locomotion;
 using GodotAls.Import.Compilation;
 
@@ -53,6 +54,71 @@ public sealed class AlsRefactoredLayerGraphTests
         if(overrideSlots)Assert.Equal(7,sink.VisitedSlots.Count);
     }
     [Theory]
+    [InlineData(30)][InlineData(60)][InlineData(120)]
+    public void SharedMontageBankDrivesAllRegionSlotsThroughCompleteGraph(int hz)
+    {
+        var definition=Compile();
+        var resources=AlsRefactoredBasePoseCompiler.Compile(Read("base_pose_inputs"),Read("layering_inventory"),Read("layering_graphs"));
+        var basis=resources[37].Pose;
+        var names=AlsRefactoredLayeringInputModel.CurveNames.ToArray().Concat(new[]{"PoseStanding","PoseCrouching"}).ToArray();
+        var rest=basis.ReferencePose.ToArray();
+        var runtime=new AlsLayerBlendingRuntime(definition,basis.BoneNames.ToArray(),basis.Parents.ToArray(),names,rest.Select(FloatPose).ToArray());
+        var inputs=new Sink(resources,names){Standing=true,Amount=1};
+        var slots=new AlsRefactoredLayerSlotSink(inputs,inputs,rest,basis.Parents.ToArray(),names.Length);
+        var assets=Enumerable.Range(5,7).Select(i=>new AlsSequenceMontageAsset(i,new(i),i,2,0)).ToArray();
+        var bank=new AlsMontageRuntime([],sequences:assets);
+        var model=new AlsRefactoredLayeringInputModel(names);
+        var history=new AlsInertialCurve[names.Length]; var pose=new AlsLocalPose[79];
+        var graph=default(AlsAnimationGraphFrame);var previous=default(AlsFrameIdentity);
+        ushort visited=0;var fullFrames=0;
+        for(var f=1;f<=hz*3;f++)
+        {
+            var id=new AlsFrameIdentity(f,3,1);graph=graph.Next(id,(ulong)f);
+            var feedback=f==1?Array.Empty<AlsInertialCurve>():history.ToArray();
+            var input=model.Evaluate(id,previous,feedback);
+            if(f==hz)
+            {
+                Prepare();inputs.FailMontageSample=true;
+                Assert.Throws<InvalidOperationException>(()=>runtime.Evaluate(pose,history));
+                inputs.FailMontageSample=false;runtime.Cancel();bank.Discard();
+                Assert.Throws<InvalidOperationException>(()=>slots.RelevantSlots);slots.End();
+            }
+            Prepare();runtime.Evaluate(pose,history);
+            var expected=pose.ToArray();var expectedCurves=history.ToArray();var mask=slots.RelevantSlots;
+            var instances=bank.Candidate.ToArray();
+            runtime.Cancel();slots.End();bank.Discard();
+            Assert.Throws<InvalidOperationException>(()=>slots.RelevantSlots);
+            Prepare();runtime.Evaluate(pose,history);
+            Assert.Equal(expected,pose);Assert.Equal(expectedCurves,history);Assert.Equal(mask,slots.RelevantSlots);
+            Assert.Equal(instances,bank.Candidate.ToArray());visited|=mask;
+            if(bank.Frame.SlotWeights(AlsMontageSlot.Curves).SlotNodeWeight==1)
+            {
+                fullFrames++;
+                for(var i=0;i<names.Length;i++)if(names[i].EndsWith("Slot",StringComparison.Ordinal))Assert.Equal(new AlsInertialCurve(.5f),history[i]);
+            }
+            runtime.Commit();slots.End();bank.Commit(id);previous=id;
+            void Prepare()
+            {
+                bank.Begin(id,1f/hz);
+                if(f==1)foreach(var asset in assets)Assert.True(bank.PlaySequence(new(asset.AnimationId,asset.Slot,1,0,.2f,.2f)));
+                slots.Begin(bank.Frame,id);
+                Assert.Throws<InvalidOperationException>(()=>slots.Begin(bank.Frame,id));
+                Assert.Throws<ArgumentException>(()=>slots.GetSlotWeights(0,"Head",new(new(f,4,1),1,1f/hz)));
+                if(f==2)
+                {
+                    var weights=bank.Frame.SlotWeights(AlsMontageSlot.Head);
+                    slots.UpdateSlot(0,"Head",weights,default,new(id,0,1f/hz));
+                    Assert.Equal(AlsMontageSlot.Head.Mask,slots.RelevantSlots);
+                    slots.End();slots.Begin(bank.Frame,id);Assert.Equal((ushort)0,slots.RelevantSlots);
+                }
+                runtime.Prepare(new(id,1,1f/hz),input,feedback,graph.Initialization,graph.Bones,graph.Evaluation,slots);
+            }
+        }
+        Assert.Equal((ushort)(AlsMontageSlot.AllMask&~31),visited);
+        Assert.True(fullFrames>hz);Assert.True(inputs.BaseSamples>0);Assert.True(inputs.MontageSamples>0);
+        Assert.Equal(0,inputs.SlotUpdates);Assert.Empty(bank.Committed.ToArray());
+    }
+    [Theory]
     [InlineData("edge")][InlineData("scale")][InlineData("slot")][InlineData("slotName")][InlineData("rootspace")][InlineData("callback")][InlineData("mask")]
     public void UnsupportedOrMismatchedCompiledPoliciesAreRejected(string change)
     {
@@ -75,11 +141,11 @@ public sealed class AlsRefactoredLayerGraphTests
     }
     private static AlsLocalPose FloatPose(AlsPrecisePose pose)=>new(new((float)pose.Position.X,(float)pose.Position.Y,(float)pose.Position.Z),
         new((float)pose.Rotation.X,(float)pose.Rotation.Y,(float)pose.Rotation.Z,(float)pose.Rotation.W),new((float)pose.Scale.X,(float)pose.Scale.Y,(float)pose.Scale.Z));
-    private sealed class Sink : IAlsLayerBlendingSink
+    private sealed class Sink : IAlsLayerBlendingSink, IAlsMontagePoseSource
     {
         private readonly Dictionary<int,AlsLocalPose[]> _poses;
         private readonly string[] _names;
-        public bool Standing,OverrideSlots;public float Amount;public int BaseSamples,SlotUpdates;
+        public bool Standing,OverrideSlots,FailMontageSample;public float Amount;public int BaseSamples,SlotUpdates,MontageSamples;
         public HashSet<string> VisitedSlots {get;}=[];
         public Sink(IReadOnlyDictionary<int,AlsRefactoredBasePoseResource> resources,string[] names)
         {
@@ -87,6 +153,18 @@ public sealed class AlsRefactoredLayerGraphTests
             {var pose=new AlsPrecisePose[79];p.Value.CreateSampler().Evaluate(pose,[]);return pose.Select(FloatPose).ToArray();});
         }
         public void InitializeInput(int index,string name){}
+        public void Sample(in AlsMontageEvaluation entry,Span<AlsPrecisePose> pose,Span<AlsInertialCurve> curves)
+        {
+            if(FailMontageSample)throw new InvalidOperationException("Injected region sample failure.");
+            MontageSamples++;curves.Clear();
+            for(var i=0;i<pose.Length;i++)
+            {
+                var p=_poses[38][i];pose[i]=new(new(p.Position.X,p.Position.Y,p.Position.Z),
+                    new(p.Rotation.X,p.Rotation.Y,p.Rotation.Z,p.Rotation.W),new(p.Scale.X,p.Scale.Y,p.Scale.Z));
+            }
+            for(var i=0;i<_names.Length;i++)if(_names[i].StartsWith("Layer",StringComparison.Ordinal))
+                curves[i]=new(_names[i].EndsWith("Slot",StringComparison.Ordinal)?.5f:Amount);
+        }
         public void CacheInputBones(int index,string name){}
         public void UpdateInput(int index,string name,in AlsPoseUpdateContext context){}
         public void EvaluateInput(int index,string name,Span<AlsLocalPose> pose,Span<AlsInertialCurve> curves)
