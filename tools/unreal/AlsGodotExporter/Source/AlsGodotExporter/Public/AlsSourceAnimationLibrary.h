@@ -27,6 +27,9 @@ public:
     static FString ReadRawBlendSpacePose(UBlendSpace* BlendSpace, float Pitch, float NormalizedTime);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadBlendSpaceTriangulationReference(UBlendSpace* BlendSpace, const FString& InputsJson);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadSourceAnimationMetadata(UAnimSequence* Animation);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")

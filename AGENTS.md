@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Refactored二维三角形：`docs/verification/2026-09-25-refactored-triangulation.md`。原6WalkRun+2Lean采用三角形，保留旧V4grid；Core缓存邻边/外缘投影/容差/排序/阈值，Import完整精度拓扑+catalog/sample/policy绑定。4096连续权重查询的order/cache同native，maxWeight5.9604645e-8（预算1e-7，非逐位同），每步retry；新增6/Import28/Optimize0/0。初外缘同triangle的-1门禁过严修复，原失败保留。UE全构建5actions/审计E1F521...，冷/普通27020实际exit0 inputs F57F65...及reference19616B...字节同，DV0/3旧warn，Editor两旧Condition五warn。仅权重/元数据；滤波、时间/Sync、pose/curve混合与图宿主尚待整合，普通Demo未切/无Godot或全量。下一步这些完整移动Overlay再所有旧缺口；保留用户修改/暂缓项。
+
 - 最新原加法资源：`docs/verification/2026-09-25-refactored-additive.md`。Catalog 新 CompileAdditivePose 支持实际42源(15local/27mesh)、固定baseFrame按UE sampledKeyCount分母、原raw basis不递归、曲线名称并集差值；旧Look/Mantle门禁保持。210原生pose/16590骨/200curve maxP1.474e-13cm/Q6.107e-16/S0/curve1.193e-7；重试/独立owner并行/4非法政策，新5、Import138、Optimize0/0。UE审计0action同05A9CE，冷/普通36376实际exit0参考字节同886DF2...；两旧Condition五warn保留，无C++改动/DV/Godot/全量。普通Demo未切，下一步实际Locomotion/Overlay的BS/图/共享ID/宿主及全部旧缺口，保留用户文件/暂缓项。
 
 - 最新Refactored整批动画源：`docs/verification/2026-09-25-refactored-animation-sources.md`。180payload/112.5MB：127Sequence(85绝对/15local+27mesh additive)、9BS、9Montage、21AB、1settings、10CurveFloat原文、3redirector；raw/policy/动画curve/compiled与引用绑定。Catalog逐文件hash/安全路径，CompileAbsolutePose单源ID0须未来映射；85源425pose33575骨native最大P1.0467e-13cm/Q6.66e-16/S0。8个None休眠base政策走新入口按UE忽略，旧Mantle严格政策保留；初policy失败/再数量预估错误已修保留TRX。新增6/Import117/Optimize0/0。UE零action审计同05A9CE；冷0/0/普通19152实际exit0两旧Condition五warn。冷hash7691A4.../editor6D77EB...不同：105payload=66nativeText(45只行序、21蓝图GUID等行变化)+39rootLockFirstFrame rotation/scale辅助差；所有raw/curves/compiled/samples/poseReferences同；内部加载原因未定，保留两份，冷快照入库。无插件变更/DV/Godot/全量。42additive通用编译未齐、CurveFloat全精度键未新增、图/共享ID/宿主未接；普通Demo未切，下一步这些实际移动/Overlay资源与图→宿主/Mantle及全部旧缺口。保留用户文件/暂缓项。
