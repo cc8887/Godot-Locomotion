@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle queued notify：`docs/verification/2026-09-24-mantle-queued-notifies.md`。9真实脚步对象/6montage18绑定，hash/类/对象/偏移/filter闭包，T3D左右脚+效果引用/开关，音频/效果执行未接。共享queue支持PostLocomotion slot4；同一bank新增NotifyTraversal按branch marker分段并保存EarlyTick前中断状态，原Traversal维持整帧action契约；普通BaseLayer改消费通知视图。Core154/Import定向99/Optimize0/0；既有native126状态轨迹过但不含queue oracle，下一步补队列/上下文native对照及资源/graph/探测/motion整合。普通demo未接Mantle，旧缺口/用户修改/暂缓项保留。
+
 - 最新Mantle原生branch对照：`docs/verification/2026-09-24-mantle-native-branching.md`。临时真实角色/AnimInstance调用native UpdateWeight+Advance及原状态，6montage×3Hz×7场景126轨迹10688帧；action/active集合/存在/playing一致，P/weight/desired/blendTime float最大差0。ImportMantling63/Optimize0/0；无生产算法修改/Godot场景/全量。完整Editor审计fingerprint8807CB03DA577AE981F4F27FB7BC5C3D4BFA9BEBEBB9853E03F75FAC2FDD97AE，冷0/0、普通11708实际exit0字节同，旧两Condition保留；reference SHA D6DAFAEB0A53861906616AF91E0F34815076F8BEDB689D59127CFCC69D395305。初轮protected/include编译失败、NetCore BuildId更新后隔离重建、错误LookingDirection改ViewDirection、空tag None断言映射修复，日志保留。取证为逐帧状态/副作用，非全回调插桩/任意子步跳转证明；下一步queued Footstep与资源/graph/探测/motion整合，普通demo未接，旧缺口/用户文件/暂缓项保留。
 
 - 最新Mantle branching：`docs/verification/2026-09-24-mantle-branching.md`。两实际native类显式编译与hash/身份/触发偏移闭包，按物理instance追踪动作状态和EarlyBlendOut四条件OR，边界后单次Tick/中断保留至Terminate End/标签匹配清空；共享bank候选提交丢弃与清理。限单终止section/正向/不跳转/两不重叠状态/trigger0/rootdisabled，并非通用native子步调度。Core定向154、Import Mantling62、Optimize0/0；无新UE回调oracle或Godot场景验收。后续native回调对照、queued Footstep（注意收集早于Early Tick）、资源/graph/探测/motion生命周期；普通demo未接。所有旧缺口/用户文件/暂缓项保留。
