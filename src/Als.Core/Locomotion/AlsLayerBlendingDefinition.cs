@@ -4,7 +4,7 @@ public enum AlsLayerPoseKind
 {
     Input, Root, SaveCache, UseCache, DynamicLocalAdditive, DynamicMeshAdditive,
     ApplyLocalAdditive, ApplyMeshAdditive, TwoWayBlend, Slot, LayeredBlend,
-    CurveAccumulate, CurveOverride, CurveReset,
+    CurveAccumulate, CurveOverride, CurveReset, NormalizedMultiWayBlend,
 }
 
 public enum AlsLayerAlphaKind { Constant, Property, Curve }
@@ -55,12 +55,14 @@ public sealed class AlsLayerBlendingDefinition
                     AlsLayerPoseKind.ApplyLocalAdditive or AlsLayerPoseKind.ApplyMeshAdditive or AlsLayerPoseKind.TwoWayBlend or
                     AlsLayerPoseKind.CurveAccumulate or AlsLayerPoseKind.CurveOverride => 2,
                 AlsLayerPoseKind.LayeredBlend => (node.Filters?.Length ?? 0) + 1,
+                AlsLayerPoseKind.NormalizedMultiWayBlend => node.Alphas.Length,
                 _ => 1,
             };
             var expectedAlphas = node.Kind switch
             {
                 AlsLayerPoseKind.ApplyLocalAdditive or AlsLayerPoseKind.ApplyMeshAdditive or AlsLayerPoseKind.TwoWayBlend => 1,
                 AlsLayerPoseKind.LayeredBlend => expectedInputs - 1,
+                AlsLayerPoseKind.NormalizedMultiWayBlend => expectedInputs,
                 _ => 0,
             };
             if (node.Inputs.Length != expectedInputs || node.Alphas.Length != expectedAlphas ||

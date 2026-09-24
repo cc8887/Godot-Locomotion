@@ -301,6 +301,20 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
                     UpdateNode(node.Inputs[1], context.WithWeight(context.Weight * alpha));
                 }
                 return;
+            case AlsLayerPoseKind.NormalizedMultiWayBlend:
+                // Native defaults: normalize=true, additive=false, AlphaScaleBias=(1,0).
+                // Sum raw alphas BEFORE clamping. Clamping each input first changes negative controls.
+                var total = 0f;
+                for (var child = 0; child < state.Alphas.Length; child++)
+                { state.Alphas[child] = ReadAlpha(node, child); total += state.Alphas[child]; }
+                if (!float.IsFinite(total)) throw new ArgumentException("MultiWay total alpha overflow.");
+                for (var child = 0; child < state.Alphas.Length; child++)
+                {
+                    var weight = state.Alphas[child] = Relevant(System.Math.Clamp(total, 0, 1))
+                        ? System.Math.Clamp(state.Alphas[child] / total, 0, 1) : 0;
+                    if (Relevant(weight)) UpdateNode(node.Inputs[child], context.WithWeight(context.Weight * weight));
+                }
+                return;
             case AlsLayerPoseKind.Slot:
                 var weights = _sink!.GetSlotWeights(index, node.Label, context); weights.Validate();
                 var source = AlsSlotSourceUpdate.Resolve(state.Slot.SourceWeight, weights, context, alwaysUpdateSource: false);
@@ -363,6 +377,30 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
         var bPose = WorkPose(depth, 1); var bCurves = WorkCurves(depth, 1);
         switch (node.Kind)
         {
+            case AlsLayerPoseKind.NormalizedMultiWayBlend:
+                var contributed = 0;
+                for (var child = 0; child < state.Alphas.Length; child++)
+                {
+                    var weight = state.Alphas[child];
+                    if (!Relevant(weight)) continue;
+                    EvaluateNode(node.Inputs[child], bPose, bCurves, depth + 1);
+                    for (var bone = 0; bone < _boneCount; bone++)
+                        pose[bone] = contributed == 0 ? AlsPoseBlender.Scale(bPose[bone], weight)
+                            : AlsPoseBlender.Accumulate(pose[bone], bPose[bone], weight);
+                    for (var curve = 0; curve < _curveCount; curve++)
+                        curves[curve] = contributed == 0 ? AlsStandingCycleCurves.Scale(bCurves[curve], weight)
+                            : AlsStandingCycleCurves.Accumulate(curves[curve], bCurves[curve], weight);
+                    contributed++;
+                }
+                if (contributed == 0) { _referencePose.CopyTo(pose); curves.Clear(); }
+                else
+                    for (var bone = 0; bone < _boneCount; bone++)
+                    {
+                        // BlendPosesTogether normalizes multiple sources; MultiWay then normalizes again.
+                        if (contributed > 1) pose[bone] = AlsPoseBlender.Normalize(pose[bone]);
+                        pose[bone] = AlsPoseBlender.Normalize(pose[bone]);
+                    }
+                return;
             case AlsLayerPoseKind.CurveReset:
                 EvaluateNode(node.Inputs[0],pose,curves,depth+1);
                 var modified=_plans[index]!.ModifiedCurveIndices;
