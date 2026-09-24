@@ -16,6 +16,9 @@ class ALSGODOTEXPORTER_API UAlsSourceAnimationLibrary final : public UBlueprintF
     GENERATED_BODY()
 public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportRefactoredSyncTrace(const FString& OutputPath);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadSourceSyncMetadata(UAnimationAsset* Animation);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
@@ -32,6 +35,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadRawBlendSpacePose2D(UBlendSpace* BlendSpace, float X, float Y, float NormalizedTime);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadRawBlendSpaceTimedPose(UBlendSpace* BlendSpace, const FString& SamplesJson);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadBlendSpaceTriangulationReference(UBlendSpace* BlendSpace, const FString& InputsJson);

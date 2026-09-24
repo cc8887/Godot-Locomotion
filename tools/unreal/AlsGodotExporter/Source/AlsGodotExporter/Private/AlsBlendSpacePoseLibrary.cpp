@@ -7,7 +7,7 @@
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 
-static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const float Y, const float NormalizedTime, const bool Legacy)
+static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const float Y, const float NormalizedTime, const bool Legacy, const FString& TimedJson = FString())
 {
     if (!BlendSpace || !BlendSpace->GetSkeleton() || !FMath::IsFinite(Pitch) || !FMath::IsFinite(Y) || !FMath::IsFinite(NormalizedTime)) return {};
     USkeleton* Skeleton = BlendSpace->GetSkeleton();
@@ -26,7 +26,27 @@ static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const f
 
     TArray<FBlendSampleData> Samples;
     int32 CachedIndex = INDEX_NONE;
-    if (!BlendSpace->GetSamplesFromBlendInput(FVector(Pitch, Y, 0), Samples, CachedIndex, true)) return {};
+    if (TimedJson.IsEmpty())
+    {
+        if (!BlendSpace->GetSamplesFromBlendInput(FVector(Pitch, Y, 0), Samples, CachedIndex, true)) return {};
+    }
+    else
+    {
+        TSharedPtr<FJsonObject> Input;
+        if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(TimedJson), Input)) return {};
+        for (const auto& Value : Input->GetArrayField(TEXT("samples")))
+        {
+            const auto Row = Value->AsObject(); FBlendSampleData Sample;
+            Sample.SampleDataIndex = static_cast<int32>(Row->GetNumberField(TEXT("index")));
+            if (!BlendSpace->GetBlendSamples().IsValidIndex(Sample.SampleDataIndex)) return {};
+            Sample.TotalWeight = static_cast<float>(Row->GetNumberField(TEXT("weight")));
+            PRAGMA_DISABLE_DEPRECATION_WARNINGS
+            Sample.Time = Row->GetNumberField(TEXT("time"));
+            PRAGMA_ENABLE_DEPRECATION_WARNINGS
+            Samples.Add(Sample);
+        }
+        if (Samples.IsEmpty()) return {};
+    }
     const float Time = FMath::Clamp(NormalizedTime, 0.0f, 1.0f);
     TArray<TSharedPtr<FJsonValue>> SampleRows;
     for (FBlendSampleData& Sample : Samples)
@@ -34,7 +54,7 @@ static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const f
         const FBlendSample& Asset = BlendSpace->GetBlendSample(Sample.SampleDataIndex);
         if (!Asset.Animation) return {};
         PRAGMA_DISABLE_DEPRECATION_WARNINGS
-        Sample.Time = Time * Asset.Animation->GetPlayLength();
+        if (TimedJson.IsEmpty()) Sample.Time = Time * Asset.Animation->GetPlayLength();
         PRAGMA_ENABLE_DEPRECATION_WARNINGS
         Sample.PreviousTime = Sample.Time;
         const TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
@@ -90,4 +110,10 @@ FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose(UBlendSpace* BlendSpac
 FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose2D(UBlendSpace* BlendSpace, const float X, const float Y, const float NormalizedTime)
 {
     return ReadBlendPose(BlendSpace, X, Y, NormalizedTime, false);
+}
+
+FString UAlsSourceAnimationLibrary::ReadRawBlendSpaceTimedPose(UBlendSpace* BlendSpace, const FString& SamplesJson)
+{
+    if (SamplesJson.IsEmpty()) return {};
+    return ReadBlendPose(BlendSpace, 0, 0, 0, false, SamplesJson);
 }

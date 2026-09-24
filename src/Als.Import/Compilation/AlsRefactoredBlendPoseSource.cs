@@ -2,6 +2,8 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Import.Compilation;
 
+public readonly record struct AlsRefactoredTimedBlendSample(int Sample,float Weight,float Seconds);
+
 /// <summary>Original 2D BlendSpace pose/curve evaluation. Native skeleton and centimeters.
 /// Sampling is separate from player clocks, filtering, sync and notify dispatch.</summary>
 public sealed class AlsRefactoredBlendPoseSource
@@ -86,10 +88,40 @@ public sealed class AlsRefactoredBlendPoseSource
             {
                 Span<AlsAimGridVertex> weights=stackalloc AlsAimGridVertex[3];
                 var count=_owner._profile.Weights.Evaluate(input,previousCache,weights,out var candidate);
-                var time=Math.Clamp(normalizedTime,0,1);Array.Clear(_curves);
+                var time=Math.Clamp(normalizedTime,0,1);
+                Span<AlsRefactoredTimedBlendSample> samples=stackalloc AlsRefactoredTimedBlendSample[3];
                 for(var i=0;i<count;i++)
+                    samples[i]=new(weights[i].Sample,weights[i].Weight,time*_owner._lengths[weights[i].Sample]);
+                SampleTimesCore(samples[..count],pose,curves);return candidate;
+            }
+            finally {Volatile.Write(ref _busy,0);}
+        }
+        // The source player resolves marker-synchronized seconds independently
+        // for each sample. Do not reconstruct these from a common normalized time.
+        public void SampleTimes(ReadOnlySpan<AlsRefactoredTimedBlendSample> samples,Span<AlsPrecisePose> pose,Span<AlsInertialCurve> curves)
+        {
+            if(samples.Length is <1 or >3||pose.Length!=_result.Length||curves.Length!=_curves.Length)
+                throw new ArgumentException("Invalid timed BlendSpace sample layout.");
+            float total=0;
+            for(var i=0;i<samples.Length;i++)
+            {
+                var s=samples[i];
+                if((uint)s.Sample>=(uint)_owner._lengths.Length||!float.IsFinite(s.Seconds)||!float.IsFinite(s.Weight)||s.Weight<=0||s.Weight>1)
+                    throw new ArgumentException("Invalid timed BlendSpace sample.");
+                for(var j=0;j<i;j++)if(samples[j].Sample==s.Sample)throw new ArgumentException("Duplicate timed BlendSpace sample.");
+                total+=s.Weight;
+            }
+            if(MathF.Abs(total-1)>1e-5f)throw new ArgumentException("Unnormalized timed BlendSpace weights.");
+            if(Interlocked.Exchange(ref _busy,1)!=0)throw new InvalidOperationException("Reentrant BlendSpace pose sampler.");
+            try {SampleTimesCore(samples,pose,curves);}
+            finally {Volatile.Write(ref _busy,0);}
+        }
+        private void SampleTimesCore(ReadOnlySpan<AlsRefactoredTimedBlendSample> samples,Span<AlsPrecisePose> pose,Span<AlsInertialCurve> curves)
+        {
+                Array.Clear(_curves);
+                for(var i=0;i<samples.Length;i++)
                 {
-                    var vertex=weights[i];var index=vertex.Sample;var seconds=time*_owner._lengths[index];
+                    var vertex=samples[i];var index=vertex.Sample;var seconds=Math.Clamp(vertex.Seconds,0,_owner._lengths[index]);
                     if(_absolute[index] is {} absolute)absolute.Sample(seconds,true,false,false,_sample,_sourceCurves[index]);
                     else _additive[index]!.Sample(seconds,_sample,_sourceCurves[index]);
                     for(var bone=0;bone<_result.Length;bone++)_result[bone]=i==0?
@@ -102,12 +134,10 @@ public sealed class AlsRefactoredBlendPoseSource
                 }
                 for(var bone=0;bone<_result.Length;bone++)
                 {
-                    if(count>1)_result[bone]=_result[bone].Normalized();
+                    if(samples.Length>1)_result[bone]=_result[bone].Normalized();
                     _result[bone]=_result[bone].Normalized();
                 }
-                _result.CopyTo(pose);_curves.CopyTo(curves);return candidate;
-            }
-            finally {Volatile.Write(ref _busy,0);}
+                _result.CopyTo(pose);_curves.CopyTo(curves);
         }
     }
 }
