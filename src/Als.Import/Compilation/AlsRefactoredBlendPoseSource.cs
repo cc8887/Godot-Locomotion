@@ -18,6 +18,7 @@ public sealed class AlsRefactoredBlendPoseSource
     public ReadOnlySpan<int> Parents=>_parents;
     public ReadOnlySpan<string> CurveNames=>_curveNames;
     public bool IsAdditive { get; }
+    public System.Numerics.Vector2 FilterWindows=>_profile.FilterWindows;
     public AlsRefactoredBlendPoseSource(AlsRefactoredTriangulationProfile profile,AlsRefactoredAnimationCatalog catalog)
     {
         if(profile.CatalogDigest!=catalog.IndexDigest)throw new ArgumentException("BlendSpace and source catalog versions differ.");

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Refactored输入filter：`docs/verification/2026-09-25-refactored-blend-filter.md`。新Core按UE槽位累加/10初槽+5增长/260上限/独立轴/零窗口透传；不复用V4时间排序。新Import事务owner filter→triangle cache→pose/curve，frame门禁/重置/Prepare-Evaluate-Commit-Cancel。8源3Hz6720帧nativefilter差0、order/cache同、maxWeight5.961e-8；每帧撤销重试/重复Eval/NaN/提交门禁，260溢出恢复，新2/Import20/Optimize0/0。连续pose只内部事务对照，无新6720帧原生pose，上一批400仍适用。UE构建4actions审计458725...冷/普通36172实际exit0字节同D349A3...，DV0/3旧warn，Editor两旧Condition五warn。无Godot/全量/打包；仍显式时间evaluator无marker player/Notify/rootmotion。下一步原marker/rate绑定和sample sync时钟→实际移动Overlay宿主及全部旧缺口；用户文件/暂缓项保留。
+
 - 最新Refactored二维pose/curve：`docs/verification/2026-09-25-refactored-blend-poses.md`。新BlendPoseSource从profile自主weights→实际absolute/local additive→有序pose/curve混合，float sample时间，双阶段normalization，catalog版本/布局门禁和每owner独占。8源400pose31600骨830curve最大P1.208e-13cm/Q4.164e-16/S0/curve5.961e-8；失败原子/retry/并行/跨版本拒绝，新1综合/Import47/Optimize0/0。UE全构建5actions审计0D39DC...，冷/普通40064实际exit0字节同90A4CF...，DV0/3旧warn，Editor两旧Condition五warn保留。无全量/Godot/打包；仅normalized evaluator，无输入filter/marker player/Notify/rootmotion。普通Demo未切，下一步filter+各样本sync时间→实际Locomotion/Overlay/共享宿主及所有旧缺口；用户文件/暂缓项保留。
 
 - 最新Refactored二维三角形：`docs/verification/2026-09-25-refactored-triangulation.md`。原6WalkRun+2Lean采用三角形，保留旧V4grid；Core缓存邻边/外缘投影/容差/排序/阈值，Import完整精度拓扑+catalog/sample/policy绑定。4096连续权重查询的order/cache同native，maxWeight5.9604645e-8（预算1e-7，非逐位同），每步retry；新增6/Import28/Optimize0/0。初外缘同triangle的-1门禁过严修复，原失败保留。UE全构建5actions/审计E1F521...，冷/普通27020实际exit0 inputs F57F65...及reference19616B...字节同，DV0/3旧warn，Editor两旧Condition五warn。仅权重/元数据；滤波、时间/Sync、pose/curve混合与图宿主尚待整合，普通Demo未切/无Godot或全量。下一步这些完整移动Overlay再所有旧缺口；保留用户修改/暂缓项。
