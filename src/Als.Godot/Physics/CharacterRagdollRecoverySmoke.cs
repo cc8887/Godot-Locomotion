@@ -26,6 +26,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
     private string? _automatic;
     private int _automaticEntries, _rollInterrupted, _rollRuntimeInterrupted;
     private bool _entryFailure, _entryFailureObserved;
+    private bool _sawOverlayOverride;
     private Vector3 _exitPosition;
     private Input.MouseModeEnum _mouse;
     public override void _Ready()
@@ -62,7 +63,13 @@ public partial class CharacterRagdollRecoverySmoke : Node
                     if (outcome.ResultCode == AlsActionResultCode.InterruptedByRuntimeFailure) _rollRuntimeInterrupted++;
                     return;
                 }
-                if (outcome.ResultCode == AlsActionResultCode.Accepted) _accepted++;
+                if (outcome.ResultCode == AlsActionResultCode.Accepted)
+                {
+                    var recovery = _demo.ActiveCharacter.LastRagdollRecovery!;
+                    Require(outcome.ActionDefinitionId == _demo.RuntimeContext.MovementGraph!.GetUpSelection.Select(
+                        _demo.Overlay, recovery.Decision.FacingUpward), "Get-up ignored native Overlay selection.");
+                    _accepted++;
+                }
                 else if (outcome.ResultCode == AlsActionResultCode.Completed) _ended++;
                 else if (outcome.ResultCode == AlsActionResultCode.InterruptedByRagdoll && _interruptSent) _interrupted++;
                 else if (outcome.ResultCode == AlsActionResultCode.InterruptedByLifecycle && _lifecycleCovered) _lifecycleInterrupted++;
@@ -171,7 +178,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
                         simulation.Island.Reset(states);
                     }
                     Require(simulation.DecideExit(true).FacingUpward, "Controlled back-facing setup failed.");
-                    character.FollowRagdollPelvis(); Tap(Key.G); character.ConsumeRagdollExit(); Next(2); return;
+                    character.FollowRagdollPelvis(); Tap(Key.G); character.ConsumeRagdollExit();
+                    ArmRecoveryFailure(character); Next(2); return;
                 }
                 Tap(Key.G); Next(2); return;
             }
@@ -191,11 +199,10 @@ public partial class CharacterRagdollRecoverySmoke : Node
                     "G did not restore capsule/start ground recovery.");
                 _exitPosition = motor.GlobalPosition;
                 _sawGetUp = false;
+                _sawOverlayOverride = false;
                 if (_lifecycle == "pending" && !_lifecycleCovered) { Suspend(character); return; }
                 GD.Print($"GET_UP_EXIT cycle={_cycles} upward={character.LastRagdollRecovery!.Decision.FacingUpward} yaw={character.LastRagdollRecovery.Decision.ActorYawDegrees:R}");
-                if (_failure && !_failureArmed)
-                { _demo.RuntimeContext.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish,
-                    character.HandleIdentity(character.RuntimeCommittedFrameId + 1)); _failureArmed = true; }
+                ArmRecoveryFailure(character);
                 Next(3); return;
             }
             if (_stage == 3)
@@ -213,6 +220,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
                     (_stageTicks == 1 || _stageTicks == _hz / 6 || _stageTicks == _hz / 3 || _stageTicks == _hz / 2 || _stageTicks == _hz || _stageTicks == _hz * 3 / 2))
                     _captureDue++;
                 if (character.Diagnostics.Result.ActionPlayback.Active != 0) _sawGetUp = true;
+                if (character.FullMovementDiagnostics.OverlayOverride == 3) _sawOverlayOverride = true;
                 if (_lifecycle is "active" or "suspend" or "generation" && !_lifecycleCovered && _stageTicks == _hz / 3)
                 { Require(_sawGetUp && character.GettingUp, "No active Get-up to suspend."); Suspend(character); return; }
                 if (_interrupt && !_interruptSent && _stageTicks == _hz / 3)
@@ -225,6 +233,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
                 Require(_accepted == _cycles + 1 + _interrupted + _lifecycleInterrupted && _ended == _cycles + 1, "Get-up ownership did not finish exactly once.");
                 Require(motor.GlobalPosition.DistanceTo(_exitPosition) > .25f, "Held movement did not resume after Get-up.");
                 Require(character.CommittedAnimation.ActionCount == 0 && character.CommittedAnimation.StateCount == 0, "Get-up leaked action/notify state.");
+                Require(character.FullMovementDiagnostics.OverlayOverride == 0 &&
+                    ((int)_demo.Overlay < 3 || _sawOverlayOverride), "Get-up override was not applied/reset.");
                 _cycles++; _sawGetUp = false;
                 if (_cycles < 2) { Next(0); return; }
                 _air = true; Next(0);
@@ -233,6 +243,12 @@ public partial class CharacterRagdollRecoverySmoke : Node
         catch (Exception e) { Fail(e); }
     }
     private void Next(int stage) { _stage = stage; _stageTicks = 0; }
+    private void ArmRecoveryFailure(AlsP3Character character)
+    {
+        if (!_failure || _failureArmed) return;
+        _demo.RuntimeContext.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish,
+            character.HandleIdentity(character.RuntimeCommittedFrameId + 1)); _failureArmed = true;
+    }
     private void Suspend(AlsP3Character character)
     {
         _lifecycleCovered = true;

@@ -31,6 +31,7 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public AlsProductionGraphCapture? GraphCapture { get; init; }
     public AlsOverlayKind Overlay { get; init; }
     public AlsMovementNotifyState MovementNotifies { get; init; }
+    public int OverlayOverride { get; init; }
 }
 
 // Exclusive production adapter. The Worker retains publication authority; the
@@ -125,6 +126,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     private AlsGraphTraversalCounter _evaluation, _nextEvaluation;
     private AlsFrameIdentity _identity;
     private AlsMovementNotifyState _notifyState, _nextNotifyState;
+    private int _overlayOverride, _nextOverlayOverride;
     private bool _prepared, _applied, _queriesPending;
     private readonly AlsAnimationSetDefinition? _captureSet;
     private readonly string[]? _captureNames;
@@ -148,6 +150,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     public AlsFullMovementDiagnostics Diagnostics => new(_base.CommittedIdentity, _feedback, _base.CommittedGroundInput,
         _base.CommittedGlobalInput, _evaluation, _base.Movement.CommittedMovement.CurrentState)
         { RootIdentity = CommittedRootIdentity, RootState = CommittedRoot, Ragdoll = CommittedRagdoll, MovementNotifies = _notifyState,
+            OverlayOverride = _overlayOverride,
             StopTransitions = _base.CommittedStopTransitionCount,
             HasPoseMovingChannel = _poseMoving >= 0, PoseMoving = _committedPoseMoving,
             RefactoredFeedback = _committedRefactoredFeedback, RefactoredInputPose = _base.CommittedRefactoredPose,
@@ -294,6 +297,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             {
                 _layered.PrepareFromFrame(input,result,movement,rules,ground,new(input.Identity,1,input.DeltaTime),this,
                     componentPose,parent,_definition.ComponentTeleportDistance,overlayKind:input.Command.RequestedOverlay,
+                    overlayOverride:_overlayOverride,
                     meshVerticalScale:MathF.Abs(componentPose.Scale.Y),
                     ragdollObservation: input.RagdollPhysics.Identity.FrameId > 0 || _recoverySnapshot is not null
                         ? new AlsRagdollFrameObservation(input.Identity, input.RagdollPhysics.PelvisVelocityCm, _recoverySnapshot) : null);
@@ -343,6 +347,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         if (_refactoredPoseReader is not null)
             _nextRefactoredFeedback = new(_refactoredPoseReader.Read(_identity, Curves), Curve(_predictionBlock));
         _nextNotifyState = _notifyState.Advance(_base.SourceEvents, _base.ResetGroundedEntry);
+        _nextOverlayOverride = _definition.OverlayOverrideNotifies.Advance(_overlayOverride, _base.SourceEvents);
         _prepared = true;
     }
 
@@ -467,6 +472,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _committedRefactoredFeedback = _nextRefactoredFeedback;
         _committedGraphCapture = _nextGraphCapture; _nextGraphCapture = null;
         _notifyState = _nextNotifyState; _prepared = _applied = false;
+        _overlayOverride = _nextOverlayOverride;
         _candidateAnimationPose.AsSpan().CopyTo(_committedAnimationPose);
         _committedAnimationIdentity = _identity;
     }
@@ -517,6 +523,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         if (_prepared || _queriesPending) throw new InvalidOperationException("Production candidate still owns animation state.");
         _base.ClearAnimationOwnershipForLifecycle(abandonedInput);
         _notifyState = _nextNotifyState = default;
+        _overlayOverride = _nextOverlayOverride = 0;
     }
 
     private float Curve(int index) => index >= 0 && Curves[index].Present ? Curves[index].Value : 0;

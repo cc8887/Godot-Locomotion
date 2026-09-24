@@ -20,5 +20,71 @@
     "playRate": 1.0,
     "blendSeconds": 0.2,
     "loopPolicy": "Once"
+  },
+  {
+    "name": "GetUpFront_LH",
+    "montage": "6691c274d56466d10311066e2ecd6285a00a709a",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
+  },
+  {
+    "name": "GetUpBack_LH",
+    "montage": "ff9b7d6c520fcb306b1f0857fac06c2504f77808",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
+  },
+  {
+    "name": "GetUpFront_2H",
+    "montage": "1a73f66279c200a5853da9f42e600488a1a74c26",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
+  },
+  {
+    "name": "GetUpBack_2H",
+    "montage": "96304d81ece808c8202bb6472f580c0e3af84037",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
+  },
+  {
+    "name": "GetUpFront_RH",
+    "montage": "ae92864f7fb79dfa50846bb6c1624020b7ef0152",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
+  },
+  {
+    "name": "GetUpBack_RH",
+    "montage": "570a4b91e06e0a1843f6a3dfd151baf3bf18de39",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
   }
 ]
