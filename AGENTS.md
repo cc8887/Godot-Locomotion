@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新原生组件位置：`docs/verification/2026-09-24-camera-component-native-parity.md`。真实B_Als_Character参考pose+Camera TickComponent/实际curves，30/60/120各4秒共840帧；native初始之后连续Core历史，四位置max6.8728e-6cm<.001、旋转0<1e-7、FOV1e-5过，fullFP192/partial36/teleport3/override210。Import相机41过；无Godot生产改动/新渲染/全量。两冷导轨迹字节同（第二份仅加engine元数据），正式SHA C3117D4D88ED129A8A4F90BCBD8133A40096B64C9CC4D245887A5741628EED86与普通Editor3688输出全同/退出0，两旧Condition保留；DV0error/3旧warn。完整Editor审计fingerprint66EB7E32057D2F034396EFB7CE2F749AF75D939455F96141589E0307F9BDEAE1过；初次.NET10缺失用引擎bundled修，不改系统。仅clear/no base/受控viewactor位置层，下一步原生碰撞/穿透/base及Godot图到场景联合；旧物理9/12、Flail0/3、Mantle/性能保留，头颈道具暂缓，用户文件保留。
+
 - 最新FOV完整性：`docs/verification/2026-09-24-camera-fov-completeness.md`。源码TickCamera/CalculateFovOffset核对发现组合runtime漏消费图FovOffset，现候选图值+宿主offset送Follow，保留fullFP早返回/覆盖/5..175限制。七夹具先红5/绿2后全绿，Import相机40过、Optimize0/0、普通Parallel60八秒480提交过。原始3114帧FovOffset存在0，不宣称当前非零曲线观感修复。无UE改动/启动/构建或新位置oracle；下一步真实组件Tick轨迹（曲线/插槽/base/view/内部history）再碰撞与完整链。全目标/旧物理失败/Mantle/性能保留，头颈道具暂缓，用户文件未动。
 
 - 最新相机恢复：`docs/verification/2026-09-24-camera-query-recovery.md`。修一次查询异常永久冻结：容量/非法fraction专用可重试异常，Discard候选、下一eligible帧当前场景重查、不积攒dt；成功清当前故障，保留计数/最近错误，每段首帧warning；其他配置/owner错误仍terminal。绑定先构造后换owner。真实肩部70小盒+胶囊排除制造64容量溢出，Single30/Parallel60/120各两轮五帧冻结FollowState/Camera3D/FOV，撤障次帧恢复、10失败52提交；连续环境60回归数值同，Optimize0/0。首轮大盒夹具未触发、fail保留，非放宽断言。无新Core/Import全量/UE/截图；下一步原生组件位置oracle。旧9/12、Flail0/3、Mantle/性能继续，头颈/道具暂缓，用户文件保留。

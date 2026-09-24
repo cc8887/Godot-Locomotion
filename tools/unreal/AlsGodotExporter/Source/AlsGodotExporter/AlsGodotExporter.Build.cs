@@ -16,6 +16,7 @@ public class AlsGodotExporter : ModuleRules
         PrivateDependencyModuleNames.AddRange(new[]
         {
             "ALS",
+            "ALSCamera",
             "ControlRig",
             "RigVM",
             "GameplayTags",

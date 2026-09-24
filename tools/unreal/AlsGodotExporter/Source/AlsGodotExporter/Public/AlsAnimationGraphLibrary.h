@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Real camera component ticks in a clear scene; records spatial inputs and outputs. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportCameraComponentTrace(const FString& OutputPath);
+
     /** Unmodified Refactored Camera AnimGraph; controlled input tags, no assets saved. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportCameraGraphTrace(const FString& RequestPath, const FString& OutputPath);
