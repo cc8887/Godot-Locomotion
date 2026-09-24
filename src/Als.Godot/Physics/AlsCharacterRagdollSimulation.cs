@@ -23,6 +23,9 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
     private AlsP3Character _character = null!;
     private AlsCorePhysicsPose _bridge = null!;
     private AlsLocalPose[] _entryPose = [];
+    private string[] _snapshotBones = [];
+    private int[] _snapshotToLogical = [];
+    private string _snapshotName = "", _meshName = "";
     private AlsPrecisePose[] _flail = [], _candidateFlail = [];
     private bool _hasFlail, _disposed;
     private AlsRagdollSpeedLimit _speedLimit;
@@ -55,6 +58,11 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
         var history = character.BodyHistory ?? throw new InvalidOperationException("Character has no physical history.");
         var skeleton = context.AnimationSet.Skeletons[context.Profile.SkeletonId];
         var mesh = context.AnimationSet.SkeletalMeshes[context.Profile.MannequinMeshId];
+        _snapshotName = context.MovementGraph?.RagdollPose.SnapshotName ??
+            throw new InvalidOperationException("Ragdoll recovery requires the complete root graph.");
+        _meshName = mesh.Name;
+        _snapshotBones = skeleton.PhysicalBones.Select(b => b.Name).ToArray();
+        _snapshotToLogical = skeleton.PhysicalToLogical.ToArray();
         var authored = AlsPhysicsAssetCompiler.Compile(Read("v4_physics_asset_inputs.json"), mesh.ObjectPath);
         var definition = AlsPhysicsJointFrameCompiler.Compile(Read("v4_physics_joint_frame_inputs.json"), authored);
         var settings = AlsPhysicsJointCompiler.Compile(Read("v4_physics_joint_reference.json"), definition);
@@ -169,6 +177,45 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
     { Check(); _bridge.Capture(Island, skeletonToWorld, destination); }
     internal void Capture(Transform3D skeletonToWorld, ReadOnlySpan<AlsLocalPose> animationPose, Span<AlsLocalPose> destination)
     { Check(); _bridge.Capture(Island, skeletonToWorld, animationPose, destination); }
+
+    internal AlsRagdollExitDecision DecideExit(bool grounded)
+    { Check(); return AlsRagdollExit.Decide(_animation.PelvisRotation, PelvisVelocity, grounded); }
+
+    // The caller supplies the proposed RESTORED mesh world transform, not the
+    // current followed capsule transform. Capture rebases physical bones to it
+    // while retaining current animation locals on nonphysical branches.
+    internal AlsRagdollRecoveryFrame PrepareRecovery(AlsFrameIdentity identity,
+        Transform3D restoredSkeletonToWorld, bool grounded)
+    {
+        Check();
+        if (!_character.BodyHistoryActive || _character.RagdollSimulation != this || CompletedSteps <= 0 ||
+            identity != AnimationIdentity || identity != _character.Diagnostics.Identity ||
+            _character.PublishedFrameId != _character.RuntimeCommittedFrameId)
+            throw new InvalidOperationException("Recovery requires this character's idle completed ragdoll frame.");
+        var decision = DecideExit(grounded);
+        var animation = new AlsLocalPose[_entryPose.Length];
+        _character.CopyCommittedAnimationPose(identity, animation);
+        var rebased = new AlsLocalPose[animation.Length];
+        Capture(restoredSkeletonToWorld, animation, rebased);
+        var physical = new AlsLocalPose[_snapshotToLogical.Length];
+        for (var i = 0; i < physical.Length; i++)
+        {
+            if ((uint)_snapshotToLogical[i] >= (uint)rebased.Length)
+                throw new InvalidOperationException($"Snapshot bone {i} has invalid logical binding {_snapshotToLogical[i]}.");
+            physical[i] = rebased[_snapshotToLogical[i]];
+        }
+        var snapshot = new AlsNamedPoseSnapshot(identity, _snapshotName, _meshName, _snapshotBones, physical);
+        return new(Activation.Entry.Identity, CompletedSteps, decision, restoredSkeletonToWorld, snapshot);
+    }
+
+    internal bool IsRecoveryCurrent(AlsRagdollRecoveryFrame recovery)
+    {
+        Check();
+        return _character.BodyHistoryActive && _character.RagdollSimulation == this &&
+            recovery.ActivationIdentity == Activation.Entry.Identity && recovery.CompletedSteps == CompletedSteps &&
+            recovery.Snapshot.Identity == AnimationIdentity && AnimationIdentity == _character.Diagnostics.Identity &&
+            _character.PublishedFrameId == _character.RuntimeCommittedFrameId;
+    }
 
     private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
     private static void Main()
