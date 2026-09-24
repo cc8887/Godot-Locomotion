@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Refactored组合阶段：`docs/verification/2026-09-25-refactored-post-layer.md`。Core PostLayer统一View/Spine→真实Layering→Head候选/曲线反馈/提交回滚，Import profile复用资源校验并核对完整names/parents；厘米逻辑布局，外部source/Montage/Notify仍由宿主事务管理。3Hz420提交帧真实Stand/Crouch/Look、每帧discard重试、各2Head采样fault与上游fault/隐藏/旧帧身份门禁，新4/Import64/Core12/Optimize0/0。初测试Span局部捕获编译失败修夹具后过。无新UE/组合native oracle/Godot/全量；普通Demo未切换，下一步实际Locomotion/Overlay/共享Montage/完整视觉布局宿主接入→Mantle及所有旧缺口，保留用户文件/暂缓项。
+
 - 最新Head原生整图：`docs/verification/2026-09-25-refactored-head-native.md`。原AB_Als_Head_C实际6节点自行回调，父实际View/Spine/settings，raw Stand固定base；3Hz1050帧82950骨，C#独立counter/history/Look权重，maxP8.4732752e-6cm/Q1.8731581e-7/S0、curve精确同。各2init/半秒alpha隐藏，沿用状态单位预算；无生产算法或门槛修改。Import33/Optimize0/0；UE两完整构建成功最终fingerprint05A9CE...，冷/普通32616实际exit0字节同SHA A9F1218BD6A054065FD9B003DB60C50A0D196A98AC7802BF1ABA12E4C3A9844D，旧两Condition/五warn保留，DV0/3旧warn。非完整上游/整图跳过恢复/Godot视觉/全量；普通demo未切。下一步完整Refactored布局/宿主整合→普通Mantle及全部旧Ragdoll/相机/性能缺项，保留用户文件/暂缓项。
 
 - 最新View原生连续对照：`docs/verification/2026-09-25-refactored-view-native.md`。真实AB_Als_C settings/NativeThreadSafeUpdate+显式Head回调，3Hz1050帧独立history，210换侧布尔逐帧同。最大Spine角差.0001335144度、Head角差.0000915527度/速度.00048828125度秒；最终bool精确/weights2e-6/angle和velocity各.001预算。初统一1e-4失败，展开InvExp两实验更差均撤回，生产未改，精确舍入原因未定位；不得称逐位同或原门槛通过。冷/普通37696实际exit0字节同SHA DBADBB04BC2E9A01D37EA5E74CDAE1AECCF188992429E13D89340307E119DCBB，旧两Condition/五warn保留；UE全审计fingerprint213A8E...，DV0/3旧warn。Import29/Optimize0/0；无全量/Godot/整图。下一步Head原生整图→完整宿主/Mantle；普通demo未切，全部旧缺口/用户文件/暂缓项保留。
