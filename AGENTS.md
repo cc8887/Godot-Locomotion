@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新相机基础：`docs/verification/2026-09-24-camera-inputs-and-math.md`。只读导出Refactored Camera authored图/真实反射默认设置/两BlendCurve和原生旋转参考（非V4 CameraManager）；Core AlsCameraMath实现原生旋转阻尼/逐轴pivot/瞬移门限/trace距离平滑。Core定向7、Import原生630帧+112边界1项、Optimize过；两冷导settings/assets/参考相同，图仅3个未连接ErrorTolerance PinId不同。UE全Editor审计通过，无插件更改/普通Editor重启/DV。尚未编译相机图、接socket/平台/场景查询或普通Demo，当前OrbitCamera未改；下一步按文档编译Camera图再接入。静态9/12、Flail0/3、Mantle/完整Camera/性能验收仍未完成；头颈/道具暂缓、用户修改保留。
+
 - 最新起身中Overlay切换：`docs/verification/2026-09-24-get-up-overlay-switching.md`。新增RecoverySmoke `--overlay-cycle`，普通E键遍历13种，核对原Montage身份/epoch不变、时间前进、新Overlay/道具提交及原Notify覆盖直至释放；改旧断言按进入Overlay。Parallel60/Single30渲染+首次故障各13起身13切换过，六图检查03/04/06；Bow Parallel120打断后两次完整起身+空中退出过，Optimize过。首轮累计W离开地板导致地面断言失败保留，测试每轮回开阔点后通过。仅回归/文档，无生产算法修改、Core/Import全量或UE重导；旧静态9/12、Flail0/3及Mantle/Camera/性能目标保留，头颈/道具物理暂缓，用户修改保留。
 
 - Overlay起身最终回归补充：Import Release全量2492通过/1既有Editor跳过，TRX `artifacts/get-up-overlay-tests/import.trx`；Default自动Roll离地+触发帧故障重试两完整循环及空中退出通过，`get-up-overlay-default-regression.log`。详情同下文。
