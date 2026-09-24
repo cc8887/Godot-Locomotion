@@ -2,7 +2,7 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Import.Compilation;
 
-/// <summary>Original Default Overlay layer. The caller registers SourceInput in
+/// <summary>Original Default/Feminine/Masculine Overlay layer. The caller registers SourceInput in
 /// its shared source-player batch, then evaluates and commits both frame owners.</summary>
 public sealed class AlsRefactoredDefaultOverlayRuntime
 {
@@ -33,7 +33,7 @@ public sealed class AlsRefactoredDefaultOverlayRuntime
         if (_prepared || frame <= _committedFrame || !float.IsFinite(weight) || weight is < 0 or > 1)
             throw new ArgumentException("Invalid Default Overlay frame.");
         var candidate = AlsRefactoredDefaultOverlay.Advance(reinitialize ? default : _state, input, delta);
-        _sourceInput = new(_playerId, default, 1, weight * .75f, reinitialize);
+        _sourceInput = new(_playerId, default, 1, weight * _profile.IdleAlpha, reinitialize);
         _input = input; _candidate = candidate; _frame = frame;
         _prepared = true; _evaluated = false; _faulted = false;
     }
@@ -53,7 +53,7 @@ public sealed class AlsRefactoredDefaultOverlayRuntime
             {
                 for (var f = 0; f < 3; f++) frames[f] = _profile.Poses[f * _pose.Length + bone];
                 var basis = AlsRefactoredDefaultOverlay.Bone(frames, _profile.Reference[bone], _input, _candidate);
-                _pose[bone] = AlsPrecisePoseBlender.LocalApply(basis, sources.Pose(_playerId)[bone], .75f);
+                _pose[bone] = AlsPrecisePoseBlender.LocalApply(basis, sources.Pose(_playerId)[bone], _profile.IdleAlpha);
             }
             Span<AlsInertialCurve> curves = stackalloc AlsInertialCurve[3];
             for (var curve = 0; curve < _curves.Length; curve++)
@@ -61,7 +61,7 @@ public sealed class AlsRefactoredDefaultOverlayRuntime
                 for (var f = 0; f < 3; f++) curves[f] = _profile.Curves[f * _curves.Length + curve];
                 var basis = AlsRefactoredDefaultOverlay.Curve(curves, _input, _candidate);
                 var index = _profile.IdleCurveMap[curve];
-                _curves[curve] = index < 0 ? basis : AlsStandingCycleCurves.Accumulate(basis, sources.Curves(_playerId)[index], .75f);
+                _curves[curve] = index < 0 ? basis : AlsStandingCycleCurves.Accumulate(basis, sources.Curves(_playerId)[index], _profile.IdleAlpha);
             }
             _evaluated = true;
         }

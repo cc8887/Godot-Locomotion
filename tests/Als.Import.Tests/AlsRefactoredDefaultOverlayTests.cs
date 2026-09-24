@@ -10,6 +10,30 @@ public sealed class AlsRefactoredDefaultOverlayTests
     private static AlsRefactoredAnimationCatalog Catalog() => new(MantlingHostFixture.Read("refactored_animation_sources"),
         p => File.ReadAllBytes(Path.Combine(RepositoryRoot.Find(), "assets/config", p)));
 
+    [Theory]
+    [InlineData(AlsRefactoredBasicOverlayKind.Feminine, .5f)]
+    [InlineData(AlsRefactoredBasicOverlayKind.Masculine, 1f)]
+    public void ActualVariantsRequireTheirOwnPoseResourceAndIdleAlpha(AlsRefactoredBasicOverlayKind kind, float alpha)
+    {
+        var catalog = Catalog(); var profile = AlsRefactoredDefaultOverlayCompiler.Compile(catalog, kind);
+        Assert.Equal(kind, profile.Kind); Assert.Equal(alpha, profile.IdleAlpha);
+        var payload = catalog.Read(AlsRefactoredDefaultOverlayProfile.BlueprintFor(kind));
+        Assert.Throws<ArgumentException>(() => AlsRefactoredDefaultOverlayCompiler.ValidateGraph(payload));
+        foreach (var changeAlpha in new[] { false, true })
+        {
+            var changed = JsonNode.Parse(payload.GetRawText())!;
+            var node = changed["compiled"]!["nodes"]!.AsArray().Single(n => (int)n!["propertyIndex"]! == (changeAlpha ? 1 : 5))!;
+            if (changeAlpha) node["runtime"]!["alpha"] = .75f;
+            else node["runtime"]!["sequence"] = AlsRefactoredDefaultOverlayProfile.PoseSource;
+            using var doc = JsonDocument.Parse(changed.ToJsonString());
+            Assert.Throws<ArgumentException>(() => AlsRefactoredDefaultOverlayCompiler.ValidateGraph(doc.RootElement, kind));
+        }
+        var overlay = profile.CreateRuntime(0);
+        overlay.Prepare(0, new(0, 1, 0, 0, 0), .01f, .4f);
+        Assert.Equal(.4f * alpha, overlay.SourceInput.Weight);
+        Assert.Throws<ArgumentOutOfRangeException>(() => AlsRefactoredDefaultOverlayCompiler.Compile(catalog, (AlsRefactoredBasicOverlayKind)99));
+    }
+
     [Fact]
     public void ActualGraphCompilesAndChangedGraphPoliciesAreRejected()
     {

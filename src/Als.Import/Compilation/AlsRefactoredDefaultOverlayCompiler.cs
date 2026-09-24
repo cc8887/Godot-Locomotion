@@ -5,6 +5,8 @@ using static GodotAls.Import.Compilation.AlsYawOffsetCompiler;
 
 namespace GodotAls.Import.Compilation;
 
+public enum AlsRefactoredBasicOverlayKind { Default, Feminine, Masculine }
+
 public sealed class AlsRefactoredDefaultOverlayProfile
 {
     public const string Blueprint = "/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_Default.AB_Als_Default";
@@ -14,15 +16,29 @@ public sealed class AlsRefactoredDefaultOverlayProfile
     public ReadOnlySpan<string> BoneNames => _bones;
     public ReadOnlySpan<string> CurveNames => _names;
     public string CatalogDigest { get; }
+    public AlsRefactoredBasicOverlayKind Kind { get; }
+    public float IdleAlpha => AlphaFor(Kind);
+    public static string BlueprintFor(AlsRefactoredBasicOverlayKind kind) =>
+        $"/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_{kind}.AB_Als_{kind}";
+    public static string PoseSourceFor(AlsRefactoredBasicOverlayKind kind) =>
+        $"/ALS/ALS/Animations/Overlays/Other/A_Als_{kind}_Poses.A_Als_{kind}_Poses";
+    internal static float AlphaFor(AlsRefactoredBasicOverlayKind kind) => kind switch
+    {
+        AlsRefactoredBasicOverlayKind.Default => .75f,
+        AlsRefactoredBasicOverlayKind.Feminine => .5f,
+        AlsRefactoredBasicOverlayKind.Masculine => 1f,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
     internal readonly AlsPrecisePose[] Poses, Reference;
     internal readonly AlsInertialCurve[] Curves;
     internal readonly string[] IdleCurveNames;
     internal readonly int[] IdleCurveMap;
 
-    internal AlsRefactoredDefaultOverlayProfile(AlsRefactoredAnimationCatalog catalog)
+    internal AlsRefactoredDefaultOverlayProfile(AlsRefactoredAnimationCatalog catalog, AlsRefactoredBasicOverlayKind kind)
     {
+        Kind = kind;
         CatalogDigest = catalog.IndexDigest;
-        var source = catalog.CompileAbsolutePoseWithCurves(PoseSource);
+        var source = catalog.CompileAbsolutePoseWithCurves(PoseSourceFor(kind));
         var idle = catalog.CompileAdditivePose(IdleSource);
         if (!source.Pose.BoneNames.SequenceEqual(idle.BoneNames) || !source.Pose.Parents.SequenceEqual(idle.Parents) ||
             catalog.Read(IdleSource).GetProperty("evaluation").GetProperty("additiveType").GetString() != "AAT_LocalSpaceBase")
@@ -50,15 +66,18 @@ public sealed class AlsRefactoredDefaultOverlayProfile
 
 public static class AlsRefactoredDefaultOverlayCompiler
 {
-    public static AlsRefactoredDefaultOverlayProfile Compile(AlsRefactoredAnimationCatalog catalog)
+    public static AlsRefactoredDefaultOverlayProfile Compile(AlsRefactoredAnimationCatalog catalog,
+        AlsRefactoredBasicOverlayKind kind = AlsRefactoredBasicOverlayKind.Default)
     {
-        ValidateGraph(catalog.Read(AlsRefactoredDefaultOverlayProfile.Blueprint));
-        return new(catalog);
+        _ = AlsRefactoredDefaultOverlayProfile.AlphaFor(kind);
+        ValidateGraph(catalog.Read(AlsRefactoredDefaultOverlayProfile.BlueprintFor(kind)), kind);
+        return new(catalog, kind);
     }
 
-    public static void ValidateGraph(JsonElement payload)
+    public static void ValidateGraph(JsonElement payload, AlsRefactoredBasicOverlayKind kind = AlsRefactoredBasicOverlayKind.Default)
     {
-        var source = AlsRefactoredDefaultOverlayProfile.Blueprint;
+        var alpha = AlsRefactoredDefaultOverlayProfile.AlphaFor(kind);
+        var source = AlsRefactoredDefaultOverlayProfile.BlueprintFor(kind);
         Require(Text(payload, "source") == source && Text(payload, "class") == "AnimBlueprint", "Foreign Default Overlay.");
         var compiled = payload.GetProperty("compiled");
         Require(Text(compiled, "source") == source && Text(compiled, "generatedClass") == source + "_C" &&
@@ -96,8 +115,8 @@ public static class AlsRefactoredDefaultOverlayCompiler
         Bindings(2, ["Alpha:PoseState:GaitWalkingAmount"]); Bindings(3, ["Alpha:PoseState:InAirAmount"]);
         Bindings(4, ["Alpha:InAirState:GroundPredictionAmount"]);
         Bindings(10, ["DesiredAlphas_0:PoseState:StandingAmount", "DesiredAlphas_1:PoseState:CrouchingAmount"]);
-        Require(nodes[1].GetProperty("runtime").GetProperty("alpha").GetSingle() == .75f &&
-            float.Parse(overlay.Literal(overlay.Named(Name(nodes[1])), "Alpha"), System.Globalization.CultureInfo.InvariantCulture) == .75f,
+        Require(nodes[1].GetProperty("runtime").GetProperty("alpha").GetSingle() == alpha &&
+            float.Parse(overlay.Literal(overlay.Named(Name(nodes[1])), "Alpha"), System.Globalization.CultureInfo.InvariantCulture) == alpha,
             "Overlay additive alpha changed.");
         for (var i = 1; i <= 4; i++) foreach (var p in Policies(nodes[i]))
         {
@@ -111,7 +130,7 @@ public static class AlsRefactoredDefaultOverlayCompiler
         }
         int[] frames = [0, 1, 2, 1, 0];
         for (var i = 5; i <= 9; i++) foreach (var p in Policies(nodes[i]))
-            Require(Text(p, "sequence") == AlsRefactoredDefaultOverlayProfile.PoseSource && Text(p, "method") == "DoNotSync" && Text(p, "groupName") == "None" &&
+            Require(Text(p, "sequence") == AlsRefactoredDefaultOverlayProfile.PoseSourceFor(kind) && Text(p, "method") == "DoNotSync" && Text(p, "groupName") == "None" &&
                 p.GetProperty("bUseExplicitFrame").GetBoolean() && p.GetProperty("explicitFrame").GetInt32() == frames[i - 5] &&
                 p.GetProperty("bTeleportToExplicitTime").GetBoolean() && p.GetProperty("bShouldLoop").GetBoolean() && Text(p, "reinitializationBehavior") == "ExplicitTime", "Overlay fixed frame changed.");
         foreach (var p in Policies(nodes[10]))
