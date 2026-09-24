@@ -12,14 +12,20 @@ public sealed class AlsMantlingNativeBranchTests
 {
     private readonly Xunit.Abstractions.ITestOutputHelper _output;
     public AlsMantlingNativeBranchTests(Xunit.Abstractions.ITestOutputHelper output)=>_output=output;
-    [Fact]
-    public void ActualNativeMontageAndAlsStatesMatchAcrossRatesConditionsAndInterruptions()
+    [Theory]
+    [InlineData(false)][InlineData(true)]
+    public void ActualNativeMontageAndAlsStatesMatchAcrossRatesConditionsAndInterruptions(bool hostIds)
     {
         var config=Path.Combine(RepositoryRoot.Find(),"assets/config");
         string Read(string name)=>File.ReadAllText(Path.Combine(config,name+".json"));
         var input=Read("refactored_mantle_animation_inputs");
         var profile=AlsMantlingMontageCompiler.Compile(input,Read("refactored_mantle_root_tracks"),Read("refactored_mantle_curves"));
+        var host=hostIds?MantlingHostFixture.Bind(profile):null;
+        if(host is not null)profile=host.Profile;
         var notifyProfile=AlsMantlingNotifyCompiler.Compile(input,profile);
+        var hostNotifies=host?.BindNotifies(input,MantlingHostFixture.Notifies());
+        var notifyBinding=hostNotifies?.Binding??notifyProfile.Binding;
+        IReadOnlyDictionary<int,AlsMantlingFootstep> footstepObjects=hostNotifies?.Footsteps??notifyProfile.Footsteps.Select((f,i)=>(f,i)).ToDictionary(p=>p.i,p=>p.f);
         using var reference=JsonDocument.Parse(Read("refactored_mantle_branch_reference"));
         Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant(),reference.RootElement.GetProperty("animationInputsSha256").GetString());
         var traces=reference.RootElement.GetProperty("traces");Assert.Equal(144,traces.GetArrayLength());
@@ -28,8 +34,8 @@ public sealed class AlsMantlingNativeBranchTests
         {
             var path=trace.GetProperty("montage").GetString()!;var mode=trace.GetProperty("mode").GetInt32();
             var hz=trace.GetProperty("hz").GetInt32();Assert.Contains(hz,new[]{30,60,120});Assert.InRange(mode,0,7);Assert.True(coverage.Add((path,hz,mode)));
-            var branch=AlsMantlingBranchCompiler.Compile(input,profile);var bank=profile.CreateRuntime(branch);
-            var queue=new AlsMontageNotifyRuntime(notifyProfile.Binding);
+            var branch=AlsMantlingBranchCompiler.Compile(input,profile);var bank=host?.CreateRuntime(branch)??profile.CreateRuntime(branch);
+            var queue=new AlsMontageNotifyRuntime(notifyBinding);
             branch.Capture(new(mode is 1 or 7,mode==2?"Als.LocomotionMode.InAir":"Als.LocomotionMode.Grounded",
                 mode==3?"Als.RotationMode.Aiming":"Als.RotationMode.ViewDirection",mode==4?"Als.Stance.Crouching":"Als.Stance.Standing"));
             bank.Begin(new(1,1,1),.01f);bank.PlayAction(profile.Definitions[path].Asset.ActionDefinitionId,1);bank.Commit(new(1,1,1));
@@ -49,8 +55,8 @@ public sealed class AlsMantlingNativeBranchTests
                 for(var n=0;n<queue.Notifies.Length;n++)
                 {
                     var dispatch=queue.Notifies[n];var native=expectedQueue[n];notifications++;
-                    Assert.True(notifyProfile.Binding.TryTimeline(dispatch.Reference,out var timeline));
-                    Assert.Equal(native.GetProperty("object").GetString(),notifyProfile.Footsteps[timeline.EventId].ObjectPath);
+                    Assert.True(notifyBinding.TryTimeline(dispatch.Reference,out var timeline));
+                    Assert.Equal(native.GetProperty("object").GetString(),footstepObjects[timeline.EventId].ObjectPath);
                     Assert.Equal(native.GetProperty("instance").GetInt64(),dispatch.PlaybackEpoch);
                     var error=MathF.Abs(native.GetProperty("currentTime").GetSingle()-dispatch.Reference.CurrentTime);maxNotifyTimeError=MathF.Max(error,maxNotifyTimeError);
                     Assert.True(error<=2e-6f,context+$" notify context native={native.GetProperty("currentTime")} actual={dispatch.Reference.CurrentTime}");
