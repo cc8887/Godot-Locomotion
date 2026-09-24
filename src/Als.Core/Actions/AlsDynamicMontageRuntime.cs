@@ -138,7 +138,7 @@ public sealed class AlsMontageRuntime
         }
     }
 
-    public void Begin(AlsFrameIdentity identity, float delta)
+    public void Begin(AlsFrameIdentity identity, float delta, bool ragdoll = false)
     {
         if (_prepared || identity.SlotGeneration == 0 || !float.IsFinite(delta) || delta <= 0 ||
             CommittedIdentity != default && (identity.SlotGeneration != CommittedIdentity.SlotGeneration ||
@@ -147,9 +147,18 @@ public sealed class AlsMontageRuntime
         Ensure(_committedCount); _count = _evaluationCount = _traversalCount = 0;
         _identity = identity; _serial = _committedSerial;
         _rootMotionInstance = _committedRootMotionInstance; _rootMotionRange = new(identity, 0, -1, 0, 0);
+        if (ragdoll) _rootMotionInstance = 0;
         for (var i = 0; i < _committedCount; i++)
         {
-            var state = _committed[i]; var blend = state.Blend; var previousWeight = blend.CurrentWeight;
+            var state = _committed[i];
+            if (ragdoll && state.Blend.DesiredWeight > 0)
+            {
+                var stopBlend = state.Blend;
+                AlsActionLifecycle.Stop(.2f, state.Settings.BlendOutOption, ref stopBlend);
+                state = state with { Blend = stopBlend, BlendTime = .2f, BlendResetPending = false,
+                    Interrupted = true, OwnsActiveActionLookup = false };
+            }
+            var blend = state.Blend; var previousWeight = blend.CurrentWeight;
             // UE selects its motion owner before Advance. Auto-blend-out clears
             // future ownership, but this tick still extracts its traversed range.
             var extractMotion = state.InstanceId == _rootMotionInstance && state.Playing;
@@ -264,6 +273,24 @@ public sealed class AlsMontageRuntime
         for (var i = _count - 1; i >= 0; i--)
             if (_candidate[i].InstanceId == instanceId) { Stop(i, blendTime, option); return true; }
         return false;
+    }
+
+    // ALS entry stops every slot/group with its authored blend-out option.
+    public void StopForRagdoll()
+    {
+        RequirePrepared();
+        for (var i = 0; i < _count; i++)
+        {
+            // Montage_Stop(nullptr) only visits IsActive (desired weight > 0).
+            // Existing auto/replacement fades retain their original duration.
+            if (_candidate[i].Blend.DesiredWeight <= 0) continue;
+            var instance = _candidate[i].InstanceId;
+            Stop(i, .2f, _candidate[i].Settings.BlendOutOption);
+            for (var t = 0; t < _traversalCount; t++)
+                if (_traversal[t].InstanceId == instance) _traversal[t] = _traversal[t] with { Interrupted = true };
+        }
+        _rootMotionInstance = 0;
+        _rootMotionRange = new(_identity, 0, -1, 0, 0);
     }
 
     public long ActiveActionInstance(int definitionId)

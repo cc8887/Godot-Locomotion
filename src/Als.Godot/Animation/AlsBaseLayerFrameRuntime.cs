@@ -118,11 +118,11 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     private float _motionPreparationDelta;
     private AlsPreparedRootMotion _preparedRootMotion;
 
-    internal AlsPreparedRootMotion PrepareRootMotion(AlsFrameIdentity identity, float delta)
+    internal AlsPreparedRootMotion PrepareRootMotion(AlsFrameIdentity identity, float delta, bool ragdoll = false)
     {
         Require(Phase.Idle);
         if (_motionPreparation != default) throw new InvalidOperationException("A montage tick is already pending.");
-        _actions.Begin(identity, delta);
+        _actions.Begin(identity, delta, ragdoll);
         _motionPreparation = identity; _motionPreparationDelta = delta;
         var source = _montages.RootMotionRange;
         return _preparedRootMotion = new(identity, source.HasMotion ? source : default, _rootMotion.Read(source));
@@ -132,9 +132,9 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         if (_motionPreparation == default) return;
         Require(Phase.Idle); _actions.Discard(); _motionPreparation = default; _preparedRootMotion = default;
     }
-    private void BeginMontageFrame(AlsFrameIdentity identity, float delta)
+    private void BeginMontageFrame(AlsFrameIdentity identity, float delta, bool ragdoll = false)
     {
-        if (_motionPreparation == default) _actions.Begin(identity, delta);
+        if (_motionPreparation == default) _actions.Begin(identity, delta, ragdoll);
         else
         {
             if (_motionPreparation != identity || _motionPreparationDelta != delta)
@@ -324,12 +324,14 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         try
         {
         _identity=frame.Identity; SourceUpdated=false; RequestCount=0; _phase=Phase.GlobalUpdating;
-        BeginMontageFrame(frame.Identity, frame.DeltaTime);
+        BeginMontageFrame(frame.Identity, frame.DeltaTime, _candidateMovementState == AlsMovementStateInput.Ragdoll);
         _candidateRolling = _committedRolling;
         _movementAction = _rollingGameplay ? frame.MovementAction : default;
         AlsRollingStartContext? rolling = _rollingGameplay ? new(frame.Floor.IsGrounded == 1 && !_movementAction.RequiresRagdoll,
             !_cancelForRuntimeFailure && _committedRolling.Active ? AlsTimelineAction.Rolling : frame.GameplayAction) : null;
-        _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None, _cancelForRuntimeFailure, rolling, frame.ActionParameters);
+        _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None, _cancelForRuntimeFailure, rolling, frame.ActionParameters,
+            ragdoll: _candidateMovementState == AlsMovementStateInput.Ragdoll);
+        if (_candidateMovementState == AlsMovementStateInput.Ragdoll) _preparedRootMotion = default;
         _failureEpochCount = 0;
         for (var i = 0; i < _actions.Outcomes.Count; i++)
             if (_actions.Outcomes[i].ResultCode == AlsActionResultCode.InterruptedByRuntimeFailure)

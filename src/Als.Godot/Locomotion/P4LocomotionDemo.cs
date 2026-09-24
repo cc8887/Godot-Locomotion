@@ -234,6 +234,11 @@ public partial class P4LocomotionDemo : Node3D
             }
         }
         if (!_runtimeConfigured || !_playerInput.ActionPreviewEnabled || _failed) return;
+        if (input is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.G })
+        {
+            _slot.ActiveCharacter.RequestRagdoll(GetNode<Node3D>("World"));
+            GetViewport().SetInputAsHandled(); return;
+        }
         var roll = input.IsActionPressed("roll_preview", allowEcho: false);
         var cancel = input.IsActionPressed("action_cancel", allowEcho: false);
         if (!roll && !cancel) return;

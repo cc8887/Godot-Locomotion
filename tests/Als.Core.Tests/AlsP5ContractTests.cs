@@ -47,7 +47,7 @@ public sealed class AlsP5ContractTests
             ("RejectedBusy", 5), ("RejectedLowerPriority", 6),
             ("InterruptedByReplacement", 7), ("InterruptedByExplicitCancel", 8),
             ("InterruptedByEarlyBlendOut", 9), ("InterruptedByLifecycle", 10),
-            ("InterruptedByGeneration", 11), ("InterruptedByRuntimeFailure", 12));
+            ("InterruptedByGeneration", 11), ("InterruptedByRuntimeFailure", 12), ("InterruptedByRagdoll", 13));
         AssertEnum<byte, AlsP5OccurrenceSourceKind>(
             ("Base", 1), ("Turn", 2), ("Rotate", 3),
             ("Transition", 4), ("ActionMontage", 5), ("ActionSequence", 6),

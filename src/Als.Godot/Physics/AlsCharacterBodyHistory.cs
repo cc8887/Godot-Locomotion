@@ -125,6 +125,7 @@ public partial class AlsCharacterBodyHistory : Node
             {
                 var next = Next(); _history.PrepareNoTarget(next); _history.Commit(next); _physicalSequence = next.FrameId;
             }
+            _owner.ConsumeRagdollRequest();
         }
         catch (Exception error)
         {

@@ -36,7 +36,7 @@ public partial class AlsP3WorkerRoot
             if (!owner.TryGetMotionPreparation(delta, out identity, out var frameDelta) || HasPublishedSplitResult(identity)) return;
             var isMain = System.Environment.CurrentManagedThreadId == _context.MainManagedThreadId;
             if ((_context.Mode == AlsHarnessMode.Single) != isMain) Interlocked.Increment(ref _context.AffinityViolations);
-            MotorRootMotion = _controller.PrepareRootMotion(identity, frameDelta);
+            MotorRootMotion = _controller.PrepareRootMotion(identity, frameDelta, owner.PhysicsDriven);
         }
         catch (Exception exception)
         {

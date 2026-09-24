@@ -433,7 +433,7 @@ public static partial class AlsTimelineRuntime
             AlsActionResultCode.InterruptedByReplacement or
             AlsActionResultCode.InterruptedByExplicitCancel or
             AlsActionResultCode.InterruptedByEarlyBlendOut or
-            AlsActionResultCode.InterruptedByRuntimeFailure;
+            AlsActionResultCode.InterruptedByRuntimeFailure or AlsActionResultCode.InterruptedByRagdoll;
     }
 
     private static bool ValidateDefinitionBindings(

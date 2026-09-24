@@ -40,7 +40,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     private readonly AlsBaseLayerFrameRuntime _base;
     private readonly AlsLayeredAnimationFrameRuntime? _layered;
     public bool UsesLayeredPose => _layered is not null;
-    internal AlsPreparedRootMotion PrepareRootMotion(AlsFrameIdentity identity, float delta) => _base.PrepareRootMotion(identity, delta);
+    internal AlsPreparedRootMotion PrepareRootMotion(AlsFrameIdentity identity, float delta, bool ragdoll = false) => _base.PrepareRootMotion(identity, delta, ragdoll);
     internal void DiscardRootMotionPreparation() => _base.DiscardRootMotionPreparation();
     public Transform3D PropAttachment(int logicalBone)
     {

@@ -45,16 +45,16 @@ public sealed class AlsMontageActionRuntime
         _history = new(0,-1,AlsActionCommand.None);
     }
 
-    public void Begin(AlsFrameIdentity identity, float delta)
+    public void Begin(AlsFrameIdentity identity, float delta, bool ragdoll = false)
     {
         if (_phase != Phase.Idle) throw new InvalidOperationException("An action frame is already prepared.");
-        _montages.Begin(identity,delta);
+        _montages.Begin(identity,delta,ragdoll);
         _identity=identity; _committed.CopyTo(_candidate,0); _nextHistory=_history; _outcomes=default; _requestApplied=false;
         _phase=Phase.Preparing;
     }
 
     public void ApplyRequest(in AlsActionRequest request, bool cancelForRuntimeFailure = false,
-        AlsRollingStartContext? rolling = null, AlsMontageActionParameters parameters = default)
+        AlsRollingStartContext? rolling = null, AlsMontageActionParameters parameters = default, bool ragdoll = false)
     {
         if (_phase != Phase.Preparing || _requestApplied) throw new InvalidOperationException("Action request phase differs.");
         _requestApplied=true;
@@ -66,6 +66,19 @@ public sealed class AlsMontageActionRuntime
             if ((byte)request.Command>(byte)AlsActionCommand.CancelForRuntimeFailure ||
                 request.Command==AlsActionCommand.None && !canonicalNone)
                 throw new ArgumentException("Malformed action command.");
+            if (ragdoll)
+            {
+                _montages.StopForRagdoll();
+                for (var i = 0; i < _candidate.Length; i++)
+                {
+                    var owner = _candidate[i]; if (owner.InstanceId <= 0) continue;
+                    Add(new(owner.RequestId, owner.DefinitionId, owner.InstanceId, AlsActionResultCode.InterruptedByRagdoll));
+                    _candidate[i] = default;
+                }
+                if (!canonicalNone && request.RequestId > _nextHistory.LastRequestId)
+                { Record(request, true); Reject(request, AlsActionResultCode.RejectedBusy); }
+                return;
+            }
             if (cancelForRuntimeFailure)
                 for (var i=0;i<_candidate.Length;i++) if (_candidate[i].InstanceId>0) Close(i,AlsActionResultCode.InterruptedByRuntimeFailure);
             // Recovery owns the old action even if this frame's physical tick

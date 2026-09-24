@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Ragdoll动作/手动入口：`docs/verification/2026-09-24-ragdoll-actions-and-input.md`。G请求在Main Lifecycle已提交边界创建owner，可打断Roll；纯值PhysicsDriven在下一Montage tick前执行原生0.2秒停止，保留已淡出、清root motion、逻辑InterruptedByRagdoll=13一次，新请求Busy且去重。Single30/Parallel120、首次切入失败+暂停60及实际渲染/普通Roll回归通过，最终Notify/Action归属归零；Core2904既定过滤、Import定向122、Optimize过。姿态测试修站姿尺寸假设/1.49e-8舍入误报，详情见文档。G尚不能起身，自动高落差/离地触发、退出Get-up/PoseRecovery及全部旧目标仍待接；用户要求头颈诊断和道具暂缓，相关未提交诊断保留；main/用户P4保留。
+
 - 最新物理显示：`docs/verification/2026-09-24-ragdoll-physical-display.md`。Main物理步→胶囊跟随→用实际Skeleton world逆变换回写物理骨骼，当前committed animation作非物理TRS基底，不重Seed/不污染precise Flail；空闲worker/身份/步数检查、写失败回滚。Single60/Parallel30/120及真实渲染60故障暂停通过，最大世界误差<1e-6m，四截图人工检查；两模型8姿态/192回写/56拒绝与普通Roll恢复回归过，Optimize过。首轮截图退出重复disconnect已修复，最终rendered60-final无ERROR。无全量/UE/旧矩阵/性能验收；道具物理attachment、动作中断/普通触发/退出Get-up/Pose Recovery及其余目标仍待接。main/用户P4保留。
 
 - 最新骨盆/胶囊跟随：`docs/verification/2026-09-24-ragdoll-pelvis-follow.md`。按用户优先级先接物理 pelvis actor→胶囊，球扫球心高度+1.9 cm、配置mask/自身排除、零目标回退；Godot初始重叠需额外零运动查询。Main Lifecycle成功物理步后跟随，动画重试继续/停用暂停，不积分胶囊/不拖动物理岛。Single60、Parallel30/60/120及失败暂停、四查询边界检查通过，日志pelvis-follow-fixed*；首轮initial-overlap失败保留。Optimize通过，无全量/UE/旧矩阵；物理最终显示/当前非物理基底、触发中断退出恢复仍待接，单机范围/时序差异见文档。main/用户P4保留。
