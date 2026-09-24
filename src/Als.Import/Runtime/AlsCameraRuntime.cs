@@ -50,7 +50,11 @@ public sealed class AlsCameraRuntime(AlsCameraRigDefinition definition)
             var values = new AlsCameraFollowCurves(Vector("PivotOffset"), Vector("CameraOffset"),
                 Value("LocationLagX"), Value("LocationLagY"), Value("LocationLagZ"), Value("RotationLag"),
                 Value("TraceOverride"), Value("FirstPersonOverride"));
-            var candidate = AlsCameraFollow.Step(State, sceneInput, definition.Follow, values, trace);
+            // Native CalculateFovOffset reads the evaluated graph, after the
+            // first/third-person blend and explicit FOV override. Follow retains
+            // the full-first-person early return and final 5..175 clamp.
+            var followInput = sceneInput with { FovOffset = sceneInput.FovOffset + Value("FovOffset") };
+            var candidate = AlsCameraFollow.Step(State, followInput, definition.Follow, values, trace);
             _pending = candidate; return candidate;
         }
         catch { _graph.Discard(); throw; }

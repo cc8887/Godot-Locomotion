@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新FOV完整性：`docs/verification/2026-09-24-camera-fov-completeness.md`。源码TickCamera/CalculateFovOffset核对发现组合runtime漏消费图FovOffset，现候选图值+宿主offset送Follow，保留fullFP早返回/覆盖/5..175限制。七夹具先红5/绿2后全绿，Import相机40过、Optimize0/0、普通Parallel60八秒480提交过。原始3114帧FovOffset存在0，不宣称当前非零曲线观感修复。无UE改动/启动/构建或新位置oracle；下一步真实组件Tick轨迹（曲线/插槽/base/view/内部history）再碰撞与完整链。全目标/旧物理失败/Mantle/性能保留，头颈道具暂缓，用户文件未动。
+
 - 最新相机恢复：`docs/verification/2026-09-24-camera-query-recovery.md`。修一次查询异常永久冻结：容量/非法fraction专用可重试异常，Discard候选、下一eligible帧当前场景重查、不积攒dt；成功清当前故障，保留计数/最近错误，每段首帧warning；其他配置/owner错误仍terminal。绑定先构造后换owner。真实肩部70小盒+胶囊排除制造64容量溢出，Single30/Parallel60/120各两轮五帧冻结FollowState/Camera3D/FOV，撤障次帧恢复、10失败52提交；连续环境60回归数值同，Optimize0/0。首轮大盒夹具未触发、fail保留，非放宽断言。无新Core/Import全量/UE/截图；下一步原生组件位置oracle。旧9/12、Flail0/3、Mantle/性能继续，头颈/道具暂缓，用户文件保留。
 
 - 最新相机连续环境：`docs/verification/2026-09-24-camera-continuous-environment.md`。普通入口十四秒：往返墙面15cm球心独立间距/撤墙外放、实际平移旋转base与局部历史空间、离开清base、角色换代后恢复跟随；Single30/Parallel60/120各74/149/299墙及两平台采样过，minRatio约.454，替换过；最终渲染60数值同，Optimize0/0。只新增回归，无生产算法/Core/Import/UE改动或全量/截图。下一步宿主查询故障恢复→原生组件位置oracle/复杂环境；仍非完整相机等价。旧物理9/12、Flail0/3、Mantle/性能未完成，头颈/道具暂缓，用户文件保留。
