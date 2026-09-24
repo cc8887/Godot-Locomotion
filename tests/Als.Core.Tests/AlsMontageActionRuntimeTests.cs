@@ -220,6 +220,66 @@ public sealed class AlsMontageActionRuntimeTests
             parameters: new(1.3f, true, 90)));
     }
     private static AlsFrameIdentity Id(int frame)=>new(frame,1,1);
+    [Fact]
+    public void RagdollStopsOwnersWithNativeFadeAndCanDiscardThenRetry()
+    {
+        var (bank, owner) = Create();
+        owner.Begin(Id(1), .05f); owner.ApplyRequest(Start(1)); owner.Complete(); owner.Commit(Id(1));
+        owner.Begin(Id(2), .05f); owner.ApplyRequest(AlsActionRequest.None, ragdoll: true); owner.Complete();
+        Assert.Equal(AlsActionResultCode.InterruptedByRagdoll, owner.Outcomes[0].ResultCode);
+        Assert.Equal(.2f, bank.Candidate[0].BlendTime); Assert.True(bank.Candidate[0].Interrupted);
+        Assert.False(bank.RootMotionRange.HasMotion); Assert.Equal(0, owner.CandidateOwners[0].InstanceId);
+        owner.Discard(); Assert.False(bank.Committed[0].Interrupted); Assert.Equal(1, owner.CommittedOwners[0].RequestId);
+        owner.Begin(Id(2), .05f); owner.ApplyRequest(Start(2), ragdoll: true); owner.Complete();
+        Assert.Equal(2, owner.Outcomes.Count); Assert.Equal(AlsActionResultCode.RejectedBusy, owner.Outcomes[1].ResultCode);
+        owner.Commit(Id(2));
+        for (var frame = 3; frame <= 10; frame++)
+        {
+            owner.Begin(Id(frame), .05f); owner.ApplyRequest(Start(2), ragdoll: true); owner.Complete();
+            Assert.Equal(0, owner.Outcomes.Count); owner.Commit(Id(frame));
+        }
+        Assert.Empty(bank.Committed.ToArray());
+    }
+
+    [Fact]
+    public void RagdollStopsDynamicTurnGroupsButDoesNotShortenExistingFades()
+    {
+        var bank = new AlsMontageRuntime(new[]
+        { new AlsDynamicMontageAsset(10, AlsTurnSlot.Standing, 0, 5),
+          new AlsDynamicMontageAsset(11, AlsTurnSlot.Crouching, 1, 5) });
+        bank.Begin(Id(1), .05f);
+        bank.Play(new(10, AlsTurnSlot.Standing, 1, 0, .1f, .7f, 1, 0));
+        bank.Play(new(11, AlsTurnSlot.Crouching, 1, 0, .1f, .7f, 1, 0));
+        bank.Commit(Id(1)); bank.Begin(Id(2), .05f);
+        var old = bank.Candidate[0].InstanceId;
+        bank.StopInstance(old, .7f, AlsActionBlendOption.HermiteCubic);
+        bank.Commit(Id(2)); bank.Begin(Id(3), .05f);
+        var fading = bank.Candidate[0]; bank.StopForRagdoll();
+        Assert.Equal(fading, bank.Candidate[0]);
+        Assert.Equal(.2f, bank.Candidate[1].BlendTime);
+        Assert.True(bank.Candidate[1].Interrupted);
+        Assert.All(bank.Traversal.ToArray(), tick => Assert.True(tick.Interrupted));
+    }
+
+    [Fact]
+    public void RagdollStopPrecedesTheNextPhysicalMontageTick()
+    {
+        var (bank, owner) = Create();
+        for (var frame = 1; frame <= 4; frame++)
+        {
+            owner.Begin(Id(frame), .05f); owner.ApplyRequest(frame == 1 ? Start(1) : AlsActionRequest.None);
+            owner.Complete(); owner.Commit(Id(frame));
+        }
+        var before = bank.Committed[0].Blend.CurrentWeight;
+        owner.Begin(Id(5), .05f, ragdoll: true);
+        Assert.True(bank.Candidate[0].Interrupted);
+        Assert.True(bank.Candidate[0].Blend.CurrentWeight < before);
+        Assert.All(bank.Traversal.ToArray(), tick => Assert.True(tick.Interrupted));
+        Assert.False(bank.RootMotionRange.HasMotion);
+        owner.ApplyRequest(AlsActionRequest.None, ragdoll: true); owner.Complete();
+        Assert.Equal(AlsActionResultCode.InterruptedByRagdoll, owner.Outcomes[0].ResultCode);
+        owner.Discard(); Assert.False(bank.Committed[0].Interrupted);
+    }
     private static AlsActionRequest Start(long id)=>new(id,AlsActionCommand.Start,0,0,100,1);
     private static AlsActionRequest Cancel(long id)=>new(id,AlsActionCommand.Cancel,0,-1,0,1);
 }

@@ -29,6 +29,10 @@ public partial class CharacterRagdollFlailSmoke : Node
     private string? _captureDirectory;
     private int _nextCapture, _captures;
     private bool _captureConnected;
+    private bool _rollEntry, _keyEntry, _entryRequested, _rollRequested;
+    private int _ragdollInterrupts;
+    private bool _entryFailure;
+    private int _busyRejections;
     private Input.MouseModeEnum _mouse;
     private bool _accumulation;
 
@@ -39,6 +43,8 @@ public partial class CharacterRagdollFlailSmoke : Node
         try
         {
             var args = OS.GetCmdlineUserArgs(); _inject = args.Contains("--failure");
+            _rollEntry = args.Contains("--roll-entry"); _keyEntry = args.Contains("--key-entry");
+            _entryFailure = args.Contains("--entry-failure"); _inject |= _entryFailure;
             _pause = args.Contains("--pause");
             _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
             Require(_hz is 30 or 60 or 120, "Unsupported frequency."); Engine.PhysicsTicksPerSecond = _hz;
@@ -49,6 +55,11 @@ public partial class CharacterRagdollFlailSmoke : Node
             _demo.ConfigureRuntimePolicyForSmoke(args.Contains("--single") ? AlsHarnessMode.Single : AlsHarnessMode.Parallel,
                 args.Contains("--debug-policy"));
             AddChild(_demo); RollingGameplaySmoke.PlaceOnOpenFloor(_demo); KeyInput(true);
+            _demo.RuntimeContext.ActionOutcomeCommitted += (_, outcome) =>
+            {
+                if (outcome.ResultCode == AlsActionResultCode.InterruptedByRagdoll) _ragdollInterrupts++;
+                if (outcome.ResultCode == AlsActionResultCode.RejectedBusy) _busyRejections++;
+            };
             var capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="));
             if (capture is not null)
             {
@@ -80,13 +91,29 @@ public partial class CharacterRagdollFlailSmoke : Node
             Require(_demo.ErrorCount <= (_inject ? 1 : 0), "Unexpected graph failure.");
             if (!_entered)
             {
+                if (_rollEntry && !_rollRequested && character.RuntimeCommittedFrameId >= 10)
+                { Tap(Key.R); _rollRequested = true; }
                 if (character.RuntimeCommittedFrameId < 20) return;
+                if (_keyEntry && character.RagdollSimulation is null)
+                {
+                    if (!_entryRequested)
+                    {
+                        Require(!_rollEntry || character.CommittedAnimation.ActionCount > 0, "Roll entry has no active action.");
+                        Tap(Key.G); _entryRequested = true;
+                    }
+                    return;
+                }
                 _integrations = character.MotorIntegrationCount; _capsulePosition = character.MovementAnchor.GlobalPosition;
-                character.BeginRagdoll(_demo.GetNode<Node3D>("World"));
+                if (!_keyEntry) character.BeginRagdoll(_demo.GetNode<Node3D>("World"));
                 VerifyGroundFollow(character);
                 ConfigureDisplayChecks(character);
                 _flail = new AlsPrecisePose[character.AnimationPoseBoneCount];
                 _lastAnimation = character.RuntimeCommittedFrameId;
+                if (_entryFailure)
+                {
+                    _demo.RuntimeContext.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish,
+                        character.HandleIdentity(_lastAnimation + 1)); _armed = true;
+                }
                 KeyInput(false); _entered = true; return;
             }
             var simulation = character.RagdollSimulation!;
@@ -97,8 +124,8 @@ public partial class CharacterRagdollFlailSmoke : Node
             Require(motor.RagdollTarget == pelvis && Mathf.Abs(motor.GlobalPosition.X - pelvis.X) < 1e-5f &&
                 Mathf.Abs(motor.GlobalPosition.Z - pelvis.Z) < 1e-5f,
                 "Capsule did not follow the completed physical pelvis.");
-            Require(motor.RagdollGrounded || motor.GlobalPosition == pelvis,
-                "Airborne capsule differs from physical pelvis.");
+            Require(motor.RagdollGrounded || motor.GlobalPosition.DistanceTo(pelvis) < 1e-6f,
+                $"Airborne capsule differs from physical pelvis: capsule={motor.GlobalPosition} pelvis={pelvis} error={motor.GlobalPosition.DistanceTo(pelvis):R}.");
             Require(simulation.CompletedSteps == _lastPhysics + 1, "Ragdoll physics skipped or duplicated an engine step.");
             _lastPhysics = simulation.CompletedSteps;
             VerifyDisplay(character, simulation);
@@ -115,6 +142,8 @@ public partial class CharacterRagdollFlailSmoke : Node
                     character.LatestMotorInput.ActualVelocity == System.Numerics.Vector3.Zero,
                     "Ordinary graph did not publish/consume Ragdoll in the same frame.");
                 var input = character.LatestMotorInput; input.RagdollPhysics.Validate(id);
+                Require(!character.Diagnostics.Result.RootMotionSource.HasMotion && !character.Diagnostics.Result.Rolling.Active,
+                    "Ragdoll retained root motion or rolling ownership.");
                 Require(input.RagdollPhysics.CompletedSteps < simulation.CompletedSteps &&
                     input.RagdollPhysics.ActivationIdentity == simulation.Activation.Entry.Identity,
                     "Animation consumed future or foreign physics.");
@@ -125,6 +154,7 @@ public partial class CharacterRagdollFlailSmoke : Node
                 if (_epoch == 0) _epoch = diagnostics.PlayerEpoch;
                 Require(_epoch == diagnostics.PlayerEpoch, "Flail playback identity restarted during continuous activation.");
                 _samples++; _lastAnimation = id.FrameId;
+                if (_keyEntry && _samples == 12) { Tap(Key.G); Tap(Key.R); }
                 if (_inject && !_armed && _samples == 4)
                 {
                     _demo.RuntimeContext.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish,
@@ -142,12 +172,16 @@ public partial class CharacterRagdollFlailSmoke : Node
             Require(!_inject || _held == 1 && character.FailureDiagnosticCount == 1,
                 "Animation failure/retry coverage differs.");
             var samples = _samples; var steps = simulation.CompletedSteps;
+            Require(_ragdollInterrupts == (_rollEntry ? 1 : 0), "Ragdoll action interruption was missing or duplicated.");
+            Require(!_keyEntry || _busyRejections == 1, "Ragdoll accepted or duplicated a new action request.");
+            Require(character.CommittedAnimation.ActionCount == 0 && character.CommittedAnimation.StateCount == 0,
+                "Ragdoll retained action or Notify State ownership after montage fade-out.");
             Require(motor.GlobalPosition.DistanceTo(_capsulePosition) > .05f && motor.RagdollGrounded,
                 "Capsule never followed the falling pelvis onto the floor.");
             Cleanup();
             Require(character.RagdollSimulation is null, "Character disposal retained physical owner.");
             _done = true;
-            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 pelvis_follow=true ground_cases=4 physical_display=true max_world_error_m={_maxWorldError:R}");
+            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 pelvis_follow=true ground_cases=4 physical_display=true max_world_error_m={_maxWorldError:R} key_entry={_keyEntry} ragdoll_interrupts={_ragdollInterrupts}");
             GetTree().Quit();
         }
         catch (Exception error) { Fail(error); }
@@ -217,8 +251,9 @@ public partial class CharacterRagdollFlailSmoke : Node
         var velocity = simulation.PelvisVelocity;
         var floor = _demo!.GetNode<CollisionShape3D>("World/StartFloor/CollisionShape3D");
         var top = floor.GlobalPosition.Y + ((BoxShape3D)floor.Shape).Size.Y * .5f;
-        var half = _demo.RuntimeContext.MotorSettings.StandingHeight * .5f;
-        var radius = _demo.RuntimeContext.MotorSettings.CapsuleRadius;
+        var capsule = (CapsuleShape3D)motor.GetNode<CollisionShape3D>("AlsCapsuleCollision").Shape;
+        var half = capsule.Height * .5f;
+        var radius = capsule.Radius;
         var air = new Vector3(10, top + 10, 10);
         motor.FollowRagdoll(air);
         Require(!motor.RagdollGrounded && motor.GlobalPosition == air, "Airborne follow altered pelvis height.");
@@ -240,6 +275,14 @@ public partial class CharacterRagdollFlailSmoke : Node
     {
         using var key = new InputEventKey { Keycode = Key.W, PhysicalKeycode = Key.W, Pressed = pressed };
         Input.ParseInputEvent(key); Input.FlushBufferedEvents();
+    }
+    private static void Tap(Key key)
+    {
+        foreach (var pressed in new[] { true, false })
+        {
+            using var input = new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = pressed };
+            Input.ParseInputEvent(input); Input.FlushBufferedEvents();
+        }
     }
     private void Cleanup()
     {

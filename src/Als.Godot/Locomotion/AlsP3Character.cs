@@ -18,16 +18,30 @@ public partial class AlsP3Character : Node3D
     internal AlsOverlayPropRuntime? Props { get; private set; }
     internal GodotAls.Physics.AlsCharacterBodyHistory? BodyHistory { get; private set; }
     internal GodotAls.Physics.AlsCharacterRagdollSimulation? RagdollSimulation { get; private set; }
+    private Node? _requestedRagdollEnvironment;
+    private int _physicsDriven;
+    internal bool PhysicsDriven => Volatile.Read(ref _physicsDriven) != 0;
+    internal void RequestRagdoll(Node environment)
+    {
+        EnsureMainThread(); EnsureConfigured(); ThrowIfDisposed();
+        if (BodyHistoryActive && RagdollSimulation is null) _requestedRagdollEnvironment = environment;
+    }
+    internal void ConsumeRagdollRequest()
+    {
+        if (_requestedRagdollEnvironment is not { } environment || PublishedFrameId != RuntimeCommittedFrameId) return;
+        BeginRagdoll(environment); _requestedRagdollEnvironment = null;
+    }
     internal void BeginRagdoll(Node environment)
     {
         EnsureMainThread(); EnsureConfigured(); ThrowIfDisposed();
         if (!BodyHistoryActive || RagdollSimulation is not null || !_worker.UsesRefactoredFeet ||
-            PublishedFrameId != RuntimeCommittedFrameId || CommittedAnimation.ActionCount != 0)
-            throw new InvalidOperationException("Ragdoll activation requires an idle committed complete character; active montage interruption is not connected yet.");
+            PublishedFrameId != RuntimeCommittedFrameId)
+            throw new InvalidOperationException("Ragdoll activation requires an idle committed complete character.");
         var simulation = GodotAls.Physics.AlsCharacterRagdollSimulation.Create(this, environment, this, _context);
         _motor.CollisionLayer = 0; _motor.CollisionMask = 0;
         _motor.Velocity = Vector3.Zero;
         RagdollSimulation = simulation;
+        Volatile.Write(ref _physicsDriven, 1);
     }
     internal void FollowRagdollPelvis() => _motor.FollowRagdoll(RagdollSimulation!.PelvisPosition);
     internal void PresentRagdoll() => _worker.PresentRagdoll(RagdollSimulation!);
@@ -549,6 +563,7 @@ public partial class AlsP3Character : Node3D
         else
         {
             CloseWorkerAdmissionForDeactivation();
+            _requestedRagdollEnvironment = null;
             BodyHistory?.ResetHistory();
             _worker.CancelSplitFootForLifecycle();
             // Closed-admission checkpoint for same-generation resume. This is
@@ -789,6 +804,7 @@ public partial class AlsP3Character : Node3D
         BodyHistory?.ResetHistory();
         BodyHistory?.SetPhysicsProcess(false);
         RagdollSimulation?.Dispose(); RagdollSimulation = null;
+        _requestedRagdollEnvironment = null; Volatile.Write(ref _physicsDriven, 0);
         Props?.Dispose(); Props = null;
         _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByLifecycle);
     }

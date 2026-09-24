@@ -111,6 +111,7 @@ public enum AlsActionResultCode : ushort
     InterruptedByLifecycle = 10,
     InterruptedByGeneration = 11,
     InterruptedByRuntimeFailure = 12,
+    InterruptedByRagdoll = 13,
 }
 
 public enum AlsP5OccurrenceSourceKind : byte
