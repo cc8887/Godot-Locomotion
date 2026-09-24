@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新完整 Refactored Layering 图：`docs/verification/2026-09-25-refactored-full-layer-graph.md`。AlsRefactoredLayerGraphCompiler实际94节点/11缓存/7 Slot/4input，runtime links与authored reroute交叉校验，LayeringState绑定及PoseStanding/Crouching过去curve映射，实际79骨/VB过滤553索引weight逐值同UE。真实basepose+受控linked/Slot，两场景各120帧每帧discard重试一致，全覆盖访问7Slot。Import63/1旧跳过/Optimize0/0，新增9；首次Slot失败为测试dangling else错写Posecurve，修夹具而非runtime，诊断撤除TRX保留。无Core生产更改/新UE oracle/Godot/全量；完整linked图已跑通但仍受控provider，下一步native运行对照/生产Refactored布局及区域Slot/Head→普通Mantle。所有旧缺口/用户文件/暂缓项保留。
+
 - 最新 Refactored 基础姿态：`docs/verification/2026-09-25-refactored-base-poses.md`。实际Stand/Crouch节点37/38原始键/骨架/policy/空曲线导出，各2键1/30秒、68physical/79logical，固定frame0 teleport无sync；新Compiler校验图清单hash/源与策略，复用精确raw/retarget/VB/curve内部入口，Mantle旧motion闭包保留。40原生姿态3160骨/440VB最大P4.0283e-14cm/Q2.22e-16/S0，960独立owner采样同；Import104/Optimize0/0。两冷导0/0字节同，inputSHA61A14AEEA81197422AB3199B9E82970151211B4F2FCF9E64F3B94A75507FC502/referenceSHA A53B327B2785DAE7A94907F8EE8B9850F1E806EC9E991AB2CFFA485006D64807；完整Editor审计同6A36CA...、无插件变更/新EditorDV/Core全量/Godot。下一步真实94图绑定/PoseState/完整VB/Slot/Head→普通Mantle；旧缺口/用户文件/暂缓项保留。
 
 - 最新 Refactored MultiWay：`docs/verification/2026-09-25-refactored-multiway.md`。共享runtime新增 NormalizedMultiWayBlend，对应实际 normalize=true/additive=false/scale1bias0，raw float总和→clamp归一化→相关性筛选，剩余不重归一化；零源refpose，顺序pose/curve累加及native两次旋转normalize，嵌套与discard沿用。Core定向19、Import73/1旧条件跳过、Optimize0/0，无失败/新UE oracle/新Godot/全量。仅算子支持，未接真实站蹲SequenceEvaluator/PoseState/94完整图/VB/Head及普通Mantle；全部旧缺口/用户文件/暂缓项保留。
