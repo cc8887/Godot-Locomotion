@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新武器播放身份：`docs/verification/2026-09-25-refactored-weapon-players.md`。编译四原嵌套state/baked SequencePlayer共15身份（前三各3，Rifle6），原Idle Secondary Motion/CanBeLeader/rate1，Rifle三arms Movement/AlwaysFollower/rate0；显式host ID/group及政策校验。修SourcePlayer漏传Role，默认旧行为不变/非法role拒绝。新8/Import120/CoreRole9/Optimize0/0；实际三arms+低权重Walk三Hz420帧跟随/原79骨采样/retry过。旧适配器最终仍选Walk但先按leader尝试arms导致其time0，初对照误断言最终leader不同3失败已修日志保留。无新UE/native姿态/场景/全量/性能；尚未state更新权重/进入reset/整图pose，Overlay9/13、普通Demo未切、Ragdoll整体验收及所有旧缺口/用户文件/暂缓项保留。下一步实际state源更新→四武器整图/Locomotion统一宿主。
+
 - 最新Transition线程队列：`docs/verification/2026-09-25-refactored-transition-queue.md`。新增绑定bank/角色/generation的值候选队列，worker最后接受请求覆盖/null覆盖/门控拒绝保留；main逐次即时播放。stop优先阻止但保留play，消费后clear stop/-1、次帧可播；分开PlayQueued→Turn→StopQueued及事务取消。真实UE线程池+实际NativePostUpdate，12组3360帧265440骨/96实例/292多实例，队列一致/时间权重差0/maxP7.994e-14cm/Q6.662e-16/S0/curve1.193e-7；新Core6/相关167、worker12/Import98、Optimize0/0。首Core夹具异常类型误写1失败已修并保留。全Editor4actions审计C9B6E657...；冷/普通33852退出0字节同628ABE...；DV0/3旧warn、普通两旧Condition五类warn保留。无Godot场景/全量/性能/打包；完整Turn/dynamic足部调用端、四武器整图/Locomotion统一宿主待做，普通Demo未切/Overlay9/13/Ragdoll未整体验收，全部旧缺口/用户文件/暂缓项保留。
 
 - 最新Transition原生连续：`docs/verification/2026-09-25-refactored-transition-native.md`。实际四Linked通知函数→真实Parent设置/动态Montage→原Stand Pose+Transition Slot，12组3Hz3360帧265440骨，96实例/260多实例帧；时间/权重差0，maxP7.994e-14cm/Q8.050e-16/S0/curve1.193e-7。发现并补Core零delta入口与不推进/不自动停播，新增边界retry测试；新native12/Import86/CoreMontage161/Optimize0/0。初始缺参考和零delta12失败均保留。UE首编重载错修；旧receipt BuildId不一致移入可恢复20260924T231532036Z备份后全Editor10actions，审计A42BF623.../BuildId c5f9ab63...。冷/普通36508退出0字节同FC5E68...，DV0/3旧warn，普通两旧Condition五类warn保留。无整图/通知调度/Godot场景/全量/性能/打包；普通Demo未切、Overlay9/13、worker/stopQueued及四武器完整pose/Locomotion统一宿主、Ragdoll整体验收和全部旧缺口/用户文件/暂缓项仍保留。

@@ -4,7 +4,8 @@ using GodotAls.Core.Sync;
 
 namespace GodotAls.Import.Compilation;
 
-public sealed record AlsRefactoredSourcePlayerDefinition(int PlayerId,string Source,int GroupId,float StartPosition=0,bool Looping=true);
+public sealed record AlsRefactoredSourcePlayerDefinition(int PlayerId,string Source,int GroupId,float StartPosition=0,bool Looping=true,
+    AlsAssetSyncRole Role=AlsAssetSyncRole.CanBeLeader);
 public readonly record struct AlsRefactoredSourcePlayerInput(int PlayerId,Vector2 BlendInput,float PlayRate,float Weight,
     bool Reinitialize=false,float StartPosition=0,bool RequestedInertialization=false);
 
@@ -55,7 +56,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
     {
         if(catalog.IndexDigest!=bank.CatalogDigest)throw new ArgumentException("Foreign source Sync bank.");
         _bank=bank;var defs=definitions.OrderBy(d=>d.PlayerId).ToArray();
-        if(defs.Length is <1 or >AlsSyncRuntime.MaxAssetSyncPlayers||defs.Where((d,i)=>d.PlayerId!=i||d.GroupId< -1||!float.IsFinite(d.StartPosition)).Any())
+        if(defs.Length is <1 or >AlsSyncRuntime.MaxAssetSyncPlayers||defs.Where((d,i)=>d.PlayerId!=i||d.GroupId< -1||!float.IsFinite(d.StartPosition)||!Enum.IsDefined(d.Role)).Any())
             throw new ArgumentException("Source player IDs must form one bounded contiguous owner layout.");
         _tracks=new Track[defs.Length];
         foreach(var d in defs)
@@ -123,7 +124,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
             else _samples[cursor++]=new(id*16,track.Binding.SequenceIndex,1);
             _inputGroups[i]=track.Definition.GroupId;
             _inputs[i]=new(id,track.Binding.AssetId,_nextEpochs[id],kind,_nextTimes[id],tick.PlayRate,tick.Weight,start,cursor-start,track.Binding.MarkerMask,
-                Looping:track.Definition.Looping,LegacyLength:blend?.LegacyLength??false,RequestedInertialization:tick.RequestedInertialization);
+                Looping:track.Definition.Looping,LegacyLength:blend?.LegacyLength??false,RequestedInertialization:tick.RequestedInertialization,Role:track.Definition.Role);
         }
         if(!AlsSyncRuntime.TryEvaluateAssetSyncBatch(_groupIds,_inputGroups.AsSpan(0,input.Length),_inputs.AsSpan(0,input.Length),_samples.AsSpan(0,cursor),
             _bank.Sequences,_bank.Markers,_hasHistory?_groups:ReadOnlySpan<AlsAssetSyncBatchGroupHistory>.Empty,_history.AsSpan(0,_historyCount),_sampleHistory.AsSpan(0,_sampleHistoryCount),
