@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Transition原生连续：`docs/verification/2026-09-25-refactored-transition-native.md`。实际四Linked通知函数→真实Parent设置/动态Montage→原Stand Pose+Transition Slot，12组3Hz3360帧265440骨，96实例/260多实例帧；时间/权重差0，maxP7.994e-14cm/Q8.050e-16/S0/curve1.193e-7。发现并补Core零delta入口与不推进/不自动停播，新增边界retry测试；新native12/Import86/CoreMontage161/Optimize0/0。初始缺参考和零delta12失败均保留。UE首编重载错修；旧receipt BuildId不一致移入可恢复20260924T231532036Z备份后全Editor10actions，审计A42BF623.../BuildId c5f9ab63...。冷/普通36508退出0字节同FC5E68...，DV0/3旧warn，普通两旧Condition五类warn保留。无整图/通知调度/Godot场景/全量/性能/打包；普通Demo未切、Overlay9/13、worker/stopQueued及四武器完整pose/Locomotion统一宿主、Ragdoll整体验收和全部旧缺口/用户文件/暂缓项仍保留。
+
 - 最新Transition采样：`docs/verification/2026-09-25-refactored-transition-pose.md`。AlsRefactoredTransitionPose按显式宿主ID/catalog绑定两Standing mesh additive源，原79骨cm/显式curve重排与absence/独立worker sampler→IAlsMontagePoseSource；读物理Position不推进clock，非法输入不部分发布。新5/Import30/Optimize0/0，无失败；122时刻直源相同/并行同，840帧真实Slot混合retry/结束回base；原native仅t0两源158骨直接对照（其余旧参考double与montage float时间不同，未误比），原42 additive回归通过。无新native连续Slot/函数oracle/UE或Godot/全量/性能。下一步原生函数消费+Slot连续pose→四武器state/整图/Locomotion统一宿主；整图9/13、普通Demo未切、Ragdoll未整体验收及全部旧缺口/用户文件/暂缓项保留。
 
 - 最新Transition动态Montage：`docs/verification/2026-09-25-refactored-transition-montage.md`。新增独立Slot12/Count13保留旧编号；原SK_Als Grounded组1含Transition+两Turn，宿主显式组/动画ID，绑定两真实Standing mesh additive2源。通知批次预检→共享物理SequenceMontage，重复实例/组替换/冻结Evaluation；StopSlots依slot顺序只停active，负时长原Out/保留option/outgoing不改。新8/Import91/CoreMontage160通过，末停止循环顺序强化后8重跑，Optimize0/0，无失败。无新native播放oracle/UE或Godot/全量/性能；尚未原姿态/曲线采样、Locomotion Slot/统一宿主、stopQueued/worker覆盖生命周期。下一步原生函数消费→Transition采样及四武器源/pose；整图9/13、普通Demo未切、Ragdoll未整体验收、旧缺口/用户文件/暂缓项保留。

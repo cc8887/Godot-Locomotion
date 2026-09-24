@@ -181,7 +181,7 @@ public sealed class AlsMontageRuntime
 
     private void BeginCore(AlsFrameIdentity identity, float delta, bool ragdoll)
     {
-        if (_prepared || identity.SlotGeneration == 0 || !float.IsFinite(delta) || delta <= 0 ||
+        if (_prepared || identity.SlotGeneration == 0 || !float.IsFinite(delta) || delta < 0 ||
             CommittedIdentity != default && (identity.SlotGeneration != CommittedIdentity.SlotGeneration ||
                 identity.CharacterId != CommittedIdentity.CharacterId || identity.FrameId <= CommittedIdentity.FrameId))
             throw new ArgumentException("Invalid montage frame identity, phase or delta.");
@@ -214,7 +214,9 @@ public sealed class AlsMontageRuntime
             AlsActionLifecycle.AdvanceWeight(state.Settings, delta, ref blend);
             var previous = state.Position; var position = previous; var playing = state.Playing;
             var traversalEnd = position;
-            if (playing)
+            // With no evaluation time UE gathers active states, but never enters
+            // the substep loop (including its automatic blend-out boundary check).
+            if (playing && delta > 0)
             {
                 var rate = state.EffectivePlayRate;
                 var move = delta * rate;
