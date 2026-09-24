@@ -11,6 +11,17 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsRawAnimationSourceCompilerTests
 {
     private static readonly Lazy<AlsAnimationSetDefinition> Manifest = new(P3RepositoryFixtures.LoadAnimationSet);
+    [Theory]
+    [InlineData("AnimationScaled", 2)]
+    [InlineData("AnimationRelative", 3)]
+    [InlineData("OrientAndScale", 4)]
+    public void PreservesNativeRetargetModes(string mode, int expected)
+    {
+        var fixture = new Fixture();
+        fixture.Index["skeletons"]![0]!["translationRetargetModes"]![0] = mode;
+        Assert.Equal(expected, (int)fixture.Compile().GetSkeleton(0).TranslationRetargetModes[0]);
+    }
+
     [Fact]
     public void ReferenceRotationsRetainNativeDoubleBitsAndCannotShareAfterSubFloatChanges()
     {
@@ -286,7 +297,7 @@ public sealed class AlsRawAnimationSourceCompilerTests
             case "virtual-target": skeleton["virtualBones"]![0]!["target"] = 1; break;
             case "reference-position": skeleton["referencePose"]![1]!["position"]![0] = 999; break;
             case "reference-quaternion": skeleton["referencePose"]![1]!["rotation"] = Numbers([0, 0, 1, 0]); break;
-            case "retarget-mode": skeleton["translationRetargetModes"]![0] = "AnimationScaled"; break;
+            case "retarget-mode": skeleton["translationRetargetModes"]![0] = "UnknownRetargetMode"; break;
             case "interpolation": policy["interpolation"] = "Step"; break;
             case "root-enable": policy["enableRootMotion"] = true; break;
             case "root-force": policy["forceRootLock"] = true; break;

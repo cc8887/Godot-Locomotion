@@ -9,7 +9,8 @@ internal sealed class AlsPreciseRawAnimationSourceSampler
     private readonly AlsPreciseRawSequenceSampler _withReference, _withoutReference;
     private readonly AlsRawAnimationSourceDefinition _source;
     private readonly AlsRawAnimationSkeletonDefinition _skeleton;
-    private readonly int[] _retargetBones, _curveIds;
+    private readonly int[] _curveIds;
+    private readonly AlsPrecisePoseRetargetModel _retarget;
     private readonly AlsCurveSampler _curves;
 
     public AlsPreciseRawAnimationSourceSampler(AlsRawAnimationSourceDefinition source,
@@ -23,16 +24,8 @@ internal sealed class AlsPreciseRawAnimationSourceSampler
         _withReference = new(data, skeleton.LogicalParents, skeleton.PreciseReferencePose, skeleton.VirtualBones);
         var authored = skeleton.PreciseReferencePose.ToArray(); policy.PreciseRetargetTransforms.CopyTo(authored);
         _withoutReference = new(data, skeleton.LogicalParents, authored, skeleton.VirtualBones);
-        var retarget = new List<int>();
-        for (var bone = 0; bone < data.LogicalBoneCount; bone++)
-        {
-            var physical = skeleton.LogicalToPhysical[bone]; if (physical < 0) continue;
-            var mode = skeleton.TranslationRetargetModes[physical];
-            if (mode is not (AlsRawAnimationRetargetMode.Animation or AlsRawAnimationRetargetMode.Skeleton))
-                throw new ArgumentException("Unsupported precise raw retarget operator.");
-            if (mode == AlsRawAnimationRetargetMode.Skeleton && data.LogicalTrackPresence[bone]) retarget.Add(bone);
-        }
-        _retargetBones = retarget.ToArray();
+        _retarget = new(skeleton.LogicalToPhysical,skeleton.TranslationRetargetModes.ToArray().Select(m=>(int)m).ToArray(),
+            data.LogicalTrackPresence,skeleton.PreciseReferencePose,policy.PreciseRetargetTransforms,100);
         var animation = set.Animations[data.Identity.AnimationId];
         if (animation.StableId != data.Identity.AssetId || animation.ObjectPath != data.Identity.AssetPath)
             throw new ArgumentException("Precise raw source identity differs from its manifest.");
@@ -58,8 +51,7 @@ internal sealed class AlsPreciseRawAnimationSourceSampler
             throw new ArgumentException("Precise raw output layout differs.");
         var key = (shouldRetarget ? _withReference : _withoutReference).Sample(seconds, pose);
         var policy = _source.Policy;
-        if (shouldRetarget && !policy.PreciseRetargetTransforms.IsEmpty)
-            foreach (var bone in _retargetBones) pose[bone] = pose[bone] with { Position = _skeleton.PreciseReferencePose[bone].Position };
+        _retarget.Apply(pose,shouldRetarget);
         if (extractRootMotion && policy.EnableRootMotion || policy.ForceRootLock && !ignoreRootLock)
             pose[0] = policy.RootMotionRootLock switch
             {
