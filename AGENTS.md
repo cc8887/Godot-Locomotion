@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Refactored 基础姿态：`docs/verification/2026-09-25-refactored-base-poses.md`。实际Stand/Crouch节点37/38原始键/骨架/policy/空曲线导出，各2键1/30秒、68physical/79logical，固定frame0 teleport无sync；新Compiler校验图清单hash/源与策略，复用精确raw/retarget/VB/curve内部入口，Mantle旧motion闭包保留。40原生姿态3160骨/440VB最大P4.0283e-14cm/Q2.22e-16/S0，960独立owner采样同；Import104/Optimize0/0。两冷导0/0字节同，inputSHA61A14AEEA81197422AB3199B9E82970151211B4F2FCF9E64F3B94A75507FC502/referenceSHA A53B327B2785DAE7A94907F8EE8B9850F1E806EC9E991AB2CFFA485006D64807；完整Editor审计同6A36CA...、无插件变更/新EditorDV/Core全量/Godot。下一步真实94图绑定/PoseState/完整VB/Slot/Head→普通Mantle；旧缺口/用户文件/暂缓项保留。
+
 - 最新 Refactored MultiWay：`docs/verification/2026-09-25-refactored-multiway.md`。共享runtime新增 NormalizedMultiWayBlend，对应实际 normalize=true/additive=false/scale1bias0，raw float总和→clamp归一化→相关性筛选，剩余不重归一化；零源refpose，顺序pose/curve累加及native两次旋转normalize，嵌套与discard沿用。Core定向19、Import73/1旧条件跳过、Optimize0/0，无失败/新UE oracle/新Godot/全量。仅算子支持，未接真实站蹲SequenceEvaluator/PoseState/94完整图/VB/Head及普通Mantle；全部旧缺口/用户文件/暂缓项保留。
 
 - 最新 Refactored 编译图清单：`docs/verification/2026-09-25-refactored-layer-inventory.md`。只读 ReadCompiledAnimationGraph 按结构类型包含 ALS custom nodes，四图清单/原生默认值/cache order 导出；Layering106编辑/94编译/12未编译，原生11缓存顺序90,3,71,70,56,69,68,57,36,51,52。Import清单编译器校验hash/GUID/索引/缓存引用及闭包，非完整骨骼编译器。Import14/Optimize0/0；UE全Editor审计fingerprint6A36CA669CAA388864B0C247DC956056B6CD5200FB0EBDCD1191CE13D3DB27F1，冷0/0、普通23396实际exit0字节同SHA AB57FE0014CAA905CBE4334B055809C1DE91C40FDA6C975C4C96DDB9B32EC1AE，普通两旧Condition及5warning保留；DV0/3旧warn。首次xUnit2031已修，无全量/新Godot/打包。下一步真实94图/MultiWay基础采样/VB/Slot/Head→普通Mantle；全部旧缺口/用户文件/暂缓项保留。

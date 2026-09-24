@@ -120,14 +120,19 @@ public sealed class AlsMantlingPoseSource
 public static class AlsMantlingPoseCompiler
 {
     public static IReadOnlyDictionary<string,AlsMantlingPoseSource> Compile(string json,string rootJson)
+        =>CompileInternal(json,rootJson,null);
+    // Shared raw-key machinery for graph-owned sequences with no mantle motion/montage binding.
+    internal static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileStandaloneSequences(string json,string[] expectedPaths)
+        =>CompileInternal(json,null,expectedPaths);
+    private static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileInternal(string json,string? rootJson,string[]? expectedPaths)
     {
-        using var document=JsonDocument.Parse(json);using var rootsDocument=JsonDocument.Parse(rootJson);
-        var root=document.RootElement;var roots=rootsDocument.RootElement;
+        using var document=JsonDocument.Parse(json);using var rootsDocument=rootJson is null?null:JsonDocument.Parse(rootJson);
+        var root=document.RootElement;var roots=rootsDocument?.RootElement??default;
         var digest=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
         Require(root.GetProperty("schemaVersion").GetInt32()==1,"Unsupported mantle pose schema.");
-        Require(Text(root,"rootBindingsSha256").Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rootJson))),
+        if(rootJson is not null) Require(Text(root,"rootBindingsSha256").Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rootJson))),
             StringComparison.OrdinalIgnoreCase),"Mantle pose/root source digests differ.");
-        var rootSamplers=AlsMantlingRootCompiler.Compile(rootJson);
+        var rootSamplers=rootJson is null?null:AlsMantlingRootCompiler.Compile(rootJson);
         var skeletons=root.GetProperty("skeletons").EnumerateObject().ToArray();
         Require(skeletons.Length==1,"Mantle pose closure requires one explicit skeleton.");
         var skeleton=skeletons[0].Value.GetProperty("metadata");var skeletonPath=Text(skeleton,"source");
@@ -155,12 +160,13 @@ public static class AlsMantlingPoseCompiler
             _=>throw new ArgumentException("Unknown native retarget mode.") }).ToArray();
         Require(modes.Length==rawNames.Length,"Incomplete retarget modes.");
         var result=new Dictionary<string,AlsMantlingPoseSource>(StringComparer.Ordinal);
-        var bindings=roots.GetProperty("sequences").EnumerateArray().ToDictionary(r=>Text(r,"source"),StringComparer.Ordinal);
+        var bindings=rootJson is null?expectedPaths!.ToDictionary(p=>p,_=>default(JsonElement),StringComparer.Ordinal):
+            roots.GetProperty("sequences").EnumerateArray().ToDictionary(r=>Text(r,"source"),StringComparer.Ordinal);
         foreach(var row in root.GetProperty("sequences").EnumerateArray())
         {
             var raw=row.GetProperty("raw");var policy=row.GetProperty("evaluation");var path=Text(raw,"source");
             Require(bindings.TryGetValue(path,out var binding)&&Text(raw,"skeletonSource")==skeletonPath,"Foreign mantle pose source.");
-            foreach(var field in new[]{"skeletonSource","frameRateNumerator","frameRateDenominator","sampledKeyCount","playLength"})
+            if(rootJson is not null) foreach(var field in new[]{"skeletonSource","frameRateNumerator","frameRateDenominator","sampledKeyCount","playLength"})
                 Require(Same(raw.GetProperty(field),binding.GetProperty(field)),"Mantle pose/root timing or skeleton differs.");
             var count=raw.GetProperty("sampledKeyCount").GetInt32();Require(count>0,"Invalid mantle key count.");
             var presence=new bool[names.Length];var keys=new AlsLocalPose[checked(count*rawNames.Length)];
@@ -181,10 +187,13 @@ public static class AlsMantlingPoseCompiler
                     if(physical>=0) keys[key*rawNames.Length+physical]=pose;else virtualKeys[key*virtuals.Length+vb]=pose;
                 }
             }
-            var actualRoot=raw.GetProperty("tracks").EnumerateArray().Where(t=>Text(t,"bone").Equals(names[0],StringComparison.OrdinalIgnoreCase)).ToArray();
-            var expectedRoot=binding.GetProperty("tracks");
-            Require(actualRoot.Length==expectedRoot.GetArrayLength()&&(actualRoot.Length==0||Same(actualRoot[0],expectedRoot[0])),
-                "Mantle full-pose root channels differ from motion source.");
+            if(rootJson is not null)
+            {
+                var actualRoot=raw.GetProperty("tracks").EnumerateArray().Where(t=>Text(t,"bone").Equals(names[0],StringComparison.OrdinalIgnoreCase)).ToArray();
+                var expectedRoot=binding.GetProperty("tracks");
+                Require(actualRoot.Length==expectedRoot.GetArrayLength()&&(actualRoot.Length==0||Same(actualRoot[0],expectedRoot[0])),
+                    "Mantle full-pose root channels differ from motion source.");
+            }
             Require(Text(policy,"additiveType")=="AAT_None"&&Text(policy,"basePoseType")=="ABPT_None"&&
                 policy.GetProperty("baseAsset").ValueKind==JsonValueKind.Null&&policy.GetProperty("baseFrame").GetInt32()==0&&
                 policy.GetProperty("transformCurveCount").GetInt32()==0&&policy.GetProperty("animatedBoneAttributeCount").GetInt32()==0,
@@ -208,6 +217,7 @@ public static class AlsMantlingPoseCompiler
                 locked,policy.GetProperty("enableRootMotion").GetBoolean(),policy.GetProperty("forceRootLock").GetBoolean(),digest)),"Duplicate mantle pose source.");
         }
         Require(result.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(bindings.Keys),"Incomplete mantle pose closure.");
+        if(rootJson is null)return new ReadOnlyDictionary<string,AlsMantlingPoseSource>(result);
         var montagePaths=new HashSet<string>(StringComparer.Ordinal);
         var rootMontages=roots.GetProperty("montages").EnumerateArray().ToDictionary(r=>Text(r,"path"),StringComparer.Ordinal);
         foreach(var montage in root.GetProperty("montages").EnumerateArray())
@@ -216,7 +226,7 @@ public static class AlsMantlingPoseCompiler
             Require(Text(montage,"skeleton")==skeletonPath&&Same(montage.GetProperty("segments"),rootMontages[path].GetProperty("segments")),
                 "Mantle pose/motion montage binding differs.");
         }
-        Require(montagePaths.SetEquals(rootSamplers.Keys),"Incomplete mantle montage closure.");
+        Require(montagePaths.SetEquals(rootSamplers!.Keys),"Incomplete mantle montage closure.");
         return new ReadOnlyDictionary<string,AlsMantlingPoseSource>(result);
     }
 
