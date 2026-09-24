@@ -16,8 +16,9 @@ public sealed class AlsRefactoredTriangulationProfile
     public ReadOnlySpan<string> Samples=>_samples;
     public Vector2 FilterWindows { get; }
     public bool Loop { get; }
-    internal AlsRefactoredTriangulationProfile(AlsTriangulatedBlendSpace weights,string[] samples,bool lean)
-    {Weights=weights;_samples=samples;FilterWindows=lean?Vector2.Zero:new(.2f,.4f);Loop=!lean;}
+    public string CatalogDigest { get; }
+    internal AlsRefactoredTriangulationProfile(AlsTriangulatedBlendSpace weights,string[] samples,bool lean,string digest)
+    {Weights=weights;_samples=samples;FilterWindows=lean?Vector2.Zero:new(.2f,.4f);Loop=!lean;CatalogDigest=digest;}
 }
 
 public static class AlsRefactoredTriangulationCompiler
@@ -70,7 +71,7 @@ public static class AlsRefactoredTriangulationCompiler
                 }
             }
             ValidateEdges(vertices);
-            Require(result.TryAdd(path,new(new(vertices.ToArray(),names.Length,new(lean?-1:0,lean?-1:0),new(1,1)),names,lean)),"Duplicate triangle source.");
+            Require(result.TryAdd(path,new(new(vertices.ToArray(),names.Length,new(lean?-1:0,lean?-1:0),new(1,1)),names,lean,catalog.IndexDigest)),"Duplicate triangle source.");
         }
         Require(result.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(catalog.Assets.Values.Where(a=>a.Class=="BlendSpace").Select(a=>a.Source)),"Missing original 2D BlendSpace.");
         return new ReadOnlyDictionary<string,AlsRefactoredTriangulationProfile>(result);

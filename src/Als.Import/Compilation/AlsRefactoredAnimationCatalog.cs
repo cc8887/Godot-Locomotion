@@ -15,9 +15,11 @@ public sealed class AlsRefactoredAnimationCatalog
     private readonly Func<string,byte[]> _read;
     private readonly JsonElement _skeletons;
     public IReadOnlyDictionary<string,AlsRefactoredAnimationAsset> Assets { get; }
+    public string IndexDigest { get; }
     public AlsRefactoredAnimationCatalog(string indexJson,Func<string,byte[]> read)
     {
         ArgumentNullException.ThrowIfNull(read);_read=read;
+        IndexDigest=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexJson)));
         using var document=JsonDocument.Parse(indexJson);var root=document.RootElement;
         if(root.GetProperty("schemaVersion").GetInt32()!=1||root.GetProperty("parentClass").GetString()!="/ALS/ALS/Character/AB_Als.AB_Als_C")
             throw new ArgumentException("Foreign Refactored animation index.");
@@ -89,5 +91,16 @@ public sealed class AlsRefactoredAnimationCatalog
             skeletons=new Dictionary<string,object>{{skeleton,new {metadata=_skeletons.GetProperty(skeleton)}}},
             sequences=new[]{new {raw,evaluation=payload.GetProperty("evaluation")}}});
         return AlsMantlingPoseCompiler.CompileAbsoluteSequences(json,[source])[source];
+    }
+    public (AlsMantlingPoseSource Pose,AlsMantlingCurveSource Curves) CompileAbsolutePoseWithCurves(string source)
+    {
+        var payload=Read(source);
+        if(payload.GetProperty("class").GetString()!="AnimSequence"||payload.GetProperty("evaluation").GetProperty("additiveType").GetString()!="AAT_None")
+            throw new ArgumentException("Expected an absolute original animation sequence.");
+        var raw=payload.GetProperty("raw");var skeleton=raw.GetProperty("skeletonSource").GetString()!;
+        var json=JsonSerializer.Serialize(new {schemaVersion=1,
+            skeletons=new Dictionary<string,object>{{skeleton,new {metadata=_skeletons.GetProperty(skeleton)}}},
+            sequences=new[]{new {raw,evaluation=payload.GetProperty("evaluation"),curves=payload.GetProperty("curves")}}});
+        return (AlsMantlingPoseCompiler.CompileAbsoluteSequences(json,[source])[source],AlsMantlingCurveCompiler.CompileEmbedded(json)[source]);
     }
 }

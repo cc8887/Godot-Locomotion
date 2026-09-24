@@ -7,9 +7,9 @@
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 
-FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose(UBlendSpace* BlendSpace, const float Pitch, const float NormalizedTime)
+static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const float Y, const float NormalizedTime, const bool Legacy)
 {
-    if (!BlendSpace || !BlendSpace->GetSkeleton() || !FMath::IsFinite(Pitch) || !FMath::IsFinite(NormalizedTime)) return {};
+    if (!BlendSpace || !BlendSpace->GetSkeleton() || !FMath::IsFinite(Pitch) || !FMath::IsFinite(Y) || !FMath::IsFinite(NormalizedTime)) return {};
     USkeleton* Skeleton = BlendSpace->GetSkeleton();
     const FReferenceSkeleton& Reference = Skeleton->GetReferenceSkeleton();
     const FMemMark Mark(FMemStack::Get());
@@ -26,7 +26,7 @@ FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose(UBlendSpace* BlendSpac
 
     TArray<FBlendSampleData> Samples;
     int32 CachedIndex = INDEX_NONE;
-    if (!BlendSpace->GetSamplesFromBlendInput(FVector(Pitch, 0, 0), Samples, CachedIndex, true)) return {};
+    if (!BlendSpace->GetSamplesFromBlendInput(FVector(Pitch, Y, 0), Samples, CachedIndex, true)) return {};
     const float Time = FMath::Clamp(NormalizedTime, 0.0f, 1.0f);
     TArray<TSharedPtr<FJsonValue>> SampleRows;
     for (FBlendSampleData& Sample : Samples)
@@ -71,6 +71,7 @@ FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose(UBlendSpace* BlendSpac
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("source"), BlendSpace->GetPathName());
     Result->SetNumberField(TEXT("pitch"), Pitch);
+    if (!Legacy) Result->SetNumberField(TEXT("y"), Y);
     Result->SetNumberField(TEXT("normalizedTime"), NormalizedTime);
     Result->SetArrayField(TEXT("samples"), SampleRows);
     Result->SetArrayField(TEXT("names"), Names);
@@ -79,4 +80,14 @@ FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose(UBlendSpace* BlendSpac
     FString Json;
     if (!FJsonSerializer::Serialize(Result, TJsonWriterFactory<>::Create(&Json))) return {};
     return Json;
+}
+
+FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose(UBlendSpace* BlendSpace, const float Pitch, const float NormalizedTime)
+{
+    return ReadBlendPose(BlendSpace, Pitch, 0, NormalizedTime, true);
+}
+
+FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose2D(UBlendSpace* BlendSpace, const float X, const float Y, const float NormalizedTime)
+{
+    return ReadBlendPose(BlendSpace, X, Y, NormalizedTime, false);
 }
