@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "character": "/ALS/ALS/Character/B_Als_Character.B_Als_Character_C",
+  "mesh": "/ALS/ALS/Character/SKM_Als.SKM_Als",
+  "skeleton": "/ALS/ALS/Character/SK_Als.SK_Als",
+  "sockets": [
+    {
+      "name": "FirstPersonCamera",
+      "source": "/ALS/ALS/Character/SK_Als.SK_Als:SkeletalMeshSocket_0",
+      "bone": "head",
+      "translation": [
+        4.0,
+        14.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        -0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "name": "ThirdPersonTraceShoulderLeft",
+      "source": "/ALS/ALS/Character/SK_Als.SK_Als:SkeletalMeshSocket_2",
+      "bone": "head",
+      "translation": [
+        5.0,
+        0.0,
+        -20.0
+      ],
+      "rotation": [
+        0.0,
+        -0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "name": "ThirdPersonTraceShoulderRight",
+      "source": "/ALS/ALS/Character/SK_Als.SK_Als:SkeletalMeshSocket_1",
+      "bone": "head",
+      "translation": [
+        5.0,
+        0.0,
+        20.0
+      ],
+      "rotation": [
+        0.0,
+        -0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ]
+}
