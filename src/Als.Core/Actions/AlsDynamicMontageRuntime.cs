@@ -10,7 +10,7 @@ public readonly record struct AlsSequenceMontageCommand(int AnimationId, AlsMont
 // These are graph slot identities, not montage-local slot array indices.
 public readonly record struct AlsMontageSlot(int Id)
 {
-    public const int Count = 12;
+    public const int Count = 13;
     public const ushort AllMask = (1 << Count) - 1;
     public bool IsValid => (uint)Id < Count;
     public ushort Mask => IsValid ? (ushort)(1 << Id) : throw new ArgumentOutOfRangeException(nameof(Id));
@@ -24,6 +24,7 @@ public readonly record struct AlsMontageSlot(int Id)
     public static AlsMontageSlot Pelvis => new(9);
     public static AlsMontageSlot Legs => new(10);
     public static AlsMontageSlot Curves => new(11);
+    public static AlsMontageSlot Transition => new(12);
     public static AlsMontageSlot FromRefactoredLayerName(string name) => name switch
     {
         "Head" => Head, "Spine" => Spine, "ArmLeft" => ArmLeft, "ArmRight" => ArmRight,
@@ -129,6 +130,7 @@ public sealed class AlsMontageRuntime
     // Traversal above remains one whole-frame summary per physical instance.
     public ReadOnlySpan<AlsMontageTraversal> NotifyTraversal { get { RequirePrepared(); return _notifyTraversal.AsSpan(0,_notifyTraversalCount); } }
     public bool TryGetActionAsset(int definitionId, out AlsAuthoredMontageAsset asset) => _actions.TryGetValue(definitionId, out asset);
+    public bool TryGetSequenceAsset(int animationId, AlsMontageSlot slot, out AlsSequenceMontageAsset asset) => _sequences.TryGetValue((animationId, slot), out asset);
 
     public AlsMontageRuntime(ReadOnlySpan<AlsDynamicMontageAsset> assets, ReadOnlySpan<AlsAuthoredMontageAsset> actions = default,
         ReadOnlySpan<AlsSequenceMontageAsset> sequences = default, AlsMantlingBranchingRuntime? branching = null)
@@ -384,6 +386,23 @@ public sealed class AlsMontageRuntime
         for (var i = 0; i < _count; i++)
             if (_candidate[i].InstanceId == id) return _candidate[i].Playing;
         return false;
+    }
+
+    // UAlsMontageUtility::StopMontagesWithSlot visits only IsActive instances.
+    // Negative duration preserves each asset's authored blend-out setting.
+    public void StopSlots(ReadOnlySpan<AlsMontageSlot> slots, float blendTime = -1)
+    {
+        RequirePrepared();
+        if (!float.IsFinite(blendTime)) throw new ArgumentException("Invalid slot stop duration.");
+        foreach (var slot in slots)
+            if (!slot.IsValid) throw new ArgumentException("Invalid montage stop slot.");
+        foreach (var slot in slots)
+        for (var i = 0; i < _count; i++)
+        {
+            var instance = _candidate[i];
+            if (instance.Blend.DesiredWeight <= 0 || instance.Slot != slot) continue;
+            Stop(i, blendTime >= 0 ? blendTime : instance.Settings.BlendOutSeconds, instance.Settings.BlendOutOption);
+        }
     }
 
     private void Play(in AlsAuthoredMontageAsset asset, float playRate, float startTime, bool stopGroup)

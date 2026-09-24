@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Transition动态Montage：`docs/verification/2026-09-25-refactored-transition-montage.md`。新增独立Slot12/Count13保留旧编号；原SK_Als Grounded组1含Transition+两Turn，宿主显式组/动画ID，绑定两真实Standing mesh additive2源。通知批次预检→共享物理SequenceMontage，重复实例/组替换/冻结Evaluation；StopSlots依slot顺序只停active，负时长原Out/保留option/outgoing不改。新8/Import91/CoreMontage160通过，末停止循环顺序强化后8重跑，Optimize0/0，无失败。无新native播放oracle/UE或Godot/全量/性能；尚未原姿态/曲线采样、Locomotion Slot/统一宿主、stopQueued/worker覆盖生命周期。下一步原生函数消费→Transition采样及四武器源/pose；整图9/13、普通Demo未切、Ragdoll未整体验收、旧缺口/用户文件/暂缓项保留。
+
 - 最新武器通知请求：`docs/verification/2026-09-25-refactored-weapon-notify.md`。真实EventGraph/GetParent/双向exec+authoredStart/baked局部index/Settings.Transitions绑定；Bow/Rifle左、两Pistol右，Bow全1.5、其他举起1.75放下1.5，in/out .2/start .3/standing-idle-only。独立候选有序请求保留重复、frame/角色/generation/profile校验与discard；尚未物理Montage/slot组ID/stopQueued/worker覆盖队列。新12/相关Import71/Optimize0/0，首轮12失败因原图Comment框误算逻辑已修，日志保留。复用native通知名字，无新UE函数oracle/启动/导出/Godot/全量/性能。下一步Transition Slot资源及实际播放/原生消费→武器源/pose；整图9/13，普通Demo未切、Ragdoll未整体验收、全部旧缺口/用户文件/暂缓项保留。
 
 - 最新武器原生连续：`docs/verification/2026-09-25-refactored-weapon-native.md`。实际四Linked Graph/3Hz2424帧，状态/stack/edge/update/72notify一致，704多stack；max时间2.981e-8/alpha2.981e-7/weight1.491e-7预算2e-6，生产算法未改。生成class局部0RelaxedToReady/1ReadyToRelaxed；保留fullpose/curve/player但尚未比较，整图仍9/13。新native12/相关Import82/Optimize0/0，无新失败。UE完整4actions审计E2E1C139...，冷/普通26488实际0四输出字节同；Default重导B385B2不变，DV0/3旧warn，普通两旧Condition五类warn保留。无Godot/全量/性能/打包。下一步通知绑定原EventGraph消费→state源更新/整图pose及隐藏动作对照；普通Demo未切、Ragdoll未整体验收、全部旧缺口/用户文件/暂缓项保留。
