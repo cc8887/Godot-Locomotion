@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新普通退出/Get-up：`docs/verification/2026-09-24-ragdoll-get-up.md`。G现可进入/退出，默认Front/Back用真实原生Montage/Notify/新增raw源，唯一bank支持asset RateScale1.2、与Roll身份分离；Main安装重基物理快照/恢复胶囊与速度/释放owner，Notify解除输入，支持再次打断及重复激活。Single30受控Back/Parallel60 Front渲染各6图检查，Parallel120首次退出故障重试+起身打断+空中退出通过，旧Roll恢复和2540帧RootMotion通过；Core2914既定过滤/Import2486+1旧skip/Optimize过。UE全Editor审计及两次Montage/Notify冷导过，无新普通Editor/DV或旧稳定性矩阵；静态9/12、Flail0/3及旧UE异常保留。下一步Overlay起身变体、自动触发及起身停用/替换边界，全部旧目标继续；头颈/道具暂缓，main/用户P4及诊断文件保留。
+
 - 最新退出准备：`docs/verification/2026-09-24-ragdoll-recovery-candidate.md`。Core按本机UE骨盆FQuat4d/roll规则求朝上/朝下和恢复yaw，空中继承完整native速度；Simulation在已提交/完成物理边界生成按拟恢复mesh world重基的不可变NamedPoseSnapshot，携带激活/动画/物理步身份，不修改owner。Single30/Parallel120/故障暂停60各16检查过，Core2911/Import定向19/Optimize过。新回归揭示旧smoke FindBone大小写遗漏，改字典并加覆盖断言；过程失败日志保留。仅准备接口，尚未普通退出/物理释放/Get-up/快照淡出/输入恢复；G仍只进入。下一步补起身Montage/Notify资产配置，再实际退出事务及重复循环；全部旧目标保留，头颈/道具暂缓，main/用户P4保留。
 
 - 最新Ragdoll动作/手动入口：`docs/verification/2026-09-24-ragdoll-actions-and-input.md`。G请求在Main Lifecycle已提交边界创建owner，可打断Roll；纯值PhysicsDriven在下一Montage tick前执行原生0.2秒停止，保留已淡出、清root motion、逻辑InterruptedByRagdoll=13一次，新请求Busy且去重。Single30/Parallel120、首次切入失败+暂停60及实际渲染/普通Roll回归通过，最终Notify/Action归属归零；Core2904既定过滤、Import定向122、Optimize过。姿态测试修站姿尺寸假设/1.49e-8舍入误报，详情见文档。G尚不能起身，自动高落差/离地触发、退出Get-up/PoseRecovery及全部旧目标仍待接；用户要求头颈诊断和道具暂缓，相关未提交诊断保留；main/用户P4保留。

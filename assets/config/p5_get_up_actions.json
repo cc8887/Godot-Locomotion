@@ -1,0 +1,24 @@
+[
+  {
+    "name": "GetUpFront",
+    "montage": "35b984a2215f8d238fed23d8322bea3267dfd93f",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
+  },
+  {
+    "name": "GetUpBack",
+    "montage": "5657e37ac49745e09e5a7c4ad1c46aaa6491cb7f",
+    "slot": "BaseLayer",
+    "startSection": "Default",
+    "priority": 100,
+    "interruptible": true,
+    "playRate": 1.0,
+    "blendSeconds": 0.2,
+    "loopPolicy": "Once"
+  }
+]

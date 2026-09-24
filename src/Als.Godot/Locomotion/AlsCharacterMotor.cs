@@ -51,6 +51,25 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private ShapeCast3D? _ragdollGroundCast;
     internal bool RagdollGrounded { get; private set; }
     internal Vector3 RagdollTarget { get; private set; }
+    internal bool GetUpInputBlocked { get; set; }
+    internal AlsActionRequest RecoveryRequest { get; set; } = AlsActionRequest.None;
+
+    internal void RestoreFromRagdoll(Transform3D actor, bool grounded, Vector3 fallingVelocity)
+    {
+        EnsureMainThread(); EnsureLiveInTree();
+        if (!_configured || CollisionLayer != 0 || CollisionMask != 0 || !actor.IsFinite() || !fallingVelocity.IsFinite())
+            throw new InvalidOperationException("Ragdoll exit requires a disabled capsule and finite restored state.");
+        GlobalTransform = actor; Velocity = grounded ? Vector3.Zero : fallingVelocity;
+        _previousActualVelocity = ToNumerics(Velocity);
+        _rotationHistory = AlsCharacterRotationModel.Initialize(-GetCharacterYaw() * (180d / System.Math.PI));
+        _movementBase = default; WorldMovementVelocity = Velocity;
+        BaseTransportDelta = default; BaseTransportBlocked = false;
+        _restoredGroundedBeforeMove = grounded; _hasRestoredGroundedState = true;
+        _releasePlatformOnNextStep = true;
+        _committedLifecycleSnapshot = CaptureLifecycleSnapshot(grounded);
+        _committedLifecycleFrameId = _lastFrameId;
+        CollisionLayer = 1; CollisionMask = _settings.CollisionMask;
+    }
 
     internal void FollowRagdoll(Vector3 pelvis)
     {
@@ -320,12 +339,15 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _publishedVelocityCheckpointPending = false;
         var source = _source!;
         var command = source.GetCommand(frameId);
+        if (GetUpInputBlocked) command = command with { MovementAxes = default, JumpPressed = 0 };
         var isRolling = RollingGameplay && rolling.Active;
         // Desired stance stays in the input adapter; only the effective command
         // crouches during Rolling, then restores that desired stance with clearance.
         if (isRolling) command = command with { RequestedStance = AlsStance.Crouching, JumpPressed = 0 };
         var actionRequest = source is IAlsActionRequestSource actionSource
             ? actionSource.GetActionRequest(new(frameId, (uint)characterId, (uint)generation)) : AlsActionRequest.None;
+        if (RecoveryRequest.Command != AlsActionCommand.None) actionRequest = RecoveryRequest;
+        else if (GetUpInputBlocked) actionRequest = AlsActionRequest.None;
         if (actionRequest.Command != AlsActionCommand.None && _runtimeContext?.MovementGraph is null)
             throw new InvalidOperationException("Action requests require the complete movement runtime.");
         if (command.JumpPressed > 1)
@@ -481,7 +503,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         var actionParameters = default(AlsMontageActionParameters);
         // A landing edge and its start parameters are gathered only once. Retry
         // reuses this exact frame; X cancellation takes precedence over auto Roll.
-        if (movementAction.Trigger == AlsMovementActionTrigger.LandingRoll && actionRequest.Command != AlsActionCommand.Cancel)
+        if (!GetUpInputBlocked && movementAction.Trigger == AlsMovementActionTrigger.LandingRoll && actionRequest.Command != AlsActionCommand.Cancel)
         {
             var policy = _runtimeContext!.MovementGraph!.ActionPolicies[0];
             actionRequest = new(frameId, AlsActionCommand.Start, policy.DefinitionId, policy.StartSectionId, 100, (uint)generation);
@@ -582,7 +604,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         {
             FootPlacementReleaseSignals = releaseSignals,
             ActionRequest = actionRequest,
-            GameplayAction = RollingGameplay ? (isRolling ? AlsTimelineAction.Rolling :
+            GameplayAction = GetUpInputBlocked ? AlsTimelineAction.GettingUp : RollingGameplay ? (isRolling ? AlsTimelineAction.Rolling :
                 rotationFeedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : rotationFeedback.Action) : default,
             MeshHeightOffset = MeshHeightOffset,
             ActionParameters = actionParameters,
@@ -700,7 +722,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             WorldYaw(velocity), WorldYaw(command.WorldDirection), speed, command.InputAmount > 0 && _settings.MaxAcceleration > 0,
             hasRootMotion, grounded ? AlsMovementStateInput.Grounded : AlsMovementStateInput.InAir,
             command.RotationMode, _actualStance, _rotationGait,
-            isRolling ? AlsTimelineAction.Rolling : RollingGameplay && feedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : feedback.Action,
+            GetUpInputBlocked ? AlsTimelineAction.GettingUp : isRolling ? AlsTimelineAction.Rolling : RollingGameplay && feedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : feedback.Action,
             FirstPersonView, aim.RateDegrees,
             feedback.YawOffsetPresent ? feedback.YawOffset : 0, feedback.RotationAmountPresent ? feedback.RotationAmount : 0);
         var rotation = _characterRotation.Evaluate(input, _rotationHistory);

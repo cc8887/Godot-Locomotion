@@ -22,6 +22,7 @@ public readonly record struct AlsAuthoredMontageAsset(int ActionDefinitionId, in
     AlsActionLifecycleSettings Lifecycle, bool RootMotionEnabled = false, int MontageId = -1)
 {
     public int AdditiveType { get; init; }
+    public float RateScale { get; init; } = 1;
 }
 
 public readonly record struct AlsMontageInstance(long InstanceId, int AnimationId, AlsMontageSlot Slot,
@@ -37,6 +38,8 @@ public readonly record struct AlsMontageInstance(long InstanceId, int AnimationI
     public int MontageId { get; init; } = -1;
     public bool OwnsActiveActionLookup { get; init; }
     public int AdditiveType { get; init; }
+    public float RateScale { get; init; } = 1;
+    public float EffectivePlayRate => PlayRate * RateScale;
 }
 public readonly record struct AlsMontageEvaluation(long InstanceId, int AnimationId, AlsMontageSlot Slot,
     float Position, float Weight, int ActionDefinitionId = -1)
@@ -128,6 +131,7 @@ public sealed class AlsMontageRuntime
             if (action.ActionDefinitionId < 0 || action.MontageId < -1 || action.AnimationId < 0 || action.Slot.Id < 0 || action.GroupId < 0 || (uint)action.AdditiveType > 2 ||
                 !float.IsFinite(action.Duration) || action.Duration <= .00005f || !float.IsFinite(action.ClipStart) || action.ClipStart < 0 ||
                 !float.IsFinite(action.ClipRate) || action.ClipRate <= 0 || !float.IsFinite(action.ClipStart + action.Duration * action.ClipRate) ||
+                !float.IsFinite(action.RateScale) || action.RateScale <= 0 ||
                 action.Lifecycle.Mode == AlsActionLifecycleMode.LegacySectionEnd || !AlsActionLifecycle.IsValid(action.Lifecycle) ||
                 !_actions.TryAdd(action.ActionDefinitionId, action)) throw new ArgumentException("Invalid authored montage asset.");
             var nativeId = action.MontageId >= 0 ? action.MontageId : action.ActionDefinitionId;
@@ -173,12 +177,13 @@ public sealed class AlsMontageRuntime
             var traversalEnd = position;
             if (playing)
             {
-                var move = delta * state.PlayRate;
+                var rate = state.EffectivePlayRate;
+                var move = delta * rate;
                 if (!float.IsFinite(move)) throw new ArgumentException("Montage time overflow.");
-                var forward = state.PlayRate > 0;
+                var forward = rate > 0;
                 var boundary = forward ? state.Duration : 0;
                 position = System.Math.Clamp(position + move, 0, state.Duration); traversalEnd = position;
-                var remaining = MathF.Abs(state.PlayRate) <= 1e-8f ? float.MaxValue : MathF.Abs((boundary - position) / state.PlayRate);
+                var remaining = MathF.Abs(rate) <= 1e-8f ? float.MaxValue : MathF.Abs((boundary - position) / rate);
                 var wasStopped = blend.BlendingOut == 1;
                 AlsActionLifecycle.TryBeginBlendOut(state.Settings, remaining, ref blend);
                 if (!wasStopped && blend.BlendingOut == 1)
@@ -317,6 +322,7 @@ public sealed class AlsMontageRuntime
 
     private void Play(in AlsAuthoredMontageAsset asset, float playRate, float startTime, bool stopGroup)
     {
+        if (!float.IsFinite(playRate * asset.RateScale)) throw new ArgumentException("Montage effective rate overflow.");
         if (_serial == long.MaxValue) throw new InvalidOperationException("Montage instance identity exhausted.");
         Ensure(_count + 1);
         var montageId = asset.ActionDefinitionId < 0 ? -1 : asset.MontageId >= 0 ? asset.MontageId : asset.ActionDefinitionId;
@@ -336,7 +342,7 @@ public sealed class AlsMontageRuntime
             // its requested duration but does not update/reset it this frame.
             asset.Lifecycle, new AlsActionLifecycleState { DesiredWeight = 1, RemainingSeconds = .2f }, true, false)
             { BlendResetPending = true, ActionDefinitionId = asset.ActionDefinitionId, ClipStart = asset.ClipStart, ClipRate = asset.ClipRate,
-                MontageId = montageId, OwnsActiveActionLookup = montageId >= 0, AdditiveType = asset.AdditiveType };
+                MontageId = montageId, OwnsActiveActionLookup = montageId >= 0, AdditiveType = asset.AdditiveType, RateScale = asset.RateScale };
         if (asset.RootMotionEnabled) _rootMotionInstance = _serial;
     }
 

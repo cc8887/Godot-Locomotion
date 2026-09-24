@@ -21,6 +21,9 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
     AlsMontageNotifyBinding MontageNotifies)
 {
     public AlsMontageActionPlaybackReader ActionPlayback { get; init; } = null!;
+    public int RollDefinitionId { get; init; }
+    public int GetUpFrontDefinitionId { get; init; }
+    public int GetUpBackDefinitionId { get; init; }
     public AlsGroundedEntryNotifyProfile GroundedEntryNotify { get; init; } = null!;
     public AlsCharacterAnimationBridgeSettings CharacterBridge { get; init; }
     public AlsCharacterRotationModel CharacterRotation { get; init; } = null!;
@@ -72,7 +75,7 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
     {
         return (this with { Sources = sources, Binding = binding,
             TurnNotifies = AlsTurnNotifyCompiler.Compile(Read("v4_turn_notify_inputs.json"), set, sources, binding, TurnMontageAssets),
-            MontageNotifies = AlsMontageNotifyCompiler.Compile(Read("v4_action_notify_inputs.json"), Read("v4_turn_notify_inputs.json"),
+            MontageNotifies = AlsMontageNotifyCompiler.Compile(Read("v4_recovery_action_notify_inputs.json"), Read("v4_turn_notify_inputs.json"),
                 set, sources, binding, TurnMontageAssets, AuthoredMontageAssets, GroundedTransitionAssets, GroundedTransitionNotifyJson) }).WithActionPlayback(set);
     }
     private AlsMovementGraphDefinition WithActionPlayback(AlsAnimationSetDefinition set) => this with
@@ -92,8 +95,8 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
         var groundedRates = AlsGroundedRateCompiler.Compile(inputJson, inputCurves, functions);
         var defaults = AlsMovementInputStateCompiler.Compile(inputJson);
         var turns = AlsTurnInPlaceCompiler.CompileMontageAssets(Read("v4_turn_montage_inputs.json"), set, pose);
-        var actionProfile = AlsP5aAnimationRuntimeProfileCompiler.Compile(Read("p5a_animation_runtime.json"), set);
-        var actions = AlsAuthoredMontageCompiler.Compile(Read("v4_action_montage_inputs.json"),
+        var actionProfile = AlsRecoveryActionProfileCompiler.Compile(Read("p5a_animation_runtime.json"), Read("p5_get_up_actions.json"), set);
+        var actions = AlsAuthoredMontageCompiler.Compile(Read("v4_recovery_action_montage_inputs.json"),
             Read("v4_turn_montage_inputs.json"), set, actionProfile, locomotion.SkeletonId);
         var layeringJson = Read("v4_layering_inputs.json");
         AlsAnimationUpdateGraphCompiler.Validate(layeringJson);
@@ -115,8 +118,11 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
             AlsTurnInPlaceCompiler.Compile(Read("v4_idle_control_inputs.json"), set, pose),
             turns, AlsTurnNotifyCompiler.Compile(Read("v4_turn_notify_inputs.json"), set, sources, binding, turns),
             actions, AlsAuthoredMontageCompiler.CompileRequests(actionProfile, actions),
-            AlsMontageNotifyCompiler.Compile(Read("v4_action_notify_inputs.json"),Read("v4_turn_notify_inputs.json"),set,sources,binding,turns,actions))
-            { CharacterBridge = AlsCharacterAnimationBridgeCompiler.Compile(Read("v4_character_animation_bridge.json")),
+            AlsMontageNotifyCompiler.Compile(Read("v4_recovery_action_notify_inputs.json"),Read("v4_turn_notify_inputs.json"),set,sources,binding,turns,actions))
+            { RollDefinitionId = actionProfile.DemoCases.RollActionDefinitionId,
+                GetUpFrontDefinitionId = actionProfile.Actions.Single(a => set.Montages[a.MontageId].StableId == "35b984a2215f8d238fed23d8322bea3267dfd93f").DefinitionId,
+                GetUpBackDefinitionId = actionProfile.Actions.Single(a => set.Montages[a.MontageId].StableId == "5657e37ac49745e09e5a7c4ad1c46aaa6491cb7f").DefinitionId,
+                CharacterBridge = AlsCharacterAnimationBridgeCompiler.Compile(Read("v4_character_animation_bridge.json")),
                 CharacterRotation = AlsCharacterRotationCompiler.Compile(Read("v4_character_rotation_inputs.json")),
                 CharacterMovement = characterMovement,
                 CharacterMovementRuntime = AlsCharacterMovementCompiler.CompileRuntime(Read("v4_character_movement_runtime.json"), characterMovement),
@@ -145,7 +151,7 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
         definition = definition with { GroundedTransitionAssets = [.. definition.OverlayTransitionAssets,
                 .. AlsStopTransitionCompiler.CompileAssets(Read("v4_turn_montage_inputs.json"), set, definition.StopTransitions)],
             GroundedTransitionNotifyJson = AlsStopTransitionCompiler.MergeNotifyMetadata(Read("v4_transition_notify_inputs.json"), Read("v4_stop_notify_inputs.json")) };
-        definition = definition with { MontageNotifies = AlsMontageNotifyCompiler.Compile(Read("v4_action_notify_inputs.json"), Read("v4_turn_notify_inputs.json"),
+        definition = definition with { MontageNotifies = AlsMontageNotifyCompiler.Compile(Read("v4_recovery_action_notify_inputs.json"), Read("v4_turn_notify_inputs.json"),
             set, sources, binding, turns, actions, definition.GroundedTransitionAssets, definition.GroundedTransitionNotifyJson) };
         definition = definition with { OverlayClocks = AlsOverlaySyncCompiler.Compile(Read("v4_overlay_sync_inputs.json"), Read("v4_overlay_inputs.json"), definition.OverlaySources, set) };
         var sharedSources = AlsOverlaySharedSourceCompiler.Compile(sources, definition.OverlaySources, definition.OverlayClocks,

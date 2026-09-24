@@ -40,6 +40,19 @@ public partial class AlsP3WorkerRoot : Node3D
         _controller!.PresentRagdoll(simulation);
     }
     internal Skeleton3D PhysicalDisplaySkeleton => _skeleton!;
+    internal Transform3D RecoverySkeletonWorld(Transform3D restoredRoot)
+    {
+        if (!GodotThread.IsMainThread() || _state.WorkerInFlightCount != 0 || Volatile.Read(ref _disposed) != 0)
+            throw new InvalidOperationException("Recovery requires an idle live visual worker.");
+        return restoredRoot * _visualRoot!.GlobalTransform.AffineInverse() * _skeleton!.GlobalTransform;
+    }
+    internal void InstallRagdollRecovery(Transform3D restoredRoot, AlsNamedPoseSnapshot snapshot)
+    {
+        _ = RecoverySkeletonWorld(restoredRoot);
+        var previous = _visualRoot!.GlobalTransform;
+        try { _visualRoot.GlobalTransform = restoredRoot; _controller!.InstallRagdollSnapshot(snapshot); }
+        catch { _visualRoot.GlobalTransform = previous; throw; }
+    }
     internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
         _controller is not null && _controller.TryCopyCommittedFlail(identity, destination);
     internal bool TryCopyCommittedPreciseFlail(AlsFrameIdentity identity, Span<AlsPrecisePose> destination) =>

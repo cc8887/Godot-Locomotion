@@ -156,7 +156,7 @@ public partial class CharacterRagdollFlailSmoke : Node
                 if (_epoch == 0) _epoch = diagnostics.PlayerEpoch;
                 Require(_epoch == diagnostics.PlayerEpoch, "Flail playback identity restarted during continuous activation.");
                 _samples++; _lastAnimation = id.FrameId;
-                if (_keyEntry && _samples == 12) { Tap(Key.G); Tap(Key.R); }
+                if (_keyEntry && _samples == 12) { character.RequestRagdoll(_demo.GetNode<Node3D>("World")); Tap(Key.R); }
                 if (_inject && !_armed && _samples == 4)
                 {
                     _demo.RuntimeContext.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish,

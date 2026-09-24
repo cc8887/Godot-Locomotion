@@ -22,7 +22,7 @@ public partial class MixedMontagePoseSmoke : Node
         var locomotion = AlsLocomotionProfileCompiler.Compile(Read("p4_cycle_locomotion_profile.json"),set);
         var pose = AlsPoseProfileCompiler.Compile(Read("p4_pose_profile.json"),set,locomotion);
         var definition = AlsMovementGraphDefinition.Load(set,locomotion,pose);
-        var roll = definition.AuthoredMontageAssets.Single();
+        var roll = definition.AuthoredMontageAssets.Single(a => a.ActionDefinitionId == definition.RollDefinitionId);
         using var library = AlsAnimationLibraryBuilder.BuildP5a(set,definition.Binding); AddChild(library.Root);
         var detail = AlsLocomotionDetailCompiler.Compile(Read("v4_locomotion_detail_graph.json"),set,locomotion.SkeletonId);
         using var reference = new AlsDetailPoseSampler(library,set,detail);
@@ -33,7 +33,7 @@ public partial class MixedMontagePoseSmoke : Node
         var curve = set.Animations[roll.AnimationId].Curves.First(); var sampler = new AlsCurveSampler(set.Animations[roll.AnimationId].Curves);
         var montage = new AlsMontageRuntime(definition.TurnMontageAssets,definition.AuthoredMontageAssets);
         var actions = new AlsMontageActionRuntime(montage,definition.ActionPolicies);
-        var policy = definition.ActionPolicies.Single();
+        var policy = definition.ActionPolicies.Single(p => p.DefinitionId == definition.RollDefinitionId);
         var accepted = 0; var replaced = 0; var completed = 0;
         var fades = 0; var changed = 0; var curveFrames = 0; var retries = 0;
         for (var frame = 1; frame <= 240; frame++)

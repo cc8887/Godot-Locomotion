@@ -8,6 +8,20 @@ namespace GodotAls.Core.Tests;
 [Collection(AllocationTestCollection.Name)]
 public sealed class AlsMontageRootMotionTests
 {
+    [Fact]
+    public void AssetRateScaleControlsRemainingTimeAndPreservesFinalMotionTick()
+    {
+        var bank = new AlsMontageRuntime([], [Asset() with { RateScale = 2 }]);
+        bank.Begin(Id(1), .05f); bank.PlayAction(0, 1, .51f); bank.Commit(Id(1));
+        bank.Begin(Id(2), .05f);
+        Assert.Equal(.61f, bank.Candidate[0].Position, 6);
+        Assert.Equal(1, bank.Candidate[0].Blend.BlendingOut);
+        Assert.Equal(.195f, bank.Candidate[0].BlendTime, 6);
+        Assert.True(bank.RootMotionRange.HasMotion);
+        Assert.Equal(0, bank.CandidateRootMotionInstance);
+        bank.Commit(Id(2)); bank.Begin(Id(3), .05f);
+        Assert.False(bank.RootMotionRange.HasMotion);
+    }
     private static AlsFrameIdentity Id(long frame) => new(frame,1,1);
     private static AlsAuthoredMontageAsset Asset() => new(0,5,AlsMontageSlot.BaseLayer,2,1,.25f,2,
         new(AlsActionLifecycleMode.MontageAutoBlendOut,.2f,AlsActionBlendOption.HermiteCubic,.2f,AlsActionBlendOption.HermiteCubic,-1),true);

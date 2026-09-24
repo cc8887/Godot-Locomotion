@@ -38,12 +38,13 @@ public static class AlsRollingGameplay
         : -frame.CharacterYaw * (180f / MathF.PI);
 
     public static AlsRollingState ApplyOutcomes(AlsRollingState previous, in AlsFrameInput frame,
-        in AlsActionOutcomeBuffer outcomes)
+        in AlsActionOutcomeBuffer outcomes, int rollDefinitionId = -1)
     {
         var next = previous;
         for (var i = 0; i < outcomes.Count; i++)
         {
             var outcome = outcomes[i];
+            if (rollDefinitionId >= 0 && outcome.ActionDefinitionId != rollDefinitionId) continue;
             if (outcome.ResultCode == AlsActionResultCode.Accepted)
                 next = new(outcome.RequestId, outcome.PlaybackEpoch, frame.ActionParameters.HasTargetYaw
                     ? frame.ActionParameters.TargetYawDegrees : TargetYaw(frame));

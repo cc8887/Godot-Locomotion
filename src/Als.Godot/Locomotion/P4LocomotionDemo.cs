@@ -160,7 +160,7 @@ public partial class P4LocomotionDemo : Node3D
             _configureSmokeContext?.Invoke(_context);
             if (_smokeCommandSource is null && _context.MovementGraph is { } movementGraph)
             {
-                var preview = movementGraph.ActionPolicies.Single();
+                var preview = movementGraph.ActionPolicies.Single(p => p.DefinitionId == movementGraph.RollDefinitionId);
                 _playerInput.ConfigureActionPreview(preview.DefinitionId, preview.StartSectionId);
                 _context.ActionOutcomeCommitted += _playerInput.ObserveActionOutcome;
                 _hud.EnableActionPreview();
@@ -236,7 +236,7 @@ public partial class P4LocomotionDemo : Node3D
         if (!_runtimeConfigured || !_playerInput.ActionPreviewEnabled || _failed) return;
         if (input is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.G })
         {
-            _slot.ActiveCharacter.RequestRagdoll(GetNode<Node3D>("World"));
+            _slot.ActiveCharacter.RequestRagdollToggle(GetNode<Node3D>("World"));
             GetViewport().SetInputAsHandled(); return;
         }
         var roll = input.IsActionPressed("roll_preview", allowEcho: false);

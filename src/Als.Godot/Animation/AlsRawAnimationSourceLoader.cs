@@ -22,7 +22,7 @@ internal static class AlsRawAnimationSourceLoader
     {
         var source = definition.Sources.CreateCoreView();
         return AlsRawAnimationSourceCompiler.Compile(
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_movement_source_inputs.json"), set,
+            Godot.FileAccess.GetFileAsString("res://assets/config/v4_recovery_movement_source_inputs.json"), set,
             definition.Binding.CreateCoreView().Digest.ToString("X16"), source.Players.Length, source.Samples.Length,
             CollectRoots(set, definition), relative => Godot.FileAccess.GetFileAsBytes("res://assets/config/" + relative));
     }

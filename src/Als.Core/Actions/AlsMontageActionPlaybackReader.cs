@@ -61,7 +61,7 @@ public sealed class AlsMontageActionPlaybackReader
                     previous = tick.PreviousPosition;
                     // Traversal reaches the endpoint even when native playback
                     // retains endpoint-epsilon for its last sampled pose.
-                    elapsed = instance.PlayRate == 0 ? 0 : MathF.Abs((tick.CurrentPosition - previous) / instance.PlayRate);
+                    elapsed = instance.EffectivePlayRate == 0 ? 0 : MathF.Abs((tick.CurrentPosition - previous) / instance.EffectivePlayRate);
                     break;
                 }
             var weight = 0f;
@@ -76,7 +76,7 @@ public sealed class AlsMontageActionPlaybackReader
                 binding.SectionId, binding.SegmentId, instanceId, previous, instance.Position,
                 instance.ClipStart + previous * instance.ClipRate,
                 instance.ClipStart + instance.Position * instance.ClipRate, elapsed,
-                instance.PlayRate * instance.ClipRate, instance.BlendTime, weight, 1);
+                instance.EffectivePlayRate * instance.ClipRate, instance.BlendTime, weight, 1);
         }
         return AlsActionPlayback.CreateDefault();
     }

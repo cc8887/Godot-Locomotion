@@ -111,6 +111,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     internal AlsMontageActionRuntime Actions => _actions;
     private readonly bool _rollingGameplay = AlsAnimationRuntimeOptions.Has("--rolling-gameplay");
     private AlsRollingState _committedRolling, _candidateRolling;
+    private readonly int _rollDefinitionId;
     private AlsMovementActionTransition _movementAction;
     private readonly AlsMontageActionPlaybackReader _actionPlayback;
     private readonly AlsMontageRootMotionReader _rootMotion;
@@ -202,8 +203,9 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         IAlsSharedSourceContributor? contributor = null)
     {
         _requester = definition.BaseLayer.InertializationNodeIndex;
-        if (_rollingGameplay && definition.ActionPolicies.Length != 1)
-            throw new InvalidOperationException("Rolling gameplay requires the single compiled Roll action binding.");
+        _rollDefinitionId = definition.RollDefinitionId;
+        if (_rollingGameplay && !definition.ActionPolicies.Any(p => p.DefinitionId == _rollDefinitionId))
+            throw new InvalidOperationException("Rolling gameplay requires its compiled Roll action binding.");
         var refactoredDefinitions = AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") ?
             AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/refactored_pose_curve_inputs.json")) : null;
         if (refactoredDefinitions is not null)
@@ -327,7 +329,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         BeginMontageFrame(frame.Identity, frame.DeltaTime, _candidateMovementState == AlsMovementStateInput.Ragdoll);
         _candidateRolling = _committedRolling;
         _movementAction = _rollingGameplay ? frame.MovementAction : default;
-        AlsRollingStartContext? rolling = _rollingGameplay ? new(frame.Floor.IsGrounded == 1 && !_movementAction.RequiresRagdoll,
+        AlsRollingStartContext? rolling = _rollingGameplay && frame.ActionRequest.ActionDefinitionId == _rollDefinitionId ? new(frame.Floor.IsGrounded == 1 && !_movementAction.RequiresRagdoll,
             !_cancelForRuntimeFailure && _committedRolling.Active ? AlsTimelineAction.Rolling : frame.GameplayAction) : null;
         _actions.ApplyRequest(authoredActions ? frame.ActionRequest : AlsActionRequest.None, _cancelForRuntimeFailure, rolling, frame.ActionParameters,
             ragdoll: _candidateMovementState == AlsMovementStateInput.Ragdoll);
@@ -362,7 +364,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         }
         var control = _candidateControlInput.State;
         _actions.Complete();
-        if (_rollingGameplay) _candidateRolling = AlsRollingGameplay.ApplyOutcomes(_committedRolling, frame, _actions.Outcomes);
+        if (_rollingGameplay) _candidateRolling = AlsRollingGameplay.ApplyOutcomes(_committedRolling, frame, _actions.Outcomes, _rollDefinitionId);
         // Global UpdateInAirValues runs even when BaseLayer source relevance is zero.
         _candidateGlobalInput = _candidateMovementState == AlsMovementStateInput.InAir ?
             _airInput.Evaluate(frame, _committedGlobalInput.Lean, feedback, _candidateMovementState) :

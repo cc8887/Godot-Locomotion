@@ -99,6 +99,7 @@ public partial class AlsCharacterBodyHistory : Node
                 simulation.StepCharacterAnimation(delta);
                 _owner.FollowRagdollPelvis();
                 _owner.PresentRagdoll();
+                _owner.ConsumeRagdollExit();
                 return;
             }
             var fresh = diagnostics.Identity != SourceAnimationIdentity;
@@ -125,6 +126,7 @@ public partial class AlsCharacterBodyHistory : Node
             {
                 var next = Next(); _history.PrepareNoTarget(next); _history.Commit(next); _physicalSequence = next.FrameId;
             }
+            _owner.ObserveGetUp();
             _owner.ConsumeRagdollRequest();
         }
         catch (Exception error)

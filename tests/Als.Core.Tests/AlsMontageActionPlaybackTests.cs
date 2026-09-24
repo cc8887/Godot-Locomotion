@@ -7,6 +7,26 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsMontageActionPlaybackTests
 {
     [Fact]
+    public void AuthoredRateScaleChangesTraversalButNotElapsedSecondsOrBlendClock()
+    {
+        var (bank, actions, reader) = Create(Asset() with { RateScale = 1.2f, RootMotionEnabled = true });
+        Begin(actions, 1, Start(1)); actions.Commit(Id(1));
+        Begin(actions, 2, AlsActionRequest.None);
+        var playback = Read(reader, actions, 2);
+        Assert.Equal(1.25f, bank.Candidate[0].PlayRate);
+        Assert.Equal(1.2f, bank.Candidate[0].RateScale);
+        Assert.Equal(.075f, playback.CurrentTime, 6);
+        Assert.Equal(.4f, playback.CurrentClipTime, 6);
+        Assert.Equal(.05f, playback.FinalSegmentDeltaSeconds, 6);
+        Assert.Equal(3, playback.PlayRate);
+        Assert.Equal(.25f, playback.EffectiveWeight);
+        Assert.Equal(playback.CurrentClipTime, bank.RootMotionRange.EndSeconds);
+        var traversal = bank.Traversal.ToArray(); actions.Discard();
+        Begin(actions, 2, AlsActionRequest.None);
+        Assert.Equal(playback, Read(reader, actions, 2));
+        Assert.Equal(traversal, bank.Traversal.ToArray());
+    }
+    [Fact]
     public void AcceptedFrameIsStationaryAndNextFrameUsesPhysicalClockAndClipMapping()
     {
         var (bank, actions, reader) = Create();
