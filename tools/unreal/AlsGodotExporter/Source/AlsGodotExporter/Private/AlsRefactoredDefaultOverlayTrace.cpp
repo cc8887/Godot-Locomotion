@@ -75,7 +75,7 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
     FString Text;TSharedPtr<FJsonObject> Request;
     if(!FFileHelper::LoadFileToString(Text,*RequestPath)||!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Request))return false;
     FString Kind=TEXT("Default");Request->TryGetStringField(TEXT("overlay"),Kind);
-    if(Kind!=TEXT("Default")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel"))return false;
+    if(Kind!=TEXT("Default")&&Kind!=TEXT("Feminine")&&Kind!=TEXT("Masculine")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel"))return false;
     const bool Box=Kind==TEXT("Box");
     const bool Hands=Kind==TEXT("HandsTied"),Injured=Kind==TEXT("Injured"),Barrel=Kind==TEXT("Barrel");
     const bool Cached=Hands||Injured||Barrel,HasActions=Box||Cached;

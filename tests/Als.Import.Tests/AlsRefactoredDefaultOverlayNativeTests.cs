@@ -10,24 +10,30 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsRefactoredDefaultOverlayNativeTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(30)]
-    [InlineData(60)]
-    [InlineData(120)]
-    public void OriginalAnimGraphMatchesCandidateClocksPredictionPoseAndCurves(int hz)
+    [InlineData(30, AlsRefactoredBasicOverlayKind.Default)]
+    [InlineData(60, AlsRefactoredBasicOverlayKind.Default)]
+    [InlineData(120, AlsRefactoredBasicOverlayKind.Default)]
+    [InlineData(30, AlsRefactoredBasicOverlayKind.Feminine)]
+    [InlineData(60, AlsRefactoredBasicOverlayKind.Feminine)]
+    [InlineData(120, AlsRefactoredBasicOverlayKind.Feminine)]
+    [InlineData(30, AlsRefactoredBasicOverlayKind.Masculine)]
+    [InlineData(60, AlsRefactoredBasicOverlayKind.Masculine)]
+    [InlineData(120, AlsRefactoredBasicOverlayKind.Masculine)]
+    public void OriginalAnimGraphMatchesCandidateClocksPredictionPoseAndCurves(int hz, AlsRefactoredBasicOverlayKind kind)
     {
         var json = MantlingHostFixture.Read("refactored_animation_sources");
         var catalog = new AlsRefactoredAnimationCatalog(json,
             p => File.ReadAllBytes(Path.Combine(RepositoryRoot.Find(), "assets/config", p)));
         var sync = MantlingHostFixture.Read("refactored_sync_inputs");
         var bank = new AlsRefactoredSyncBank(sync, catalog);
-        var profile = AlsRefactoredDefaultOverlayCompiler.Compile(catalog);
+        var profile = AlsRefactoredDefaultOverlayCompiler.Compile(catalog, kind);
         var overlay = profile.CreateRuntime(0);
         var players = new AlsRefactoredSourcePlayerRuntime(catalog, bank,
             new Dictionary<string, AlsRefactoredTriangulationProfile>(), [profile.PlayerDefinition(0, 0)]);
-        using var document = JsonDocument.Parse(MantlingHostFixture.Read("refactored_default_overlay_trace"));
+        using var document = JsonDocument.Parse(MantlingHostFixture.Read("refactored_" + kind.ToString().ToLowerInvariant() + "_overlay_trace"));
         var root = document.RootElement;
         Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
-        Assert.Equal(AlsRefactoredDefaultOverlayProfile.Blueprint, root.GetProperty("source").GetString());
+        Assert.Equal(AlsRefactoredDefaultOverlayProfile.BlueprintFor(kind), root.GetProperty("source").GetString());
         Assert.Equal(profile.BoneNames.ToArray(), root.GetProperty("names").EnumerateArray().Select(n => n.GetString()!));
         foreach (var (name, text) in new[] { ("refactored_animation_sources", json), ("refactored_sync_inputs", sync) })
             Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))),
@@ -80,6 +86,6 @@ public sealed class AlsRefactoredDefaultOverlayNativeTests(ITestOutputHelper out
             players.ValidateCommit(frame); overlay.ValidateCommit(frame); players.Commit(frame); overlay.Commit(frame++);
         }
         Assert.Equal(hz * 3, frame);
-        output.WriteLine($"{hz}Hz frames={frame} bones={frame * 79} maxP_cm={maxP:R} maxQ={maxQ:R} maxS={maxS:R} maxCurve={maxC:R} maxPrediction={maxA:R} maxTime={maxT:R}");
+        output.WriteLine($"{kind}/{hz}Hz frames={frame} bones={frame * 79} maxP_cm={maxP:R} maxQ={maxQ:R} maxS={maxS:R} maxCurve={maxC:R} maxPrediction={maxA:R} maxTime={maxT:R}");
     }
 }

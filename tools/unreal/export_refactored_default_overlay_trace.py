@@ -1,4 +1,4 @@
-"""Tick the unmodified Default Overlay AnimGraph with controlled parent state."""
+"""Tick an unmodified Default/Feminine/Masculine AnimGraph with controlled parent state."""
 import hashlib
 import json
 import os
@@ -7,6 +7,9 @@ import unreal
 
 root = Path(__file__).parents[2] / "assets/config"
 output = Path(os.environ["ALS_DEFAULT_OVERLAY_TRACE_OUTPUT"])
+kind = os.environ.get("ALS_BASIC_OVERLAY_KIND", "Default")
+if kind not in ("Default", "Feminine", "Masculine"):
+    raise ValueError("Unknown basic Overlay")
 if not output.is_absolute():
     raise ValueError("Absolute output required")
 traces = []
@@ -29,6 +32,8 @@ for hz in (30, 60, 120):
 hashes = {name: hashlib.sha256((root / (name + ".json")).read_bytes()).hexdigest()
           for name in ("refactored_animation_sources", "refactored_sync_inputs")}
 request = {"schemaVersion": 1, "resourceHashes": hashes, "traces": traces}
+if kind != "Default":
+    request["overlay"] = kind
 request["requestDigest"] = hashlib.sha256(json.dumps(request, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 output.parent.mkdir(parents=True, exist_ok=True)
 request_path = output.with_suffix(".request.json")
@@ -38,7 +43,7 @@ if not unreal.AlsAnimationGraphLibrary.export_refactored_default_overlay_trace(s
 value = json.loads(output.read_text(encoding="utf-8"))
 value["resourceHashes"] = hashes
 output.write_text(json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n", encoding="utf-8", newline="\n")
-unreal.log("ALS_DEFAULT_OVERLAY_TRACE_OK traces=3 frames=630 assets_saved=0")
+unreal.log("ALS_DEFAULT_OVERLAY_TRACE_OK overlay=" + kind + " traces=3 frames=630 assets_saved=0")
 if os.environ.get("ALS_DEFAULT_OVERLAY_TRACE_QUIT") == "1":
     ticks = 0
     def finish(delta):
