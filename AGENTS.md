@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Refactored 分层共享运行时：`docs/verification/2026-09-25-refactored-layer-runtime.md`。显式 V4/Refactored 属性模式及 22 个原生属性，既有缓存/事务接入固定全权重 CurveAccumulate/Override/Reset；保留基础 pose、完整曲线存在性和 Slot 源相关性。受控 13 节点组合图非完整 authored 图/UE oracle。Core 定向10、Import65/1既有条件跳过、Optimize0/0、普通并行60Hz相机/倒地起身480帧通过。无新UE/资产导出/全量/最终视觉。下一步实际图 inventory/cache order、MultiWay/VB/区域Slot/Head，再普通Mantle宿主；旧缺口和用户文件/暂缓项保留。
+
 - 最新 Refactored 分层契约：`docs/verification/2026-09-25-refactored-layering-contract.md`。四原生AnimGraph已导出，验证Locomotion→PostLocomotion→Layering→Head；curve tail为Overlay六slot曲线reset→Curves Slot→与Locomotion累加→Override最终曲线，新增两阶段算子，调用方仍须实际求值中间Slot。输入模型保留负float、MS=!FullWeight(LS)、三View曲线因子与过去帧身份；不是V4别名/完整View。Core4/Import133后graph强化6重跑/Optimize0/0；无native运行oracle/Godot/全量。冷导两次0/0，三图同，Locomotion仅5隐藏未连ErrorTolerance PinId随机，原文保留非字节一致。下一步Refactored骨骼分支/缓存/Head及虚拟骨布局迁移，再实际Mantle宿主接入；全部旧缺口/用户文件/暂缓项保留。
 
 - 最新 Mantle typed events：`docs/verification/2026-09-25-mantle-typed-events.md`。HostNotifyResources 按event/action/animation/handle与phase/payload解析最终脚步配置，不产生效果，消费仍须在帧提交后。真实P5 proxy source binding+Roll/Mantle，3Hz×4场景×6动作共25200帧且每帧discard重试，事件/RNG/allocator/bank一致，普通18脚步、替换新epoch/隐藏/Ragdoll/清空通过；另源sequence与Mantle同proxy通过。新增13/Import定向127/Optimize0/0。初次新测试ref struct lambda/enum编译错修；无新UE/Core全量/Godot/原生完整图。普通Demo未接Mantle，下一步实际图/曲线控制消费和宿主资源接入→探测/motion生命周期；所有旧缺口与用户修改/暂缓项保留。

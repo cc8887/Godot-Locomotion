@@ -35,6 +35,21 @@ public readonly record struct AlsRefactoredLayeringInput
     public float ViewAmount { get; init; }
     public float ViewHeadBlendAmount { get; init; }
     public float ViewSpineBlendAmount { get; init; }
+    public float GetValue(string name)=>name switch
+    {
+        "HeadBlendAmount"=>HeadBlendAmount,"HeadAdditiveBlendAmount"=>HeadAdditiveBlendAmount,"HeadSlotBlendAmount"=>HeadSlotBlendAmount,
+        "ArmLeftBlendAmount"=>ArmLeftBlendAmount,"ArmLeftAdditiveBlendAmount"=>ArmLeftAdditiveBlendAmount,
+        "ArmLeftSlotBlendAmount"=>ArmLeftSlotBlendAmount,"ArmLeftLocalSpaceBlendAmount"=>ArmLeftLocalSpaceBlendAmount,
+        "ArmLeftMeshSpaceBlendAmount"=>ArmLeftMeshSpaceBlendAmount,
+        "ArmRightBlendAmount"=>ArmRightBlendAmount,"ArmRightAdditiveBlendAmount"=>ArmRightAdditiveBlendAmount,
+        "ArmRightSlotBlendAmount"=>ArmRightSlotBlendAmount,"ArmRightLocalSpaceBlendAmount"=>ArmRightLocalSpaceBlendAmount,
+        "ArmRightMeshSpaceBlendAmount"=>ArmRightMeshSpaceBlendAmount,
+        "HandLeftBlendAmount"=>HandLeftBlendAmount,"HandRightBlendAmount"=>HandRightBlendAmount,
+        "SpineBlendAmount"=>SpineBlendAmount,"SpineAdditiveBlendAmount"=>SpineAdditiveBlendAmount,"SpineSlotBlendAmount"=>SpineSlotBlendAmount,
+        "PelvisBlendAmount"=>PelvisBlendAmount,"PelvisSlotBlendAmount"=>PelvisSlotBlendAmount,
+        "LegsBlendAmount"=>LegsBlendAmount,"LegsSlotBlendAmount"=>LegsSlotBlendAmount,
+        _=>throw new ArgumentException("Unknown Refactored LayeringState property: "+name)
+    };
 }
 
 public sealed class AlsRefactoredLayeringInputModel

@@ -30,12 +30,19 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
     private sealed class Plan
     {
         public readonly int[] CurveIndices, StaticSources;
+        public readonly int[] ModifiedCurveIndices;
         public readonly float[] StaticWeights;
-        public Plan(AlsLayerPoseNode node, string[] names, int[] parents, string[] curves)
+        public Plan(AlsLayerPoseNode node, string[] names, int[] parents, string[] curves,AlsLayerPropertySchema schema)
         {
             CurveIndices = node.Alphas.Select(a => a.Kind == AlsLayerAlphaKind.Curve ? Array.IndexOf(curves, a.Name) : -1).ToArray();
+            ModifiedCurveIndices=node.ModifiedCurves?.Select(name=>Array.IndexOf(curves,name)).ToArray()??[];
+            if(ModifiedCurveIndices.Any(i=>i<0))throw new ArgumentException("Missing curve reset output name.");
             foreach (var alpha in node.Alphas)
-                if (alpha.Kind == AlsLayerAlphaKind.Property) _ = default(AlsLayeringInput).GetValue(alpha.Name);
+                if (alpha.Kind == AlsLayerAlphaKind.Property)
+                {
+                    if(schema==AlsLayerPropertySchema.Refactored)_=default(AlsRefactoredLayeringInput).GetValue(alpha.Name);
+                    else _ = default(AlsLayeringInput).GetValue(alpha.Name);
+                }
             if (node.Kind != AlsLayerPoseKind.LayeredBlend) { StaticSources = []; StaticWeights = []; return; }
             foreach (var layer in node.Filters!)
             foreach (var filter in layer)
@@ -96,6 +103,7 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
     private AlsPoseCacheEvaluation _committedCache, _candidateCache;
     private IAlsLayerBlendingSink? _sink;
     private AlsLayeringInput _input;
+    private AlsRefactoredLayeringInput _refactoredInput;
     private AlsPoseCacheScope _scope;
     private int _sourceEvaluationDepth;
     private bool _prepared, _evaluated, _busy, _scopeOpen, _unvisited;
@@ -122,7 +130,7 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
         _definition = definition; _nodes = definition.Nodes.ToArray(); _boneCount = names.Length; _curveCount = curveNames.Length;
         _referencePose = referencePose.ToArray(); _previousCurves = new AlsInertialCurve[_curveCount];
         _plans = new Plan[definition.Caches.NodeCount];
-        foreach (var node in _nodes) _plans[node.Index] = new(node, names, _parents, _curveNames);
+        foreach (var node in _nodes) _plans[node.Index] = new(node, names, _parents, _curveNames,definition.PropertySchema);
         _frameWidth = System.Math.Max(2, _nodes.Max(n => n.Inputs.Length)); _frameCapacity = checked(_nodes.Length + 2);
         _workPose = new AlsLocalPose[checked(_frameCapacity * _frameWidth * _boneCount)];
         _workCurves = new AlsInertialCurve[checked(_frameCapacity * _frameWidth * _curveCount)];
@@ -137,6 +145,27 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
         ReadOnlySpan<AlsInertialCurve> previousCommittedCurves, AlsGraphTraversalCounter initialization,
         AlsGraphTraversalCounter bones, AlsGraphTraversalCounter evaluation, IAlsLayerBlendingSink sink,
         bool updateSource = true)
+    {
+        if(_definition.PropertySchema!=AlsLayerPropertySchema.V4)throw new ArgumentException("V4 inputs cannot drive a Refactored layering graph.");
+        PrepareCore(context,input,previousCommittedCurves,initialization,bones,evaluation,sink,updateSource);
+    }
+    public void Prepare(in AlsPoseUpdateContext context,in AlsRefactoredLayeringInput input,
+        ReadOnlySpan<AlsInertialCurve> previousCommittedCurves,AlsGraphTraversalCounter initialization,
+        AlsGraphTraversalCounter bones,AlsGraphTraversalCounter evaluation,IAlsLayerBlendingSink sink,bool updateSource=true)
+    {
+        if(_definition.PropertySchema!=AlsLayerPropertySchema.Refactored)throw new ArgumentException("Refactored inputs cannot drive a V4 layering graph.");
+        if(_prepared||_busy)throw new InvalidOperationException("Layering already owns a candidate.");
+        foreach(var node in _nodes)
+        foreach(var alpha in node.Alphas)
+            if(alpha.Kind==AlsLayerAlphaKind.Property&&!float.IsFinite(input.GetValue(alpha.Name)))
+                throw new ArgumentException("Nonfinite Refactored layering property.");
+        _refactoredInput=input;
+        var identityOnly=new AlsLayeringInput {Identity=input.Identity,FeedbackIdentity=input.FeedbackIdentity};
+        PrepareCore(context,identityOnly,previousCommittedCurves,initialization,bones,evaluation,sink,updateSource);
+    }
+    private void PrepareCore(in AlsPoseUpdateContext context,in AlsLayeringInput input,
+        ReadOnlySpan<AlsInertialCurve> previousCommittedCurves,AlsGraphTraversalCounter initialization,
+        AlsGraphTraversalCounter bones,AlsGraphTraversalCounter evaluation,IAlsLayerBlendingSink sink,bool updateSource)
     {
         ArgumentNullException.ThrowIfNull(sink);
         if (_prepared || _busy || context.Identity.SlotGeneration == 0 || input.Identity != context.Identity ||
@@ -249,7 +278,10 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
             case AlsLayerPoseKind.Input: _sink!.UpdateInput(index, node.Label, context); return;
             case AlsLayerPoseKind.UseCache: _updates.Use(index, context); return;
             case AlsLayerPoseKind.Root:
+            case AlsLayerPoseKind.CurveReset:
             case AlsLayerPoseKind.SaveCache: UpdateNode(node.Inputs[0], context); return;
+            case AlsLayerPoseKind.CurveAccumulate:
+            case AlsLayerPoseKind.CurveOverride:
             case AlsLayerPoseKind.DynamicLocalAdditive:
             case AlsLayerPoseKind.DynamicMeshAdditive:
                 UpdateNode(node.Inputs[0], context); UpdateNode(node.Inputs[1], context); return;
@@ -300,7 +332,8 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
         var value = alpha.Kind switch
         {
             AlsLayerAlphaKind.Constant => alpha.Value,
-            AlsLayerAlphaKind.Property => _input.GetValue(alpha.Name),
+            AlsLayerAlphaKind.Property => _definition.PropertySchema==AlsLayerPropertySchema.Refactored
+                ? _refactoredInput.GetValue(alpha.Name) : _input.GetValue(alpha.Name),
             AlsLayerAlphaKind.Curve => curve >= 0 && _previousCurves[curve].Present ? _previousCurves[curve].Value : 0,
             _ => throw new InvalidOperationException("Unsupported LayerBlending alpha."),
         };
@@ -330,6 +363,18 @@ public sealed class AlsLayerBlendingRuntime : IAlsPoseCacheUpdateSink, IAlsPoseC
         var bPose = WorkPose(depth, 1); var bCurves = WorkCurves(depth, 1);
         switch (node.Kind)
         {
+            case AlsLayerPoseKind.CurveReset:
+                EvaluateNode(node.Inputs[0],pose,curves,depth+1);
+                var modified=_plans[index]!.ModifiedCurveIndices;
+                for(var i=0;i<modified.Length;i++)curves[modified[i]]=new(node.ModifiedValues![i]);
+                return;
+            case AlsLayerPoseKind.CurveAccumulate:
+            case AlsLayerPoseKind.CurveOverride:
+                EvaluateNode(node.Inputs[0],pose,curves,depth+1);
+                EvaluateNode(node.Inputs[1],bPose,bCurves,depth+1);
+                if(node.Kind==AlsLayerPoseKind.CurveOverride)bCurves.CopyTo(curves);
+                else AlsLayeringCurves.Apply(curves,bCurves,1,curves);
+                return;
             case AlsLayerPoseKind.DynamicLocalAdditive:
             case AlsLayerPoseKind.DynamicMeshAdditive:
                 EvaluateNode(node.Inputs[0], aPose, aCurves, depth + 1);
