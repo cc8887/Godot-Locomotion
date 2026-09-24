@@ -14,6 +14,9 @@ class ALSGODOTEXPORTER_API UAlsSourceAnimationLibrary final : public UBlueprintF
     GENERATED_BODY()
 public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadSourceFloatCurves(UAnimSequence* Animation);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadRawSamplingCases();
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")

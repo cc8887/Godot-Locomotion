@@ -56,6 +56,41 @@ void SourceOptionalPath(const TSharedRef<FJsonObject>& Object, const TCHAR* Fiel
 }
 }
 
+FString UAlsSourceAnimationLibrary::ReadSourceFloatCurves(UAnimSequence* Animation)
+{
+    if (!Animation || !Animation->GetDataModelInterface()) return {};
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("source"), Animation->GetPathName());
+    TArray<TSharedPtr<FJsonValue>> Curves;
+    for (const FFloatCurve& Curve : Animation->GetDataModelInterface()->GetFloatCurves())
+    {
+        const TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
+        Row->SetStringField(TEXT("name"), Curve.GetName().ToString());
+        Row->SetStringField(TEXT("preInfinity"), SourceEnumName(Curve.FloatCurve.PreInfinityExtrap.GetValue()));
+        Row->SetStringField(TEXT("postInfinity"), SourceEnumName(Curve.FloatCurve.PostInfinityExtrap.GetValue()));
+        Row->SetNumberField(TEXT("defaultValue"), Curve.FloatCurve.GetDefaultValue());
+        TArray<TSharedPtr<FJsonValue>> Keys;
+        for (const FRichCurveKey& Key : Curve.FloatCurve.GetConstRefOfKeys())
+        {
+            const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+            Value->SetNumberField(TEXT("time"), Key.Time);
+            Value->SetNumberField(TEXT("value"), Key.Value);
+            Value->SetNumberField(TEXT("arriveTangent"), Key.ArriveTangent);
+            Value->SetNumberField(TEXT("leaveTangent"), Key.LeaveTangent);
+            Value->SetNumberField(TEXT("arriveWeight"), Key.ArriveTangentWeight);
+            Value->SetNumberField(TEXT("leaveWeight"), Key.LeaveTangentWeight);
+            Value->SetStringField(TEXT("interpolation"), SourceEnumName(Key.InterpMode.GetValue()));
+            Value->SetStringField(TEXT("tangentMode"), SourceEnumName(Key.TangentMode.GetValue()));
+            Value->SetStringField(TEXT("weightMode"), SourceEnumName(Key.TangentWeightMode.GetValue()));
+            Keys.Add(MakeShared<FJsonValueObject>(Value));
+        }
+        Row->SetArrayField(TEXT("keys"), Keys);
+        Curves.Add(MakeShared<FJsonValueObject>(Row));
+    }
+    Result->SetArrayField(TEXT("curves"), Curves);
+    return SourceJson(Result);
+}
+
 FString UAlsSourceAnimationLibrary::ReadSourceAnimationMetadata(UAnimSequence* Animation)
 {
     if (!Animation || !Animation->GetSkeleton()) return {};

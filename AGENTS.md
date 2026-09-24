@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle曲线：`docs/verification/2026-09-24-mantle-curves.md`。新增只读native原始RichCurve键导出（避开T3D六位截断），3source/6curve；Compiler严格hash/名字/顺序/策略，Pose sampler按资产+输入digest绑定，使用同次量化SampleTime与presence。363 native pose曲线参考726值max5.96e-8，Import Mantling47过、Optimize0/0。首轮9过1元数据time断言错，把请求时间当量化时间，按源码修测试、未改算法/容差。UE全Editor构建/插件审计fingerprint3A2435A0BA821769E64D0EE19C4E2A206EB0B4EAD76F08BE5BBA40D922CABECB，冷导0/0、普通Editor28072实际句柄exit0，两输出字节一致；DV0/3旧warn，两旧Condition及渲染警告保留。curvesSHA87441D4792EC835F58823A02D1D6AE5C9698B542ED1807C64CD2DA8296D20B0F/referenceSHA656F7198C73684DFB94966F513C617D29F1715E69CD928E4A439351195665E2E。无新Godot场景/全量/游戏打包；下一步manifest/场景骨架/slot/notify及探测生命周期，Mantle未接demo，其余旧缺口/用户文件/暂缓项保留。
+
 - 最新Mantle完整pose：`docs/verification/2026-09-24-mantle-full-pose.md`。AlsMantlingPoseCompiler从3真实完整原始键编译原生厘米资源，复用precise key/VB/retarget/rootlock；核对root hash、骨架拓扑、根键/时间与6montage段闭包。60pose/4740骨含660VB独立native对照Pmax4.58445e-14cm/q分量3.33e-16/S0；各4owner×31逆序并行与串行位值同、改pelvis键改变结果、12非法拒绝。Import Mantling37过，Optimize0/0；无新UE/Godot场景/全量。不是animation-set manifest，curve/notify/slot/场景骨架适配仍缺，非恒等Orient原生覆盖未补，Mantle未接demo；下一步这些绑定及探测/身份motion生命周期。用户plan SHA78EEA141...未变、头颈文件保留；本轮外部project.godot与大量cs.uid变更未触碰/提交，后续保留。旧移动oracle闭包失败和全目标剩余/暂缓项不变。
 
 - 最新Mantle重定向：`docs/verification/2026-09-24-mantle-retarget.md`。新增同骨架非baked precise算子，AnimationScaled/Relative/OrientAndScale接入两raw sampler与Import枚举；厘米阈值/float长度比例/安全倒数/反向向量。Core19、Import87+hash补断言2过、Optimize0/0；真实60pose/4740骨在厘米与FBX各对照一次P/S0、q分量2.22e-16，但输入是native raw pose，非原始键全链；真实参考相同，非恒等Orient仅受控测试覆盖。Godot Overlay两精度848pose各过，float零分配与4owner并行一致；普通60Hz480提交过。默认raw移动场景因旧oracle与当前recovery闭包不匹配在采样前失败，日志保留、未放宽断言。未改UE/资产/全量/视觉，Mantle未接demo。下一步Refactored真实manifest/完整关键帧编译与虚拟骨/curve/slot/Notify→探测及具身份motion生命周期；所有旧未完目标/用户文件/暂缓项保留。
