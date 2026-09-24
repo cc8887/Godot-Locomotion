@@ -1,5 +1,6 @@
-"""Record actual UE camera ticks; ALS_CAMERA_COMPONENT_BASE=1 adds moving bases.
+"""Record actual UE camera ticks; BASE=1 adds bases, COLLISION=1 adds a wall.
 
+The full option names are ALS_CAMERA_COMPONENT_BASE / ALS_CAMERA_COMPONENT_COLLISION.
 Writes only the requested reference JSON; never saves source assets.
 """
 import os
