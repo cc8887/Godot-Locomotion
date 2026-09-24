@@ -46,6 +46,9 @@ public sealed class AlsRefactoredSyncTraceTests(ITestOutputHelper output)
             var scenario=trace.GetProperty("scenario").GetInt32();var independent=scenario==6;
             float[] times=[.2f,.2f,.93f,.2f,.33f,.2f,0,0];var epochs=Enumerable.Repeat(1L,8).ToArray();
             var filters=new AlsRefactoredBlendFilterState[8];var caches=Enumerable.Repeat(-1,8).ToArray();
+            var playerCount=scenario is 0 or 6?1:scenario==5?8:6;
+            var owner=new AlsRefactoredSourcePlayerRuntime(catalog,bank,profiles,Enumerable.Range(0,playerCount)
+                .Select(i=>new AlsRefactoredSourcePlayerDefinition(i,assets[independent?8:i],independent?-1:0,times[i])));
             var group=default(AlsAssetSyncGroupHistory);AlsAssetPlayerHistory[] history=[];AlsAssetSampleHistory[] sampleHistory=[];
             var frameIndex=0;
             foreach(var frame in trace.GetProperty("frames").EnumerateArray())
@@ -72,6 +75,10 @@ public sealed class AlsRefactoredSyncTraceTests(ITestOutputHelper output)
                         LegacyLength:isBlend&&blend!.LegacyLength,RequestedInertialization:reset));
                 }
                 var ticks=players.ToArray();var resolved=samples.ToArray();var result=new AlsAssetPlayerHistory[ticks.Length];var sampleResult=new AlsAssetSampleHistory[resolved.Length];
+                var ownerInput=frame.GetProperty("input").EnumerateArray().Select(i=>new AlsRefactoredSourcePlayerInput(i.GetProperty("slot").GetInt32(),
+                    new(i.GetProperty("x").GetSingle(),i.GetProperty("y").GetSingle()),i.GetProperty("rate").GetSingle(),i.GetProperty("weight").GetSingle(),
+                    i.GetProperty("reset").GetBoolean(),.1f,i.GetProperty("reset").GetBoolean())).ToArray();
+                owner.Prepare(frameIndex,ownerInput,delta);
                 bool Evaluate(AlsAssetPlayerHistory[] p,AlsAssetSampleHistory[] s,out AlsAssetSyncGroupHistory next)
                 {
                     if(independent)
@@ -79,6 +86,11 @@ public sealed class AlsRefactoredSyncTraceTests(ITestOutputHelper output)
                     return AlsSyncRuntime.TryEvaluateAssetSyncGroup(0,group,ticks,resolved,bank.Sequences,bank.Markers,history,sampleHistory,delta,p,s,out next,out _);
                 }
                 Assert.True(Evaluate(result,sampleResult,out var nextGroup),label+" rejected");
+                Assert.True(owner.Players.SequenceEqual(result),label+" production player history");
+                Assert.True(owner.Samples.SequenceEqual(sampleResult),label+" production sample history");
+                if(!independent)Assert.Equal(nextGroup,owner.Groups[0].Group);
+                owner.Cancel();owner.Prepare(frameIndex,ownerInput,delta);
+                Assert.True(owner.Players.SequenceEqual(result));Assert.True(owner.Samples.SequenceEqual(sampleResult));
                 Assert.Equal(frame.GetProperty("leader").GetInt32(),nextGroup.LeaderPlayerId);
                 Near(frame.GetProperty("previousRatio").GetSingle(),nextGroup.PreviousRatio,label+" previous ratio");
                 Near(frame.GetProperty("ratio").GetSingle(),nextGroup.Ratio,label+" ratio");
@@ -113,6 +125,8 @@ public sealed class AlsRefactoredSyncTraceTests(ITestOutputHelper output)
                         }
                         var pose=new AlsPrecisePose[source.BoneNames.Length];var curves=new AlsInertialCurve[source.CurveNames.Length];
                         poseSamplers[path].SampleTimes(timed,pose,curves);
+                        owner.Evaluate(frameIndex,slot);owner.Evaluate(frameIndex,slot);
+                        Assert.True(owner.Pose(slot).SequenceEqual(pose));Assert.True(owner.Curves(slot).SequenceEqual(curves));
                         Assert.Equal(source.BoneNames.ToArray(),poseReference.GetProperty("names").EnumerateArray().Select(v=>v.GetString()!));
                         for(var bone=0;bone<pose.Length;bone++)
                         {
@@ -141,6 +155,9 @@ public sealed class AlsRefactoredSyncTraceTests(ITestOutputHelper output)
                 var retry=new AlsAssetPlayerHistory[result.Length];var retrySamples=new AlsAssetSampleHistory[sampleResult.Length];
                 Assert.True(Evaluate(retry,retrySamples,out var retried),label);Assert.Equal(nextGroup,retried);Assert.Equal(result,retry);Assert.Equal(sampleResult,retrySamples);
                 if(group.HasLeader&&nextGroup.HasLeader&&group.LeaderPlayerId!=nextGroup.LeaderPlayerId)changes++;
+                Assert.Throws<ArgumentException>(()=>owner.ValidateCommit(frameIndex+1));
+                owner.ValidateCommit(frameIndex);owner.Commit(frameIndex);
+                Assert.Throws<ArgumentException>(()=>owner.Prepare(frameIndex,ownerInput,delta));
                 filters=candidates;caches=nextCaches;group=nextGroup;history=result;sampleHistory=sampleResult;frameIndex++;frames++;
             }
         }

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新生产source-player owner：`docs/verification/2026-09-25-refactored-source-player.md`。新Import runtime冻结Sequence/2DBS播放定义，独立资源/player/sample/epoch身份，filter→triangle→Core多组/独立Sync→sampletime pose/curve，候选/重置/Commit/Cancel；更新但未Evaluate可提交时钟，采样fault禁止提交。已暴露ticks/samples/contexts供后续Notify，不执行Notify/rootmotion。原native1344帧13283sample282leader+384pose扩展生产owner严格相同，新增90帧重复资源/absolute+additive及120帧多组late-failure/cancel恢复；新增2+扩展1/Import20/Optimize0/0，无失败/新UE/Godot/全量/性能。仅CanBeLeader/固定group/2DBS（Look原Head另路）；生产图尚未接。下一步实际Locomotion/Overlay回调与图→现完整后处理及共享frame/Notify/rootmotion/宿主与全部旧缺口，普通Demo未切，保留用户文件/暂缓项。
+
 - 最新Refactored连续Sync：`docs/verification/2026-09-25-refactored-sync-trace.md`。实际FAnimSync9原资源/3Hz7场景1344帧，自主filter/triangle/time/history，13283sample/282leader切换，时钟等max2.981e-8；新SampleTimes每sample秒数→384nativepose/30336骨 maxP8.273e-14cm/Q3.331e-16/curve5.961e-8。Core算法未改/无预算放宽，新1综合/Import29/Optimize0/0。两完整UE构建最终5actions审计47422D...，首轮含NetCore且系统BuildId变4cd31a69（未手改）；冷/普通34280实际exit0字节同C3AAAC...，DV0/3旧warn，Editor两旧Condition五warn。无Godot/全量/打包；生产SampleTimes已接，但组合调度仍测试夹具，下一步生产source-player owner→实际Locomotion/Overlay/Notify/rootmotion/身份/最终布局宿主及全部旧缺口；普通Demo未切，保留用户文件/暂缓项。
 
 - 最新Refactored Sync资源表：`docs/verification/2026-09-25-refactored-sync-bank.md`。全部127Sequence+9BS/136资源/60marker/Left Right，全精度timing和原nativeText交叉，路径排序新Sync编号0..135（未重映射PoseSource/旧宿主），有序weights→Core sample绑定。实际9BS legacyLength=false/phasefalse/markertrue/highestNotify，拒绝旧默认legacy；全表逆序ID同，真实Forward240帧Core marker/retry有效但无新UE连续tick oracle。新8/Import23/Optimize0/0，UE构建5actions审计6FF235...冷/普通30504实际exit0字节同CF0B5E...，DV0/3旧warn，Editor两旧Condition五warn。无Godot/全量/打包；下一步原资源FAnimSync连续tick对照（自主filter/triangle/history/new-length）→每sample时间pose→移动Overlay图宿主及所有旧缺口。普通Demo未切，保留用户文件/暂缓项。
