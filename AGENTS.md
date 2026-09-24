@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Head图运行时：`docs/verification/2026-09-25-refactored-head-runtime.md`。实际6节点compiler runtime/authored交叉，alpha/teleport/no-sync/回调/bindings门控，profile绑定settings/Look；Core候选Head以实际遍历counter处理Init→Refresh、隐藏/重初始，Evaluate只Look+MeshApply/curve透传，fault后禁止commit。实际源3Hz630提交帧重试/重复Eval/各4init/3采样fault恢复，5非法图；新8/Import54/最终Head8重叠/Optimize0/0。初次误校authored linkId=-1导致3失败，改runtime链接+编辑图FollowReroutes后通过，日志保留。无新UE连续状态/整图oracle/Godot/全量；普通demo未切，下一步原生Head/View状态与整图对照→完整宿主/Mantle，旧缺口及用户文件/暂缓项保留。
+
 - 最新Look独立权重：`docs/verification/2026-09-25-refactored-look-weights.md`。原BS实际两段1D非V4grid，新Core double归一化→float段→排序阈值归一化，Look Evaluate自主pitch→weights→pose；编译原文严格轴/段/样本/类/非默认属性，省略策略依据本地原生默认。35native权重order逐值同/2765骨同前误差，无参考权重驱动。Import123、最终Look11复跑重叠、Core1细边界、Optimize0/0。无新增UE细边界oracle/Godot/全量。下一步Head图回调相关性整合及连续状态oracle→宿主/Mantle，旧缺口/用户文件/暂缓项保留。
 
 - 最新Look加法姿态：`docs/verification/2026-09-25-refactored-look-pose.md`。新Look compiler/source三目标+Stand frame0，内部raw additive target入口复用Mantling键/retarget/VB，旧入口政策保留；mesh差值与按调用者权重有序混合。35native姿态2765骨maxP6.434238129413513e-14cm/Q4.440892098500626e-16/S0，使用native记录权重，不是pitch→weight独立验证。4owner×3×31根锁关辅助scale0/1无影响；5策略及非法weight恢复。新7/Import119/Optimize0/0，无新UE/Godot/全量。下一步真实BS权重/Head图回调与状态oracle→宿主/Mantle，普通demo未切，旧缺口/用户文件/暂缓项保留。

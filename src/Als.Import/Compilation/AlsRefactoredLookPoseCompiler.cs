@@ -13,7 +13,7 @@ public sealed class AlsRefactoredLookPoseSource
     internal AlsRefactoredLookPoseSource(AlsMantlingPoseSource[] targets,AlsMantlingPoseSource basis)
     {_targets=targets;_basis=basis;}
     public Sampler CreateSampler()=>new(this);
-    public sealed class Sampler
+    public sealed class Sampler : IAlsRefactoredLookPoseSampler
     {
         private readonly AlsMantlingPoseSource.Sampler[] _targets;
         private readonly AlsPrecisePose[] _basis,_target,_sample;
