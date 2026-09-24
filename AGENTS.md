@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新相机连续环境：`docs/verification/2026-09-24-camera-continuous-environment.md`。普通入口十四秒：往返墙面15cm球心独立间距/撤墙外放、实际平移旋转base与局部历史空间、离开清base、角色换代后恢复跟随；Single30/Parallel60/120各74/149/299墙及两平台采样过，minRatio约.454，替换过；最终渲染60数值同，Optimize0/0。只新增回归，无生产算法/Core/Import/UE改动或全量/截图。下一步宿主查询故障恢复→原生组件位置oracle/复杂环境；仍非完整相机等价。旧物理9/12、Flail0/3、Mantle/性能未完成，头颈/道具暂缓，用户文件保留。
+
 - 最新普通相机：`docs/verification/2026-09-24-camera-demo-integration.md`。AlsDemoEntry 默认接图/socket/实际胶囊与base/球扫，在 Main Observe 成功姿态后发布独立 Camera3D，保留 control yaw，水平 FOV；B 人称、T 换肩。Optimize 0/0；普通八秒 Single30、Parallel60/120 及渲染60通过，240/480/960/480相机提交，真实B/T分发、移动/冲刺、倒地/起身、控制yaw不回写；五图保存。无新Core/Import/UE全量。仍缺相机组件原生位置oracle、连续墙/平台/换代故障专项、scaled host与宿主查询失败恢复、最终性能；当前错误冻结并报告。旧物理9/12、Flail0/3、Mantle等继续，头颈/道具暂缓，用户文件保留。
 
 - 最新Camera碰撞：`docs/verification/2026-09-24-camera-collision.md`。Main query-only球扫/零运动起点穿透、按shape去重接触深度+1cm×scale膨胀恢复、拒绝背离owner、复查及保留调整起点、明确Godotmask/可更新自身RID排除/容量拒绝。三Hz实际Jolt各13静态几何/边界检查通过，Optimize过，日志camera-collision-final-*；Godot接触投影不是Chaos MTD，未证复杂凹面/深包围/连续移动或视觉等价。无Core/Import/UE新验证，普通Demo仍未接；下一步socket/真实base胶囊/查询/CameraRuntime在完成姿态后的Main输出，control yaw独立。旧静态9/12、Flail0/3、Mantle/完整Camera/性能继续，头颈/道具暂缓，用户文件保留。
