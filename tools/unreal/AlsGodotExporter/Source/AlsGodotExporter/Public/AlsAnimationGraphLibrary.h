@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Original parent View/Spine update and Head callbacks on transient game-world instances. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportRefactoredViewTrace(const FString& RequestPath, const FString& OutputPath);
+
     /** Original linked Layering graph with controlled parent states and cached linked input poses. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportRefactoredLayerGraphTrace(const FString& RequestPath, const FString& OutputPath);
