@@ -35,6 +35,9 @@ public static class AlsCameraGraphCompiler
             .GetProperty("nativeText").GetString()!;
         var curves = root.GetProperty("assets").EnumerateArray().Where(a => a.GetProperty("class").GetString() == "/Script/Engine.CurveFloat")
             .ToDictionary(a => a.GetProperty("path").GetString()!, a => AlsCameraBlendCurve.Compile(a.GetProperty("nativeText").GetString()!), StringComparer.Ordinal);
+        var nativeBlends = root.GetProperty("blendNodes").EnumerateArray().ToDictionary(n => n.GetProperty("path").GetString()!,
+            n => n.GetProperty("blendType").GetString()!, StringComparer.Ordinal);
+        var usedBlends = new HashSet<string>(StringComparer.Ordinal);
         var nodes = new Dictionary<string, AlsCameraPoseNode>(StringComparer.Ordinal);
         var visiting = new HashSet<string>(StringComparer.Ordinal);
         var graphs = new Dictionary<string, Graph>(StringComparer.Ordinal);
@@ -93,12 +96,17 @@ public static class AlsCameraGraphCompiler
                     Require(node.Pins.Values.Count(p => p.Name.StartsWith("BlendPose_", StringComparison.Ordinal)) == count, "Camera child count changed.");
                     var times = Enumerable.Range(0, count).Select(i => Number(graph.Literal(node, "BlendTime_" + i))).ToArray();
                     Require(times.All(t => t >= 0), "Negative camera blend time.");
-                    var blend = Regex.Match(config, @"BlendType=(\w+)").Groups[1].Value;
-                    Require(blend is "" or "Cubic" or "Custom", "Unsupported camera blend function.");
+                    Require(nativeBlends.TryGetValue(id, out var reflectedBlend), "Missing reflected camera blend type.");
+                    usedBlends.Add(id);
+                    var blend = reflectedBlend switch
+                    { "LINEAR" => "Linear", "CUBIC" => "Cubic", "HERMITE_CUBIC" => "HermiteCubic", "CUSTOM" => "Custom",
+                        _ => throw new ArgumentException("Unsupported reflected camera blend type: " + reflectedBlend) };
+                    var serializedBlend = Regex.Match(config, @"BlendType=(\w+)").Groups[1].Value;
+                    Require(serializedBlend == "" || serializedBlend == blend, "Reflected and serialized camera blend types differ.");
                     var custom = blend == "Custom" ? Curve(config) : null;
                     var children = Enumerable.Range(0, count).Select(i => Input("BlendPose_" + i)).ToArray();
                     result = new AlsCameraSelectPose(id, input, boolean, Array.AsReadOnly(tags), Array.AsReadOnly(children), Array.AsReadOnly(times),
-                        blend == "" ? "Linear" : blend, custom, updateMode == "ResetChildOnActivate"); break;
+                        blend, custom, updateMode == "ResetChildOnActivate"); break;
                 case "AnimGraphNode_StateMachine":
                     Require(config == "", "Changed camera state-machine evaluation policy.");
                     var machinePath = id + ".Look States"; var machine = Read(machinePath);
@@ -150,6 +158,7 @@ public static class AlsCameraGraphCompiler
         }
         var graph = Read(Source);
         var output = Pose(Source, graph.Nodes.Single(n => n.Kind == "AnimGraphNode_Root"));
+        Require(usedBlends.SetEquals(nativeBlends.Keys), "Unused or foreign reflected camera blend nodes.");
         return new(output, new ReadOnlyDictionary<string, AlsCameraPoseNode>(nodes), new ReadOnlyDictionary<string, AlsCameraBlendCurve>(curves));
     }
 

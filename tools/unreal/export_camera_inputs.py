@@ -15,6 +15,7 @@ paths = [root + name for name in (
     "Data/CF_Als_CameraBlend_Smooth", "Data/CF_Als_CameraBlend_Quick")]
 assets = []
 graphs = []
+blend_nodes = []
 with tempfile.TemporaryDirectory(prefix="als-camera-inputs-") as temporary:
     def export_text(obj):
         task = unreal.AssetExportTask()
@@ -40,6 +41,12 @@ with tempfile.TemporaryDirectory(prefix="als-camera-inputs-") as temporary:
     for graph in unreal.ObjectIterator(unreal.EdGraph):
         if graph.get_path_name().startswith(prefixes) and graph.get_name() == "AnimGraph":
             graphs.append({"path": graph.get_path_name(), "nativeText": export_text(graph)})
+    camera_graph = root + "AB_Als_Camera.AB_Als_Camera:AnimGraph."
+    for node in unreal.ObjectIterator(unreal.EdGraphNode):
+        if node.get_path_name().startswith(camera_graph) and node.get_class().get_name() in (
+                "AlsAnimGraphNode_GameplayTagsBlend", "AnimGraphNode_BlendListByBool"):
+            blend_nodes.append({"path": node.get_path_name(),
+                "blendType": node.get_editor_property("node").get_editor_property("blend_type").name})
 if not graphs:
     raise RuntimeError("Camera animation graphs missing")
 settings = unreal.load_asset(root + "Data/CS_Als_Default")
@@ -94,6 +101,7 @@ for half_life in (0.0, 0.2):
                     "rotation": rotation_values(unreal.AlsRotation.damper_exact_rotation(current, target, delta, half_life))})
 output.parent.mkdir(parents=True, exist_ok=True)
 output.write_text(json.dumps({"schemaVersion": 1, "assets": assets, "settings": values,
+    "blendNodes": sorted(blend_nodes, key=lambda n: n["path"]),
     "rotationReference": reference, "rotationBoundaries": rotation_boundaries,
     "graphs": sorted(graphs, key=lambda g: g["path"])}, indent=2) + "\n", encoding="utf-8")
 unreal.log("ALS_CAMERA_INPUTS_OK assets=" + str(len(assets)) + " graphs=" + str(len(graphs)) + " assets_saved=0")
