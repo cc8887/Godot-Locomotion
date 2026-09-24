@@ -5,20 +5,31 @@ namespace GodotAls.Import.Compilation;
 
 /// <summary>Explicit physical-skin compatibility adapter, not arbitrary retargeting.
 /// Generates host virtual bones per native key before blending, then converts final
-/// double transforms to the host FBX basis/meters. Each pose source owns its scratch.</summary>
+/// double transforms to the host FBX basis/meters. ForNativeSkeleton retains the
+/// original layout and centimetres. Each pose source owns its scratch.</summary>
 public sealed class AlsMantlingHostPoseProfile
 {
     private readonly AlsMantlingMontageProfile _adapted;
     private readonly int[] _curveTargets;
     private readonly string[] _curveNames;
+    private readonly bool _convertToFbx;
     private readonly Dictionary<int,(AlsAuthoredMontageAsset Asset,AlsMantlingCurveSource Curves,int[] Targets)> _montageCurves=[];
     public int BoneCount { get; }
     public ReadOnlySpan<string> CurveNames=>_curveNames;
     public AlsMantlingHostPoseProfile(AlsMantlingMontageProfile profile,AlsRawAnimationSkeletonDefinition host,ReadOnlySpan<string> curveNames,
         IReadOnlyDictionary<string,AlsMantlingCurveSource>? montageCurves=null)
+        :this(profile,host,curveNames,montageCurves,true) { }
+    // Refactored linked graphs already use the original full logical skeleton in
+    // native centimetres. Keep exactly that layout while sharing montage curves.
+    public static AlsMantlingHostPoseProfile ForNativeSkeleton(AlsMantlingMontageProfile profile,ReadOnlySpan<string> curveNames,
+        IReadOnlyDictionary<string,AlsMantlingCurveSource> montageCurves)
+    {ArgumentNullException.ThrowIfNull(montageCurves);return new(profile,null,curveNames,montageCurves,false);}
+    private AlsMantlingHostPoseProfile(AlsMantlingMontageProfile profile,AlsRawAnimationSkeletonDefinition? host,ReadOnlySpan<string> curveNames,
+        IReadOnlyDictionary<string,AlsMantlingCurveSource>? montageCurves,bool convertToFbx)
     {
-        ArgumentNullException.ThrowIfNull(profile);ArgumentNullException.ThrowIfNull(host);
-        _curveNames=curveNames.ToArray();BoneCount=host.LogicalBoneCount;
+        ArgumentNullException.ThrowIfNull(profile);if(convertToFbx)ArgumentNullException.ThrowIfNull(host);
+        _convertToFbx=convertToFbx;
+        _curveNames=curveNames.ToArray();BoneCount=host?.LogicalBoneCount??profile.Poses.Values.First().Data.LogicalBoneCount;
         if(_curveNames.Any(string.IsNullOrWhiteSpace)||_curveNames.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=_curveNames.Length)
             throw new ArgumentException("Host mantle curve layout must have unique names.");
         var curveLayout=profile.Curves.Values.First().Names;
@@ -28,9 +39,13 @@ public sealed class AlsMantlingHostPoseProfile
             var name=curveLayout[i];_curveTargets[i]=Array.FindIndex(_curveNames,n=>n.Equals(name,StringComparison.OrdinalIgnoreCase));
             if(_curveTargets[i]<0)throw new ArgumentException("Host curve layout omits native mantle curve: "+name);
         }
-        var poses=profile.Definitions.Values.GroupBy(d=>d.SequencePath,StringComparer.Ordinal).ToDictionary(g=>g.Key,g=>
-            profile.Poses[g.Key].AdaptHostLayout(host,g.Select(d=>d.Asset.AnimationId).Distinct().Single()),StringComparer.Ordinal);
-        _adapted=new(profile.Definitions.ToDictionary(p=>p.Key,p=>p.Value,StringComparer.Ordinal),poses,profile.Curves,profile.GroupName);
+        if(host is null)_adapted=profile;
+        else
+        {
+            var poses=profile.Definitions.Values.GroupBy(d=>d.SequencePath,StringComparer.Ordinal).ToDictionary(g=>g.Key,g=>
+                profile.Poses[g.Key].AdaptHostLayout(host,g.Select(d=>d.Asset.AnimationId).Distinct().Single()),StringComparer.Ordinal);
+            _adapted=new(profile.Definitions.ToDictionary(p=>p.Key,p=>p.Value,StringComparer.Ordinal),poses,profile.Curves,profile.GroupName);
+        }
         if(montageCurves is not null)
         {
             if(!montageCurves.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(profile.Definitions.Keys))
@@ -75,7 +90,7 @@ public sealed class AlsMantlingHostPoseProfile
                     montage.Curves.Sample(entry.Position,_montageScratch.AsSpan(0,montage.Targets.Length));
                 }
                 _native.Sample(entry,_pose,_curves);
-                for(var bone=0;bone<_pose.Length;bone++)_pose[bone]=ToFbx(_pose[bone]);
+                if(_profile._convertToFbx)for(var bone=0;bone<_pose.Length;bone++)_pose[bone]=ToFbx(_pose[bone]);
                 _pose.CopyTo(pose);curves.Clear();
                 for(var i=0;i<_curves.Length;i++)curves[_profile._curveTargets[i]]=_curves[i];
                 // UE SlotEvaluatePose: sequence curves.Combine(montage curves), before slot weighting.

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新PostLocomotion整合：`docs/verification/2026-09-25-refactored-post-locomotion.md`。Core Slot provider共享冻结bank，源权重history/reset/skip/相关性；HostPose新增ForNativeSkeleton原79骨厘米+完整Montage自有曲线，旧FBX保留；组合compiler补外层链政策。6实际Mantle×3Hz×3秒3780提交帧，每帧图/Slot/Notify discard重试同，18真实sample fault回滚，reinit active与全覆盖源skip验证；186原生样本全部骨/curve同。新4/最终Import19/Optimize0/0，无失败/UE变更/新整链native/Godot/全量。上游与Overlay为受控Stand，普通Demo未切；下一步实际移动/Overlay布局曲线和宿主/视觉→Mantle gameplay及所有旧缺口。保留用户文件/暂缓项。
+
 - 最新Refactored组合阶段：`docs/verification/2026-09-25-refactored-post-layer.md`。Core PostLayer统一View/Spine→真实Layering→Head候选/曲线反馈/提交回滚，Import profile复用资源校验并核对完整names/parents；厘米逻辑布局，外部source/Montage/Notify仍由宿主事务管理。3Hz420提交帧真实Stand/Crouch/Look、每帧discard重试、各2Head采样fault与上游fault/隐藏/旧帧身份门禁，新4/Import64/Core12/Optimize0/0。初测试Span局部捕获编译失败修夹具后过。无新UE/组合native oracle/Godot/全量；普通Demo未切换，下一步实际Locomotion/Overlay/共享Montage/完整视觉布局宿主接入→Mantle及所有旧缺口，保留用户文件/暂缓项。
 
 - 最新Head原生整图：`docs/verification/2026-09-25-refactored-head-native.md`。原AB_Als_Head_C实际6节点自行回调，父实际View/Spine/settings，raw Stand固定base；3Hz1050帧82950骨，C#独立counter/history/Look权重，maxP8.4732752e-6cm/Q1.8731581e-7/S0、curve精确同。各2init/半秒alpha隐藏，沿用状态单位预算；无生产算法或门槛修改。Import33/Optimize0/0；UE两完整构建成功最终fingerprint05A9CE...，冷/普通32616实际exit0字节同SHA A9F1218BD6A054065FD9B003DB60C50A0D196A98AC7802BF1ABA12E4C3A9844D，旧两Condition/五warn保留，DV0/3旧warn。非完整上游/整图跳过恢复/Godot视觉/全量；普通demo未切。下一步完整Refactored布局/宿主整合→普通Mantle及全部旧Ragdoll/相机/性能缺项，保留用户文件/暂缓项。
