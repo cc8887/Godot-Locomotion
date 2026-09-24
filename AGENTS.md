@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle宿主资源：`docs/verification/2026-09-24-mantle-host-resources.md`。AlsMantlingHostResources在完整host set/physical inventory后稳定映射3动画/6montage/6action/独立group，原始pose身份保持，PoseSource按映射ID路由。BindNotifies保留host prefix/旧表并映射event/object/name/handle，返回新event脚步查找。真实9+6动作bank共存/组内替换/rootowner/discard/Ragdoll清理、126姿态curve逐值同、旧notify表逐值同通过。原始和宿主编号各跑native144轨迹11001帧306事件均0差；Import定向106/Optimize0/0。无新UE/Core全量/Godot场景；不是扩展V4 set，禁止新ID索引旧Animations，尚未普通host采样/骨曲线适配/图/typeddispatch/探测/motion接入。下一步这些宿主整合，全部旧缺口/用户修改/暂缓项保留。
+
 - 最新Mantle原生queue：`docs/verification/2026-09-24-mantle-native-queue.md`。原生NotifyQueue增加slot通知对象/上下文时间/实例与RNG取证，6×3Hz×8场景144轨迹11001帧306事件，对象/顺序/instance/seed一致，float字段及notifytime最大差0；新两秒输入hitch覆盖High同帧脚步后EarlyStop。Import定向99/Optimize0/0，无生产算法更改/新Godot场景/全量。UE首轮Reset未导出链接失败修公共数组清理，完整审计fingerprintF828B170818ACB14853BFFF27B6B67FB392A4D8714BF72473A522A44187864BB，冷0/0、普通33092实际exit0字节同，旧两Condition保留。reference新SHA48056AE2C2F3CBC5064E2929DAEF32980A2263F411609219F6A528D5E06CDB2A。仅原生政策过滤后的slot队列，不含完整图relevance/效果执行；下一步资源映射/graph/探测/motion宿主整合，demo未接Mantle，全部旧缺口/用户文件/暂缓项保留。
 
 - 最新Mantle queued notify：`docs/verification/2026-09-24-mantle-queued-notifies.md`。9真实脚步对象/6montage18绑定，hash/类/对象/偏移/filter闭包，T3D左右脚+效果引用/开关，音频/效果执行未接。共享queue支持PostLocomotion slot4；同一bank新增NotifyTraversal按branch marker分段并保存EarlyTick前中断状态，原Traversal维持整帧action契约；普通BaseLayer改消费通知视图。Core154/Import定向99/Optimize0/0；既有native126状态轨迹过但不含queue oracle，下一步补队列/上下文native对照及资源/graph/探测/motion整合。普通demo未接Mantle，旧缺口/用户修改/暂缓项保留。

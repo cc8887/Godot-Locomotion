@@ -25,8 +25,12 @@ public sealed class AlsMantlingMontageProfile
     private sealed class PoseSource : IAlsMontagePoseSource
     {
         private readonly Dictionary<int,AlsMantlingPoseSource.Sampler> _sources;
-        public PoseSource(AlsMantlingMontageProfile profile)=>_sources=profile.Poses.Values.ToDictionary(p=>p.Data.Identity.AnimationId,
-            p=>p.CreateSampler(profile.Curves[p.Data.Identity.AssetPath]));
+        public PoseSource(AlsMantlingMontageProfile profile)=>_sources=profile.Definitions.Values
+            .GroupBy(d=>d.Asset.AnimationId).ToDictionary(g=>g.Key,g=>
+            {
+                var path=g.Select(d=>d.SequencePath).Distinct(StringComparer.Ordinal).Single();
+                return profile.Poses[path].CreateSampler(profile.Curves[path]);
+            });
         public void Sample(in AlsMontageEvaluation entry,Span<AlsPrecisePose> pose,Span<AlsInertialCurve> curves)
         {
             if(entry.Slot!=AlsMontageSlot.PostLocomotion||entry.AdditiveType!=0||!_sources.TryGetValue(entry.AnimationId,out var source))
