@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新相机恢复：`docs/verification/2026-09-24-camera-query-recovery.md`。修一次查询异常永久冻结：容量/非法fraction专用可重试异常，Discard候选、下一eligible帧当前场景重查、不积攒dt；成功清当前故障，保留计数/最近错误，每段首帧warning；其他配置/owner错误仍terminal。绑定先构造后换owner。真实肩部70小盒+胶囊排除制造64容量溢出，Single30/Parallel60/120各两轮五帧冻结FollowState/Camera3D/FOV，撤障次帧恢复、10失败52提交；连续环境60回归数值同，Optimize0/0。首轮大盒夹具未触发、fail保留，非放宽断言。无新Core/Import全量/UE/截图；下一步原生组件位置oracle。旧9/12、Flail0/3、Mantle/性能继续，头颈/道具暂缓，用户文件保留。
+
 - 最新相机连续环境：`docs/verification/2026-09-24-camera-continuous-environment.md`。普通入口十四秒：往返墙面15cm球心独立间距/撤墙外放、实际平移旋转base与局部历史空间、离开清base、角色换代后恢复跟随；Single30/Parallel60/120各74/149/299墙及两平台采样过，minRatio约.454，替换过；最终渲染60数值同，Optimize0/0。只新增回归，无生产算法/Core/Import/UE改动或全量/截图。下一步宿主查询故障恢复→原生组件位置oracle/复杂环境；仍非完整相机等价。旧物理9/12、Flail0/3、Mantle/性能未完成，头颈/道具暂缓，用户文件保留。
 
 - 最新普通相机：`docs/verification/2026-09-24-camera-demo-integration.md`。AlsDemoEntry 默认接图/socket/实际胶囊与base/球扫，在 Main Observe 成功姿态后发布独立 Camera3D，保留 control yaw，水平 FOV；B 人称、T 换肩。Optimize 0/0；普通八秒 Single30、Parallel60/120 及渲染60通过，240/480/960/480相机提交，真实B/T分发、移动/冲刺、倒地/起身、控制yaw不回写；五图保存。无新Core/Import/UE全量。仍缺相机组件原生位置oracle、连续墙/平台/换代故障专项、scaled host与宿主查询失败恢复、最终性能；当前错误冻结并报告。旧物理9/12、Flail0/3、Mantle等继续，头颈/道具暂缓，用户文件保留。
