@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新道具 Overlay 姿态：`docs/verification/2026-09-25-refactored-prop-overlay-pose.md`。Binoculars/Torch完整28/26节点编译/资源与mesh Aim→stance→瞄准→Idle→动作曲线；沿用已验证update，事务/owner隔离/fault/update-only。旧native1680帧132720骨maxP6.235e-14cm/Q4.441e-16/S2.221e-16，Binoculars curve0、Torch5.961e-8，预算未改；新9/相关Import60/Optimize0/0。初MeshApply调用顺序编译错、JSON float按double误判explicitTime（4失败）和隐藏Alpha引脚误要求（9失败）已纠正，日志保留。无新UE/导出/Godot场景/全量/性能/打包。整图姿态现9/13，余四武器状态机→真实移动/统一宿主及全部旧缺口；普通Demo未切，Ragdoll未整体验收，用户文件/暂缓项保留。
+
 - 最新道具 Overlay 更新：`docs/verification/2026-09-25-refactored-prop-overlay-update.md`。Binoculars/Torch 外动作线性.5/.2/0/.2、内瞄准Hermite .75/.2、Idle .5更新路径；隐藏保持/旧分支零权重tick/隐藏reset pending/事务source输入。实际两图3Hz1680帧更新权重/有效Idle时间差0，612隐藏/6零更新；新8/相关Import47/Optimize0/0。原生完整pose/curve已导出但C#尚未组合或比较，整图姿态进度仍7/13。UE完整4actions审计7B77EF...冷/普通43268实际exit0字节同E40F38.../7DDEB2...，旧Default/Box重导不变；DV0/3旧warn，普通两旧Condition五类warn保留，无新失败/全量/Godot/性能/打包。下一步两图完整Aim mesh/stance/固定秒采样/动作曲线→四武器状态机及全部旧缺口；Torch未瞄准walking两源实际都frame0勿猜改。普通Demo未切，Ragdoll未整体验收，用户文件/暂缓项保留。
 
 - 最新基础 Overlay 变体：`docs/verification/2026-09-25-refactored-basic-overlays.md`。实际Feminine/Masculine均14节点，严格具体图/源校验，共用Default算法但独立profile/候选，Idle比例.5/1（Default仍.75）。新增两图3Hz1260帧99540骨，maxP9.238e-14cm/Q5.552e-16，scale/curve/pred/time差0，更新权重同；新8/相关Import44/Optimize0/0，无新失败。UE完整4actions审计0206D2...冷三图实际0，普通2624/20360实际0新两份字节同353ABD.../CFC8E6...，Default重导B385B2不变；DV0/3旧warn、普通各两旧Condition五类warn保留。无Godot场景/全量/性能/打包；现7/13原Overlay连续证据，余Binoculars/Torch双tag+mesh加法与四武器状态机、移动状态机/统一宿主及全部旧缺口待做。普通Demo未切，Ragdoll未整体验收，用户修改/暂缓项保留。
