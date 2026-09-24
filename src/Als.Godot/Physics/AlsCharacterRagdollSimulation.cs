@@ -32,6 +32,8 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
     internal AlsJointIsland Island => _host.Island;
     internal AlsRagdollSpeedLimit SpeedLimit => _speedLimit;
     internal AlsDoubleVector PelvisVelocity => _animation.PelvisVelocity;
+    internal Vector3 PelvisPosition => new((float)(_animation.PelvisPosition.Y * .01),
+        (float)(_animation.PelvisPosition.Z * .01), (float)(-_animation.PelvisPosition.X * .01));
     internal int EnvironmentBodies => _scene!.BodyCount;
     internal int LastContactCount => _contacts.LastContactCount;
 

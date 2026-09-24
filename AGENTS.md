@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新骨盆/胶囊跟随：`docs/verification/2026-09-24-ragdoll-pelvis-follow.md`。按用户优先级先接物理 pelvis actor→胶囊，球扫球心高度+1.9 cm、配置mask/自身排除、零目标回退；Godot初始重叠需额外零运动查询。Main Lifecycle成功物理步后跟随，动画重试继续/停用暂停，不积分胶囊/不拖动物理岛。Single60、Parallel30/60/120及失败暂停、四查询边界检查通过，日志pelvis-follow-fixed*；首轮initial-overlap失败保留。Optimize通过，无全量/UE/旧矩阵；物理最终显示/当前非物理基底、触发中断退出恢复仍待接，单机范围/时序差异见文档。main/用户P4保留。
+
 - 共享Flail最终补充：普通 locomotion 速度不能用骨盆速度替代；本机 UE MOVE_None 清 CMC velocity、APawn::GetVelocity读 CMC，现 ActualVelocity=0/首次差分减速，Flail 独立原生骨盆样本。最终四组 *-verified 日志通过。Core2901、Import2485+1旧Editor skip（首轮日志缺结论，独立TRX复跑确认）、Optimize与普通Roll通过；详见下一条文档。
 
 - 最新普通共享Flail：`docs/verification/2026-09-23-character-ragdoll-flail.md`。内部BeginRagdoll创建owner后禁碰胶囊，Gather纯值物理样本/双身份步数，Core显式Ragdoll优先floor且限定完整图；生产root/Flail rate/time接通，Main Lifecycle消费同一committed precise源，无第二时钟。修首次切入缺Refactored prediction/history：保留身份反馈但禁射线。Single60/Parallel30/120两秒及Parallel60动画故障+3回调暂停恢复过，120动画/121物理、epoch1、capsule积分0；普通Roll回归、Core既定过滤2901、定向24 LatestMajor、Optimize过，Import见文档/日志。尚无普通自动/手动触发；active action入口拒绝待原生中断。当前显示Flail非物理、胶囊未跟随，下一步物理最终显示/当前非物理基底→跟随→动作中断/触发/退出恢复；静态9/12、Flail0/3/全部后续目标保留，main/用户P4保留。

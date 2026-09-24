@@ -8,7 +8,7 @@ using GodotAls.Locomotion;
 namespace GodotAls.Physics;
 
 // The real character keeps its animation owner throughout activation. Physical
-// display/capsule following and Get-up are deliberately not asserted here.
+// display and Get-up are deliberately not asserted here.
 public partial class CharacterRagdollFlailSmoke : Node
 {
     private P4LocomotionDemo? _demo;
@@ -19,6 +19,7 @@ public partial class CharacterRagdollFlailSmoke : Node
     private long _integrations, _lastAnimation, _epoch;
     private long _lastPhysics;
     private Vector3 _capsulePosition;
+    private Vector3 _pausedPosition;
     private AlsPrecisePose[] _flail = [];
     private Input.MouseModeEnum _mouse;
     private bool _accumulation;
@@ -53,7 +54,8 @@ public partial class CharacterRagdollFlailSmoke : Node
             if (_pauseTicks > 0)
             {
                 Require(character.RagdollSimulation!.CompletedSteps == _lastPhysics &&
-                    character.FullMovementDiagnostics.Ragdoll.Time == _pauseTime, "Paused character advanced physics or Flail.");
+                    character.FullMovementDiagnostics.Ragdoll.Time == _pauseTime &&
+                    character.MovementAnchor.GlobalPosition == _pausedPosition, "Paused character advanced physics, capsule or Flail.");
                 if (--_pauseTicks == 0) character.SetSchedulingActive(true);
                 return;
             }
@@ -65,13 +67,21 @@ public partial class CharacterRagdollFlailSmoke : Node
                 if (character.RuntimeCommittedFrameId < 20) return;
                 _integrations = character.MotorIntegrationCount; _capsulePosition = character.MovementAnchor.GlobalPosition;
                 character.BeginRagdoll(_demo.GetNode<Node3D>("World"));
+                VerifyGroundFollow(character);
                 _flail = new AlsPrecisePose[character.AnimationPoseBoneCount];
                 _lastAnimation = character.RuntimeCommittedFrameId;
                 KeyInput(false); _entered = true; return;
             }
             var simulation = character.RagdollSimulation!;
-            Require(character.MotorIntegrationCount == _integrations && character.MovementAnchor.GlobalPosition == _capsulePosition,
+            Require(character.MotorIntegrationCount == _integrations,
                 "Disabled character movement continued integrating during physics drive.");
+            var motor = (AlsCharacterMotor)character.MovementAnchor;
+            var pelvis = simulation.PelvisPosition;
+            Require(motor.RagdollTarget == pelvis && Mathf.Abs(motor.GlobalPosition.X - pelvis.X) < 1e-5f &&
+                Mathf.Abs(motor.GlobalPosition.Z - pelvis.Z) < 1e-5f,
+                "Capsule did not follow the completed physical pelvis.");
+            Require(motor.RagdollGrounded || motor.GlobalPosition == pelvis,
+                "Airborne capsule differs from physical pelvis.");
             Require(simulation.CompletedSteps == _lastPhysics + 1, "Ragdoll physics skipped or duplicated an engine step.");
             _lastPhysics = simulation.CompletedSteps;
             var id = character.Diagnostics.Identity;
@@ -106,19 +116,49 @@ public partial class CharacterRagdollFlailSmoke : Node
             if (_pause && !_paused && _samples == 10)
             {
                 _pauseTime = diagnostics.Time; _paused = true; _pauseTicks = 3;
+                _pausedPosition = motor.GlobalPosition;
                 character.SetSchedulingActive(false); return;
             }
             if (_samples < _hz * 2) return;
             Require(!_inject || _held == 1 && character.FailureDiagnosticCount == 1,
                 "Animation failure/retry coverage differs.");
             var samples = _samples; var steps = simulation.CompletedSteps;
+            Require(motor.GlobalPosition.DistanceTo(_capsulePosition) > .05f && motor.RagdollGrounded,
+                "Capsule never followed the falling pelvis onto the floor.");
             Cleanup();
             Require(character.RagdollSimulation is null, "Character disposal retained physical owner.");
             _done = true;
-            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 physical_display=false");
+            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 pelvis_follow=true ground_cases=4 physical_display=false");
             GetTree().Quit();
         }
         catch (Exception error) { Fail(error); }
+    }
+    private void VerifyGroundFollow(AlsP3Character character)
+    {
+        var motor = (AlsCharacterMotor)character.MovementAnchor;
+        var simulation = character.RagdollSimulation!;
+        var before = simulation.PelvisPosition;
+        var velocity = simulation.PelvisVelocity;
+        var floor = _demo!.GetNode<CollisionShape3D>("World/StartFloor/CollisionShape3D");
+        var top = floor.GlobalPosition.Y + ((BoxShape3D)floor.Shape).Size.Y * .5f;
+        var half = _demo.RuntimeContext.MotorSettings.StandingHeight * .5f;
+        var radius = _demo.RuntimeContext.MotorSettings.CapsuleRadius;
+        var air = new Vector3(10, top + 10, 10);
+        motor.FollowRagdoll(air);
+        Require(!motor.RagdollGrounded && motor.GlobalPosition == air, "Airborne follow altered pelvis height.");
+        motor.FollowRagdoll(Vector3.Zero);
+        Require(!motor.RagdollGrounded && motor.GlobalPosition == air, "Zero target did not retain actor location.");
+        motor.FollowRagdoll(new(10, top + radius, 10));
+        Require(motor.RagdollGrounded && Mathf.Abs(motor.GlobalPosition.Y - (top + half + .019f)) < .003f,
+            "Floor correction used contact point instead of sphere center, or lost native clearance.");
+        // A sweep already intersecting the floor reports time zero (no downward travel).
+        var overlap = new Vector3(10, top - 1.5f * radius, 10);
+        motor.FollowRagdoll(overlap);
+        Require(motor.RagdollGrounded && Mathf.Abs(motor.GlobalPosition.Y -
+            (overlap.Y + radius + half + .019f)) < .003f, "Initial-overlap follow differs from time-zero sweep.");
+        Require(simulation.PelvisPosition == before && simulation.PelvisVelocity == velocity && simulation.CompletedSteps == 0,
+            "Moving the capsule dragged or advanced the physical island.");
+        motor.GlobalPosition = _capsulePosition;
     }
     private static void KeyInput(bool pressed)
     {
