@@ -17,6 +17,7 @@ public sealed class AlsMantlingPoseSource
     private readonly AlsLogicalVirtualBone[] _virtuals;
     private readonly AlsPrecisePose[] _target, _source;
     private readonly AlsPrecisePoseRetargetModel _retarget;
+    private readonly int[] _modes;
     private readonly AlsPrecisePose _lockedRoot;
     private readonly bool _enableRoot, _forceRoot;
     public AlsRawAnimationPoseData Data { get; }
@@ -31,15 +32,54 @@ public sealed class AlsMantlingPoseSource
         AlsPrecisePose lockedRoot,bool enableRoot,bool forceRoot,string digest)
     {
         Data=data;SkeletonPath=skeleton;AnimationInputsDigest=digest;_names=names.ToArray();_parents=parents.ToArray();_virtuals=virtuals.ToArray();
-        _target=target.ToArray();_source=target.ToArray();source.CopyTo(_source,0);
+        _target=target.ToArray();_source=target.ToArray();
+        if(source.Length<data.PhysicalBoneCount)throw new ArgumentException("Missing physical retarget references.");
+        for(var physical=0;physical<data.PhysicalBoneCount;physical++)_source[data.PhysicalToLogical[physical]]=source[physical];
         _lockedRoot=lockedRoot;_enableRoot=enableRoot;_forceRoot=forceRoot;
         _retarget=new(data.LogicalToPhysical,modes,data.LogicalTrackPresence,target,source);
+        _modes=modes.ToArray();
         // Validate topology now, rather than deferring malformed resources until playback.
         _=new AlsPreciseRawSequenceSampler(Data,_parents,_target,_virtuals);
     }
 
     public Sampler CreateSampler()=>new(this);
     public Sampler CreateSampler(AlsMantlingCurveSource curves)=>new(this,curves);
+
+    internal AlsMantlingPoseSource AdaptHostLayout(AlsRawAnimationSkeletonDefinition host,int animationId)
+    {
+        if(host.PhysicalBoneCount!=Data.PhysicalBoneCount||Data.VirtualTrackPresence.Contains(true))
+            throw new ArgumentException("Mantle host adaptation requires the same physical skin and generated virtual tracks.");
+        var names=host.LogicalBoneNames.ToArray();var parents=host.LogicalParents.ToArray();
+        var sourceByName=_names.Select((name,index)=>(name,index)).ToDictionary(p=>p.name,p=>p.index,StringComparer.OrdinalIgnoreCase);
+        var physicalMap=new int[host.PhysicalBoneCount];var target=new AlsPrecisePose[names.Length];var source=new AlsPrecisePose[host.PhysicalBoneCount];
+        var modes=new int[host.PhysicalBoneCount];var presence=new bool[names.Length];
+        for(var bone=0;bone<names.Length;bone++)target[bone]=AlsMantlingHostPoseProfile.ToNative(host.PreciseReferencePose[bone]);
+        for(var physical=0;physical<physicalMap.Length;physical++)
+        {
+            var logical=host.PhysicalToLogical[physical];
+            if(!sourceByName.TryGetValue(names[logical],out var original)||Data.LogicalToPhysical[original]<0)
+                throw new ArgumentException("Missing mantle physical bone: "+names[logical]);
+            var parent=parents[logical];var originalParent=_parents[original];
+            if((parent<0)!=(originalParent<0)||parent>=0&&!names[parent].Equals(_names[originalParent],StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Mantle physical hierarchy differs: "+names[logical]);
+            var expected=AlsMantlingHostPoseProfile.ToFbx(_target[original]);var actual=host.PreciseReferencePose[logical];
+            if((actual.Position-expected.Position).LengthSquared>4e-8||(actual.Scale-expected.Scale).LengthSquared>4e-8||
+                1-System.Math.Abs(AlsQuaternion.Dot(actual.Rotation,expected.Rotation))>1e-5)
+                throw new ArgumentException("Mantle physical rest requires explicit retarget: "+names[logical]);
+            physicalMap[physical]=Data.LogicalToPhysical[original];presence[logical]=Data.LogicalTrackPresence[original];
+            target[logical]=_target[original];source[physical]=_source[original];modes[physical]=_modes[Data.LogicalToPhysical[original]];
+        }
+        if(host.LogicalToPhysical[0]!=0||!names[0].Equals(_names[0],StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Mantle root lock requires the same root.");
+        var keys=new AlsLocalPose[Data.SampledKeyCount*physicalMap.Length];
+        for(var key=0;key<Data.SampledKeyCount;key++)
+        for(var physical=0;physical<physicalMap.Length;physical++)keys[key*physicalMap.Length+physical]=Data.GetPhysicalKey(key)[physicalMap[physical]];
+        var virtuals=host.VirtualBones.ToArray();
+        var data=new AlsRawAnimationPoseData(Data.Identity with {AnimationId=animationId,SkeletonId=host.SkeletonId},Data.FrameRateNumerator,
+            Data.FrameRateDenominator,Data.SampledKeyCount,Data.PlayLength,Data.Interpolation,host.LogicalToPhysical,
+            virtuals.Select(v=>v.Bone).ToArray(),presence,keys,new AlsLocalPose[Data.SampledKeyCount*virtuals.Length]);
+        return new(data,host.Source,names,parents,virtuals,target,source,modes,_lockedRoot,_enableRoot,_forceRoot,AnimationInputsDigest);
+    }
 
     /// <summary>One owner per sampler; resources can be shared by independent workers.</summary>
     public sealed class Sampler
