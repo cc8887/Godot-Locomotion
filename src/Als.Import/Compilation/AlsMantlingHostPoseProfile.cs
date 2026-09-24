@@ -11,9 +11,11 @@ public sealed class AlsMantlingHostPoseProfile
     private readonly AlsMantlingMontageProfile _adapted;
     private readonly int[] _curveTargets;
     private readonly string[] _curveNames;
+    private readonly Dictionary<int,(AlsAuthoredMontageAsset Asset,AlsMantlingCurveSource Curves,int[] Targets)> _montageCurves=[];
     public int BoneCount { get; }
     public ReadOnlySpan<string> CurveNames=>_curveNames;
-    public AlsMantlingHostPoseProfile(AlsMantlingMontageProfile profile,AlsRawAnimationSkeletonDefinition host,ReadOnlySpan<string> curveNames)
+    public AlsMantlingHostPoseProfile(AlsMantlingMontageProfile profile,AlsRawAnimationSkeletonDefinition host,ReadOnlySpan<string> curveNames,
+        IReadOnlyDictionary<string,AlsMantlingCurveSource>? montageCurves=null)
     {
         ArgumentNullException.ThrowIfNull(profile);ArgumentNullException.ThrowIfNull(host);
         _curveNames=curveNames.ToArray();BoneCount=host.LogicalBoneCount;
@@ -29,6 +31,23 @@ public sealed class AlsMantlingHostPoseProfile
         var poses=profile.Definitions.Values.GroupBy(d=>d.SequencePath,StringComparer.Ordinal).ToDictionary(g=>g.Key,g=>
             profile.Poses[g.Key].AdaptHostLayout(host,g.Select(d=>d.Asset.AnimationId).Distinct().Single()),StringComparer.Ordinal);
         _adapted=new(profile.Definitions.ToDictionary(p=>p.Key,p=>p.Value,StringComparer.Ordinal),poses,profile.Curves,profile.GroupName);
+        if(montageCurves is not null)
+        {
+            if(!montageCurves.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(profile.Definitions.Keys))
+                throw new ArgumentException("Incomplete mantle montage curve inventory.");
+            foreach(var definition in profile.Definitions.Values)
+            {
+                var source=montageCurves[definition.Path];var asset=definition.Asset;
+                if(source.SourcePath!=definition.Path||source.AnimationInputsDigest!=profile.Poses[definition.SequencePath].AnimationInputsDigest)
+                    throw new ArgumentException("Foreign mantle montage curves.");
+                // Evaluation.Position currently carries sequence time. For these native assets
+                // the timelines coincide; never reconstruct a rounded montage time by division.
+                if(asset.ClipStart!=0||asset.ClipRate!=1)throw new ArgumentException("Montage curves require an explicit montage time for remapped segments.");
+                var targets=source.Names.ToArray().Select(name=>Array.FindIndex(_curveNames,n=>n.Equals(name,StringComparison.OrdinalIgnoreCase))).ToArray();
+                if(targets.Any(i=>i<0))throw new ArgumentException("Host layout omits montage-owned curves.");
+                _montageCurves.Add(asset.ActionDefinitionId,(asset,source,targets));
+            }
+        }
     }
     public IAlsMontagePoseSource CreatePoseSource()=>new Source(this);
     private sealed class Source : IAlsMontagePoseSource
@@ -37,19 +56,31 @@ public sealed class AlsMantlingHostPoseProfile
         private readonly IAlsMontagePoseSource _native;
         private readonly AlsPrecisePose[] _pose;
         private readonly AlsInertialCurve[] _curves;
+        private readonly AlsInertialCurve[] _montageScratch;
         private int _sampling;
         public Source(AlsMantlingHostPoseProfile profile)
-        {_profile=profile;_native=profile._adapted.CreatePoseSource();_pose=new AlsPrecisePose[profile.BoneCount];_curves=new AlsInertialCurve[profile._curveTargets.Length];}
+        {_profile=profile;_native=profile._adapted.CreatePoseSource();_pose=new AlsPrecisePose[profile.BoneCount];_curves=new AlsInertialCurve[profile._curveTargets.Length];
+            _montageScratch=new AlsInertialCurve[profile._montageCurves.Values.Select(v=>v.Targets.Length).DefaultIfEmpty(0).Max()];}
         public void Sample(in AlsMontageEvaluation entry,Span<AlsPrecisePose> pose,Span<AlsInertialCurve> curves)
         {
             if(pose.Length!=_pose.Length||curves.Length!=_profile._curveNames.Length)throw new ArgumentException("Host mantle output layout differs.");
             if(Interlocked.CompareExchange(ref _sampling,1,0)!=0)throw new InvalidOperationException("Host mantle sampling scratch is already in use.");
             try
             {
+                var montage=default((AlsAuthoredMontageAsset Asset,AlsMantlingCurveSource Curves,int[] Targets));
+                if(_profile._montageCurves.Count>0)
+                {
+                    if(!_profile._montageCurves.TryGetValue(entry.ActionDefinitionId,out montage)||montage.Asset.AnimationId!=entry.AnimationId)
+                        throw new ArgumentException("Foreign mantle montage curve identity.");
+                    montage.Curves.Sample(entry.Position,_montageScratch.AsSpan(0,montage.Targets.Length));
+                }
                 _native.Sample(entry,_pose,_curves);
                 for(var bone=0;bone<_pose.Length;bone++)_pose[bone]=ToFbx(_pose[bone]);
                 _pose.CopyTo(pose);curves.Clear();
                 for(var i=0;i<_curves.Length;i++)curves[_profile._curveTargets[i]]=_curves[i];
+                // UE SlotEvaluatePose: sequence curves.Combine(montage curves), before slot weighting.
+                if(montage.Targets is not null)
+                    for(var i=0;i<montage.Targets.Length;i++)curves[montage.Targets[i]]=_montageScratch[i];
             }
             finally{Volatile.Write(ref _sampling,0);}
         }

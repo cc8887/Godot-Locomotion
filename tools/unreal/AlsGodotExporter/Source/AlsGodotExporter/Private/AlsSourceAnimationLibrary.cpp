@@ -56,7 +56,7 @@ void SourceOptionalPath(const TSharedRef<FJsonObject>& Object, const TCHAR* Fiel
 }
 }
 
-FString UAlsSourceAnimationLibrary::ReadSourceFloatCurves(UAnimSequence* Animation)
+FString UAlsSourceAnimationLibrary::ReadSourceFloatCurves(UAnimSequenceBase* Animation)
 {
     if (!Animation || !Animation->GetDataModelInterface()) return {};
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -88,6 +88,20 @@ FString UAlsSourceAnimationLibrary::ReadSourceFloatCurves(UAnimSequence* Animati
         Curves.Add(MakeShared<FJsonValueObject>(Row));
     }
     Result->SetArrayField(TEXT("curves"), Curves);
+    return SourceJson(Result);
+}
+
+FString UAlsSourceAnimationLibrary::ReadAssetFloatCurveValues(UAnimSequenceBase* Animation, float TimeSeconds)
+{
+    if (!Animation || !Animation->GetDataModelInterface() || !FMath::IsFinite(TimeSeconds)) return {};
+    const auto Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("source"), Animation->GetPathName());
+    Result->SetNumberField(TEXT("timeSeconds"), TimeSeconds);
+    const auto Curves = MakeShared<FJsonObject>();
+    const FAnimExtractContext Context(TimeSeconds, false);
+    for (const FFloatCurve& Curve : Animation->GetDataModelInterface()->GetFloatCurves())
+        Curves->SetNumberField(Curve.GetName().ToString(), Animation->EvaluateCurveData(Curve.GetName(), Context, true));
+    Result->SetObjectField(TEXT("curves"), Curves);
     return SourceJson(Result);
 }
 

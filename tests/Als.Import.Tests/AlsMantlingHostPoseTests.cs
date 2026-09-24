@@ -7,7 +7,7 @@ using GodotAls.Import.Inspection;
 
 namespace GodotAls.Import.Tests;
 
-public sealed class AlsMantlingHostPoseTests
+public sealed class AlsMantlingHostPoseTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     private static readonly Lazy<AlsRawAnimationSkeletonDefinition> Host=new(()=>
     {
@@ -21,6 +21,71 @@ public sealed class AlsMantlingHostPoseTests
         MantlingHostFixture.Read("refactored_mantle_animation_inputs"),MantlingHostFixture.Read("refactored_mantle_root_tracks"),
         MantlingHostFixture.Read("refactored_mantle_curves"))).Profile;
     private static readonly string[] Curves=["UnusedHostCurve","PoseGrounded","PoseStanding","FootLeftLock"];
+    [Fact]
+    public void MontageOwnedCurvesMatchNativeEvaluationAndSurviveHostSlotComposition()
+    {
+        var profile=Profile();var host=Host.Value;var json=MantlingHostFixture.Read("refactored_mantle_montage_curves");
+        var owned=AlsMantlingCurveCompiler.CompileMontages(json,MantlingHostFixture.Read("refactored_mantle_animation_inputs"));
+        using var reference=JsonDocument.Parse(MantlingHostFixture.Read("refactored_mantle_montage_curve_reference"));
+        Assert.Equal(reference.RootElement.GetProperty("curvesSha256").GetString()!.ToUpperInvariant(),Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json))));
+        var names=Curves.Concat(owned.Values.SelectMany(c=>c.Names.ToArray())).Distinct(StringComparer.Ordinal).ToArray();
+        var sampler=new AlsMantlingHostPoseProfile(profile,host,names,owned).CreatePoseSource();
+        var pose=new AlsPrecisePose[host.LogicalBoneCount];var curves=new AlsInertialCurve[names.Length];
+        var samples=0;var values=0;var partial=0;float maxError=0;
+        foreach(var row in reference.RootElement.GetProperty("montages").EnumerateArray())
+        {
+            var path=row.GetProperty("source").GetString()!;var asset=profile.Definitions[path].Asset;
+            foreach(var sample in row.GetProperty("samples").EnumerateArray())
+            {
+                sampler.Sample(new(1,asset.AnimationId,asset.Slot,sample.GetProperty("timeSeconds").GetSingle(),1,asset.ActionDefinitionId),pose,curves);
+                foreach(var curve in sample.GetProperty("curves").EnumerateObject())
+                {
+                    var actual=curves[Array.IndexOf(names,curve.Name)];var expected=curve.Value.GetSingle();
+                    Assert.True(actual.Present);Assert.True(MathF.Abs(expected-actual.Value)<=2e-6,$"{path} {curve.Name}: {expected:R} != {actual.Value:R}");
+                    maxError=MathF.Max(maxError,MathF.Abs(expected-actual.Value));
+                    values++;if(expected!=0&&expected!=1&&expected!=-1)partial++;
+                }
+                Assert.False(curves[0].Present);samples++;
+            }
+            var bank=profile.CreateRuntime();var slot=new AlsMontageSlotPose(host.PreciseReferencePose,host.LogicalParents,names.Length);
+            var sourceCurves=Enumerable.Repeat(new AlsInertialCurve(.3f),names.Length).ToArray();
+            var mixed=new AlsInertialCurve[names.Length];var mixedPose=new AlsPrecisePose[pose.Length];
+            for(var frame=1;frame<=240;frame++)
+            {
+                var identity=new AlsFrameIdentity(frame,1,1);bank.Begin(identity,1f/60);
+                if(frame==1)bank.PlayAction(asset.ActionDefinitionId,1);
+                slot.Evaluate(bank.Frame,identity,asset.Slot,host.PreciseReferencePose,sourceCurves,mixedPose,mixed,sampler);
+                if(bank.Evaluation.Length>0)
+                {
+                    var entry=bank.Evaluation[0];sampler.Sample(entry,pose,curves);var sourceWeight=bank.SlotWeights(asset.Slot).SourceWeight;
+                    foreach(var name in owned[path].Names)
+                    {
+                        var i=Array.IndexOf(names,name);Assert.True(mixed[i].Present);
+                        Assert.True(MathF.Abs(mixed[i].Value-(curves[i].Value*entry.Weight+.3f*sourceWeight))<2e-6);
+                    }
+                }
+                bank.Commit(identity);
+            }
+        }
+        Assert.Equal(726,samples);Assert.Equal(7502,values);Assert.True(partial>100);
+        output.WriteLine($"montages=6 samples={samples} values={values} partial={partial} max_error={maxError:R}");
+        var good=profile.Definitions.Values.First().Asset;var saved=curves.ToArray();
+        Assert.Throws<ArgumentException>(()=>sampler.Sample(new(1,good.AnimationId,good.Slot,.4f,1,int.MaxValue),pose,curves));
+        Assert.Equal(saved,curves);
+        Assert.Throws<ArgumentException>(()=>new AlsMantlingHostPoseProfile(profile,host,Curves,owned));
+        Assert.Throws<ArgumentException>(()=>new AlsMantlingHostPoseProfile(profile,host,names,owned.Skip(1).ToDictionary(p=>p.Key,p=>p.Value)));
+    }
+    [Theory]
+    [InlineData("digest")][InlineData("curve")][InlineData("montage")]
+    public void MontageCurveCompilerRejectsIncompleteOrForeignResources(string mutation)
+    {
+        var json=System.Text.Json.Nodes.JsonNode.Parse(MantlingHostFixture.Read("refactored_mantle_montage_curves"))!;
+        if(mutation=="digest")json["animationInputsSha256"]=new string('0',64);
+        else if(mutation=="curve")json["montages"]![0]!["curves"]!.AsArray().RemoveAt(0);
+        else json["montages"]!.AsArray().RemoveAt(0);
+        Assert.Throws<ArgumentException>(()=>AlsMantlingCurveCompiler.CompileMontages(json.ToJsonString(),MantlingHostFixture.Read("refactored_mantle_animation_inputs")));
+    }
     [Fact]
     public void PhysicalBonesPreserveNativeSamplesAndCurvesKeepPresenceInReorderedHostLayout()
     {
