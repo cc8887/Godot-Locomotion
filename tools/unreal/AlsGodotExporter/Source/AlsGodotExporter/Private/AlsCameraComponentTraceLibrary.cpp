@@ -4,6 +4,7 @@
 #include "AlsCameraSettings.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraTypes.h"
+#include "Components/BoxComponent.h"
 #include "Editor.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
@@ -44,6 +45,7 @@ TSharedPtr<FJsonObject> State(UAlsCameraComponent* C)
 bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& OutputPath)
 {
     if (FPaths::IsRelative(OutputPath)) return false;
+    const bool bMovingBase = FPlatformMisc::GetEnvironmentVariable(TEXT("ALS_CAMERA_COMPONENT_BASE")) == TEXT("1");
     auto* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
     auto* CharacterClass = LoadClass<AAlsCharacter>(nullptr, TEXT("/ALS/ALS/Character/B_Als_Character.B_Als_Character_C"));
     auto* CameraClass = LoadClass<UAlsCameraComponent>(nullptr, TEXT("/ALS/ALSCamera/B_Als_CameraComponent.B_Als_CameraComponent_C"));
@@ -60,6 +62,19 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
         auto* Character = World->SpawnActor<AAlsCharacter>(CharacterClass, FVector(0,0,100000), FRotator::ZeroRotator, Spawn);
         if (!Character) return false;
         ON_SCOPE_EXIT { World->DestroyActor(Character); };
+        AActor* BaseOwner = bMovingBase ? World->SpawnActor<AActor>(Spawn) : nullptr;
+        ON_SCOPE_EXIT { if (BaseOwner) World->DestroyActor(BaseOwner); };
+        UBoxComponent* Bases[2] = {nullptr,nullptr};
+        if (bMovingBase)
+        {
+            if (!BaseOwner) return false;
+            for (auto& Base : Bases)
+            {
+                Base = NewObject<UBoxComponent>(BaseOwner, NAME_None, RF_Transient);
+                Base->SetMobility(EComponentMobility::Movable);
+                Base->SetCollisionEnabled(ECollisionEnabled::NoCollision); Base->RegisterComponent();
+            }
+        }
         Character->SetActorTickEnabled(false); Character->SetActorEnableCollision(false);
         auto* Mesh = Character->GetMesh(); Mesh->bForceRefpose = true;
         Mesh->RefreshBoneTransforms();
@@ -82,6 +97,25 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
             const double T = static_cast<double>(Frame) / Hz;
             const float Delta = 1.0f / Hz;
             Character->SetActorLocationAndRotation(FVector(T * 80 + (T >= 3 ? 500 : 0), FMath::Sin(T * 2) * 40, 100000 + FMath::Sin(T) * 20), FRotator(0,T * 35,0));
+            int32 BaseId = 0;
+            if (bMovingBase)
+            {
+                BaseId = T < 1.5 ? 1 : T < 3.3 ? 2 : 0;
+                for (int32 Index = 0; Index < 2; ++Index)
+                    Bases[Index]->SetWorldLocationAndRotation(FVector(T*50 + Index*90,FMath::Sin(T)*80-Index*40,100000),
+                        FRotator(15*FMath::Sin(T*2),T*55+Index*30,10*FMath::Cos(T)));
+                FMovementBaseInterfaceData NewBase;
+                if (BaseId) NewBase.Set(Bases[BaseId-1]);
+                Character->SetBase(&NewBase);
+                if (BaseId)
+                {
+                    const auto Transform = Bases[BaseId-1]->GetComponentTransform();
+                    Character->SetActorLocationAndRotation(Transform.TransformPosition(FVector(40+(T>=3?500:0),0,100)),
+                        Transform.GetRotation()*FRotator(0,T*35,0).Quaternion());
+                    Character->SaveRelativeBasedMovement(Transform.InverseTransformPosition(Character->GetActorLocation()),
+                        FRotator(0,T*35,0),true);
+                }
+            }
             ViewProperty->ContainerPtrToValuePtr<FAlsViewState>(Character)->Rotation = FRotator(FMath::Sin(T * 3) * 30, T * 110 - 170, 0);
             Character->SetViewMode(FGameplayTag::RequestGameplayTag(FName(T >= 1 && T < 2 ? TEXT("Als.ViewMode.FirstPerson") : TEXT("Als.ViewMode.ThirdPerson"))));
             Camera->SetRightShoulder(T < 2.5);
@@ -97,6 +131,18 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
             Input->SetNumberField(TEXT("meshScale"), Mesh->GetComponentScale().Z);
             Input->SetBoolField(TEXT("overrideFov"),Camera->IsFieldOfViewOverriden());
             Input->SetNumberField(TEXT("fovOverride"),Camera->GetFieldOfViewOverride());
+            if (bMovingBase)
+            {
+                const auto& Based = Character->GetBasedMovement();
+                auto Location = FVector::ZeroVector; auto RotationValue = FQuat::Identity;
+                if (Based.HasRelativeRotation())
+                    MovementBaseUtility::GetMovementBaseTransform(&Based.MovementBaseInterfaceData,Based.BoneName,Location,RotationValue);
+                if ((BaseId != 0) != Based.HasRelativeRotation()) return false;
+                Input->SetNumberField(TEXT("baseId"),BaseId);
+                Input->SetBoolField(TEXT("relativeBaseRotation"),Based.HasRelativeRotation());
+                Vector(Input,TEXT("baseLocation"),Location);
+                Input->SetArrayField(TEXT("baseRotation"),Numbers({RotationValue.X,RotationValue.Y,RotationValue.Z,RotationValue.W}));
+            }
             Camera->TickComponent(Delta, LEVELTICK_All, &Camera->PrimaryComponentTick);
             if (Camera->IsRunningParallelEvaluation()) return false;
             auto Curves = MakeShared<FJsonObject>();
@@ -104,13 +150,20 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
                 TEXT("LocationLagX"),TEXT("LocationLagY"),TEXT("LocationLagZ"),TEXT("RotationLag"),TEXT("TraceOverride"),TEXT("FirstPersonOverride"),TEXT("FovOffset")})
                 Curves->SetNumberField(Name, Camera->GetAnimInstance()->GetCurveValue(FName(Name)));
             auto Row = MakeShared<FJsonObject>(); Row->SetObjectField(TEXT("input"),Input); Row->SetObjectField(TEXT("curves"),Curves);
-            Row->SetObjectField(TEXT("output"),State(Camera)); Frames.Add(MakeShared<FJsonValueObject>(Row));
+            auto Output = State(Camera);
+            if (bMovingBase)
+            {
+                Vector(Output,TEXT("baseLocalPivotLag"),Read<FVector>(Camera,TEXT("PivotLagLocationMovementBaseSpace")));
+                const auto LocalRotation = Read<FQuat>(Camera,TEXT("CameraRotationMovementBaseSpace"));
+                Output->SetArrayField(TEXT("baseLocalRotation"),Numbers({LocalRotation.X,LocalRotation.Y,LocalRotation.Z,LocalRotation.W}));
+            }
+            Row->SetObjectField(TEXT("output"),Output); Frames.Add(MakeShared<FJsonValueObject>(Row));
         }
         Trace->SetArrayField(TEXT("frames"),Frames); Traces.Add(MakeShared<FJsonValueObject>(Trace));
         Camera->DestroyComponent();
     }
     auto Result = MakeShared<FJsonObject>(); Result->SetNumberField(TEXT("schemaVersion"),1);
-    Result->SetStringField(TEXT("scope"),TEXT("Actual UAlsCameraComponent::TickComponent; reference-pose character; controlled actor/view; clear scene, no movement base; observed native curves."));
+    Result->SetStringField(TEXT("scope"),bMovingBase ? TEXT("Actual camera component; controlled moving/tilted bases, switch during first-person and leave; reference-pose character; no collision; observed native curves.") : TEXT("Actual UAlsCameraComponent::TickComponent; reference-pose character; controlled actor/view; clear scene, no movement base; observed native curves."));
     Result->SetArrayField(TEXT("traces"),Traces);
     FString Json;
     if (!FJsonSerializer::Serialize(Result,TJsonWriterFactory<TCHAR,TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json)) ||

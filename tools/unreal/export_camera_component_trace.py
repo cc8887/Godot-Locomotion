@@ -1,4 +1,7 @@
-"""Record actual UE camera component ticks; never save source assets."""
+"""Record actual UE camera ticks; ALS_CAMERA_COMPONENT_BASE=1 adds moving bases.
+
+Writes only the requested reference JSON; never saves source assets.
+"""
 import os
 import json
 import hashlib
