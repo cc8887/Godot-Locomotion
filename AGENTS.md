@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新区域 Slot 基础：`docs/verification/2026-09-25-refactored-region-slots.md`。共享 bank/pose/notify 扩展为12 Slot，保留0—4，Head/Spine/ArmLeft/ArmRight/Pelvis/Legs/Curves为5—11；相关性ushort与12组预分配，事件总容量不变；图编译拒绝未知区域。Core定向172、Import212及新增校验后图10（9重叠）全过，Optimize0/0，Godot普通并行60Hz480帧含Ragdoll/第一人称通过。新区域使用受控采样测试，无新UE Slot覆盖/全量；普通Demo未切新图。下一步区域provider/真实覆盖native对照/宿主布局/Head→普通Mantle，旧缺口及用户文件/暂缓项保留。
+
 - 最新完整 Layering 原生对照：`docs/verification/2026-09-25-refactored-layer-native.md`。原始linked图/94节点，临时Parent受控22float/站蹲、实际raw Stand/Crouch填两个linked缓存，Slot无Montage透传。3Hz210连续帧16590骨maxP5.8292e-6cm/Q2.468e-7/S7.45e-8，curve presence同/值0差；Import64/1旧跳过/Optimize0/0，无C#生产改动/全量/Godot。UE首次辅助Update隐藏base warning改UpdateRoot，完整审计fingerprint C1E13C8BE16C15A0E4427F4D37F21FB14262557178C0FCAC14AC46DF96161D8C；冷0/0、普通11580实际exit0字节同SHA D28E20BC8F8760D480C8F0987224A879D60FF90D4085846BFD7F2FAC6C1FA3EE，两旧Condition/5warn保留；DV0/3旧warn。非完整父Refresh/角色/Slot覆盖证据；下一步真实区域Slot/宿主布局/Head→普通Mantle。旧缺口/用户文件/暂缓项保留。
 
 - 最新完整 Refactored Layering 图：`docs/verification/2026-09-25-refactored-full-layer-graph.md`。AlsRefactoredLayerGraphCompiler实际94节点/11缓存/7 Slot/4input，runtime links与authored reroute交叉校验，LayeringState绑定及PoseStanding/Crouching过去curve映射，实际79骨/VB过滤553索引weight逐值同UE。真实basepose+受控linked/Slot，两场景各120帧每帧discard重试一致，全覆盖访问7Slot。Import63/1旧跳过/Optimize0/0，新增9；首次Slot失败为测试dangling else错写Posecurve，修夹具而非runtime，诊断撤除TRX保留。无Core生产更改/新UE oracle/Godot/全量；完整linked图已跑通但仍受控provider，下一步native运行对照/生产Refactored布局及区域Slot/Head→普通Mantle。所有旧缺口/用户文件/暂缓项保留。

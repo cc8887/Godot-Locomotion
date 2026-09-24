@@ -7,6 +7,20 @@ namespace GodotAls.Core.Tests;
 [Collection(AllocationTestCollection.Name)]
 public sealed class AlsMontageNotifyRuntimeTests
 {
+    [Theory]
+    [InlineData(5)][InlineData(6)][InlineData(7)][InlineData(8)][InlineData(9)][InlineData(10)][InlineData(11)]
+    public void RefactoredRegionBitsRetainPreviousRelevanceAndDiscardIdentity(int slotId)
+    {
+        var slot=new AlsMontageSlot(slotId);var runtime=new AlsMontageNotifyRuntime(Binding(slot:slot));
+        var tick=Tick(77) with {Slot=slot};
+        runtime.Begin(new(1,0,1),[tick]);runtime.Complete(slot.Mask);
+        Assert.Single(runtime.Notifies.ToArray());Assert.Equal(slot.Mask,runtime.Candidate.RelevantSlots);
+        var candidate=runtime.Candidate;var queued=runtime.Notifies.ToArray();runtime.Discard();
+        runtime.Begin(new(1,0,1),[tick]);runtime.Complete(slot.Mask);
+        Assert.Equal(candidate,runtime.Candidate);Assert.Equal(queued,runtime.Notifies.ToArray());runtime.Commit(new(1,0,1));
+        runtime.Begin(new(2,0,1),[tick]);runtime.Complete(0);Assert.Single(runtime.Notifies.ToArray());runtime.Commit(new(2,0,1));
+        runtime.Begin(new(3,0,1),[tick]);runtime.Complete(0);Assert.Empty(runtime.Notifies.ToArray());Assert.Single(runtime.DirectNotifies.ToArray());
+    }
     [Fact]
     public void HiddenSlotStillQueuesDirectStateAndRetainsPreviousRelevanceForOneFrame()
     {
@@ -71,11 +85,11 @@ public sealed class AlsMontageNotifyRuntimeTests
         void Run(){runtime.Begin(new(1,0,1),ticks);runtime.Complete(4);runtime.Discard();}
     }
     private static AlsMontageTraversal Tick(long id)=>new(id,20,AlsMontageSlot.BaseLayer,.1f,.4f,1,false,false,0);
-    private static AlsMontageNotifyBinding Binding(float start=0,float rate=1)=>new([],
+    private static AlsMontageNotifyBinding Binding(float start=0,float rate=1,AlsMontageSlot? slot=null)=>new([],
         [new(40,0,0,-1,40,0,.5f,1,AlsAssetNotifyFilterType.Lod,2,AlsTimelineTickMode.Queued,true,false,false),
          new(41,0,0,41,-1,1,.5f,1,AlsAssetNotifyFilterType.Lod,2,AlsTimelineTickMode.Queued,true,false,false)],
         [new(40,0,.8f),new(41,.3f,.3f)],
         [new(40,10,0,10,AlsTimelineSourceKind.Montage,0,0,0,0,.8f,.5f,AlsTimelineEventKind.Generic,AlsTimelineTickMode.Queued,default),
          new(41,20,0,11,AlsTimelineSourceKind.MontageSegmentAnimation,0,0,0,.3f,0,.5f,AlsTimelineEventKind.Generic,AlsTimelineTickMode.Queued,default)],
-        [new(0,20,AlsMontageSlot.BaseLayer,10,0,1,1,0,1,true),new(0,20,AlsMontageSlot.BaseLayer,11,1,1,1,start,rate,false)]);
+        [new(0,20,slot??AlsMontageSlot.BaseLayer,10,0,1,1,0,1,true),new(0,20,slot??AlsMontageSlot.BaseLayer,11,1,1,1,start,rate,false)]);
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Locomotion;
 using static GodotAls.Import.Compilation.AlsYawOffsetCompiler;
 
@@ -92,7 +93,8 @@ public static class AlsRefactoredLayerGraphCompiler
                     FloatAlpha();Off("bResetChildOnActivation");Off("bAlwaysUpdateChildren");Field("alpha");
                     kind=AlsLayerPoseKind.TwoWayBlend;inputs=[Link("a","A"),Link("b","B")];alphas=[Alpha("Alpha",value.GetProperty("alpha").GetSingle())];break;
                 case "AnimGraphNode_Slot":
-                    Off("bAlwaysUpdateSourcePose");Field("slotName");kind=AlsLayerPoseKind.Slot;inputs=[Link("source","Source")];label=Text(value,"slotName");break;
+                    Off("bAlwaysUpdateSourcePose");Field("slotName");kind=AlsLayerPoseKind.Slot;inputs=[Link("source","Source")];label=Text(value,"slotName");
+                    _=AlsMontageSlot.FromRefactoredLayerName(label);break;
                 case "AlsAnimGraphNode_CurvesBlend":
                     Field("blendAmount");Field("blendMode");Require(value.GetProperty("blendAmount").GetSingle()==1,"Dynamic curve amount not supported.");
                     kind=Text(value,"blendMode") switch {"Accumulate"=>AlsLayerPoseKind.CurveAccumulate,"Override"=>AlsLayerPoseKind.CurveOverride,_=>throw new ArgumentException("Unsupported curve mode.")};

@@ -4,18 +4,18 @@ using GodotAls.Core.Contracts;
 
 namespace GodotAls.Core.Events;
 
-public readonly record struct AlsMontageNotifyState(AlsFrameIdentity Identity, uint RandomSeed, byte RelevantSlots);
+public readonly record struct AlsMontageNotifyState(AlsFrameIdentity Identity, uint RandomSeed, ushort RelevantSlots);
 
 // One Montage RNG, distinct from the proxy RNG. Direct notifies are independent
-// of Slot relevance; the five Slot queues are revealed in first-traversal order.
+// of Slot relevance; Slot queues are revealed in first-traversal order.
 public sealed class AlsMontageNotifyRuntime
 {
     private const int Capacity = AlsP5Runtime.SourceNotifyReferenceCapacity;
     private readonly AlsMontageNotifyBinding _binding;
     private readonly AlsAssetNotifyDispatchInput[] _direct = new AlsAssetNotifyDispatchInput[Capacity];
-    private readonly AlsAssetNotifyDispatchInput[] _slots = new AlsAssetNotifyDispatchInput[5 * Capacity];
+    private readonly AlsAssetNotifyDispatchInput[] _slots = new AlsAssetNotifyDispatchInput[AlsMontageSlot.Count * Capacity];
     private readonly AlsAssetNotifyDispatchInput[] _visible = new AlsAssetNotifyDispatchInput[Capacity];
-    private readonly int[] _slotCounts = new int[5], _slotOrder = new int[5];
+    private readonly int[] _slotCounts = new int[AlsMontageSlot.Count], _slotOrder = new int[AlsMontageSlot.Count];
     private int _directCount, _visibleCount, _slotCount, _total;
     private Phase _phase;
     private enum Phase { Idle, Preparing, Prepared, Complete, Faulted }
@@ -45,7 +45,7 @@ public sealed class AlsMontageNotifyRuntime
             foreach (var tick in traversal)
             {
                 if (tick.Interrupted || interruptedInstances.Contains(tick.InstanceId)) continue;
-                if (tick.InstanceId <= 0 || (uint)tick.Slot.Id > 4 || !float.IsFinite(tick.NotifyWeight) || tick.NotifyWeight < 0)
+                if (tick.InstanceId <= 0 || !tick.Slot.IsValid || !float.IsFinite(tick.NotifyWeight) || tick.NotifyWeight < 0)
                     throw new ArgumentException("Invalid montage notify traversal.");
                 var found = false;
                 // Each instance extracts Montage-owned notifies before its sequence track.
@@ -94,9 +94,9 @@ public sealed class AlsMontageNotifyRuntime
         catch { _phase=Phase.Faulted; throw; }
     }
 
-    public void Complete(byte relevantSlots)
+    public void Complete(ushort relevantSlots)
     {
-        if (_phase!=Phase.Prepared || relevantSlots>31) throw new InvalidOperationException("Montage notify relevance differs.");
+        if (_phase!=Phase.Prepared || (relevantSlots & ~AlsMontageSlot.AllMask)!=0) throw new InvalidOperationException("Montage notify relevance differs.");
         Candidate=Candidate with {RelevantSlots=relevantSlots};
         foreach(var slot in _slotOrder.AsSpan(0,_slotCount))
         {
