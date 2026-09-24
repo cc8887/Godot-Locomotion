@@ -17,9 +17,12 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 触发方向并使用半衰期转向，重复播放/空中触发受门控。详见
 [地面 Roll 接线记录](docs/verification/2026-09-20-grounded-roll-gameplay.md)。中等落差现支持
 1.3 倍速自动 Roll，详见[落地动作记录](docs/verification/2026-09-20-landing-action-routing.md)。
-高落差及翻滚离地的真实 Ragdoll 尚未实现；`--action-preview` 保留旧原地预览诊断入口。
+高落差及翻滚离地现已接入自动 Ragdoll，支持 G 手动进入/退出及按 Overlay 选择起身动画；
+物理稳定性仍有未通过项。`--action-preview` 保留旧原地预览诊断入口。
 两套原始 PhysicsAsset 的形状、质量/惯量、关节和碰撞排除数据现已导出并校验，
-见[物理资产记录](docs/verification/2026-09-20-physics-asset-export.md)，Godot 物理骨架消费仍待实现。
+见[物理资产记录](docs/verification/2026-09-20-physics-asset-export.md)，现已由 Core 物理运行时消费并接入普通角色。
+普通入口现使用移植的 ALS 相机图、骨骼插槽和球扫跟随，详见
+[相机接入验证](docs/verification/2026-09-24-camera-demo-integration.md)。完整相机等价及最终性能尚未验收。
 角色永久销毁/换代现会根据主线程已提交记录结束 Notify State 和动作；包含回调内销毁及
 未提交动作隔离。见[退役清理记录](docs/verification/2026-09-20-animation-retirement.md)。
 完整入口现已区分调度暂停与真正停用；停用会清理动作，恢复时保留移动/脚部检查点，
@@ -56,7 +59,10 @@ Editor 使用 F5 运行项目；单独运行旧的 `p4_locomotion_demo.tscn` 是
 | `Space` | Jump |
 | `V` | 切换 rotation mode |
 | 鼠标右键 | Aiming |
-| 鼠标移动 | Orbit camera |
+| 鼠标移动 | 控制视角，ALS 相机按状态跟随 |
+| `B` | 切换第一/第三人称 |
+| `T` | 左右换肩 |
+| `G` | 进入/退出 Ragdoll |
 | `Esc` | 切换鼠标捕获 |
 | `R` | 地面翻滚，朝触发瞬间的移动方向；无输入时朝角色前方 |
 | `X` | 取消当前已接受的动作 |
@@ -134,7 +140,7 @@ dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 | --- | --- | --- |
 | P3/P4 完整性 | 实现与整体验收中 | 默认完整入口已接通；地形、起停滑步、换髋与上下身联合验收未关闭 |
 | P5A | 已部分实现，待收尾 | Curve/Notify/Notify State、Sync、共同 Montage、动作摘要及普通请求入口已接通；其余玩法消费者、生命周期通知闭合及当前完整图验收待完成 |
-| P5B | 动画数据/姿势已有，玩法待实施 | Overlay 装备/切换和道具生命周期 |
-| P5C | Roll 播放组件已有，玩法待实施 | Mantle、Roll、碰撞安全 Root Motion |
-| P6 | 基础组件已有，完整功能待实施 | Ragdoll、Get-up、Pose Recovery、完整 ALS Camera |
+| P5B | 普通装备/切换已接入 | Overlay 和道具生命周期；道具物理按用户要求暂缓 |
+| P5C | Roll/Root Motion 已接入，Mantle 未实现 | 继续 Mantle 及整体验收 |
+| P6 | Ragdoll/起身恢复及 ALS 相机已接入，尚未完整验收 | 物理稳定性、相机场景/原生组件对照和联合验收 |
 | P7 | 待实施 | 30 秒热身、10 分钟 Release 最终性能认证 |

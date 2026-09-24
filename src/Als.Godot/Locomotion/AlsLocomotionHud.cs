@@ -38,6 +38,9 @@ public partial class AlsLocomotionHud : VBoxContainer
         label.Text = $"R：{action}  |  X：取消动作  |  G：进入 / 退出 Ragdoll  |  Q / E：切换 Overlay 道具";
     }
 
+    public void EnableNativeCameraHelp() => CreateLabel("CameraHelp").Text =
+        "鼠标：转动视角  |  B：第一 / 第三人称  |  T：左右换肩";
+
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;

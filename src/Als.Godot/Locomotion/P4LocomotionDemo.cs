@@ -13,6 +13,8 @@ namespace GodotAls.Locomotion;
 public partial class P4LocomotionDemo : Node3D
 {
     [Export] public AlsOverlayKind Overlay { get; set; } = AlsOverlayKind.Default;
+    internal bool EnableNativeCamera { get; set; }
+    internal AlsNativeCameraHost? NativeCamera { get; private set; }
     private const string ProfilePath = "res://assets/config/p4_cycle_locomotion_profile.json";
     private const string SettingsPath = "res://assets/config/p3_locomotion_settings.json";
     private const float TranslationSpeed = 0.06f;
@@ -182,6 +184,13 @@ public partial class P4LocomotionDemo : Node3D
             EnsureCameraTarget(active);
             _hud.Refresh(default, Engine.GetFramesPerSecond(), errors: 0);
             _runtimeConfigured = true;
+            if (EnableNativeCamera)
+            {
+                NativeCamera = new AlsNativeCameraHost();
+                NativeCamera.Configure(this, _context.MotorSettings.CollisionMask);
+                AddChild(NativeCamera);
+                _hud.EnableNativeCameraHelp();
+            }
         }
         catch (Exception exception)
         {

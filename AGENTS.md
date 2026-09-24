@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新普通相机：`docs/verification/2026-09-24-camera-demo-integration.md`。AlsDemoEntry 默认接图/socket/实际胶囊与base/球扫，在 Main Observe 成功姿态后发布独立 Camera3D，保留 control yaw，水平 FOV；B 人称、T 换肩。Optimize 0/0；普通八秒 Single30、Parallel60/120 及渲染60通过，240/480/960/480相机提交，真实B/T分发、移动/冲刺、倒地/起身、控制yaw不回写；五图保存。无新Core/Import/UE全量。仍缺相机组件原生位置oracle、连续墙/平台/换代故障专项、scaled host与宿主查询失败恢复、最终性能；当前错误冻结并报告。旧物理9/12、Flail0/3、Mantle等继续，头颈/道具暂缓，用户文件保留。
+
 - 最新Camera碰撞：`docs/verification/2026-09-24-camera-collision.md`。Main query-only球扫/零运动起点穿透、按shape去重接触深度+1cm×scale膨胀恢复、拒绝背离owner、复查及保留调整起点、明确Godotmask/可更新自身RID排除/容量拒绝。三Hz实际Jolt各13静态几何/边界检查通过，Optimize过，日志camera-collision-final-*；Godot接触投影不是Chaos MTD，未证复杂凹面/深包围/连续移动或视觉等价。无Core/Import/UE新验证，普通Demo仍未接；下一步socket/真实base胶囊/查询/CameraRuntime在完成姿态后的Main输出，control yaw独立。旧静态9/12、Flail0/3、Mantle/完整Camera/性能继续，头颈/道具暂缓，用户文件保留。
 
 - 最新Camera插槽：`docs/verification/2026-09-24-camera-sockets.md`。从Refactored真实角色CDO→SKM_Als/SK_Als只读导出3socket（全head，FP4/14/0、肩5/0/±20cm），严格编译来源/TRS，Godot Main按FBX骨局部(x,-y,z)→最终骨骼world→native厘米绑定，禁worker/失效骨架。实际两模型8姿态40位置max3.09255e-5cm、4拒绝过；Import相机33/Optimize过。UE全Editor审计0action，两冷导SHA00386B4F5C6F6028EF82E088AC67410802A1A11630D7BAFEFE834DF8AF15B899同，无新插件/普通Editor/DV/全量/渲染。每帧骨骼名检查尚未优化，宿主须确保worker空闲；下一步球扫/穿透/通道排除/普通Demo已完成显示时序，control yaw独立。旧静态9/12、Flail0/3、Mantle/完整Camera/性能继续，头颈/道具暂缓，用户文件保留。
