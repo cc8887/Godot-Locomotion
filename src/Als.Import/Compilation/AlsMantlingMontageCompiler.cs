@@ -20,6 +20,7 @@ public sealed class AlsMantlingMontageProfile
         IReadOnlyDictionary<string,AlsMantlingPoseSource> poses,IReadOnlyDictionary<string,AlsMantlingCurveSource> curves,string group)
     {Definitions=new ReadOnlyDictionary<string,AlsMantlingMontageDefinition>(definitions);Poses=poses;Curves=curves;GroupName=group;}
     public AlsMontageRuntime CreateRuntime()=>new([],Definitions.Values.Select(d=>d.Asset).ToArray());
+    public AlsMontageRuntime CreateRuntime(AlsMantlingBranchingRuntime branching)=>new([],Definitions.Values.Select(d=>d.Asset).ToArray(),branching:branching);
     public IAlsMontagePoseSource CreatePoseSource()=>new PoseSource(this);
     private sealed class PoseSource : IAlsMontagePoseSource
     {

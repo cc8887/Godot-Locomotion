@@ -98,6 +98,7 @@ public sealed class AlsMontageRuntime
     public AlsMontageRootMotionRange RootMotionRange { get { RequirePrepared(); return _rootMotionRange; } }
     private AlsFrameIdentity _identity;
     private bool _prepared;
+    private readonly AlsMantlingBranchingRuntime? _branching;
     public AlsFrameIdentity CommittedIdentity { get; private set; }
     public ReadOnlySpan<AlsMontageInstance> Committed => _committed.AsSpan(0, _committedCount);
     public ReadOnlySpan<AlsMontageInstance> Candidate { get { RequirePrepared(); return _candidate.AsSpan(0, _count); } }
@@ -107,8 +108,9 @@ public sealed class AlsMontageRuntime
     public bool TryGetActionAsset(int definitionId, out AlsAuthoredMontageAsset asset) => _actions.TryGetValue(definitionId, out asset);
 
     public AlsMontageRuntime(ReadOnlySpan<AlsDynamicMontageAsset> assets, ReadOnlySpan<AlsAuthoredMontageAsset> actions = default,
-        ReadOnlySpan<AlsSequenceMontageAsset> sequences = default)
+        ReadOnlySpan<AlsSequenceMontageAsset> sequences = default, AlsMantlingBranchingRuntime? branching = null)
     {
+        _branching=branching;
         _assets = new();
         foreach (var asset in assets)
         {
@@ -141,14 +143,24 @@ public sealed class AlsMontageRuntime
                 throw new ArgumentException("Action aliases disagree about their authored montage.");
             nativeAssets[nativeId] = canonical;
         }
+        _branching?.Attach(actions);
     }
 
     public void Begin(AlsFrameIdentity identity, float delta, bool ragdoll = false)
+    {
+        // Do not discard an already prepared frame on a caller phase error.
+        if(_prepared)throw new ArgumentException("A montage frame is already prepared.");
+        try{BeginCore(identity,delta,ragdoll);}
+        catch{Discard();throw;}
+    }
+
+    private void BeginCore(AlsFrameIdentity identity, float delta, bool ragdoll)
     {
         if (_prepared || identity.SlotGeneration == 0 || !float.IsFinite(delta) || delta <= 0 ||
             CommittedIdentity != default && (identity.SlotGeneration != CommittedIdentity.SlotGeneration ||
                 identity.CharacterId != CommittedIdentity.CharacterId || identity.FrameId <= CommittedIdentity.FrameId))
             throw new ArgumentException("Invalid montage frame identity, phase or delta.");
+        _branching?.Begin(identity);
         Ensure(_committedCount); _count = _evaluationCount = _traversalCount = 0;
         _identity = identity; _serial = _committedSerial;
         _rootMotionInstance = _committedRootMotionInstance; _rootMotionRange = new(identity, 0, -1, 0, 0);
@@ -200,14 +212,24 @@ public sealed class AlsMontageRuntime
                 if (blend.BlendingOut == 1 && state.BlendTime <= 0) playing = false;
             }
             var terminated = AlsActionLifecycle.IsComplete(blend);
+            state = state with { Position = position, Playing = playing, Blend = blend,
+                OwnsActiveActionLookup = state.OwnsActiveActionLookup && blend.DesiredWeight > 0 };
+            if(_branching is not null)
+            {
+                var stopSeconds=_branching.Advance(state,previous,traversalEnd,terminated);
+                if(stopSeconds>=0)
+                {
+                    state=StopInstance(state,stopSeconds,state.Settings.BlendOutOption);
+                    if(_rootMotionInstance==state.InstanceId)_rootMotionInstance=0;
+                    blend=state.Blend;
+                }
+            }
             if (extractMotion && previous != traversalEnd)
                 _rootMotionRange = new(identity, state.InstanceId, state.AnimationId,
                     state.ClipStart + previous * state.ClipRate, state.ClipStart + traversalEnd * state.ClipRate);
             _traversal[_traversalCount++] = new(state.InstanceId, state.AnimationId, state.Slot,
                 previous, traversalEnd, MathF.Max(previousWeight, blend.CurrentWeight), state.Interrupted, terminated, state.ActionDefinitionId);
             if (terminated) continue;
-            state = state with { Position = position, Playing = playing, Blend = blend,
-                OwnsActiveActionLookup = state.OwnsActiveActionLookup && blend.DesiredWeight > 0 };
             _candidate[_count++] = state;
             if (blend.CurrentWeight > AlsPoseBlender.WeightThreshold)
                 _frame.Entries[_evaluationCount++] = new(state.InstanceId, state.AnimationId, state.Slot,
@@ -351,6 +373,10 @@ public sealed class AlsMontageRuntime
     {
         var old = _candidate[index];
         if (_rootMotionInstance == old.InstanceId) _rootMotionInstance = 0;
+        _candidate[index]=StopInstance(old,seconds,option);
+    }
+    private static AlsMontageInstance StopInstance(in AlsMontageInstance old,float seconds,AlsActionBlendOption option)
+    {
         var blend = old.Blend; var duration = old.BlendTime;
         var pending = old.BlendResetPending;
         var settings = old.Settings;
@@ -370,7 +396,7 @@ public sealed class AlsMontageRuntime
             blend.BeginWeight = blend.CurrentWeight;
             pending = true;
         }
-        _candidate[index] = old with { Blend = blend, BlendTime = duration, BlendResetPending = pending, Settings = settings,
+        return old with { Blend = blend, BlendTime = duration, BlendResetPending = pending, Settings = settings,
             Interrupted = true, Playing = old.Playing && duration > 0, OwnsActiveActionLookup = false };
     }
 
@@ -379,18 +405,19 @@ public sealed class AlsMontageRuntime
         RequirePrepared(); return _frame.SlotWeights(slot);
     }
     public void ValidateCommit(AlsFrameIdentity identity)
-    { RequirePrepared(); if (identity != _identity) throw new ArgumentException("Foreign montage commit."); }
+    { RequirePrepared(); if (identity != _identity) throw new ArgumentException("Foreign montage commit."); _branching?.ValidateCommit(identity); }
     public void Commit(AlsFrameIdentity identity)
     {
-        ValidateCommit(identity); (_committed, _candidate) = (_candidate, _committed);
+        ValidateCommit(identity); _branching?.Commit(); (_committed, _candidate) = (_candidate, _committed);
         (_committedFrame, _frame) = (_frame, _committedFrame);
         _committedCount = _count; _committedSerial = _serial; CommittedIdentity = identity; _prepared = false;
         _committedRootMotionInstance = _rootMotionInstance;
     }
-    public void Discard() { _prepared = false; _count = _evaluationCount = _traversalCount = 0; _frame.Count = 0; _frame.Identity = default; }
+    public void Discard() { _branching?.Discard(); _prepared = false; _count = _evaluationCount = _traversalCount = 0; _frame.Count = 0; _frame.Identity = default; }
     public void ClearForLifecycle()
     {
         if (_prepared) throw new InvalidOperationException("Discard the montage candidate before lifecycle cleanup.");
+        _branching?.Clear();
         Array.Clear(_committed); Array.Clear(_candidate);
         _committedCount = _count = _evaluationCount = _traversalCount = 0;
         _committedRootMotionInstance = _rootMotionInstance = 0; _rootMotionRange = default;
