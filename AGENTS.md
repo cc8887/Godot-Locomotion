@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Refactored 编译图清单：`docs/verification/2026-09-25-refactored-layer-inventory.md`。只读 ReadCompiledAnimationGraph 按结构类型包含 ALS custom nodes，四图清单/原生默认值/cache order 导出；Layering106编辑/94编译/12未编译，原生11缓存顺序90,3,71,70,56,69,68,57,36,51,52。Import清单编译器校验hash/GUID/索引/缓存引用及闭包，非完整骨骼编译器。Import14/Optimize0/0；UE全Editor审计fingerprint6A36CA669CAA388864B0C247DC956056B6CD5200FB0EBDCD1191CE13D3DB27F1，冷0/0、普通23396实际exit0字节同SHA AB57FE0014CAA905CBE4334B055809C1DE91C40FDA6C975C4C96DDB9B32EC1AE，普通两旧Condition及5warning保留；DV0/3旧warn。首次xUnit2031已修，无全量/新Godot/打包。下一步真实94图/MultiWay基础采样/VB/Slot/Head→普通Mantle；全部旧缺口/用户文件/暂缓项保留。
+
 - 最新 Refactored 分层共享运行时：`docs/verification/2026-09-25-refactored-layer-runtime.md`。显式 V4/Refactored 属性模式及 22 个原生属性，既有缓存/事务接入固定全权重 CurveAccumulate/Override/Reset；保留基础 pose、完整曲线存在性和 Slot 源相关性。受控 13 节点组合图非完整 authored 图/UE oracle。Core 定向10、Import65/1既有条件跳过、Optimize0/0、普通并行60Hz相机/倒地起身480帧通过。无新UE/资产导出/全量/最终视觉。下一步实际图 inventory/cache order、MultiWay/VB/区域Slot/Head，再普通Mantle宿主；旧缺口和用户文件/暂缓项保留。
 
 - 最新 Refactored 分层契约：`docs/verification/2026-09-25-refactored-layering-contract.md`。四原生AnimGraph已导出，验证Locomotion→PostLocomotion→Layering→Head；curve tail为Overlay六slot曲线reset→Curves Slot→与Locomotion累加→Override最终曲线，新增两阶段算子，调用方仍须实际求值中间Slot。输入模型保留负float、MS=!FullWeight(LS)、三View曲线因子与过去帧身份；不是V4别名/完整View。Core4/Import133后graph强化6重跑/Optimize0/0；无native运行oracle/Godot/全量。冷导两次0/0，三图同，Locomotion仅5隐藏未连ErrorTolerance PinId随机，原文保留非字节一致。下一步Refactored骨骼分支/缓存/Head及虚拟骨布局迁移，再实际Mantle宿主接入；全部旧缺口/用户文件/暂缓项保留。
