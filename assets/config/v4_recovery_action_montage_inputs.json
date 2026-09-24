@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_Default.ALS_N_LandRoll_F_Montage_Default",
+      "length": 1.5,
+      "slot": 2,
+      "in": 0.10000000149011612,
+      "out": 0.30000001192092896,
+      "inOption": 2,
+      "outOption": 2,
+      "trigger": -1.0,
+      "auto": true,
+      "group": "MovementActionGroup",
+      "rateScale": 1.0,
+      "blendInMode": 0,
+      "blendOutMode": 0,
+      "blendProfiles": false,
+      "customBlendCurves": false,
+      "hasRootMotion": true
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_Default.ALS_CLF_GetUp_Front_Montage_Default",
+      "length": 1.5,
+      "slot": 2,
+      "in": 0.0,
+      "out": 0.30000001192092896,
+      "inOption": 0,
+      "outOption": 1,
+      "trigger": -1.0,
+      "auto": true,
+      "group": "MovementActionGroup",
+      "rateScale": 1.2000000476837158,
+      "blendInMode": 0,
+      "blendOutMode": 0,
+      "blendProfiles": false,
+      "customBlendCurves": false,
+      "hasRootMotion": true
+    },
+    {
+      "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_Default.ALS_CLF_GetUp_Back_Montage_Default",
+      "length": 1.5,
+      "slot": 2,
+      "in": 0.0,
+      "out": 0.30000001192092896,
+      "inOption": 0,
+      "outOption": 1,
+      "trigger": -1.0,
+      "auto": true,
+      "group": "MovementActionGroup",
+      "rateScale": 1.2000000476837158,
+      "blendInMode": 0,
+      "blendOutMode": 0,
+      "blendProfiles": false,
+      "customBlendCurves": false,
+      "hasRootMotion": true
+    }
+  ]
+}

@@ -77,7 +77,8 @@ public static class AlsAuthoredMontageCompiler
                 _ => throw new ArgumentException("Authored action slot requires an explicit graph binding.") };
             Require(groups.TryGetValue(slot.SlotName, out var group) && native.GetProperty("group").GetString() == group.Name &&
                 native.GetProperty("slot").GetInt32() == runtimeSlot.Id, "Native montage group/slot differs.");
-            Require(native.GetProperty("rateScale").GetSingle() == 1 && native.GetProperty("blendInMode").GetInt32() == 0 &&
+            var rateScale = native.GetProperty("rateScale").GetSingle();
+            Require(float.IsFinite(rateScale) && rateScale > 0 && native.GetProperty("blendInMode").GetInt32() == 0 &&
                 native.GetProperty("blendOutMode").GetInt32() == 0 && !native.GetProperty("blendProfiles").GetBoolean() &&
                 !native.GetProperty("customBlendCurves").GetBoolean() && native.GetProperty("hasRootMotion").GetBoolean() == animation.RootMotionEnabled,
                 "Unsupported montage rate, blend mode, profile, custom curve or root-motion provenance.");
@@ -89,7 +90,7 @@ public static class AlsAuthoredMontageCompiler
                 montage.BlendInTime, (AlsActionBlendOption)montage.BlendInOption, montage.BlendOutTime, (AlsActionBlendOption)montage.BlendOutOption, montage.BlendOutTriggerTime);
             Require(action.Lifecycle == settings, "Action profile lifecycle differs.");
             result.Add(new(action.DefinitionId, animation.Id, runtimeSlot, group.Id, montage.PlayLength,
-                segment.AnimationStartTime, segment.PlayRate, settings, animation.RootMotionEnabled, montage.Id));
+                segment.AnimationStartTime, segment.PlayRate, settings, animation.RootMotionEnabled, montage.Id) { RateScale = rateScale });
         }
         var compiled = result.ToArray(); _ = new AlsMontageRuntime([], compiled); return compiled;
     }

@@ -163,6 +163,7 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     internal int AnimationPoseBoneCount => _fullMovement?.AnimationPoseBoneCount ?? 0;
     internal void PresentRagdoll(GodotAls.Physics.AlsCharacterRagdollSimulation simulation) =>
         (_fullMovement ?? throw new InvalidOperationException("Complete animation runtime is unavailable.")).PresentRagdoll(simulation);
+    internal void InstallRagdollSnapshot(AlsNamedPoseSnapshot snapshot) => _fullMovement!.InstallRagdollSnapshot(snapshot);
     internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
         _fullMovement is not null && _fullMovement.TryCopyCommittedFlail(identity, destination);
     internal bool TryCopyCommittedPreciseFlail(AlsFrameIdentity identity, Span<AlsPrecisePose> destination) =>

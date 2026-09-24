@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "sequences": {
+    "notifySchemaVersion": 1,
+    "syncAssets": [
+      {
+        "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F",
+        "notifies": [
+          {
+            "index": 0,
+            "track": 0,
+            "name": "CameraShake_C",
+            "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F:CameraShake_AnimNotify_C_1",
+            "stateObject": "",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/CameraShake_Notify.CameraShake_Notify_C",
+            "time": 0.1009986400604248,
+            "duration": 0.0,
+            "triggerOffset": 0.0,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 0.1009986400604248,
+            "endTriggerTime": 0.1009986400604248,
+            "weightThreshold": 9.999999747378752e-06,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          },
+          {
+            "index": 1,
+            "track": 0,
+            "name": "CameraShake_C",
+            "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F:CameraShake_AnimNotify_C_0",
+            "stateObject": "",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/CameraShake_Notify.CameraShake_Notify_C",
+            "time": 0.4800272285938263,
+            "duration": 0.0,
+            "triggerOffset": 0.0,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 0.4800272285938263,
+            "endTriggerTime": 0.4800272285938263,
+            "weightThreshold": 9.999999747378752e-06,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          },
+          {
+            "index": 2,
+            "track": 0,
+            "name": "GroundedEntryState_C",
+            "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F:GroundedEntryState_AnimNotify_C_0",
+            "stateObject": "",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/GroundedEntryState_AnimNotify.GroundedEntryState_AnimNotify_C",
+            "time": 0.9311392903327942,
+            "duration": 0.0,
+            "triggerOffset": 0.0,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 0.9311392903327942,
+            "endTriggerTime": 0.9311392903327942,
+            "weightThreshold": 9.999999747378752e-06,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          }
+        ]
+      },
+      {
+        "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front.ALS_CLF_GetUp_Front",
+        "notifies": [
+          {
+            "index": 0,
+            "track": 0,
+            "name": "Footstep_C",
+            "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front.ALS_CLF_GetUp_Front:Footstep_Notify_C_0",
+            "stateObject": "",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+            "time": 0.8006498217582703,
+            "duration": 0.0,
+            "triggerOffset": 0.0,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 0.8006498217582703,
+            "endTriggerTime": 0.8006498217582703,
+            "weightThreshold": 0.5,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          },
+          {
+            "index": 1,
+            "track": 0,
+            "name": "Footstep_C",
+            "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front.ALS_CLF_GetUp_Front:Footstep_Notify_C_1",
+            "stateObject": "",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+            "time": 1.200974702835083,
+            "duration": 0.0,
+            "triggerOffset": 0.0,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 1.200974702835083,
+            "endTriggerTime": 1.200974702835083,
+            "weightThreshold": 0.5,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          }
+        ]
+      },
+      {
+        "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back.ALS_CLF_GetUp_Back",
+        "notifies": [
+          {
+            "index": 0,
+            "track": 0,
+            "name": "Footstep_C",
+            "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back.ALS_CLF_GetUp_Back:Footstep_Notify_C_0",
+            "stateObject": "",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+            "time": 0.46669456362724304,
+            "duration": 0.0,
+            "triggerOffset": 0.0,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 0.46669456362724304,
+            "endTriggerTime": 0.46669456362724304,
+            "weightThreshold": 0.5,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          },
+          {
+            "index": 1,
+            "track": 0,
+            "name": "Footstep_C",
+            "notifyObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back.ALS_CLF_GetUp_Back:Footstep_Notify_C_1",
+            "stateObject": "",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify_C",
+            "time": 1.0334703922271729,
+            "duration": 0.0,
+            "triggerOffset": 0.0,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 1.0334703922271729,
+            "endTriggerTime": 1.0334703922271729,
+            "weightThreshold": 0.5,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          }
+        ]
+      }
+    ]
+  },
+  "montages": {
+    "notifySchemaVersion": 1,
+    "syncAssets": [
+      {
+        "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_Default.ALS_N_LandRoll_F_Montage_Default",
+        "notifies": [
+          {
+            "index": 0,
+            "track": 0,
+            "name": "MovementAction_C",
+            "notifyObject": "",
+            "stateObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_Default.ALS_N_LandRoll_F_Montage_Default:MovementAction_AnimNotify_C_0",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/MovementAction_NotifyState.MovementAction_NotifyState_C",
+            "time": 0.0,
+            "duration": 0.9301273822784424,
+            "triggerOffset": -9.999999747378752e-05,
+            "endTriggerOffset": 0.0,
+            "triggerTime": -9.999999747378752e-05,
+            "endTriggerTime": 0.9300273656845093,
+            "weightThreshold": 9.999999747378752e-06,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          }
+        ]
+      },
+      {
+        "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_Default.ALS_CLF_GetUp_Front_Montage_Default",
+        "notifies": [
+          {
+            "index": 0,
+            "track": 0,
+            "name": "MovementAction_C",
+            "notifyObject": "",
+            "stateObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_Default.ALS_CLF_GetUp_Front_Montage_Default:MovementAction_AnimNotify_C_0",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/MovementAction_NotifyState.MovementAction_NotifyState_C",
+            "time": 0.0,
+            "duration": 1.158579707145691,
+            "triggerOffset": 9.999999747378752e-05,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 9.999999747378752e-05,
+            "endTriggerTime": 1.158679723739624,
+            "weightThreshold": 9.999999747378752e-06,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          }
+        ]
+      },
+      {
+        "path": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_Default.ALS_CLF_GetUp_Back_Montage_Default",
+        "notifies": [
+          {
+            "index": 0,
+            "track": 0,
+            "name": "MovementAction_C",
+            "notifyObject": "",
+            "stateObject": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_Default.ALS_CLF_GetUp_Back_Montage_Default:MovementAction_NotifyState_C_0",
+            "stateBehaviorFlags": 0,
+            "class": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/MovementAction_NotifyState.MovementAction_NotifyState_C",
+            "time": 0.0,
+            "duration": 1.15857994556427,
+            "triggerOffset": 9.999999747378752e-05,
+            "endTriggerOffset": 0.0,
+            "triggerTime": 9.999999747378752e-05,
+            "endTriggerTime": 1.1586799621582031,
+            "weightThreshold": 9.999999747378752e-06,
+            "chance": 1.0,
+            "filterType": 0,
+            "filterLod": 0,
+            "tickMode": 0,
+            "filterViaRequest": true,
+            "onDedicatedServer": true,
+            "onFollower": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -35,7 +35,7 @@ public partial class AlsLocomotionHud : VBoxContainer
         var label = CreateLabel("ActionPreviewHelp");
         var action = GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay") ? "地面翻滚" :
             GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--montage-root-motion") ? "翻滚位移测试" : "原地翻滚动画预览";
-        label.Text = $"R：{action}  |  X：取消动作  |  G：进入 Ragdoll（起身待接）  |  Q / E：切换 Overlay 道具";
+        label.Text = $"R：{action}  |  X：取消动作  |  G：进入 / 退出 Ragdoll  |  Q / E：切换 Overlay 道具";
     }
 
     public override void _Ready()

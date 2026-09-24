@@ -98,6 +98,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     // independent Flail source that must feed continuous motor targets.
     private readonly AlsLocalPose[] _candidateAnimationPose, _committedAnimationPose;
     private AlsFrameIdentity _committedAnimationIdentity;
+    private AlsNamedPoseSnapshot? _recoverySnapshot;
     internal int AnimationPoseBoneCount => _logicalBoneCount;
     internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
         identity == _committedAnimationIdentity && _layered is not null && _layered.TryCopyCommittedFlail(identity, destination);
@@ -294,8 +295,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
                 _layered.PrepareFromFrame(input,result,movement,rules,ground,new(input.Identity,1,input.DeltaTime),this,
                     componentPose,parent,_definition.ComponentTeleportDistance,overlayKind:input.Command.RequestedOverlay,
                     meshVerticalScale:MathF.Abs(componentPose.Scale.Y),
-                    ragdollObservation: input.RagdollPhysics.Identity.FrameId > 0
-                        ? new AlsRagdollFrameObservation(input.Identity, input.RagdollPhysics.PelvisVelocityCm, null) : null);
+                    ragdollObservation: input.RagdollPhysics.Identity.FrameId > 0 || _recoverySnapshot is not null
+                        ? new AlsRagdollFrameObservation(input.Identity, input.RagdollPhysics.PelvisVelocityCm, _recoverySnapshot) : null);
                 if (UsesRefactoredFeet)
                 {
                     var queries = _layered.PrepareFootQueries(componentPose, parent, _definition.ComponentTeleportDistance);
@@ -476,10 +477,12 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     }
     private AlsLocalPose[]? _physicalDisplayPose;
     internal long PhysicalDisplayStep { get; private set; }
+    private AlsFrameIdentity _physicalDisplayActivation;
     internal void PresentRagdoll(GodotAls.Physics.AlsCharacterRagdollSimulation simulation)
     {
         if (!GodotThread.IsMainThread() || _prepared || _queriesPending ||
-            simulation.AnimationIdentity != _committedAnimationIdentity || simulation.CompletedSteps <= PhysicalDisplayStep)
+            simulation.AnimationIdentity != _committedAnimationIdentity || simulation.CompletedSteps <= 0 ||
+            _physicalDisplayActivation == simulation.Activation.Entry.Identity && simulation.CompletedSteps <= PhysicalDisplayStep)
             throw new InvalidOperationException("Physical display requires a completed physics step and idle committed animation.");
         _physicalDisplayPose ??= new AlsLocalPose[_logicalBoneCount];
         // Capsule following has already completed. Inverting the CURRENT skeleton
@@ -489,6 +492,25 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         try { WriteLogicalPose(_physicalDisplayPose); }
         catch { WritePhysicalPose(_rollbackPose); throw; }
         PhysicalDisplayStep = simulation.CompletedSteps;
+        _physicalDisplayActivation = simulation.Activation.Entry.Identity;
+    }
+    internal void InstallRagdollSnapshot(AlsNamedPoseSnapshot snapshot)
+    {
+        if (!GodotThread.IsMainThread() || _prepared || _queriesPending || snapshot.Identity != _committedAnimationIdentity)
+            throw new InvalidOperationException("Snapshot publication requires the idle committed animation owner.");
+        var poses = new AlsLocalPose[_skeleton.GetBoneCount()];
+        for (var bone = 0; bone < poses.Length; bone++)
+        {
+            var source = -1;
+            for (var i = 0; i < snapshot.BoneNames.Length; i++)
+                if (string.Equals(snapshot.BoneNames[i], _skeleton.GetBoneName(bone).ToString(), StringComparison.OrdinalIgnoreCase))
+                { source = i; break; }
+            if (source < 0 || source >= snapshot.LocalPoses.Length) throw new ArgumentException("Incomplete recovery mesh pose.");
+            poses[bone] = snapshot.LocalPoses[source]; _rollbackPose[bone] = ReadBone(bone);
+        }
+        try { WritePhysicalPose(poses); }
+        catch { WritePhysicalPose(_rollbackPose); throw; }
+        _recoverySnapshot = snapshot;
     }
     internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
     {

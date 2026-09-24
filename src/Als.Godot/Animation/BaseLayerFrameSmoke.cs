@@ -784,9 +784,9 @@ public partial class BaseLayerFrameSmoke : Node
             using var graph=AlsLocomotionGraphBuilder.Build(library,locomotion,poseProfile,set,definition.Binding);
             using var owner=new AlsBaseLayerFrameRuntime(definition,library,graph.StandingCycle!,set,poseProfile);
             var sink=new Sink(owner.ReferencePose.ToArray()); var fault=new ActionFailureSlot(owner.ActionSlot);
-            var feedback=default(AlsAnimationInputFeedback); var policy=definition.ActionPolicies.Single();
+            var feedback=default(AlsAnimationInputFeedback); var policy=definition.ActionPolicies.Single(p => p.DefinitionId == definition.RollDefinitionId);
             var notifyState = default(AlsMovementNotifyState);
-            var roll=definition.AuthoredMontageAssets.Single();
+            var roll=definition.AuthoredMontageAssets.Single(a => a.ActionDefinitionId == definition.RollDefinitionId);
             using var clip=library.MovementSources(set, poseProfile.SkeletonId).Create(roll.AnimationId);
             var sampled=owner.ReferencePose.ToArray();
             var rollCurveNames=set.Animations[roll.AnimationId].Curves.Where(c=>c.Provenance==AlsCurveProvenance.SourceCurve).Select(c=>c.SourceName).ToHashSet(StringComparer.Ordinal);

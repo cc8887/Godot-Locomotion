@@ -43,7 +43,7 @@ public sealed class AlsAuthoredMontageCompilerTests
     }
 
     [Theory]
-    [InlineData("rateScale",2)] [InlineData("blendInMode",1)] [InlineData("blendOutMode",1)]
+    [InlineData("rateScale",0)] [InlineData("blendInMode",1)] [InlineData("blendOutMode",1)]
     [InlineData("inOption",0)] [InlineData("outOption",0)] [InlineData("slot",0)] [InlineData("length",3)]
     public void RejectsUnsupportedOrStaleNativeNumericFields(string field,int value) =>
         Reject(a => a[field] = value);

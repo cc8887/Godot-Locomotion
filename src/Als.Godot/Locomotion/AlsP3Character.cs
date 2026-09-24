@@ -20,6 +20,61 @@ public partial class AlsP3Character : Node3D
     internal GodotAls.Physics.AlsCharacterRagdollSimulation? RagdollSimulation { get; private set; }
     private Node? _requestedRagdollEnvironment;
     private int _physicsDriven;
+    private bool _ragdollExitRequested, _getUpAccepted, _getUpNotifySeen;
+    private long _getUpRequestId;
+    internal bool GettingUp => _motor.GetUpInputBlocked;
+    internal GodotAls.Physics.AlsRagdollRecoveryFrame? LastRagdollRecovery { get; private set; }
+    internal void RequestRagdollToggle(Node environment)
+    {
+        EnsureMainThread(); EnsureConfigured(); ThrowIfDisposed();
+        if (!BodyHistoryActive) return;
+        if (RagdollSimulation is null) RequestRagdoll(environment);
+        else _ragdollExitRequested = true;
+    }
+    internal void ConsumeRagdollExit()
+    {
+        if (!_ragdollExitRequested || PublishedFrameId != RuntimeCommittedFrameId || RagdollSimulation is not { } simulation) return;
+        var decision = simulation.DecideExit(_motor.RagdollGrounded);
+        var actor = _motor.GlobalTransform;
+        actor.Basis = new Basis(Vector3.Up, (float)(-decision.ActorYawDegrees * (Math.PI / 180)));
+        var restoredRoot = AlsP3Presentation.Compose(actor, _context.PresentationTransform);
+        restoredRoot.Origin += Vector3.Up * _state.MotorInput.MeshHeightOffset;
+        var recovery = simulation.PrepareRecovery(Diagnostics.Identity, _worker.RecoverySkeletonWorld(restoredRoot), decision.Grounded);
+        if (!simulation.IsRecoveryCurrent(recovery)) throw new InvalidOperationException("Ragdoll recovery candidate expired.");
+        var definition = decision.FacingUpward ? _context.MovementGraph!.GetUpBackDefinitionId : _context.MovementGraph!.GetUpFrontDefinitionId;
+        var policy = _context.MovementGraph.ActionPolicies.Single(p => p.DefinitionId == definition);
+        var request = decision.PlayGetUp ? new AlsActionRequest(checked(RuntimeCommittedFrameId + 1), AlsActionCommand.Start,
+            definition, policy.StartSectionId, 100, Handle.Generation) : AlsActionRequest.None;
+        var velocity = decision.FallingVelocityCm;
+        _worker.InstallRagdollRecovery(restoredRoot, recovery.Snapshot);
+        _motor.RestoreFromRagdoll(actor, decision.Grounded, new((float)(velocity.Y * .01), (float)(velocity.Z * .01), (float)(-velocity.X * .01)));
+        simulation.Dispose(); RagdollSimulation = null;
+        Volatile.Write(ref _physicsDriven, 0);
+        _state.HasCommittedTargetYaw = 0;
+        BodyHistory!.ResetHistory();
+        _motor.RecoveryRequest = request; _motor.GetUpInputBlocked = decision.PlayGetUp;
+        _getUpRequestId = request.RequestId; _getUpAccepted = _getUpNotifySeen = false;
+        LastRagdollRecovery = recovery; _ragdollExitRequested = false;
+    }
+    internal void ObserveGetUp()
+    {
+        if (!_motor.GetUpInputBlocked) return;
+        var result = Diagnostics.Result;
+        var terminal = false;
+        for (var i = 0; i < result.ActionOutcomes.Count; i++)
+        {
+            var outcome = result.ActionOutcomes[i];
+            if (outcome.RequestId != _getUpRequestId) continue;
+            _motor.RecoveryRequest = AlsActionRequest.None;
+            if (outcome.ResultCode == AlsActionResultCode.Accepted) _getUpAccepted = true;
+            else terminal = true;
+        }
+        var action = FullMovementDiagnostics.MovementNotifies.Action;
+        if (action == AlsTimelineAction.GettingUp) _getUpNotifySeen = true;
+        if (terminal || _getUpNotifySeen && action != AlsTimelineAction.GettingUp ||
+            _getUpAccepted && result.ActionPlayback.Active == 0)
+        { _motor.GetUpInputBlocked = false; _motor.RecoveryRequest = AlsActionRequest.None; }
+    }
     internal bool PhysicsDriven => Volatile.Read(ref _physicsDriven) != 0;
     internal void RequestRagdoll(Node environment)
     {
@@ -41,6 +96,8 @@ public partial class AlsP3Character : Node3D
         _motor.CollisionLayer = 0; _motor.CollisionMask = 0;
         _motor.Velocity = Vector3.Zero;
         RagdollSimulation = simulation;
+        _motor.GetUpInputBlocked = false; _motor.RecoveryRequest = AlsActionRequest.None;
+        _ragdollExitRequested = false;
         Volatile.Write(ref _physicsDriven, 1);
     }
     internal void FollowRagdollPelvis() => _motor.FollowRagdoll(RagdollSimulation!.PelvisPosition);
@@ -564,6 +621,7 @@ public partial class AlsP3Character : Node3D
         {
             CloseWorkerAdmissionForDeactivation();
             _requestedRagdollEnvironment = null;
+            _ragdollExitRequested = false;
             BodyHistory?.ResetHistory();
             _worker.CancelSplitFootForLifecycle();
             // Closed-admission checkpoint for same-generation resume. This is

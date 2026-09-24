@@ -25,7 +25,7 @@ public partial class MontageRootMotionSmoke : Node
         var pose = AlsPoseProfileCompiler.Compile(Read("p4_pose_profile.json"), set, locomotion);
         var definition = AlsMovementGraphDefinition.Load(set, locomotion, pose);
         var reader = new AlsMontageRootMotionReader(definition);
-        var roll = definition.AuthoredMontageAssets.Single();
+        var roll = definition.AuthoredMontageAssets.Single(a => a.ActionDefinitionId == definition.RollDefinitionId);
         using var document = JsonDocument.Parse(Read("v4_montage_root_motion_native.json"));
         var assets = document.RootElement.GetProperty("assets").EnumerateArray().ToArray();
         var turns = assets.Take(8).Select(a => definition.TurnMontageAssets.Single(t =>

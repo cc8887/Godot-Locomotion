@@ -115,7 +115,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 var character = new AlsP3Character { Name = "Character" + i, Position = new(i * 5, motor.StandingHeight * .5f, 0) };
                 AddChild(character); _characters.Add(character);
                 character.Configure(_context, new AlsSlotHandle(checked((uint)i), 1), new Commands(_hz, _overlayCycle, i,
-                    _actionRequests ? _context.MovementGraph!.ActionPolicies.Single() : null));
+                    _actionRequests ? _context.MovementGraph!.ActionPolicies.Single(p => p.DefinitionId == _context.MovementGraph.RollDefinitionId) : null));
                 character.SetActive(true);
             }
         }

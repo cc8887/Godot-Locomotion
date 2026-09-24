@@ -7,6 +7,16 @@ namespace GodotAls.Core.Tests;
 
 public sealed class AlsRollingGameplayTests
 {
+    [Fact]
+    public void GetUpAcceptanceDoesNotClaimRollingAndOldRollInterruptionStillClearsIt()
+    {
+        var frame = AlsFrameInput.CreateDefault(new(3, 1, 1), .01f);
+        var outcomes = new AlsActionOutcomeBuffer();
+        outcomes.TryAdd(new(2, 1, 20, AlsActionResultCode.Accepted));
+        Assert.Equal(default, AlsRollingGameplay.ApplyOutcomes(default, frame, outcomes, 0));
+        outcomes.TryAdd(new(1, 0, 10, AlsActionResultCode.InterruptedByReplacement));
+        Assert.Equal(default, AlsRollingGameplay.ApplyOutcomes(new(1, 10, 90), frame, outcomes, 0));
+    }
     [Theory]
     [InlineData(false, AlsTimelineAction.None, false, false)]
     [InlineData(true, AlsTimelineAction.None, true, true)]

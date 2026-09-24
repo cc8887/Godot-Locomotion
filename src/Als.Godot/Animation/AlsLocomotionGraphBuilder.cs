@@ -427,7 +427,7 @@ public static class AlsLocomotionGraphBuilder
     {
         static string Read(string name) => Godot.FileAccess.GetFileAsString($"res://assets/config/{name}");
         pose ??= AlsPoseProfileCompiler.Compile(Read("p4_pose_profile.json"), set, profile);
-        var p5 = AlsP5aAnimationRuntimeProfileCompiler.Compile(Read("p5a_animation_runtime.json"), set);
+        var p5 = AlsRecoveryActionProfileCompiler.Compile(Read("p5a_animation_runtime.json"), Read("p5_get_up_actions.json"), set);
         // The caller owns the source closure for the entire character transaction. Grounded
         // may consume the full Main Movement snapshot without compiling a second clock/layout.
         var sources = sourceProfile ?? AlsLocomotionSourceCompiler.Compile(Read("v4_locomotion_source_graph.json"), set, profile.SkeletonId);

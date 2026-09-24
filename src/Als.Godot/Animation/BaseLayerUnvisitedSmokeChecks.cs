@@ -24,7 +24,7 @@ public partial class BaseLayerFrameSmoke
             using var graph=AlsLocomotionGraphBuilder.Build(library,profile,pose,set,definition.Binding);
             using var owner=new AlsBaseLayerFrameRuntime(definition,library,graph.StandingCycle!,set,pose);
             var sink=new Sink(owner.ReferencePose.ToArray()); var feedback=default(AlsAnimationInputFeedback);
-            var wasHidden=false; var policy=definition.ActionPolicies.Single();
+            var wasHidden=false; var policy=definition.ActionPolicies.Single(p => p.DefinitionId == definition.RollDefinitionId);
             var committedTraversal=default(AlsAnimationGraphFrame);
             for(var frame=1;frame<=hz*5;frame++)
             {
