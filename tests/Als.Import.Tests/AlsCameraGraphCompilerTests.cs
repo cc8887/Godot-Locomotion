@@ -20,6 +20,7 @@ public sealed class AlsCameraGraphCompilerTests
         Assert.IsType<AlsCameraReferencePose>(ragdoll.Source);
         var view = Assert.IsType<AlsCameraPoseCache>(action.Children[0]);
         Assert.Equal("View Mode", view.Name);
+        Assert.Equal("HermiteCubic", Assert.IsType<AlsCameraSelectPose>(view.Source).Blend);
         Assert.Same(view, Assert.IsType<AlsCameraModifyCurves>(action.Children[1]).Source);
         Assert.Same(view, Assert.IsType<AlsCameraModifyCurves>(action.Children[2]).Source);
         var states = graph.Nodes.Values.OfType<AlsCameraLookStates>().Single();
@@ -48,6 +49,9 @@ public sealed class AlsCameraGraphCompilerTests
     [InlineData("dynamic_curve")]
     [InlineData("child_update")]
     [InlineData("negative_transition")]
+    [InlineData("missing_blend")]
+    [InlineData("foreign_blend")]
+    [InlineData("conflicting_blend")]
     public void RejectsUnsupportedCameraChanges(string mutation)
     {
         var root = JsonNode.Parse(Read())!;
@@ -60,6 +64,9 @@ public sealed class AlsCameraGraphCompilerTests
         if (mutation == "dynamic_curve") text = text.Replace("ApplyMode=Scale", "ApplyMode=Scale,Alpha=0.5");
         if (mutation == "child_update") text = text.Replace("ChildUpateMode=ResetChildOnActivate", "ChildUpateMode=Unknown");
         if (mutation == "negative_transition") text = text.Replace("CrossfadeDuration=0.350000", "CrossfadeDuration=-0.350000");
+        if (mutation == "missing_blend") root["blendNodes"]!.AsArray().RemoveAt(0);
+        if (mutation == "foreign_blend") root["blendNodes"]!.AsArray().Add(new JsonObject { ["path"] = "foreign", ["blendType"] = "LINEAR" });
+        if (mutation == "conflicting_blend") text = text.Replace("BlendType=Cubic", "BlendType=Linear");
         root["graphs"]![0]!["nativeText"] = text;
         Assert.Throws<ArgumentException>(() => AlsCameraGraphCompiler.Compile(root.ToJsonString()));
     }

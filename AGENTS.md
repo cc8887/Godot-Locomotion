@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新相机图运行时：`docs/verification/2026-09-24-camera-graph-runtime.md`。多子BlendList/逐边过渡曲线/共享cache一次更新/失去相关性重入及Prepare/Commit/Discard；只读反射12节点修ViewMode省略默认误判Linear，实际HermiteCubic（10 Cubic/1 Custom）。Core相机11、Import23、Optimize过；三频率1890帧逐帧丢弃重试及480快速中断。UE全Editor审计过，两冷导字段同、仅3未连接PinId异；首轮protected Nodes失败保留，改ObjectIterator。尚无原生全图连续oracle、Godot接入/渲染/性能或全量测试；下一步原生对照→socket/pivot/trace/普通镜头，保留control yaw独立。字典复制未优化，旧静态9/12、Flail0/3、Mantle等继续，头颈/道具暂缓，用户修改保持。
+
 - 最新相机图编译：`docs/verification/2026-09-24-camera-graph-compilation.md`。AlsCameraGraphCompiler读取原始连接/引脚，保留3 Look States/6有向过渡/共享缓存、tag/bool选择及真实混合时间、Modifier/动作覆盖；Velocity回退是RotationMode匹配或无效，未编造LocomotionMode分支。两RichCurve编译和202采样按原生FAlphaBlend clamp校验，Quick末端原始值>1；首轮误比未clamp值失败TRX保留。Import相机专项11过（含旧630帧112边界），Optimize过；无新UE/全量。尚未动态图runtime或普通相机接入，下一步多子混合/状态重入/cache单次更新和原生连续图对照。曲线T3D六位小数/双精度Hermite只证2e-6容差非bit exact；旧静态9/12、Flail0/3、Mantle/完整Camera/性能目标保留，头颈/道具暂缓，用户修改保留。
 
 - 最新相机基础：`docs/verification/2026-09-24-camera-inputs-and-math.md`。只读导出Refactored Camera authored图/真实反射默认设置/两BlendCurve和原生旋转参考（非V4 CameraManager）；Core AlsCameraMath实现原生旋转阻尼/逐轴pivot/瞬移门限/trace距离平滑。Core定向7、Import原生630帧+112边界1项、Optimize过；两冷导settings/assets/参考相同，图仅3个未连接ErrorTolerance PinId不同。UE全Editor审计通过，无插件更改/普通Editor重启/DV。尚未编译相机图、接socket/平台/场景查询或普通Demo，当前OrbitCamera未改；下一步按文档编译Camera图再接入。静态9/12、Flail0/3、Mantle/完整Camera/性能验收仍未完成；头颈/道具暂缓、用户修改保留。
