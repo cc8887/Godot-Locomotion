@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Camera插槽：`docs/verification/2026-09-24-camera-sockets.md`。从Refactored真实角色CDO→SKM_Als/SK_Als只读导出3socket（全head，FP4/14/0、肩5/0/±20cm），严格编译来源/TRS，Godot Main按FBX骨局部(x,-y,z)→最终骨骼world→native厘米绑定，禁worker/失效骨架。实际两模型8姿态40位置max3.09255e-5cm、4拒绝过；Import相机33/Optimize过。UE全Editor审计0action，两冷导SHA00386B4F5C6F6028EF82E088AC67410802A1A11630D7BAFEFE834DF8AF15B899同，无新插件/普通Editor/DV/全量/渲染。每帧骨骼名检查尚未优化，宿主须确保worker空闲；下一步球扫/穿透/通道排除/普通Demo已完成显示时序，control yaw独立。旧静态9/12、Flail0/3、Mantle/完整Camera/性能继续，头颈/道具暂缓，用户文件保留。
+
 - 最新Camera跟随事务：`docs/verification/2026-09-24-camera-follow-transaction.md`。Core纯值socket/pivot均值、detached root胶囊底替代、mesh/视角不同offset空间、旋转基座历史/换基座重基、瞬移、FP早返回/FOV及可调整trace start；Import读取设置/socket并统一图+位置Prepare/Commit/Discard，查询失败不推进。Core相机18+后补调整起点1、Import27（含旧3114帧native图）/Optimize过；630帧三Hz联合故障重试同。无新UE/全量/渲染，位置层尚无独立原生oracle；普通Demo未接，下一步Godot socket/坐标/基座/真实球扫穿透/镜头输出，保留control yaw，native trace enum不作Godotmask。旧静态9/12、Flail0/3、Mantle/性能继续，头颈/道具暂缓，用户文件保留。
 
 - 最新Camera原生图对照：`docs/verification/2026-09-24-camera-native-graph-parity.md`。新增只读Editor接口运行实际Refactored Camera图，受控tag/shoulder，原始nodes/cache；三频率2730连续帧+384稳定组合，共3114帧29701曲线值，存在性一致、max abs0.0002746582，位置1e-3cm/其他3e-6预设容差内。Import相机24过；无生产C#改动/新Core全量/Godot渲染。初次漏FMemMark断言退出3保留，最终补scope/GFrameCounter、清辅助重名warning，全Editor审计fingerprint2AABEBF5350E74B6E46D1E5F32785955F3F7DB1710B7EFCA7EB305D42B1CFAB5过；DV0/3旧warn，普通Editor42464导出/退出0仍两旧Condition，最终冷导与Editor字节同SHA8A26256E898B4A62D012F594B47F9059E5E3B273C2FF41ABB240EF6BBCE222F9。排除NativeUpdateAnimation/角色/场景查询，不声称bit exact或完整Camera；下一步socket/pivot/平台/trace/普通镜头，保留control yaw。旧静态9/12、Flail0/3、Mantle/最终性能继续；头颈/道具暂缓，用户文件保留。
