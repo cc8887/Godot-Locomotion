@@ -4,6 +4,7 @@
 #include "AlsSourceAnimationLibrary.generated.h"
 
 class UAnimSequence;
+class UAnimSequenceBase;
 class USkeleton;
 class UBlendSpace;
 
@@ -14,7 +15,10 @@ class ALSGODOTEXPORTER_API UAlsSourceAnimationLibrary final : public UBlueprintF
     GENERATED_BODY()
 public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
-    static FString ReadSourceFloatCurves(UAnimSequence* Animation);
+    static FString ReadSourceFloatCurves(UAnimSequenceBase* Animation);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadAssetFloatCurveValues(UAnimSequenceBase* Animation, float TimeSeconds);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadRawSamplingCases();

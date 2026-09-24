@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using GodotAls.Core.Curves;
 using GodotAls.Core.Locomotion;
 
@@ -32,20 +33,29 @@ public sealed class AlsMantlingCurveSource
 public static class AlsMantlingCurveCompiler
 {
     public static IReadOnlyDictionary<string,AlsMantlingCurveSource> Compile(string json,string animationJson)
+        =>CompileInternal(json,animationJson,false);
+    public static IReadOnlyDictionary<string,AlsMantlingCurveSource> CompileMontages(string json,string animationJson)
+        =>CompileInternal(json,animationJson,true);
+    private static IReadOnlyDictionary<string,AlsMantlingCurveSource> CompileInternal(string json,string animationJson,bool montage)
     {
         using var doc=JsonDocument.Parse(json);using var animation=JsonDocument.Parse(animationJson);
         var root=doc.RootElement;
         var digest=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(animationJson)));
         Require(root.GetProperty("schemaVersion").GetInt32()==1&&animation.RootElement.GetProperty("schemaVersion").GetInt32()==1&&
             Text(root,"animationInputsSha256").Equals(digest,StringComparison.OrdinalIgnoreCase),"Foreign mantle curve source digest/schema.");
-        var policies=animation.RootElement.GetProperty("sequences").EnumerateArray()
-            .ToDictionary(r=>Text(r.GetProperty("raw"),"source"),r=>r.GetProperty("evaluation"),StringComparer.Ordinal);
+        var collection=montage?"montages":"sequences";
+        var policies=animation.RootElement.GetProperty(collection).EnumerateArray()
+            .ToDictionary(r=>montage?Text(r,"path"):Text(r.GetProperty("raw"),"source"),r=>r,StringComparer.Ordinal);
         var result=new Dictionary<string,AlsMantlingCurveSource>(StringComparer.Ordinal);
-        foreach(var sequence in root.GetProperty("sequences").EnumerateArray())
+        foreach(var sequence in root.GetProperty(collection).EnumerateArray())
         {
             var path=Text(sequence,"source");Require(policies.TryGetValue(path,out var policy),"Unrelated mantle curve source.");
-            var names=policy.GetProperty("floatCurveNames").EnumerateArray().Select(n=>n.GetString()!).ToArray();
-            Require(names.Length==policy.GetProperty("floatCurveCount").GetInt32()&&names.All(n=>!string.IsNullOrWhiteSpace(n))&&
+            // Text is used only for name closure, never for rounded key values.
+            var modelCurveData=montage?Regex.Matches(Text(policy,"nativeText"),@"(?m)^      CurveData=([^\r\n]+)"):null;
+            Require(!montage||modelCurveData!.Count==1,"Missing unique montage data-model curve payload.");
+            var names=montage?Regex.Matches(modelCurveData![0].Value,"CurveName=\"([^\"]+)\"").Select(m=>m.Groups[1].Value).ToArray():
+                policy.GetProperty("evaluation").GetProperty("floatCurveNames").EnumerateArray().Select(n=>n.GetString()!).ToArray();
+            Require((montage||names.Length==policy.GetProperty("evaluation").GetProperty("floatCurveCount").GetInt32())&&names.All(n=>!string.IsNullOrWhiteSpace(n))&&
                 names.Distinct(StringComparer.OrdinalIgnoreCase).Count()==names.Length,"Invalid source curve layout.");
             var curves=new Dictionary<string,AlsCurveKey[]>(StringComparer.OrdinalIgnoreCase);
             foreach(var row in sequence.GetProperty("curves").EnumerateArray())
