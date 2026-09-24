@@ -124,11 +124,15 @@ public static class AlsMantlingPoseCompiler
     // Shared raw-key machinery for graph-owned sequences with no mantle motion/montage binding.
     internal static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileStandaloneSequences(string json,string[] expectedPaths)
         =>CompileInternal(json,null,expectedPaths);
+    // AAT_None never evaluates additive base settings. General original assets
+    // can retain those dormant editor values; do not rewrite their export.
+    internal static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileAbsoluteSequences(string json,string[] expectedPaths)
+        =>CompileInternal(json,null,expectedPaths,false,true);
     // Returns absolute raw targets, never additive deltas. The caller validates
     // and evaluates the declared additive base before composing a delta.
     internal static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileRawAdditiveTargets(string json,string[] expectedPaths)
         =>CompileInternal(json,null,expectedPaths,true);
-    private static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileInternal(string json,string? rootJson,string[]? expectedPaths,bool additiveTargets=false)
+    private static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileInternal(string json,string? rootJson,string[]? expectedPaths,bool additiveTargets=false,bool dormantAdditiveBase=false)
     {
         using var document=JsonDocument.Parse(json);using var rootsDocument=rootJson is null?null:JsonDocument.Parse(rootJson);
         var root=document.RootElement;var roots=rootsDocument?.RootElement??default;
@@ -198,8 +202,8 @@ public static class AlsMantlingPoseCompiler
                 Require(actualRoot.Length==expectedRoot.GetArrayLength()&&(actualRoot.Length==0||Same(actualRoot[0],expectedRoot[0])),
                     "Mantle full-pose root channels differ from motion source.");
             }
-            var nonAdditive=Text(policy,"additiveType")=="AAT_None"&&Text(policy,"basePoseType")=="ABPT_None"&&
-                policy.GetProperty("baseAsset").ValueKind==JsonValueKind.Null&&policy.GetProperty("baseFrame").GetInt32()==0;
+            var nonAdditive=Text(policy,"additiveType")=="AAT_None"&&(dormantAdditiveBase||Text(policy,"basePoseType")=="ABPT_None"&&
+                policy.GetProperty("baseAsset").ValueKind==JsonValueKind.Null&&policy.GetProperty("baseFrame").GetInt32()==0);
             var meshTarget=additiveTargets&&Text(policy,"additiveType")=="AAT_RotationOffsetMeshSpace"&&
                 Text(policy,"basePoseType")=="ABPT_AnimFrame"&&policy.GetProperty("baseAsset").ValueKind==JsonValueKind.String&&
                 policy.GetProperty("baseFrame").GetInt32()==0&&!policy.GetProperty("enableRootMotion").GetBoolean()&&

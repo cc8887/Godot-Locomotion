@@ -6,3 +6,4 @@ tests/Als.Core.Tests/Fixtures/P5A/*.json text eol=lf
 # Preserve each export's original bytes, including its line endings.
 assets/config/*.json -text
 assets/config/raw_sequences/*.json -text
+assets/config/refactored_animation_sources/*.json -text
