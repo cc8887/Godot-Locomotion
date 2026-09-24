@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Unmodified Refactored Camera AnimGraph; controlled input tags, no assets saved. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportCameraGraphTrace(const FString& RequestPath, const FString& OutputPath);
+
     /** Actual isolated native joint scene steps and effective global solver settings. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportPhysicsJointSolverReference(const FString& OutputPath);
