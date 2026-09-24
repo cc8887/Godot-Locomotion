@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新退出准备：`docs/verification/2026-09-24-ragdoll-recovery-candidate.md`。Core按本机UE骨盆FQuat4d/roll规则求朝上/朝下和恢复yaw，空中继承完整native速度；Simulation在已提交/完成物理边界生成按拟恢复mesh world重基的不可变NamedPoseSnapshot，携带激活/动画/物理步身份，不修改owner。Single30/Parallel120/故障暂停60各16检查过，Core2911/Import定向19/Optimize过。新回归揭示旧smoke FindBone大小写遗漏，改字典并加覆盖断言；过程失败日志保留。仅准备接口，尚未普通退出/物理释放/Get-up/快照淡出/输入恢复；G仍只进入。下一步补起身Montage/Notify资产配置，再实际退出事务及重复循环；全部旧目标保留，头颈/道具暂缓，main/用户P4保留。
+
 - 最新Ragdoll动作/手动入口：`docs/verification/2026-09-24-ragdoll-actions-and-input.md`。G请求在Main Lifecycle已提交边界创建owner，可打断Roll；纯值PhysicsDriven在下一Montage tick前执行原生0.2秒停止，保留已淡出、清root motion、逻辑InterruptedByRagdoll=13一次，新请求Busy且去重。Single30/Parallel120、首次切入失败+暂停60及实际渲染/普通Roll回归通过，最终Notify/Action归属归零；Core2904既定过滤、Import定向122、Optimize过。姿态测试修站姿尺寸假设/1.49e-8舍入误报，详情见文档。G尚不能起身，自动高落差/离地触发、退出Get-up/PoseRecovery及全部旧目标仍待接；用户要求头颈诊断和道具暂缓，相关未提交诊断保留；main/用户P4保留。
 
 - 最新物理显示：`docs/verification/2026-09-24-ragdoll-physical-display.md`。Main物理步→胶囊跟随→用实际Skeleton world逆变换回写物理骨骼，当前committed animation作非物理TRS基底，不重Seed/不污染precise Flail；空闲worker/身份/步数检查、写失败回滚。Single60/Parallel30/120及真实渲染60故障暂停通过，最大世界误差<1e-6m，四截图人工检查；两模型8姿态/192回写/56拒绝与普通Roll恢复回归过，Optimize过。首轮截图退出重复disconnect已修复，最终rendered60-final无ERROR。无全量/UE/旧矩阵/性能验收；道具物理attachment、动作中断/普通触发/退出Get-up/Pose Recovery及其余目标仍待接。main/用户P4保留。

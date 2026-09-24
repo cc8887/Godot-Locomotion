@@ -33,6 +33,8 @@ public partial class CharacterRagdollFlailSmoke : Node
     private int _ragdollInterrupts;
     private bool _entryFailure;
     private int _busyRejections;
+    private int _recoveryChecks;
+    private AlsRagdollRecoveryFrame? _previousRecovery;
     private Input.MouseModeEnum _mouse;
     private bool _accumulation;
 
@@ -172,6 +174,7 @@ public partial class CharacterRagdollFlailSmoke : Node
             Require(!_inject || _held == 1 && character.FailureDiagnosticCount == 1,
                 "Animation failure/retry coverage differs.");
             var samples = _samples; var steps = simulation.CompletedSteps;
+            VerifyRecovery(character, simulation);
             Require(_ragdollInterrupts == (_rollEntry ? 1 : 0), "Ragdoll action interruption was missing or duplicated.");
             Require(!_keyEntry || _busyRejections == 1, "Ragdoll accepted or duplicated a new action request.");
             Require(character.CommittedAnimation.ActionCount == 0 && character.CommittedAnimation.StateCount == 0,
@@ -181,7 +184,7 @@ public partial class CharacterRagdollFlailSmoke : Node
             Cleanup();
             Require(character.RagdollSimulation is null, "Character disposal retained physical owner.");
             _done = true;
-            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 pelvis_follow=true ground_cases=4 physical_display=true max_world_error_m={_maxWorldError:R} key_entry={_keyEntry} ragdoll_interrupts={_ragdollInterrupts}");
+            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 pelvis_follow=true ground_cases=4 physical_display=true max_world_error_m={_maxWorldError:R} key_entry={_keyEntry} ragdoll_interrupts={_ragdollInterrupts} recovery_checks={_recoveryChecks}");
             GetTree().Quit();
         }
         catch (Exception error) { Fail(error); }
@@ -193,17 +196,22 @@ public partial class CharacterRagdollFlailSmoke : Node
         var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString(
             "res://assets/config/v4_physics_asset_inputs.json"), mesh.ObjectPath);
         var skeleton = character.PhysicalDisplaySkeleton;
-        _bodyBones = definition.Bodies.Select(b => skeleton.FindBone(b.Bone)).ToArray();
+        var physicalNames = Enumerable.Range(0, skeleton.GetBoneCount())
+            .ToDictionary(i => skeleton.GetBoneName(i).ToString(), i => i, StringComparer.OrdinalIgnoreCase);
+        _bodyBones = definition.Bodies.Select(b => physicalNames.GetValueOrDefault(b.Bone, -1)).ToArray();
         _logicalBones = context.AnimationSet.Skeletons[context.Profile.SkeletonId].LogicalBones
-            .Select(b => skeleton.FindBone(b.Name)).ToArray();
+            .Select(b => physicalNames.GetValueOrDefault(b.Name, -1)).ToArray();
         Require(_bodyBones.All(b => b >= 0), "Physical display body mapping is incomplete.");
+        Require(_logicalBones.Count(b => b >= 0) == skeleton.GetBoneCount(), "Logical display mapping omitted physical bones.");
         _nonphysicalBones = Enumerable.Range(0, _logicalBones.Length)
             .Where(i => _logicalBones[i] >= 0 && !_bodyBones.Contains(_logicalBones[i])).ToArray();
+        Require(_nonphysicalBones.Length > 0, "Nonphysical display coverage is empty.");
         _animationPose = new AlsLocalPose[_logicalBones.Length]; _beforeDisplay = new AlsLocalPose[_logicalBones.Length];
         character.CopyCommittedAnimationPose(character.Diagnostics.Identity, _beforeDisplay);
     }
     private void VerifyDisplay(AlsP3Character character, AlsCharacterRagdollSimulation simulation)
     {
+        if (_samples > 0 && _samples % (_hz / 2) == 0) VerifyRecovery(character, simulation);
         var skeleton = character.PhysicalDisplaySkeleton;
         for (var body = 0; body < _bodyBones.Length; body++)
         {
@@ -226,6 +234,69 @@ public partial class CharacterRagdollFlailSmoke : Node
         if (character.Diagnostics.Identity.FrameId == _lastAnimation)
             Require(_animationPose.AsSpan().SequenceEqual(_beforeDisplay), "Physical display overwrote held committed animation.");
         _animationPose.AsSpan().CopyTo(_beforeDisplay);
+    }
+    private void VerifyRecovery(AlsP3Character character, AlsCharacterRagdollSimulation simulation)
+    {
+        var context = _demo!.RuntimeContext;
+        var layout = context.AnimationSet.Skeletons[context.Profile.SkeletonId];
+        var skeleton = character.PhysicalDisplaySkeleton;
+        var identity = character.Diagnostics.Identity;
+        var before = Enumerable.Range(0, simulation.Island.BodyCount).Select(simulation.Island.BodyAt).ToArray();
+        var steps = simulation.CompletedSteps; var limits = simulation.SpeedLimit;
+        var world = skeleton.GlobalTransform;
+        var previousAnimation = new AlsLocalPose[_logicalBones.Length];
+        character.CopyCommittedAnimationPose(identity, previousAnimation);
+        if (_previousRecovery is not null && _previousRecovery.CompletedSteps != steps)
+            Require(!simulation.IsRecoveryCurrent(_previousRecovery), "A later physics step did not retire the exit candidate.");
+        // Deliberately change both heading and position: a snapshot captured in
+        // the old component space would rotate/teleport every physical body.
+        var restored = new Transform3D(new Basis(Vector3.Up, 1.1f), new Vector3(.3f, .7f, -.4f)) * world;
+        foreach (var grounded in new[] { false, true })
+        {
+            var candidate = simulation.PrepareRecovery(identity, restored, grounded);
+            Require(simulation.IsRecoveryCurrent(candidate) && candidate.CompletedSteps == steps &&
+                candidate.Decision.PlayGetUp == grounded && candidate.SkeletonToWorld == restored,
+                "Recovery candidate lost its boundary or ground decision.");
+            Require(candidate.Decision.FallingVelocityCm == (grounded ? default : simulation.PelvisVelocity),
+                "Air recovery did not inherit all three native velocity components.");
+            var snapshot = candidate.Snapshot;
+            Require(snapshot.LocalPoses.Length == layout.PhysicalBones.Length &&
+                snapshot.BoneNames.SequenceEqual(layout.PhysicalBones.Select(b => b.Name).ToArray()), "Snapshot order differs from raw mesh.");
+            var locals = new AlsLocalPose[_logicalBones.Length];
+            var reader = new AlsNamedPoseSnapshotRuntime(snapshot.Name, snapshot.MeshName, identity.CharacterId, identity.SlotGeneration,
+                snapshot.BoneNames, layout.LogicalToPhysical, previousAnimation);
+            reader.Evaluate(identity, snapshot, locals, Span<AlsInertialCurve>.Empty);
+            var components = new Transform3D[locals.Length];
+            for (var i = 0; i < locals.Length; i++)
+            {
+                var local = AlsPhysicsBodySet.Local(locals[i]); var parent = layout.LogicalBones[i].ParentLogicalId;
+                Require(parent < i, $"Recovery layout is not parent-first at {i}, parent {parent}.");
+                components[i] = parent < 0 ? local : components[parent] * local;
+            }
+            for (var body = 0; body < _bodyBones.Length; body++)
+            {
+                var logical = Array.IndexOf(_logicalBones, _bodyBones[body]);
+                Require(logical >= 0, $"Recovery body {body} has no logical mapping (Godot bone {_bodyBones[body]}).");
+                var actual = restored * components[logical]; var expected = AlsCorePhysicsPose.ToWorld(before[body].Actor);
+                Require(actual.Origin.DistanceTo(expected.Origin) < .0001f && actual.Basis.IsEqualApprox(expected.Basis),
+                    $"Recovery rebase moved world body {body}.");
+            }
+            foreach (var logical in _nonphysicalBones)
+                Require(locals[logical] == previousAnimation[logical], "Recovery changed a nonphysical animation local.");
+            var saved = snapshot.LocalPoses.ToArray(); Array.Fill(locals, default);
+            Require(snapshot.LocalPoses.SequenceEqual(saved), "Snapshot retained mutable caller memory.");
+            _previousRecovery = candidate; _recoveryChecks++;
+        }
+        try { simulation.PrepareRecovery(new(identity.FrameId + 1, identity.CharacterId, identity.SlotGeneration), restored, true);
+            throw new Exception("Future animation identity was accepted."); }
+        catch (InvalidOperationException) { _recoveryChecks++; }
+        try { simulation.PrepareRecovery(identity, new Transform3D(new Basis(Vector3.Zero, Vector3.Zero, Vector3.Zero), Vector3.Zero), true);
+            throw new Exception("Singular recovery component was accepted."); }
+        catch (ArgumentException) { _recoveryChecks++; }
+        character.CopyCommittedAnimationPose(identity, _animationPose);
+        Require(previousAnimation.AsSpan().SequenceEqual(_animationPose) && skeleton.GlobalTransform == world &&
+            steps == simulation.CompletedSteps && limits == simulation.SpeedLimit, "Preparing recovery mutated its owners.");
+        for (var i = 0; i < before.Length; i++) Require(before[i] == simulation.Island.BodyAt(i), "Preparing recovery changed physics.");
     }
     public override void _Process(double delta)
     {
