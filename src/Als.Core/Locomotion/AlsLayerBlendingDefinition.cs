@@ -4,9 +4,11 @@ public enum AlsLayerPoseKind
 {
     Input, Root, SaveCache, UseCache, DynamicLocalAdditive, DynamicMeshAdditive,
     ApplyLocalAdditive, ApplyMeshAdditive, TwoWayBlend, Slot, LayeredBlend,
+    CurveAccumulate, CurveOverride, CurveReset,
 }
 
 public enum AlsLayerAlphaKind { Constant, Property, Curve }
+public enum AlsLayerPropertySchema { V4, Refactored }
 public enum AlsLayerCurveBlendMode { Override, BlendByWeight }
 public readonly record struct AlsLayerBranchFilter(string Bone, int Depth);
 public readonly record struct AlsLayerAlpha(AlsLayerAlphaKind Kind, double Value = 0, string Name = "");
@@ -16,7 +18,7 @@ public readonly record struct AlsLayerAlpha(AlsLayerAlphaKind Kind, double Value
 public sealed record AlsLayerPoseNode(int Index, string Name, AlsLayerPoseKind Kind,
     int[] Inputs, AlsLayerAlpha[] Alphas, string Label = "", bool MeshSpaceRotation = false,
     AlsLayerCurveBlendMode CurveBlendMode = AlsLayerCurveBlendMode.Override,
-    AlsLayerBranchFilter[][]? Filters = null);
+    AlsLayerBranchFilter[][]? Filters = null,string[]? ModifiedCurves=null,float[]? ModifiedValues=null);
 
 public sealed class AlsLayerBlendingDefinition
 {
@@ -26,13 +28,17 @@ public sealed class AlsLayerBlendingDefinition
     public int RootIndex { get; }
     public ReadOnlySpan<AlsLayerPoseNode> Nodes => _nodes;
     public AlsPoseCacheDefinition Caches { get; }
+    public AlsLayerPropertySchema PropertySchema { get; }
 
     public AlsLayerBlendingDefinition(string source, int compiledPropertyCount, int rootIndex,
-        IEnumerable<AlsLayerPoseNode> nodes, int[] cacheUpdateOrder)
+        IEnumerable<AlsLayerPoseNode> nodes, int[] cacheUpdateOrder, AlsLayerPropertySchema propertySchema=AlsLayerPropertySchema.V4)
     {
         ArgumentException.ThrowIfNullOrEmpty(source);
+        if(!Enum.IsDefined(propertySchema))throw new ArgumentException("Unknown layering property schema.");
+        PropertySchema=propertySchema;
         _nodes = nodes.Select(n => n with { Inputs = (int[])n.Inputs.Clone(), Alphas = (AlsLayerAlpha[])n.Alphas.Clone(),
-            Filters = n.Filters?.Select(f => (AlsLayerBranchFilter[])f.Clone()).ToArray() }).ToArray();
+            Filters = n.Filters?.Select(f => (AlsLayerBranchFilter[])f.Clone()).ToArray(),
+            ModifiedCurves=n.ModifiedCurves?.ToArray(),ModifiedValues=n.ModifiedValues?.ToArray() }).ToArray();
         _byIndex = _nodes.ToDictionary(n => n.Index);
         if (_nodes.Length == 0 || _nodes.Any(n => n.Index < 0 || n.Index >= compiledPropertyCount ||
                 n.Inputs.Any(i => !_byIndex.ContainsKey(i))) ||
@@ -46,7 +52,8 @@ public sealed class AlsLayerBlendingDefinition
             {
                 AlsLayerPoseKind.Input => 0,
                 AlsLayerPoseKind.DynamicLocalAdditive or AlsLayerPoseKind.DynamicMeshAdditive or
-                    AlsLayerPoseKind.ApplyLocalAdditive or AlsLayerPoseKind.ApplyMeshAdditive or AlsLayerPoseKind.TwoWayBlend => 2,
+                    AlsLayerPoseKind.ApplyLocalAdditive or AlsLayerPoseKind.ApplyMeshAdditive or AlsLayerPoseKind.TwoWayBlend or
+                    AlsLayerPoseKind.CurveAccumulate or AlsLayerPoseKind.CurveOverride => 2,
                 AlsLayerPoseKind.LayeredBlend => (node.Filters?.Length ?? 0) + 1,
                 _ => 1,
             };
@@ -57,10 +64,19 @@ public sealed class AlsLayerBlendingDefinition
                 _ => 0,
             };
             if (node.Inputs.Length != expectedInputs || node.Alphas.Length != expectedAlphas ||
+                !Enum.IsDefined(node.Kind)||
                 node.Kind == AlsLayerPoseKind.UseCache && _byIndex[node.Inputs[0]].Kind != AlsLayerPoseKind.SaveCache ||
                 node.Kind == AlsLayerPoseKind.LayeredBlend && (node.Filters is null || node.Filters.Length == 0) ||
                 node.Alphas.Any(a => !double.IsFinite(a.Value) || (uint)a.Kind > 2 || a.Kind != AlsLayerAlphaKind.Constant && string.IsNullOrEmpty(a.Name)))
                 throw new ArgumentException("Invalid LayerBlending node inputs or alpha bindings.");
+            if(node.Kind==AlsLayerPoseKind.CurveReset)
+            {
+                if(node.ModifiedCurves is null||node.ModifiedValues is null||node.ModifiedCurves.Length==0||
+                    node.ModifiedCurves.Length!=node.ModifiedValues.Length||node.ModifiedCurves.Any(string.IsNullOrWhiteSpace)||
+                    node.ModifiedCurves.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=node.ModifiedCurves.Length||node.ModifiedValues.Any(v=>!float.IsFinite(v)))
+                    throw new ArgumentException("Incomplete authored curve reset.");
+            }
+            else if(node.ModifiedCurves is not null||node.ModifiedValues is not null)throw new ArgumentException("Curve reset belongs to another node kind.");
         }
         // Include cache read -> write edges when rejecting cycles.
         var visiting = new HashSet<int>(); var visited = new HashSet<int>();
