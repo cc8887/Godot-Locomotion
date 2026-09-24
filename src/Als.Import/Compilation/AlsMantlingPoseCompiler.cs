@@ -23,6 +23,8 @@ public sealed class AlsMantlingPoseSource
     public string SkeletonPath { get; }
     public string AnimationInputsDigest { get; }
     public ReadOnlySpan<string> BoneNames => _names;
+    public ReadOnlySpan<int> Parents => _parents;
+    public ReadOnlySpan<AlsPrecisePose> ReferencePose => _target;
 
     internal AlsMantlingPoseSource(AlsRawAnimationPoseData data,string skeleton,string[] names,int[] parents,
         AlsLogicalVirtualBone[] virtuals,AlsPrecisePose[] target,AlsPrecisePose[] source,int[] modes,
