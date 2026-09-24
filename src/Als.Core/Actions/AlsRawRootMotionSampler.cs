@@ -20,13 +20,15 @@ public sealed class AlsRawRootMotionSampler
     }
     public AlsPrecisePose Extract(double start, double end)
     {
-        var first = SampleRoot(start); var last = SampleRoot(end);
+        var first = SampleAbsolute(start); var last = SampleAbsolute(end);
         if (_normalizeScale) { first = first with { Scale = AlsDoubleVector.One }; last = last with { Scale = AlsDoubleVector.One }; }
         first = AlsPrecisePose.Compose(_rootToComponent, first); last = AlsPrecisePose.Compose(_rootToComponent, last);
         // FRootMotionMovementParams resets motion scale to one when accumulating.
         return AlsPrecisePose.Relative(last, first) with { Scale = AlsDoubleVector.One };
     }
-    private AlsPrecisePose SampleRoot(double seconds)
+    // Absolute source root transform for ALS mantle warping. Unlike Extract,
+    // this preserves authored scale and does not remove the reference/start pose.
+    public AlsPrecisePose SampleAbsolute(double seconds)
     {
         var keys = AlsRawSequencePoseSampler.SelectKeys(_data, seconds);
         if (!_data.LogicalTrackPresence[0]) return _reference;
