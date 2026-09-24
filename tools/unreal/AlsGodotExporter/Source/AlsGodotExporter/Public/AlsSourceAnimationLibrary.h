@@ -7,6 +7,7 @@ class UAnimSequence;
 class UAnimSequenceBase;
 class USkeleton;
 class UBlendSpace;
+class UAnimationAsset;
 
 /** Read-only source metadata and explicitly raw, non-additive pose evaluation. */
 UCLASS()
@@ -14,6 +15,9 @@ class ALSGODOTEXPORTER_API UAlsSourceAnimationLibrary final : public UBlueprintF
 {
     GENERATED_BODY()
 public:
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadSourceSyncMetadata(UAnimationAsset* Animation);
+
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadSourceFloatCurves(UAnimSequenceBase* Animation);
 
