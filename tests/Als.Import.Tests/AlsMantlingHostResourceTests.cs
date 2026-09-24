@@ -25,6 +25,8 @@ internal static class MantlingHostFixture
     internal static AlsMantlingHostResources Bind(AlsMantlingMontageProfile profile)
     {var host=Load();return new(profile,host.Set,host.Actions,host.Turns,host.Sequences);}
     internal static AlsMontageNotifyBinding Notifies()
+        =>EventBindings().Notifies;
+    internal static (AlsP5CoreRuntimeBindingSnapshot Core,AlsMontageNotifyBinding Notifies) EventBindings()
     {
         var host=Load();var set=host.Set;
         var locomotion=AlsLocomotionProfileCompiler.Compile(Read("p4_cycle_locomotion_profile"),set);
@@ -34,7 +36,7 @@ internal static class MantlingHostFixture
         var inventory=AlsP5SourceInventoryCompiler.Compile(Read("v4_anim_graph_inventory"),set,sources);
         var layout=AlsP5OccurrenceLayoutCompiler.CompileSourceAware(locomotion,pose,actions,sources,inventory);
         var binding=AlsP5CoreRuntimeBindingCompiler.CompileSourceAware(set,locomotion,pose,actions,layout,sources,inventory);
-        return AlsMontageNotifyCompiler.Compile(Read("v4_recovery_action_notify_inputs"),Read("v4_turn_notify_inputs"),set,sources,binding,host.Turns,host.Actions);
+        return(binding,AlsMontageNotifyCompiler.Compile(Read("v4_recovery_action_notify_inputs"),Read("v4_turn_notify_inputs"),set,sources,binding,host.Turns,host.Actions));
     }
 }
 

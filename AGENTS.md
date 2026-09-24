@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Mantle typed events：`docs/verification/2026-09-25-mantle-typed-events.md`。HostNotifyResources 按event/action/animation/handle与phase/payload解析最终脚步配置，不产生效果，消费仍须在帧提交后。真实P5 proxy source binding+Roll/Mantle，3Hz×4场景×6动作共25200帧且每帧discard重试，事件/RNG/allocator/bank一致，普通18脚步、替换新epoch/隐藏/Ragdoll/清空通过；另源sequence与Mantle同proxy通过。新增13/Import定向127/Optimize0/0。初次新测试ref struct lambda/enum编译错修；无新UE/Core全量/Godot/原生完整图。普通Demo未接Mantle，下一步实际图/曲线控制消费和宿主资源接入→探测/motion生命周期；所有旧缺口与用户修改/暂缓项保留。
+
 - 最新 Mantle Montage 曲线：`docs/verification/2026-09-25-mantle-montage-curves.md`。发现此前仅含 sequence 两曲线，补六 Montage 自有62曲线原始键/原生求值，CompileMontages闭包验证，HostPose按action身份覆盖自有曲线再Slot混合；必须显式传montageCurves，旧省略接口仍sequence-only，普通宿主未来不可省略。实际ClipStart0/ClipRate1，其他映射拒绝。726时刻7502值最大1.1920929e-7；6×240Slot/非法拒绝，Import114/Optimize0/0。首轮名字重复修限定model CurveData。UE整Editor审计fingerprint7AE5DC05C3174F83E4519A0610CB08CAFEF05B06884EB2B33766F58F4DDC282A，冷0/0、普通35136实际exit0字节同，两旧Condition保留；DV0/3旧warn。无新Godot/全图/打包验收；Layer*/ViewBlock消费与图/通知/探测/motion尚待接通，全部旧缺口/用户修改/暂缓项保留。
 
 - 最新 Mantle 宿主姿态：`docs/verification/2026-09-25-mantle-host-pose.md`。AlsMantlingHostPoseProfile 保留原生实体骨键/retarget/root lock，按宿主定义逐键生成 11 VB 后插值，最终 double 转 FBX 米，显式映射两条原生曲线且保留 absence。修正 source/modes 物理索引与 logical mapping。366 姿态/24888 实体骨逐值同、957 VB 公式检查、4 owner 并行、6×240 帧共享 Slot 生命周期通过；Import 定向110/Optimize0/0，旧 Godot 姿态场景186/12648/24过。新适配器未做普通图/渲染验收、无新 UE oracle/Core全量；接下来 host 曲线/图/typed dispatch、探测及 motion 生命周期。普通 Demo 未接 Mantle，所有旧缺口和用户修改/暂缓项保留。
