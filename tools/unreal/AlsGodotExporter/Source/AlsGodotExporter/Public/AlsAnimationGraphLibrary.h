@@ -97,6 +97,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportOverlayStateTrace(const FString& RequestPath, const FString& OutputPath);
 
+    /** Actual mantling root motion source on transient characters; never saves assets. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportMantlingRootMotionTrace(const FString& OutputPath);
+
     /** Original complete V4 AnimGraph, controlled properties; no Character/UpdateGraph simulation. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportFullGraphTrace(const FString& RequestPath, const FString& OutputPath);

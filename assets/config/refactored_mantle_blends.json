@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "montages": [
+    {
+      "path": "/ALS/ALS/Animations/Actions/Mantle/AM_Als_Mantle_High.AM_Als_Mantle_High",
+      "time": 0.20000000298023224,
+      "option": "HERMITE_CUBIC"
+    },
+    {
+      "path": "/ALS/ALS/Animations/Actions/Mantle/AM_Als_Mantle_Low.AM_Als_Mantle_Low",
+      "time": 0.20000000298023224,
+      "option": "HERMITE_CUBIC"
+    },
+    {
+      "path": "/ALS/ALS/Animations/Actions/Mantle/AM_Als_Mantle_Low_BothArms.AM_Als_Mantle_Low_BothArms",
+      "time": 0.20000000298023224,
+      "option": "HERMITE_CUBIC"
+    },
+    {
+      "path": "/ALS/ALS/Animations/Actions/Mantle/AM_Als_Mantle_Low_Box.AM_Als_Mantle_Low_Box",
+      "time": 0.20000000298023224,
+      "option": "HERMITE_CUBIC"
+    },
+    {
+      "path": "/ALS/ALS/Animations/Actions/Mantle/AM_Als_Mantle_Low_Left.AM_Als_Mantle_Low_Left",
+      "time": 0.20000000298023224,
+      "option": "HERMITE_CUBIC"
+    },
+    {
+      "path": "/ALS/ALS/Animations/Actions/Mantle/AM_Als_Mantle_Low_Right.AM_Als_Mantle_Low_Right",
+      "time": 0.20000000298023224,
+      "option": "HERMITE_CUBIC"
+    }
+  ]
+}
