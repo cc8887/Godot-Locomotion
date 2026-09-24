@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新武器连续更新：`docs/verification/2026-09-25-refactored-weapon-runtime.md`。独立machine构造+显式Refactored规则域复用共享执行器，原四武器profile/PrepareCommitCancel、entry/update/stack/local-notify候选；校验无state/machine callback。UE源码确认首帧skip/通知抑制、先rule再blend再time、重入/relevance及Custom clamp。新10通过，四武器×3Hz共3600压力帧逐帧discard重试/79骨贡献；Import129/CoreStack15/Optimize0/0，无编译测试失败。无新UE连续oracle/导出/UE或Godot启动/全量/性能。通知未绑定消费、Sequence未tick、pose未接，整图仍9/13；下一步实际连续native/通知→state源及姿态，普通Demo未切、Ragdoll未整体验收、全部旧缺口/用户文件/暂缓项保留。
+
 - 最新武器条件：`docs/verification/2026-09-25-refactored-weapon-rules.md`。四原图按完整outer路径提取，编译实际六边/pin/父属性/精确tag/机器clock；原生为elapsed>=3且TransitionsAllowed或Moving，非V4的严格大于/curve比较。独立Core规则保留Ready出口2,3,4,5。新11/相关Import91通过，2880输入17280判断含float边界/子tag/门控，Optimize0/0，无失败。无新UE oracle/导出/启动/Godot/全量/性能；只条件，不含连续tick/通知消费/四武器pose，整图仍9/13。下一步状态机连续执行/通知及pose对照、所有旧缺口；普通Demo未切、Ragdoll未整体验收、用户文件/暂缓项保留。
 
 - 最新武器状态资源：`docs/verification/2026-09-25-refactored-weapon-machine-resources.md`。新四武器baked状态/六过渡出口顺序/root-rule-player身份、通知局部索引、两全精度Aim曲线和QuickFeet18entry资源，绑定原catalog并交叉authored/compiled。原Ready→Relaxed三边不可合并，弓AimIn .5/退回.4，其余.2；只资源，尚未规则/运行时/通知消费，整图仍9/13。新11/相关Import85/Optimize0/0，1608curve/2376profile对比max1.193e-7/5.961e-8预算2e-6，无新失败。UE完整0actions审计仍7B77EF...冷/普通41000实际0字节同7A1C489...，普通两旧Condition五类warn保留；无C++变化/DV/Godot/全量/性能/打包。下一步原transition条件/通知→状态机连续tick/pose及全部旧缺口；普通Demo未切、Ragdoll未整体验收、用户文件/暂缓项保留。
