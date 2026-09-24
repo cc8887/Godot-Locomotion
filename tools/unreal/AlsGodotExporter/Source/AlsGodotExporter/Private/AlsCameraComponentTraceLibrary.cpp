@@ -46,6 +46,8 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
 {
     if (FPaths::IsRelative(OutputPath)) return false;
     const bool bMovingBase = FPlatformMisc::GetEnvironmentVariable(TEXT("ALS_CAMERA_COMPONENT_BASE")) == TEXT("1");
+    const bool bCollision = FPlatformMisc::GetEnvironmentVariable(TEXT("ALS_CAMERA_COMPONENT_COLLISION")) == TEXT("1");
+    if (bMovingBase && bCollision) return false;
     auto* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
     auto* CharacterClass = LoadClass<AAlsCharacter>(nullptr, TEXT("/ALS/ALS/Character/B_Als_Character.B_Als_Character_C"));
     auto* CameraClass = LoadClass<UAlsCameraComponent>(nullptr, TEXT("/ALS/ALSCamera/B_Als_CameraComponent.B_Als_CameraComponent_C"));
@@ -62,9 +64,18 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
         auto* Character = World->SpawnActor<AAlsCharacter>(CharacterClass, FVector(0,0,100000), FRotator::ZeroRotator, Spawn);
         if (!Character) return false;
         ON_SCOPE_EXIT { World->DestroyActor(Character); };
-        AActor* BaseOwner = bMovingBase ? World->SpawnActor<AActor>(Spawn) : nullptr;
+        AActor* BaseOwner = bMovingBase || bCollision ? World->SpawnActor<AActor>(Spawn) : nullptr;
         ON_SCOPE_EXIT { if (BaseOwner) World->DestroyActor(BaseOwner); };
         UBoxComponent* Bases[2] = {nullptr,nullptr};
+        UBoxComponent* Wall = nullptr;
+        if (bCollision)
+        {
+            if (!BaseOwner) return false;
+            Wall = NewObject<UBoxComponent>(BaseOwner, NAME_None, RF_Transient);
+            Wall->SetMobility(EComponentMobility::Movable);
+            Wall->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+            Wall->SetCollisionResponseToAllChannels(ECR_Block); Wall->RegisterComponent();
+        }
         if (bMovingBase)
         {
             if (!BaseOwner) return false;
@@ -120,6 +131,13 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
             Character->SetViewMode(FGameplayTag::RequestGameplayTag(FName(T >= 1 && T < 2 ? TEXT("Als.ViewMode.FirstPerson") : TEXT("Als.ViewMode.ThirdPerson"))));
             Camera->SetRightShoulder(T < 2.5);
             Camera->SetFieldOfViewOverriden(T >= 2.5 && T < 3.5); Camera->SetFieldOfViewOverride(105);
+            if (bCollision)
+            {
+                Character->SetActorLocationAndRotation(FVector(0,0,100000),FRotator::ZeroRotator);
+                ViewProperty->ContainerPtrToValuePtr<FAlsViewState>(Character)->Rotation = FRotator::ZeroRotator;
+                Character->SetViewMode(FGameplayTag::RequestGameplayTag(FName(TEXT("Als.ViewMode.ThirdPerson"))));
+                Camera->SetRightShoulder(true); Camera->SetFieldOfViewOverriden(false);
+            }
             Mesh->UpdateComponentToWorld(); Mesh->RefreshBoneTransforms();
             auto Input = MakeShared<FJsonObject>(); Input->SetNumberField(TEXT("delta"), Delta);
             Rotation(Input,TEXT("view"),Character->GetViewRotation());
@@ -131,6 +149,28 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
             Input->SetNumberField(TEXT("meshScale"), Mesh->GetComponentScale().Z);
             Input->SetBoolField(TEXT("overrideFov"),Camera->IsFieldOfViewOverriden());
             Input->SetNumberField(TEXT("fovOverride"),Camera->GetFieldOfViewOverride());
+            if (bCollision)
+            {
+                const auto Shoulder = Camera->GetThirdPersonTraceStartLocation();
+                FVector WallLocation; FVector Extent;
+                if (T >= 2 && T < 3)
+                {
+                    // Inflated-sphere recovery towards the actor, then towards
+                    // the opposite side (native rejection). No copied MTD math.
+                    const double Toward = Character->GetActorLocation().Y >= Shoulder.Y ? 1 : -1;
+                    const double Normal = T < 2.5 ? Toward : -Toward;
+                    WallLocation = Shoulder - FVector(0,Normal*20,0); Extent = FVector(1000,10,1000);
+                }
+                else
+                {
+                    const double Distance = T < 1 || T >= 3 ? 600 : 150+60*FMath::Sin(T*6);
+                    WallLocation = Shoulder-FVector(Distance,0,0); Extent = FVector(10,1000,1000);
+                }
+                Wall->SetBoxExtent(Extent); Wall->SetWorldLocation(WallLocation);
+                Vector(Input,TEXT("wallLocation"),Wall->GetComponentLocation());
+                Vector(Input,TEXT("wallExtent"),Wall->GetUnscaledBoxExtent());
+                Vector(Input,TEXT("ownerLocation"),Character->GetActorLocation());
+            }
             if (bMovingBase)
             {
                 const auto& Based = Character->GetBasedMovement();
@@ -164,6 +204,7 @@ bool UAlsAnimationGraphLibrary::ExportCameraComponentTrace(const FString& Output
     }
     auto Result = MakeShared<FJsonObject>(); Result->SetNumberField(TEXT("schemaVersion"),1);
     Result->SetStringField(TEXT("scope"),bMovingBase ? TEXT("Actual camera component; controlled moving/tilted bases, switch during first-person and leave; reference-pose character; no collision; observed native curves.") : TEXT("Actual UAlsCameraComponent::TickComponent; reference-pose character; controlled actor/view; clear scene, no movement base; observed native curves."));
+    if (bCollision) Result->SetStringField(TEXT("scope"),TEXT("Actual camera component and native box queries; clear, swept wall, towards/away initial penetration, release; reference pose and observed curves; no base."));
     Result->SetArrayField(TEXT("traces"),Traces);
     FString Json;
     if (!FJsonSerializer::Serialize(Result,TJsonWriterFactory<TCHAR,TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json)) ||
