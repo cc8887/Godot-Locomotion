@@ -7,6 +7,7 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimNode_SequencePlayer.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
+#include "Nodes/AlsAnimNode_GameplayTagsBlend.h"
 #include "Animation/Skeleton.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -36,6 +37,15 @@ struct FOverlayBlendAccess : FAnimNode_TwoWayBlend
 {
     static float Alpha(const FAnimNode_TwoWayBlend& Node){return Node.*&FOverlayBlendAccess::InternalBlendAlpha;}
 };
+struct FOverlayActionBlendAccess : FAlsAnimNode_GameplayTagsBlend
+{
+    static TArray<TSharedPtr<FJsonValue>> Weights(const FAlsAnimNode_GameplayTagsBlend& Node)
+    {
+        TArray<TSharedPtr<FJsonValue>> Result;
+        for(const auto& Child:Node.*&FOverlayActionBlendAccess::PerBlendData)Result.Add(MakeShared<FJsonValueNumber>(Child.Weight));
+        return Result;
+    }
+};
 bool SetState(UObject* Object,const TCHAR* StructName,const TSharedPtr<FJsonObject>& Values)
 {
     auto* Struct=FindFProperty<FStructProperty>(Object->GetClass(),StructName);if(!Struct)return false;
@@ -63,7 +73,11 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
     if(FPaths::IsRelative(RequestPath)||FPaths::IsRelative(OutputPath)||RequestPath==OutputPath)return false;
     FString Text;TSharedPtr<FJsonObject> Request;
     if(!FFileHelper::LoadFileToString(Text,*RequestPath)||!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Request))return false;
-    auto* Blueprint=LoadObject<UAnimBlueprint>(nullptr,TEXT("/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_Default.AB_Als_Default"));
+    FString Kind=TEXT("Default");Request->TryGetStringField(TEXT("overlay"),Kind);
+    if(Kind!=TEXT("Default")&&Kind!=TEXT("Box"))return false;
+    const bool Box=Kind==TEXT("Box");
+    const FString BlueprintPath=FString::Printf(TEXT("/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_%s.AB_Als_%s"),*Kind,*Kind);
+    auto* Blueprint=LoadObject<UAnimBlueprint>(nullptr,*BlueprintPath);
     auto* Generated=Blueprint?Cast<UAnimBlueprintGeneratedClass>(Blueprint->GeneratedClass):nullptr;
     auto* CharacterClass=LoadClass<AAlsCharacter>(nullptr,TEXT("/ALS/ALS/Character/B_Als_Character.B_Als_Character_C"));
     auto* Defaults=CharacterClass?Cast<AAlsCharacter>(CharacterClass->GetDefaultObject()):nullptr;
@@ -92,9 +106,12 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
         Initialize();
         auto& Proxy=FOverlayInstanceAccess::Proxy(Instance.Get());
         const auto& Properties=Generated->GetAnimNodeProperties();
-        if(Properties.Num()!=14||Properties[4]->Struct!=FAnimNode_TwoWayBlend::StaticStruct()||Properties[11]->Struct!=FAnimNode_SequencePlayer::StaticStruct())return false;
-        auto* Prediction=Properties[4]->ContainerPtrToValuePtr<FAnimNode_TwoWayBlend>(Instance.Get());
-        auto* Idle=Properties[11]->ContainerPtrToValuePtr<FAnimNode_SequencePlayer>(Instance.Get());
+        const int32 IdleIndex=Box?9:11;
+        if(Properties.Num()!=(Box?17:14)||Properties[IdleIndex]->Struct!=FAnimNode_SequencePlayer::StaticStruct())return false;
+        if(Box?Properties[13]->Struct!=FAlsAnimNode_GameplayTagsBlend::StaticStruct():Properties[4]->Struct!=FAnimNode_TwoWayBlend::StaticStruct())return false;
+        auto* Prediction=Box?nullptr:Properties[4]->ContainerPtrToValuePtr<FAnimNode_TwoWayBlend>(Instance.Get());
+        auto* Actions=Box?Properties[13]->ContainerPtrToValuePtr<FAlsAnimNode_GameplayTagsBlend>(Instance.Get()):nullptr;
+        auto* Idle=Properties[IdleIndex]->ContainerPtrToValuePtr<FAnimNode_SequencePlayer>(Instance.Get());
         TArray<TSharedPtr<FJsonValue>> Frames;
         for(const auto& FrameValue:TraceValue->AsObject()->GetArrayField(TEXT("frames")))
         {
@@ -104,6 +121,13 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             if(Frame->GetBoolField(TEXT("reset")))Initialize();
             if(!SetState(Parent.Get(),TEXT("PoseState"),Frame->GetObjectField(TEXT("poseState")))||
                 !SetState(Parent.Get(),TEXT("InAirState"),Frame->GetObjectField(TEXT("inAirState"))))return false;
+            if(Box)
+            {
+                auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("LocomotionAction"));
+                if(!Property||Property->Struct!=FGameplayTag::StaticStruct())return false;
+                const auto Tag=Frame->GetStringField(TEXT("action"));
+                *Property->ContainerPtrToValuePtr<FGameplayTag>(Parent.Get())=Tag.IsEmpty()?FGameplayTag():FGameplayTag::RequestGameplayTag(FName(*Tag),false);
+            }
             FOverlayProxyAccess::Pre(Proxy,Instance.Get(),Delta);
             FOverlayProxyAccess::UpdateRoot(Proxy);Proxy.FlipBufferWriteIndex();FOverlayProxyAccess::Post(Proxy,Instance.Get());
             FPoseContext Pose(&Proxy,true);FBlendedHeapCurve Curve;UE::Anim::FHeapAttributeContainer Attributes;
@@ -111,7 +135,8 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             TArray<TSharedPtr<FJsonValue>> Atoms;for(auto Bone:Pose.Pose.ForEachBoneIndex())Atoms.Add(MakeShared<FJsonValueObject>(DefaultOverlayTransformJson(Pose.Pose[Bone])));
             const auto Curves=MakeShared<FJsonObject>();Curve.ForEachElement([&](const auto& C){Curves->SetNumberField(C.Name.ToString(),C.Value);});
             const auto Row=MakeShared<FJsonObject>();Row->SetObjectField(TEXT("input"),Frame);Row->SetArrayField(TEXT("pose"),Atoms);Row->SetObjectField(TEXT("curves"),Curves);
-            Row->SetNumberField(TEXT("predictionAlpha"),FOverlayBlendAccess::Alpha(*Prediction));
+            if(Prediction)Row->SetNumberField(TEXT("predictionAlpha"),FOverlayBlendAccess::Alpha(*Prediction));
+            if(Actions)Row->SetArrayField(TEXT("actionWeights"),FOverlayActionBlendAccess::Weights(*Actions));
             Row->SetNumberField(TEXT("idleTime"),Idle->GetAccumulatedTime());Row->SetNumberField(TEXT("idleWeight"),Idle->GetCachedBlendWeight());
             Frames.Add(MakeShared<FJsonValueObject>(Row));++Total;
         }

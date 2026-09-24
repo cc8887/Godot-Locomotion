@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Box Overlay：`docs/verification/2026-09-25-refactored-box-overlay.md`。实际17节点图+精确动作tag四通道标准线性BlendList，0.5/.2/0/.2时长，Mantle/Getup/Roll固定帧与曲线；共享Idle有效/零权重更新、隐藏重置pending、候选回滚/帧门禁。补原生单满权重透传与双pose快速路径。3Hz840帧66360骨 maxP4.793e-14cm/Q4.441e-16，scale/curve/动作weights/有效时钟差0；306隐藏帧、3零权重更新，原始未覆盖零更新的序列已补并留档。新6/Import23/Optimize0/0；UE4actions审计EC038D...，冷/普通35136实际exit0字节同1D6379...，旧Default重导字节同B385B2，DV0/3旧warn、普通两旧Condition五类warn。无Godot/全量/性能/打包；仅Default+Box有实际整图连续证据，其余11 Overlay与移动状态机/宿主及全部旧缺口仍待做。普通Demo未切，Ragdoll未整体验收、保留用户修改/暂缓项。
+
 - 最新 Default Overlay 原生：`docs/verification/2026-09-25-refactored-default-overlay-native.md`。实际主 Root→LinkedLayer→Overlay 原图 3Hz/630帧/49770骨；首次预算内通过仍定位 TwoWayBlend 两次 float 补数差异，修正本图 pose/curve（未改通用 helper）。最终 maxP9.507e-14cm/Q4.441e-16，scale/curve/预测/Idle 时钟权重差0；收紧 P1e-10/Q及S1e-12 后原生3通过，相关Import17、Optimize0/0。UE首次 Unity helper重名编译失败修正，完整4actions审计 D086CE...；冷/普通42428实际exit0字节同 B385B2...，DV0/3旧warn，普通两旧Condition五类warn保留。无Godot场景/全量/性能/打包；普通Demo未切。下一步其余Overlay与实际移动状态机回调、共享宿主/Notify/root-motion，再所有旧缺口；Ragdoll未整体验收、用户修改及暂缓项保留。
 
 - 最新 Default Overlay：`docs/verification/2026-09-25-refactored-default-overlay.md`。实际 AB_Als_Default 的 14 节点/原始连线/5 属性绑定校验，三固定帧（SamplingFrameRate 秒数）、归一化 stance/reference fallback、空中预测 20/5 插值及隐藏分支保持、0.75 Idle local additive 接共享 source-player。profile 冻结 native 79 骨/curve，runtime Prepare/Evaluate/Commit/Cancel；外部宿主须协调所有参与者提交。新 7 项含三 Hz 共 420 帧取消重试，相关 Import 14 通过、Optimize 0/0；初解析/字段/Alpha 引脚覆盖失败修正，失败 TRX 保留。无新增 UE 整图 golden、UE/Godot 启动、全量/性能；普通 Demo 未切。下一步原生 Default 整图连续对照、其余 Overlay/Locomotion 状态回调与统一宿主，再所有旧缺口；Ragdoll/Flail/Get-up 尚未整体验收，保留用户文件/暂缓项。
