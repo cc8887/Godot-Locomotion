@@ -28,6 +28,8 @@ public partial class AlsNativeCameraHost : Node
     internal long QueryFailures { get; private set; }
     internal int ConsecutiveQueryFailures { get; private set; }
     internal long Frames { get; private set; }
+    internal float LastCommittedDelta { get; private set; }
+    internal float RotationLag => _runtime?.Curves.GetValueOrDefault("RotationLag") ?? 0;
     internal AlsCameraFollowState State => _runtime?.State ?? AlsCameraFollowState.Initial;
     internal void Configure(P4LocomotionDemo demo, uint mask)
     {
@@ -88,7 +90,12 @@ public partial class AlsNativeCameraHost : Node
                 ? GodotObject.InstanceFromId((ulong)input.Floor.ColliderId) as Node3D : null;
             var based = baseNode is not null && GodotObject.IsInstanceValid(baseNode) && baseNode.IsInsideTree();
             var basePose = based ? AlsSceneContactSet.FromWorld(baseNode!.GlobalTransform) : AlsPrecisePose.Identity;
-            var dt = (float)(_definition.IgnoreTimeDilation && Engine.TimeScale > 0 ? delta / Engine.TimeScale : delta);
+            // Godot samples scale once for the entire physics catch-up batch.
+            // Engine.TimeScale may already have changed during input/gameplay;
+            // dividing this callback's delta by it would over/under-step both
+            // graph transitions and lag. Our camera runs on the fixed physics
+            // clock. Like other ALS hosts, rate changes belong at idle boundaries.
+            var dt = (float)(_definition.IgnoreTimeDilation ? 1d / Engine.PhysicsTicksPerSecond : delta);
             var scene = new AlsCameraFollowInput(dt, true,
                 new(_demo.OrbitCamera.Pitch * (180 / System.Math.PI), -_demo.OrbitCamera.Yaw * (180 / System.Math.PI), 0),
                 sockets.FirstPivot, sockets.SecondPivot, sockets.FirstPerson, RightShoulder ? sockets.RightShoulder : sockets.LeftShoulder,
@@ -98,7 +105,7 @@ public partial class AlsNativeCameraHost : Node
                 q => _probe.Query(q, AlsCameraCollisionProbe.Native(motor.GlobalPosition), 1));
             var world = AlsGodotContactQuery.ToGodot(new(candidate.Location, AlsCameraMath.Quaternion(candidate.Rotation), AlsDoubleVector.One));
             _camera.GlobalTransform = world; _camera.Fov = candidate.Fov;
-            _runtime.Commit(); Frames++;
+            _runtime.Commit(); LastCommittedDelta = dt; Frames++;
             Failure = null; ConsecutiveQueryFailures = 0;
         }
         catch (AlsCameraQueryException e)
