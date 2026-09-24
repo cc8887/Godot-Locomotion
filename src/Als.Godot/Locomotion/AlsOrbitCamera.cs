@@ -29,6 +29,13 @@ public partial class AlsOrbitCamera : Node3D
             : null;
 
     public bool IsMouseCaptured { get; private set; }
+    internal void UseNativeOutput()
+    {
+        _springArm!.ProcessMode = ProcessModeEnum.Disabled;
+        var camera = GetNode<Camera3D>("SpringArm3D/Camera3D");
+        camera.TopLevel = true;
+        camera.KeepAspect = Camera3D.KeepAspectEnum.Width;
+    }
 
     public override void _Ready()
     {
