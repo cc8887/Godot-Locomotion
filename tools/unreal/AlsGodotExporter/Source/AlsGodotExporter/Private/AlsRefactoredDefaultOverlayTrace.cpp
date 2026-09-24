@@ -6,6 +6,7 @@
 #include "Animation/AnimBlueprintGeneratedClass.h"
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimNode_SequencePlayer.h"
+#include "Animation/AnimNode_SaveCachedPose.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
 #include "Nodes/AlsAnimNode_GameplayTagsBlend.h"
 #include "Animation/Skeleton.h"
@@ -74,8 +75,10 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
     FString Text;TSharedPtr<FJsonObject> Request;
     if(!FFileHelper::LoadFileToString(Text,*RequestPath)||!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Request))return false;
     FString Kind=TEXT("Default");Request->TryGetStringField(TEXT("overlay"),Kind);
-    if(Kind!=TEXT("Default")&&Kind!=TEXT("Box"))return false;
+    if(Kind!=TEXT("Default")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel"))return false;
     const bool Box=Kind==TEXT("Box");
+    const bool Hands=Kind==TEXT("HandsTied"),Injured=Kind==TEXT("Injured"),Barrel=Kind==TEXT("Barrel");
+    const bool Cached=Hands||Injured||Barrel,HasActions=Box||Cached;
     const FString BlueprintPath=FString::Printf(TEXT("/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_%s.AB_Als_%s"),*Kind,*Kind);
     auto* Blueprint=LoadObject<UAnimBlueprint>(nullptr,*BlueprintPath);
     auto* Generated=Blueprint?Cast<UAnimBlueprintGeneratedClass>(Blueprint->GeneratedClass):nullptr;
@@ -106,11 +109,17 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
         Initialize();
         auto& Proxy=FOverlayInstanceAccess::Proxy(Instance.Get());
         const auto& Properties=Generated->GetAnimNodeProperties();
-        const int32 IdleIndex=Box?9:11;
-        if(Properties.Num()!=(Box?17:14)||Properties[IdleIndex]->Struct!=FAnimNode_SequencePlayer::StaticStruct())return false;
-        if(Box?Properties[13]->Struct!=FAlsAnimNode_GameplayTagsBlend::StaticStruct():Properties[4]->Struct!=FAnimNode_TwoWayBlend::StaticStruct())return false;
-        auto* Prediction=Box?nullptr:Properties[4]->ContainerPtrToValuePtr<FAnimNode_TwoWayBlend>(Instance.Get());
-        auto* Actions=Box?Properties[13]->ContainerPtrToValuePtr<FAlsAnimNode_GameplayTagsBlend>(Instance.Get()):nullptr;
+        const int32 IdleIndex=Hands?19:Injured?13:Box||Barrel?9:11;
+        const int32 ActionIndex=Hands?2:Injured?14:Barrel?10:13;
+        const int32 PredictionIndex=Hands?11:Injured||!HasActions?4:INDEX_NONE;
+        const int32 CacheIndex=Hands?17:Injured?10:5;
+        if(Properties.Num()!=(Hands||Injured?22:Barrel?18:Box?17:14)||Properties[IdleIndex]->Struct!=FAnimNode_SequencePlayer::StaticStruct())return false;
+        if(HasActions&&Properties[ActionIndex]->Struct!=FAlsAnimNode_GameplayTagsBlend::StaticStruct())return false;
+        if(PredictionIndex!=INDEX_NONE&&Properties[PredictionIndex]->Struct!=FAnimNode_TwoWayBlend::StaticStruct())return false;
+        if(Cached&&Properties[CacheIndex]->Struct!=FAnimNode_SaveCachedPose::StaticStruct())return false;
+        auto* Prediction=PredictionIndex==INDEX_NONE?nullptr:Properties[PredictionIndex]->ContainerPtrToValuePtr<FAnimNode_TwoWayBlend>(Instance.Get());
+        auto* Actions=HasActions?Properties[ActionIndex]->ContainerPtrToValuePtr<FAlsAnimNode_GameplayTagsBlend>(Instance.Get()):nullptr;
+        auto* Cache=Cached?Properties[CacheIndex]->ContainerPtrToValuePtr<FAnimNode_SaveCachedPose>(Instance.Get()):nullptr;
         auto* Idle=Properties[IdleIndex]->ContainerPtrToValuePtr<FAnimNode_SequencePlayer>(Instance.Get());
         TArray<TSharedPtr<FJsonValue>> Frames;
         for(const auto& FrameValue:TraceValue->AsObject()->GetArrayField(TEXT("frames")))
@@ -121,7 +130,7 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             if(Frame->GetBoolField(TEXT("reset")))Initialize();
             if(!SetState(Parent.Get(),TEXT("PoseState"),Frame->GetObjectField(TEXT("poseState")))||
                 !SetState(Parent.Get(),TEXT("InAirState"),Frame->GetObjectField(TEXT("inAirState"))))return false;
-            if(Box)
+            if(HasActions)
             {
                 auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("LocomotionAction"));
                 if(!Property||Property->Struct!=FGameplayTag::StaticStruct())return false;
@@ -137,6 +146,7 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             const auto Row=MakeShared<FJsonObject>();Row->SetObjectField(TEXT("input"),Frame);Row->SetArrayField(TEXT("pose"),Atoms);Row->SetObjectField(TEXT("curves"),Curves);
             if(Prediction)Row->SetNumberField(TEXT("predictionAlpha"),FOverlayBlendAccess::Alpha(*Prediction));
             if(Actions)Row->SetArrayField(TEXT("actionWeights"),FOverlayActionBlendAccess::Weights(*Actions));
+            if(Cache)Row->SetNumberField(TEXT("cacheWeight"),Cache->GlobalWeight);
             Row->SetNumberField(TEXT("idleTime"),Idle->GetAccumulatedTime());Row->SetNumberField(TEXT("idleWeight"),Idle->GetCachedBlendWeight());
             Frames.Add(MakeShared<FJsonValueObject>(Row));++Total;
         }
