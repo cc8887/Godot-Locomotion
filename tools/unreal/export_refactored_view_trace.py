@@ -1,4 +1,5 @@
-"""Run original View/Spine and explicit Head callbacks; no asset saves."""
+"""Run original View/Spine; optional ALS_VIEW_HEAD_GRAPH=1 drives the actual
+linked Head graph instead of explicit callbacks. No asset saves."""
 import hashlib
 import json
 import math
@@ -30,6 +31,12 @@ for hz in (30, 60, 120):
         previous_update = update
     traces.append(dict(name=f"{hz}hz", frames=frames))
 request = dict(schemaVersion=1, inputsSha256=hashlib.sha256((root / "assets/config/refactored_head_inputs.json").read_bytes()).hexdigest(), traces=traces)
+if os.environ.get("ALS_VIEW_HEAD_GRAPH") == "1":
+    request["headGraph"] = True
+    request["resourceHashes"] = {
+        name: hashlib.sha256((root / f"assets/config/refactored_{name}.json").read_bytes()).hexdigest()
+        for name in ("layering_graphs", "layering_inventory", "base_pose_inputs")
+    }
 output.parent.mkdir(parents=True, exist_ok=True)
 request_path = output.with_suffix(".request.json")
 request_path.write_text(json.dumps(request, separators=(",", ":"), allow_nan=False) + "\n", encoding="utf-8", newline="\n")
