@@ -12,6 +12,7 @@ public readonly record struct AlsMontageSlot(int Id)
 {
     public static AlsMontageSlot BaseLayer => new(2);
     public static AlsMontageSlot Grounded => new(3);
+    public static AlsMontageSlot PostLocomotion => new(4);
     public static implicit operator AlsMontageSlot(AlsTurnSlot slot) => new((int)slot);
 }
 
@@ -118,7 +119,7 @@ public sealed class AlsMontageRuntime
         _sequences = new();
         foreach (var asset in sequences)
         {
-            if (asset.AnimationId < 0 || asset.Slot.Id is < 0 or > 3 || asset.GroupId < 0 ||
+            if (asset.AnimationId < 0 || asset.Slot.Id is < 0 or > 4 || asset.GroupId < 0 ||
                 !float.IsFinite(asset.Duration) || asset.Duration <= .00005f || (uint)asset.AdditiveType > 2 ||
                 asset.Slot.Id < 2 && _assets.ContainsKey((asset.AnimationId, (AlsTurnSlot)asset.Slot.Id)) ||
                 !_sequences.TryAdd((asset.AnimationId, asset.Slot), asset))
