@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Camera碰撞：`docs/verification/2026-09-24-camera-collision.md`。Main query-only球扫/零运动起点穿透、按shape去重接触深度+1cm×scale膨胀恢复、拒绝背离owner、复查及保留调整起点、明确Godotmask/可更新自身RID排除/容量拒绝。三Hz实际Jolt各13静态几何/边界检查通过，Optimize过，日志camera-collision-final-*；Godot接触投影不是Chaos MTD，未证复杂凹面/深包围/连续移动或视觉等价。无Core/Import/UE新验证，普通Demo仍未接；下一步socket/真实base胶囊/查询/CameraRuntime在完成姿态后的Main输出，control yaw独立。旧静态9/12、Flail0/3、Mantle/完整Camera/性能继续，头颈/道具暂缓，用户文件保留。
+
 - 最新Camera插槽：`docs/verification/2026-09-24-camera-sockets.md`。从Refactored真实角色CDO→SKM_Als/SK_Als只读导出3socket（全head，FP4/14/0、肩5/0/±20cm），严格编译来源/TRS，Godot Main按FBX骨局部(x,-y,z)→最终骨骼world→native厘米绑定，禁worker/失效骨架。实际两模型8姿态40位置max3.09255e-5cm、4拒绝过；Import相机33/Optimize过。UE全Editor审计0action，两冷导SHA00386B4F5C6F6028EF82E088AC67410802A1A11630D7BAFEFE834DF8AF15B899同，无新插件/普通Editor/DV/全量/渲染。每帧骨骼名检查尚未优化，宿主须确保worker空闲；下一步球扫/穿透/通道排除/普通Demo已完成显示时序，control yaw独立。旧静态9/12、Flail0/3、Mantle/完整Camera/性能继续，头颈/道具暂缓，用户文件保留。
 
 - 最新Camera跟随事务：`docs/verification/2026-09-24-camera-follow-transaction.md`。Core纯值socket/pivot均值、detached root胶囊底替代、mesh/视角不同offset空间、旋转基座历史/换基座重基、瞬移、FP早返回/FOV及可调整trace start；Import读取设置/socket并统一图+位置Prepare/Commit/Discard，查询失败不推进。Core相机18+后补调整起点1、Import27（含旧3114帧native图）/Optimize过；630帧三Hz联合故障重试同。无新UE/全量/渲染，位置层尚无独立原生oracle；普通Demo未接，下一步Godot socket/坐标/基座/真实球扫穿透/镜头输出，保留control yaw，native trace enum不作Godotmask。旧静态9/12、Flail0/3、Mantle/性能继续，头颈/道具暂缓，用户文件保留。
