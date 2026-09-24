@@ -132,7 +132,9 @@ public static class AlsMantlingPoseCompiler
     // and evaluates the declared additive base before composing a delta.
     internal static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileRawAdditiveTargets(string json,string[] expectedPaths)
         =>CompileInternal(json,null,expectedPaths,true);
-    private static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileInternal(string json,string? rootJson,string[]? expectedPaths,bool additiveTargets=false,bool dormantAdditiveBase=false)
+    internal static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileCatalogAdditiveTargets(string json,string[] expectedPaths)
+        =>CompileInternal(json,null,expectedPaths,false,true,true);
+    private static IReadOnlyDictionary<string,AlsMantlingPoseSource> CompileInternal(string json,string? rootJson,string[]? expectedPaths,bool additiveTargets=false,bool dormantAdditiveBase=false,bool catalogAdditive=false)
     {
         using var document=JsonDocument.Parse(json);using var rootsDocument=rootJson is null?null:JsonDocument.Parse(rootJson);
         var root=document.RootElement;var roots=rootsDocument?.RootElement??default;
@@ -208,7 +210,10 @@ public static class AlsMantlingPoseCompiler
                 Text(policy,"basePoseType")=="ABPT_AnimFrame"&&policy.GetProperty("baseAsset").ValueKind==JsonValueKind.String&&
                 policy.GetProperty("baseFrame").GetInt32()==0&&!policy.GetProperty("enableRootMotion").GetBoolean()&&
                 !policy.GetProperty("forceRootLock").GetBoolean();
-            Require((nonAdditive||meshTarget)&&
+            var catalogTarget=catalogAdditive&&Text(policy,"additiveType") is "AAT_LocalSpaceBase" or "AAT_RotationOffsetMeshSpace"&&
+                Text(policy,"basePoseType")=="ABPT_AnimFrame"&&policy.GetProperty("baseAsset").ValueKind==JsonValueKind.String&&
+                !policy.GetProperty("enableRootMotion").GetBoolean()&&!policy.GetProperty("forceRootLock").GetBoolean();
+            Require((nonAdditive||meshTarget||catalogTarget)&&
                 policy.GetProperty("transformCurveCount").GetInt32()==0&&policy.GetProperty("animatedBoneAttributeCount").GetInt32()==0,
                 "Unsupported mantle additive, transform curve or attribute policy.");
             Require(Text(policy,"retargetSource")=="None"&&Text(policy,"retargetTransformsSourceName")=="None"&&

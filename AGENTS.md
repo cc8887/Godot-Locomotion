@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新原加法资源：`docs/verification/2026-09-25-refactored-additive.md`。Catalog 新 CompileAdditivePose 支持实际42源(15local/27mesh)、固定baseFrame按UE sampledKeyCount分母、原raw basis不递归、曲线名称并集差值；旧Look/Mantle门禁保持。210原生pose/16590骨/200curve maxP1.474e-13cm/Q6.107e-16/S0/curve1.193e-7；重试/独立owner并行/4非法政策，新5、Import138、Optimize0/0。UE审计0action同05A9CE，冷/普通36376实际exit0参考字节同886DF2...；两旧Condition五warn保留，无C++改动/DV/Godot/全量。普通Demo未切，下一步实际Locomotion/Overlay的BS/图/共享ID/宿主及全部旧缺口，保留用户文件/暂缓项。
+
 - 最新Refactored整批动画源：`docs/verification/2026-09-25-refactored-animation-sources.md`。180payload/112.5MB：127Sequence(85绝对/15local+27mesh additive)、9BS、9Montage、21AB、1settings、10CurveFloat原文、3redirector；raw/policy/动画curve/compiled与引用绑定。Catalog逐文件hash/安全路径，CompileAbsolutePose单源ID0须未来映射；85源425pose33575骨native最大P1.0467e-13cm/Q6.66e-16/S0。8个None休眠base政策走新入口按UE忽略，旧Mantle严格政策保留；初policy失败/再数量预估错误已修保留TRX。新增6/Import117/Optimize0/0。UE零action审计同05A9CE；冷0/0/普通19152实际exit0两旧Condition五warn。冷hash7691A4.../editor6D77EB...不同：105payload=66nativeText(45只行序、21蓝图GUID等行变化)+39rootLockFirstFrame rotation/scale辅助差；所有raw/curves/compiled/samples/poseReferences同；内部加载原因未定，保留两份，冷快照入库。无插件变更/DV/Godot/全量。42additive通用编译未齐、CurveFloat全精度键未新增、图/共享ID/宿主未接；普通Demo未切，下一步这些实际移动/Overlay资源与图→宿主/Mantle及全部旧缺口。保留用户文件/暂缓项。
 
 - 最新PostLocomotion整合：`docs/verification/2026-09-25-refactored-post-locomotion.md`。Core Slot provider共享冻结bank，源权重history/reset/skip/相关性；HostPose新增ForNativeSkeleton原79骨厘米+完整Montage自有曲线，旧FBX保留；组合compiler补外层链政策。6实际Mantle×3Hz×3秒3780提交帧，每帧图/Slot/Notify discard重试同，18真实sample fault回滚，reinit active与全覆盖源skip验证；186原生样本全部骨/curve同。新4/最终Import19/Optimize0/0，无失败/UE变更/新整链native/Godot/全量。上游与Overlay为受控Stand，普通Demo未切；下一步实际移动/Overlay布局曲线和宿主/视觉→Mantle gameplay及所有旧缺口。保留用户文件/暂缓项。
