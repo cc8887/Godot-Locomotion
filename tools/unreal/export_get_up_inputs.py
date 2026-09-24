@@ -1,5 +1,6 @@
-"""Read Roll and default front/back Get-up montages without saving UE assets."""
+"""Read Roll and native-selected Get-up montages without saving UE assets."""
 import json
+import hashlib
 import os
 import re
 import runpy
@@ -15,7 +16,17 @@ def export():
         raise ValueError("ALS_GET_UP_OUTPUT must be absolute")
     read_asset = runpy.run_path(str(Path(__file__).with_name("export_action_notify_inputs.py")))["read_asset"]
     base = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/"
-    names = ("ALS_N_LandRoll_F_Montage_Default", "ALS_CLF_GetUp_Front_Montage_Default", "ALS_CLF_GetUp_Back_Montage_Default")
+    names = ["ALS_N_LandRoll_F_Montage_Default", "ALS_CLF_GetUp_Front_Montage_Default", "ALS_CLF_GetUp_Back_Montage_Default"]
+    selection_file = os.environ.get("ALS_GET_UP_SELECTION_INPUT")
+    if selection_file:
+        selection = json.loads(Path(selection_file).read_text(encoding="utf-8-sig"))
+        for case in selection["cases"]:
+            path = case["montage"]
+            if not path.startswith(base):
+                raise RuntimeError("Foreign Get-up montage")
+            name = path[len(base):].split(".")[0]
+            if name not in names:
+                names.append(name)
     assets, sequences, montages = [], {}, []
     for name in names:
         asset = unreal.load_asset(base + name)
@@ -61,7 +72,12 @@ def export():
             "hasRootMotion": sequence.get_editor_property("enable_root_motion"),
         })
         sequences[sequence.get_path_name()] = read_asset(sequence.get_path_name())
-        montages.append(read_asset(asset.get_path_name()))
+        montage = read_asset(asset.get_path_name())
+        for row in montage["notifies"]:
+            if "/OverlayOverride_NotifyState." in row["class"]:
+                obj = unreal.load_object(None, row["stateObject"])
+                row["overlayOverrideState"] = obj.get_editor_property("OverlayOverrideState")
+        montages.append(montage)
     output.mkdir(parents=True, exist_ok=True)
     prefix = os.environ.get("ALS_GET_UP_PREFIX", "v4_action")
     if prefix not in ("v4_action", "v4_recovery_action"):
@@ -70,7 +86,15 @@ def export():
     (output / (prefix + "_notify_inputs.json")).write_text(json.dumps({"schemaVersion": 1,
         "sequences": {"notifySchemaVersion": 1, "syncAssets": list(sequences.values())},
         "montages": {"notifySchemaVersion": 1, "syncAssets": montages}}, indent=2) + "\n", encoding="utf-8")
-    unreal.log("ALS_GET_UP_INPUTS_OK montages=3 sequences=3 assets_saved=0")
+    if selection_file:
+        actions = []
+        for asset in assets[1:]:
+            name = asset["path"].split(".")[-1].replace("ALS_CLF_", "").replace("_Montage_Default", "").replace("_Montage_", "_").replace("GetUp_", "GetUp")
+            actions.append({"name": name, "montage": hashlib.sha1(asset["path"].encode("utf-8")).hexdigest(),
+                "slot": "BaseLayer", "startSection": "Default", "priority": 100, "interruptible": True,
+                "playRate": 1.0, "blendSeconds": 0.2, "loopPolicy": "Once"})
+        (output / "p5_get_up_actions.json").write_text(json.dumps(actions, indent=2) + "\n", encoding="utf-8")
+    unreal.log("ALS_GET_UP_INPUTS_OK montages=" + str(len(assets)) + " sequences=" + str(len(sequences)) + " assets_saved=0")
 
 
 if __name__ == "__main__":

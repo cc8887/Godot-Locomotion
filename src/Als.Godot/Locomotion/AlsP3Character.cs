@@ -41,7 +41,8 @@ public partial class AlsP3Character : Node3D
         restoredRoot.Origin += Vector3.Up * _state.MotorInput.MeshHeightOffset;
         var recovery = simulation.PrepareRecovery(Diagnostics.Identity, _worker.RecoverySkeletonWorld(restoredRoot), decision.Grounded);
         if (!simulation.IsRecoveryCurrent(recovery)) throw new InvalidOperationException("Ragdoll recovery candidate expired.");
-        var definition = decision.FacingUpward ? _context.MovementGraph!.GetUpBackDefinitionId : _context.MovementGraph!.GetUpFrontDefinitionId;
+        var definition = _context.MovementGraph!.GetUpSelection.Select(
+            _state.MotorInput.Command.RequestedOverlay, decision.FacingUpward);
         var policy = _context.MovementGraph.ActionPolicies.Single(p => p.DefinitionId == definition);
         var request = decision.PlayGetUp ? new AlsActionRequest(checked(RuntimeCommittedFrameId + 1), AlsActionCommand.Start,
             definition, policy.StartSectionId, 100, Handle.Generation) : AlsActionRequest.None;

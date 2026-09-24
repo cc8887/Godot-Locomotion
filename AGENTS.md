@@ -8,6 +8,10 @@
 
 # 运行和验证
 
+- Overlay起身最终回归补充：Import Release全量2492通过/1既有Editor跳过，TRX `artifacts/get-up-overlay-tests/import.trx`；Default自动Roll离地+触发帧故障重试两完整循环及空中退出通过，`get-up-overlay-default-regression.log`。详情同下文。
+
+- 最新Overlay起身：`docs/verification/2026-09-24-overlay-get-up.md`。实际调用V4 GetGetUpAnimation取得13×2映射，增加LH/RH/2H六Montage（共9含Roll），共享既有两Get-up序列。补原先固定0的OverlayOverride消费：精确action/montage/event绑定，原生Begin实例值3/End0图校验，成功提交→下一帧Overlay读取，停用清零。RH60正反面及六图、LH120停用恢复、2H Single30首次起身失败重试、旧2540帧rootmotion/定向Import7/Optimize通过；UE全Editor审计、两次Montage/Notify/action字节一致、26映射一致，原始graph仅未连接EventReference GUID不同。raw78资源全保留，仅bindingDigest更新。无Core全量/旧稳定性/性能验收，静态9/12、Flail0/3及全目标保留；头颈/道具暂缓，main/用户修改保留。
+
 - 最新自动Ragdoll：`docs/verification/2026-09-24-automatic-ragdoll.md`。普通Demo提供World，Main Lifecycle消费committed LandingRagdoll/RollingInAir，成功提交才创建owner；自动entry限速速度改用触发边界缓存速度，对齐本机ALS而非碰撞后归零值。Parallel60高落差两循环+空中退出/六渲染截图检查、Parallel120 Roll离地触发帧故障重试通过，Single30初轮/旧三档landing路由隔离/Optimize过。故障统计首轮误期待全Ragdoll中断，最终明确1 RuntimeFailure+1 Ragdoll。无全量Core/Import、UE新导出、旧稳定性或性能验收；静态9/12/Flail0/3保留。继续Overlay起身及全部原目标，真实边缘/平台更多场景待覆盖，头颈/道具暂缓，main/用户修改保留。
 
 - 最新Get-up生命周期：`docs/verification/2026-09-24-get-up-lifecycle.md`。修未Gather请求在gameplay停用后残留输入锁/重放，统一停用/退休/销毁清理，调度暂停保留；generation迁移清旧GettingUp标记。pending60/active120/suspend Single30/generation60两循环+空中退出通过，旧Roll generation通过。暂停暴露0.9999905动画scale被场景determinant校验误拒，按本机UE slot阈值语义改动画祖先逐轴1e-5检查，最终仍刚体、场景校验不改；两模型8姿态/160handoffs/192captures/64拒绝过，Optimize过。无新Core/Import全量、UE、渲染或旧矩阵；静态9/12、Flail0/3保留。继续Overlay起身/自动触发及全部旧目标，头颈/道具暂缓，main/用户P4保留。

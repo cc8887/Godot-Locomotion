@@ -14,7 +14,7 @@ public sealed class AlsRecoveryActionProfileTests
         var locomotion = AlsLocomotionProfileCompiler.Compile(Read("p4_cycle_locomotion_profile.json"), set);
         var pose = AlsPoseProfileCompiler.Compile(Read("p4_pose_profile.json"), set, locomotion);
         var profile = AlsRecoveryActionProfileCompiler.Compile(Read("p5a_animation_runtime.json"), Read("p5_get_up_actions.json"), set);
-        Assert.Equal(3, profile.Actions.Length); Assert.Equal(0, profile.DemoCases.RollActionDefinitionId);
+        Assert.Equal(9, profile.Actions.Length); Assert.Equal(0, profile.DemoCases.RollActionDefinitionId);
         var sources = AlsLocomotionSourceCompiler.CompileWithMovement(Read("v4_main_movement_graph.json"), set, locomotion.SkeletonId);
         var inventory = AlsP5SourceInventoryCompiler.Compile(Read("v4_anim_graph_inventory.json"), set, sources);
         var layout = AlsP5OccurrenceLayoutCompiler.CompileSourceAware(locomotion, pose, profile, sources, inventory);

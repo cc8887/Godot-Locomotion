@@ -24,6 +24,8 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
     public int RollDefinitionId { get; init; }
     public int GetUpFrontDefinitionId { get; init; }
     public int GetUpBackDefinitionId { get; init; }
+    public AlsGetUpSelectionProfile GetUpSelection { get; init; } = null!;
+    public AlsOverlayOverrideNotifyProfile OverlayOverrideNotifies { get; init; } = null!;
     public AlsGroundedEntryNotifyProfile GroundedEntryNotify { get; init; } = null!;
     public AlsCharacterAnimationBridgeSettings CharacterBridge { get; init; }
     public AlsCharacterRotationModel CharacterRotation { get; init; } = null!;
@@ -120,6 +122,9 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
             actions, AlsAuthoredMontageCompiler.CompileRequests(actionProfile, actions),
             AlsMontageNotifyCompiler.Compile(Read("v4_recovery_action_notify_inputs.json"),Read("v4_turn_notify_inputs.json"),set,sources,binding,turns,actions))
             { RollDefinitionId = actionProfile.DemoCases.RollActionDefinitionId,
+                GetUpSelection = AlsGetUpSelectionCompiler.Compile(Read("v4_get_up_selection_inputs.json"), set, actionProfile),
+                OverlayOverrideNotifies = AlsOverlayOverrideNotifyCompiler.Compile(Read("v4_get_up_selection_inputs.json"),
+                    Read("v4_recovery_action_notify_inputs.json"), set, actionProfile),
                 GetUpFrontDefinitionId = actionProfile.Actions.Single(a => set.Montages[a.MontageId].StableId == "35b984a2215f8d238fed23d8322bea3267dfd93f").DefinitionId,
                 GetUpBackDefinitionId = actionProfile.Actions.Single(a => set.Montages[a.MontageId].StableId == "5657e37ac49745e09e5a7c4ad1c46aaa6491cb7f").DefinitionId,
                 CharacterBridge = AlsCharacterAnimationBridgeCompiler.Compile(Read("v4_character_animation_bridge.json")),
