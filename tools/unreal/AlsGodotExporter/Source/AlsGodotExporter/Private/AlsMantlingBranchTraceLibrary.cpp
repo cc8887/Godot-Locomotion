@@ -3,6 +3,8 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimNotifies/AnimNotifyState.h"
+#include "Animation/AnimNotifies/AnimNotify.h"
+#include "Animation/ActiveMontageInstanceScope.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Settings/AlsMantlingSettings.h"
 #include "Editor.h"
@@ -20,6 +22,8 @@ namespace
 // real UAnimInstance, without downcasting it or substituting its implementation.
 struct FMantleBranchAnimAccess : UAnimInstance
 {
+    static FAnimNotifyQueue& Queue(UAnimInstance* Instance)
+    {const auto Member=&FMantleBranchAnimAccess::NotifyQueue;return Instance->*Member;}
     static void Advance(UAnimInstance* Instance,float Delta)
     {
         const auto Weight=&FMantleBranchAnimAccess::Montage_UpdateWeight;
@@ -43,7 +47,7 @@ bool UAlsAnimationGraphLibrary::ExportMantlingBranchTrace(const FString& OutputP
         auto* Settings=LoadObject<UAlsMantlingSettings>(nullptr,*Path);
         if (!Settings || !Settings->Montage) return false;
         auto* Montage=Settings->Montage.Get();
-        for (int32 Hz : {30,60,120}) for (int32 Mode=0;Mode<7;++Mode)
+        for (int32 Hz : {30,60,120}) for (int32 Mode=0;Mode<8;++Mode)
         {
             FActorSpawnParameters Spawn; Spawn.ObjectFlags|=RF_Transient;
             Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -64,7 +68,7 @@ bool UAlsAnimationGraphLibrary::ExportMantlingBranchTrace(const FString& OutputP
                 !SetTag(TEXT("Stance"),Mode==4?TEXT("Als.Stance.Crouching"):TEXT("Als.Stance.Standing"))) return false;
             auto* StateProperty=FindFProperty<FStructProperty>(Class,TEXT("LocomotionState"));
             if (!StateProperty || StateProperty->Struct!=FAlsLocomotionState::StaticStruct()) return false;
-            StateProperty->ContainerPtrToValuePtr<FAlsLocomotionState>(Character)->bHasInput=Mode==1;
+            StateProperty->ContainerPtrToValuePtr<FAlsLocomotionState>(Character)->bHasInput=Mode==1 || Mode==7;
             auto* Anim=Character->GetMesh()->GetAnimInstance();
             if (!Anim || Anim->Montage_Play(Montage)<=0) return false;
             auto* Instance=Anim->GetActiveInstanceForMontage(Montage); if (!Instance) return false;
@@ -74,7 +78,7 @@ bool UAlsAnimationGraphLibrary::ExportMantlingBranchTrace(const FString& OutputP
             TArray<TSharedPtr<FJsonValue>> Frames;
             for (int32 Frame=0;Frame<Hz*5;++Frame)
             {
-                const float Delta=Mode==6 && Frame==0 ? 4.f : 1.f/Hz;
+                const float Delta=Frame==0 && Mode==6 ? 4.f : Frame==0 && Mode==7 ? 2.f : 1.f/Hz;
                 // Action callbacks may apply the character's desired stance. Capture
                 // the next controlled input again, as the Godot host will do per frame.
                 if (!SetTag(TEXT("Stance"),Mode==4?TEXT("Als.Stance.Crouching"):TEXT("Als.Stance.Standing"))) return false;
@@ -84,11 +88,36 @@ bool UAlsAnimationGraphLibrary::ExportMantlingBranchTrace(const FString& OutputP
                     Instance=Anim->GetMontageInstanceForID(Id);if (!Instance) return false;
                     FMontageBlendSettings Blend(Montage->BlendOut);Blend.Blend.BlendTime=.4f;Instance->Stop(Blend);
                 }
+                auto& Queue=FMantleBranchAnimAccess::Queue(Anim);
+                // Reset is not DLL-exported. Initialization already bound World;
+                // clear the per-frame arrays and refresh LOD, preserving native RNG.
+                Queue.AnimNotifies.Reset();Queue.UnfilteredMontageAnimNotifies.Reset();
+                Queue.PredictedLODLevel=Character->GetMesh()->GetPredictedLODLevel();
                 FMantleBranchAnimAccess::Advance(Anim,Delta);
                 Instance=Anim->GetMontageInstanceForID(Id);
                 if (Instance && !Instance->IsValid()) Instance=nullptr;
                 auto Row=MakeShared<FJsonObject>();Row->SetNumberField(TEXT("delta"),Delta);Row->SetBoolField(TEXT("stopBefore"),bStop);
                 Row->SetBoolField(TEXT("exists"),Instance!=nullptr);Row->SetStringField(TEXT("action"),Character->GetLocomotionAction().ToString());
+                Row->SetNumberField(TEXT("directNotifyCount"),Queue.AnimNotifies.Num());
+                Row->SetNumberField(TEXT("notifyRandomSeed"),Queue.RandomStream.GetCurrentSeed());
+                TArray<TSharedPtr<FJsonValue>> Queued;
+                // Only one authored slot. Read the original filtered-by-policy queue,
+                // before proxy slot relevance; do not dispatch sounds or effects.
+                for (const auto& Slot : Queue.UnfilteredMontageAnimNotifies)
+                {
+                    if (Slot.Key!=FName(TEXT("PostLocomotion"))) return false;
+                    for (const auto& Ref : Slot.Value.Notifies)
+                    {
+                        const auto* Event=Ref.GetNotify();
+                        const auto* Context=Ref.GetContextData<UE::Anim::FAnimNotifyMontageInstanceContext>();
+                        if (!Event || !Event->Notify || !Context || Context->MontageInstanceID!=Id) return false;
+                        auto Notify=MakeShared<FJsonObject>();Notify->SetStringField(TEXT("object"),Event->Notify->GetPathName());
+                        Notify->SetNumberField(TEXT("currentTime"),Ref.GetCurrentAnimationTime());
+                        // Normalize the process-global engine ID only after checking ownership.
+                        Notify->SetNumberField(TEXT("instance"),1);Queued.Add(MakeShared<FJsonValueObject>(Notify));
+                    }
+                }
+                Row->SetArrayField(TEXT("queued"),Queued);
                 if (Instance)
                 {
                     Row->SetNumberField(TEXT("position"),Instance->GetPosition());Row->SetNumberField(TEXT("weight"),Instance->GetWeight());

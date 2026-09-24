@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle原生queue：`docs/verification/2026-09-24-mantle-native-queue.md`。原生NotifyQueue增加slot通知对象/上下文时间/实例与RNG取证，6×3Hz×8场景144轨迹11001帧306事件，对象/顺序/instance/seed一致，float字段及notifytime最大差0；新两秒输入hitch覆盖High同帧脚步后EarlyStop。Import定向99/Optimize0/0，无生产算法更改/新Godot场景/全量。UE首轮Reset未导出链接失败修公共数组清理，完整审计fingerprintF828B170818ACB14853BFFF27B6B67FB392A4D8714BF72473A522A44187864BB，冷0/0、普通33092实际exit0字节同，旧两Condition保留。reference新SHA48056AE2C2F3CBC5064E2929DAEF32980A2263F411609219F6A528D5E06CDB2A。仅原生政策过滤后的slot队列，不含完整图relevance/效果执行；下一步资源映射/graph/探测/motion宿主整合，demo未接Mantle，全部旧缺口/用户文件/暂缓项保留。
+
 - 最新Mantle queued notify：`docs/verification/2026-09-24-mantle-queued-notifies.md`。9真实脚步对象/6montage18绑定，hash/类/对象/偏移/filter闭包，T3D左右脚+效果引用/开关，音频/效果执行未接。共享queue支持PostLocomotion slot4；同一bank新增NotifyTraversal按branch marker分段并保存EarlyTick前中断状态，原Traversal维持整帧action契约；普通BaseLayer改消费通知视图。Core154/Import定向99/Optimize0/0；既有native126状态轨迹过但不含queue oracle，下一步补队列/上下文native对照及资源/graph/探测/motion整合。普通demo未接Mantle，旧缺口/用户修改/暂缓项保留。
 
 - 最新Mantle原生branch对照：`docs/verification/2026-09-24-mantle-native-branching.md`。临时真实角色/AnimInstance调用native UpdateWeight+Advance及原状态，6montage×3Hz×7场景126轨迹10688帧；action/active集合/存在/playing一致，P/weight/desired/blendTime float最大差0。ImportMantling63/Optimize0/0；无生产算法修改/Godot场景/全量。完整Editor审计fingerprint8807CB03DA577AE981F4F27FB7BC5C3D4BFA9BEBEBB9853E03F75FAC2FDD97AE，冷0/0、普通11708实际exit0字节同，旧两Condition保留；reference SHA D6DAFAEB0A53861906616AF91E0F34815076F8BEDB689D59127CFCC69D395305。初轮protected/include编译失败、NetCore BuildId更新后隔离重建、错误LookingDirection改ViewDirection、空tag None断言映射修复，日志保留。取证为逐帧状态/副作用，非全回调插桩/任意子步跳转证明；下一步queued Footstep与资源/graph/探测/motion整合，普通demo未接，旧缺口/用户文件/暂缓项保留。
