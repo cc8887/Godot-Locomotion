@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新原生Slot清单与组：`docs/verification/2026-09-25-refactored-slot-inventory.md`。只读全/ALS扫描实际9Montage全部PostLocomotion，无7区域authored Montage；7区域全部属于Layer组index3，旧独立组测试仅容量。新AlsRefactoredRegionSlotBindings交叉校验nativeText/七区域/唯一组，以宿主分配group id绑定同组；Head→ArmRight替换不影响独立PostLocomotion、discard及4非法用例。Import131/Optimize0/0。UE完整审计0action同C1E13C8...；修首次遗漏DefaultGroup后冷0/0、普通21700实际exit0字节同SHA872CBE40ACC2D211E8EA4B99C4A31835A0A2CC0F6347797F7C62FB24D8CFAF21，普通两旧Condition/五warn保留，无插件变更/DV/新Godot/native覆盖/全量。下一步Head/View真实BlendSpace回调/宿主布局→普通Mantle；勿寻找不存在的7套Montage，区域覆盖oracle可补非资产前置阻塞。旧缺口及用户文件/暂缓项保留。
+
 - 最新区域 Slot 图接入：`docs/verification/2026-09-25-refactored-slot-sink.md`。新增Core AlsRefactoredLayerSlotSink转发上游inputs/cache、绑定共享冻结Montage帧并复用SlotPose，无新clock/allocator/history；ushort当前relevance按UE UpdateSlotNodeWeight仅localweight，跨帧仍notify owner。真实94图+basepose/受控区域采样，3Hz各3秒630提交帧每帧discard一致，淡入/全覆盖/淡出、7region、3注入sample故障恢复/重复错身份过期拒绝通过。Import定向216、最终图13复跑（重叠）、Optimize0/0。无新native覆盖/Godot/全量，普通Demo未切；下一步真实资源/native覆盖/完整宿主布局/Head→普通Mantle，旧缺口及用户文件/暂缓项保留。
 
 - 最新区域 Slot 基础：`docs/verification/2026-09-25-refactored-region-slots.md`。共享 bank/pose/notify 扩展为12 Slot，保留0—4，Head/Spine/ArmLeft/ArmRight/Pelvis/Legs/Curves为5—11；相关性ushort与12组预分配，事件总容量不变；图编译拒绝未知区域。Core定向172、Import212及新增校验后图10（9重叠）全过，Optimize0/0，Godot普通并行60Hz480帧含Ragdoll/第一人称通过。新区域使用受控采样测试，无新UE Slot覆盖/全量；普通Demo未切新图。下一步区域provider/真实覆盖native对照/宿主布局/Head→普通Mantle，旧缺口及用户文件/暂缓项保留。
