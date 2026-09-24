@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新武器通知请求：`docs/verification/2026-09-25-refactored-weapon-notify.md`。真实EventGraph/GetParent/双向exec+authoredStart/baked局部index/Settings.Transitions绑定；Bow/Rifle左、两Pistol右，Bow全1.5、其他举起1.75放下1.5，in/out .2/start .3/standing-idle-only。独立候选有序请求保留重复、frame/角色/generation/profile校验与discard；尚未物理Montage/slot组ID/stopQueued/worker覆盖队列。新12/相关Import71/Optimize0/0，首轮12失败因原图Comment框误算逻辑已修，日志保留。复用native通知名字，无新UE函数oracle/启动/导出/Godot/全量/性能。下一步Transition Slot资源及实际播放/原生消费→武器源/pose；整图9/13，普通Demo未切、Ragdoll未整体验收、全部旧缺口/用户文件/暂缓项保留。
+
 - 最新武器原生连续：`docs/verification/2026-09-25-refactored-weapon-native.md`。实际四Linked Graph/3Hz2424帧，状态/stack/edge/update/72notify一致，704多stack；max时间2.981e-8/alpha2.981e-7/weight1.491e-7预算2e-6，生产算法未改。生成class局部0RelaxedToReady/1ReadyToRelaxed；保留fullpose/curve/player但尚未比较，整图仍9/13。新native12/相关Import82/Optimize0/0，无新失败。UE完整4actions审计E2E1C139...，冷/普通26488实际0四输出字节同；Default重导B385B2不变，DV0/3旧warn，普通两旧Condition五类warn保留。无Godot/全量/性能/打包。下一步通知绑定原EventGraph消费→state源更新/整图pose及隐藏动作对照；普通Demo未切、Ragdoll未整体验收、全部旧缺口/用户文件/暂缓项保留。
 
 - 最新武器连续更新：`docs/verification/2026-09-25-refactored-weapon-runtime.md`。独立machine构造+显式Refactored规则域复用共享执行器，原四武器profile/PrepareCommitCancel、entry/update/stack/local-notify候选；校验无state/machine callback。UE源码确认首帧skip/通知抑制、先rule再blend再time、重入/relevance及Custom clamp。新10通过，四武器×3Hz共3600压力帧逐帧discard重试/79骨贡献；Import129/CoreStack15/Optimize0/0，无编译测试失败。无新UE连续oracle/导出/UE或Godot启动/全量/性能。通知未绑定消费、Sequence未tick、pose未接，整图仍9/13；下一步实际连续native/通知→state源及姿态，普通Demo未切、Ragdoll未整体验收、全部旧缺口/用户文件/暂缓项保留。
