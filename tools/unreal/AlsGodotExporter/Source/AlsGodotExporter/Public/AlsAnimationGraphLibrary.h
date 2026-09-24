@@ -101,6 +101,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportMantlingRootMotionTrace(const FString& OutputPath);
 
+    /** Original montage Advance and ALS native states on transient characters. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportMantlingBranchTrace(const FString& OutputPath);
+
     /** Original complete V4 AnimGraph, controlled properties; no Character/UpdateGraph simulation. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportFullGraphTrace(const FString& RequestPath, const FString& OutputPath);

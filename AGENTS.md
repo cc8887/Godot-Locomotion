@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle原生branch对照：`docs/verification/2026-09-24-mantle-native-branching.md`。临时真实角色/AnimInstance调用native UpdateWeight+Advance及原状态，6montage×3Hz×7场景126轨迹10688帧；action/active集合/存在/playing一致，P/weight/desired/blendTime float最大差0。ImportMantling63/Optimize0/0；无生产算法修改/Godot场景/全量。完整Editor审计fingerprint8807CB03DA577AE981F4F27FB7BC5C3D4BFA9BEBEBB9853E03F75FAC2FDD97AE，冷0/0、普通11708实际exit0字节同，旧两Condition保留；reference SHA D6DAFAEB0A53861906616AF91E0F34815076F8BEDB689D59127CFCC69D395305。初轮protected/include编译失败、NetCore BuildId更新后隔离重建、错误LookingDirection改ViewDirection、空tag None断言映射修复，日志保留。取证为逐帧状态/副作用，非全回调插桩/任意子步跳转证明；下一步queued Footstep与资源/graph/探测/motion整合，普通demo未接，旧缺口/用户文件/暂缓项保留。
+
 - 最新Mantle branching：`docs/verification/2026-09-24-mantle-branching.md`。两实际native类显式编译与hash/身份/触发偏移闭包，按物理instance追踪动作状态和EarlyBlendOut四条件OR，边界后单次Tick/中断保留至Terminate End/标签匹配清空；共享bank候选提交丢弃与清理。限单终止section/正向/不跳转/两不重叠状态/trigger0/rootdisabled，并非通用native子步调度。Core定向154、Import Mantling62、Optimize0/0；无新UE回调oracle或Godot场景验收。后续native回调对照、queued Footstep（注意收集早于Early Tick）、资源/graph/探测/motion生命周期；普通demo未接。所有旧缺口/用户文件/暂缓项保留。
 
 - 最新Mantle montage：`docs/verification/2026-09-24-mantle-montage.md`。真实6montage编译到共享MontageRuntime+SlotPose，PostLocomotion图slot4/原生Locomotion组index2；资源IDs属于独立Refactored作用域，禁止直接插入V4bank。HighRateScale1.2/OutCubic，其余1/Hermite；In均.2Hermite，source root disabled保留独立Mantling motion。Import54/CoreMontage151/Optimize0/0；6×240帧生命周期/全权重posecurve/替换discard过，无新native oracle/Godot场景/UE改动。初轮测试属性/identity编译错修；53过1失败是错误假设全OutCubic，核对数据修测试，生产未改。关键源码发现SetLocomotionAction和EarlyBlendOut均native branching，即使event tickMode0；现queued notify不能直接绑定，下一步原生子步/指定instance同步callback及结束中断事务，再资源/graph/探测/motion整合。普通demo未接，旧缺口/用户文件/暂缓项保留。
