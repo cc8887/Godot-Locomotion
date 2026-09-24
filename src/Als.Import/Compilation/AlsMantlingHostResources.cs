@@ -4,7 +4,37 @@ using GodotAls.Core.Events;
 
 namespace GodotAls.Import.Compilation;
 
-public sealed record AlsMantlingHostNotifyResources(AlsMontageNotifyBinding Binding,IReadOnlyDictionary<int,AlsMantlingFootstep> Footsteps);
+/// <summary>Immutable host namespace plus a provenance-checked lookup for final typed events.
+/// Resolving has no side effects: scene effects must only consume committed frame events.</summary>
+public sealed class AlsMantlingHostNotifyResources
+{
+    private readonly Dictionary<(int Event,int Action,int Animation,int Handle),AlsTimelineEventDefinition> _events=[];
+    public AlsMontageNotifyBinding Binding { get; }
+    public IReadOnlyDictionary<int,AlsMantlingFootstep> Footsteps { get; }
+    internal AlsMantlingHostNotifyResources(AlsMontageNotifyBinding binding,IReadOnlyDictionary<int,AlsMantlingFootstep> footsteps)
+    {
+        Binding=binding;Footsteps=new ReadOnlyDictionary<int,AlsMantlingFootstep>(footsteps.ToDictionary(p=>p.Key,p=>p.Value));
+        foreach(var range in binding.Ranges)
+        for(var i=0;i<range.Count;i++)
+        {
+            if(!binding.TryTimeline(new(binding.SourcePolicyCount+range.Offset+i,range.Handle,0,true,false),out var entry))
+                throw new ArgumentException("Incomplete host notify timeline.");
+            if(!Footsteps.TryGetValue(entry.EventId,out var footstep))continue;
+            if(range.Direct||entry.Kind!=GodotAls.Core.Contracts.AlsTimelineEventKind.Footstep||entry.DurationSeconds!=0||entry.Payload.EnumValue0!=(int)footstep.Foot)
+                throw new ArgumentException("Invalid mantle footstep payload.");
+            _events.Add((entry.EventId,entry.SourceActionId,entry.SourceAnimationId,range.Handle),entry);
+        }
+        if(!_events.Keys.Select(k=>k.Event).ToHashSet().SetEquals(Footsteps.Keys))throw new ArgumentException("Unbound mantle footstep settings.");
+    }
+    public bool TryResolveFootstep(in AlsAnimationEvent item,out AlsMantlingFootstep? footstep)
+    {
+        footstep=null;
+        if(item.Phase!=AlsAnimationEventPhase.Trigger||item.PlaybackEpoch<=0||
+            !_events.TryGetValue((item.EventId,item.SourceActionId,item.SourceAnimationId,item.OccurrenceHandleId),out var definition)||
+            item.Kind!=definition.Kind||item.Payload!=definition.Payload)return false;
+        footstep=Footsteps[item.EventId];return true;
+    }
+}
 
 /// <summary>Maps Refactored resources after the host's complete resource inventory.
 /// Original-key pose data keeps its source identity; only playback-facing IDs change.
