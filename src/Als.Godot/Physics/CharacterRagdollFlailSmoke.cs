@@ -4,11 +4,12 @@ using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
 using GodotAls.Locomotion;
+using GodotAls.Import.Compilation;
 
 namespace GodotAls.Physics;
 
-// The real character keeps its animation owner throughout activation. Physical
-// display and Get-up are deliberately not asserted here.
+// The character keeps its animation owner while physics owns final display.
+// Get-up remains outside this regression.
 public partial class CharacterRagdollFlailSmoke : Node
 {
     private P4LocomotionDemo? _demo;
@@ -21,6 +22,13 @@ public partial class CharacterRagdollFlailSmoke : Node
     private Vector3 _capsulePosition;
     private Vector3 _pausedPosition;
     private AlsPrecisePose[] _flail = [];
+    private AlsLocalPose[] _animationPose = [];
+    private AlsLocalPose[] _beforeDisplay = [];
+    private int[] _bodyBones = [], _nonphysicalBones = [], _logicalBones = [];
+    private float _maxWorldError;
+    private string? _captureDirectory;
+    private int _nextCapture, _captures;
+    private bool _captureConnected;
     private Input.MouseModeEnum _mouse;
     private bool _accumulation;
 
@@ -41,6 +49,14 @@ public partial class CharacterRagdollFlailSmoke : Node
             _demo.ConfigureRuntimePolicyForSmoke(args.Contains("--single") ? AlsHarnessMode.Single : AlsHarnessMode.Parallel,
                 args.Contains("--debug-policy"));
             AddChild(_demo); RollingGameplaySmoke.PlaceOnOpenFloor(_demo); KeyInput(true);
+            var capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="));
+            if (capture is not null)
+            {
+                _captureDirectory = ProjectSettings.GlobalizePath(capture[14..]);
+                Directory.CreateDirectory(_captureDirectory); _nextCapture = _hz / 4;
+                RenderingServer.FramePostDraw += Capture;
+                _captureConnected = true;
+            }
         }
         catch (Exception error) { Fail(error); }
     }
@@ -68,6 +84,7 @@ public partial class CharacterRagdollFlailSmoke : Node
                 _integrations = character.MotorIntegrationCount; _capsulePosition = character.MovementAnchor.GlobalPosition;
                 character.BeginRagdoll(_demo.GetNode<Node3D>("World"));
                 VerifyGroundFollow(character);
+                ConfigureDisplayChecks(character);
                 _flail = new AlsPrecisePose[character.AnimationPoseBoneCount];
                 _lastAnimation = character.RuntimeCommittedFrameId;
                 KeyInput(false); _entered = true; return;
@@ -84,6 +101,7 @@ public partial class CharacterRagdollFlailSmoke : Node
                 "Airborne capsule differs from physical pelvis.");
             Require(simulation.CompletedSteps == _lastPhysics + 1, "Ragdoll physics skipped or duplicated an engine step.");
             _lastPhysics = simulation.CompletedSteps;
+            VerifyDisplay(character, simulation);
             var id = character.Diagnostics.Identity;
             var diagnostics = character.FullMovementDiagnostics.Ragdoll;
             if (id.FrameId == _lastAnimation)
@@ -120,6 +138,7 @@ public partial class CharacterRagdollFlailSmoke : Node
                 character.SetSchedulingActive(false); return;
             }
             if (_samples < _hz * 2) return;
+            if (_captureDirectory is not null && _captures < 4) return;
             Require(!_inject || _held == 1 && character.FailureDiagnosticCount == 1,
                 "Animation failure/retry coverage differs.");
             var samples = _samples; var steps = simulation.CompletedSteps;
@@ -128,10 +147,67 @@ public partial class CharacterRagdollFlailSmoke : Node
             Cleanup();
             Require(character.RagdollSimulation is null, "Character disposal retained physical owner.");
             _done = true;
-            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 pelvis_follow=true ground_cases=4 physical_display=false");
+            GD.Print($"CHARACTER_RAGDOLL_FLAIL_OK hz={_hz} samples={samples} steps={steps} retry_holds={_held} pause={_paused} source_epoch={_epoch} owner=shared capsule_integrations=0 pelvis_follow=true ground_cases=4 physical_display=true max_world_error_m={_maxWorldError:R}");
             GetTree().Quit();
         }
         catch (Exception error) { Fail(error); }
+    }
+    private void ConfigureDisplayChecks(AlsP3Character character)
+    {
+        var context = _demo!.RuntimeContext;
+        var mesh = context.AnimationSet.SkeletalMeshes[context.Profile.MannequinMeshId];
+        var definition = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString(
+            "res://assets/config/v4_physics_asset_inputs.json"), mesh.ObjectPath);
+        var skeleton = character.PhysicalDisplaySkeleton;
+        _bodyBones = definition.Bodies.Select(b => skeleton.FindBone(b.Bone)).ToArray();
+        _logicalBones = context.AnimationSet.Skeletons[context.Profile.SkeletonId].LogicalBones
+            .Select(b => skeleton.FindBone(b.Name)).ToArray();
+        Require(_bodyBones.All(b => b >= 0), "Physical display body mapping is incomplete.");
+        _nonphysicalBones = Enumerable.Range(0, _logicalBones.Length)
+            .Where(i => _logicalBones[i] >= 0 && !_bodyBones.Contains(_logicalBones[i])).ToArray();
+        _animationPose = new AlsLocalPose[_logicalBones.Length]; _beforeDisplay = new AlsLocalPose[_logicalBones.Length];
+        character.CopyCommittedAnimationPose(character.Diagnostics.Identity, _beforeDisplay);
+    }
+    private void VerifyDisplay(AlsP3Character character, AlsCharacterRagdollSimulation simulation)
+    {
+        var skeleton = character.PhysicalDisplaySkeleton;
+        for (var body = 0; body < _bodyBones.Length; body++)
+        {
+            var actual = skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(_bodyBones[body]);
+            var expected = AlsCorePhysicsPose.ToWorld(simulation.Island.BodyAt(body).Actor);
+            var error = actual.Origin.DistanceTo(expected.Origin);
+            _maxWorldError = Mathf.Max(_maxWorldError, error);
+            Require(error < .0001f && actual.Basis.IsEqualApprox(expected.Basis),
+                $"Physical display differs from world body {body}: position error {error:R} m.");
+        }
+        character.CopyCommittedAnimationPose(character.Diagnostics.Identity, _animationPose);
+        foreach (var i in _nonphysicalBones)
+        {
+            var bone = _logicalBones[i]; var pose = _animationPose[i];
+            Require(skeleton.GetBonePosePosition(bone).IsEqualApprox(new(pose.Position.X, pose.Position.Y, pose.Position.Z)) &&
+                skeleton.GetBonePoseScale(bone).IsEqualApprox(new(pose.Scale.X, pose.Scale.Y, pose.Scale.Z)) &&
+                skeleton.GetBonePoseRotation(bone).IsEqualApprox(new(pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z, pose.Rotation.W)),
+                $"Nonphysical bone {bone} lost current animation base.");
+        }
+        if (character.Diagnostics.Identity.FrameId == _lastAnimation)
+            Require(_animationPose.AsSpan().SequenceEqual(_beforeDisplay), "Physical display overwrote held committed animation.");
+        _animationPose.AsSpan().CopyTo(_beforeDisplay);
+    }
+    public override void _Process(double delta)
+    {
+        if (_captureDirectory is null || _done || _demo is null) return;
+        var camera = GetViewport().GetCamera3D();
+        if (camera is null) return;
+        var center = _demo.ActiveCharacter.MovementAnchor.GlobalPosition;
+        camera.GlobalPosition = center + new Vector3(2.5f, 1.4f, 2.5f);
+        camera.LookAt(center - Vector3.Up * .3f);
+    }
+    private void Capture()
+    {
+        if (_done || _samples < _nextCapture || _captures >= 4) return;
+        using var image = GetViewport().GetTexture().GetImage();
+        Require(image.SavePng(Path.Combine(_captureDirectory!, $"ragdoll-{_samples:D4}.png")) == Error.Ok, "Ragdoll screenshot failed.");
+        _captures++; _nextCapture += _hz / 2;
     }
     private void VerifyGroundFollow(AlsP3Character character)
     {
@@ -167,6 +243,7 @@ public partial class CharacterRagdollFlailSmoke : Node
     }
     private void Cleanup()
     {
+        if (_captureConnected) { RenderingServer.FramePostDraw -= Capture; _captureConnected = false; }
         if (_inputOwned) { KeyInput(false); Input.MouseMode = _mouse; Input.UseAccumulatedInput = _accumulation; _inputOwned = false; }
         _demo?.DisposeRuntime();
     }

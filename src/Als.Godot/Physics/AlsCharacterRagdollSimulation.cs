@@ -167,6 +167,8 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
 
     internal void Capture(Transform3D skeletonToWorld, Span<AlsLocalPose> destination)
     { Check(); _bridge.Capture(Island, skeletonToWorld, destination); }
+    internal void Capture(Transform3D skeletonToWorld, ReadOnlySpan<AlsLocalPose> animationPose, Span<AlsLocalPose> destination)
+    { Check(); _bridge.Capture(Island, skeletonToWorld, animationPose, destination); }
 
     private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
     private static void Main()

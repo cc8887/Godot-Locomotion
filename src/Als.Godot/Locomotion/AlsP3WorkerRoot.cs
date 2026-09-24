@@ -33,6 +33,13 @@ public partial class AlsP3WorkerRoot : Node3D
     internal bool UsesLayeredPose => _controller?.UsesLayeredPose == true;
     internal AlsFullMovementDiagnostics FullMovementDiagnostics => _controller?.FullMovementDiagnostics ?? default;
     internal int AnimationPoseBoneCount => _controller?.AnimationPoseBoneCount ?? 0;
+    internal void PresentRagdoll(GodotAls.Physics.AlsCharacterRagdollSimulation simulation)
+    {
+        if (!GodotThread.IsMainThread() || _state.WorkerInFlightCount != 0 || Volatile.Read(ref _disposed) != 0)
+            throw new InvalidOperationException("Physical display requires an idle live visual worker.");
+        _controller!.PresentRagdoll(simulation);
+    }
+    internal Skeleton3D PhysicalDisplaySkeleton => _skeleton!;
     internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
         _controller is not null && _controller.TryCopyCommittedFlail(identity, destination);
     internal bool TryCopyCommittedPreciseFlail(AlsFrameIdentity identity, Span<AlsPrecisePose> destination) =>

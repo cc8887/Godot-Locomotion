@@ -98,6 +98,7 @@ public partial class AlsCharacterBodyHistory : Node
             {
                 simulation.StepCharacterAnimation(delta);
                 _owner.FollowRagdollPelvis();
+                _owner.PresentRagdoll();
                 return;
             }
             var fresh = diagnostics.Identity != SourceAnimationIdentity;

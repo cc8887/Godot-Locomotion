@@ -161,6 +161,8 @@ public sealed class AlsLocomotionAnimationController : IDisposable
     internal float PendingPropDraw(string curve) => _fullMovement!.PropDraw(curve);
     internal AlsFullMovementDiagnostics FullMovementDiagnostics => _fullMovement?.Diagnostics ?? default;
     internal int AnimationPoseBoneCount => _fullMovement?.AnimationPoseBoneCount ?? 0;
+    internal void PresentRagdoll(GodotAls.Physics.AlsCharacterRagdollSimulation simulation) =>
+        (_fullMovement ?? throw new InvalidOperationException("Complete animation runtime is unavailable.")).PresentRagdoll(simulation);
     internal bool TryCopyCommittedFlail(AlsFrameIdentity identity, Span<AlsLocalPose> destination) =>
         _fullMovement is not null && _fullMovement.TryCopyCommittedFlail(identity, destination);
     internal bool TryCopyCommittedPreciseFlail(AlsFrameIdentity identity, Span<AlsPrecisePose> destination) =>

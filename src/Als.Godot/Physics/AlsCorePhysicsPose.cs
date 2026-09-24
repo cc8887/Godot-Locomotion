@@ -104,10 +104,20 @@ internal sealed class AlsCorePhysicsPose
     }
 
     internal void Capture(AlsJointIsland island, Transform3D componentToWorld, Span<AlsLocalPose> destination)
+        => Capture(island, componentToWorld, _seedPose, destination);
+
+    // Current animation supplies nonphysical branches; it never reseeds the island.
+    internal void Capture(AlsJointIsland island, Transform3D componentToWorld,
+        ReadOnlySpan<AlsLocalPose> animationPose, Span<AlsLocalPose> destination)
     {
         Main(); Rigid(componentToWorld);
-        if (SeedIdentity.FrameId <= 0 || island.BodyCount < _states.Length || destination.Length != _parents.Length)
+        if (SeedIdentity.FrameId <= 0 || island.BodyCount < _states.Length || destination.Length != _parents.Length ||
+            animationPose.Length != _parents.Length)
             throw new InvalidOperationException("Physical capture requires a seeded skeleton and matching body prefix.");
+        foreach (var pose in animationPose)
+            if (!AlsPhysicsBodySet.Local(pose).IsFinite() || !float.IsFinite(pose.Rotation.LengthSquared()) ||
+                MathF.Abs(pose.Rotation.LengthSquared() - 1) > .00001f)
+                throw new ArgumentException("Invalid animation base for physical capture.");
         var inverse = componentToWorld.AffineInverse();
         for (var i = 0; i < _parents.Length; i++)
         {
@@ -119,10 +129,10 @@ internal sealed class AlsCorePhysicsPose
             }
             else
             {
-                local = AlsPhysicsBodySet.Local(_seedPose[i]); _components[i] = parent < 0 ? local : _components[parent] * local;
+                local = AlsPhysicsBodySet.Local(animationPose[i]); _components[i] = parent < 0 ? local : _components[parent] * local;
             }
             if (body >= 0) { Rigid(local); _poseScratch[i] = AlsPhysicsBodySet.Pose(local); }
-            else _poseScratch[i] = _seedPose[i];
+            else _poseScratch[i] = animationPose[i];
         }
         _poseScratch.AsSpan().CopyTo(destination);
     }

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新物理显示：`docs/verification/2026-09-24-ragdoll-physical-display.md`。Main物理步→胶囊跟随→用实际Skeleton world逆变换回写物理骨骼，当前committed animation作非物理TRS基底，不重Seed/不污染precise Flail；空闲worker/身份/步数检查、写失败回滚。Single60/Parallel30/120及真实渲染60故障暂停通过，最大世界误差<1e-6m，四截图人工检查；两模型8姿态/192回写/56拒绝与普通Roll恢复回归过，Optimize过。首轮截图退出重复disconnect已修复，最终rendered60-final无ERROR。无全量/UE/旧矩阵/性能验收；道具物理attachment、动作中断/普通触发/退出Get-up/Pose Recovery及其余目标仍待接。main/用户P4保留。
+
 - 最新骨盆/胶囊跟随：`docs/verification/2026-09-24-ragdoll-pelvis-follow.md`。按用户优先级先接物理 pelvis actor→胶囊，球扫球心高度+1.9 cm、配置mask/自身排除、零目标回退；Godot初始重叠需额外零运动查询。Main Lifecycle成功物理步后跟随，动画重试继续/停用暂停，不积分胶囊/不拖动物理岛。Single60、Parallel30/60/120及失败暂停、四查询边界检查通过，日志pelvis-follow-fixed*；首轮initial-overlap失败保留。Optimize通过，无全量/UE/旧矩阵；物理最终显示/当前非物理基底、触发中断退出恢复仍待接，单机范围/时序差异见文档。main/用户P4保留。
 
 - 共享Flail最终补充：普通 locomotion 速度不能用骨盆速度替代；本机 UE MOVE_None 清 CMC velocity、APawn::GetVelocity读 CMC，现 ActualVelocity=0/首次差分减速，Flail 独立原生骨盆样本。最终四组 *-verified 日志通过。Core2901、Import2485+1旧Editor skip（首轮日志缺结论，独立TRX复跑确认）、Optimize与普通Roll通过；详见下一条文档。

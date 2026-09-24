@@ -116,6 +116,23 @@ public partial class PhysicsWorldPoseSmoke : Node3D
                         var scaledIsland = new AlsJointIsland(bodies, [], states.AsSpan(0, bodies.Length));
                         bridge.Capture(scaledIsland, world, snapshot);
                         Require(snapshot[ikRoot] == scaled[ikRoot], "Physics capture lost unrelated IK branch scale.");
+                        var current = scaled.ToArray();
+                        for (var bone = 0; bone < current.Length; bone++)
+                            if (!physical.Contains(bone)) current[bone] = current[bone] with
+                            { Position = current[bone].Position + new System.Numerics.Vector3(.013f, -.009f, .007f) };
+                        bridge.Capture(scaledIsland, world, current, snapshot);
+                        for (var bone = 0; bone < current.Length; bone++)
+                        {
+                            var local = AlsPhysicsBodySet.Local(snapshot[bone]);
+                            components[bone] = parents[bone] < 0 ? local : components[parents[bone]] * local;
+                            if (!physical.Contains(bone)) Require(snapshot[bone] == current[bone], "Current animation base was frozen at entry.");
+                        }
+                        for (var i = 0; i < bodies.Length; i++) Compare(world * components[mapping[i]], AlsCorePhysicsPose.ToWorld(scaledIsland.BodyAt(i).Actor));
+                        var heldCapture = snapshot.ToArray();
+                        Reject(() => bridge.Capture(scaledIsland, world, bad, snapshot));
+                        Require(snapshot.SequenceEqual(heldCapture), "Invalid current animation partially published a capture.");
+                        bridge.Capture(scaledIsland, world, snapshot);
+                        Require(snapshot[ikRoot] == scaled[ikRoot], "Current animation capture changed the entry baseline.");
                         for (var i = 0; i < bodies.Length; i++) Compare(
                             AlsCorePhysicsPose.ToWorld(saved[i].Actor), AlsCorePhysicsPose.ToWorld(states[i].Actor));
                         var scaledRoot = pose.ToArray(); scaledRoot[0] = scaledRoot[0] with { Scale = new(1.2f, 1, 1) };
