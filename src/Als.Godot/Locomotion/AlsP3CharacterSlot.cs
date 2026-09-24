@@ -324,6 +324,8 @@ public partial class AlsP3CharacterSlot : Node
                 : AlsActionRequest.None with { SlotGeneration = replacement.Handle.Generation },
             ActionParameters = default,
             MovementAction = default,
+            GameplayAction = _retiredMotorInput.GameplayAction == AlsTimelineAction.GettingUp
+                ? AlsTimelineAction.None : _retiredMotorInput.GameplayAction,
         };
         var releasePlatformOnNextStep =
             stagedMotorInput.Floor.PlatformId >= 0 ||

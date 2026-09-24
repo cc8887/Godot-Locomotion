@@ -17,6 +17,12 @@ public partial class CharacterRagdollRecoverySmoke : Node
     private string? _captureDirectory;
     private Vector3 _airVelocity;
     private bool _forceBack;
+    private string? _lifecycle;
+    private bool _lifecycleCovered;
+    private int _lifecycleInterrupted, _heldAccepted, _heldEnded;
+    private long _heldFrame;
+    private Vector3 _heldPosition;
+    private AlsP3Character? _retired;
     private Vector3 _exitPosition;
     private Input.MouseModeEnum _mouse;
     public override void _Ready()
@@ -28,6 +34,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
             _failure = args.Contains("--failure"); _mouse = Input.MouseMode;
             _interrupt = args.Contains("--interrupt");
             _forceBack = args.Contains("--back");
+            _lifecycle = args.FirstOrDefault(a => a.StartsWith("--lifecycle="))?[12..];
+            Require(_lifecycle is null or "pending" or "active" or "suspend" or "generation", "Unknown lifecycle case.");
             var capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="));
             if (capture is not null)
             {
@@ -44,6 +52,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
                 if (outcome.ResultCode == AlsActionResultCode.Accepted) _accepted++;
                 else if (outcome.ResultCode == AlsActionResultCode.Completed) _ended++;
                 else if (outcome.ResultCode == AlsActionResultCode.InterruptedByRagdoll && _interruptSent) _interrupted++;
+                else if (outcome.ResultCode == AlsActionResultCode.InterruptedByLifecycle && _lifecycleCovered) _lifecycleInterrupted++;
+                else if (outcome.ResultCode == AlsActionResultCode.InterruptedByGeneration && _lifecycle == "generation") _lifecycleInterrupted++;
                 else throw new InvalidOperationException("Unexpected Get-up outcome: " + outcome.ResultCode);
             };
             SendKey(Key.W, true);
@@ -57,9 +67,38 @@ public partial class CharacterRagdollRecoverySmoke : Node
         {
             Require(++_ticks < _hz * 22, $"Recovery stalled in stage {_stage}, cycle {_cycles}.");
             var character = _demo.ActiveCharacter; var motor = (AlsCharacterMotor)character.MovementAnchor;
-            Require(character.BodyHistory?.Failure is null && !character.IsPoseFrozen && _demo.ErrorCount <= (_failure ? 1 : 0),
-                "Recovery runtime failed: " + character.BodyHistory?.Failure);
+            var expectedClassification = _lifecycle == "generation" && _lifecycleCovered ? 1 : 0;
+            Require(character.BodyHistory?.Failure is null && (_stage == 6 || !character.IsPoseFrozen) && _demo.ErrorCount <= (_failure ? 1 : 0) + expectedClassification,
+                $"Recovery runtime failed: {character.BodyHistory?.Failure} frozen={character.IsPoseFrozen} errors={_demo.ErrorCount}");
             _stageTicks++;
+            if (_stage == 6)
+            {
+                if (!_demo.ReplacementDiagnostics.RecoveryCommitted) return;
+                Require(character.Handle.Generation == _retired!.Handle.Generation + 1 && !character.GettingUp && !_retired.GettingUp &&
+                    character.LatestMotorInput.GameplayAction != AlsTimelineAction.GettingUp &&
+                    character.CommittedAnimation.ActionCount == 0 && character.CommittedAnimation.StateCount == 0,
+                    "Generation replacement inherited Get-up gameplay or notify ownership.");
+                Next(5); return;
+            }
+            if (_stage == 4)
+            {
+                Require(character.RuntimeCommittedFrameId == _heldFrame && motor.GlobalPosition == _heldPosition &&
+                    _accepted == _heldAccepted && _ended == _heldEnded, "Inactive Get-up advanced or dispatched outcomes.");
+                if (_stageTicks < 3) return;
+                if (_lifecycle == "suspend") { character.SetSchedulingActive(true); Next(3); }
+                else { character.SetActive(true); Next(5); }
+                return;
+            }
+            if (_stage == 5)
+            {
+                Require(!character.GettingUp && motor.RecoveryRequest.Command == AlsActionCommand.None,
+                    "Deactivated Get-up retained its input lock or pending request.");
+                if (_stageTicks < _hz / 2) return;
+                Require(_accepted == _heldAccepted && character.CommittedAnimation.ActionCount == 0 &&
+                    character.CommittedAnimation.StateCount == 0 && motor.GlobalPosition.DistanceTo(_heldPosition) > .25f,
+                    "Resume replayed Get-up or failed to restore ordinary movement.");
+                Next(0); return;
+            }
             if (_stage == 0)
             {
                 if (character.RuntimeCommittedFrameId < 20 || _stageTicks < 20) return;
@@ -109,6 +148,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
                     "G did not restore capsule/start ground recovery.");
                 _exitPosition = motor.GlobalPosition;
                 _sawGetUp = false;
+                if (_lifecycle == "pending" && !_lifecycleCovered) { Suspend(character); return; }
                 GD.Print($"GET_UP_EXIT cycle={_cycles} upward={character.LastRagdollRecovery!.Decision.FacingUpward} yaw={character.LastRagdollRecovery.Decision.ActorYawDegrees:R}");
                 if (_failure && !_failureArmed)
                 { _demo.RuntimeContext.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish,
@@ -121,7 +161,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
                 {
                     if (_stageTicks < 5) return;
                     Require(character.Diagnostics.Result.ResolvedLocomotionState == AlsLocomotionState.InAir &&
-                        motor.Velocity.Y < _airVelocity.Y && _accepted == _ended + _interrupted && !character.GettingUp,
+                        motor.Velocity.Y < _airVelocity.Y && _accepted == _ended + _interrupted + _lifecycleInterrupted && !character.GettingUp,
                         "Air exit did not resume falling without an action.");
                     Finish(); return;
                 }
@@ -130,6 +170,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
                     (_stageTicks == 1 || _stageTicks == _hz / 6 || _stageTicks == _hz / 3 || _stageTicks == _hz / 2 || _stageTicks == _hz || _stageTicks == _hz * 3 / 2))
                     _captureDue++;
                 if (character.Diagnostics.Result.ActionPlayback.Active != 0) _sawGetUp = true;
+                if (_lifecycle is "active" or "suspend" or "generation" && !_lifecycleCovered && _stageTicks == _hz / 3)
+                { Require(_sawGetUp && character.GettingUp, "No active Get-up to suspend."); Suspend(character); return; }
                 if (_interrupt && !_interruptSent && _stageTicks == _hz / 3)
                 { _interruptSent = true; Tap(Key.G); Next(1); return; }
                 if (character.GettingUp)
@@ -137,7 +179,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
                         character.Diagnostics.Result.Identity.FrameId == character.LastRagdollRecovery.Snapshot.Identity.FrameId + 1 ||
                         character.Diagnostics.Result.ResolvedLocomotionState != AlsLocomotionState.Ragdoll, "Recovery stayed physics-driven.");
                 if (!_sawGetUp || character.GettingUp || _stageTicks < _hz * 2) return;
-                Require(_accepted == _cycles + 1 + _interrupted && _ended == _cycles + 1, "Get-up ownership did not finish exactly once.");
+                Require(_accepted == _cycles + 1 + _interrupted + _lifecycleInterrupted && _ended == _cycles + 1, "Get-up ownership did not finish exactly once.");
                 Require(motor.GlobalPosition.DistanceTo(_exitPosition) > .25f, "Held movement did not resume after Get-up.");
                 Require(character.CommittedAnimation.ActionCount == 0 && character.CommittedAnimation.StateCount == 0, "Get-up leaked action/notify state.");
                 _cycles++; _sawGetUp = false;
@@ -148,6 +190,24 @@ public partial class CharacterRagdollRecoverySmoke : Node
         catch (Exception e) { Fail(e); }
     }
     private void Next(int stage) { _stage = stage; _stageTicks = 0; }
+    private void Suspend(AlsP3Character character)
+    {
+        _lifecycleCovered = true;
+        if (_lifecycle == "generation")
+        {
+            _retired = character; _heldPosition = character.MovementAnchor.GlobalPosition;
+            _heldAccepted = _accepted; _heldEnded = _ended;
+            _demo.GetNode<AlsP3CharacterSlot>("CharacterSlot").RequestReplacement(character.RuntimeCommittedFrameId);
+            Next(6); return;
+        }
+        if (_lifecycle == "suspend") character.SetSchedulingActive(false);
+        else character.SetActive(false);
+        _heldFrame = character.RuntimeCommittedFrameId; _heldPosition = character.MovementAnchor.GlobalPosition;
+        _heldAccepted = _accepted; _heldEnded = _ended;
+        Require(_lifecycle == "suspend" ? character.GettingUp : !character.GettingUp,
+            "Lifecycle did not preserve suspension or clear gameplay Get-up ownership.");
+        Next(4);
+    }
     public override void _Process(double delta)
     {
         if (_captureDirectory is null || _done || _demo is null) return;
@@ -166,9 +226,15 @@ public partial class CharacterRagdollRecoverySmoke : Node
     {
         Require(!_failure || _demo.ActiveCharacter.FailureDiagnosticCount == 1, "Failure injection was not covered.");
         Require(!_interrupt || _interrupted == 1, "Ragdoll interruption was not covered.");
+        Require(_lifecycle is null || _lifecycleCovered && _lifecycleInterrupted == (_lifecycle is "active" or "generation" ? 1 : 0),
+            "Get-up lifecycle coverage or retirement count differs.");
+        var expectedGenerationMismatch = _lifecycle == "generation" ? 1 : 0;
+        Require(_demo.RuntimeContext.GenerationMismatches == expectedGenerationMismatch &&
+            _demo.ErrorCount == (_failure ? 1 : 0) + expectedGenerationMismatch,
+            "Unexpected diagnostic was hidden by the lifecycle test allowance.");
         Require(_captureDirectory is null || _captureNumber >= 6, "Get-up screenshot coverage incomplete.");
         Cleanup(); _done = true;
-        GD.Print($"CHARACTER_RAGDOLL_RECOVERY_OK hz={_hz} cycles={_cycles} accepted={_accepted} completed={_ended} interruptions={_interrupted} airborne=true retry={_failureArmed} errors={_demo.ErrorCount} captures={_captureNumber}");
+        GD.Print($"CHARACTER_RAGDOLL_RECOVERY_OK hz={_hz} cycles={_cycles} accepted={_accepted} completed={_ended} interruptions={_interrupted} airborne=true retry={_failureArmed} errors={_demo.ErrorCount} captures={_captureNumber} lifecycle={_lifecycle ?? "none"} retired={_lifecycleInterrupted}");
         GetTree().Quit();
     }
     private void Cleanup()

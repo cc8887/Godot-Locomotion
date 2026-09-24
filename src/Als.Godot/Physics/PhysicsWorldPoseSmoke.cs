@@ -137,6 +137,15 @@ public partial class PhysicsWorldPoseSmoke : Node3D
                             AlsCorePhysicsPose.ToWorld(saved[i].Actor), AlsCorePhysicsPose.ToWorld(states[i].Actor));
                         var scaledRoot = pose.ToArray(); scaledRoot[0] = scaledRoot[0] with { Scale = new(1.2f, 1, 1) };
                         Reject(() => bridge.SeedWithBodyVelocities(new(199, 7, 3), world, scaledRoot, inherited, states));
+                        // A nearly full-weight UE montage may omit its subthreshold
+                        // source. Preserve its positions, but export a rigid actor.
+                        var nearUnit = pose.Select(p => p with { Scale = p.Scale * .9999905f }).ToArray();
+                        bridge.SeedWithBodyVelocities(new(199, 7, 3), world, nearUnit, inherited, states);
+                        foreach (var state in states.Take(bodies.Length))
+                            Require(Math.Abs(state.Actor.Rotation.LengthSquared - 1) < .00001,
+                                "Near-unit animation did not produce a rigid body rotation.");
+                        scaledRoot[0] = scaledRoot[0] with { Scale = new(1.00002f, 1, 1) };
+                        Reject(() => bridge.SeedWithBodyVelocities(new(200, 7, 3), world, scaledRoot, inherited, states));
                         var held = states.ToArray(); var heldIdentity = bridge.SeedIdentity;
                         inherited[^1] = new(new(float.NaN, 0, 0), default);
                         Reject(() => bridge.SeedWithBodyVelocities(new(200 + variant, 7, 3), world, pose, inherited, states));
