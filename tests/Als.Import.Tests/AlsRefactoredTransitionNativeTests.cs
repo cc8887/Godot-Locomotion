@@ -16,6 +16,14 @@ public sealed class AlsRefactoredTransitionNativeTests(ITestOutputHelper output)
     [Theory]
     [MemberData(nameof(Cases))]
     public void ActualNotifyFunctionsAndContinuousSlotMatch(AlsRefactoredWeaponKind kind, int hz)
+        => CompareTrace(kind, hz, false);
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void ActualWorkerQueueAndPostUpdateMatch(AlsRefactoredWeaponKind kind, int hz)
+        => CompareTrace(kind, hz, true);
+
+    private void CompareTrace(AlsRefactoredWeaponKind kind, int hz, bool worker)
     {
         var catalog = new AlsRefactoredAnimationCatalog(MantlingHostFixture.Read("refactored_animation_sources"),
             p => File.ReadAllBytes(Path.Combine(RepositoryRoot.Find(), "assets/config", p)));
@@ -29,13 +37,14 @@ public sealed class AlsRefactoredTransitionNativeTests(ITestOutputHelper output)
         var names = additive.CurveNames.ToArray().Concat(basis.Curves.Names.ToArray()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var source = new AlsRefactoredTransitionPose(catalog, montages, additive.BoneNames, additive.Parents, names);
         var sampler = source.CreateSampler(); var bank = new AlsMontageRuntime([], sequences: montages.Assets);
+        var queue = new AlsTransitionQueueRuntime(bank, 11, 1);
         var basePose = new AlsPrecisePose[79]; var baseCurves = new AlsInertialCurve[names.Length];
         var rawCurves = new AlsInertialCurve[basis.Curves.Names.Length];
         basis.Pose.CreateSampler(basis.Curves).Sample(0, true, false, false, basePose, rawCurves);
         for (var c = 0; c < rawCurves.Length; c++) baseCurves[Array.IndexOf(names, basis.Curves.Names[c])] = rawCurves[c];
         var mixer = new AlsMontageSlotPose(basePose, additive.Parents, names.Length);
         var pose = new AlsPrecisePose[79]; var curves = new AlsInertialCurve[names.Length];
-        using var doc = JsonDocument.Parse(MantlingHostFixture.Read("refactored_transition_trace"));
+        using var doc = JsonDocument.Parse(MantlingHostFixture.Read(worker ? "refactored_transition_worker_trace" : "refactored_transition_trace"));
         var root = doc.RootElement; Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
         foreach (var hash in root.GetProperty("resourceHashes").EnumerateObject())
             Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(MantlingHostFixture.Read(hash.Name)))), hash.Value.GetString()!.ToUpperInvariant());
@@ -45,7 +54,7 @@ public sealed class AlsRefactoredTransitionNativeTests(ITestOutputHelper output)
         foreach (var row in trace.GetProperty("frames").EnumerateArray())
         {
             var input = row.GetProperty("input"); var id = new AlsFrameIdentity(frame, 11, 1);
-            var context = $"{kind}/{hz}/{frame}"; bank.Begin(id, input.GetProperty("delta").GetSingle());
+            var context = $"{kind}/{hz}/{frame}"; bank.Begin(id, input.GetProperty("delta").GetSingle()); queue.Begin(id);
             var weights = bank.Frame.SlotWeights(AlsMontageSlot.Transition);
             Compare(weights.SourceWeight, row.GetProperty("sourceWeight").GetDouble(), ref maxWeight, 2e-6, "source weight");
             Compare(weights.SlotNodeWeight, row.GetProperty("slotWeight").GetDouble(), ref maxWeight, 2e-6, "slot weight");
@@ -82,11 +91,33 @@ public sealed class AlsRefactoredTransitionNativeTests(ITestOutputHelper output)
                 Assert.Equal(nativeCurves.ContainsKey(names[c]), curves[c].Present);
                 if (curves[c].Present) Compare(curves[c].Value, nativeCurves[names[c]], ref maxCurve, 2e-6, "curve " + names[c]);
             }
-            var requests = input.GetProperty("stance").GetString() == "Als.Stance.Standing" && !input.GetProperty("moving").GetBoolean()
-                ? input.GetProperty("notifies").EnumerateArray().Select((n, i) => new AlsRefactoredWeaponTransitionRequest(id, i, profiles.Single(p => p.Machine.Resources.Kind == kind).Bindings[n.GetInt32()])).ToArray()
-                : [];
-            montages.Play(bank, id, requests);
-            if (input.GetProperty("stop").GetBoolean()) montages.StopTransitionAndTurnInPlace(bank, id, input.GetProperty("stopDuration").GetSingle());
+            var profile = profiles.Single(p => p.Machine.Resources.Kind == kind);
+            if (worker)
+            {
+                foreach (var command in input.GetProperty("worker").EnumerateArray())
+                    if (command.GetProperty("op").GetString() == "stop") queue.QueueStop(command.GetProperty("duration").GetSingle());
+                    else queue.QueuePlay(command.GetProperty("notify").GetInt32() < 0 ? null : montages.Command(profile.Bindings[command.GetProperty("notify").GetInt32()]),
+                        input.GetProperty("stance").GetString()!, input.GetProperty("moving").GetBoolean(), true);
+                if (input.GetProperty("postUpdate").GetBoolean()) { queue.PlayQueued(); queue.StopQueued(); }
+            }
+            foreach (var notify in input.GetProperty("notifies").EnumerateArray())
+                queue.PlayImmediate(montages.Command(profiles.Single(p => p.Machine.Resources.Kind == kind).Bindings[notify.GetInt32()]),
+                    input.GetProperty("stance").GetString()!, input.GetProperty("moving").GetBoolean(), standingIdleOnly: true);
+            if (input.GetProperty("stop").GetBoolean()) queue.StopImmediate(input.GetProperty("stopDuration").GetSingle());
+            if (worker)
+            {
+                var expected = row.GetProperty("queue"); var actual = queue.Candidate;
+                Assert.Equal(expected.GetProperty("stop").GetBoolean(), actual.Stop);
+                Assert.Equal(expected.GetProperty("duration").GetSingle(), actual.StopDuration);
+                Assert.Equal(expected.GetProperty("source").GetString(), actual.Play is { } play ? montages.SourcePath(play.AnimationId) : "");
+                if (actual.Play is { } request)
+                {
+                    Assert.Equal(expected.GetProperty("rate").GetSingle(), request.PlayRate);
+                    Assert.Equal(expected.GetProperty("start").GetSingle(), request.StartTime);
+                    Assert.Equal(expected.GetProperty("in").GetSingle(), request.BlendInTime);
+                    Assert.Equal(expected.GetProperty("out").GetSingle(), request.BlendOutTime);
+                }
+            }
             var states = row.GetProperty("instances"); Assert.True(bank.Candidate.Length == states.GetArrayLength(), context + " instance count");
             for (var i = 0; i < bank.Candidate.Length; i++)
             {
@@ -100,7 +131,7 @@ public sealed class AlsRefactoredTransitionNativeTests(ITestOutputHelper output)
                 Compare(actual.BlendTime, expected.GetProperty("blendTime").GetDouble(), ref maxClock, 2e-6, "blend time");
                 Compare(actual.PlayRate, expected.GetProperty("rate").GetDouble(), ref maxClock, 0, "rate");
             }
-            bank.Commit(id); frame++;
+            bank.ValidateCommit(id); queue.ValidateCommit(id); queue.Commit(id); bank.Commit(id); frame++;
             void Compare(double actual, double expected, ref double maximum, double tolerance, string field)
             {
                 var difference = Math.Abs(actual - expected); maximum = Math.Max(maximum, difference);

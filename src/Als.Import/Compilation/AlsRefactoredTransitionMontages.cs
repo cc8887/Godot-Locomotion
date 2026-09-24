@@ -57,6 +57,12 @@ public sealed class AlsRefactoredTransitionMontages
         _assets = paths.Select(p => _sources[p]).ToArray();
         _ = new AlsMontageRuntime([], sequences: _assets);
     }
+    public AlsSequenceMontageCommand Command(in AlsRefactoredWeaponNotifyBinding binding)
+    {
+        if (!_bindings.Contains(binding)) throw new ArgumentException("Foreign transition binding.");
+        var asset = _sources[binding.Sequence];
+        return new(asset.AnimationId, asset.Slot, binding.PlayRate, binding.StartTime, binding.BlendIn, binding.BlendOut);
+    }
     public void Play(AlsMontageRuntime owner, AlsFrameIdentity identity, ReadOnlySpan<AlsRefactoredWeaponTransitionRequest> requests)
     {
         owner.ValidateCommit(identity);

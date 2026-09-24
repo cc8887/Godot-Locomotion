@@ -2,6 +2,8 @@
 #include "AlsAnimationInstance.h"
 #include "AlsLinkedAnimationInstance.h"
 #include "AlsCharacter.h"
+#include "State/AlsTransitionsState.h"
+#include "Async/Async.h"
 #include "Animation/AnimBlueprint.h"
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimMontage.h"
@@ -114,6 +116,29 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredTransitionTrace(const FString& R
                 const auto Data=MakeShared<FJsonObject>();Data->SetStringField(TEXT("source"),Segment.GetAnimReference()->GetPathName());
                 Data->SetNumberField(TEXT("position"),E.MontagePosition);Data->SetNumberField(TEXT("weight"),E.BlendInfo.GetBlendedValue());Evaluations.Add(MakeShared<FJsonValueObject>(Data));
             }
+            const TArray<TSharedPtr<FJsonValue>>* Worker=nullptr;
+            if(Input->TryGetArrayField(TEXT("worker"),Worker))
+            {
+                // Main waits for this exclusive worker. The real ALS functions detect
+                // the thread and only change their queue; no montage/UObject is created.
+                Async(EAsyncExecution::ThreadPool,[Parent,Worker,&Kind]()
+                {
+                    for(const auto& Item:*Worker)
+                    {
+                        const auto Command=Item->AsObject();const auto Op=Command->GetStringField(TEXT("op"));
+                        if(Op==TEXT("stop"))Parent->StopTransitionAndTurnInPlaceAnimations(static_cast<float>(Command->GetNumberField(TEXT("duration"))));
+                        else
+                        {
+                            const int32 Index=static_cast<int32>(Command->GetNumberField(TEXT("notify")));
+                            const float Rate=Index==0&&Kind!=TEXT("Bow")?1.75f:1.5f;
+                            if(Index<0)Parent->PlayTransitionAnimation(nullptr,.2f,.2f,Rate,.3f,true);
+                            else if(Kind==TEXT("Bow")||Kind==TEXT("Rifle"))Parent->PlayTransitionLeftAnimation(.2f,.2f,Rate,.3f,true);
+                            else Parent->PlayTransitionRightAnimation(.2f,.2f,Rate,.3f,true);
+                        }
+                    }
+                }).Get();
+                if(Input->GetBoolField(TEXT("postUpdate")))Parent->NativePostUpdateAnimation();
+            }
             // Invoke the real generated notification functions after the native montage
             // tick/evaluation snapshot, as main-thread animation notify dispatch does.
             for(const auto& Notify:Input->GetArrayField(TEXT("notifies")))
@@ -123,6 +148,21 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredTransitionTrace(const FString& R
                 if(!Function)return false;Linked->ProcessEvent(Function,nullptr);
             }
             if(Input->GetBoolField(TEXT("stop")))Parent->StopTransitionAndTurnInPlaceAnimations(static_cast<float>(Input->GetNumberField(TEXT("stopDuration"))));
+            if(Worker)
+            {
+                const auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("TransitionsState"));
+                if(!Property||Property->Struct!=FAlsTransitionsState::StaticStruct())return false;
+                const auto& State=*Property->ContainerPtrToValuePtr<FAlsTransitionsState>(Parent);
+                const auto Queue=MakeShared<FJsonObject>();
+                Queue->SetStringField(TEXT("source"),State.QueuedTransitionSequence?State.QueuedTransitionSequence->GetPathName():TEXT(""));
+                Queue->SetBoolField(TEXT("stop"),State.bStopTransitionsQueued);Queue->SetNumberField(TEXT("duration"),State.QueuedStopTransitionsBlendOutDuration);
+                if(State.QueuedTransitionSequence)
+                {
+                    Queue->SetNumberField(TEXT("rate"),State.QueuedTransitionPlayRate);Queue->SetNumberField(TEXT("start"),State.QueuedTransitionStartTime);
+                    Queue->SetNumberField(TEXT("in"),State.QueuedTransitionBlendInDuration);Queue->SetNumberField(TEXT("out"),State.QueuedTransitionBlendOutDuration);
+                }
+                Row->SetObjectField(TEXT("queue"),Queue);
+            }
             for(const auto* I:Parent->MontageInstances)
             {
                 if(!I||!I->Montage)continue;
