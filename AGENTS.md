@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新区域 Slot 图接入：`docs/verification/2026-09-25-refactored-slot-sink.md`。新增Core AlsRefactoredLayerSlotSink转发上游inputs/cache、绑定共享冻结Montage帧并复用SlotPose，无新clock/allocator/history；ushort当前relevance按UE UpdateSlotNodeWeight仅localweight，跨帧仍notify owner。真实94图+basepose/受控区域采样，3Hz各3秒630提交帧每帧discard一致，淡入/全覆盖/淡出、7region、3注入sample故障恢复/重复错身份过期拒绝通过。Import定向216、最终图13复跑（重叠）、Optimize0/0。无新native覆盖/Godot/全量，普通Demo未切；下一步真实资源/native覆盖/完整宿主布局/Head→普通Mantle，旧缺口及用户文件/暂缓项保留。
+
 - 最新区域 Slot 基础：`docs/verification/2026-09-25-refactored-region-slots.md`。共享 bank/pose/notify 扩展为12 Slot，保留0—4，Head/Spine/ArmLeft/ArmRight/Pelvis/Legs/Curves为5—11；相关性ushort与12组预分配，事件总容量不变；图编译拒绝未知区域。Core定向172、Import212及新增校验后图10（9重叠）全过，Optimize0/0，Godot普通并行60Hz480帧含Ragdoll/第一人称通过。新区域使用受控采样测试，无新UE Slot覆盖/全量；普通Demo未切新图。下一步区域provider/真实覆盖native对照/宿主布局/Head→普通Mantle，旧缺口及用户文件/暂缓项保留。
 
 - 最新完整 Layering 原生对照：`docs/verification/2026-09-25-refactored-layer-native.md`。原始linked图/94节点，临时Parent受控22float/站蹲、实际raw Stand/Crouch填两个linked缓存，Slot无Montage透传。3Hz210连续帧16590骨maxP5.8292e-6cm/Q2.468e-7/S7.45e-8，curve presence同/值0差；Import64/1旧跳过/Optimize0/0，无C#生产改动/全量/Godot。UE首次辅助Update隐藏base warning改UpdateRoot，完整审计fingerprint C1E13C8BE16C15A0E4427F4D37F21FB14262557178C0FCAC14AC46DF96161D8C；冷0/0、普通11580实际exit0字节同SHA D28E20BC8F8760D480C8F0987224A879D60FF90D4085846BFD7F2FAC6C1FA3EE，两旧Condition/5warn保留；DV0/3旧warn。非完整父Refresh/角色/Slot覆盖证据；下一步真实区域Slot/宿主布局/Head→普通Mantle。旧缺口/用户文件/暂缓项保留。
