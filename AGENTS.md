@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle montage：`docs/verification/2026-09-24-mantle-montage.md`。真实6montage编译到共享MontageRuntime+SlotPose，PostLocomotion图slot4/原生Locomotion组index2；资源IDs属于独立Refactored作用域，禁止直接插入V4bank。HighRateScale1.2/OutCubic，其余1/Hermite；In均.2Hermite，source root disabled保留独立Mantling motion。Import54/CoreMontage151/Optimize0/0；6×240帧生命周期/全权重posecurve/替换discard过，无新native oracle/Godot场景/UE改动。初轮测试属性/identity编译错修；53过1失败是错误假设全OutCubic，核对数据修测试，生产未改。关键源码发现SetLocomotionAction和EarlyBlendOut均native branching，即使event tickMode0；现queued notify不能直接绑定，下一步原生子步/指定instance同步callback及结束中断事务，再资源/graph/探测/motion整合。普通demo未接，旧缺口/用户文件/暂缓项保留。
+
 - 最新Mantle场景适配：`docs/verification/2026-09-24-mantle-visual-binding.md`。新增Main-only AlsMantlingVisualBinding，原生厘米→FBX，按名字/父级/rest容差绑定68实体骨，完整校验后写，Refactored11VB不混用V4逻辑缓冲。两真实模型×3动作×31时刻186姿态/12648骨component TRS检查过，max5.75e-7m，24worker/非法尾部不部分写/改名/rest拒绝过；headless和渲染通过，High20/50/80%三图已查看（锁根预览，非攀爬运动验收）。Optimize0/0，初轮GetScale编译误用修Scale，后补scale断言headless过。无UE/新CoreImport全量，普通demo未接。下一步slot/notify/动作资源+探测/身份motion生命周期；所有旧缺口/用户改动/暂缓项保留。
 
 - 最新Mantle曲线：`docs/verification/2026-09-24-mantle-curves.md`。新增只读native原始RichCurve键导出（避开T3D六位截断），3source/6curve；Compiler严格hash/名字/顺序/策略，Pose sampler按资产+输入digest绑定，使用同次量化SampleTime与presence。363 native pose曲线参考726值max5.96e-8，Import Mantling47过、Optimize0/0。首轮9过1元数据time断言错，把请求时间当量化时间，按源码修测试、未改算法/容差。UE全Editor构建/插件审计fingerprint3A2435A0BA821769E64D0EE19C4E2A206EB0B4EAD76F08BE5BBA40D922CABECB，冷导0/0、普通Editor28072实际句柄exit0，两输出字节一致；DV0/3旧warn，两旧Condition及渲染警告保留。curvesSHA87441D4792EC835F58823A02D1D6AE5C9698B542ED1807C64CD2DA8296D20B0F/referenceSHA656F7198C73684DFB94966F513C617D29F1715E69CD928E4A439351195665E2E。无新Godot场景/全量/游戏打包；下一步manifest/场景骨架/slot/notify及探测生命周期，Mantle未接demo，其余旧缺口/用户文件/暂缓项保留。

@@ -33,7 +33,7 @@ public sealed class AlsMontageSlotPose
         Span<AlsPrecisePose> output, Span<AlsInertialCurve> curves, IAlsMontagePoseSource sampler)
     {
         ArgumentNullException.ThrowIfNull(frame); ArgumentNullException.ThrowIfNull(sampler);
-        if (_busy || identity.SlotGeneration == 0 || frame.Identity != identity || slot.Id is < 0 or > 3 ||
+        if (_busy || identity.SlotGeneration == 0 || frame.Identity != identity || slot.Id is < 0 or > 4 ||
             output.Length != _reference.Length || curves.Length != _resultCurves.Length ||
             !source.IsEmpty && source.Length != output.Length || !sourceCurves.IsEmpty && sourceCurves.Length != curves.Length)
             throw new ArgumentException("Stale montage frame or invalid pose buffers.");
