@@ -58,14 +58,23 @@ public struct AlsOverlayMachineUpdate
 // interrupted transitions and the conduit path used to reach each target.
 public sealed class AlsOverlayStateMachine
 {
-    private readonly AlsOverlayStateGraph _graph;
+    private readonly AlsOverlayBoneProfile _quickFeet;
+    private readonly AlsMovementInputCurve[] _curves;
     private readonly AlsOverlayMachineDefinition _definition;
     private readonly Func<int, float, float> _sampleCurve;
     private AlsOverlayActivePaths _curvePaths;
     public AlsOverlayStateMachine(AlsOverlayStateGraph graph, AlsOverlayMachineKind kind)
     {
         ArgumentNullException.ThrowIfNull(graph); if ((uint)kind > 4) throw new ArgumentOutOfRangeException(nameof(kind));
-        _graph = graph; _definition = graph.Machines[(int)kind]; _sampleCurve = SampleCurve;
+        _quickFeet = graph.QuickFeet; _curves = graph.Curves.ToArray(); _definition = graph.Machines[(int)kind]; _sampleCurve = SampleCurve;
+    }
+    // A standalone compiled machine need not invent the legacy outer Overlay graph.
+    public AlsOverlayStateMachine(AlsOverlayMachineDefinition definition, ReadOnlySpan<AlsMovementInputCurve> curves, AlsOverlayBoneProfile quickFeet)
+    {
+        ArgumentNullException.ThrowIfNull(definition); ArgumentNullException.ThrowIfNull(quickFeet);
+        foreach (var edge in definition.Edges)
+            if (edge.Curve >= curves.Length) throw new ArgumentException("Missing machine transition curve.");
+        _definition = definition; _curves = curves.ToArray(); _quickFeet = quickFeet; _sampleCurve = SampleCurve;
     }
     public AlsOverlayMachineUpdate Initialize()
     {
@@ -77,6 +86,18 @@ public sealed class AlsOverlayStateMachine
         float contextWeight, float delta, long serial, bool inactive = false, AlsGraphTraversalCounter? updateCounter = null)
     {
         input.Validate();
+        if (_definition.UsesRefactoredRules) throw new ArgumentException("Refactored machine requires Refactored input.");
+        return UpdateCore(previous, input, null, contextWeight, delta, serial, inactive, updateCounter);
+    }
+    public AlsOverlayMachineUpdate UpdateRefactored(in AlsOverlayMachineState previous, in AlsRefactoredWeaponRuleInput input,
+        float contextWeight, float delta, long serial, bool inactive = false, AlsGraphTraversalCounter? updateCounter = null)
+    {
+        if (!_definition.UsesRefactoredRules) throw new ArgumentException("Legacy machine requires legacy input.");
+        return UpdateCore(previous, default, input, contextWeight, delta, serial, inactive, updateCounter);
+    }
+    private AlsOverlayMachineUpdate UpdateCore(in AlsOverlayMachineState previous, in AlsOverlayStateInput input,
+        AlsRefactoredWeaponRuleInput? refactored, float contextWeight, float delta, long serial, bool inactive, AlsGraphTraversalCounter? updateCounter)
+    {
         if(updateCounter is {HasUpdated:false} || previous.Updated && previous.LastUpdateCounter.HasValue!=updateCounter.HasValue)
             throw new ArgumentException("Overlay machine update traversal ownership differs.");
         if (!float.IsFinite(delta) || delta < 0 || serial < 0 || !float.IsFinite(contextWeight) || contextWeight < 0 ||
@@ -88,7 +109,7 @@ public sealed class AlsOverlayStateMachine
         var state = result.State; var first = !state.Updated;
         for (var step = 0; step < _definition.MaxTransitions; step++)
         {
-            uint visited = 0; var selected = FindTransition(state.CurrentState, input, state.ElapsedSeconds, ref visited);
+            uint visited = 0; var selected = FindTransition(state.CurrentState, input, refactored, state.ElapsedSeconds, ref visited);
             if (selected.Edge < 0) break;
             var edge = _definition.Edges[selected.Edge];
             // A conduit route may return to the current content state. UE stops
@@ -124,16 +145,18 @@ public sealed class AlsOverlayStateMachine
         state.Updated = true; state.LastUpdateSerial = serial; state.LastUpdateCounter=updateCounter; result.State = state; return result;
     }
 
-    private AlsOverlayActivePath FindTransition(int state, in AlsOverlayStateInput input, float elapsed, ref uint visited)
+    private AlsOverlayActivePath FindTransition(int state, in AlsOverlayStateInput input, AlsRefactoredWeaponRuleInput? refactored, float elapsed, ref uint visited)
     {
         if ((visited & (1u << state)) != 0) return new(-1, -1); visited |= 1u << state;
         // The only authored conduit has a literal true entry rule, enforced by
         // the compiler. It owns no pose/player and never consumes a blend step.
         foreach (var index in _definition.States[state].Exits)
         {
-            var edge = _definition.Edges[index]; if (edge.Rule.Matches(input, elapsed) != edge.DesiredReturn) continue;
+            var edge = _definition.Edges[index];
+            var matches = refactored is { } value ? edge.RefactoredRule!.Value.Matches(value, elapsed) : edge.Rule.Matches(input, elapsed);
+            if (matches != edge.DesiredReturn) continue;
             if (!_definition.States[edge.To].Conduit) return new(index, -1);
-            var nested = FindTransition(edge.To, input, elapsed, ref visited);
+            var nested = FindTransition(edge.To, input, refactored, elapsed, ref visited);
             if (nested.Edge >= 0)
             {
                 if (nested.ConduitEntrance >= 0) throw new InvalidOperationException("Unsupported nested Overlay conduit path.");
@@ -146,18 +169,18 @@ public sealed class AlsOverlayStateMachine
     // Diagnostic contribution; pose evaluation must preserve the ordered stack.
     public float BoneStateWeight(in AlsOverlayMachineState state, int stateIndex, int bone)
     {
-        if (!state.Initialized || state.Kind != _definition.Kind || (uint)stateIndex >= _definition.States.Length || (uint)bone >= _graph.QuickFeet.BoneNames.Length)
+        if (!state.Initialized || state.Kind != _definition.Kind || (uint)stateIndex >= _definition.States.Length || (uint)bone >= _quickFeet.BoneNames.Length)
             throw new ArgumentException("Invalid Overlay bone contribution.");
         if (state.Transitions.Count == 0) return state.CurrentState == stateIndex ? 1 : 0;
         var value = 0f;
         for (var i = 0; i < state.Transitions.Count; i++)
         {
             var transition = state.Transitions.GetTransition(i);
-            var weights = _definition.Edges[state.Paths[i].Edge].QuickFeet ? _graph.QuickFeet.Weights(bone, transition.Alpha) : new System.Numerics.Vector2(transition.Alpha, 1 - transition.Alpha);
+            var weights = _definition.Edges[state.Paths[i].Edge].QuickFeet ? _quickFeet.Weights(bone, transition.Alpha) : new System.Numerics.Vector2(transition.Alpha, 1 - transition.Alpha);
             if (i > 0) value *= weights.Y; else if (transition.From == stateIndex) value += weights.Y;
             if (transition.To == stateIndex) value += weights.X;
         }
         return System.Math.Clamp(value, 0, 1);
     }
-    private float SampleCurve(int activeIndex, float time) => _graph.Curves[_definition.Edges[_curvePaths[activeIndex].Edge].Curve].Sample(time);
+    private float SampleCurve(int activeIndex, float time) => _curves[_definition.Edges[_curvePaths[activeIndex].Edge].Curve].Sample(time);
 }

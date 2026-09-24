@@ -56,7 +56,10 @@ public sealed class AlsOverlayStateDefinition
 }
 
 public sealed record AlsOverlayEdgeDefinition(string SourceNode, int From, int To, int DelegateIndex, int Priority,
-    bool DesiredReturn, AlsOverlayRule Rule, float Duration, AlsTransitionBlend Blend, int Curve, bool QuickFeet, int StartNotify, bool Inertialization);
+    bool DesiredReturn, AlsOverlayRule Rule, float Duration, AlsTransitionBlend Blend, int Curve, bool QuickFeet, int StartNotify, bool Inertialization)
+{
+    public AlsRefactoredWeaponRule? RefactoredRule { get; init; }
+}
 
 public sealed class AlsOverlayMachineDefinition
 {
@@ -68,6 +71,7 @@ public sealed class AlsOverlayMachineDefinition
     public int InitialState { get; }
     public int MaxTransitions { get; }
     public bool SkipFirstBlend { get; }
+    public bool UsesRefactoredRules { get; }
     public ReadOnlySpan<AlsOverlayStateDefinition> States => _states;
     public ReadOnlySpan<AlsOverlayEdgeDefinition> Edges => _edges;
     public AlsOverlayMachineDefinition(AlsOverlayMachineKind kind, int compiledIndex, int nativeIndex, int initialState,
@@ -78,6 +82,10 @@ public sealed class AlsOverlayMachineDefinition
             states.Select(s => s.Name).Distinct().Count() != states.Length ||
             !states.SelectMany(s => s.Exits.ToArray()).Order().SequenceEqual(Enumerable.Range(0, edges.Length)))
             throw new ArgumentException("Incomplete Overlay state topology.");
+        UsesRefactoredRules = edges.Any(e => e.RefactoredRule.HasValue);
+        if (UsesRefactoredRules && (kind == AlsOverlayMachineKind.Overlay || edges.Any(e => !e.RefactoredRule.HasValue ||
+            !Enum.IsDefined(e.RefactoredRule.Value.Kind) || !double.IsFinite(e.RefactoredRule.Value.Delay) || e.RefactoredRule.Value.Delay < 0)))
+            throw new ArgumentException("Mixed or invalid Overlay rule domains.");
         for (var state = 0; state < states.Length; state++)
         {
             var item = states[state]; var priority = 0;
