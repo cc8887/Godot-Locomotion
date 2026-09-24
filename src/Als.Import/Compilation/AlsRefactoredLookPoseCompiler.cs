@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Import.Compilation;
@@ -39,6 +40,12 @@ public sealed class AlsRefactoredLookPoseSource
             }
             finally {_busy=false;}
         }
+        public void Evaluate(float pitch,float normalizedTime,Span<AlsPrecisePose> output)
+        {
+            Span<AlsAimGridVertex> samples=stackalloc AlsAimGridVertex[2];
+            var count=AlsRefactoredLookBlendSpace.Evaluate(pitch,samples);
+            SampleBlend(samples[..count],normalizedTime,output);
+        }
         // Sample selection/order belongs to the BlendSpace evaluator. This method
         // consumes its final normalized weights, without advancing sample time.
         public void SampleBlend(ReadOnlySpan<AlsAimGridVertex> samples,float normalizedTime,Span<AlsPrecisePose> output)
@@ -77,6 +84,7 @@ public static class AlsRefactoredLookPoseCompiler
         using var document=JsonDocument.Parse(inputsJson);var root=document.RootElement;
         var space=root.GetProperty("blendSpace");
         Require(space.GetProperty("source").GetString()==prefix+"View/BS_Als_Look.BS_Als_Look","Foreign Look BlendSpace.");
+        ValidateBlendPolicy(space.GetProperty("nativeText").GetString()!);
         var samples=space.GetProperty("samples").EnumerateArray().ToArray();Require(samples.Length==3,"Look sample closure differs.");
         float[] positions=[0,-90,90];
         for(var i=0;i<3;i++)
@@ -98,4 +106,30 @@ public static class AlsRefactoredLookPoseCompiler
         return new(paths.Select(p=>raw[p]).ToArray(),raw[basis]);
     }
     private static void Require(bool value,string message){if(!value)throw new ArgumentException(message);}
+    private static void ValidateBlendPolicy(string native)
+    {
+        Require(native.StartsWith("Begin Object Class=/Script/Engine.BlendSpace1D Name=\"BS_Als_Look\" ",StringComparison.Ordinal),
+            "Look must retain the original BlendSpace1D class.");
+        // ObjectExporter omits class defaults. These are BlendSpace1D's native
+        // defaults: segment interpolation, no axis/sample smoothing or per-bone overrides.
+        var properties=Regex.Matches(native.Replace("\r",""),@"(?m)^   (\w+(?:\(\d+\))?)=(.*)$")
+            .ToDictionary(m=>m.Groups[1].Value,m=>m.Groups[2].Value,StringComparer.Ordinal);
+        string[] allowed=["bContainsRotationOffsetMeshSpaceSamples","bLoop","PreviewBasePose","AnimLength",
+            "SampleData(0)","SampleData(1)","SampleData(2)","BlendSpaceData","BlendParameters(0)","Skeleton","ThumbnailInfo","PreviewSkeletalMesh"];
+        Require(properties.Keys.All(allowed.Contains),"Look has unsupported non-default BlendSpace policy.");
+        Require(properties.GetValueOrDefault("bContainsRotationOffsetMeshSpaceSamples")=="True"&&properties.GetValueOrDefault("bLoop")=="False"&&
+            properties.GetValueOrDefault("AnimLength")=="1.000000"&&
+            properties.GetValueOrDefault("BlendParameters(0)")=="(DisplayName=\"Pitch Angle\",Min=-90.000000,Max=90.000000)"&&
+            properties.GetValueOrDefault("BlendSpaceData")=="(Segments=((SampleIndices[0]=1,SampleIndices[1]=0,Vertices[1]=0.500000),(SampleIndices[0]=0,SampleIndices[1]=2,Vertices[0]=0.500000,Vertices[1]=1.000000)))",
+            "Look segment layout or axis differs.");
+        string[] directions=["Forward","Down","Up"];
+        for(var i=0;i<3;i++)
+        {
+            var name="A_Als_Look_"+directions[i];
+            var point=i==0?"":",SampleValue=(X="+(i==1?"-90":"90")+".000000,Y=0.000000,Z=0.000000)";
+            Require(properties.GetValueOrDefault("SampleData("+i+")")==
+                "(Animation=\"/Script/Engine.AnimSequence'/ALS/ALS/Animations/View/"+name+"."+name+"'\""+point+")",
+                "Look native sample order differs.");
+        }
+    }
 }

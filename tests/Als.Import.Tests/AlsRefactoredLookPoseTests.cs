@@ -9,7 +9,7 @@ public sealed class AlsRefactoredLookPoseTests(ITestOutputHelper log)
 {
     private static string Read(string name)=>MantlingHostFixture.Read("refactored_"+name);
     [Fact]
-    public void OriginalMeshAdditivePosesMatchNativeWithRecordedSampleWeights()
+    public void OriginalLookEvaluatorIndependentlyMatchesNativeWeightsAndPoses()
     {
         var resource=AlsRefactoredLookPoseCompiler.Compile(Read("head_inputs"),Read("layering_graphs"));
         var sampler=resource.CreateSampler();var pose=new AlsPrecisePose[79];
@@ -18,7 +18,10 @@ public sealed class AlsRefactoredLookPoseTests(ITestOutputHelper log)
         foreach(var row in rows)
         {
             var samples=row!["samples"]!.AsArray().Select(s=>new AlsAimGridVertex(s!["index"]!.GetValue<int>(),s["weight"]!.GetValue<float>())).ToArray();
-            sampler.SampleBlend(samples,row["normalizedTime"]!.GetValue<float>(),pose);
+            var weights=new AlsAimGridVertex[2];var pitch=row["pitch"]!.GetValue<float>();
+            var countWeights=AlsRefactoredLookBlendSpace.Evaluate(pitch,weights);
+            Assert.Equal(samples,weights.Take(countWeights).ToArray());
+            sampler.Evaluate(pitch,row["normalizedTime"]!.GetValue<float>(),pose);
             Assert.Equal(resource.BoneNames.ToArray(),row["names"]!.AsArray().Select(n=>n!.GetValue<string>()));
             for(var bone=0;bone<79;bone++)
             {
@@ -56,6 +59,7 @@ public sealed class AlsRefactoredLookPoseTests(ITestOutputHelper log)
     }
     [Theory]
     [InlineData("base")][InlineData("root")][InlineData("duration")][InlineData("additive")][InlineData("curves")]
+    [InlineData("grid")][InlineData("segments")][InlineData("axis")][InlineData("nativeSample")]
     public void UnsupportedLookPolicyIsRejected(string mutation)
     {
         var data=JsonNode.Parse(Read("head_inputs"))!;var policy=data["sequences"]![0]!["evaluation"]!;
@@ -64,6 +68,11 @@ public sealed class AlsRefactoredLookPoseTests(ITestOutputHelper log)
         if(mutation=="duration")policy["sequencePlayLength"]=2;
         if(mutation=="additive")policy["additiveType"]="AAT_LocalSpaceBase";
         if(mutation=="curves")policy["floatCurveCount"]=1;
+        var native=data["blendSpace"]!["nativeText"]!.GetValue<string>();
+        if(mutation=="grid")data["blendSpace"]!["nativeText"]=native+"\n   bInterpolateUsingGrid=True\n";
+        if(mutation=="segments")data["blendSpace"]!["nativeText"]=native.Replace("Vertices[1]=0.500000","Vertices[1]=0.600000",StringComparison.Ordinal);
+        if(mutation=="axis")data["blendSpace"]!["nativeText"]=native.Replace("Min=-90.000000","Min=-100.000000",StringComparison.Ordinal);
+        if(mutation=="nativeSample")data["blendSpace"]!["nativeText"]=native.Replace("A_Als_Look_Up","A_Als_Look_Down",StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(()=>AlsRefactoredLookPoseCompiler.Compile(data.ToJsonString(),Read("layering_graphs")));
     }
 }

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Look独立权重：`docs/verification/2026-09-25-refactored-look-weights.md`。原BS实际两段1D非V4grid，新Core double归一化→float段→排序阈值归一化，Look Evaluate自主pitch→weights→pose；编译原文严格轴/段/样本/类/非默认属性，省略策略依据本地原生默认。35native权重order逐值同/2765骨同前误差，无参考权重驱动。Import123、最终Look11复跑重叠、Core1细边界、Optimize0/0。无新增UE细边界oracle/Godot/全量。下一步Head图回调相关性整合及连续状态oracle→宿主/Mantle，旧缺口/用户文件/暂缓项保留。
+
 - 最新Look加法姿态：`docs/verification/2026-09-25-refactored-look-pose.md`。新Look compiler/source三目标+Stand frame0，内部raw additive target入口复用Mantling键/retarget/VB，旧入口政策保留；mesh差值与按调用者权重有序混合。35native姿态2765骨maxP6.434238129413513e-14cm/Q4.440892098500626e-16/S0，使用native记录权重，不是pitch→weight独立验证。4owner×3×31根锁关辅助scale0/1无影响；5策略及非法weight恢复。新7/Import119/Optimize0/0，无新UE/Godot/全量。下一步真实BS权重/Head图回调与状态oracle→宿主/Mantle，普通demo未切，旧缺口/用户文件/暂缓项保留。
 
 - 最新Head真实输入：`docs/verification/2026-09-25-refactored-head-inputs.md`。原AB_Als_C→AIS_Als_Default五参数(.1,.1,.2,.01,.01)编译验证；BSLook三源1s31keys/mesh additive/Stand frame0，共4源raw/policy/curve/skeleton及35×79 native姿态导出。Import41/最终Head7（6重叠）过/Optimize0/0；仅结构来源检查无C#姿态对照。图递归确认Init→Refresh→Look。UE全审计0action同C1E13...冷0/0，普通39164实际exit0/两旧Condition五warn。输入不字节同：仅3additive rootLockFirstFrame.scale冷1/editor0九值，native35pose全同，仅reference输入hash不同；根锁均关，helper ExtractRootTrackTransform内部原因未定，勿把其当additivebase。冷input357BF870.../ref9D5E10CC...，两份保留artifacts。无插件变化/DV/Godot/全量。下一步Look raw/additive采样对照及View状态oracle/Head回调→宿主/Mantle，旧缺口/用户文件/暂缓项保留。
