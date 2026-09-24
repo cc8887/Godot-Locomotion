@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Original linked Layering graph with controlled parent states and cached linked input poses. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportRefactoredLayerGraphTrace(const FString& RequestPath, const FString& OutputPath);
+
     /** Compiled node identities, reflected defaults and native deferred cache order. Never compiles or saves assets. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadCompiledAnimationGraph(UAnimBlueprint* Blueprint);
