@@ -59,7 +59,7 @@ public static class AlsRefactoredDefaultOverlay
         return TwoCurve(ground, TwoCurve(curves[1], curves[0], state.Prediction), input.InAir);
     }
 
-    private static AlsPrecisePose Two(in AlsPrecisePose a, in AlsPrecisePose b, float alpha)
+    public static AlsPrecisePose Two(in AlsPrecisePose a, in AlsPrecisePose b, float alpha)
     {
         if (alpha <= AlsPoseBlender.WeightThreshold) return a;
         if (alpha >= 1 - AlsPoseBlender.WeightThreshold) return b;
@@ -70,7 +70,7 @@ public static class AlsRefactoredDefaultOverlay
         var weightB = 1f - weightA;
         return AlsPrecisePoseBlender.Accumulate(AlsPrecisePoseBlender.Scale(a, weightA), b, weightB).Normalized();
     }
-    private static AlsInertialCurve TwoCurve(AlsInertialCurve a, AlsInertialCurve b, float alpha) =>
+    public static AlsInertialCurve TwoCurve(AlsInertialCurve a, AlsInertialCurve b, float alpha) =>
         alpha <= AlsPoseBlender.WeightThreshold ? a : alpha >= 1 - AlsPoseBlender.WeightThreshold ? b :
             AlsStandingCycleCurves.Lerp(a, b, 1f - (1f - alpha));
     private static bool Unit(float x) => float.IsFinite(x) && x is >= 0 and <= 1;
