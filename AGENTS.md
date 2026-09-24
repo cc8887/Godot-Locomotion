@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新View原生连续对照：`docs/verification/2026-09-25-refactored-view-native.md`。真实AB_Als_C settings/NativeThreadSafeUpdate+显式Head回调，3Hz1050帧独立history，210换侧布尔逐帧同。最大Spine角差.0001335144度、Head角差.0000915527度/速度.00048828125度秒；最终bool精确/weights2e-6/angle和velocity各.001预算。初统一1e-4失败，展开InvExp两实验更差均撤回，生产未改，精确舍入原因未定位；不得称逐位同或原门槛通过。冷/普通37696实际exit0字节同SHA DBADBB04BC2E9A01D37EA5E74CDAE1AECCF188992429E13D89340307E119DCBB，旧两Condition/五warn保留；UE全审计fingerprint213A8E...，DV0/3旧warn。Import29/Optimize0/0；无全量/Godot/整图。下一步Head原生整图→完整宿主/Mantle；普通demo未切，全部旧缺口/用户文件/暂缓项保留。
+
 - 最新Head图运行时：`docs/verification/2026-09-25-refactored-head-runtime.md`。实际6节点compiler runtime/authored交叉，alpha/teleport/no-sync/回调/bindings门控，profile绑定settings/Look；Core候选Head以实际遍历counter处理Init→Refresh、隐藏/重初始，Evaluate只Look+MeshApply/curve透传，fault后禁止commit。实际源3Hz630提交帧重试/重复Eval/各4init/3采样fault恢复，5非法图；新8/Import54/最终Head8重叠/Optimize0/0。初次误校authored linkId=-1导致3失败，改runtime链接+编辑图FollowReroutes后通过，日志保留。无新UE连续状态/整图oracle/Godot/全量；普通demo未切，下一步原生Head/View状态与整图对照→完整宿主/Mantle，旧缺口及用户文件/暂缓项保留。
 
 - 最新Look独立权重：`docs/verification/2026-09-25-refactored-look-weights.md`。原BS实际两段1D非V4grid，新Core double归一化→float段→排序阈值归一化，Look Evaluate自主pitch→weights→pose；编译原文严格轴/段/样本/类/非默认属性，省略策略依据本地原生默认。35native权重order逐值同/2765骨同前误差，无参考权重驱动。Import123、最终Look11复跑重叠、Core1细边界、Optimize0/0。无新增UE细边界oracle/Godot/全量。下一步Head图回调相关性整合及连续状态oracle→宿主/Mantle，旧缺口/用户文件/暂缓项保留。
