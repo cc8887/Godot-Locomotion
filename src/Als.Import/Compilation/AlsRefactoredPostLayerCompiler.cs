@@ -25,6 +25,9 @@ public static class AlsRefactoredPostLayerCompiler
 {
     public static AlsRefactoredPostLayerProfile Compile(string graphs,string inventory,string baseInputs,string headInputs)
     {
+        // Bind the parent PostLocomotion placement and default Slot source policy,
+        // in addition to each linked graph's internal compilation.
+        _=AlsRefactoredLayeringGraphCompiler.CompileCurveTail(graphs,AlsRefactoredLayeringInputModel.CurveNames);
         var layering=AlsRefactoredLayerGraphCompiler.Compile(graphs,inventory,baseInputs);
         var bases=AlsRefactoredBasePoseCompiler.Compile(baseInputs,inventory,graphs);
         var head=AlsRefactoredHeadGraphCompiler.Compile(graphs,inventory,headInputs);
