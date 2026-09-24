@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle根骨采样：`docs/verification/2026-09-24-mantle-root-sampling.md`。Core SampleAbsolute开放原始root TRS不减参考/不强制scale；新增first-slot有序段绝对sampler，逆序共享边界/空隙末段/原时间转换、序列×段速率/loop、独立SampleLast按原生GetEndPos。受控5新+12旧RootMotion Release17过，Optimize0/0。尚未绑定真实6montage源轨道或对照616 native样本，无UE/Import全量/Godot新场景；下一步真实轨道/段绑定与原生精度→warp时钟/探测/生命周期。Mantle及其余目标未完，头颈道具暂缓，用户文件保留。
+
 - 最新Mantle配置编译：`docs/verification/2026-09-24-mantle-settings-compilation.md`。Core类型+Import编译实际入口/类型Switch/Overlay tagSwitch/返回引用及7设置，生产不读selection/rootSamples。独立39原生选择一致；删除oracle仍可编译，改authored返回引用会改结果，5非法边界拒绝，Release8过/Optimize0/0。手动/自动起始时间接Core，实际7份全手动；当前Linear/HermiteCubic，未知混合拒绝。无gameplay、任意时root采样、通用探测配置或UE/Godot新场景/全量，冻结SHA不变。下一步根骨采样/原生source对照→探测/warp同步/动作生命周期；所有剩余目标及用户文件保留。
 
 - 最新Mantle原生输入：`docs/verification/2026-09-24-mantle-inputs.md`。只读Python导出7实际设置/6montage/1选择图/角色通用设置，13overlay×3类型39原生选择，616原生绝对root TRS采样。全部autoStartTime=false：High125..200→.6..0、InAir .8..0、Low50..100→.5..0，warp高.3..6/低.3..7。全Editor0action审计同fingerprint5507EC2FCBD1D34CCE8C479248800626CB6EFA1E0DE171EF91A041FCBDA81BC6。两冷导CRLF字节同；改显式LF后再冷导0/0，与冻结文件同SHA94B9618B08623A380028C53D84F08CD6C5BD700F3B073DCD5F776424D7484165。首轮registry未扫描、Vector2f属性、wrapper相等失败已修并留日志。无UE源码/资产写入/C#改动/新Godot或全量/普通Editor/DV。下一步编译真实设置+authored选择、任意时间root采样/原生source轨迹，再Main探测/warp同步/生命周期；Mantle和其余全目标未完，用户文件保留。
