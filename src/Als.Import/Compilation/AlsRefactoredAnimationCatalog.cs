@@ -53,8 +53,30 @@ public sealed class AlsRefactoredAnimationCatalog
             throw new ArgumentException("Refactored source identity differs.");
         return root.Clone();
     }
-    // Absolute sequences only. Additive resources remain present in the catalog;
-    // their original base-pose and subtraction policies need an explicit compiler.
+    public AlsRefactoredAdditiveSource CompileAdditivePose(string source)
+    {
+        var target=Read(source);var policy=target.GetProperty("evaluation");
+        var type=policy.GetProperty("additiveType").GetString();
+        if(target.GetProperty("class").GetString()!="AnimSequence"||
+            type is not ("AAT_LocalSpaceBase" or "AAT_RotationOffsetMeshSpace")||
+            policy.GetProperty("basePoseType").GetString()!="ABPT_AnimFrame")
+            throw new ArgumentException("Unsupported original additive source policy.");
+        var basePath=policy.GetProperty("baseAsset").GetString()??throw new ArgumentException("Missing additive base.");
+        var basis=Read(basePath);
+        if(basis.GetProperty("class").GetString()!="AnimSequence")throw new ArgumentException("Invalid additive base class.");
+        var skeleton=target.GetProperty("raw").GetProperty("skeletonSource").GetString()!;
+        var rows=source==basePath?new[]{target}:new[]{target,basis};
+        var json=JsonSerializer.Serialize(new {schemaVersion=1,
+            skeletons=new Dictionary<string,object>{{skeleton,new {metadata=_skeletons.GetProperty(skeleton)}}},
+            sequences=rows.Select(p=>new {raw=p.GetProperty("raw"),evaluation=p.GetProperty("evaluation"),curves=p.GetProperty("curves")})});
+        var poses=AlsMantlingPoseCompiler.CompileCatalogAdditiveTargets(json,rows.Select(p=>p.GetProperty("source").GetString()!).ToArray());
+        var curves=AlsMantlingCurveCompiler.CompileEmbedded(json);
+        // UE GetSequencePose divides by sampled keys, not frame intervals.
+        var baseTime=basis.GetProperty("evaluation").GetProperty("sequencePlayLength").GetDouble()*
+            Math.Clamp((double)policy.GetProperty("baseFrame").GetInt32()/poses[basePath].Data.SampledKeyCount,0,1);
+        return new(poses[source],poses[basePath],curves[source],curves[basePath],baseTime,type=="AAT_RotationOffsetMeshSpace");
+    }
+    // Absolute sequences only; additive deltas require CompileAdditivePose.
     // The returned single-source scope has local animation ID zero. Map that ID
     // explicitly when assembling a shared playback/resource bank.
     public AlsMantlingPoseSource CompileAbsolutePose(string source)
