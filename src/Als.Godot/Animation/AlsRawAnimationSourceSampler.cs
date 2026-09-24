@@ -8,7 +8,7 @@ namespace GodotAls.Animation;
 internal sealed class AlsRawAnimationSourceSampler
 {
     private readonly AlsRawSequencePoseSampler _withRetargetReference, _withoutRetargetReference;
-    private readonly AlsRawPoseRetargetModel _retarget;
+    private readonly AlsPrecisePoseRetargetModel _retarget;
     private readonly AlsCurveSampler _curves;
     private readonly int[] _curveIds;
     private readonly AlsRawAnimationSkeletonDefinition _skeleton;
@@ -33,7 +33,7 @@ internal sealed class AlsRawAnimationSourceSampler
         policy.RetargetTransforms.CopyTo(authoredReference.AsSpan(0, policy.RetargetTransforms.Length));
         _withoutRetargetReference = new(data, skeleton.LogicalParents, authoredReference, skeleton.VirtualBones);
         _retarget = new(skeleton.LogicalToPhysical, skeleton.TranslationRetargetModes.ToArray().Select(m => (int)m).ToArray(),
-            data.LogicalTrackPresence, skeleton.ReferencePose, !policy.RetargetTransforms.IsEmpty);
+            data.LogicalTrackPresence, skeleton.PreciseReferencePose, policy.PreciseRetargetTransforms,100);
         var curves = animation.Curves.Where(c => c.Provenance == AlsCurveProvenance.SourceCurve).ToArray();
         if (curves.Any(c => c.PreInfinity != AlsCurveInfinityMode.Constant || c.PostInfinity != AlsCurveInfinityMode.Constant))
             throw new ArgumentException("Raw source curve sampling requires the authored constant infinity policy.");

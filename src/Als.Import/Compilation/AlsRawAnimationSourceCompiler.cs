@@ -163,6 +163,9 @@ public static class AlsRawAnimationSourceCompiler
             {
                 "Animation" => AlsRawAnimationRetargetMode.Animation,
                 "Skeleton" => AlsRawAnimationRetargetMode.Skeleton,
+                "AnimationScaled" => AlsRawAnimationRetargetMode.AnimationScaled,
+                "AnimationRelative" => AlsRawAnimationRetargetMode.AnimationRelative,
+                "OrientAndScale" => AlsRawAnimationRetargetMode.OrientAndScale,
                 var mode => throw new ArgumentException("Raw source retarget mode requires an unimplemented native operator: " + mode)
             };
         }
