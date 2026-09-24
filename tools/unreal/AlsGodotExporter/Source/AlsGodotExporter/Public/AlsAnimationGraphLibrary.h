@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Compiled node identities, reflected defaults and native deferred cache order. Never compiles or saves assets. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadCompiledAnimationGraph(UAnimBlueprint* Blueprint);
+
     /** Real camera component ticks in a clear scene; records spatial inputs and outputs. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportCameraComponentTrace(const FString& OutputPath);
