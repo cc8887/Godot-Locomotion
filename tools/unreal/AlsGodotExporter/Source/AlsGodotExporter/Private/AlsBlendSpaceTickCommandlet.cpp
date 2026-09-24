@@ -1,4 +1,5 @@
 #include "AlsBlendSpaceTickCommandlet.h"
+#include "AlsSourceAnimationLibrary.h"
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimInstanceProxy.h"
@@ -9,6 +10,7 @@
 #include "Dom/JsonObject.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
+#include "Misc/Paths.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 
@@ -75,11 +77,23 @@ int32 UAlsBlendSpaceTickCommandlet::Main(const FString& Params)
     if (!FParse::Value(*Params, TEXT("Output="), OutputPath)) return 1;
     const FString Base = TEXT("/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/");
     TArray<UAnimationAsset*> Assets;
+    const bool Refactored = FParse::Param(*Params, TEXT("Refactored"));
+    if (Refactored)
+    {
+        for (const TCHAR* Direction : {TEXT("Forward"), TEXT("Backward"), TEXT("Left_Forward"), TEXT("Left_Backward"), TEXT("Right_Forward"), TEXT("Right_Backward")})
+            Assets.Add(LoadObject<UBlendSpace>(nullptr, *(FString(TEXT("/ALS/ALS/Animations/Grounded/WalkRun/BS_Als_WalkRun_")) + Direction)));
+        Assets.Add(LoadObject<UAnimSequence>(nullptr, TEXT("/ALS/ALS/Animations/Grounded/Sprint/A_Als_Sprint")));
+        Assets.Add(LoadObject<UAnimSequence>(nullptr, TEXT("/ALS/ALS/Animations/Grounded/Sprint/A_Als_Sprint_Acceleration")));
+        Assets.Add(LoadObject<UBlendSpace>(nullptr, TEXT("/ALS/ALS/Animations/Grounded/Lean/BS_Als_Lean")));
+    }
+    else
+    {
     for (const TCHAR* Direction : {TEXT("F"), TEXT("B"), TEXT("FL"), TEXT("BL"), TEXT("FR"), TEXT("BR")})
         Assets.Add(LoadObject<UBlendSpace>(nullptr, *(Base + TEXT("ALS_N_WalkRun_") + Direction)));
     Assets.Add(LoadObject<UAnimSequence>(nullptr, *(Base + TEXT("ALS_N_Sprint_F"))));
     Assets.Add(LoadObject<UAnimSequence>(nullptr, *(Base + TEXT("ALS_N_Sprint_F_Impulse"))));
     Assets.Add(LoadObject<UBlendSpace>(nullptr, *(Base + TEXT("Detail/ALS_N_Lean"))));
+    }
     TArray<TSharedPtr<FJsonValue>> AssetJson;
     auto DescribeSequence = [](const UAnimSequence* Sequence)
     {
@@ -231,6 +245,7 @@ int32 UAlsBlendSpaceTickCommandlet::Main(const FString& Params)
     }
     const auto Root = MakeShared<FJsonObject>();
     Root->SetNumberField(TEXT("schemaVersion"), 1);
+    Root->SetBoolField(TEXT("refactored"), Refactored);
     Root->SetStringField(TEXT("source"), TEXT("UE FAnimSync::TickAssetPlayerInstances with real ALS BlendSpaces and Sprint sequences; no AnimBP simulation"));
     Root->SetArrayField(TEXT("assets"), AssetJson); Root->SetArrayField(TEXT("traces"), Traces);
     FString Text;
@@ -238,4 +253,10 @@ int32 UAlsBlendSpaceTickCommandlet::Main(const FString& Params)
         !FFileHelper::SaveStringToFile(Text, *OutputPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)) return 5;
     UE_LOG(LogTemp, Display, TEXT("ALS_BLENDSPACE_TICK_OK assets=9 traces=%d frames=%d assets_saved=0"), Traces.Num(), Traces.Num() * 64);
     return 0;
+}
+
+bool UAlsSourceAnimationLibrary::ExportRefactoredSyncTrace(const FString& OutputPath)
+{
+    if (FPaths::IsRelative(OutputPath) || OutputPath.Contains(TEXT("\""))) return false;
+    return NewObject<UAlsBlendSpaceTickCommandlet>()->Main(TEXT("-Refactored -Output=\"") + OutputPath + TEXT("\"")) == 0;
 }

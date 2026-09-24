@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Refactored连续Sync：`docs/verification/2026-09-25-refactored-sync-trace.md`。实际FAnimSync9原资源/3Hz7场景1344帧，自主filter/triangle/time/history，13283sample/282leader切换，时钟等max2.981e-8；新SampleTimes每sample秒数→384nativepose/30336骨 maxP8.273e-14cm/Q3.331e-16/curve5.961e-8。Core算法未改/无预算放宽，新1综合/Import29/Optimize0/0。两完整UE构建最终5actions审计47422D...，首轮含NetCore且系统BuildId变4cd31a69（未手改）；冷/普通34280实际exit0字节同C3AAAC...，DV0/3旧warn，Editor两旧Condition五warn。无Godot/全量/打包；生产SampleTimes已接，但组合调度仍测试夹具，下一步生产source-player owner→实际Locomotion/Overlay/Notify/rootmotion/身份/最终布局宿主及全部旧缺口；普通Demo未切，保留用户文件/暂缓项。
+
 - 最新Refactored Sync资源表：`docs/verification/2026-09-25-refactored-sync-bank.md`。全部127Sequence+9BS/136资源/60marker/Left Right，全精度timing和原nativeText交叉，路径排序新Sync编号0..135（未重映射PoseSource/旧宿主），有序weights→Core sample绑定。实际9BS legacyLength=false/phasefalse/markertrue/highestNotify，拒绝旧默认legacy；全表逆序ID同，真实Forward240帧Core marker/retry有效但无新UE连续tick oracle。新8/Import23/Optimize0/0，UE构建5actions审计6FF235...冷/普通30504实际exit0字节同CF0B5E...，DV0/3旧warn，Editor两旧Condition五warn。无Godot/全量/打包；下一步原资源FAnimSync连续tick对照（自主filter/triangle/history/new-length）→每sample时间pose→移动Overlay图宿主及所有旧缺口。普通Demo未切，保留用户文件/暂缓项。
 
 - 最新Refactored输入filter：`docs/verification/2026-09-25-refactored-blend-filter.md`。新Core按UE槽位累加/10初槽+5增长/260上限/独立轴/零窗口透传；不复用V4时间排序。新Import事务owner filter→triangle cache→pose/curve，frame门禁/重置/Prepare-Evaluate-Commit-Cancel。8源3Hz6720帧nativefilter差0、order/cache同、maxWeight5.961e-8；每帧撤销重试/重复Eval/NaN/提交门禁，260溢出恢复，新2/Import20/Optimize0/0。连续pose只内部事务对照，无新6720帧原生pose，上一批400仍适用。UE构建4actions审计458725...冷/普通36172实际exit0字节同D349A3...，DV0/3旧warn，Editor两旧Condition五warn。无Godot/全量/打包；仍显式时间evaluator无marker player/Notify/rootmotion。下一步原marker/rate绑定和sample sync时钟→实际移动Overlay宿主及全部旧缺口；用户文件/暂缓项保留。
