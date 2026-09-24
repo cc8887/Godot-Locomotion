@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Default Overlay 原生：`docs/verification/2026-09-25-refactored-default-overlay-native.md`。实际主 Root→LinkedLayer→Overlay 原图 3Hz/630帧/49770骨；首次预算内通过仍定位 TwoWayBlend 两次 float 补数差异，修正本图 pose/curve（未改通用 helper）。最终 maxP9.507e-14cm/Q4.441e-16，scale/curve/预测/Idle 时钟权重差0；收紧 P1e-10/Q及S1e-12 后原生3通过，相关Import17、Optimize0/0。UE首次 Unity helper重名编译失败修正，完整4actions审计 D086CE...；冷/普通42428实际exit0字节同 B385B2...，DV0/3旧warn，普通两旧Condition五类warn保留。无Godot场景/全量/性能/打包；普通Demo未切。下一步其余Overlay与实际移动状态机回调、共享宿主/Notify/root-motion，再所有旧缺口；Ragdoll未整体验收、用户修改及暂缓项保留。
+
 - 最新 Default Overlay：`docs/verification/2026-09-25-refactored-default-overlay.md`。实际 AB_Als_Default 的 14 节点/原始连线/5 属性绑定校验，三固定帧（SamplingFrameRate 秒数）、归一化 stance/reference fallback、空中预测 20/5 插值及隐藏分支保持、0.75 Idle local additive 接共享 source-player。profile 冻结 native 79 骨/curve，runtime Prepare/Evaluate/Commit/Cancel；外部宿主须协调所有参与者提交。新 7 项含三 Hz 共 420 帧取消重试，相关 Import 14 通过、Optimize 0/0；初解析/字段/Alpha 引脚覆盖失败修正，失败 TRX 保留。无新增 UE 整图 golden、UE/Godot 启动、全量/性能；普通 Demo 未切。下一步原生 Default 整图连续对照、其余 Overlay/Locomotion 状态回调与统一宿主，再所有旧缺口；Ragdoll/Flail/Get-up 尚未整体验收，保留用户文件/暂缓项。
 
 - 最新生产source-player owner：`docs/verification/2026-09-25-refactored-source-player.md`。新Import runtime冻结Sequence/2DBS播放定义，独立资源/player/sample/epoch身份，filter→triangle→Core多组/独立Sync→sampletime pose/curve，候选/重置/Commit/Cancel；更新但未Evaluate可提交时钟，采样fault禁止提交。已暴露ticks/samples/contexts供后续Notify，不执行Notify/rootmotion。原native1344帧13283sample282leader+384pose扩展生产owner严格相同，新增90帧重复资源/absolute+additive及120帧多组late-failure/cancel恢复；新增2+扩展1/Import20/Optimize0/0，无失败/新UE/Godot/全量/性能。仅CanBeLeader/固定group/2DBS（Look原Head另路）；生产图尚未接。下一步实际Locomotion/Overlay回调与图→现完整后处理及共享frame/Notify/rootmotion/宿主与全部旧缺口，普通Demo未切，保留用户文件/暂缓项。

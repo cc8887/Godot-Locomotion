@@ -15,6 +15,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Original Default Overlay AnimGraph, including its linked layer, property access and Sync ticking. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportRefactoredDefaultOverlayTrace(const FString& RequestPath, const FString& OutputPath);
+
     /** Original parent View/Spine update and Head callbacks on transient game-world instances. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportRefactoredViewTrace(const FString& RequestPath, const FString& OutputPath);
