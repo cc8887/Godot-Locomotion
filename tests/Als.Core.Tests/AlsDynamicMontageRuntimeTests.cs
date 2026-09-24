@@ -7,6 +7,26 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsDynamicMontageRuntimeTests
 {
     [Fact]
+    public void ZeroDeltaProcessesPendingBlendsWithoutAdvancingOrAutoStoppingAndCanRetry()
+    {
+        var owner = Owner(); owner.Begin(Id(1), 0);
+        owner.Play(Command(10) with { StartTime = 1 }); owner.Commit(Id(1));
+        owner.Begin(Id(2), 0);
+        Assert.Equal(1, owner.Candidate[0].Position); Assert.True(owner.Candidate[0].Playing);
+        Assert.Equal(1, owner.Candidate[0].Blend.DesiredWeight); Assert.Equal(0, owner.Candidate[0].Blend.CurrentWeight);
+        owner.Play(Command(11) with { BlendInTime = 0 }); owner.Commit(Id(2));
+        owner.Begin(Id(3), 0); var states = owner.Candidate.ToArray(); var evaluation = owner.Evaluation.ToArray();
+        Assert.Single(states); Assert.Equal(11, states[0].AnimationId);
+        Assert.Equal(0, states[0].Position); Assert.Equal(1, states[0].Blend.CurrentWeight);
+        owner.Discard(); owner.Begin(Id(3), 0);
+        Assert.Equal(states, owner.Candidate.ToArray()); Assert.Equal(evaluation, owner.Evaluation.ToArray());
+        owner.Commit(Id(3));
+        foreach (var invalid in new[] { -.01f, float.NaN, float.PositiveInfinity })
+            Assert.Throws<ArgumentException>(() => owner.Begin(Id(4), invalid));
+        Assert.Equal(states, owner.Committed.ToArray());
+    }
+
+    [Fact]
     public void RepeatedReplacementDoesNotAllocateAfterOverlapCapacityIsWarm()
     {
         var owner = Owner(); var command = Command(10);
