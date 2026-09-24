@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新起身中Overlay切换：`docs/verification/2026-09-24-get-up-overlay-switching.md`。新增RecoverySmoke `--overlay-cycle`，普通E键遍历13种，核对原Montage身份/epoch不变、时间前进、新Overlay/道具提交及原Notify覆盖直至释放；改旧断言按进入Overlay。Parallel60/Single30渲染+首次故障各13起身13切换过，六图检查03/04/06；Bow Parallel120打断后两次完整起身+空中退出过，Optimize过。首轮累计W离开地板导致地面断言失败保留，测试每轮回开阔点后通过。仅回归/文档，无生产算法修改、Core/Import全量或UE重导；旧静态9/12、Flail0/3及Mantle/Camera/性能目标保留，头颈/道具物理暂缓，用户修改保留。
+
 - Overlay起身最终回归补充：Import Release全量2492通过/1既有Editor跳过，TRX `artifacts/get-up-overlay-tests/import.trx`；Default自动Roll离地+触发帧故障重试两完整循环及空中退出通过，`get-up-overlay-default-regression.log`。详情同下文。
 
 - 最新Overlay起身：`docs/verification/2026-09-24-overlay-get-up.md`。实际调用V4 GetGetUpAnimation取得13×2映射，增加LH/RH/2H六Montage（共9含Roll），共享既有两Get-up序列。补原先固定0的OverlayOverride消费：精确action/montage/event绑定，原生Begin实例值3/End0图校验，成功提交→下一帧Overlay读取，停用清零。RH60正反面及六图、LH120停用恢复、2H Single30首次起身失败重试、旧2540帧rootmotion/定向Import7/Optimize通过；UE全Editor审计、两次Montage/Notify/action字节一致、26映射一致，原始graph仅未连接EventReference GUID不同。raw78资源全保留，仅bindingDigest更新。无Core全量/旧稳定性/性能验收，静态9/12、Flail0/3及全目标保留；头颈/道具暂缓，main/用户修改保留。
