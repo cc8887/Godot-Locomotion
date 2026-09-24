@@ -16,11 +16,14 @@ public sealed class AlsRefactoredTransitionMontages
     public ReadOnlySpan<AlsSequenceMontageAsset> Assets => _assets;
     public int NativeGroupIndex { get; }
     public int HostGroupId { get; }
+    public string CatalogDigest { get; }
+    public string SourcePath(int animationId) => _sources.Single(p => p.Value.AnimationId == animationId).Key;
     public AlsRefactoredTransitionMontages(AlsRefactoredAnimationCatalog catalog, string inventoryJson,
         IReadOnlyList<AlsRefactoredWeaponNotifyProfile> profiles, IReadOnlyDictionary<string, int> animationIds, int hostGroupId)
     {
         if (hostGroupId < 0 || !profiles.Select(p => p.Machine.Resources.Kind).Order().SequenceEqual(Enum.GetValues<AlsRefactoredWeaponKind>().Order()) ||
             profiles.Any(p => p.Machine.Resources.CatalogDigest != catalog.IndexDigest)) throw new ArgumentException("Incomplete original weapon binding closure.");
+        CatalogDigest = catalog.IndexDigest;
         _bindings = profiles.SelectMany(p => p.Bindings.ToArray()).ToHashSet();
         var paths = _bindings.Select(b => b.Sequence).Distinct().Order(StringComparer.Ordinal).ToArray();
         if (animationIds.Count != paths.Length || paths.Any(p => !animationIds.TryGetValue(p, out var id) || id < 0) ||
