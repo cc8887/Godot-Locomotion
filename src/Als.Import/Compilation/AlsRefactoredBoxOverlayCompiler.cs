@@ -140,9 +140,9 @@ public static class AlsRefactoredBoxOverlayCompiler
         }
     }
     private static string Name(JsonElement n) => n.GetProperty("path").GetString()!.Split('.')[^1];
-    private static void Scale(JsonElement p) => Expect(p, new { scale = 1, bias = 0 });
-    private static void Clamp(JsonElement p) { Scale(p); Expect(p, new { bMapRange = false, bClampResult = false, bInterpResult = false }); }
-    private static void Expect(JsonElement actual, object expected)
+    internal static void Scale(JsonElement p) => Expect(p, new { scale = 1, bias = 0 });
+    internal static void Clamp(JsonElement p) { Scale(p); Expect(p, new { bMapRange = false, bClampResult = false, bInterpResult = false }); }
+    internal static void Expect(JsonElement actual, object expected)
     {
         var fields = JsonSerializer.SerializeToElement(expected);
         foreach (var field in fields.EnumerateObject()) Require(actual.TryGetProperty(field.Name, out var value) && Equal(value, field.Value), "Box policy changed: " + field.Name);
