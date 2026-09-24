@@ -75,6 +75,15 @@ public partial class AlsP3Character : Node3D
             _getUpAccepted && result.ActionPlayback.Active == 0)
         { _motor.GetUpInputBlocked = false; _motor.RecoveryRequest = AlsActionRequest.None; }
     }
+    private void ClearGetUpForLifecycle()
+    {
+        // Gameplay retirement abandons the request even before its first Gather.
+        // Scheduling-only suspension deliberately retains it and the input lock.
+        _motor.GetUpInputBlocked = false;
+        _motor.RecoveryRequest = AlsActionRequest.None;
+        _getUpRequestId = 0;
+        _getUpAccepted = _getUpNotifySeen = false;
+    }
     internal bool PhysicsDriven => Volatile.Read(ref _physicsDriven) != 0;
     internal void RequestRagdoll(Node environment)
     {
@@ -587,6 +596,7 @@ public partial class AlsP3Character : Node3D
         SetSchedulingActive(false);
         if (_animationDeactivated) return;
         _worker.ClearAnimationOwnershipForLifecycle(_state.MotorInput.ActionRequest);
+        ClearGetUpForLifecycle();
         var published = Volatile.Read(ref _state.PublishedFrameId);
         if (published > Volatile.Read(ref _state.CommittedFrameId) &&
             _state.ExchangeSlot.TryGetPublishedIdentity(out var resultIdentity) && resultIdentity == HandleIdentity(published))
@@ -774,6 +784,7 @@ public partial class AlsP3Character : Node3D
         EnsureMainThread();
         ThrowIfDisposed();
         SetSchedulingActive(false);
+        ClearGetUpForLifecycle();
         Volatile.Write(ref _state.GatherSuspended, 1);
         Volatile.Write(ref _state.WorkerSuspended, 1);
         Volatile.Write(ref _state.CommitSuspended, 1);
@@ -863,6 +874,7 @@ public partial class AlsP3Character : Node3D
         BodyHistory?.SetPhysicsProcess(false);
         RagdollSimulation?.Dispose(); RagdollSimulation = null;
         _requestedRagdollEnvironment = null; Volatile.Write(ref _physicsDriven, 0);
+        ClearGetUpForLifecycle();
         Props?.Dispose(); Props = null;
         _context.DispatchAnimationRetirement(CommittedAnimation, AlsActionResultCode.InterruptedByLifecycle);
     }

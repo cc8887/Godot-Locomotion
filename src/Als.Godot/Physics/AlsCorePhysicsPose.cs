@@ -61,7 +61,18 @@ internal sealed class AlsCorePhysicsPose
             if (!local.IsFinite()) throw new ArgumentException("Nonfinite animation transform.");
             // IK/virtual branches can carry animation scale without scaling any
             // physical body. Enforce rigidity only along physical ancestor chains.
-            if (_rigidBone[i]) Rigid(local);
+            if (_rigidBone[i])
+            {
+                // UE slot blending can omit a source below ZERO_ANIMWEIGHT_THRESH,
+                // leaving unit-scale animation within that per-axis tolerance.
+                // Do not apply the scene transform's determinant test here: its
+                // three-axis product magnifies the accepted animation residual.
+                var scaleError = p.Scale - NVector.One;
+                if (MathF.Abs(scaleError.X) > AlsPoseBlender.WeightThreshold ||
+                    MathF.Abs(scaleError.Y) > AlsPoseBlender.WeightThreshold ||
+                    MathF.Abs(scaleError.Z) > AlsPoseBlender.WeightThreshold)
+                    throw new ArgumentException("Physical animation bones require unit scale within animation weight tolerance.");
+            }
             _components[i] = _parents[i] < 0 ? local : _components[_parents[i]] * local;
         }
         for (var i = 0; i < _states.Length; i++)

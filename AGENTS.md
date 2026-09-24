@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Get-up生命周期：`docs/verification/2026-09-24-get-up-lifecycle.md`。修未Gather请求在gameplay停用后残留输入锁/重放，统一停用/退休/销毁清理，调度暂停保留；generation迁移清旧GettingUp标记。pending60/active120/suspend Single30/generation60两循环+空中退出通过，旧Roll generation通过。暂停暴露0.9999905动画scale被场景determinant校验误拒，按本机UE slot阈值语义改动画祖先逐轴1e-5检查，最终仍刚体、场景校验不改；两模型8姿态/160handoffs/192captures/64拒绝过，Optimize过。无新Core/Import全量、UE、渲染或旧矩阵；静态9/12、Flail0/3保留。继续Overlay起身/自动触发及全部旧目标，头颈/道具暂缓，main/用户P4保留。
+
 - 最新普通退出/Get-up：`docs/verification/2026-09-24-ragdoll-get-up.md`。G现可进入/退出，默认Front/Back用真实原生Montage/Notify/新增raw源，唯一bank支持asset RateScale1.2、与Roll身份分离；Main安装重基物理快照/恢复胶囊与速度/释放owner，Notify解除输入，支持再次打断及重复激活。Single30受控Back/Parallel60 Front渲染各6图检查，Parallel120首次退出故障重试+起身打断+空中退出通过，旧Roll恢复和2540帧RootMotion通过；Core2914既定过滤/Import2486+1旧skip/Optimize过。UE全Editor审计及两次Montage/Notify冷导过，无新普通Editor/DV或旧稳定性矩阵；静态9/12、Flail0/3及旧UE异常保留。下一步Overlay起身变体、自动触发及起身停用/替换边界，全部旧目标继续；头颈/道具暂缓，main/用户P4及诊断文件保留。
 
 - 最新退出准备：`docs/verification/2026-09-24-ragdoll-recovery-candidate.md`。Core按本机UE骨盆FQuat4d/roll规则求朝上/朝下和恢复yaw，空中继承完整native速度；Simulation在已提交/完成物理边界生成按拟恢复mesh world重基的不可变NamedPoseSnapshot，携带激活/动画/物理步身份，不修改owner。Single30/Parallel120/故障暂停60各16检查过，Core2911/Import定向19/Optimize过。新回归揭示旧smoke FindBone大小写遗漏，改字典并加覆盖断言；过程失败日志保留。仅准备接口，尚未普通退出/物理释放/Get-up/快照淡出/输入恢复；G仍只进入。下一步补起身Montage/Notify资产配置，再实际退出事务及重复循环；全部旧目标保留，头颈/道具暂缓，main/用户P4保留。
