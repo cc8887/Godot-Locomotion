@@ -474,6 +474,22 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         try { if (_applied) WritePhysicalPose(_rollbackPose); }
         finally { if (_layered is null) _base.Discard(); else _layered.Discard(); _nextGraphCapture = null; _prepared = _applied = _queriesPending = false; }
     }
+    private AlsLocalPose[]? _physicalDisplayPose;
+    internal long PhysicalDisplayStep { get; private set; }
+    internal void PresentRagdoll(GodotAls.Physics.AlsCharacterRagdollSimulation simulation)
+    {
+        if (!GodotThread.IsMainThread() || _prepared || _queriesPending ||
+            simulation.AnimationIdentity != _committedAnimationIdentity || simulation.CompletedSteps <= PhysicalDisplayStep)
+            throw new InvalidOperationException("Physical display requires a completed physics step and idle committed animation.");
+        _physicalDisplayPose ??= new AlsLocalPose[_logicalBoneCount];
+        // Capsule following has already completed. Inverting the CURRENT skeleton
+        // world transform prevents applying that displacement to physics twice.
+        simulation.Capture(_skeleton.GlobalTransform, _committedAnimationPose, _physicalDisplayPose);
+        for (var bone = 0; bone < _rollbackPose.Length; bone++) _rollbackPose[bone] = ReadBone(bone);
+        try { WriteLogicalPose(_physicalDisplayPose); }
+        catch { WritePhysicalPose(_rollbackPose); throw; }
+        PhysicalDisplayStep = simulation.CompletedSteps;
+    }
     internal void ClearAnimationOwnershipForLifecycle(in AlsActionRequest abandonedInput)
     {
         if (_prepared || _queriesPending) throw new InvalidOperationException("Production candidate still owns animation state.");
