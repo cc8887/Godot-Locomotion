@@ -254,7 +254,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         {
             if (usePhysicalMontages)
             {
-                _actions.Begin(result.Identity, context.Delta); _turnNotifies.Begin(result.Identity, _montages.Traversal);
+                _actions.Begin(result.Identity, context.Delta); _turnNotifies.Begin(result.Identity, _montages.NotifyTraversal);
                 _actions.ApplyRequest(AlsActionRequest.None); _actions.Complete();
                 _groundedSlot.Prepare(_montages.Frame, result.Identity);
             }
@@ -338,7 +338,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         for (var i = 0; i < _actions.Outcomes.Count; i++)
             if (_actions.Outcomes[i].ResultCode == AlsActionResultCode.InterruptedByRuntimeFailure)
                 _failureEpochs[_failureEpochCount++] = _actions.Outcomes[i].PlaybackEpoch;
-        _turnNotifies.Begin(frame.Identity, _montages.Traversal,
+        _turnNotifies.Begin(frame.Identity, _montages.NotifyTraversal,
             interruptedInstances: _failureEpochs.AsSpan(0, _failureEpochCount));
         _candidateJumpInput = _jumpInput.Evaluate(frame, _committedGlobalInput.Speed, _committedJumpInput);
         // Blueprint-global aiming updates before movement graph relevance gates.

@@ -68,6 +68,13 @@ public sealed class AlsMantlingBranchingRuntime
         _identity=identity;_candidate.Clear();foreach(var item in _committed)_candidate.Add(item.Key,item.Value);
         _nextAction=_capturedAction;_events.Clear();_prepared=true;
     }
+    internal int CopyCrossedMarkers(int action,float previous,float end,Span<float> output)
+    {
+        if(!_definitions.TryGetValue(action,out var d))return 0;
+        Span<float> markers=stackalloc float[]{d.ActionStart,d.ActionEnd,d.EarlyStart,d.EarlyEnd};
+        var count=0;foreach(var marker in markers)if(previous<marker&&marker<end)output[count++]=marker;
+        return count;
+    }
     internal float Advance(in AlsMontageInstance instance,float previous,float end,bool terminated)
     {
         if(!_definitions.TryGetValue(instance.ActionDefinitionId,out var definition))return -1;

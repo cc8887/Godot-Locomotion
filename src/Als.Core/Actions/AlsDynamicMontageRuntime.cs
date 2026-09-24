@@ -88,6 +88,8 @@ public sealed class AlsMontageRuntime
     private AlsMontageInstance[] _committed = new AlsMontageInstance[8], _candidate = new AlsMontageInstance[8];
     private AlsMontageFrame _committedFrame = new(), _frame = new();
     private AlsMontageTraversal[] _traversal = new AlsMontageTraversal[8];
+    private AlsMontageTraversal[] _notifyTraversal = new AlsMontageTraversal[8];
+    private int _notifyTraversalCount;
     private AlsTurnSlotObservation[] _observations = new AlsTurnSlotObservation[8];
     private int _committedCount, _count, _evaluationCount, _traversalCount;
     private long _committedSerial, _serial;
@@ -105,6 +107,9 @@ public sealed class AlsMontageRuntime
     public AlsMontageFrame Frame { get { RequirePrepared(); return _frame; } }
     public ReadOnlySpan<AlsMontageEvaluation> Evaluation { get { RequirePrepared(); return _frame.Evaluations; } }
     public ReadOnlySpan<AlsMontageTraversal> Traversal { get { RequirePrepared(); return _traversal.AsSpan(0, _traversalCount); } }
+    // Ordered HandleEvents ranges before post-movement branching Tick. The action
+    // Traversal above remains one whole-frame summary per physical instance.
+    public ReadOnlySpan<AlsMontageTraversal> NotifyTraversal { get { RequirePrepared(); return _notifyTraversal.AsSpan(0,_notifyTraversalCount); } }
     public bool TryGetActionAsset(int definitionId, out AlsAuthoredMontageAsset asset) => _actions.TryGetValue(definitionId, out asset);
 
     public AlsMontageRuntime(ReadOnlySpan<AlsDynamicMontageAsset> assets, ReadOnlySpan<AlsAuthoredMontageAsset> actions = default,
@@ -161,10 +166,11 @@ public sealed class AlsMontageRuntime
                 identity.CharacterId != CommittedIdentity.CharacterId || identity.FrameId <= CommittedIdentity.FrameId))
             throw new ArgumentException("Invalid montage frame identity, phase or delta.");
         _branching?.Begin(identity);
-        Ensure(_committedCount); _count = _evaluationCount = _traversalCount = 0;
+        Ensure(_committedCount); _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0;
         _identity = identity; _serial = _committedSerial;
         _rootMotionInstance = _committedRootMotionInstance; _rootMotionRange = new(identity, 0, -1, 0, 0);
         if (ragdoll) _rootMotionInstance = 0;
+        Span<float> notifyMarkers=stackalloc float[4];
         for (var i = 0; i < _committedCount; i++)
         {
             var state = _committed[i];
@@ -214,6 +220,12 @@ public sealed class AlsMontageRuntime
             var terminated = AlsActionLifecycle.IsComplete(blend);
             state = state with { Position = position, Playing = playing, Blend = blend,
                 OwnsActiveActionLookup = state.OwnsActiveActionLookup && blend.DesiredWeight > 0 };
+            // HandleEvents collects queues before the post-movement branching Tick.
+            // Keep that interruption state and each marker's context time even if
+            // EarlyBlendOut stops this instance later in the same frame.
+            var notifyInterrupted=state.Interrupted;
+            var notifyMarkerCount=!notifyInterrupted&&_branching is not null
+                ?_branching.CopyCrossedMarkers(state.ActionDefinitionId,previous,traversalEnd,notifyMarkers):0;
             if(_branching is not null)
             {
                 var stopSeconds=_branching.Advance(state,previous,traversalEnd,terminated);
@@ -227,8 +239,19 @@ public sealed class AlsMontageRuntime
             if (extractMotion && previous != traversalEnd)
                 _rootMotionRange = new(identity, state.InstanceId, state.AnimationId,
                     state.ClipStart + previous * state.ClipRate, state.ClipStart + traversalEnd * state.ClipRate);
-            _traversal[_traversalCount++] = new(state.InstanceId, state.AnimationId, state.Slot,
-                previous, traversalEnd, MathF.Max(previousWeight, blend.CurrentWeight), state.Interrupted, terminated, state.ActionDefinitionId);
+            _traversal[_traversalCount++] = new(state.InstanceId,state.AnimationId,state.Slot,
+                previous,traversalEnd,MathF.Max(previousWeight,blend.CurrentWeight),state.Interrupted,terminated,state.ActionDefinitionId);
+            if(_notifyTraversalCount+notifyMarkerCount+1>_notifyTraversal.Length)
+                Array.Resize(ref _notifyTraversal,System.Math.Max(_notifyTraversal.Length*2,_notifyTraversalCount+notifyMarkerCount+1));
+            var notifyPrevious=previous;
+            for(var marker=0;marker<=notifyMarkerCount;marker++)
+            {
+                var notifyEnd=marker<notifyMarkerCount?notifyMarkers[marker]:traversalEnd;
+                _notifyTraversal[_notifyTraversalCount++] = new(state.InstanceId, state.AnimationId, state.Slot,
+                    notifyPrevious, notifyEnd, MathF.Max(previousWeight, blend.CurrentWeight), notifyInterrupted,
+                    terminated&&marker==notifyMarkerCount, state.ActionDefinitionId);
+                notifyPrevious=notifyEnd;
+            }
             if (terminated) continue;
             _candidate[_count++] = state;
             if (blend.CurrentWeight > AlsPoseBlender.WeightThreshold)
@@ -316,6 +339,8 @@ public sealed class AlsMontageRuntime
             Stop(i, .2f, _candidate[i].Settings.BlendOutOption);
             for (var t = 0; t < _traversalCount; t++)
                 if (_traversal[t].InstanceId == instance) _traversal[t] = _traversal[t] with { Interrupted = true };
+            for (var t = 0; t < _notifyTraversalCount; t++)
+                if (_notifyTraversal[t].InstanceId == instance) _notifyTraversal[t] = _notifyTraversal[t] with { Interrupted = true };
         }
         _rootMotionInstance = 0;
         _rootMotionRange = new(_identity, 0, -1, 0, 0);
@@ -413,13 +438,13 @@ public sealed class AlsMontageRuntime
         _committedCount = _count; _committedSerial = _serial; CommittedIdentity = identity; _prepared = false;
         _committedRootMotionInstance = _rootMotionInstance;
     }
-    public void Discard() { _branching?.Discard(); _prepared = false; _count = _evaluationCount = _traversalCount = 0; _frame.Count = 0; _frame.Identity = default; }
+    public void Discard() { _branching?.Discard(); _prepared = false; _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0; _frame.Count = 0; _frame.Identity = default; }
     public void ClearForLifecycle()
     {
         if (_prepared) throw new InvalidOperationException("Discard the montage candidate before lifecycle cleanup.");
         _branching?.Clear();
         Array.Clear(_committed); Array.Clear(_candidate);
-        _committedCount = _count = _evaluationCount = _traversalCount = 0;
+        _committedCount = _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0;
         _committedRootMotionInstance = _rootMotionInstance = 0; _rootMotionRange = default;
         _committedFrame.Count = _frame.Count = 0;
         // Keep the frame boundary and serial allocator: resuming this generation

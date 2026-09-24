@@ -31,7 +31,7 @@ public sealed class AlsMontageNotifyBinding : IAlsMontageNotifyBinding
         var end = 0; var handles = new HashSet<int>(); var keys = new HashSet<(int,int,AlsMontageSlot,bool)>();
         foreach (var range in _ranges)
         {
-            if (range.ActionDefinitionId < -1 || range.AnimationId < 0 || (uint)range.Slot.Id > 3 ||
+            if (range.ActionDefinitionId < -1 || range.AnimationId < 0 || (uint)range.Slot.Id > 4 ||
                 range.Handle < 0 || !handles.Add(range.Handle) || !keys.Add((range.ActionDefinitionId,range.AnimationId,range.Slot,range.Direct)) ||
                 range.Offset != end || range.Count < 0 || range.Count > timeline.Length - end ||
                 !float.IsFinite(range.Duration) || range.Duration <= 0 || !float.IsFinite(range.ClipStart) ||
