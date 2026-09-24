@@ -21,13 +21,14 @@ public sealed class AlsMantlingPoseSource
     private readonly bool _enableRoot, _forceRoot;
     public AlsRawAnimationPoseData Data { get; }
     public string SkeletonPath { get; }
+    public string AnimationInputsDigest { get; }
     public ReadOnlySpan<string> BoneNames => _names;
 
     internal AlsMantlingPoseSource(AlsRawAnimationPoseData data,string skeleton,string[] names,int[] parents,
         AlsLogicalVirtualBone[] virtuals,AlsPrecisePose[] target,AlsPrecisePose[] source,int[] modes,
-        AlsPrecisePose lockedRoot,bool enableRoot,bool forceRoot)
+        AlsPrecisePose lockedRoot,bool enableRoot,bool forceRoot,string digest)
     {
-        Data=data;SkeletonPath=skeleton;_names=names.ToArray();_parents=parents.ToArray();_virtuals=virtuals.ToArray();
+        Data=data;SkeletonPath=skeleton;AnimationInputsDigest=digest;_names=names.ToArray();_parents=parents.ToArray();_virtuals=virtuals.ToArray();
         _target=target.ToArray();_source=target.ToArray();source.CopyTo(_source,0);
         _lockedRoot=lockedRoot;_enableRoot=enableRoot;_forceRoot=forceRoot;
         _retarget=new(data.LogicalToPhysical,modes,data.LogicalTrackPresence,target,source);
@@ -36,14 +37,19 @@ public sealed class AlsMantlingPoseSource
     }
 
     public Sampler CreateSampler()=>new(this);
+    public Sampler CreateSampler(AlsMantlingCurveSource curves)=>new(this,curves);
 
     /// <summary>One owner per sampler; resources can be shared by independent workers.</summary>
     public sealed class Sampler
     {
         private readonly AlsMantlingPoseSource _owner;
         private readonly AlsPreciseRawSequenceSampler _target, _source;
-        internal Sampler(AlsMantlingPoseSource owner)
+        private readonly AlsMantlingCurveSource? _curves;
+        internal Sampler(AlsMantlingPoseSource owner,AlsMantlingCurveSource? curves=null)
         {
+            if(curves is not null&&(curves.SourcePath!=owner.Data.Identity.AssetPath||curves.AnimationInputsDigest!=owner.AnimationInputsDigest))
+                throw new ArgumentException("Mantle pose and curve resource versions differ.");
+            _curves=curves;
             _owner=owner;
             _target=new(owner.Data,owner._parents,owner._target,owner._virtuals);
             _source=new(owner.Data,owner._parents,owner._source,owner._virtuals);
@@ -54,6 +60,14 @@ public sealed class AlsMantlingPoseSource
             var keys=(retarget?_target:_source).Sample(seconds,output);
             _owner._retarget.Apply(output,retarget);
             if(extractRootMotion&&_owner._enableRoot||_owner._forceRoot&&!ignoreRootLock) output[0]=_owner._lockedRoot;
+            return keys;
+        }
+        public AlsRawPoseKeySelection Sample(double seconds,bool retarget,bool extractRootMotion,bool ignoreRootLock,
+            Span<AlsPrecisePose> output,Span<AlsInertialCurve> curves)
+        {
+            if(_curves is null||curves.Length!=_curves.Names.Length)throw new ArgumentException("Unbound mantle curve layout.");
+            var keys=Sample(seconds,retarget,extractRootMotion,ignoreRootLock,output);
+            _curves.Sample((float)keys.SampleTimeSeconds,curves);
             return keys;
         }
     }
@@ -67,6 +81,7 @@ public static class AlsMantlingPoseCompiler
     {
         using var document=JsonDocument.Parse(json);using var rootsDocument=JsonDocument.Parse(rootJson);
         var root=document.RootElement;var roots=rootsDocument.RootElement;
+        var digest=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
         Require(root.GetProperty("schemaVersion").GetInt32()==1,"Unsupported mantle pose schema.");
         Require(Text(root,"rootBindingsSha256").Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rootJson))),
             StringComparison.OrdinalIgnoreCase),"Mantle pose/root source digests differ.");
@@ -148,7 +163,7 @@ public static class AlsMantlingPoseCompiler
             { "RefPose"=>reference[0],"AnimFirstFrame"=>Pose(policy.GetProperty("rootLockFirstFrame")),
                 "Zero"=>AlsPrecisePose.Identity,_=>throw new ArgumentException("Unknown root lock.") };
             Require(result.TryAdd(path,new(data,skeletonPath,names,parents,virtuals,reference,Poses(policy,"retargetTransforms"),modes,
-                locked,policy.GetProperty("enableRootMotion").GetBoolean(),policy.GetProperty("forceRootLock").GetBoolean())),"Duplicate mantle pose source.");
+                locked,policy.GetProperty("enableRootMotion").GetBoolean(),policy.GetProperty("forceRootLock").GetBoolean(),digest)),"Duplicate mantle pose source.");
         }
         Require(result.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(bindings.Keys),"Incomplete mantle pose closure.");
         var montagePaths=new HashSet<string>(StringComparer.Ordinal);
