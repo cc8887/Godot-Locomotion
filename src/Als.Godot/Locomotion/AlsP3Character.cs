@@ -26,8 +26,10 @@ public partial class AlsP3Character : Node3D
             throw new InvalidOperationException("Ragdoll activation requires an idle committed complete character; active montage interruption is not connected yet.");
         var simulation = GodotAls.Physics.AlsCharacterRagdollSimulation.Create(this, environment, this, _context);
         _motor.CollisionLayer = 0; _motor.CollisionMask = 0;
+        _motor.Velocity = Vector3.Zero;
         RagdollSimulation = simulation;
     }
+    internal void FollowRagdollPelvis() => _motor.FollowRagdoll(RagdollSimulation!.PelvisPosition);
     internal bool BodyHistoryActive => _configured && Volatile.Read(ref _disposed) == 0 &&
         Volatile.Read(ref _state.Active) != 0 && Volatile.Read(ref _state.VisualReady) != 0;
     private AlsFrameInput _stagedReplacementMotorInput;

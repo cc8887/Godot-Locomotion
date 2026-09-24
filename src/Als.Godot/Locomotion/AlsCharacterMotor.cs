@@ -48,6 +48,56 @@ public partial class AlsCharacterMotor : CharacterBody3D
     private IAlsLocomotionCommandSource? _source;
     private CollisionShape3D? _collisionNode;
     private CapsuleShape3D? _capsuleShape;
+    private ShapeCast3D? _ragdollGroundCast;
+    internal bool RagdollGrounded { get; private set; }
+    internal Vector3 RagdollTarget { get; private set; }
+
+    internal void FollowRagdoll(Vector3 pelvis)
+    {
+        EnsureMainThread(); EnsureLiveInTree();
+        if (!_configured || CollisionLayer != 0 || CollisionMask != 0 || !pelvis.IsFinite())
+            throw new InvalidOperationException("Ragdoll following requires a finite pelvis and disabled capsule.");
+        if (_ragdollGroundCast is null)
+        {
+            _ragdollGroundCast = new ShapeCast3D
+            {
+                Name = "AlsRagdollGroundCast", Shape = new SphereShape3D(), Enabled = false,
+                TopLevel = true, CollisionMask = _settings.CollisionMask,
+                CollideWithBodies = true, CollideWithAreas = false, ExcludeParent = true, Margin = 0,
+            };
+            AddChild(_ragdollGroundCast);
+            _ragdollGroundCast.AddException(this);
+        }
+        var scale = _collisionNode!.GlobalBasis.Scale.Abs();
+        var radius = _capsuleShape!.Radius * Mathf.Min(scale.X, scale.Z);
+        var halfHeight = Mathf.Max(radius, _capsuleShape.Height * scale.Y * .5f);
+        // ALS uses the actor location only when the replicated target is exactly zero.
+        var target = pelvis == Vector3.Zero ? GlobalPosition : pelvis;
+        var start = target + Vector3.Up * (2 * radius);
+        var motion = Vector3.Down * (halfHeight + radius);
+        ((SphereShape3D)_ragdollGroundCast.Shape).Radius = radius;
+        _ragdollGroundCast.GlobalTransform = new Transform3D(Basis.Identity, start);
+        // Godot motion casts can skip initial overlaps. Check the starting sphere
+        // explicitly so penetration retains UE's blocking time-zero hit.
+        _ragdollGroundCast.TargetPosition = Vector3.Zero;
+        _ragdollGroundCast.ForceShapecastUpdate();
+        var initiallyOverlapping = _ragdollGroundCast.IsColliding();
+        if (!initiallyOverlapping)
+        {
+            _ragdollGroundCast.TargetPosition = motion;
+            _ragdollGroundCast.ForceShapecastUpdate();
+        }
+        RagdollGrounded = _ragdollGroundCast.IsColliding();
+        RagdollTarget = target;
+        if (RagdollGrounded)
+        {
+            // UE Hit.Location is the swept sphere CENTER, not the contact point.
+            var center = start + motion * (initiallyOverlapping ? 0 : _ragdollGroundCast.GetClosestCollisionUnsafeFraction());
+            target.Y = center.Y + halfHeight - radius + .019f;
+        }
+        GlobalPosition = target;
+        Velocity = Vector3.Zero;
+    }
     private ShapeCast3D? _standClearance;
     private KinematicCollision3D? _initialFloorProbe;
     private AlsLandPredictionProbe _landPredictionProbe = null!;

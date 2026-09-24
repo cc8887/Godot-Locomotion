@@ -16,6 +16,7 @@ public sealed class AlsAnimatedJointInputs
     private readonly int _pelvis;
     public AlsJointIsland Island { get; }
     public AlsDoubleVector PelvisVelocity => new(Island.BodyAt(_pelvis).Velocity.Linear);
+    public AlsDoubleVector PelvisPosition => Island.BodyAt(_pelvis).Actor.Position;
 
     public AlsAnimatedJointInputs(AlsRagdollPhysicsDefinition authored, ReadOnlySpan<AlsPhysicsJointSettings> settings,
         ReadOnlySpan<string> names, ReadOnlySpan<int> parents, AlsJointIsland island, float stiffnessScale, float dampingScale)
