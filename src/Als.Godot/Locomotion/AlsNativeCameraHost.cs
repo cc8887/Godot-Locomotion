@@ -20,9 +20,13 @@ public partial class AlsNativeCameraHost : Node
     private AlsCameraCollisionProbe _probe = null!;
     private Camera3D _camera = null!;
     private uint _mask;
+    private bool _terminalFailure;
     internal bool FirstPerson { get; set; }
     internal bool RightShoulder { get; set; } = true;
     internal string? Failure { get; private set; }
+    internal string? LastQueryFailure { get; private set; }
+    internal long QueryFailures { get; private set; }
+    internal int ConsecutiveQueryFailures { get; private set; }
     internal long Frames { get; private set; }
     internal AlsCameraFollowState State => _runtime?.State ?? AlsCameraFollowState.Initial;
     internal void Configure(P4LocomotionDemo demo, uint mask)
@@ -49,7 +53,7 @@ public partial class AlsNativeCameraHost : Node
     }
     public override void _PhysicsProcess(double delta)
     {
-        if (Failure is not null || !_demo.IsRuntimeReady) return;
+        if (_terminalFailure || !_demo.IsRuntimeReady) return;
         var owner = _demo.ActiveCharacter;
         if (!owner.BodyHistoryActive || owner.WorkerInFlight != 0 || owner.Diagnostics.PresentationPending ||
             owner.RuntimeCommittedFrameId <= 0 || owner.PublishedFrameId != owner.RuntimeCommittedFrameId) return;
@@ -59,8 +63,10 @@ public partial class AlsNativeCameraHost : Node
             motor.FirstPersonView = FirstPerson;
             if (_owner != owner)
             {
-                _owner = owner; _binding = new(owner.PhysicalDisplaySkeleton, _definition, _sockets);
-                _runtime = new(_definition); _probe.SetExcludedBodies([motor.GetRid()]);
+                var binding = new AlsCameraSocketBinding(owner.PhysicalDisplaySkeleton, _definition, _sockets);
+                var runtime = new AlsCameraRuntime(_definition);
+                _probe.SetExcludedBodies([motor.GetRid()]);
+                _owner = owner; _binding = binding; _runtime = runtime;
             }
             // Ragdoll body proxies are query-disabled (layer=0); only the active
             // capsule has a collision RID on the world camera mask.
@@ -93,8 +99,18 @@ public partial class AlsNativeCameraHost : Node
             var world = AlsGodotContactQuery.ToGodot(new(candidate.Location, AlsCameraMath.Quaternion(candidate.Rotation), AlsDoubleVector.One));
             _camera.GlobalTransform = world; _camera.Fov = candidate.Fov;
             _runtime.Commit(); Frames++;
+            Failure = null; ConsecutiveQueryFailures = 0;
         }
-        catch (Exception e) { _runtime?.Discard(); Failure = e.ToString(); GD.PushError("ALS camera: " + e); }
+        catch (AlsCameraQueryException e)
+        {
+            // Do not advance graph/lag history or publish a partial transform.
+            // The next eligible frame samples the current scene, without replaying
+            // stale queries or accumulating a large catch-up delta.
+            _runtime?.Discard(); Failure = LastQueryFailure = e.ToString(); QueryFailures++;
+            if (++ConsecutiveQueryFailures == 1) GD.PushWarning("ALS camera query paused; will retry: " + e.Message);
+        }
+        catch (Exception e)
+        { _runtime?.Discard(); _terminalFailure = true; Failure = e.ToString(); GD.PushError("ALS camera: " + e); }
     }
     public override void _ExitTree() { _probe?.Dispose(); }
 }

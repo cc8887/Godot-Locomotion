@@ -4,6 +4,10 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Locomotion;
 
+// Transient scene-query failures may be retried from committed camera history.
+// Invalid inputs, expired owners and programming errors remain terminal.
+internal sealed class AlsCameraQueryException(string message) : InvalidOperationException(message);
+
 // Main-thread, query-only adapter. Mask is explicitly Godot's mask; it is never
 // taken directly from the exported UE TraceChannel enum.
 internal sealed class AlsCameraCollisionProbe : IDisposable
@@ -70,14 +74,14 @@ internal sealed class AlsCameraCollisionProbe : IDisposable
         _cast.ForceShapecastUpdate(); QueryCount++;
         if (!_cast.IsColliding()) return Response(start, end);
         var fraction = _cast.GetClosestCollisionSafeFraction();
-        if (!float.IsFinite(fraction) || fraction < 0 || fraction > 1) throw new InvalidOperationException("Invalid camera sweep fraction.");
+        if (!float.IsFinite(fraction) || fraction < 0 || fraction > 1) throw new AlsCameraQueryException("Invalid camera sweep fraction.");
         return Response(start, start + (end - start) * fraction);
     }
     private void Overlap(Vector3 start, float radius)
     {
         _sphere.Radius = radius; _cast.GlobalTransform = new(Basis.Identity, start); _cast.TargetPosition = Vector3.Zero;
         _cast.ForceShapecastUpdate(); QueryCount++;
-        if (_cast.GetCollisionCount() >= Capacity) throw new InvalidOperationException("Camera overlap capacity exceeded.");
+        if (_cast.GetCollisionCount() >= Capacity) throw new AlsCameraQueryException("Camera overlap capacity exceeded.");
     }
     private bool HasPenetration(Vector3 start, float radius)
     {
