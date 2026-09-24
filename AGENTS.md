@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Refactored二维pose/curve：`docs/verification/2026-09-25-refactored-blend-poses.md`。新BlendPoseSource从profile自主weights→实际absolute/local additive→有序pose/curve混合，float sample时间，双阶段normalization，catalog版本/布局门禁和每owner独占。8源400pose31600骨830curve最大P1.208e-13cm/Q4.164e-16/S0/curve5.961e-8；失败原子/retry/并行/跨版本拒绝，新1综合/Import47/Optimize0/0。UE全构建5actions审计0D39DC...，冷/普通40064实际exit0字节同90A4CF...，DV0/3旧warn，Editor两旧Condition五warn保留。无全量/Godot/打包；仅normalized evaluator，无输入filter/marker player/Notify/rootmotion。普通Demo未切，下一步filter+各样本sync时间→实际Locomotion/Overlay/共享宿主及所有旧缺口；用户文件/暂缓项保留。
+
 - 最新Refactored二维三角形：`docs/verification/2026-09-25-refactored-triangulation.md`。原6WalkRun+2Lean采用三角形，保留旧V4grid；Core缓存邻边/外缘投影/容差/排序/阈值，Import完整精度拓扑+catalog/sample/policy绑定。4096连续权重查询的order/cache同native，maxWeight5.9604645e-8（预算1e-7，非逐位同），每步retry；新增6/Import28/Optimize0/0。初外缘同triangle的-1门禁过严修复，原失败保留。UE全构建5actions/审计E1F521...，冷/普通27020实际exit0 inputs F57F65...及reference19616B...字节同，DV0/3旧warn，Editor两旧Condition五warn。仅权重/元数据；滤波、时间/Sync、pose/curve混合与图宿主尚待整合，普通Demo未切/无Godot或全量。下一步这些完整移动Overlay再所有旧缺口；保留用户修改/暂缓项。
 
 - 最新原加法资源：`docs/verification/2026-09-25-refactored-additive.md`。Catalog 新 CompileAdditivePose 支持实际42源(15local/27mesh)、固定baseFrame按UE sampledKeyCount分母、原raw basis不递归、曲线名称并集差值；旧Look/Mantle门禁保持。210原生pose/16590骨/200curve maxP1.474e-13cm/Q6.107e-16/S0/curve1.193e-7；重试/独立owner并行/4非法政策，新5、Import138、Optimize0/0。UE审计0action同05A9CE，冷/普通36376实际exit0参考字节同886DF2...；两旧Condition五warn保留，无C++改动/DV/Godot/全量。普通Demo未切，下一步实际Locomotion/Overlay的BS/图/共享ID/宿主及全部旧缺口，保留用户文件/暂缓项。
