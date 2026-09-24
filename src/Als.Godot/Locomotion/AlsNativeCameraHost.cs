@@ -83,7 +83,7 @@ public partial class AlsNativeCameraHost : Node
                 "Als.ViewMode." + (FirstPerson ? "FirstPerson" : "ThirdPerson"),
                 action.Length == 0 ? "" : "Als.LocomotionAction." + action, RightShoulder);
             var skeleton = owner.PhysicalDisplaySkeleton;
-            var component = AlsCorePhysicsPose.FromWorld(skeleton.GlobalTransform);
+            var component = AlsCameraMeshPose.FromWorld(skeleton.GlobalTransform);
             var capsule = motor.GetNode<CollisionShape3D>("AlsCapsuleCollision");
             var bottom = motor.GlobalPosition - Vector3.Up * (((CapsuleShape3D)capsule.Shape).Height * .5f);
             var baseNode = !owner.PhysicsDriven && input.Floor.PlatformId >= 0 && input.Floor.ColliderId > 0
@@ -99,10 +99,10 @@ public partial class AlsNativeCameraHost : Node
             var scene = new AlsCameraFollowInput(dt, true,
                 new(_demo.OrbitCamera.Pitch * (180 / System.Math.PI), -_demo.OrbitCamera.Yaw * (180 / System.Math.PI), 0),
                 sockets.FirstPivot, sockets.SecondPivot, sockets.FirstPerson, RightShoulder ? sockets.RightShoulder : sockets.LeftShoulder,
-                owner.PhysicsDriven && _definition.FirstPivotSocket == "root", AlsCameraCollisionProbe.Native(bottom), component.Rotation, 1,
+                owner.PhysicsDriven && _definition.FirstPivotSocket == "root", AlsCameraCollisionProbe.Native(bottom), component.Rotation, component.Scale,
                 based ? input.Floor.ColliderId : 0, "", based, basePose.Position, basePose.Rotation, false, 90, 0);
             var candidate = _runtime!.Prepare(_runtime.CommittedFrame + 1, graph, scene,
-                q => _probe.Query(q, AlsCameraCollisionProbe.Native(motor.GlobalPosition), 1));
+                q => _probe.Query(q, AlsCameraCollisionProbe.Native(motor.GlobalPosition), component.Scale));
             var world = AlsGodotContactQuery.ToGodot(new(candidate.Location, AlsCameraMath.Quaternion(candidate.Rotation), AlsDoubleVector.One));
             _camera.GlobalTransform = world; _camera.Fov = candidate.Fov;
             _runtime.Commit(); LastCommittedDelta = dt; Frames++;

@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新相机缩放：`docs/verification/2026-09-24-camera-mesh-scale.md`。专用AlsCameraMeshPose分离FBX骨架旋转/局部Z缩放，host不再固定1，送Follow半径/偏移与probe恢复padding；拒绝非有限/奇异/反射/剪切，物理刚性检查未动。先红0.5倍rigid异常，后两真实模型×3旋转×4缩放24例/4拒绝过，max0.000213249cm；真实墙恢复余量过。Optimize0/0，普通未缩放Parallel60八秒480提交倒地起身等过。无新UE/Core/Import/全量/截图，非UE缩放oracle；普通角色history/Ragdoll仍刚性，整体缩放支持未完成。复杂相机/旧9/12与Flail0/3/Mantle/性能仍保留，头颈道具暂缓，用户文件保留。
+
 - 最新相机时间边界：`docs/verification/2026-09-24-camera-time-scale.md`。普通host忽略时间缩放改固定物理步长，不再用已改变的Engine.TimeScale除当前callback；Hz切换仍须idle。先红60Hz 1→.25时camera_dt=.06666667、yaw差14.20458°，后Single30/Parallel60/120固定15FPS共840样本+普通60 240样本均0偏航差，8次倍率切换/场。普通60 480提交倒地起身人称/肩侧/control yaw回归过，Optimize0/0。无UE/Core/Import改动或全量/截图，非暂停/custom dilation证明。源码核实Godot批次固定scale，agent-reach后端失败后网页读官方提交。MeshScale固定1/刚性转换缺口未修；复杂碰撞/旧9/12和Flail0/3/Mantle/最终性能保留，头颈道具暂缓，用户文件保留。
 
 - 最新原生碰撞：`docs/verification/2026-09-24-camera-native-collision.md`。COLLISION=1 真实 CameraComponent+UBox 球扫、向内穿透恢复/背离拒绝/撤墙；Godot真实StaticBody+生产probe连续自身history，30/60/120共840帧过，max0.181499cm在预设0.3cm内。无生产算法变更，非复杂MTD/完整视觉等价。Optimize0/0，全Editor审计fingerprint5507EC2FCBD1D34CCE8C479248800626CB6EFA1E0DE171EF91A041FCBDA81BC6；冷/普通Editor2108导出SHA BB67D409F6DE4F99712EC496F200E70A63EC1E32BF38E326DB47306BA2923C95相同/退出0，两旧Condition及渲染警告保留；DV0/3旧warn。下一步复杂几何/完整图场景联合/scale与timeDilation。旧9/12、Flail0/3、Mantle/最终性能未完，头颈道具暂缓，用户文件保留。
