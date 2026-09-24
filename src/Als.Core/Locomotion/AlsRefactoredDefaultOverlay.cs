@@ -53,13 +53,25 @@ public static class AlsRefactoredDefaultOverlay
         {
             var a = input.Standing / total; var b = input.Crouching / total;
             if (a > AlsPoseBlender.WeightThreshold)
-                ground = AlsStandingCycleCurves.Scale(AlsStandingCycleCurves.Lerp(curves[0], curves[1], input.Walking), a);
+                ground = AlsStandingCycleCurves.Scale(TwoCurve(curves[0], curves[1], input.Walking), a);
             ground = AlsStandingCycleCurves.Accumulate(ground, curves[2], b);
         }
-        return AlsStandingCycleCurves.Lerp(ground, AlsStandingCycleCurves.Lerp(curves[1], curves[0], state.Prediction), input.InAir);
+        return TwoCurve(ground, TwoCurve(curves[1], curves[0], state.Prediction), input.InAir);
     }
 
-    private static AlsPrecisePose Two(in AlsPrecisePose a, in AlsPrecisePose b, float alpha) =>
-        alpha <= AlsPoseBlender.WeightThreshold ? a : alpha >= 1 - AlsPoseBlender.WeightThreshold ? b : AlsPrecisePoseBlender.Blend(a, b, alpha);
+    private static AlsPrecisePose Two(in AlsPrecisePose a, in AlsPrecisePose b, float alpha)
+    {
+        if (alpha <= AlsPoseBlender.WeightThreshold) return a;
+        if (alpha >= 1 - AlsPoseBlender.WeightThreshold) return b;
+        // TwoWayBlend passes 1-alpha into BlendTwoPosesTogetherInPlace. That
+        // routine subtracts again in float for B; using alpha directly changes
+        // both translations and scales even though the algebra looks identical.
+        var weightA = 1f - alpha;
+        var weightB = 1f - weightA;
+        return AlsPrecisePoseBlender.Accumulate(AlsPrecisePoseBlender.Scale(a, weightA), b, weightB).Normalized();
+    }
+    private static AlsInertialCurve TwoCurve(AlsInertialCurve a, AlsInertialCurve b, float alpha) =>
+        alpha <= AlsPoseBlender.WeightThreshold ? a : alpha >= 1 - AlsPoseBlender.WeightThreshold ? b :
+            AlsStandingCycleCurves.Lerp(a, b, 1f - (1f - alpha));
     private static bool Unit(float x) => float.IsFinite(x) && x is >= 0 and <= 1;
 }
