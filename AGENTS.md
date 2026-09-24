@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新武器条件：`docs/verification/2026-09-25-refactored-weapon-rules.md`。四原图按完整outer路径提取，编译实际六边/pin/父属性/精确tag/机器clock；原生为elapsed>=3且TransitionsAllowed或Moving，非V4的严格大于/curve比较。独立Core规则保留Ready出口2,3,4,5。新11/相关Import91通过，2880输入17280判断含float边界/子tag/门控，Optimize0/0，无失败。无新UE oracle/导出/启动/Godot/全量/性能；只条件，不含连续tick/通知消费/四武器pose，整图仍9/13。下一步状态机连续执行/通知及pose对照、所有旧缺口；普通Demo未切、Ragdoll未整体验收、用户文件/暂缓项保留。
+
 - 最新武器状态资源：`docs/verification/2026-09-25-refactored-weapon-machine-resources.md`。新四武器baked状态/六过渡出口顺序/root-rule-player身份、通知局部索引、两全精度Aim曲线和QuickFeet18entry资源，绑定原catalog并交叉authored/compiled。原Ready→Relaxed三边不可合并，弓AimIn .5/退回.4，其余.2；只资源，尚未规则/运行时/通知消费，整图仍9/13。新11/相关Import85/Optimize0/0，1608curve/2376profile对比max1.193e-7/5.961e-8预算2e-6，无新失败。UE完整0actions审计仍7B77EF...冷/普通41000实际0字节同7A1C489...，普通两旧Condition五类warn保留；无C++变化/DV/Godot/全量/性能/打包。下一步原transition条件/通知→状态机连续tick/pose及全部旧缺口；普通Demo未切、Ragdoll未整体验收、用户文件/暂缓项保留。
 
 - 最新道具 Overlay 姿态：`docs/verification/2026-09-25-refactored-prop-overlay-pose.md`。Binoculars/Torch完整28/26节点编译/资源与mesh Aim→stance→瞄准→Idle→动作曲线；沿用已验证update，事务/owner隔离/fault/update-only。旧native1680帧132720骨maxP6.235e-14cm/Q4.441e-16/S2.221e-16，Binoculars curve0、Torch5.961e-8，预算未改；新9/相关Import60/Optimize0/0。初MeshApply调用顺序编译错、JSON float按double误判explicitTime（4失败）和隐藏Alpha引脚误要求（9失败）已纠正，日志保留。无新UE/导出/Godot场景/全量/性能/打包。整图姿态现9/13，余四武器状态机→真实移动/统一宿主及全部旧缺口；普通Demo未切，Ragdoll未整体验收，用户文件/暂缓项保留。
