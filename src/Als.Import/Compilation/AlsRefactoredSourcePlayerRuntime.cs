@@ -87,6 +87,8 @@ public sealed class AlsRefactoredSourcePlayerRuntime
         _history=new AlsAssetPlayerHistory[n];_candidatePlayers=new AlsAssetPlayerHistory[n];_sampleHistory=new AlsAssetSampleHistory[n*3];_candidateSamples=new AlsAssetSampleHistory[n*3];
         _groups=new AlsAssetSyncBatchGroupHistory[_groupIds.Length];_candidateGroups=new AlsAssetSyncBatchGroupHistory[_groupIds.Length];_tickContexts=new AlsAssetPlayerTickContext[n];
     }
+    public string CatalogDigest=>_bank.CatalogDigest;
+    public string Source(int player)=>_tracks[player].Definition.Source;
     public ReadOnlySpan<string> BoneNames(int player)=>_tracks[player].Names;
     public ReadOnlySpan<string> CurveNames(int player)=>_tracks[player].CurveNames;
     public AlsBlendSpaceNotifyMode NotifyMode(int player)=>_tracks[player].Blend?.NotifyMode??AlsBlendSpaceNotifyMode.AllAnimations;
