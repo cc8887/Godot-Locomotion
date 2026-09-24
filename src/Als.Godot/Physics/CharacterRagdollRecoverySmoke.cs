@@ -27,6 +27,11 @@ public partial class CharacterRagdollRecoverySmoke : Node
     private int _automaticEntries, _rollInterrupted, _rollRuntimeInterrupted;
     private bool _entryFailure, _entryFailureObserved;
     private bool _sawOverlayOverride;
+    private bool _overlayCycle, _overlaySwitched;
+    private int _overlaySwitches;
+    private AlsOverlayKind _entryOverlay;
+    private AlsActionPlayback _beforeOverlaySwitch;
+    private bool _checkedOverlaySwitch;
     private Vector3 _exitPosition;
     private Input.MouseModeEnum _mouse;
     public override void _Ready()
@@ -45,6 +50,9 @@ public partial class CharacterRagdollRecoverySmoke : Node
             _failure |= _entryFailure;
             _lifecycle = args.FirstOrDefault(a => a.StartsWith("--lifecycle="))?[12..];
             Require(_lifecycle is null or "pending" or "active" or "suspend" or "generation", "Unknown lifecycle case.");
+            _overlayCycle = args.Contains("--overlay-cycle");
+            Require(!_overlayCycle || _lifecycle is null && !_interrupt && _automatic is null,
+                "Overlay cycle is a separate 13-Overlay recovery scenario.");
             var capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="));
             if (capture is not null)
             {
@@ -85,7 +93,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
         if (_done) return;
         try
         {
-            Require(++_ticks < _hz * 22, $"Recovery stalled in stage {_stage}, cycle {_cycles}.");
+            Require(++_ticks < _hz * (_overlayCycle ? 100 : 22), $"Recovery stalled in stage {_stage}, cycle {_cycles}.");
             var character = _demo.ActiveCharacter; var motor = (AlsCharacterMotor)character.MovementAnchor;
             var expectedClassification = _lifecycle == "generation" && _lifecycleCovered ? 1 : 0;
             Require(character.BodyHistory?.Failure is null && (_stage == 6 || !character.IsPoseFrozen) && _demo.ErrorCount <= (_failure ? 1 : 0) + expectedClassification,
@@ -149,7 +157,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
             if (_stage == 1)
             {
                 if (character.RagdollSimulation is not { } simulation || simulation.CompletedSteps < (_air ? 2 : _hz * 2)) return;
-                Require(motor.RagdollGrounded != _air, "Ragdoll ground state differs from exit scenario.");
+                Require(motor.RagdollGrounded != _air, $"Ragdoll ground state differs from exit scenario: cycle={_cycles}, position={motor.GlobalPosition}.");
                 if (!_air && _automatic is not null)
                 {
                     _automaticEntries++;
@@ -198,6 +206,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
                 Require(character.LastRagdollRecovery?.Decision.PlayGetUp == true && character.GettingUp && motor.CollisionMask != 0,
                     "G did not restore capsule/start ground recovery.");
                 _exitPosition = motor.GlobalPosition;
+                _entryOverlay = _demo.Overlay;
+                _overlaySwitched = _checkedOverlaySwitch = false;
                 _sawGetUp = false;
                 _sawOverlayOverride = false;
                 if (_lifecycle == "pending" && !_lifecycleCovered) { Suspend(character); return; }
@@ -221,6 +231,29 @@ public partial class CharacterRagdollRecoverySmoke : Node
                     _captureDue++;
                 if (character.Diagnostics.Result.ActionPlayback.Active != 0) _sawGetUp = true;
                 if (character.FullMovementDiagnostics.OverlayOverride == 3) _sawOverlayOverride = true;
+                if (_overlayCycle && !_overlaySwitched && _stageTicks >= _hz / 3)
+                {
+                    _beforeOverlaySwitch = character.Diagnostics.Result.ActionPlayback;
+                    Require(_beforeOverlaySwitch.Active != 0 && character.GettingUp, "No active Get-up to change Overlay.");
+                    Tap(Key.E);
+                    Require(_demo.Overlay == (AlsOverlayKind)(((int)_entryOverlay + 1) % 13),
+                        "Ordinary Overlay input was ignored during Get-up.");
+                    _overlaySwitched = true;
+                    _overlaySwitches++;
+                }
+                if (_overlaySwitched && !_checkedOverlaySwitch && character.FullMovementDiagnostics.Overlay == _demo.Overlay)
+                {
+                    var playback = character.Diagnostics.Result.ActionPlayback;
+                    Require(playback.Active != 0 && playback.ActionDefinitionId == _beforeOverlaySwitch.ActionDefinitionId &&
+                        playback.OccurrenceHandleId == _beforeOverlaySwitch.OccurrenceHandleId &&
+                        playback.PlaybackEpoch == _beforeOverlaySwitch.PlaybackEpoch && playback.CurrentTime > _beforeOverlaySwitch.CurrentTime,
+                        "Changing Overlay replaced or restarted the accepted Get-up.");
+                    Require(character.FullMovementDiagnostics.OverlayOverride == ((int)_entryOverlay < 3 ? 0 : 3),
+                        "Changing Overlay changed the active Montage's notify override.");
+                    Require(character.Props?.Committed.Overlay == _demo.Overlay, "Props did not commit the new Overlay.");
+                    _checkedOverlaySwitch = true;
+                    GD.Print($"GET_UP_OVERLAY_SWITCH cycle={_cycles} from={_entryOverlay} to={_demo.Overlay} action={playback.ActionDefinitionId} epoch={playback.PlaybackEpoch}");
+                }
                 if (_lifecycle is "active" or "suspend" or "generation" && !_lifecycleCovered && _stageTicks == _hz / 3)
                 { Require(_sawGetUp && character.GettingUp, "No active Get-up to suspend."); Suspend(character); return; }
                 if (_interrupt && !_interruptSent && _stageTicks == _hz / 3)
@@ -234,9 +267,13 @@ public partial class CharacterRagdollRecoverySmoke : Node
                 Require(motor.GlobalPosition.DistanceTo(_exitPosition) > .25f, "Held movement did not resume after Get-up.");
                 Require(character.CommittedAnimation.ActionCount == 0 && character.CommittedAnimation.StateCount == 0, "Get-up leaked action/notify state.");
                 Require(character.FullMovementDiagnostics.OverlayOverride == 0 &&
-                    ((int)_demo.Overlay < 3 || _sawOverlayOverride), "Get-up override was not applied/reset.");
+                    ((int)_entryOverlay < 3 || _sawOverlayOverride), "Get-up override was not applied/reset.");
+                Require(!_overlayCycle || _checkedOverlaySwitch, "Overlay switch was not committed while Get-up was active.");
                 _cycles++; _sawGetUp = false;
-                if (_cycles < 2) { Next(0); return; }
+                // Keep this repeated input/ownership test on the open floor.
+                // Thirteen recoveries with held W otherwise walk off its edge.
+                if (_overlayCycle) RollingGameplaySmoke.PlaceOnOpenFloor(_demo);
+                if (_cycles < (_overlayCycle ? 13 : 2)) { Next(0); return; }
                 _air = true; Next(0);
             }
         }
@@ -286,6 +323,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
         Require(!_failure || _demo.ActiveCharacter.FailureDiagnosticCount == 1, "Failure injection was not covered.");
         Require(!_entryFailure || _entryFailureObserved, "Automatic entry failure boundary was not observed.");
         Require(!_interrupt || _interrupted == 1, "Ragdoll interruption was not covered.");
+        Require(!_overlayCycle || _overlaySwitches == 13, "Not all Overlay transitions were covered.");
         Require(_lifecycle is null || _lifecycleCovered && _lifecycleInterrupted == (_lifecycle is "active" or "generation" ? 1 : 0),
             "Get-up lifecycle coverage or retirement count differs.");
         var expectedGenerationMismatch = _lifecycle == "generation" ? 1 : 0;
@@ -297,7 +335,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
             _rollRuntimeInterrupted == (_entryFailure ? 1 : 0) && _rollInterrupted + _rollRuntimeInterrupted == _automaticEntries),
             "Automatic Ragdoll or Roll interruption coverage incomplete.");
         Cleanup(); _done = true;
-        GD.Print($"CHARACTER_RAGDOLL_RECOVERY_OK hz={_hz} cycles={_cycles} accepted={_accepted} completed={_ended} interruptions={_interrupted} airborne=true retry={_failureArmed} errors={_demo.ErrorCount} captures={_captureNumber} lifecycle={_lifecycle ?? "none"} retired={_lifecycleInterrupted} automatic={_automatic ?? "none"} entries={_automaticEntries} roll_interrupted={_rollInterrupted} roll_runtime_interrupted={_rollRuntimeInterrupted}");
+        GD.Print($"CHARACTER_RAGDOLL_RECOVERY_OK hz={_hz} cycles={_cycles} accepted={_accepted} completed={_ended} interruptions={_interrupted} airborne=true retry={_failureArmed} errors={_demo.ErrorCount} captures={_captureNumber} lifecycle={_lifecycle ?? "none"} retired={_lifecycleInterrupted} automatic={_automatic ?? "none"} entries={_automaticEntries} roll_interrupted={_rollInterrupted} roll_runtime_interrupted={_rollRuntimeInterrupted} overlay_switches={_overlaySwitches}");
         GetTree().Quit();
     }
     private void Cleanup()
