@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle配置编译：`docs/verification/2026-09-24-mantle-settings-compilation.md`。Core类型+Import编译实际入口/类型Switch/Overlay tagSwitch/返回引用及7设置，生产不读selection/rootSamples。独立39原生选择一致；删除oracle仍可编译，改authored返回引用会改结果，5非法边界拒绝，Release8过/Optimize0/0。手动/自动起始时间接Core，实际7份全手动；当前Linear/HermiteCubic，未知混合拒绝。无gameplay、任意时root采样、通用探测配置或UE/Godot新场景/全量，冻结SHA不变。下一步根骨采样/原生source对照→探测/warp同步/动作生命周期；所有剩余目标及用户文件保留。
+
 - 最新Mantle原生输入：`docs/verification/2026-09-24-mantle-inputs.md`。只读Python导出7实际设置/6montage/1选择图/角色通用设置，13overlay×3类型39原生选择，616原生绝对root TRS采样。全部autoStartTime=false：High125..200→.6..0、InAir .8..0、Low50..100→.5..0，warp高.3..6/低.3..7。全Editor0action审计同fingerprint5507EC2FCBD1D34CCE8C479248800626CB6EFA1E0DE171EF91A041FCBDA81BC6。两冷导CRLF字节同；改显式LF后再冷导0/0，与冻结文件同SHA94B9618B08623A380028C53D84F08CD6C5BD700F3B073DCD5F776424D7484165。首轮registry未扫描、Vector2f属性、wrapper相等失败已修并留日志。无UE源码/资产写入/C#改动/新Godot或全量/普通Editor/DV。下一步编译真实设置+authored选择、任意时间root采样/原生source轨迹，再Main探测/warp同步/生命周期；Mantle和其余全目标未完，用户文件保留。
 
 - 最新Mantle起始时间：`docs/verification/2026-09-24-mantle-start-time.md`。新增Core AlsMantlingStartTime按本机Refactored手动夹紧/逆序/点区间及绝对rootZ二分，1cm或采样一帧停止、中点保留；时间float/帧间隔double。Release14过含32/32.0000001fps精度边界，Optimize0/0。初轮11过1测试预期多二分一次，按原停止条件修测试并留TRX。无gameplay调用/实际Mantle资产验证/native新oracle/UE/全量；下一步导出真实High/Low/InAir选择设置+montage/根骨，再探测、warp/source同步、动作生命周期/移动平台/目标销毁。Mantle未完成；相机复杂场景/物理缩放/旧9/12与Flail0/3/性能仍待做，头颈道具暂缓，用户文件保留。
