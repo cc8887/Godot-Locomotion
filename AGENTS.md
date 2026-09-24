@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Mantle起始时间：`docs/verification/2026-09-24-mantle-start-time.md`。新增Core AlsMantlingStartTime按本机Refactored手动夹紧/逆序/点区间及绝对rootZ二分，1cm或采样一帧停止、中点保留；时间float/帧间隔double。Release14过含32/32.0000001fps精度边界，Optimize0/0。初轮11过1测试预期多二分一次，按原停止条件修测试并留TRX。无gameplay调用/实际Mantle资产验证/native新oracle/UE/全量；下一步导出真实High/Low/InAir选择设置+montage/根骨，再探测、warp/source同步、动作生命周期/移动平台/目标销毁。Mantle未完成；相机复杂场景/物理缩放/旧9/12与Flail0/3/性能仍待做，头颈道具暂缓，用户文件保留。
+
 - 最新相机缩放：`docs/verification/2026-09-24-camera-mesh-scale.md`。专用AlsCameraMeshPose分离FBX骨架旋转/局部Z缩放，host不再固定1，送Follow半径/偏移与probe恢复padding；拒绝非有限/奇异/反射/剪切，物理刚性检查未动。先红0.5倍rigid异常，后两真实模型×3旋转×4缩放24例/4拒绝过，max0.000213249cm；真实墙恢复余量过。Optimize0/0，普通未缩放Parallel60八秒480提交倒地起身等过。无新UE/Core/Import/全量/截图，非UE缩放oracle；普通角色history/Ragdoll仍刚性，整体缩放支持未完成。复杂相机/旧9/12与Flail0/3/Mantle/性能仍保留，头颈道具暂缓，用户文件保留。
 
 - 最新相机时间边界：`docs/verification/2026-09-24-camera-time-scale.md`。普通host忽略时间缩放改固定物理步长，不再用已改变的Engine.TimeScale除当前callback；Hz切换仍须idle。先红60Hz 1→.25时camera_dt=.06666667、yaw差14.20458°，后Single30/Parallel60/120固定15FPS共840样本+普通60 240样本均0偏航差，8次倍率切换/场。普通60 480提交倒地起身人称/肩侧/control yaw回归过，Optimize0/0。无UE/Core/Import改动或全量/截图，非暂停/custom dilation证明。源码核实Godot批次固定scale，agent-reach后端失败后网页读官方提交。MeshScale固定1/刚性转换缺口未修；复杂碰撞/旧9/12和Flail0/3/Mantle/最终性能保留，头颈道具暂缓，用户文件保留。
