@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Camera原生图对照：`docs/verification/2026-09-24-camera-native-graph-parity.md`。新增只读Editor接口运行实际Refactored Camera图，受控tag/shoulder，原始nodes/cache；三频率2730连续帧+384稳定组合，共3114帧29701曲线值，存在性一致、max abs0.0002746582，位置1e-3cm/其他3e-6预设容差内。Import相机24过；无生产C#改动/新Core全量/Godot渲染。初次漏FMemMark断言退出3保留，最终补scope/GFrameCounter、清辅助重名warning，全Editor审计fingerprint2AABEBF5350E74B6E46D1E5F32785955F3F7DB1710B7EFCA7EB305D42B1CFAB5过；DV0/3旧warn，普通Editor42464导出/退出0仍两旧Condition，最终冷导与Editor字节同SHA8A26256E898B4A62D012F594B47F9059E5E3B273C2FF41ABB240EF6BBCE222F9。排除NativeUpdateAnimation/角色/场景查询，不声称bit exact或完整Camera；下一步socket/pivot/平台/trace/普通镜头，保留control yaw。旧静态9/12、Flail0/3、Mantle/最终性能继续；头颈/道具暂缓，用户文件保留。
+
 - 最新相机图运行时：`docs/verification/2026-09-24-camera-graph-runtime.md`。多子BlendList/逐边过渡曲线/共享cache一次更新/失去相关性重入及Prepare/Commit/Discard；只读反射12节点修ViewMode省略默认误判Linear，实际HermiteCubic（10 Cubic/1 Custom）。Core相机11、Import23、Optimize过；三频率1890帧逐帧丢弃重试及480快速中断。UE全Editor审计过，两冷导字段同、仅3未连接PinId异；首轮protected Nodes失败保留，改ObjectIterator。尚无原生全图连续oracle、Godot接入/渲染/性能或全量测试；下一步原生对照→socket/pivot/trace/普通镜头，保留control yaw独立。字典复制未优化，旧静态9/12、Flail0/3、Mantle等继续，头颈/道具暂缓，用户修改保持。
 
 - 最新相机图编译：`docs/verification/2026-09-24-camera-graph-compilation.md`。AlsCameraGraphCompiler读取原始连接/引脚，保留3 Look States/6有向过渡/共享缓存、tag/bool选择及真实混合时间、Modifier/动作覆盖；Velocity回退是RotationMode匹配或无效，未编造LocomotionMode分支。两RichCurve编译和202采样按原生FAlphaBlend clamp校验，Quick末端原始值>1；首轮误比未clamp值失败TRX保留。Import相机专项11过（含旧630帧112边界），Optimize过；无新UE/全量。尚未动态图runtime或普通相机接入，下一步多子混合/状态重入/cache单次更新和原生连续图对照。曲线T3D六位小数/双精度Hermite只证2e-6容差非bit exact；旧静态9/12、Flail0/3、Mantle/完整Camera/性能目标保留，头颈/道具暂缓，用户修改保留。
