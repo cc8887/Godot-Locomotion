@@ -36,19 +36,22 @@ public static class AlsMantlingCurveCompiler
         =>CompileInternal(json,animationJson,false);
     public static IReadOnlyDictionary<string,AlsMantlingCurveSource> CompileMontages(string json,string animationJson)
         =>CompileInternal(json,animationJson,true);
-    private static IReadOnlyDictionary<string,AlsMantlingCurveSource> CompileInternal(string json,string animationJson,bool montage)
+    internal static IReadOnlyDictionary<string,AlsMantlingCurveSource> CompileEmbedded(string animationJson)
+        =>CompileInternal(animationJson,animationJson,false,true);
+    private static IReadOnlyDictionary<string,AlsMantlingCurveSource> CompileInternal(string json,string animationJson,bool montage,bool embedded=false)
     {
         using var doc=JsonDocument.Parse(json);using var animation=JsonDocument.Parse(animationJson);
         var root=doc.RootElement;
         var digest=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(animationJson)));
         Require(root.GetProperty("schemaVersion").GetInt32()==1&&animation.RootElement.GetProperty("schemaVersion").GetInt32()==1&&
-            Text(root,"animationInputsSha256").Equals(digest,StringComparison.OrdinalIgnoreCase),"Foreign mantle curve source digest/schema.");
+            (embedded||Text(root,"animationInputsSha256").Equals(digest,StringComparison.OrdinalIgnoreCase)),"Foreign mantle curve source digest/schema.");
         var collection=montage?"montages":"sequences";
         var policies=animation.RootElement.GetProperty(collection).EnumerateArray()
             .ToDictionary(r=>montage?Text(r,"path"):Text(r.GetProperty("raw"),"source"),r=>r,StringComparer.Ordinal);
         var result=new Dictionary<string,AlsMantlingCurveSource>(StringComparer.Ordinal);
-        foreach(var sequence in root.GetProperty(collection).EnumerateArray())
+        foreach(var entry in root.GetProperty(collection).EnumerateArray())
         {
+            var sequence=embedded?entry.GetProperty("curves"):entry;
             var path=Text(sequence,"source");Require(policies.TryGetValue(path,out var policy),"Unrelated mantle curve source.");
             // Text is used only for name closure, never for rounded key values.
             var modelCurveData=montage?Regex.Matches(Text(policy,"nativeText"),@"(?m)^      CurveData=([^\r\n]+)"):null;
