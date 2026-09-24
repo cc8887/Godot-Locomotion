@@ -53,18 +53,19 @@ public sealed class AlsRefactoredLayerGraphTests
         if(overrideSlots)Assert.Equal(7,sink.VisitedSlots.Count);
     }
     [Theory]
-    [InlineData("edge")][InlineData("scale")][InlineData("slot")][InlineData("rootspace")][InlineData("callback")][InlineData("mask")]
+    [InlineData("edge")][InlineData("scale")][InlineData("slot")][InlineData("slotName")][InlineData("rootspace")][InlineData("callback")][InlineData("mask")]
     public void UnsupportedOrMismatchedCompiledPoliciesAreRejected(string change)
     {
         var inventory=JsonNode.Parse(Read("layering_inventory"))!;var nodes=inventory["blueprints"]![2]!["nodes"]!.AsArray();
         JsonNode Node(string kind)=>nodes.First(n=>n!["class"]!.GetValue<string>()==kind&&n["compiledNodeIndex"]!.GetValue<int>()>=0)!;
-        var item=Node(change switch {"edge"=>"AnimGraphNode_Root","scale"=>"AnimGraphNode_MultiWayBlend","slot"=>"AnimGraphNode_Slot",_=>"AnimGraphNode_LayeredBoneBlend"});
+        var item=Node(change switch {"edge"=>"AnimGraphNode_Root","scale"=>"AnimGraphNode_MultiWayBlend","slot" or "slotName"=>"AnimGraphNode_Slot",_=>"AnimGraphNode_LayeredBoneBlend"});
         if(change=="edge")item["runtime"]!["result"]!["linkId"]=item["propertyIndex"]!.GetValue<int>();
         else if(change=="mask")item["runtime"]!["perBoneBlendWeights"]![0]!["blendWeight"]=.5;
         else foreach(var state in new[]{item["runtime"]!,item["authoredProperties"]!["Node"]!})
         {
             if(change=="scale")state["alphaScaleBias"]!["scale"]=2;
             if(change=="slot")state["bAlwaysUpdateSourcePose"]=true;
+            if(change=="slotName")state["slotName"]="UnknownRegion";
             if(change=="rootspace")state["bRootSpaceRotationBlend"]=true;
             if(change=="callback")state["updateFunction"]!["functionName"]="Other";
         }

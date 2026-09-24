@@ -10,9 +10,26 @@ public readonly record struct AlsSequenceMontageCommand(int AnimationId, AlsMont
 // These are graph slot identities, not montage-local slot array indices.
 public readonly record struct AlsMontageSlot(int Id)
 {
+    public const int Count = 12;
+    public const ushort AllMask = (1 << Count) - 1;
+    public bool IsValid => (uint)Id < Count;
+    public ushort Mask => IsValid ? (ushort)(1 << Id) : throw new ArgumentOutOfRangeException(nameof(Id));
     public static AlsMontageSlot BaseLayer => new(2);
     public static AlsMontageSlot Grounded => new(3);
     public static AlsMontageSlot PostLocomotion => new(4);
+    public static AlsMontageSlot Head => new(5);
+    public static AlsMontageSlot Spine => new(6);
+    public static AlsMontageSlot ArmLeft => new(7);
+    public static AlsMontageSlot ArmRight => new(8);
+    public static AlsMontageSlot Pelvis => new(9);
+    public static AlsMontageSlot Legs => new(10);
+    public static AlsMontageSlot Curves => new(11);
+    public static AlsMontageSlot FromRefactoredLayerName(string name) => name switch
+    {
+        "Head" => Head, "Spine" => Spine, "ArmLeft" => ArmLeft, "ArmRight" => ArmRight,
+        "Pelvis" => Pelvis, "Legs" => Legs, "Curves" => Curves,
+        _ => throw new ArgumentException("Unknown Refactored Layering Slot: " + name)
+    };
     public static implicit operator AlsMontageSlot(AlsTurnSlot slot) => new((int)slot);
 }
 
@@ -66,6 +83,7 @@ public sealed class AlsMontageFrame
     public ReadOnlySpan<AlsMontageEvaluation> Evaluations => Entries.AsSpan(0, Count);
     public AlsSlotWeights SlotWeights(AlsMontageSlot slot)
     {
+        if (!slot.IsValid) throw new ArgumentOutOfRangeException(nameof(slot));
         var total = 0f; var nonAdditive = 0f;
         foreach (var entry in Evaluations)
             if (entry.Slot == slot) { total += entry.Weight; if (entry.AdditiveType == 0) nonAdditive += entry.Weight; }
@@ -126,7 +144,7 @@ public sealed class AlsMontageRuntime
         _sequences = new();
         foreach (var asset in sequences)
         {
-            if (asset.AnimationId < 0 || asset.Slot.Id is < 0 or > 4 || asset.GroupId < 0 ||
+            if (asset.AnimationId < 0 || !asset.Slot.IsValid || asset.GroupId < 0 ||
                 !float.IsFinite(asset.Duration) || asset.Duration <= .00005f || (uint)asset.AdditiveType > 2 ||
                 asset.Slot.Id < 2 && _assets.ContainsKey((asset.AnimationId, (AlsTurnSlot)asset.Slot.Id)) ||
                 !_sequences.TryAdd((asset.AnimationId, asset.Slot), asset))
@@ -136,7 +154,7 @@ public sealed class AlsMontageRuntime
         var nativeAssets = new Dictionary<int, AlsAuthoredMontageAsset>();
         foreach (var action in actions)
         {
-            if (action.ActionDefinitionId < 0 || action.MontageId < -1 || action.AnimationId < 0 || action.Slot.Id < 0 || action.GroupId < 0 || (uint)action.AdditiveType > 2 ||
+            if (action.ActionDefinitionId < 0 || action.MontageId < -1 || action.AnimationId < 0 || !action.Slot.IsValid || action.GroupId < 0 || (uint)action.AdditiveType > 2 ||
                 !float.IsFinite(action.Duration) || action.Duration <= .00005f || !float.IsFinite(action.ClipStart) || action.ClipStart < 0 ||
                 !float.IsFinite(action.ClipRate) || action.ClipRate <= 0 || !float.IsFinite(action.ClipStart + action.Duration * action.ClipRate) ||
                 !float.IsFinite(action.RateScale) || action.RateScale <= 0 ||
