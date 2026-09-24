@@ -23,6 +23,9 @@ public partial class CharacterRagdollRecoverySmoke : Node
     private long _heldFrame;
     private Vector3 _heldPosition;
     private AlsP3Character? _retired;
+    private string? _automatic;
+    private int _automaticEntries, _rollInterrupted, _rollRuntimeInterrupted;
+    private bool _entryFailure, _entryFailureObserved;
     private Vector3 _exitPosition;
     private Input.MouseModeEnum _mouse;
     public override void _Ready()
@@ -34,6 +37,11 @@ public partial class CharacterRagdollRecoverySmoke : Node
             _failure = args.Contains("--failure"); _mouse = Input.MouseMode;
             _interrupt = args.Contains("--interrupt");
             _forceBack = args.Contains("--back");
+            _automatic = args.FirstOrDefault(a => a.StartsWith("--auto="))?[7..];
+            Require(_automatic is null or "landing" or "roll", "Unknown automatic Ragdoll case.");
+            _entryFailure = args.Contains("--entry-failure");
+            Require(!_entryFailure || _automatic == "roll", "Entry failure case requires --auto=roll.");
+            _failure |= _entryFailure;
             _lifecycle = args.FirstOrDefault(a => a.StartsWith("--lifecycle="))?[12..];
             Require(_lifecycle is null or "pending" or "active" or "suspend" or "generation", "Unknown lifecycle case.");
             var capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="));
@@ -48,7 +56,12 @@ public partial class CharacterRagdollRecoverySmoke : Node
             AddChild(_demo); RollingGameplaySmoke.PlaceOnOpenFloor(_demo);
             _demo.RuntimeContext.ActionOutcomeCommitted += (_, outcome) =>
             {
-                if (outcome.ActionDefinitionId == _demo.RuntimeContext.MovementGraph!.RollDefinitionId) return;
+                if (outcome.ActionDefinitionId == _demo.RuntimeContext.MovementGraph!.RollDefinitionId)
+                {
+                    if (outcome.ResultCode == AlsActionResultCode.InterruptedByRagdoll) _rollInterrupted++;
+                    if (outcome.ResultCode == AlsActionResultCode.InterruptedByRuntimeFailure) _rollRuntimeInterrupted++;
+                    return;
+                }
                 if (outcome.ResultCode == AlsActionResultCode.Accepted) _accepted++;
                 else if (outcome.ResultCode == AlsActionResultCode.Completed) _ended++;
                 else if (outcome.ResultCode == AlsActionResultCode.InterruptedByRagdoll && _interruptSent) _interrupted++;
@@ -71,6 +84,24 @@ public partial class CharacterRagdollRecoverySmoke : Node
             Require(character.BodyHistory?.Failure is null && (_stage == 6 || !character.IsPoseFrozen) && _demo.ErrorCount <= (_failure ? 1 : 0) + expectedClassification,
                 $"Recovery runtime failed: {character.BodyHistory?.Failure} frozen={character.IsPoseFrozen} errors={_demo.ErrorCount}");
             _stageTicks++;
+            if (_entryFailure && character.AnimationRecoveryAttempts > 0)
+            {
+                Require(_stage == 1 && character.RagdollSimulation is null && character.LatestMotorInput.MovementAction.RequiresRagdoll,
+                    "Failed automatic edge activated physics before commit.");
+                _entryFailureObserved = true;
+            }
+            if (_stage == 7)
+            {
+                if (!character.Diagnostics.Result.Rolling.Active) return;
+                if (_entryFailure && !_failureArmed)
+                {
+                    _demo.RuntimeContext.ArmWorkerFailureInjection(AlsP3WorkerFailureInjectionStage.BeforePublish,
+                        character.HandleIdentity(character.RuntimeCommittedFrameId + 1));
+                    _failureArmed = true;
+                }
+                motor.GlobalPosition += Vector3.Up * 2;
+                Next(1); return;
+            }
             if (_stage == 6)
             {
                 if (!_demo.ReplacementDiagnostics.RecoveryCommitted) return;
@@ -103,12 +134,24 @@ public partial class CharacterRagdollRecoverySmoke : Node
             {
                 if (character.RuntimeCommittedFrameId < 20 || _stageTicks < 20) return;
                 if (_air) motor.GlobalPosition += Vector3.Up * 10;
+                else if (_automatic == "landing")
+                { motor.GlobalPosition += Vector3.Up * 8; motor.Velocity = Vector3.Zero; Next(1); return; }
+                else if (_automatic == "roll") { Tap(Key.R); Next(7); return; }
                 Tap(Key.G); Next(1); return;
             }
             if (_stage == 1)
             {
                 if (character.RagdollSimulation is not { } simulation || simulation.CompletedSteps < (_air ? 2 : _hz * 2)) return;
                 Require(motor.RagdollGrounded != _air, "Ragdoll ground state differs from exit scenario.");
+                if (!_air && _automatic is not null)
+                {
+                    _automaticEntries++;
+                    Require(simulation.Activation.Entry.Identity.FrameId > 0 && motor.CollisionMask == 0,
+                        "Automatic trigger did not create committed physical ownership.");
+                    if (_automatic == "landing")
+                        Require(simulation.Activation.Entry.CharacterVelocity.Y <= -10 && simulation.Activation.SpeedLimit.SpeedLimit >= 1000,
+                            "Automatic landing used collision-clipped velocity for initial speed limiting.");
+                }
                 if (_forceBack && _cycles == 0)
                 {
                     // Controlled back-facing setup, not a claim about natural
@@ -225,6 +268,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
     private void Finish()
     {
         Require(!_failure || _demo.ActiveCharacter.FailureDiagnosticCount == 1, "Failure injection was not covered.");
+        Require(!_entryFailure || _entryFailureObserved, "Automatic entry failure boundary was not observed.");
         Require(!_interrupt || _interrupted == 1, "Ragdoll interruption was not covered.");
         Require(_lifecycle is null || _lifecycleCovered && _lifecycleInterrupted == (_lifecycle is "active" or "generation" ? 1 : 0),
             "Get-up lifecycle coverage or retirement count differs.");
@@ -233,8 +277,11 @@ public partial class CharacterRagdollRecoverySmoke : Node
             _demo.ErrorCount == (_failure ? 1 : 0) + expectedGenerationMismatch,
             "Unexpected diagnostic was hidden by the lifecycle test allowance.");
         Require(_captureDirectory is null || _captureNumber >= 6, "Get-up screenshot coverage incomplete.");
+        Require(_automatic is null || _automaticEntries >= 2 && (_automatic != "roll" ||
+            _rollRuntimeInterrupted == (_entryFailure ? 1 : 0) && _rollInterrupted + _rollRuntimeInterrupted == _automaticEntries),
+            "Automatic Ragdoll or Roll interruption coverage incomplete.");
         Cleanup(); _done = true;
-        GD.Print($"CHARACTER_RAGDOLL_RECOVERY_OK hz={_hz} cycles={_cycles} accepted={_accepted} completed={_ended} interruptions={_interrupted} airborne=true retry={_failureArmed} errors={_demo.ErrorCount} captures={_captureNumber} lifecycle={_lifecycle ?? "none"} retired={_lifecycleInterrupted}");
+        GD.Print($"CHARACTER_RAGDOLL_RECOVERY_OK hz={_hz} cycles={_cycles} accepted={_accepted} completed={_ended} interruptions={_interrupted} airborne=true retry={_failureArmed} errors={_demo.ErrorCount} captures={_captureNumber} lifecycle={_lifecycle ?? "none"} retired={_lifecycleInterrupted} automatic={_automatic ?? "none"} entries={_automaticEntries} roll_interrupted={_rollInterrupted} roll_runtime_interrupted={_rollRuntimeInterrupted}");
         GetTree().Quit();
     }
     private void Cleanup()

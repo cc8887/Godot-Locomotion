@@ -46,6 +46,9 @@ public partial class LandingActionSmoke : Node
             _demo = ResourceLoader.Load<PackedScene>("res://scenes/demo/p4_locomotion_demo.tscn").Instantiate<P4LocomotionDemo>();
             _demo.ConfigureRuntimePolicyForSmoke(args.Contains("--single") ? AlsHarnessMode.Single : AlsHarnessMode.Parallel, !_failure);
             AddChild(_demo); Require(_demo.IsRuntimeReady, "Normal graph initialization failed.");
+            // This older test isolates all three routing branches in one run.
+            // Actual automatic physics and Get-up are covered by RecoverySmoke.
+            _demo.RuntimeContext.AutomaticRagdollEnvironment = null;
             RollingGameplaySmoke.PlaceOnOpenFloor(_demo); _groundY = Body.GlobalPosition.Y;
             _demo.RuntimeContext.ActionOutcomeCommitted += (_, outcome) =>
             {

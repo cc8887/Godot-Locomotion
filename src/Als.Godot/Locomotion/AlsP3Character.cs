@@ -92,6 +92,10 @@ public partial class AlsP3Character : Node3D
     }
     internal void ConsumeRagdollRequest()
     {
+        // Read only the committed edge. A failed/retried animation must never
+        // activate physics from the newer gathered Motor input.
+        if (_requestedRagdollEnvironment is null && Diagnostics.Result.MovementAction.RequiresRagdoll)
+            _requestedRagdollEnvironment = _context.AutomaticRagdollEnvironment;
         if (_requestedRagdollEnvironment is not { } environment || PublishedFrameId != RuntimeCommittedFrameId) return;
         BeginRagdoll(environment); _requestedRagdollEnvironment = null;
     }
@@ -225,7 +229,12 @@ public partial class AlsP3Character : Node3D
             throw new InvalidOperationException("Ragdoll entry requires one live, fully presented committed frame.");
         var character = Transform(committed.FootProbeSource.CharacterTransform);
         var skeleton = Transform(committed.FootProbeSource.SkeletonTransform);
-        var v = committed.ActualVelocity; var velocity = new Vector3(v.X, v.Y, v.Z);
+        // Native mode-change callbacks use the previous character tick's
+        // LocomotionState.Velocity for both the trigger and initial speed limit.
+        // The collision-adjusted landing velocity has already lost its fall speed.
+        var v = committed.Result.MovementAction.RequiresRagdoll
+            ? committed.Result.MovementAction.CachedVelocity : committed.ActualVelocity;
+        var velocity = new Vector3(v.X, v.Y, v.Z);
         // Validate all metadata before the caller's pose buffer can change.
         _ = GodotAls.Physics.AlsSceneContactSet.FromWorld(character);
         _ = GodotAls.Physics.AlsCorePhysicsPose.FromWorld(skeleton);
