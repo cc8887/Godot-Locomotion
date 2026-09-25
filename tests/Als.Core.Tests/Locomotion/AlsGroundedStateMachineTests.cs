@@ -6,6 +6,31 @@ namespace GodotAls.Core.Tests.Locomotion;
 [Collection(AllocationTestCollection.Name)]
 public sealed class AlsGroundedStateMachineTests
 {
+    [Fact]
+    public void RefactoredMovementDetailsCannotUseLegacyOrDirectionRuleDomains()
+    {
+        var states = Enumerable.Range(0, 6).Select(i => new AlsGroundedStateDefinition(false, AlsGroundedCondition.Never,
+            i == 0 ? 0 : 1, i == 0 ? 1 : 0, -1, -1, -1)).ToArray();
+        var edge = new AlsGroundedEdge(0, 1, AlsGroundedCondition.Never, 0, .1f, AlsTransitionBlend.HermiteCubic, true, -1, -1, -1)
+            { RefactoredMovementDetailsRule = AlsRefactoredMovementDetailsRule.Pivot };
+        var definition = new AlsGroundedMachineDefinition(AlsGroundedMachineKind.RefactoredMovementDetails, 0, 1, false, states, [edge]);
+        var times = new AlsGroundedAutomaticTime[6];
+        Assert.Throws<ArgumentException>(() => AlsGroundedStateMachine.Update(definition, default, default, times, 1, 0, 0));
+        Assert.Throws<ArgumentException>(() => AlsGroundedStateMachine.UpdateRefactoredDirection(definition, default, default, 1, 0, 0));
+        Assert.Throws<ArgumentException>(() => AlsGroundedStateMachine.UpdateRefactoredMovementDetails(Model, default, default, new AlsGroundedAutomaticTime[2], 1, 0, 0));
+        foreach (var invalid in new[] { edge with { RefactoredMovementDetailsRule = null },
+            edge with { RefactoredDirectionRule = new(AlsRefactoredDirectionRuleKind.Forward) },
+            edge with { Condition = AlsGroundedCondition.Always },
+            edge with { RefactoredMovementDetailsRule = AlsRefactoredMovementDetailsRule.AutomaticRemainingTime } })
+            Assert.Throws<ArgumentException>(() => new AlsGroundedMachineDefinition(AlsGroundedMachineKind.RefactoredMovementDetails, 0, 1, false, states, [invalid]));
+        Assert.Throws<ArgumentException>(() => new AlsGroundedMachineDefinition(AlsGroundedMachineKind.Main, 0, 1, false, states, [edge]));
+        Assert.Throws<ArgumentException>(() => new AlsGroundedMachineDefinition(AlsGroundedMachineKind.RefactoredMovementDetails, 0, 3, false, states, [edge]));
+        Assert.Throws<ArgumentException>(() => new AlsGroundedMachineDefinition(AlsGroundedMachineKind.RefactoredMovementDetails, 0, 1, true, states, [edge]));
+        var update = AlsGroundedStateMachine.UpdateRefactoredMovementDetails(definition, default, new("", 0, 0, 0, true), times, .5f, 0, 0);
+        Assert.Equal(1, update.State.CurrentState); Assert.Equal(.1f, update.InertializationSeconds);
+        Assert.Equal(new(1, .5f, true), update.GetUpdate(0));
+    }
+
     private static readonly AlsGroundedRuleInput Idle = new(false, false, false, AlsStance.Standing, true, false, 0, 0);
     private static readonly AlsGroundedMachineDefinition Model = new(AlsGroundedMachineKind.Main, 0, 3, true,
         [new(false, AlsGroundedCondition.Always, 0, 1, 10, 11, 12), new(false, AlsGroundedCondition.Always, 1, 1, 20, 21, 22)],
