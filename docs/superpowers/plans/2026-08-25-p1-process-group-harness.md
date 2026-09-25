@@ -286,7 +286,7 @@ GODOT_ALS_P1_OK mode=(single|parallel) characters=(\d+) frames=(\d+) digest=([0-
 Run:
 
 ```powershell
-.\scripts\verify-p1.ps1 -GodotExecutable 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+.\scripts\verify-p1.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}"
 ```
 
 Expected: build 和核心测试通过，Godot 因 `p1_dispatch_harness.tscn` 不存在而失败。

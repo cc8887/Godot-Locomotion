@@ -1,6 +1,6 @@
 # Standing 独立方向输入与初始化后求值
 
-日期：2026-09-12，第六十九批。工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-12，第六十九批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 
 ## 实现与原生依据
 

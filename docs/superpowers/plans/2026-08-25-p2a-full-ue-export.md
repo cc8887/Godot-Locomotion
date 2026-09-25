@@ -185,8 +185,8 @@ Run:
 
 ```powershell
 .\scripts\verify-p2a.ps1 `
-  -EngineRoot 'D:\UnrealEngine' `
-  -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+  -EngineRoot "${env:UE_ENGINE_ROOT}" `
+  -UnrealProject "${env:ALS_UE_PROJECT_FILE}"
 ```
 
 Expected: RED，构建脚本或插件不存在。
@@ -396,8 +396,8 @@ Run:
 
 ```powershell
 .\scripts\verify-p2a.ps1 `
-  -EngineRoot 'D:\UnrealEngine' `
-  -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+  -EngineRoot "${env:UE_ENGINE_ROOT}" `
+  -UnrealProject "${env:ALS_UE_PROJECT_FILE}"
 ```
 
 Expected: plugin build/deploy、dry-run、full export 完成；输出全部目标类别，音频等排除数量为 0。
@@ -430,9 +430,9 @@ git commit -m "test: enforce deterministic complete ALS export"
 - [x] **Step 2：运行最终验证**
 
 ```powershell
-.\scripts\verify-p2a.ps1 -EngineRoot 'D:\UnrealEngine' -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
-.\scripts\verify-p1.ps1 -GodotExecutable 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
-.\scripts\verify-p0.ps1 -GodotExecutable 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+.\scripts\verify-p2a.ps1 -EngineRoot "${env:UE_ENGINE_ROOT}" -UnrealProject "${env:ALS_UE_PROJECT_FILE}"
+.\scripts\verify-p1.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}"
+.\scripts\verify-p0.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}"
 git diff --check
 ```
 

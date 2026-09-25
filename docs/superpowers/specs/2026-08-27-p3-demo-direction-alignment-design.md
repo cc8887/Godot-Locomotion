@@ -4,11 +4,11 @@
 
 **日期：** 2026-08-27
 
-**Godot 工程：** `D:\GodotALS`
+**Godot 工程：** `${env:GODOT_ALS_ROOT}`
 
 **行为参考：**
 
-- 原版 ALS V4 工程：`D:\AdvancedLocomotionSystemV`
+- 原版 ALS V4 工程：`${env:ALS_UE_PROJECT_ROOT}`
 - `ALS-Refactored` 固定 commit：
   `b754d6f0f2bb03741d301f8fb88077ebfe561e17`
 - Godot 基线：`main` commit
@@ -51,7 +51,7 @@
 ### 2.1 证据边界
 
 - 原版输入映射来自
-  `D:\AdvancedLocomotionSystemV\Config\DefaultInput.ini`；
+  `${env:ALS_UE_PROJECT_ROOT}\Config\DefaultInput.ini`；
 - 原版 CameraManager、CameraBehavior、PlayerController 和 AnimMan CDO/Blueprint 图来自只读 UE 审计，
   核心源资产没有保存修改；
 - 原版资产可确定相机是状态/曲线驱动，但只读导出不能严谨证明某一组提取曲线值就是 demo 初始状态的
@@ -60,7 +60,7 @@
 - C++ 参考中的隐藏 Camera skeletal component 挂在 Character mesh 下并带 local yaw `+90 deg`，默认与
   mesh 的 `-90 deg` 相消；这再次证明 mesh yaw 不是 movement/view basis；
 - 当前问题截图位于
-  `D:\GodotALS\artifacts\diagnostics\p3-direction-before.png`。
+  `${env:GODOT_ALS_ROOT}\artifacts\diagnostics\p3-direction-before.png`。
 
 ### 2.2 输入数学对照
 
@@ -426,18 +426,18 @@ P3 不用固定 SpringArm 参数冒充上述系统，也不把本阶段 `0.53 m`
 
 ## 十三、参考
 
-- `D:\GodotALS\docs\superpowers\specs\2026-08-25-godot-als-port-design.md`
-- `D:\GodotALS\docs\superpowers\specs\2026-08-26-p3-basic-locomotion-design.md`
-- `D:\GodotALS\docs\architecture\p3-basic-locomotion.md`
-- `D:\GodotALS-References\ALS-Refactored\Source\ALS\Private\AlsCharacter.cpp`
-- `D:\GodotALS-References\ALS-Refactored\Source\ALSExtras\Private\AlsCharacterExample.cpp`
-- `D:\GodotALS-References\ALS-Refactored\Source\ALSCamera\Private\AlsCameraComponent.cpp`
-- `D:\GodotALS-References\ALS-Refactored\Source\ALSCamera\Public\AlsCameraSettings.h`
-- `D:\AdvancedLocomotionSystemV\Config\DefaultInput.ini`
-- `D:\AdvancedLocomotionSystemV\Content\AdvancedLocomotionV4\Blueprints\CameraSystem\ALS_PlayerCameraManager.uasset`
-- `D:\AdvancedLocomotionSystemV\Content\AdvancedLocomotionV4\Blueprints\CameraSystem\ALS_PlayerCameraBehavior.uasset`
-- `D:\AdvancedLocomotionSystemV\Content\AdvancedLocomotionV4\Blueprints\CharacterLogic\ALS_Player_Controller.uasset`
-- `D:\AdvancedLocomotionSystemV\Content\AdvancedLocomotionV4\Blueprints\CharacterLogic\ALS_AnimMan_CharacterBP.uasset`
-- `D:\GodotALS\src\Als.Godot\Locomotion\AlsP3WorkerRoot.cs`
-- `D:\GodotALS\src\Als.Godot\Locomotion\AlsOrbitCamera.cs`
-- `D:\GodotALS\src\Als.Core\Locomotion\AlsLocomotionCommandResolver.cs`
+- `${env:GODOT_ALS_ROOT}\docs\superpowers\specs\2026-08-25-godot-als-port-design.md`
+- `${env:GODOT_ALS_ROOT}\docs\superpowers\specs\2026-08-26-p3-basic-locomotion-design.md`
+- `${env:GODOT_ALS_ROOT}\docs\architecture\p3-basic-locomotion.md`
+- `${env:ALS_REFERENCE_ROOT}\Source\ALS\Private\AlsCharacter.cpp`
+- `${env:ALS_REFERENCE_ROOT}\Source\ALSExtras\Private\AlsCharacterExample.cpp`
+- `${env:ALS_REFERENCE_ROOT}\Source\ALSCamera\Private\AlsCameraComponent.cpp`
+- `${env:ALS_REFERENCE_ROOT}\Source\ALSCamera\Public\AlsCameraSettings.h`
+- `${env:ALS_UE_PROJECT_ROOT}\Config\DefaultInput.ini`
+- `${env:ALS_UE_PROJECT_ROOT}\Content\AdvancedLocomotionV4\Blueprints\CameraSystem\ALS_PlayerCameraManager.uasset`
+- `${env:ALS_UE_PROJECT_ROOT}\Content\AdvancedLocomotionV4\Blueprints\CameraSystem\ALS_PlayerCameraBehavior.uasset`
+- `${env:ALS_UE_PROJECT_ROOT}\Content\AdvancedLocomotionV4\Blueprints\CharacterLogic\ALS_Player_Controller.uasset`
+- `${env:ALS_UE_PROJECT_ROOT}\Content\AdvancedLocomotionV4\Blueprints\CharacterLogic\ALS_AnimMan_CharacterBP.uasset`
+- `${env:GODOT_ALS_ROOT}\src\Als.Godot\Locomotion\AlsP3WorkerRoot.cs`
+- `${env:GODOT_ALS_ROOT}\src\Als.Godot\Locomotion\AlsOrbitCamera.cs`
+- `${env:GODOT_ALS_ROOT}\src\Als.Core\Locomotion\AlsLocomotionCommandResolver.cs`

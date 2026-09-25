@@ -1,4 +1,5 @@
 .worktrees/
+.env.local.ps1
 .godot/
 .mono/
 bin/

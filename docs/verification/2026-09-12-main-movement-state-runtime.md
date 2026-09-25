@@ -1,6 +1,6 @@
 # Main Movement 源图与状态规则
 
-日期：2026-09-12。工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-12。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 
 ## 本轮范围
 

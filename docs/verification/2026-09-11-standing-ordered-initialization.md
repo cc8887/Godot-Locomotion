@@ -1,6 +1,6 @@
 # Standing / Detail 的有序来源初始化
 
-日期：2026-09-11。第五十九批。工作区 `D:\GodotALS-p5a-events-actions`，
+日期：2026-09-11。第五十九批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`，
 继续保留 `d6b45e3` 以来的已有改动；本批没有提交、回退或修改 UE 资产。
 
 ## 已修正的生产缺口

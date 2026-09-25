@@ -1,6 +1,6 @@
 # 实际场景碰撞与外部运动身体接入
 
-主目录 `D:\GodotALS` / `main`，接续 `6d82cbc`。
+主目录 `${env:GODOT_ALS_ROOT}` / `main`，接续 `6d82cbc`。
 Core 现在可以消费外部驱动的零质量身体姿态与速度；Godot 适配器可以从指定环境子树读取实际碰撞形状、过滤条件和平台运动。
 两套资产在 demo World 的普通/高速落地、30/60/120 Hz 六项十秒检查通过。
 本批仍是物理接入与独立诊断，**普通角色 Ragdoll / Get-up / Pose Recovery 尚未接通**。
@@ -16,8 +16,8 @@ Core 现在可以消费外部驱动的零质量身体姿态与速度；Godot 适
 
 `AlsKinematicMotion.PositionTarget` 对齐本机 UE 源码的一次完整 Position target 步：
 
-- `D:\UnrealEngine\Engine\Source\Runtime\Experimental\Chaos\Private\Chaos\PBDRigidsEvolutionGBF.cpp`，约 1188–1298 行：Position / Reset，目标先应用到 X/R 与 P/Q，再 Gather。
-- `D:\UnrealEngine\Engine\Source\Runtime\Experimental\ChaosCore\Private\Rotation.cpp`，约 146 行：float 最短弧四元数导数计算角速度。
+- `${env:UE_ENGINE_ROOT}\Engine\Source\Runtime\Experimental\Chaos\Private\Chaos\PBDRigidsEvolutionGBF.cpp`，约 1188–1298 行：Position / Reset，目标先应用到 X/R 与 P/Q，再 Gather。
+- `${env:UE_ENGINE_ROOT}\Engine\Source\Runtime\Experimental\ChaosCore\Private\Rotation.cpp`，约 146 行：float 最短弧四元数导数计算角速度。
 - 位置差使用 double，粒子旋转与输出速度保持 float 边界；保留 `1e-6f` 最小步长和 `1e-8f` 变化容差。
 
 这里只移植完整 Position 步及下一步速度重置契约，未实现 substep 插值、Velocity target 模式、CCD。

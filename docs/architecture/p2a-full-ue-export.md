@@ -8,7 +8,7 @@ P2A 建立 UE 5.9 到 Godot ALS 项目的可重复资产交付边界。本阶段
 
 ## 工具链与入口
 
-- 源项目：`D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject`
+- 源项目：`${env:ALS_UE_PROJECT_FILE}`
 - Unreal Engine：`5.9.0-0+UE5`
 - 导出插件：`AlsGodotExporter 1.0.0`，Editor-only、Win64
 - 目标内容根：`/Game/AdvancedLocomotionV4`
@@ -21,8 +21,8 @@ P2A 建立 UE 5.9 到 Godot ALS 项目的可重复资产交付边界。本阶段
 
 ```powershell
 .\scripts\verify-p2a.ps1 `
-  -EngineRoot 'D:\UnrealEngine' `
-  -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+  -EngineRoot "${env:UE_ENGINE_ROOT}" `
+  -UnrealProject "${env:ALS_UE_PROJECT_FILE}"
 ```
 
 脚本按顺序执行插件 BuildPlugin、带管理哨兵的受控部署、ReadyCheck、dry-run、第一次完整导出、第二次隔离导出和逐文件确定性比较。完整导出必须带 `-AllowCommandletRendering -RenderOffscreen`；UE 5.9 的 SkeletalMesh FBX exporter 需要可用的 renderer scene，不能使用 `-nullrhi`。

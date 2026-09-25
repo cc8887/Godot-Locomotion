@@ -1,6 +1,6 @@
 # 蹲姿主状态机与姿势内容合同
 
-日期：2026-09-11。第四十六批，工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-11。第四十六批，工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 承接第四十五批；没有 commit、revert、UE 资产保存或键鼠控制修改。
 
 ## 完整性修复方案

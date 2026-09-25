@@ -1,6 +1,6 @@
 # 实际混合胶囊重放与 .NET 运行时叉积差异
 
-本批在 `D:\GodotALS` / `main` 完成实际 capsule-pair/capsule-convex 重放，并修复由 .NET 8/9 运算实现差异造成的胶囊接触偏差。没有切换普通角色到实验物理后端，整链仍未整体验收。
+本批在 `${env:GODOT_ALS_ROOT}` / `main` 完成实际 capsule-pair/capsule-convex 重放，并修复由 .NET 8/9 运算实现差异造成的胶囊接触偏差。没有切换普通角色到实验物理后端，整链仍未整体验收。
 
 ## 实际几何和身体输入
 

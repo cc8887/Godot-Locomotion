@@ -1,6 +1,6 @@
 # 第五批：MovementDirection 的源图语义
 
-日期：2026-09-10。工作区：`D:\GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 本批补 P3 的活动移动方向求值，不代表完整 Locomotion 或 P5A 已验收。
 
 ## 源行为与实现

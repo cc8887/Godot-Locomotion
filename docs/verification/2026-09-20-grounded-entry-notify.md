@@ -1,6 +1,6 @@
 # Roll GroundedEntry 通知与状态反馈
 
-在 `D:\GodotALS` / `main` 接续 `2597dca`。没有新建项目或 worktree；用户的
+在 `${env:GODOT_ALS_ROOT}` / `main` 接续 `2597dca`。没有新建项目或 worktree；用户的
 P4 规划文件保留，SHA256 仍为
 `78EEA1410FF3EBC93A5EAEAA224ABFD74565B54090DBA3670C08A37BED60B100`。
 

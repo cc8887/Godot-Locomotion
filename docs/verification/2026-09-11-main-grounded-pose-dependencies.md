@@ -1,7 +1,7 @@
 # Main Grounded 姿势与原生依赖补完
 
 日期：2026-09-11；完整性计划第四十四批。
-工作区：`D:\GodotALS-p5a-events-actions`；保留现有未提交修改，未执行 commit/revert。
+工作区：`ARCHIVED_P5A_WORKTREE_PATH`；保留现有未提交修改，未执行 commit/revert。
 
 ## 结论与范围
 

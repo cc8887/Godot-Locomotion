@@ -1,6 +1,6 @@
 # Standing YawOffset 输入与曲线写入
 
-日期：2026-09-12。第七十批，工作区 `D:\GodotALS-p5a-events-actions`，
+日期：2026-09-12。第七十批，工作区 `ARCHIVED_P5A_WORKTREE_PATH`，
 分支 `feature/p5a-events-actions`。保留既有未提交工作，本批未 commit、revert 或合并。
 
 ## 原计划归属与实际改动

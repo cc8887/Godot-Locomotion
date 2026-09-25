@@ -1,6 +1,6 @@
 # Overlay 原生道具装备与弓动画
 
-本批在 `D:\GodotALS` 的 main 上继续，基于 `230930d`。普通 Demo 新增 Q / E
+本批在 `${env:GODOT_ALS_ROOT}` 的 main 上继续，基于 `230930d`。普通 Demo 新增 Q / E
 切换全部 13 种 Overlay，并按源蓝图装备 8 种持物状态、7 个不同模型。
 前 5 种 Overlay 清空道具；两种手枪状态复用 M9 实例。音频仍暂缓。
 
@@ -76,8 +76,8 @@ Overlay、挂接变换和弓姿态，随原有成功结果发布。Main 通过�
 
 ```powershell
 dotnet build GodotALS.csproj -p:Optimize=true
-& '<Godot-4.7.2-console.exe>' --headless --path D:\GodotALS res://scenes/tests/overlay_prop_smoke.tscn -- --single
-& '<Godot-4.7.2-console.exe>' --path D:\GodotALS --resolution 1280x720 res://scenes/tests/overlay_prop_smoke.tscn -- --render-props
+& '<Godot-4.7.2-console.exe>' --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/overlay_prop_smoke.tscn -- --single
+& '<Godot-4.7.2-console.exe>' --path ${env:GODOT_ALS_ROOT} --resolution 1280x720 res://scenes/tests/overlay_prop_smoke.tscn -- --render-props
 ```
 
 ## 首错与覆盖边界

@@ -1,6 +1,6 @@
 # 原生关节有效配置与角度数学层
 
-本批在 `D:\GodotALS` / `main`，基于 `5cd9d99` 继续 Ragdoll 关节前置工作。
+本批在 `${env:GODOT_ALS_ROOT}` / `main`，基于 `5cd9d99` 继续 Ragdoll 关节前置工作。
 没有新建项目副本。用户的 P4 计划修改未纳入本批。
 
 ## 修正实际求解器分支
@@ -56,7 +56,7 @@ Mannequin 手部全锁、AnimMan 手部有限角度，不能混用两套资产�
 第一次构建遇到 TObjectPtr 的 auto 指针推导失败，改为显式模板类型后修复。
 失败构建期间引擎 BuildId 改变，随后构建合同拒绝旧项目 receipt；确认目标为
 项目本地生成物后，使用构建包装器隔离旧 receipt/manifests/DLL/PDB 并重新构建，
-备份位于 `D:\AdvancedLocomotionSystemV\Saved\BuildReceiptBackup\20260920T151710969Z`。
+备份位于 `${env:ALS_UE_PROJECT_ROOT}\Saved\BuildReceiptBackup\20260920T151710969Z`。
 没有修改 BuildId 或拷贝单个 DLL 绕过审计。
 
 NullRHI 冷启动 commandlet 和正常 D3D12 Editor 的 Python 导出均退出 0，

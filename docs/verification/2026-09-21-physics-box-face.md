@@ -1,6 +1,6 @@
 # 大平面接触选面修复
 
-本批直接在 `D:\GodotALS` 的 `main` 完成。普通角色尚未切换物理后端；本批修复的是 Core 物理验证场景使用的 Godot 几何查询。
+本批直接在 `${env:GODOT_ALS_ROOT}` 的 `main` 完成。普通角色尚未切换物理后端；本批修复的是 Core 物理验证场景使用的 Godot 几何查询。
 运行引擎为 Godot 4.7.2 Mono `ed1daf0bf`。全部产物保留在 `artifacts/physics-contact-trace-20260921/`。
 
 ## 已复现的原因

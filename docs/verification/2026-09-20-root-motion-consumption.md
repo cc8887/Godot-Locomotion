@@ -1,6 +1,6 @@
 # 同帧 Root Motion 与碰撞移动
 
-本批在 `D:\GodotALS` / `main` 接通共同 Montage 的同帧准备、Motor 消费和
+本批在 `${env:GODOT_ALS_ROOT}` / `main` 接通共同 Montage 的同帧准备、Motor 消费和
 之后的脚部查询。没有新增项目副本。上一批 `4071505` 只提取运动；本批在
 实际 CharacterBody3D 中消费，并用原始 Roll、真实场景碰撞、多角色与故障边界验证。
 
@@ -100,7 +100,7 @@ Ragdoll/Get-up/Pose Recovery、完整 Camera、全地形观感和十分钟预算
 手动检查消费原型：
 
 ```powershell
-& '<Godot-4.7.2-console.exe>' --path D:\GodotALS -- --montage-root-motion
+& '<Godot-4.7.2-console.exe>' --path ${env:GODOT_ALS_ROOT} -- --montage-root-motion
 ```
 
 仍从 `scenes/demo/als_demo.tscn` 启动；WASD / 鼠标控制，R 翻滚测试，X 取消。

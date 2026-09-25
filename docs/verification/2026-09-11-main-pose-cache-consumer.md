@@ -1,6 +1,6 @@
 # Main/BaseLayer 实际姿势缓存消费
 
-日期：2026-09-11。第五十八批。工作区 `D:\GodotALS-p5a-events-actions`，
+日期：2026-09-11。第五十八批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`，
 基线仍为 `d6b45e3` 加既有未提交工作；没有提交、回退或覆盖其他改动。
 
 ## 本批关闭的缺口

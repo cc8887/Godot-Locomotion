@@ -1,6 +1,6 @@
 # 完整动画入口的停用与恢复
 
-本批在 `D:\GodotALS` / `main` 继续实现 P5A 可恢复生命周期。永久销毁/换代已由
+本批在 `${env:GODOT_ALS_ROOT}` / `main` 继续实现 P5A 可恢复生命周期。永久销毁/换代已由
 前一批覆盖；本批补齐同 generation 停用、恢复、新动作和输入丢弃。
 
 ## 行为与边界
@@ -74,7 +74,7 @@ Motor 的帧保持原值，其旧动作由 Worker 请求高水位隔离。
 
 ```powershell
 dotnet build GodotALS.csproj -p:Optimize=true
-& '<Godot-4.7.2-console.exe>' --headless --path D:\GodotALS res://scenes/tests/animation_deactivation_smoke.tscn -- --boundary=committed
+& '<Godot-4.7.2-console.exe>' --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/animation_deactivation_smoke.tscn -- --boundary=committed
 ```
 
 依次将 `committed` 替换为 `pending`、`held`、`callback`、`callback-reopen`。

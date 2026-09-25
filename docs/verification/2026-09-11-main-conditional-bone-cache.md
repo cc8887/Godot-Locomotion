@@ -1,6 +1,6 @@
 # Main / BaseLayer 条件 CacheBones
 
-日期：2026-09-11。第六十批。工作区 `D:\GodotALS-p5a-events-actions`，保留既有
+日期：2026-09-11。第六十批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`，保留既有
 未提交改动；本批没有 Git 提交、回退、UE 插件修改或资源导出。
 
 ## 实现

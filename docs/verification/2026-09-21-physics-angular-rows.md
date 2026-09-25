@@ -1,6 +1,6 @@
 # 原生 cached 角约束行对照
 
-本批在 `D:\GodotALS` 的 `main` 实现实际角限位和 swing/twist 驱动行，补上前批
+本批在 `${env:GODOT_ALS_ROOT}` 的 `main` 实现实际角限位和 swing/twist 驱动行，补上前批
 “只转换 Jolt 电机系数”未覆盖的逐端惯量响应。新增 Core 求解器和 UE 原生观测数据；
 尚未接入 Godot 物理世界或普通角色，不能据此宣布整链稳定或 Ragdoll 完成。
 

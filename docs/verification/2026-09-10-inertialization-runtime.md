@@ -1,6 +1,6 @@
 # 第十批：惯性化运行时与 UE 原生节点轨迹
 
-日期：2026-09-10。工作区：`D:\GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 范围：完整性补完 A 中 Detail 所需的下游惯性化组件。尚未接入可玩 Demo。
 
 ## 实现

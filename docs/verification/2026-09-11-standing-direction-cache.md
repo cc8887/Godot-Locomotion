@@ -1,6 +1,6 @@
 # Standing 方向层骨骼缓存接入
 
-日期：2026-09-11，第六十七批。工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-11，第六十七批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 
 ## 修复定位
 

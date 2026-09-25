@@ -1,6 +1,6 @@
 # Chaos 真实步进参考与软限制释放修复
 
-本批基于 `c91f8f5`，直接在 `D:\GodotALS` 的 `main` 实现。没有建立项目副本，
+本批基于 `c91f8f5`，直接在 `${env:GODOT_ALS_ROOT}` 的 `main` 实现。没有建立项目副本，
 用户未提交的 P4 计划修改保留。实验关节尚未接入普通 Demo，Ragdoll 未验收完成。
 
 ## 原生参考与移植完整性
@@ -37,7 +37,7 @@ projection 迭代数为 8/2/1。这些来自运行中的 solver，不用结构�
    不是仅截断最小分量。用 144 份实际固定父体记录及 8 份独立 utility 分支参考验证。
    152 份记录不是 152 个独立物理工况；工具尚未接入 Jolt，也不应覆盖共享刚体惯量。
 
-参考源码位于 `D:\UnrealEngine\Engine\Source\Runtime\Experimental\Chaos`：
+参考源码位于 `${env:UE_ENGINE_ROOT}\Engine\Source\Runtime\Experimental\Chaos`：
 `Private/Chaos/MassConditioning.cpp`、`Private/Chaos/PBDJointConstraintUtilities.cpp`、
 `Private/Chaos/Joint/PBDJointCachedSolverGaussSeidel.cpp`、
 `Private/Chaos/Evolution/SolverBodyContainer.cpp`、`Private/PBDRigidsSolver.cpp`。

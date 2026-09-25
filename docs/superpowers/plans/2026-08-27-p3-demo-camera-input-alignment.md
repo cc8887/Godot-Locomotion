@@ -52,12 +52,12 @@
 Task 0 建立隔离 checkout 后，每个新的 PowerShell 会话都先执行：
 
 ```powershell
-Set-Location 'D:\GodotALS-p3-direction-alignment'
+Set-Location 'ARCHIVED_P3_WORKTREE_PATH'
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
-$godotExe = 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+$godotExe = "${env:GODOT_EXECUTABLE}"
 $worktreeRoot = (& git rev-parse --show-toplevel).Trim()
-if ($worktreeRoot -cne 'D:\GodotALS-p3-direction-alignment') {
+if ($worktreeRoot -cne 'ARCHIVED_P3_WORKTREE_PATH') {
     throw "Unexpected implementation worktree: $worktreeRoot"
 }
 ```
@@ -70,18 +70,18 @@ if ($worktreeRoot -cne 'D:\GodotALS-p3-direction-alignment') {
 
 - [ ] **Step 1: Invoke the required isolation skill**
 
-Use `superpowers:using-git-worktrees` before any implementation edit. Create branch `fix/p3-direction-alignment` from the confirmed `main` commit at the verified-free path `D:\GodotALS-p3-direction-alignment`.
+Use `superpowers:using-git-worktrees` before any implementation edit. Create branch `fix/p3-direction-alignment` from the confirmed `main` commit at the verified-free path `ARCHIVED_P3_WORKTREE_PATH`.
 
-Expected: the implementation shell is inside the isolated worktree, not `D:\GodotALS`, and `git status --short --branch` is clean.
+Expected: the implementation shell is inside the isolated worktree, not `${env:GODOT_ALS_ROOT}`, and `git status --short --branch` is clean.
 
 - [ ] **Step 2: Provision the ignored generated asset batch into the worktree**
 
-Run from `D:\GodotALS-p3-direction-alignment`:
+Run from `ARCHIVED_P3_WORKTREE_PATH`:
 
 ```powershell
 New-Item -ItemType Directory -Force .\assets\generated | Out-Null
 New-Item -ItemType Directory -Force .\assets\generated\als_v4 | Out-Null
-Copy-Item -Path 'D:\GodotALS\assets\generated\als_v4\*' `
+Copy-Item -Path "${env:GODOT_ALS_ROOT}\assets\generated\als_v4\*" `
   -Destination '.\assets\generated\als_v4' -Recurse -Force
 Test-Path .\assets\generated\als_v4\als_manifest.json
 ```
@@ -109,7 +109,7 @@ GODOT_ALS_P3B_GRAPH_OK transitions=5 digest=3B75E5CD3AF16FEC
 
 The graph digest above was observed on `main` during plan preparation; it is baseline evidence, not a post-change golden value.
 
-Open `D:\GodotALS\artifacts\diagnostics\p3-direction-before.png` and retain it as the visual baseline. Task 0 creates no commit.
+Open `${env:GODOT_ALS_ROOT}\artifacts\diagnostics\p3-direction-before.png` and retain it as the visual baseline. Task 0 creates no commit.
 
 ### Task 1: Upgrade the Locomotion Profile to Schema v2
 
@@ -1088,7 +1088,7 @@ Verify in the rendered window:
 - replacement may show the declared short zero-visible window, but never raw/stale/double rigs;
 - HUD reports zero runtime/thread/missing/stale/generation errors.
 
-Save the after screenshot to `D:\GodotALS-p3-direction-alignment\artifacts\diagnostics\p3-direction-after.png` and compare it with `D:\GodotALS\artifacts\diagnostics\p3-direction-before.png`. Keep both artifacts out of Git.
+Save the after screenshot to `ARCHIVED_P3_WORKTREE_PATH\artifacts\diagnostics\p3-direction-after.png` and compare it with `${env:GODOT_ALS_ROOT}\artifacts\diagnostics\p3-direction-before.png`. Keep both artifacts out of Git.
 
 - [ ] **Step 3: Invoke verification-before-completion and inspect repository state**
 

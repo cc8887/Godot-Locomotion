@@ -1,6 +1,6 @@
 # 第十一批：Detail 状态更新与姿势链
 
-日期：2026-09-10。工作区：`D:\GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 范围：完整性补完 A 的 Detail 状态更新、相关播放器选择和姿势消费。
 尚未接入可玩 Demo；本批时间输入不等同于完成 P5A Sync。
 

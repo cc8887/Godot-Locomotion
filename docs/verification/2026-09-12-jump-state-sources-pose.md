@@ -1,6 +1,6 @@
 # Jump 状态、来源与内层姿势
 
-日期：2026-09-12。工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-12。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 本轮是完整性恢复路线的下一步，未提交或撤销用户现有改动。
 
 ## 原生证据与实现

@@ -1,6 +1,6 @@
 # 蹲姿方向缓存更新接线
 
-日期：2026-09-11。第五十一批。工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-11。第五十一批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 
 ## 对完整性问题的判断
 

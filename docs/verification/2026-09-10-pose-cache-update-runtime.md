@@ -95,7 +95,7 @@ Core 状态/缓存组合的初始化后热路径与重试无分配。状态链�
 - 初版探针直接使用缓存跳过处理器时链接失败，因为类型符号未导出。改用真实惯性化节点的
   请求入口观测转发，不修改引擎或仿造该内部处理器。私有 UPROPERTY 设置使用原生反射。
 - 该失败构建同时重建了已有 NetCore 引擎模块，产生新 BuildId。经核实，项目内旧 receipt/
-  三个插件 manifest、DLL/PDB 已移入 `D:\AdvancedLocomotionSystemV\Saved\BuildReceiptBackup\20260910T114718340Z`；
+  三个插件 manifest、DLL/PDB 已移入 `${env:ALS_UE_PROJECT_ROOT}\Saved\BuildReceiptBackup\20260910T114718340Z`；
   没有删除源码或资产，备份可恢复。随后完整 Editor 重建与三插件审计通过。
 - 初次探针在无共享上下文时调用 GetMessage 触发 ensure；补正确的空检查后，正式与重复导出
   均 exit 0、0 errors、0 warnings。失败日志 `pose-cache-export-20260910.log` 保留，

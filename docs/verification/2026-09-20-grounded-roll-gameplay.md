@@ -1,13 +1,13 @@
 # 普通入口的地面 Roll 玩法
 
-本批直接在 `D:\GodotALS` / `main` 实现。普通入口
+本批直接在 `${env:GODOT_ALS_ROOT}` / `main` 实现。普通入口
 `scenes/demo/als_demo.tscn` 默认启用地面翻滚及同帧 Root Motion 碰撞消费；
 R 触发，X 取消。`--action-preview` 保留旧的可替换原地 Montage 诊断模式，
 可额外配合 `--montage-root-motion` 单独验证位移传输。
 
 ## 原版依据与实现范围
 
-本地 `D:\GodotALS-References\ALS-Refactored` 的
+本地 `${env:ALS_REFERENCE_ROOT}` 的
 `b754d6f0f2bb03741d301f8fb88077ebfe561e17`：
 
 - `AlsCharacter_Actions.cpp`：`StartRollingGrounded` 仅地面触发；

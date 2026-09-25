@@ -1,6 +1,6 @@
 # 胶囊盒面分离距离接入
 
-继续在 `D:\GodotALS` / `main` 实现。此前 Core 的胶囊盒面算法已经支持显式 cull，原生参考也包含 0/3 cm，但 Godot 运行时固定传入 0。本批将它接入已验证的实际 detector 计算，不扩大 Godot margin。
+继续在 `${env:GODOT_ALS_ROOT}` / `main` 实现。此前 Core 的胶囊盒面算法已经支持显式 cull，原生参考也包含 0/3 cm，但 Godot 运行时固定传入 0。本批将它接入已验证的实际 detector 计算，不扩大 Godot margin。
 
 ## 范围
 

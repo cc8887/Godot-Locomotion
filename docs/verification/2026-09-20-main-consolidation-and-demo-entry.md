@@ -2,7 +2,7 @@
 
 ## 交付目录与 Git
 
-后续唯一开发入口为 `D:\GodotALS` 的 `main`。本次没有创建新的项目副本或 worktree。
+后续唯一开发入口为 `${env:GODOT_ALS_ROOT}` 的 `main`。本次没有创建新的项目副本或 worktree。
 
 - 原主目录停在 `a69fda2`，P5A 工作目录原 HEAD 为 `d6b45e3`，之后积累了大量未提交的实现、原生对照数据及报告。
 - `253cb25` 保存该开发状态，随后 fast-forward 合入主目录。它是开发基线，包含尚未验收的部分，不是完成全部 ALS 的声明。
@@ -43,7 +43,7 @@ Editor 使用 F5 运行项目；F6 直接运行旧内部场景仍是诊断入口
 
 ## 本次验证
 
-全部命令从 `D:\GodotALS` 执行，日志位于 `artifacts/consolidation-20260920`。
+全部命令从 `${env:GODOT_ALS_ROOT}` 执行，日志位于 `artifacts/consolidation-20260920`。
 
 | 检查 | 结果与范围 |
 | --- | --- |

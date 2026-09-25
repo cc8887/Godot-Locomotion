@@ -1,6 +1,6 @@
 # 实际失败帧的原生胶囊重放
 
-本批在主目录 `D:\GodotALS` / `main` 补齐当前 `native_capsule` 格式的 capsule-box 重放。不是修复整链休眠，也没有切换普通角色后端。
+本批在主目录 `${env:GODOT_ALS_ROOT}` / `main` 补齐当前 `native_capsule` 格式的 capsule-box 重放。不是修复整链休眠，也没有切换普通角色后端。
 
 ## 为什么需要新重放
 

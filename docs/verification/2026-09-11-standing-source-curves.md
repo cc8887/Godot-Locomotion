@@ -1,6 +1,6 @@
 # Standing 来源曲线缓存与实际消费
 
-日期：2026-09-11，第六十八批。工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-11，第六十八批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 
 ## 变化与依据
 

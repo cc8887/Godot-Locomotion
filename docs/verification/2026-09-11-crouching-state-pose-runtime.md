@@ -1,6 +1,6 @@
 # 蹲姿主状态姿势与曲线运行图
 
-日期：2026-09-11。第五十三批。工作区 `D:\GodotALS-p5a-events-actions`。
+日期：2026-09-11。第五十三批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 
 ## 本批完成
 
@@ -28,7 +28,7 @@ Rotate 惯性化请求仍由拥有整个姿势历史的外层处理，没有在�
 `AlsMeshSpacePoseBlend.BlendLayers` 扩展既有单层内核，接收连续的多个来源姿势与
 逐骨骼 SourceIndex。未覆盖骨保持 SourceIndex=0、Weight=0，不能丢掉其目标链计算。
 
-依据本机 `D:\UnrealEngine\Engine\Source\Runtime\Engine\Private\Animation\AnimationRuntime.cpp`
+依据本机 `${env:UE_ENGINE_ROOT}\Engine\Source\Runtime\Engine\Private\Animation\AnimationRuntime.cpp`
 的 `BlendPosesPerBoneFilter`，尤其 `AccumulateMeshSpaceRotation` 与 MeshSpaceRotation
 分支：每个骨选择当前来源的局部旋转，但父目标旋转来自同一条已经累积的目标链。
 它不是分别累积完整左右来源的组件姿势，也不是串行执行两次单层混合。

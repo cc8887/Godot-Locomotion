@@ -149,7 +149,7 @@ P3A 运行时 gate 因此明确重建 `Debug -p:Optimize=true --no-incremental`�
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-p3a.ps1 `
-  -GodotExecutable 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+  -GodotExecutable "${env:GODOT_EXECUTABLE}"
 ```
 
 入口先 restore/build Release，运行 Pester、自身 motor smoke、optimized Debug editor host 和 P3A 四矩阵；
@@ -169,8 +169,8 @@ dotnet test GodotALS.sln -c Release --no-restore
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-p2a.ps1 `
-  -EngineRoot 'D:\UnrealEngine' `
-  -UnrealProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+  -EngineRoot "${env:UE_ENGINE_ROOT}" `
+  -UnrealProject "${env:ALS_UE_PROJECT_FILE}"
 pwsh -NoProfile -File scripts/verify-p2b.ps1 `
   -GodotExecutable '<Godot console>' `
   -CleanImport
@@ -196,7 +196,7 @@ whitespace error 和误跟踪输出都不能越过正式成功 marker。人工�
 git diff --check
 git status --short
 git ls-files | Select-String -Pattern '(^|/)(\.godot|bin|obj)/'
-Get-FileHash -Algorithm SHA256 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+Get-FileHash -Algorithm SHA256 "${env:ALS_UE_PROJECT_FILE}"
 ```
 
 最后一项必须仍为

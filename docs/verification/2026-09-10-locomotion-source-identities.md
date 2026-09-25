@@ -1,6 +1,6 @@
 # 第十四批：原生播放器与采样身份
 
-日期：2026-09-10。工作区：`D:\GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 归属：原 P5A 接线所需的真实源图合同，继续服务于完整 Locomotion 移植。
 
 ## 本次发现

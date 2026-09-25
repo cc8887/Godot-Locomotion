@@ -1,6 +1,6 @@
 # 实际 primitive 几何与 leaf 坐标绑定
 
-在 `D:\GodotALS` / `main` 继续推进。本批补齐实际 sphere/capsule/box 的几何数据与实验运行时绑定；没有完成全部窄相算法，普通角色仍未切换后端。
+在 `${env:GODOT_ALS_ROOT}` / `main` 继续推进。本批补齐实际 sphere/capsule/box 的几何数据与实验运行时绑定；没有完成全部窄相算法，普通角色仍未切换后端。
 
 ## 原生观察与差异
 

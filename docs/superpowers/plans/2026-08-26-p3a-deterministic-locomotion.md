@@ -43,9 +43,9 @@
 在每个新的 PowerShell 会话先定义这些任务专用变量：
 
 ```powershell
-$godotExe = 'F:\下载\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
-$unrealEditorCmd = 'D:\UnrealEngine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$uProject = 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+$godotExe = "${env:GODOT_EXECUTABLE}"
+$unrealEditorCmd = "${env:UE_ENGINE_ROOT}\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+$uProject = "${env:ALS_UE_PROJECT_FILE}"
 ```
 
 ### Task 1: Pin and Validate the Reference Source
@@ -108,13 +108,13 @@ Its public parameters are:
 
 ```powershell
 param(
-    [string]$ReferenceRoot = 'D:\GodotALS-References\ALS-Refactored',
+    [string]$ReferenceRoot = "${env:ALS_REFERENCE_ROOT}",
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 )
 ```
 
 For generation, it also validates or creates the UE-project junction
-`D:\AdvancedLocomotionSystemV\Plugins\ALSRefactored` pointing at the locked external clone. It refuses to replace
+`${env:ALS_UE_PROJECT_ROOT}\Plugins\ALSRefactored` pointing at the locked external clone. It refuses to replace
 an existing directory or junction that resolves elsewhere, and updates the `.uproject` plugin list through JSON parsing
 rather than text replacement.
 
@@ -662,8 +662,8 @@ Run:
 
 ```powershell
 pwsh -NoProfile -File scripts/generate-p3-golden.ps1 `
-  -UnrealEditorCmd 'D:\UnrealEngine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' `
-  -UProject 'D:\AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject' `
+  -UnrealEditorCmd "${env:UE_ENGINE_ROOT}\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" `
+  -UProject "${env:ALS_UE_PROJECT_FILE}" `
   -ReadyCheck
 ```
 
@@ -695,7 +695,7 @@ Expected: FAIL because the trace plugin/commandlet does not exist.
 
 The script accepts `-UnrealEditorCmd`, `-UProject`, `-ReferenceRoot`, `-ProjectRoot`, and `-ReadyCheck`. It calls
 `prepare-p3-reference.ps1`, synchronizes only the repository-owned trace plugin into
-`D:\AdvancedLocomotionSystemV\Plugins\AlsLocomotionTrace` while the ALS plugin remains the validated junction,
+`${env:ALS_UE_PROJECT_ROOT}\Plugins\AlsLocomotionTrace` while the ALS plugin remains the validated junction,
 builds the editor target, invokes `-run=AlsLocomotionTrace`, validates all generated JSON against the schema,
 atomically replaces the settings and five trace fixtures, and refuses replacement when the locked SHA or patch hash differs.
 
@@ -746,7 +746,7 @@ blocked uncrouch keeps ActualStance=Crouching
 clear uncrouch restores ActualStance=Standing
 ```
 
-Run: `& $godotExe --headless --path D:\GodotALS res://scenes/tests/p3a_motor_smoke.tscn`
+Run: `& $godotExe --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/p3a_motor_smoke.tscn`
 
 Expected: nonzero exit because `AlsCharacterMotor` is absent.
 
@@ -763,7 +763,7 @@ public AlsFrameInput Step(long frameId, int characterId, int generation, float d
 
 - [ ] **Step 3: Make the smoke pass**
 
-Run: `& $godotExe --headless --path D:\GodotALS res://scenes/tests/p3a_motor_smoke.tscn`
+Run: `& $godotExe --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/p3a_motor_smoke.tscn`
 
 Expected: `GODOT_ALS_P3A_MOTOR_OK cases=7` and exit `0`.
 

@@ -1,6 +1,6 @@
 # 原始 PhysicsAsset 导出与导入定义
 
-本批在 `D:\GodotALS` / `main` 基于 `d3a8cfd` 推进真实 Ragdoll 的数据前置。
+本批在 `${env:GODOT_ALS_ROOT}` / `main` 基于 `d3a8cfd` 推进真实 Ragdoll 的数据前置。
 新增 `assets/config/v4_physics_asset_inputs.json` 和 `AlsPhysicsAssetCompiler`，
 尚未创建 Godot 物理骨架，也未改变普通 Demo 的物理所有权；不能据此关闭 P6。
 

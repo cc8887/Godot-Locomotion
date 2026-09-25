@@ -63,8 +63,8 @@ P4 继续复用以下正式参考边界：
 
 - `reference/als-refactored.lock.json`；
 - `scripts/prepare-p3-reference.ps1` 的 origin、commit、patch SHA 和工作树完整性检查；
-- `D:\GodotALS-References\ALS-Refactored` 的固定 detached HEAD；
-- `D:\AdvancedLocomotionSystemV` 中用户拥有的 ALS V4 资产；
+- `${env:ALS_REFERENCE_ROOT}` 的固定 detached HEAD；
+- `${env:ALS_UE_PROJECT_ROOT}` 中用户拥有的 ALS V4 资产；
 - P2A/P2B 已发布的 267 assets / 141 files 正式 manifest 和生成资源。
 
 P4 golden 不新建另一套上游锁。它复用现有 reference lock，并在所有 schema、fixture 和生成输出中写入相同的 40 字符 commit。任何新增兼容补丁都必须登记路径和 SHA，且继续使用同一固定提交。
@@ -645,6 +645,6 @@ P4 完成后按总路线进入 P5A Curve/Notify/Sync/Action 基础，再进入 P
 - `src/Als.Core/Contracts/AlsRuntimeState.cs`
 - `src/Als.Godot/Animation/AlsLocomotionGraphBuilder.cs`
 - `src/Als.Godot/Locomotion/AlsP3WorkerRoot.cs`
-- `D:\GodotALS-References\ALS-Refactored\Source\ALS\Private\AlsAnimationInstance.cpp`
-- `D:\GodotALS-References\ALS-Refactored\Source\ALS\Private\AlsCharacter.cpp`
-- `D:\GodotALS-References\ALS-Refactored\Source\ALSEditor\Private\Modifiers\AlsAnimationModifier_CalculateRotationYawSpeed.cpp`
+- `${env:ALS_REFERENCE_ROOT}\Source\ALS\Private\AlsAnimationInstance.cpp`
+- `${env:ALS_REFERENCE_ROOT}\Source\ALS\Private\AlsCharacter.cpp`
+- `${env:ALS_REFERENCE_ROOT}\Source\ALSEditor\Private\Modifiers\AlsAnimationModifier_CalculateRotationYawSpeed.cpp`

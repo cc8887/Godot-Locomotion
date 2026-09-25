@@ -1,6 +1,6 @@
 # Godot 物理体与姿势所有权基础
 
-本批基于 `66ff396`，直接在 `D:\GodotALS` / `main` 实现。
+本批基于 `66ff396`，直接在 `${env:GODOT_ALS_ROOT}` / `main` 实现。
 新增 `AlsPhysicsBodySet` 与实际引擎 smoke 场景，尚未连接关节或普通角色的
 Ragdoll 状态。当前是物理体/姿势边界实现，不能视为完整物理骨架或 P6 验收。
 
