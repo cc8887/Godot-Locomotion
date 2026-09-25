@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新起步/Pivot连续更新：`docs/verification/2026-09-25-refactored-movement-details-runtime.md`。共享Grounded新增隔离Details规则域，Import候选机器+16原序源长度/loop观察，严格最大weight/先到tie/微小正权重、raw累计时间自动退出；max1/首帧转换、初始化/清weight、惯性化请求117/Hermite/UseBlendMode。新runtime6/Import26/Core58/Optimize0/0，全部11edge、3Hz630提交帧逐帧retry+独立owner；输入/帧门禁。两次测试误判惯性化只更新新状态/旧weight0已按UE零duration QueryAlpha0与清理顺序修测试，生产旧算法未改，失败保留；一次xUnit2031修正。受控prior快照非实际源时钟，尚无新UE Details oracle/pose/Parent/request消费/普通Demo/Godot/全量/性能。下一步起步Pivot状态内图/回调/cache/共享历史观察→native对照及其余stance/宿主；全部旧缺口/用户修改/暂缓项保留。
+
 - 最新起步/Pivot资源：`docs/verification/2026-09-25-refactored-movement-details-resources.md`。原Movement Details六state/十一edge，7惯性化/4自动时间、16播放器原序；property117及Standing权重来源65，max1/首帧不skip。连线解析Gait/Grounded/外层weight/Pivot/Running曲线<.2；自动规则拒绝布尔替代，待相关player查询。初authored index0/runtime1误判两失败修正；新增4/相关20、最终门禁见final.trx，13资源+6原图变异，Optimize0/0。仅资源/规则，无连续机器/请求消费/新UE或Godot/全量/性能，普通Demo未切；下一步共享状态引擎+自动时间+惯性化→起步Pivot pose/cache/Parent及其他stance机器/宿主，全部旧缺口/用户修改/暂缓项保留。
 
 - 最新移动方向原生：`docs/verification/2026-09-25-refactored-direction-moving-native.md`。双stance三频率1680帧/132720骨、1640移动/1272多stack/9239ticks/9411cache；全部6state和8/6源，time/weight差0，maxP7.097e-6cm/Q1.139e-8/S1.644e-7/C2.384e-7，原预算不变。初6失败定位整实例Sync组未清与隐藏BS样本丢失；SourceRuntime新增候选instance reset/pending隐藏与独立保留样本、新组marker仍Invalid，修后6与相关33过/Optimize0/0；每17及reset帧retry。完整UE4actions审计FB0BF00F...，冷/普通19052均0字节同119B17D3.../96F80425...，Default重导B385B2不变，DV0/3旧warn；普通两旧Condition五warn保留。无普通Demo/Godot场景/全量/性能，仍受控Parent方向子图；下一步其它stance机器/真实Parent通知/外层cache与统一宿主，旧缺口/用户改动/暂缓项保留。

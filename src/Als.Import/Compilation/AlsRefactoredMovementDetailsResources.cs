@@ -7,6 +7,7 @@ namespace GodotAls.Import.Compilation;
 
 public readonly record struct AlsRefactoredMovementDetailsEdge(int From, int To, int RulePropertyIndex,
     AlsRefactoredMovementDetailsRule Rule, float Seconds, bool Inertialization, float AutomaticTriggerTime);
+public readonly record struct AlsRefactoredMovementDetailsPlayer(int PropertyIndex, string Source, float Length, bool Loop);
 
 public sealed class AlsRefactoredMovementDetailsState
 {
@@ -25,8 +26,10 @@ public sealed class AlsRefactoredMovementDetailsResources
 {
     private readonly AlsRefactoredMovementDetailsState[] _states;
     private readonly AlsRefactoredMovementDetailsEdge[] _edges;
+    private readonly AlsRefactoredMovementDetailsPlayer[] _timingPlayers;
     public ReadOnlySpan<AlsRefactoredMovementDetailsState> States => _states;
     public ReadOnlySpan<AlsRefactoredMovementDetailsEdge> Edges => _edges;
+    public ReadOnlySpan<AlsRefactoredMovementDetailsPlayer> TimingPlayers => _timingPlayers;
     public string CatalogDigest { get; }
     public int MachinePropertyIndex { get; }
     public int StandingMachinePropertyIndex { get; }
@@ -69,6 +72,7 @@ public sealed class AlsRefactoredMovementDetailsResources
         _states = new AlsRefactoredMovementDetailsState[6]; _edges = new AlsRefactoredMovementDetailsEdge[11];
         var paths = new string[6]; var delegates = new int[11];
         var players = new AlsRefactoredMovementPlayers(catalog, false).Players.ToArray();
+        var timing = new List<AlsRefactoredMovementDetailsPlayer>();
         for (var s = 0; s < states.Length; s++)
         {
             var state = states[s];
@@ -83,6 +87,13 @@ public sealed class AlsRefactoredMovementDetailsResources
             Require(ps.SequenceEqual(timingPlayers[s]) && ps.All(p => players.Any(v => v.PropertyIndex == p)), "Movement timing player order differs.");
             foreach (var id in state.GetProperty("playerNodeIndices").EnumerateArray())
                 Require(Text(nodes[id.GetInt32()], "class") == "AnimGraphNode_SequencePlayer" && Text(nodes[id.GetInt32()], "graph") == Text(result, "graph"), "Foreign movement timing player.");
+            foreach (var property in ps)
+            {
+                var player = players.Single(p => p.PropertyIndex == property);
+                var length = catalog.Read(player.Source).GetProperty("evaluation").GetProperty("sequencePlayLength").GetSingle();
+                Require(float.IsFinite(length) && length > 0 && !player.BlendSpace, "Invalid movement timing asset.");
+                timing.Add(new(property, player.Source, length, player.Loop));
+            }
             var outgoing = state.GetProperty("transitions").EnumerateArray().ToArray();
             Require(outgoing.Select(e => Int(e, "transitionIndex")).SequenceEqual(exits[s]), "Movement exit priority changed.");
             foreach (var exit in outgoing)
@@ -115,6 +126,7 @@ public sealed class AlsRefactoredMovementDetailsResources
             Require(policy.GetProperty("CrossfadeDuration").GetSingle() == seconds, "Authored movement duration differs.");
             _edges[e] = new(from[e], to[e], Int(ruleNode, "propertyIndex"), rule, seconds, inertial, automatic ? 0 : -1);
         }
+        _timingPlayers = timing.ToArray();
     }
     private static void NoCallbacks(JsonElement node)
     {
