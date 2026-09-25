@@ -42,6 +42,11 @@ public sealed class AlsRefactoredSourcePlayerRuntime
     private AlsAssetSampleHistory[] _sampleHistory,_candidateSamples;
     private AlsAssetSyncBatchGroupHistory[] _groups,_candidateGroups;
     private readonly AlsAssetPlayerTickContext[] _tickContexts;
+    private readonly bool[] _resetPending,_nextResetPending,_retainedValid;
+    private readonly AlsAssetPlayerHistory[] _retainedPlayers,_priorPlayers;
+    private readonly AlsAssetSampleHistory[] _retainedSamples,_priorSamples;
+    private readonly AlsAssetSyncBatchGroupHistory[] _priorGroups;
+    private bool _resetInstance;
     private int _historyCount,_sampleHistoryCount,_candidateCount,_candidateSampleCount;
     private bool _hasHistory,_prepared,_faulted;
     private long _committedFrame=-1,_frame;
@@ -87,6 +92,9 @@ public sealed class AlsRefactoredSourcePlayerRuntime
         _caches=Enumerable.Repeat(-1,n).ToArray();_nextCaches=new int[n];_epochs=new long[n];_nextEpochs=new long[n];_times=new float[n];_nextTimes=new float[n];
         _history=new AlsAssetPlayerHistory[n];_candidatePlayers=new AlsAssetPlayerHistory[n];_sampleHistory=new AlsAssetSampleHistory[n*3];_candidateSamples=new AlsAssetSampleHistory[n*3];
         _groups=new AlsAssetSyncBatchGroupHistory[_groupIds.Length];_candidateGroups=new AlsAssetSyncBatchGroupHistory[_groupIds.Length];_tickContexts=new AlsAssetPlayerTickContext[n];
+        _resetPending=new bool[n];_nextResetPending=new bool[n];_retainedValid=new bool[n];
+        _retainedPlayers=new AlsAssetPlayerHistory[n];_priorPlayers=new AlsAssetPlayerHistory[n];
+        _retainedSamples=new AlsAssetSampleHistory[n*3];_priorSamples=new AlsAssetSampleHistory[n*3];_priorGroups=new AlsAssetSyncBatchGroupHistory[_groupIds.Length];
     }
     public string CatalogDigest=>_bank.CatalogDigest;
     public string Source(int player)=>_tracks[player].Definition.Source;
@@ -95,10 +103,14 @@ public sealed class AlsRefactoredSourcePlayerRuntime
     public AlsBlendSpaceNotifyMode NotifyMode(int player)=>_tracks[player].Blend?.NotifyMode??AlsBlendSpaceNotifyMode.AllAnimations;
     public float CommittedTime(int player)=>_times[player];
     public Vector2 FilteredInput(int player)=>_prepared?_nextFilters[player].Output:throw new InvalidOperationException("No prepared player batch.");
-    public void Prepare(long frame,ReadOnlySpan<AlsRefactoredSourcePlayerInput> input,float delta)
+    // Instance reset clears group sync and retained samples atomically on commit.
+    // Hidden players carry a pending reset until ticked; playback epochs remain
+    // monotonic. A local node reinitialization must not clear the whole group.
+    public void Prepare(long frame,ReadOnlySpan<AlsRefactoredSourcePlayerInput> input,float delta,bool reinitializeInstance=false)
     {
         if(_prepared||frame<=_committedFrame||!float.IsFinite(delta)||delta<0||input.Length>_tracks.Length)throw new ArgumentException("Invalid source frame.");
         Array.Fill(_inputIndices,-1);_filters.CopyTo(_nextFilters,0);_caches.CopyTo(_nextCaches,0);_epochs.CopyTo(_nextEpochs,0);_times.CopyTo(_nextTimes,0);
+        _resetPending.CopyTo(_nextResetPending,0);if(reinitializeInstance)Array.Fill(_nextResetPending,true);
         foreach(var t in _tracks)t.Evaluated=false;
         var cursor=0;Span<AlsAimGridVertex> weights=stackalloc AlsAimGridVertex[3];
         for(var i=0;i<input.Length;i++)
@@ -107,12 +119,13 @@ public sealed class AlsRefactoredSourcePlayerRuntime
             if((uint)id>=(uint)_tracks.Length||_inputIndices[id]>=0||!float.IsFinite(tick.PlayRate)||!float.IsFinite(tick.Weight)||tick.Weight is <0 or >1||
                 !float.IsFinite(tick.StartPosition)||!float.IsFinite(tick.BlendInput.X)||!float.IsFinite(tick.BlendInput.Y))throw new ArgumentException("Invalid source tick.");
             _inputIndices[id]=i;var track=_tracks[id];var blend=track.Blend;var kind=blend is null?AlsAssetSyncKind.Sequence:AlsAssetSyncKind.BlendSpace;
-            if(tick.Reinitialize||_epochs[id]==0)
+            if(tick.Reinitialize||_nextResetPending[id]||_epochs[id]==0)
             {
                 _nextEpochs[id]=AlsAssetSourceInitialization.NextEpoch(_epochs[id]);_nextFilters[id]=default;_nextCaches[id]=-1;
                 var seq=blend is null?_bank.Sequences[track.Binding.SequenceIndex]:default;
                 _nextTimes[id]=AlsAssetSourceInitialization.Time(kind,tick.Reinitialize?tick.StartPosition:track.Definition.StartPosition,
                     blend is null?seq.DurationSeconds:1,tick.PlayRate,assetRateScale:blend is null?seq.RateScale:1);
+                _nextResetPending[id]=false;
             }
             var start=cursor;
             if(blend is not null)
@@ -126,11 +139,38 @@ public sealed class AlsRefactoredSourcePlayerRuntime
             _inputs[i]=new(id,track.Binding.AssetId,_nextEpochs[id],kind,_nextTimes[id],tick.PlayRate,tick.Weight,start,cursor-start,track.Binding.MarkerMask,
                 Looping:tick.Looping??track.Definition.Looping,LegacyLength:blend?.LegacyLength??false,RequestedInertialization:tick.RequestedInertialization,Role:track.Definition.Role);
         }
+        var priorCount=0;var priorSamples=0;var hasPrior=_hasHistory&&!reinitializeInstance;
+        if(hasPrior)BuildPreviousHistory(out priorCount,out priorSamples);
         if(!AlsSyncRuntime.TryEvaluateAssetSyncBatch(_groupIds,_inputGroups.AsSpan(0,input.Length),_inputs.AsSpan(0,input.Length),_samples.AsSpan(0,cursor),
-            _bank.Sequences,_bank.Markers,_hasHistory?_groups:ReadOnlySpan<AlsAssetSyncBatchGroupHistory>.Empty,_history.AsSpan(0,_historyCount),_sampleHistory.AsSpan(0,_sampleHistoryCount),
+            _bank.Sequences,_bank.Markers,hasPrior?_priorGroups:ReadOnlySpan<AlsAssetSyncBatchGroupHistory>.Empty,_priorPlayers.AsSpan(0,priorCount),_priorSamples.AsSpan(0,priorSamples),
             delta,_candidateGroups,_candidatePlayers,_candidateSamples,out var failure,_tickContexts))throw new InvalidOperationException("Source Sync failed: "+failure);
         for(var i=0;i<input.Length;i++)_nextTimes[_candidatePlayers[i].PlayerId]=_candidatePlayers[i].Time;
-        _frame=frame;_candidateCount=input.Length;_candidateSampleCount=cursor;_prepared=true;_faulted=false;
+        _frame=frame;_candidateCount=input.Length;_candidateSampleCount=cursor;_resetInstance=reinitializeInstance;_prepared=true;_faulted=false;
+    }
+    // Sync-group membership lasts one frame, but a BlendSpace node retains its
+    // sample cache while hidden. Reintroduce only that local sample history;
+    // a returning player's group marker record stays invalid (new membership).
+    private void BuildPreviousHistory(out int playerCount,out int sampleCount)
+    {
+        var pc=0;var sc=0;
+        for(var g=0;g<=_groupIds.Length;g++)
+        {
+            var group=g<_groupIds.Length?_groupIds[g]:-1;var begin=pc;var samplesBegin=sc;
+            for(var i=0;i<_historyCount;i++)if(_tracks[_history[i].PlayerId].Definition.GroupId==group)Append(_history[i],_sampleHistory);
+            for(var id=0;id<_tracks.Length;id++)
+            {
+                if(!_retainedValid[id]||_tracks[id].Blend is null||_tracks[id].Definition.GroupId!=group)continue;
+                var present=false;for(var i=begin;i<pc;i++)if(_priorPlayers[i].PlayerId==id)present=true;
+                if(!present)Append(_retainedPlayers[id] with{Marker=AlsAssetMarkerRecord.Invalid},_retainedSamples);
+            }
+            if(g<_groupIds.Length)_priorGroups[g]=new(_groups[g].Group,begin,pc-begin,samplesBegin,sc-samplesBegin);
+        }
+        playerCount=pc;sampleCount=sc;
+        void Append(AlsAssetPlayerHistory player,AlsAssetSampleHistory[] samples)
+        {
+            _priorPlayers[pc++]=player with{SampleStart=sc};
+            samples.AsSpan(player.SampleStart,player.SampleCount).CopyTo(_priorSamples.AsSpan(sc));sc+=player.SampleCount;
+        }
     }
     public void Evaluate(long frame,int player)
     {
@@ -165,6 +205,13 @@ public sealed class AlsRefactoredSourcePlayerRuntime
     public void Commit(long frame)
     {
         ValidateCommit(frame);_nextFilters.CopyTo(_filters,0);_nextCaches.CopyTo(_caches,0);_nextEpochs.CopyTo(_epochs,0);_nextTimes.CopyTo(_times,0);
+        _nextResetPending.CopyTo(_resetPending,0);if(_resetInstance)Array.Clear(_retainedValid);
+        for(var i=0;i<_candidateCount;i++)
+        {
+            var player=_candidatePlayers[i];var id=player.PlayerId;
+            _retainedPlayers[id]=player with{SampleStart=id*3};_retainedValid[id]=true;
+            _candidateSamples.AsSpan(player.SampleStart,player.SampleCount).CopyTo(_retainedSamples.AsSpan(id*3));
+        }
         (_history,_candidatePlayers)=(_candidatePlayers,_history);(_sampleHistory,_candidateSamples)=(_candidateSamples,_sampleHistory);(_groups,_candidateGroups)=(_candidateGroups,_groups);
         _historyCount=_candidateCount;_sampleHistoryCount=_candidateSampleCount;_hasHistory=true;_committedFrame=frame;Cancel();
     }

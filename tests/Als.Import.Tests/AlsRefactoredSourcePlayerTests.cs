@@ -6,6 +6,20 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsRefactoredSourcePlayerTests
 {
+    [Fact]
+    public void InstanceResetIsAtomicAndHiddenPlayersResetOnTheirNextTick()
+    {
+        var r=Resources();const string walk="/ALS/ALS/Animations/Grounded/WalkRun/A_Als_Walk_Forward.A_Als_Walk_Forward";
+        var runtime=new AlsRefactoredSourcePlayerRuntime(r.Catalog,r.Bank,r.Profiles,[new(0,walk,-1,.2f),new(1,walk,-1,.6f)]);
+        AlsRefactoredSourcePlayerInput[] both=[new(0,default,1,1),new(1,default,1,1)];
+        runtime.Prepare(0,both,.1f);var before=runtime.Players.ToArray();runtime.Commit(0);
+        runtime.Prepare(1,both[..1],0,true);Assert.Equal(.2f,runtime.Players[0].Time);Assert.Equal(before[0].Epoch+1,runtime.Players[0].Epoch);runtime.Cancel();
+        runtime.Prepare(1,both,0);Assert.Equal(before.Select(p=>p.Time),runtime.Players.ToArray().Select(p=>p.Time));runtime.Cancel();
+        runtime.Prepare(1,both[..1],0,true);runtime.Commit(1);
+        runtime.Prepare(2,both[1..],0);Assert.Equal(.6f,runtime.Players[0].Time);Assert.Equal(before[1].Epoch+1,runtime.Players[0].Epoch);runtime.Commit(2);
+        runtime.Prepare(3,[],0,true);runtime.Commit(3);
+        runtime.Prepare(4,both[1..],0);Assert.Equal(.6f,runtime.Players[0].Time);Assert.Equal(before[1].Epoch+2,runtime.Players[0].Epoch);runtime.Cancel();
+    }
     private static (AlsRefactoredAnimationCatalog Catalog,AlsRefactoredSyncBank Bank,IReadOnlyDictionary<string,AlsRefactoredTriangulationProfile> Profiles) Resources()
     {
         var json=MantlingHostFixture.Read("refactored_animation_sources");

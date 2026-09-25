@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新移动方向原生：`docs/verification/2026-09-25-refactored-direction-moving-native.md`。双stance三频率1680帧/132720骨、1640移动/1272多stack/9239ticks/9411cache；全部6state和8/6源，time/weight差0，maxP7.097e-6cm/Q1.139e-8/S1.644e-7/C2.384e-7，原预算不变。初6失败定位整实例Sync组未清与隐藏BS样本丢失；SourceRuntime新增候选instance reset/pending隐藏与独立保留样本、新组marker仍Invalid，修后6与相关33过/Optimize0/0；每17及reset帧retry。完整UE4actions审计FB0BF00F...，冷/普通19052均0字节同119B17D3.../96F80425...，Default重导B385B2不变，DV0/3旧warn；普通两旧Condition五warn保留。无普通Demo/Godot场景/全量/性能，仍受控Parent方向子图；下一步其它stance机器/真实Parent通知/外层cache与统一宿主，旧缺口/用户改动/暂缓项保留。
+
 - 最新方向姿态求值：`docs/verification/2026-09-25-refactored-direction-pose-evaluation.md`。79骨cm profile/curve并集→scope内cache/player一次求值→前向原三层mix→六向MultiWay/冻结Yaw ModifyCurve→有序每骨transition栈，独占暂存/owner门禁。新11/相关27/Optimize0/0；移动组合840提交帧66360骨retry+独立sampler同，三源位置混合过。旧native2814帧222306骨在P1e-4cm/QSC2e-6预算内，但VelocityBlend默认全0、cache/player采样0，只证明refpose/曲线分支，非移动oracle。下一步补UE非零速度/Stride/Gait/加速阻挡/Yaw连续cache权重、BS/Sequence clocks及pose曲线采集与对照→其它stance/Parent/宿主。无UE新导出/Godot场景/全量/性能，普通Demo未切，旧缺口/用户修改/暂缓项保留。
 
 - 最新方向缓存源调度：`docs/verification/2026-09-25-refactored-direction-source.md`。Standing7cache/26reader、Crouch6/24原编译顺序闭包；状态→callback→MultiWay→Core延迟最大权重/先到tie→Forward/base→共享player请求；初始化counter去重/pending reset/上下文状态祖先与Inactive/候选撤销。新10、5变异、双stance三频率840提交帧retry+独立owner+真实采样；最终相关见related.trx，Core缓存41/Optimize0/0，无初失败。尚无新UE源oracle/cache pose/Parent消费；外层cache读者及inertial消息须未来统一scheduler，普通Demo未切。下一步cache一次pose/前向与方向混合→其它stance/统一宿主，旧缺口/用户改动/暂缓项保留。
