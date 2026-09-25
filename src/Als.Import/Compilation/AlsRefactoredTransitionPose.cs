@@ -20,6 +20,9 @@ public sealed class AlsRefactoredTransitionPose
     public AlsRefactoredTransitionPose(AlsRefactoredAnimationCatalog catalog, AlsRefactoredStandingActions actions,
         ReadOnlySpan<string> bones, ReadOnlySpan<int> parents, ReadOnlySpan<string> curves)
         :this(catalog,actions.CatalogDigest,actions.Assets,actions.SourcePath,bones,parents,curves) { }
+    public AlsRefactoredTransitionPose(AlsRefactoredAnimationCatalog catalog, AlsRefactoredQuickStop quickStop,
+        ReadOnlySpan<string> bones, ReadOnlySpan<int> parents, ReadOnlySpan<string> curves)
+        :this(catalog,quickStop.CatalogDigest,quickStop.Assets,quickStop.SourcePath,bones,parents,curves) { }
     private AlsRefactoredTransitionPose(AlsRefactoredAnimationCatalog catalog,string digest,ReadOnlySpan<AlsSequenceMontageAsset> assets,
         Func<int,string> sourcePath,ReadOnlySpan<string> bones,ReadOnlySpan<int> parents,ReadOnlySpan<string> curves)
     {
