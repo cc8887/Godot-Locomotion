@@ -27,6 +27,10 @@ public sealed class AlsRefactoredMovementInertialization
     public int ForwardAttempts { get; private set; }
     public ReadOnlySpan<AlsPrecisePose> Pose => _prepared && _evaluated && !_faulted ? _pose : throw new InvalidOperationException("Inertial pose unavailable.");
     public ReadOnlySpan<AlsInertialCurve> Curves => _prepared && _evaluated && !_faulted ? _curves : throw new InvalidOperationException("Inertial curves unavailable.");
+    public ReadOnlySpan<string> BoneNames => _profile.BoneNames;
+    public ReadOnlySpan<string> CurveNames => _profile.CurveNames;
+    internal void ValidateContext(in AlsFrameIdentity identity)
+    { ValidateCommit(identity.FrameId); if (_identity != identity) throw new ArgumentException("Foreign Movement inertial context."); }
     public IReadOnlyList<AlsRefactoredForwardedInertialRequest> ForwardedRequests => _prepared ? _forwarded.AsReadOnly() : throw new InvalidOperationException("No inertial candidate.");
     public AlsRefactoredMovementInertialization(AlsRefactoredAnimationCatalog catalog, AlsRefactoredMovementDetailsPose profile)
     {

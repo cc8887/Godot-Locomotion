@@ -38,6 +38,7 @@ public sealed class AlsRefactoredStopPose
         private readonly AlsQuaternion[] _rotations;
         private readonly bool[] _evaluated=new bool[5];
         private int _busy;
+        private AlsRefactoredMovementInertialization? _movementOwner;
         public int StateEvaluations { get; private set; }
         internal Sampler(AlsRefactoredStopPose profile)
         {
@@ -53,6 +54,15 @@ public sealed class AlsRefactoredStopPose
             }
             AlsPrecisePose[][] Poses(int count)=>Enumerable.Range(0,count).Select(_=>new AlsPrecisePose[bones]).ToArray();
             AlsInertialCurve[][] Curves(int count)=>Enumerable.Range(0,count).Select(_=>new AlsInertialCurve[curves]).ToArray();
+        }
+        public void Sample(long frame,AlsRefactoredStopRuntime machine,AlsRefactoredStopSourceRuntime source,
+            AlsRefactoredMovementInertialization movement,Span<AlsPrecisePose> output,Span<AlsInertialCurve> outputCurves)
+        {
+            movement.ValidateContext(source.Identity);
+            if(_movementOwner is not null&&!ReferenceEquals(_movementOwner,movement)||
+                !movement.BoneNames.SequenceEqual(_profile._bones)||!movement.CurveNames.SequenceEqual(_profile._baseCurves))
+                throw new ArgumentException("Foreign Stop Movement cache owner/layout.");
+            Sample(frame,machine,source,movement.Pose,movement.Curves,output,outputCurves);_movementOwner??=movement;
         }
         public void Sample(long frame,AlsRefactoredStopRuntime machine,AlsRefactoredStopSourceRuntime source,
             ReadOnlySpan<AlsPrecisePose> movementPose,ReadOnlySpan<AlsInertialCurve> movementCurves,

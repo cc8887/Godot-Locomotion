@@ -20,6 +20,7 @@ public sealed class AlsRefactoredStopSourceRuntime
     private bool _prepared,_hasCommitted;
     private Vector4 _weights;
     public AlsRefactoredStopPoseGraph Profile { get; }
+    public AlsFrameIdentity Identity=>_prepared?_identity:throw new InvalidOperationException("No Stop source candidate.");
     public Vector4 DirectionWeights=>_prepared?_weights:throw new InvalidOperationException("No Stop source candidate.");
     public ReadOnlySpan<AlsRefactoredMovementCacheRead> CacheReads=>_prepared?_reads.AsSpan(0,_readCount):throw new InvalidOperationException("No Stop source candidate.");
     public ReadOnlySpan<int> CacheInitializationReads=>_prepared?_initialReads.AsSpan(0,_initialCount):throw new InvalidOperationException("No Stop source candidate.");

@@ -16,6 +16,8 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
     public AlsRefactoredDirectionRuntime Direction { get; }
     public AlsRefactoredDirectionSourceRuntime Sources { get; }
     private readonly AlsPoseCacheTraversal _traversal;
+    private AlsPoseCacheTraversal? _activeTraversal;
+    private bool _shared, _sharedComplete;
     private readonly HashSet<int> _movementReads;
     private readonly AlsRefactoredDirectionCacheUpdate[] _updates = new AlsRefactoredDirectionCacheUpdate[8];
     private readonly AlsRefactoredSkippedCacheUpdates[] _batches = new AlsRefactoredSkippedCacheUpdates[8];
@@ -66,6 +68,17 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
         AlsGraphTraversalCounter initialization, AlsRefactoredDirectionInput direction, AlsRefactoredMovementPlayerInput movement,
         AlsRefactoredForwardInput forward, bool initializeInstance = false, Vector4 yaw = default,
         AlsRefactoredMovementParentRuntime? parent = null)
+        => PrepareCore(frame, detailsMachine, details, initialization, direction, movement, forward, initializeInstance, yaw, parent, null);
+
+    internal void PrepareShared(long frame, AlsRefactoredMovementDetailsRuntime detailsMachine, AlsRefactoredMovementDetailsSourceRuntime details,
+        AlsGraphTraversalCounter initialization, AlsRefactoredDirectionInput direction, AlsRefactoredMovementPlayerInput movement,
+        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 yaw, AlsRefactoredMovementParentRuntime parent, AlsPoseCacheTraversal traversal)
+        => PrepareCore(frame, detailsMachine, details, initialization, direction, movement, forward, initializeInstance, yaw, parent, traversal);
+
+    private void PrepareCore(long frame, AlsRefactoredMovementDetailsRuntime detailsMachine, AlsRefactoredMovementDetailsSourceRuntime details,
+        AlsGraphTraversalCounter initialization, AlsRefactoredDirectionInput direction, AlsRefactoredMovementPlayerInput movement,
+        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 yaw,
+        AlsRefactoredMovementParentRuntime? parent, AlsPoseCacheTraversal? shared)
     {
         if (_prepared || frame < 0 || frame <= _committed || !ReferenceEquals(details.Profile, Details) ||
             _owner is not null && !ReferenceEquals(_owner, details) || details.FirstPlayer != Sources.FirstPlayer || !initialization.HasUpdated)
@@ -77,6 +90,7 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
         _nextInitialization = initializeInstance ? default : _initialization;
         _requestedInitialization = initialization; _direction = direction; _movement = movement; _forward = forward;
         _velocity = details.DesiredWeights; _yaw = yaw; _initializeInstance = initializeInstance; _resetMovement = false;
+        _shared = shared is not null; _sharedComplete = false; _activeTraversal = shared ?? _traversal;
         _updateCount = _batchCount = _skippedCount = _inputCount = 0;
         try
         {
@@ -89,14 +103,24 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
                 if (!_nextInitialization.MatchesCounter(initialization))
                 { _nextInitialization = initialization; _resetMovement = true; }
             }
-            _traversal.Begin(_identity);
-            foreach (var read in details.CacheReads) _traversal.Use(read.ReadPropertyIndex, read.Context);
-            _traversal.Drain(this); Sources.CompleteShared(frame);
-            for (var i = 0; i < details.SourceInputs.Length; i++) Add(details.SourceInputs[i], details.SourceContexts[i]);
-            for (var i = 0; i < Sources.SourceInputs.Length; i++) Add(Sources.SourceInputs[i], Sources.SourceContexts[i]);
+            if (!_shared) _traversal.Begin(_identity);
+            foreach (var read in details.CacheReads) _activeTraversal.Use(read.ReadPropertyIndex, read.Context);
             _owner ??= details; _prepared = true;
+            if (!_shared) { _traversal.Drain(this); CompleteSources(frame); }
         }
-        catch { Direction.Cancel(); Sources.Cancel(); throw; }
+        catch { Cancel(); throw; }
+    }
+    internal void CompleteShared(long frame)
+    {
+        if (!_prepared || !_shared || _sharedComplete || frame != _identity.FrameId || _activeTraversal is not { IsFinished: true })
+            throw new ArgumentException("Invalid shared Movement completion.");
+        CompleteSources(frame); _sharedComplete = true;
+    }
+    private void CompleteSources(long frame)
+    {
+        Sources.CompleteShared(frame);
+        for (var i = 0; i < _owner!.SourceInputs.Length; i++) Add(_owner.SourceInputs[i], _owner.SourceContexts[i]);
+        for (var i = 0; i < Sources.SourceInputs.Length; i++) Add(Sources.SourceInputs[i], Sources.SourceContexts[i]);
     }
     private void Add(AlsRefactoredSourcePlayerInput input, AlsPoseUpdateContext context)
     {
@@ -111,7 +135,7 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
             _movementContext = context;
             Direction.Prepare(_identity.FrameId, _direction, context.Delta, context.Weight, _resetMovement, context.UpdateCounter);
             Sources.PrepareShared(Direction, context, _requestedInitialization, _velocity, _movement, _forward,
-                _initializeInstance, _yaw, _traversal, _parent);
+                _initializeInstance, _yaw, _activeTraversal!, _parent);
         }
         else ((IAlsPoseCacheUpdateSink)Sources).UpdateCachedSource(cacheNodeIndex, context);
     }
@@ -122,7 +146,7 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
     }
     public void ValidateCommit(long frame)
     {
-        if (!_prepared || frame != _identity.FrameId) throw new ArgumentException("Incomplete Movement traversal.");
+        if (!_prepared || frame != _identity.FrameId || _shared && !_sharedComplete) throw new ArgumentException("Incomplete Movement traversal.");
         Direction.ValidateCommit(frame); Sources.ValidateCommit(frame);
     }
     public void Commit(long frame)
@@ -130,5 +154,5 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
         ValidateCommit(frame); Direction.Commit(frame); Sources.Commit(frame);
         _initialization = _nextInitialization; _committed = frame; Cancel();
     }
-    public void Cancel() { _prepared = false; _parent = null; Direction.Cancel(); Sources.Cancel(); }
+    public void Cancel() { _prepared = _sharedComplete = false; _parent = null; _activeTraversal = null; Direction.Cancel(); Sources.Cancel(); }
 }
