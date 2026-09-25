@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新方向状态资源：`docs/verification/2026-09-25-refactored-direction-resources.md`。导出六stance机器33state/87edge；编译两Movement各6state/24edge/8共享规则，原方向/曲线/来源权重门槛、SharedRulesGuid与出口顺序。Standing六.5/Cubic+ActivatePivot、七.75/QuadraticInOut、其余.7/Cubic，Crouch全.7/Cubic；18entry MoveDirectionChange原生33组权重预算2e-6。新7/相关22/CoreStack15/Optimize0/0，初重复端点/notify/duration/blend假设失败已修留档。完整UE0actions审计68FD4C51...冷/普通39656均0且字节同0CAFF6EC...；普通两旧Condition五warn保留，无插件修改/DV/Godot场景/全量/性能。尚无连续方向机器oracle/运行时/通知消费，下一步这些→其余stance机器/cache/pose/Parent与统一宿主；普通Demo未切，全部旧缺口/用户改动/暂缓项保留。
+
 - 最新stance回调：`docs/verification/2026-09-25-refactored-stance-callbacks.md`。原Standing15/Crouching12 CallFunction、六向外层参数/调用阶段/递归Source身份；候选Enter/Leave遵循UE前递归调用、后同步counter，间断/回绕/取消重试/fault门禁。初private检查编译错及内模板全Forward误读两失败已修；新4/相关15/Optimize0/0。无新UE连续callback oracle/场景/全量/性能，尚未执行Parent方法体或接完整图。下一步stance规则/机器/cache/pose→回调实际Parent与统一宿主；普通Demo未切，全部旧缺口/用户改动/暂缓项保留。
 
 - 最新移动播放器：`docs/verification/2026-09-25-refactored-movement-players.md`。Standing24/Crouching6 原图身份、四同步组、起点/循环/动态rate和BS输入绑定；暴露StartPosition覆盖Node默认，Sprint加速RateBasis=.833333015须除基准。新5/相关13通过，30源90提交帧逐帧取消重试，5变异拒绝；Optimize0/0。初start精度/引脚覆盖与basis默认假设失败已修并保留日志，无新UE连续oracle/场景/全量/性能。下一步完整stance状态/cache/callback/pose图→统一宿主；普通Demo未切、Ragdoll等旧缺口/用户修改/暂缓项保留。
