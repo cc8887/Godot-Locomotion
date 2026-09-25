@@ -7,7 +7,7 @@ namespace GodotAls.Import.Compilation;
 public sealed record AlsRefactoredSourcePlayerDefinition(int PlayerId,string Source,int GroupId,float StartPosition=0,bool Looping=true,
     AlsAssetSyncRole Role=AlsAssetSyncRole.CanBeLeader);
 public readonly record struct AlsRefactoredSourcePlayerInput(int PlayerId,Vector2 BlendInput,float PlayRate,float Weight,
-    bool Reinitialize=false,float StartPosition=0,bool RequestedInertialization=false);
+    bool Reinitialize=false,float StartPosition=0,bool RequestedInertialization=false,bool? Looping=null);
 
 /// <summary>Character-owned original Sequence/2D BlendSpace player batch. Frozen
 /// resources, separate playback identities and candidate-only clocks/poses.
@@ -124,7 +124,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
             else _samples[cursor++]=new(id*16,track.Binding.SequenceIndex,1);
             _inputGroups[i]=track.Definition.GroupId;
             _inputs[i]=new(id,track.Binding.AssetId,_nextEpochs[id],kind,_nextTimes[id],tick.PlayRate,tick.Weight,start,cursor-start,track.Binding.MarkerMask,
-                Looping:track.Definition.Looping,LegacyLength:blend?.LegacyLength??false,RequestedInertialization:tick.RequestedInertialization,Role:track.Definition.Role);
+                Looping:tick.Looping??track.Definition.Looping,LegacyLength:blend?.LegacyLength??false,RequestedInertialization:tick.RequestedInertialization,Role:track.Definition.Role);
         }
         if(!AlsSyncRuntime.TryEvaluateAssetSyncBatch(_groupIds,_inputGroups.AsSpan(0,input.Length),_inputs.AsSpan(0,input.Length),_samples.AsSpan(0,cursor),
             _bank.Sequences,_bank.Markers,_hasHistory?_groups:ReadOnlySpan<AlsAssetSyncBatchGroupHistory>.Empty,_history.AsSpan(0,_historyCount),_sampleHistory.AsSpan(0,_sampleHistoryCount),
