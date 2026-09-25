@@ -8,6 +8,7 @@ class UCharacterMovementComponent;
 class UPrimitiveComponent;
 class AActor;
 class UWorld;
+class UAlsAnimationInstanceSettings;
 
 /** Read-only baked state machines and their original transition curves. */
 UCLASS()
@@ -15,6 +16,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Full precision movement settings and referenced curves; no asset writes. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadMovementSettings(UAlsAnimationInstanceSettings* Settings);
+
     /** Actual weapon notify functions, parent transition playback and native Slot poses. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportRefactoredTransitionTrace(const FString& RequestPath, const FString& OutputPath);
