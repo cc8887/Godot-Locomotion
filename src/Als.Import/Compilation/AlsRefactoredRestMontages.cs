@@ -68,6 +68,7 @@ public sealed class AlsRefactoredRestMontages
     }
     public void PlayQueued(AlsMontageRuntime bank, AlsRefactoredRestParentRuntime parent, in AlsFrameIdentity identity, bool stopTransitionsQueued = false)
     {
+        if(parent.UsesSharedTransitions)throw new ArgumentException("Shared Rest owner requires PostUpdate consumption.");
         bank.ValidateCommit(identity); parent.ValidateContext(identity,Settings.CatalogDigest);
         if (!ReferenceEquals(parent.Settings,Settings)) throw new ArgumentException("Foreign rest Parent settings.");
         if (stopTransitionsQueued) return;
@@ -87,6 +88,35 @@ public sealed class AlsRefactoredRestMontages
             if (!bank.PlaySequence(Command(request))) throw new InvalidOperationException("Validated rest montage disappeared.");
             parent.AcceptPlayback(frame,request,isTurn);
         }
+    }
+    internal void ValidateResources(AlsMontageRuntime bank)
+    {
+        foreach(var expected in _assets)
+            if(!bank.TryGetSequenceAsset(expected.AnimationId,expected.Slot,out var actual)||actual!=expected)
+                throw new ArgumentException("Shared bank omitted Rest resources.");
+    }
+    internal void QueueTransition(AlsMontageRuntime bank,AlsTransitionQueueRuntime queue,in AlsFrameIdentity identity,AlsRefactoredRestPlayback request)
+    {
+        queue.ValidateBank(bank,identity);var command=Command(request);
+        if(command.Slot!=AlsMontageSlot.Transition)throw new ArgumentException("A Turn cannot overwrite the Transition queue.");
+        queue.QueuePlay(command,"",false);
+    }
+    public void PostUpdate(AlsMontageRuntime bank,AlsRefactoredRestParentRuntime parent,AlsTransitionQueueRuntime queue,in AlsFrameIdentity identity)
+    {
+        parent.ValidateSharedTransitions(this,bank,queue,identity);bank.ValidateCommit(identity);
+        var turn=parent.Candidate.QueuedTurn;var stop=queue.Candidate.Stop;
+        AlsSequenceMontageCommand? command=turn is null?null:Command(turn);
+        if(command is {} value && (!bank.TryGetSequenceAsset(value.AnimationId,value.Slot,out var actual)||actual!=_sources[turn!.Sequence]))
+            throw new ArgumentException("Turn resource missing from shared bank.");
+        // Dynamic/Stop/weapon calls have already overwritten the SAME queue in
+        // traversal order. Never copy a deferred Dynamic request here.
+        queue.PlayQueued();
+        if(!stop&&command is {} play)
+        {
+            if(!bank.PlaySequence(play))throw new InvalidOperationException("Validated Turn resource disappeared.");
+            parent.AcceptPlayback(identity.FrameId,turn!,true);
+        }
+        queue.StopQueued();
     }
     public void Stop(AlsMontageRuntime bank, in AlsFrameIdentity identity, float duration = -1)
     { bank.ValidateCommit(identity);bank.StopSlots([AlsMontageSlot.Transition,AlsTurnSlot.Standing,AlsTurnSlot.Crouching],duration); }

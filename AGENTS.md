@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Rest共享Transition队列：`docs/verification/2026-09-25-refactored-rest-shared-queue.md`。共享绑定Parent在Dynamic回调当刻直接覆盖同一queue，保持两帧延迟；PostUpdate按Transition→Turn→Stop消费，stop阻塞保留两play；共享模式拒绝独立PlayQueued，强owner/frame/资源门禁，提前丢弃queue不吞刷新。四顺序/stop组合、武器即时通知覆盖及门控、180帧完整Standing已切共享模式；相关112/最终5通过，Optimize0/0，无失败。无新UE/native连续/Godot/DV，完整宿主仍未切此模式；下步StopQuick设置/通知与native对照→Crouch/统一宿主/Demo，所有Ragdoll等旧目标/用户改动/暂缓项保留。
+
 - 最新Standing动作入口：`docs/verification/2026-09-25-refactored-standing-actions.md`。原三个BP函数图校验，四Stop状态→左右专用Stop(.2/.2、rate1.5、start.4、无idle门控)，Idle exit与Movement entry→共享Transition线程队列停止；queue-bank身份校验，复用mesh sampler。最终新4/既有Transition37/CoreQueue6通过，480帧真实79骨Slot retry、停止优先/保留play/回base，Optimize0/0。首4失败漏Idle exit后修，第二4失败测试曲线未去重后修，历史TRX保留。尚缺StopQuick主线程通知、Rest Dynamic与共享队列按调用顺序统一、native连续对照/角色宿主/Crouch/Demo/视觉/性能；无新UE运行/导出/DV。全部Ragdoll等旧目标、用户修改和暂缓项保留。
 
 - 最新Standing Slot与最终输出：`docs/verification/2026-09-25-refactored-standing-idle-output.md`。原Slot60真实bank→source63/61权重裁剪/Inactive/历史/初始化/update-only/retry；原node68在118后写PoseStanding=1，绑定具体owner/profile/frame/角色。整链180帧、三Hz630帧源规则、七变异拒绝；相关66/最后3/Optimize0/0。末次测试构建遇前轮testhost锁DLL，复制重试后成功，无中断/重启。无新UE/Godot运行/导出/DV/native连续oracle；普通Demo未切，停止动作消费/Crouch/统一宿主/视觉/性能及Ragdoll等全部旧目标、用户修改与暂缓项保留。

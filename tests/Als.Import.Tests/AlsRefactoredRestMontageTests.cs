@@ -30,6 +30,79 @@ public sealed class AlsRefactoredRestMontageTests
         public AlsRefactoredStanceCallback Turn=>Callbacks.Nodes.ToArray().Single(c=>c.Function==AlsRefactoredStanceFunction.RefreshTurnInPlace);
     }
     private static readonly Lazy<Fixture> Data=new(()=>new());
+    [Fact]
+    public void WeaponMainThreadNotifyOverwritesRetainedDynamicRequestAfterStopConsumption()
+    {
+        var f=Data.Value;
+        var profiles=Enum.GetValues<AlsRefactoredWeaponKind>().Select(k=>new AlsRefactoredWeaponNotifyProfile(f.Catalog,
+            new(f.Catalog,new(MantlingHostFixture.Read("refactored_weapon_machines"),f.Catalog,k)))).ToArray();
+        var paths=profiles.SelectMany(p=>p.Bindings.ToArray()).Select(b=>b.Sequence).Distinct().Order().ToArray();
+        var weapons=new AlsRefactoredTransitionMontages(f.Catalog,MantlingHostFixture.Read("refactored_slot_inventory"),profiles,
+            paths.Select((p,i)=>(p,i)).ToDictionary(v=>v.p,v=>v.i+70),5);
+        var bank=new AlsMontageRuntime([],sequences:f.Montages.Assets.ToArray().Concat(weapons.Assets.ToArray()).ToArray());
+        var queue=new AlsTransitionQueueRuntime(bank,9,1);var parent=new AlsRefactoredRestParentRuntime(f.Settings,f.Montages,bank,queue,f.Callbacks);
+        var id=new AlsFrameIdentity(0,9,1);queue.Begin(id);parent.Prepare(id,Input(8));bank.Begin(id,0);
+        queue.Discard();Assert.Throws<ArgumentException>(()=>parent.Apply(id,f.Dynamic));
+        Assert.Equal(0,parent.Candidate.DynamicFrameDelay);queue.Begin(id);
+        parent.Apply(id,f.Dynamic);queue.QueueStop();var dynamicRequest=queue.Candidate.Play;
+        f.Montages.PostUpdate(bank,parent,queue,id);Assert.Equal(dynamicRequest,queue.Candidate.Play);Assert.Empty(bank.Candidate.ToArray());
+        var command=weapons.Command(profiles[0].Bindings[0]);
+        Assert.False(queue.PlayImmediate(command,"Als.Stance.Standing",true,true));Assert.Equal(dynamicRequest,queue.Candidate.Play);
+        Assert.True(queue.PlayImmediate(command,"Als.Stance.Standing",false,true));Assert.Null(queue.Candidate.Play);
+        Assert.Equal(command.AnimationId,Assert.Single(bank.Candidate.ToArray()).AnimationId);
+        queue.Commit(id);parent.Commit(0);bank.Commit(id);
+        id=new(1,9,1);queue.Begin(id);parent.Prepare(id,Input(8));bank.Begin(id,.016f);parent.Apply(id,f.Dynamic);
+        Assert.Equal(1,parent.Candidate.DynamicFrameDelay);Assert.Null(queue.Candidate.Play);
+        f.Montages.PostUpdate(bank,parent,queue,id);Assert.Single(bank.Candidate.ToArray());Assert.Equal(command.AnimationId,bank.Candidate[0].AnimationId);
+    }
+    [Theory]
+    [InlineData(false,false)] [InlineData(true,false)] [InlineData(false,true)] [InlineData(true,true)]
+    public void SharedTransitionQueuePreservesCallOrderAndNativePostUpdateOrder(bool dynamicLast,bool stopQueued)
+    {
+        var f=Data.Value;var json=MantlingHostFixture.Read("refactored_stance_machines");
+        var standing=new AlsRefactoredStandingResources(json,f.Catalog);var stopResources=new AlsRefactoredStopResources(json,f.Catalog);
+        var actions=new AlsRefactoredStandingActions(f.Catalog,standing,stopResources,f.Montages,60,61);
+        var bank=new AlsMontageRuntime([],sequences:f.Montages.Assets.ToArray().Concat(actions.Assets.ToArray()).ToArray());
+        var queue=new AlsTransitionQueueRuntime(bank,9,1);var parent=new AlsRefactoredRestParentRuntime(f.Settings,f.Montages,bank,queue,f.Callbacks);
+        var stop=new AlsRefactoredStopRuntime(stopResources);var id=new AlsFrameIdentity(0,9,1);
+        var input=Input(0) with{LeftLock=1,LeftTarget=new(20,0,0)};
+        Assert.Throws<ArgumentException>(()=>parent.Prepare(id,input)); // The shared queue owns the frame boundary.
+        void Prepare()
+        {
+            queue.Begin(id);parent.Prepare(id,input);stop.Prepare(id.FrameId,-.75f,.016f);bank.Begin(id,0);
+            if(!dynamicLast)parent.Apply(id,f.Dynamic);
+            actions.QueueStopState(queue,bank,id,stop);
+            if(dynamicLast)parent.Apply(id,f.Dynamic);
+            parent.Apply(id,f.Turn);
+            if(stopQueued)queue.QueueStop(.15f);
+        }
+        Prepare();Assert.Null(parent.Candidate.QueuedTransition);Assert.Equal(2,parent.Candidate.DynamicFrameDelay);
+        var expected=dynamicLast?f.Montages.Assets[8].AnimationId:60;
+        Assert.Equal(expected,queue.Candidate.Play!.Value.AnimationId);
+        Assert.Throws<ArgumentException>(()=>f.Montages.PlayQueued(bank,parent,id));
+        f.Montages.PostUpdate(bank,parent,queue,id);
+        var state=parent.Candidate;var queueState=queue.Candidate;var instances=bank.Candidate.ToArray();
+        if(stopQueued)
+        {
+            Assert.Empty(instances);Assert.NotNull(state.QueuedTurn);Assert.Equal(expected,queueState.Play!.Value.AnimationId);Assert.False(queueState.Stop);
+        }
+        else
+        {
+            Assert.Equal(2,instances.Length);Assert.Equal(expected,instances[0].AnimationId);Assert.Equal(AlsMontageSlot.Transition,instances[0].Slot);
+            Assert.Equal((AlsMontageSlot)AlsTurnSlot.Standing,instances[1].Slot);Assert.Null(state.QueuedTurn);Assert.Null(queueState.Play);
+        }
+        parent.Cancel();queue.Discard();stop.Cancel();bank.Discard();Prepare();f.Montages.PostUpdate(bank,parent,queue,id);
+        Assert.Equal(state,parent.Candidate);Assert.Equal(queueState,queue.Candidate);Assert.Equal(instances,bank.Candidate.ToArray());
+        parent.ValidateCommit(0);queue.ValidateCommit(id);stop.ValidateCommit(0);bank.ValidateCommit(id);
+        parent.Commit(0);queue.Commit(id);stop.Commit(0);bank.Commit(id);
+        if(stopQueued)
+        {
+            id=new(1,9,1);queue.Begin(id);parent.Prepare(id,input with{TransitionsAllowed=false});bank.Begin(id,.016f);
+            parent.Apply(id,f.Dynamic);parent.Apply(id,f.Turn);f.Montages.PostUpdate(bank,parent,queue,id);
+            Assert.Equal(2,bank.Candidate.Length);Assert.Equal(expected,bank.Candidate[0].AnimationId);
+            Assert.Equal((AlsMontageSlot)AlsTurnSlot.Standing,bank.Candidate[1].Slot);Assert.Null(queue.Candidate.Play);Assert.Null(parent.Candidate.QueuedTurn);
+        }
+    }
     [Theory]
     [InlineData(-.75f,0)] [InlineData(.75f,1)] [InlineData(-.25f,0)] [InlineData(.25f,1)]
     public void ActualStopCallbacksQueueOriginalSequenceAndMovementStopsSharedGroup(float foot,int side)

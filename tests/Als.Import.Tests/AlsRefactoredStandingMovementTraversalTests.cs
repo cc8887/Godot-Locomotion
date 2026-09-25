@@ -59,13 +59,14 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
         var standing=new AlsRefactoredStandingRuntime(f.Standing);
         var graph=new AlsRefactoredStandingMovementTraversal(f.Catalog,f.Standing,f.Details,f.Direction,0);
         var parent=new AlsRefactoredMovementParentRuntime(f.Details.Callbacks,f.Settings);
-        var restParent=new AlsRefactoredRestParentRuntime(settings,callbacks);var traversal=new AlsRefactoredStandingRestTraversal(restGraph,callbacks);
         var bank=new AlsMontageRuntime([],sequences:montages.Assets);
+        var transitionQueue=new AlsTransitionQueueRuntime(bank,19,1);
+        var restParent=new AlsRefactoredRestParentRuntime(settings,montages,bank,transitionQueue,callbacks);var traversal=new AlsRefactoredStandingRestTraversal(restGraph,callbacks);
         var input=new AlsRefactoredRestInput(1,-90,0,false,false,AlsRefactoredRestRotation.ViewDirection,
             AlsRefactoredRestStance.Standing,true,false,1,0,0,default,default,default,default);
-        var id=new AlsFrameIdentity(0,19,1);restParent.Prepare(id,input);
+        var id=new AlsFrameIdentity(0,19,1);transitionQueue.Begin(id);restParent.Prepare(id,input);
         restParent.Apply(id,callbacks.Nodes.ToArray().Single(c=>c.Function==AlsRefactoredStanceFunction.RefreshTurnInPlace));
-        bank.Begin(id,0);montages.PlayQueued(bank,restParent,id);Assert.Single(bank.Candidate.ToArray());bank.Commit(id);restParent.Commit(0);
+        bank.Begin(id,0);montages.PostUpdate(bank,restParent,transitionQueue,id);Assert.Single(bank.Candidate.ToArray());bank.Commit(id);restParent.Commit(0);transitionQueue.Commit(id);
         var idleSlot=new AlsRefactoredStandingIdleSlot(f.Catalog,restGraph,rest,montagePose);
         var basis=new AlsPrecisePose[79];var baseCurves=new AlsInertialCurve[rest.CurveNames.Length];rest.SampleIdleSource(basis,baseCurves);
         AlsRefactoredStandingObservation[] clocks=[new(12,0,0,false),new(9,0,0,false)];
@@ -73,7 +74,7 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
         for(var frame=1;frame<=180;frame++)
         {
             id=new(frame,19,1);var context=new AlsPoseUpdateContext(id,1,1f/60).WithUpdateCounter(counter).WithInertialization(118,true);
-            bank.Begin(id,context.Delta);restParent.Prepare(id,input with{Delta=context.Delta,Yaw=0});
+            bank.Begin(id,context.Delta);transitionQueue.Begin(id);restParent.Prepare(id,input with{Delta=context.Delta,Yaw=0});
             traversal.Begin(context,restParent);traversal.BeginIdle(frame);traversal.CompleteIdle(frame);traversal.Complete(frame);
             standing.Prepare(frame,new(false,false,false),clocks,context.Delta,updateCounter:counter);
             parent.Prepare(id,new AlsRefactoredMovementInput(default,default,AlsQuaternion.Identity,0,1,0,0,1000,800,"Als.Gait.Running",false,false,context.Delta,1,0,0,0));
@@ -96,8 +97,9 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
                 var expected=inertia.Pose.ToArray();inertia.Cancel();inertia.Prepare(context,standing,graph,slotRequest:request);
                 inertia.Evaluate(frame,output,AlsPrecisePose.Identity);Assert.Equal(expected,inertia.Pose.ToArray());
             }
+            montages.PostUpdate(bank,restParent,transitionQueue,id);
             inertia.Commit(frame);output.Commit(frame);graph.Commit(frame);parent.Commit(frame);standing.Commit(frame);
-            traversal.Commit(frame);restParent.Commit(frame);idleSlot.Commit(id);bank.Commit(id);counter=counter.Next((ulong)frame+1);
+            traversal.Commit(frame);restParent.Commit(frame);idleSlot.Commit(id);transitionQueue.Commit(id);bank.Commit(id);counter=counter.Next((ulong)frame+1);
         }
         Assert.Equal(1,exits);Assert.False(inertia.IsActive);
     }

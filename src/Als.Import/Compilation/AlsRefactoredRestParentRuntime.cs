@@ -1,4 +1,5 @@
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Actions;
 using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Import.Compilation;
@@ -28,6 +29,10 @@ public sealed class AlsRefactoredRestParentRuntime
     private AlsRefactoredRestInput _input;
     private AlsFrameIdentity _identity, _committedIdentity;
     private bool _prepared, _hasCommitted, _rotateUpdated, _turnUpdated, _dynamicUpdated;
+    private readonly AlsRefactoredRestMontages? _sharedMontages;
+    private readonly AlsMontageRuntime? _sharedBank;
+    private readonly AlsTransitionQueueRuntime? _sharedTransitions;
+    internal bool UsesSharedTransitions=>_sharedTransitions is not null;
     public AlsRefactoredRestState Committed { get; private set; } = AlsRefactoredRestState.Initial;
     public AlsRefactoredRestState Candidate => _prepared ? _candidate : throw new InvalidOperationException("No rest Parent candidate.");
     public AlsRefactoredRestParentRuntime(AlsRefactoredRestSettings settings, params AlsRefactoredStanceCallbacks[] callbacks)
@@ -37,6 +42,19 @@ public sealed class AlsRefactoredRestParentRuntime
             AlsRefactoredStanceFunction.RefreshDynamicTransitions or AlsRefactoredStanceFunction.RefreshRotateInPlace or
             AlsRefactoredStanceFunction.InitializeTurnInPlace or AlsRefactoredStanceFunction.RefreshTurnInPlace).ToHashSet();
     }
+    public AlsRefactoredRestParentRuntime(AlsRefactoredRestSettings settings,AlsRefactoredRestMontages montages,
+        AlsMontageRuntime bank,AlsTransitionQueueRuntime transitions,params AlsRefactoredStanceCallbacks[] callbacks):this(settings,callbacks)
+    {
+        if(!ReferenceEquals(settings,montages.Settings))throw new ArgumentException("Foreign shared Rest settings.");
+        montages.ValidateResources(bank);_sharedMontages=montages;_sharedBank=bank;_sharedTransitions=transitions;
+    }
+    internal void ValidateSharedTransitions(AlsRefactoredRestMontages montages,AlsMontageRuntime bank,AlsTransitionQueueRuntime transitions,in AlsFrameIdentity identity)
+    {
+        ValidateContext(identity,montages.Settings.CatalogDigest);
+        if(!ReferenceEquals(_sharedMontages,montages)||!ReferenceEquals(_sharedBank,bank)||!ReferenceEquals(_sharedTransitions,transitions))
+            throw new ArgumentException("Foreign shared Rest queue owner.");
+        transitions.ValidateBank(bank,identity);
+    }
     public void Prepare(in AlsFrameIdentity identity, in AlsRefactoredRestInput input, bool initializeInstance = false)
     {
         if (_prepared || identity.SlotGeneration == 0 || _hasCommitted && (identity.FrameId <= _committedIdentity.FrameId || identity.CharacterId != _committedIdentity.CharacterId || identity.SlotGeneration != _committedIdentity.SlotGeneration) ||
@@ -45,6 +63,7 @@ public sealed class AlsRefactoredRestParentRuntime
             !float.IsFinite(input.Scale) || input.Scale <= 0 || !float.IsFinite(input.LeftLock) || !float.IsFinite(input.RightLock) ||
             input.LeftLock is < 0 or > 1 || input.RightLock is < 0 or > 1 || !input.LeftTarget.IsFinite || !input.LeftLocation.IsFinite ||
             !input.RightTarget.IsFinite || !input.RightLocation.IsFinite) throw new ArgumentException("Invalid rest Parent identity/input.");
+        _sharedTransitions?.ValidateBank(_sharedBank!,identity);
         _identity = identity; _input = input; _candidate = initializeInstance ? AlsRefactoredRestState.Initial : Committed;
         _rotateUpdated = _turnUpdated = _dynamicUpdated = false; _prepared = true;
     }
@@ -52,6 +71,7 @@ public sealed class AlsRefactoredRestParentRuntime
     {
         Check(identity.FrameId);
         if (identity != _identity || !_bindings.Contains(command)) throw new ArgumentException("Foreign rest Parent callback.");
+        _sharedTransitions?.ValidateBank(_sharedBank!,identity);
         if (command.Function == AlsRefactoredStanceFunction.InitializeTurnInPlace) { _candidate = _candidate with {TurnDelay = 0}; return; }
         if (!_input.GameWorld) return;
         var i = _input; var s = Settings;
@@ -81,7 +101,9 @@ public sealed class AlsRefactoredRestParentRuntime
                 var selected = AlsRefactoredRestModel.Dynamic(s.DynamicDistance,i.Scale,i.LeftLock,i.RightLock,i.LeftTarget,i.LeftLocation,i.RightTarget,i.RightLocation,
                     i.Stance == AlsRefactoredRestStance.Crouching);
                 if (selected < 0) return;
-                _candidate = _candidate with {DynamicFrameDelay = 2, QueuedTransition = new(s.DynamicSequence(selected >= 2,selected%2 == 0),"Transition",s.DynamicRate,1,s.DynamicBlend,s.DynamicBlend,false)};
+                var request=new AlsRefactoredRestPlayback(s.DynamicSequence(selected >= 2,selected%2 == 0),"Transition",s.DynamicRate,1,s.DynamicBlend,s.DynamicBlend,false);
+                if(_sharedTransitions is not null)_sharedMontages!.QueueTransition(_sharedBank!,_sharedTransitions,identity,request);
+                _candidate = _candidate with {DynamicFrameDelay = 2, QueuedTransition = _sharedTransitions is null?request:null};
                 break;
         }
     }
