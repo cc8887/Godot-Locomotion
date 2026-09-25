@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新方向缓存源调度：`docs/verification/2026-09-25-refactored-direction-source.md`。Standing7cache/26reader、Crouch6/24原编译顺序闭包；状态→callback→MultiWay→Core延迟最大权重/先到tie→Forward/base→共享player请求；初始化counter去重/pending reset/上下文状态祖先与Inactive/候选撤销。新10、5变异、双stance三频率840提交帧retry+独立owner+真实采样；最终相关见related.trx，Core缓存41/Optimize0/0，无初失败。尚无新UE源oracle/cache pose/Parent消费；外层cache读者及inertial消息须未来统一scheduler，普通Demo未切。下一步cache一次pose/前向与方向混合→其它stance/统一宿主，旧缺口/用户改动/暂缓项保留。
+
 - 最新站立前向源：`docs/verification/2026-09-25-refactored-forward-source.md`。原共享ForwardBase→Gait精确tag/Cubic(.3退出/.2进入)→Sprint加速映射0..25百分比/20与4插值/激活reset→SprintBlock混回；profile+候选source请求，双base读取保留identity/weight/inactive，未合并或自建时钟。初authored默认.1/.1误判5失败，修读取暴露引脚；新6/10变异、3Hz630提交帧retry+实际共享player采样，相关27/Core15/Optimize0/0。无新UE连续oracle/缓存调度/pose/Parent消费/Godot场景/全量/性能，普通Demo未切；下一步统一cache遍历与实际pose→其余stance和宿主。旧缺口/用户改动/暂缓项保留。
 
 - 最新方向姿态接线：`docs/verification/2026-09-25-refactored-direction-pose-graph.md`。双 stance 12state/96内部节点、48UseCached/12共享cache，逐通道原缓存顺序/曲线绑定/换髋回调及runtime↔authored链接校验；Standing前向source139为组合图，未简化为player。新增4/20变异拒绝，相关42通过，末次输入表达式门禁重测见graph-final.trx；Optimize0/0。仅资源compiler，尚无cache调度/pose求值/Parent消费或新UE/Godot场景/全量/性能；下一步这些及Standing前向内部图→其余stance和统一宿主。普通Demo未切，旧缺口/用户改动/暂缓项保留。
