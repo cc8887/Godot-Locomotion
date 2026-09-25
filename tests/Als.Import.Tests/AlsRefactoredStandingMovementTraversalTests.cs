@@ -1,4 +1,6 @@
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Actions;
+using GodotAls.Core.Contracts;
 using GodotAls.Import.Compilation;
 
 namespace GodotAls.Import.Tests;
@@ -34,6 +36,66 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
             new Dictionary<string,int>{{"Movement",0},{"Run Start",1},{"First Pivot",2},{"Second Pivot",3}}));
     }
     private static readonly Lazy<Fixture> Data=new(()=>new());
+
+    [Fact]
+    public void ActualTurnSlotExitDrivesOuterStandingInertia()
+    {
+        var f=Data.Value;var settings=new AlsRefactoredRestSettings(MantlingHostFixture.Read("refactored_rest_settings"),f.Catalog);
+        var paths=settings.Turns.ToArray().Select(t=>t.Sequence).Concat(Enumerable.Range(0,4).Select(i=>settings.DynamicSequence(i>=2,i%2==0))).ToArray();
+        var montages=new AlsRefactoredRestMontages(f.Catalog,settings,MantlingHostFixture.Read("refactored_slot_inventory"),
+            paths.Select((p,i)=>(p,i)).ToDictionary(v=>v.p,v=>v.i),5);
+        var restGraph=new AlsRefactoredStandingRestGraph(f.Catalog);var callbacks=new AlsRefactoredStanceCallbacks(f.Catalog,false);
+        var initialRest=new AlsRefactoredStandingRestPose(f.Catalog,restGraph,f.Metadata,[]);
+        var montagePose=new AlsRefactoredRestMontagePose(f.Catalog,montages,initialRest.CurveNames);
+        var rest=new AlsRefactoredStandingRestPose(f.Catalog,restGraph,f.Metadata,montagePose.CurveNames.ToArray());
+        var movement=new AlsRefactoredMovementCacheRuntime(f.Movement,f.DirectionPose.BoneNames,f.DirectionPose.CurveNames);
+        var details=new AlsRefactoredMovementDetailsPose(f.Catalog,f.Details,f.Movement,movement.CurveNames);
+        var stop=new AlsRefactoredStopPose(f.Catalog,f.Stop,f.Metadata,details.CurveNames);
+        var profile=new AlsRefactoredStandingPose(f.Standing,rest,details,stop);
+        var rotate=new AlsRefactoredSourcePlayerRuntime(f.Catalog,f.Bank,f.Triangles,f.Standing.RotatePlayers.Bind(0));
+        var output=profile.CreateRuntime(rotate,0);var inertia=new AlsRefactoredStandingInertialization(f.Catalog,profile);
+        var standing=new AlsRefactoredStandingRuntime(f.Standing);
+        var graph=new AlsRefactoredStandingMovementTraversal(f.Catalog,f.Standing,f.Details,f.Direction,0);
+        var parent=new AlsRefactoredMovementParentRuntime(f.Details.Callbacks,f.Settings);
+        var restParent=new AlsRefactoredRestParentRuntime(settings,callbacks);var traversal=new AlsRefactoredStandingRestTraversal(restGraph,callbacks);
+        var bank=new AlsMontageRuntime([],sequences:montages.Assets);
+        var input=new AlsRefactoredRestInput(1,-90,0,false,false,AlsRefactoredRestRotation.ViewDirection,
+            AlsRefactoredRestStance.Standing,true,false,1,0,0,default,default,default,default);
+        var id=new AlsFrameIdentity(0,19,1);restParent.Prepare(id,input);
+        restParent.Apply(id,callbacks.Nodes.ToArray().Single(c=>c.Function==AlsRefactoredStanceFunction.RefreshTurnInPlace));
+        bank.Begin(id,0);montages.PlayQueued(bank,restParent,id);Assert.Single(bank.Candidate.ToArray());bank.Commit(id);restParent.Commit(0);
+        var reference=f.Catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence);
+        var mixer=new AlsMontageSlotPose(reference.ReferencePose,montagePose.Parents,montagePose.CurveNames.Length);var sampler=montagePose.CreateSampler();
+        var basis=new AlsPrecisePose[79];var baseCurves=new AlsInertialCurve[rest.CurveNames.Length];rest.SampleIdleSource(basis,baseCurves);
+        var pose=new AlsPrecisePose[79];var curves=new AlsInertialCurve[baseCurves.Length];
+        AlsRefactoredStandingObservation[] clocks=[new(12,0,0,false),new(9,0,0,false)];
+        var init=new AlsGraphTraversalCounter(0,0);var counter=init;var exits=0;
+        for(var frame=1;frame<=180;frame++)
+        {
+            id=new(frame,19,1);var context=new AlsPoseUpdateContext(id,1,1f/60).WithUpdateCounter(counter).WithInertialization(118,true);
+            bank.Begin(id,context.Delta);restParent.Prepare(id,input with{Delta=context.Delta,Yaw=0});
+            traversal.Begin(context,restParent);traversal.BeginIdle(frame);traversal.CompleteIdle(frame);traversal.Complete(frame);
+            standing.Prepare(frame,new(false,false,false),clocks,context.Delta,updateCounter:counter);
+            parent.Prepare(id,new AlsRefactoredMovementInput(default,default,AlsQuaternion.Identity,0,1,0,0,1000,800,"Als.Gait.Running",false,false,context.Delta,1,0,0,0));
+            graph.Prepare(context,[],[],init,parent,new(1,1,1,0));
+            mixer.Evaluate(bank.Frame,id,AlsTurnSlot.Standing,basis,baseCurves,pose,curves,sampler);
+            output.Begin(id,standing);output.CaptureIdleSlot(pose,curves,restParent.Candidate.TurnPlayRate);output.Evaluate(frame);
+            var request=montages.StandingSlotRequest(bank.Frame,id,traversal);
+            inertia.Prepare(context,standing,graph,slotRequest:request);Assert.Equal(request is null?0:1,inertia.PendingRequests);
+            inertia.Evaluate(frame,output,AlsPrecisePose.Identity);
+            if(request is not null)
+            {
+                exits++;Assert.True(inertia.IsActive);Assert.Equal(basis,pose);
+                Assert.False(output.Pose.ToArray().SequenceEqual(inertia.Pose.ToArray()));
+                var yaw=Array.IndexOf(profile.CurveNames.ToArray(),"RotationYawSpeed");Assert.Equal(output.Curves[yaw],inertia.Curves[yaw]);
+                var expected=inertia.Pose.ToArray();inertia.Cancel();inertia.Prepare(context,standing,graph,slotRequest:request);
+                inertia.Evaluate(frame,output,AlsPrecisePose.Identity);Assert.Equal(expected,inertia.Pose.ToArray());
+            }
+            inertia.Commit(frame);output.Commit(frame);graph.Commit(frame);parent.Commit(frame);standing.Commit(frame);
+            traversal.Commit(frame);restParent.Commit(frame);bank.Commit(id);counter=counter.Next((ulong)frame+1);
+        }
+        Assert.Equal(1,exits);Assert.False(inertia.IsActive);
+    }
 
     [Fact]
     public void StandingPoseRequiresEveryCurrentSourceAndRejectsForeignOwners()

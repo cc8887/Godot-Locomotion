@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新真实Rest Montage：`docs/verification/2026-09-25-refactored-rest-montages.md`。原八Turn/四Dynamic共享Grounded bank、Parent队列顺序/预校验/ack、真实79骨绝对/mesh采样；Core惯性退出和proxy请求快照、last-per-group、候选回滚，Standing60→118实际Idle更新门控。Core168/Import189/新整链1通过、Optimize0/0，三Hz7560播放帧retry与180帧真实Standing退出平滑/Yaw直通。修复几处编译类型问题，无阈值放宽；本批只读UE源码、无UE启动/导出/插件变更/DV。尚无连续Rest/Montage退出native oracle、Slot源裁剪/node68/统一宿主/普通Demo切换/Godot视觉/性能；Crouch采样测试基底为受控Standing。下一步原生对照和余下Standing更新语义→宿主，Ragdoll等所有旧目标/用户修改/暂缓项保留。
+
 - 最新Rest Parent刷新：`docs/verification/2026-09-25-refactored-rest-parent.md`。真实默认资产全精度Rotate/Turn/Dynamic设置+8转身/4动态资源；原严格阈值/175逆时针/delay/0.15阻尼/两帧间隔/每帧去重/候选播放队列，Standing203与Idle57/59/58作用域。相关53、最终新18、Optimize0/0；3Hz840 Parent帧retry并接实际Standing/Rotate clocks。UE整Editor0actions/四插件审计FA68F487...，冷37352/普通41620实际0，3555字节SHA396BB6A5...相同；首冷Vector2f.x失败改反射读取，普通两旧Condition及旧警告保留，无C++/配置变更或新DV。尚无UE连续Parent oracle/真实队列Montage消费/node68最终封装/统一宿主/Demo渲染/全量/性能；下步native对照与action/Slot接入，Ragdoll等旧目标及用户修改/暂缓项保留。
 
 - 最新完整Standing姿态与118：`docs/verification/2026-09-25-refactored-standing-pose-inertia.md`。五state候选采集、真实Idle/Move119/Stop/Rotate、标准stack一次合成和curve存在性；外118原Yaw排除/相关性重置/update-only队列/候选回滚/119转发接线。最终相关50/Optimize0/0；3Hz1680帧132720骨逐帧retry/重复Evaluate，五state、多edge、单state原输出、实际平滑/Yaw直通、三帧延迟求值、故障恢复和counter中断通过。首生命周期测试误with只读identity编译失败，改显式构造后过。未真实转身Montage/Parent Idle回调/新UE整图/Godot渲染/全量/性能，跨祖先转发未新native专项；普通Demo未切。下步Idle/Rotate源刷新与实际动作→UE整图/统一宿主，Ragdoll等旧目标及用户修改/暂缓项保留。

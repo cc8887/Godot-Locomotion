@@ -6,7 +6,14 @@ namespace GodotAls.Core.Actions;
 public readonly record struct AlsDynamicMontageAsset(int AnimationId, AlsTurnSlot Slot, int GroupId, float Duration);
 public readonly record struct AlsSequenceMontageAsset(int AnimationId, AlsMontageSlot Slot, int GroupId, float Duration, int AdditiveType);
 public readonly record struct AlsSequenceMontageCommand(int AnimationId, AlsMontageSlot Slot, float PlayRate,
-    float StartTime, float BlendInTime, float BlendOutTime, int LoopCount = 1, float BlendOutTriggerTime = 0);
+    float StartTime, float BlendInTime, float BlendOutTime, int LoopCount = 1, float BlendOutTriggerTime = 0)
+{
+    public bool InertialBlendOut { get; init; }
+}
+public readonly record struct AlsMontageInertialRequest(float Duration, AlsActionBlendOption BlendOption)
+{
+    public bool UseBlendMode => BlendOption != AlsActionBlendOption.Linear;
+}
 // These are graph slot identities, not montage-local slot array indices.
 public readonly record struct AlsMontageSlot(int Id)
 {
@@ -42,6 +49,7 @@ public readonly record struct AlsAuthoredMontageAsset(int ActionDefinitionId, in
 {
     public int AdditiveType { get; init; }
     public float RateScale { get; init; } = 1;
+    public bool InertialBlendOut { get; init; }
 }
 
 public readonly record struct AlsMontageInstance(long InstanceId, int AnimationId, AlsMontageSlot Slot,
@@ -58,6 +66,7 @@ public readonly record struct AlsMontageInstance(long InstanceId, int AnimationI
     public bool OwnsActiveActionLookup { get; init; }
     public int AdditiveType { get; init; }
     public float RateScale { get; init; } = 1;
+    public bool InertialBlendOut { get; init; }
     public float EffectivePlayRate => PlayRate * RateScale;
 }
 public readonly record struct AlsMontageEvaluation(long InstanceId, int AnimationId, AlsMontageSlot Slot,
@@ -78,6 +87,8 @@ public readonly record struct AlsMontageRootMotionRange(AlsFrameIdentity Identit
 // Consumers retain Identity and reject a bank recycled for a later frame.
 public sealed class AlsMontageFrame
 {
+    internal readonly Dictionary<int,AlsMontageInertialRequest> InertialRequests = new();
+    public bool TryGetInertializationRequest(int groupId, out AlsMontageInertialRequest request) => InertialRequests.TryGetValue(groupId,out request);
     internal AlsMontageEvaluation[] Entries = new AlsMontageEvaluation[8];
     internal int Count;
     public AlsFrameIdentity Identity { get; internal set; }
@@ -101,6 +112,8 @@ public sealed class AlsMontageFrame
 // Arrays grow only when overlap capacity is first exceeded; no old instance is evicted.
 public sealed class AlsMontageRuntime
 {
+    // Mutable AnimInstance requests and the proxy snapshot have distinct lifetimes.
+    private Dictionary<int,AlsMontageInertialRequest> _requests = new(), _committedRequests = new();
     private readonly Dictionary<(int, AlsTurnSlot), AlsDynamicMontageAsset> _assets;
     private readonly Dictionary<int, AlsAuthoredMontageAsset> _actions;
     private readonly Dictionary<(int, AlsMontageSlot), AlsSequenceMontageAsset> _sequences;
@@ -186,6 +199,7 @@ public sealed class AlsMontageRuntime
                 identity.CharacterId != CommittedIdentity.CharacterId || identity.FrameId <= CommittedIdentity.FrameId))
             throw new ArgumentException("Invalid montage frame identity, phase or delta.");
         _branching?.Begin(identity);
+        _requests.Clear();foreach(var request in _committedRequests)_requests.Add(request.Key,request.Value);
         Ensure(_committedCount); _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0;
         _identity = identity; _serial = _committedSerial;
         _rootMotionInstance = _committedRootMotionInstance; _rootMotionRange = new(identity, 0, -1, 0, 0);
@@ -197,8 +211,10 @@ public sealed class AlsMontageRuntime
             if (ragdoll && state.Blend.DesiredWeight > 0)
             {
                 var stopBlend = state.Blend;
-                AlsActionLifecycle.Stop(.2f, state.Settings.BlendOutOption, ref stopBlend);
-                state = state with { Blend = stopBlend, BlendTime = .2f, BlendResetPending = false,
+                if(state.InertialBlendOut)QueueInertialization(state.GroupId,.2f,state.Settings.BlendOutOption);
+                AlsActionLifecycle.Stop(state.InertialBlendOut?0:.2f, state.Settings.BlendOutOption, ref stopBlend);
+                state = state with { Blend = stopBlend, BlendTime = state.InertialBlendOut?0:.2f, BlendResetPending = false,
+                    Playing = state.Playing&&!state.InertialBlendOut,
                     Interrupted = true, OwnsActiveActionLookup = false };
             }
             var blend = state.Blend; var previousWeight = blend.CurrentWeight;
@@ -230,6 +246,11 @@ public sealed class AlsMontageRuntime
                 if (!wasStopped && blend.BlendingOut == 1)
                 {
                     state = state with { BlendTime = state.Settings.BlendOutTriggerSeconds >= 0 ? state.Settings.BlendOutSeconds : remaining };
+                    if(state.InertialBlendOut)
+                    {
+                        QueueInertialization(state.GroupId,state.BlendTime,state.Settings.BlendOutOption);
+                        AlsActionLifecycle.Stop(0,state.Settings.BlendOutOption,ref blend);state=state with{BlendTime=0};
+                    }
                     if (_rootMotionInstance == state.InstanceId) _rootMotionInstance = 0;
                 }
                 if (move != 0 && position == boundary)
@@ -281,6 +302,8 @@ public sealed class AlsMontageRuntime
                     state.ClipStart + position * state.ClipRate, blend.CurrentWeight, state.ActionDefinitionId) { AdditiveType = state.AdditiveType };
         }
         _frame.Count = _evaluationCount; _frame.Identity = identity;
+        _frame.InertialRequests.Clear();foreach(var request in _requests)_frame.InertialRequests.Add(request.Key,request.Value);
+        _requests.Clear();
         _prepared = true;
     }
 
@@ -332,7 +355,7 @@ public sealed class AlsMontageRuntime
         var lifecycle = new AlsActionLifecycleSettings(AlsActionLifecycleMode.MontageAutoBlendOut,
             command.BlendInTime, AlsActionBlendOption.HermiteCubic, command.BlendOutTime, AlsActionBlendOption.HermiteCubic, command.BlendOutTriggerTime);
         Play(new AlsAuthoredMontageAsset(-1, asset.AnimationId, asset.Slot, asset.GroupId, asset.Duration, 0, 1, lifecycle)
-            { AdditiveType = asset.AdditiveType }, command.PlayRate, command.StartTime, true);
+            { AdditiveType = asset.AdditiveType, InertialBlendOut = command.InertialBlendOut }, command.PlayRate, command.StartTime, true);
         return true;
     }
 
@@ -417,7 +440,7 @@ public sealed class AlsMontageRuntime
         for (var i = _count - 1; i >= 0; i--)
         {
             if (stopGroup && _candidate[i].GroupId == asset.GroupId)
-                Stop(i, asset.Lifecycle.BlendInSeconds, asset.Lifecycle.BlendInOption);
+                Stop(i, asset.Lifecycle.BlendInSeconds, asset.Lifecycle.BlendInOption, false);
             // ActiveMontagesMap selects the newest play of the authored asset.
             // Removing that entry later does not reactivate an older instance.
             if (montageId >= 0 && _candidate[i].MontageId == montageId)
@@ -429,24 +452,26 @@ public sealed class AlsMontageRuntime
             // its requested duration but does not update/reset it this frame.
             asset.Lifecycle, new AlsActionLifecycleState { DesiredWeight = 1, RemainingSeconds = .2f }, true, false)
             { BlendResetPending = true, ActionDefinitionId = asset.ActionDefinitionId, ClipStart = asset.ClipStart, ClipRate = asset.ClipRate,
-                MontageId = montageId, OwnsActiveActionLookup = montageId >= 0, AdditiveType = asset.AdditiveType, RateScale = asset.RateScale };
+                MontageId = montageId, OwnsActiveActionLookup = montageId >= 0, AdditiveType = asset.AdditiveType, RateScale = asset.RateScale, InertialBlendOut = asset.InertialBlendOut };
         if (asset.RootMotionEnabled) _rootMotionInstance = _serial;
     }
 
-    private void Stop(int index, float seconds, AlsActionBlendOption option)
+    private void Stop(int index, float seconds, AlsActionBlendOption option, bool useAssetBlendMode = true)
     {
         var old = _candidate[index];
         if (_rootMotionInstance == old.InstanceId) _rootMotionInstance = 0;
-        _candidate[index]=StopInstance(old,seconds,option);
+        _candidate[index]=StopInstance(old,seconds,option,useAssetBlendMode);
     }
-    private static AlsMontageInstance StopInstance(in AlsMontageInstance old,float seconds,AlsActionBlendOption option)
+    private AlsMontageInstance StopInstance(in AlsMontageInstance old,float seconds,AlsActionBlendOption option,bool useAssetBlendMode = true)
     {
         var blend = old.Blend; var duration = old.BlendTime;
         var pending = old.BlendResetPending;
         var settings = old.Settings;
         if (blend.BlendingOut == 0)
         {
-            duration = seconds;
+            var inertial=useAssetBlendMode&&old.InertialBlendOut;
+            if(inertial)QueueInertialization(old.GroupId,seconds,option);
+            duration = inertial?0:seconds;
             // First Stop calls Blend.Update(0) in UE.
             AlsActionLifecycle.Stop(duration, option, ref blend);
             settings = settings with { BlendOutOption = option };
@@ -468,6 +493,11 @@ public sealed class AlsMontageRuntime
     {
         RequirePrepared(); return _frame.SlotWeights(slot);
     }
+    private void QueueInertialization(int group,float duration,AlsActionBlendOption option)
+    {
+        // Montage arbitration uses the last request per group, not the shortest.
+        _requests[group]=new(duration,option);
+    }
     public void ValidateCommit(AlsFrameIdentity identity)
     { RequirePrepared(); if (identity != _identity) throw new ArgumentException("Foreign montage commit."); _branching?.ValidateCommit(identity); }
     public void Commit(AlsFrameIdentity identity)
@@ -476,8 +506,9 @@ public sealed class AlsMontageRuntime
         (_committedFrame, _frame) = (_frame, _committedFrame);
         _committedCount = _count; _committedSerial = _serial; CommittedIdentity = identity; _prepared = false;
         _committedRootMotionInstance = _rootMotionInstance;
+        (_committedRequests,_requests)=(_requests,_committedRequests);
     }
-    public void Discard() { _branching?.Discard(); _prepared = false; _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0; _frame.Count = 0; _frame.Identity = default; }
+    public void Discard() { _branching?.Discard(); _prepared = false; _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0; _frame.Count = 0; _frame.Identity = default; _frame.InertialRequests.Clear();_requests.Clear(); }
     public void ClearForLifecycle()
     {
         if (_prepared) throw new InvalidOperationException("Discard the montage candidate before lifecycle cleanup.");
@@ -486,6 +517,7 @@ public sealed class AlsMontageRuntime
         _committedCount = _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0;
         _committedRootMotionInstance = _rootMotionInstance = 0; _rootMotionRange = default;
         _committedFrame.Count = _frame.Count = 0;
+        _requests.Clear();_committedRequests.Clear();_frame.InertialRequests.Clear();_committedFrame.InertialRequests.Clear();
         // Keep the frame boundary and serial allocator: resuming this generation
         // must never reuse a physical playback identity.
     }
