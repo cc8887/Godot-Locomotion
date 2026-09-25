@@ -6,6 +6,7 @@
 #include "Animation/AnimBlueprintGeneratedClass.h"
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimNode_SequencePlayer.h"
+#include "Animation/AnimNode_Root.h"
 #include "Animation/AnimNode_SaveCachedPose.h"
 #include "Animation/AnimNode_StateMachine.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
@@ -29,6 +30,12 @@ struct FOverlayProxyAccess : FAnimInstanceProxy
     static void Pre(FAnimInstanceProxy& P,UAnimInstance* I,float D){(P.*&FOverlayProxyAccess::PreUpdate)(I,D);}
     static void UpdateRoot(FAnimInstanceProxy& P){(P.*&FOverlayProxyAccess::UpdateAnimation)();}
     static void Post(FAnimInstanceProxy& P,UAnimInstance* I){(P.*&FOverlayProxyAccess::PostUpdate)(I);}
+    static void DirectionRoot(FAnimInstanceProxy& P,FAnimNode_StateMachine* Machine)
+    {
+        auto* Root=static_cast<FAnimNode_Root*>(P.GetRootNode());
+        Root->Result.SetLinkNode(Machine);
+        (P.*&FOverlayProxyAccess::InitializeRootNode_WithRoot)(Root);
+    }
 };
 struct FOverlayInstanceAccess : UAlsLinkedAnimationInstance
 {
@@ -69,6 +76,11 @@ bool SetOverlayStructState(UStruct* Struct,void* Memory,const TSharedPtr<FJsonOb
             if(!Child||!SetOverlayStructState(Child->Struct,Child->ContainerPtrToValuePtr<void>(Memory),Pair.Value->AsObject()))return false;
             continue;
         }
+        if(Pair.Value->Type==EJson::Boolean)
+        {
+            auto* Field=FindFProperty<FBoolProperty>(Struct,FName(*Pair.Key));if(!Field)return false;
+            Field->SetPropertyValue_InContainer(Memory,Pair.Value->AsBool());continue;
+        }
         auto* Field=FindFProperty<FFloatProperty>(Struct,FName(*Pair.Key));if(!Field)return false;
         const float Value=static_cast<float>(Pair.Value->AsNumber());if(!FMath::IsFinite(Value))return false;
         Field->SetPropertyValue_InContainer(Memory,Value);
@@ -97,12 +109,14 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
     if(!FFileHelper::LoadFileToString(Text,*RequestPath)||!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Request))return false;
     FString Kind=TEXT("Default");Request->TryGetStringField(TEXT("overlay"),Kind);
     const bool Weapon=Kind==TEXT("Bow")||Kind==TEXT("PistolOneHanded")||Kind==TEXT("PistolTwoHanded")||Kind==TEXT("Rifle");
-    if(!Weapon&&Kind!=TEXT("Default")&&Kind!=TEXT("Feminine")&&Kind!=TEXT("Masculine")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel")&&Kind!=TEXT("Binoculars")&&Kind!=TEXT("Torch"))return false;
+    const bool Direction=Kind==TEXT("Standing")||Kind==TEXT("Crouching");
+    const bool MachineTrace=Weapon||Direction;
+    if(!MachineTrace&&Kind!=TEXT("Default")&&Kind!=TEXT("Feminine")&&Kind!=TEXT("Masculine")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel")&&Kind!=TEXT("Binoculars")&&Kind!=TEXT("Torch"))return false;
     const bool Box=Kind==TEXT("Box");
     const bool Hands=Kind==TEXT("HandsTied"),Injured=Kind==TEXT("Injured"),Barrel=Kind==TEXT("Barrel");
     const bool Binoculars=Kind==TEXT("Binoculars"),Torch=Kind==TEXT("Torch"),Prop=Binoculars||Torch;
     const bool Cached=Hands||Injured||Barrel,HasActions=Box||Cached||Prop;
-    const FString BlueprintPath=FString::Printf(TEXT("/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_%s.AB_Als_%s"),*Kind,*Kind);
+    const FString BlueprintPath=FString::Printf(TEXT("/ALS/ALS/Character/AnimationInstances/%s/AB_Als_%s.AB_Als_%s"),Direction?TEXT("Stances"):TEXT("Overlays"),*Kind,*Kind);
     auto* Blueprint=LoadObject<UAnimBlueprint>(nullptr,*BlueprintPath);
     auto* Generated=Blueprint?Cast<UAnimBlueprintGeneratedClass>(Blueprint->GeneratedClass):nullptr;
     auto* CharacterClass=LoadClass<AAlsCharacter>(nullptr,TEXT("/ALS/ALS/Character/B_Als_Character.B_Als_Character_C"));
@@ -110,6 +124,8 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
     auto* Mesh=Defaults?Defaults->GetMesh()->GetSkeletalMeshAsset():nullptr;
     auto* World=GEditor?GEditor->GetEditorWorldContext().World():nullptr;
     if(!Generated||!Mesh||!Mesh->GetSkeleton()||!World)return false;
+    if(Direction&&(Generated->GetAnimBlueprintFunctions().Num()==0||
+        Generated->GetAnimBlueprintFunctions()[0].OutputPoseNodeProperty->Struct!=FAnimNode_Root::StaticStruct()))return false;
     FActorSpawnParameters Spawn;Spawn.ObjectFlags|=RF_Transient;Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     auto* Owner=World->SpawnActor<AActor>(Spawn);if(!Owner)return false;Owner->SetActorTickEnabled(false);
     ON_SCOPE_EXIT{World->DestroyActor(Owner);};
@@ -128,6 +144,12 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             auto& P=FOverlayInstanceAccess::Proxy(Instance.Get());
             P.GetRequiredBones().InitializeTo(Required,UE::Anim::FCurveFilterSettings(),*Mesh->GetSkeleton());
             P.GetRequiredBones().SetUseRAWData(true);P.GetRequiredBones().SetUseSourceData(false);
+            if(Direction)
+                for(auto* Property:Generated->GetAnimNodeProperties())if(Property->Struct==FAnimNode_StateMachine::StaticStruct())
+                {
+                    auto* Candidate=Property->ContainerPtrToValuePtr<FAnimNode_StateMachine>(Instance.Get());
+                    if(Candidate->StateMachineIndexInClass==0)FOverlayProxyAccess::DirectionRoot(P,Candidate);
+                }
         };
         Initialize();
         auto& Proxy=FOverlayInstanceAccess::Proxy(Instance.Get());
@@ -135,9 +157,9 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
         const int32 IdleIndex=Binoculars?5:Torch?6:Hands?19:Injured?13:Box||Barrel?9:11;
         const int32 ActionIndex=Binoculars?24:Torch?23:Hands?2:Injured?14:Barrel?10:13;
         const int32 AimIndex=Binoculars?6:7;
-        const int32 PredictionIndex=Weapon?INDEX_NONE:Hands?11:Injured||!HasActions?4:INDEX_NONE;
+        const int32 PredictionIndex=MachineTrace?INDEX_NONE:Hands?11:Injured||!HasActions?4:INDEX_NONE;
         const int32 CacheIndex=Hands?17:Injured?10:5;
-        if(!Weapon&&(Properties.Num()!=(Binoculars?28:Torch?26:Hands||Injured?22:Barrel?18:Box?17:14)||Properties[IdleIndex]->Struct!=FAnimNode_SequencePlayer::StaticStruct()))return false;
+        if(!MachineTrace&&(Properties.Num()!=(Binoculars?28:Torch?26:Hands||Injured?22:Barrel?18:Box?17:14)||Properties[IdleIndex]->Struct!=FAnimNode_SequencePlayer::StaticStruct()))return false;
         if(Prop&&Properties[AimIndex]->Struct!=FAlsAnimNode_GameplayTagsBlend::StaticStruct())return false;
         if(HasActions&&Properties[ActionIndex]->Struct!=FAlsAnimNode_GameplayTagsBlend::StaticStruct())return false;
         if(PredictionIndex!=INDEX_NONE&&Properties[PredictionIndex]->Struct!=FAnimNode_TwoWayBlend::StaticStruct())return false;
@@ -146,13 +168,18 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
         auto* Actions=HasActions?Properties[ActionIndex]->ContainerPtrToValuePtr<FAlsAnimNode_GameplayTagsBlend>(Instance.Get()):nullptr;
         auto* Aim=Prop?Properties[AimIndex]->ContainerPtrToValuePtr<FAlsAnimNode_GameplayTagsBlend>(Instance.Get()):nullptr;
         auto* Cache=Cached?Properties[CacheIndex]->ContainerPtrToValuePtr<FAnimNode_SaveCachedPose>(Instance.Get()):nullptr;
-        auto* Idle=Weapon?nullptr:Properties[IdleIndex]->ContainerPtrToValuePtr<FAnimNode_SequencePlayer>(Instance.Get());
+        auto* Idle=MachineTrace?nullptr:Properties[IdleIndex]->ContainerPtrToValuePtr<FAnimNode_SequencePlayer>(Instance.Get());
         FAnimNode_StateMachine* Machine=nullptr;
-        if(Weapon)
+        if(MachineTrace)
         {
             for(auto* Property:Properties)if(Property->Struct==FAnimNode_StateMachine::StaticStruct())
-            {if(Machine)return false;Machine=Property->ContainerPtrToValuePtr<FAnimNode_StateMachine>(Instance.Get());}
-            if(!Machine||Generated->GetBakedStateMachines().Num()!=1||Generated->GetAnimNotifies().Num()!=2)return false;
+            {
+                auto* Candidate=Property->ContainerPtrToValuePtr<FAnimNode_StateMachine>(Instance.Get());
+                if(Direction&&Candidate->StateMachineIndexInClass!=0)continue;
+                if(Machine)return false;Machine=Candidate;
+            }
+            if(!Machine||(!Direction&&(Generated->GetBakedStateMachines().Num()!=1||Generated->GetAnimNotifies().Num()!=2)))return false;
+            if(Direction&&Generated->GetBakedStateMachines()[0].States.Num()!=6)return false;
         }
         TArray<TSharedPtr<FJsonValue>> Frames;
         for(const auto& FrameValue:TraceValue->AsObject()->GetArrayField(TEXT("frames")))
@@ -163,6 +190,13 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             if(Frame->GetBoolField(TEXT("reset")))Initialize();
             if(!SetState(Parent.Get(),TEXT("PoseState"),Frame->GetObjectField(TEXT("poseState")))||
                 !SetState(Parent.Get(),TEXT("InAirState"),Frame->GetObjectField(TEXT("inAirState"))))return false;
+            if(Direction)
+            {
+                if(!SetState(Parent.Get(),TEXT("GroundedState"),Frame->GetObjectField(TEXT("groundedState")))||
+                    !SetState(Parent.Get(),TEXT("FeetState"),Frame->GetObjectField(TEXT("feetState")))||
+                    !SetState(Parent.Get(),TEXT("StandingState"),Frame->GetObjectField(TEXT("standingState")))||
+                    !SetState(Parent.Get(),TEXT("CrouchingState"),Frame->GetObjectField(TEXT("crouchingState"))))return false;
+            }
             if(HasActions||Weapon)
             {
                 auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("LocomotionAction"));
@@ -194,7 +228,7 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             }
             FOverlayProxyAccess::Pre(Proxy,Instance.Get(),Delta);
             FOverlayProxyAccess::UpdateRoot(Proxy);Proxy.FlipBufferWriteIndex();
-            if(Weapon){Instance->NotifyQueue.AnimNotifies.Reset();Instance->NotifyQueue.UnfilteredMontageAnimNotifies.Reset();}
+            if(MachineTrace){Instance->NotifyQueue.AnimNotifies.Reset();Instance->NotifyQueue.UnfilteredMontageAnimNotifies.Reset();}
             FOverlayProxyAccess::Post(Proxy,Instance.Get());
             FPoseContext Pose(&Proxy,true);FBlendedHeapCurve Curve;UE::Anim::FHeapAttributeContainer Attributes;
             FParallelEvaluationData Evaluation{Curve,Pose.Pose,Attributes};Instance->PreEvaluateAnimation();Instance->ParallelEvaluateAnimation(false,Mesh,Evaluation);
@@ -210,7 +244,7 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             {
                 Row->SetNumberField(TEXT("current"),Machine->GetCurrentState());Row->SetNumberField(TEXT("elapsed"),Machine->GetCurrentStateElapsedTime());
                 TArray<TSharedPtr<FJsonValue>> Weights,Edges,Updates,Notifies,Players;
-                for(int32 State=0;State<3;++State)Weights.Add(MakeShared<FJsonValueNumber>(Machine->GetStateWeight(State)));
+                for(int32 State=0;State<(Direction?6:3);++State)Weights.Add(MakeShared<FJsonValueNumber>(Machine->GetStateWeight(State)));
                 for(int32 State:FWeaponMachineTraceAccess::Updates(*Machine))Updates.Add(MakeShared<FJsonValueNumber>(State));
                 for(const auto& Edge:FWeaponMachineTraceAccess::Edges(*Machine))
                 {
@@ -235,7 +269,7 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
         Trace->SetArrayField(TEXT("frames"),Frames);Traces.Add(MakeShared<FJsonValueObject>(Trace));
     }
     const auto Result=MakeShared<FJsonObject>();Result->SetNumberField(TEXT("schemaVersion"),1);Result->SetStringField(TEXT("source"),Blueprint->GetPathName());
-    if(Weapon)
+    if(MachineTrace)
     {
         TArray<TSharedPtr<FJsonValue>> Notifies;int32 Index=0;
         for(const auto& Notify:Generated->GetAnimNotifies())

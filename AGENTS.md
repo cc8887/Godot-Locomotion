@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新方向原生连续：`docs/verification/2026-09-25-refactored-direction-native.md`。临时Root公开SetLinkNode→原Movement子图，双stance×3Hz2814帧，每场景全24edge/6state；1618多stack/85Pivot通知，状态/边/update/notify一致，time/alpha/weight差0、预算2e-6不变。初1734只14edge已补覆盖；新6/Import47/Optimize0/0。首次private RootNode编译失败修公开链接；完整UE4actions审计2ABF6BC7...，最终冷/普通11700均0两产物字节同7C40C5ED.../2F91F1F5...；Default重导B385B2不变，DV0/3旧warn，普通两旧Condition五warn保留。输出pose保留未比较，无实际Parent通知消费/完整stance/普通Demo/Godot/全量/性能。下一步state/cache/pose与Parent→其余stance和统一宿主，全部旧缺口/用户改动/暂缓项保留。
+
 - 最新方向连续更新：`docs/verification/2026-09-25-refactored-direction-runtime.md`。共享Grounded引擎新增独立两Refactored方向规则域，不改V4严格条件；原出口/三步/初帧skip/stack/通知，上一轮recorded state weight门槛，Import候选owner与79骨有序贡献。新10/Import75/Core38/Optimize0/0；六频率场景1260提交帧逐帧cancel重试和独立实例一致，597240骨状态贡献归一预算2e-6，换髋满权重后下一更新才解锁。无新失败/UE连续oracle/场景/全量/性能；通知仅候选，未Parent消费或pose。下一步原生连续方向对照→state/cache/pose/Parent与其余stance机器和统一宿主，普通Demo未切，全部旧缺口/用户改动/暂缓项保留。
 
 - 最新方向状态资源：`docs/verification/2026-09-25-refactored-direction-resources.md`。导出六stance机器33state/87edge；编译两Movement各6state/24edge/8共享规则，原方向/曲线/来源权重门槛、SharedRulesGuid与出口顺序。Standing六.5/Cubic+ActivatePivot、七.75/QuadraticInOut、其余.7/Cubic，Crouch全.7/Cubic；18entry MoveDirectionChange原生33组权重预算2e-6。新7/相关22/CoreStack15/Optimize0/0，初重复端点/notify/duration/blend假设失败已修留档。完整UE0actions审计68FD4C51...冷/普通39656均0且字节同0CAFF6EC...；普通两旧Condition五warn保留，无插件修改/DV/Godot场景/全量/性能。尚无连续方向机器oracle/运行时/通知消费，下一步这些→其余stance机器/cache/pose/Parent与统一宿主；普通Demo未切，全部旧缺口/用户改动/暂缓项保留。
