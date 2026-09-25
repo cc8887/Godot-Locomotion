@@ -16,6 +16,10 @@ class ALSGODOTEXPORTER_API UAlsAnimationGraphLibrary final : public UBlueprintFu
 {
     GENERATED_BODY()
 public:
+    /** Original Rest Parent refresh and deferred requests, with real worker execution. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportRestParentTrace(const FString& RequestPath, const FString& OutputPath);
+
     /** Actual original Parent refresh functions on transient game-world instances. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportMovementParentTrace(const FString& RequestPath, const FString& OutputPath);
