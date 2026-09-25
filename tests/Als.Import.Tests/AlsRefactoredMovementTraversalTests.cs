@@ -31,6 +31,43 @@ public sealed class AlsRefactoredMovementTraversalTests
     private static readonly Lazy<Fixture> Data = new(() => new());
 
     [Fact]
+    public void RefreshedParentDrivesDirectionSourcesAndMovementPose()
+    {
+        var f = Data.Value; var parent = new AlsRefactoredMovementParentRuntime(f.Details.Callbacks,
+            new(MantlingHostFixture.Read("refactored_movement_settings"), f.Catalog));
+        var machine = new AlsRefactoredMovementDetailsRuntime(f.Details.Resources);
+        var details = new AlsRefactoredMovementDetailsSourceRuntime(f.Details, 0); var players = f.Players();
+        var graph = new AlsRefactoredMovementTraversal(f.Catalog, f.Details, f.Direction, 0);
+        var movement = new AlsRefactoredMovementCacheRuntime(f.Movement, f.DirectionPose.BoneNames, f.DirectionPose.CurveNames);
+        var direction = f.DirectionPose.CreateSampler(); var pose = new AlsPrecisePose[79]; var curves = new AlsInertialCurve[f.DirectionPose.CurveNames.Length];
+        var callbacks = f.Details.Callbacks.Nodes.ToArray().GroupBy(c => c.Function).ToDictionary(g => g.Key, g => g.First());
+        var init = new AlsGraphTraversalCounter(0, 0); var counter = init; var rates = new HashSet<float>(); var hips = new HashSet<AlsRefactoredHipsDirection>();
+        for (var frame = 0; frame < 90; frame++)
+        {
+            var input = new AlsRefactoredMovementInput(new(170, frame % 30 < 15 ? 130 : -130, 0), new(300, 100, 0), AlsQuaternion.Identity,
+                150 + frame, 1, frame % 30 < 15 ? 90 : -90, 0, 1000, 800, "Als.Gait.Running", false, frame == 0, 1f / 60, 1, 0, 0, .2f);
+            var context = new AlsPoseUpdateContext(new(frame, 7, 1), 1, input.Delta).WithUpdateCounter(counter);
+            parent.Prepare(context.Identity, input); parent.RefreshGrounded(frame);
+            parent.Apply(context.Identity, f.Catalog.IndexDigest, callbacks[AlsRefactoredStanceFunction.RefreshGroundedMovement]);
+            parent.Apply(context.Identity, f.Catalog.IndexDigest, callbacks[AlsRefactoredStanceFunction.RefreshStandingMovement]);
+            var state = parent.MovementCandidate; rates.Add(state.StandingRate);
+            machine.Prepare(frame, new(input.Gait, 1, input.RunningAmount, 1, parent.Candidate.PivotActive), details.CommittedObservations, input.Delta, updateCounter: counter);
+            details.Prepare(machine, context, state.VelocityBlend, parent: parent);
+            graph.Prepare(frame, machine, details, init, parent.DirectionInput(1), parent.PlayerInput(), parent.ForwardInput(), yaw: state.YawOffsets, parent: parent);
+            Assert.Equal(state.YawOffsets, graph.Sources.RotationYawOffsets); hips.Add(parent.Candidate.HipsDirection);
+            players.Prepare(frame, graph.SourceInputs, input.Delta); details.CaptureSourceTimes(frame, players);
+            direction.Sample(frame, graph.Direction, graph.Sources, players, pose, curves);
+            movement.Prepare(frame, input.RunningAmount, state.Lean, input.Delta, graph.InitializeMovement);
+            movement.Evaluate(frame, pose, curves); Assert.Equal(79, movement.Pose.Length);
+            Assert.All(movement.Pose.ToArray(), p => Assert.True(p.Position.IsFinite && double.IsFinite(p.Rotation.LengthSquared)));
+            parent.ValidateCommit(frame); machine.ValidateCommit(frame); details.ValidateCommit(frame); graph.ValidateCommit(frame); players.ValidateCommit(frame); movement.ValidateCommit(frame);
+            parent.Commit(frame); machine.Commit(frame); details.Commit(frame); graph.Commit(frame); players.Commit(frame); movement.Commit(frame);
+            counter = counter.Next((ulong)frame + 1);
+        }
+        Assert.True(rates.Count > 60); Assert.True(hips.Count > 1);
+    }
+
+    [Fact]
     public void ParentLatchesPreserveNativeEnumThresholdAndTransactionBoundaries()
     {
         var f = Data.Value; var callbacks = f.Details.Callbacks;

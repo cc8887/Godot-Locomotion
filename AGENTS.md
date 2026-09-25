@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Parent移动刷新：`docs/verification/2026-09-25-refactored-movement-refresh.md`。原Grounded/VelocityBlend/Lean、GroundedMovement方向/yaw/HipsLock、Standing初始化/stride/rate/Sprint.5、Crouching刷新接候选Parent与双stance原回调；输出接现有Direction/players/Lean。新UE实际函数3Hz1050帧23字段max1.192093e-7预算2e-6、每帧Cancel重试；90帧Parent→Direction/Lean79骨集成。Core11/Import31/Optimize0/0，初Core代数.5误断言修为原float前驱、失败保留，native无失败。UE完整10actions含NetCore/auditFA68F487.../BuildId f7c75dee...，冷/普通PID24956实际0重导同A0E5AB7A...，DV0/3旧warn，普通旧Condition保留。尚无整图UE pose/Godot/全量/性能；下一步外层Standing65/cache66自动回调→Details/119完整native，Lean update-only/Notify/统一宿主/普通Demo/Ragdoll等旧缺口、用户修改/暂缓项保留。
+
 - 最新移动设置：`docs/verification/2026-09-25-refactored-movement-settings.md`。原Parent CDO绑定General/Grounded/Standing/Crouching全精度反射与7引用/5去重RichCurve，独立catalog绑定资源；Import原属性引用交叉/共享身份、constant与原CycleWithOffset采样。新增13/最终33过，1238 native采样max1.192093e-7预算2e-6，Optimize0/0；初采样输入除200与UE倒数乘法差异已修、失败保留。UE完整6actions/4插件audit fingerprint0C07299B...、BuildId c5f9ab63...；冷/普通PID42244实际0重导字节同1F4A2B9A...，DV0/3旧warn，普通旧Condition/警告保留。无Godot/全量/打包；仍是资源非Parent刷新，下一步原Grounded/Standing/Crouching、VelocityBlend/Lean刷新+native整链，外层/统一宿主/普通Demo/Ragdoll等旧缺口、用户修改/暂缓项保留。
 
 - 最新Movement Parent回调：`docs/verification/2026-09-25-refactored-movement-parent.md`。Details/Direction原relevant位置在子源前执行ResetPivot/SetHipsDirection，候选Parent共用、完整原表/角色/frame/catalog校验，Hips原枚举序，ActivatePivot严格未缩放speed<threshold。新增4/目标9/相关15过，3Hz840提交帧每帧Cancel重试，一次激活仅FirstPivot并由真实源clock退出；旧方向native6回归通过，Optimize0/0，无失败/新UE/Godot/全量。仍仅两个Parent字段，Notify激活/完整Grounded与Standing刷新待全精度设置曲线导出和新整链oracle；外层65/66/统一宿主/普通Demo切换/Ragdoll等旧缺口、用户修改及暂缓项保留。
