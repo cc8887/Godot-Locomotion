@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$UProject,
 
-    [string]$ReferenceRoot = '../GodotALS-References\ALS-Refactored',
+    [string]$ReferenceRoot = $env:ALS_REFERENCE_ROOT,
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
     [switch]$ReadyCheck
 )
@@ -1244,6 +1244,11 @@ function Publish-P3GeneratedOutputSet(
 
 if ($MyInvocation.InvocationName -ceq '.') { return }
 
+if ([string]::IsNullOrWhiteSpace($ReferenceRoot))
+{
+    throw 'ALS_REFERENCE_ROOT is not set. Copy .env.local.ps1.example to .env.local.ps1, configure it, and dot-source it.'
+}
+
 try
 {
     $resolvedProjectRoot = Get-FullPath (Resolve-Path -LiteralPath $ProjectRoot).Path
@@ -1251,7 +1256,11 @@ try
     $resolvedEditor = (Resolve-Path -LiteralPath $UnrealEditorCmd).Path
     $resolvedProject = (Resolve-Path -LiteralPath $UProject).Path
     $projectFileHashAtStart = (Get-FileHash -LiteralPath $resolvedProject -Algorithm SHA256).Hash
-    $expectedProject = Get-FullPath '../AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+    if ([string]::IsNullOrWhiteSpace($env:ALS_UE_PROJECT_FILE))
+    {
+        throw 'ALS_UE_PROJECT_FILE is not set. Load the configured .env.local.ps1 before generating P3 traces.'
+    }
+    $expectedProject = Get-FullPath $env:ALS_UE_PROJECT_FILE
     if (-not [System.StringComparer]::OrdinalIgnoreCase.Equals((Get-FullPath $resolvedProject), $expectedProject))
     {
         throw "Unexpected UE project file: $resolvedProject; expected $expectedProject"

@@ -1,6 +1,6 @@
 # 第七批：Stop Plant 姿势组件
 
-日期：2026-09-10。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 范围：完整性补完 A 的固定落脚采样与姿势运算。**尚未接入可玩 Demo 的外层 Stop 状态机**。
 
 ## 实现

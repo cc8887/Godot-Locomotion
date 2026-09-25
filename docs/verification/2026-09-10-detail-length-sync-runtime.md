@@ -1,6 +1,6 @@
 # 第十二批：Detail 非循环同步
 
-日期：2026-09-10。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 归属：完整性补完 A 的 Detail 源时间，以及原 P5A 的 Sync 接线前置。
 这是已有规划内的继续实施，不是新增一套独立生产动画系统。
 

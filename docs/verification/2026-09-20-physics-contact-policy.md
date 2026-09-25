@@ -1,6 +1,6 @@
 # 物理接触后端与普通运行回归
 
-本批在主目录 `.` / `main` 基于 `cd3053e` 推进。
+本批在主目录 `${env:GODOT_ALS_ROOT}` / `main` 基于 `cd3053e` 推进。
 上批独立刚体在 GodotPhysics 的低 Hz 落地失败，现改用项目级 Jolt Physics，
 并设置 `physics/jolt_physics_3d/simulation/penetration_slop=0.002`。
 没有改变原始资产、碰撞几何、质量、惯量、阻尼或材质系数。

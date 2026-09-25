@@ -1,6 +1,6 @@
 # Main/BaseLayer 共享缓存更新验证
 
-日期：2026-09-11。第五十六批，工作区 `../GodotALS-p5a-events-actions`。
+日期：2026-09-11。第五十六批，工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 未提交、回滚或合并；保留既有未提交修改。未改 UE 插件、资产和已确认键鼠输入。
 
 ## 完整性修复位置

@@ -1,6 +1,6 @@
 # 第六批：Cycle 局部姿势合成
 
-日期：2026-09-10。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 本批有实际 Demo 接入，不只是标量权重或源数据合同；完整目标仍未完成。
 
 ## 源证据

@@ -1,6 +1,6 @@
 # Standing Turn Slot 实际位置修正
 
-日期：2026-09-11。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-11。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 完整性修复第四十二批。未完成完整 Main/Slot，也未关闭基础移动视觉验收。
 
 ## 源图差异与本批实现

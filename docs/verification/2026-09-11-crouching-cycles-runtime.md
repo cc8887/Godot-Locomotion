@@ -1,6 +1,6 @@
 # 完整蹲姿 Cycles 运行图
 
-日期：2026-09-11。第五十二批。工作区 `../GodotALS-p5a-events-actions`。
+日期：2026-09-11。第五十二批。工作区 `ARCHIVED_P5A_WORKTREE_PATH`。
 
 ## 本批完成
 
@@ -52,7 +52,7 @@ LinkedInputPose 的 Initialize/CacheBones 回调不转发至外部动画；外�
 
 ## 本机源码依据
 
-UE 根目录：`../UnrealEngine`，`Engine/Source/Runtime/` 下：
+UE 根目录：`${env:UE_ENGINE_ROOT}`，`Engine/Source/Runtime/` 下：
 
 - `Engine/Private/Animation/AnimNode_LinkedInputPose.cpp`：明确不转发 Initialize
   和 CacheBones；由拥有它的 LinkedAnimGraph 遍历所有外部输入。

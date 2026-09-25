@@ -1,6 +1,6 @@
 # 生产动画的主线程所有权与永久退役
 
-本批继续在 `.` / `main` 实现 P5A 生命周期，完成**永久销毁和角色
+本批继续在 `${env:GODOT_ALS_ROOT}` / `main` 实现 P5A 生命周期，完成**永久销毁和角色
 generation 退役**的动作/Notify State 清理。它不代表可恢复停用或 Worker 故障
 后的取消已完成，也没有新增 Roll 位移或改变原有移动/相机算法。
 
@@ -63,7 +63,7 @@ timeline 的整个 occurrence/epoch 元组匹配全部生产 Tick/End。新增�
 
 ```powershell
 dotnet build GodotALS.csproj -p:Optimize=true
-& '<Godot-4.7.2-console.exe>' --headless --path . res://scenes/tests/animation_retirement_smoke.tscn -- --retirement=dispose
+& '<Godot-4.7.2-console.exe>' --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/animation_retirement_smoke.tscn -- --retirement=dispose
 ```
 
 将 `dispose` 依次替换为 `generation`、`held`、`callback`、`generation-callback`。

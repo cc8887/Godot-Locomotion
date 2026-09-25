@@ -1,6 +1,6 @@
 # Montage Root Motion 来源与提取
 
-本批直接在 `.` / `main` 推进 P5C 的前置链路。原先共同 Montage
+本批直接在 `${env:GODOT_ALS_ROOT}` / `main` 推进 P5C 的前置链路。原先共同 Montage
 保留了 `RootMotionEnabled`，但没有读取根轨迹；现在从同一物理播放实例的
 推进区间提取位移和旋转，发布到正式 `AlsFrameResult`。没有新增项目副本。
 

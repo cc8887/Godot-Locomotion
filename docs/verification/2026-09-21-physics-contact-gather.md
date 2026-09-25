@@ -1,6 +1,6 @@
 # 接触几何 Gather 与初始重叠状态
 
-在 `.` / `main` 继续前批接触行，新增运行时代码 `AlsContactGather`。
+在 `${env:GODOT_ALS_ROOT}` / `main` 继续前批接触行，新增运行时代码 `AlsContactGather`。
 现在能够从原始 shape-local 接触点、局部法向、锚点、世界形状姿态、COM 和速度，
 直接生成接触求解输入；不需要加载原生已经 Gather 的接触臂、切线或恢复目标来运行。
 

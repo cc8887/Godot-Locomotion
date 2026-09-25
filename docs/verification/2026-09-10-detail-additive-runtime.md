@@ -1,6 +1,6 @@
 # 第九批：Detail 加法姿势与实际资源采样
 
-日期：2026-09-10。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 范围：完整性补完 A 的 Detail 求值组件。**尚未接入可玩 Demo 状态机和惯性化链**。
 
 ## 实现

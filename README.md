@@ -7,7 +7,7 @@
 locomotion、AimOffset、上半身分层、Turn/Rotate In Place、Foot IK、Foot Lock、
 pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 
-主目录统一为 `.`，后续在这里的 `main` 分支继续开发。
+仓库位置从本地环境配置中的 `GODOT_ALS_ROOT` 读取；后续在 `main` 分支继续开发。
 2026-09-20 已合入此前 P5A 工作目录的实现、数据和验证记录，并同步本地生成资产。
 普通入口默认启用完整分层、Aim、Refactored 脚部调度及最终接触策略，不再依赖一串诊断参数。
 这仍是开发中的 Demo：地形全程接触、起停滑步、换髋和上下身观感、P5A 收尾及后续玩法尚未全部验收。
@@ -37,13 +37,21 @@ Worker 在 Release 策略下完成回滚后，现可沿用原帧输入重试；�
 环境要求：Godot 4.7.2 .NET、.NET 8 SDK、PowerShell 7，以及仓库验证脚本
 使用的 Pester 模块（当前证书环境为 Pester 3.4.0）。
 
+本机路径配置使用 `.env.local.ps1`：`GODOT_ALS_ROOT` 自动取仓库位置，需填写
+`ALS_UE_PROJECT_ROOT`、`UE_ENGINE_ROOT`、`ALS_REFERENCE_ROOT` 和
+`GODOT_EXECUTABLE`。该文件已加入 `.gitignore`；提交前不要使用 `git add -f`
+强制跟踪它。
+
 在 Godot 中导入仓库根目录的 `project.godot` 后运行主场景，或从 PowerShell
 直接启动 Demo：
 
 ```powershell
-Set-Location .
+if (-not (Test-Path .env.local.ps1)) { Copy-Item .env.local.ps1.example .env.local.ps1 }
+# 编辑 .env.local.ps1，填写本机 UE、参考仓库和 Godot 可执行文件路径。
+. ./.env.local.ps1
+Set-Location $env:GODOT_ALS_ROOT
 dotnet build GodotALS.csproj -p:Optimize=true
-& '<Godot-4.7.2-console.exe>' --path .
+& $env:GODOT_EXECUTABLE --path $env:GODOT_ALS_ROOT
 ```
 
 Editor 使用 F5 运行项目；单独运行旧的 `p4_locomotion_demo.tscn` 是历史诊断入口。
@@ -99,7 +107,7 @@ Mannequin、Overlay 与道具模型。最初 P2 批次的审计为 0 error / 0 w
 当前普通入口的键鼠/完整姿势回归：
 
 ```powershell
-& '<Godot-4.7.2-console.exe>' --path . --rendering-method gl_compatibility `
+& $env:GODOT_EXECUTABLE --path $env:GODOT_ALS_ROOT --rendering-method gl_compatibility `
   res://scenes/tests/p4_keyboard_mouse_smoke.tscn
 ```
 
@@ -110,8 +118,8 @@ Mannequin、Overlay 与道具模型。最初 P2 批次的审计为 0 error / 0 w
 动作输入及角色重建回归：
 
 ```powershell
-& '<Godot-4.7.2-console.exe>' --headless --path . res://scenes/tests/action_input_smoke.tscn -- --hz=60
-& '<Godot-4.7.2-console.exe>' --headless --path . res://scenes/tests/action_lifecycle_smoke.tscn
+& $env:GODOT_EXECUTABLE --headless --path $env:GODOT_ALS_ROOT res://scenes/tests/action_input_smoke.tscn -- --hz=60
+& $env:GODOT_EXECUTABLE --headless --path $env:GODOT_ALS_ROOT res://scenes/tests/action_lifecycle_smoke.tscn
 ```
 
 前者通过实际 R/X 输入检查替换、取消、自然完成和通知反馈；后者检查角色重建、

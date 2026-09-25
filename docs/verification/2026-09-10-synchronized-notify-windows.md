@@ -1,6 +1,6 @@
 # 第十三批：同步后的通知提取窗口
 
-日期：2026-09-10。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 归属：原 P5A Sync / Notify 事务接线的时间语义补项。目标仍是完整移植，不是另建事件系统。
 
 ## 接线检查发现

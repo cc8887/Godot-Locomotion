@@ -1071,7 +1071,7 @@ Run:
 
 ```powershell
 dotnet build .\GodotALS.csproj --no-restore
-& 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path .
+& "${env:GODOT_EXECUTABLE}" --headless --path .
 ```
 
 Expected: 进程退出码为 0，输出包含 `GODOT_ALS_P0_OK frame=0 generation=1`。
@@ -1118,7 +1118,7 @@ exit 0
 Run:
 
 ```powershell
-.\scripts\verify-p0.ps1 -GodotExecutable 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+.\scripts\verify-p0.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}"
 ```
 
 Expected: restore、build、全部测试、Godot headless 均通过，脚本最终输出 `P0_VERIFICATION_OK`。
@@ -1157,7 +1157,7 @@ git commit -m "test: add Godot P0 verification gate"
 Run:
 
 ```powershell
-.\scripts\verify-p0.ps1 -GodotExecutable 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+.\scripts\verify-p0.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}"
 git diff --check
 git status --short
 ```

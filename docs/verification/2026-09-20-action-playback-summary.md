@@ -1,6 +1,6 @@
 # 共同 Montage 动作摘要接线
 
-工作目录为 `.` / `main`，延续 `729cd11`。未新建项目或 worktree，
+工作目录为 `${env:GODOT_ALS_ROOT}` / `main`，延续 `729cd11`。未新建项目或 worktree，
 未修改用户保留的 P4 规划文件、导出资产、冻结夹具及 schema。
 
 ## 本批实现

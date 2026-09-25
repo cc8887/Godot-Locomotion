@@ -1,6 +1,6 @@
 # 第八批：Locomotion Detail 源合同与规则选择
 
-日期：2026-09-10。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 范围：完整性补完 A。源数据和规则组件已实现，**可玩 Demo 尚未接入 Detail**。
 
 ## 原生依据

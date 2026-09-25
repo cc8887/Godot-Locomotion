@@ -115,6 +115,10 @@ size = Vector3(8, 112.90759, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wvhbo"]
 
+[sub_resource type="BoxMesh" id="BoxMesh_wvhbo"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ifow5"]
+
 [node name="P4LocomotionDemo" type="Node3D" unique_id=1810879079]
 script = ExtResource("1_demo")
 
@@ -255,6 +259,24 @@ mesh = SubResource("Mesh_floor")
 transform = Transform3D(200, 0, 0, 0, 200, 0, 0, 0, 50, 0, 0, 0.22809267)
 visibility_parent = NodePath("..")
 shape = SubResource("BoxShape3D_wvhbo")
+
+[node name="Climbable1M" type="StaticBody3D" parent="World" unique_id=1654069730]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -15.894897)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="World/Climbable1M" unique_id=791984525]
+mesh = SubResource("BoxMesh_wvhbo")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="World/Climbable1M" unique_id=6134611]
+shape = SubResource("BoxShape3D_ifow5")
+
+[node name="Climbable2M" type="StaticBody3D" parent="World" unique_id=1641497858]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0.5, -21.574)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="World/Climbable2M" unique_id=1513462438]
+mesh = SubResource("BoxMesh_wvhbo")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="World/Climbable2M" unique_id=1992373696]
+shape = SubResource("BoxShape3D_ifow5")
 
 [node name="SmokeStations" type="Node3D" parent="." unique_id=1381753419]
 

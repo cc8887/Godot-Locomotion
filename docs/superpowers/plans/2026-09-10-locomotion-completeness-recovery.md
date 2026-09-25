@@ -1,6 +1,6 @@
 # ALS 移植完整性补完与修复顺序
 
-日期：2026-09-10。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-10。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 基线：`d6b45e3` 加现有未提交的 CycleBlending 与上身修复。
 
 ## 最新执行状态（第二百零三批，2026-09-14）

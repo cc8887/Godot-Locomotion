@@ -1,10 +1,15 @@
 param(
-    [string]$ReferenceRoot = '../GodotALS-References\ALS-Refactored',
+    [string]$ReferenceRoot = $env:ALS_REFERENCE_ROOT,
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($ReferenceRoot))
+{
+    throw 'ALS_REFERENCE_ROOT is not set. Copy .env.local.ps1.example to .env.local.ps1, configure it, and dot-source it.'
+}
 
 $lockPath = Join-Path $ProjectRoot 'reference\als-refactored.lock.json'
 if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf))

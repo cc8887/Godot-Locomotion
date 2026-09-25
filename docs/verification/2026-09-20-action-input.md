@@ -1,6 +1,6 @@
 # 普通动作输入与主线程结果回传
 
-本批在 `.` / `main` 直接实现。按照 P5A 设计，普通 Demo 的 R 键触发
+本批在 `${env:GODOT_ALS_ROOT}` / `main` 直接实现。按照 P5A 设计，普通 Demo 的 R 键触发
 原生 Roll **原地动画预览**，X 取消已接受的动作；真实 Montage、Slot 姿势、通知、
 GroundedEntry 和退出路径沿用当前生产图。没有添加翻滚位移，也没有完成 Roll
 玩法门控、碰撞安全 Root Motion 或 Mantle。
@@ -66,14 +66,14 @@ State 在停用、销毁、故障/换代时生成主线程合成 End/Interrupted
 
 ```powershell
 dotnet build GodotALS.csproj -p:Optimize=true
-& '<Godot-4.7.2-console.exe>' --headless --path . res://scenes/tests/action_input_smoke.tscn -- --hz=60
-& '<Godot-4.7.2-console.exe>' --headless --path . res://scenes/tests/action_lifecycle_smoke.tscn
+& '<Godot-4.7.2-console.exe>' --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/action_input_smoke.tscn -- --hz=60
+& '<Godot-4.7.2-console.exe>' --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/action_lifecycle_smoke.tscn
 ```
 
 运行十角色动作调度专项（另运行一次追加 `--parallel` 比较摘要）：
 
 ```powershell
-& '<Godot-4.7.2-console.exe>' --headless --path . res://scenes/tests/refactored_foot_dispatch_smoke.tscn -- `
+& '<Godot-4.7.2-console.exe>' --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/refactored_foot_dispatch_smoke.tscn -- `
   --hz=60 --characters=10 --action-requests --layered-frame --foot-ik-frame --based-foot-lock `
   --refactored-pose-curves --refactored-movement-curves --refactored-foot-frame `
   --foot-lock-gravity-twist --foot-lock-final-contact --foot-ground-clearance `

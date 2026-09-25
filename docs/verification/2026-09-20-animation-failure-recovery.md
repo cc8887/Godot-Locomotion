@@ -1,6 +1,6 @@
 # 完整动画链路的故障恢复取消
 
-本批直接在 `.` 的 `main` 实现，没有创建项目副本或 worktree。
+本批直接在 `${env:GODOT_ALS_ROOT}` 的 `main` 实现，没有创建项目副本或 worktree。
 用户未提交的 `2026-08-28-p4-aim-layering-foot-placement.md` 保持原样。
 
 ## 完成的行为
@@ -65,7 +65,7 @@ Debug/headless 的严格失败策略不变，第一次故障即退出。专项�
 
 ```powershell
 dotnet build GodotALS.csproj -p:Optimize=true
-& '<Godot-4.7.2-console.exe>' --headless --path . res://scenes/tests/animation_failure_recovery_smoke.tscn -- --single
+& '<Godot-4.7.2-console.exe>' --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/animation_failure_recovery_smoke.tscn -- --single
 ```
 
 去掉 `--single` 使用 Parallel；加 `--replacement` 在故障帧带入新 Start；

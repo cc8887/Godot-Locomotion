@@ -1,7 +1,7 @@
 # 蹲姿正式来源与共享播放链补完
 
 日期：2026-09-11；完整性修复计划第四十五批。
-工作区：`../GodotALS-p5a-events-actions`，分支 `feature/p5a-events-actions`。
+工作区：`ARCHIVED_P5A_WORKTREE_PATH`，分支 `feature/p5a-events-actions`。
 保留用户已有修改，未执行 commit、revert 或合并。
 
 ## 已完成与未完成

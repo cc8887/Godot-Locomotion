@@ -1,6 +1,6 @@
 # Standing/Stop 生产接线与脚部姿势历史
 
-日期：2026-09-11。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-11。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 本批为完整性修复第四十批，不是完整 ALS 或基础移动视觉验收。
 
 ## 实际改动

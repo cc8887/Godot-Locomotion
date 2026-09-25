@@ -1,6 +1,6 @@
 # 方向状态事件与 Pivot 生产反馈
 
-日期：2026-09-11。工作区：`../GodotALS-p5a-events-actions`。
+日期：2026-09-11。工作区：`ARCHIVED_P5A_WORKTREE_PATH`。
 完整性修复第四十一批。基础移动视觉、完整 P5A 和最终 ALS 验收保持未完成。
 
 ## 实际改动

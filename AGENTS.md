@@ -2,9 +2,9 @@
 
 - 当前统一实施路线为 `ROADMAP.md`；历史目录归并和清理结果见 `docs/verification/2026-09-25-main-directory-audit.md`。2026-09-25 已按用户要求删除三个已合入的旧 worktree；ignored 资料经逐文件 SHA256 校验归档到 `artifacts/history/worktrees/2026-09-25/`，勿用旧生成资源覆盖当前资产。
 
-- Godot 项目的主目录是 `.`，主分支是 `main`。
+- Godot 项目的主目录是 `${env:GODOT_ALS_ROOT}`，主分支是 `main`。
 - 按用户要求，日常修复和后续实现直接在此目录推进；不要为每次修改创建新的项目副本或 worktree。
-- `../GodotALS-p3-direction-alignment`、`../GodotALS-p4-pose-foot-placement`、`../GodotALS-p5a-events-actions` 已归档并移除；旧文档中的路径是历史证据位置，需从上述归档查找，不能继续在旧目录实现。
+- `ARCHIVED_P3_WORKTREE_PATH`、`ARCHIVED_P4_WORKTREE_PATH`、`ARCHIVED_P5A_WORKTREE_PATH` 已归档并移除；旧文档中的路径是历史证据位置，需从上述归档查找，不能继续在旧目录实现。
 - 提交时只纳入本次工作，保留用户未提交的修改。当前本地资产在 `assets/generated/als_v4`，被 Git 忽略，不能把仅有代码的检出当成可运行交付。
 - 导出 JSON 之间有文件字节级哈希依赖，遵循 `.gitattributes`，不要统一格式化这些资产。
 

@@ -32,7 +32,7 @@
 在每个新的 PowerShell 会话先定义：
 
 ```powershell
-$godotExe = 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+$godotExe = "${env:GODOT_EXECUTABLE}"
 ```
 
 ### Task 0: Restore the Complete Generated Asset Batch
@@ -52,8 +52,8 @@ Run:
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-p2a.ps1 `
-  -EngineRoot '../UnrealEngine' `
-  -UnrealProject '../AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
+  -EngineRoot "${env:UE_ENGINE_ROOT}" `
+  -UnrealProject "${env:ALS_UE_PROJECT_FILE}"
 ```
 
 Expected: `GODOT_ALS_P2A_FULL_EXPORT_OK files=141`, deterministic export comparison success, and
@@ -214,7 +214,7 @@ The smoke loads the compiled P2 set and P3 profile, builds the library, then req
 GODOT_ALS_P3B_LIBRARY_OK bones=68 clips=<profile clip count> skeletons=1
 ```
 
-Run: `& $godotExe --headless --path . res://scenes/tests/p3b_animation_library_smoke.tscn`
+Run: `& $godotExe --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/p3b_animation_library_smoke.tscn`
 
 Expected: nonzero exit because builder is missing.
 
@@ -228,7 +228,7 @@ The builder instantiates the Mannequin once, loads each `ResourcePath` by intege
 
 - [ ] **Step 4: Run the smoke and P2B regression**
 
-Run: `& $godotExe --headless --path . res://scenes/tests/p3b_animation_library_smoke.tscn`
+Run: `& $godotExe --headless --path ${env:GODOT_ALS_ROOT} res://scenes/tests/p3b_animation_library_smoke.tscn`
 
 Run: `pwsh -NoProfile -File scripts/verify-p2b.ps1 -GodotExecutable $godotExe`
 
@@ -361,7 +361,7 @@ Run `verify-p0.ps1` immediately after the change and require `P0_VERIFICATION_OK
 
 - [ ] **Step 4: Run a 300-frame headless demo smoke**
 
-Run: `& $godotExe --headless --path . res://scenes/demo/p3_locomotion_demo.tscn -- --als-smoke-frames=300`
+Run: `& $godotExe --headless --path ${env:GODOT_ALS_ROOT} res://scenes/demo/p3_locomotion_demo.tscn -- --als-smoke-frames=300`
 
 Expected: `GODOT_ALS_P3_DEMO_OK frames=300 errors=0` and exit `0`.
 
@@ -435,7 +435,7 @@ Expected: `P3B_VERIFICATION_OK`, `P3A_VERIFICATION_OK`, `P2B_VERIFICATION_OK`, `
 
 - [ ] **Step 4: Launch the interactive demo for manual acceptance**
 
-Run: `& $godotExe --path . --editor res://scenes/demo/p3_locomotion_demo.tscn`
+Run: `& $godotExe --path ${env:GODOT_ALS_ROOT} --editor res://scenes/demo/p3_locomotion_demo.tscn`
 
 Verify WASD, Alt, Shift, Ctrl, Space, V, RMB, mouse orbit and Esc; inspect Stand/Crouch/Walk/Run/Sprint/Jump/Fall/Land on the real Mannequin. This manual check supplements but does not replace Step 3.
 

@@ -65,10 +65,10 @@
 每个新 PowerShell 会话先定义：
 
 ```powershell
-$godotExe = 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
-$unrealEditorCmd = '../UnrealEngine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$uProject = '../AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
-$referenceRoot = '../GodotALS-References\ALS-Refactored'
+$godotExe = "${env:GODOT_EXECUTABLE}"
+$unrealEditorCmd = "${env:UE_ENGINE_ROOT}\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+$uProject = "${env:ALS_UE_PROJECT_FILE}"
+$referenceRoot = "${env:ALS_REFERENCE_ROOT}"
 ```
 
 ### Task 0: Create the Isolated P4 Worktree
@@ -83,9 +83,9 @@ Invoke `superpowers:using-git-worktrees`, verify `main` is clean and create a si
 Run:
 
 ```powershell
-git -C . status --short
-git -C . worktree add ../GodotALS-p4-pose-foot-placement -b feature/p4-pose-foot-placement 1d941ee0611ca2f6af710deab7a6d63f07e2105c
-git -C ../GodotALS-p4-pose-foot-placement rev-parse HEAD
+git -C ${env:GODOT_ALS_ROOT} status --short
+git -C ${env:GODOT_ALS_ROOT} worktree add ARCHIVED_P4_WORKTREE_PATH -b feature/p4-pose-foot-placement 1d941ee0611ca2f6af710deab7a6d63f07e2105c
+git -C ARCHIVED_P4_WORKTREE_PATH rev-parse HEAD
 ```
 
 Expected: empty status and exact base SHA `1d941ee0611ca2f6af710deab7a6d63f07e2105c`.
@@ -95,7 +95,7 @@ Expected: empty status and exact base SHA `1d941ee0611ca2f6af710deab7a6d63f07e21
 Run:
 
 ```powershell
-pwsh -NoProfile -File ../GodotALS-p4-pose-foot-placement\scripts\verify-p3b.ps1 -GodotExecutable $godotExe
+pwsh -NoProfile -File ARCHIVED_P4_WORKTREE_PATH\scripts\verify-p3b.ps1 -GodotExecutable $godotExe
 ```
 
 Expected: exit `0`, `P3B_VERIFICATION_OK`, no `SCRIPT ERROR:` and no `ERROR:`. This preflight creates no commit.
@@ -173,7 +173,7 @@ Run:
 
 ```powershell
 dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj --filter "FullyQualifiedName~AlsManifestSerializerTests|FullyQualifiedName~AlsManifestValidatorTests"
-pwsh -NoProfile -File scripts/build-als-exporter.ps1 -EngineRoot ../UnrealEngine -UnrealProject $uProject
+pwsh -NoProfile -File scripts/build-als-exporter.ps1 -EngineRoot ${env:UE_ENGINE_ROOT} -UnrealProject $uProject
 ```
 
 Expected: tests PASS and plugin build exit `0`.
@@ -222,7 +222,7 @@ Run:
 
 ```powershell
 dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj --filter FullyQualifiedName~AlsRotationYawCurveTests
-pwsh -NoProfile -File scripts/verify-p2a.ps1 -EngineRoot ../UnrealEngine -UnrealProject $uProject
+pwsh -NoProfile -File scripts/verify-p2a.ps1 -EngineRoot ${env:UE_ENGINE_ROOT} -UnrealProject $uProject
 ```
 
 Expected: unit tests PASS, two complete exports compare byte/hash equal, and `P2A_VERIFICATION_OK`.
@@ -378,7 +378,7 @@ The generator writes the profile to a same-directory temporary file, flushes, at
 Run:
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-p2a.ps1 -EngineRoot ../UnrealEngine -UnrealProject $uProject -UpdateAssetLock
+pwsh -NoProfile -File scripts/verify-p2a.ps1 -EngineRoot ${env:UE_ENGINE_ROOT} -UnrealProject $uProject -UpdateAssetLock
 pwsh -NoProfile -File scripts/generate-p4-profile.ps1
 Invoke-Pester tests/GenerateP4Profile.Tests.ps1 -Output Detailed
 dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj
@@ -590,7 +590,7 @@ The smoke compiles the real P4 profile, samples Constant/Linear/Cubic keys at bo
 
 - [ ] **Step 2: Run and verify missing graph nodes fail**
 
-Run: `& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_graph_smoke.tscn`
+Run: `& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_graph_smoke.tscn`
 
 Expected: nonzero exit or missing sentinel because the sampler/P4 nodes are absent.
 
@@ -603,8 +603,8 @@ Expected: nonzero exit or missing sentinel because the sampler/P4 nodes are abse
 Run:
 
 ```powershell
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_graph_smoke.tscn
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_graph_smoke.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_graph_smoke.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_graph_smoke.tscn
 ```
 
 Expected twice: `P4_ANIMATION_GRAPH_OK frames=240 advances=240`, identical digest, no engine/script error.
@@ -631,7 +631,7 @@ For center/up/down/left/right, assert five distinct stable pose digests. Assert 
 
 - [ ] **Step 2: Run and verify unchanged Skeleton fails**
 
-Run: `& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_pose_smoke.tscn`
+Run: `& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_pose_smoke.tscn`
 
 Expected: missing sentinel because P4 modifier is absent.
 
@@ -654,11 +654,14 @@ Run:
 
 ```powershell
 dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj --filter "FullyQualifiedName~AlsViewPoseModelTests|FullyQualifiedName~AlsTurnRotateModelTests"
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_graph_smoke.tscn
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_pose_smoke.tscn
+pwsh -NoProfile -File scripts/verify-p4-pose.ps1 `
+  -GodotExecutable $godotExe `
+  -ProjectRoot ARCHIVED_P4_WORKTREE_PATH
 ```
 
-Expected: Core tests PASS; graph sentinel present; pose smoke prints `P4_POSE_OK` with nonzero Aim/Turn/Rotate digests and rollback count `1`.
+Expected: Core tests PASS; the verifier restores both tiering environment variables in `finally`, runs the optimized build, rejects engine/script errors, validates the graph and pose sentinels, requires zero/active allocation evidence to be `0 B`, and prints `P4_POSE_VERIFICATION_OK graph=1 pose=1 zero_alloc=0B active_alloc=0B`.
+
+Task 9 controlled evidence measured active Aim at approximately `0.58-0.64 ms` per character (`47/68` affected bones, `0 B`). Ten characters remain above the final Worker budget; Task 16 must profile and resolve this risk without reducing ALS feature quality.
 
 - [ ] **Step 5: Commit P4-Pose**
 
@@ -732,7 +735,7 @@ Use a fixed foot probe at Worker frame N, cache it at Commit N, move and rotate 
 
 - [ ] **Step 2: Run and verify zero foot hits fail**
 
-Run: `& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_foot_gather_smoke.tscn`
+Run: `& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_foot_gather_smoke.tscn`
 
 Expected: missing sentinel because `AlsCharacterMotor` currently publishes zero `FootHits`.
 
@@ -745,8 +748,8 @@ Preallocate two probe requests per slot. Commit validates identity/frame/generat
 Run:
 
 ```powershell
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_foot_gather_smoke.tscn
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p3b_frame_order_smoke.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_foot_gather_smoke.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p3b_frame_order_smoke.tscn
 ```
 
 Expected: `P4_FOOT_GATHER_OK latency=1` and existing P3 frame-order sentinel; no stale/missing/generation errors.
@@ -773,7 +776,7 @@ Build flat, continuous slope, uneven stairs, translating platform and rotating p
 
 - [ ] **Step 2: Run and verify feet remain uncorrected**
 
-Run: `& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_foot_placement_smoke.tscn`
+Run: `& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_foot_placement_smoke.tscn`
 
 Expected: missing sentinel because pelvis/feet are not yet applied.
 
@@ -787,8 +790,8 @@ Run:
 
 ```powershell
 dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj --filter FullyQualifiedName~AlsFootPlacementModelTests
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_foot_gather_smoke.tscn
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_foot_placement_smoke.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_foot_gather_smoke.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_foot_placement_smoke.tscn
 ```
 
 Expected: tests PASS; smoke prints `P4_FOOT_PLACEMENT_OK` with flat/slope/stairs/translate/rotate cases and rollback count `2`.
@@ -816,7 +819,7 @@ Verify Worker order is P3 -> View/Aim/Turn/Rotate -> Feet -> one Advance -> one 
 
 - [ ] **Step 2: Run and verify partial P4 lifecycle fails**
 
-Run: `& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_lifecycle_smoke.tscn`
+Run: `& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_lifecycle_smoke.tscn`
 
 Expected: missing sentinel because P4 generation/recovery rules are not integrated end to end.
 
@@ -829,7 +832,7 @@ Capture pose/root before any P4 visual mutation. Only publish the new `AlsFrameR
 Run:
 
 ```powershell
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_lifecycle_smoke.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_lifecycle_smoke.tscn
 pwsh -NoProfile -File scripts/verify-p3b.ps1 -GodotExecutable $godotExe -SkipRegression
 ```
 
@@ -908,7 +911,7 @@ Require 120 warmup and 600 measured frames, character 0 replacement after warmup
 
 - [ ] **Step 2: Run and verify harness sentinel is absent**
 
-Run: `& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_harness.tscn -- --mode=single --characters=1 --warmup=120 --frames=600`
+Run: `& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_harness.tscn -- --mode=single --characters=1 --warmup=120 --frames=600`
 
 Expected: missing sentinel because P4 harness is absent.
 
@@ -921,10 +924,10 @@ Reuse `AlsP3Character`, Worker and Commit; do not add a reduced feature path. Fe
 Run:
 
 ```powershell
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_harness.tscn -- --mode=single --characters=1 --warmup=120 --frames=600
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_harness.tscn -- --mode=parallel --characters=1 --warmup=120 --frames=600
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_harness.tscn -- --mode=single --characters=10 --warmup=120 --frames=600
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_animation_harness.tscn -- --mode=parallel --characters=10 --warmup=120 --frames=600
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_harness.tscn -- --mode=single --characters=1 --warmup=120 --frames=600
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_harness.tscn -- --mode=parallel --characters=1 --warmup=120 --frames=600
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_harness.tscn -- --mode=single --characters=10 --warmup=120 --frames=600
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_animation_harness.tscn -- --mode=parallel --characters=10 --warmup=120 --frames=600
 ```
 
 Expected: each prints `P4_MATRIX_OK`; paired digests match; allocations/errors are `0`; timing thresholds pass.
@@ -952,7 +955,7 @@ Assert one visible production rig, current P3 WASD/mouse alignment unchanged, RM
 
 - [ ] **Step 2: Run and verify the P4 scene is absent**
 
-Run: `& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_demo_smoke.tscn -- --als-smoke-frames=300`
+Run: `& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_demo_smoke.tscn -- --als-smoke-frames=300`
 
 Expected: missing scene or missing sentinel.
 
@@ -965,8 +968,8 @@ Copy the P3 production character/camera/input semantics into the P4 scene, add a
 Run:
 
 ```powershell
-& $godotExe --headless --path ../GodotALS-p4-pose-foot-placement res://scenes/tests/p4_demo_smoke.tscn -- --als-smoke-frames=300
-& $godotExe --path ../GodotALS-p4-pose-foot-placement --editor res://scenes/demo/p4_locomotion_demo.tscn
+& $godotExe --headless --path ARCHIVED_P4_WORKTREE_PATH res://scenes/tests/p4_demo_smoke.tscn -- --als-smoke-frames=300
+& $godotExe --path ARCHIVED_P4_WORKTREE_PATH --editor res://scenes/demo/p4_locomotion_demo.tscn
 ```
 
 Expected automated sentinel: `P4_DEMO_OK frames=300 rigs=1`. Manually verify Aim continuity, all Turn/Rotate variants, cancellation, flat/slope/stairs foot contact, platform-local lock and teleport/base-change release; record pass/fail in the architecture document during Task 17.

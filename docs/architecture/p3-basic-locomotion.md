@@ -178,7 +178,7 @@ GODOT_ALS_P3B_ALLOC model=0 controller=0 skeleton=0 exchange=0 commit=0
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-p3b.ps1 `
-  -GodotExecutable 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+  -GodotExecutable "${env:GODOT_EXECUTABLE}"
 ```
 
 Task 7 focused 路径在 1/10 harness matrix 前严格运行 input、library、presentation normal/initial、graph 两次、frame-order single/parallel、300-frame demo。本次实测场景证据为：
@@ -210,8 +210,8 @@ P3B 非 Skip 路径在同一 focused 场景与矩阵之后直接调用完整 `ve
 编辑器入口：
 
 ```powershell
-& 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' `
-  --path '../GodotALS-p3-direction-alignment' `
+& "${env:GODOT_EXECUTABLE}" `
+  --path 'ARCHIVED_P3_WORKTREE_PATH' `
   --editor 'res://scenes/demo/p3_locomotion_demo.tscn'
 ```
 

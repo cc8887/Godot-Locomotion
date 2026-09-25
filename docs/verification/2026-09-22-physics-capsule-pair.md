@@ -1,6 +1,6 @@
 # 胶囊对原生流形与运行时接入
 
-在 `.` / `main` 实现 capsule–capsule one-shot manifold；实验整链由 **7/12 提升到 8/12**。普通角色仍未接入实验后端，整体 ALS 目标未完成。
+在 `${env:GODOT_ALS_ROOT}` / `main` 实现 capsule–capsule one-shot manifold；实验整链由 **7/12 提升到 8/12**。普通角色仍未接入实验后端，整体 ALS 目标未完成。
 
 ## 原生规则与实现
 

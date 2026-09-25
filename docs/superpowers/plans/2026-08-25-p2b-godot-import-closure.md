@@ -380,9 +380,9 @@ git commit -m "test: verify real ALS rigs across process groups"
 - [x] **Step 1: Run the complete fresh verification matrix**
 
 ```powershell
-.\scripts\verify-p2b.ps1 -GodotExecutable 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' -CleanImport
-.\scripts\verify-p1.ps1 -GodotExecutable 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
-.\scripts\verify-p0.ps1 -GodotExecutable 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+.\scripts\verify-p2b.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}" -CleanImport
+.\scripts\verify-p1.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}"
+.\scripts\verify-p0.ps1 -GodotExecutable "${env:GODOT_EXECUTABLE}"
 dotnet test .\GodotALS.sln -c Release --no-restore
 git diff --check
 ```

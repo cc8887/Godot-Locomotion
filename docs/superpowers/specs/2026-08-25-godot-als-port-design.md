@@ -6,7 +6,7 @@
 
 **目标引擎：** Godot 4.7.2 .NET
 
-**UE 资产源工程：** `../AdvancedLocomotionSystemV`
+**UE 资产源工程：** `${env:ALS_UE_PROJECT_ROOT}`
 
 **参考实现：** `Sixze/ALS-Refactored`，固定使用 commit `b754d6f0f2bb03741d301f8fb88077ebfe561e17`
 
@@ -35,9 +35,9 @@
 
 ### 2.1 独立仓库
 
-Godot 项目放在独立目录 `.`，使用独立 Git 仓库管理，默认分支为 `main`。
+Godot 项目放在独立目录 `${env:GODOT_ALS_ROOT}`，使用独立 Git 仓库管理，默认分支为 `main`。
 
-现有 UE 工程 `../AdvancedLocomotionSystemV` 不并入这个仓库。它承担以下职责：
+现有 UE 工程 `${env:ALS_UE_PROJECT_ROOT}` 不并入这个仓库。它承担以下职责：
 
 - 提供原始 ALS Skeletal Mesh、Skeleton、Animation Sequence 和相关配置；
 - 运行 UE 侧导出工具；

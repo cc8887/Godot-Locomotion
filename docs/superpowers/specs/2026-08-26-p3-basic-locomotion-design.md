@@ -4,9 +4,9 @@
 
 **日期：** 2026-08-26
 
-**Godot 工程：** `.`
+**Godot 工程：** `${env:GODOT_ALS_ROOT}`
 
-**UE 资产源工程：** `../AdvancedLocomotionSystemV`
+**UE 资产源工程：** `${env:ALS_UE_PROJECT_ROOT}`
 
 **行为参考：** `ALS-Refactored` main，commit
 `b754d6f0f2bb03741d301f8fb88077ebfe561e17`

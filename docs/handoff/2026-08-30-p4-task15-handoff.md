@@ -1,8 +1,8 @@
 # Godot ALS P4 Task 15 Handoff
 
 **日期：** 2026-08-30
-**项目：** `.`
-**当前工作树：** `../GodotALS-p4-pose-foot-placement`
+**项目：** `${env:GODOT_ALS_ROOT}`
+**当前工作树：** `ARCHIVED_P4_WORKTREE_PATH`
 **分支：** `feature/p4-pose-foot-placement`
 **提交基线：** `678899e` (`test: add P4 cross engine pose golden`)
 **引擎：** Godot 4.7.2 .NET
@@ -147,7 +147,7 @@ feet        A5C6917B045EB6FF
 
 ## 7. 复现命令
 
-在 `../GodotALS-p4-pose-foot-placement` 执行：
+在 `ARCHIVED_P4_WORKTREE_PATH` 执行：
 
 ```powershell
 dotnet build .\GodotALS.sln --no-restore

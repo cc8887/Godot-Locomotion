@@ -91,18 +91,18 @@ Detail/起停与 P5 facade 仍需继续，不能把当前七播放器摘要当�
 
 ## Execution Contract
 
-计划在既有 worktree `../GodotALS-p5a-events-actions`、分支 `feature/p5a-events-actions` 上执行。规格提交 `ce292b2` 必须是 `HEAD` 祖先。Task 1-5 为 Asset/Import；Task 6-12 为 Core；Task 13 为 cross-engine oracle；Task 14-17 为 Godot production integration；Task 18-22 为派发、语义、矩阵、Demo 与完整闭环。
+计划在既有 worktree `ARCHIVED_P5A_WORKTREE_PATH`、分支 `feature/p5a-events-actions` 上执行。规格提交 `ce292b2` 必须是 `HEAD` 祖先。Task 1-5 为 Asset/Import；Task 6-12 为 Core；Task 13 为 cross-engine oracle；Task 14-17 为 Godot production integration；Task 18-22 为派发、语义、矩阵、Demo 与完整闭环。
 
 Task 1-5 必须串行，因为它们共享 manifest/definition/profile。Task 6 是 Core ABI owner，之后 Task 7、9、10 可以由独立 agent 实现，但合并必须按任务编号进行；Task 8、11、12 依赖前序状态合同。Task 14-17 必须由一个 Godot integration owner 串行处理共享 hot files。每次进入下一任务前都要运行上一任务的 GREEN 命令并提交。
 
 每个新 PowerShell 会话先定义：
 
 ```powershell
-$repo = '../GodotALS-p5a-events-actions'
-$godotExe = 'Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
-$unrealEditorCmd = '../UnrealEngine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$uProject = '../AdvancedLocomotionSystemV\AdvancedLocomotionSystemV.uproject'
-$referenceRoot = '../GodotALS-References\ALS-Refactored'
+$repo = 'ARCHIVED_P5A_WORKTREE_PATH'
+$godotExe = "${env:GODOT_EXECUTABLE}"
+$unrealEditorCmd = "${env:UE_ENGINE_ROOT}\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+$uProject = "${env:ALS_UE_PROJECT_FILE}"
+$referenceRoot = "${env:ALS_REFERENCE_ROOT}"
 Set-Location $repo
 ```
 
@@ -123,7 +123,7 @@ Run:
 git status --short
 git branch --show-current
 git merge-base --is-ancestor ce292b2 HEAD
-git -C . status --short
+git -C ${env:GODOT_ALS_ROOT} status --short
 ```
 
 Expected: feature worktree is clean; branch is `feature/p5a-events-actions`; ancestry exits `0`; the main checkout may show only the user-owned edit to `docs/superpowers/plans/2026-08-28-p4-aim-layering-foot-placement.md`. Do not edit, restore, stage or commit that main-checkout file.
@@ -243,7 +243,7 @@ Run:
 ```powershell
 dotnet test tests/Als.Import.Tests/Als.Import.Tests.csproj -c Debug --filter FullyQualifiedName~AlsTimelineExporterSourceContractTests
 pwsh -NoProfile -Command '$r = Invoke-Pester -PassThru -Path "tests/BuildAlsExporter.Tests.ps1"; if ($r.TotalCount -le 0 -or $r.FailedCount -ne 0) { exit 1 }'
-pwsh -NoProfile -File scripts/build-als-exporter.ps1 -EngineRoot ../UnrealEngine -UnrealProject $uProject
+pwsh -NoProfile -File scripts/build-als-exporter.ps1 -EngineRoot ${env:UE_ENGINE_ROOT} -UnrealProject $uProject
 ```
 
 Expected: tests PASS, plugin build exits `0`, and ready output contains `GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0`.
@@ -451,7 +451,7 @@ Keep `verify-p2a.ps1` as the one build/dry-run/export/determinism/publish path. 
 Run:
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-p2a.ps1 -EngineRoot ../UnrealEngine -UnrealProject $uProject -UpdateAssetLock
+pwsh -NoProfile -File scripts/verify-p2a.ps1 -EngineRoot ${env:UE_ENGINE_ROOT} -UnrealProject $uProject -UpdateAssetLock
 ```
 
 Expected: ready/dry-run/export audit succeeds; native self-test covers both tick modes; two full roots are byte-identical; `assetCount=267`, `fileCount=141`, `animationCount=126`; canonical manifest is v2; tick-mode audit totals match all authored events; terminal sections use empty links; audio is absent; lock records exporter `2.0.0` and the new lowercase SHA-256.
@@ -2507,7 +2507,7 @@ git commit -m "docs: close p5a event action runtime verification"
 Invoke `superpowers:verification-before-completion`, then run:
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-p5a.ps1 -GodotExecutable $godotExe -EngineRoot ../UnrealEngine -UnrealProject $uProject
+pwsh -NoProfile -File scripts/verify-p5a.ps1 -GodotExecutable $godotExe -EngineRoot ${env:UE_ENGINE_ROOT} -UnrealProject $uProject
 git status --short
 ```
 

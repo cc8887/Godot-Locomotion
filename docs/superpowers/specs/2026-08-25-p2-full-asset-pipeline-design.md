@@ -4,9 +4,9 @@
 
 **日期：** 2026-08-25
 
-**Godot 工程：** `.`
+**Godot 工程：** `${env:GODOT_ALS_ROOT}`
 
-**UE 资产源工程：** `../AdvancedLocomotionSystemV`
+**UE 资产源工程：** `${env:ALS_UE_PROJECT_ROOT}`
 
 **源引擎：** Unreal Engine 5.9.0
 
