@@ -31,6 +31,50 @@ public sealed class AlsRefactoredMovementTraversalTests
     private static readonly Lazy<Fixture> Data = new(() => new());
 
     [Fact]
+    public void InertiaRetainsUpdateOnlyRequestsAndResetsAfterMissingTraversal()
+    {
+        var f = Data.Value; var machine = new AlsRefactoredMovementDetailsRuntime(f.Details.Resources);
+        var details = new AlsRefactoredMovementDetailsSourceRuntime(f.Details, 0); var players = f.Players();
+        var graph = new AlsRefactoredMovementTraversal(f.Catalog, f.Details, f.Direction, 0);
+        var movement = new AlsRefactoredMovementCacheRuntime(f.Movement, f.DirectionPose.BoneNames, f.DirectionPose.CurveNames);
+        var profile = new AlsRefactoredMovementDetailsPose(f.Catalog, f.Details, f.Movement, movement.CurveNames);
+        var node = new AlsRefactoredMovementInertialization(f.Catalog, profile);
+        var init = new AlsGraphTraversalCounter(0, 0); var counter = init;
+        var pose = Enumerable.Repeat(AlsPrecisePose.Identity, 79).ToArray(); var curves = new AlsInertialCurve[profile.CurveNames.Length];
+        for (var frame = 0; frame < 5; frame++)
+        {
+            if (frame == 4) counter = counter.Next(4).Next(4);
+            var context = new AlsPoseUpdateContext(new(frame, 4, 1), 1, .01f).WithUpdateCounter(counter);
+            machine.Prepare(frame, new(frame == 0 ? "" : "Als.Gait.Running", 1, frame == 0 ? 0 : 1, 1, false), details.CommittedObservations, .01f, updateCounter: counter);
+            details.Prepare(machine, AlsRefactoredMovementInertialization.SourceContext(context), Vector4.One);
+            graph.Prepare(frame, machine, details, init, new(true, false, false, false, 0, 0), new(1, 1, 1, 1), new("Als.Gait.Running", 0, 0));
+            players.Prepare(frame, graph.SourceInputs, .01f); details.CaptureSourceTimes(frame, players);
+            node.Prepare(context, machine, graph);
+            if (frame is 1 or 2)
+            {
+                Assert.Equal(1, node.PendingRequests); Assert.Equal(1, node.CommittedHistoryCount);
+                node.Cancel(); node.Prepare(context, machine, graph); Assert.Equal(1, node.PendingRequests);
+            }
+            else
+            {
+                pose[1] = pose[1] with { Position = new(frame, 0, 0) };
+                if (frame == 3)
+                {
+                    Assert.Throws<ArgumentException>(() => node.Evaluate(frame, [], curves, AlsPrecisePose.Identity));
+                    Assert.Throws<ArgumentException>(() => node.Commit(frame)); node.Cancel(); node.Prepare(context, machine, graph);
+                }
+                node.Evaluate(frame, pose, curves, AlsPrecisePose.Identity);
+                Assert.Equal(frame == 3, node.IsActive);
+                if (frame == 4) Assert.Equal(pose, node.Pose.ToArray());
+            }
+            node.ValidateCommit(frame); graph.ValidateCommit(frame); details.ValidateCommit(frame); machine.ValidateCommit(frame); players.ValidateCommit(frame);
+            node.Commit(frame); graph.Commit(frame); details.Commit(frame); machine.Commit(frame); players.Commit(frame);
+            counter = counter.Next((ulong)frame + 1);
+        }
+        Assert.Equal(1, node.CommittedHistoryCount); Assert.Equal(0, node.PendingRequests);
+    }
+
+    [Fact]
     public void InitializationAndFailedDeferredUpdatesRemainCandidateOwned()
     {
         var f = Data.Value; var machine = new AlsRefactoredMovementDetailsRuntime(f.Details.Resources);
@@ -79,11 +123,13 @@ public sealed class AlsRefactoredMovementTraversalTests
         var movement = new AlsRefactoredMovementCacheRuntime(f.Movement, f.DirectionPose.BoneNames, f.DirectionPose.CurveNames);
         var poseProfile = new AlsRefactoredMovementDetailsPose(f.Catalog, f.Details, f.Movement, movement.CurveNames);
         var sampler = poseProfile.CreateSampler();
+        var inertia = new AlsRefactoredMovementInertialization(f.Catalog, poseProfile);
         var basePose = new AlsPrecisePose[79]; var baseCurves = new AlsInertialCurve[f.DirectionPose.CurveNames.Length];
         var pose = new AlsPrecisePose[79]; var curves = new AlsInertialCurve[poseProfile.CurveNames.Length];
         var init = new AlsGraphTraversalCounter(0, 0); var counter = init; var stage = 0;
         int[] targets = [5,2,0,1,2,3,4,3,2,0,2];
         var states = new HashSet<int>(); var cacheIds = new HashSet<int>(); var skipped = 0; var inertialTicks = 0; var mixed = 0;
+        var active = 0; var forwarded = 0;
         for (var frame = 0; frame < hz * 6; frame++)
         {
             var delta = frame % 31 == 0 ? 0 : 1f / hz;
@@ -102,13 +148,17 @@ public sealed class AlsRefactoredMovementTraversalTests
                 details.Prepare(machine, context, velocity);
                 graph.Prepare(frame, machine, details, init, directionInput, new(1.1f, 1, .83f, .75f),
                     new(frame % 13 < 5 ? "Als.Gait.Sprinting" : "Als.Gait.Running", .23f, .12f), yaw: new(2, -3, 4, -5));
+                inertia.Prepare(context, machine, graph);
                 players.Prepare(frame, graph.SourceInputs, delta); details.CaptureSourceTimes(frame, players);
                 direction.Sample(frame, graph.Direction, graph.Sources, players, basePose, baseCurves);
                 movement.Prepare(frame, input.UnweightedGaitRunningAmount, new(.3f, -.4f), delta, graph.InitializeMovement);
                 movement.Evaluate(frame, basePose, baseCurves);
                 sampler.Sample(frame, machine, details, players, movement, pose, curves);
+                inertia.Evaluate(frame, pose, curves, AlsPrecisePose.Identity);
             }
             Prepare(); var expected = pose.ToArray(); var expectedCurves = curves.ToArray();
+            var smoothed = inertia.Pose.ToArray(); var smoothedCurves = inertia.Curves.ToArray();
+            active += inertia.IsActive ? 1 : 0; forwarded += inertia.ForwardAttempts;
             var updates = graph.CacheUpdates.ToArray(); var ticks = graph.SourceInputs.ToArray(); var paths = graph.SourceContexts.ToArray();
             var batches = graph.SkippedBatches.ToArray(); var skippedPaths = graph.SkippedContexts.ToArray();
             var chosen = details.CacheReads.ToArray().Aggregate((a, b) => b.Context.Weight > a.Context.Weight ? b : a).Context;
@@ -127,15 +177,18 @@ public sealed class AlsRefactoredMovementTraversalTests
             Assert.All(batches, b => Assert.Equal(119, b.Handler)); skipped += skippedPaths.Length;
             mixed += details.CacheReads.Length > 1 ? 1 : 0; states.Add(machine.Candidate.State.CurrentState);
             var current = machine.Candidate.State.CurrentState;
-            machine.Cancel(); details.Cancel(); graph.Cancel(); players.Cancel(); movement.Cancel();
+            machine.Cancel(); details.Cancel(); graph.Cancel(); players.Cancel(); movement.Cancel(); inertia.Cancel();
             Prepare(); Assert.Equal(expected, pose); Assert.Equal(expectedCurves, curves);
+            Assert.Equal(smoothed, inertia.Pose.ToArray()); Assert.Equal(smoothedCurves, inertia.Curves.ToArray());
             Assert.Equal(updates, graph.CacheUpdates.ToArray()); Assert.Equal(ticks, graph.SourceInputs.ToArray()); Assert.Equal(paths, graph.SourceContexts.ToArray());
             Assert.Equal(batches, graph.SkippedBatches.ToArray()); Assert.Equal(skippedPaths, graph.SkippedContexts.ToArray());
             machine.ValidateCommit(frame); details.ValidateCommit(frame); graph.ValidateCommit(frame); players.ValidateCommit(frame); movement.ValidateCommit(frame);
-            machine.Commit(frame); details.Commit(frame); graph.Commit(frame); players.Commit(frame); movement.Commit(frame);
+            inertia.ValidateCommit(frame);
+            machine.Commit(frame); details.Commit(frame); graph.Commit(frame); players.Commit(frame); movement.Commit(frame); inertia.Commit(frame);
             if (current == targets[stage]) stage = (stage + 1) % targets.Length;
             counter = counter.Next((ulong)frame + 1);
         }
         Assert.Equal(6, states.Count); Assert.Equal(8, cacheIds.Count); Assert.True(skipped > 0); Assert.True(inertialTicks > 0); Assert.True(mixed > 0);
+        Assert.True(active > 0); Assert.True(forwarded > 0);
     }
 }
