@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Standing移动缓存整链：`docs/verification/2026-09-25-refactored-standing-movement-traversal.md`。原66→67→七方向缓存单Drain，9cache/38reader；最大weight先到tie，选定66上下文执行原Parent入口/Details并enqueue67，回调Leave在延迟子cache之前；初始化counter与无read时pending reset候选、外118/内119 skipped分流。Movement支持共享调度并在Drain完成前拒绝提交；Stop新增惯性化owner/frame/角色/布局校验入口。新4/相关29/Core缓存41/Optimize0/0；3Hz1050帧真实Parent→Direction→Lean→Details→119→Stop逐帧retry，覆盖交叠/隐藏/初始延迟。初IsFinished internal编译错已开放只读；初30Hz覆盖断言失败，增加尾部Idle并分别断言后全过，保留TRX。无新UE/Godot运行/全量/性能；外65仍缺Idle/Rotate源/完整pose118、停止回调/Notify实际动作与连续UE整图，普通Demo/统一角色宿主/Ragdoll等旧目标及用户修改/暂缓项保留。
+
 - 最新Stop姿态合成：`docs/verification/2026-09-25-refactored-stop-pose-evaluation.md`。独立catalog绑定Skeleton native43条全空metadata门禁，拒绝LinkedBones静默丢失；十二leaf→hips selector→MultiWay→mesh腿层/Override→FootLock→Stop标准stack，零权重reference fallback与候选校验，锁曲线索引预计算。新9/相关66/最后9/Optimize0/0，3Hz1260帧99540骨retry；基底目前reference非真实cache119联合/native整图。首轮2失败为测试忽略float alpha补数累积漂移，改独立不受腿层影响的stack期望，原阈值不变。UE完整0actions/4插件审计FA68F487...，冷/普通40896实际0导出SHA742D1892...字节同，普通两旧Condition/旧warn保留；无C++变更/DV/Godot运行/全量/性能。下一步统一cache66→67/源/姿态与118/IdleRotate/实际动作消费及原生连续Stop整图；普通Demo/Ragdoll等旧目标、用户修改/暂缓项保留。
 
 - 最新Stop姿态图/源遍历：`docs/verification/2026-09-25-refactored-stop-pose-sources.md`。五state完整34节点、cache66五读者、FootLock=1、原MultiWay/hips枚举、两腿三branch native79骨mask；右后向进入Linear .1/退回0，左两向0，初始立即选择。候选source保留隐藏selector history/初始化/零old-child/Inactive/祖先/rootmotion(layer0/base原值)/requester，发出独立cache读取与12 evaluator更新；可update-only提交。新13/相关57/Optimize0/0，3Hz1260帧逐帧retry，8变异；首次curveValues模板0误要求1失败，改runtime+可见pin校验后过，TRX保留。尚无最终Stop pose合成/UE整图/统一66调度/Godot运行；发现当前Refactored skeleton资源未含CurveMetaData.LinkedBones，下步补只读导出/门禁再曲线与mesh合成、native整链；实际动作回调/118/普通Demo/Ragdoll等旧目标及用户修改/暂缓项保留。

@@ -129,7 +129,7 @@ public sealed class AlsPoseCacheTraversal
     private bool _finished;
     public int SourceUpdateCount { get; private set; }
     internal AlsPoseCacheDefinition Definition => _definition;
-    internal bool IsFinished => _finished;
+    public bool IsFinished => _finished;
     public int CachedCallCount => _count;
 
     public AlsPoseCacheTraversal(AlsPoseCacheDefinition definition, int callCapacity)
