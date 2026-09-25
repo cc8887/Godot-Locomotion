@@ -114,9 +114,9 @@ public sealed class AlsRefactoredDirectionSourceTests
             Assert.Equal(updates.Select(u => u.PropertyIndex), p.Caches.UpdateOrder.ToArray().Where(id => updates.Any(u => u.PropertyIndex == id)));
             foreach (var c in contexts) { Assert.Equal(2, c.StateCount); Assert.Equal(new AlsActiveAnimationState(999, 2), c.GetState(0)); Assert.Equal(.4f, c.RootMotionWeight); }
             sharedFrames += source.CacheReadCount > updates.Length ? 1 : 0; zeroFrames += ticks.Length == 0 ? 1 : 0;
-            players.Prepare(frame, ticks, delta);
+            players.Prepare(frame, ticks, delta, reset);
             foreach (var tick in ticks) players.Evaluate(frame, tick.PlayerId);
-            var times = players.Players.ToArray(); players.Cancel(); players.Prepare(frame, ticks, delta);
+            var times = players.Players.ToArray(); players.Cancel(); players.Prepare(frame, ticks, delta, reset);
             Assert.Equal(times, players.Players.ToArray());
             players.Commit(frame); source.Commit(frame); machine.Commit(frame); clean.Commit(frame); cleanMachine.Commit(frame);
             counter = counter.Next((ulong)frame + 1);

@@ -74,7 +74,7 @@ public sealed class AlsRefactoredDirectionPoseTests
             machine.Prepare(frame, new(true, false, false, false, 0, 0), .01f, reinitialize: true, updateCounter: counter);
             update.Prepare(machine, new GodotAls.Core.Locomotion.AlsPoseUpdateContext(new(frame, 1, 1), 1, .01f).WithUpdateCounter(counter), counter,
                 new(1, 0, 0, 0), new(1, 1, .7f, .8f), new("Als.Gait.Sprinting", frame == 0 ? 1 : 0, frame == 2 ? 1 : 0), true, new(13, -17, 23, -29));
-            players.Prepare(frame, update.SourceInputs, .01f); sampler.Sample(frame, machine, update, players, pose, curves);
+            players.Prepare(frame, update.SourceInputs, .01f, true); sampler.Sample(frame, machine, update, players, pose, curves);
             var player = Assert.Single(update.SourceInputs.ToArray()).PlayerId;
             players.Evaluate(frame, player);
             var expected = players.Pose(player);
@@ -121,7 +121,7 @@ public sealed class AlsRefactoredDirectionPoseTests
             var forward = new AlsRefactoredForwardInput(frame % hz < hz / 2 ? "Als.Gait.Sprinting" : "Als.Gait.Running", frame % 11 == 0 ? 1 : .3f, frame % 7 / 6f);
             var yaw = new Vector4(10 + frame, -20, 30, -40);
             update.Prepare(machine, context, initialization, velocity, movement, forward, reset, yaw);
-            players.Prepare(frame, update.SourceInputs, delta); sampler.Sample(frame, machine, update, players, pose, curves);
+            players.Prepare(frame, update.SourceInputs, delta, reset); sampler.Sample(frame, machine, update, players, pose, curves);
             Assert.InRange(sampler.CacheEvaluations, 0, update.CacheUpdates.Length);
             Assert.InRange(sampler.PlayerEvaluations, 0, update.SourceInputs.Length);
             cached += update.CacheReadCount > sampler.CacheEvaluations ? 1 : 0;
@@ -134,7 +134,7 @@ public sealed class AlsRefactoredDirectionPoseTests
             worker.Sample(frame, machine, update, players, retryPose, retryCurves); Assert.Equal(pose, retryPose); Assert.Equal(curves, retryCurves);
             update.Cancel(); players.Cancel();
             update.Prepare(machine, context, initialization, velocity, movement, forward, reset, yaw);
-            players.Prepare(frame, update.SourceInputs, delta); sampler.Sample(frame, machine, update, players, retryPose, retryCurves);
+            players.Prepare(frame, update.SourceInputs, delta, reset); sampler.Sample(frame, machine, update, players, retryPose, retryCurves);
             Assert.Equal(pose, retryPose); Assert.Equal(curves, retryCurves);
             // A stale or foreign owner cannot publish partially computed data.
             if (frame == 0)
@@ -172,7 +172,7 @@ public sealed class AlsRefactoredDirectionPoseTests
                 if (reset) initialization = initialization.Next((ulong)frame);
                 machine.Prepare(frame, new(direction.GetProperty("bForward").GetBoolean(), direction.GetProperty("bBackward").GetBoolean(), direction.GetProperty("bLeft").GetBoolean(), direction.GetProperty("bRight").GetBoolean(), grounded.GetProperty("HipsDirectionLockAmount").GetSingle(), input.GetProperty("feetState").GetProperty("FeetCrossingAmount").GetSingle()), delta, reinitialize: reset, updateCounter: counter);
                 update.Prepare(machine, new GodotAls.Core.Locomotion.AlsPoseUpdateContext(new(frame, 1, 1), 1, delta).WithUpdateCounter(counter), initialization, Vector4.Zero, new(1, 1, 1, 1), new("", 0, 0), reset);
-                players.Prepare(frame, update.SourceInputs, delta); sampler.Sample(frame, machine, update, players, pose, curves);
+                players.Prepare(frame, update.SourceInputs, delta, reset); sampler.Sample(frame, machine, update, players, pose, curves);
                 Assert.Equal(0, sampler.CacheEvaluations); Assert.Equal(0, sampler.PlayerEvaluations);
                 for (var b = 0; b < 79; b++)
                 {

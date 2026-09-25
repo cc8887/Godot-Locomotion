@@ -10,6 +10,7 @@
 #include "Animation/AnimNode_SaveCachedPose.h"
 #include "Animation/AnimNode_StateMachine.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
+#include "AnimNodes/AnimNode_BlendSpacePlayer.h"
 #include "Nodes/AlsAnimNode_GameplayTagsBlend.h"
 #include "Animation/Skeleton.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -110,6 +111,8 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
     FString Kind=TEXT("Default");Request->TryGetStringField(TEXT("overlay"),Kind);
     const bool Weapon=Kind==TEXT("Bow")||Kind==TEXT("PistolOneHanded")||Kind==TEXT("PistolTwoHanded")||Kind==TEXT("Rifle");
     const bool Direction=Kind==TEXT("Standing")||Kind==TEXT("Crouching");
+    bool TraceDirectionSources=false;Request->TryGetBoolField(TEXT("directionSources"),TraceDirectionSources);
+    if(TraceDirectionSources&&!Direction)return false;
     const bool MachineTrace=Weapon||Direction;
     if(!MachineTrace&&Kind!=TEXT("Default")&&Kind!=TEXT("Feminine")&&Kind!=TEXT("Masculine")&&Kind!=TEXT("Box")&&Kind!=TEXT("HandsTied")&&Kind!=TEXT("Injured")&&Kind!=TEXT("Barrel")&&Kind!=TEXT("Binoculars")&&Kind!=TEXT("Torch"))return false;
     const bool Box=Kind==TEXT("Box");
@@ -196,6 +199,13 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
                     !SetState(Parent.Get(),TEXT("FeetState"),Frame->GetObjectField(TEXT("feetState")))||
                     !SetState(Parent.Get(),TEXT("StandingState"),Frame->GetObjectField(TEXT("standingState")))||
                     !SetState(Parent.Get(),TEXT("CrouchingState"),Frame->GetObjectField(TEXT("crouchingState"))))return false;
+                if(TraceDirectionSources)
+                {
+                    auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("Gait"));
+                    if(!Property||Property->Struct!=FGameplayTag::StaticStruct())return false;
+                    const auto Tag=Frame->GetStringField(TEXT("gait"));
+                    *Property->ContainerPtrToValuePtr<FGameplayTag>(Parent.Get())=Tag.IsEmpty()?FGameplayTag():FGameplayTag::RequestGameplayTag(FName(*Tag),false);
+                }
             }
             if(HasActions||Weapon)
             {
@@ -235,6 +245,29 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             TArray<TSharedPtr<FJsonValue>> Atoms;for(auto Bone:Pose.Pose.ForEachBoneIndex())Atoms.Add(MakeShared<FJsonValueObject>(DefaultOverlayTransformJson(Pose.Pose[Bone])));
             const auto Curves=MakeShared<FJsonObject>();Curve.ForEachElement([&](const auto& C){Curves->SetNumberField(C.Name.ToString(),C.Value);});
             const auto Row=MakeShared<FJsonObject>();Row->SetObjectField(TEXT("input"),Frame);Row->SetArrayField(TEXT("pose"),Atoms);Row->SetObjectField(TEXT("curves"),Curves);
+            if(TraceDirectionSources)
+            {
+                TArray<TSharedPtr<FJsonValue>> Sources,Caches;
+                for(int32 Index=0;Index<Properties.Num();++Index)
+                {
+                    FAnimNode_AssetPlayerBase* Player=nullptr;
+                    if(Properties[Index]->Struct==FAnimNode_SequencePlayer::StaticStruct())Player=Properties[Index]->ContainerPtrToValuePtr<FAnimNode_SequencePlayer>(Instance.Get());
+                    else if(Properties[Index]->Struct==FAnimNode_BlendSpacePlayer::StaticStruct())Player=Properties[Index]->ContainerPtrToValuePtr<FAnimNode_BlendSpacePlayer>(Instance.Get());
+                    if(Player)
+                    {
+                        const auto Data=MakeShared<FJsonObject>();Data->SetNumberField(TEXT("propertyIndex"),Index);
+                        Data->SetNumberField(TEXT("time"),Player->GetAccumulatedTime());Data->SetNumberField(TEXT("weight"),Player->GetCachedBlendWeight());
+                        Sources.Add(MakeShared<FJsonValueObject>(Data));
+                    }
+                    if(Properties[Index]->Struct==FAnimNode_SaveCachedPose::StaticStruct())
+                    {
+                        const auto* Saved=Properties[Index]->ContainerPtrToValuePtr<FAnimNode_SaveCachedPose>(Instance.Get());
+                        const auto Data=MakeShared<FJsonObject>();Data->SetNumberField(TEXT("propertyIndex"),Index);Data->SetNumberField(TEXT("weight"),Saved->GlobalWeight);
+                        Caches.Add(MakeShared<FJsonValueObject>(Data));
+                    }
+                }
+                Row->SetArrayField(TEXT("sourcePlayers"),Sources);Row->SetArrayField(TEXT("sourceCaches"),Caches);
+            }
             if(Prediction)Row->SetNumberField(TEXT("predictionAlpha"),FOverlayBlendAccess::Alpha(*Prediction));
             if(Actions)Row->SetArrayField(TEXT("actionWeights"),FOverlayActionBlendAccess::Weights(*Actions));
             if(Aim)Row->SetArrayField(TEXT("aimWeights"),FOverlayActionBlendAccess::Weights(*Aim));
