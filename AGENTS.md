@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新移动播放器：`docs/verification/2026-09-25-refactored-movement-players.md`。Standing24/Crouching6 原图身份、四同步组、起点/循环/动态rate和BS输入绑定；暴露StartPosition覆盖Node默认，Sprint加速RateBasis=.833333015须除基准。新5/相关13通过，30源90提交帧逐帧取消重试，5变异拒绝；Optimize0/0。初start精度/引脚覆盖与basis默认假设失败已修并保留日志，无新UE连续oracle/场景/全量/性能。下一步完整stance状态/cache/callback/pose图→统一宿主；普通Demo未切、Ragdoll等旧缺口/用户修改/暂缓项保留。
+
 - 最新原地旋转源：`docs/verification/2026-09-25-refactored-rotate-players.md`。原Standing12/9、Crouching20/17四玩家实际PlayRate+左右bLoop动态绑定；共享SourceInput新增可选Looping逐帧覆盖/null保留资源、不重置clock，显式host身份。新6/Import157/Optimize0/0；真实四序列正反端点/恢复循环/retry及8变异拒绝。初摘要漏同一行绑定误判Standing固定，完整图解析/首1失败证实后修，诊断保留。无新UE旋转oracle/场景/全量/性能；尚余30个stance播放器及完整状态/cache/callback图，下一步这些→真实Locomotion统一宿主。Overlay受控证据13/13、普通Demo未切、Ragdoll等全部旧缺口/用户改动/暂缓项保留。
 
 - 最新四武器整图原生：`docs/verification/2026-09-25-refactored-weapon-overlay-native.md`。真实完整Action切换/隐藏/零delta/隐藏Initialize/零旧分支更新恢复，8424帧665496骨/4548隐藏/24零更新/48reset，maxP6.13e-6cm/Q3.509e-8/S4.471e-8/C1.193e-7/有效clock0，预算不变、非逐位同。补AnimGraph→LinkedLayer入口政策与四变异门禁；新12/Import156/Optimize0/0。初测试编译多括号修复，无native失败。完整Editor0actions审计68FD4C51...冷/普通44116退出0四文件字节同；两旧Condition五warn保留。受控输入下Overlay连续图证据现13/13，非完整角色完成；普通Demo未切。下一步真实Standing/Crouching Locomotion图/回调→共享播放器/Montage/Notify/rootmotion统一宿主整链；Ragdoll/Mantle/Camera/性能等所有旧缺口/用户改动/暂缓项保留。无新DV/打包/Godot/全量/性能。
