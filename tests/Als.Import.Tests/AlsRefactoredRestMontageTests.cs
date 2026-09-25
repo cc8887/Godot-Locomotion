@@ -2,6 +2,8 @@ using GodotAls.Core.Actions;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Import.Compilation;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace GodotAls.Import.Tests;
 
@@ -28,6 +30,27 @@ public sealed class AlsRefactoredRestMontageTests
         public AlsRefactoredStanceCallback Turn=>Callbacks.Nodes.ToArray().Single(c=>c.Function==AlsRefactoredStanceFunction.RefreshTurnInPlace);
     }
     private static readonly Lazy<Fixture> Data=new(()=>new());
+    [Theory]
+    [InlineData("name")] [InlineData("mode")] [InlineData("alpha")] [InlineData("value")]
+    [InlineData("link")] [InlineData("map")] [InlineData("callback")]
+    public void FinalStandingCurveRejectsChangedOriginalPolicy(string change)
+    {
+        var payload=JsonNode.Parse(Data.Value.Catalog.Read(AlsRefactoredRotatePlayers.Blueprint(false)).GetRawText())!;
+        var node=payload["compiled"]!["nodes"]!.AsArray().Single(n=>(int)n!["propertyIndex"]! ==68)!;
+        var runtime=node["runtime"]!;
+        switch(change)
+        {
+            case "name":runtime["curveNames"]![0]="PoseCrouching";break;
+            case "mode":runtime["applyMode"]="Scale";break;
+            case "alpha":runtime["alpha"]=.5f;break;
+            case "value":runtime["curveValues"]![0]=0;break;
+            case "link":runtime["sourcePose"]!["linkId"]=65;break;
+            case "map":runtime["curveMap"]!["Extra"]=1;break;
+            case "callback":runtime["updateFunction"]!["functionName"]="Unexpected";break;
+        }
+        using var document=JsonDocument.Parse(payload.ToJsonString());
+        Assert.Throws<ArgumentException>(()=>AlsRefactoredStandingOutput.ValidateNode(document.RootElement));
+    }
     private static AlsRefactoredRestInput Input(int asset)
     {
         var turn=asset<8;var crouch=turn?asset>=4:asset>=10;var left=asset%2==0;
@@ -50,6 +73,51 @@ public sealed class AlsRefactoredRestMontageTests
         Assert.All(bank.Candidate.ToArray(),c=>Assert.Equal(5,c.GroupId));Assert.Null(parent.Candidate.QueuedTransition);Assert.Null(parent.Candidate.QueuedTurn);
         var expected=bank.Candidate.ToArray();bank.Discard();parent.Cancel();parent.Prepare(id,Input(0) with{LeftLock=1,LeftTarget=new(20,0,0)});
         parent.Apply(id,f.Dynamic);parent.Apply(id,f.Turn);bank.Begin(id,0);f.Montages.PlayQueued(bank,parent,id);Assert.Equal(expected,bank.Candidate.ToArray());
+    }
+    [Theory]
+    [InlineData(30)] [InlineData(60)] [InlineData(120)]
+    public void IdleSlotSuppressesSourceAndPreservesTransactionalWeightHistory(int hz)
+    {
+        var f=Data.Value;var slot=new AlsRefactoredStandingIdleSlot(f.Catalog,f.Rest.Graph,f.Rest,f.Pose);
+        var bank=new AlsMontageRuntime([],sequences:f.Montages.Assets);var id=new AlsFrameIdentity(0,9,1);
+        bank.Begin(id,0);var asset=f.Montages.Assets[0];
+        bank.PlaySequence(new(asset.AnimationId,asset.Slot,1,0,.2f,.2f){InertialBlendOut=true});bank.Commit(id);
+        var reference=f.Catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence);
+        var mixer=new AlsMontageSlotPose(reference.ReferencePose,f.Pose.Parents,f.Pose.CurveNames.Length);var sampler=f.Pose.CreateSampler();
+        var basis=new AlsPrecisePose[79];var baseCurves=new AlsInertialCurve[f.Rest.CurveNames.Length];f.Rest.SampleIdleSource(basis,baseCurves);
+        var expected=new AlsPrecisePose[79];var expectedCurves=new AlsInertialCurve[baseCurves.Length];
+        var counter=new AlsGraphTraversalCounter(0,0);var previous=0f;var suppressed=0;var inactive=0;var evaluated=0;
+        for(var frame=1;frame<=hz*3;frame++)
+        {
+            id=new(frame,9,1);bank.Begin(id,1f/hz);
+            var context=new AlsPoseUpdateContext(id,.4f,1f/hz,.7f).WithUpdateCounter(counter).WithState(65,0).WithInertialization(118,true);
+            var weights=bank.Frame.SlotWeights(asset.Slot);var initialize=frame==3;
+            slot.Prepare(bank.Frame,context,initialize);var source=slot.SourceUpdate;
+            Assert.Equal(weights.SourceWeight>AlsPoseBlender.WeightThreshold,source.Updated);
+            if(source.Updated)
+            {
+                Assert.Equal(context.Weight*MathF.Max(2*AlsPoseBlender.WeightThreshold,weights.SourceWeight),source.Context.Weight);
+                Assert.Equal(!((initialize?0:previous)>weights.SourceWeight||weights.SlotNodeWeight>=1-AlsPoseBlender.WeightThreshold),source.Context.IsActive);
+                Assert.Equal(.7f,source.Context.RootMotionWeight);Assert.Equal(118,source.Context.InertializationRequester);Assert.Equal(context.GetState(0),source.Context.GetState(0));
+                if(!source.Context.IsActive)inactive++;
+            }
+            else suppressed++;
+            // Update-only commits are valid, but never expose a previous pose.
+            Assert.Throws<InvalidOperationException>(()=>slot.Pose.ToArray());
+            if(frame%7!=0)
+            {
+                slot.Evaluate();Assert.Equal(source.Updated,slot.SourceEvaluated);
+                mixer.Evaluate(bank.Frame,id,asset.Slot,basis,baseCurves,expected,expectedCurves,sampler);
+                Assert.Equal(expected,slot.Pose.ToArray());Assert.Equal(expectedCurves,slot.Curves.ToArray());evaluated++;
+                slot.Evaluate();Assert.Equal(expected,slot.Pose.ToArray());
+            }
+            slot.Cancel();slot.Prepare(bank.Frame,context,initialize);Assert.Equal(source,slot.SourceUpdate);
+            slot.Commit(id);previous=weights.SourceWeight;bank.Commit(id);counter=counter.Next((ulong)frame+1);
+        }
+        Assert.True(suppressed>0);Assert.True(inactive>0);Assert.True(evaluated>hz);
+        id=new(hz*3+1,9,1);bank.Begin(id,0);
+        var wrong=new AlsPoseUpdateContext(new(id.FrameId,10,1),1,0).WithUpdateCounter(counter);
+        Assert.Throws<ArgumentException>(()=>slot.Prepare(bank.Frame,wrong));
     }
     [Theory]
     [InlineData(true)] [InlineData(false)]

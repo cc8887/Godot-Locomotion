@@ -10,6 +10,9 @@ public sealed class AlsRefactoredStandingInertialization
 {
     public const int NodeIndex = 118;
     private readonly AlsRefactoredStandingPose _profile;
+    internal AlsRefactoredStandingPose Profile=>_profile;
+    internal void ValidateIdentity(in AlsFrameIdentity identity)
+    {ValidateCommit(identity.FrameId);if(identity!=_identity)throw new ArgumentException("Foreign Standing output frame.");}
     private readonly int[] _unfiltered;
     private readonly int _yaw;
     private readonly AlsPrecisePose[] _pose;
