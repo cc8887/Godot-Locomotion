@@ -1,5 +1,7 @@
 # 原始 StopQuick 通知、参数与播放
 
+后续原生对照纠正了本文的世界角度转换顺序和176度速率预期，见 `2026-09-25-refactored-quick-stop-native.md`；以该原生验证和修正后的实现为准。
+
 新增只读 `export_refactored_quick_stop_settings.py`，从原 Parent CDO 的 AIS_Als_Default 读取全精度 QuickStop 参数和站立/蹲伏左右四个 Transition 引用。没有保存 UE 资产。
 
 实际参数：blend-in 为原 float0.1、blend-out 为原 float0.2、start为原 float0.3、rate范围1.75..3。保存至 `assets/config/refactored_quick_stop_settings.json`，绑定既有 catalog SHA。
