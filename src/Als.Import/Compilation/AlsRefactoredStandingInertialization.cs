@@ -62,7 +62,8 @@ public sealed class AlsRefactoredStandingInertialization
     }
     public static AlsPoseUpdateContext SourceContext(in AlsPoseUpdateContext context) => context.WithInertialization(NodeIndex,true);
     public void Prepare(in AlsPoseUpdateContext context, AlsRefactoredStandingRuntime machine,
-        AlsRefactoredStandingMovementTraversal traversal, AlsRefactoredMovementInertialization? movement = null, bool initializeInstance = false)
+        AlsRefactoredStandingMovementTraversal traversal, AlsRefactoredMovementInertialization? movement = null, bool initializeInstance = false,
+        AlsRefactoredStandingSlotInertialization? slotRequest = null)
     {
         var frame = context.Identity.FrameId;
         if (_prepared || context.UpdateCounter is not {HasUpdated:true} || !context.HasSharedContext || !ReferenceEquals(machine.Resources,_profile.Resources) ||
@@ -78,12 +79,14 @@ public sealed class AlsRefactoredStandingInertialization
         }
         else if (movement is not null) throw new ArgumentException("Inactive Standing Movement inertia supplied.");
         if (traversal.OuterSkippedContexts.Length > 0 && traversal.OuterSkippedHandler != NodeIndex) throw new ArgumentException("Foreign Standing skipped handler.");
+        if(slotRequest is not null&&(slotRequest.Identity!=context.Identity||slotRequest.CatalogDigest!=_profile.Resources.CatalogDigest))throw new ArgumentException("Foreign Standing Slot request.");
         _updated.CopyFrom(_committed); _nextRequests.Clear(); _forwarded.Clear(); ForwardAttempts = 0;
         var reset = initializeInstance || _counter.HasUpdated && !_counter.WasSynchronizedCounter(context.UpdateCounter.Value);
         if (reset) { _updated.Reset(); if (!initializeInstance) _updated.Update(_pendingDelta); }
         else _nextRequests.AddRange(_requests);
         _nextDelta = (initializeInstance ? 0 : _pendingDelta) + context.Delta; _updated.Update(context.Delta);
         if (machine.InertializationRequest is {} incoming) Add(incoming);
+        if(slotRequest is not null)Add(slotRequest.Request);
         if (movement is not null) foreach (var forwarded in movement.ForwardedRequests)
         {
             if (forwarded.Target == NodeIndex) Add(forwarded.Request);

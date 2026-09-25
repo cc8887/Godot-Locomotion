@@ -61,6 +61,8 @@ public sealed class AlsRefactoredStandingRestTraversal
         _owner!.ValidateContext(_identity,_graph.CatalogDigest);
     }
     public void ValidateCommit(long frame){Check(frame);if(!_complete)throw new ArgumentException("Standing rest source incomplete.");_callbacks.ValidateCommit(frame);}
+    internal bool IdleUpdated(in AlsFrameIdentity identity,string digest)
+    { ValidateCommit(identity.FrameId);if(identity!=_identity||digest!=_graph.CatalogDigest)throw new ArgumentException("Foreign Standing Slot traversal.");return _idleStarted; }
     public void Commit(long frame){ValidateCommit(frame);_callbacks.Commit(frame);Cancel();}
     public void Cancel(){_prepared=_complete=_idleStarted=_idleComplete=false;_callbacks.Cancel();}
 }
