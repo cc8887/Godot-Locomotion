@@ -26,12 +26,13 @@ public sealed class AlsRefactoredDirectionResources
     public ReadOnlySpan<AlsRefactoredDirectionEdge> Edges => _edges;
     public AlsOverlayBoneProfile BlendProfile { get; }
     public string CatalogDigest { get; }
+    public bool Crouching { get; }
     public int MachinePropertyIndex { get; }
 
     public AlsRefactoredDirectionResources(string json, AlsRefactoredAnimationCatalog catalog, bool crouching)
     {
         using var document = JsonDocument.Parse(json); var root = document.RootElement;
-        Expect(root, new { schemaVersion = 1 }); CatalogDigest = catalog.IndexDigest;
+        Expect(root, new { schemaVersion = 1 }); CatalogDigest = catalog.IndexDigest; Crouching = crouching;
         Require(string.Equals(Text(root, "catalogSha256"), CatalogDigest, StringComparison.OrdinalIgnoreCase), "Foreign stance catalog.");
         var inventory = root.GetProperty("stances").EnumerateArray().ToArray();
         Require(inventory.Select(v => Text(v, "source")).Order().SequenceEqual(new[] { AlsRefactoredRotatePlayers.Blueprint(false), AlsRefactoredRotatePlayers.Blueprint(true) }.Order()), "Stance inventory differs.");
