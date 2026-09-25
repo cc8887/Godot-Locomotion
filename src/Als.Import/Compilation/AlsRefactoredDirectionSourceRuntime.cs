@@ -8,12 +8,14 @@ public readonly record struct AlsRefactoredDirectionCacheUpdate(int PropertyInde
 
 /// <summary>Direction-state traversal and deferred cache-source updates. The
 /// enclosing character still owns machine/player/Parent transactions. This
-/// standalone closure has no inertialization requester or outer cache readers.</summary>
+/// public standalone closure has no outer readers/requester. The internal shared
+/// path defers source updates and skipped messages to the enclosing traversal.</summary>
 public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSink
 {
     private readonly AlsRefactoredDirectionSourceProfile _profile;
     private readonly int _first;
     private readonly AlsPoseCacheTraversal _traversal;
+    private AlsPoseCacheTraversal _activeTraversal;
     private readonly AlsRefactoredStanceCallbackRuntime _callbacks;
     private readonly AlsRefactoredForwardSourceRuntime? _forward;
     private AlsGraphTraversalCounter[] _initialization, _nextInitialization;
@@ -29,6 +31,7 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
     private AlsRefactoredForwardInput _forwardInput;
     private AlsFrameIdentity _identity, _committedIdentity;
     private bool _prepared, _hasCommitted;
+    private bool _shared, _sharedComplete;
     private Vector4 _weights;
     private Vector4 _yaw;
     internal int FirstPlayer => _first;
@@ -40,12 +43,13 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
     public Vector4 DirectionWeights => _prepared ? _weights : throw new InvalidOperationException("No direction source candidate.");
     public Vector4 RotationYawOffsets => _prepared ? _yaw : throw new InvalidOperationException("No direction source candidate.");
     public AlsRefactoredForwardWeights ForwardWeights => _prepared && _forwardUpdated ? _forward!.Weights : throw new InvalidOperationException("Forward cache was not updated.");
-    public int CacheReadCount => _prepared ? _traversal.CachedCallCount : throw new InvalidOperationException("No direction source candidate.");
+    public int CacheReadCount => _prepared ? _activeTraversal.CachedCallCount : throw new InvalidOperationException("No direction source candidate.");
 
     public AlsRefactoredDirectionSourceRuntime(AlsRefactoredDirectionSourceProfile profile, int firstPlayer)
     {
         if (firstPlayer < 0 || firstPlayer > int.MaxValue - profile.Players.Players.Length) throw new ArgumentOutOfRangeException(nameof(firstPlayer));
         _profile = profile; _first = firstPlayer; _traversal = new(profile.Caches, 26); _callbacks = new(profile.Callbacks);
+        _activeTraversal = _traversal;
         if (profile.Forward is not null) _forward = new(profile.Forward, firstPlayer);
         _initialization = new AlsGraphTraversalCounter[profile.Caches.NodeCount]; _nextInitialization = new AlsGraphTraversalCounter[_initialization.Length];
         _resets = new bool[profile.Players.Players.Length]; _nextResets = new bool[_resets.Length];
@@ -56,11 +60,22 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
     public void Prepare(AlsRefactoredDirectionRuntime machine, in AlsPoseUpdateContext context,
         AlsGraphTraversalCounter initialization, Vector4 velocity, AlsRefactoredMovementPlayerInput movement,
         AlsRefactoredForwardInput forward = default, bool initializeInstance = false, Vector4 rotationYawOffsets = default)
+        => PrepareCore(machine, context, initialization, velocity, movement, forward, initializeInstance, rotationYawOffsets, null);
+
+    internal void PrepareShared(AlsRefactoredDirectionRuntime machine, in AlsPoseUpdateContext context,
+        AlsGraphTraversalCounter initialization, Vector4 velocity, AlsRefactoredMovementPlayerInput movement,
+        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 rotationYawOffsets, AlsPoseCacheTraversal traversal)
+        => PrepareCore(machine, context, initialization, velocity, movement, forward, initializeInstance, rotationYawOffsets, traversal);
+
+    private void PrepareCore(AlsRefactoredDirectionRuntime machine, in AlsPoseUpdateContext context,
+        AlsGraphTraversalCounter initialization, Vector4 velocity, AlsRefactoredMovementPlayerInput movement,
+        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 rotationYawOffsets, AlsPoseCacheTraversal? shared)
     {
         var frame = context.Identity.FrameId;
         if (_prepared || !ReferenceEquals(machine.Resources, _profile.Graph.Resources) || _owner is not null && !ReferenceEquals(_owner, machine) ||
             _hasCommitted && (context.Identity.CharacterId != _committedIdentity.CharacterId || context.Identity.SlotGeneration != _committedIdentity.SlotGeneration || frame <= _committedIdentity.FrameId) ||
-            !initialization.HasUpdated || context.UpdateCounter is not { HasUpdated: true } || context.InertializationRequester >= 0 || context.SkippedUpdateHandler >= 0)
+            !initialization.HasUpdated || context.UpdateCounter is not { HasUpdated: true } ||
+            shared is null && (context.InertializationRequester >= 0 || context.SkippedUpdateHandler >= 0))
             throw new ArgumentException("Invalid direction source owner/context.");
         machine.ValidateCommit(frame); var candidate = machine.Candidate;
         if (candidate.State.LastUpdateCounter != context.UpdateCounter) throw new ArgumentException("Direction update counter differs.");
@@ -71,11 +86,12 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
         if (_forward is not null && (forward.Gait is null || !float.IsFinite(forward.SprintBlock) || !float.IsFinite(forward.SprintAcceleration))) throw new ArgumentException("Invalid forward source input.");
         if (initializeInstance) { Array.Clear(_nextInitialization); Array.Clear(_nextResets); }
         else { _initialization.CopyTo(_nextInitialization, 0); _resets.CopyTo(_nextResets, 0); }
+        _shared = shared is not null; _sharedComplete = false; _activeTraversal = shared ?? _traversal;
         _nextForwardReset = initializeInstance || _forwardReset; _inputCount = _cacheCount = _commandCount = 0; _forwardUpdated = false;
         _movement = movement; _forwardInput = forward; _identity = context.Identity; _weights = weights; _yaw = rotationYawOffsets;
         try
         {
-            _callbacks.Prepare(frame, context.UpdateCounter.Value, initializeInstance); _traversal.Begin(context.Identity);
+            _callbacks.Prepare(frame, context.UpdateCounter.Value, initializeInstance); if (!_shared) _traversal.Begin(context.Identity);
             for (var i = 0; i < candidate.InitializationCount; i++)
                 foreach (var cache in _profile.Graph.States[candidate.GetInitialization(i)].CachePropertyIndices) Initialize(cache);
             for (var i = 0; i < candidate.UpdateCount; i++)
@@ -85,10 +101,10 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
                 if (command is not null) _commands[_commandCount++] = command;
                 var stateContext = context.WithWeight(update.Weight).WithState(machine.Resources.MachinePropertyIndex, update.State, update.InertializationSync);
                 for (var channel = 0; channel < 4; channel++) if (weights[channel] > AlsPoseBlender.WeightThreshold)
-                    _traversal.Use(state.ReadPropertyIndices[channel], stateContext.WithWeight(update.Weight * weights[channel]));
+                    _activeTraversal.Use(state.ReadPropertyIndices[channel], stateContext.WithWeight(update.Weight * weights[channel]));
                 _callbacks.Leave(frame, state.CallbackPropertyIndex);
             }
-            _traversal.Drain(this); _callbacks.ValidateCommit(frame);
+            if (!_shared) _traversal.Drain(this); _callbacks.ValidateCommit(frame);
             _owner ??= machine; _prepared = true;
         }
         catch { _callbacks.Cancel(); _forward?.Cancel(); _forwardUpdated = false; throw; }
@@ -115,7 +131,7 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
             foreach (var read in _forward.BaseReads)
             {
                 var child = context.WithWeight(read.Weight); if (read.Inactive) child = child.AsInactive();
-                _traversal.Use(read.ReadPropertyIndex, child);
+                _activeTraversal.Use(read.ReadPropertyIndex, child);
             }
             for (var i = 0; i < _forward.SourceInputs.Length; i++)
             {
@@ -134,14 +150,19 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
     private void Add(AlsRefactoredSourcePlayerInput tick, AlsPoseUpdateContext context)
     {
         for (var i = 0; i < _inputCount; i++) if (_inputs[i].PlayerId == tick.PlayerId) throw new InvalidOperationException("Direction player updated more than once.");
-        _inputs[_inputCount] = tick; _contexts[_inputCount++] = context;
+        _inputs[_inputCount] = tick with { RequestedInertialization = context.InertializationSync }; _contexts[_inputCount++] = context;
     }
     void IAlsPoseCacheUpdateSink.OnCachedUpdatesSkipped(int handlerNodeIndex, ReadOnlySpan<AlsPoseUpdateContext> skipped) =>
         throw new InvalidOperationException("Outer inertialization must be handled by the full stance cache scheduler.");
     public void ValidateCommit(long frame)
     {
-        if (!_prepared || frame != _identity.FrameId) throw new ArgumentException("Invalid direction source commit.");
+        if (!_prepared || frame != _identity.FrameId || _shared && !_sharedComplete) throw new ArgumentException("Invalid direction source commit.");
         _callbacks.ValidateCommit(frame); if (_forwardUpdated) _forward!.ValidateCommit(frame);
+    }
+    internal void CompleteShared(long frame)
+    {
+        if (!_prepared || !_shared || frame != _identity.FrameId) throw new ArgumentException("Invalid shared direction completion.");
+        _callbacks.ValidateCommit(frame); if (_forwardUpdated) _forward!.ValidateCommit(frame); _sharedComplete = true;
     }
     internal void ValidateMachine(long frame, AlsRefactoredDirectionRuntime machine)
     {

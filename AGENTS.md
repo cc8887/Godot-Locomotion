@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新统一Movement遍历：`docs/verification/2026-09-25-refactored-movement-traversal.md`。Details六读者+Direction26读者单Drain，67→七方向cache原序；maxweight/先到tie、Forward双读者、完整祖先/Inactive/rootmotion/inertial请求与skipped批次候选，24原ID无重复；rawVelocity避免双归一化。新4/最终24/Optimize0/0，3Hz1260帧真实direction→Lean→Details逐帧retry、6state8cache；旧native6/1680帧时间weight0误差。曾推断SaveCachedPose.UpdateCounter应同步导致旧native2失败，完整源码证实本机UE未同步此字段，已撤回非原生重置并保留失败，未放宽门槛。尚无新UE Details整链/Godot/全量/性能、普通Demo未切；只Details入口不含外66/Standing，下一步119惯性化/skipped消费、真实Parent/ResetPivot/Hips及新UE整链，update-only/其余stance/宿主/Ragdoll旧缺口、用户修改/暂缓项保留。
+
 - 最新Details姿态：`docs/verification/2026-09-25-refactored-movement-details-pose.md`。六状态共享完整Movement，四加法状态各四原源按序MultiWay→local Apply、curve合并，零通道identity，标准stack末尾normalize/同state仅一次，外惯性化未重复blend；同帧source捕获/player owner/cache/layout门禁。新4/相关19/Optimize0/0，3Hz1260提交帧99540骨retry、六state/stack/零和单多通道；单方向按真实time独立变换/curve校验，无失败。基础为reference+真实Lean，尚非direction完整cache/native oracle；无新UE/Godot/全量/性能、普通Demo未切。下一步统一Movement/direction读者及初始化/context/skipped/requester→119惯性化/ResetPivot/Parent→UE整链；update-only/其他stance/宿主/Ragdoll及所有旧缺口、用户改动/暂缓项保留。
 
 - 最新Movement外层：`docs/verification/2026-09-25-refactored-movement-cache-envelope.md`。Standing67→122 PoseMoving→120 Lean(local additive)/201方向，202原BS evaluator固定0/DoNotSync，Running权重clamp .5..1、20/1插值；候选filter/alpha与79骨/curve合成、Cancel/retry/失败门禁。新4/10变异/3Hz630帧，相关22过、Optimize0/0。首轮4失败因原接线有Knot，改FollowReroutes后过并保留记录。基础测试identity而非真实direction/native整图；无新UE/Godot/全量/性能，普通Demo未切。owner目前须Evaluate提交，update-only及外层cache/context/初始化、Details pose/惯性化/ResetPivot统一尚待接，接后原生对照；其余stance/Parent/宿主/Ragdoll旧缺口、用户修改和暂缓项保留。
