@@ -35,6 +35,30 @@ for hz in (30, 60, 120):
                             allowed=i % 17 < 5, moving=i % 23 < 5,
                             sprint=i % 41 < 7, air=i % 61 < 5, reset=i == 81))
     frames.extend([frame(d, aim=True), frame(d)] + [frame(d) for _ in range(hz + 2)])
+    if os.environ.get("ALS_WEAPON_SOURCE_TRACE") == "1":
+        for i, item in enumerate(frames):
+            item["poseState"].update({"GaitRunningAmount": 1 if i % 29 < 20 else .3,
+                                      "GaitWalkingAmount": 0 if i % 23 < 15 else .4,
+                                      "GaitSprintingAmount": 1 if i % 17 < 9 else 0,
+                                      "InAirAmount": .8 if i % 43 < 6 else 0})
+            item["inAirState"]["GroundPredictionAmount"] = .9 if i % 31 < 7 else 0
+            item["standingState"] = {"SprintAccelerationAmount": .3 if i % 11 < 4 else 0}
+            item["groundedState"] = {"VelocityBlend": dict(zip(
+                ("ForwardAmount", "BackwardAmount", "LeftAmount", "RightAmount"),
+                ([1, 0, 0, 0], [0, 1, 0, 0], [.2, 0, .8, 0], [0, .3, 0, .7])[i % 4]))}
+        # Isolate every Rifle arms path at every Hz, independently of the earlier
+        # interrupted state transitions and directional zero weights.
+        for phase in range(3):
+            for i in range(hz // 2):
+                item = frame(d, reset=phase == 0 and i == 0)
+                # Gait amounts are cumulative: the Walking amount also gates the
+                # moving branch during running/sprinting; they are not one-hot.
+                item["poseState"].update({"GaitWalkingAmount": 1, "GaitRunningAmount": 1,
+                                          "GaitSprintingAmount": 0 if phase == 0 else 1,
+                                          "StandingAmount": 1, "CrouchingAmount": 0})
+                item["standingState"] = {"SprintAccelerationAmount": .3 if phase == 2 else 0}
+                item["groundedState"] = {"VelocityBlend": {"ForwardAmount": 1, "BackwardAmount": 0, "LeftAmount": 0, "RightAmount": 0}}
+                frames.append(item)
     traces.append({"name": str(hz) + "hz", "frames": frames})
 for kind in ("Bow", "PistolOneHanded", "PistolTwoHanded", "Rifle"):
     request = {"schemaVersion": 1, "overlay": kind, "resourceHashes": hashes, "traces": traces}
