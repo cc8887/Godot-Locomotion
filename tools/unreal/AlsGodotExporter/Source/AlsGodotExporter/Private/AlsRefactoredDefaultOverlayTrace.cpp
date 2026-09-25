@@ -59,17 +59,26 @@ struct FOverlayActionBlendAccess : FAlsAnimNode_GameplayTagsBlend
         return Result;
     }
 };
-bool SetState(UObject* Object,const TCHAR* StructName,const TSharedPtr<FJsonObject>& Values)
+bool SetOverlayStructState(UStruct* Struct,void* Memory,const TSharedPtr<FJsonObject>& Values)
 {
-    auto* Struct=FindFProperty<FStructProperty>(Object->GetClass(),StructName);if(!Struct)return false;
-    void* Memory=Struct->ContainerPtrToValuePtr<void>(Object);
     for(const auto& Pair:Values->Values)
     {
-        auto* Field=FindFProperty<FFloatProperty>(Struct->Struct,FName(*Pair.Key));if(!Field)return false;
+        if(Pair.Value->Type==EJson::Object)
+        {
+            auto* Child=FindFProperty<FStructProperty>(Struct,FName(*Pair.Key));
+            if(!Child||!SetOverlayStructState(Child->Struct,Child->ContainerPtrToValuePtr<void>(Memory),Pair.Value->AsObject()))return false;
+            continue;
+        }
+        auto* Field=FindFProperty<FFloatProperty>(Struct,FName(*Pair.Key));if(!Field)return false;
         const float Value=static_cast<float>(Pair.Value->AsNumber());if(!FMath::IsFinite(Value))return false;
         Field->SetPropertyValue_InContainer(Memory,Value);
     }
     return true;
+}
+bool SetState(UObject* Object,const TCHAR* StructName,const TSharedPtr<FJsonObject>& Values)
+{
+    auto* Struct=FindFProperty<FStructProperty>(Object->GetClass(),StructName);
+    return Struct&&SetOverlayStructState(Struct->Struct,Struct->ContainerPtrToValuePtr<void>(Object),Values);
 }
 TSharedPtr<FJsonObject> DefaultOverlayTransformJson(const FTransform& T)
 {
@@ -171,6 +180,8 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredDefaultOverlayTrace(const FStrin
             }
             if(Weapon)
             {
+                if(Frame->HasField(TEXT("standingState"))&&!SetState(Parent.Get(),TEXT("StandingState"),Frame->GetObjectField(TEXT("standingState"))))return false;
+                if(Frame->HasField(TEXT("groundedState"))&&!SetState(Parent.Get(),TEXT("GroundedState"),Frame->GetObjectField(TEXT("groundedState"))))return false;
                 for(const auto& Pair:{TPair<const TCHAR*,const TCHAR*>(TEXT("Gait"),TEXT("gait")),TPair<const TCHAR*,const TCHAR*>(TEXT("LocomotionMode"),TEXT("locomotionMode"))})
                 {
                     auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),Pair.Key);
