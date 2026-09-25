@@ -16,14 +16,20 @@ public sealed class AlsRefactoredTransitionPose
     public ReadOnlySpan<string> CurveNames => _curves;
     public AlsRefactoredTransitionPose(AlsRefactoredAnimationCatalog catalog, AlsRefactoredTransitionMontages montages,
         ReadOnlySpan<string> bones, ReadOnlySpan<int> parents, ReadOnlySpan<string> curves)
+        :this(catalog,montages.CatalogDigest,montages.Assets,montages.SourcePath,bones,parents,curves) { }
+    public AlsRefactoredTransitionPose(AlsRefactoredAnimationCatalog catalog, AlsRefactoredStandingActions actions,
+        ReadOnlySpan<string> bones, ReadOnlySpan<int> parents, ReadOnlySpan<string> curves)
+        :this(catalog,actions.CatalogDigest,actions.Assets,actions.SourcePath,bones,parents,curves) { }
+    private AlsRefactoredTransitionPose(AlsRefactoredAnimationCatalog catalog,string digest,ReadOnlySpan<AlsSequenceMontageAsset> assets,
+        Func<int,string> sourcePath,ReadOnlySpan<string> bones,ReadOnlySpan<int> parents,ReadOnlySpan<string> curves)
     {
-        if (catalog.IndexDigest != montages.CatalogDigest || bones.Length != 79 || parents.Length != bones.Length ||
+        if (catalog.IndexDigest != digest || bones.Length != 79 || parents.Length != bones.Length ||
             curves.ToArray().Any(string.IsNullOrWhiteSpace) || curves.ToArray().Distinct(StringComparer.OrdinalIgnoreCase).Count() != curves.Length)
             throw new ArgumentException("Foreign transition pose layout/catalog.");
         _bones = bones.ToArray(); _parents = parents.ToArray(); _curves = curves.ToArray();
-        foreach (var asset in montages.Assets)
+        foreach (var asset in assets)
         {
-            var source = catalog.CompileAdditivePose(montages.SourcePath(asset.AnimationId));
+            var source = catalog.CompileAdditivePose(sourcePath(asset.AnimationId));
             if (!source.BoneNames.SequenceEqual(bones) || !source.Parents.SequenceEqual(parents))
                 throw new ArgumentException("Transition pose requires the original native bone basis/layout.");
             var map = source.CurveNames.ToArray().Select(name => Array.FindIndex(_curves, c => c.Equals(name, StringComparison.OrdinalIgnoreCase))).ToArray();

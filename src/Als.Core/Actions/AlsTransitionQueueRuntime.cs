@@ -78,6 +78,8 @@ public sealed class AlsTransitionQueueRuntime
     {
         if (!_prepared || identity != _identity) throw new ArgumentException("Wrong transition queue commit.");
     }
+    public void ValidateBank(AlsMontageRuntime owner,AlsFrameIdentity identity)
+    {ValidateCommit(identity);if(!ReferenceEquals(owner,_owner))throw new ArgumentException("Foreign transition queue bank.");}
     public void Commit(AlsFrameIdentity identity)
     {
         ValidateCommit(identity); Committed = _candidate; CommittedIdentity = identity; Discard();
