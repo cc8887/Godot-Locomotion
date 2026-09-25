@@ -44,7 +44,7 @@ public sealed class AlsRefactoredWeaponActionTests
                 Assert.Equal(expected,profile.Curves[action][c]);
             }
         }
-        foreach(var change in new[]{"time","tag","curve","frame","link","binding"})
+        foreach(var change in new[]{"time","tag","curve","frame","link","binding","entry"})
         {
             var root=JsonNode.Parse(payload.GetRawText())!;var nodes=root["compiled"]!["nodes"]!.AsArray().Where(n=>n!["graph"]!.GetValue<string>().EndsWith(":Overlay",StringComparison.Ordinal)).ToArray();
             JsonNode Node(string kindName)=>nodes.First(n=>n!["class"]!.GetValue<string>()==kindName)!;
@@ -55,6 +55,7 @@ public sealed class AlsRefactoredWeaponActionTests
             if(change=="frame")Node("AnimGraphNode_SequenceEvaluator")["runtime"]!["explicitFrame"]=99;
             if(change=="link")action["blendPose"]![1]!["linkId"]=0;
             if(change=="binding")root["nativeText"]=root["nativeText"]!.GetValue<string>().Replace("\"LocomotionAction\"","\"RotationMode\"",StringComparison.Ordinal);
+            if(change=="entry")root["compiled"]!["nodes"]!.AsArray().Single(n=>n!["class"]!.GetValue<string>()=="AnimGraphNode_LinkedAnimLayer")!["runtime"]!["layer"]="Other";
             using var changed=JsonDocument.Parse(root.ToJsonString());Assert.Throws<ArgumentException>(()=>AlsRefactoredWeaponActionProfile.Compile(changed.RootElement,source));
         }
     }
