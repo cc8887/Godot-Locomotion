@@ -116,7 +116,7 @@ public sealed class AlsRefactoredWeaponMachineResources
             return new AlsCurveKey(k.GetProperty("time").GetSingle(),k.GetProperty("value").GetSingle(),k.GetProperty("arriveTangent").GetSingle(),k.GetProperty("leaveTangent").GetSingle(),Text(k,"interpMode") switch{"RCIM_Cubic"=>AlsCurveInterpolationMode.Cubic,"RCIM_Linear"=>AlsCurveInterpolationMode.Linear,_=>throw new ArgumentException("Unsupported weapon curve interpolation.")});
         }).ToArray();
         if(keys[0].TimeSeconds!=0||keys[^1].TimeSeconds!=1)throw new ArgumentException("Weapon blend curve domain differs.");
-        var result=new AlsMovementInputCurve(keys);var samples=row.GetProperty("verification");if(samples.GetArrayLength()!=201)throw new ArgumentException("Missing weapon curve reference.");
+        var result=new AlsMovementInputCurve(keys,nativePrecision:true);var samples=row.GetProperty("verification");if(samples.GetArrayLength()!=201)throw new ArgumentException("Missing weapon curve reference.");
         for(var i=0;i<201;i++){var rowSample=samples[i];var t=rowSample.GetProperty("input").GetSingle();if(t!=i*(1f/200)||MathF.Abs(result.Sample(t)-rowSample.GetProperty("value").GetSingle())>2e-6f)throw new ArgumentException("Weapon curve native mismatch.");}
         return result;
     }

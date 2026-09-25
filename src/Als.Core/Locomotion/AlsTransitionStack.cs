@@ -149,7 +149,7 @@ public static class AlsTransitionStack
         var value = blend switch
         {
             AlsTransitionBlend.Linear => progress,
-            AlsTransitionBlend.Cubic => -2 * progress * progress * progress + 3 * progress * progress,
+            AlsTransitionBlend.Cubic => -2 * ((progress * progress) * progress) + 3 * (progress * progress),
             AlsTransitionBlend.HermiteCubic => progress <= 0 ? 0 : progress >= 1 ? 1 : progress * progress * (3 - 2 * progress),
             AlsTransitionBlend.Custom => customCurve is not null ? customCurve(progress) :
                 throw new ArgumentException("Custom transitions require the source curve.", nameof(customCurve)),

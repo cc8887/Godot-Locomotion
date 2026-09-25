@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新武器状态pose：`docs/verification/2026-09-25-refactored-weapon-state-pose.md`。复用source update本帧alpha/weights→原52 evaluator/15player/Two/Multi/local/mesh状态求值→有序transition栈/QuickFeet分支，独占暂存/owner/取消门禁。原RichCurve新增floatBezier可选路径、Cubic先A²/A³。native机器3684帧291036骨maxP1.578e-5cm/Q1.238e-7/S5.961e-8/C1.789e-7；单状态严格精度通过，完整过渡原严格测试失败后明确采用P1e-4cm/QS2e-6预算，尚未逐位同，全部调查TRX保留。现有trace无QuickFeet活跃求值帧，覆盖断言24失败后确认数据缺口，最终明确quick=0，不能宣称已端到端验证。最终回归见文档；Core47/Optimize0/0。无UE新导出/Godot/全量/性能。下一步新增QuickFeet连续原生场景+外Action隐藏/重入；整图仍9/13、普通Demo未切、Ragdoll未整体验收及全部旧缺口/用户改动/暂缓项保留。
+
 - 最新武器 evaluator：`docs/verification/2026-09-25-refactored-weapon-evaluators.md`。四state图52叶（13/16/11/12），原固定frame→float秒、八PitchAmount mesh Aim、79骨cm/curve映射、独立worker采样无时钟；严格绑定/源/政策门禁。新4含3worker×5pitch共780次直资源逐值比较及20变异拒绝，相关Import100通过/Optimize0/0。首轮Rifle数量误写17实际16，1失败已修并保留。无新UE/整图native/Godot/全量/性能；state混合及每骨过渡尚未接，整图仍9/13、普通Demo未切、Ragdoll未整体验收和全部旧缺口/暂缓项保留。下一步复用update候选alpha接state pose→每骨过渡/外Action/统一宿主。
 
 - 最新武器状态源更新：`docs/verification/2026-09-25-refactored-weapon-source-update.md`。原state树/绑定/pose links→候选节点插值/范围/子相关性、Entry reset/隐藏pending→共享SourcePlayer输入；唯一machine owner/事务取消，无第二时钟。新增变化输入含Rifle三arms覆盖，最终新3684+旧2424=6108帧、11382ticks/474reset，time差0/weight1.193e-7；新25/Import91/Optimize0/0。两次Rifle30覆盖5/6失败，夹具Walking=0关闭移动分支，按原gait累进语义修输入后全15身份/3Hz覆盖，失败证据保留，无放宽。全Editor4actions审计68FD4C51...；冷complete/普通38880退出0四文件字节同；DV0/3旧warn/普通两旧Condition五类warn保留。无state完整pose/外Action生命周期/Godot场景/全量/性能/打包；Overlay9/13、普通Demo未切/Ragdoll未整体验收及全部旧缺口/用户文件/暂缓项保留。下一步状态pose/每骨过渡→外Action/四武器整图→Locomotion统一宿主。

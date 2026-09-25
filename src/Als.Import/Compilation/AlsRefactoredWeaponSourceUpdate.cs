@@ -92,7 +92,15 @@ public sealed class AlsRefactoredWeaponSourceProfile
                         reset = runtime.GetProperty("bResetChildOnActivation").GetBoolean(); Expect(policy, new { bResetChildOnActivation = reset });
                         Link("a", "A"); Link("b", "B");
                     }
-                    else { foreach (var p in new[] { runtime, policy }) Expect(p, new { lODThreshold = -1 }); Link("base", "Base"); Link("additive", "Additive"); }
+                    else
+                    {
+                        foreach (var p in new[] { runtime, policy })
+                        {
+                            Expect(p, new { lODThreshold = -1 });
+                            if (kind == "AnimGraphNode_ApplyMeshSpaceAdditive") Expect(p, new { bRootSpaceAdditive = false });
+                        }
+                        Link("base", "Base"); Link("additive", "Additive");
+                    }
                     Value("Alpha", runtime.GetProperty("alpha").GetSingle());
                     var clamp = runtime.GetProperty("alphaScaleBiasClamp");
                     if (clamp.GetRawText() != policy.GetProperty("alphaScaleBiasClamp").GetRawText()) throw new ArgumentException("Weapon alpha policies differ.");
@@ -122,6 +130,21 @@ public sealed class AlsRefactoredWeaponSourceRuntime
     private readonly AlsRefactoredWeaponSourceProfile _profile; private readonly int _first;
     private State[] _states, _next; private bool[] _reset, _nextReset;
     private readonly AlsRefactoredSourcePlayerInput[] _inputs; private int _count;
+    private readonly Vector4[] _poseWeights;
+    private readonly bool[] _updated;
+    internal AlsRefactoredWeaponSourceProfile Profile => _profile;
+    internal int FirstPlayer => _first;
+    internal void ValidateMachine(long frame, AlsRefactoredWeaponMachineRuntime machine)
+    {
+        ValidateCommit(frame); machine.ValidateCommit(frame);
+        if (!ReferenceEquals(_owner, machine)) throw new ArgumentException("Foreign weapon machine owner.");
+    }
+    internal Vector4 PoseWeights(long frame, int node)
+    {
+        ValidateCommit(frame);
+        if ((uint)node >= (uint)_updated.Length || !_updated[node]) throw new ArgumentException("Weapon pose node was not updated.");
+        return _poseWeights[node];
+    }
     private AlsRefactoredWeaponMachineRuntime? _owner;
     private bool _prepared; private long _frame, _committed = -1;
     public ReadOnlySpan<AlsRefactoredSourcePlayerInput> SourceInputs => _prepared ? _inputs.AsSpan(0, _count) : throw new InvalidOperationException("No weapon source frame.");
@@ -130,12 +153,14 @@ public sealed class AlsRefactoredWeaponSourceRuntime
         if (firstPlayer < 0 || firstPlayer > int.MaxValue - profile.Players.Players.Length) throw new ArgumentOutOfRangeException(nameof(firstPlayer));
         _profile = profile; _first = firstPlayer; _states = new State[profile.Nodes.Length]; _next = new State[_states.Length];
         _reset = new bool[profile.Players.Players.Length]; _nextReset = new bool[_reset.Length]; _inputs = new AlsRefactoredSourcePlayerInput[_reset.Length];
+        _poseWeights = new Vector4[_states.Length]; _updated = new bool[_states.Length];
     }
     public void Prepare(long frame, AlsRefactoredWeaponMachineRuntime machine, AlsRefactoredWeaponPoseInput input, float delta)
     {
         if (_prepared || frame < 0 || frame <= _committed || !ReferenceEquals(machine.Profile, _profile.Machine) ||
             _owner is not null && !ReferenceEquals(machine, _owner) || !float.IsFinite(delta) || delta < 0) throw new ArgumentException("Invalid weapon source frame.");
         machine.ValidateCommit(frame); input.Validate(); _states.CopyTo(_next, 0); _reset.CopyTo(_nextReset, 0); _count = 0;
+        Array.Clear(_updated); Array.Clear(_poseWeights);
         var update = machine.Candidate;
         for (var i = 0; i < update.EntryCount; i++) { var entry = update.GetEntry(i); if (entry.Initialize) Initialize(_profile.Roots[entry.State]); }
         for (var i = 0; i < update.UpdateCount; i++) { var child = update.GetUpdate(i); Update(_profile.Roots[child.State], child.Weight); }
@@ -148,6 +173,7 @@ public sealed class AlsRefactoredWeaponSourceRuntime
         }
         void Update(int id, float weight)
         {
+            _updated[id] = true;
             var node = _profile.Nodes[id]!; ref var state = ref _next[id];
             if (node.Player >= 0)
             {
@@ -161,10 +187,12 @@ public sealed class AlsRefactoredWeaponSourceRuntime
             {
                 var desired = Vector4.Zero; for (var i = 0; i < node.Constants.Length; i++) desired[i] = Value(i);
                 var weights = AlsOverlayPoseWeights.MultiWay(desired, node.Children.Length);
+                _poseWeights[id] = weights;
                 for (var i = 0; i < node.Children.Length; i++) if (weights[i] > AlsPoseBlender.WeightThreshold) Update(node.Children[i], weight * weights[i]);
                 return;
             }
             var alpha = AlsOverlayPoseWeights.Alpha(Value(0), node.Alpha, delta, ref state.Initialized, ref state.History);
+            _poseWeights[id] = new(alpha, 0, 0, 0);
             if (node.Kind == "AnimGraphNode_TwoWayBlend")
             {
                 var a = alpha < 1 - AlsPoseBlender.WeightThreshold; var b = alpha > AlsPoseBlender.WeightThreshold;
