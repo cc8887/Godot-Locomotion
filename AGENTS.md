@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Standing 原生连续：`docs/verification/2026-09-25-refactored-standing-host-native.md`。原完整Standing/真实Parent/物理Montage，三Hz2310帧/140067骨/五状态/12Quick；修独立MovingSmooth及隐藏帧空播放器批次清同步组，30Hz再起步旧组覆盖已消除。相关62通过、ExportRelease0/0、Python语法过；**原生严格3组仍失败**：258位置分量超2e-5cm，FootPlanted/Yaw超2e-6，maxP3.86872e-5cm/C7.6294e-6，未放宽/未跳过。全帧状态/已比较Parent/动作/播放器clock通过，maxclock4.768e-7。完整Editor4actions审计173CD9BE.../BuildId b4127720-ddfd-475f-a955-59a24fb7ace6；冷40584/普通18296退出0，28559445字节SHA2C6FC401...一致，DV27668退出0/3旧warn；编译/导出/早期oracle失败均保留。下一步隔离源采样/混合/惯性误差，严禁称原生验收通过；外层Transition/Crouch/全角色/Demo及Ragdoll等全部旧目标/用户改动/暂缓项保留，无Godot运行或性能验收。
+
 - 最新 Standing 统一宿主：`docs/verification/2026-09-25-refactored-standing-host.md`。生产 profile/角色 owner 统一 Parent、203/65/Stop/66/67、独立播放器、Idle Turn Slot、119/118/68、停止队列和主线程 QuickStop；候选完整预校验/依赖提交、异常整帧取消、update-only 与重复求值。新增初4/最终相关57通过，三Hz2310帧逐帧后处理后取消重试/稀疏求值/全求值状态动作对照、初始化counter间断与后处理故障；Optimize0/0，无失败。未新UE整图oracle/Godot运行/全量/性能。输出只到Standing68，外层Transition Slot尚未混入；局部18资源bank仍须统一角色绑定，源Notify/曲线反馈/Crouch/Overlay/Demo待接。下步完整原生连续对照和角色外层接入，所有Ragdoll等旧目标/用户修改/暂缓项保留。
 
 - 最新 Movement update-only：`docs/verification/2026-09-25-refactored-movement-update-only.md`。按本机 UE tick/Evaluate 分工将 Lean 权重/三角形缓存解析前移至 Prepare，允许无骨骼求值提交滤波与 alpha；失败求值仍拒绝提交，取消/重置/旧姿态门禁保留。Release 相关15通过，既有native6720帧新增稀疏求值逐帧cache对照，Movement三Hz630帧稀疏/全求值严格一致；Optimize0/0。未新UE导出/Godot运行/全量/视觉/性能，统一Standing宿主和普通Demo未完成；下步统一宿主/连续原生整图，Crouch/Ragdoll等全部旧目标及用户修改/暂缓项保留。

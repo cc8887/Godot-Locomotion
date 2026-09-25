@@ -6,7 +6,7 @@ namespace GodotAls.Import.Compilation;
 
 public readonly record struct AlsRefactoredStandingHostInput(AlsRefactoredMovementInput Movement,
     AlsRefactoredRestInput Rest, AlsRefactoredStandingMovementInput Details,
-    AlsRefactoredQuickStopInput QuickStop, float FootPlanted, bool ActivatePivot = false);
+    AlsRefactoredQuickStopInput QuickStop, float FootPlanted, bool MovingSmooth, bool ActivatePivot = false);
 
 /// <summary>Exclusive character-owned Standing graph and Grounded action bank.
 /// Prepare/Evaluate may run on one worker; after joining it, PostUpdateActions
@@ -58,6 +58,7 @@ public sealed class AlsRefactoredStandingHost
     public ReadOnlySpan<AlsMontageInstance> CandidateMontages { get { Check(); return _bank.Candidate; } }
     public AlsMontageFrame MontageFrame { get { Check(); return _bank.Frame; } }
     public int QuickStopDispatchCount { get; private set; }
+    internal AlsRefactoredSourcePlayerRuntime? MovementPlayers { get { Check(); return _hasMovement ? _players : null; } }
 
     internal AlsRefactoredStandingHost(AlsRefactoredStandingHostProfile profile, uint character, uint generation)
     {
@@ -105,7 +106,7 @@ public sealed class AlsRefactoredStandingHost
             var source = AlsRefactoredStandingInertialization.SourceContext(context);
             _restTraversal.Begin(source, _restParent, initializeInstance);
             var rotate = _restParent.Candidate.Rotate;
-            _standing.Prepare(frame, new(input.Rest.Moving, rotate.Left, rotate.Right), _clocks, context.Delta,
+            _standing.Prepare(frame, new(input.MovingSmooth, rotate.Left, rotate.Right), _clocks, context.Delta,
                 context.Weight, initializeInstance, context.UpdateCounter);
             _profile.Actions.QueueStanding(_queue, _identity, _standing);
             var update = _standing.Candidate;
@@ -145,9 +146,12 @@ public sealed class AlsRefactoredStandingHost
                 _parent, input.Details, initializeInstance);
             _rotate.Prepare(frame, _rotateInputs.AsSpan(0, rotateCount), context.Delta, initializeInstance);
             _hasMovement = _traversal.HasMovement;
+            // Sync membership belongs to the animation frame, not the lifetime
+            // of the cached Movement branch. Empty frames retire prior groups
+            // while the source runtime retains each hidden player's own state.
+            _players.Prepare(frame, _hasMovement ? _traversal.Movement.SourceInputs : [], context.Delta, initializeInstance);
             if (_hasMovement)
             {
-                _players.Prepare(frame, _traversal.Movement.SourceInputs, context.Delta, initializeInstance);
                 _traversal.DetailsSources.CaptureSourceTimes(frame, _players);
                 _movementInertia.Prepare(_traversal.DetailsContext, _traversal.DetailsMachine, _traversal.Movement, initializeInstance);
                 _movement.Prepare(frame, input.Details.UnweightedRunningAmount, _parent.MovementCandidate.Lean, context.Delta, _traversal.Movement.InitializeMovement);
@@ -218,10 +222,10 @@ public sealed class AlsRefactoredStandingHost
         _bank.ValidateCommit(identity); _queue.ValidateCommit(identity);
         _restParent.ValidateCommit(frame); _restTraversal.ValidateCommit(frame);
         _parent.ValidateCommit(frame); _standing.ValidateCommit(frame); _traversal.ValidateCommit(frame);
-        _rotate.ValidateCommit(frame); _inertia.ValidateCommit(frame);
+        _rotate.ValidateCommit(frame); _players.ValidateCommit(frame); _inertia.ValidateCommit(frame);
         if (_hasIdle) _idle.ValidateCommit(identity);
         if (_hasStop) { _stop.ValidateCommit(frame); _stopSources.ValidateCommit(frame); }
-        if (_hasMovement) { _players.ValidateCommit(frame); _movement.ValidateCommit(frame); _movementInertia.ValidateCommit(frame); }
+        if (_hasMovement) { _movement.ValidateCommit(frame); _movementInertia.ValidateCommit(frame); }
         if (_poseBegun) _standingPose.ValidateCommit(frame);
     }
     public void Commit(in AlsFrameIdentity identity)
@@ -231,8 +235,8 @@ public sealed class AlsRefactoredStandingHost
         if (_hasIdle) _idle.Commit(identity);
         _restTraversal.Commit(frame); _traversal.Commit(frame);
         if (_hasStop) { _stopSources.Commit(frame); _stop.Commit(frame); }
-        if (_hasMovement) { _movementInertia.Commit(frame); _movement.Commit(frame); _players.Commit(frame); }
-        _rotate.Commit(frame); _standing.Commit(frame); _parent.Commit(frame); _restParent.Commit(frame);
+        if (_hasMovement) { _movementInertia.Commit(frame); _movement.Commit(frame); }
+        _players.Commit(frame); _rotate.Commit(frame); _standing.Commit(frame); _parent.Commit(frame); _restParent.Commit(frame);
         _queue.Commit(identity); _bank.Commit(identity); _nextClocks.CopyTo(_clocks, 0);
         CommittedIdentity = identity; Cancel();
     }

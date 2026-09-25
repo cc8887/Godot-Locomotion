@@ -7,7 +7,7 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsRefactoredStandingHostTests
 {
-    private static readonly Lazy<AlsRefactoredStandingHostProfile> Data = new(() =>
+    internal static readonly Lazy<AlsRefactoredStandingHostProfile> Data = new(() =>
     {
         var index = MantlingHostFixture.Read("refactored_animation_sources");
         byte[] Read(string p) => File.ReadAllBytes(Path.Combine(RepositoryRoot.Find(), "assets/config", p));
@@ -35,7 +35,7 @@ public sealed class AlsRefactoredStandingHostTests
             AlsRefactoredRestStance.Standing, true, frame == 0, 1, phase == 9 ? 1 : 0, 0,
             new(20, 0, 0), default, default, default);
         return new(movement, rest, new(1, 1, 1, 0), new(false, false, moving, 90, 0, 0),
-            (phase % 4) switch { 0 => -.75f, 1 => -.25f, 2 => .25f, _ => .75f }, phase == 4 && local < .01f);
+            (phase % 4) switch { 0 => -.75f, 1 => -.25f, 2 => .25f, _ => .75f }, moving, phase == 4 && local < .01f);
     }
 
     [Theory]
@@ -105,6 +105,46 @@ public sealed class AlsRefactoredStandingHostTests
         Assert.Equal(5, states.Count); Assert.True(quick > 0); Assert.True(movement > 0);
         Assert.Contains((AlsMontageSlot)AlsTurnSlot.Standing, slots); Assert.Contains(AlsMontageSlot.Transition, slots);
         Assert.True(skipped > 0); Assert.Equal(evaluated * 79, nativeBones);
+    }
+
+    [Fact]
+    public void MovingSmoothDrivesStandingIndependentlyOfRawMoving()
+    {
+        var host = Data.Value.CreateRuntime(19, 1); var counter = new AlsGraphTraversalCounter(0, 0);
+        for (var frame = 0; frame < 2; frame++)
+        {
+            var id = new AlsFrameIdentity(frame, 19, 1);
+            var context = new AlsPoseUpdateContext(id, 1, 1f / 60).WithUpdateCounter(counter);
+            var input = Input(0, 60) with { MovingSmooth = frame == 1 };
+            Assert.False(input.Rest.Moving);
+            host.Prepare(context, input, new(0, 0), frame == 0);
+            Assert.Equal(frame, host.State);
+            host.PostUpdateActions(); host.Commit(id); counter = counter.Next((ulong)frame + 1);
+        }
+    }
+
+    [Fact]
+    public void HiddenMovementFramesRetireSyncGroupBeforeRunStartReentry()
+    {
+        var profile = Data.Value; var host = profile.CreateRuntime(19, 1);
+        var counter = new AlsGraphTraversalCounter(0, 0); var first = 0f;
+        var playerId = Array.FindIndex(profile.Details.Players.Players.ToArray(), p => p.PropertyIndex == 114);
+        Assert.True(playerId >= 0);
+        for (var frame = 0; frame <= 69; frame++)
+        {
+            var id = new AlsFrameIdentity(frame, 19, 1);
+            var context = new AlsPoseUpdateContext(id, 1, 1f / 30).WithUpdateCounter(counter);
+            host.Prepare(context, Input(frame, 30), new(0, 0), frame == 0);
+            if (frame is >= 65 and <= 68) Assert.Null(host.MovementPlayers);
+            if (frame is 60 or 69)
+            {
+                var time = host.MovementPlayers!.Players.ToArray().Single(p => p.PlayerId == playerId).Time;
+                if (frame == 60) first = time;
+                else Assert.Equal(first, time);
+                Assert.Equal(.1f + 1.25f * (1f / 30), time);
+            }
+            host.PostUpdateActions(); host.Commit(id); counter = counter.Next((ulong)frame + 1);
+        }
     }
 
     [Fact]
