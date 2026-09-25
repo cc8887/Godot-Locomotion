@@ -8,7 +8,7 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsRefactoredQuickStopTests
 {
-    private sealed class Fixture
+    internal sealed class Fixture
     {
         public readonly AlsRefactoredAnimationCatalog Catalog=new(MantlingHostFixture.Read("refactored_animation_sources"),p=>File.ReadAllBytes(Path.Combine(RepositoryRoot.Find(),"assets/config",p)));
         public readonly AlsRefactoredStandingResources Standing;
@@ -24,10 +24,10 @@ public sealed class AlsRefactoredQuickStopTests
             Quick=new(MantlingHostFixture.Read("refactored_quick_stop_settings"),Catalog,Standing,rest,ids);
         }
     }
-    private static readonly Lazy<Fixture> Data=new(()=>new());
+    internal static readonly Lazy<Fixture> Data=new(()=>new());
     [Theory]
     [InlineData(0,0,1.75f)] [InlineData(90,1,2.375f)] [InlineData(-90,0,2.375f)]
-    [InlineData(175,1,2.9652777f)] [InlineData(176,0,3.0277779f)] [InlineData(180,0,3)]
+    [InlineData(175,1,2.9652777f)] [InlineData(176,0,3.0277777f)] [InlineData(180,0,3)]
     [InlineData(-180,0,3)] [InlineData(540,0,3)] [InlineData(-540,0,3)]
     public void OriginalAngleRemapAndUnclampedRate(double angle,int side,float rate)
     {
@@ -37,10 +37,10 @@ public sealed class AlsRefactoredQuickStopTests
         var view=q.Command(new(false,false,true,angle,42,0));Assert.Equal(q.Assets[0].AnimationId,view.AnimationId);Assert.Equal(q.MinRate,view.PlayRate);
     }
     [Fact]
-    public void WorldAnglesSubtractBeforeFloatConversionAndInvalidValuesCannotPlay()
+    public void FloatLocomotionYawSubtractsDoubleActorYawAndInvalidValuesCannotPlay()
     {
         var q=Data.Value.Quick;
-        Assert.Equal(q.Command(new(true,false,true,90,0,0)),q.Command(new(true,false,true,1000000090,0,1000000000)));
+        Assert.Equal(q.Command(new(true,false,true,64,0,0)),q.Command(new(true,false,true,1000000090,0,1000000000)));
         Assert.Equal(q.Command(new(true,false,true,176,0,0)).AnimationId,q.Assets[0].AnimationId);
         Assert.True(q.Command(new(true,false,true,176,0,0)).PlayRate>q.MaxRate);
         Assert.Throws<ArgumentException>(()=>q.Command(new(true,false,true,double.NaN,0,0)));

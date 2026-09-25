@@ -3,6 +3,7 @@
 #include "AlsLinkedAnimationInstance.h"
 #include "AlsCharacter.h"
 #include "State/AlsTransitionsState.h"
+#include "State/AlsLocomotionAnimationState.h"
 #include "Async/Async.h"
 #include "Animation/AnimBlueprint.h"
 #include "Animation/AnimInstanceProxy.h"
@@ -70,8 +71,8 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredTransitionTrace(const FString& R
     for(const auto& TraceValue:Request->GetArrayField(TEXT("traces")))
     {
         const auto Trace=TraceValue->AsObject();const auto Kind=Trace->GetStringField(TEXT("kind"));
-        if(Kind!=TEXT("Bow")&&Kind!=TEXT("Rifle")&&Kind!=TEXT("PistolOneHanded")&&Kind!=TEXT("PistolTwoHanded"))return false;
-        const auto Path=FString::Printf(TEXT("/ALS/ALS/Character/AnimationInstances/Overlays/AB_Als_%s.AB_Als_%s"),*Kind,*Kind);
+        if(Kind!=TEXT("Standing")&&Kind!=TEXT("Bow")&&Kind!=TEXT("Rifle")&&Kind!=TEXT("PistolOneHanded")&&Kind!=TEXT("PistolTwoHanded"))return false;
+        const auto Path=FString::Printf(TEXT("/ALS/ALS/Character/AnimationInstances/%s/AB_Als_%s.AB_Als_%s"),Kind==TEXT("Standing")?TEXT("Stances"):TEXT("Overlays"),*Kind,*Kind);
         auto* Blueprint=LoadObject<UAnimBlueprint>(nullptr,*Path);if(!Blueprint||!Blueprint->GeneratedClass)return false;
         FActorSpawnParameters Spawn;Spawn.ObjectFlags|=RF_Transient;Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
         auto* Character=World->SpawnActor<AAlsCharacter>(CharacterClass,FVector(0,0,100000),FRotator::ZeroRotator,Spawn);
@@ -99,6 +100,18 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredTransitionTrace(const FString& R
             const auto Tag=Input->GetStringField(TEXT("stance"));
             *Stance->ContainerPtrToValuePtr<FGameplayTag>(Parent)=Tag.IsEmpty()?FGameplayTag():FGameplayTag::RequestGameplayTag(FName(*Tag),false);
             Moving->SetPropertyValue_InContainer(Locomotion->ContainerPtrToValuePtr<void>(Parent),Input->GetBoolField(TEXT("moving")));
+            const TSharedPtr<FJsonObject>* Quick=nullptr;
+            if(Input->TryGetObjectField(TEXT("quick"),Quick))
+            {
+                auto* RotationMode=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("RotationMode"));
+                if(Kind!=TEXT("Standing")||!RotationMode||RotationMode->Struct!=FGameplayTag::StaticStruct()||Locomotion->Struct!=FAlsLocomotionAnimationState::StaticStruct())return false;
+                *RotationMode->ContainerPtrToValuePtr<FGameplayTag>(Parent)=FGameplayTag::RequestGameplayTag(FName(*(*Quick)->GetStringField(TEXT("rotation"))),false);
+                auto& State=*Locomotion->ContainerPtrToValuePtr<FAlsLocomotionAnimationState>(Parent);
+                State.bHasInput=(*Quick)->GetBoolField(TEXT("hasInput"));
+                State.InputYawAngleWorldSpace=static_cast<float>((*Quick)->GetNumberField(TEXT("inputYaw")));
+                State.TargetYawAngleWorldSpace=static_cast<float>((*Quick)->GetNumberField(TEXT("targetYaw")));
+                State.RotationWorldSpace.Yaw=(*Quick)->GetNumberField(TEXT("actorYaw"));
+            }
             FTransitionInstanceAccess::Tick(Parent,Delta);
             FCompactPose Source,Result;Source.SetBoneContainer(&Bones);Result.SetBoneContainer(&Bones);
             FBlendedCurve SourceCurves,ResultCurves;SourceCurves.InitFrom(Bones);ResultCurves.InitFrom(Bones);
@@ -148,6 +161,12 @@ bool UAlsAnimationGraphLibrary::ExportRefactoredTransitionTrace(const FString& R
                 if(!Function)return false;Linked->ProcessEvent(Function,nullptr);
             }
             if(Input->GetBoolField(TEXT("stop")))Parent->StopTransitionAndTurnInPlaceAnimations(static_cast<float>(Input->GetNumberField(TEXT("stopDuration"))));
+            if(Quick)
+            {
+                const int32 Count=static_cast<int32>((*Quick)->GetNumberField(TEXT("count")));if(Count<0||Count>2)return false;
+                auto* Function=Linked->FindFunction(TEXT("AnimNotify_StopQuick"));if(!Function)return false;
+                for(int32 I=0;I<Count;++I)Linked->ProcessEvent(Function,nullptr);
+            }
             if(Worker)
             {
                 const auto* Property=FindFProperty<FStructProperty>(Parent->GetClass(),TEXT("TransitionsState"));

@@ -75,12 +75,15 @@ public sealed class AlsRefactoredQuickStop
         var left=true;var rate=MinRate;
         if(input.VelocityDirection)
         {
-            var angle=(float)((input.HasInput?input.InputYaw:input.TargetYaw)-input.ActorYaw);
+            // The two locomotion fields are float; FRotator::Yaw is double.
+            var worldYaw=(float)(input.HasInput?input.InputYaw:input.TargetYaw);
+            var angle=(float)((double)worldYaw-input.ActorYaw);
             if(!float.IsFinite(angle))throw new ArgumentException("QuickStop yaw difference exceeds float range.");
             while(angle>180){var next=angle-360;if(next==angle)throw new ArgumentException("QuickStop yaw cannot unwind.");angle=next;}
             while(angle< -180){var next=angle+360;if(next==angle)throw new ArgumentException("QuickStop yaw cannot unwind.");angle=next;}
             if(angle>175)angle-=360;
-            left=angle<=0;rate=MinRate+(MaxRate-MinRate)*(MathF.Abs(angle)/180);
+            // Preserve the native optimized Lerp rounding verified by the trace.
+            left=angle<=0;rate=MinRate+MathF.Abs(angle)*((MaxRate-MinRate)/180);
         }
         var asset=_assets[(input.Crouching?2:0)+(left?0:1)];return new(asset.AnimationId,asset.Slot,rate,StartTime,BlendIn,BlendOut);
     }
