@@ -1,5 +1,7 @@
 # Godot ALS
 
+当前剩余任务、完整角色动画链路的接入顺序与验收条件统一记录在 [ROADMAP](ROADMAP.md)。历史目录是否归并见 [主目录审计](docs/verification/2026-09-25-main-directory-audit.md)。
+
 这是一个面向 Godot 4.7.2 .NET 的 ALS 示例项目。当前主场景是
 `res://scenes/demo/als_demo.tscn`，已经接入真实 Mannequin、P3
 locomotion、AimOffset、上半身分层、Turn/Rotate In Place、Foot IK、Foot Lock、
