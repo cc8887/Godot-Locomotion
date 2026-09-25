@@ -34,7 +34,7 @@ public static class AlsInertialDecay
 
 /// <summary>Full fixed bone/curve layout, default ALS filters/profile, no root-motion attributes.
 /// Own one instance per candidate/committed state and use CopyFrom for transactional evaluation.</summary>
-public sealed class AlsInertialization
+public sealed partial class AlsInertialization
 {
     private readonly AlsLocalPose[] _current;
     private readonly AlsLocalPose[] _previous;
@@ -73,6 +73,7 @@ public sealed class AlsInertialization
             throw new ArgumentException("The fallback rotation axis must be a unit vector in the pose coordinate system.", nameof(rotationFallbackAxis));
         _current = new AlsLocalPose[boneCount];
         _previous = new AlsLocalPose[boneCount];
+        _fullCurrent = new AlsPrecisePose[boneCount]; _fullPrevious = new AlsPrecisePose[boneCount];
         _preciseCurrent = new AlsQuaternion[boneCount];
         _precisePrevious = new AlsQuaternion[boneCount];
         _bones = new AlsInertialBone[boneCount];
@@ -115,6 +116,11 @@ public sealed class AlsInertialization
             _preciseCurrentComponent = source._preciseCurrentComponent; _precisePreviousComponent = source._precisePreviousComponent;
         }
         _rotationMode = source._rotationMode;
+        if (source._rotationMode == 3)
+        {
+            source._fullCurrent.CopyTo(_fullCurrent, 0); source._fullPrevious.CopyTo(_fullPrevious, 0);
+            _fullCurrentComponent = source._fullCurrentComponent; _fullPreviousComponent = source._fullPreviousComponent;
+        }
         source._currentCurves.CopyTo(_currentCurves, 0); source._previousCurves.CopyTo(_previousCurves, 0); source._curveDiffs.CopyTo(_curveDiffs, 0);
         _currentComponent = source._currentComponent; _previousComponent = source._previousComponent;
         _currentParent = source._currentParent; _previousParent = source._previousParent;
