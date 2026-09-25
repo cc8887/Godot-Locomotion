@@ -55,6 +55,19 @@ public sealed class AlsRefactoredBlendPoseSource
         _curveNames=_sourceCurveNames.SelectMany(n=>n).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
     public Sampler CreateSampler()=>new(this);
+    // Native BlendSpace ticks resolve weights/cache even when pose evaluation is skipped.
+    internal int ResolveSamples(AlsBlendPoint input, float normalizedTime, int previousCache,
+        Span<AlsRefactoredTimedBlendSample> samples, out int candidateCache)
+    {
+        if (!float.IsFinite(normalizedTime) || samples.Length < 3)
+            throw new ArgumentException("Invalid BlendSpace update request.");
+        Span<AlsAimGridVertex> weights = stackalloc AlsAimGridVertex[3];
+        var count = _profile.Weights.Evaluate(input, previousCache, weights, out candidateCache);
+        var time = Math.Clamp(normalizedTime, 0, 1);
+        for (var i = 0; i < count; i++)
+            samples[i] = new(weights[i].Sample, weights[i].Weight, time * _lengths[weights[i].Sample]);
+        return count;
+    }
     public sealed class Sampler
     {
         private readonly AlsRefactoredBlendPoseSource _owner;
@@ -86,12 +99,8 @@ public sealed class AlsRefactoredBlendPoseSource
             if(Interlocked.Exchange(ref _busy,1)!=0)throw new InvalidOperationException("Reentrant BlendSpace pose sampler.");
             try
             {
-                Span<AlsAimGridVertex> weights=stackalloc AlsAimGridVertex[3];
-                var count=_owner._profile.Weights.Evaluate(input,previousCache,weights,out var candidate);
-                var time=Math.Clamp(normalizedTime,0,1);
                 Span<AlsRefactoredTimedBlendSample> samples=stackalloc AlsRefactoredTimedBlendSample[3];
-                for(var i=0;i<count;i++)
-                    samples[i]=new(weights[i].Sample,weights[i].Weight,time*_owner._lengths[weights[i].Sample]);
+                var count=_owner.ResolveSamples(input,normalizedTime,previousCache,samples,out var candidate);
                 SampleTimesCore(samples[..count],pose,curves);return candidate;
             }
             finally {Volatile.Write(ref _busy,0);}

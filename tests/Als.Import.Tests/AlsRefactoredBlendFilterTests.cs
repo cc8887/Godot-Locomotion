@@ -26,6 +26,7 @@ public sealed class AlsRefactoredBlendFilterTests(ITestOutputHelper output)
             {
                 var state=default(AlsRefactoredBlendFilterState);var cache=-1;var frame=0;
                 var clean=new AlsRefactoredBlendEvaluatorRuntime(source);var retry=new AlsRefactoredBlendEvaluatorRuntime(source);
+                var sparse=new AlsRefactoredBlendEvaluatorRuntime(source);
                 foreach(var row in run.GetProperty("cases").EnumerateArray())
                 {
                     var input=row.GetProperty("input");var raw=new Vector2(input[0].GetSingle(),input[1].GetSingle());
@@ -46,12 +47,37 @@ public sealed class AlsRefactoredBlendFilterTests(ITestOutputHelper output)
                     clean.Prepare(frame,raw,delta,time,reset);clean.Evaluate(frame);
                     var before=retry.CommittedInput;
                     retry.Prepare(frame,raw,delta,time,reset);
-                    Assert.Throws<ArgumentException>(()=>retry.ValidateCommit(frame));
+                    retry.ValidateCommit(frame);
                     retry.Evaluate(frame);retry.Cancel();
                     Assert.Equal(before,retry.CommittedInput);
                     retry.Prepare(frame,raw,delta,time,reset);retry.Evaluate(frame);retry.Evaluate(frame);
                     Assert.Equal(next.Output,retry.CandidateInput);
                     Assert.True(clean.Pose.SequenceEqual(retry.Pose));Assert.True(clean.Curves.SequenceEqual(retry.Curves));
+                    Assert.Equal(nextCache,retry.CandidateTriangulationCache);
+                    // Update-only frames must advance native filter AND triangle history,
+                    // including resets that occur while no bones are requested.
+                    sparse.Prepare(frame,raw,delta,time,reset);
+                    Assert.Equal(next.Output,sparse.CandidateInput);
+                    Assert.Equal(nextCache,sparse.CandidateTriangulationCache);
+                    sparse.Cancel();
+                    sparse.Prepare(frame,raw,delta,time,reset);
+                    if(frame%7==6)
+                    {
+                        sparse.Evaluate(frame);
+                        Assert.True(clean.Pose.SequenceEqual(sparse.Pose));
+                        Assert.True(clean.Curves.SequenceEqual(sparse.Curves));
+                        Assert.Throws<ArgumentException>(()=>sparse.Evaluate(frame+1));
+                        Assert.Throws<ArgumentException>(()=>sparse.Commit(frame));
+                        Assert.Throws<InvalidOperationException>(()=>sparse.Pose.ToArray());
+                        sparse.Evaluate(frame);
+                    }
+                    else
+                    {
+                        Assert.Throws<InvalidOperationException>(()=>sparse.Pose.ToArray());
+                        Assert.Throws<InvalidOperationException>(()=>sparse.Curves.ToArray());
+                    }
+                    sparse.Commit(frame);
+                    Assert.Throws<InvalidOperationException>(()=>sparse.Pose.ToArray());
                     Assert.Throws<ArgumentException>(()=>retry.ValidateCommit(frame+1));
                     clean.ValidateCommit(frame);retry.ValidateCommit(frame);clean.Commit(frame);retry.Commit(frame);
                     Assert.Throws<ArgumentException>(()=>retry.Prepare(frame,raw,delta,time));

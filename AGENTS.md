@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Movement update-only：`docs/verification/2026-09-25-refactored-movement-update-only.md`。按本机 UE tick/Evaluate 分工将 Lean 权重/三角形缓存解析前移至 Prepare，允许无骨骼求值提交滤波与 alpha；失败求值仍拒绝提交，取消/重置/旧姿态门禁保留。Release 相关15通过，既有native6720帧新增稀疏求值逐帧cache对照，Movement三Hz630帧稀疏/全求值严格一致；Optimize0/0。未新UE导出/Godot运行/全量/视觉/性能，统一Standing宿主和普通Demo未完成；下步统一宿主/连续原生整图，Crouch/Ragdoll等全部旧目标及用户修改/暂缓项保留。
+
 - 最新Rest Parent原生连续：`docs/verification/2026-09-25-refactored-rest-parent-native.md`。独立临时GamePreview世界/真实worker原四函数，三Hz3360帧，重复回调/跳过刷新/非游戏世界/阈值/8Turn+4Dynamic全部覆盖；每帧取消重试，native三组通过，rate/delay最大差0，候选和参数同，Optimize0/0，无失败。全Editor11actions含UBT所需NetCore重编，四插件审计D949664C.../BuildId b4127720-ddfd-475f-a955-59a24fb7ace6；冷28316/普通10132实际0、2814734字节SHA93F2E838...一致，DV43092实际0/3旧warn。普通两旧Condition/旧warn保留，无打包/Godot运行/全量/性能。仅刷新→未消费候选，不含NativePostUpdate的Turn接受/惯性或完整Standing图；下步统一连续宿主/图与动作Slot，再Crouch/Demo，全部Ragdoll等旧目标/用户改动/暂缓项保留。
 
 - 最新QuickStop原生连续：`docs/verification/2026-09-25-refactored-quick-stop-native.md`。真实Standing生成通知→Parent→Montage→Slot，3Hz1050帧82950骨/42实例/109混合帧；修正float世界角字段先量化再减double actor及native优化Lerp舍入，纠正上批仅本地测试结论。首native3失败保留，修正17/最终3通过，time/weight0、rate严格同、pose6.04e-14/curve1.19e-7，Optimize0/0。全Editor4actions四插件审计7E4D1FD3...，冷25824/普通3568实际0，11,907,620字节SHA B736A748...一致；DV26436实际0/3旧warn，普通两旧Condition/旧warn保留。镜像源SHA B18EDB57...一致，无打包/Godot运行/全量/性能。仅受控Stand基底，非完整Rest刷新/Standing图/角色宿主/Demo，全部Crouch/Ragdoll等旧目标、用户改动及暂缓项保留。
