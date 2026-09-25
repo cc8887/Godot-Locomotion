@@ -33,6 +33,7 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
     private bool _prepared, _initializeInstance, _resetMovement;
     private long _committed = -1;
     private AlsRefactoredMovementDetailsSourceRuntime? _owner;
+    private AlsRefactoredMovementParentRuntime? _parent;
     private AlsPoseUpdateContext _movementContext;
     public ReadOnlySpan<AlsRefactoredDirectionCacheUpdate> CacheUpdates => _prepared ? _updates.AsSpan(0, _updateCount) : throw new InvalidOperationException("No Movement traversal.");
     public ReadOnlySpan<AlsRefactoredSkippedCacheUpdates> SkippedBatches => _prepared ? _batches.AsSpan(0, _batchCount) : throw new InvalidOperationException("No Movement traversal.");
@@ -63,7 +64,8 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
 
     public void Prepare(long frame, AlsRefactoredMovementDetailsRuntime detailsMachine, AlsRefactoredMovementDetailsSourceRuntime details,
         AlsGraphTraversalCounter initialization, AlsRefactoredDirectionInput direction, AlsRefactoredMovementPlayerInput movement,
-        AlsRefactoredForwardInput forward, bool initializeInstance = false, Vector4 yaw = default)
+        AlsRefactoredForwardInput forward, bool initializeInstance = false, Vector4 yaw = default,
+        AlsRefactoredMovementParentRuntime? parent = null)
     {
         if (_prepared || frame < 0 || frame <= _committed || !ReferenceEquals(details.Profile, Details) ||
             _owner is not null && !ReferenceEquals(_owner, details) || details.FirstPlayer != Sources.FirstPlayer || !initialization.HasUpdated)
@@ -71,6 +73,7 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
         details.ValidateTraversal(frame, detailsMachine);
         if (details.CacheReads.IsEmpty || initializeInstance && !detailsMachine.Candidate.Reinitialized) throw new ArgumentException("Movement readers are not initialized.");
         _identity = details.CacheReads[0].Context.Identity;
+        parent?.ValidateContext(_identity, Details.Resources.CatalogDigest); _parent = parent;
         _nextInitialization = initializeInstance ? default : _initialization;
         _requestedInitialization = initialization; _direction = direction; _movement = movement; _forward = forward;
         _velocity = details.DesiredWeights; _yaw = yaw; _initializeInstance = initializeInstance; _resetMovement = false;
@@ -108,7 +111,7 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
             _movementContext = context;
             Direction.Prepare(_identity.FrameId, _direction, context.Delta, context.Weight, _resetMovement, context.UpdateCounter);
             Sources.PrepareShared(Direction, context, _requestedInitialization, _velocity, _movement, _forward,
-                _initializeInstance, _yaw, _traversal);
+                _initializeInstance, _yaw, _traversal, _parent);
         }
         else ((IAlsPoseCacheUpdateSink)Sources).UpdateCachedSource(cacheNodeIndex, context);
     }
@@ -127,5 +130,5 @@ public sealed class AlsRefactoredMovementTraversal : IAlsPoseCacheUpdateSink
         ValidateCommit(frame); Direction.Commit(frame); Sources.Commit(frame);
         _initialization = _nextInitialization; _committed = frame; Cancel();
     }
-    public void Cancel() { _prepared = false; Direction.Cancel(); Sources.Cancel(); }
+    public void Cancel() { _prepared = false; _parent = null; Direction.Cancel(); Sources.Cancel(); }
 }
