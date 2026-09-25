@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Movement外层：`docs/verification/2026-09-25-refactored-movement-cache-envelope.md`。Standing67→122 PoseMoving→120 Lean(local additive)/201方向，202原BS evaluator固定0/DoNotSync，Running权重clamp .5..1、20/1插值；候选filter/alpha与79骨/curve合成、Cancel/retry/失败门禁。新4/10变异/3Hz630帧，相关22过、Optimize0/0。首轮4失败因原接线有Knot，改FollowReroutes后过并保留记录。基础测试identity而非真实direction/native整图；无新UE/Godot/全量/性能，普通Demo未切。owner目前须Evaluate提交，update-only及外层cache/context/初始化、Details pose/惯性化/ResetPivot统一尚待接，接后原生对照；其余stance/Parent/宿主/Ragdoll旧缺口、用户修改和暂缓项保留。
+
 - 最新起步/Pivot源更新：`docs/verification/2026-09-25-refactored-movement-details-sources.md`。六state遍历→独立Movement67读者/初始化请求→共享16Sequence tick，原VelocityBlend/零外层weight/Inactive/rootmotion/祖先/requester/skipped/inertialsync；候选ResetPivot、清weights、隐藏pending reset。Capture真实Sync时间→原序下一帧观察，核对owner/asset/tick并阻止不完整提交。新5/最终相关18/Optimize0/0，3Hz1260提交帧逐帧retry、ID偏移7/16源/每场景>=3自动退出真实length；扩覆盖三失败因输入未制造外层zero tick，补真实场景后过，保留失败。无新UE/Godot/全量/性能或合成pose/native；Movement读者尚未统一Drain，ResetPivot未消费，普通Demo未切。下一步完整Movement Lean/PoseMoving及cache/pose→native，其余stance/Parent/宿主及全部旧缺口/用户修改/暂缓项保留。
 
 - 最新起步/Pivot姿态接线：`docs/verification/2026-09-25-refactored-movement-details-pose-graph.md`。六state全部38节点，6读者共享Movement67→ModifyCurve122边界，4 ApplyAdditive/4 MultiWay/16独立player/2 ResetPivot原relevant回调；原四通道VelocityBlend、local additive四资产79骨。新2/15变异/相关见related.trx/Optimize0/0；初cache authoredNone、对象字段比较、未暴露Alpha三假设失败修正留档。尚无source遍历/cache调度/pose求值/Parent消费/新UE或Godot/全量/性能，普通Demo未切。注意完整Movement含Lean/PoseMoving，不能直接用方向201替代；MultiWay bAdditive=false但ApplyAdditive子context期待additive，全零fallback仍identity。下一步原状态source/context与统一cache、完整Movement→姿态/native对照及其余stance/宿主；旧缺口/用户修改/暂缓项保留。
