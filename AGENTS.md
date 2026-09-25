@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Standing动作入口：`docs/verification/2026-09-25-refactored-standing-actions.md`。原三个BP函数图校验，四Stop状态→左右专用Stop(.2/.2、rate1.5、start.4、无idle门控)，Idle exit与Movement entry→共享Transition线程队列停止；queue-bank身份校验，复用mesh sampler。最终新4/既有Transition37/CoreQueue6通过，480帧真实79骨Slot retry、停止优先/保留play/回base，Optimize0/0。首4失败漏Idle exit后修，第二4失败测试曲线未去重后修，历史TRX保留。尚缺StopQuick主线程通知、Rest Dynamic与共享队列按调用顺序统一、native连续对照/角色宿主/Crouch/Demo/视觉/性能；无新UE运行/导出/DV。全部Ragdoll等旧目标、用户修改和暂缓项保留。
+
 - 最新Standing Slot与最终输出：`docs/verification/2026-09-25-refactored-standing-idle-output.md`。原Slot60真实bank→source63/61权重裁剪/Inactive/历史/初始化/update-only/retry；原node68在118后写PoseStanding=1，绑定具体owner/profile/frame/角色。整链180帧、三Hz630帧源规则、七变异拒绝；相关66/最后3/Optimize0/0。末次测试构建遇前轮testhost锁DLL，复制重试后成功，无中断/重启。无新UE/Godot运行/导出/DV/native连续oracle；普通Demo未切，停止动作消费/Crouch/统一宿主/视觉/性能及Ragdoll等全部旧目标、用户修改与暂缓项保留。
 
 - 最新真实Rest Montage：`docs/verification/2026-09-25-refactored-rest-montages.md`。原八Turn/四Dynamic共享Grounded bank、Parent队列顺序/预校验/ack、真实79骨绝对/mesh采样；Core惯性退出和proxy请求快照、last-per-group、候选回滚，Standing60→118实际Idle更新门控。Core168/Import189/新整链1通过、Optimize0/0，三Hz7560播放帧retry与180帧真实Standing退出平滑/Yaw直通。修复几处编译类型问题，无阈值放宽；本批只读UE源码、无UE启动/导出/插件变更/DV。尚无连续Rest/Montage退出native oracle、Slot源裁剪/node68/统一宿主/普通Demo切换/Godot视觉/性能；Crouch采样测试基底为受控Standing。下一步原生对照和余下Standing更新语义→宿主，Ragdoll等所有旧目标/用户修改/暂缓项保留。

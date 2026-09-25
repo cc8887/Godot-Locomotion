@@ -31,6 +31,56 @@ public sealed class AlsRefactoredRestMontageTests
     }
     private static readonly Lazy<Fixture> Data=new(()=>new());
     [Theory]
+    [InlineData(-.75f,0)] [InlineData(.75f,1)] [InlineData(-.25f,0)] [InlineData(.25f,1)]
+    public void ActualStopCallbacksQueueOriginalSequenceAndMovementStopsSharedGroup(float foot,int side)
+    {
+        var f=Data.Value;var json=MantlingHostFixture.Read("refactored_stance_machines");
+        var standingResources=new AlsRefactoredStandingResources(json,f.Catalog);var stopResources=new AlsRefactoredStopResources(json,f.Catalog);
+        var actions=new AlsRefactoredStandingActions(f.Catalog,standingResources,stopResources,f.Montages,60,61);
+        var assets=f.Montages.Assets.ToArray().Concat(actions.Assets.ToArray()).ToArray();var bank=new AlsMontageRuntime([],sequences:assets);
+        var queue=new AlsTransitionQueueRuntime(bank,9,1);var stop=new AlsRefactoredStopRuntime(stopResources);
+        var standing=new AlsRefactoredStandingRuntime(standingResources);var id=new AlsFrameIdentity(0,9,1);
+        var counter=new AlsGraphTraversalCounter(0,0);AlsRefactoredStandingObservation[] clocks=[new(12,0,0,false),new(9,0,0,false)];
+        queue.Begin(id);stop.Prepare(0,foot,.016f,updateCounter:counter);bank.Begin(id,0);
+        Assert.True(actions.QueueStopState(queue,bank,id,stop));Assert.Empty(bank.Candidate.ToArray());
+        var request=queue.Candidate.Play!.Value;Assert.Equal(60+side,request.AnimationId);Assert.Equal(.4f,request.StartTime);Assert.Equal(1.5f,request.PlayRate);
+        var foreign=new AlsMontageRuntime([],sequences:assets);
+        Assert.Throws<ArgumentException>(()=>actions.QueueStopState(queue,foreign,id,stop));Assert.Equal(request,queue.Candidate.Play);
+        queue.Discard();stop.Cancel();queue.Begin(id);stop.Prepare(0,foot,.016f,updateCounter:counter);
+        actions.QueueStopState(queue,bank,id,stop);Assert.Equal(request,queue.Candidate.Play);Assert.True(queue.PlayQueued());
+        Assert.Equal(.4f,Assert.Single(bank.Candidate.ToArray()).Position);
+        standing.Prepare(0,new(false,false,false),clocks,.016f,updateCounter:counter);Assert.Equal(0,actions.QueueStanding(queue,id,standing));
+        queue.Commit(id);stop.Commit(0);standing.Commit(0);bank.Commit(id);
+        id=new(1,9,1);counter=counter.Next(1);queue.Begin(id);bank.Begin(id,.1f);
+        stop.Prepare(1,foot,.1f,updateCounter:counter);Assert.False(actions.QueueStopState(queue,bank,id,stop));
+        standing.Prepare(1,new(true,false,false),clocks,.1f,updateCounter:counter);Assert.Equal(2,actions.QueueStanding(queue,id,standing));
+        Assert.True(queue.Candidate.Stop);Assert.Equal(-1,queue.Candidate.StopDuration);
+        // A new worker request is retained when movement's stop takes precedence.
+        queue.QueuePlay(request,"Als.Stance.Standing",true);Assert.False(queue.PlayQueued());queue.StopQueued();
+        Assert.Equal(0,Assert.Single(bank.Candidate.ToArray()).Blend.DesiredWeight);Assert.Equal(request,queue.Candidate.Play);
+        queue.Commit(id);stop.Commit(1);standing.Commit(1);bank.Commit(id);
+        id=new(2,9,1);queue.Begin(id);bank.Begin(id,.016f);Assert.True(queue.PlayQueued());
+        Assert.Equal(request.AnimationId,bank.Candidate[^1].AnimationId);Assert.Equal(.4f,bank.Candidate[^1].Position);
+        queue.Commit(id);bank.Commit(id);
+        var sources=actions.Assets.ToArray().Select(a=>f.Catalog.CompileAdditivePose(actions.SourcePath(a.AnimationId))).ToArray();
+        var rest=new AlsRefactoredStandingRestPose(f.Catalog,f.Rest.Graph,new(MantlingHostFixture.Read("refactored_skeleton_curves"),f.Catalog),
+            sources.SelectMany(s=>s.CurveNames.ToArray()).Distinct(StringComparer.OrdinalIgnoreCase));
+        var profile=new AlsRefactoredTransitionPose(f.Catalog,actions,rest.BoneNames,rest.Parents,rest.CurveNames);var sampler=profile.CreateSampler();
+        var reference=f.Catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence);
+        var mixer=new AlsMontageSlotPose(reference.ReferencePose,rest.Parents,rest.CurveNames.Length);
+        var basis=new AlsPrecisePose[79];var baseCurves=new AlsInertialCurve[rest.CurveNames.Length];rest.SampleIdleSource(basis,baseCurves);
+        var pose=new AlsPrecisePose[79];var curves=new AlsInertialCurve[baseCurves.Length];var changed=false;
+        for(var frame=3;frame<123;frame++)
+        {
+            id=new(frame,9,1);bank.Begin(id,1f/60);
+            mixer.Evaluate(bank.Frame,id,AlsMontageSlot.Transition,basis,baseCurves,pose,curves,sampler);
+            var expected=pose.ToArray();var expectedCurves=curves.ToArray();changed|=!basis.SequenceEqual(pose);
+            bank.Discard();bank.Begin(id,1f/60);mixer.Evaluate(bank.Frame,id,AlsMontageSlot.Transition,basis,baseCurves,pose,curves,sampler);
+            Assert.Equal(expected,pose);Assert.Equal(expectedCurves,curves);bank.Commit(id);
+        }
+        Assert.True(changed);Assert.Empty(bank.Committed.ToArray());Assert.Equal(basis,pose);Assert.Equal(baseCurves,curves);
+    }
+    [Theory]
     [InlineData("name")] [InlineData("mode")] [InlineData("alpha")] [InlineData("value")]
     [InlineData("link")] [InlineData("map")] [InlineData("callback")]
     public void FinalStandingCurveRejectsChangedOriginalPolicy(string change)
