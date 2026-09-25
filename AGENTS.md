@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新StopQuick：`docs/verification/2026-09-25-refactored-quick-stop.md`。原Parent CDO全精度.1/.2/.3、rate1.75..3和四序列，BP通知连线/资源门禁；原double相减→float unwind→>175逆时针→不钳制rate，真实Standing edge4/notify1→共享queue即时播放/mesh采样。相关76/Optimize0/0，四资源480帧retry；首13中1预期字面量差一个float单位，修测试未放宽。全Editor0actions/四插件审计FA68F487...；冷41988/普通34720实际0、797字节SHA7537FE7E...一致，普通两旧Condition及旧warn保留，无C++/配置变更/DV。未连续UE QuickStop/整图oracle，Crouch为受控Standing基底，统一宿主/普通Demo/Godot视觉/性能及所有Ragdoll等旧目标仍待，用户修改/暂缓项保留。
+
 - 最新Rest共享Transition队列：`docs/verification/2026-09-25-refactored-rest-shared-queue.md`。共享绑定Parent在Dynamic回调当刻直接覆盖同一queue，保持两帧延迟；PostUpdate按Transition→Turn→Stop消费，stop阻塞保留两play；共享模式拒绝独立PlayQueued，强owner/frame/资源门禁，提前丢弃queue不吞刷新。四顺序/stop组合、武器即时通知覆盖及门控、180帧完整Standing已切共享模式；相关112/最终5通过，Optimize0/0，无失败。无新UE/native连续/Godot/DV，完整宿主仍未切此模式；下步StopQuick设置/通知与native对照→Crouch/统一宿主/Demo，所有Ragdoll等旧目标/用户改动/暂缓项保留。
 
 - 最新Standing动作入口：`docs/verification/2026-09-25-refactored-standing-actions.md`。原三个BP函数图校验，四Stop状态→左右专用Stop(.2/.2、rate1.5、start.4、无idle门控)，Idle exit与Movement entry→共享Transition线程队列停止；queue-bank身份校验，复用mesh sampler。最终新4/既有Transition37/CoreQueue6通过，480帧真实79骨Slot retry、停止优先/保留play/回base，Optimize0/0。首4失败漏Idle exit后修，第二4失败测试曲线未去重后修，历史TRX保留。尚缺StopQuick主线程通知、Rest Dynamic与共享队列按调用顺序统一、native连续对照/角色宿主/Crouch/Demo/视觉/性能；无新UE运行/导出/DV。全部Ragdoll等旧目标、用户修改和暂缓项保留。
