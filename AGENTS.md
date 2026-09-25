@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新完整Standing姿态与118：`docs/verification/2026-09-25-refactored-standing-pose-inertia.md`。五state候选采集、真实Idle/Move119/Stop/Rotate、标准stack一次合成和curve存在性；外118原Yaw排除/相关性重置/update-only队列/候选回滚/119转发接线。最终相关50/Optimize0/0；3Hz1680帧132720骨逐帧retry/重复Evaluate，五state、多edge、单state原输出、实际平滑/Yaw直通、三帧延迟求值、故障恢复和counter中断通过。首生命周期测试误with只读identity编译失败，改显式构造后过。未真实转身Montage/Parent Idle回调/新UE整图/Godot渲染/全量/性能，跨祖先转发未新native专项；普通Demo未切。下步Idle/Rotate源刷新与实际动作→UE整图/统一宿主，Ragdoll等旧目标及用户修改/暂缓项保留。
+
 - 最新Standing待机/旋转姿态：`docs/verification/2026-09-25-refactored-standing-rest-pose.md`。原Idle/左右Rotate十四节点接线/闭包/动态绑定校验，Idle固定79骨帧零与三曲线先于TurnInPlaceStanding Slot、Slot后TurnRate缩放；Rotate绑定实际独立播放器owner/候选帧/Evaluate/布局，原Scale后Lerp次序与absence插零。新12/相关49/Optimize0/0，无失败；3Hz840帧双player共132720骨逐值原采样与Cancel重试，含循环/负速/reset/非零ID。Slot测试为受控输出，未实际Montage、无新UE整图/Godot渲染/全量/性能；Idle回调仅编译身份，源遍历/Parent刷新/真实Slot动作/完整65与118尚待。普通Demo未切，Ragdoll等旧目标及用户修改/暂缓项保留。
 
 - 最新Standing移动缓存整链：`docs/verification/2026-09-25-refactored-standing-movement-traversal.md`。原66→67→七方向缓存单Drain，9cache/38reader；最大weight先到tie，选定66上下文执行原Parent入口/Details并enqueue67，回调Leave在延迟子cache之前；初始化counter与无read时pending reset候选、外118/内119 skipped分流。Movement支持共享调度并在Drain完成前拒绝提交；Stop新增惯性化owner/frame/角色/布局校验入口。新4/相关29/Core缓存41/Optimize0/0；3Hz1050帧真实Parent→Direction→Lean→Details→119→Stop逐帧retry，覆盖交叠/隐藏/初始延迟。初IsFinished internal编译错已开放只读；初30Hz覆盖断言失败，增加尾部Idle并分别断言后全过，保留TRX。无新UE/Godot运行/全量/性能；外65仍缺Idle/Rotate源/完整pose118、停止回调/Notify实际动作与连续UE整图，普通Demo/统一角色宿主/Ragdoll等旧目标及用户修改/暂缓项保留。

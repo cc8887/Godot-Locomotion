@@ -36,6 +36,42 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
     private static readonly Lazy<Fixture> Data=new(()=>new());
 
     [Fact]
+    public void StandingPoseRequiresEveryCurrentSourceAndRejectsForeignOwners()
+    {
+        var f=Data.Value;var movement=new AlsRefactoredMovementCacheRuntime(f.Movement,f.DirectionPose.BoneNames,f.DirectionPose.CurveNames);
+        var details=new AlsRefactoredMovementDetailsPose(f.Catalog,f.Details,f.Movement,movement.CurveNames);
+        var stop=new AlsRefactoredStopPose(f.Catalog,f.Stop,f.Metadata,details.CurveNames);
+        var rest=new AlsRefactoredStandingRestPose(f.Catalog,new(f.Catalog),f.Metadata,["OnlyInSlot"]);
+        var profile=new AlsRefactoredStandingPose(f.Standing,rest,details,stop);
+        var rotate=new AlsRefactoredSourcePlayerRuntime(f.Catalog,f.Bank,f.Triangles,f.Standing.RotatePlayers.Bind(0));
+        var output=profile.CreateRuntime(rotate,0);var machine=new AlsRefactoredStandingRuntime(f.Standing);
+        AlsRefactoredStandingObservation[] clocks=[new(12,0,0,false),new(9,0,0,false)];
+        var counter=new AlsGraphTraversalCounter(0,0);var identity=new GodotAls.Core.Contracts.AlsFrameIdentity(0,19,1);
+        machine.Prepare(0,new(false,false,false),clocks,.01f,updateCounter:counter);output.Begin(identity,machine);
+        Assert.Throws<ArgumentException>(()=>output.Commit(0));Assert.Throws<InvalidOperationException>(()=>output.Evaluate(0));
+        Assert.Throws<ArgumentException>(()=>output.CaptureRotate(true,1));
+        var idle=new AlsPrecisePose[79];var curves=new AlsInertialCurve[rest.CurveNames.Length];rest.SampleIdleSource(idle,curves);
+        curves[Array.IndexOf(rest.CurveNames.ToArray(),"OnlyInSlot")]=new(.375f);
+        Assert.Throws<ArgumentException>(()=>output.CaptureIdleSlot(idle,curves,float.NaN));
+        Assert.Throws<ArgumentException>(()=>output.Commit(0));
+        output.CaptureIdleSlot(idle,curves,1);Assert.Throws<ArgumentException>(()=>output.CaptureIdleSlot(idle,curves,1));
+        output.Evaluate(0);Assert.Equal(idle,output.Pose.ToArray());
+        Assert.Equal(new AlsInertialCurve(.375f),output.Curves[Array.IndexOf(profile.CurveNames.ToArray(),"OnlyInSlot")]);
+        var expected=output.Curves.ToArray();output.Cancel();output.Begin(identity,machine);
+        Assert.Throws<InvalidOperationException>(()=>output.Evaluate(0)); // Ready bits from the cancelled frame must not leak.
+        output.CaptureIdleSlot(idle,curves,1);output.Evaluate(0);Assert.Equal(expected,output.Curves.ToArray());
+        output.Commit(0);machine.Commit(0);
+        var foreign=new AlsRefactoredStandingRuntime(f.Standing);foreign.Prepare(1,new(false,false,false),clocks,.01f,updateCounter:counter.Next(1));
+        Assert.Throws<ArgumentException>(()=>output.Begin(new(1,19,1),foreign));
+        machine.Prepare(1,new(true,false,false),clocks,.01f,updateCounter:counter.Next(1));
+        Assert.Throws<ArgumentException>(()=>output.Begin(new(1,20,1),machine));
+        output.Begin(new(1,19,1),machine);Assert.True(output.NeedsState(0));Assert.True(output.NeedsState(1));
+        output.CaptureIdleSlot(idle,curves,1);Assert.Throws<InvalidOperationException>(()=>output.Evaluate(1));
+        // A cancelled or replaced source candidate invalidates pose collection.
+        machine.Cancel();Assert.Throws<ArgumentException>(()=>output.Evaluate(1));output.Cancel();
+    }
+
+    [Fact]
     public void DeferredInitializationAndFailedCompletionDoNotCommitPartialHistory()
     {
         var f=Data.Value;var parent=new AlsRefactoredMovementParentRuntime(f.Details.Callbacks,f.Settings);
@@ -75,29 +111,41 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
         var detailsPose=new AlsRefactoredMovementDetailsPose(f.Catalog,f.Details,f.Movement,movement.CurveNames);var detailsSampler=detailsPose.CreateSampler();
         var inertia=new AlsRefactoredMovementInertialization(f.Catalog,detailsPose);
         var stopPose=new AlsRefactoredStopPose(f.Catalog,f.Stop,f.Metadata,detailsPose.CurveNames);var stopSampler=stopPose.CreateSampler();
+        var rest=new AlsRefactoredStandingRestPose(f.Catalog,new(f.Catalog),f.Metadata,[]);
+        var rotate=new AlsRefactoredSourcePlayerRuntime(f.Catalog,f.Bank,f.Triangles,f.Standing.RotatePlayers.Bind(0));
+        var standingPoseProfile=new AlsRefactoredStandingPose(f.Standing,rest,detailsPose,stopPose);
+        var standingPose=standingPoseProfile.CreateRuntime(rotate,0);
+        var standingInertia=new AlsRefactoredStandingInertialization(f.Catalog,standingPoseProfile);
+        var idlePose=new AlsPrecisePose[79];var idleCurves=new AlsInertialCurve[rest.CurveNames.Length];rest.SampleIdleSource(idlePose,idleCurves);
         var basePose=new AlsPrecisePose[79];var baseCurves=new AlsInertialCurve[f.DirectionPose.CurveNames.Length];
         var pose=new AlsPrecisePose[79];var curves=new AlsInertialCurve[detailsPose.CurveNames.Length];
         var finalPose=new AlsPrecisePose[79];var finalCurves=new AlsInertialCurve[stopPose.CurveNames.Length];
         AlsRefactoredStandingObservation[] clocks=[new(12,0,0,false),new(9,0,0,false)];
         var init=new AlsGraphTraversalCounter(0,0);var counter=init;var overlap=0;var stopped=0;var idle=0;var caches=new HashSet<int>();
-        for(var frame=0;frame<hz*5;frame++)
+        var states=new HashSet<int>();var inertialRequests=0;var multiEdges=0;var smoothed=0;var deferred=0;
+        for(var frame=0;frame<hz*8;frame++)
         {
+            if(frame==hz*7)counter=counter.Next((ulong)frame).Next((ulong)frame);
             var local=(float)(frame%hz)/hz;var moving=frame<hz*4&&(local<.45f||local>=.6f&&local<.78f);var cycle=frame/hz;
             var angle=cycle%2==0?55f:-55f;var velocity=moving?new AlsDoubleVector(170,cycle%2==0?100:-100,0):AlsDoubleVector.Zero;
             var input=new AlsRefactoredMovementInput(velocity,new(200,100,0),AlsQuaternion.Identity,moving?200:0,1,angle,0,1000,800,"Als.Gait.Running",false,frame==0,1f/hz,1,0,0,.2f);
             var context=new AlsPoseUpdateContext(new(frame,19,1),1,input.Delta,.4f).WithUpdateCounter(counter).WithInertialization(118,true);
+            var rotatingLeft=cycle==5;var rotatingRight=cycle==6;
+            var evaluateOuter=frame<hz*6||frame>=hz*6+3;
             var hasStop=false;var reads=new List<AlsRefactoredMovementCacheRead>();var initialReads=new List<int>();
             void Prepare()
             {
                 reads.Clear();initialReads.Clear();hasStop=false;
                 parent.Prepare(context.Identity,input);parent.RefreshGrounded(frame);
-                standing.Prepare(frame,new(moving,false,false),clocks,input.Delta,updateCounter:counter);
+                standing.Prepare(frame,new(moving,rotatingLeft,rotatingRight),clocks,input.Delta,updateCounter:counter);
                 var update=standing.Candidate;
+                var rotateTicks=new List<AlsRefactoredSourcePlayerInput>();
                 var initialized=Enumerable.Range(0,update.InitializationCount).Select(update.GetInitialization).ToArray();
                 if(initialized.Contains(1))initialReads.Add(55);
                 for(var i=0;i<update.UpdateCount;i++)
                 {
                     var state=update.GetUpdate(i);var path=context.WithWeight(state.Weight).WithState(65,state.State,state.InertializationSync);
+                    if(state.State>=3)rotateTicks.Add(f.Standing.RotatePlayers.Input(0,state.State-3,1.5f,rotatingLeft,rotatingRight,state.Weight,initialized.Contains(state.State)));
                     if(state.State==1)reads.Add(new(55,66,path));
                     if(state.State!=2)continue;
                     hasStop=true;var foot=(cycle%4)switch{0=>-.75f,1=>-.25f,2=>.25f,_=>.75f};
@@ -107,7 +155,9 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
                     reads.AddRange(stopSources.CacheReads.ToArray());initialReads.AddRange(stopSources.CacheInitializationReads.ToArray());
                 }
                 graph.Prepare(context,reads.ToArray(),initialReads.ToArray(),init,parent,new(1,1,1,0));
-                if(!graph.HasMovement)return;
+                rotate.Prepare(frame,rotateTicks.ToArray(),input.Delta);
+                if(graph.HasMovement)
+                {
                 var chosen=reads.Aggregate((a,b)=>b.Context.Weight>a.Context.Weight?b:a).Context;
                 Assert.Equal(chosen,graph.CacheUpdates[0].Context);Assert.Equal(119,graph.DetailsContext.InertializationRequester);
                 players.Prepare(frame,graph.Movement.SourceInputs,input.Delta);graph.DetailsSources.CaptureSourceTimes(frame,players);
@@ -117,22 +167,81 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
                 detailsSampler.Sample(frame,graph.DetailsMachine,graph.DetailsSources,players,movement,pose,curves);
                 inertia.Evaluate(frame,pose,curves,AlsPrecisePose.Identity);
                 if(hasStop)stopSampler.Sample(frame,stop,stopSources,inertia,finalPose,finalCurves);
+                }
+                standingPose.Begin(context.Identity,standing);
+                Assert.Throws<InvalidOperationException>(()=>standingPose.Evaluate(frame));
+                if(standingPose.NeedsState(0))standingPose.CaptureIdleSlot(idlePose,idleCurves,1);
+                if(standingPose.NeedsState(1))standingPose.CaptureMovement(inertia);
+                if(standingPose.NeedsState(2))standingPose.CaptureStop(stop,stopSources,inertia);
+                for(var side=0;side<2;side++)if(standingPose.NeedsState(3+side))
+                {rotate.Evaluate(frame,side);standingPose.CaptureRotate(side==0,1.5f);}
+                standingPose.Evaluate(frame);
+                standingInertia.Prepare(context,standing,graph,graph.HasMovement?inertia:null);
+                if(evaluateOuter)standingInertia.Evaluate(frame,standingPose,AlsPrecisePose.Identity);
             }
             Prepare();var updated=graph.HasMovement;var expected=hasStop?finalPose.ToArray():[];var expectedCurves=hasStop?finalCurves.ToArray():[];
+            var completePose=standingPose.Pose.ToArray();var completeCurves=standingPose.Curves.ToArray();
+            for(var s=0;s<5;s++)if(standingPose.NeedsState(s))states.Add(s);
+            Assert.Equal(Enumerable.Range(0,5).Count(standingPose.NeedsState),standingPose.StateEvaluations);
+            if(standing.InertializationRequest.HasValue)inertialRequests++;
+            if(standing.Candidate.State.Transitions.Count>1)multiEdges++;
+            var outerPose=evaluateOuter?standingInertia.Pose.ToArray():[];
+            var outerCurves=evaluateOuter?standingInertia.Curves.ToArray():[];
+            var pending=standingInertia.PendingRequests;
+            if(!evaluateOuter&&pending>0)deferred++;
+            if(evaluateOuter)
+            {
+                var yaw=Array.IndexOf(standingPoseProfile.CurveNames.ToArray(),"RotationYawSpeed");
+                Assert.Equal(completeCurves[yaw],outerCurves[yaw]);
+                if(standingInertia.IsActive&&!completePose.SequenceEqual(outerPose))smoothed++;
+            }
+            if(standing.Candidate.State.Transitions.Count==0)
+            {
+                var s=standing.Candidate.State.CurrentState;
+                if(s==1)Assert.Equal(inertia.Pose.ToArray(),completePose);
+                if(s==2)Assert.Equal(finalPose,completePose);
+                if(s>=3)Assert.Equal(rotate.Pose(s-3).ToArray(),completePose);
+                if(s==0)Assert.Equal(idlePose,completePose);
+            }
+            var nextClocks=clocks.ToArray();
+            for(var side=0;side<2;side++)if((standing.Candidate.ClearCachedWeightStates&(1<<(3+side)))!=0)nextClocks[side]=nextClocks[side] with{CachedWeight=0};
+            foreach(var tick in rotate.Ticks)
+            {
+                var history=rotate.Players.ToArray().Single(p=>p.PlayerId==tick.PlayerId);
+                nextClocks[tick.PlayerId]=new(f.Standing.RotatePlayers.Players[tick.PlayerId].PropertyIndex,tick.Weight,history.Time,tick.Looping);
+            }
             var cacheUpdates=graph.CacheUpdates.ToArray();var ticks=updated?graph.Movement.SourceInputs.ToArray():[];var skipped=graph.OuterSkippedContexts.ToArray();
             if(hasStop)stopped++;if(!updated)idle++;if(reads.Any(r=>r.ReadPropertyIndex==55)&&hasStop)overlap++;
             foreach(var c in cacheUpdates)caches.Add(c.PropertyIndex);
             Assert.Equal(cacheUpdates.Length,cacheUpdates.Select(c=>c.PropertyIndex).Distinct().Count());Assert.Equal(ticks.Length,ticks.Select(t=>t.PlayerId).Distinct().Count());
-            graph.Cancel();parent.Cancel();standing.Cancel();stop.Cancel();stopSources.Cancel();players.Cancel();movement.Cancel();inertia.Cancel();
+            if(frame==hz*6+3)
+            {
+                Assert.Throws<ArgumentException>(()=>standingInertia.Evaluate(frame,standingPose,default));
+                Assert.Throws<ArgumentException>(()=>standingInertia.Commit(frame));
+            }
+            standingInertia.Cancel();standingPose.Cancel();rotate.Cancel();graph.Cancel();parent.Cancel();standing.Cancel();stop.Cancel();stopSources.Cancel();players.Cancel();movement.Cancel();inertia.Cancel();
             Prepare();Assert.Equal(updated,graph.HasMovement);Assert.Equal(cacheUpdates,graph.CacheUpdates.ToArray());Assert.Equal(skipped,graph.OuterSkippedContexts.ToArray());
+            Assert.Equal(completePose,standingPose.Pose.ToArray());Assert.Equal(completeCurves,standingPose.Curves.ToArray());
+            standingPose.Evaluate(frame);Assert.Equal(completePose,standingPose.Pose.ToArray());Assert.Equal(completeCurves,standingPose.Curves.ToArray());
+            Assert.Equal(pending,standingInertia.PendingRequests);
+            if(evaluateOuter)
+            {
+                Assert.Equal(outerPose,standingInertia.Pose.ToArray());Assert.Equal(outerCurves,standingInertia.Curves.ToArray());
+                standingInertia.Evaluate(frame,standingPose,AlsPrecisePose.Identity);
+                Assert.Equal(outerPose,standingInertia.Pose.ToArray());Assert.Equal(outerCurves,standingInertia.Curves.ToArray());
+            }
             if(updated)Assert.Equal(ticks,graph.Movement.SourceInputs.ToArray());
             if(hasStop){Assert.Equal(expected,finalPose);Assert.Equal(expectedCurves,finalCurves);stop.ValidateCommit(frame);stopSources.ValidateCommit(frame);}
             graph.ValidateCommit(frame);parent.ValidateCommit(frame);standing.ValidateCommit(frame);
             if(updated){players.ValidateCommit(frame);movement.ValidateCommit(frame);inertia.ValidateCommit(frame);}
-            graph.Commit(frame);parent.Commit(frame);standing.Commit(frame);
+            standingPose.ValidateCommit(frame);rotate.ValidateCommit(frame);standingInertia.ValidateCommit(frame);
+            standingInertia.Commit(frame);standingPose.Commit(frame);rotate.Commit(frame);graph.Commit(frame);parent.Commit(frame);standing.Commit(frame);
+            if(frame==hz*7)Assert.Equal(1,standingInertia.CommittedHistoryCount);
             if(hasStop){stop.Commit(frame);stopSources.Commit(frame);}if(updated){players.Commit(frame);movement.Commit(frame);inertia.Commit(frame);}
-            counter=counter.Next((ulong)frame+1);
+            clocks=nextClocks;counter=counter.Next((ulong)frame+1);
         }
         Assert.True(stopped>0,"No Stop pose samples.");Assert.True(overlap>0,"Move/Stop never overlapped.");Assert.True(idle>0,"No cache-inactive frames.");Assert.Contains(66,caches);Assert.Contains(67,caches);
+        Assert.Equal(5,states.Count);Assert.True(inertialRequests>0);Assert.True(multiEdges>0);
+        Assert.True(smoothed>0,"Standing inertia never changed a pose.");Assert.Equal(3,deferred);
     }
 }

@@ -27,6 +27,7 @@ public sealed class AlsRefactoredStandingMovementTraversal : IAlsPoseCacheUpdate
     private AlsRefactoredStandingMovementInput _input;
     private AlsFrameIdentity _identity,_committed;
     private AlsPoseUpdateContext _detailsContext;
+    private AlsPoseUpdateContext _rootContext;
     private bool _prepared,_updated,_hasCommitted;
     public bool HasMovement=>_prepared?_updated:throw new InvalidOperationException("No Standing movement candidate.");
     public AlsPoseUpdateContext DetailsContext=>_prepared&&_updated?_detailsContext:throw new InvalidOperationException("Movement Details not updated.");
@@ -61,7 +62,7 @@ public sealed class AlsRefactoredStandingMovementTraversal : IAlsPoseCacheUpdate
         foreach(var read in reads)if(!_readers.Contains(read.ReadPropertyIndex)||read.CachePropertyIndex!=66||read.Context.Identity!=identity||
             read.Context.UpdateCounter!=context.UpdateCounter||read.Context.Delta!=context.Delta)throw new ArgumentException("Foreign Movement Details reader.");
         foreach(var read in initializationReads)if(!_readers.Contains(read))throw new ArgumentException("Foreign Movement Details initialization.");
-        _identity=identity;_parent=parent;_input=input;_requestedInitialization=initialization;
+        _identity=identity;_rootContext=context;_parent=parent;_input=input;_requestedInitialization=initialization;
         _nextInitialization=initializeInstance?default:_initialization;
         _nextPendingReset=initializeInstance||_pendingReset;_nextPendingInstance=initializeInstance||_pendingInstance;
         _updated=false;_updateCount=_skippedCount=0;_handler=-1;
@@ -108,6 +109,8 @@ public sealed class AlsRefactoredStandingMovementTraversal : IAlsPoseCacheUpdate
         if(!_prepared||frame!=_identity.FrameId)throw new ArgumentException("Invalid Standing movement commit.");
         if(_updated){_entry.ValidateCommit(frame);DetailsMachine.ValidateCommit(frame);DetailsSources.ValidateCommit(frame);Movement.ValidateCommit(frame);}
     }
+    internal void ValidateContext(in AlsPoseUpdateContext context)
+    { ValidateCommit(context.Identity.FrameId);if(_rootContext!=context)throw new ArgumentException("Foreign Standing traversal context."); }
     public void Commit(long frame)
     {
         ValidateCommit(frame);
