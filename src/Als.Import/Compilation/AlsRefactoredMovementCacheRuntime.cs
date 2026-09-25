@@ -16,6 +16,7 @@ public sealed class AlsRefactoredMovementCacheRuntime
     private bool _initialized, _nextInitialized, _prepared, _evaluated;
     private float _history, _nextHistory, _alpha;
     private long _frame, _committed = -1;
+    public AlsRefactoredMovementCacheProfile Profile => _profile;
     public ReadOnlySpan<string> BoneNames => _profile.Lean.BoneNames;
     public ReadOnlySpan<string> CurveNames => _curveNames;
     public float Alpha => _prepared ? _alpha : throw new InvalidOperationException("No Movement candidate.");
