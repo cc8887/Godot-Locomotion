@@ -58,13 +58,15 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
             destination[index] = new(property, 0, Profile.Players.Players[_locals[property]].Start);
     }
 
-    public void Prepare(AlsRefactoredMovementDetailsRuntime machine, in AlsPoseUpdateContext context, Vector4 velocity, bool initializeInstance = false)
+    public void Prepare(AlsRefactoredMovementDetailsRuntime machine, in AlsPoseUpdateContext context, Vector4 velocity, bool initializeInstance = false,
+        AlsRefactoredMovementParentRuntime? parent = null)
     {
         var frame = context.Identity.FrameId;
         if (_prepared || !ReferenceEquals(machine.Resources, Profile.Resources) || _owner is not null && !ReferenceEquals(_owner, machine) ||
             context.UpdateCounter is not { HasUpdated: true } || !context.HasSharedContext ||
             _hasCommitted && (context.Identity.CharacterId != _committedIdentity.CharacterId || context.Identity.SlotGeneration != _committedIdentity.SlotGeneration || frame <= _committedIdentity.FrameId))
             throw new ArgumentException("Invalid details source owner/context.");
+        parent?.ValidateContext(context.Identity, Profile.Resources.CatalogDigest);
         machine.ValidateCommit(frame); var update = machine.Candidate;
         if (update.State.LastUpdateCounter != context.UpdateCounter || update.State.RecordedWeight != context.Weight || initializeInstance && !update.Reinitialized)
             throw new ArgumentException("Details machine and traversal context differ.");
@@ -97,7 +99,14 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
                 var child = update.GetUpdate(i); var state = Profile.States[child.State];
                 var path = context.WithWeight(child.Weight).WithState(Profile.Resources.MachinePropertyIndex, child.State, child.InertializationSync);
                 if (state.CallbackPropertyIndex >= 0)
-                { var command = _callbacks.Enter(frame, state.CallbackPropertyIndex); if (command is not null) _commands[_commandCount++] = command; }
+                {
+                    var command = _callbacks.Enter(frame, state.CallbackPropertyIndex);
+                    if (command is not null)
+                    {
+                        _commands[_commandCount++] = command;
+                        parent?.Apply(context.Identity, Profile.Resources.CatalogDigest, command);
+                    }
+                }
                 // ApplyAdditive updates Base first. The saved cache defers its
                 // source until all readers (including zero-weight ones) arrive.
                 _reads[_readCount++] = new(state.ReadPropertyIndex, Profile.MovementCache.PropertyIndex, path);

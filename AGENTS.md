@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Movement Parent回调：`docs/verification/2026-09-25-refactored-movement-parent.md`。Details/Direction原relevant位置在子源前执行ResetPivot/SetHipsDirection，候选Parent共用、完整原表/角色/frame/catalog校验，Hips原枚举序，ActivatePivot严格未缩放speed<threshold。新增4/目标9/相关15过，3Hz840提交帧每帧Cancel重试，一次激活仅FirstPivot并由真实源clock退出；旧方向native6回归通过，Optimize0/0，无失败/新UE/Godot/全量。仍仅两个Parent字段，Notify激活/完整Grounded与Standing刷新待全精度设置曲线导出和新整链oracle；外层65/66/统一宿主/普通Demo切换/Ragdoll等旧缺口、用户修改及暂缓项保留。
+
 - 最新Movement惯性化：`docs/verification/2026-09-25-refactored-movement-inertia.md`。原119→117资源门禁，Details请求去重/最短duration、skipped同节点AddUnique/外目标候选、update-only跨帧队列、counter间断历史reset与累计delta、Cancel/重复Evaluate。新增Core完整double TRS/component/history入口，差分保留原float边界；旧mode兼容。Core新4/相关21，旧native15轨迹900帧P/S/curve0、Q1.06233e-6原预算不变；真实整链3Hz1260帧惯性化active/retry+新生命周期，Import相关18，补authored门禁最终目标见authored-final.trx，Optimize0/0。初Math命名遮蔽及request局部重名编译错修复；无运行时失败/新UE/Godot/全量/性能。新Refactored整链oracle/真实Parent/ResetPivot/Hips、外66/Standing及跨节点转发接收、Lean update-only/宿主/Ragdoll等旧缺口仍待；普通Demo未切，用户修改及暂缓项保留。
 
 - 最新统一Movement遍历：`docs/verification/2026-09-25-refactored-movement-traversal.md`。Details六读者+Direction26读者单Drain，67→七方向cache原序；maxweight/先到tie、Forward双读者、完整祖先/Inactive/rootmotion/inertial请求与skipped批次候选，24原ID无重复；rawVelocity避免双归一化。新4/最终24/Optimize0/0，3Hz1260帧真实direction→Lean→Details逐帧retry、6state8cache；旧native6/1680帧时间weight0误差。曾推断SaveCachedPose.UpdateCounter应同步导致旧native2失败，完整源码证实本机UE未同步此字段，已撤回非原生重置并保留失败，未放宽门槛。尚无新UE Details整链/Godot/全量/性能、普通Demo未切；只Details入口不含外66/Standing，下一步119惯性化/skipped消费、真实Parent/ResetPivot/Hips及新UE整链，update-only/其余stance/宿主/Ragdoll旧缺口、用户修改/暂缓项保留。

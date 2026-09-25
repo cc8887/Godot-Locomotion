@@ -31,6 +31,101 @@ public sealed class AlsRefactoredMovementTraversalTests
     private static readonly Lazy<Fixture> Data = new(() => new());
 
     [Fact]
+    public void ParentLatchesPreserveNativeEnumThresholdAndTransactionBoundaries()
+    {
+        var f = Data.Value; var callbacks = f.Details.Callbacks;
+        var parent = new AlsRefactoredMovementParentRuntime(callbacks);
+        var identity = new GodotAls.Core.Contracts.AlsFrameIdentity(0, 7, 1);
+        parent.Prepare(identity);
+        parent.ActivatePivot(0, MathF.BitDecrement(200), 200); Assert.True(parent.Candidate.PivotActive);
+        parent.ActivatePivot(0, 200, 200); Assert.False(parent.Candidate.PivotActive);
+        parent.ActivatePivot(0, 0, 200); parent.ActivatePivot(0, 201, 200); Assert.False(parent.Candidate.PivotActive);
+        var hips = callbacks.Nodes.ToArray().Where(n => n.Function == AlsRefactoredStanceFunction.SetHipsDirection).ToArray();
+        Assert.Equal(6, hips.Length);
+        string[] nativeOrder = ["Forward", "Backward", "LeftForward", "LeftBackward", "RightForward", "RightBackward"];
+        foreach (var command in hips)
+        {
+            parent.Apply(identity, f.Catalog.IndexDigest, command);
+            Assert.Equal(Array.IndexOf(nativeOrder, command.HipsDirection), (int)parent.Candidate.HipsDirection);
+            Assert.Equal(default, parent.Committed);
+        }
+        parent.ActivatePivot(0, 0, 200); var candidate = parent.Candidate;
+        parent.Cancel(); parent.Prepare(identity); Assert.Equal(default, parent.Candidate);
+        parent.ActivatePivot(0, 0, 200); parent.Apply(identity, f.Catalog.IndexDigest, hips[^1]);
+        Assert.Equal(candidate, parent.Candidate); parent.Commit(0); Assert.Equal(candidate, parent.Committed);
+        Assert.Throws<ArgumentException>(() => parent.Prepare(new(1, 8, 1)));
+        parent.Prepare(new(1, 7, 1), true); Assert.Equal(default, parent.Candidate);
+        parent.Cancel(); parent.Prepare(new(1, 7, 1)); Assert.Equal(candidate, parent.Candidate);
+        var reset = callbacks.Nodes.ToArray().First(n => n.Function == AlsRefactoredStanceFunction.ResetPivot);
+        parent.Apply(new(1, 7, 1), f.Catalog.IndexDigest, reset); Assert.False(parent.Candidate.PivotActive);
+        Assert.Equal(candidate, parent.Committed); parent.Cancel();
+        foreach (var bad in new[] { reset with { SourcePropertyIndex = -1 }, reset with { OnBecomeRelevant = false },
+            hips[0] with { HipsDirection = "Invalid" }, callbacks.Nodes.ToArray().First(n => n.Function == AlsRefactoredStanceFunction.RefreshGroundedMovement) })
+        {
+            parent.Prepare(new(1, 7, 1));
+            Assert.Throws<ArgumentException>(() => parent.Apply(new(1, 7, 1), f.Catalog.IndexDigest, bad));
+            Assert.Throws<InvalidOperationException>(() => parent.Commit(1)); parent.Cancel();
+        }
+        parent.Prepare(new(1, 7, 1));
+        Assert.Throws<ArgumentException>(() => parent.Apply(new(1, 8, 1), f.Catalog.IndexDigest, reset));
+        Assert.Throws<InvalidOperationException>(() => parent.Commit(1)); parent.Cancel();
+        parent.Prepare(new(1, 7, 1));
+        Assert.Throws<ArgumentException>(() => parent.Apply(new(1, 7, 1), "foreign", reset));
+        Assert.Throws<InvalidOperationException>(() => parent.Commit(1)); parent.Cancel();
+        parent.Prepare(new(1, 7, 1));
+        Assert.Throws<ArgumentException>(() => parent.ActivatePivot(1, float.NaN, 200));
+        Assert.Throws<InvalidOperationException>(() => parent.Commit(1)); parent.Cancel();
+        Assert.Equal(candidate, parent.Committed);
+    }
+
+    [Theory]
+    [InlineData(30)] [InlineData(60)] [InlineData(120)]
+    public void OnePivotActivationIsConsumedBeforeSourcesAndExitsUsingRealClocks(int hz)
+    {
+        var f = Data.Value; var machine = new AlsRefactoredMovementDetailsRuntime(f.Details.Resources);
+        var details = new AlsRefactoredMovementDetailsSourceRuntime(f.Details, 0); var players = f.Players();
+        var graph = new AlsRefactoredMovementTraversal(f.Catalog, f.Details, f.Direction, 0);
+        var parent = new AlsRefactoredMovementParentRuntime(f.Details.Callbacks);
+        var init = new AlsGraphTraversalCounter(0, 0); var counter = init;
+        var fired = false; var entered = 0; var pivotFrames = 0; var exited = false; var hipCallbacks = 0;
+        for (var frame = 0; frame < hz * 4; frame++)
+        {
+            var context = new AlsPoseUpdateContext(new(frame, 7, 1), 1, 1f / hz).WithUpdateCounter(counter);
+            var activate = !fired && machine.CommittedState.CurrentState == 2;
+            var direction = (frame / Math.Max(1, hz / 3)) % 4;
+            void Prepare()
+            {
+                parent.Prepare(context.Identity);
+                if (activate) parent.ActivatePivot(frame, 150, 200);
+                machine.Prepare(frame, new("Als.Gait.Running", 1, 1, 1, parent.Candidate.PivotActive),
+                    details.CommittedObservations, context.Delta, updateCounter: counter);
+                details.Prepare(machine, context, Vector4.One, parent: parent);
+                // The callback has already consumed the request before deferred Movement runs.
+                if (activate) Assert.False(parent.Candidate.PivotActive);
+                graph.Prepare(frame, machine, details, init,
+                    new(direction == 0, direction == 1, direction == 2, direction == 3, .7f, 0),
+                    new(1, 1, 1, 1), new("Als.Gait.Running", 0, 0), parent: parent);
+                if (!graph.Sources.CallbackCommands.IsEmpty)
+                    Assert.Equal(graph.Sources.CallbackCommands[^1].HipsDirection, parent.Candidate.HipsDirection.ToString());
+                players.Prepare(frame, graph.SourceInputs, context.Delta); details.CaptureSourceTimes(frame, players);
+            }
+            Prepare(); var expected = parent.Candidate; var ticks = graph.SourceInputs.ToArray();
+            var state = machine.Candidate.State.CurrentState;
+            if (activate) { Assert.Equal(3, state); entered++; }
+            Assert.NotEqual(4, state); if (state == 3) pivotFrames++;
+            if (fired && state == 2) exited = true;
+            hipCallbacks += graph.Sources.CallbackCommands.Length;
+            parent.Cancel(); machine.Cancel(); details.Cancel(); graph.Cancel(); players.Cancel();
+            Prepare(); Assert.Equal(expected, parent.Candidate); Assert.Equal(ticks, graph.SourceInputs.ToArray());
+            parent.ValidateCommit(frame); machine.ValidateCommit(frame); details.ValidateCommit(frame); graph.ValidateCommit(frame); players.ValidateCommit(frame);
+            parent.Commit(frame); machine.Commit(frame); details.Commit(frame); graph.Commit(frame); players.Commit(frame);
+            fired |= activate; counter = counter.Next((ulong)frame + 1);
+        }
+        Assert.Equal(1, entered); Assert.True(pivotFrames > 1); Assert.True(exited); Assert.True(hipCallbacks > 4);
+        Assert.False(parent.Committed.PivotActive);
+    }
+
+    [Fact]
     public void InertiaRetainsUpdateOnlyRequestsAndResetsAfterMissingTraversal()
     {
         var f = Data.Value; var machine = new AlsRefactoredMovementDetailsRuntime(f.Details.Resources);

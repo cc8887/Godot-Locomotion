@@ -59,17 +59,20 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
 
     public void Prepare(AlsRefactoredDirectionRuntime machine, in AlsPoseUpdateContext context,
         AlsGraphTraversalCounter initialization, Vector4 velocity, AlsRefactoredMovementPlayerInput movement,
-        AlsRefactoredForwardInput forward = default, bool initializeInstance = false, Vector4 rotationYawOffsets = default)
-        => PrepareCore(machine, context, initialization, velocity, movement, forward, initializeInstance, rotationYawOffsets, null);
+        AlsRefactoredForwardInput forward = default, bool initializeInstance = false, Vector4 rotationYawOffsets = default,
+        AlsRefactoredMovementParentRuntime? parent = null)
+        => PrepareCore(machine, context, initialization, velocity, movement, forward, initializeInstance, rotationYawOffsets, null, parent);
 
     internal void PrepareShared(AlsRefactoredDirectionRuntime machine, in AlsPoseUpdateContext context,
         AlsGraphTraversalCounter initialization, Vector4 velocity, AlsRefactoredMovementPlayerInput movement,
-        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 rotationYawOffsets, AlsPoseCacheTraversal traversal)
-        => PrepareCore(machine, context, initialization, velocity, movement, forward, initializeInstance, rotationYawOffsets, traversal);
+        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 rotationYawOffsets, AlsPoseCacheTraversal traversal,
+        AlsRefactoredMovementParentRuntime? parent = null)
+        => PrepareCore(machine, context, initialization, velocity, movement, forward, initializeInstance, rotationYawOffsets, traversal, parent);
 
     private void PrepareCore(AlsRefactoredDirectionRuntime machine, in AlsPoseUpdateContext context,
         AlsGraphTraversalCounter initialization, Vector4 velocity, AlsRefactoredMovementPlayerInput movement,
-        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 rotationYawOffsets, AlsPoseCacheTraversal? shared)
+        AlsRefactoredForwardInput forward, bool initializeInstance, Vector4 rotationYawOffsets, AlsPoseCacheTraversal? shared,
+        AlsRefactoredMovementParentRuntime? parent)
     {
         var frame = context.Identity.FrameId;
         if (_prepared || !ReferenceEquals(machine.Resources, _profile.Graph.Resources) || _owner is not null && !ReferenceEquals(_owner, machine) ||
@@ -77,6 +80,7 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
             !initialization.HasUpdated || context.UpdateCounter is not { HasUpdated: true } ||
             shared is null && (context.InertializationRequester >= 0 || context.SkippedUpdateHandler >= 0))
             throw new ArgumentException("Invalid direction source owner/context.");
+        parent?.ValidateContext(context.Identity, _profile.Graph.Resources.CatalogDigest);
         machine.ValidateCommit(frame); var candidate = machine.Candidate;
         if (candidate.State.LastUpdateCounter != context.UpdateCounter) throw new ArgumentException("Direction update counter differs.");
         if (initializeInstance && !candidate.Reinitialized) throw new ArgumentException("Instance initialization requires a reinitialized direction machine.");
@@ -98,7 +102,11 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
             {
                 var update = candidate.GetUpdate(i); var state = _profile.Graph.States[update.State];
                 var command = _callbacks.Enter(frame, state.CallbackPropertyIndex);
-                if (command is not null) _commands[_commandCount++] = command;
+                if (command is not null)
+                {
+                    _commands[_commandCount++] = command;
+                    parent?.Apply(context.Identity, _profile.Graph.Resources.CatalogDigest, command);
+                }
                 var stateContext = context.WithWeight(update.Weight).WithState(machine.Resources.MachinePropertyIndex, update.State, update.InertializationSync);
                 for (var channel = 0; channel < 4; channel++) if (weights[channel] > AlsPoseBlender.WeightThreshold)
                     _activeTraversal.Use(state.ReadPropertyIndices[channel], stateContext.WithWeight(update.Weight * weights[channel]));
