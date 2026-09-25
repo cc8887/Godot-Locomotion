@@ -30,12 +30,15 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
     private AlsFrameIdentity _identity, _committedIdentity;
     private bool _prepared, _hasCommitted;
     private Vector4 _weights;
+    private Vector4 _yaw;
+    internal int FirstPlayer => _first;
     public AlsRefactoredDirectionSourceProfile Profile => _profile;
     public ReadOnlySpan<AlsRefactoredSourcePlayerInput> SourceInputs => _prepared ? _inputs.AsSpan(0, _inputCount) : throw new InvalidOperationException("No direction source candidate.");
     public ReadOnlySpan<AlsPoseUpdateContext> SourceContexts => _prepared ? _contexts.AsSpan(0, _inputCount) : throw new InvalidOperationException("No direction source candidate.");
     public ReadOnlySpan<AlsRefactoredDirectionCacheUpdate> CacheUpdates => _prepared ? _cacheUpdates.AsSpan(0, _cacheCount) : throw new InvalidOperationException("No direction source candidate.");
     public ReadOnlySpan<AlsRefactoredStanceCallback> CallbackCommands => _prepared ? _commands.AsSpan(0, _commandCount) : throw new InvalidOperationException("No direction source candidate.");
     public Vector4 DirectionWeights => _prepared ? _weights : throw new InvalidOperationException("No direction source candidate.");
+    public Vector4 RotationYawOffsets => _prepared ? _yaw : throw new InvalidOperationException("No direction source candidate.");
     public AlsRefactoredForwardWeights ForwardWeights => _prepared && _forwardUpdated ? _forward!.Weights : throw new InvalidOperationException("Forward cache was not updated.");
     public int CacheReadCount => _prepared ? _traversal.CachedCallCount : throw new InvalidOperationException("No direction source candidate.");
 
@@ -52,7 +55,7 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
 
     public void Prepare(AlsRefactoredDirectionRuntime machine, in AlsPoseUpdateContext context,
         AlsGraphTraversalCounter initialization, Vector4 velocity, AlsRefactoredMovementPlayerInput movement,
-        AlsRefactoredForwardInput forward = default, bool initializeInstance = false)
+        AlsRefactoredForwardInput forward = default, bool initializeInstance = false, Vector4 rotationYawOffsets = default)
     {
         var frame = context.Identity.FrameId;
         if (_prepared || !ReferenceEquals(machine.Resources, _profile.Graph.Resources) || _owner is not null && !ReferenceEquals(_owner, machine) ||
@@ -63,12 +66,13 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
         if (candidate.State.LastUpdateCounter != context.UpdateCounter) throw new ArgumentException("Direction update counter differs.");
         if (initializeInstance && !candidate.Reinitialized) throw new ArgumentException("Instance initialization requires a reinitialized direction machine.");
         var weights = AlsOverlayPoseWeights.MultiWay(velocity, 4);
+        for (var i = 0; i < 4; i++) if (!float.IsFinite(rotationYawOffsets[i])) throw new ArgumentException("Invalid direction yaw curve input.");
         _ = _profile.Players.Input(_first, 0, movement, 1);
         if (_forward is not null && (forward.Gait is null || !float.IsFinite(forward.SprintBlock) || !float.IsFinite(forward.SprintAcceleration))) throw new ArgumentException("Invalid forward source input.");
         if (initializeInstance) { Array.Clear(_nextInitialization); Array.Clear(_nextResets); }
         else { _initialization.CopyTo(_nextInitialization, 0); _resets.CopyTo(_nextResets, 0); }
         _nextForwardReset = initializeInstance || _forwardReset; _inputCount = _cacheCount = _commandCount = 0; _forwardUpdated = false;
-        _movement = movement; _forwardInput = forward; _identity = context.Identity; _weights = weights;
+        _movement = movement; _forwardInput = forward; _identity = context.Identity; _weights = weights; _yaw = rotationYawOffsets;
         try
         {
             _callbacks.Prepare(frame, context.UpdateCounter.Value, initializeInstance); _traversal.Begin(context.Identity);
@@ -138,6 +142,11 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
     {
         if (!_prepared || frame != _identity.FrameId) throw new ArgumentException("Invalid direction source commit.");
         _callbacks.ValidateCommit(frame); if (_forwardUpdated) _forward!.ValidateCommit(frame);
+    }
+    internal void ValidateMachine(long frame, AlsRefactoredDirectionRuntime machine)
+    {
+        ValidateCommit(frame); machine.ValidateCommit(frame);
+        if (!ReferenceEquals(_owner, machine)) throw new ArgumentException("Foreign direction pose machine.");
     }
     public void Commit(long frame)
     {
