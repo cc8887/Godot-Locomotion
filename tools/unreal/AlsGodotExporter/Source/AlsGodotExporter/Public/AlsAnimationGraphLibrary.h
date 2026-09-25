@@ -20,6 +20,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportRestParentTrace(const FString& RequestPath, const FString& OutputPath);
 
+    /** Original complete Standing graph with real Parent callbacks and Grounded montage requests. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static bool ExportStandingHostTrace(const FString& RequestPath, const FString& OutputPath);
+
     /** Actual original Parent refresh functions on transient game-world instances. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportMovementParentTrace(const FString& RequestPath, const FString& OutputPath);
