@@ -58,7 +58,7 @@ public static class AlsOverlayPoseWeights
     public static AlsOverlayBlendListUpdate BlendList(in AlsOverlayBlendListState previous, int selected,
         ReadOnlySpan<float> times, AlsTransitionBlend blend, bool inertial, bool resetChild, float delta)
     {
-        if (times.Length is not (2 or 4) || !float.IsFinite(delta) || delta < 0 || blend is not (AlsTransitionBlend.Linear or AlsTransitionBlend.HermiteCubic))
+        if (times.Length is not (2 or 4) || !float.IsFinite(delta) || delta < 0 || blend is not (AlsTransitionBlend.Linear or AlsTransitionBlend.Cubic or AlsTransitionBlend.HermiteCubic))
             throw new ArgumentException("Invalid Overlay BlendList update.");
         foreach (var time in times) if (!float.IsFinite(time) || time < 0) throw new ArgumentException("Invalid blend duration.");
         var state = previous; selected = System.Math.Clamp(selected, 0, times.Length - 1);

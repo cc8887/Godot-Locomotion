@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新站立前向源：`docs/verification/2026-09-25-refactored-forward-source.md`。原共享ForwardBase→Gait精确tag/Cubic(.3退出/.2进入)→Sprint加速映射0..25百分比/20与4插值/激活reset→SprintBlock混回；profile+候选source请求，双base读取保留identity/weight/inactive，未合并或自建时钟。初authored默认.1/.1误判5失败，修读取暴露引脚；新6/10变异、3Hz630提交帧retry+实际共享player采样，相关27/Core15/Optimize0/0。无新UE连续oracle/缓存调度/pose/Parent消费/Godot场景/全量/性能，普通Demo未切；下一步统一cache遍历与实际pose→其余stance和宿主。旧缺口/用户改动/暂缓项保留。
+
 - 最新方向姿态接线：`docs/verification/2026-09-25-refactored-direction-pose-graph.md`。双 stance 12state/96内部节点、48UseCached/12共享cache，逐通道原缓存顺序/曲线绑定/换髋回调及runtime↔authored链接校验；Standing前向source139为组合图，未简化为player。新增4/20变异拒绝，相关42通过，末次输入表达式门禁重测见graph-final.trx；Optimize0/0。仅资源compiler，尚无cache调度/pose求值/Parent消费或新UE/Godot场景/全量/性能；下一步这些及Standing前向内部图→其余stance和统一宿主。普通Demo未切，旧缺口/用户改动/暂缓项保留。
 
 - 最新方向原生连续：`docs/verification/2026-09-25-refactored-direction-native.md`。临时Root公开SetLinkNode→原Movement子图，双stance×3Hz2814帧，每场景全24edge/6state；1618多stack/85Pivot通知，状态/边/update/notify一致，time/alpha/weight差0、预算2e-6不变。初1734只14edge已补覆盖；新6/Import47/Optimize0/0。首次private RootNode编译失败修公开链接；完整UE4actions审计2ABF6BC7...，最终冷/普通11700均0两产物字节同7C40C5ED.../2F91F1F5...；Default重导B385B2不变，DV0/3旧warn，普通两旧Condition五warn保留。输出pose保留未比较，无实际Parent通知消费/完整stance/普通Demo/Godot/全量/性能。下一步state/cache/pose与Parent→其余stance和统一宿主，全部旧缺口/用户改动/暂缓项保留。
