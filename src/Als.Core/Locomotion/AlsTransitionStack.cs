@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace GodotAls.Core.Locomotion;
 
-public enum AlsTransitionBlend : byte { Linear, Cubic, HermiteCubic, Custom }
+public enum AlsTransitionBlend : byte { Linear, Cubic, HermiteCubic, Custom, QuadraticInOut }
 
 public readonly record struct AlsActiveTransition(int From, int To, float Duration, float Elapsed,
     float Remaining, float Alpha, AlsTransitionBlend Blend)
@@ -40,7 +40,7 @@ public static class AlsTransitionStack
         float duration, AlsTransitionBlend blend)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(target);
-        if (!float.IsFinite(duration) || duration < 0 || (uint)blend > (uint)AlsTransitionBlend.Custom)
+        if (!float.IsFinite(duration) || duration < 0 || (uint)blend > (uint)AlsTransitionBlend.QuadraticInOut)
             throw new ArgumentOutOfRangeException(nameof(duration));
         if (target == previous.CurrentState) return previous;
         if (previous.Count == Capacity) throw new InvalidOperationException("Active transition capacity exceeded.");
@@ -151,6 +151,7 @@ public static class AlsTransitionStack
             AlsTransitionBlend.Linear => progress,
             AlsTransitionBlend.Cubic => -2 * ((progress * progress) * progress) + 3 * (progress * progress),
             AlsTransitionBlend.HermiteCubic => progress <= 0 ? 0 : progress >= 1 ? 1 : progress * progress * (3 - 2 * progress),
+            AlsTransitionBlend.QuadraticInOut => progress < .5f ? MathF.Pow(progress * 2, 2) * .5f : (1 - MathF.Pow(1 - (progress * 2 - 1), 2)) * .5f + .5f,
             AlsTransitionBlend.Custom => customCurve is not null ? customCurve(progress) :
                 throw new ArgumentException("Custom transitions require the source curve.", nameof(customCurve)),
             _ => throw new ArgumentOutOfRangeException(nameof(blend)),
