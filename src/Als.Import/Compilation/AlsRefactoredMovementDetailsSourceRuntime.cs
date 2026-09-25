@@ -28,6 +28,7 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
     private AlsFrameIdentity _identity, _committedIdentity;
     private bool _prepared, _captured, _hasCommitted;
     private Vector4 _weights;
+    internal int FirstPlayer => _first;
     public AlsRefactoredMovementDetailsPoseGraph Profile { get; }
     public ReadOnlySpan<AlsRefactoredMovementDetailsObservation> CommittedObservations => _observations;
     public ReadOnlySpan<AlsRefactoredMovementDetailsObservation> CandidateObservations => _prepared && _captured ? _nextObservations : throw new InvalidOperationException("Source times not captured.");
@@ -145,6 +146,12 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
     {
         if (!_prepared || !_captured || frame != _identity.FrameId) throw new ArgumentException("Details source candidate is incomplete.");
         _callbacks.ValidateCommit(frame);
+    }
+    internal void ValidateEvaluation(long frame, AlsRefactoredMovementDetailsRuntime machine, AlsRefactoredSourcePlayerRuntime players)
+    {
+        ValidateCommit(frame); machine.ValidateCommit(frame); players.ValidateCommit(frame);
+        if (!ReferenceEquals(_owner, machine) || !ReferenceEquals(_playerOwner, players))
+            throw new ArgumentException("Foreign movement details evaluation owners.");
     }
     public void Commit(long frame)
     {
