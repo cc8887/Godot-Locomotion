@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Stop姿态合成：`docs/verification/2026-09-25-refactored-stop-pose-evaluation.md`。独立catalog绑定Skeleton native43条全空metadata门禁，拒绝LinkedBones静默丢失；十二leaf→hips selector→MultiWay→mesh腿层/Override→FootLock→Stop标准stack，零权重reference fallback与候选校验，锁曲线索引预计算。新9/相关66/最后9/Optimize0/0，3Hz1260帧99540骨retry；基底目前reference非真实cache119联合/native整图。首轮2失败为测试忽略float alpha补数累积漂移，改独立不受腿层影响的stack期望，原阈值不变。UE完整0actions/4插件审计FA68F487...，冷/普通40896实际0导出SHA742D1892...字节同，普通两旧Condition/旧warn保留；无C++变更/DV/Godot运行/全量/性能。下一步统一cache66→67/源/姿态与118/IdleRotate/实际动作消费及原生连续Stop整图；普通Demo/Ragdoll等旧目标、用户修改/暂缓项保留。
+
 - 最新Stop姿态图/源遍历：`docs/verification/2026-09-25-refactored-stop-pose-sources.md`。五state完整34节点、cache66五读者、FootLock=1、原MultiWay/hips枚举、两腿三branch native79骨mask；右后向进入Linear .1/退回0，左两向0，初始立即选择。候选source保留隐藏selector history/初始化/零old-child/Inactive/祖先/rootmotion(layer0/base原值)/requester，发出独立cache读取与12 evaluator更新；可update-only提交。新13/相关57/Optimize0/0，3Hz1260帧逐帧retry，8变异；首次curveValues模板0误要求1失败，改runtime+可见pin校验后过，TRX保留。尚无最终Stop pose合成/UE整图/统一66调度/Godot运行；发现当前Refactored skeleton资源未含CurveMetaData.LinkedBones，下步补只读导出/门禁再曲线与mesh合成、native整链；实际动作回调/118/普通Demo/Ragdoll等旧目标及用户修改/暂缓项保留。
 
 - 最新Stop内层：`docs/verification/2026-09-25-refactored-stop-runtime.md`。原53五state/四有序出口、FootPlantedAmount严格边界、0/.1 Hermite和首次不skip；独立候选runtime保留相关性reset/停止回调。十二固定帧evaluator来自六Walk序列，原frame-rate秒数/79骨curve冻结采样，无新clock。新20/相关Import46/Core39/Optimize0/0；3Hz840帧单机retry+840帧Standing驱动Stop淡出与重入。首次三测试失败是phase取模switch优先级，修夹具并保留TRX。无新UE oracle/Godot运行/全量/性能；Stop腿部分层/hips枚举混合、实际回调动作、66统一Drain/118惯性化/整图native/普通Demo及旧目标仍待，用户修改/暂缓项保留。
