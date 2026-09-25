@@ -54,6 +54,8 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
         var profile=new AlsRefactoredStandingPose(f.Standing,rest,details,stop);
         var rotate=new AlsRefactoredSourcePlayerRuntime(f.Catalog,f.Bank,f.Triangles,f.Standing.RotatePlayers.Bind(0));
         var output=profile.CreateRuntime(rotate,0);var inertia=new AlsRefactoredStandingInertialization(f.Catalog,profile);
+        var final=new AlsRefactoredStandingOutput(f.Catalog,profile,inertia);
+        var finalPose=new AlsPrecisePose[79];var finalCurves=new AlsInertialCurve[final.CurveNames.Length];
         var standing=new AlsRefactoredStandingRuntime(f.Standing);
         var graph=new AlsRefactoredStandingMovementTraversal(f.Catalog,f.Standing,f.Details,f.Direction,0);
         var parent=new AlsRefactoredMovementParentRuntime(f.Details.Callbacks,f.Settings);
@@ -64,10 +66,8 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
         var id=new AlsFrameIdentity(0,19,1);restParent.Prepare(id,input);
         restParent.Apply(id,callbacks.Nodes.ToArray().Single(c=>c.Function==AlsRefactoredStanceFunction.RefreshTurnInPlace));
         bank.Begin(id,0);montages.PlayQueued(bank,restParent,id);Assert.Single(bank.Candidate.ToArray());bank.Commit(id);restParent.Commit(0);
-        var reference=f.Catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence);
-        var mixer=new AlsMontageSlotPose(reference.ReferencePose,montagePose.Parents,montagePose.CurveNames.Length);var sampler=montagePose.CreateSampler();
+        var idleSlot=new AlsRefactoredStandingIdleSlot(f.Catalog,restGraph,rest,montagePose);
         var basis=new AlsPrecisePose[79];var baseCurves=new AlsInertialCurve[rest.CurveNames.Length];rest.SampleIdleSource(basis,baseCurves);
-        var pose=new AlsPrecisePose[79];var curves=new AlsInertialCurve[baseCurves.Length];
         AlsRefactoredStandingObservation[] clocks=[new(12,0,0,false),new(9,0,0,false)];
         var init=new AlsGraphTraversalCounter(0,0);var counter=init;var exits=0;
         for(var frame=1;frame<=180;frame++)
@@ -78,21 +78,26 @@ public sealed class AlsRefactoredStandingMovementTraversalTests
             standing.Prepare(frame,new(false,false,false),clocks,context.Delta,updateCounter:counter);
             parent.Prepare(id,new AlsRefactoredMovementInput(default,default,AlsQuaternion.Identity,0,1,0,0,1000,800,"Als.Gait.Running",false,false,context.Delta,1,0,0,0));
             graph.Prepare(context,[],[],init,parent,new(1,1,1,0));
-            mixer.Evaluate(bank.Frame,id,AlsTurnSlot.Standing,basis,baseCurves,pose,curves,sampler);
-            output.Begin(id,standing);output.CaptureIdleSlot(pose,curves,restParent.Candidate.TurnPlayRate);output.Evaluate(frame);
+            idleSlot.Prepare(bank.Frame,context);idleSlot.Evaluate();
+            output.Begin(id,standing);output.CaptureIdleSlot(idleSlot.Pose,idleSlot.Curves,restParent.Candidate.TurnPlayRate);output.Evaluate(frame);
             var request=montages.StandingSlotRequest(bank.Frame,id,traversal);
             inertia.Prepare(context,standing,graph,slotRequest:request);Assert.Equal(request is null?0:1,inertia.PendingRequests);
             inertia.Evaluate(frame,output,AlsPrecisePose.Identity);
+            final.Evaluate(id,finalPose,finalCurves);Assert.Equal(inertia.Pose.ToArray(),finalPose);
+            var standingCurve=Array.IndexOf(final.CurveNames.ToArray(),"PoseStanding");
+            Assert.Equal(new AlsInertialCurve(1),finalCurves[standingCurve]);
+            for(var c=0;c<inertia.Curves.Length;c++)if(c!=standingCurve)Assert.Equal(inertia.Curves[c],finalCurves[c]);
+            var foreign=new AlsFrameIdentity(frame,20,1);Assert.Throws<ArgumentException>(()=>final.Evaluate(foreign,finalPose,finalCurves));
             if(request is not null)
             {
-                exits++;Assert.True(inertia.IsActive);Assert.Equal(basis,pose);
+                exits++;Assert.True(inertia.IsActive);Assert.Equal(basis,idleSlot.Pose.ToArray());
                 Assert.False(output.Pose.ToArray().SequenceEqual(inertia.Pose.ToArray()));
                 var yaw=Array.IndexOf(profile.CurveNames.ToArray(),"RotationYawSpeed");Assert.Equal(output.Curves[yaw],inertia.Curves[yaw]);
                 var expected=inertia.Pose.ToArray();inertia.Cancel();inertia.Prepare(context,standing,graph,slotRequest:request);
                 inertia.Evaluate(frame,output,AlsPrecisePose.Identity);Assert.Equal(expected,inertia.Pose.ToArray());
             }
             inertia.Commit(frame);output.Commit(frame);graph.Commit(frame);parent.Commit(frame);standing.Commit(frame);
-            traversal.Commit(frame);restParent.Commit(frame);bank.Commit(id);counter=counter.Next((ulong)frame+1);
+            traversal.Commit(frame);restParent.Commit(frame);idleSlot.Commit(id);bank.Commit(id);counter=counter.Next((ulong)frame+1);
         }
         Assert.Equal(1,exits);Assert.False(inertia.IsActive);
     }

@@ -7,6 +7,7 @@ namespace GodotAls.Import.Compilation;
 /// physical montage instance time, in the original 79-bone skeleton basis.</summary>
 public sealed class AlsRefactoredRestMontagePose
 {
+    public string CatalogDigest { get; }
     private sealed record Source(AlsSequenceMontageAsset Asset, AlsMantlingPoseSource? Absolute,
         AlsMantlingCurveSource? AbsoluteCurves, AlsRefactoredAdditiveSource? Additive, string[] Names);
     private readonly Dictionary<int,Source> _sources = new();
@@ -18,6 +19,7 @@ public sealed class AlsRefactoredRestMontagePose
     public AlsRefactoredRestMontagePose(AlsRefactoredAnimationCatalog catalog, AlsRefactoredRestMontages montages, ReadOnlySpan<string> hostCurves)
     {
         if(catalog.IndexDigest!=montages.Settings.CatalogDigest)throw new ArgumentException("Foreign rest montage pose catalog.");
+        CatalogDigest=catalog.IndexDigest;
         var reference=catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence);
         _bones=reference.BoneNames.ToArray();_parents=reference.Parents.ToArray();
         var names=hostCurves.ToArray();
