@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新 Standing 统一宿主：`docs/verification/2026-09-25-refactored-standing-host.md`。生产 profile/角色 owner 统一 Parent、203/65/Stop/66/67、独立播放器、Idle Turn Slot、119/118/68、停止队列和主线程 QuickStop；候选完整预校验/依赖提交、异常整帧取消、update-only 与重复求值。新增初4/最终相关57通过，三Hz2310帧逐帧后处理后取消重试/稀疏求值/全求值状态动作对照、初始化counter间断与后处理故障；Optimize0/0，无失败。未新UE整图oracle/Godot运行/全量/性能。输出只到Standing68，外层Transition Slot尚未混入；局部18资源bank仍须统一角色绑定，源Notify/曲线反馈/Crouch/Overlay/Demo待接。下步完整原生连续对照和角色外层接入，所有Ragdoll等旧目标/用户修改/暂缓项保留。
+
 - 最新 Movement update-only：`docs/verification/2026-09-25-refactored-movement-update-only.md`。按本机 UE tick/Evaluate 分工将 Lean 权重/三角形缓存解析前移至 Prepare，允许无骨骼求值提交滤波与 alpha；失败求值仍拒绝提交，取消/重置/旧姿态门禁保留。Release 相关15通过，既有native6720帧新增稀疏求值逐帧cache对照，Movement三Hz630帧稀疏/全求值严格一致；Optimize0/0。未新UE导出/Godot运行/全量/视觉/性能，统一Standing宿主和普通Demo未完成；下步统一宿主/连续原生整图，Crouch/Ragdoll等全部旧目标及用户修改/暂缓项保留。
 
 - 最新Rest Parent原生连续：`docs/verification/2026-09-25-refactored-rest-parent-native.md`。独立临时GamePreview世界/真实worker原四函数，三Hz3360帧，重复回调/跳过刷新/非游戏世界/阈值/8Turn+4Dynamic全部覆盖；每帧取消重试，native三组通过，rate/delay最大差0，候选和参数同，Optimize0/0，无失败。全Editor11actions含UBT所需NetCore重编，四插件审计D949664C.../BuildId b4127720-ddfd-475f-a955-59a24fb7ace6；冷28316/普通10132实际0、2814734字节SHA93F2E838...一致，DV43092实际0/3旧warn。普通两旧Condition/旧warn保留，无打包/Godot运行/全量/性能。仅刷新→未消费候选，不含NativePostUpdate的Turn接受/惯性或完整Standing图；下步统一连续宿主/图与动作Slot，再Crouch/Demo，全部Ragdoll等旧目标/用户改动/暂缓项保留。
