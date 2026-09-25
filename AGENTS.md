@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Standing待机/旋转姿态：`docs/verification/2026-09-25-refactored-standing-rest-pose.md`。原Idle/左右Rotate十四节点接线/闭包/动态绑定校验，Idle固定79骨帧零与三曲线先于TurnInPlaceStanding Slot、Slot后TurnRate缩放；Rotate绑定实际独立播放器owner/候选帧/Evaluate/布局，原Scale后Lerp次序与absence插零。新12/相关49/Optimize0/0，无失败；3Hz840帧双player共132720骨逐值原采样与Cancel重试，含循环/负速/reset/非零ID。Slot测试为受控输出，未实际Montage、无新UE整图/Godot渲染/全量/性能；Idle回调仅编译身份，源遍历/Parent刷新/真实Slot动作/完整65与118尚待。普通Demo未切，Ragdoll等旧目标及用户修改/暂缓项保留。
+
 - 最新Standing移动缓存整链：`docs/verification/2026-09-25-refactored-standing-movement-traversal.md`。原66→67→七方向缓存单Drain，9cache/38reader；最大weight先到tie，选定66上下文执行原Parent入口/Details并enqueue67，回调Leave在延迟子cache之前；初始化counter与无read时pending reset候选、外118/内119 skipped分流。Movement支持共享调度并在Drain完成前拒绝提交；Stop新增惯性化owner/frame/角色/布局校验入口。新4/相关29/Core缓存41/Optimize0/0；3Hz1050帧真实Parent→Direction→Lean→Details→119→Stop逐帧retry，覆盖交叠/隐藏/初始延迟。初IsFinished internal编译错已开放只读；初30Hz覆盖断言失败，增加尾部Idle并分别断言后全过，保留TRX。无新UE/Godot运行/全量/性能；外65仍缺Idle/Rotate源/完整pose118、停止回调/Notify实际动作与连续UE整图，普通Demo/统一角色宿主/Ragdoll等旧目标及用户修改/暂缓项保留。
 
 - 最新Stop姿态合成：`docs/verification/2026-09-25-refactored-stop-pose-evaluation.md`。独立catalog绑定Skeleton native43条全空metadata门禁，拒绝LinkedBones静默丢失；十二leaf→hips selector→MultiWay→mesh腿层/Override→FootLock→Stop标准stack，零权重reference fallback与候选校验，锁曲线索引预计算。新9/相关66/最后9/Optimize0/0，3Hz1260帧99540骨retry；基底目前reference非真实cache119联合/native整图。首轮2失败为测试忽略float alpha补数累积漂移，改独立不受腿层影响的stack期望，原阈值不变。UE完整0actions/4插件审计FA68F487...，冷/普通40896实际0导出SHA742D1892...字节同，普通两旧Condition/旧warn保留；无C++变更/DV/Godot运行/全量/性能。下一步统一cache66→67/源/姿态与118/IdleRotate/实际动作消费及原生连续Stop整图；普通Demo/Ragdoll等旧目标、用户修改/暂缓项保留。
