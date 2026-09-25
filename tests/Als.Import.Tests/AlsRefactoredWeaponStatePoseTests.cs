@@ -1,4 +1,6 @@
 using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using GodotAls.Core.Locomotion;
 using GodotAls.Import.Compilation;
@@ -17,7 +19,11 @@ public sealed class AlsRefactoredWeaponStatePoseTests(ITestOutputHelper output)
     [MemberData(nameof(Cases))]
     public void OrderedMachineTransitionsMatchNativePoseAndCurves(AlsRefactoredWeaponKind kind, int hz)
         => Compare(kind, hz, true);
-    private void Compare(AlsRefactoredWeaponKind kind, int hz, bool wholeMachine)
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void QuickFeetAndInterruptedRecoveryMatchNativePoseAndCurves(AlsRefactoredWeaponKind kind, int hz)
+        => Compare(kind, hz, true, true);
+    private void Compare(AlsRefactoredWeaponKind kind, int hz, bool wholeMachine, bool quickTrace = false)
     {
         var catalog = new AlsRefactoredAnimationCatalog(MantlingHostFixture.Read("refactored_animation_sources"), p => File.ReadAllBytes(Path.Combine(RepositoryRoot.Find(), "assets/config", p)));
         var source = new AlsRefactoredWeaponSourceProfile(catalog, new(catalog, new(MantlingHostFixture.Read("refactored_weapon_machines"), catalog, kind)));
@@ -26,11 +32,14 @@ public sealed class AlsRefactoredWeaponStatePoseTests(ITestOutputHelper output)
         var machine = source.Machine.CreateRuntime(); var update = source.CreateRuntime(0);
         var players = new AlsRefactoredSourcePlayerRuntime(catalog, new(MantlingHostFixture.Read("refactored_sync_inputs"), catalog),
             new Dictionary<string, AlsRefactoredTriangulationProfile>(), source.Players.Bind(0, new Dictionary<string, int> { ["Secondary Motion"] = 0, ["Movement"] = 1 }));
-        using var doc = JsonDocument.Parse(MantlingHostFixture.Read("refactored_weapon_source_trace_" + kind));
+        using var doc = JsonDocument.Parse(MantlingHostFixture.Read((quickTrace ? "refactored_weapon_quickfeet_trace_" : "refactored_weapon_source_trace_") + kind));
+        Assert.Equal(AlsRefactoredWeaponMachineResources.Blueprint(kind), doc.RootElement.GetProperty("source").GetString());
+        foreach (var hash in doc.RootElement.GetProperty("resourceHashes").EnumerateObject())
+            Assert.Equal(hash.Value.GetString()!.ToUpperInvariant(), Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(MantlingHostFixture.Read(hash.Name)))));
         var trace = doc.RootElement.GetProperty("traces").EnumerateArray().Single(t => t.GetProperty("name").GetString() == hz + "hz");
         Assert.Equal(profile.BoneNames.ToArray(), doc.RootElement.GetProperty("names").EnumerateArray().Select(n => n.GetString()!));
         var result = new AlsPrecisePose[79]; var curves = new AlsInertialCurve[profile.CurveNames.Length];
-        var frame = 0; var compared = 0; var multi = 0; var quick = 0; var states = new HashSet<int>(); double maxP = 0, maxQ = 0, maxS = 0, maxC = 0, maxAlpha = 0;
+        var frame = 0; var compared = 0; var multi = 0; var quick = 0; var quickInterrupted = 0; var states = new HashSet<int>(); double maxP = 0, maxQ = 0, maxS = 0, maxC = 0, maxAlpha = 0;
         foreach (var row in trace.GetProperty("frames").EnumerateArray())
         {
             var input = row.GetProperty("input"); var delta = input.GetProperty("delta").GetSingle(); var ps = input.GetProperty("poseState");
@@ -47,7 +56,11 @@ public sealed class AlsRefactoredWeaponStatePoseTests(ITestOutputHelper output)
             for (var i = 0; i < transitions.Count; i++)
             {
                 maxAlpha = Math.Max(maxAlpha, Math.Abs(transitions.GetTransition(i).Alpha - nativeTransitions[i].GetProperty("alpha").GetSingle()));
-                if (source.Machine.Resources.Edges[machine.Candidate.State.GetActivePath(i).Edge].QuickFeet) quick++;
+                if (source.Machine.Resources.Edges[machine.Candidate.State.GetActivePath(i).Edge].QuickFeet)
+                {
+                    quick++;
+                    if (transitions.Count > 1) quickInterrupted++;
+                }
             }
             Assert.True(maxAlpha <= 2e-6);
             var weights = row.GetProperty("weights").EnumerateArray().Select(w => w.GetSingle()).ToArray();
@@ -109,8 +122,8 @@ public sealed class AlsRefactoredWeaponStatePoseTests(ITestOutputHelper output)
         Assert.True(multi > 0);
         // Existing traces take/replace the ready exits without retaining edge 2
         // for Evaluate. Do not claim native QuickFeet pose coverage from them.
-        Assert.Equal(0, quick);
+        if (quickTrace) { Assert.True(quick > hz / 2); Assert.True(quickInterrupted > 0); } else Assert.Equal(0, quick);
         if (wholeMachine) Assert.Equal(frame, compared);
-        output.WriteLine($"{kind}/{hz} machine={wholeMachine}: frames={frame} compared={compared} multi={multi} quick={quick} maxP={maxP:R} maxQ={maxQ:R} maxS={maxS:R} maxC={maxC:R} maxAlpha={maxAlpha:R}");
+        output.WriteLine($"{kind}/{hz} machine={wholeMachine} quickTrace={quickTrace}: frames={frame} compared={compared} multi={multi} quick={quick} quickInterrupted={quickInterrupted} maxP={maxP:R} maxQ={maxQ:R} maxS={maxS:R} maxC={maxC:R} maxAlpha={maxAlpha:R}");
     }
 }
