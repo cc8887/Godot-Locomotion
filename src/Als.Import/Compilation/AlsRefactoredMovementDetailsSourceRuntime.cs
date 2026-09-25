@@ -28,6 +28,8 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
     private AlsFrameIdentity _identity, _committedIdentity;
     private bool _prepared, _captured, _hasCommitted;
     private Vector4 _weights;
+    private Vector4 _desiredWeights;
+    internal Vector4 DesiredWeights => _prepared ? _desiredWeights : throw new InvalidOperationException("No details source candidate.");
     internal int FirstPlayer => _first;
     public AlsRefactoredMovementDetailsPoseGraph Profile { get; }
     public ReadOnlySpan<AlsRefactoredMovementDetailsObservation> CommittedObservations => _observations;
@@ -67,6 +69,7 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
         if (update.State.LastUpdateCounter != context.UpdateCounter || update.State.RecordedWeight != context.Weight || initializeInstance && !update.Reinitialized)
             throw new ArgumentException("Details machine and traversal context differ.");
         _weights = AlsOverlayPoseWeights.MultiWay(velocity, 4);
+        _desiredWeights = velocity;
         if (initializeInstance) { Array.Clear(_nextResets); ResetObservations(_nextObservations); }
         else { _resets.CopyTo(_nextResets, 0); _observations.CopyTo(_nextObservations, 0); }
         _inputCount = _readCount = _initialCount = _commandCount = 0; _captured = false;
@@ -152,6 +155,12 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
         ValidateCommit(frame); machine.ValidateCommit(frame); players.ValidateCommit(frame);
         if (!ReferenceEquals(_owner, machine) || !ReferenceEquals(_playerOwner, players))
             throw new ArgumentException("Foreign movement details evaluation owners.");
+    }
+    internal void ValidateTraversal(long frame, AlsRefactoredMovementDetailsRuntime machine)
+    {
+        if (!_prepared || _identity.FrameId != frame || !ReferenceEquals(_owner, machine))
+            throw new ArgumentException("Foreign movement details traversal.");
+        machine.ValidateCommit(frame);
     }
     public void Commit(long frame)
     {
