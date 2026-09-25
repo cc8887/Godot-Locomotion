@@ -50,6 +50,7 @@ public sealed class AlsRefactoredWeaponActionProfile
     {
         var blueprint = AlsRefactoredWeaponMachineResources.Blueprint(source.Machine.Resources.Kind);
         Expect(payload, new { source = blueprint, @class = "AnimBlueprint" });
+        ValidateEntry(payload, blueprint);
         var nodes = payload.GetProperty("compiled").GetProperty("nodes").EnumerateArray().Where(n => n.GetProperty("graph").GetString() == blueprint + ":Overlay")
             .ToDictionary(n => n.GetProperty("propertyIndex").GetInt32());
         var graph = new AlsYawOffsetCompiler.Graph(AlsNativeNestedGraph.Extract(payload.GetProperty("nativeText").GetString()!, blueprint, blueprint + ":Overlay"), true);
@@ -114,5 +115,30 @@ public sealed class AlsRefactoredWeaponActionProfile
         }
         if (visited.Count != nodes.Count) throw new ArgumentException("Unconsumed weapon action nodes.");
         return (times, branches);
+    }
+    private static void ValidateEntry(JsonElement payload, string blueprint)
+    {
+        var nodes = payload.GetProperty("compiled").GetProperty("nodes").EnumerateArray()
+            .Where(n => n.GetProperty("graph").GetString() == blueprint + ":AnimGraph").ToArray();
+        if (nodes.Length != 2) throw new ArgumentException("Weapon layer entry differs.");
+        var root = nodes.Single(n => n.GetProperty("class").GetString() == "AnimGraphNode_Root");
+        var layer = nodes.Single(n => n.GetProperty("class").GetString() == "AnimGraphNode_LinkedAnimLayer");
+        var graph = new AlsYawOffsetCompiler.Graph(AlsNativeNestedGraph.Extract(payload.GetProperty("nativeText").GetString()!, blueprint, blueprint + ":AnimGraph"), true);
+        var authoredRoot = graph.Named(root.GetProperty("path").GetString()!.Split('.')[^1]);
+        var authoredLayer = graph.Named(layer.GetProperty("path").GetString()!.Split('.')[^1]);
+        if (authoredRoot.Kind != "AnimGraphNode_Root" || authoredLayer.Kind != "AnimGraphNode_LinkedAnimLayer" ||
+            graph.FollowReroutes(authoredRoot, "Result").Item1.Name != authoredLayer.Name || authoredLayer.Body.Contains("bIsBound=True", StringComparison.Ordinal))
+            throw new ArgumentException("Weapon authored entry differs.");
+        Expect(root.GetProperty("runtime").GetProperty("result"), new { linkId = layer.GetProperty("propertyIndex").GetInt32(), sourceLinkId = root.GetProperty("propertyIndex").GetInt32() });
+        foreach (var node in nodes) foreach (var policy in new[] { node.GetProperty("runtime"), node.GetProperty("authoredProperties").GetProperty("Node") })
+        {
+            foreach (var cb in new[] { "initialUpdateFunction", "becomeRelevantFunction", "updateFunction" }) Expect(policy.GetProperty(cb), new { functionName = "None" });
+            if (node.GetProperty("class").GetString() == "AnimGraphNode_LinkedAnimLayer")
+            {
+                Expect(policy, new { layer = "Overlay", @interface = "/ALS/ALS/Character/ALI_Overlay.ALI_Overlay_C", instanceClass = "", bReceiveNotifiesFromLinkedInstances = false, bPropagateNotifiesToLinkedInstances = false });
+                foreach (var field in new[] { "inputPoses", "inputPoseNames", "sourcePropertyNames", "destPropertyNames" })
+                    if (policy.GetProperty(field).GetArrayLength() != 0) throw new ArgumentException("Unexpected weapon layer inputs.");
+            }
+        }
     }
 }

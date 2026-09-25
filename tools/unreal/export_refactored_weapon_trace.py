@@ -36,6 +36,7 @@ for hz in (30, 60, 120):
                             sprint=i % 41 < 7, air=i % 61 < 5, reset=i == 81))
     frames.extend([frame(d, aim=True), frame(d)] + [frame(d) for _ in range(hz + 2)])
     quick = os.environ.get("ALS_WEAPON_QUICKFEET_TRACE") == "1"
+    actions = os.environ.get("ALS_WEAPON_ACTION_TRACE") == "1"
     if quick:
         frames = []
         for interrupted in (False, True):
@@ -45,7 +46,16 @@ for hz in (30, 60, 120):
                 # QuickFeet exit across ordinary Evaluate frames. The second
                 # pass interrupts that exit by aiming again.
                 frames.append(frame(d, allowed=True, aim=interrupted and hz * 3 + hz // 4 <= i < hz * 4))
-    if os.environ.get("ALS_WEAPON_SOURCE_TRACE") == "1" or quick:
+    if actions:
+        frames = []
+        for phase, action in enumerate(("", "Mantling", "GettingUp", "Rolling", "", "GettingUp", "", "Mantling", "Rolling", "")):
+            for i in range(hz):
+                item = frame(0 if i == hz // 2 else d, aim=i < hz // 2, reset=phase == 5 and i == hz // 3)
+                item["action"] = "Als.LocomotionAction." + action if action else ""
+                frames.append(item)
+        # Force the default branch's final zero-weight update, then reopen it.
+        frames.extend([dict(frame(d, aim=True), action="Als.LocomotionAction.GettingUp"), frame(d)])
+    if os.environ.get("ALS_WEAPON_SOURCE_TRACE") == "1" or quick or actions:
         for i, item in enumerate(frames):
             item["poseState"].update({"GaitRunningAmount": 1 if i % 29 < 20 else .3,
                                       "GaitWalkingAmount": 0 if i % 23 < 15 else .4,
@@ -58,7 +68,7 @@ for hz in (30, 60, 120):
                 ([1, 0, 0, 0], [0, 1, 0, 0], [.2, 0, .8, 0], [0, .3, 0, .7])[i % 4]))}
         # Isolate every Rifle arms path at every Hz, independently of the earlier
         # interrupted state transitions and directional zero weights.
-        for phase in range(0 if quick else 3):
+        for phase in range(0 if quick or actions else 3):
             for i in range(hz // 2):
                 item = frame(d, reset=phase == 0 and i == 0)
                 # Gait amounts are cumulative: the Walking amount also gates the

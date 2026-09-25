@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新四武器整图原生：`docs/verification/2026-09-25-refactored-weapon-overlay-native.md`。真实完整Action切换/隐藏/零delta/隐藏Initialize/零旧分支更新恢复，8424帧665496骨/4548隐藏/24零更新/48reset，maxP6.13e-6cm/Q3.509e-8/S4.471e-8/C1.193e-7/有效clock0，预算不变、非逐位同。补AnimGraph→LinkedLayer入口政策与四变异门禁；新12/Import156/Optimize0/0。初测试编译多括号修复，无native失败。完整Editor0actions审计68FD4C51...冷/普通44116退出0四文件字节同；两旧Condition五warn保留。受控输入下Overlay连续图证据现13/13，非完整角色完成；普通Demo未切。下一步真实Standing/Crouching Locomotion图/回调→共享播放器/Montage/Notify/rootmotion统一宿主整链；Ragdoll/Mantle/Camera/性能等所有旧缺口/用户改动/暂缓项保留。无新DV/打包/Godot/全量/性能。
+
 - 最新武器外Action：`docs/verification/2026-09-25-refactored-weapon-actions.md`。编译真实四外Overlay图/Default机器/.3/.3/0/.3/各动作固定帧与ModifyCurve；runtime接ActionBlend/机器/source/有序pose/ActionMix，隐藏停钟、零旧分支更新、pending reset/serial-gap重入、事务/fault/update-only。新8含24变异及四图各50提交帧，首8误将machine嵌套绑定当外层拒绝已修，失败日志保留；最终相关见文档/Optimize0/0。尚无新UE完整Action oracle或AnimGraph入口整体验收，下一步原生隐藏/重入/动作pose对照；整图证据仍9/13、普通Demo未切、Ragdoll未整体验收及所有旧缺口/用户改动/暂缓项保留。无UE/Godot/全量/性能。
 
 - 最新QuickFeet连续原生：`docs/verification/2026-09-25-refactored-weapon-quickfeet.md`。新增正常delta等待Ready三秒→.75s每骨退出及途中瞄准打断，四武器3Hz8424帧665496骨/868QuickFeet活跃条目，补旧trace edge2未保留到Evaluate缺口。新12通过/最终相关见文档/Optimize0/0；maxP1.536e-5cm/Q1.238e-7/S8.941e-8/curve及alpha1.789e-7，沿用既定预算，生产算法未改/非逐位同。完整Editor0actions审计68FD4C51...，冷/普通40880退出0四JSON字节同；普通两旧Condition五类warn保留，无插件改动/DV/打包/Godot/全量/性能。下一步外Action/隐藏重入；完整Overlay仍9/13、普通Demo未切、Ragdoll未整体验收及全部旧缺口/用户改动/暂缓项保留。
