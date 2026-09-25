@@ -40,7 +40,7 @@ public sealed class AlsRefactoredMovementCacheTests
             else expected += (target - expected) * Math.Clamp(delta * (target >= expected ? 20 : 1), 0, 1);
             var lean = new Vector2(MathF.Sin(frame * .13f), MathF.Cos(frame * .07f));
             runtime.Prepare(frame, running, lean, delta, reset);
-            Assert.Throws<ArgumentException>(() => runtime.ValidateCommit(frame));
+            runtime.ValidateCommit(frame);
             runtime.Evaluate(frame, pose, curves);
             var before = runtime.Pose.ToArray(); var beforeCurves = runtime.Curves.ToArray(); var filtered = runtime.FilteredLean;
             runtime.Cancel();
@@ -57,6 +57,56 @@ public sealed class AlsRefactoredMovementCacheTests
             runtime.Evaluate(frame, pose, curves);
             runtime.Commit(frame); clean.Commit(frame);
         }
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(120)]
+    public void UpdateOnlyFramesPreserveLeanAndAlphaUntilEvaluationResumes(int hz)
+    {
+        var profile = Fixture.Value.Profile;
+        var sparse = new AlsRefactoredMovementCacheRuntime(profile, profile.Lean.BoneNames, ["Untouched"]);
+        var full = new AlsRefactoredMovementCacheRuntime(profile, profile.Lean.BoneNames, ["Untouched"]);
+        var pose = Enumerable.Repeat(AlsPrecisePose.Identity, profile.Lean.BoneNames.Length).ToArray();
+        AlsInertialCurve[] curves = [new(.37f)];
+        var evaluations = 0;
+        for (var frame = 0; frame < hz * 3; frame++)
+        {
+            var running = frame < hz ? 1f : 0f;
+            var lean = new Vector2(MathF.Sin(frame * .13f), MathF.Cos(frame * .07f));
+            var delta = frame % 23 == 0 ? 0 : 1f / hz;
+            var reset = frame == hz + 1;
+            full.Prepare(frame, running, lean, delta, reset);
+            full.Evaluate(frame, pose, curves);
+            sparse.Prepare(frame, running, lean, delta, reset);
+            var alpha = sparse.Alpha; var filtered = sparse.FilteredLean;
+            sparse.Cancel();
+            sparse.Prepare(frame, running, lean, delta, reset);
+            Assert.Equal(alpha, sparse.Alpha); Assert.Equal(filtered, sparse.FilteredLean);
+            Assert.Equal(full.Alpha, sparse.Alpha); Assert.Equal(full.FilteredLean, sparse.FilteredLean);
+            Assert.Throws<ArgumentException>(() => sparse.Commit(frame + 1));
+            if (frame % 9 == 8 || frame == hz * 3 - 1)
+            {
+                sparse.Evaluate(frame, pose, curves);
+                Assert.True(full.Pose.SequenceEqual(sparse.Pose));
+                Assert.True(full.Curves.SequenceEqual(sparse.Curves));
+                Assert.Throws<ArgumentException>(() => sparse.Evaluate(frame, [], curves));
+                Assert.Throws<ArgumentException>(() => sparse.Commit(frame));
+                Assert.Throws<InvalidOperationException>(() => sparse.Pose.ToArray());
+                sparse.Evaluate(frame, pose, curves);
+                evaluations++;
+            }
+            else
+            {
+                Assert.Throws<InvalidOperationException>(() => sparse.Pose.ToArray());
+                Assert.Throws<InvalidOperationException>(() => sparse.Curves.ToArray());
+            }
+            sparse.Commit(frame); full.Commit(frame);
+            Assert.Throws<InvalidOperationException>(() => sparse.Pose.ToArray());
+            Assert.Throws<ArgumentException>(() => sparse.Prepare(frame, running, lean, delta));
+        }
+        Assert.True(evaluations >= 10);
     }
 
     [Fact]

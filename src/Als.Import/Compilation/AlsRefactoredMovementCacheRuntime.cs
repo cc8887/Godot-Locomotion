@@ -13,7 +13,7 @@ public sealed class AlsRefactoredMovementCacheRuntime
     private readonly int[] _baseMap, _leanMap;
     private readonly AlsPrecisePose[] _pose;
     private readonly AlsInertialCurve[] _curves;
-    private bool _initialized, _nextInitialized, _prepared, _evaluated;
+    private bool _initialized, _nextInitialized, _prepared, _evaluated, _evaluationAttempted;
     private float _history, _nextHistory, _alpha;
     private long _frame, _committed = -1;
     public AlsRefactoredMovementCacheProfile Profile => _profile;
@@ -44,11 +44,11 @@ public sealed class AlsRefactoredMovementCacheRuntime
         _alpha = AlsOverlayPoseWeights.Alpha(runningAmount, _profile.AlphaPolicy, delta, ref _nextInitialized, ref _nextHistory);
         // Original evaluator uses X=right, Y=forward, normalized time zero and no sync group.
         _lean.Prepare(frame, lean, delta, 0, reinitialize);
-        _frame = frame; _prepared = true; _evaluated = false;
+        _frame = frame; _prepared = true; _evaluated = false; _evaluationAttempted = false;
     }
     public void Evaluate(long frame, ReadOnlySpan<AlsPrecisePose> direction, ReadOnlySpan<AlsInertialCurve> curves)
     {
-        _evaluated = false;
+        _evaluated = false; _evaluationAttempted = true;
         if (!_prepared || frame != _frame || direction.Length != _pose.Length || curves.Length != _baseCurves.Length)
             throw new ArgumentException("Invalid Movement direction pose.");
         foreach (var p in direction) p.Validate();
@@ -66,7 +66,7 @@ public sealed class AlsRefactoredMovementCacheRuntime
     }
     public void ValidateCommit(long frame)
     {
-        if (!_prepared || !_evaluated || frame != _frame) throw new ArgumentException("Incomplete Movement frame.");
+        if (!_prepared || (_evaluationAttempted && !_evaluated) || frame != _frame) throw new ArgumentException("Incomplete Movement frame.");
         _lean.ValidateCommit(frame);
     }
     public void Commit(long frame)
@@ -74,5 +74,5 @@ public sealed class AlsRefactoredMovementCacheRuntime
         ValidateCommit(frame); _lean.Commit(frame); _initialized = _nextInitialized; _history = _nextHistory;
         _committed = frame; Cancel();
     }
-    public void Cancel() { _lean.Cancel(); _prepared = _evaluated = false; }
+    public void Cancel() { _lean.Cancel(); _prepared = _evaluated = _evaluationAttempted = false; }
 }
