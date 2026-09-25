@@ -8,6 +8,8 @@
 
 # 运行和验证
 
+- 最新Rest Parent刷新：`docs/verification/2026-09-25-refactored-rest-parent.md`。真实默认资产全精度Rotate/Turn/Dynamic设置+8转身/4动态资源；原严格阈值/175逆时针/delay/0.15阻尼/两帧间隔/每帧去重/候选播放队列，Standing203与Idle57/59/58作用域。相关53、最终新18、Optimize0/0；3Hz840 Parent帧retry并接实际Standing/Rotate clocks。UE整Editor0actions/四插件审计FA68F487...，冷37352/普通41620实际0，3555字节SHA396BB6A5...相同；首冷Vector2f.x失败改反射读取，普通两旧Condition及旧警告保留，无C++/配置变更或新DV。尚无UE连续Parent oracle/真实队列Montage消费/node68最终封装/统一宿主/Demo渲染/全量/性能；下步native对照与action/Slot接入，Ragdoll等旧目标及用户修改/暂缓项保留。
+
 - 最新完整Standing姿态与118：`docs/verification/2026-09-25-refactored-standing-pose-inertia.md`。五state候选采集、真实Idle/Move119/Stop/Rotate、标准stack一次合成和curve存在性；外118原Yaw排除/相关性重置/update-only队列/候选回滚/119转发接线。最终相关50/Optimize0/0；3Hz1680帧132720骨逐帧retry/重复Evaluate，五state、多edge、单state原输出、实际平滑/Yaw直通、三帧延迟求值、故障恢复和counter中断通过。首生命周期测试误with只读identity编译失败，改显式构造后过。未真实转身Montage/Parent Idle回调/新UE整图/Godot渲染/全量/性能，跨祖先转发未新native专项；普通Demo未切。下步Idle/Rotate源刷新与实际动作→UE整图/统一宿主，Ragdoll等旧目标及用户修改/暂缓项保留。
 
 - 最新Standing待机/旋转姿态：`docs/verification/2026-09-25-refactored-standing-rest-pose.md`。原Idle/左右Rotate十四节点接线/闭包/动态绑定校验，Idle固定79骨帧零与三曲线先于TurnInPlaceStanding Slot、Slot后TurnRate缩放；Rotate绑定实际独立播放器owner/候选帧/Evaluate/布局，原Scale后Lerp次序与absence插零。新12/相关49/Optimize0/0，无失败；3Hz840帧双player共132720骨逐值原采样与Cancel重试，含循环/负速/reset/非零ID。Slot测试为受控输出，未实际Montage、无新UE整图/Godot渲染/全量/性能；Idle回调仅编译身份，源遍历/Parent刷新/真实Slot动作/完整65与118尚待。普通Demo未切，Ragdoll等旧目标及用户修改/暂缓项保留。
