@@ -31,7 +31,8 @@ public sealed class AlsRefactoredSourcePlayerRuntime
     }
     private readonly Track[] _tracks;
     private readonly AlsRefactoredSyncBank _bank;
-    private readonly int[] _groupIds,_inputGroups,_inputIndices;
+    private int[] _groupIds,_nextGroupIds;
+    private readonly int[] _inputGroups,_inputIndices;
     private readonly AlsAssetSyncPlayer[] _inputs;
     private readonly AlsAssetSyncSample[] _samples;
     private readonly AlsRefactoredBlendFilterState[] _filters,_nextFilters;
@@ -61,7 +62,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
     {
         if(catalog.IndexDigest!=bank.CatalogDigest)throw new ArgumentException("Foreign source Sync bank.");
         _bank=bank;var defs=definitions.OrderBy(d=>d.PlayerId).ToArray();
-        if(defs.Length is <1 or >AlsSyncRuntime.MaxAssetSyncPlayers||defs.Where((d,i)=>d.PlayerId!=i||d.GroupId< -1||!float.IsFinite(d.StartPosition)||!Enum.IsDefined(d.Role)).Any())
+        if(defs.Length is <1 or >AlsSyncRuntime.MaxAssetSyncBatchPlayers||defs.Where((d,i)=>d.PlayerId!=i||d.GroupId< -1||!float.IsFinite(d.StartPosition)||!Enum.IsDefined(d.Role)).Any())
             throw new ArgumentException("Source player IDs must form one bounded contiguous owner layout.");
         _tracks=new Track[defs.Length];
         foreach(var d in defs)
@@ -86,6 +87,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
                 Names=names,CurveNames=curves,Pose=new AlsPrecisePose[names.Length],Curves=new AlsInertialCurve[curves.Length]};
         }
         var n=defs.Length;_groupIds=defs.Where(d=>d.GroupId>=0).Select(d=>d.GroupId).Distinct().Order().ToArray();
+        _nextGroupIds=new int[_groupIds.Length];
         if(_groupIds.Length>AlsSyncRuntime.MaxAssetSyncBatchGroups)throw new ArgumentException("Too many source Sync groups.");
         _inputGroups=new int[n];_inputIndices=new int[n];_inputs=new AlsAssetSyncPlayer[n];_samples=new AlsAssetSyncSample[n*3];
         _filters=new AlsRefactoredBlendFilterState[n];_nextFilters=new AlsRefactoredBlendFilterState[n];
@@ -106,9 +108,18 @@ public sealed class AlsRefactoredSourcePlayerRuntime
     // Instance reset clears group sync and retained samples atomically on commit.
     // Hidden players carry a pending reset until ticked; playback epochs remain
     // monotonic. A local node reinitialization must not clear the whole group.
-    public void Prepare(long frame,ReadOnlySpan<AlsRefactoredSourcePlayerInput> input,float delta,bool reinitializeInstance=false)
+    public void Prepare(long frame,ReadOnlySpan<AlsRefactoredSourcePlayerInput> input,float delta,bool reinitializeInstance=false,
+        ReadOnlySpan<int> groupOrder=default)
     {
         if(_prepared||frame<=_committedFrame||!float.IsFinite(delta)||delta<0||input.Length>_tracks.Length)throw new ArgumentException("Invalid source frame.");
+        if(!groupOrder.IsEmpty)
+        {
+            if(groupOrder.Length!=_groupIds.Length)throw new ArgumentException("Incomplete source group order.");
+            for(var i=0;i<groupOrder.Length;i++)
+                if(!_groupIds.Contains(groupOrder[i])||groupOrder[..i].Contains(groupOrder[i]))throw new ArgumentException("Foreign or repeated source group order.");
+            groupOrder.CopyTo(_nextGroupIds);
+        }
+        else _groupIds.CopyTo(_nextGroupIds,0);
         Array.Fill(_inputIndices,-1);_filters.CopyTo(_nextFilters,0);_caches.CopyTo(_nextCaches,0);_epochs.CopyTo(_nextEpochs,0);_times.CopyTo(_nextTimes,0);
         _resetPending.CopyTo(_nextResetPending,0);if(reinitializeInstance)Array.Fill(_nextResetPending,true);
         foreach(var t in _tracks)t.Evaluated=false;
@@ -141,7 +152,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
         }
         var priorCount=0;var priorSamples=0;var hasPrior=_hasHistory&&!reinitializeInstance;
         if(hasPrior)BuildPreviousHistory(out priorCount,out priorSamples);
-        if(!AlsSyncRuntime.TryEvaluateAssetSyncBatch(_groupIds,_inputGroups.AsSpan(0,input.Length),_inputs.AsSpan(0,input.Length),_samples.AsSpan(0,cursor),
+        if(!AlsSyncRuntime.TryEvaluateAssetSyncBatch(_nextGroupIds,_inputGroups.AsSpan(0,input.Length),_inputs.AsSpan(0,input.Length),_samples.AsSpan(0,cursor),
             _bank.Sequences,_bank.Markers,hasPrior?_priorGroups:ReadOnlySpan<AlsAssetSyncBatchGroupHistory>.Empty,_priorPlayers.AsSpan(0,priorCount),_priorSamples.AsSpan(0,priorSamples),
             delta,_candidateGroups,_candidatePlayers,_candidateSamples,out var failure,_tickContexts))throw new InvalidOperationException("Source Sync failed: "+failure);
         for(var i=0;i<input.Length;i++)_nextTimes[_candidatePlayers[i].PlayerId]=_candidatePlayers[i].Time;
@@ -155,7 +166,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
         var pc=0;var sc=0;
         for(var g=0;g<=_groupIds.Length;g++)
         {
-            var group=g<_groupIds.Length?_groupIds[g]:-1;var begin=pc;var samplesBegin=sc;
+            var group=g<_groupIds.Length?_nextGroupIds[g]:-1;var begin=pc;var samplesBegin=sc;
             for(var i=0;i<_historyCount;i++)if(_tracks[_history[i].PlayerId].Definition.GroupId==group)Append(_history[i],_sampleHistory);
             for(var id=0;id<_tracks.Length;id++)
             {
@@ -163,7 +174,11 @@ public sealed class AlsRefactoredSourcePlayerRuntime
                 var present=false;for(var i=begin;i<pc;i++)if(_priorPlayers[i].PlayerId==id)present=true;
                 if(!present)Append(_retainedPlayers[id] with{Marker=AlsAssetMarkerRecord.Invalid},_retainedSamples);
             }
-            if(g<_groupIds.Length)_priorGroups[g]=new(_groups[g].Group,begin,pc-begin,samplesBegin,sc-samplesBegin);
+            if(g<_groupIds.Length)
+            {
+                var prior=Array.IndexOf(_groupIds,group);
+                _priorGroups[g]=new(_groups[prior].Group,begin,pc-begin,samplesBegin,sc-samplesBegin);
+            }
         }
         playerCount=pc;sampleCount=sc;
         void Append(AlsAssetPlayerHistory player,AlsAssetSampleHistory[] samples)
@@ -213,6 +228,7 @@ public sealed class AlsRefactoredSourcePlayerRuntime
             _candidateSamples.AsSpan(player.SampleStart,player.SampleCount).CopyTo(_retainedSamples.AsSpan(id*3));
         }
         (_history,_candidatePlayers)=(_candidatePlayers,_history);(_sampleHistory,_candidateSamples)=(_candidateSamples,_sampleHistory);(_groups,_candidateGroups)=(_candidateGroups,_groups);
+        (_groupIds,_nextGroupIds)=(_nextGroupIds,_groupIds);
         _historyCount=_candidateCount;_sampleHistoryCount=_candidateSampleCount;_hasHistory=true;_committedFrame=frame;Cancel();
     }
     public void Cancel(){_prepared=false;_faulted=false;}

@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-26。代码基线：`main / 137f702` 加本批原资产通知表与真实 Sync tick 提取接口；角色级通知队列和旧源更新替换仍待。Locomotion、Pivot、Rest、方向/速度历史和真实组件惯性已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
+更新：2026-09-26。代码基线：`main / e5530f6` 加本批跨 linked graph 共享 Source Sync 收集器与完整移动资源绑定；宿主收集/统一时钟捕获、角色级通知队列和旧源更新替换仍待。Locomotion、Pivot、Rest、方向/速度历史和真实组件惯性已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -60,7 +60,9 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 
 交付：同一角色输入驱动的完整 locomotion 输出（姿态、曲线、播放观察、事件、根运动候选）；站蹲、跳跑、落地和换向连续 UE 对照。
 
-下一接入顺序：补齐其余源 Notify 的真实时钟/消费者并移除旧移动更新兼容依赖；以真实Character输入/方向/加速度历史补 Crouching/Grounded/Locomotion 与 Parent 连续 UE oracle，随后推进原生上身分层。Pivot、Rest足部反馈、MovingSmooth、方向/速度历史、平台身份及组件变换均已接生产输入；旧外层惯性和通知兼容仍保留，不能称完整移植验收。
+新增同步前置项：本机 UE 的 linked graph 会共用外层 Sync 范围；目前 Standing/Crouching 的同名 Movement 仍分别推进，不能仅拼接通知。已实现显式 owner 身份、单次 tick、双缓冲组插入顺序/ResetAll、隐藏初始化、六类原 source 资源绑定，见 [共享 Source Sync](docs/verification/2026-09-26-refactored-source-scope.md)。**尚未接生产宿主，不能视为当前 Demo 跨 stance 同步已修复。**
+
+下一接入顺序：把实际节点访问（含 deferred cache 前直接源）汇入共享 Source Sync，统一 tick 后捕获 Details/Rotate/Grounded/Air 时钟；接普通 Demo 后，再汇总真实 Notify 与 Montage 队列/消费者并移除旧移动更新兼容依赖。以真实Character输入/方向/加速度历史补 Crouching/Grounded/Locomotion 与 Parent 连续 UE oracle，随后推进原生上身分层。Pivot、Rest足部反馈、MovingSmooth、方向/速度历史、平台身份及组件变换均已接生产输入；旧外层惯性和通知兼容仍保留，不能称完整移植验收。
 
 ### R4：接上半身、Overlay 与完整最终姿态
 
