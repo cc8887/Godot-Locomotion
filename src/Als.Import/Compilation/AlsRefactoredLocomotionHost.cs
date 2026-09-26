@@ -5,6 +5,11 @@ using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Import.Compilation;
 
+public enum AlsRefactoredLocomotionSourceOwner : uint
+{
+    StandingMovement = 1, StandingRotate, CrouchingMovement, CrouchingRotate, Grounded, Locomotion
+}
+
 public sealed class AlsRefactoredLocomotionHostProfile
 {
     public AlsRefactoredCharacterActionProfile Actions {get;}
@@ -46,6 +51,27 @@ public sealed class AlsRefactoredLocomotionHostProfile
             graph.Nodes.Count(n=>n.Kind!="EdGraphNode_Comment")!=3)throw new ArgumentException("Locomotion action closure differs.");
     }
     public AlsRefactoredLocomotionHost CreateRuntime(uint character,uint generation)=>new(this,character,generation);
+
+    /// <summary>Full original moving-player inventory for the upcoming shared host traversal.
+    /// Teleport evaluators do not register asset ticks. Existing standalone hosts remain separate
+    /// until their node visits and post-Sync clock capture are moved into this scope together.</summary>
+    public AlsRefactoredSourceSyncScope CreateSourceScope(uint character,uint generation,AlsRefactoredNotifyBank? notifies=null)
+    {
+        var s=Actions.Standing;var c=Actions.Crouching!;
+        var movement=new Dictionary<string,int>{{"Movement",0},{"Run Start",1},{"First Pivot",2},{"Second Pivot",3}};
+        var crouching=new Dictionary<string,int>{{"Movement",0}};
+        var air=new Dictionary<string,int>{{"Fall",0},{"Jump",1},{"Flail",2},{"Land",3},{"None",-1}};
+        static Dictionary<int,string> Names(Dictionary<string,int> map)=>map.Where(p=>p.Value>=0).ToDictionary(p=>p.Value,p=>p.Key);
+        return new(character,generation,s.Catalog,s.Sync,s.Triangles,
+        [new((uint)AlsRefactoredLocomotionSourceOwner.StandingMovement,s.Details.Players.Bind(0,movement),Names(movement)),
+         new((uint)AlsRefactoredLocomotionSourceOwner.StandingRotate,s.Standing.RotatePlayers.Bind(0),new Dictionary<int,string>()),
+         new((uint)AlsRefactoredLocomotionSourceOwner.CrouchingMovement,c.Direction.Players.Bind(0,crouching),Names(crouching)),
+         new((uint)AlsRefactoredLocomotionSourceOwner.CrouchingRotate,c.Machine.RotatePlayers.Bind(0),new Dictionary<int,string>()),
+         new((uint)AlsRefactoredLocomotionSourceOwner.Grounded,Actions.Grounded!.Machine.Players.ToArray()
+             .Select((p,i)=>new AlsRefactoredSourcePlayerDefinition(i,p.Source,-1,Looping:false)).ToArray(),new Dictionary<int,string>()),
+         new((uint)AlsRefactoredLocomotionSourceOwner.Locomotion,Pose.Players.ToArray()
+             .Select((p,i)=>new AlsRefactoredSourcePlayerDefinition(i,p.Source,air[p.Group],p.Start,p.Loop)).ToArray(),Names(air))],notifies);
+    }
 }
 
 public readonly record struct AlsRefactoredLocomotionHostInput(AlsRefactoredStandingHostInput Grounded,
