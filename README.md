@@ -148,6 +148,18 @@ dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 - [P2B 全量资产导入](docs/architecture/p2b-godot-import-closure.md)
 - [P3 基础 Locomotion](docs/architecture/p3-basic-locomotion.md)
 
+## 许可
+
+本项目原创代码、配置、场景、文档及其他原创资源采用根目录
+[非商业学习与交互许可](LICENSE.md)。仅允许个人或学术学习、研究、教学、
+测试、评估、文档编写，以及非商业交互式软件、演示、原型或游戏使用；禁止
+商业使用。该许可不限制 Godot、Unreal 或任何其他引擎、框架、运行时和平台。
+
+这是一份自定义的 source-available 非商业许可，不是 MIT，也不属于 OSI
+认可的 Open Source 许可。第三方代码和资源不适用根许可，具体边界见
+[第三方声明](THIRD_PARTY_NOTICES.md)；尤其不要把 Mixamo、Epic/Unreal 或
+其他外部资源视为本项目原创资源。
+
 ## 后续阶段
 
 | 阶段 | 状态 | 范围 |
