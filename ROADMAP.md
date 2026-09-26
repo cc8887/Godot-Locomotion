@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-26。代码基线：`main / 9215664` 加本批跨 linked graph 共享 Source Sync 生产宿主接入；六类源在实际节点处收集，统一 tick 后捕获时钟，普通 Demo 默认使用。角色级通知队列和旧源更新替换仍待。Locomotion、Pivot、Rest、方向/速度历史和真实组件惯性已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
+更新：2026-09-26。代码基线：`main / f3be43d` 加本批 Mantle 普通 Demo 接入。按用户最新要求优先完成攀爬：真实探测、原资产、运动变形、共享 Montage、PostLocomotion 姿态槽、平台跟随和中断恢复已接通。此前跨图共享 Source Sync 已接生产；角色级源通知队列与旧兼容更新替换暂后移。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -21,7 +21,7 @@
 | R3 完整主移动图 | 原移动姿态、Parent、Rest反馈、Moving/MovingSmooth、方向记忆、动画加速度历史、平台身份及组件惯性已接 Demo。源 Notify、完整原生输入时序对照仍待 | 移除兼容更新，补完整生产反馈和 Crouching/Grounded/Locomotion 连续原生轨迹 |
 | R4 上身、Overlay 与最终脚部 | 13 Overlay 等已有受控组件证据；不能代替新全角色连续证据 | Aim/Layering/手部/脚部按原图拓扑接入，换向与支撑窗口、地形/平台通过 |
 | R5 Godot 普通入口 | 首批接入完成：普通入口默认新 stance/Transition；现有 Gather/Worker/Commit 统一发布，30/60/120 Hz 与键鼠/多帧测试通过；完整图与人工验收未关闭 | 延续新入口完成剩余子图，并补完整功能矩阵、人工和性能验收 |
-| R6 通用动作与物理恢复 | Roll/Ragdoll/Get-up/Camera 等已接旧入口；Mantle 有组件；长期物理稳定性尚有失败 | 通知、Root Motion、Mantle/Roll、Ragdoll/Get-up/Pose Recovery 与新链路整合并验收 |
+| R6 通用动作与物理恢复 | Mantle 已接普通新移动链：低/高台、空中抓边、平台跟随、取消和目标销毁恢复；Roll/Ragdoll/Get-up/Camera 接线保留，长期物理稳定性尚有失败 | 扩展人工/地形/Overlay 矩阵，并完成其余动作及长期物理门禁 |
 | R7 最终交付 | 十分钟预算、完整人工矩阵及可复现交付未完成 | 原性能目标与所有功能门禁通过，生成资产交付可复现 |
 
 R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing-curve-precision.md)：最大位置差约 9.73409e-6 cm，最大曲线差 3.57628e-7，原三项严格失败已通过，未放宽阈值。此前失败保留在 [原生连续首轮记录](docs/verification/2026-09-25-refactored-standing-host-native.md)。R2 首批见 [角色共享动作与 Transition 边界](docs/verification/2026-09-26-character-actions-shared.md)，整阶段尚未关闭。
@@ -96,7 +96,8 @@ Main Gather：键鼠/移动/物理与平台快照、动作请求、上一提交�
 ## R6：动作、Ragdoll 与相机剩余收尾
 
 - [ ] **通用 P5A**：完成源通知与消费者、ActionPlayer/Slot 竞争、动作生命周期、同步与根运动在完整角色里的统一验证；音频消费者暂缓。
-- [ ] **Mantle**：复用现有设置、检测/warp、真实轨迹、Montage 曲线与 pose host；接完整角色触发、平台跟随、碰撞、不同高度、运动/视觉一致、失败/中断恢复。不能把单独 pose host 当普通玩法完成。
+- [x] **Mantle 生产玩法接入**：地面空格优先翻越、空中自动抓边；原前向/顶部/容身探测与高度/方向/速度门槛、原设置与动画、RootMotionSource 时间、物理 Montage seek、同步 branching/脚步通知及 PostLocomotion 槽已接普通 Demo。支持相对移动/旋转平台、X 取消与目标销毁转 Ragdoll；主线程胶囊、候选动画和最终骨骼沿原提交机制。场景新增三个标识台。见 [验证记录](docs/verification/2026-09-26-mantling-demo.md)。
+- [ ] **Mantle 扩展验收**：补完整高度/斜面/薄边缘/全部 Overlay 的人工矩阵和 UE 整角色连续轨迹对照；纳入最终十分钟性能预算。当前组件原生对照与 Godot 自动/截图验证不能代替这些门禁；此条不表示生产入口尚未接入。
 - [ ] **Roll/Root Motion**：保留已接地面翻滚/自动落地 Roll，重验方向锁定、转向、胶囊碰撞、空中门控、重复请求、中断、根运动仅消费一次，并与新 bank/图一致。
 - [ ] **Ragdoll**：保留已完成骨盆/胶囊跟随、物理显示与普通触发；关闭长期接触/关节/速度/休眠矩阵中的剩余失败。旧静态 9/12、不同 Flail 批次的失败只能作历史证据，必须按最新代码统一复测，不能拼接通过项。
 - [ ] **Get-up/Pose Recovery**：复用已接的仰卧/俯卧起身及恢复候选，补新骨架/新宿主交接、反复进入退出、空中退出、起身打断、Overlay 选择、斜坡/平台和失败恢复。动画/物理显示所有权、快照及胶囊碰撞恢复须一起验收。

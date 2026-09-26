@@ -21,6 +21,7 @@ public partial class AlsDemoEntry : Node
             Demo.EnableNativeCamera = true;
             ConfigureBeforeReady?.Invoke(Demo);
             AddChild(Demo);
+            if (Demo.IsRuntimeReady) AlsMantlingCourse.Add(Demo.GetNode<Node3D>("World"));
         }
         catch (Exception exception)
         {

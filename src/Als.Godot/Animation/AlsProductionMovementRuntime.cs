@@ -315,6 +315,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
                 AlsLocomotionState.Grounded => AlsMovementStateInput.Grounded,
                 AlsLocomotionState.InAir => AlsMovementStateInput.InAir,
                 AlsLocomotionState.Ragdoll => AlsMovementStateInput.Ragdoll,
+                AlsLocomotionState.Mantling => AlsMovementStateInput.Mantling,
                 _ => throw new InvalidOperationException("Movement graph has no pose owner for this locomotion state."),
             },
             HasMovementInput = movement.HasMovementInput, Speed = movement.Speed,

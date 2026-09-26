@@ -112,7 +112,7 @@ public static class AlsLocomotionModel
         var nextResult = AlsFrameResult.CreateDefault(input.Identity);
         nextResult.RequestedDriveMode = input.CurrentDriveMode;
         var previousLocomotionState = state.LocomotionState;
-        var currentLocomotionState = input.RagdollState == AlsRagdollState.Active ? AlsLocomotionState.Ragdoll : input.Floor.IsGrounded == 1
+        var currentLocomotionState = input.RagdollState == AlsRagdollState.Active ? AlsLocomotionState.Ragdoll : input.Mantling.Active ? AlsLocomotionState.Mantling : input.Floor.IsGrounded == 1
             ? AlsLocomotionState.Grounded
             : AlsLocomotionState.InAir;
         var landed = previousLocomotionState == AlsLocomotionState.InAir &&
@@ -549,6 +549,9 @@ public static class AlsLocomotionModel
 
     private static void ValidateInput(in AlsFrameInput input)
     {
+        input.Mantling.Validate();
+        if (input.Mantling.Active && (input.CurrentDriveMode != AlsDriveMode.AnimationDriven || input.RagdollState == AlsRagdollState.Active))
+            throw new ArgumentException("Mantle root motion must exclusively own animation drive.");
         if ((uint)input.CurrentDriveMode > (uint)AlsDriveMode.RecoveryBlend)
             throw new ArgumentOutOfRangeException(nameof(input), "Drive mode must be defined.");
         if (!float.IsFinite(input.DeltaTime) || input.DeltaTime <= 0f)

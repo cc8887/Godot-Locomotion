@@ -50,6 +50,7 @@ public readonly record struct AlsFrameInput(
     public GodotAls.Core.Actions.AlsMontageActionParameters ActionParameters { get; init; }
     public GodotAls.Core.Actions.AlsMovementActionTransition MovementAction { get; init; }
     public AlsRagdollPhysicsSample RagdollPhysics { get; init; }
+    public GodotAls.Core.Actions.AlsMantlingFrame Mantling { get; init; }
 
     public static AlsFrameInput CreateDefault(AlsFrameIdentity identity, float deltaTime)
     {

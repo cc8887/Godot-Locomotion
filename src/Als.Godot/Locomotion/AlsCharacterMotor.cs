@@ -34,6 +34,7 @@ internal readonly record struct AlsCharacterMotorLifecycleSnapshot(
     public AlsCharacterMovementHistory MovementHistory { get; init; }
     public AlsMovementBaseHistory MovementBase { get; init; }
     public Vector3 WorldVelocity { get; init; }
+    public AlsMotorMantlingState Mantling { get; init; }
 }
 
 public partial class AlsCharacterMotor : CharacterBody3D
@@ -274,6 +275,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
 
         _capsuleShape = capsuleShape;
+        if (AlsAnimationRuntimeOptions.Has("--refactored-stance-hosts"))
+        { _mantleResources = AlsMantlingDemoResources.Shared.Value; _mantleProbe = new(this); }
         _landPredictionProbe = new AlsLandPredictionProbe(this, capsuleShape);
         if (AlsAnimationRuntimeOptions.Has("--refactored-pose-curves"))
         {
@@ -399,7 +402,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             _settings.MaxBrakingDeceleration,
             deltaTime) : currentHorizontal;
 
-        var standingRequestBlocked = UpdateStance(currentStanceCommand.RequestedStance);
+        var standingRequestBlocked = _mantling.Frame.Active ? false : UpdateStance(currentStanceCommand.RequestedStance);
         var usedRequestedStance = _actualStance == currentStanceCommand.RequestedStance;
         var resolvedCommand = usedRequestedStance ? requestedStanceCommand : currentStanceCommand;
         var desiredSpeed = usedRequestedStance ? requestedDesiredSpeed : currentDesiredSpeed;
@@ -414,7 +417,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
             ? _restoredGroundedBeforeMove
             : IsOnFloor() || (_lastFrameId < 0 && ProbeInitialFloor());
         _hasRestoredGroundedState = false;
-        if (groundedBeforeMove)
+        var isMantling = StepMantling(groundedBeforeMove, resolvedCommand, command.RequestedOverlay,
+            GetUpInputBlocked || isRolling || hasRootMotion || standingRequestBlocked, command.CancelAction, actionRequest, deltaTime);
+        if (isMantling) resolvedCommand = resolvedCommand with { JumpPressed = 0 };
+        if (groundedBeforeMove && !isMantling)
         {
             if (resolvedCommand.JumpPressed == 1 && !standingRequestBlocked)
             {
@@ -431,7 +437,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             verticalVelocity -= _settings.Gravity * deltaTime;
         }
 
-        MoveWithNativeBase(groundedBeforeMove, transport: jumpAccepted == 0);
+        if (!isMantling) MoveWithNativeBase(groundedBeforeMove, transport: jumpAccepted == 0);
         var movementStep = default(AlsCharacterMovementStep);
         if (jumpAccepted == 1 && _movementRuntime is not null)
         {
@@ -447,7 +453,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             movementStep = _movementRuntime.Integrate(_movementHistory,
                 new(-currentHorizontal.Z * 100d, currentHorizontal.X * 100d, 0),
                 new(-(double)direction.Z * resolvedCommand.InputAmount, (double)direction.X * resolvedCommand.InputAmount, 0),
-                _actualStance, groundedBeforeMove && jumpAccepted == 0, deltaTime, hasRootMotion);
+                _actualStance, groundedBeforeMove && jumpAccepted == 0 && !isMantling, deltaTime, hasRootMotion || isMantling);
             horizontalVelocity = new((float)(movementStep.Velocity.Y * .01), 0, (float)(-movementStep.Velocity.X * .01));
             desiredSpeed = movementStep.MaxSpeed * movementStep.Analog * .01f;
             MovementDiagnostics = movementStep;
@@ -470,8 +476,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
                 throw new InvalidOperationException("Root motion cannot tilt the upright character capsule.");
         }
         RequireFiniteVector(nextVelocity, nameof(nextVelocity));
-        Velocity = nextVelocity;
-        MoveAndSlide();
+        if (!isMantling) { Velocity = nextVelocity; MoveAndSlide(); }
         if (isRolling)
         {
             var yaw = AlsRollingGameplay.Rotate(-GetCharacterYaw() * (180f / MathF.PI), rolling.TargetYawDegrees, deltaTime);
@@ -485,7 +490,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             LastConsumedRootMotion = rootMotionSource;
         }
 
-        if (_movementRuntime is not null && groundedBeforeMove && !IsOnFloor() && jumpAccepted == 0)
+        if (!isMantling && _movementRuntime is not null && groundedBeforeMove && !IsOnFloor() && jumpAccepted == 0)
             Velocity += NativeBaseDepartureVelocity();
         WorldMovementVelocity = (GlobalPosition - worldStart) / deltaTime;
 
@@ -496,8 +501,8 @@ public partial class AlsCharacterMotor : CharacterBody3D
         // This also keeps animation, dynamic movement parameters and foot locking
         // on the same velocity source. World displacement remains in the transform.
         var actualVelocity = ToNumerics(_movementRuntime is null ? GetRealVelocity() : Velocity);
-        var grounded = IsOnFloor();
-        var movementAction = RollingGameplay && _lastFrameId > 0
+        var grounded = !isMantling && IsOnFloor();
+        var movementAction = !isMantling && RollingGameplay && _lastFrameId > 0
             ? AlsMovementActionRules.Evaluate(groundedBeforeMove, grounded, _previousActualVelocity,
                 -GetCharacterYaw() * (180f / MathF.PI), isRolling) : default;
         var actionParameters = default(AlsMontageActionParameters);
@@ -521,7 +526,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         }
         var aimRate = AlsAimYawRate.Gather(command.ViewYaw, _previousControlDegrees, deltaTime);
         var lastMovementRotation = GlobalBasis.GetRotationQuaternion();
-        var rotationSample = ApplyCharacterRotation(deltaTime, actualVelocity, grounded, resolvedCommand, aimRate, rotationFeedback, hasRootMotion, isRolling);
+        var rotationSample = ApplyCharacterRotation(deltaTime, actualVelocity, grounded, resolvedCommand, aimRate, rotationFeedback, hasRootMotion || isMantling, isRolling);
         var characterTransform = GlobalTransform;
         var characterYaw = GetCharacterYaw(characterTransform.Basis);
         if (!float.IsFinite(characterYaw))
@@ -587,12 +592,14 @@ public partial class AlsCharacterMotor : CharacterBody3D
             Floor: floor,
             LeftFootHit: leftFootHit,
             RightFootHit: rightFootHit,
-            MantleProbe: new AlsMantleProbeResult(0, NumericsMatrix4x4.Identity, -1),
+            MantleProbe: new AlsMantleProbeResult(isMantling ? (byte)1 : (byte)0,
+                isMantling ? ToNumerics(MantleDestination) : NumericsMatrix4x4.Identity,
+                isMantling && _mantling.Relative ? CreatePlatformId(_mantling.Target!.GetInstanceId()) : -1),
             RequestedGait: command.RequestedGait,
             Stance: _actualStance,
             RotationMode: resolvedCommand.RotationMode,
-            RequestedAction: AlsLocomotionAction.None,
-            CurrentDriveMode: hasRootMotion ? AlsDriveMode.AnimationDriven : AlsDriveMode.MotorDriven,
+            RequestedAction: isMantling ? AlsLocomotionAction.Mantling : AlsLocomotionAction.None,
+            CurrentDriveMode: hasRootMotion || isMantling ? AlsDriveMode.AnimationDriven : AlsDriveMode.MotorDriven,
             RagdollState: AlsRagdollState.Inactive,
             AnimationQualityTier: AlsAnimationQualityTier.Tier0,
             Command: command,
@@ -604,9 +611,10 @@ public partial class AlsCharacterMotor : CharacterBody3D
         {
             FootPlacementReleaseSignals = releaseSignals,
             ActionRequest = actionRequest,
-            GameplayAction = GetUpInputBlocked ? AlsTimelineAction.GettingUp : RollingGameplay ? (isRolling ? AlsTimelineAction.Rolling :
+            GameplayAction = isMantling ? AlsTimelineAction.Mantling : GetUpInputBlocked ? AlsTimelineAction.GettingUp : RollingGameplay ? (isRolling ? AlsTimelineAction.Rolling :
                 rotationFeedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : rotationFeedback.Action) : default,
             MeshHeightOffset = MeshHeightOffset,
+            Mantling = _mantling.Frame,
             ActionParameters = actionParameters,
             MovementAction = movementAction,
             AimYawRateDegrees = aimRate.RateDegrees,
@@ -660,6 +668,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             CurrentDriveMode = AlsDriveMode.PhysicsDriven, RagdollState = AlsRagdollState.Active,
             RequestedAction = AlsLocomotionAction.None, ActionRequest = action,
             GameplayAction = AlsTimelineAction.Ragdolling, MovementAction = default, ActionParameters = default,
+            Mantling = default, MantleProbe = new(0, NumericsMatrix4x4.Identity, -1),
             CharacterYaw = GetCharacterYaw(), JumpAccepted = 0, MovementInput = new(1, 0),
             CharacterRotation = new(1, GetCharacterYaw(), 0, AlsCharacterRotationBranch.Hold, _rotationGait, default),
             AimYawRateDegrees = aim.RateDegrees, FirstPerson = FirstPersonView ? (byte)1 : (byte)0,
@@ -722,7 +731,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
             WorldYaw(velocity), WorldYaw(command.WorldDirection), speed, command.InputAmount > 0 && _settings.MaxAcceleration > 0,
             hasRootMotion, grounded ? AlsMovementStateInput.Grounded : AlsMovementStateInput.InAir,
             command.RotationMode, _actualStance, _rotationGait,
-            GetUpInputBlocked ? AlsTimelineAction.GettingUp : isRolling ? AlsTimelineAction.Rolling : RollingGameplay && feedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : feedback.Action,
+            _mantling.Frame.Active ? AlsTimelineAction.Mantling : GetUpInputBlocked ? AlsTimelineAction.GettingUp : isRolling ? AlsTimelineAction.Rolling : RollingGameplay && feedback.Action == AlsTimelineAction.Rolling ? AlsTimelineAction.None : feedback.Action,
             FirstPersonView, aim.RateDegrees,
             feedback.YawOffsetPresent ? feedback.YawOffset : 0, feedback.RotationAmountPresent ? feedback.RotationAmount : 0);
         var rotation = _characterRotation.Evaluate(input, _rotationHistory);
@@ -872,6 +881,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         RotationWalkSpeed = _rotationWalkSpeed, RotationRunSpeed = _rotationRunSpeed,
         MovementHistory = _movementHistory,
         MovementBase = _movementBase, WorldVelocity = WorldMovementVelocity,
+        Mantling = _mantling,
     };
 
     private void RestoreRotationHistory(in AlsCharacterMotorLifecycleSnapshot snapshot)
@@ -882,6 +892,7 @@ public partial class AlsCharacterMotor : CharacterBody3D
         _movementHistory = snapshot.MovementHistory;
         MovementDiagnostics = default;
         _movementBase = snapshot.MovementBase; WorldMovementVelocity = snapshot.WorldVelocity;
+        _mantling = snapshot.Mantling; MantleTargetDestroyed = false;
         BaseTransportDelta = default; BaseTransportBlocked = false;
     }
 

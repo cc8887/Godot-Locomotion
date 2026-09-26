@@ -18,6 +18,7 @@ public readonly record struct AlsLocomotionCommand(
 {
     // Captured with the movement command; retries retain the same selection.
     public AlsOverlayKind RequestedOverlay { get; init; }
+    public bool CancelAction { get; init; }
 
     public static AlsLocomotionCommand CreateDefault() => new(
         Vector2.Zero,
