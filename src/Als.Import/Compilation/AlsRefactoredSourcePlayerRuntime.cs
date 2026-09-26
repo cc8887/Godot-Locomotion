@@ -12,7 +12,7 @@ public readonly record struct AlsRefactoredSourcePlayerInput(int PlayerId,Vector
 /// <summary>Character-owned original Sequence/2D BlendSpace player batch. Frozen
 /// resources, separate playback identities and candidate-only clocks/poses.
 /// Notify admission and root-motion extraction remain external frame stages.</summary>
-public sealed class AlsRefactoredSourcePlayerRuntime
+public sealed class AlsRefactoredSourcePlayerRuntime : IAlsRefactoredSourcePlayers
 {
     private sealed class Track
     {

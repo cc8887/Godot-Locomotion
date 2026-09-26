@@ -59,7 +59,7 @@ public sealed class AlsRefactoredMovementDetailsPose
             _slots = profile._properties.Select((p, i) => (p, i)).ToDictionary(v => v.p, v => v.i);
         }
         public void Sample(long frame, AlsRefactoredMovementDetailsRuntime machine, AlsRefactoredMovementDetailsSourceRuntime update,
-            AlsRefactoredSourcePlayerRuntime players, AlsRefactoredMovementCacheRuntime movement,
+            IAlsRefactoredSourcePlayers players, AlsRefactoredMovementCacheRuntime movement,
             Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
         {
             if (!ReferenceEquals(update.Profile, _profile.Graph) || !ReferenceEquals(movement.Profile, _profile.Movement) ||

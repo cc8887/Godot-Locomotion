@@ -12,6 +12,7 @@ public readonly record struct AlsRefactoredMovementCacheRead(int ReadPropertyInd
 /// single shared Sync batch; this owner never advances an animation clock.</summary>
 public sealed class AlsRefactoredMovementDetailsSourceRuntime
 {
+    internal IAlsRefactoredSourcePlayers? Registration { get; set; }
     private readonly int _first;
     private readonly Dictionary<int, int> _locals, _observed;
     private readonly AlsRefactoredStanceCallbackRuntime _callbacks;
@@ -24,7 +25,7 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
     private readonly AlsRefactoredStanceCallback[] _commands = new AlsRefactoredStanceCallback[2];
     private int _inputCount, _readCount, _initialCount, _commandCount;
     private AlsRefactoredMovementDetailsRuntime? _owner;
-    private AlsRefactoredSourcePlayerRuntime? _playerOwner;
+    private IAlsRefactoredSourcePlayers? _playerOwner;
     private AlsFrameIdentity _identity, _committedIdentity;
     private bool _prepared, _captured, _hasCommitted;
     private Vector4 _weights;
@@ -116,6 +117,7 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
                     var local = _locals[state.PlayerPropertyIndices[channel]]; var sourceContext = path.WithWeight(path.Weight * _weights[channel]);
                     var tick = Profile.Players.Input(_first, local, default, sourceContext.Weight, _nextResets[local]) with { RequestedInertialization = sourceContext.InertializationSync };
                     _inputs[_inputCount] = tick; _contexts[_inputCount++] = sourceContext; _nextResets[local] = false;
+                    Registration?.Register(tick, sourceContext);
                 }
                 if (state.CallbackPropertyIndex >= 0) _callbacks.Leave(frame, state.CallbackPropertyIndex);
             }
@@ -124,7 +126,7 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
         catch { _callbacks.Cancel(); throw; }
     }
 
-    public void CaptureSourceTimes(long frame, AlsRefactoredSourcePlayerRuntime players)
+    public void CaptureSourceTimes(long frame, IAlsRefactoredSourcePlayers players)
     {
         if (!_prepared || frame != _identity.FrameId) throw new ArgumentException("No matching details source frame.");
         _captured = false;
@@ -159,7 +161,7 @@ public sealed class AlsRefactoredMovementDetailsSourceRuntime
         if (!_prepared || !_captured || frame != _identity.FrameId) throw new ArgumentException("Details source candidate is incomplete.");
         _callbacks.ValidateCommit(frame);
     }
-    internal void ValidateEvaluation(long frame, AlsRefactoredMovementDetailsRuntime machine, AlsRefactoredSourcePlayerRuntime players)
+    internal void ValidateEvaluation(long frame, AlsRefactoredMovementDetailsRuntime machine, IAlsRefactoredSourcePlayers players)
     {
         ValidateCommit(frame); machine.ValidateCommit(frame); players.ValidateCommit(frame);
         if (!ReferenceEquals(_owner, machine) || !ReferenceEquals(_playerOwner, players))

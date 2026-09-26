@@ -12,6 +12,7 @@ public readonly record struct AlsRefactoredDirectionCacheUpdate(int PropertyInde
 /// path defers source updates and skipped messages to the enclosing traversal.</summary>
 public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSink
 {
+    internal IAlsRefactoredSourcePlayers? Registration { get; set; }
     private readonly AlsRefactoredDirectionSourceProfile _profile;
     private readonly int _first;
     private readonly AlsPoseCacheTraversal _traversal;
@@ -158,7 +159,9 @@ public sealed class AlsRefactoredDirectionSourceRuntime : IAlsPoseCacheUpdateSin
     private void Add(AlsRefactoredSourcePlayerInput tick, AlsPoseUpdateContext context)
     {
         for (var i = 0; i < _inputCount; i++) if (_inputs[i].PlayerId == tick.PlayerId) throw new InvalidOperationException("Direction player updated more than once.");
-        _inputs[_inputCount] = tick with { RequestedInertialization = context.InertializationSync }; _contexts[_inputCount++] = context;
+        tick = tick with { RequestedInertialization = context.InertializationSync };
+        _inputs[_inputCount] = tick; _contexts[_inputCount++] = context;
+        Registration?.Register(tick, context);
     }
     void IAlsPoseCacheUpdateSink.OnCachedUpdatesSkipped(int handlerNodeIndex, ReadOnlySpan<AlsPoseUpdateContext> skipped) =>
         throw new InvalidOperationException("Outer inertialization must be handled by the full stance cache scheduler.");

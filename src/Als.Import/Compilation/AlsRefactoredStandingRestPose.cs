@@ -66,15 +66,15 @@ public sealed class AlsRefactoredStandingRestPose
         slotPose.CopyTo(output); slotCurves.CopyTo(curves); curves[_yaw] = yaw;
     }
 
-    public RotateSampler BindRotate(AlsRefactoredSourcePlayerRuntime players, int firstPlayer) => new(this,players,firstPlayer);
+    public RotateSampler BindRotate(IAlsRefactoredSourcePlayers players, int firstPlayer) => new(this,players,firstPlayer);
 
     public sealed class RotateSampler
     {
         private readonly AlsRefactoredStandingRestPose _profile;
-        private readonly AlsRefactoredSourcePlayerRuntime _players;
+        private readonly IAlsRefactoredSourcePlayers _players;
         private readonly int _first;
         private readonly int[][] _maps;
-        internal RotateSampler(AlsRefactoredStandingRestPose profile, AlsRefactoredSourcePlayerRuntime players, int first)
+        internal RotateSampler(AlsRefactoredStandingRestPose profile, IAlsRefactoredSourcePlayers players, int first)
         {
             _profile = profile; _players = players; _first = first;
             var bindings = profile.Graph.RotatePlayers.Bind(first);

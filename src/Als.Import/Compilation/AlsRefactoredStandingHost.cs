@@ -23,7 +23,7 @@ public sealed class AlsRefactoredStandingHost
     private readonly AlsRefactoredRestParentRuntime _restParent;
     private readonly AlsRefactoredStandingRestTraversal _restTraversal;
     private readonly AlsRefactoredStandingMovementTraversal _traversal;
-    private readonly AlsRefactoredSourcePlayerRuntime _players, _rotate;
+    private readonly IAlsRefactoredSourcePlayers _players, _rotate;
     private readonly AlsRefactoredDirectionPose.Sampler _direction;
     private readonly AlsRefactoredMovementCacheRuntime _movement;
     private readonly AlsRefactoredMovementDetailsPose.Sampler _details;
@@ -42,6 +42,8 @@ public sealed class AlsRefactoredStandingHost
     private readonly AlsPrecisePose[] _directionPose, _detailsPose, _pose;
     private readonly AlsInertialCurve[] _directionCurves, _detailsCurves, _curves;
     private AlsFrameIdentity _identity;
+    private AlsPoseUpdateContext _context;
+    private bool _initialize;
     private AlsRefactoredStandingHostInput _input;
     private float _machineWeight, _nextMachineWeight;
     private bool _prepared, _evaluated, _postUpdated, _hasIdle, _hasStop, _hasMovement, _poseBegun;
@@ -66,7 +68,7 @@ public sealed class AlsRefactoredStandingHost
     public bool PivotActive { get { Check(); return _parent.Candidate.PivotActive; } }
     public int MovementDetailsState { get { Check(); return _hasMovement ? _traversal.DetailsMachine.Candidate.State.CurrentState : -1; } }
     internal AlsGroundedMachineUpdate? DirectionUpdate { get { Check(); return _hasMovement ? _traversal.Movement.Direction.Candidate : null; } }
-    internal AlsRefactoredSourcePlayerRuntime? MovementPlayers { get { Check(); return _hasMovement ? _players : null; } }
+    internal IAlsRefactoredSourcePlayers? MovementPlayers { get { Check(); return _hasMovement ? _players : null; } }
 
     internal AlsRefactoredStandingHost(AlsRefactoredStandingHostProfile profile, uint character, uint generation,
         AlsRefactoredCharacterActionRuntime? sharedActions = null)
@@ -76,9 +78,11 @@ public sealed class AlsRefactoredStandingHost
         _standing = new(profile.Standing); _stop = new(profile.Stop.Resources); _stopSources = new(profile.Stop);
         _parent = sharedActions?.MovementParent??new(profile.Details.Callbacks, profile.MovementSettings);
         _traversal = new(profile.Catalog, profile.Standing, profile.Details, profile.Direction, 0);
-        _players = new(profile.Catalog, profile.Sync, profile.Triangles, profile.Details.Players.Bind(0,
+        _players = sharedActions?.Sources?.CreateView(AlsRefactoredLocomotionSourceOwner.StandingMovement) ?? new AlsRefactoredSourcePlayerRuntime(profile.Catalog, profile.Sync, profile.Triangles, profile.Details.Players.Bind(0,
             new Dictionary<string, int> { ["Movement"] = 0, ["Run Start"] = 1, ["First Pivot"] = 2, ["Second Pivot"] = 3 }));
-        _rotate = new(profile.Catalog, profile.Sync, profile.Triangles, profile.Standing.RotatePlayers.Bind(0));
+        _rotate = sharedActions?.Sources?.CreateView(AlsRefactoredLocomotionSourceOwner.StandingRotate) ?? new AlsRefactoredSourcePlayerRuntime(profile.Catalog, profile.Sync, profile.Triangles, profile.Standing.RotatePlayers.Bind(0));
+        _traversal.DetailsSources.Registration = _players;
+        _traversal.Movement.Sources.Registration = _players;
         _direction = profile.DirectionPose.CreateSampler();
         _movement = new(profile.Movement, profile.DirectionPose.BoneNames, profile.DirectionPose.CurveNames);
         _details = profile.Pose.Movement.CreateSampler(); _movementInertia = new(profile.Catalog, profile.Pose.Movement);
@@ -106,10 +110,11 @@ public sealed class AlsRefactoredStandingHost
             _sharedActions is null&&(input.Rest.Stance != AlsRefactoredRestStance.Standing || input.QuickStop.Crouching) ||
             input.QuickStop.VelocityDirection != (input.Rest.Rotation == AlsRefactoredRestRotation.VelocityDirection) ||
             !float.IsFinite(input.FootPlanted)) throw new ArgumentException("Invalid Standing host input/context.");
-        _identity = context.Identity; _input = input;
+        _identity = context.Identity; _input = input; _context = context; _initialize = initializeInstance;
         var frame = _identity.FrameId;
         try
         {
+            _players.BeginRegistration(initializeInstance); _rotate.BeginRegistration(initializeInstance);
             if (_sharedActions is null) { _queue.Begin(_identity); _bank.Begin(_identity, context.Delta); }
             else _sharedActions.ValidateUpdate(context);
             if(_sharedActions is not null)_sharedActions.PrepareParents(context,input,initializeInstance);
@@ -153,7 +158,8 @@ public sealed class AlsRefactoredStandingHost
                         break;
                     default:
                         _rotateInputs[rotateCount++] = _profile.Standing.RotatePlayers.Input(0, state.State - 3,
-                            rotate.PlayRate, rotate.Left, rotate.Right, state.Weight, reset);
+                            rotate.PlayRate, rotate.Left, rotate.Right, state.Weight, reset) with { RequestedInertialization = path.InertializationSync };
+                        _rotate.Register(_rotateInputs[rotateCount - 1], path);
                         break;
                 }
             }
@@ -170,26 +176,37 @@ public sealed class AlsRefactoredStandingHost
             // of the cached Movement branch. Empty frames retire prior groups
             // while the source runtime retains each hidden player's own state.
             _players.Prepare(frame, _hasMovement ? _traversal.Movement.SourceInputs : [], context.Delta, initializeInstance);
+            // Capture Parent values at this graph's visit. A later linked graph
+            // may refresh the shared Parent before the outer Sync tick finishes.
             if (_hasMovement)
-            {
-                _traversal.DetailsSources.CaptureSourceTimes(frame, _players);
-                _movementInertia.Prepare(_traversal.DetailsContext, _traversal.DetailsMachine, _traversal.Movement, initializeInstance);
                 _movement.Prepare(frame, input.Details.UnweightedRunningAmount, _parent.MovementCandidate.Lean, context.Delta, _traversal.Movement.InitializeMovement);
-            }
-            _inertia.Prepare(context, _standing, _traversal, _hasMovement ? _movementInertia : null, initializeInstance,
-                _profile.Montages.StandingSlotRequest(_bank.Frame, _identity, _restTraversal));
-            _clocks.CopyTo(_nextClocks, 0);
-            for (var i = 0; i < 2; i++)
-                if (initializeInstance || (update.ClearCachedWeightStates & (1 << (3 + i))) != 0)
-                    _nextClocks[i] = new(_profile.Standing.RotatePlayers.Players[i].PropertyIndex, 0, 0, false);
-            foreach (var tick in _rotate.Ticks)
-                foreach (var player in _rotate.Players)
-                    if (player.PlayerId == tick.PlayerId)
-                        _nextClocks[tick.PlayerId] = new(_profile.Standing.RotatePlayers.Players[tick.PlayerId].PropertyIndex,
-                            tick.Weight, player.Time, tick.Looping);
             _prepared = true;
+            if (!_players.Deferred) CompleteSources();
         }
         catch { Cancel(); throw; }
+    }
+
+    internal void CompleteSources()
+    {
+        Check();
+        var frame = _identity.FrameId; var context = _context; var initializeInstance = _initialize;
+        var update = _standing.Candidate;
+        if (_hasMovement)
+        {
+            _traversal.DetailsSources.CaptureSourceTimes(frame, _players);
+            _movementInertia.Prepare(_traversal.DetailsContext, _traversal.DetailsMachine, _traversal.Movement, initializeInstance);
+        }
+        _inertia.Prepare(context, _standing, _traversal, _hasMovement ? _movementInertia : null, initializeInstance,
+            _profile.Montages.StandingSlotRequest(_bank.Frame, _identity, _restTraversal));
+        _clocks.CopyTo(_nextClocks, 0);
+        for (var i = 0; i < 2; i++)
+            if (initializeInstance || (update.ClearCachedWeightStates & (1 << (3 + i))) != 0)
+                _nextClocks[i] = new(_profile.Standing.RotatePlayers.Players[i].PropertyIndex, 0, 0, false);
+        foreach (var tick in _rotate.Ticks)
+            foreach (var player in _rotate.Players)
+                if (player.PlayerId == tick.PlayerId)
+                    _nextClocks[tick.PlayerId] = new(_profile.Standing.RotatePlayers.Players[tick.PlayerId].PropertyIndex,
+                        tick.Weight, player.Time, tick.Looping);
     }
 
     public void Evaluate(in AlsPrecisePose component, long attachParent = 0, float teleportDistance = 0)

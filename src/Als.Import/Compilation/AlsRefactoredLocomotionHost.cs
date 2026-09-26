@@ -52,9 +52,8 @@ public sealed class AlsRefactoredLocomotionHostProfile
     }
     public AlsRefactoredLocomotionHost CreateRuntime(uint character,uint generation)=>new(this,character,generation);
 
-    /// <summary>Full original moving-player inventory for the upcoming shared host traversal.
-    /// Teleport evaluators do not register asset ticks. Existing standalone hosts remain separate
-    /// until their node visits and post-Sync clock capture are moved into this scope together.</summary>
+    /// <summary>Full original moving-player inventory for shared host traversal.
+    /// Teleport evaluators do not register asset ticks.</summary>
     public AlsRefactoredSourceSyncScope CreateSourceScope(uint character,uint generation,AlsRefactoredNotifyBank? notifies=null)
     {
         var s=Actions.Standing;var c=Actions.Crouching!;
@@ -93,12 +92,13 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
     private long _attachParent;
     private float _teleportDistance;
     public AlsFrameIdentity CommittedIdentity=>Actions.CommittedIdentity;
+    public AlsRefactoredSourceSyncScope Sources {get;}
     public AlsRefactoredInAirState Air=>Actions.MovementParent.AirCandidate;
     public AlsRefactoredMovementState Movement=>Actions.MovementParent.MovementCandidate;
     public ReadOnlySpan<AlsPrecisePose> Pose=>Graph.Pose;
     public ReadOnlySpan<AlsInertialCurve> Curves=>Graph.Curves;
     internal AlsRefactoredLocomotionHost(AlsRefactoredLocomotionHostProfile profile,uint character,uint generation)
-    {_p=profile;Actions=profile.Actions.CreateRuntime(character,generation);Graph=new(profile.Pose,profile.Actions.Standing.Sync);}
+    {_p=profile;Sources=profile.CreateSourceScope(character,generation);Actions=new(profile.Actions,character,generation,Sources);Graph=new(profile.Pose,profile.Actions.Standing.Sync,Sources);}
     public void BeginGlobal(in AlsPoseUpdateContext context,in AlsRefactoredLocomotionHostInput input,
         AlsGraphTraversalCounter initialization,bool initialize=false)
     {
@@ -106,6 +106,7 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
             !float.IsFinite(input.PreviousStanding)||!float.IsFinite(input.PreviousCrouching))throw new ArgumentException("Invalid Locomotion host frame.");
         try
         {
+            Sources.Begin(context,initialize);
             Actions.BeginGlobal(context,input.Grounded,initialize);
             Actions.MovementParent.PrepareInAir(context.Identity.FrameId,_p.Air,input.JumpRequested,input.Prediction,input.Grounded.Rest.GameWorld);
             _context=context;_input=input;_initialization=initialization;_prepared=true;
@@ -117,7 +118,16 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
         Validate(context);Actions.ValidateUpdate(context);if(_visited)throw new InvalidOperationException("Repeated Locomotion graph traversal.");
         if(initialization is {} value){if(!value.HasUpdated)throw new ArgumentException("Invalid initialization counter.");_initialization=value;}
         if(fromRoll is {} roll)_input=_input with{FromRoll=roll};
-        try{Graph.Prepare(context,this,initialize);_visited=true;}catch{Discard();throw;}
+        try
+        {
+            Graph.Prepare(context,this,initialize);
+            Sources.Complete();
+            if(Actions.Standing.Prepared)Actions.Standing.CompleteSources();
+            if(Actions.Crouching?.Prepared==true)Actions.Crouching.CompleteSources();
+            if(Actions.Grounded?.Prepared==true)Actions.Grounded.CompleteSources();
+            Graph.CompleteSources();_visited=true;
+        }
+        catch{Discard();throw;}
     }
     public void Evaluate(in AlsPrecisePose component, long attachParent = 0, float teleportDistance = 0)
     {
@@ -177,6 +187,7 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
         Validate(_context);if(_post)throw new InvalidOperationException("Repeated Locomotion PostUpdate.");
         try
         {
+            if(!_visited)Sources.Complete();
             Actions.PostUpdateActions();
             if(_land)
             {
@@ -189,9 +200,9 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
         catch{Discard();throw;}
     }
     public void ValidateCommit(in AlsFrameIdentity identity)
-    {Validate(_context);if(!_post||identity!=_context.Identity)throw new ArgumentException("Incomplete Locomotion transaction.");Actions.ValidateCommit(identity);if(_visited)Graph.ValidateCommit(identity);}
+    {Validate(_context);if(!_post||identity!=_context.Identity)throw new ArgumentException("Incomplete Locomotion transaction.");Sources.ValidateCommit(identity);Actions.ValidateCommit(identity);if(_visited)Graph.ValidateCommit(identity);}
     public void Commit(in AlsFrameIdentity identity)
-    {ValidateCommit(identity);if(_visited)Graph.Commit(identity);Actions.Commit(identity);Clear();}
-    public void Discard(){Graph.Cancel();Actions.Discard();Clear();}
+    {ValidateCommit(identity);if(_visited)Graph.Commit(identity);Actions.Commit(identity);Sources.Commit(identity);Clear();}
+    public void Discard(){Graph.Cancel();Actions.Discard();Sources.Discard();Clear();}
     private void Clear(){_prepared=_visited=_post=_land=false;}
 }

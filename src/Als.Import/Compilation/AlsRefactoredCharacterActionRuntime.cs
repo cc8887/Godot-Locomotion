@@ -21,6 +21,7 @@ public sealed class AlsRefactoredCharacterActionRuntime
     private float _delta;
     private bool _prepared, _postUpdated, _globalFrame;
     public AlsRefactoredStandingHost Standing { get; }
+    internal AlsRefactoredSourceSyncScope? Sources { get; }
     public AlsRefactoredCrouchingHost? Crouching { get; }
     public AlsRefactoredGroundedHost? Grounded { get; }
     public AlsRefactoredTransitionSlot Transition { get; }
@@ -30,10 +31,11 @@ public sealed class AlsRefactoredCharacterActionRuntime
     public ReadOnlySpan<AlsMontageInstance> Candidate { get { Check(); return Bank.Candidate; } }
     public AlsTransitionQueueState QueueState { get { Check(); return Queue.Candidate; } }
 
-    internal AlsRefactoredCharacterActionRuntime(AlsRefactoredCharacterActionProfile profile, uint character, uint generation)
+    internal AlsRefactoredCharacterActionRuntime(AlsRefactoredCharacterActionProfile profile, uint character, uint generation,
+        AlsRefactoredSourceSyncScope? sources = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(generation);
-        _profile = profile; _character = character; _generation = generation;
+        _profile = profile; _character = character; _generation = generation; Sources = sources;
         Bank = new([], sequences: profile.Assets); Queue = new(Bank, character, generation);
         MovementParent=new(profile.Standing.Callbacks,profile.Standing.MovementSettings,profile.Crouching?.Callbacks);
         RestParent=new(profile.Standing.Montages.Settings,profile.Standing.Montages,Bank,Queue,

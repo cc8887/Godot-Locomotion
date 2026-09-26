@@ -22,6 +22,8 @@ public sealed class AlsRefactoredSourceSyncScope
     private readonly AlsRefactoredSourcePlayerRuntime _runtime;
     private readonly AlsRefactoredSourceNotifyBinding? _notifies;
     private readonly AlsRefactoredSourcePlayerInput[] _inputs;
+    private readonly AlsRefactoredSourcePlayerInput[] _localInputs;
+    private readonly HashSet<uint> _viewOwners = new();
     private readonly AlsPoseUpdateContext[] _contexts;
     private readonly AlsRefactoredNotifyPlayerContext[] _notifyContexts;
     private readonly bool[] _registered, _pendingReset, _nextPendingReset;
@@ -79,6 +81,7 @@ public sealed class AlsRefactoredSourceSyncScope
         // There is one physical source bank. Its globally unique player IDs include all linked owners.
         if (notifies is not null) _notifies = new(1, _runtime, notifies);
         _inputs = new AlsRefactoredSourcePlayerInput[_definitions.Length]; _contexts = new AlsPoseUpdateContext[_inputs.Length];
+        _localInputs = new AlsRefactoredSourcePlayerInput[_inputs.Length];
         _notifyContexts = new AlsRefactoredNotifyPlayerContext[_inputs.Length]; _registered = new bool[_inputs.Length];
         _pendingReset = new bool[_inputs.Length]; _nextPendingReset = new bool[_inputs.Length];
         _orders = [new int[names.Count], new int[names.Count]]; _nextOrder = new int[names.Count]; _fullOrder = new int[names.Count];
@@ -87,6 +90,28 @@ public sealed class AlsRefactoredSourceSyncScope
     {
         if (!_owners.TryGetValue(owner, out var range) || (uint)localPlayer >= (uint)range.Count) throw new ArgumentException("Foreign source player.");
         return range.First + localPlayer;
+    }
+    internal IAlsRefactoredSourcePlayers CreateView(AlsRefactoredLocomotionSourceOwner owner)
+    {
+        var id = (uint)owner;
+        if (_begun || !_owners.TryGetValue(id, out var range) || !_viewOwners.Add(id)) throw new ArgumentException("Duplicate or foreign source view.");
+        return new AlsRefactoredSourcePlayerView(this, _runtime, id, range.Count);
+    }
+    internal void ValidateFrame(long frame)
+    { RequireComplete(); if (frame != _context.Identity.FrameId) throw new ArgumentException("Foreign shared source frame."); _runtime.ValidateCommit(frame); }
+    internal void ValidateOwnerInputs(uint owner, long frame, float delta, ReadOnlySpan<AlsRefactoredSourcePlayerInput> inputs)
+    {
+        RequireCollecting();
+        if (frame != _context.Identity.FrameId || delta != _context.Delta) throw new ArgumentException("Foreign source view frame.");
+        var range = _owners[owner]; var count = 0;
+        for (var i = range.First; i < range.First + range.Count; i++) if (_registered[i]) count++;
+        if (count != inputs.Length) throw new ArgumentException("Missing graph node registrations.");
+        for (var i = 0; i < inputs.Length; i++)
+        {
+            var id = PlayerId(owner, inputs[i].PlayerId);
+            if (!_registered[id] || _localInputs[id] != inputs[i]) throw new ArgumentException("Graph registration differs from source input.");
+            for (var j = 0; j < i; j++) if (inputs[j].PlayerId == inputs[i].PlayerId) throw new ArgumentException("Duplicate graph source input.");
+        }
     }
     public AlsRefactoredSourceOwnerPlayer OwnerPlayer(int player) => (uint)player < (uint)_ownerPlayers.Length
         ? _ownerPlayers[player] : throw new ArgumentException("Foreign scope player.");
@@ -125,7 +150,7 @@ public sealed class AlsRefactoredSourceSyncScope
         var mapped = input with { PlayerId = id };
         if (_nextPendingReset[id]) mapped = mapped with { Reinitialize = true,
             StartPosition = input.Reinitialize ? input.StartPosition : _definitions[id].StartPosition };
-        _inputs[_count] = mapped; _contexts[_count] = context;
+        _localInputs[id] = input; _inputs[_count] = mapped; _contexts[_count] = context;
         _notifyContexts[_count++] = new(id, context.IsActive, scopeFiltered); _registered[id] = true; _nextPendingReset[id] = false;
         var group = _definitions[id].GroupId;
         if (group >= 0 && !_nextOrder.AsSpan(0, _nextOrderCount).Contains(group)) _nextOrder[_nextOrderCount++] = group;
