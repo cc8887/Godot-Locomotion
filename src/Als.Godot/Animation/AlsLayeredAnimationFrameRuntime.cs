@@ -245,6 +245,7 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
                 throw new InvalidOperationException("Ragdoll input requires the final root source binding.");
             _feet?.PrepareGlobal(frame, footState);
             _refactoredFeet?.PrepareGlobal(frame, footState, Base.CandidateRefactoredPose, Base.CandidateRefactoredPrediction);
+            if (_refactoredFeet is not null) Base.RefactoredStances?.UpdateFeet(_refactoredFeet.TransitionFeedback);
             var childContext = context;
             if (_root is not null)
             {

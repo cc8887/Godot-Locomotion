@@ -41,6 +41,10 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public int RefactoredLocomotionStateMask {get;init;}
     public long RefactoredPivotNotifies { get; init; }
     public int RefactoredMovementDetailsMask { get; init; }
+    public long RefactoredFootFeedbackFrames { get; init; }
+    public long RefactoredDynamicRequests { get; init; }
+    public AlsFootTransitionFeedback RefactoredRestFeet { get; init; }
+    public bool RefactoredTransitionsAllowed { get; init; }
     public AlsLockCurveProducerValues LockProducers {get;init;}
     public AlsLockCurveProducerValues RawLockProducers {get;init;}
 }
@@ -173,6 +177,10 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             RefactoredGroundedStateMask = _base.RefactoredStances?.CommittedGroundedStateMask ?? 0,
             RefactoredPivotNotifies = _base.RefactoredStances?.CommittedPivotNotifies ?? 0,
             RefactoredMovementDetailsMask = _base.RefactoredStances?.CommittedMovementDetailsMask ?? 0,
+            RefactoredFootFeedbackFrames = _base.RefactoredStances?.CommittedFootFeedbackFrames ?? 0,
+            RefactoredDynamicRequests = _base.RefactoredStances?.CommittedDynamicRequests ?? 0,
+            RefactoredRestFeet = _base.RefactoredStances?.CommittedFeet ?? default,
+            RefactoredTransitionsAllowed = _base.RefactoredStances?.CommittedTransitionsAllowed ?? false,
             RefactoredLocomotionFrames = _base.RefactoredStances?.CommittedLocomotionFrames ?? 0,
             RefactoredLocomotionStateMask = _base.RefactoredStances?.CommittedLocomotionStateMask ?? 0,
             StopTransitions = _base.CommittedStopTransitionCount,

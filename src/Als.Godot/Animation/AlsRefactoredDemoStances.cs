@@ -36,6 +36,18 @@ internal sealed class AlsRefactoredDemoStances
     internal int CommittedLocomotionStateMask {get;private set;}
     internal long CommittedPivotNotifies { get; private set; }
     internal int CommittedMovementDetailsMask { get; private set; }
+    internal long CommittedFootFeedbackFrames { get; private set; }
+    internal long CommittedDynamicRequests { get; private set; }
+    private bool _feetUpdated;
+    private AlsFootTransitionFeedback _nextFeet;
+    internal AlsFootTransitionFeedback CommittedFeet { get; private set; }
+    internal bool CommittedTransitionsAllowed { get; private set; }
+    internal void UpdateFeet(in AlsFootTransitionFeedback feet)
+    {
+        if (!_prepared || _visited || _post || feet.Identity != _identity)
+            throw new InvalidOperationException("Foot feedback arrived outside the global Demo update.");
+        _runtime!.UpdateFeet(feet); _nextFeet = feet; _feetUpdated = true;
+    }
     internal bool ResetGroundedEntry => _visited && SourceUpdated && _runtime!.Grounded!.ResetEntryMode;
     internal int StandingState => _standing ? _runtime!.Standing.State : -1;
     internal int CrouchingState => _crouching ? _runtime!.Crouching!.State : -1;
@@ -185,6 +197,9 @@ internal sealed class AlsRefactoredDemoStances
     {
         ValidateCommit(id);
         var groundedState=_visited&&SourceUpdated?_runtime!.Grounded!.State:-1;
+        if (_feetUpdated) { CommittedFootFeedbackFrames++; CommittedFeet = _nextFeet; }
+        CommittedTransitionsAllowed = _input.Rest.TransitionsAllowed;
+        CommittedDynamicRequests += _runtime!.DynamicRequestCount;
         if (_standing)
         {
             CommittedPivotNotifies += _runtime!.Standing.PivotDispatchCount;
@@ -198,7 +213,7 @@ internal sealed class AlsRefactoredDemoStances
         _nextValues.CopyTo(_previousValues,0);_counter=_nextCounter;Clear();
     }
     internal void Discard(){_host?.Discard();Clear();}
-    private void Clear(){_prepared=_visited=_standing=_crouching=_evaluated=_post=false;}
+    private void Clear(){_prepared=_visited=_standing=_crouching=_evaluated=_post=_feetUpdated=false;}
     private static void Components(ReadOnlySpan<AlsPrecisePose> local,ReadOnlySpan<int> parents,Span<AlsPrecisePose> components)
     {
         for(var b=0;b<parents.Length;b++)components[b]=parents[b]<0?local[b]:AlsPrecisePose.Compose(local[b],components[parents[b]]).Normalized();

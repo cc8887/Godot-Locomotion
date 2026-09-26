@@ -29,6 +29,8 @@ public sealed class AlsRefactoredRestParentRuntime
     private AlsRefactoredRestInput _input;
     private AlsFrameIdentity _identity, _committedIdentity;
     private bool _prepared, _hasCommitted, _rotateUpdated, _turnUpdated, _dynamicUpdated;
+    private bool _feetUpdated, _graphStarted;
+    public int DynamicRequestCount { get; private set; }
     private readonly AlsRefactoredRestMontages? _sharedMontages;
     private readonly AlsMontageRuntime? _sharedBank;
     private readonly AlsTransitionQueueRuntime? _sharedTransitions;
@@ -65,11 +67,22 @@ public sealed class AlsRefactoredRestParentRuntime
             !input.RightTarget.IsFinite || !input.RightLocation.IsFinite) throw new ArgumentException("Invalid rest Parent identity/input.");
         _sharedTransitions?.ValidateBank(_sharedBank!,identity);
         _identity = identity; _input = input; _candidate = initializeInstance ? AlsRefactoredRestState.Initial : Committed;
-        _rotateUpdated = _turnUpdated = _dynamicUpdated = false; _prepared = true;
+        _rotateUpdated = _turnUpdated = _dynamicUpdated = _feetUpdated = _graphStarted = false;
+        DynamicRequestCount = 0; _prepared = true;
+    }
+    public void UpdateFeet(in AlsFootTransitionFeedback feet)
+    {
+        Check(feet.Identity.FrameId); feet.Validate();
+        if (feet.Identity != _identity || feet.PoseIdentity != (_hasCommitted ? _committedIdentity : default) || _feetUpdated || _graphStarted)
+            throw new ArgumentException("Foot feedback must precede Rest graph traversal exactly once.");
+        _input = _input with { Scale = feet.Scale, LeftLock = feet.LeftAmount, RightLock = feet.RightAmount,
+            LeftTarget = feet.LeftTarget, LeftLocation = feet.LeftLock, RightTarget = feet.RightTarget, RightLocation = feet.RightLock };
+        _feetUpdated = true;
     }
     public void RefreshRotateInPlace(long frame)
     {
         Check(frame);_sharedTransitions?.ValidateBank(_sharedBank!,_identity);
+        _graphStarted = true;
         if(!_input.GameWorld||_rotateUpdated)return;_rotateUpdated=true;
         var s=Settings;var i=_input;
         _candidate=_candidate with{Rotate=AlsRefactoredRestModel.Rotate(new(s.RotateYaw,s.FirstPersonYaw,s.ReferenceYawSpeed,s.RotateRate),
@@ -80,6 +93,7 @@ public sealed class AlsRefactoredRestParentRuntime
         Check(identity.FrameId);
         if (identity != _identity || !_bindings.Contains(command)) throw new ArgumentException("Foreign rest Parent callback.");
         _sharedTransitions?.ValidateBank(_sharedBank!,identity);
+        _graphStarted = true;
         if (command.Function == AlsRefactoredStanceFunction.InitializeTurnInPlace) { _candidate = _candidate with {TurnDelay = 0}; return; }
         if (!_input.GameWorld) return;
         var i = _input; var s = Settings;
@@ -109,6 +123,7 @@ public sealed class AlsRefactoredRestParentRuntime
                 if (selected < 0) return;
                 var request=new AlsRefactoredRestPlayback(s.DynamicSequence(selected >= 2,selected%2 == 0),"Transition",s.DynamicRate,1,s.DynamicBlend,s.DynamicBlend,false);
                 if(_sharedTransitions is not null)_sharedMontages!.QueueTransition(_sharedBank!,_sharedTransitions,identity,request);
+                DynamicRequestCount++;
                 _candidate = _candidate with {DynamicFrameDelay = 2, QueuedTransition = _sharedTransitions is null?request:null};
                 break;
         }

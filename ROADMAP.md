@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-26。代码基线：`main / 5098921` 加本批实际方向通知/Pivot 与 Standing 机器权重反馈；Locomotion 已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
+更新：2026-09-26。代码基线：`main / c47390c` 加本批真实足部历史 → Rest 动态补步；Locomotion 和 Pivot 已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -51,12 +51,13 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 - [x] Crouching 组件：在 [外层状态机](docs/verification/2026-09-26-crouching-machine.md) 基础上补齐 Idle Turn Slot、Movement/Stop、Walk↔方向混合、Lean、缓存遍历、QuickFeet、node34 惯性及 PoseCrouching；使用原蹲伏配置并接共享 owner。三频率受控姿态/事务测试通过。**完整 Crouching 连续原生姿态 oracle 仍待，不能凭组件通过关闭 R3。**
 - [x] 组合 Standing/Crouching、Grounded、Jump/Fall/Land 与各自 Lean/预测落地数据，按原图处理初始化、相关性、缓存最大权重路径、Inactive 和 Sync。完整宿主使用真实子图、13 个独立源和两层惯性，原精度 Air 设置只读导出并验证；Parent 起跳锁存、共享 Lean 和原落地过渡实际执行，普通 Demo 已切换。验证见 [本批记录](docs/verification/2026-09-26-refactored-locomotion-host.md)，尚无新整图连续原生 oracle。
 - [ ] 区分原始输入、Parent 更新状态、图内曲线、最终输出曲线及下一更新读取的已提交历史。Moving 与 MovingSmooth、FootPlanted、FeetCrossing、HipsDirectionLock、YawOffset、SprintBlock 等逐项建立生产者/消费者和帧时序表。
+- [x] 真实脚部反馈 → Rest DynamicTransitions：上一最终 IK 目标经本帧组件变换，与本帧 global 足锁结果一起传入原图；保持原门控、8 cm×scale、左右选择和两帧间隔，实际进入共享 Transition 动作队列。身份、隐藏全局帧、晚期取消／重试及普通角色扰动测试见 [足部反馈验证](docs/verification/2026-09-26-refactored-rest-feet.md)。这不是新完整足部／角色 UE oracle，项目接触修正仍须单独验收。
 - [x] 原方向状态机生成的 `ActivatePivot` 通知已接 Standing PostUpdate → Parent → 下一帧 Movement Details，普通 Demo 真实输入覆盖 First/Second Pivot。原门槛严格 speed<200 cm/s；不在 worker 回调中提前执行，不对生成通知套源动画 weight/follower/chance 过滤。Standing 机器权重改为实际上一更新记录，初值及隐藏提交为0，取消不发布。独立/共享三频率新连续 UE 对照通过，见 [Pivot 验证](docs/verification/2026-09-26-refactored-pivot-notify.md)。
 - [ ] 将其余源 Notify/Notify State 与生成状态通知接到通用队列及类型化消费者。保留存在性、事件顺序、持续区间、停用/销毁结束语义，只有成功提交才派发副作用。**纠正此前描述：Pivot 的直接来源是方向图的生成过渡通知，不是动画序列上的普通源 Notify；不能为了接 Pivot 人工添加源通知。**
 
 交付：同一角色输入驱动的完整 locomotion 输出（姿态、曲线、播放观察、事件、根运动候选）；站蹲、跳跑、落地和换向连续 UE 对照。
 
-下一接入顺序：补最终足锁/脚目标→Rest DynamicTransitions、MovingSmooth 原设置、移动平台相对位置及组件变换惯性，完成其余源 Notify 的真实时钟/消费者并移除旧移动更新兼容依赖；再补 Crouching/Grounded/Locomotion 与 Parent 连续 UE oracle，随后推进原生上身分层。Pivot 已由原方向过渡事件驱动；当前 Rest 足锁/目标输入仍为零，Demo 相对位置仍 false，桥内组件变换仍 Identity，这些不是完整移植验收状态。
+下一接入顺序：MovingSmooth 原设置、移动平台相对位置及组件变换惯性，完成其余源 Notify 的真实时钟/消费者并移除旧移动更新兼容依赖；再补 Crouching/Grounded/Locomotion 与 Parent 连续 UE oracle，随后推进原生上身分层。Pivot 和 Rest 足部反馈已接真实生产者；Demo 相对位置仍 false，桥内组件变换仍 Identity，这些不是完整移植验收状态。
 
 ### R4：接上半身、Overlay 与完整最终姿态
 
