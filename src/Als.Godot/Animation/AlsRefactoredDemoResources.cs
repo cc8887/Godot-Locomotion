@@ -32,6 +32,6 @@ internal static class AlsRefactoredDemoResources
             new(catalog, new(Read("refactored_weapon_machines"), catalog, k)))).ToArray();
         var paths = standing.ActionAssets.ToArray().Select(a => standing.ActionSource(a.AnimationId))
             .Concat(weapons.SelectMany(w => w.Bindings.ToArray()).Select(b => b.Sequence)).Distinct().ToArray();
-        return new(standing, weapons, paths.Select((p, i) => (p, i)).ToDictionary(v => v.p, v => v.i), 0, machines, metadata);
+        return new(standing, weapons, paths.Select((p, i) => (p, i)).ToDictionary(v => v.p, v => v.i), 0, machines, metadata, Read("refactored_locomotion_machines"));
     }
 }

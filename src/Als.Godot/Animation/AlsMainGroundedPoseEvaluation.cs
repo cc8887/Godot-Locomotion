@@ -176,7 +176,7 @@ internal sealed class AlsMainGroundedPoseEvaluation : IAlsGroundedPoseCacheReade
 
     private void EvaluateMain(Span<AlsPrecisePose> bones, Span<AlsInertialCurve> curves)
     {
-        if (RefactoredStances is { SourceUpdated: false })
+        if (RefactoredStances is not null)
         { RefactoredStances.FinishGrounded(bones, curves); return; }
         var stack = _update.State.Main.Transitions;
         var visited = 0;

@@ -35,6 +35,8 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public long RefactoredStandingFrames { get; init; }
     public long RefactoredCrouchingFrames { get; init; }
     public long RefactoredTransitionFrames { get; init; }
+    public long RefactoredGroundedFrames { get; init; }
+    public int RefactoredGroundedStateMask { get; init; }
 }
 
 // Exclusive production adapter. The Worker retains publication authority; the
@@ -157,6 +159,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             RefactoredStandingFrames = _base.RefactoredStances?.CommittedStandingFrames ?? 0,
             RefactoredCrouchingFrames = _base.RefactoredStances?.CommittedCrouchingFrames ?? 0,
             RefactoredTransitionFrames = _base.RefactoredStances?.CommittedTransitionFrames ?? 0,
+            RefactoredGroundedFrames = _base.RefactoredStances?.CommittedGroundedFrames ?? 0,
+            RefactoredGroundedStateMask = _base.RefactoredStances?.CommittedGroundedStateMask ?? 0,
             StopTransitions = _base.CommittedStopTransitionCount,
             HasPoseMovingChannel = _poseMoving >= 0, PoseMoving = _committedPoseMoving,
             RefactoredFeedback = _committedRefactoredFeedback, RefactoredInputPose = _base.CommittedRefactoredPose,

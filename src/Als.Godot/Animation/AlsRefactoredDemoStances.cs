@@ -4,8 +4,8 @@ using GodotAls.Import.Compilation;
 
 namespace GodotAls.Animation;
 
-/// <summary>Migration boundary: original Refactored stance hosts and Transition
-/// Slot feed the existing Grounded/air/layer/foot owners. All mutable data belongs
+/// <summary>Migration boundary: original Refactored stances, Grounded and
+/// Transition Slot feed the existing air/layer/foot owners. All mutable data belongs
 /// to this character; no Godot API is used during Prepare/Evaluate/Commit.</summary>
 internal sealed class AlsRefactoredDemoStances
 {
@@ -13,9 +13,8 @@ internal sealed class AlsRefactoredDemoStances
     private AlsRefactoredCharacterActionRuntime? _runtime;
     private readonly int[] _bones, _nativeCurves;
     private readonly string[] _names;
-    private readonly AlsPrecisePose[] _nativePose;
-    private readonly AlsPrecisePose[] _nativeComponents, _targetComponents;
-    private readonly int[] _targetParents, _wrapperCurves;
+    private readonly AlsPrecisePose[] _targetComponents;
+    private readonly int[] _targetParents;
     private readonly AlsVirtualBoneDefinition[] _targetVirtuals;
     private readonly AlsInertialCurve[] _nativeValues, _previousValues, _nextValues;
     private readonly AlsRefactoredPoseInertia _inertia;
@@ -28,6 +27,9 @@ internal sealed class AlsRefactoredDemoStances
     internal long CommittedStandingFrames { get; private set; }
     internal long CommittedCrouchingFrames { get; private set; }
     internal long CommittedTransitionFrames { get; private set; }
+    internal long CommittedGroundedFrames { get; private set; }
+    internal int CommittedGroundedStateMask { get; private set; }
+    internal bool ResetGroundedEntry => _visited && SourceUpdated && _runtime!.Grounded!.ResetEntryMode;
     internal int StandingState => _standing ? _runtime!.Standing.State : -1;
     internal int CrouchingState => _crouching ? _runtime!.Crouching!.State : -1;
     internal bool SourceUpdated => _visited && _runtime!.Transition.SourceUpdate.Updated;
@@ -49,12 +51,10 @@ internal sealed class AlsRefactoredDemoStances
                 throw new ArgumentException("Refactored physical rest requires retargeting: "+_profile.BoneNames[b]);
         }
         if(skeleton.PhysicalBones.Any(b=>!_bones.Contains(b.LogicalId)))throw new ArgumentException("Unmapped Demo physical bone.");
-        _nativeComponents=new AlsPrecisePose[_bones.Length];_targetComponents=new AlsPrecisePose[reference.Length];
+        _targetComponents=new AlsPrecisePose[reference.Length];
         var nativeNames = _profile.CurveNames.ToArray();
         _nativeCurves = nativeNames.Select(n => Array.IndexOf(_names, n)).ToArray();
         if (_nativeCurves.Any(i => i < 0)) throw new ArgumentException("Demo curve layout omitted Refactored curves.");
-        _nativePose = AlsRefactoredDemoResources.NativeReference.ToArray();
-        _wrapperCurves=new[]{"PoseGrounded","FootLeftIk","FootRightIk"}.Select(n=>Array.IndexOf(nativeNames,n)).Where(i=>i>=0).ToArray();
         _nativeValues = new AlsInertialCurve[nativeNames.Length]; _previousValues = new AlsInertialCurve[nativeNames.Length];
         _nextValues = new AlsInertialCurve[nativeNames.Length];
         _inertia = new(_bones.Length, nativeNames, "RotationYawSpeed");
@@ -121,7 +121,7 @@ internal sealed class AlsRefactoredDemoStances
     { var i=_profile.CurveNames.IndexOf(name); return i>=0&&_previousValues[i].Present?_previousValues[i].Value:0; }
     private AlsPoseUpdateContext Context(float weight) => new AlsPoseUpdateContext(_identity,weight,_delta).WithUpdateCounter(_nextCounter);
 
-    internal void Prepare(in AlsMainGroundedCachedUpdate outer, AlsGraphTraversalCounter initialization)
+    internal void Prepare(in AlsMainGroundedCachedUpdate outer, AlsGraphTraversalCounter initialization, bool fromRoll)
     {
         if (!_prepared || _visited) throw new InvalidOperationException("Invalid Demo stance traversal.");
         if (!outer.MainUpdated) return;
@@ -132,12 +132,8 @@ internal sealed class AlsRefactoredDemoStances
         if (_runtime.Transition.InertializationRequest is {} request) _inertia.Request(request.Duration);
         if (source.Updated)
         {
-            var stack = outer.State.Main.Transitions;
-            var standing = AlsTransitionStack.Weight(stack,1); var crouch = AlsTransitionStack.Weight(stack,2);
-            if (standing > AlsPoseBlender.WeightThreshold)
-            { _runtime.Standing.Prepare(source.Context.WithWeight(source.Context.Weight*standing),_input,initialization); _standing=true; }
-            if (crouch > AlsPoseBlender.WeightThreshold)
-            { _runtime.Crouching!.Prepare(source.Context.WithWeight(source.Context.Weight*crouch),_input,initialization); _crouching=true; }
+            _runtime.Grounded!.Prepare(source.Context,_input,Value("PoseStanding"),Value("PoseCrouching"),fromRoll,initialization);
+            _standing=_runtime.Grounded.StandingUpdated;_crouching=_runtime.Grounded.CrouchingUpdated;
         }
         _visited=true;
     }
@@ -154,14 +150,9 @@ internal sealed class AlsRefactoredDemoStances
     internal void FinishGrounded(Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
     {
         if(!_visited)throw new InvalidOperationException("No Refactored Grounded boundary.");
-        for(var b=0;b<_bones.Length;b++)if(_bones[b]>=0)_nativePose[b]=ToNative(pose[_bones[b]]);
-        Components(_nativePose,_profile.Parents,_nativeComponents);
-        foreach(var v in AlsRefactoredDemoResources.NativeVirtuals)
-        {_nativePose[v.Bone]=AlsPrecisePose.Relative(_nativeComponents[v.Target],_nativeComponents[v.Source]).Normalized();_nativeComponents[v.Bone]=_nativeComponents[v.Target];}
-        for(var c=0;c<_nativeValues.Length;c++)_nativeValues[c]=curves[_nativeCurves[c]];
-        foreach(var c in _wrapperCurves)_nativeValues[c]=new(1);
-        _runtime!.Transition.Evaluate(SourceUpdated?_nativePose:ReadOnlySpan<AlsPrecisePose>.Empty,
-            SourceUpdated?_nativeValues:ReadOnlySpan<AlsInertialCurve>.Empty);
+        if(SourceUpdated)_runtime!.Grounded!.Evaluate(AlsPrecisePose.Identity);
+        _runtime!.Transition.Evaluate(SourceUpdated?_runtime.Grounded!.Pose:ReadOnlySpan<AlsPrecisePose>.Empty,
+            SourceUpdated?_runtime.Grounded!.Curves:ReadOnlySpan<AlsInertialCurve>.Empty);
         _inertia.Evaluate(_runtime.Transition.Pose,_runtime.Transition.Curves,AlsPrecisePose.Identity);
         MapOut(_inertia.Pose,_inertia.Curves,_profile.CurveNames,pose,curves);
         _inertia.Curves.CopyTo(_nextValues);_evaluated=true;
@@ -190,7 +181,10 @@ internal sealed class AlsRefactoredDemoStances
     {if(!_prepared||!_post||id!=_identity)throw new InvalidOperationException("Incomplete Demo stance frame.");_runtime!.ValidateCommit(id);if(_visited)_inertia.ValidateCommit(id);}
     internal void Commit(AlsFrameIdentity id)
     {
-        ValidateCommit(id);_runtime!.Commit(id);if(_visited)_inertia.Commit(id);
+        ValidateCommit(id);
+        var groundedState=_visited&&SourceUpdated?_runtime!.Grounded!.State:-1;
+        _runtime!.Commit(id);if(_visited)_inertia.Commit(id);
+        if(groundedState>=0){CommittedGroundedFrames++;CommittedGroundedStateMask|=1<<groundedState;}
         if(_standing)CommittedStandingFrames++;if(_crouching)CommittedCrouchingFrames++;if(_evaluated)CommittedTransitionFrames++;
         _nextValues.CopyTo(_previousValues,0);_counter=_nextCounter;Clear();
     }
@@ -201,7 +195,5 @@ internal sealed class AlsRefactoredDemoStances
         for(var b=0;b<parents.Length;b++)components[b]=parents[b]<0?local[b]:AlsPrecisePose.Compose(local[b],components[parents[b]]).Normalized();
     }
     private static AlsPrecisePose FromNative(AlsPrecisePose value)=>new(new(value.Position.X*.01,-value.Position.Y*.01,value.Position.Z*.01),
-        new(-value.Rotation.X,value.Rotation.Y,-value.Rotation.Z,value.Rotation.W),value.Scale);
-    private static AlsPrecisePose ToNative(AlsPrecisePose value)=>new(new(value.Position.X*100,-value.Position.Y*100,value.Position.Z*100),
         new(-value.Rotation.X,value.Rotation.Y,-value.Rotation.Z,value.Rotation.W),value.Scale);
 }
