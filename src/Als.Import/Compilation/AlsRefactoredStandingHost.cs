@@ -43,10 +43,12 @@ public sealed class AlsRefactoredStandingHost
     private readonly AlsInertialCurve[] _directionCurves, _detailsCurves, _curves;
     private AlsFrameIdentity _identity;
     private AlsRefactoredStandingHostInput _input;
+    private float _machineWeight, _nextMachineWeight;
     private bool _prepared, _evaluated, _postUpdated, _hasIdle, _hasStop, _hasMovement, _poseBegun;
 
     public AlsFrameIdentity CommittedIdentity { get; private set; }
     internal bool Prepared=>_prepared;
+    internal float CommittedMachineWeight => _machineWeight;
     public int CommittedState => _standing.CommittedState.CurrentState;
     public int State { get { Check(); return _standing.Candidate.State.CurrentState; } }
     public AlsRefactoredRestState RestState { get { Check(); return _restParent.Candidate; } }
@@ -60,6 +62,10 @@ public sealed class AlsRefactoredStandingHost
     public ReadOnlySpan<AlsMontageInstance> CandidateMontages { get { Check(); return _bank.Candidate; } }
     public AlsMontageFrame MontageFrame { get { Check(); return _bank.Frame; } }
     public int QuickStopDispatchCount { get; private set; }
+    public int PivotDispatchCount { get; private set; }
+    public bool PivotActive { get { Check(); return _parent.Candidate.PivotActive; } }
+    public int MovementDetailsState { get { Check(); return _hasMovement ? _traversal.DetailsMachine.Candidate.State.CurrentState : -1; } }
+    internal AlsGroundedMachineUpdate? DirectionUpdate { get { Check(); return _hasMovement ? _traversal.Movement.Direction.Candidate : null; } }
     internal AlsRefactoredSourcePlayerRuntime? MovementPlayers { get { Check(); return _hasMovement ? _players : null; } }
 
     internal AlsRefactoredStandingHost(AlsRefactoredStandingHostProfile profile, uint character, uint generation,
@@ -152,8 +158,12 @@ public sealed class AlsRefactoredStandingHost
                 }
             }
             _restTraversal.Complete(frame);
+            _nextMachineWeight = context.Weight;
+            // GetInstanceMachineWeight reads the proxy's previous buffer. The
+            // linked host owns this value; it is not a constant Parent input.
+            var detailsInput = input.Details with { StandingMachineWeight = initializeInstance ? 0 : _machineWeight };
             _traversal.Prepare(source, _reads.AsSpan(0, readCount), _initialReads.AsSpan(0, initialCount), initialization,
-                _parent, input.Details, initializeInstance);
+                _parent, detailsInput, initializeInstance);
             _rotate.Prepare(frame, _rotateInputs.AsSpan(0, rotateCount), context.Delta, initializeInstance);
             _hasMovement = _traversal.HasMovement;
             // Sync membership belongs to the animation frame, not the lifetime
@@ -225,6 +235,7 @@ public sealed class AlsRefactoredStandingHost
         {
             if(_sharedActions is null)_profile.Montages.PostUpdate(_bank, _restParent, _queue, _identity);
             QuickStopDispatchCount = _profile.QuickStop.Dispatch(_queue, _bank, _identity, _standing, _input.QuickStop);
+            PivotDispatchCount = _hasMovement ? _profile.PivotNotify.Dispatch(_traversal.Movement.Direction, _parent, _identity) : 0;
             _postUpdated = true;
         }
         catch { Cancel(); throw; }
@@ -260,8 +271,10 @@ public sealed class AlsRefactoredStandingHost
         if(_sharedActions is null){_parent.Commit(frame);_restParent.Commit(frame);}
         if (_sharedActions is null) { _queue.Commit(identity); _bank.Commit(identity); }
         _nextClocks.CopyTo(_clocks, 0);
+        _machineWeight = _nextMachineWeight;
         CommittedIdentity = identity; CancelGraph();
     }
+    internal void CommitUnvisitedMachineWeight() => _machineWeight = 0;
     public void Cancel()
     {
         if (_sharedActions is not null) _sharedActions.Discard();
@@ -274,7 +287,8 @@ public sealed class AlsRefactoredStandingHost
         _rotate.Cancel(); _standing.Cancel();
         if(_sharedActions is null){_parent.Cancel();_restParent.Cancel();}
         if (_sharedActions is null) { _queue.Discard(); _bank.Discard(); }
-        _prepared = _evaluated = _postUpdated = _hasIdle = _hasStop = _hasMovement = _poseBegun = false; QuickStopDispatchCount = 0;
+        _prepared = _evaluated = _postUpdated = _hasIdle = _hasStop = _hasMovement = _poseBegun = false;
+        QuickStopDispatchCount = PivotDispatchCount = 0;
     }
     private void Check() { if (!_prepared) throw new InvalidOperationException("No Standing host candidate."); }
     private void RequirePose() { Check(); if (!_evaluated) throw new InvalidOperationException("Standing host pose was not evaluated."); }
