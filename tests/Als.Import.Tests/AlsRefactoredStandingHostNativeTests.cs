@@ -26,6 +26,7 @@ public sealed class AlsRefactoredStandingHostNativeTests(ITestOutputHelper outpu
         double maxParent = 0, maxPose = 0, maxCurve = 0, maxClock = 0, maxWeight = 0;
         var states = new HashSet<int>();
         var numericFailures = new Dictionary<string, (int Count, string First, double Maximum)>();
+        var upstreamDifferences = new Dictionary<string, (string First, double Maximum)>();
         foreach (var row in trace.GetProperty("frames").EnumerateArray())
         {
             var r = row.GetProperty("input"); var delta = r.GetProperty("delta").GetSingle(); var moving = r.GetProperty("moving").GetBoolean();
@@ -106,6 +107,11 @@ public sealed class AlsRefactoredStandingHostNativeTests(ITestOutputHelper outpu
             {
                 var error = Math.Abs(a - e); maximum = Math.Max(maximum, error);
                 var message = $"{hz}/{frame}/{field}: {a:R} vs {e:R}, error={error:R}";
+                if (error > 0 && (field.StartsWith("playerTime", StringComparison.Ordinal) || field.StartsWith("movement", StringComparison.Ordinal)))
+                {
+                    var previous = upstreamDifferences.GetValueOrDefault(field);
+                    upstreamDifferences[field] = (previous.First ?? message, Math.Max(previous.Maximum, error));
+                }
                 if (!(error <= tolerance))
                 {
                     var category = field.StartsWith("bone", StringComparison.Ordinal) ? "pose" : field;
@@ -116,6 +122,8 @@ public sealed class AlsRefactoredStandingHostNativeTests(ITestOutputHelper outpu
         }
         Assert.Equal(hz * 11, frame); Assert.Equal(5, states.Count); Assert.True(quick > 0);
         output.WriteLine($"hz={hz} frames={frame} bones={bones} quick={quick} parent={maxParent:R} pose={maxPose:R} curve={maxCurve:R} clock={maxClock:R} weight={maxWeight:R}");
+        foreach (var difference in upstreamDifferences)
+            output.WriteLine($"upstream {difference.Key}: first={difference.Value.First}; max={difference.Value.Maximum:R}");
         Assert.True(numericFailures.Count == 0, string.Join(Environment.NewLine, numericFailures.Select(f =>
             $"{f.Key}: {f.Value.Count} components exceeded budget; first: {f.Value.First}; max={f.Value.Maximum:R}")));
     }
