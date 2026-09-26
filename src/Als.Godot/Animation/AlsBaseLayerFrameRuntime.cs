@@ -32,6 +32,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     private readonly AlsMontageNotifyBinding _turnNotifyBinding;
     private readonly AlsMontageNotifyRuntime _turnNotifies;
     private bool _cancelForRuntimeFailure;
+    private bool _legacySourceUpdate;
     private readonly long[] _failureEpochs = new long[AlsActionOutcomeBuffer.Capacity];
     private int _failureEpochCount;
 
@@ -91,7 +92,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     public ref readonly AlsCycleSyncFrame CommittedSources => ref _movement.CommittedSources;
     public ref readonly AlsCycleSyncFrame Sources { get { RequireGraphCandidate(); return ref _movement.Sources; } }
     public ref readonly AlsEventBuffer SourceEvents { get { RequireGraphCandidate(); return ref _movement.SourceEvents; } }
-    internal bool ResetGroundedEntry { get { RequireGraphCandidate(); return _grounded.ResetGroundedEntry; } }
+    internal bool ResetGroundedEntry { get { RequireGraphCandidate(); return RefactoredStances?.ResetGroundedEntry??_grounded.ResetGroundedEntry; } }
     internal AlsMainMovementFrameRuntime Movement => _movement;
     internal AlsInAirAnimationInput CommittedGlobalInput => _committedGlobalInput;
     internal AlsGroundedAnimationInput CommittedGroundInput => _committedGroundInput;
@@ -234,6 +235,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
                 definition.Air, definition.Landing, definition.Dependencies,
                 definition.AuthoredMontageAssets.SelectMany(a=>set.Animations[a.AnimationId].Curves).Select(c=>c.SourceName).ToArray(), contributor,
                 refactoredDefinitions, definition.GroundedEntryNotify.Binding);
+            RefactoredStances?.BindOutputLayout(_movement.CurveNames);
             _actionSlot = new(library,set,definition.AuthoredMontageAssets.Select(a=>a.AnimationId).Distinct().ToArray(),
                 _movement.ReferencePose,_movement.CurveNames);
             _tail = new(definition.BaseLayer, _movement.ReferencePose.Length, _movement.CurveNames.Length);
@@ -327,7 +329,6 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         try
         {
         _identity=frame.Identity; SourceUpdated=false; RequestCount=0; _phase=Phase.GlobalUpdating;
-        RefactoredStances?.Begin(frame, result, movement);
         BeginMontageFrame(frame.Identity, frame.DeltaTime, _candidateMovementState == AlsMovementStateInput.Ragdoll);
         _candidateRolling = _committedRolling;
         _movementAction = _rollingGameplay ? frame.MovementAction : default;
@@ -405,6 +406,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             _ = CandidateRefactoredPose.PelvisAmount(_candidateRefactoredPrediction);
             inputs = inputs with { RefactoredCurves = new(frame.Identity, _candidateRefactoredPrediction) };
         }
+        RefactoredStances?.Begin(frame,result,movement,_candidateRefactoredPrediction);
         _mappedResult=mappedResult; _mappedMovement=mappedMovement; _mappedRules=mappedRules; _mappedInputs=inputs;
         _mappedSlot=authoredActions ? _montages.SlotWeights(AlsMontageSlot.BaseLayer) : slot;
         _phase=Phase.GlobalPrepared;
@@ -470,9 +472,15 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             var graphContext=traversal is { } graphFrame ? context.WithUpdateCounter(graphFrame.Update) : context;
             var update = _tail.Begin(graphContext, slot,traversal); _tailPrepared=true; SourceUpdated = update.Updated;
             var physical = HasMontageFrame;
-            if (SourceUpdated) _movement.Prepare(result, movement, rules, inputs, update.Context, this, physical,traversal);
+            if (SourceUpdated)
+            {
+                _legacySourceUpdate=RefactoredStances is not null;
+                try{_movement.Prepare(result,movement,rules,inputs,update.Context,this,physical,traversal);}
+                finally{_legacySourceUpdate=false;}
+            }
             else if(traversal is { } frame)_movement.PrepareUnvisited(result,movement,rules,inputs,frame,this,physical);
             else _movement.PrepareHidden(_identity, context.Delta, physical);
+            if(SourceUpdated)RefactoredStances?.PrepareLocomotion(update.Context,inputs.Grounded.Initialization,rules.FromRoll);
             if (physical)
             {
                 var visitedGround = SourceUpdated && _movement.GroundedReadCount > 0;
@@ -498,7 +506,12 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         Require(Phase.Prepared);
         try
         {
-            if (SourceUpdated) _movement.EvaluateRaw(_rawPrecise, _rawCurves, groundedSlot ?? (HasMontageFrame ? _groundedSlot : null));
+            if (SourceUpdated)
+            {
+                if(RefactoredStances is {} original)
+                {original.EvaluateLocomotion(_rawPrecise,_rawCurves);_movement.CompleteUpdateOnly();}
+                else _movement.EvaluateRaw(_rawPrecise, _rawCurves, groundedSlot ?? (HasMontageFrame ? _groundedSlot : null));
+            }
             _tail.EvaluatePrecise(SourceUpdated ? _rawPrecise : ReadOnlySpan<AlsPrecisePose>.Empty,
                 SourceUpdated ? _rawCurves : ReadOnlySpan<AlsInertialCurve>.Empty,
                 component, parent, teleportDistance, _posePrecise, _curves, baseSlot ?? (_authoredActions==true ? _actionSlot : null));
@@ -608,6 +621,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         RequireUpdate();
         if (context.Identity != _identity || !float.IsFinite(seconds) || seconds < 0)
             throw new ArgumentException("Foreign or invalid frame inertialization request.");
+        if(_legacySourceUpdate)return;
         if (context.InertializationRequester != _requester) { _sink!.RequestInertialization(context, seconds); return; }
         _tail.RequestInertialization(context, seconds);
         _request = _request < 0 ? seconds : MathF.Min(_request, seconds); RequestCount++;

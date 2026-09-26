@@ -37,7 +37,14 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public long RefactoredTransitionFrames { get; init; }
     public long RefactoredGroundedFrames { get; init; }
     public int RefactoredGroundedStateMask { get; init; }
+    public long RefactoredLocomotionFrames {get;init;}
+    public int RefactoredLocomotionStateMask {get;init;}
+    public AlsLockCurveProducerValues LockProducers {get;init;}
+    public AlsLockCurveProducerValues RawLockProducers {get;init;}
 }
+
+internal readonly record struct AlsLockCurveProducerValues(AlsInertialCurve Left,AlsInertialCurve LegacyLeft,
+    AlsInertialCurve Right,AlsInertialCurve LegacyRight);
 
 // Exclusive production adapter. The Worker retains publication authority; the
 // native-foot option supplies the final animated pose without legacy correction.
@@ -121,6 +128,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     private readonly int _leftIk, _rightIk, _leftLock, _rightLock, _rotationAmount, _yawOffset;
     private readonly int _v4LeftLock, _v4RightLock, _refLeftLock, _refRightLock;
     private bool _nextLockProducersMatch, _committedLockProducersMatch;
+    private AlsLockCurveProducerValues _nextLockProducers,_committedLockProducers,_nextRawLockProducers,_committedRawLockProducers;
     private AlsAnimationInputFeedback _feedback, _nextFeedback;
     private readonly int _poseMoving;
     private AlsInertialCurve _committedPoseMoving, _nextPoseMoving;
@@ -161,6 +169,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             RefactoredTransitionFrames = _base.RefactoredStances?.CommittedTransitionFrames ?? 0,
             RefactoredGroundedFrames = _base.RefactoredStances?.CommittedGroundedFrames ?? 0,
             RefactoredGroundedStateMask = _base.RefactoredStances?.CommittedGroundedStateMask ?? 0,
+            RefactoredLocomotionFrames = _base.RefactoredStances?.CommittedLocomotionFrames ?? 0,
+            RefactoredLocomotionStateMask = _base.RefactoredStances?.CommittedLocomotionStateMask ?? 0,
             StopTransitions = _base.CommittedStopTransitionCount,
             HasPoseMovingChannel = _poseMoving >= 0, PoseMoving = _committedPoseMoving,
             RefactoredFeedback = _committedRefactoredFeedback, RefactoredInputPose = _base.CommittedRefactoredPose,
@@ -170,6 +180,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             FootPoseIdentity = _layered?.CommittedFootPoseIdentity ?? default,
             RefactoredLocks = UsesRefactoredFeet ? CommittedBasedFeet : default,
             LockCurveProducersMatch = _committedLockProducersMatch, GraphCapture = _committedGraphCapture,
+            LockProducers=_committedLockProducers,RawLockProducers=_committedRawLockProducers,
             Overlay = _layered?.CommittedOverlayState.Overlay ?? AlsOverlayKind.Default };
     public AlsAnimationState AnimationState => _base.Movement.Update.State.CurrentState switch
     {
@@ -355,6 +366,12 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _nextPoseMoving = _poseMoving >= 0 ? Curves[_poseMoving] : default;
         _nextLockProducersMatch = _refLeftLock >= 0 && _refRightLock >= 0 && _v4LeftLock >= 0 && _v4RightLock >= 0 &&
             Curves[_refLeftLock] == Curves[_v4LeftLock] && Curves[_refRightLock] == Curves[_v4RightLock];
+        static AlsInertialCurve Read(ReadOnlySpan<string> names,ReadOnlySpan<AlsInertialCurve> values,string name)
+        {var i=names.IndexOf(name);return i>=0?values[i]:default;}
+        static AlsLockCurveProducerValues Locks(ReadOnlySpan<string> names,ReadOnlySpan<AlsInertialCurve> values)=>
+            new(Read(names,values,"FootLeftLock"),Read(names,values,"FootLock_L"),Read(names,values,"FootRightLock"),Read(names,values,"FootLock_R"));
+        _nextLockProducers=Locks(CurveNames,Curves);
+        _nextRawLockProducers=_base.SourceUpdated?Locks(_base.CurveNames,_base.RawMovementCurves):default;
         if (_refactoredPoseReader is not null)
             _nextRefactoredFeedback = new(_refactoredPoseReader.Read(_identity, Curves), Curve(_predictionBlock));
         _nextNotifyState = _notifyState.Advance(_base.SourceEvents, _base.ResetGroundedEntry);
@@ -480,6 +497,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _feedback = _nextFeedback; _evaluation = _nextEvaluation;
         _committedPoseMoving = _nextPoseMoving;
         _committedLockProducersMatch = _nextLockProducersMatch;
+        _committedLockProducers=_nextLockProducers;_committedRawLockProducers=_nextRawLockProducers;
         _committedRefactoredFeedback = _nextRefactoredFeedback;
         _committedGraphCapture = _nextGraphCapture; _nextGraphCapture = null;
         _notifyState = _nextNotifyState; _prepared = _applied = false;

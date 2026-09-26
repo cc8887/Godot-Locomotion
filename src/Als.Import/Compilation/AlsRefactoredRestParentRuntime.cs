@@ -67,6 +67,14 @@ public sealed class AlsRefactoredRestParentRuntime
         _identity = identity; _input = input; _candidate = initializeInstance ? AlsRefactoredRestState.Initial : Committed;
         _rotateUpdated = _turnUpdated = _dynamicUpdated = false; _prepared = true;
     }
+    public void RefreshRotateInPlace(long frame)
+    {
+        Check(frame);_sharedTransitions?.ValidateBank(_sharedBank!,_identity);
+        if(!_input.GameWorld||_rotateUpdated)return;_rotateUpdated=true;
+        var s=Settings;var i=_input;
+        _candidate=_candidate with{Rotate=AlsRefactoredRestModel.Rotate(new(s.RotateYaw,s.FirstPersonYaw,s.ReferenceYawSpeed,s.RotateRate),
+            _candidate.Rotate.PlayRate,i.Moving,i.Rotation==AlsRefactoredRestRotation.Aiming,i.FirstPerson,i.Yaw,i.YawSpeed,i.Delta,i.PendingUpdate)};
+    }
     public void Apply(in AlsFrameIdentity identity, AlsRefactoredStanceCallback command)
     {
         Check(identity.FrameId);
@@ -78,9 +86,7 @@ public sealed class AlsRefactoredRestParentRuntime
         switch (command.Function)
         {
             case AlsRefactoredStanceFunction.RefreshRotateInPlace:
-                if (_rotateUpdated) return; _rotateUpdated = true;
-                _candidate = _candidate with {Rotate = AlsRefactoredRestModel.Rotate(new(s.RotateYaw,s.FirstPersonYaw,s.ReferenceYawSpeed,s.RotateRate),
-                    _candidate.Rotate.PlayRate,i.Moving,i.Rotation == AlsRefactoredRestRotation.Aiming,i.FirstPerson,i.Yaw,i.YawSpeed,i.Delta,i.PendingUpdate)};
+                RefreshRotateInPlace(identity.FrameId);
                 break;
             case AlsRefactoredStanceFunction.RefreshTurnInPlace:
                 if (_turnUpdated) return; _turnUpdated = true;

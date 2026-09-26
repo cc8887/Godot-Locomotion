@@ -8,6 +8,12 @@ namespace GodotAls.Animation;
 internal static class AlsRefactoredDemoResources
 {
     internal static readonly Lazy<AlsRefactoredCharacterActionProfile> Profile = new(Load);
+    internal static readonly Lazy<AlsRefactoredLocomotionHostProfile> Locomotion = new(()=>
+    {
+        var actions=Profile.Value;
+        return new(actions,Godot.FileAccess.GetFileAsString("res://assets/config/refactored_air_settings.json"),
+            Godot.FileAccess.GetFileAsString("res://assets/config/refactored_locomotion_machines.json"));
+    });
     internal static AlsLogicalVirtualBone[] NativeVirtuals { get; private set; } = [];
     internal static AlsPrecisePose[] NativeReference { get; private set; } = [];
     private static AlsRefactoredCharacterActionProfile Load()
