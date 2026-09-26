@@ -10,6 +10,10 @@
 
 # 运行和验证
 
+- R2本批收尾补验：公共Standing.Cancel在共享模式取消整个角色动作帧，内部提交清理独立，防止旧queue残留；`character-actions-cancel-final.trx`角色/Standing生命周期/原生六组27通过0失败0跳过，Optimize再次0/0。与下条70项扩展属于同批，详见同一验证记录。
+
+- 最新 R2共享动作首批：`docs/verification/2026-09-26-character-actions-shared.md`。不可变Grounded动作profile合并Standing/武器资源，局部18来源映射外部角色ID/group，79骨/曲线并集门禁；Standing注入同一bank/queue，协调器预校验后统一提交，子图禁止独立提交/后处理。原AB_Als node13实际为Grounded6→Transition13→Locomotion7，已校编译/编辑链接，真实Stop/Dynamic/QuickSlot混合、source上下文/请求输出、update-only/retry；测试基底为真实Standing受控输出，**不是完整Grounded执行或外层原生验收**。非连续反序ID700+/group20，独立/共享原生六组4620帧/280134骨同原门槛，shared maxP9.73409e-6cm/C3.57628e-7/Parent和clock0；首16/最终相关70通过0失败0跳过，Optimize0/0、diff过。首编译两不存在属性引用已改原武器固定idle-only=true，无运行失败/UE改动或重导/Godot运行/全量/性能。R2仍待完整角色资源、真实Grounded/Locomotion组合、外层惯性接收和新整链native；普通Demo仍旧链路，全部Ragdoll等目标/暂缓项保留。
+
 - 最新 Standing 严格对齐已通过：`docs/verification/2026-09-26-standing-curve-precision.md`。定位步幅曲线 float ULP→rate→clock 累积，以及源曲线误用 double；按本机 UE 源码/只读反汇编新增 AlsNativeRichCurve，共用于原生移动设置/Refactored 序列与 Montage，无 UE 修改/重导。三Hz2310帧/140067骨/五状态/12Quick 原3组通过，位置最大9.73409e-6cm/曲线3.57628e-7/已比较Parent和clock0，原阈值不变；1238设置、726Mantle序列值、7502Montage值精确同。Core35通过；Import扩展279中276通过/3旧LayerGraph mask失败，显式原七Slot修测试后该类13通过，失败TRX保留。Optimize0警告0错误，diff检查过，无全量/Godot运行/视觉/性能。ROADMAP R1关闭范围仅受控Standing，下一步R2角色共享bank/queue/身份及原外层Transition Slot；普通Demo仍旧链路，全部Ragdoll等目标及用户暂缓项保留。
 
 - 最新 Standing 原生连续：`docs/verification/2026-09-25-refactored-standing-host-native.md`。原完整Standing/真实Parent/物理Montage，三Hz2310帧/140067骨/五状态/12Quick；修独立MovingSmooth及隐藏帧空播放器批次清同步组，30Hz再起步旧组覆盖已消除。相关62通过、ExportRelease0/0、Python语法过；**原生严格3组仍失败**：258位置分量超2e-5cm，FootPlanted/Yaw超2e-6，maxP3.86872e-5cm/C7.6294e-6，未放宽/未跳过。全帧状态/已比较Parent/动作/播放器clock通过，maxclock4.768e-7。完整Editor4actions审计173CD9BE.../BuildId b4127720-ddfd-475f-a955-59a24fb7ace6；冷40584/普通18296退出0，28559445字节SHA2C6FC401...一致，DV27668退出0/3旧warn；编译/导出/早期oracle失败均保留。下一步隔离源采样/混合/惯性误差，严禁称原生验收通过；外层Transition/Crouch/全角色/Demo及Ragdoll等全部旧目标/用户改动/暂缓项保留，无Godot运行或性能验收。

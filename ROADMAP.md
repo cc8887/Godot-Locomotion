@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-26。代码基线：`main / 1ef1b3c` 加本批 Standing 曲线精度修正。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
+更新：2026-09-26。代码基线：`main / 4a7208c` 加本批角色共享动作与 Transition 边界。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -17,14 +17,14 @@
 | 阶段 | 当前证据与缺口 | 下一交付与关闭条件 |
 |---|---|---|
 | R1 Standing 严格对齐 | 已关闭本批门禁：三频率 2310 帧/140067 骨骼求值全部通过；Parent 已比较字段和时钟差 0 | 保持既定阈值作为后续角色整合的回归；不代表完整角色或普通 Demo 验收 |
-| R2 角色级动作与 Transition Slot | Standing 到 node68；局部 18 资源 bank；外层 Transition 尚未混入 | 共享角色 bank/身份/队列，真实 Stop/Dynamic/QuickStop 输出到最终姿态与曲线 |
+| R2 角色级动作与 Transition Slot | 已有共享 Grounded 动作资源/ID/bank/队列、Standing 注入及原 node13 Slot；受控输入真实混合通过；完整 Grounded 上游和新整链原生轨迹待接 | 扩展完整角色资源、按原位置接 Grounded→Transition→Locomotion，并完成整链原生对照 |
 | R3 完整主移动图 | Standing/Crouch/空中等已有不同程度组件及旧入口实现，尚无新角色宿主闭环 | 真实 Standing/Crouching/Jump/Fall/Land 与姿势切换，缓存/Sync/曲线反馈统一 |
 | R4 上身、Overlay 与最终脚部 | 13 Overlay 等已有受控组件证据；不能代替新全角色连续证据 | Aim/Layering/手部/脚部按原图拓扑接入，换向与支撑窗口、地形/平台通过 |
 | R5 Godot 普通入口 | 新宿主未接现有 Gather/Worker/Commit | 普通入口实际使用新宿主，单线程/并行一致，键鼠、多帧和人工通过 |
 | R6 通用动作与物理恢复 | Roll/Ragdoll/Get-up/Camera 等已接旧入口；Mantle 有组件；长期物理稳定性尚有失败 | 通知、Root Motion、Mantle/Roll、Ragdoll/Get-up/Pose Recovery 与新链路整合并验收 |
 | R7 最终交付 | 十分钟预算、完整人工矩阵及可复现交付未完成 | 原性能目标与所有功能门禁通过，生成资产交付可复现 |
 
-最新证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing-curve-precision.md)：最大位置差约 9.73409e-6 cm，最大曲线差 3.57628e-7，原三项严格失败已通过，未放宽阈值。此前失败保留在 [原生连续首轮记录](docs/verification/2026-09-25-refactored-standing-host-native.md)。下一阶段为 R2 角色级共享动作与外层 Transition Slot。
+R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing-curve-precision.md)：最大位置差约 9.73409e-6 cm，最大曲线差 3.57628e-7，原三项严格失败已通过，未放宽阈值。此前失败保留在 [原生连续首轮记录](docs/verification/2026-09-25-refactored-standing-host-native.md)。R2 首批见 [角色共享动作与 Transition 边界](docs/verification/2026-09-26-character-actions-shared.md)，整阶段尚未关闭。
 
 ## 完整角色动画链路实施方案
 
@@ -36,10 +36,10 @@
 
 ### R2：把局部 Standing owner 提升为角色级 owner
 
-- [ ] 建立不可变角色 profile，统一资源 ID、骨骼父序/布局、曲线名映射、Montage group/slot、动作定义和源节点身份。V4 旧入口与 Refactored 新图的版本/骨架边界必须显式绑定，禁止仅按序号混用。
-- [ ] 将 Standing 私有 bank/queue 改为角色注入的共同 bank/queue，保留可独立测试的子图入口；其局部 18 个 ID 映射为角色资源 ID。每个物理播放实例只有一份时钟、epoch、marker、通知游标和 Root Motion 历史。
-- [ ] 按实际 AB_Als 图编译外层 Transition Slot 的位置与输入。混入 Stop/Dynamic/QuickStop 的真实姿态和曲线，覆盖默认源、多个实例重叠、blend in/out、停止和中断；Idle Turn Slot 保持原图位置。不得把所有 Slot 简单叠到最终输出上。
-- [ ] 统一动作生命周期与主线程后处理顺序；本帧已冻结播放快照不被后处理新播放覆盖，下一帧才按原语义生效。验证 Stop/Turn/QuickStop 同帧竞争、取消重试与失败后恢复。
+- [ ] 扩展不可变角色 profile 到完整角色：本批已统一 Grounded 的资源 ID、79 骨父序、曲线映射及 Montage group/slot，并共享武器过渡资源；Mantle/Roll 等动作及其他图资源仍待纳入。V4/Refactored 边界必须显式绑定，禁止按序号混用。
+- [x] Standing 支持角色注入的共同 bank/queue，并保留独立测试入口；原局部 18 个资源显式映射为角色 ID。子图不再推进或提交共享 bank，实际播放实例及其时间/遍历历史由同一物理 bank 所有。
+- [ ] 原 AB_Als 外层 Transition Slot node13 的位置、编译/编辑图链接及策略已校验；Stop/Dynamic/QuickStop 的真实姿态和曲线已在受控 Standing 输入上混合，包含重叠、淡入淡出、停止及重试。**原位置是 Grounded→Transition→Locomotion，不能跳过 Grounded 直接宣称新角色整图完成**。待接真实 Grounded 输出、外层惯性请求接收与新的整链原生轨迹。
+- [x] 当前 Grounded 动作共享帧统一预校验/提交及主线程后处理顺序；冻结播放快照不受新播放改写。覆盖停止阻塞保留请求、武器 worker/main 请求、实际 Turn/Stop/QuickStop、取消重试及晚期故障。完整角色其余消费者接入时须继续扩展该门禁。
 
 交付：角色资源绑定、可组合子图 owner、真实外层 Slot 及原生连续对照；不能以 bank 中存在实例作为姿态已接入的证明。
 

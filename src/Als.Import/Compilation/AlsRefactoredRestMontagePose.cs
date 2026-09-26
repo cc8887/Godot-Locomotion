@@ -17,16 +17,19 @@ public sealed class AlsRefactoredRestMontagePose
     public ReadOnlySpan<int> Parents => _parents;
     public ReadOnlySpan<string> CurveNames => _curves;
     public AlsRefactoredRestMontagePose(AlsRefactoredAnimationCatalog catalog, AlsRefactoredRestMontages montages, ReadOnlySpan<string> hostCurves)
+        : this(catalog, montages.Settings.CatalogDigest, montages.Assets, montages.SourcePath, hostCurves) { }
+    internal AlsRefactoredRestMontagePose(AlsRefactoredAnimationCatalog catalog, string digest,
+        ReadOnlySpan<AlsSequenceMontageAsset> assets, Func<int,string> sourcePath, ReadOnlySpan<string> hostCurves)
     {
-        if(catalog.IndexDigest!=montages.Settings.CatalogDigest)throw new ArgumentException("Foreign rest montage pose catalog.");
+        if(catalog.IndexDigest!=digest)throw new ArgumentException("Foreign rest montage pose catalog.");
         CatalogDigest=catalog.IndexDigest;
         var reference=catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence);
         _bones=reference.BoneNames.ToArray();_parents=reference.Parents.ToArray();
         var names=hostCurves.ToArray();
         if(names.Any(string.IsNullOrWhiteSpace)||names.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=names.Length)throw new ArgumentException("Invalid rest montage host curves.");
-        foreach(var asset in montages.Assets)
+        foreach(var asset in assets)
         {
-            var path=montages.SourcePath(asset.AnimationId);Source source;
+            var path=sourcePath(asset.AnimationId);Source source;
             if(asset.AdditiveType==0)
             {
                 var absolute=catalog.CompileAbsolutePoseWithCurves(path);

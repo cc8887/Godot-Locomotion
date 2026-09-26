@@ -14,8 +14,18 @@ public sealed class AlsRefactoredStandingHostNativeTests(ITestOutputHelper outpu
     [Theory]
     [InlineData(30)] [InlineData(60)] [InlineData(120)]
     public void OriginalStandingGraphAndParentMatchContinuousHost(int hz)
+        => Compare(hz, false);
+
+    [Theory]
+    [InlineData(30)] [InlineData(60)] [InlineData(120)]
+    public void SharedCharacterBankKeepsOriginalStandingGraphAndClocks(int hz)
+        => Compare(hz, true);
+
+    private void Compare(int hz, bool shared)
     {
-        var profile = AlsRefactoredStandingHostTests.Data.Value; var host = profile.CreateRuntime(19, 1);
+        var actions = shared ? AlsRefactoredCharacterActionTests.Data.Value.Profile.CreateRuntime(19, 1) : null;
+        var profile = shared ? AlsRefactoredCharacterActionTests.Data.Value.Profile.Standing : AlsRefactoredStandingHostTests.Data.Value;
+        var host = actions?.Standing ?? profile.CreateRuntime(19, 1);
         using var document = JsonDocument.Parse(MantlingHostFixture.Read("refactored_standing_host_trace"));
         var root = document.RootElement; Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(host.BoneNames.ToArray(), root.GetProperty("names").EnumerateArray().Select(n => n.GetString()).ToArray());
@@ -41,6 +51,7 @@ public sealed class AlsRefactoredStandingHostNativeTests(ITestOutputHelper outpu
             var input = new AlsRefactoredStandingHostInput(movement, rest, new(1, 1, 1, 0), new(false, false, moving, 90, 0, 0),
                 r.GetProperty("foot").GetSingle(), r.GetProperty("movingSmooth").GetBoolean(), r.GetProperty("pivot").GetBoolean());
             var id = new AlsFrameIdentity(frame, 19, 1); var context = new AlsPoseUpdateContext(id, 1, delta).WithUpdateCounter(counter);
+            if (actions is not null) { actions.Begin(id, delta); actions.Transition.Prepare(context, frame == 0); }
             host.Prepare(context, input, init, frame == 0);
             Assert.True(host.State == row.GetProperty("state").GetInt32(), $"{hz}/{frame} state {host.State} vs {row.GetProperty("state")}"); states.Add(host.State);
             Parent(row.GetProperty("parent"));
@@ -75,20 +86,22 @@ public sealed class AlsRefactoredStandingHostNativeTests(ITestOutputHelper outpu
                 }
                 bones += 79;
             }
-            host.PostUpdateActions(); Parent(row.GetProperty("postParent"));
+            if (actions is null) host.PostUpdateActions(); else actions.PostUpdateActions();
+            Parent(row.GetProperty("postParent"));
             Assert.Equal(row.GetProperty("quick").GetInt32(), host.QuickStopDispatchCount); quick += host.QuickStopDispatchCount;
             var montages = row.GetProperty("montages"); Assert.Equal(montages.GetArrayLength(), host.CandidateMontages.Length);
             for (var i = 0; i < host.CandidateMontages.Length; i++)
             {
                 var a = host.CandidateMontages[i]; var e = montages[i];
-                var path = a.AnimationId < 12 ? profile.Montages.SourcePath(a.AnimationId) : a.AnimationId < 14 ? profile.Actions.SourcePath(a.AnimationId) : profile.QuickStop.SourcePath(a.AnimationId);
+                var path = profile.ActionSource(a.AnimationId);
                 Assert.Equal(e.GetProperty("source").GetString(), path);
                 Assert.Equal(e.GetProperty("slot").GetString(), a.Slot == AlsMontageSlot.Transition ? "Transition" : "TurnInPlaceStanding");
                 Assert.Equal(e.GetProperty("playing").GetBoolean(), a.Playing); Assert.Equal(e.GetProperty("rate").GetSingle(), a.PlayRate);
                 Compare(a.Position, e.GetProperty("time").GetDouble(), ref maxClock, 2e-6, "montageTime");
                 Compare(a.Blend.CurrentWeight, e.GetProperty("weight").GetDouble(), ref maxWeight, 2e-6, "montageWeight");
             }
-            host.Commit(id); counter = counter.Next((ulong)++frame);
+            if (actions is null) host.Commit(id); else actions.Commit(id);
+            counter = counter.Next((ulong)++frame);
 
             void Parent(JsonElement expected)
             {
