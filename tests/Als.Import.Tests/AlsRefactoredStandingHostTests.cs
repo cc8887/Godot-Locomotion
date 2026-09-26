@@ -21,7 +21,7 @@ public sealed class AlsRefactoredStandingHostTests
             MantlingHostFixture.Read("refactored_slot_inventory"), MantlingHostFixture.Read("refactored_quick_stop_settings"));
     });
 
-    private static AlsRefactoredStandingHostInput Input(int frame, int hz)
+    internal static AlsRefactoredStandingHostInput Input(int frame, int hz)
     {
         var phase = frame / hz; var local = (float)(frame % hz) / hz;
         var moving = phase is >= 2 and <= 5 && (local < .08f || local >= .3f && local < .82f);

@@ -8,7 +8,7 @@ public readonly record struct AlsRefactoredStandingHostInput(AlsRefactoredMoveme
     AlsRefactoredRestInput Rest, AlsRefactoredStandingMovementInput Details,
     AlsRefactoredQuickStopInput QuickStop, float FootPlanted, bool MovingSmooth, bool ActivatePivot = false);
 
-/// <summary>Exclusive character-owned Standing graph and Grounded action bank.
+/// <summary>Exclusive Standing graph, with a standalone or character-shared action bank.
 /// Prepare/Evaluate may run on one worker; after joining it, PostUpdateActions
 /// consumes Parent requests then main-thread notifies. Validate all before Commit.
 /// Output ends at node68, before the character's outer Transition Slot/layers.</summary>
@@ -34,6 +34,7 @@ public sealed class AlsRefactoredStandingHost
     private readonly AlsRefactoredStandingOutput _output;
     private readonly AlsMontageRuntime _bank;
     private readonly AlsTransitionQueueRuntime _queue;
+    private readonly AlsRefactoredCharacterActionRuntime? _sharedActions;
     private readonly AlsRefactoredStandingObservation[] _clocks = new AlsRefactoredStandingObservation[2], _nextClocks = new AlsRefactoredStandingObservation[2];
     private readonly AlsRefactoredMovementCacheRead[] _reads = new AlsRefactoredMovementCacheRead[6];
     private readonly int[] _initialReads = new int[5];
@@ -60,7 +61,8 @@ public sealed class AlsRefactoredStandingHost
     public int QuickStopDispatchCount { get; private set; }
     internal AlsRefactoredSourcePlayerRuntime? MovementPlayers { get { Check(); return _hasMovement ? _players : null; } }
 
-    internal AlsRefactoredStandingHost(AlsRefactoredStandingHostProfile profile, uint character, uint generation)
+    internal AlsRefactoredStandingHost(AlsRefactoredStandingHostProfile profile, uint character, uint generation,
+        AlsRefactoredCharacterActionRuntime? sharedActions = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(generation);
         _profile = profile; _character = character; _generation = generation;
@@ -75,7 +77,9 @@ public sealed class AlsRefactoredStandingHost
         _details = profile.Pose.Movement.CreateSampler(); _movementInertia = new(profile.Catalog, profile.Pose.Movement);
         _standingPose = profile.Pose.CreateRuntime(_rotate, 0); _inertia = new(profile.Catalog, profile.Pose);
         _output = new(profile.Catalog, profile.Pose, _inertia);
-        _bank = new([], sequences: profile.Assets); _queue = new(_bank, character, generation);
+        _sharedActions = sharedActions;
+        _bank = sharedActions?.Bank ?? new([], sequences: profile.Assets);
+        _queue = sharedActions?.Queue ?? new(_bank, character, generation);
         _restParent = new(profile.Montages.Settings, profile.Montages, _bank, _queue, profile.Callbacks);
         _restTraversal = new(profile.RestGraph, profile.Callbacks);
         _idle = new(profile.Catalog, profile.RestGraph, profile.Pose.Rest, profile.MontagePose);
@@ -99,7 +103,8 @@ public sealed class AlsRefactoredStandingHost
         var frame = _identity.FrameId;
         try
         {
-            _queue.Begin(_identity); _bank.Begin(_identity, context.Delta);
+            if (_sharedActions is null) { _queue.Begin(_identity); _bank.Begin(_identity, context.Delta); }
+            else _sharedActions.ValidateUpdate(context);
             _parent.Prepare(_identity, input.Movement, initializeInstance); _parent.RefreshGrounded(frame);
             if (input.ActivatePivot) _parent.ActivatePivot(frame);
             _restParent.Prepare(_identity, input.Rest, initializeInstance);
@@ -204,6 +209,11 @@ public sealed class AlsRefactoredStandingHost
 
     public void PostUpdateActions()
     {
+        if (_sharedActions is not null) throw new InvalidOperationException("Shared actions are consumed by the character coordinator.");
+        PostUpdateSharedActions();
+    }
+    internal void PostUpdateSharedActions()
+    {
         Check();
         if (_postUpdated) throw new InvalidOperationException("Standing actions already consumed.");
         try
@@ -230,6 +240,11 @@ public sealed class AlsRefactoredStandingHost
     }
     public void Commit(in AlsFrameIdentity identity)
     {
+        if (_sharedActions is not null) throw new InvalidOperationException("Shared Standing commits through the character coordinator.");
+        CommitShared(identity);
+    }
+    internal void CommitShared(in AlsFrameIdentity identity)
+    {
         ValidateCommit(identity); var frame = identity.FrameId;
         _inertia.Commit(frame); if (_poseBegun) _standingPose.Commit(frame);
         if (_hasIdle) _idle.Commit(identity);
@@ -237,14 +252,21 @@ public sealed class AlsRefactoredStandingHost
         if (_hasStop) { _stopSources.Commit(frame); _stop.Commit(frame); }
         if (_hasMovement) { _movementInertia.Commit(frame); _movement.Commit(frame); }
         _players.Commit(frame); _rotate.Commit(frame); _standing.Commit(frame); _parent.Commit(frame); _restParent.Commit(frame);
-        _queue.Commit(identity); _bank.Commit(identity); _nextClocks.CopyTo(_clocks, 0);
-        CommittedIdentity = identity; Cancel();
+        if (_sharedActions is null) { _queue.Commit(identity); _bank.Commit(identity); }
+        _nextClocks.CopyTo(_clocks, 0);
+        CommittedIdentity = identity; CancelGraph();
     }
     public void Cancel()
     {
+        if (_sharedActions is not null) _sharedActions.Discard();
+        else CancelGraph();
+    }
+    internal void CancelGraph()
+    {
         _inertia.Cancel(); _standingPose.Cancel(); _idle.Cancel(); _restTraversal.Cancel(); _traversal.Cancel();
         _stopSources.Cancel(); _stop.Cancel(); _movementInertia.Cancel(); _movement.Cancel(); _players.Cancel();
-        _rotate.Cancel(); _standing.Cancel(); _parent.Cancel(); _restParent.Cancel(); _queue.Discard(); _bank.Discard();
+        _rotate.Cancel(); _standing.Cancel(); _parent.Cancel(); _restParent.Cancel();
+        if (_sharedActions is null) { _queue.Discard(); _bank.Discard(); }
         _prepared = _evaluated = _postUpdated = _hasIdle = _hasStop = _hasMovement = _poseBegun = false; QuickStopDispatchCount = 0;
     }
     private void Check() { if (!_prepared) throw new InvalidOperationException("No Standing host candidate."); }
