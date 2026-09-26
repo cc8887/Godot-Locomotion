@@ -115,7 +115,8 @@ public sealed class AlsRefactoredCharacterActionRuntime
     public void Commit(in AlsFrameIdentity identity)
     {
         ValidateCommit(identity);
-        if(Standing.Prepared)Standing.CommitShared(identity);if(Crouching?.Prepared==true)Crouching.CommitShared(identity);
+        if(Standing.Prepared)Standing.CommitShared(identity);else Standing.CommitUnvisitedMachineWeight();
+        if(Crouching?.Prepared==true)Crouching.CommitShared(identity);
         if(Grounded?.Prepared==true)Grounded.CommitShared(identity);
         MovementParent.Commit(identity.FrameId);RestParent.Commit(identity.FrameId);
         if (Transition.Prepared) Transition.Commit(identity);

@@ -34,6 +34,8 @@ internal sealed class AlsRefactoredDemoStances
     internal int CommittedGroundedStateMask { get; private set; }
     internal long CommittedLocomotionFrames {get;private set;}
     internal int CommittedLocomotionStateMask {get;private set;}
+    internal long CommittedPivotNotifies { get; private set; }
+    internal int CommittedMovementDetailsMask { get; private set; }
     internal bool ResetGroundedEntry => _visited && SourceUpdated && _runtime!.Grounded!.ResetEntryMode;
     internal int StandingState => _standing ? _runtime!.Standing.State : -1;
     internal int CrouchingState => _crouching ? _runtime!.Crouching!.State : -1;
@@ -183,6 +185,12 @@ internal sealed class AlsRefactoredDemoStances
     {
         ValidateCommit(id);
         var groundedState=_visited&&SourceUpdated?_runtime!.Grounded!.State:-1;
+        if (_standing)
+        {
+            CommittedPivotNotifies += _runtime!.Standing.PivotDispatchCount;
+            var details = _runtime.Standing.MovementDetailsState;
+            if (details >= 0) CommittedMovementDetailsMask |= 1 << details;
+        }
         if(_visited){CommittedLocomotionFrames++;CommittedLocomotionStateMask|=1<<_host!.Graph.MainUpdate.State.CurrentState;}
         _host!.Commit(id);
         if(groundedState>=0){CommittedGroundedFrames++;CommittedGroundedStateMask|=1<<groundedState;}

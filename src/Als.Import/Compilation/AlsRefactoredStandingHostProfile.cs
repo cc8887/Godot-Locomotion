@@ -23,6 +23,7 @@ public sealed class AlsRefactoredStandingHostProfile
     internal readonly AlsRefactoredRestMontagePose MontagePose;
     internal readonly AlsRefactoredStandingActions Actions;
     internal readonly AlsRefactoredQuickStop QuickStop;
+    internal readonly AlsRefactoredPivotNotify PivotNotify;
     internal readonly AlsSequenceMontageAsset[] Assets;
     internal readonly string SlotInventory, QuickStopSettings;
     public AlsRefactoredStandingPose Pose { get; }
@@ -47,6 +48,7 @@ public sealed class AlsRefactoredStandingHostProfile
             throw new ArgumentException("Foreign Standing host resources.");
         Standing = new(machines, catalog); Details = new(catalog, new(machines, catalog));
         Direction = new(catalog, new(catalog, new(machines, catalog, false)));
+        PivotNotify = new(catalog, Direction.Graph.Resources);
         DirectionPose = new(catalog, Direction, Triangles); Movement = new(catalog, Triangles);
         Stop = new(catalog, new(machines, catalog)); RestGraph = new(catalog); Callbacks = new(catalog, false);
         var paths = restSettings.Turns.ToArray().Select(t => t.Sequence)
@@ -81,6 +83,7 @@ public sealed class AlsRefactoredStandingHostProfile
             ids.Values.Distinct().Count() != ids.Count) throw new ArgumentException("Invalid Standing character action IDs.");
         Catalog = source.Catalog; Sync = source.Sync; Triangles = source.Triangles; Standing = source.Standing;
         Details = source.Details; Direction = source.Direction; DirectionPose = source.DirectionPose; Movement = source.Movement;
+        PivotNotify = source.PivotNotify;
         MovementSettings = source.MovementSettings; Stop = source.Stop; RestGraph = source.RestGraph; Callbacks = source.Callbacks;
         SlotInventory = source.SlotInventory; QuickStopSettings = source.QuickStopSettings; Pose = source.Pose;
         Dictionary<string, int> Map(ReadOnlySpan<AlsSequenceMontageAsset> assets) =>

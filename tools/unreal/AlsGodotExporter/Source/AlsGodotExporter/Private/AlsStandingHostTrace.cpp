@@ -44,6 +44,13 @@ struct FStandingTraceInstance : UAlsLinkedAnimationInstance
 };
 struct FStandingTraceParent : UAlsAnimationInstance
 {
+    static void ResetGroundedBoundary(UAlsAnimationInstance* I)
+    {
+        // SetAnimInstanceClass may already evaluate the main graph at rest.
+        // The isolated Standing probe starts at a fresh Grounded entry; use the
+        // real initialization callback, not hand-written Parent state values.
+        (I->*&FStandingTraceParent::InitializeGrounded)();
+    }
     static void BeforeGraph(UAlsAnimationInstance* I,bool Pivot)
     {(I->*&FStandingTraceParent::RefreshGrounded)();if(Pivot)(I->*&FStandingTraceParent::ActivatePivot)();}
     static void Input(UAlsAnimationInstance* I,AAlsCharacter* C,const TSharedPtr<FJsonObject>& R)
@@ -54,6 +61,11 @@ struct FStandingTraceParent : UAlsAnimationInstance
         L.VelocityWorldSpace=Speed>0?FVector(170,100*Side,0):FVector::ZeroVector;L.AccelerationWorldSpace=FVector(200,100,0);
         L.RotationQuaternionWorldSpace=FQuat::Identity;L.RotationWorldSpace=FRotator::ZeroRotator;
         L.Speed=Speed;L.ScaleWorldSpace=1;L.VelocityYawAngleWorldSpace=55*Side;L.MaxAcceleration=1000;L.MaxBrakingDeceleration=800;
+        if(R->HasField(TEXT("heading")))
+        {
+            L.VelocityYawAngleWorldSpace=R->GetNumberField(TEXT("heading"));
+            L.VelocityWorldSpace=FVector(R->GetNumberField(TEXT("velocityX")),R->GetNumberField(TEXT("velocityY")),0);
+        }
         L.bMoving=Moving;L.bMovingSmooth=R->GetBoolField(TEXT("movingSmooth"));L.bHasInput=Moving;L.InputYawAngleWorldSpace=90;L.TargetYawAngleWorldSpace=0;
         auto& V=I->*&FStandingTraceParent::ViewState;V.RotationWorldSpace=FRotator::ZeroRotator;
         V.YawAngle=R->GetNumberField(TEXT("yaw"));V.YawSpeed=0;
@@ -96,6 +108,7 @@ bool UAlsAnimationGraphLibrary::ExportStandingHostTrace(const FString& RequestPa
     if(FPaths::IsRelative(RequestPath)||FPaths::IsRelative(OutputPath)||RequestPath==OutputPath)return StandingTraceFail(__LINE__);
     FString Text;TSharedPtr<FJsonObject> Request;
     if(!FFileHelper::LoadFileToString(Text,*RequestPath)||!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Request))return StandingTraceFail(__LINE__);
+    const bool GeneratedPivot=Request->HasField(TEXT("dispatchGeneratedPivot"))&&Request->GetBoolField(TEXT("dispatchGeneratedPivot"));
     auto* Blueprint=LoadObject<UAnimBlueprint>(nullptr,TEXT("/ALS/ALS/Character/AnimationInstances/Stances/AB_Als_Standing.AB_Als_Standing"));
     auto* Generated=Blueprint?Cast<UAnimBlueprintGeneratedClass>(Blueprint->GeneratedClass):nullptr;
     auto* ParentClass=LoadClass<UAlsAnimationInstance>(nullptr,TEXT("/ALS/ALS/Character/AB_Als.AB_Als_C"));
@@ -111,6 +124,7 @@ bool UAlsAnimationGraphLibrary::ExportStandingHostTrace(const FString& RequestPa
     if(Required.Num()!=79)return StandingTraceFail(__LINE__);
     const auto& Properties=Generated->GetAnimNodeProperties();
     if(Properties.Num()<=203||Properties[65]->Struct!=FAnimNode_StateMachine::StaticStruct())return StandingTraceFail(__LINE__);
+    if(GeneratedPivot&&(Properties[201]->Struct!=FAnimNode_StateMachine::StaticStruct()||Properties[117]->Struct!=FAnimNode_StateMachine::StaticStruct()))return StandingTraceFail(__LINE__);
     TArray<TSharedPtr<FJsonValue>> Traces;int32 Total=0;
     for(const auto& TraceValue:Request->GetArrayField(TEXT("traces")))
     {
@@ -118,6 +132,7 @@ bool UAlsAnimationGraphLibrary::ExportStandingHostTrace(const FString& RequestPa
         Character->SetActorTickEnabled(false);auto* Component=Character->GetMesh();Component->SetRelativeTransform(FTransform::Identity);
         Component->SetSkeletalMesh(Mesh);Component->SetAnimInstanceClass(ParentClass);
         auto* Parent=Cast<UAlsAnimationInstance>(Component->GetAnimInstance());if(!Parent)return StandingTraceFail(__LINE__);
+        if(GeneratedPivot)FStandingTraceParent::ResetGroundedBoundary(Parent);
         TStrongObjectPtr<UAlsLinkedAnimationInstance> Instance(NewObject<UAlsLinkedAnimationInstance>(Component,Generated));
         Instance->InitializeAnimation(true);FStandingTraceInstance::ParentTo(Instance.Get(),Parent);
         auto& Proxy=FStandingTraceInstance::Proxy(Instance.Get());
@@ -143,6 +158,11 @@ bool UAlsAnimationGraphLibrary::ExportStandingHostTrace(const FString& RequestPa
                 FStandingTraceParent::BeforeGraph(Parent,Input->GetBoolField(TEXT("pivot")));
                 FStandingTraceProxy::UpdateRoot(Proxy);Proxy.FlipBufferWriteIndex();
                 Row->SetObjectField(TEXT("parent"),FStandingTraceParent::State(Parent));Row->SetNumberField(TEXT("state"),Machine->GetCurrentState());
+                if(GeneratedPivot)
+                {
+                    Row->SetNumberField(TEXT("directionState"),Properties[201]->ContainerPtrToValuePtr<FAnimNode_StateMachine>(Instance.Get())->GetCurrentState());
+                    Row->SetNumberField(TEXT("detailsState"),Properties[117]->ContainerPtrToValuePtr<FAnimNode_StateMachine>(Instance.Get())->GetCurrentState());
+                }
                 TArray<TSharedPtr<FJsonValue>> Players;
                 for(int32 Index=0;Index<Properties.Num();++Index)
                 {
@@ -168,11 +188,21 @@ bool UAlsAnimationGraphLibrary::ExportStandingHostTrace(const FString& RequestPa
             }).Get();
             Instance->NotifyQueue.AnimNotifies.Reset();Instance->NotifyQueue.UnfilteredMontageAnimNotifies.Reset();
             FStandingTraceProxy::Post(Proxy,Instance.Get());Parent->NativePostUpdateAnimation();
-            int32 Quick=0;
+            int32 Quick=0,Pivot=0;
             for(const auto& Event:Instance->NotifyQueue.AnimNotifies)if(const auto* Notify=Event.GetNotify())
+            {
                 if(Notify->NotifyName==TEXT("StopQuick"))++Quick;
+                if(GeneratedPivot&&(Notify->NotifyName==TEXT("ActivatePivot")||Notify->NotifyName==TEXT("StopQuick")))
+                {
+                    auto* NotifyFunction=Instance->FindFunction(FName(*FString::Printf(TEXT("AnimNotify_%s"),*Notify->NotifyName.ToString())));
+                    if(!NotifyFunction)return StandingTraceFail(__LINE__);
+                    Instance->ProcessEvent(NotifyFunction,nullptr);
+                    if(Notify->NotifyName==TEXT("ActivatePivot"))++Pivot;
+                }
+            }
             auto* Function=Instance->FindFunction(TEXT("AnimNotify_StopQuick"));if(!Function)return StandingTraceFail(__LINE__);
-            for(int32 I=0;I<Quick;++I)Instance->ProcessEvent(Function,nullptr);
+            if(!GeneratedPivot)for(int32 I=0;I<Quick;++I)Instance->ProcessEvent(Function,nullptr);
+            if(GeneratedPivot)Row->SetNumberField(TEXT("pivotNotifies"),Pivot);
             Row->SetNumberField(TEXT("quick"),Quick);Row->SetObjectField(TEXT("postParent"),FStandingTraceParent::State(Parent));
             TArray<TSharedPtr<FJsonValue>> Montages;
             for(const auto* I:Parent->MontageInstances)
