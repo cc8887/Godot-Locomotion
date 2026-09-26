@@ -37,7 +37,7 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
 {
     private readonly AlsRefactoredLocomotionPoseProfile _p;
     private readonly AlsRefactoredLocomotionRuntime _main,_jump;
-    private readonly AlsRefactoredSourcePlayerRuntime _players;
+    private readonly IAlsRefactoredSourcePlayers _players;
     private readonly AlsRefactoredBlendEvaluatorRuntime[] _lean;
     private readonly AlsRefactoredPoseInertia _outer,_inner;
     private readonly AlsPoseCacheTraversal _cache;
@@ -71,10 +71,12 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
     public float Alpha(int node){Check();if(!_updated[node])throw new ArgumentException("Node was not traversed.");return _alpha[node];}
 
     public AlsRefactoredLocomotionPoseRuntime(AlsRefactoredLocomotionPoseProfile profile,AlsRefactoredSyncBank sync)
+        :this(profile,sync,null){}
+    internal AlsRefactoredLocomotionPoseRuntime(AlsRefactoredLocomotionPoseProfile profile,AlsRefactoredSyncBank sync,AlsRefactoredSourceSyncScope? sources)
     {
         _p=profile;_main=new(profile.Main);_jump=new(profile.Jump);_cache=new(profile.Caches,16);
         var groups=new Dictionary<string,int>{{"Fall",0},{"Jump",1},{"Flail",2},{"Land",3},{"None",-1}};
-        _players=new(profile.Catalog,sync,new Dictionary<string,AlsRefactoredTriangulationProfile>(),profile.Players.ToArray().Select((p,i)=>
+        _players=sources?.CreateView(AlsRefactoredLocomotionSourceOwner.Locomotion)??new AlsRefactoredSourcePlayerRuntime(profile.Catalog,sync,new Dictionary<string,AlsRefactoredTriangulationProfile>(),profile.Players.ToArray().Select((p,i)=>
             new AlsRefactoredSourcePlayerDefinition(i,p.Source,groups[p.Group],p.Start,p.Loop)));
         _lean=[new(profile.Lean),new(profile.Lean)];_outer=new(profile.BoneNames.Length,profile.CurveNames,"RotationYawSpeed");_inner=new(profile.BoneNames.Length,profile.CurveNames);
         _pose=Enumerable.Range(0,84).Select(_=>new AlsPrecisePose[profile.BoneNames.Length]).ToArray();
@@ -101,20 +103,26 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
         _tickCount=0;GroundedUpdated=false;_nextGroundedInitialized=!initialize&&_groundedInitialized;_prepared=true;_evaluated=_faulted=false;
         try
         {
+            _players.BeginRegistration(initialize);
             if(initialize||!_counter.HasUpdated)Initialize(0);
             _cache.Begin(context.Identity);Update(0,context);_cache.Drain(this);
             _players.Prepare(context.Identity.FrameId,_ticks.AsSpan(0,_tickCount),context.Delta,initialize);
-            foreach(var tick in _ticks.AsSpan(0,_tickCount))
-            {
-                var property=_p.Players[tick.PlayerId].PropertyIndex;var time=-1f;
-                foreach(var player in _players.Players)if(player.PlayerId==tick.PlayerId)time=player.Time;
-                Require(time>=0,"Missing Locomotion source clock.");
-                for(var i=0;i<4;i++)
-                {if(_nextMainClocks[i].PropertyIndex==property)_nextMainClocks[i]=new(property,tick.Weight,time);
-                    if(_nextJumpClocks[i].PropertyIndex==property)_nextJumpClocks[i]=new(property,tick.Weight,time);}
-            }
+            if(!_players.Deferred)CompleteSources();
         }
         catch{Cancel();throw;}
+    }
+    internal void CompleteSources()
+    {
+        Check();
+        foreach(var tick in _ticks.AsSpan(0,_tickCount))
+        {
+            var property=_p.Players[tick.PlayerId].PropertyIndex;var time=-1f;
+            foreach(var player in _players.Players)if(player.PlayerId==tick.PlayerId)time=player.Time;
+            Require(time>=0,"Missing Locomotion source clock.");
+            for(var i=0;i<4;i++)
+            {if(_nextMainClocks[i].PropertyIndex==property)_nextMainClocks[i]=new(property,tick.Weight,time);
+                if(_nextJumpClocks[i].PropertyIndex==property)_nextJumpClocks[i]=new(property,tick.Weight,time);}
+        }
     }
     private void Initialize(int id)
     {
@@ -154,6 +162,7 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
                 break;
             case AlsRefactoredLocomotionPoseKind.Player:
                 var p=_p.Players[n.A];_ticks[_tickCount]=new(n.A,default,p.JumpRate?input.JumpRate:p.Rate,context.Weight,reset,p.Start,context.InertializationSync,p.Loop);
+                _players.Register(_ticks[_tickCount],context);
                 _tickContexts[_tickCount++]=context;break;
             case AlsRefactoredLocomotionPoseKind.Frame:break;
             case AlsRefactoredLocomotionPoseKind.Lean:_lean[n.A].Prepare(frame,input.Lean,context.Delta,0,reset);break;

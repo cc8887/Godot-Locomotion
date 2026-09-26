@@ -28,7 +28,7 @@ public sealed class AlsRefactoredStandingPose
         _curves = layouts.SelectMany(c => c).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         _maps = layouts.Select(c => c.Select(n => Array.FindIndex(_curves,s => s.Equals(n,StringComparison.OrdinalIgnoreCase))).ToArray()).ToArray();
     }
-    public Runtime CreateRuntime(AlsRefactoredSourcePlayerRuntime rotatePlayers, int firstRotatePlayer) => new(this,rotatePlayers,firstRotatePlayer);
+    public Runtime CreateRuntime(IAlsRefactoredSourcePlayers rotatePlayers, int firstRotatePlayer) => new(this,rotatePlayers,firstRotatePlayer);
 
     public sealed class Runtime
     {
@@ -48,7 +48,7 @@ public sealed class AlsRefactoredStandingPose
         public int StateEvaluations { get; private set; }
         public ReadOnlySpan<AlsPrecisePose> Pose => _prepared && _evaluated ? _pose : throw new InvalidOperationException("Standing pose unavailable.");
         public ReadOnlySpan<AlsInertialCurve> Curves => _prepared && _evaluated ? _curves : throw new InvalidOperationException("Standing curves unavailable.");
-        internal Runtime(AlsRefactoredStandingPose profile, AlsRefactoredSourcePlayerRuntime rotatePlayers, int first)
+        internal Runtime(AlsRefactoredStandingPose profile, IAlsRefactoredSourcePlayers rotatePlayers, int first)
         {
             Profile = profile; _rotate = profile.Rest.BindRotate(rotatePlayers,first); _stop = profile.Stop.CreateSampler();
             _pose = new AlsPrecisePose[profile._bones.Length]; _curves = new AlsInertialCurve[profile._curves.Length];

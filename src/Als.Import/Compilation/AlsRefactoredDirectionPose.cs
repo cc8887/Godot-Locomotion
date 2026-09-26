@@ -74,7 +74,7 @@ public sealed class AlsRefactoredDirectionPose
             _sprintCurves = new AlsInertialCurve[profile._curves.Length]; _gaitCurves = new AlsInertialCurve[_sprintCurves.Length]; _resultCurves = new AlsInertialCurve[_sprintCurves.Length];
         }
         public void Sample(long frame, AlsRefactoredDirectionRuntime machine, AlsRefactoredDirectionSourceRuntime update,
-            AlsRefactoredSourcePlayerRuntime players, Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
+            IAlsRefactoredSourcePlayers players, Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
         {
             if (!ReferenceEquals(update.Profile, _profile.Source) || players.CatalogDigest != _profile.Source.Graph.Resources.CatalogDigest ||
                 pose.Length != _result.Length || curves.Length != _resultCurves.Length) throw new ArgumentException("Invalid direction pose owner/layout.");

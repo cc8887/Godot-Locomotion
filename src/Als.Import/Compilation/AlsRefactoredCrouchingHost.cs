@@ -14,7 +14,7 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
     private readonly AlsRefactoredDirectionRuntime _direction;
     private readonly AlsRefactoredDirectionSourceRuntime _sources;
     private readonly AlsRefactoredDirectionPose.Sampler _directionPose;
-    private readonly AlsRefactoredSourcePlayerRuntime _players,_rotate;
+    private readonly IAlsRefactoredSourcePlayers _players,_rotate;
     private readonly AlsRefactoredMovementParentRuntime _parent;
     private readonly AlsRefactoredRestParentRuntime _rest;
     private readonly AlsRefactoredStandingRestTraversal _restTraversal;
@@ -58,8 +58,9 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
         ArgumentOutOfRangeException.ThrowIfZero(generation); _p=profile; _character=character; _generation=generation; _shared=shared;
         var s=profile.Shared; _machine=new(profile.Machine); _direction=new(profile.Direction.Graph.Resources);
         _sources=new(profile.Direction,0); _directionPose=profile.DirectionPose.CreateSampler();
-        _players=new(s.Catalog,s.Sync,s.Triangles,profile.Direction.Players.Bind(0,new Dictionary<string,int>{{"Movement",0}}));
-        _rotate=new(s.Catalog,s.Sync,s.Triangles,profile.Machine.RotatePlayers.Bind(0));
+        _players=shared?.Sources?.CreateView(AlsRefactoredLocomotionSourceOwner.CrouchingMovement)??new AlsRefactoredSourcePlayerRuntime(s.Catalog,s.Sync,s.Triangles,profile.Direction.Players.Bind(0,new Dictionary<string,int>{{"Movement",0}}));
+        _rotate=shared?.Sources?.CreateView(AlsRefactoredLocomotionSourceOwner.CrouchingRotate)??new AlsRefactoredSourcePlayerRuntime(s.Catalog,s.Sync,s.Triangles,profile.Machine.RotatePlayers.Bind(0));
+        _sources.Registration=_players;
         _bank=shared?.Bank??new([],sequences:s.Assets); _queue=shared?.Queue??new(_bank,character,generation);
         _parent=shared?.MovementParent??new(profile.Callbacks,s.MovementSettings); _rest=shared?.RestParent??new(s.Montages.Settings,s.Montages,_bank,_queue,profile.Callbacks);
         _restTraversal=new(profile.RestGraph,profile.Callbacks); _callbacks=new(profile.Callbacks);
@@ -82,6 +83,7 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
         _context=context; _identity=context.Identity; _input=input; _initialization=initialization; _initialize=initialize; var frame=_identity.FrameId;
         try
         {
+            _players.BeginRegistration(initialize);_rotate.BeginRegistration(initialize);
             if(_shared is null){_queue.Begin(_identity);_bank.Begin(_identity,context.Delta);}else _shared.ValidateUpdate(context);
             if(_shared is not null)_shared.PrepareParents(context,input,initialize);
             else{_parent.Prepare(_identity,input.Movement,initialize); _parent.RefreshGrounded(frame); _rest.Prepare(_identity,input.Rest,initialize);}
@@ -101,7 +103,9 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
                     case 0: _hasIdle=true; _restTraversal.BeginIdle(frame); _idle.Prepare(_bank.Frame,path,initialize||reset); _restTraversal.CompleteIdle(frame); break;
                     case 1: _cache.Use(23,path); break;
                     case 4: _cache.Use(11,path); break;
-                    default: _rotateInputs[rotateCount++]=_p.Machine.RotatePlayers.Input(0,state.State-2,rotate.PlayRate,rotate.Left,rotate.Right,state.Weight,reset); break;
+                    default:
+                        _rotateInputs[rotateCount++]=_p.Machine.RotatePlayers.Input(0,state.State-2,rotate.PlayRate,rotate.Left,rotate.Right,state.Weight,reset) with { RequestedInertialization=path.InertializationSync };
+                        _rotate.Register(_rotateInputs[rotateCount-1],path);break;
                 }
             }
             _restTraversal.Complete(frame); _cache.Drain(this); _callbacks.ValidateCommit(frame);
@@ -113,9 +117,8 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
             if(_hasIdle&&_bank.Frame.TryGetInertializationRequest(_p.Shared.Montages.HostGroupId,out var slot))_inertia.Request(slot.Duration);
             _clocks.CopyTo(_nextClocks,0);
             for(var i=0;i<2;i++) if(initialize||(update.ClearCachedWeightStates&(1<<(2+i)))!=0)_nextClocks[i]=new(_p.Machine.RotatePlayers.Players[i].PropertyIndex,0,0,false);
-            foreach(var tick in _rotate.Ticks) foreach(var player in _rotate.Players) if(tick.PlayerId==player.PlayerId)
-                _nextClocks[tick.PlayerId]=new(_p.Machine.RotatePlayers.Players[tick.PlayerId].PropertyIndex,tick.Weight,player.Time,tick.Looping);
             _prepared=true;
+            if(!_players.Deferred)CompleteSources();
         }
         catch {Cancel();throw;}
     }
@@ -138,6 +141,12 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
         }
         _lean.Prepare(frame,_parent.MovementCandidate.Lean,context.Delta,0,reset);
         _callbacks.Leave(frame,109); _callbacks.Leave(frame,44); _nextMovementCounter=context.UpdateCounter!.Value;
+    }
+    internal void CompleteSources()
+    {
+        Check();
+        foreach(var tick in _rotate.Ticks) foreach(var player in _rotate.Players) if(tick.PlayerId==player.PlayerId)
+            _nextClocks[tick.PlayerId]=new(_p.Machine.RotatePlayers.Players[tick.PlayerId].PropertyIndex,tick.Weight,player.Time,tick.Looping);
     }
     void IAlsPoseCacheUpdateSink.OnCachedUpdatesSkipped(int handler,ReadOnlySpan<AlsPoseUpdateContext> skipped)
     { if(handler!=34)throw new ArgumentException("Foreign Crouching skipped-update handler."); }

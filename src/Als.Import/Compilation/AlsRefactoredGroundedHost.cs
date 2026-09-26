@@ -10,7 +10,7 @@ public sealed class AlsRefactoredGroundedHost : IAlsPoseCacheUpdateSink
     private readonly AlsRefactoredGroundedHostProfile _g;
     private readonly AlsRefactoredCharacterActionRuntime _owner;
     private readonly AlsRefactoredGroundedRuntime _machine;
-    private readonly AlsRefactoredSourcePlayerRuntime _players;
+    private readonly IAlsRefactoredSourcePlayers _players;
     private readonly AlsPoseCacheTraversal _cache;
     private readonly AlsRefactoredPoseInertia _inertia;
     private readonly AlsRefactoredGroundedObservation[] _clocks=new AlsRefactoredGroundedObservation[2],_nextClocks=new AlsRefactoredGroundedObservation[2];
@@ -40,7 +40,7 @@ public sealed class AlsRefactoredGroundedHost : IAlsPoseCacheUpdateSink
     internal AlsRefactoredGroundedHost(AlsRefactoredCharacterActionProfile profile,AlsRefactoredCharacterActionRuntime owner)
     {
         _p=profile;_g=profile.Grounded!;_owner=owner;_machine=new(_g.Machine);
-        _players=new(profile.Standing.Catalog,profile.Standing.Sync,profile.Standing.Triangles,
+        _players=owner.Sources?.CreateView(AlsRefactoredLocomotionSourceOwner.Grounded)??new AlsRefactoredSourcePlayerRuntime(profile.Standing.Catalog,profile.Standing.Sync,profile.Standing.Triangles,
             _g.Machine.Players.ToArray().Select((p,i)=>new AlsRefactoredSourcePlayerDefinition(i,p.Source,-1,Looping:false)));
         _cache=new(_g.Caches,16);_inertia=new(profile.BoneNames.Length,profile.CurveNames);
         _states=Enumerable.Range(0,6).Select(_=>new AlsPrecisePose[profile.BoneNames.Length]).ToArray();
@@ -61,6 +61,7 @@ public sealed class AlsRefactoredGroundedHost : IAlsPoseCacheUpdateSink
         var frame=_identity.FrameId;_nextCounter=context.UpdateCounter.Value;
         try
         {
+            _players.BeginRegistration(initialize);
             _owner.PrepareParents(context,input,initialize);
             var reentry=initialize||!_counter.HasUpdated||!_counter.WasSynchronizedCounter(_nextCounter);
             if(reentry)_owner.MovementParent.InitializeGrounded(frame);
@@ -89,18 +90,24 @@ public sealed class AlsRefactoredGroundedHost : IAlsPoseCacheUpdateSink
                     case 1:_cache.Use(39,path);break;
                     case 2:_cache.Use(36,path);break;
                     case 3:case 4:
-                        var i=state.State-3;_ticks[count++]=new(i,default,_g.Machine.Players[i].Rate,state.Weight,reset,Looping:false);break;
+                        var i=state.State-3;_ticks[count++]=new(i,default,_g.Machine.Players[i].Rate,state.Weight,reset,RequestedInertialization:path.InertializationSync,Looping:false);
+                        _players.Register(_ticks[count-1],path);break;
                 }
             }
             _cache.Drain(this);_players.Prepare(frame,_ticks.AsSpan(0,count),context.Delta,initialize);
             _inertia.Prepare(context,initialize);if(_machine.InertializationRequest is {} request)_inertia.Request(request.Duration);
             _clocks.CopyTo(_nextClocks,0);
             for(var i=0;i<2;i++)if(initialize||(update.ClearCachedWeightStates&(1<<(i+3)))!=0)_nextClocks[i]=new(_g.Machine.Players[i].PropertyIndex,0,0);
-            foreach(var tick in _players.Ticks)foreach(var player in _players.Players)if(tick.PlayerId==player.PlayerId)
-                _nextClocks[tick.PlayerId]=new(_g.Machine.Players[tick.PlayerId].PropertyIndex,tick.Weight,player.Time);
             _prepared=true;
+            if(!_players.Deferred)CompleteSources();
         }
         catch{_owner.Discard();throw;}
+    }
+    internal void CompleteSources()
+    {
+        Check();
+        foreach(var tick in _players.Ticks)foreach(var player in _players.Players)if(tick.PlayerId==player.PlayerId)
+            _nextClocks[tick.PlayerId]=new(_g.Machine.Players[tick.PlayerId].PropertyIndex,tick.Weight,player.Time);
     }
     void IAlsPoseCacheUpdateSink.UpdateCachedSource(int cache,in AlsPoseUpdateContext context)
     {
