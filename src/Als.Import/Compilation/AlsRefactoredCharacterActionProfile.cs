@@ -5,7 +5,8 @@ using GodotAls.Core.Locomotion;
 namespace GodotAls.Import.Compilation;
 
 /// <summary>Character Grounded action resources shared by Standing and weapon producers.
-/// Authored Mantle/Roll actions and the complete locomotion graph remain separate bindings.</summary>
+/// Optional Grounded owns stance clips and the fixed Roll pose. Authored moving
+/// Mantle/Roll actions and the complete locomotion graph remain separate bindings.</summary>
 public sealed class AlsRefactoredCharacterActionProfile
 {
     private readonly AlsSequenceMontageAsset[] _assets;
@@ -14,6 +15,7 @@ public sealed class AlsRefactoredCharacterActionProfile
     internal readonly AlsPrecisePose[] Reference;
     public AlsRefactoredStandingHostProfile Standing { get; }
     public AlsRefactoredCrouchingHostProfile? Crouching { get; }
+    public AlsRefactoredGroundedHostProfile? Grounded { get; }
     public AlsRefactoredTransitionMontages Weapons { get; }
     public AlsRefactoredTransitionSlotGraph Transition { get; }
     public IReadOnlyDictionary<string, int> AnimationIds { get; }
@@ -26,7 +28,7 @@ public sealed class AlsRefactoredCharacterActionProfile
 
     public AlsRefactoredCharacterActionProfile(AlsRefactoredStandingHostProfile standing,
         IReadOnlyList<AlsRefactoredWeaponNotifyProfile> weapons, IReadOnlyDictionary<string, int> animationIds, int groundedGroupId,
-        string? stanceMachines = null, AlsRefactoredSkeletonCurves? metadata = null)
+        string? stanceMachines = null, AlsRefactoredSkeletonCurves? metadata = null, string? locomotionMachines = null)
     {
         var standingPaths = standing.ActionAssets.ToArray().Select(a => standing.ActionSource(a.AnimationId)).ToArray();
         var weaponPaths = weapons.SelectMany(w => w.Bindings.ToArray()).Select(b => b.Sequence).Distinct(StringComparer.Ordinal).ToArray();
@@ -37,13 +39,18 @@ public sealed class AlsRefactoredCharacterActionProfile
         AnimationIds = new ReadOnlyDictionary<string, int>(ids); _paths = ids.ToDictionary(p => p.Value, p => p.Key);
         Standing = standing.BindActions(standingPaths.ToDictionary(p => p, p => ids[p]), groundedGroupId);
         if(stanceMachines is not null) Crouching=new(Standing,stanceMachines,metadata??throw new ArgumentException("Crouching requires skeleton metadata."));
+        if(locomotionMachines is not null)
+        {
+            if(Crouching is null)throw new ArgumentException("Grounded requires both stance profiles.");
+            Grounded=new(Standing,locomotionMachines);
+        }
         Weapons = new(standing.Catalog, standing.SlotInventory, weapons, weaponPaths.ToDictionary(p => p, p => ids[p]), groundedGroupId);
         _assets = Standing.ActionAssets.ToArray().Concat(Weapons.Assets.ToArray()).Distinct().OrderBy(a => a.AnimationId).ToArray();
         if (_assets.Select(a => a.AnimationId).Distinct().Count() != _assets.Length)
             throw new ArgumentException("Action producers disagree about a shared sequence policy.");
         Transition = new(standing.Catalog);
         Samples = new(standing.Catalog, CatalogDigest, _assets, SourcePath,
-            Standing.Pose.CurveNames.ToArray().Concat(Crouching?.CurveNames.ToArray()??[]).Append("PoseStanding").Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+            Standing.Pose.CurveNames.ToArray().Concat(Crouching?.CurveNames.ToArray()??[]).Concat(Grounded?.CurveNames.ToArray()??[]).Append("PoseStanding").Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
         Reference = standing.Catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence).ReferencePose.ToArray();
         if (!BoneNames.SequenceEqual(standing.Pose.BoneNames) || !Parents.SequenceEqual(standing.Pose.Rest.Parents))
             throw new ArgumentException("Foreign character action skeleton.");

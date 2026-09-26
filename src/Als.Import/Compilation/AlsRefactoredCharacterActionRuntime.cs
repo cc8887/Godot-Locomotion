@@ -5,8 +5,8 @@ using GodotAls.Core.Locomotion;
 namespace GodotAls.Import.Compilation;
 
 /// <summary>One physical Grounded bank/queue and atomic frame coordinator.
-/// Caller traverses Standing and supplies the Grounded pose to Transition;
-/// this object does not stand in for the missing Grounded/Locomotion graph.</summary>
+/// Caller traverses the optional original Grounded host (or isolated stances)
+/// and supplies its pose to Transition. Locomotion remains an outer consumer.</summary>
 public sealed class AlsRefactoredCharacterActionRuntime
 {
     internal readonly AlsMontageRuntime Bank;
@@ -22,6 +22,7 @@ public sealed class AlsRefactoredCharacterActionRuntime
     private bool _prepared, _postUpdated, _globalFrame;
     public AlsRefactoredStandingHost Standing { get; }
     public AlsRefactoredCrouchingHost? Crouching { get; }
+    public AlsRefactoredGroundedHost? Grounded { get; }
     public AlsRefactoredTransitionSlot Transition { get; }
     public AlsFrameIdentity CommittedIdentity { get; private set; }
     public AlsMontageFrame Frame { get { Check(); return Bank.Frame; } }
@@ -39,6 +40,7 @@ public sealed class AlsRefactoredCharacterActionRuntime
             profile.Crouching is null?[profile.Standing.Callbacks]:[profile.Standing.Callbacks,profile.Crouching.Callbacks]);
         Standing = new(profile.Standing, character, generation, this); Transition = new(profile, this);
         if(profile.Crouching is not null)Crouching=new(profile.Crouching,character,generation,this);
+        if(profile.Grounded is not null)Grounded=new(profile,this);
     }
     public void Begin(in AlsFrameIdentity identity, float delta)
     {
@@ -68,7 +70,10 @@ public sealed class AlsRefactoredCharacterActionRuntime
         ValidateUpdate(context);
         if(_parentsPrepared)
         {if(input.Movement!=_parentInput.Movement||input.Rest!=_parentInput.Rest)throw new ArgumentException("Stance children received different Parent inputs.");return;}
-        MovementParent.Prepare(context.Identity,input.Movement,initialize);MovementParent.RefreshGrounded(context.Identity.FrameId);
+        MovementParent.Prepare(context.Identity,input.Movement,initialize);
+        // With the original outer graph, Grounded refresh belongs to node5 and
+        // only runs when that graph is traversed, after node44 initialization.
+        if(Grounded is null)MovementParent.RefreshGrounded(context.Identity.FrameId);
         if(input.ActivatePivot)MovementParent.ActivatePivot(context.Identity.FrameId);
         RestParent.Prepare(context.Identity,input.Rest,initialize);_parentInput=input;_parentsPrepared=true;
     }
@@ -102,6 +107,7 @@ public sealed class AlsRefactoredCharacterActionRuntime
         Check(); if (identity != _identity || !_postUpdated) throw new ArgumentException("Incomplete character action frame.");
         if(!_globalFrame&&!Standing.Prepared&&Crouching?.Prepared!=true)throw new ArgumentException("No stance updated.");
         if(Standing.Prepared)Standing.ValidateCommit(identity);if(Crouching?.Prepared==true)Crouching.ValidateCommit(identity);
+        if(Grounded?.Prepared==true)Grounded.ValidateCommit(identity);
         MovementParent.ValidateCommit(identity.FrameId);RestParent.ValidateCommit(identity.FrameId);
         if (!_globalFrame || Transition.Prepared) Transition.ValidateCommit(identity);
         Queue.ValidateCommit(identity); Bank.ValidateCommit(identity);
@@ -110,12 +116,13 @@ public sealed class AlsRefactoredCharacterActionRuntime
     {
         ValidateCommit(identity);
         if(Standing.Prepared)Standing.CommitShared(identity);if(Crouching?.Prepared==true)Crouching.CommitShared(identity);
+        if(Grounded?.Prepared==true)Grounded.CommitShared(identity);
         MovementParent.Commit(identity.FrameId);RestParent.Commit(identity.FrameId);
         if (Transition.Prepared) Transition.Commit(identity);
         Queue.Commit(identity); Bank.Commit(identity);
         CommittedIdentity = identity; _prepared = _postUpdated = _parentsPrepared = _globalFrame = false;
     }
     public void Discard()
-    { Standing.CancelGraph();Crouching?.CancelGraph();MovementParent.Cancel();RestParent.Cancel(); Transition.Cancel(); Queue.Discard(); Bank.Discard(); _prepared = _postUpdated = _parentsPrepared = _globalFrame = false; }
+    { Grounded?.CancelGraph();Standing.CancelGraph();Crouching?.CancelGraph();MovementParent.Cancel();RestParent.Cancel(); Transition.Cancel(); Queue.Discard(); Bank.Discard(); _prepared = _postUpdated = _parentsPrepared = _globalFrame = false; }
     private void Check() { if (!_prepared) throw new InvalidOperationException("No character action candidate."); }
 }

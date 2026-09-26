@@ -203,7 +203,8 @@ internal sealed class AlsGroundedFrameRuntime : IDisposable, IAlsMainGroundedCac
             _prepared = _standing.ConsumeSharedUpdate(_committedStanding, _result, _inputs.Delta, _inputs.AnimatedSpeeds,
                 _movement, _update.Standing, _observed.Rotation, _inputs.StandingSlot, _inputs.GlobalInput, _inputs.GlobalControl, _inputs.InputFeedback,
                 _inputs.Initialization);
-            RefactoredStances?.Prepare(_update, _inputs.Initialization);
+            RefactoredStances?.Prepare(_update, _inputs.Initialization, rules.FromRoll);
+            if(RefactoredStances is not null)ResetGroundedEntry=RefactoredStances.ResetGroundedEntry;
             _phase = Phase.Updated;
         }
         catch { _phase = Phase.Faulted; throw; }
