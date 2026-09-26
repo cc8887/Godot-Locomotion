@@ -3,7 +3,7 @@ using GodotAls.Core.Contracts;
 
 namespace GodotAls.Core.Locomotion;
 
-public enum AlsGroundedMachineKind : byte { Main, Standing, Stop, Crouching, CrouchingDirection, CrouchingCycles, MainMovement, Jump, Ragdoll, RefactoredStandingDirection, RefactoredCrouchingDirection, RefactoredMovementDetails, RefactoredStanding, RefactoredStop }
+public enum AlsGroundedMachineKind : byte { Main, Standing, Stop, Crouching, CrouchingDirection, CrouchingCycles, MainMovement, Jump, Ragdoll, RefactoredStandingDirection, RefactoredCrouchingDirection, RefactoredMovementDetails, RefactoredStanding, RefactoredStop, RefactoredCrouching }
 public enum AlsMovementStateInput : byte { None, Grounded, InAir, Ragdoll, Mantling }
 public enum AlsGroundedBlendProfile : byte { None, QuickFeet, ChangeDirection }
 public enum AlsGroundedCondition : byte
@@ -30,6 +30,7 @@ public readonly record struct AlsGroundedEdge(int From, int To, AlsGroundedCondi
     public AlsRefactoredMovementDetailsRule? RefactoredMovementDetailsRule { get; init; }
     public AlsRefactoredStandingRule? RefactoredStandingRule { get; init; }
     public AlsRefactoredStopRule? RefactoredStopRule { get; init; }
+    public AlsRefactoredCrouchingRule? RefactoredCrouchingRule { get; init; }
 }
 
 public sealed class AlsGroundedMachineDefinition
@@ -44,6 +45,7 @@ public sealed class AlsGroundedMachineDefinition
     public bool UsesRefactoredMovementDetailsRules => Kind == AlsGroundedMachineKind.RefactoredMovementDetails;
     public bool UsesRefactoredStandingRules => Kind == AlsGroundedMachineKind.RefactoredStanding;
     public bool UsesRefactoredStopRules => Kind == AlsGroundedMachineKind.RefactoredStop;
+    public bool UsesRefactoredCrouchingRules => Kind == AlsGroundedMachineKind.RefactoredCrouching;
     public ReadOnlySpan<AlsGroundedStateDefinition> States => _states;
     public ReadOnlySpan<AlsGroundedEdge> Edges => _edges;
 
@@ -54,7 +56,8 @@ public sealed class AlsGroundedMachineDefinition
         var details = kind == AlsGroundedMachineKind.RefactoredMovementDetails;
         var standing = kind == AlsGroundedMachineKind.RefactoredStanding;
         var stop = kind == AlsGroundedMachineKind.RefactoredStop;
-        if ((uint)kind > (uint)AlsGroundedMachineKind.RefactoredStop || states.Length is < 1 or > 8 || (uint)initialState >= states.Length ||
+        var crouching = kind == AlsGroundedMachineKind.RefactoredCrouching;
+        if ((uint)kind > (uint)AlsGroundedMachineKind.RefactoredCrouching || states.Length is < 1 or > 8 || (uint)initialState >= states.Length ||
             states[initialState].Conduit || maxTransitions is < 1 or > 3)
             throw new ArgumentException("Invalid grounded machine policy.");
         if (direction && (states.Length != 6 || initialState != 0 || maxTransitions != 3 || !skipFirstBlend || states.Any(s => s.Conduit)))
@@ -65,6 +68,8 @@ public sealed class AlsGroundedMachineDefinition
             throw new ArgumentException("Invalid Refactored Standing policy.");
         if (stop && (states.Length != 5 || initialState != 0 || maxTransitions != 3 || skipFirstBlend || states.Any(s => s.Conduit)))
             throw new ArgumentException("Invalid Refactored Stop policy.");
+        if (crouching && (states.Length != 5 || initialState != 0 || maxTransitions != 3 || !skipFirstBlend || states.Any(s => s.Conduit)))
+            throw new ArgumentException("Invalid Refactored Crouching policy.");
         var nextExit = 0;
         for (var i = 0; i < states.Length; i++)
         {
@@ -111,6 +116,11 @@ public sealed class AlsGroundedMachineDefinition
                     (!Enum.IsDefined(edge.RefactoredStopRule!.Value) || edge.Blend != AlsTransitionBlend.HermiteCubic ||
                      edge.BlendProfile != AlsGroundedBlendProfile.None || edge.Inertialization || edge.Condition != AlsGroundedCondition.Never))
                     throw new ArgumentException("Mixed Stop rule domains.");
+                if (edge.RefactoredCrouchingRule.HasValue != crouching || crouching &&
+                    (!Enum.IsDefined(edge.RefactoredCrouchingRule!.Value) || edge.Blend != AlsTransitionBlend.HermiteCubic ||
+                     edge.BlendProfile != (edge.RefactoredCrouchingRule == AlsRefactoredCrouchingRule.StopFull ? AlsGroundedBlendProfile.QuickFeet : AlsGroundedBlendProfile.None) ||
+                     edge.Condition != (edge.RefactoredCrouchingRule == AlsRefactoredCrouchingRule.Automatic ? AlsGroundedCondition.Automatic : AlsGroundedCondition.Never)))
+                    throw new ArgumentException("Mixed Crouching rule domains.");
             }
         }
         if (nextExit != edges.Length) throw new ArgumentException("Unowned grounded transition.");
@@ -223,7 +233,7 @@ public static class AlsGroundedStateMachine
         Func<float, float>? changeStanceCurve = null, AlsGraphTraversalCounter? updateCounter = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        if (definition.UsesRefactoredDirectionRules || definition.UsesRefactoredMovementDetailsRules || definition.UsesRefactoredStandingRules || definition.UsesRefactoredStopRules) throw new ArgumentException("Refactored machine requires its original input domain.");
+        if (definition.UsesRefactoredDirectionRules || definition.UsesRefactoredMovementDetailsRules || definition.UsesRefactoredStandingRules || definition.UsesRefactoredStopRules || definition.UsesRefactoredCrouchingRules) throw new ArgumentException("Refactored machine requires its original input domain.");
         return UpdateCore(definition, previous, input, null, times, contextWeight, delta, serial, changeStanceCurve, updateCounter);
     }
 
@@ -270,11 +280,21 @@ public static class AlsGroundedStateMachine
         return UpdateCore(definition, previous, default, null, times, contextWeight, delta, serial, null, updateCounter, stop: footPlantedAmount);
     }
 
+    public static AlsGroundedMachineUpdate UpdateRefactoredCrouching(AlsGroundedMachineDefinition definition,
+        in AlsGroundedMachineState previous, in AlsRefactoredCrouchingInput input,
+        ReadOnlySpan<AlsGroundedAutomaticTime> times, float contextWeight, float delta, long serial,
+        AlsGraphTraversalCounter? updateCounter = null)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (!definition.UsesRefactoredCrouchingRules) throw new ArgumentException("Invalid Crouching input domain.");
+        return UpdateCore(definition, previous, default, null, times, contextWeight, delta, serial, null, updateCounter, crouching: input);
+    }
+
     private static AlsGroundedMachineUpdate UpdateCore(AlsGroundedMachineDefinition definition,
         in AlsGroundedMachineState previous, in AlsGroundedRuleInput input, AlsRefactoredDirectionInput? direction,
         ReadOnlySpan<AlsGroundedAutomaticTime> times, float contextWeight, float delta, long serial,
         Func<float, float>? changeStanceCurve, AlsGraphTraversalCounter? updateCounter, AlsRefactoredMovementDetailsInput? details = null,
-        AlsRefactoredStandingInput? standing = null, float? stop = null)
+        AlsRefactoredStandingInput? standing = null, float? stop = null, AlsRefactoredCrouchingInput? crouching = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         if(updateCounter is {HasUpdated:false} || previous.HasUpdated &&
@@ -304,7 +324,7 @@ public static class AlsGroundedStateMachine
         // AnimInstance's getter reads the proxy's recorded weights from the
         // preceding update, not the in-progress transition stack of this frame.
         Span<float> recordedWeights = stackalloc float[definition.States.Length]; recordedWeights.Clear();
-        if ((direction.HasValue || standing.HasValue) && !firstUpdate)
+        if ((direction.HasValue || standing.HasValue || crouching.HasValue) && !firstUpdate)
             for (var s = 0; s < recordedWeights.Length; s++) recordedWeights[s] = AlsTransitionStack.Weight(previous.Transitions, s);
         var result = reset ? Initialize(definition) : new AlsGroundedMachineUpdate { State = previous, InertializationSeconds = -1 };
         var state = result.State;
@@ -313,7 +333,7 @@ public static class AlsGroundedStateMachine
             var visited = 0;
             // Initial state players have no cached update weight until the first Update, even if Initialize ran earlier.
             var clearedStates = (byte)(result.ClearCachedWeightStates | (firstUpdate ? 1 << definition.InitialState : 0));
-            if (!Find(definition, state.CurrentState, previous, firstUpdate, input, direction, details, standing, stop, recordedWeights, times, clearedStates,
+            if (!Find(definition, state.CurrentState, previous, firstUpdate, input, direction, details, standing, stop, crouching, recordedWeights, times, clearedStates,
                 ref visited, out var edgeIndex, out var adjustment)) break;
             var edge = definition.Edges[edgeIndex];
             if (edge.To == state.CurrentState) break;
@@ -375,7 +395,7 @@ public static class AlsGroundedStateMachine
 
     private static bool Find(AlsGroundedMachineDefinition definition, int current, in AlsGroundedMachineState previous,
         bool reset, in AlsGroundedRuleInput input, AlsRefactoredDirectionInput? direction, AlsRefactoredMovementDetailsInput? details,
-        AlsRefactoredStandingInput? standing, float? stop, ReadOnlySpan<float> recordedWeights,
+        AlsRefactoredStandingInput? standing, float? stop, AlsRefactoredCrouchingInput? crouching, ReadOnlySpan<float> recordedWeights,
         ReadOnlySpan<AlsGroundedAutomaticTime> times, byte clearedStates,
         ref int visited, out int selected, out float adjustment)
     {
@@ -413,11 +433,12 @@ public static class AlsGroundedStateMachine
                     details is { } movement ? !edge.RefactoredMovementDetailsRule!.Value.Evaluate(movement) :
                     standing is { } stance ? !edge.RefactoredStandingRule!.Value.Evaluate(stance, recordedWeights) :
                     stop is { } planted ? !edge.RefactoredStopRule!.Value.Evaluate(planted) :
+                    crouching is { } crouch ? !edge.RefactoredCrouchingRule!.Value.Evaluate(crouch, recordedWeights) :
                     !Condition(edge.Condition, edge.Threshold, definition.Kind, previous, reset, input, edge.WeightState)) continue;
             }
             if (definition.States[edge.To].Conduit)
             {
-                if (Find(definition, edge.To, previous, reset, input, direction, details, standing, stop, recordedWeights, times, clearedStates, ref visited, out selected, out adjustment)) return true;
+                if (Find(definition, edge.To, previous, reset, input, direction, details, standing, stop, crouching, recordedWeights, times, clearedStates, ref visited, out selected, out adjustment)) return true;
             }
             else { selected = i; adjustment = candidateAdjustment; return true; }
         }
