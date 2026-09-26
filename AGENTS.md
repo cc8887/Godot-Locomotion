@@ -10,6 +10,8 @@
 
 # 运行和验证
 
+- 最新 Crouching 外层状态机：`docs/verification/2026-09-26-crouching-machine.md`。原 node33 五状态/十二边、独立规则域/Stop=state4、move优先/0.1秒Stop/0.5秒QuickFeet、上一更新权重、回调/StopQuick候选、原转身播放器自动退出与惯性请求、隐藏重入/取消重试；编译/编辑图及QuickFeet79骨/18项/33原生权重样本校验。首11项5失败（Stop模板OnStateEntry/实际成员绑定），修后1失败（双转身请求预期应1→10→7），均保留TRX；相关Import56/Core81/收尾新门禁Crouching16全部过，最终Optimize0/0。30/60/120Hz各8秒1680帧受控状态+真实播放器重试，不是新Crouch原生姿态oracle；Standing独立/共享native六组保持门槛。无UE修改/运行/新导出/Godot运行/全量/视觉/性能。下一步Crouch Idle/Stop/Movement pose+cache+Parent+inertia34/统一事务，再Grounded专用站蹲/Roll/曲线→Transition→Locomotion；Grounded catalog有节点/编辑图但stance_machines尚无其baked导出。普通Demo未切换，全部旧目标/用户暂缓项保留。
+
 - R2本批收尾补验：公共Standing.Cancel在共享模式取消整个角色动作帧，内部提交清理独立，防止旧queue残留；`character-actions-cancel-final.trx`角色/Standing生命周期/原生六组27通过0失败0跳过，Optimize再次0/0。与下条70项扩展属于同批，详见同一验证记录。
 
 - 最新 R2共享动作首批：`docs/verification/2026-09-26-character-actions-shared.md`。不可变Grounded动作profile合并Standing/武器资源，局部18来源映射外部角色ID/group，79骨/曲线并集门禁；Standing注入同一bank/queue，协调器预校验后统一提交，子图禁止独立提交/后处理。原AB_Als node13实际为Grounded6→Transition13→Locomotion7，已校编译/编辑链接，真实Stop/Dynamic/QuickSlot混合、source上下文/请求输出、update-only/retry；测试基底为真实Standing受控输出，**不是完整Grounded执行或外层原生验收**。非连续反序ID700+/group20，独立/共享原生六组4620帧/280134骨同原门槛，shared maxP9.73409e-6cm/C3.57628e-7/Parent和clock0；首16/最终相关70通过0失败0跳过，Optimize0/0、diff过。首编译两不存在属性引用已改原武器固定idle-only=true，无运行失败/UE改动或重导/Godot运行/全量/性能。R2仍待完整角色资源、真实Grounded/Locomotion组合、外层惯性接收和新整链native；普通Demo仍旧链路，全部Ragdoll等目标/暂缓项保留。
