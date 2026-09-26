@@ -11,6 +11,8 @@ public partial class RefactoredStanceDemoSmoke : Node
     private int _tick,_previousStage,_hz;
     private long _standing,_crouching,_transition,_grounded;
     private int _groundedStates;
+    private long _locomotion;
+    private int _locomotionStates;
     private int _air,_crouch,_sprint;
     private bool _done;
     private string? _capture;
@@ -64,23 +66,29 @@ public partial class RefactoredStanceDemoSmoke : Node
             // stance clips. Mouse rotation deliberately takes the other route.
             if(At(480)||At(540))Input.ActionPress("crouch_toggle");
             if(At(490)||At(550))Input.ActionRelease("crouch_toggle");
+            if(At(650))Input.ActionPress("jump");
+            if(At(660))Input.ActionRelease("jump");
             if(stage>30&&stage<430&&_tick%4==0)demo.OrbitCamera.ApplyMouseMotion(new(2,0));
             var full=character.FullMovementDiagnostics;var frame=character.Diagnostics;
+            if(full.Identity.SlotGeneration!=0&&!full.LockCurveProducersMatch)
+                throw new Exception($"Foot lock curve alias mismatch: raw={full.RawLockProducers}; final={full.LockProducers}.");
             _standing=Math.Max(_standing,full.RefactoredStandingFrames);_crouching=Math.Max(_crouching,full.RefactoredCrouchingFrames);
             _transition=Math.Max(_transition,full.RefactoredTransitionFrames);
             _grounded=Math.Max(_grounded,full.RefactoredGroundedFrames);_groundedStates|=full.RefactoredGroundedStateMask;
+            _locomotion=Math.Max(_locomotion,full.RefactoredLocomotionFrames);_locomotionStates|=full.RefactoredLocomotionStateMask;
             if(frame.Result.ActualStance==AlsStance.Crouching)_crouch++;
             if(frame.Result.ActualGait==AlsGait.Sprinting)_sprint++;
             if(frame.Result.ResolvedLocomotionState==AlsLocomotionState.InAir)_air++;
             if(stage>20&&full.Identity!=frame.Identity)throw new Exception("New chain escaped normal frame ownership.");
-            if(_capture is not null)foreach(var at in new[]{60,110,165,210,255,310,350,390,470,485,495,545,555})if(At(at))_captures.Add(at);
+            if(_capture is not null)foreach(var at in new[]{60,110,165,210,255,310,350,390,470,485,495,545,555,670,710,750,790})if(At(at))_captures.Add(at);
             _previousStage=stage;
-            if(stage>=620)
+            if(stage>=820)
             {
                 if(_grounded<_hz*5||(_groundedStates&30)!=30)throw new Exception($"Original Grounded pose not covered: frames={_grounded} states={_groundedStates}.");
+                if(_locomotion<_hz*12||(_locomotionStates&29)!=29)throw new Exception($"Original Locomotion not covered: frames={_locomotion} states={_locomotionStates}.");
                 if(_standing<_hz*3||_crouching<_hz||_transition<_hz*5||_crouch<_hz||_air==0||_sprint==0)
                     throw new Exception($"Incomplete native-host coverage standing={_standing} crouching={_crouching} transition={_transition} crouch={_crouch} air={_air} sprint={_sprint}.");
-                GD.Print($"ALS_REFACTORED_STANCE_DEMO_OK hz={_hz} standing={_standing} crouching={_crouching} transition={_transition} grounded={_grounded} grounded_states={_groundedStates} air={_air} sprint={_sprint}");
+                GD.Print($"ALS_REFACTORED_STANCE_DEMO_OK hz={_hz} standing={_standing} crouching={_crouching} transition={_transition} grounded={_grounded} grounded_states={_groundedStates} locomotion={_locomotion} locomotion_states={_locomotionStates} air={_air} sprint={_sprint}");
                 _done=true;GetTree().Quit();
             }
         }

@@ -20,7 +20,7 @@ internal readonly record struct AlsMainMovementInputs(AlsGroundedFrameInputs Gro
 // provided/consumed by the enclosing animation owner; this is not the final Demo controller.
 internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGroundedUpdateSink
 {
-    private enum Phase { Idle, Prepared, Evaluated, Hidden, Faulted, Disposed }
+    private enum Phase { Idle, Prepared, Evaluated, UpdateOnly, Hidden, Faulted, Disposed }
     private Phase _phase;
     private readonly AlsGroundedFrameRuntime _grounded;
     private readonly AlsP5CoreRuntimeBindingSnapshot _binding;
@@ -480,6 +480,10 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
     void IAlsLandingGroundedUpdateSink.UpdateGrounded(int read, in AlsPoseUpdateContext context)
     { if (read != _landingRead) throw new ArgumentException("Foreign landing cache update."); RegisterGround(read, context); }
 
+    // During migration legacy sources still supply notify ownership. The new
+    // Locomotion host supplies the pose; no legacy pose/inertia is evaluated.
+    internal void CompleteUpdateOnly()
+    {Require(Phase.Prepared);if(!_eventsPrepared)throw new InvalidOperationException("Source events are not ready.");_phase=Phase.UpdateOnly;}
     public void Commit(AlsFrameIdentity identity)
     {
         ValidateCommit(identity);
@@ -494,7 +498,7 @@ internal sealed class AlsMainMovementFrameRuntime : IDisposable, IAlsLandingGrou
     }
     internal void ValidateCommit(AlsFrameIdentity identity)
     {
-        if (_phase is not (Phase.Evaluated or Phase.Hidden) || identity != _identity || !_eventsPrepared)
+        if (_phase is not (Phase.Evaluated or Phase.Hidden or Phase.UpdateOnly) || identity != _identity || !_eventsPrepared)
             throw new InvalidOperationException("Main Movement is not ready for this commit.");
         if (_groundedCandidate) _grounded.ValidateCommit(identity);
     }

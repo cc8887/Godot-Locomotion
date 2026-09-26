@@ -4,39 +4,44 @@ using GodotAls.Import.Compilation;
 
 namespace GodotAls.Animation;
 
-/// <summary>Migration boundary: original Refactored stances, Grounded and
-/// Transition Slot feed the existing air/layer/foot owners. All mutable data belongs
+/// <summary>Migration boundary: original Refactored Grounded, Transition and
+/// Locomotion feed the existing layer/foot owners. All mutable data belongs
 /// to this character; no Godot API is used during Prepare/Evaluate/Commit.</summary>
 internal sealed class AlsRefactoredDemoStances
 {
     private readonly AlsRefactoredCharacterActionProfile _profile;
-    private AlsRefactoredCharacterActionRuntime? _runtime;
+    private readonly AlsRefactoredLocomotionHostProfile _locomotion;
+    private AlsRefactoredLocomotionHost? _host;
+    private AlsRefactoredCharacterActionRuntime? _runtime=>_host?.Actions;
+    private ReadOnlySpan<string> NativeNames=>_locomotion.Pose.CurveNames;
     private readonly int[] _bones, _nativeCurves;
     private readonly string[] _names;
     private readonly AlsPrecisePose[] _targetComponents;
     private readonly int[] _targetParents;
     private readonly AlsVirtualBoneDefinition[] _targetVirtuals;
     private readonly AlsInertialCurve[] _nativeValues, _previousValues, _nextValues;
-    private readonly AlsRefactoredPoseInertia _inertia;
     private readonly (int Native, int Legacy, float Scale)[] _aliases;
     private AlsRefactoredStandingHostInput _input;
     private AlsFrameIdentity _identity;
     private AlsGraphTraversalCounter _counter, _nextCounter;
     private float _delta;
+    private int _outputCurveCount;
     private bool _prepared, _visited, _standing, _crouching, _evaluated, _post;
     internal long CommittedStandingFrames { get; private set; }
     internal long CommittedCrouchingFrames { get; private set; }
     internal long CommittedTransitionFrames { get; private set; }
     internal long CommittedGroundedFrames { get; private set; }
     internal int CommittedGroundedStateMask { get; private set; }
+    internal long CommittedLocomotionFrames {get;private set;}
+    internal int CommittedLocomotionStateMask {get;private set;}
     internal bool ResetGroundedEntry => _visited && SourceUpdated && _runtime!.Grounded!.ResetEntryMode;
     internal int StandingState => _standing ? _runtime!.Standing.State : -1;
     internal int CrouchingState => _crouching ? _runtime!.Crouching!.State : -1;
-    internal bool SourceUpdated => _visited && _runtime!.Transition.SourceUpdate.Updated;
+    internal bool SourceUpdated => _visited && _host!.Graph.GroundedUpdated && _runtime!.Transition.SourceUpdate.Updated;
 
     internal AlsRefactoredDemoStances(AlsSkeletonDefinition skeleton, ReadOnlySpan<AlsPrecisePose> reference, ReadOnlySpan<string> names)
     {
-        _profile = AlsRefactoredDemoResources.Profile.Value; _names = names.ToArray();
+        _locomotion=AlsRefactoredDemoResources.Locomotion.Value;_profile = _locomotion.Actions; _names = names.ToArray();
         _bones = _profile.BoneNames.ToArray().Select(skeleton.GetLogicalBoneId).ToArray();
         _targetParents=skeleton.LogicalBones.Select(b=>b.ParentLogicalId).ToArray();
         _targetVirtuals=skeleton.VirtualBones;
@@ -52,12 +57,11 @@ internal sealed class AlsRefactoredDemoStances
         }
         if(skeleton.PhysicalBones.Any(b=>!_bones.Contains(b.LogicalId)))throw new ArgumentException("Unmapped Demo physical bone.");
         _targetComponents=new AlsPrecisePose[reference.Length];
-        var nativeNames = _profile.CurveNames.ToArray();
+        var nativeNames = NativeNames.ToArray();
         _nativeCurves = nativeNames.Select(n => Array.IndexOf(_names, n)).ToArray();
         if (_nativeCurves.Any(i => i < 0)) throw new ArgumentException("Demo curve layout omitted Refactored curves.");
         _nativeValues = new AlsInertialCurve[nativeNames.Length]; _previousValues = new AlsInertialCurve[nativeNames.Length];
         _nextValues = new AlsInertialCurve[nativeNames.Length];
-        _inertia = new(_bones.Length, nativeNames, "RotationYawSpeed");
         var aliases = new Dictionary<string, string>
         {
             ["PoseGait"]="Weight_Gait", ["PoseCrouching"]="BasePose_CLF", ["PoseStanding"]="BasePose_N",
@@ -75,13 +79,25 @@ internal sealed class AlsRefactoredDemoStances
             Scale: p.Key == "RotationYawSpeed" ? 0f : 1f)).Where(p => p.Native >= 0 && p.Legacy >= 0).ToArray();
     }
 
-    internal void Begin(in AlsFrameInput frame, in AlsFrameResult result, in AlsStandingMovementInput movement)
+    // The Grounded cache and enclosing Locomotion output have different sorted
+    // curve layouts. Bind once on Main after the outer movement layout exists.
+    internal void BindOutputLayout(ReadOnlySpan<string> names)
+    {
+        if(_outputCurveCount!=0||_host is not null)throw new InvalidOperationException("Demo output layout already bound.");
+        for(var i=0;i<_nativeCurves.Length;i++)
+        {var target=names.IndexOf(NativeNames[i]);if(target<0)throw new ArgumentException("Missing outer Locomotion curve.");_nativeCurves[i]=target;}
+        for(var i=0;i<_aliases.Length;i++)
+        {var alias=_aliases[i];var target=names.IndexOf(_names[alias.Legacy]);if(target<0)throw new ArgumentException("Missing outer compatibility curve.");_aliases[i]=(alias.Native,target,alias.Scale);}
+        _outputCurveCount=names.Length;
+    }
+
+    internal void Begin(in AlsFrameInput frame, in AlsFrameResult result, in AlsStandingMovementInput movement,float prediction)
     {
         if (_prepared) throw new InvalidOperationException("Refactored Demo frame still pending.");
         _identity = frame.Identity; _delta = frame.DeltaTime;
-        _runtime ??= _profile.CreateRuntime(_identity.CharacterId, _identity.SlotGeneration);
+        _host ??= _locomotion.CreateRuntime(_identity.CharacterId, _identity.SlotGeneration);
         _nextCounter = _counter.HasUpdated ? _counter.Next((ulong)frame.Identity.FrameId) : new(0, (ulong)frame.Identity.FrameId);
-        var pending = _runtime.CommittedIdentity.SlotGeneration == 0;
+        var pending = _host.CommittedIdentity.SlotGeneration == 0;
         var velocity = AlsFootIkCoordinates.ToNative(frame.ActualVelocity);
         var yaw = -frame.CharacterYaw * (180d / Math.PI); var view = -frame.Command.ViewYaw * (180d / Math.PI);
         var half = yaw * (Math.PI / 360d);
@@ -111,55 +127,39 @@ internal sealed class AlsRefactoredDemoStances
             Math.Clamp(Value("FootPlanted"),-1,1), smooth);
         try
         {
-            _runtime.BeginGlobal(Context(1), _input, pending);
-            if (result.ResolvedLocomotionState != AlsLocomotionState.Grounded) _runtime.StopTransitions();
+            var mode=result.ResolvedLocomotionState==AlsLocomotionState.Grounded?AlsRefactoredLocomotionMode.Grounded:
+                result.ResolvedLocomotionState==AlsLocomotionState.InAir?AlsRefactoredLocomotionMode.InAir:AlsRefactoredLocomotionMode.Other;
+            _host.BeginGlobal(Context(1),new(_input,mode,frame.JumpAccepted==1,movement.HasMovementInput,false,prediction,
+                Value("PoseStanding"),Value("PoseCrouching")),new(0,0),pending);
             _previousValues.CopyTo(_nextValues,0); _prepared = true;
         }
         catch { Discard(); throw; }
     }
     private float Value(string name)
-    { var i=_profile.CurveNames.IndexOf(name); return i>=0&&_previousValues[i].Present?_previousValues[i].Value:0; }
+    { var i=NativeNames.IndexOf(name); return i>=0&&_previousValues[i].Present?_previousValues[i].Value:0; }
     private AlsPoseUpdateContext Context(float weight) => new AlsPoseUpdateContext(_identity,weight,_delta).WithUpdateCounter(_nextCounter);
 
-    internal void Prepare(in AlsMainGroundedCachedUpdate outer, AlsGraphTraversalCounter initialization, bool fromRoll)
+    internal void PrepareLocomotion(in AlsPoseUpdateContext context, AlsGraphTraversalCounter initialization, bool fromRoll)
     {
         if (!_prepared || _visited) throw new InvalidOperationException("Invalid Demo stance traversal.");
-        if (!outer.MainUpdated) return;
-        var context = Context(outer.MainContext.Weight);
-        _runtime!.Transition.Prepare(context);
-        var source = _runtime.Transition.SourceUpdate;
-        _inertia.Prepare(context);
-        if (_runtime.Transition.InertializationRequest is {} request) _inertia.Request(request.Duration);
-        if (source.Updated)
-        {
-            _runtime.Grounded!.Prepare(source.Context,_input,Value("PoseStanding"),Value("PoseCrouching"),fromRoll,initialization);
-            _standing=_runtime.Grounded.StandingUpdated;_crouching=_runtime.Grounded.CrouchingUpdated;
-        }
+        _host!.Prepare(context,initialization:initialization,fromRoll:fromRoll);
+        _standing=_host.Graph.GroundedUpdated&&_runtime!.Grounded!.StandingUpdated;
+        _crouching=_host.Graph.GroundedUpdated&&_runtime!.Grounded!.CrouchingUpdated;
         _visited=true;
     }
-    internal void EvaluateStance(bool crouch, Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
+    internal void EvaluateLocomotion(Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
     {
-        if (!_visited || crouch&&!_crouching || !crouch&&!_standing) throw new InvalidOperationException("Unvisited Refactored stance.");
-        // Mesh-space histories use a fixed component here; the enclosing existing
-        // graph owns world-space movement/teleport inertia during migration.
-        if(crouch)
-        { var host=_runtime!.Crouching!;host.Evaluate(AlsPrecisePose.Identity);MapOut(host.Pose,host.Curves,host.CurveNames,pose,curves); }
-        else
-        { var host=_runtime!.Standing;host.Evaluate(AlsPrecisePose.Identity);MapOut(host.Pose,host.Curves,host.CurveNames,pose,curves); }
-    }
-    internal void FinishGrounded(Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
-    {
-        if(!_visited)throw new InvalidOperationException("No Refactored Grounded boundary.");
-        if(SourceUpdated)_runtime!.Grounded!.Evaluate(AlsPrecisePose.Identity);
-        _runtime!.Transition.Evaluate(SourceUpdated?_runtime.Grounded!.Pose:ReadOnlySpan<AlsPrecisePose>.Empty,
-            SourceUpdated?_runtime.Grounded!.Curves:ReadOnlySpan<AlsInertialCurve>.Empty);
-        _inertia.Evaluate(_runtime.Transition.Pose,_runtime.Transition.Curves,AlsPrecisePose.Identity);
-        MapOut(_inertia.Pose,_inertia.Curves,_profile.CurveNames,pose,curves);
-        _inertia.Curves.CopyTo(_nextValues);_evaluated=true;
+        if(!_visited)throw new InvalidOperationException("No Refactored Locomotion boundary.");
+        // Existing outer world/teleport inertia remains the migration boundary.
+        _host!.Evaluate(AlsPrecisePose.Identity);
+        MapOut(_host.Pose,_host.Curves,NativeNames,pose,curves);
+        _host.Curves.CopyTo(_nextValues);_evaluated=true;
     }
     private void MapOut(ReadOnlySpan<AlsPrecisePose> native,ReadOnlySpan<AlsInertialCurve> values,ReadOnlySpan<string> names,
         Span<AlsPrecisePose> pose,Span<AlsInertialCurve> curves)
     {
+        if(_outputCurveCount==0||curves.Length!=_outputCurveCount||pose.Length!=_targetParents.Length)
+            throw new ArgumentException("Foreign Demo Locomotion output layout.");
         for(var b=0;b<_bones.Length;b++)if(_bones[b]>=0)pose[_bones[b]]=FromNative(native[b]);
         foreach(var v in _targetVirtuals)pose[v.LogicalBoneId]=AlsPrecisePose.Identity;
         Components(pose,_targetParents,_targetComponents);
@@ -167,28 +167,29 @@ internal sealed class AlsRefactoredDemoStances
         {pose[v.LogicalBoneId]=AlsPrecisePose.Relative(_targetComponents[v.TargetLogicalBoneId],_targetComponents[v.SourceLogicalBoneId]).Normalized();_targetComponents[v.LogicalBoneId]=_targetComponents[v.TargetLogicalBoneId];}
         curves.Clear(); Array.Clear(_nativeValues);
         for(var c=0;c<names.Length;c++)
-        {var i=_profile.CurveNames.IndexOf(names[c]);if(i<0)throw new InvalidOperationException("Foreign stance curve.");_nativeValues[i]=values[c];curves[_nativeCurves[i]]=values[c];}
+        {var i=NativeNames.IndexOf(names[c]);if(i<0)throw new InvalidOperationException("Foreign stance curve.");_nativeValues[i]=values[c];curves[_nativeCurves[i]]=values[c];}
         foreach(var alias in _aliases)curves[alias.Legacy]=AlsStandingCycleCurves.Scale(_nativeValues[alias.Native],alias.Scale==0?_delta:alias.Scale);
     }
-    internal void PostUpdate(){if(!_prepared||_post)throw new InvalidOperationException("Invalid Demo post update.");_runtime!.PostUpdateActions();_post=true;}
+    internal void PostUpdate(){if(!_prepared||_post)throw new InvalidOperationException("Invalid Demo post update.");_host!.PostUpdate();_post=true;}
     internal void CaptureFeedback(ReadOnlySpan<string> names,ReadOnlySpan<AlsInertialCurve> curves)
     {
         if(!_prepared||names.Length!=curves.Length)throw new ArgumentException("Foreign Refactored feedback.");
         for(var c=0;c<_nextValues.Length;c++)
-        {var i=names.IndexOf(_profile.CurveNames[c]);_nextValues[c]=i<0?default:curves[i];}
+        {var i=names.IndexOf(NativeNames[c]);_nextValues[c]=i<0?default:curves[i];}
     }
     internal void ValidateCommit(AlsFrameIdentity id)
-    {if(!_prepared||!_post||id!=_identity)throw new InvalidOperationException("Incomplete Demo stance frame.");_runtime!.ValidateCommit(id);if(_visited)_inertia.ValidateCommit(id);}
+    {if(!_prepared||!_post||id!=_identity)throw new InvalidOperationException("Incomplete Demo stance frame.");_host!.ValidateCommit(id);}
     internal void Commit(AlsFrameIdentity id)
     {
         ValidateCommit(id);
         var groundedState=_visited&&SourceUpdated?_runtime!.Grounded!.State:-1;
-        _runtime!.Commit(id);if(_visited)_inertia.Commit(id);
+        if(_visited){CommittedLocomotionFrames++;CommittedLocomotionStateMask|=1<<_host!.Graph.MainUpdate.State.CurrentState;}
+        _host!.Commit(id);
         if(groundedState>=0){CommittedGroundedFrames++;CommittedGroundedStateMask|=1<<groundedState;}
-        if(_standing)CommittedStandingFrames++;if(_crouching)CommittedCrouchingFrames++;if(_evaluated)CommittedTransitionFrames++;
+        if(_standing)CommittedStandingFrames++;if(_crouching)CommittedCrouchingFrames++;if(_evaluated&&groundedState>=0)CommittedTransitionFrames++;
         _nextValues.CopyTo(_previousValues,0);_counter=_nextCounter;Clear();
     }
-    internal void Discard(){_runtime?.Discard();_inertia.Cancel();Clear();}
+    internal void Discard(){_host?.Discard();Clear();}
     private void Clear(){_prepared=_visited=_standing=_crouching=_evaluated=_post=false;}
     private static void Components(ReadOnlySpan<AlsPrecisePose> local,ReadOnlySpan<int> parents,Span<AlsPrecisePose> components)
     {

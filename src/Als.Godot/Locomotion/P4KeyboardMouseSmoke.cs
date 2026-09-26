@@ -107,7 +107,7 @@ public partial class P4KeyboardMouseSmoke : Node
                     Require(character.UsesLayeredPose && movement.UsesRefactoredFeet &&
                         movement.RootIdentity == frame.Identity && movement.FootPoseIdentity == frame.Identity &&
                         movement.LockCurveProducersMatch && movement.Overlay == _demo.Overlay,
-                        "Default Demo did not commit layered animation, final foot pose and matching lock curves.");
+                        $"Default Demo boundary differs: layered={character.UsesLayeredPose} feet={movement.UsesRefactoredFeet} root={movement.RootIdentity==frame.Identity} foot={movement.FootPoseIdentity==frame.Identity} locks={movement.LockCurveProducersMatch} overlay={movement.Overlay}/{_demo.Overlay}; raw={movement.RawLockProducers}; final={movement.LockProducers}.");
                     Require(character.SplitFootDiagnostics.Resumed > 0,
                         "Default Demo did not execute split foot dispatch.");
                     if (movement.RefactoredRig.LeftToePinned || movement.RefactoredRig.RightToePinned)

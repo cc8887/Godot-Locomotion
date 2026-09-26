@@ -86,6 +86,22 @@ public static class AlsRefactoredMovementModel
         return previous with { VelocityInitialized = true, VelocityBlend = blend, Lean = lean };
     }
 
+    public static AlsRefactoredMovementState RefreshInAir(in AlsRefactoredMovementState previous,
+        in AlsRefactoredMovementInput input,float leanMultiplier,float halfLife)
+    {
+        Validate(input);
+        if(!float.IsFinite(leanMultiplier)||!float.IsFinite(halfLife))throw new ArgumentException("Invalid air Lean settings.");
+        var velocity=input.Velocity.Rotate(input.Rotation.Conjugate()).ToSingle();
+        var target=velocity*(1f/350)*leanMultiplier;
+        var lean=new Vector2(target.Y,target.X);
+        if(!input.PendingUpdate&&halfLife>0)
+        {
+            var alpha=AlsRefactoredRigMath.DamperAlpha(input.Delta,halfLife);
+            lean=new(Lerp(previous.Lean.X,lean.X,alpha),Lerp(previous.Lean.Y,lean.Y,alpha));
+        }
+        return previous with{Lean=lean};
+    }
+
     public static float VelocityYaw(in AlsRefactoredMovementInput i)
     {
         var angle = (float)(i.VelocityYaw - i.ViewYaw);

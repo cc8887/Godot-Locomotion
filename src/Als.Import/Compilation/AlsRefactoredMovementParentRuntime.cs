@@ -45,6 +45,8 @@ public sealed partial class AlsRefactoredMovementParentRuntime
              identity.FrameId <= _committedIdentity.FrameId)) throw new ArgumentException("Invalid movement Parent frame/owner.");
         _identity = identity; _candidate = initializeInstance ? default : Committed;
         _movementCandidate = initializeInstance ? AlsRefactoredMovementState.Initial : CommittedMovement;
+        _airCandidate = initializeInstance ? AlsRefactoredInAirState.Initial : CommittedAir;
+        _airPrepared = false;
         _hasInput = false;
         _prepared = true; _faulted = false;
     }
@@ -89,7 +91,7 @@ public sealed partial class AlsRefactoredMovementParentRuntime
     public void ValidateCommit(long frame) => Check(frame);
     public void Commit(long frame)
     {
-        Check(frame); Committed = _candidate; CommittedMovement = _movementCandidate;
+        Check(frame); Committed = _candidate; CommittedMovement = _movementCandidate; CommittedAir = _airCandidate;
         _committedIdentity = _identity; _hasCommitted = true; Cancel();
     }
     public void Cancel() { _prepared = _faulted = false; }

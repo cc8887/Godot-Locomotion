@@ -32,6 +32,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadMovementSettings(UAlsAnimationInstanceSettings* Settings);
 
+    /** Original InAir settings and full precision Lean curve; no asset writes. */
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadAirSettings(UAlsAnimationInstanceSettings* Settings);
+
     /** Actual weapon notify functions, parent transition playback and native Slot poses. */
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static bool ExportRefactoredTransitionTrace(const FString& RequestPath, const FString& OutputPath);
