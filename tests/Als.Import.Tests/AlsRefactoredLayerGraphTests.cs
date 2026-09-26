@@ -114,7 +114,11 @@ public sealed class AlsRefactoredLayerGraphTests
                 runtime.Prepare(new(id,1,1f/hz),input,feedback,graph.Initialization,graph.Bones,graph.Evaluation,slots);
             }
         }
-        Assert.Equal((ushort)(AlsMontageSlot.AllMask&~31),visited);
+        // Only the original seven regional slots belong to this graph. The
+        // character-wide slot registry also contains unrelated action slots.
+        var regionalMask = AlsMontageSlot.Head.Mask | AlsMontageSlot.ArmLeft.Mask | AlsMontageSlot.ArmRight.Mask |
+            AlsMontageSlot.Spine.Mask | AlsMontageSlot.Pelvis.Mask | AlsMontageSlot.Legs.Mask | AlsMontageSlot.Curves.Mask;
+        Assert.Equal((ushort)regionalMask,visited);
         Assert.True(fullFrames>hz);Assert.True(inputs.BaseSamples>0);Assert.True(inputs.MontageSamples>0);
         Assert.Equal(0,inputs.SlotUpdates);Assert.Empty(bank.Committed.ToArray());
     }

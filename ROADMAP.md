@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-25。代码基线：`main / a53cf82`。唯一开发主目录：`D:/GodotALS`。
+更新：2026-09-26。代码基线：`main / 1ef1b3c` 加本批 Standing 曲线精度修正。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -16,7 +16,7 @@
 
 | 阶段 | 当前证据与缺口 | 下一交付与关闭条件 |
 |---|---|---|
-| R1 Standing 严格对齐 | 2310 帧五状态、Parent 已比较字段、动作及播放器时钟通过；3 组姿态/曲线门禁仍失败 | 定位源采样、混合、惯性历史误差，保留既定阈值和失败证据；三频率原生连续通过 |
+| R1 Standing 严格对齐 | 已关闭本批门禁：三频率 2310 帧/140067 骨骼求值全部通过；Parent 已比较字段和时钟差 0 | 保持既定阈值作为后续角色整合的回归；不代表完整角色或普通 Demo 验收 |
 | R2 角色级动作与 Transition Slot | Standing 到 node68；局部 18 资源 bank；外层 Transition 尚未混入 | 共享角色 bank/身份/队列，真实 Stop/Dynamic/QuickStop 输出到最终姿态与曲线 |
 | R3 完整主移动图 | Standing/Crouch/空中等已有不同程度组件及旧入口实现，尚无新角色宿主闭环 | 真实 Standing/Crouching/Jump/Fall/Land 与姿势切换，缓存/Sync/曲线反馈统一 |
 | R4 上身、Overlay 与最终脚部 | 13 Overlay 等已有受控组件证据；不能代替新全角色连续证据 | Aim/Layering/手部/脚部按原图拓扑接入，换向与支撑窗口、地形/平台通过 |
@@ -24,15 +24,15 @@
 | R6 通用动作与物理恢复 | Roll/Ragdoll/Get-up/Camera 等已接旧入口；Mantle 有组件；长期物理稳定性尚有失败 | 通知、Root Motion、Mantle/Roll、Ragdoll/Get-up/Pose Recovery 与新链路整合并验收 |
 | R7 最终交付 | 十分钟预算、完整人工矩阵及可复现交付未完成 | 原性能目标与所有功能门禁通过，生成资产交付可复现 |
 
-当前严格差异和测试记录见 [Standing 原生连续对照](docs/verification/2026-09-25-refactored-standing-host-native.md)：最大位置差约 3.86872e-5 cm；FootPlanted/RotationYawSpeed 曲线超限。相关 62 项通过不能抵消原生 3 项失败。
+最新证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing-curve-precision.md)：最大位置差约 9.73409e-6 cm，最大曲线差 3.57628e-7，原三项严格失败已通过，未放宽阈值。此前失败保留在 [原生连续首轮记录](docs/verification/2026-09-25-refactored-standing-host-native.md)。下一阶段为 R2 角色级共享动作与外层 Transition Slot。
 
 ## 完整角色动画链路实施方案
 
 ### R1：先关闭 Standing 已知原生差异
 
-- [ ] 按相同输入、资源哈希、初始姿态和更新顺序，分别观测源播放器输出、状态混合、119/118 惯性化和最终曲线，定位首次分歧。
-- [ ] 继续覆盖 30/60/120 Hz、update-only、失去相关性与重入、取消重试、重复求值；保持位置 2e-5 cm、旋转/缩放/曲线 2e-6 的本批门槛，不用放宽阈值关闭失败。
-- [ ] 修复后重跑受影响组件和原生连续测试，记录最大误差及覆盖范围。通过后才标记 Standing 原生验收完成。
+- [x] 按相同输入、资源哈希和更新顺序定位首次分歧：Parent 步幅曲线先差一个 float ULP，播放时钟随后累积偏差；另有源动画曲线误用双精度采样。已按本机 UE 源码和实际二进制的运算顺序修正，无需改变状态混合或 119/118 惯性算法。
+- [x] 覆盖 30/60/120 Hz、update-only、失去相关性与重入、取消重试、重复求值；保持位置 2e-5 cm、旋转/缩放/曲线 2e-6 的本批门槛，不用放宽阈值关闭失败。
+- [x] 原三频率连续测试通过，1238 个原生移动设置曲线样本精确一致；受影响组件、生命周期和构建结果见本批验证记录。关闭范围仅限这套受控 Standing 原生门禁。
 
 ### R2：把局部 Standing owner 提升为角色级 owner
 

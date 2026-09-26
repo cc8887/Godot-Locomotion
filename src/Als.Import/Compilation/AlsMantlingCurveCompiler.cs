@@ -12,21 +12,16 @@ namespace GodotAls.Import.Compilation;
 public sealed class AlsMantlingCurveSource
 {
     private readonly string[] _names;
-    private readonly AlsCurveKey[][] _keys;
+    private readonly AlsNativeRichCurve[] _curves;
     public string SourcePath { get; }
     public string AnimationInputsDigest { get; }
     public ReadOnlySpan<string> Names=>_names;
     internal AlsMantlingCurveSource(string path,string digest,string[] names,AlsCurveKey[][] keys)
-    {SourcePath=path;AnimationInputsDigest=digest;_names=names.ToArray();_keys=keys.Select(k=>k.ToArray()).ToArray();}
+    {SourcePath=path;AnimationInputsDigest=digest;_names=names.ToArray();_curves=keys.Select(k=>new AlsNativeRichCurve(k)).ToArray();}
     public void Sample(float seconds,Span<AlsInertialCurve> output)
     {
-        if(output.Length!=_keys.Length||!float.IsFinite(seconds))throw new ArgumentException("Invalid mantle curve output/time.");
-        for(var i=0;i<_keys.Length;i++)
-        {
-            if(!AlsCurveRuntime.TrySample(new(i,0,_keys[i].Length,0,1,0),_keys[i],0,seconds,out var value,out var failure))
-                throw new InvalidOperationException("Invalid mantle curve sample: "+failure);
-            output[i]=new(value);
-        }
+        if(output.Length!=_curves.Length||!float.IsFinite(seconds))throw new ArgumentException("Invalid mantle curve output/time.");
+        for(var i=0;i<_curves.Length;i++) output[i]=new(_curves[i].Sample(seconds));
     }
 }
 

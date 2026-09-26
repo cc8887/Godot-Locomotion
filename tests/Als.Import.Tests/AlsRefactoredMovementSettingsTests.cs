@@ -29,7 +29,8 @@ public sealed class AlsRefactoredMovementSettingsTests(ITestOutputHelper output)
             foreach (var sample in row.GetProperty("verification").EnumerateArray())
             {
                 var error = MathF.Abs(curve.Sample(sample.GetProperty("input").GetSingle()) - sample.GetProperty("value").GetSingle());
-                Assert.InRange(error, 0, 2e-6f); maximum = MathF.Max(maximum, error); count++;
+                // A single stride ULP becomes a persistent playback-rate error.
+                Assert.Equal(0, error); maximum = MathF.Max(maximum, error); count++;
             }
             Assert.Throws<ArgumentOutOfRangeException>(() => curve.Sample(float.NaN));
         }
