@@ -39,6 +39,62 @@ public sealed class AlsRefactoredFootAnimationFrameTests
     private static AlsFootRigObservations Miss(AlsFootRigQueries queries) => new(queries, default, default);
 
     [Theory]
+    [InlineData(30, false)] [InlineData(60, false)] [InlineData(120, false)]
+    [InlineData(30, true)] [InlineData(60, true)] [InlineData(120, true)]
+    public void RestReadsCurrentLocksAndPreviousTargetsBeforeGraphAndRollsBack(int hz, bool crouch)
+    {
+        var feet = Create(true);
+        var profile = AlsRefactoredCharacterActionTests.Data.Value.Profile;
+        var callbacks = new AlsRefactoredStanceCallbacks(profile.Standing.Catalog, crouch);
+        var rest = new AlsRefactoredRestParentRuntime(profile.Standing.Montages.Settings, callbacks);
+        var command = callbacks.Nodes.ToArray().First(c => c.Function == AlsRefactoredStanceFunction.RefreshDynamicTransitions);
+        var curves = Curves(); curves[2] = curves[3] = new(1);
+        for (var frame = 1; frame <= 5; frame++)
+        {
+            var input = Frame(feet, frame) with { DeltaTime = 1f / hz };
+            // Move the animated left IK target after lock capture; next frame
+            // sees this socket under a translated, uniformly scaled component.
+            input = input with { FootIk = input.FootIk with { ComponentToWorld = input.FootIk.ComponentToWorld with {
+                Position = new(1, 2, 3), Scale = new(1.5f) } } };
+            var restInput = new AlsRefactoredRestInput(1f / hz, 0, 0, false, false, AlsRefactoredRestRotation.ViewDirection,
+                crouch ? AlsRefactoredRestStance.Crouching : AlsRefactoredRestStance.Standing, true, frame == 1,
+                1, 0, 0, default, default, default, default);
+            void Start()
+            {
+                feet.PrepareGlobal(input, AlsMovementStateInput.Grounded, new(feet.CommittedIdentity, 1, 0, 0), 0);
+                rest.Prepare(input.Identity, restInput);
+            }
+            Start(); var feedback = feet.TransitionFeedback; feedback.Validate();
+            Assert.Equal(input.Identity, feedback.Identity); Assert.Equal(feet.CommittedIdentity, feedback.PoseIdentity);
+            Assert.Equal(1.5f, feedback.Scale);
+            var expectedTarget = new AlsDoubleVector(frame >= 3 ? -255 : -300, 89.5, 220.25);
+            Assert.InRange((feedback.LeftTarget - expectedTarget).LengthSquared, 0, 1e-8);
+            Assert.Equal(feet.CandidateLocks.Left.Amount, feedback.LeftAmount);
+            Assert.Equal(feet.CandidateLocks.Left.WorldLock.Position, feedback.LeftLock);
+            if (frame == 2) { Assert.Equal(0, feet.CommittedLocks.Left.Amount); Assert.Equal(1, feedback.LeftAmount); }
+            if (frame >= 3)
+                Assert.True((feedback.LeftTarget - feedback.LeftLock).LengthSquared > 20 * 20);
+            rest.UpdateFeet(feedback); rest.Apply(input.Identity, command);
+            var state = rest.Candidate;
+            Assert.Equal(frame == 3 ? 1 : 0, rest.DynamicRequestCount);
+            if (frame == 3)
+                Assert.Equal(rest.Settings.DynamicSequence(crouch, true), state.QueuedTransition!.Sequence);
+            var query = feet.PrepareQueries(Pose(), curves, true); feet.Evaluate(Miss(query));
+            var final = feet.Pose.ToArray();
+            if (frame >= 2) final[9] = final[9] with { Position = final[9].Position + new Vector3(.3f, 0, 0) };
+            feet.CompleteFinalOutput(input.Identity, final, curves);
+            Assert.Throws<InvalidOperationException>(() => feet.TransitionFeedback);
+            // Cancel after final output has overwritten the candidate sockets.
+            feet.Cancel(); rest.Cancel(); Start();
+            Assert.Equal(feedback, feet.TransitionFeedback);
+            rest.UpdateFeet(feet.TransitionFeedback); rest.Apply(input.Identity, command); Assert.Equal(state, rest.Candidate);
+            if (rest.Candidate.QueuedTransition is { } request) rest.AcceptPlayback(frame, request, false);
+            query = feet.PrepareQueries(Pose(), curves, true); feet.Evaluate(Miss(query));
+            feet.CompleteFinalOutput(input.Identity, final, curves); feet.Commit(input.Identity); rest.Commit(frame);
+        }
+    }
+
+    [Theory]
     [InlineData(false, true, true)]
     [InlineData(true, true, false)]
     [InlineData(false, false, false)]

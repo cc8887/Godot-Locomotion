@@ -21,6 +21,28 @@ public sealed class AlsRefactoredRestParentTests
         AlsRefactoredRestStance.Standing,true,false,1,1,1,new(10,0,0),default,new(10,0,0),default);
 
     [Fact]
+    public void FootFeedbackRejectsForeignDuplicateNonfiniteAndLateSnapshots()
+    {
+        var f = Data.Value; var parent = f.Runtime(); var id = new AlsFrameIdentity(1, 7, 1);
+        var feet = new AlsFootTransitionFeedback(id, default, 1, 1, 1, new(20, 0, 0), default, default, default);
+        parent.Prepare(id, Input());
+        Assert.Throws<ArgumentException>(() => parent.UpdateFeet(feet with { Identity = new(1, 8, 1) }));
+        Assert.Throws<ArgumentException>(() => parent.UpdateFeet(feet with { PoseIdentity = new(0, 7, 2) }));
+        Assert.Throws<ArgumentException>(() => parent.UpdateFeet(feet with { LeftAmount = float.NaN }));
+        parent.UpdateFeet(feet);
+        Assert.Throws<ArgumentException>(() => parent.UpdateFeet(feet));
+        parent.Cancel(); parent.Prepare(id, Input());
+        parent.Apply(id, f.Command(AlsRefactoredStanceFunction.InitializeTurnInPlace));
+        Assert.Throws<ArgumentException>(() => parent.UpdateFeet(feet));
+        parent.Cancel(); parent.Prepare(id, Input()); parent.UpdateFeet(feet);
+        parent.Apply(id, f.Command(AlsRefactoredStanceFunction.RefreshDynamicTransitions));
+        Assert.Equal(1, parent.DynamicRequestCount);
+        parent.Commit(1); parent.Prepare(new(2, 7, 1), Input());
+        Assert.Throws<ArgumentException>(() => parent.UpdateFeet(feet with { Identity = new(2, 7, 1) }));
+        parent.UpdateFeet(feet with { Identity = new(2, 7, 1), PoseIdentity = id });
+    }
+
+    [Fact]
     public void OriginalIdleScopesReinitializeDelayAfterRelevanceGapAndCancel()
     {
         var f=Data.Value;var parent=f.Runtime();var traversal=new AlsRefactoredStandingRestTraversal(new(f.Catalog),f.Standing);

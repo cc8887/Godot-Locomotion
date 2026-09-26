@@ -65,6 +65,14 @@ public sealed class AlsRefactoredCharacterActionRuntime
     }
     public void StopTransitions()
     { Check(); if (_postUpdated) throw new InvalidOperationException("Late transition stop."); Queue.QueueStop(); }
+    public int DynamicRequestCount { get { Check(); return RestParent.DynamicRequestCount; } }
+    public void UpdateFeet(in AlsFootTransitionFeedback feet)
+    {
+        Check();
+        if (!_parentsPrepared || _postUpdated || Standing.Prepared || Crouching?.Prepared == true || feet.Identity != _identity)
+            throw new InvalidOperationException("Foot feedback must precede character graph traversal.");
+        RestParent.UpdateFeet(feet);
+    }
     internal void PrepareParents(in AlsPoseUpdateContext context,in AlsRefactoredStandingHostInput input,bool initialize)
     {
         ValidateUpdate(context);

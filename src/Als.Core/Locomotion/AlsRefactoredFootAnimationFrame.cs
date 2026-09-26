@@ -38,6 +38,19 @@ public sealed class AlsRefactoredFootAnimationFrame
     public AlsBasedFootLockFrameState CommittedLocks => _locks.Committed;
     public AlsBasedFootLockFrameTrace? CommittedLockTrace => _locks.CommittedTrace;
     public AlsBasedFootLockFrameState CandidateLocks => _locks.Candidate;
+    public AlsFootTransitionFeedback TransitionFeedback
+    {
+        get
+        {
+            Require(Phase.Global);
+            var component = ToNativeWorld(_frame.FootIk.ComponentToWorld);
+            var locks = _locks.Candidate;
+            return new(_frame.Identity, CommittedIdentity, MathF.Abs(_frame.FootIk.ComponentToWorld.Scale.Y),
+                locks.Left.Amount, locks.Right.Amount,
+                AlsPrecisePose.Compose(_locks.Committed.LeftTarget, component).Position, locks.Left.WorldLock.Position,
+                AlsPrecisePose.Compose(_locks.Committed.RightTarget, component).Position, locks.Right.WorldLock.Position);
+        }
+    }
     public ReadOnlySpan<AlsLocalPose> Pose { get { Require(Phase.Evaluated); if (!_visited) throw new InvalidOperationException("Unvisited foot pose."); return _pose; } }
     public ReadOnlySpan<AlsInertialCurve> Curves { get { Require(Phase.Evaluated); return _rig.Curves; } }
 
