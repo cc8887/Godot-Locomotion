@@ -171,6 +171,17 @@ public struct AlsGroundedMachineState
     public readonly int CurrentState => Transitions.CurrentState;
     public readonly int GetActiveEdge(int index) => (uint)index < Transitions.Count
         ? ActiveEdges[index] : throw new ArgumentOutOfRangeException(nameof(index));
+    public readonly bool Matches(in AlsGroundedMachineState other)
+    {
+        if (Kind != other.Kind || RecordedWeight != other.RecordedWeight || ElapsedSeconds != other.ElapsedSeconds ||
+            LastUpdateSerial != other.LastUpdateSerial || LastUpdateCounter != other.LastUpdateCounter ||
+            HasUpdated != other.HasUpdated || HasInitialized != other.HasInitialized ||
+            Transitions.CurrentState != other.Transitions.CurrentState || Transitions.Count != other.Transitions.Count ||
+            Transitions.Latest != other.Transitions.Latest) return false;
+        for (var i = 0; i < Transitions.Count; i++)
+            if (Transitions.GetTransition(i) != other.Transitions.GetTransition(i) || ActiveEdges[i] != other.ActiveEdges[i]) return false;
+        return true;
+    }
 }
 
 public struct AlsGroundedMachineUpdate

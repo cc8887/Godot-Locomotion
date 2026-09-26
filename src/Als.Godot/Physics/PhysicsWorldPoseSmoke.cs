@@ -141,6 +141,22 @@ public partial class PhysicsWorldPoseSmoke : Node3D
                         // source. Preserve its positions, but export a rigid actor.
                         var nearUnit = pose.Select(p => p with { Scale = p.Scale * .9999905f }).ToArray();
                         bridge.SeedWithBodyVelocities(new(199, 7, 3), world, nearUnit, inherited, states);
+                        // Both nested Slots may omit a subthreshold source. Their
+                        // product is valid for rigid transport, not authored scale.
+                        var nested = pose.Select(p => p with { Scale = p.Scale * (.9999905f * .9999905f) }).ToArray();
+                        bridge.SeedWithBodyVelocities(new(200, 7, 3), world, nested, inherited, states);
+                        for (var bone = 0; bone < nested.Length; bone++)
+                        {
+                            var local = AlsPhysicsBodySet.Local(nested[bone]);
+                            components[bone] = parents[bone] < 0 ? local : components[parents[bone]] * local;
+                        }
+                        for (var i = 0; i < bodies.Length; i++)
+                            Require((world * components[mapping[i]]).Origin.DistanceTo(AlsCorePhysicsPose.ToWorld(states[i].Actor).Origin) < 1e-5f,
+                                "Rigid transport changed nested Slot animation positions.");
+                        var outside = pose.ToArray(); outside[0] = outside[0] with { Scale = new(.99997f, 1, 1) };
+                        var beforeReject = states.ToArray();
+                        Reject(() => bridge.SeedWithBodyVelocities(new(201, 7, 3), world, outside, inherited, states));
+                        Require(states.SequenceEqual(beforeReject), "Rejected scale partially published bodies.");
                         foreach (var state in states.Take(bodies.Length))
                             Require(Math.Abs(state.Actor.Rotation.LengthSquared - 1) < .00001,
                                 "Near-unit animation did not produce a rigid body rotation.");

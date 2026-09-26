@@ -32,6 +32,9 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public AlsOverlayKind Overlay { get; init; }
     public AlsMovementNotifyState MovementNotifies { get; init; }
     public int OverlayOverride { get; init; }
+    public long RefactoredStandingFrames { get; init; }
+    public long RefactoredCrouchingFrames { get; init; }
+    public long RefactoredTransitionFrames { get; init; }
 }
 
 // Exclusive production adapter. The Worker retains publication authority; the
@@ -151,6 +154,9 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _base.CommittedGlobalInput, _evaluation, _base.Movement.CommittedMovement.CurrentState)
         { RootIdentity = CommittedRootIdentity, RootState = CommittedRoot, Ragdoll = CommittedRagdoll, MovementNotifies = _notifyState,
             OverlayOverride = _overlayOverride,
+            RefactoredStandingFrames = _base.RefactoredStances?.CommittedStandingFrames ?? 0,
+            RefactoredCrouchingFrames = _base.RefactoredStances?.CommittedCrouchingFrames ?? 0,
+            RefactoredTransitionFrames = _base.RefactoredStances?.CommittedTransitionFrames ?? 0,
             StopTransitions = _base.CommittedStopTransitionCount,
             HasPoseMovingChannel = _poseMoving >= 0, PoseMoving = _committedPoseMoving,
             RefactoredFeedback = _committedRefactoredFeedback, RefactoredInputPose = _base.CommittedRefactoredPose,
@@ -341,6 +347,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         // The component is attached to a stable character rig. Movement-base
         // changes do not reparent this component; they must not reset inertia.
         _nextFeedback = AlsAnimationInputFeedback.FromCompletedFrame(_identity, CurveNames, Curves);
+        _base.RefactoredStances?.CaptureFeedback(CurveNames, Curves);
         _nextPoseMoving = _poseMoving >= 0 ? Curves[_poseMoving] : default;
         _nextLockProducersMatch = _refLeftLock >= 0 && _refRightLock >= 0 && _v4LeftLock >= 0 && _v4RightLock >= 0 &&
             Curves[_refLeftLock] == Curves[_v4LeftLock] && Curves[_refRightLock] == Curves[_v4RightLock];

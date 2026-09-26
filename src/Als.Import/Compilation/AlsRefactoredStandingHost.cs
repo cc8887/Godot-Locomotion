@@ -46,6 +46,7 @@ public sealed class AlsRefactoredStandingHost
     private bool _prepared, _evaluated, _postUpdated, _hasIdle, _hasStop, _hasMovement, _poseBegun;
 
     public AlsFrameIdentity CommittedIdentity { get; private set; }
+    internal bool Prepared=>_prepared;
     public int CommittedState => _standing.CommittedState.CurrentState;
     public int State { get { Check(); return _standing.Candidate.State.CurrentState; } }
     public AlsRefactoredRestState RestState { get { Check(); return _restParent.Candidate; } }
@@ -67,7 +68,7 @@ public sealed class AlsRefactoredStandingHost
         ArgumentOutOfRangeException.ThrowIfZero(generation);
         _profile = profile; _character = character; _generation = generation;
         _standing = new(profile.Standing); _stop = new(profile.Stop.Resources); _stopSources = new(profile.Stop);
-        _parent = new(profile.Details.Callbacks, profile.MovementSettings);
+        _parent = sharedActions?.MovementParent??new(profile.Details.Callbacks, profile.MovementSettings);
         _traversal = new(profile.Catalog, profile.Standing, profile.Details, profile.Direction, 0);
         _players = new(profile.Catalog, profile.Sync, profile.Triangles, profile.Details.Players.Bind(0,
             new Dictionary<string, int> { ["Movement"] = 0, ["Run Start"] = 1, ["First Pivot"] = 2, ["Second Pivot"] = 3 }));
@@ -80,7 +81,7 @@ public sealed class AlsRefactoredStandingHost
         _sharedActions = sharedActions;
         _bank = sharedActions?.Bank ?? new([], sequences: profile.Assets);
         _queue = sharedActions?.Queue ?? new(_bank, character, generation);
-        _restParent = new(profile.Montages.Settings, profile.Montages, _bank, _queue, profile.Callbacks);
+        _restParent = sharedActions?.RestParent??new(profile.Montages.Settings, profile.Montages, _bank, _queue, profile.Callbacks);
         _restTraversal = new(profile.RestGraph, profile.Callbacks);
         _idle = new(profile.Catalog, profile.RestGraph, profile.Pose.Rest, profile.MontagePose);
         _directionPose = new AlsPrecisePose[BoneNames.Length]; _detailsPose = new AlsPrecisePose[BoneNames.Length]; _pose = new AlsPrecisePose[BoneNames.Length];
@@ -96,7 +97,7 @@ public sealed class AlsRefactoredStandingHost
         if (context.Identity.CharacterId != _character || context.Identity.SlotGeneration != _generation ||
             context.UpdateCounter is not { HasUpdated: true } || !context.HasSharedContext ||
             context.Delta != input.Movement.Delta || context.Delta != input.Rest.Delta ||
-            input.Rest.Stance != AlsRefactoredRestStance.Standing || input.QuickStop.Crouching ||
+            _sharedActions is null&&(input.Rest.Stance != AlsRefactoredRestStance.Standing || input.QuickStop.Crouching) ||
             input.QuickStop.VelocityDirection != (input.Rest.Rotation == AlsRefactoredRestRotation.VelocityDirection) ||
             !float.IsFinite(input.FootPlanted)) throw new ArgumentException("Invalid Standing host input/context.");
         _identity = context.Identity; _input = input;
@@ -105,9 +106,13 @@ public sealed class AlsRefactoredStandingHost
         {
             if (_sharedActions is null) { _queue.Begin(_identity); _bank.Begin(_identity, context.Delta); }
             else _sharedActions.ValidateUpdate(context);
-            _parent.Prepare(_identity, input.Movement, initializeInstance); _parent.RefreshGrounded(frame);
-            if (input.ActivatePivot) _parent.ActivatePivot(frame);
-            _restParent.Prepare(_identity, input.Rest, initializeInstance);
+            if(_sharedActions is not null)_sharedActions.PrepareParents(context,input,initializeInstance);
+            else
+            {
+                _parent.Prepare(_identity, input.Movement, initializeInstance); _parent.RefreshGrounded(frame);
+                if (input.ActivatePivot) _parent.ActivatePivot(frame);
+                _restParent.Prepare(_identity, input.Rest, initializeInstance);
+            }
             var source = AlsRefactoredStandingInertialization.SourceContext(context);
             _restTraversal.Begin(source, _restParent, initializeInstance);
             var rotate = _restParent.Candidate.Rotate;
@@ -218,7 +223,7 @@ public sealed class AlsRefactoredStandingHost
         if (_postUpdated) throw new InvalidOperationException("Standing actions already consumed.");
         try
         {
-            _profile.Montages.PostUpdate(_bank, _restParent, _queue, _identity);
+            if(_sharedActions is null)_profile.Montages.PostUpdate(_bank, _restParent, _queue, _identity);
             QuickStopDispatchCount = _profile.QuickStop.Dispatch(_queue, _bank, _identity, _standing, _input.QuickStop);
             _postUpdated = true;
         }
@@ -251,7 +256,8 @@ public sealed class AlsRefactoredStandingHost
         _restTraversal.Commit(frame); _traversal.Commit(frame);
         if (_hasStop) { _stopSources.Commit(frame); _stop.Commit(frame); }
         if (_hasMovement) { _movementInertia.Commit(frame); _movement.Commit(frame); }
-        _players.Commit(frame); _rotate.Commit(frame); _standing.Commit(frame); _parent.Commit(frame); _restParent.Commit(frame);
+        _players.Commit(frame); _rotate.Commit(frame); _standing.Commit(frame);
+        if(_sharedActions is null){_parent.Commit(frame);_restParent.Commit(frame);}
         if (_sharedActions is null) { _queue.Commit(identity); _bank.Commit(identity); }
         _nextClocks.CopyTo(_clocks, 0);
         CommittedIdentity = identity; CancelGraph();
@@ -265,7 +271,8 @@ public sealed class AlsRefactoredStandingHost
     {
         _inertia.Cancel(); _standingPose.Cancel(); _idle.Cancel(); _restTraversal.Cancel(); _traversal.Cancel();
         _stopSources.Cancel(); _stop.Cancel(); _movementInertia.Cancel(); _movement.Cancel(); _players.Cancel();
-        _rotate.Cancel(); _standing.Cancel(); _parent.Cancel(); _restParent.Cancel();
+        _rotate.Cancel(); _standing.Cancel();
+        if(_sharedActions is null){_parent.Cancel();_restParent.Cancel();}
         if (_sharedActions is null) { _queue.Discard(); _bank.Discard(); }
         _prepared = _evaluated = _postUpdated = _hasIdle = _hasStop = _hasMovement = _poseBegun = false; QuickStopDispatchCount = 0;
     }

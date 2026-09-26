@@ -114,7 +114,7 @@ public sealed class AlsRefactoredStandingPose
         private void ValidateMachine()
         {
             _machineOwner!.ValidateCommit(_identity.FrameId);
-            if (!_machineOwner.Candidate.State.Equals(_state)) throw new ArgumentException("Standing candidate changed after pose collection began.");
+            if (!_machineOwner.Candidate.State.Matches(_state)) throw new ArgumentException("Standing candidate changed after pose collection began.");
         }
         public void Evaluate(long frame)
         {

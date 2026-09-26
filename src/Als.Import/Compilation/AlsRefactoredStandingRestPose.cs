@@ -22,7 +22,7 @@ public sealed class AlsRefactoredStandingRestPose
         if (catalog.IndexDigest != graph.CatalogDigest || catalog.IndexDigest != metadata.CatalogDigest)
             throw new ArgumentException("Foreign Standing rest catalog.");
         Graph = graph;
-        var idle = catalog.CompileAbsolutePoseWithCurves(AlsRefactoredStandingRestGraph.IdleSequence);
+        var idle = catalog.CompileAbsolutePoseWithCurves(graph.IdleSource);
         _bones = idle.Pose.BoneNames.ToArray(); _parents = idle.Pose.Parents.ToArray();
         var rotate = graph.RotatePlayers.Players.ToArray().Select(p => catalog.CompileAbsolutePoseWithCurves(p.Source)).ToArray();
         if (rotate.Any(p => !p.Pose.BoneNames.SequenceEqual(_bones) || !p.Pose.Parents.SequenceEqual(_parents)))

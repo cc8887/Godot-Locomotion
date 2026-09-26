@@ -10,31 +10,34 @@ namespace GodotAls.Import.Compilation;
 public sealed class AlsRefactoredStandingRestGraph
 {
     public const string IdleSequence = "/ALS/ALS/Animations/Base/A_Als_Stand_Pose.A_Als_Stand_Pose";
+    public bool Crouching { get; }
+    public string IdleSource => Crouching ? "/ALS/ALS/Animations/Base/A_Als_Crouch_Pose.A_Als_Crouch_Pose" : IdleSequence;
     public string CatalogDigest { get; }
-    public string SlotName => "TurnInPlaceStanding";
-    public int SlotPropertyIndex => 60;
+    public string SlotName => Crouching ? "TurnInPlaceCrouching" : "TurnInPlaceStanding";
+    public int SlotPropertyIndex => Crouching ? 28 : 60;
     public bool AlwaysUpdateSlotSource => false;
     public AlsRefactoredRotatePlayers RotatePlayers { get; }
     private readonly AlsRefactoredStanceCallback[] _idleCallbacks;
     public ReadOnlySpan<AlsRefactoredStanceCallback> IdleCallbacks => _idleCallbacks;
 
-    public AlsRefactoredStandingRestGraph(AlsRefactoredAnimationCatalog catalog)
+    public AlsRefactoredStandingRestGraph(AlsRefactoredAnimationCatalog catalog, bool crouching = false)
     {
-        CatalogDigest = catalog.IndexDigest;
-        var payload = catalog.Read(AlsRefactoredRotatePlayers.Blueprint(false));
-        _idleCallbacks = Compile(payload);
-        RotatePlayers = new(catalog, false);
+        CatalogDigest = catalog.IndexDigest; Crouching = crouching;
+        var payload = catalog.Read(AlsRefactoredRotatePlayers.Blueprint(crouching));
+        _idleCallbacks = Compile(payload, crouching);
+        RotatePlayers = new(catalog, crouching);
     }
 
-    internal static AlsRefactoredStanceCallback[] Compile(JsonElement payload)
+    internal static AlsRefactoredStanceCallback[] Compile(JsonElement payload, bool crouching = false)
     {
-        var blueprint = AlsRefactoredRotatePlayers.Blueprint(false);
+        var blueprint = AlsRefactoredRotatePlayers.Blueprint(crouching);
+        var idleSource = crouching ? "/ALS/ALS/Animations/Base/A_Als_Crouch_Pose.A_Als_Crouch_Pose" : IdleSequence;
         Expect(payload, new { source = blueprint, @class = "AnimBlueprint" });
         var nodes = payload.GetProperty("compiled").GetProperty("nodes").EnumerateArray().ToDictionary(Id);
         var graphs = new Dictionary<string, AlsYawOffsetCompiler.Graph>();
-        var callbacks = AlsRefactoredStanceCallbacks.Compile(payload, false).ToDictionary(c => c.PropertyIndex);
-        _ = AlsRefactoredRotatePlayers.Compile(payload, false);
-        int[][] chains = [[64,57,59,58,62,60,63,61], [14,13,12], [11,10,9]];
+        var callbacks = AlsRefactoredStanceCallbacks.Compile(payload, crouching).ToDictionary(c => c.PropertyIndex);
+        _ = AlsRefactoredRotatePlayers.Compile(payload, crouching);
+        int[][] chains = crouching ? [[32,25,27,26,29,28,30,31], [22,21,20], [19,18,17]] : [[64,57,59,58,62,60,63,61], [14,13,12], [11,10,9]];
         string[][] kinds = [["StateResult","CallFunction","CallFunction","CallFunction","ModifyCurve","Slot","ModifyCurve","SequenceEvaluator"],
             ["StateResult","ModifyCurve","SequencePlayer"], ["StateResult","ModifyCurve","SequencePlayer"]];
         for (var state = 0; state < chains.Length; state++)
@@ -62,12 +65,12 @@ public sealed class AlsRefactoredStandingRestGraph
                 var bindings = Regex.Matches(authored.Body,"PropertyName=\"([^\"]+)\".*?PropertyPath=\\(([^)]*)\\).*?bIsBound=True")
                     .Select(m => m.Groups[1].Value + ":" + string.Join(".",Regex.Matches(m.Groups[2].Value,"\"([^\"]+)\"").Select(v => v.Groups[1].Value))).Order().ToArray();
                 if (kind == "SequencePlayer") continue; // Validated by RotatePlayers above.
-                string[] expectedBindings = Id(n) is 62 or 13 or 10
+                string[] expectedBindings = kind == "ModifyCurve" && Id(n) != (crouching ? 30 : 63)
                     ? ["CurveValues_0:GetParent." + (state == 0 ? "TurnInPlaceState" : "RotateInPlaceState") + ".PlayRate"] : [];
                 Require(bindings.SequenceEqual(expectedBindings), "Standing rest property binding differs.");
                 if (kind == "ModifyCurve")
                 {
-                    var locks = Id(n) == 63;
+                    var locks = Id(n) == (crouching ? 30 : 63);
                     string[] names = locks ? ["FootLeftLock","FootRightLock","AllowTransitions"] : ["RotationYawSpeed"];
                     foreach (var policy in Policies(n))
                     {
@@ -79,17 +82,17 @@ public sealed class AlsRefactoredStandingRestGraph
                         Require(float.Parse(Graph(n).Literal(authored,"CurveValues_"+c),CultureInfo.InvariantCulture) == (locks ? 1 : 0), "Standing rest curve pin differs.");
                 }
                 if (kind == "Slot") foreach (var policy in Policies(n))
-                    Expect(policy, new { slotName = "TurnInPlaceStanding", bAlwaysUpdateSourcePose = false });
+                    Expect(policy, new { slotName = crouching ? "TurnInPlaceCrouching" : "TurnInPlaceStanding", bAlwaysUpdateSourcePose = false });
                 if (kind == "SequenceEvaluator")
                 {
-                    foreach (var policy in Policies(n)) Expect(policy, new { sequence = IdleSequence, explicitTime = 0, explicitFrame = 0,
+                    foreach (var policy in Policies(n)) Expect(policy, new { sequence = idleSource, explicitTime = 0, explicitFrame = 0,
                         bUseExplicitFrame = true, bShouldLoop = true, bTeleportToExplicitTime = true, reinitializationBehavior = "ExplicitTime",
                         startPosition = 0, groupName = "None", groupRole = "CanBeLeader", method = "DoNotSync", bIgnoreForRelevancyTest = false });
-                    Require(Graph(n).Literal(authored,"ExplicitFrame") == "0" && authored.Body.Contains("Sequence=\"/Script/Engine.AnimSequence'"+IdleSequence+"'\"",StringComparison.Ordinal), "Idle evaluator source differs.");
+                    Require(Graph(n).Literal(authored,"ExplicitFrame") == "0" && authored.Body.Contains("Sequence=\"/Script/Engine.AnimSequence'"+idleSource+"'\"",StringComparison.Ordinal), "Idle evaluator source differs.");
                 }
             }
         }
-        int[] ids = [57,59,58];
+        int[] ids = crouching ? [25,27,26] : [57,59,58];
         AlsRefactoredStanceFunction[] functions = [AlsRefactoredStanceFunction.RefreshDynamicTransitions, AlsRefactoredStanceFunction.InitializeTurnInPlace, AlsRefactoredStanceFunction.RefreshTurnInPlace];
         for (var i = 0; i < ids.Length; i++) Require(callbacks[ids[i]].Function == functions[i], "Idle callback order differs.");
         return ids.Select(i => callbacks[i]).ToArray();

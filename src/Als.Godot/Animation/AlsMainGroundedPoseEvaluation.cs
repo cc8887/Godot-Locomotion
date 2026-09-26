@@ -49,6 +49,7 @@ internal sealed class AlsMainGroundedPoseEvaluation : IAlsGroundedPoseCacheReade
     public bool CrouchingCyclesEvaluated { get; private set; }
     public int EvaluatedCacheMask { get; private set; }
     public ReadOnlySpan<string> CurveNames => _names;
+    internal AlsRefactoredDemoStances? RefactoredStances { get; set; }
 
     public AlsMainGroundedPoseEvaluation(AlsMainGroundedCachedGraphDefinition definition, AlsStandingCycleGraph standing,
         AlsCrouchingCyclePoseGraph cycles, AlsCrouchingStatePoseGraph crouching, AlsMainGroundedPoseGraph main)
@@ -137,6 +138,7 @@ internal sealed class AlsMainGroundedPoseEvaluation : IAlsGroundedPoseCacheReade
         }
         if (node == _definition.CrouchingCacheIndex)
         {
+            if (RefactoredStances is not null) { RefactoredStances.EvaluateStance(true, bones, curves); return; }
             var stack = _update.State.Crouching.Machine.Transitions;
             var visited = 0;
             Visit(stack.Count > 0 ? stack.GetTransition(0).From : stack.CurrentState);
@@ -162,6 +164,8 @@ internal sealed class AlsMainGroundedPoseEvaluation : IAlsGroundedPoseCacheReade
             CrouchingCyclesEvaluated = true;
             return;
         }
+        if (RefactoredStances is not null && node == _definition.Standing.StandingBinding.CacheNodeIndex)
+        { RefactoredStances.EvaluateStance(false, bones, curves); return; }
         _standing.EvaluateCachedSource(node, _frame, this, bones, curves);
         if (node == _definition.Standing.StandingBinding.CacheNodeIndex)
         {
@@ -172,6 +176,8 @@ internal sealed class AlsMainGroundedPoseEvaluation : IAlsGroundedPoseCacheReade
 
     private void EvaluateMain(Span<AlsPrecisePose> bones, Span<AlsInertialCurve> curves)
     {
+        if (RefactoredStances is { SourceUpdated: false })
+        { RefactoredStances.FinishGrounded(bones, curves); return; }
         var stack = _update.State.Main.Transitions;
         var visited = 0;
         Visit(stack.Count > 0 ? stack.GetTransition(0).From : stack.CurrentState);
@@ -179,6 +185,7 @@ internal sealed class AlsMainGroundedPoseEvaluation : IAlsGroundedPoseCacheReade
         _main.Compose(_update.State.Main, _sourceTimes, _standingPose, _crouchingPose, _rest, bones);
         for (var i = 0; i < curves.Length; i++) curves[i] = _main.CurveWithPresence(_update.State.Main, _sourceTimes,
             _names[i], _standingCurves[i], _crouchingCurves[i]);
+        RefactoredStances?.FinishGrounded(bones, curves);
         void Visit(int state)
         {
             if ((visited & (1 << state)) != 0) return;

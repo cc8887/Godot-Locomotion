@@ -15,6 +15,7 @@ internal static class AlsAnimationRuntimeOptions
         "--refactored-pose-curves", "--refactored-movement-curves",
         "--refactored-foot-frame", "--foot-lock-gravity-twist",
         "--foot-lock-final-contact", "--foot-ground-clearance", "--foot-contact-toes",
+        "--refactored-stance-hosts",
     ];
 
     internal static bool Has(string flag) =>

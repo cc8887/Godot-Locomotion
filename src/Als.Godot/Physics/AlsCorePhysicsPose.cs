@@ -11,6 +11,10 @@ namespace GodotAls.Physics;
 // Never samples a live skeleton or advances a second physics integration owner.
 internal sealed class AlsCorePhysicsPose
 {
+    // The migration graph nests Refactored Transition inside the existing
+    // Grounded Slot. Each can omit a source below ZERO_ANIMWEIGHT_THRESH.
+    // Bound their combined residual here, not in animation/oracle tolerances.
+    private const float AnimationScaleResidual = 2 * AlsPoseBlender.WeightThreshold;
     // Native local axes become FBX (X,-Y,Z), while native world axes become
     // Godot (Y,Z,-X). A bone frame needs this right-side basis, not merely the
     // conjugated world rotation used by the geometry query adapter.
@@ -63,14 +67,14 @@ internal sealed class AlsCorePhysicsPose
             // physical body. Enforce rigidity only along physical ancestor chains.
             if (_rigidBone[i])
             {
-                // UE slot blending can omit a source below ZERO_ANIMWEIGHT_THRESH,
-                // leaving unit-scale animation within that per-axis tolerance.
+                // Preserve the composed animation positions; only the physical
+                // actor rotation is made rigid below. Real scale remains rejected.
                 // Do not apply the scene transform's determinant test here: its
                 // three-axis product magnifies the accepted animation residual.
                 var scaleError = p.Scale - NVector.One;
-                if (MathF.Abs(scaleError.X) > AlsPoseBlender.WeightThreshold ||
-                    MathF.Abs(scaleError.Y) > AlsPoseBlender.WeightThreshold ||
-                    MathF.Abs(scaleError.Z) > AlsPoseBlender.WeightThreshold)
+                if (MathF.Abs(scaleError.X) > AnimationScaleResidual ||
+                    MathF.Abs(scaleError.Y) > AnimationScaleResidual ||
+                    MathF.Abs(scaleError.Z) > AnimationScaleResidual)
                     throw new ArgumentException("Physical animation bones require unit scale within animation weight tolerance.");
             }
             _components[i] = _parents[i] < 0 ? local : _components[_parents[i]] * local;
