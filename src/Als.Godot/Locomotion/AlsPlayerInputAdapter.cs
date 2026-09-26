@@ -92,7 +92,7 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource, IAlsAct
         // A replacement can inherit a movement frame already captured for the
         // retired actor. Rebind action ownership without applying toggles twice.
         if (sameOwner || identity.FrameId != _capturedFrameId)
-            CaptureMovementFrame(identity.FrameId, snapshot, viewYaw, viewPitch);
+            CaptureMovementFrame(identity.FrameId, snapshot with { CancelActionPressed = cancel }, viewYaw, viewPitch);
         _actions.Capture(identity, request);
         if (!sameOwner) _previewOwnerRequest = _previewOwnerEpoch = _lastOutcomeFrame = 0;
         if (pending || !SameOwner(identity, _pendingActionIdentity)) _pendingRoll = _pendingCancel = false;
@@ -180,7 +180,7 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource, IAlsAct
             gait,
             _stance,
             snapshot.AimHeld ? AlsRotationMode.Aiming : _rotationMode,
-            snapshot.JumpPressed ? (byte)1 : (byte)0) { RequestedOverlay = snapshot.Overlay };
+            snapshot.JumpPressed ? (byte)1 : (byte)0) { RequestedOverlay = snapshot.Overlay, CancelAction = snapshot.CancelActionPressed };
         _capturedFrameId = frameId;
     }
 

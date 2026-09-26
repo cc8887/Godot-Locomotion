@@ -184,20 +184,36 @@ public sealed class AlsMontageRuntime
         _branching?.Attach(actions);
     }
 
-    public void Begin(AlsFrameIdentity identity, float delta, bool ragdoll = false)
+    public void Begin(AlsFrameIdentity identity, float delta, bool ragdoll = false,
+        AlsMontagePositionOverride? positionOverride = null)
     {
         // Do not discard an already prepared frame on a caller phase error.
         if(_prepared)throw new ArgumentException("A montage frame is already prepared.");
-        try{BeginCore(identity,delta,ragdoll);}
+        try{BeginCore(identity,delta,ragdoll,positionOverride);}
         catch{Discard();throw;}
     }
 
-    private void BeginCore(AlsFrameIdentity identity, float delta, bool ragdoll)
+    private void BeginCore(AlsFrameIdentity identity, float delta, bool ragdoll, AlsMontagePositionOverride? positionOverride)
     {
         if (_prepared || identity.SlotGeneration == 0 || !float.IsFinite(delta) || delta < 0 ||
             CommittedIdentity != default && (identity.SlotGeneration != CommittedIdentity.SlotGeneration ||
                 identity.CharacterId != CommittedIdentity.CharacterId || identity.FrameId <= CommittedIdentity.FrameId))
             throw new ArgumentException("Invalid montage frame identity, phase or delta.");
+        if (positionOverride is { } seek)
+        {
+            if (seek.InstanceId <= 0 || !float.IsFinite(seek.Position) || seek.Position < 0)
+                throw new ArgumentException("Invalid montage position override.");
+            var found = false;
+            foreach (var instance in Committed)
+                if (instance.InstanceId == seek.InstanceId)
+                {
+                    if (instance.Slot != AlsMontageSlot.PostLocomotion || instance.Interrupted ||
+                        !instance.Playing || seek.Position > instance.Duration)
+                        throw new ArgumentException("Mantle seek requires its live physical PostLocomotion instance.");
+                    found = true;
+                }
+            if (!found) throw new ArgumentException("Expired montage position override.");
+        }
         _branching?.Begin(identity);
         _requests.Clear();foreach(var request in _committedRequests)_requests.Add(request.Key,request.Value);
         Ensure(_committedCount); _count = _evaluationCount = _traversalCount = _notifyTraversalCount = 0;
@@ -208,6 +224,10 @@ public sealed class AlsMontageRuntime
         for (var i = 0; i < _committedCount; i++)
         {
             var state = _committed[i];
+            // Native Montage_SetPosition precedes montage Advance. Seeking does
+            // not emit notifies for the skipped interval or change blend time.
+            if (!ragdoll && positionOverride is { } overridePosition && overridePosition.InstanceId == state.InstanceId)
+                state = state with { Position = overridePosition.Position };
             if (ragdoll && state.Blend.DesiredWeight > 0)
             {
                 var stopBlend = state.Blend;

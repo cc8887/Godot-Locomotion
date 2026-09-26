@@ -8,7 +8,7 @@ namespace GodotAls.Animation;
 
 // One exclusive owner per character, including dynamic turns and supported authored
 // actions. Final LayerBlending/IK still require the enclosing controller's commit.
-internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameRuntimeSink
+internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameRuntimeSink
 {
     private readonly AlsGroundedFrameRuntime _grounded;
     private readonly AlsMainMovementFrameRuntime _movement;
@@ -125,10 +125,11 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     {
         Require(Phase.Idle);
         if (_motionPreparation != default) throw new InvalidOperationException("A montage tick is already pending.");
-        _actions.Begin(identity, delta, ragdoll);
+        BeginMantleMontages(identity, delta, ragdoll);
         _motionPreparation = identity; _motionPreparationDelta = delta;
         var source = _montages.RootMotionRange;
-        return _preparedRootMotion = new(identity, source.HasMotion ? source : default, _rootMotion.Read(source));
+        return _preparedRootMotion = new(identity, source.HasMotion ? source : default, _rootMotion.Read(source))
+        { MantlingEnded = MantlePhysicalActionEnded() };
     }
     internal void DiscardRootMotionPreparation()
     {
@@ -137,7 +138,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     }
     private void BeginMontageFrame(AlsFrameIdentity identity, float delta, bool ragdoll = false)
     {
-        if (_motionPreparation == default) _actions.Begin(identity, delta, ragdoll);
+        if (_motionPreparation == default) BeginMantleMontages(identity, delta, ragdoll);
         else
         {
             if (_motionPreparation != identity || _motionPreparationDelta != delta)
@@ -219,10 +220,18 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         _controlInput = definition.GroundedControl; _committedControlInput = _controlInput.InitialState;
         _aimingInput = definition.AimingInput; _committedAimingInput = _aimingInput.InitialState;
         _idleControl = definition.IdleControl;
-        _turnInPlace = definition.TurnInPlace; _montages = new(definition.TurnMontageAssets, definition.AuthoredMontageAssets, definition.GroundedTransitionAssets);
+        _turnInPlace = definition.TurnInPlace;
+        if (AlsAnimationRuntimeOptions.Has("--refactored-stance-hosts"))
+        {
+            _mantleResources = AlsMantlingDemoResources.Shared.Value;
+            _mantleHost = new(_mantleResources.Montages, set, definition.AuthoredMontageAssets, definition.TurnMontageAssets, definition.GroundedTransitionAssets);
+            _mantleBranches = AlsMantlingBranchCompiler.Compile(_mantleResources.AnimationJson, _mantleHost.Profile);
+        }
+        _montages = _mantleHost is null ? new(definition.TurnMontageAssets, definition.AuthoredMontageAssets, definition.GroundedTransitionAssets) : _mantleHost.CreateRuntime(_mantleBranches);
         _actions = new(_montages,definition.ActionPolicies); _actionPlayback = definition.ActionPlayback;
         _rootMotion = new(definition);
-        _turnNotifyBinding = definition.MontageNotifies; _turnNotifies = new(_turnNotifyBinding);
+        _turnNotifyBinding = _mantleHost?.BindNotifies(_mantleResources!.AnimationJson, definition.MontageNotifies).Binding ?? definition.MontageNotifies;
+        _turnNotifies = new(_turnNotifyBinding);
         _overlayTransitions = definition.OverlayTransitions; _stopTransitions = definition.StopTransitions;
         _committedGlobalInput = new(default, definition.InputCurves.Defaults["FallSpeed"] * .01f,
             definition.InputCurves.Defaults["LandPrediction"], definition.InputStateDefaults.Lean, definition.InputStateDefaults.Speed);
@@ -233,9 +242,15 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         {
             _movement = new(library, set, definition.Sources, definition.Binding, definition.Movement, _grounded,
                 definition.Air, definition.Landing, definition.Dependencies,
-                definition.AuthoredMontageAssets.SelectMany(a=>set.Animations[a.AnimationId].Curves).Select(c=>c.SourceName).ToArray(), contributor,
+                definition.AuthoredMontageAssets.SelectMany(a=>set.Animations[a.AnimationId].Curves).Select(c=>c.SourceName).Concat(_mantleResources?.CurveNames ?? []).ToArray(), contributor,
                 refactoredDefinitions, definition.GroundedEntryNotify.Binding);
             RefactoredStances?.BindOutputLayout(_movement.CurveNames);
+            if (_mantleHost is not null)
+            {
+                var skeleton = definition.RawSources.GetSkeleton(set.Animations[definition.AuthoredMontageAssets[0].AnimationId].SkeletonId);
+                _mantlePose = new AlsMantlingHostPoseProfile(_mantleHost.Profile, skeleton, _movement.CurveNames, _mantleResources!.MontageCurves).CreatePoseSource();
+                _mantleSlot = new(skeleton.PreciseReferencePose, skeleton.LogicalParents, _movement.CurveNames.Length);
+            }
             _actionSlot = new(library,set,definition.AuthoredMontageAssets.Select(a=>a.AnimationId).Distinct().ToArray(),
                 _movement.ReferencePose,_movement.CurveNames);
             _tail = new(definition.BaseLayer, _movement.ReferencePose.Length, _movement.CurveNames.Length);
@@ -330,6 +345,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         {
         _identity=frame.Identity; SourceUpdated=false; RequestCount=0; _phase=Phase.GlobalUpdating;
         BeginMontageFrame(frame.Identity, frame.DeltaTime, _candidateMovementState == AlsMovementStateInput.Ragdoll);
+        PrepareMantling(frame);
         _candidateRolling = _committedRolling;
         _movementAction = _rollingGameplay ? frame.MovementAction : default;
         AlsRollingStartContext? rolling = _rollingGameplay && frame.ActionRequest.ActionDefinitionId == _rollDefinitionId ? new(frame.Floor.IsGrounded == 1 && !_movementAction.RequiresRagdoll,
@@ -472,15 +488,18 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             var graphContext=traversal is { } graphFrame ? context.WithUpdateCounter(graphFrame.Update) : context;
             var update = _tail.Begin(graphContext, slot,traversal); _tailPrepared=true; SourceUpdated = update.Updated;
             var physical = HasMontageFrame;
-            if (SourceUpdated)
+            var sourceWeight = _mantleSlot is null ? 1 : _montages.SlotWeights(AlsMontageSlot.PostLocomotion).SourceWeight;
+            _locomotionUpdated = SourceUpdated && sourceWeight > AlsPoseBlender.WeightThreshold;
+            var sourceContext = update.Context.WithWeight(update.Context.Weight * sourceWeight, sourceWeight);
+            if (_locomotionUpdated)
             {
                 _legacySourceUpdate=RefactoredStances is not null;
-                try{_movement.Prepare(result,movement,rules,inputs,update.Context,this,physical,traversal);}
+                try{_movement.Prepare(result,movement,rules,inputs,sourceContext,this,physical,traversal);}
                 finally{_legacySourceUpdate=false;}
             }
             else if(traversal is { } frame)_movement.PrepareUnvisited(result,movement,rules,inputs,frame,this,physical);
             else _movement.PrepareHidden(_identity, context.Delta, physical);
-            if(SourceUpdated)RefactoredStances?.PrepareLocomotion(update.Context,inputs.Grounded.Initialization,rules.FromRoll);
+            if(_locomotionUpdated)RefactoredStances?.PrepareLocomotion(sourceContext,inputs.Grounded.Initialization,rules.FromRoll);
             if (physical)
             {
                 var visitedGround = SourceUpdated && _movement.GroundedReadCount > 0;
@@ -491,7 +510,9 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
                     (crouching && _montages.SlotWeights(AlsTurnSlot.Crouching).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 2 : 0) |
                     (_authoredActions==true && _montages.SlotWeights(AlsMontageSlot.BaseLayer).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 4 : 0) |
                     (visitedGround && _montages.SlotWeights(AlsMontageSlot.Grounded).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 8 : 0);
-                _turnNotifies.Complete((byte)relevant);
+                if (SourceUpdated && _mantleSlot is not null && _montages.SlotWeights(AlsMontageSlot.PostLocomotion).SlotNodeWeight > AlsPoseBlender.WeightThreshold)
+                    relevant |= AlsMontageSlot.PostLocomotion.Mask;
+                _turnNotifies.Complete((ushort)relevant);
                 _movement.PrepareEvents(_turnNotifyBinding, _turnNotifies.Notifies, _turnNotifies.DirectNotifies,
                     _failureEpochs.AsSpan(0, _failureEpochCount));
             }
@@ -506,11 +527,17 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         Require(Phase.Prepared);
         try
         {
-            if (SourceUpdated)
+            if (_locomotionUpdated)
             {
                 if(RefactoredStances is {} original)
                 {original.EvaluateLocomotion(_rawPrecise,_rawCurves,component);_movement.CompleteUpdateOnly();}
                 else _movement.EvaluateRaw(_rawPrecise, _rawCurves, groundedSlot ?? (HasMontageFrame ? _groundedSlot : null));
+            }
+            if (SourceUpdated && _mantleSlot is not null)
+            {
+                _mantleSlot.Evaluate(_montages.Frame, _identity, AlsMontageSlot.PostLocomotion,
+                    _locomotionUpdated ? _rawPrecise : [], _locomotionUpdated ? _rawCurves : [], _rawPrecise, _rawCurves, _mantlePose!);
+                ApplyMantleCurveAliases();
             }
             _tail.EvaluatePrecise(SourceUpdated ? _rawPrecise : ReadOnlySpan<AlsPrecisePose>.Empty,
                 SourceUpdated ? _rawCurves : ReadOnlySpan<AlsInertialCurve>.Empty,
@@ -544,6 +571,9 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         _committedRolling = _candidateRolling;
         CommittedStopTransitionCount = StopTransitionCount;
         CommittedIdentity=identity; _sink = null; _phase = Phase.Idle; _cancelForRuntimeFailure = false; _failureEpochCount = 0;
+        _committedMantling = _candidateMantling; _committedMantleInstance = _candidateMantleInstance;
+        _committedMantleInputs = _candidateMantleInputs;
+        _committedMantleEnded = _candidateMantleEnded;
     }
     internal void ValidateCommit(AlsFrameIdentity identity)
     {

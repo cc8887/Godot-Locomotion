@@ -93,9 +93,10 @@ public partial class AlsP3Character : Node3D
     }
     internal void ConsumeRagdollRequest()
     {
+        if (PublishedFrameId != RuntimeCommittedFrameId) return;
         // Read only the committed edge. A failed/retried animation must never
         // activate physics from the newer gathered Motor input.
-        if (_requestedRagdollEnvironment is null && Diagnostics.Result.MovementAction.RequiresRagdoll)
+        if (_requestedRagdollEnvironment is null && (Diagnostics.Result.MovementAction.RequiresRagdoll || _motor.MantleTargetDestroyed))
             _requestedRagdollEnvironment = _context.AutomaticRagdollEnvironment;
         if (_requestedRagdollEnvironment is not { } environment || PublishedFrameId != RuntimeCommittedFrameId) return;
         BeginRagdoll(environment); _requestedRagdollEnvironment = null;
@@ -107,6 +108,7 @@ public partial class AlsP3Character : Node3D
             PublishedFrameId != RuntimeCommittedFrameId)
             throw new InvalidOperationException("Ragdoll activation requires an idle committed complete character.");
         var simulation = GodotAls.Physics.AlsCharacterRagdollSimulation.Create(this, environment, this, _context);
+        _motor.CancelMantling();
         _motor.CollisionLayer = 0; _motor.CollisionMask = 0;
         _motor.Velocity = Vector3.Zero;
         RagdollSimulation = simulation;
@@ -541,6 +543,7 @@ public partial class AlsP3Character : Node3D
             }
             else
             {
+                _motor.MantlingEndedByAnimation = _worker.MotorRootMotion.MantlingEnded;
                 input = _motor.Step(
                     frameId,
                     checked((int)_state.Handle.CharacterId),

@@ -45,10 +45,10 @@ public sealed class AlsMontageActionRuntime
         _history = new(0,-1,AlsActionCommand.None);
     }
 
-    public void Begin(AlsFrameIdentity identity, float delta, bool ragdoll = false)
+    public void Begin(AlsFrameIdentity identity, float delta, bool ragdoll = false, AlsMontagePositionOverride? positionOverride = null)
     {
         if (_phase != Phase.Idle) throw new InvalidOperationException("An action frame is already prepared.");
-        _montages.Begin(identity,delta,ragdoll);
+        _montages.Begin(identity,delta,ragdoll,positionOverride);
         _identity=identity; _committed.CopyTo(_candidate,0); _nextHistory=_history; _outcomes=default; _requestApplied=false;
         _phase=Phase.Preparing;
     }

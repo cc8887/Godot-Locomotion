@@ -75,7 +75,7 @@ public partial class AlsNativeCameraHost : Node
             var sockets = _binding!.Sample(); var input = owner.LatestMotorInput;
             var result = owner.Diagnostics.Result;
             var mode = FirstPerson ? input.Command.RequestedRotationMode : result.ActualRotationMode;
-            var action = owner.PhysicsDriven ? "Ragdolling" : owner.FullMovementDiagnostics.MovementNotifies.Action switch
+            var action = owner.PhysicsDriven ? "Ragdolling" : input.Mantling.Active ? "Mantling" : owner.FullMovementDiagnostics.MovementNotifies.Action switch
             { AlsTimelineAction.Rolling => "Rolling", AlsTimelineAction.Mantling => "Mantling", _ => "" };
             var graph = new AlsCameraGraphInput("Als.RotationMode." + (mode switch
             { AlsRotationMode.VelocityDirection => "VelocityDirection", AlsRotationMode.Aiming => "Aiming", _ => "ViewDirection" }),
