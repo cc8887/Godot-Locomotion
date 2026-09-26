@@ -22,6 +22,12 @@ public readonly record struct AlsFootIkSceneSample(byte Captured, AlsFrameIdenti
 
 public static class AlsFootIkCoordinates
 {
+    public static AlsPrecisePose FbxComponentToNativeWorld(in AlsLocalPose fbxWorld)
+    {
+        new AlsPrecisePose(fbxWorld).Validate(.001);
+        var q = fbxWorld.Rotation * Quaternion.Conjugate(FbxToGodotRotation);
+        return new(ToNative(fbxWorld.Position), new AlsQuaternion(q.Z, -q.X, -q.Y, q.W).Normalized(), new(fbxWorld.Scale));
+    }
     // FBX bone-local axes -> canonical Godot component axes: (-Y, Z, -X).
     public static Quaternion FbxToGodotRotation => new(-.5f,.5f,.5f,.5f);
     public static AlsDoubleVector ComponentToNative(Vector3 v, AlsFootIkPoseSpace space) =>

@@ -38,6 +38,28 @@ public sealed class AlsRefactoredFootAnimationFrameTests
         AlsMovementStateInput.Grounded, new(owner.CommittedIdentity, 1, 0, 0), 0);
     private static AlsFootRigObservations Miss(AlsFootRigQueries queries) => new(queries, default, default);
 
+    [Fact]
+    public void FootLockUsesSharedConfiguredMotionInsteadOfItsLegacySpeedFallback()
+    {
+        var feet = Create(true); var curves = Curves(); curves[2] = curves[3] = new(1);
+        for (var f = 1; f <= 3; f++)
+        {
+            var input = Frame(feet, f) with { ActualVelocity = f == 3 ? Vector3.UnitX : Vector3.Zero };
+            var observation = AlsRefactoredMotionObservation.Capture(input, 50, 75);
+            Assert.Throws<ArgumentException>(() => feet.PrepareGlobal(input, AlsMovementStateInput.Grounded,
+                new(feet.CommittedIdentity, 1, 0, 0), 0, observation with { Identity = new(f, 3, 1) }));
+            var committed = feet.CommittedLocomotion;
+            feet.PrepareGlobal(input, AlsMovementStateInput.Grounded, new(feet.CommittedIdentity, 1, 0, 0), 0, observation);
+            feet.Cancel();
+            Assert.Equal(committed, feet.CommittedLocomotion);
+            feet.PrepareGlobal(input, AlsMovementStateInput.Grounded, new(feet.CommittedIdentity, 1, 0, 0), 0, observation);
+            if (f == 3) Assert.Equal(1 - input.DeltaTime * 5, feet.CandidateLocks.Left.Amount);
+            var query = feet.PrepareQueries(Pose(), curves, true); feet.Evaluate(Miss(query));
+            feet.CompleteFinalOutput(input.Identity, feet.Pose, curves); feet.Commit(input.Identity);
+            Assert.Equal(observation, feet.CommittedLocomotion);
+        }
+    }
+
     [Theory]
     [InlineData(30, false)] [InlineData(60, false)] [InlineData(120, false)]
     [InlineData(30, true)] [InlineData(60, true)] [InlineData(120, true)]

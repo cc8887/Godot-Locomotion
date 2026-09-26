@@ -509,7 +509,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             if (SourceUpdated)
             {
                 if(RefactoredStances is {} original)
-                {original.EvaluateLocomotion(_rawPrecise,_rawCurves);_movement.CompleteUpdateOnly();}
+                {original.EvaluateLocomotion(_rawPrecise,_rawCurves,component);_movement.CompleteUpdateOnly();}
                 else _movement.EvaluateRaw(_rawPrecise, _rawCurves, groundedSlot ?? (HasMontageFrame ? _groundedSlot : null));
             }
             _tail.EvaluatePrecise(SourceUpdated ? _rawPrecise : ReadOnlySpan<AlsPrecisePose>.Empty,

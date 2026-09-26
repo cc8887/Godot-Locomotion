@@ -24,6 +24,7 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
     private readonly AlsFootIkFrameRuntime? _feet;
     private readonly AlsRefactoredFootAnimationFrame? _refactoredFeet;
     public AlsRefactoredFootRigState CommittedRefactoredRig => _refactoredFeet?.CommittedRig ?? default;
+    public AlsRefactoredMotionObservation? CommittedFootMotion => _refactoredFeet?.CommittedLocomotion;
     internal ReadOnlySpan<AlsPrecisePose> CommittedRefactoredRigPose => _refactoredFeet is not null
         ? _refactoredFeet.CommittedRigPose : throw new InvalidOperationException("No Refactored foot rig.");
     internal AlsRefactoredFootRigInput CandidateRefactoredRigInput => _refactoredFeet is not null
@@ -244,7 +245,8 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
             if (_root is null && (footState==AlsMovementStateInput.Ragdoll || ragdollObservation.HasValue))
                 throw new InvalidOperationException("Ragdoll input requires the final root source binding.");
             _feet?.PrepareGlobal(frame, footState);
-            _refactoredFeet?.PrepareGlobal(frame, footState, Base.CandidateRefactoredPose, Base.CandidateRefactoredPrediction);
+            _refactoredFeet?.PrepareGlobal(frame, footState, Base.CandidateRefactoredPose, Base.CandidateRefactoredPrediction,
+                Base.RefactoredStances?.Observation);
             if (_refactoredFeet is not null) Base.RefactoredStances?.UpdateFeet(_refactoredFeet.TransitionFeedback);
             var childContext = context;
             if (_root is not null)

@@ -52,6 +52,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
     private bool[] _toeOwners = [];
     private bool[] _contactOwners = [];
     private int _armedFrames;
+    private int _relativeMotionFrames;
     private AlsProductionGraphCapture? _pausedGraph, _commitGraph;
 
     public override void _Ready()
@@ -160,6 +161,16 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 if (frame.CommittedFrameId == _lastFrames[i]) continue;
                 Require(frame.CommittedFrameId == _lastFrames[i] + 1, "Committed frame sequence skipped or duplicated.");
                 var full = character.FullMovementDiagnostics; var split = character.SplitFootDiagnostics;
+                if (full.RefactoredMotion.Identity.SlotGeneration != 0)
+                {
+                    Require(full.RefactoredMotion.Identity == frame.Identity && full.FootMotion == full.RefactoredMotion,
+                        "Graph and feet committed different motion observations.");
+                    var floor = character.LatestMotorInput.Floor;
+                    Require(full.RefactoredMotion.RelativeLocation ==
+                        (floor.IsGrounded == 1 && floor.PlatformId >= 0 && floor.ColliderId > 0),
+                        "Relative movement base differs from the captured floor.");
+                    if (full.RefactoredMotion.RelativeLocation) _relativeMotionFrames++;
+                }
                 if (full.RefactoredRig.LeftToePinned || full.RefactoredRig.RightToePinned)
                 { _toeFrames++; _toeOwners[i] = true; }
                 if (_contactStatic) Require(full.RefactoredLocks.Left.BaseIdentity == 0 && full.RefactoredLocks.Right.BaseIdentity == 0,
@@ -235,6 +246,12 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             Require(!TestContacts || _contactFrames > _count * 10 && _contactOwners.All(p => p),
                 "Not every character established a real final contact anchor.");
             if (TestContacts) GD.Print($"FINAL_CONTACT_DISPATCH_OK owners={_count} frames={_contactFrames} warm_cancel=true static={_contactStatic}");
+            if (_characters[0].FullMovementDiagnostics.RefactoredMotion.Identity.SlotGeneration != 0)
+            {
+                Require(!_contactPlatform || _relativeMotionFrames > _count * 10, "Relative base branch was not exercised.");
+                Require(!_contactStatic || _relativeMotionFrames == 0, "Static floor became a relative base.");
+                GD.Print($"REFACTORED_MOTION_DISPATCH_OK relative_frames={_relativeMotionFrames} owners={_count}");
+            }
             if (OS.GetCmdlineUserArgs().Contains("--foot-ground-clearance"))
             {
                 Require(_clearanceFrames > 0, "Unplanted geometry correction was not exercised.");

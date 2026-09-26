@@ -141,7 +141,7 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
     }
     void IAlsPoseCacheUpdateSink.OnCachedUpdatesSkipped(int handler,ReadOnlySpan<AlsPoseUpdateContext> skipped)
     { if(handler!=34)throw new ArgumentException("Foreign Crouching skipped-update handler."); }
-    public void Evaluate(in AlsPrecisePose component)
+    public void Evaluate(in AlsPrecisePose component, long attachParent = 0, float teleportDistance = 0)
     {
         Check(); if(_post)throw new InvalidOperationException("Late Crouching evaluation."); var frame=_identity.FrameId;
         try
@@ -172,7 +172,7 @@ public sealed class AlsRefactoredCrouchingHost : IAlsPoseCacheUpdateSink
                 for(var c=0;c<_rawCurves.Length;c++)_rawCurves[c]=AlsStandingCycleCurves.Accumulate(AlsStandingCycleCurves.Scale(_rawCurves[c],1-edge.Alpha),_stateCurves[edge.To][c],edge.Alpha);
             }
             if(stack.Count>0)for(var b=0;b<_raw.Length;b++)_raw[b]=_raw[b].Normalized();
-            _inertia.Evaluate(_raw,_rawCurves,component);_inertia.Pose.CopyTo(_pose);_inertia.Curves.CopyTo(_curves);Set(_curves,"PoseCrouching",1);_evaluated=true;
+            _inertia.Evaluate(_raw,_rawCurves,component,attachParent,teleportDistance);_inertia.Pose.CopyTo(_pose);_inertia.Curves.CopyTo(_curves);Set(_curves,"PoseCrouching",1);_evaluated=true;
         }
         catch{Cancel();throw;}
         void Sample(int state)
