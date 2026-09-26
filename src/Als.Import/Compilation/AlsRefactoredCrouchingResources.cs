@@ -153,7 +153,7 @@ public sealed class AlsRefactoredCrouchingResources
         _rotateLengths = RotatePlayers.Players.ToArray().Select(p => catalog.Read(p.Source).GetProperty("evaluation").GetProperty("sequencePlayLength").GetSingle()).ToArray();
     }
 
-    private static AlsOverlayBoneProfile CompileQuickFeet(JsonElement stance, AlsRefactoredAnimationCatalog catalog)
+    internal static AlsOverlayBoneProfile CompileQuickFeet(JsonElement stance, AlsRefactoredAnimationCatalog catalog)
     {
         var profile = stance.GetProperty("blendProfiles").EnumerateArray().Single(p => Text(p, "path") == "/ALS/ALS/Character/SK_Als.SK_Als:QuickFeetBlend");
         Expect(profile, new { skeleton = "/ALS/ALS/Character/SK_Als.SK_Als", mode = 1 });

@@ -10,6 +10,8 @@
 
 # 运行和验证
 
+- 最新 Locomotion/Jump 状态组件：`docs/verification/2026-09-26-refactored-locomotion-machines.md`。原 node83 六state/十六edge、node64 五state/五edge、alias/落地conduit/typed rules/原trigger、QuickFeet/通知/退出停止候选、真实8计时源。三Hz各16秒3360提交帧共享Sync及逐帧retry、双脚/两落地；最终Import59含新16及Standing原生六组、Core57、Optimize0/0。首嵌套函数className遗漏10失败、腾空短于1.67秒导致3覆盖失败均修正留档，未改算法/阈值。只组件，受控channel，未生产空中source/pose/Parent宿主/UE新oracle或Godot运行；Demo仍9bde6d5的Grounded→Transition+旧外层。下一步原Fall/Jump/Land姿态/源遍历/Parent/cache/node39与4惯性→共享owner→Demo，再全部R2–R7。无UE变更/运行/导出，用户改动/暂缓项保留。
+
 - 最新 Grounded pose/Demo：`docs/verification/2026-09-26-refactored-grounded-host.md`。原两条1.2f非loop player、Roll45帧、两stance cache、Grounded初始化/刷新及入口清除、Stop/Roll退出回调、node43无filter惯性/node42曲线，共享角色事务。普通地面pose改为新Grounded→Transition；旧V4 Grounded更新/source通知仍为旧Locomotion兼容保留，固定component惯性桥接尚待替换。新宿主三Hz1680真实帧重试/5state及100隐藏稀疏/晚期故障；Import相关35含Standing原生六组、最终新5通过，Optimize0/0。普通三Hz state1–4、render13帧、10角色single/parallel3621帧摘要同、Roll420帧、Camera/Ragdoll/Getup480帧通过；另相机容量注入2轮/10失败恢复通过，预期2WARN，普通测试无WARN/ERROR。首rate模板/最终曲线映射/持续旋转未覆盖专用蹲下等失败保留。无UE改动/运行/导出、新Grounded/Crouch原生oracle、全量/10分钟/人工签收。下一步Locomotion6state16edge/Jump5state5edge、真实Notify/脚反馈/新上身/完整动作及全部R2–R7；用户暂缓项和未提交修改保留。
 
 - 最新 Grounded 状态机组件：`docs/verification/2026-09-26-refactored-grounded-machine.md`。原 node41 六state/二十edge，十二编辑规则经两个alias展开、delegate与源property分离；Conduit首次更新、原stance curve201样本、自转换禁止、回调候选、上一缓存weight自动退出、惯性请求/取消重试。三Hz受控输入与测试时钟1680帧，新10/最终Import56（含Standing原生六组）/Core57全过，Optimize0/0；早期回调/正则/alias/path/float校验失败TRX保留。无UE修改/构建/运行/新导出/Godot场景/全量/性能。**不是Grounded姿态host，普通Demo仍上一批stance桥接**。下一步两专用player/Roll固定帧/stance cache/Parent回调/node43惯性/node42曲线/统一事务→Demo，再Locomotion/Jump/Fall/Land。全部旧目标与用户暂缓项保留；用户许可证提交及README/漫游/HUD/场景/LayerBlending改动不纳入本批。
