@@ -47,6 +47,7 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public bool RefactoredTransitionsAllowed { get; init; }
     public AlsRefactoredMotionObservation RefactoredMotion { get; init; }
     public AlsRefactoredMotionObservation? FootMotion { get; init; }
+    public AlsRefactoredLocomotionHistory RefactoredMotionHistory { get; init; }
     public AlsLockCurveProducerValues LockProducers {get;init;}
     public AlsLockCurveProducerValues RawLockProducers {get;init;}
 }
@@ -185,6 +186,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             RefactoredTransitionsAllowed = _base.RefactoredStances?.CommittedTransitionsAllowed ?? false,
             RefactoredMotion = _base.RefactoredStances?.CommittedObservation ?? default,
             FootMotion = _layered?.CommittedFootMotion,
+            RefactoredMotionHistory = _base.RefactoredStances?.CommittedMotionHistory ?? default,
             RefactoredLocomotionFrames = _base.RefactoredStances?.CommittedLocomotionFrames ?? 0,
             RefactoredLocomotionStateMask = _base.RefactoredStances?.CommittedLocomotionStateMask ?? 0,
             StopTransitions = _base.CommittedStopTransitionCount,

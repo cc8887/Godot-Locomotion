@@ -53,6 +53,11 @@ public partial class RefactoredFootDispatchSmoke : Node3D
     private bool[] _contactOwners = [];
     private int _armedFrames;
     private int _relativeMotionFrames;
+    private bool _platformMotion;
+    private PhysicsBody3D? _floor;
+    private int _rotatingBaseFrames;
+    private AlsRefactoredLocomotionHistory[] _motionHistories = [];
+    private AlsRefactoredLocomotionHistory _pausedMotion, _commitMotion;
     private AlsProductionGraphCapture? _pausedGraph, _commitGraph;
 
     public override void _Ready()
@@ -63,6 +68,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             _captureGraph=OS.GetCmdlineUserArgs().Contains("--production-graph-capture");
             _overlayCycle=OS.GetCmdlineUserArgs().Contains("--overlay-cycle");
             _contactPlatform=OS.GetCmdlineUserArgs().Contains("--contact-platform");
+            _platformMotion=OS.GetCmdlineUserArgs().Contains("--platform-motion");
+            Require(!_platformMotion || _contactPlatform, "Platform motion requires a real platform fixture.");
             _contactStatic=OS.GetCmdlineUserArgs().Contains("--contact-static");
             _actionRequests=OS.GetCmdlineUserArgs().Contains("--action-requests");
             Require(!_actionRequests || TestContacts, "Action boundary replay requires the contact schedule.");
@@ -87,6 +94,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 settings.Gravity, settings.JumpSpeed, 1, settings.VelocityAngleInterpolationStart, settings.VelocityAngleInterpolationEnd);
             _context = new(_mode, settings, motor, set, profile, System.Environment.CurrentManagedThreadId, true);
             _lastFrames = new long[_count]; _events = new long[_count];
+            _motionHistories = new AlsRefactoredLocomotionHistory[_count];
             _actionEvents = new long[_count];
             _contactOwners = new bool[_count];
             _toeOwners = new bool[_count];
@@ -108,6 +116,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 }
             };
             PhysicsBody3D floor = _contactPlatform ? new AnimatableBody3D { SyncToPhysics = true } : new StaticBody3D();
+            _floor = floor;
             floor.Position = new(0, -.5f, 0); floor.CollisionLayer = floor.CollisionMask = 1;
             floor.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new(200, 1, 200) } });
             AddChild(floor);
@@ -129,6 +138,11 @@ public partial class RefactoredFootDispatchSmoke : Node3D
         try
         {
             _tick++;
+            if (_platformMotion)
+            {
+                _floor!.Position = new(_tick * .15f / _hz, -.5f, 0);
+                _floor.Rotation = new(0, _tick * .1f / _hz, 0);
+            }
             Require(_tick <= _hz * 6 + 30, "Dispatch did not recover before the timeout.");
             ObserveCommitHold();
             if (_phase == 1) CancelAtBoundary();
@@ -142,6 +156,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                     "Paused owner advanced its committed pose, history or callbacks.");
                 Require(ReferenceEquals(paused.FullMovementDiagnostics.GraphCapture,_pausedGraph),
                     "Canceled candidate replaced the committed graph snapshot.");
+                Require(paused.FullMovementDiagnostics.RefactoredMotionHistory == _pausedMotion,
+                    "Canceled candidate advanced animation velocity history.");
                 if (_tick == _resumeTick)
                 {
                     paused.GetNode<Node>("FootPhysicsQuery").ProcessMode = ProcessModeEnum.Inherit;
@@ -170,6 +186,22 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                         (floor.IsGrounded == 1 && floor.PlatformId >= 0 && floor.ColliderId > 0),
                         "Relative movement base differs from the captured floor.");
                     if (full.RefactoredMotion.RelativeLocation) _relativeMotionFrames++;
+                    var history = full.RefactoredMotionHistory; var previous = _motionHistories[i];
+                    Require(history.Identity == frame.Identity && history.Velocity == AlsFootIkCoordinates.ToNative(character.LatestMotorInput.ActualVelocity),
+                        "Animation history belongs to another frame or velocity producer.");
+                    var acceleration = previous.Identity.SlotGeneration == 0 ? default :
+                        (history.Velocity - previous.Velocity) * (1d / character.LatestMotorInput.DeltaTime);
+                    Require(history.Acceleration == acceleration, "Default ALS animation acceleration differs from its committed history.");
+                    if (previous.Identity.SlotGeneration != 0)
+                    {
+                        Require(full.RefactoredMotion.HasInput || history.InputYaw == previous.InputYaw,
+                            "Stopped input lost its last direction.");
+                        Require(full.RefactoredMotion.HasVelocity || history.VelocityYaw == previous.VelocityYaw,
+                            "Stopped movement lost its last direction.");
+                        if (history.BaseIdentity != 0 && previous.BaseIdentity == history.BaseIdentity && history.BaseRotation != previous.BaseRotation)
+                            _rotatingBaseFrames++;
+                    }
+                    _motionHistories[i] = history;
                 }
                 if (full.RefactoredRig.LeftToePinned || full.RefactoredRig.RightToePinned)
                 { _toeFrames++; _toeOwners[i] = true; }
@@ -251,6 +283,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 Require(!_contactPlatform || _relativeMotionFrames > _count * 10, "Relative base branch was not exercised.");
                 Require(!_contactStatic || _relativeMotionFrames == 0, "Static floor became a relative base.");
                 GD.Print($"REFACTORED_MOTION_DISPATCH_OK relative_frames={_relativeMotionFrames} owners={_count}");
+                Require(!_platformMotion || _rotatingBaseFrames > _count * _hz, "Actual moving base history was not exercised.");
+                GD.Print($"REFACTORED_HISTORY_DISPATCH_OK rotating_base_frames={_rotatingBaseFrames} owners={_count}");
             }
             if (OS.GetCmdlineUserArgs().Contains("--foot-ground-clearance"))
             {
@@ -292,6 +326,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 "Main commit hold did not leave a completed worker result.");
             _commitInput = character.LatestMotorInput; _commitStages = stages;
             _commitGraph=character.FullMovementDiagnostics.GraphCapture;
+            _commitMotion=character.FullMovementDiagnostics.RefactoredMotionHistory;
             _commitEvents = _events[_commitOwner]; _commitActions = _actionEvents[_commitOwner]; _commitResumeTick = _tick + 2; _commitPhase = 2;
             if (_actionRequests) Require(_commitInput.ActionRequest.Command == AlsActionCommand.Start, "Commit hold did not capture a real action Start.");
             return;
@@ -302,6 +337,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             "Waiting for main commit advanced motor, animation, queries or callbacks.");
         Require(ReferenceEquals(character.FullMovementDiagnostics.GraphCapture,_commitGraph),
             "Waiting for main commit replaced the completed graph snapshot.");
+        Require(character.FullMovementDiagnostics.RefactoredMotionHistory == _commitMotion,
+            "Waiting for main commit changed the completed motion history.");
         if (_tick == _commitResumeTick)
         {
             character.GetNode<Node>("Commit").ProcessMode = ProcessModeEnum.Inherit;
@@ -330,6 +367,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                 Require(_pausedRig.LeftToePinned || _pausedRig.RightToePinned, "Late cancellation must interrupt a toe contact.");
         }
         _pausedGraph=character.FullMovementDiagnostics.GraphCapture;
+        _pausedMotion=character.FullMovementDiagnostics.RefactoredMotionHistory;
         _pausedEvents = _events[_pauseOwner];
         _pausedActions = _actionEvents[_pauseOwner];
         if (_actionRequests && _completedPauses == 0)

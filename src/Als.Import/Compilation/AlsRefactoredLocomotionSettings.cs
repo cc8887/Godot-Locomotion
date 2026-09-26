@@ -12,6 +12,8 @@ public sealed class AlsRefactoredLocomotionSettings
     public float MovingThreshold { get; }
     public float MovingSmoothThreshold { get; }
     public float TeleportDistance { get; }
+    public bool IgnoreBaseRotation { get; }
+    public bool InheritBaseYawInVelocityMode { get; }
     public AlsRefactoredLocomotionSettings(string characterJson, string animationJson)
     {
         using var character = JsonDocument.Parse(characterJson);
@@ -26,6 +28,8 @@ public sealed class AlsRefactoredLocomotionSettings
             throw new ArgumentException("Foreign animation settings for locomotion observation.");
         MovingThreshold = Number(c, "movingSpeedThreshold");
         TeleportDistance = Number(c, "teleportDistanceThreshold");
+        IgnoreBaseRotation = c.GetProperty("ignoreBaseRotation").GetBoolean();
+        InheritBaseYawInVelocityMode = c.GetProperty("inheritBaseYawInVelocityMode").GetBoolean();
         MovingSmoothThreshold = Number(a.GetProperty("general"), "movingSmoothSpeedThreshold");
     }
     private static float Number(JsonElement owner, string key)
