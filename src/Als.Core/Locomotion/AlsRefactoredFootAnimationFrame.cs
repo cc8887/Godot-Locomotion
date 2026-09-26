@@ -18,6 +18,8 @@ public sealed class AlsRefactoredFootAnimationFrame
     private readonly AlsInertialCurve[] _previousCurves;
     private readonly float[] _lockCurves = new float[4];
     private AlsFrameInput _frame;
+    private AlsRefactoredMotionObservation? _locomotion;
+    public AlsRefactoredMotionObservation? CommittedLocomotion { get; private set; }
     private AlsRefactoredPoseCurveHistory _cachedPose;
     private float _prediction;
     private bool _valid, _visited;
@@ -94,7 +96,7 @@ public sealed class AlsRefactoredFootAnimationFrame
     }
 
     public void PrepareGlobal(in AlsFrameInput frame, AlsMovementStateInput movement,
-        in AlsRefactoredPoseCurveHistory cachedPose, float prediction)
+        in AlsRefactoredPoseCurveHistory cachedPose, float prediction, AlsRefactoredMotionObservation? locomotion = null)
     {
         Require(Phase.Idle);
         if (frame.FootIk.Captured != 1 || frame.FootIk.PoseIdentity != CommittedIdentity ||
@@ -109,7 +111,8 @@ public sealed class AlsRefactoredFootAnimationFrame
         // RefreshFeetOnGameThread waits for a nonidentity pelvis before the
         // first valid sample; after becoming valid it does not repeat that test.
         _valid = CommittedIdentity != default && (_committedValid || !_finalPelvisIdentity);
-        _locks.Prepare(frame, movement, _lockCurves, _valid);
+        _locks.Prepare(frame, movement, _lockCurves, _valid, locomotion);
+        _locomotion = locomotion;
         _frame = frame; _cachedPose = cachedPose; _prediction = prediction; _visited = false; _phase = Phase.Global;
     }
 
@@ -217,7 +220,7 @@ public sealed class AlsRefactoredFootAnimationFrame
     }
     public void Commit(AlsFrameIdentity identity)
     {
-        ValidateCommit(identity); _rig.Commit(identity); _locks.Commit();
+        ValidateCommit(identity); _rig.Commit(identity); _locks.Commit(); CommittedLocomotion = _locomotion;
         _leftContact = _nextLeftContact; _rightContact = _nextRightContact;
         _leftContactToe = _nextLeftContactToe; _rightContactToe = _nextRightContactToe;
         for (var i = 0; i < 4; i++) _previousCurves[_indices[i]] = new(_lockCurves[i]);
@@ -274,12 +277,7 @@ public sealed class AlsRefactoredFootAnimationFrame
         return new(new(p.X * .01, -p.Y * .01, p.Z * .01), new(-q.X, q.Y, -q.Z, q.W), native.Scale);
     }
     private static AlsPrecisePose ToNativeWorld(AlsLocalPose fbxWorld)
-    {
-        new AlsPrecisePose(fbxWorld).Validate(.001);
-        var q = fbxWorld.Rotation * Quaternion.Conjugate(AlsFootIkCoordinates.FbxToGodotRotation);
-        return new(AlsFootIkCoordinates.ToNative(fbxWorld.Position),
-            new AlsQuaternion(q.Z, -q.X, -q.Y, q.W).Normalized(), new(fbxWorld.Scale));
-    }
+        => AlsFootIkCoordinates.FbxComponentToNativeWorld(fbxWorld);
     private void Require(Phase phase)
     { if (_phase != phase) throw new InvalidOperationException($"Refactored foot animation expected {phase}, got {_phase}."); }
 }

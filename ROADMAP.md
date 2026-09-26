@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-26。代码基线：`main / c47390c` 加本批真实足部历史 → Rest 动态补步；Locomotion 和 Pivot 已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
+更新：2026-09-26。代码基线：`main / d201e93` 加本批统一移动观察、平台相对位置及真实组件惯性；Locomotion、Pivot 和 Rest 足部反馈已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -18,7 +18,7 @@
 |---|---|---|
 | R1 Standing 严格对齐 | 已关闭本批门禁：三频率 2310 帧/140067 骨骼求值全部通过；Parent 已比较字段和时钟差 0 | 保持既定阈值作为后续角色整合的回归；不代表完整角色或普通 Demo 验收 |
 | R2 角色级动作与 Transition Slot | Standing/Crouching/Grounded/Locomotion 已共享角色事务；真实 Transition 输出、惯性请求接收、落地停止/播放已接 Demo。桥外旧 Overlay/动作 bank 仍保留 | 扩展完整角色资源，完成整链原生对照 |
-| R3 完整主移动图 | 原地面/跳跃/下落/落地姿态与 Parent 已接 Demo；真实足部反馈、源 Notify、MovingSmooth、平台与组件变换桥接仍待 | 移除兼容更新，补完整生产反馈和 Crouching/Grounded/Locomotion 连续原生轨迹 |
+| R3 完整主移动图 | 原移动姿态、Parent、真实 Rest 足部反馈及统一 Moving/MovingSmooth 已接 Demo；平台相对位置与组件惯性已接真实输入。源 Notify、加速度历史及连续原生对照仍待 | 移除兼容更新，补完整生产反馈和 Crouching/Grounded/Locomotion 连续原生轨迹 |
 | R4 上身、Overlay 与最终脚部 | 13 Overlay 等已有受控组件证据；不能代替新全角色连续证据 | Aim/Layering/手部/脚部按原图拓扑接入，换向与支撑窗口、地形/平台通过 |
 | R5 Godot 普通入口 | 首批接入完成：普通入口默认新 stance/Transition；现有 Gather/Worker/Commit 统一发布，30/60/120 Hz 与键鼠/多帧测试通过；完整图与人工验收未关闭 | 延续新入口完成剩余子图，并补完整功能矩阵、人工和性能验收 |
 | R6 通用动作与物理恢复 | Roll/Ragdoll/Get-up/Camera 等已接旧入口；Mantle 有组件；长期物理稳定性尚有失败 | 通知、Root Motion、Mantle/Roll、Ragdoll/Get-up/Pose Recovery 与新链路整合并验收 |
@@ -38,7 +38,7 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 
 - [ ] 扩展不可变角色 profile 到完整角色：本批已统一 Grounded 的资源 ID、79 骨父序、曲线映射及 Montage group/slot，并共享武器过渡资源；Mantle/Roll 等动作及其他图资源仍待纳入。V4/Refactored 边界必须显式绑定，禁止按序号混用。
 - [x] Standing/Crouching 支持角色注入的共同 Parent/bank/queue，并保留独立测试入口；原局部 18 个资源显式映射为角色 ID。子图不再推进或提交共享 bank，实际播放实例及其时间/遍历历史由同一物理 bank 所有。角色隐藏或空中仍进行全局更新，站蹲重叠只推进共享 Parent 一次。
-- [ ] 原 AB_Als 外层 Transition Slot node13 的位置、编译/编辑图链接及策略已校验；真实 Grounded→Transition→Locomotion 已接入，Stop/Dynamic/QuickStop/Roll退出及 LandToGrounded 共用动作帧，包含重叠、淡入淡出、停止及重试。原 node4 接收 Transition 惯性请求；仍待真实组件变换历史与新的整链原生轨迹。
+- [ ] 原 AB_Als 外层 Transition Slot node13 的位置、编译/编辑图链接及策略已校验；真实 Grounded→Transition→Locomotion 已接入，Stop/Dynamic/QuickStop/Roll退出及 LandToGrounded 共用动作帧，包含重叠、淡入淡出、停止及重试。原 node4 接收 Transition 惯性请求，真实组件变换历史和原瞬移阈值已传入各层；仍待新的整链原生轨迹。
 - [x] 当前 Grounded 动作共享帧统一预校验/提交及主线程后处理顺序；冻结播放快照不受新播放改写。覆盖停止阻塞保留请求、武器 worker/main 请求、实际 Turn/Stop/QuickStop、取消重试及晚期故障。完整角色其余消费者接入时须继续扩展该门禁。
 
 交付：角色资源绑定、可组合子图 owner、真实外层 Slot 及原生连续对照；不能以 bank 中存在实例作为姿态已接入的证明。
@@ -51,13 +51,14 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 - [x] Crouching 组件：在 [外层状态机](docs/verification/2026-09-26-crouching-machine.md) 基础上补齐 Idle Turn Slot、Movement/Stop、Walk↔方向混合、Lean、缓存遍历、QuickFeet、node34 惯性及 PoseCrouching；使用原蹲伏配置并接共享 owner。三频率受控姿态/事务测试通过。**完整 Crouching 连续原生姿态 oracle 仍待，不能凭组件通过关闭 R3。**
 - [x] 组合 Standing/Crouching、Grounded、Jump/Fall/Land 与各自 Lean/预测落地数据，按原图处理初始化、相关性、缓存最大权重路径、Inactive 和 Sync。完整宿主使用真实子图、13 个独立源和两层惯性，原精度 Air 设置只读导出并验证；Parent 起跳锁存、共享 Lean 和原落地过渡实际执行，普通 Demo 已切换。验证见 [本批记录](docs/verification/2026-09-26-refactored-locomotion-host.md)，尚无新整图连续原生 oracle。
 - [ ] 区分原始输入、Parent 更新状态、图内曲线、最终输出曲线及下一更新读取的已提交历史。Moving 与 MovingSmooth、FootPlanted、FeetCrossing、HipsDirectionLock、YawOffset、SprintBlock 等逐项建立生产者/消费者和帧时序表。
+- [x] Moving/MovingSmooth 使用原角色/动画资产的独立50/150 cm/s阈值，按实际水平速度和输入生成同帧观察，主移动图与脚锁共同消费。RelativeLocation 来自真实着地平台身份；各层惯性收到实际组件世界变换、Actor附着身份（当前无附着为0）和原300 cm瞬移阈值。三频率普通Demo、十角色平台身份分支及取消/重试通过，见 [移动观察与组件惯性](docs/verification/2026-09-26-refactored-locomotion-observation.md)。运动平台完整轨迹、原生整链和旧外层惯性移除未据此关闭。
 - [x] 真实脚部反馈 → Rest DynamicTransitions：上一最终 IK 目标经本帧组件变换，与本帧 global 足锁结果一起传入原图；保持原门控、8 cm×scale、左右选择和两帧间隔，实际进入共享 Transition 动作队列。身份、隐藏全局帧、晚期取消／重试及普通角色扰动测试见 [足部反馈验证](docs/verification/2026-09-26-refactored-rest-feet.md)。这不是新完整足部／角色 UE oracle，项目接触修正仍须单独验收。
 - [x] 原方向状态机生成的 `ActivatePivot` 通知已接 Standing PostUpdate → Parent → 下一帧 Movement Details，普通 Demo 真实输入覆盖 First/Second Pivot。原门槛严格 speed<200 cm/s；不在 worker 回调中提前执行，不对生成通知套源动画 weight/follower/chance 过滤。Standing 机器权重改为实际上一更新记录，初值及隐藏提交为0，取消不发布。独立/共享三频率新连续 UE 对照通过，见 [Pivot 验证](docs/verification/2026-09-26-refactored-pivot-notify.md)。
 - [ ] 将其余源 Notify/Notify State 与生成状态通知接到通用队列及类型化消费者。保留存在性、事件顺序、持续区间、停用/销毁结束语义，只有成功提交才派发副作用。**纠正此前描述：Pivot 的直接来源是方向图的生成过渡通知，不是动画序列上的普通源 Notify；不能为了接 Pivot 人工添加源通知。**
 
 交付：同一角色输入驱动的完整 locomotion 输出（姿态、曲线、播放观察、事件、根运动候选）；站蹲、跳跑、落地和换向连续 UE 对照。
 
-下一接入顺序：MovingSmooth 原设置、移动平台相对位置及组件变换惯性，完成其余源 Notify 的真实时钟/消费者并移除旧移动更新兼容依赖；再补 Crouching/Grounded/Locomotion 与 Parent 连续 UE oracle，随后推进原生上身分层。Pivot 和 Rest 足部反馈已接真实生产者；Demo 相对位置仍 false，桥内组件变换仍 Identity，这些不是完整移植验收状态。
+下一接入顺序：核对真实输入/加速度与平台相对速度历史，补齐其余源 Notify 的真实时钟/消费者并移除旧移动更新兼容依赖；再补 Crouching/Grounded/Locomotion 与 Parent 连续 UE oracle，随后推进原生上身分层。Pivot、Rest足部反馈、MovingSmooth、平台身份及组件变换均已接生产输入；旧外层惯性和通知兼容仍保留，不能称完整移植验收。
 
 ### R4：接上半身、Overlay 与完整最终姿态
 

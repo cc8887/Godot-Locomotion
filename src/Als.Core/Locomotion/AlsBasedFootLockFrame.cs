@@ -69,7 +69,8 @@ internal sealed class AlsBasedFootLockFrame
         if (axis.LengthSquared < 1e-8) throw new ArgumentException("Reference thigh axis is degenerate.");
         return axis * (1 / System.Math.Sqrt(axis.LengthSquared));
     }
-    public void Prepare(in AlsFrameInput frame, AlsMovementStateInput movementState, ReadOnlySpan<float> curves, bool valid = true)
+    public void Prepare(in AlsFrameInput frame, AlsMovementStateInput movementState, ReadOnlySpan<float> curves, bool valid = true,
+        AlsRefactoredMotionObservation? locomotion = null)
     {
         var scene = frame.FootIk;
         var worldRotation = scene.ComponentToWorld.Rotation;
@@ -87,7 +88,9 @@ internal sealed class AlsBasedFootLockFrame
         // Refactored HasVelocity >= 1 cm/s; MovingSmooth's authored default is
         // 150 cm/s, independently of V4's ShouldMove graph rule.
         var hasInput = frame.Command.MovementAxes.LengthSquared() > 1e-4f;
-        var moving = hasInput && speed >= 1 || speed > 150;
+        if (locomotion is { } observation && observation.Identity != frame.Identity)
+            throw new ArgumentException("Foreign foot locomotion observation.");
+        var moving = locomotion?.MovingSmooth ?? (hasInput && speed >= 1 || speed > 150);
         var input = new AlsBasedFootLockInput(frame.DeltaTime, curves[0], curves[2],
             movementState == AlsMovementStateInput.Grounded, moving, valid, false, elapsed,
             baseId, basis, component, AlsPrecisePose.Compose(Committed.LeftTarget, component),

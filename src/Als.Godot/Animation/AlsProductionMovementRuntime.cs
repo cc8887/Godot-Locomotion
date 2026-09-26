@@ -45,6 +45,8 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public long RefactoredDynamicRequests { get; init; }
     public AlsFootTransitionFeedback RefactoredRestFeet { get; init; }
     public bool RefactoredTransitionsAllowed { get; init; }
+    public AlsRefactoredMotionObservation RefactoredMotion { get; init; }
+    public AlsRefactoredMotionObservation? FootMotion { get; init; }
     public AlsLockCurveProducerValues LockProducers {get;init;}
     public AlsLockCurveProducerValues RawLockProducers {get;init;}
 }
@@ -181,6 +183,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             RefactoredDynamicRequests = _base.RefactoredStances?.CommittedDynamicRequests ?? 0,
             RefactoredRestFeet = _base.RefactoredStances?.CommittedFeet ?? default,
             RefactoredTransitionsAllowed = _base.RefactoredStances?.CommittedTransitionsAllowed ?? false,
+            RefactoredMotion = _base.RefactoredStances?.CommittedObservation ?? default,
+            FootMotion = _layered?.CommittedFootMotion,
             RefactoredLocomotionFrames = _base.RefactoredStances?.CommittedLocomotionFrames ?? 0,
             RefactoredLocomotionStateMask = _base.RefactoredStances?.CommittedLocomotionStateMask ?? 0,
             StopTransitions = _base.CommittedStopTransitionCount,

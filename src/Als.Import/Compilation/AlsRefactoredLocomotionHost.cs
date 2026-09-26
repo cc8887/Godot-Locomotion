@@ -64,6 +64,8 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
     private AlsPoseUpdateContext _context;
     private AlsGraphTraversalCounter _initialization;
     private bool _prepared,_visited,_post,_land;
+    private long _attachParent;
+    private float _teleportDistance;
     public AlsFrameIdentity CommittedIdentity=>Actions.CommittedIdentity;
     public AlsRefactoredInAirState Air=>Actions.MovementParent.AirCandidate;
     public AlsRefactoredMovementState Movement=>Actions.MovementParent.MovementCandidate;
@@ -91,10 +93,10 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
         if(fromRoll is {} roll)_input=_input with{FromRoll=roll};
         try{Graph.Prepare(context,this,initialize);_visited=true;}catch{Discard();throw;}
     }
-    public void Evaluate(in AlsPrecisePose component)
+    public void Evaluate(in AlsPrecisePose component, long attachParent = 0, float teleportDistance = 0)
     {
         Actions.ValidateUpdate(_context);if(!_visited)throw new InvalidOperationException("Unvisited Locomotion graph.");
-        try{Graph.Evaluate(component);}catch{Discard();throw;}
+        try{_attachParent=attachParent;_teleportDistance=teleportDistance;Graph.Evaluate(component,attachParent,teleportDistance);}catch{Discard();throw;}
     }
     AlsRefactoredAirPoseInput IAlsRefactoredLocomotionPoseSink.Input
     {
@@ -139,7 +141,7 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
     }
     void IAlsRefactoredLocomotionPoseSink.EvaluateGrounded(in AlsPrecisePose component)
     {
-        var source=Actions.Transition.SourceUpdate;if(source.Updated)Actions.Grounded!.Evaluate(component);
+        var source=Actions.Transition.SourceUpdate;if(source.Updated)Actions.Grounded!.Evaluate(component,_attachParent,_teleportDistance);
         Actions.Transition.Evaluate(source.Updated?Actions.Grounded!.Pose:[],source.Updated?Actions.Grounded!.Curves:[]);
     }
     ReadOnlySpan<AlsPrecisePose> IAlsRefactoredLocomotionPoseSink.GroundedPose=>Actions.Transition.Pose;

@@ -11,6 +11,9 @@ internal sealed class AlsRefactoredDemoStances
 {
     private readonly AlsRefactoredCharacterActionProfile _profile;
     private readonly AlsRefactoredLocomotionHostProfile _locomotion;
+    private readonly AlsRefactoredLocomotionSettings _settings;
+    internal AlsRefactoredMotionObservation Observation { get; private set; }
+    internal AlsRefactoredMotionObservation CommittedObservation { get; private set; }
     private AlsRefactoredLocomotionHost? _host;
     private AlsRefactoredCharacterActionRuntime? _runtime=>_host?.Actions;
     private ReadOnlySpan<string> NativeNames=>_locomotion.Pose.CurveNames;
@@ -56,6 +59,7 @@ internal sealed class AlsRefactoredDemoStances
     internal AlsRefactoredDemoStances(AlsSkeletonDefinition skeleton, ReadOnlySpan<AlsPrecisePose> reference, ReadOnlySpan<string> names)
     {
         _locomotion=AlsRefactoredDemoResources.Locomotion.Value;_profile = _locomotion.Actions; _names = names.ToArray();
+        _settings = AlsRefactoredDemoResources.LocomotionSettings.Value;
         _bones = _profile.BoneNames.ToArray().Select(skeleton.GetLogicalBoneId).ToArray();
         _targetParents=skeleton.LogicalBones.Select(b=>b.ParentLogicalId).ToArray();
         _targetVirtuals=skeleton.VirtualBones;
@@ -116,14 +120,15 @@ internal sealed class AlsRefactoredDemoStances
         var yaw = -frame.CharacterYaw * (180d / Math.PI); var view = -frame.Command.ViewYaw * (180d / Math.PI);
         var half = yaw * (Math.PI / 360d);
         var nativeRotation = new AlsQuaternion(0, 0, Math.Sin(half), Math.Cos(half));
-        var speed = movement.Speed * 100f;
+        Observation = AlsRefactoredMotionObservation.Capture(frame, _settings.MovingThreshold, _settings.MovingSmoothThreshold);
+        var speed = Observation.Speed;
         var velocityYaw = speed > .01f ? (float)(Math.Atan2(velocity.Y, velocity.X) * (180d / Math.PI)) : (float)yaw;
         var direction = AlsFootIkCoordinates.ToNative(frame.InputDirection);
-        var inputYaw = movement.HasMovementInput ? Math.Atan2(direction.Y,direction.X)*(180d/Math.PI) : yaw;
+        var inputYaw = Observation.HasInput ? Math.Atan2(direction.Y,direction.X)*(180d/Math.PI) : yaw;
         var gait = Value("PoseGait"); var grounded = Value("PoseGrounded");
         var unweightedGait = grounded > 1e-8f ? gait / grounded : gait;
-        var moving = movement.IsMoving;
-        var smooth = movement.ShouldMove;
+        var moving = Observation.Moving;
+        var smooth = Observation.MovingSmooth;
         var crouch = result.ActualStance == AlsStance.Crouching;
         var rotation = result.ActualRotationMode switch { AlsRotationMode.VelocityDirection => AlsRefactoredRestRotation.VelocityDirection,
             AlsRotationMode.Aiming => AlsRefactoredRestRotation.Aiming, _ => AlsRefactoredRestRotation.ViewDirection };
@@ -137,13 +142,13 @@ internal sealed class AlsRefactoredDemoStances
             rotation, crouch ? AlsRefactoredRestStance.Crouching : AlsRefactoredRestStance.Standing,
             Value("AllowTransitions") > .99f, pending, 1, 0, 0, default, default, default, default);
         _input = new(nativeMovement, rest, new(grounded, Math.Clamp(unweightedGait-1,0,1),1,Value("FeetCrossing")),
-            new(rotation == AlsRefactoredRestRotation.VelocityDirection, crouch, movement.HasMovementInput, inputYaw, yaw, yaw),
+            new(rotation == AlsRefactoredRestRotation.VelocityDirection, crouch, Observation.HasInput, inputYaw, yaw, yaw),
             Math.Clamp(Value("FootPlanted"),-1,1), smooth);
         try
         {
             var mode=result.ResolvedLocomotionState==AlsLocomotionState.Grounded?AlsRefactoredLocomotionMode.Grounded:
                 result.ResolvedLocomotionState==AlsLocomotionState.InAir?AlsRefactoredLocomotionMode.InAir:AlsRefactoredLocomotionMode.Other;
-            _host.BeginGlobal(Context(1),new(_input,mode,frame.JumpAccepted==1,movement.HasMovementInput,false,prediction,
+            _host.BeginGlobal(Context(1),new(_input,mode,frame.JumpAccepted==1,Observation.HasInput,Observation.RelativeLocation,prediction,
                 Value("PoseStanding"),Value("PoseCrouching")),new(0,0),pending);
             _previousValues.CopyTo(_nextValues,0); _prepared = true;
         }
@@ -161,11 +166,12 @@ internal sealed class AlsRefactoredDemoStances
         _crouching=_host.Graph.GroundedUpdated&&_runtime!.Grounded!.CrouchingUpdated;
         _visited=true;
     }
-    internal void EvaluateLocomotion(Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves)
+    internal void EvaluateLocomotion(Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves, in AlsLocalPose component)
     {
         if(!_visited)throw new InvalidOperationException("No Refactored Locomotion boundary.");
-        // Existing outer world/teleport inertia remains the migration boundary.
-        _host!.Evaluate(AlsPrecisePose.Identity);
+        // UE inertialization tracks the owning actor's attachment, not the
+        // mesh's scene parent. This character is not actor-attached to its floor.
+        _host!.Evaluate(AlsFootIkCoordinates.FbxComponentToNativeWorld(component), 0, _settings.TeleportDistance);
         MapOut(_host.Pose,_host.Curves,NativeNames,pose,curves);
         _host.Curves.CopyTo(_nextValues);_evaluated=true;
     }
@@ -196,6 +202,7 @@ internal sealed class AlsRefactoredDemoStances
     internal void Commit(AlsFrameIdentity id)
     {
         ValidateCommit(id);
+        CommittedObservation = Observation;
         var groundedState=_visited&&SourceUpdated?_runtime!.Grounded!.State:-1;
         if (_feetUpdated) { CommittedFootFeedbackFrames++; CommittedFeet = _nextFeet; }
         CommittedTransitionsAllowed = _input.Rest.TransitionsAllowed;

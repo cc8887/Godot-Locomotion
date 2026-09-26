@@ -38,7 +38,8 @@ public sealed class AlsRefactoredPoseInertia
         _prepared=true; _evaluated=_faulted=false;
     }
     public void Request(float seconds) { ValidateCommit(_identity); if (_evaluated) throw new InvalidOperationException("Late inertia request."); _updated.Request(seconds); }
-    public void Evaluate(ReadOnlySpan<AlsPrecisePose> pose, ReadOnlySpan<AlsInertialCurve> curves, in AlsPrecisePose component)
+    public void Evaluate(ReadOnlySpan<AlsPrecisePose> pose, ReadOnlySpan<AlsInertialCurve> curves, in AlsPrecisePose component,
+        long attachParent = 0, float teleportDistance = 0)
     {
         ValidateCommit(_identity); _evaluated=false;
         try
@@ -46,7 +47,7 @@ public sealed class AlsRefactoredPoseInertia
             if (pose.Length!=_pose.Length || curves.Length!=_curves.Length) throw new ArgumentException("Foreign inertial layout.");
             _evaluatedState.CopyFrom(_updated);
             for(var i=0;i<_included.Length;i++) _input[i]=curves[_included[i]];
-            _evaluatedState.EvaluatePrecisePose(pose,_input,component,0,0,_pose,_filtered);
+            _evaluatedState.EvaluatePrecisePose(pose,_input,component,attachParent,teleportDistance,_pose,_filtered);
             curves.CopyTo(_curves); for(var i=0;i<_included.Length;i++) _curves[_included[i]]=_filtered[i];
             _evaluated=true;
         }

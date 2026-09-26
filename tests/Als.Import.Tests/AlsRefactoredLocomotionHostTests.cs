@@ -36,8 +36,14 @@ public sealed class AlsRefactoredLocomotionHostTests
             var input=new AlsRefactoredLocomotionHostInput(ground,inAir?AlsRefactoredLocomotionMode.InAir:AlsRefactoredLocomotionMode.Grounded,
                 f% (hz*4)==hz/2,cycle==1,false,inAir&&local>2?.6f:0,priorStand,priorCrouch);
             var id=new AlsFrameIdentity(f,4,1);var context=new AlsPoseUpdateContext(id,1,1f/hz).WithUpdateCounter(counter);
+            var component = AlsPrecisePose.Identity with
+            {
+                Position = new(f < hz * 6 ? f * 2 : f * 2 + 500, 0, 0),
+                Rotation = AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitZ, f * .003f)
+            };
+            var parent = f < hz * 8 ? 0 : 71;
             void Prepare(AlsRefactoredLocomotionHost h)
-            {h.BeginGlobal(context,input,new(0,0),f==0);h.Prepare(context,f==0);h.Evaluate(AlsPrecisePose.Identity);}
+            {h.BeginGlobal(context,input,new(0,0),f==0);h.Prepare(context,f==0);h.Evaluate(component,parent,300);}
             Prepare(host);var pose=host.Pose.ToArray();var curves=host.Curves.ToArray();var air=host.Air;var movement=host.Movement;
             states.Add(host.Graph.MainUpdate.State.CurrentState);host.PostUpdate();var actions=host.Actions.Candidate.ToArray();
             landed|=actions.Any(a=>a.AnimationId==p.LandStanding.AnimationId);

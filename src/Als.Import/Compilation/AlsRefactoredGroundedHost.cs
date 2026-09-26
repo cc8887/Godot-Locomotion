@@ -110,13 +110,14 @@ public sealed class AlsRefactoredGroundedHost : IAlsPoseCacheUpdateSink
     }
     void IAlsPoseCacheUpdateSink.OnCachedUpdatesSkipped(int handler,ReadOnlySpan<AlsPoseUpdateContext> skipped)
     {if(handler!=43)throw new ArgumentException("Foreign Grounded inertia receiver.");}
-    public void Evaluate(in AlsPrecisePose component)
+    public void Evaluate(in AlsPrecisePose component, long attachParent = 0, float teleportDistance = 0)
     {
         Check();_owner.ValidateUpdate(_context);_evaluated=false;
         try
         {
             var frame=_identity.FrameId;var state=_machine.Candidate.State;var stack=state.Transitions;
-            if(StandingUpdated)_owner.Standing.Evaluate(component);if(CrouchingUpdated)_owner.Crouching!.Evaluate(component);
+            if(StandingUpdated)_owner.Standing.Evaluate(component,attachParent,teleportDistance);
+            if(CrouchingUpdated)_owner.Crouching!.Evaluate(component,attachParent,teleportDistance);
             var sampled=0;
             void Sample(int s)
             {
@@ -142,7 +143,7 @@ public sealed class AlsRefactoredGroundedHost : IAlsPoseCacheUpdateSink
                 for(var c=0;c<_rawCurves.Length;c++)_rawCurves[c]=AlsStandingCycleCurves.Accumulate(AlsStandingCycleCurves.Scale(_rawCurves[c],1-edge.Alpha),_values[edge.To][c],edge.Alpha);
             }
             if(stack.Count>0)for(var b=0;b<_raw.Length;b++)_raw[b]=_raw[b].Normalized();
-            _inertia.Evaluate(_raw,_rawCurves,component);_inertia.Curves.CopyTo(_curves);foreach(var c in _wrapper)_curves[c]=new(1);_evaluated=true;
+            _inertia.Evaluate(_raw,_rawCurves,component,attachParent,teleportDistance);_inertia.Curves.CopyTo(_curves);foreach(var c in _wrapper)_curves[c]=new(1);_evaluated=true;
         }
         catch{_owner.Discard();throw;}
     }

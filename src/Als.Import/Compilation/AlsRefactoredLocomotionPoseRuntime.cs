@@ -55,6 +55,8 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
     private AlsFrameIdentity _last;
     private IAlsRefactoredLocomotionPoseSink? _sink;
     private int _tickCount;
+    private long _attachParent;
+    private float _teleportDistance;
     private bool _prepared,_evaluated,_faulted,_groundedInitialized,_nextGroundedInitialized;
     public AlsRefactoredLocomotionPoseProfile Profile=>_p;
     public AlsGroundedMachineUpdate MainUpdate {get{Check();return _main.Candidate;}}
@@ -171,10 +173,16 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
     {Require(handler==4,"Foreign Locomotion skipped handler.");}
     public void RequestOuterInertia(in AlsFrameIdentity identity,float seconds)
     {Check();Require(identity==_context.Identity&&_updated[4],"Foreign Locomotion inertia request.");if(_evaluated)throw new InvalidOperationException("Late Locomotion inertia request.");_outer.Request(seconds);}
-    public void Evaluate(in AlsPrecisePose component)
+    public void Evaluate(in AlsPrecisePose component, long attachParent = 0, float teleportDistance = 0)
     {
         Check();_sink!.Validate(_context);_evaluated=false;Array.Clear(_sampled);
-        try{component.Validate();if(GroundedUpdated)_sink.EvaluateGrounded(component);Sample(0,component);_evaluated=true;}
+        try
+        {
+            component.Validate();
+            if (!float.IsFinite(teleportDistance) || teleportDistance < 0) throw new ArgumentException("Invalid component teleport threshold.");
+            _attachParent=attachParent;_teleportDistance=teleportDistance;
+            if(GroundedUpdated)_sink.EvaluateGrounded(component);Sample(0,component);_evaluated=true;
+        }
         catch{_faulted=true;throw;}
     }
     private void Sample(int id,in AlsPrecisePose component)
@@ -219,7 +227,7 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
                 else if(n.Kind==AlsRefactoredLocomotionPoseKind.ModifyCurve)
                     foreach(var c in _maps[id])curves[c]=AlsStandingCycleCurves.ModifyBlend(curves[c],1,_alpha[id]);
                 else if(n.Kind==AlsRefactoredLocomotionPoseKind.Inertia)
-                {var inertia=id==4?_outer:_inner;inertia.Evaluate(output,curves,component);inertia.Pose.CopyTo(output);inertia.Curves.CopyTo(curves);}
+                {var inertia=id==4?_outer:_inner;inertia.Evaluate(output,curves,component,_attachParent,_teleportDistance);inertia.Pose.CopyTo(output);inertia.Curves.CopyTo(curves);}
                 break;
         }
     }

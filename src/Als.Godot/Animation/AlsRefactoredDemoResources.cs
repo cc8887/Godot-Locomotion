@@ -8,6 +8,9 @@ namespace GodotAls.Animation;
 internal static class AlsRefactoredDemoResources
 {
     internal static readonly Lazy<AlsRefactoredCharacterActionProfile> Profile = new(Load);
+    internal static readonly Lazy<AlsRefactoredLocomotionSettings> LocomotionSettings = new(() => new(
+        Godot.FileAccess.GetFileAsString("res://assets/config/refactored_character_settings.json"),
+        Godot.FileAccess.GetFileAsString("res://assets/config/refactored_movement_settings.json")));
     internal static readonly Lazy<AlsRefactoredLocomotionHostProfile> Locomotion = new(()=>
     {
         var actions=Profile.Value;

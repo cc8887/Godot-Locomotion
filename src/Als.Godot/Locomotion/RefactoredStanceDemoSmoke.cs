@@ -18,6 +18,7 @@ public partial class RefactoredStanceDemoSmoke : Node
     private long _footFeedback, _dynamicRequests;
     private long _standingDynamic, _beforeCrouchDisplacement;
     private int _plantedTicks;
+    private int _distinctMovingFrames;
     private bool _crouchDisplaced;
     private int _air,_crouch,_sprint;
     private bool _done;
@@ -91,6 +92,12 @@ public partial class RefactoredStanceDemoSmoke : Node
             if (At(1580)) Input.ActionRelease("aim");
             if(stage>30&&stage<430&&_tick%4==0)demo.OrbitCamera.ApplyMouseMotion(new(2,0));
             var full=character.FullMovementDiagnostics;var frame=character.Diagnostics;
+            if (full.Identity.SlotGeneration != 0)
+            {
+                if (full.RefactoredMotion.Identity != full.Identity || full.FootMotion != full.RefactoredMotion)
+                    throw new Exception("Graph and foot lock used different locomotion observations.");
+                if (full.RefactoredMotion.Moving != full.RefactoredMotion.MovingSmooth) _distinctMovingFrames++;
+            }
             if(full.Identity.SlotGeneration!=0&&!full.LockCurveProducersMatch)
                 throw new Exception($"Foot lock curve alias mismatch: raw={full.RawLockProducers}; final={full.LockProducers}.");
             _standing=Math.Max(_standing,full.RefactoredStandingFrames);_crouching=Math.Max(_crouching,full.RefactoredCrouchingFrames);
@@ -139,6 +146,7 @@ public partial class RefactoredStanceDemoSmoke : Node
                     throw new Exception($"Incomplete native-host coverage standing={_standing} crouching={_crouching} transition={_transition} crouch={_crouch} air={_air} sprint={_sprint}.");
                 GD.Print($"ALS_REFACTORED_STANCE_DEMO_OK hz={_hz} standing={_standing} crouching={_crouching} transition={_transition} grounded={_grounded} grounded_states={_groundedStates} locomotion={_locomotion} locomotion_states={_locomotionStates} air={_air} sprint={_sprint} pivot_notifies={_pivotNotifies} details={_detailsStates}");
                 GD.Print($"ALS_REFACTORED_REST_FEEDBACK_OK frames={_footFeedback} dynamic_requests={_dynamicRequests}");
+                GD.Print($"ALS_REFACTORED_MOTION_OK distinct_moving_frames={_distinctMovingFrames}");
                 _done=true;GetTree().Quit();
             }
         }
