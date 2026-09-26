@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-26。代码基线：`main / f1c61f8` 加本批方向记忆、动画速度/加速度历史与运动平台验证；Locomotion、Pivot、Rest和真实组件惯性已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
+更新：2026-09-26。代码基线：`main / 137f702` 加本批原资产通知表与真实 Sync tick 提取接口；角色级通知队列和旧源更新替换仍待。Locomotion、Pivot、Rest、方向/速度历史和真实组件惯性已接 Demo。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -56,6 +56,7 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 - [x] 真实脚部反馈 → Rest DynamicTransitions：上一最终 IK 目标经本帧组件变换，与本帧 global 足锁结果一起传入原图；保持原门控、8 cm×scale、左右选择和两帧间隔，实际进入共享 Transition 动作队列。身份、隐藏全局帧、晚期取消／重试及普通角色扰动测试见 [足部反馈验证](docs/verification/2026-09-26-refactored-rest-feet.md)。这不是新完整足部／角色 UE oracle，项目接触修正仍须单独验收。
 - [x] 原方向状态机生成的 `ActivatePivot` 通知已接 Standing PostUpdate → Parent → 下一帧 Movement Details，普通 Demo 真实输入覆盖 First/Second Pivot。原门槛严格 speed<200 cm/s；不在 worker 回调中提前执行，不对生成通知套源动画 weight/follower/chance 过滤。Standing 机器权重改为实际上一更新记录，初值及隐藏提交为0，取消不发布。独立/共享三频率新连续 UE 对照通过，见 [Pivot 验证](docs/verification/2026-09-26-refactored-pivot-notify.md)。
 - [ ] 将其余源 Notify/Notify State 与生成状态通知接到通用队列及类型化消费者。保留存在性、事件顺序、持续区间、停用/销毁结束语义，只有成功提交才派发副作用。**纠正此前描述：Pivot 的直接来源是方向图的生成过渡通知，不是动画序列上的普通源 Notify；不能为了接 Pivot 人工添加源通知。**
+- [x] 原 catalog 的 136 个 Sequence/Montage、177 条源通知已完整只读导出，并编译原对象身份、全精度触发偏移、过滤策略和六类载荷。真实 source tick 接口保留 owner/player/sample/epoch、Sync 更新顺序与最高权重样本；三频率取消重试及原 Roll 状态生命周期验证见 [通知资源与提取边界](docs/verification/2026-09-26-refactored-source-notifies.md)。**这是资源与组件，尚未汇入 Demo 的角色级队列，不能据此勾选上一项或移除旧兼容时钟。**
 
 交付：同一角色输入驱动的完整 locomotion 输出（姿态、曲线、播放观察、事件、根运动候选）；站蹲、跳跑、落地和换向连续 UE 对照。
 
