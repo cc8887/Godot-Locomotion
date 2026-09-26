@@ -76,6 +76,7 @@ internal sealed class AlsCycleDetailGraph : IDisposable
             .Concat(poseProfile?.Turns.Select(t => t.AnimationId) ?? [])
             .Distinct().SelectMany(id => set.Animations[id].Curves).Where(c => c.Provenance == AlsCurveProvenance.SourceCurve).Select(c => c.SourceName).Append("YawOffset")
             .Concat(_standing.ModifiedCurveNames)
+            .Concat(AlsAnimationRuntimeOptions.Has("--refactored-stance-hosts") ? AlsRefactoredDemoResources.Profile.Value.CurveNames.ToArray() : [])
             .Concat(refactoredMovementCurves is null ? [] : new[] { "PoseMoving" })
             .Concat(AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") || AlsAnimationRuntimeOptions.Has("--refactored-state-curves")
                 ? AlsRefactoredV4SourceCurves.TargetNames : [])

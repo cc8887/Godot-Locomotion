@@ -10,6 +10,8 @@
 
 # 运行和验证
 
+- 最新普通 Demo 接入：`docs/verification/2026-09-26-demo-refactored-stances.md`。默认新 Standing/Crouching pose host+共享 Parent/bank/queue/Transition，现有 Grounded/空中/上身/Overlay/脚部外层桥接；物理骨绑定、不同虚拟骨重建、曲线反馈、全局隐藏帧与统一取消提交。相关 Import45/Core39、普通3Hz/键鼠、10角色single/parallel摘要同、相机Ragdoll/Get-up、物理边界通过，Optimize0/0。修真实.NET InlineArray比较、场景Climbable2M缩放烘入形状及双Slot物理残差（仅物理2e-5，原生动画阈值不变）；首次10角色退出0有BodyHistory错误不算过，已加失败检查并重测。UE完整Editor0actions四插件审计，冷/普通外层3machine只读导出SHA B3FFBBBB...一致，无UE源改动/DV。本批已接普通入口，但**不是完整原生Grounded/Locomotion/上身替换**；真实Rest足部反馈/源Notify→Pivot/Crouch整图native/全部R2–R7与人工性能仍待，音频/道具物理/头颈暂缓保留。以下“普通Demo未切”均为历史状态。
+
 - 最新 Crouching 外层状态机：`docs/verification/2026-09-26-crouching-machine.md`。原 node33 五状态/十二边、独立规则域/Stop=state4、move优先/0.1秒Stop/0.5秒QuickFeet、上一更新权重、回调/StopQuick候选、原转身播放器自动退出与惯性请求、隐藏重入/取消重试；编译/编辑图及QuickFeet79骨/18项/33原生权重样本校验。首11项5失败（Stop模板OnStateEntry/实际成员绑定），修后1失败（双转身请求预期应1→10→7），均保留TRX；相关Import56/Core81/收尾新门禁Crouching16全部过，最终Optimize0/0。30/60/120Hz各8秒1680帧受控状态+真实播放器重试，不是新Crouch原生姿态oracle；Standing独立/共享native六组保持门槛。无UE修改/运行/新导出/Godot运行/全量/视觉/性能。下一步Crouch Idle/Stop/Movement pose+cache+Parent+inertia34/统一事务，再Grounded专用站蹲/Roll/曲线→Transition→Locomotion；Grounded catalog有节点/编辑图但stance_machines尚无其baked导出。普通Demo未切换，全部旧目标/用户暂缓项保留。
 
 - R2本批收尾补验：公共Standing.Cancel在共享模式取消整个角色动作帧，内部提交清理独立，防止旧queue残留；`character-actions-cancel-final.trx`角色/Standing生命周期/原生六组27通过0失败0跳过，Optimize再次0/0。与下条70项扩展属于同批，详见同一验证记录。

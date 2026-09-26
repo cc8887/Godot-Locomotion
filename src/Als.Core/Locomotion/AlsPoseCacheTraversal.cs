@@ -24,6 +24,28 @@ public readonly record struct AlsPoseUpdateContext
     public int SkippedUpdateHandler { get; private init; }
     public int StateCount { get; private init; }
 
+    // .NET 9+ rejects ValueType.Equals/GetHashCode on InlineArray fields.
+    // Compare the semantic path explicitly, without boxing its fixed buffer.
+    public bool Equals(AlsPoseUpdateContext other)
+    {
+        if (Identity != other.Identity || UpdateCounter != other.UpdateCounter || Weight != other.Weight ||
+            Delta != other.Delta || RootMotionWeight != other.RootMotionWeight || HasSharedContext != other.HasSharedContext ||
+            Inactive != other.Inactive || InertializationSync != other.InertializationSync ||
+            InertializationRequester != other.InertializationRequester || SkippedUpdateHandler != other.SkippedUpdateHandler ||
+            StateCount != other.StateCount) return false;
+        for (var i = 0; i < StateCount; i++) if (_states[i] != other._states[i]) return false;
+        return true;
+    }
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Identity); hash.Add(UpdateCounter); hash.Add(Weight); hash.Add(Delta); hash.Add(RootMotionWeight);
+        hash.Add(HasSharedContext); hash.Add(Inactive); hash.Add(InertializationSync); hash.Add(InertializationRequester);
+        hash.Add(SkippedUpdateHandler); hash.Add(StateCount);
+        for (var i = 0; i < StateCount; i++) hash.Add(_states[i]);
+        return hash.ToHashCode();
+    }
+
     public AlsPoseUpdateContext(AlsFrameIdentity identity, float weight, float delta,
         float rootMotionWeight = 1, bool sharedContext = true)
     {

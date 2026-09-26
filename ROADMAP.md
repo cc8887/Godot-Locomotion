@@ -1,6 +1,6 @@
 # Godot ALS 实施路线
 
-更新：2026-09-26。代码基线：`main / 1d7ff88` 加本批 Crouching 外层状态机。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
+更新：2026-09-26。代码基线：`main / f23030f` 加本批 Crouching 姿态宿主与普通 Demo 接入。唯一开发主目录：`${env:GODOT_ALS_ROOT}`。
 
 ## 目标与状态口径
 
@@ -10,17 +10,17 @@
 
 每项分别登记：资源齐全、组件实现、原生对照、生产入口接入、人工验收、性能验收。组件测试通过不代表完整链路完成；历史场景通过也不代表新宿主通过。
 
-**当前有两条必须区分的路径：**普通 Demo 已有完整分层、脚部、Overlay/道具、Roll、Ragdoll/Get-up 和相机等接线；新 Refactored Standing 宿主仍是独立子图，尚未替换普通 Demo。不能把“新宿主尚未接入”写成“普通 Demo 完全没有这些功能”，也不能把旧入口已有功能写成新链路已验收。
+**普通 Demo 已默认接入新 Standing/Crouching 姿态宿主与共享 Transition Slot。**新输出经现有 Grounded 站蹲过渡、空中/落地、分层和脚部外层发布到角色骨骼，已有 Overlay/道具、Roll、Ragdoll/Get-up 和相机接线保留。这是迁移桥接版本，原 Refactored Grounded/Locomotion 全图尚未替换；不能把本批接入写成完整原生链路或人工验收。`--legacy-animation` 保留旧路径。详见 [本批接入与验证](docs/verification/2026-09-26-demo-refactored-stances.md)。
 
 ## 剩余工作总表
 
 | 阶段 | 当前证据与缺口 | 下一交付与关闭条件 |
 |---|---|---|
 | R1 Standing 严格对齐 | 已关闭本批门禁：三频率 2310 帧/140067 骨骼求值全部通过；Parent 已比较字段和时钟差 0 | 保持既定阈值作为后续角色整合的回归；不代表完整角色或普通 Demo 验收 |
-| R2 角色级动作与 Transition Slot | 已有共享 Grounded 动作资源/ID/bank/队列、Standing 注入及原 node13 Slot；受控输入真实混合通过；完整 Grounded 上游和新整链原生轨迹待接 | 扩展完整角色资源、按原位置接 Grounded→Transition→Locomotion，并完成整链原生对照 |
-| R3 完整主移动图 | 新增原 Crouching 五状态/十二条边执行、回调/通知候选、真实转身时钟和 QuickFeet 资源校验；尚无完整 Crouching pose host 或角色闭环 | 真实 Standing/Crouching/Jump/Fall/Land 与姿势切换，缓存/Sync/曲线反馈统一 |
+| R2 角色级动作与 Transition Slot | Standing/Crouching 已共享 Parent/bank/队列及提交；Transition 已在 Demo 实际混合。桥外旧 Overlay/动作 bank 仍保留，尚非完整角色统一 bank | 扩展完整角色资源、按原位置接 Grounded→Transition→Locomotion，并完成整链原生对照 |
+| R3 完整主移动图 | Crouching Idle/Movement/Stop、Lean、QuickFeet、缓存与 node34 惯性已实现并接入 Demo；Grounded/Locomotion/Jump baked 已导出。原外层执行、真实足部 Parent 反馈和源 Notify 尚待 | 替换桥接外层，补 Crouching 及整链原生轨迹，统一 Jump/Fall/Land、Sync、反馈 |
 | R4 上身、Overlay 与最终脚部 | 13 Overlay 等已有受控组件证据；不能代替新全角色连续证据 | Aim/Layering/手部/脚部按原图拓扑接入，换向与支撑窗口、地形/平台通过 |
-| R5 Godot 普通入口 | 新宿主未接现有 Gather/Worker/Commit | 普通入口实际使用新宿主，单线程/并行一致，键鼠、多帧和人工通过 |
+| R5 Godot 普通入口 | 首批接入完成：普通入口默认新 stance/Transition；现有 Gather/Worker/Commit 统一发布，30/60/120 Hz 与键鼠/多帧测试通过；完整图与人工验收未关闭 | 延续新入口完成剩余子图，并补完整功能矩阵、人工和性能验收 |
 | R6 通用动作与物理恢复 | Roll/Ragdoll/Get-up/Camera 等已接旧入口；Mantle 有组件；长期物理稳定性尚有失败 | 通知、Root Motion、Mantle/Roll、Ragdoll/Get-up/Pose Recovery 与新链路整合并验收 |
 | R7 最终交付 | 十分钟预算、完整人工矩阵及可复现交付未完成 | 原性能目标与所有功能门禁通过，生成资产交付可复现 |
 
@@ -37,7 +37,7 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 ### R2：把局部 Standing owner 提升为角色级 owner
 
 - [ ] 扩展不可变角色 profile 到完整角色：本批已统一 Grounded 的资源 ID、79 骨父序、曲线映射及 Montage group/slot，并共享武器过渡资源；Mantle/Roll 等动作及其他图资源仍待纳入。V4/Refactored 边界必须显式绑定，禁止按序号混用。
-- [x] Standing 支持角色注入的共同 bank/queue，并保留独立测试入口；原局部 18 个资源显式映射为角色 ID。子图不再推进或提交共享 bank，实际播放实例及其时间/遍历历史由同一物理 bank 所有。
+- [x] Standing/Crouching 支持角色注入的共同 Parent/bank/queue，并保留独立测试入口；原局部 18 个资源显式映射为角色 ID。子图不再推进或提交共享 bank，实际播放实例及其时间/遍历历史由同一物理 bank 所有。角色隐藏或空中仍进行全局更新，站蹲重叠只推进共享 Parent 一次。
 - [ ] 原 AB_Als 外层 Transition Slot node13 的位置、编译/编辑图链接及策略已校验；Stop/Dynamic/QuickStop 的真实姿态和曲线已在受控 Standing 输入上混合，包含重叠、淡入淡出、停止及重试。**原位置是 Grounded→Transition→Locomotion，不能跳过 Grounded 直接宣称新角色整图完成**。待接真实 Grounded 输出、外层惯性请求接收与新的整链原生轨迹。
 - [x] 当前 Grounded 动作共享帧统一预校验/提交及主线程后处理顺序；冻结播放快照不受新播放改写。覆盖停止阻塞保留请求、武器 worker/main 请求、实际 Turn/Stop/QuickStop、取消重试及晚期故障。完整角色其余消费者接入时须继续扩展该门禁。
 
@@ -45,14 +45,14 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 
 ### R3：接完整主移动图与 Parent 反馈
 
-- [ ] 用已导出的原始图/规则补齐 Crouching 的状态、播放器、缓存、回调、惯性化；复用公共算法，保留独立节点身份和资源配置，不能复制 Standing 数值代替。本批已完成外层 node33 五状态/十二条边、前帧权重规则、Stop/StopQuick 候选、转身自动退出及惯性请求输出，见 [蹲伏状态机](docs/verification/2026-09-26-crouching-machine.md)。QuickFeet 已校验 79 骨及既有原生样本，**尚未在新蹲伏最终姿态中应用**；Idle/Stop/Movement 姿态组合、缓存遍历、node34 惯性接收与统一宿主待做。
+- [x] Crouching 组件：在 [外层状态机](docs/verification/2026-09-26-crouching-machine.md) 基础上补齐 Idle Turn Slot、Movement/Stop、Walk↔方向混合、Lean、缓存遍历、QuickFeet、node34 惯性及 PoseCrouching；使用原蹲伏配置并接共享 owner。三频率受控姿态/事务测试通过。**完整 Crouching 连续原生姿态 oracle 仍待，不能凭组件通过关闭 R3。**
 - [ ] 组合 Standing/Crouching、Grounded、Jump/Fall/Land 与各自 Lean/预测落地数据，按原图处理初始化、相关性、缓存最大权重路径、Inactive 和 Sync。移除测试用固定 Grounded/Standing 基底，改为真实子图输出。
 - [ ] 区分原始输入、Parent 更新状态、图内曲线、最终输出曲线及下一更新读取的已提交历史。Moving 与 MovingSmooth、FootPlanted、FeetCrossing、HipsDirectionLock、YawOffset、SprintBlock 等逐项建立生产者/消费者和帧时序表。
 - [ ] 将源 Notify/Notify State 与生成状态通知接到通用队列及类型化消费者；用实际通知替代宿主测试中的显式 ActivatePivot 输入。保留存在性、事件顺序、持续区间、停用/销毁结束语义，只有成功提交才派发副作用。
 
 交付：同一角色输入驱动的完整 locomotion 输出（姿态、曲线、播放观察、事件、根运动候选）；站蹲、跳跑、落地和换向连续 UE 对照。
 
-当前接入顺序：先完成上述 Crouching pose host，并与 Standing 共享动作 owner；再接 Grounded 的站蹲过渡序列、Roll 基底、回调和 PoseGrounded/脚部曲线，随后接 Transition→Locomotion。现有 `refactored_stance_machines` 仅有 Standing/Crouching 的 baked machines，Grounded 现有 catalog 保存编译节点/编辑图但没有这一份 baked machine 导出；完整 Grounded 实施时须补齐原生状态资料和连续 oracle，不能用简单站蹲混合替代。新 Crouching 本批仅受控组件验证，不是新的 UE 整图轨迹验收。
+下一接入顺序：以当前普通 Demo 新宿主为入口，替换桥接用的 Grounded 站蹲过渡/Roll 基底/回调，再替换 Locomotion 与 Jump/Fall/Land，补原生连续 oracle。新增 `refactored_locomotion_machines.json` 已包含两个 linked graph 的三个 baked machines，冷/普通 Editor 导出字节一致；**导出不等于执行已实现**。真实源 Notify→ActivatePivot、最终足锁/脚目标→Rest DynamicTransitions、MovingSmooth 原设置、组件变换惯性及原生上身分层仍待闭合。当前已有上一提交最终曲线反馈，但 Rest 足锁/目标输入暂为零，Pivot 未由源通知激活；这两个缺口会影响动作完整性。
 
 ### R4：接上半身、Overlay 与完整最终姿态
 
@@ -76,9 +76,9 @@ Main Gather：键鼠/移动/物理与平台快照、动作请求、上一提交�
   → 下一帧反馈；失败丢弃候选，同身份重试不重复运动或事件
 ```
 
-- [ ] 接入现有 Gather/Worker/Commit 和角色代际校验，不另建第二套角色移动或动画调度器。Root Motion 对胶囊的消费保留已建立的同帧语义；在集成测试中验证不能因上述分阶段实现引入一帧延迟或重复积分。
+- [x] 本批 stance/Transition 接入现有 Gather/Worker/Commit 与角色代际校验，不另建角色调度器。候选曲线/Parent/bank/惯性/输出同帧提交或丢弃；完整角色其余动作的 Root Motion 门禁继续归 R6。
 - [ ] worker 不查询物理世界、不读取输入、不修改其他角色/相机/道具；主线程写物理显示时确认动画 worker 已结束。update-only 仍更新必要时间/事件，不发布陈旧姿态。
-- [ ] 新链路先用明确诊断入口验证，再切 `scenes/demo/als_demo.tscn` 普通入口；记录实际启用的宿主和资源版本。旧入口只作为回归对照，不能以旧入口画面认证新宿主。
+- [x] `scenes/demo/als_demo.tscn` 默认启用 `--refactored-stance-hosts`；新 stance 实际输出，物理骨按名称/父序/参考姿态校验，两个版本不同的虚拟骨分别重建，曲线显式映射。诊断记录新宿主真实提交数；旧入口只供回归。原外层尚在，不把桥接画面当完整 Refactored 图验收。
 - [ ] 单角色与十角色、single/parallel、30/60/120 Hz，覆盖替换/销毁/暂停/停用/故障与重试；普通键鼠验证鼠标、WASD、Walk/Sprint/Crouch、跳跃、瞄准、相机模式/换肩和 Overlay。
 
 交付：用户无需诊断参数即可启动新完整角色链路的普通 Demo，附同输入录像/连续截图及人工待签收表。

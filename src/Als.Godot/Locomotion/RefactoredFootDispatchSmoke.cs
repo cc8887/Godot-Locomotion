@@ -151,6 +151,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             for (var i = 0; i < _count; i++)
             {
                 var character = _characters[i];
+                Require(character.BodyHistory?.Failure is null,
+                    $"Physical history failed owner={i}: {character.BodyHistory?.Failure}");
                 Require(!character.IsPoseFrozen && character.FailureDiagnosticCount == 0,
                     $"Dispatch failed owner={i} tick={_tick} published={character.PublishedFrameId} committed={character.RuntimeCommittedFrameId}.");
                 if (i == _pauseOwner && _phase is 2 or 3 && character.RuntimeCommittedFrameId == _pausedCommit) continue;

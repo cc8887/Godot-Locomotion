@@ -11,12 +11,17 @@ public sealed class AlsRefactoredCharacterActionRuntime
 {
     internal readonly AlsMontageRuntime Bank;
     internal readonly AlsTransitionQueueRuntime Queue;
+    internal readonly AlsRefactoredMovementParentRuntime MovementParent;
+    internal readonly AlsRefactoredRestParentRuntime RestParent;
+    private bool _parentsPrepared;
+    private AlsRefactoredStandingHostInput _parentInput;
     private readonly AlsRefactoredCharacterActionProfile _profile;
     private readonly uint _character, _generation;
     private AlsFrameIdentity _identity;
     private float _delta;
-    private bool _prepared, _postUpdated;
+    private bool _prepared, _postUpdated, _globalFrame;
     public AlsRefactoredStandingHost Standing { get; }
+    public AlsRefactoredCrouchingHost? Crouching { get; }
     public AlsRefactoredTransitionSlot Transition { get; }
     public AlsFrameIdentity CommittedIdentity { get; private set; }
     public AlsMontageFrame Frame { get { Check(); return Bank.Frame; } }
@@ -29,7 +34,11 @@ public sealed class AlsRefactoredCharacterActionRuntime
         ArgumentOutOfRangeException.ThrowIfZero(generation);
         _profile = profile; _character = character; _generation = generation;
         Bank = new([], sequences: profile.Assets); Queue = new(Bank, character, generation);
+        MovementParent=new(profile.Standing.Callbacks,profile.Standing.MovementSettings,profile.Crouching?.Callbacks);
+        RestParent=new(profile.Standing.Montages.Settings,profile.Standing.Montages,Bank,Queue,
+            profile.Crouching is null?[profile.Standing.Callbacks]:[profile.Standing.Callbacks,profile.Crouching.Callbacks]);
         Standing = new(profile.Standing, character, generation, this); Transition = new(profile, this);
+        if(profile.Crouching is not null)Crouching=new(profile.Crouching,character,generation,this);
     }
     public void Begin(in AlsFrameIdentity identity, float delta)
     {
@@ -44,6 +53,25 @@ public sealed class AlsRefactoredCharacterActionRuntime
         if (_postUpdated || context.Identity != _identity || context.Delta != _delta)
             throw new ArgumentException("Foreign, stale or post-updated character action context.");
     }
+    /// <summary>AnimInstance update also runs when the pose graph is hidden. The
+    /// caller may subsequently visit either stance and the outer Transition Slot.</summary>
+    public void BeginGlobal(in AlsPoseUpdateContext context, in AlsRefactoredStandingHostInput input, bool initialize = false)
+    {
+        Begin(context.Identity, context.Delta);
+        try { PrepareParents(context, input, initialize); _globalFrame = true; }
+        catch { Discard(); throw; }
+    }
+    public void StopTransitions()
+    { Check(); if (_postUpdated) throw new InvalidOperationException("Late transition stop."); Queue.QueueStop(); }
+    internal void PrepareParents(in AlsPoseUpdateContext context,in AlsRefactoredStandingHostInput input,bool initialize)
+    {
+        ValidateUpdate(context);
+        if(_parentsPrepared)
+        {if(input.Movement!=_parentInput.Movement||input.Rest!=_parentInput.Rest)throw new ArgumentException("Stance children received different Parent inputs.");return;}
+        MovementParent.Prepare(context.Identity,input.Movement,initialize);MovementParent.RefreshGrounded(context.Identity.FrameId);
+        if(input.ActivatePivot)MovementParent.ActivatePivot(context.Identity.FrameId);
+        RestParent.Prepare(context.Identity,input.Rest,initialize);_parentInput=input;_parentsPrepared=true;
+    }
     public void QueueWeapon(in AlsRefactoredWeaponNotifyBinding binding, string stance, bool moving)
     {
         Check(); if (_postUpdated) throw new InvalidOperationException("Worker requests must precede PostUpdate.");
@@ -53,7 +81,14 @@ public sealed class AlsRefactoredCharacterActionRuntime
     public void PostUpdateActions()
     {
         Check(); if (_postUpdated) throw new InvalidOperationException("Character actions already consumed.");
-        try { Standing.PostUpdateSharedActions(); _postUpdated = true; }
+        try
+        {
+            if(!_parentsPrepared)throw new InvalidOperationException("No character Parent update.");
+            _profile.Standing.Montages.PostUpdate(Bank,RestParent,Queue,_identity);
+            if(Standing.Prepared)Standing.PostUpdateSharedActions();
+            if(Crouching?.Prepared==true)Crouching.PostUpdateSharedActions();
+            _postUpdated = true;
+        }
         catch { Discard(); throw; }
     }
     public void PlayWeaponNotify(in AlsRefactoredWeaponNotifyBinding binding, string stance, bool moving)
@@ -65,15 +100,22 @@ public sealed class AlsRefactoredCharacterActionRuntime
     public void ValidateCommit(in AlsFrameIdentity identity)
     {
         Check(); if (identity != _identity || !_postUpdated) throw new ArgumentException("Incomplete character action frame.");
-        Standing.ValidateCommit(identity); Transition.ValidateCommit(identity); Queue.ValidateCommit(identity); Bank.ValidateCommit(identity);
+        if(!_globalFrame&&!Standing.Prepared&&Crouching?.Prepared!=true)throw new ArgumentException("No stance updated.");
+        if(Standing.Prepared)Standing.ValidateCommit(identity);if(Crouching?.Prepared==true)Crouching.ValidateCommit(identity);
+        MovementParent.ValidateCommit(identity.FrameId);RestParent.ValidateCommit(identity.FrameId);
+        if (!_globalFrame || Transition.Prepared) Transition.ValidateCommit(identity);
+        Queue.ValidateCommit(identity); Bank.ValidateCommit(identity);
     }
     public void Commit(in AlsFrameIdentity identity)
     {
         ValidateCommit(identity);
-        Standing.CommitShared(identity); Transition.Commit(identity); Queue.Commit(identity); Bank.Commit(identity);
-        CommittedIdentity = identity; _prepared = _postUpdated = false;
+        if(Standing.Prepared)Standing.CommitShared(identity);if(Crouching?.Prepared==true)Crouching.CommitShared(identity);
+        MovementParent.Commit(identity.FrameId);RestParent.Commit(identity.FrameId);
+        if (Transition.Prepared) Transition.Commit(identity);
+        Queue.Commit(identity); Bank.Commit(identity);
+        CommittedIdentity = identity; _prepared = _postUpdated = _parentsPrepared = _globalFrame = false;
     }
     public void Discard()
-    { Standing.CancelGraph(); Transition.Cancel(); Queue.Discard(); Bank.Discard(); _prepared = _postUpdated = false; }
+    { Standing.CancelGraph();Crouching?.CancelGraph();MovementParent.Cancel();RestParent.Cancel(); Transition.Cancel(); Queue.Discard(); Bank.Discard(); _prepared = _postUpdated = _parentsPrepared = _globalFrame = false; }
     private void Check() { if (!_prepared) throw new InvalidOperationException("No character action candidate."); }
 }

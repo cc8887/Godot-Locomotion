@@ -19,6 +19,7 @@ public sealed class AlsRefactoredTransitionSlot
     private AlsSlotSourceUpdate _source;
     private float _committedSource;
     private bool _prepared, _evaluated;
+    internal bool Prepared => _prepared;
     public AlsSlotSourceUpdate SourceUpdate { get { Check(); return _source; } }
     public AlsSlotWeights Weights { get { Check(); return _weights; } }
     public AlsMontageInertialRequest? InertializationRequest

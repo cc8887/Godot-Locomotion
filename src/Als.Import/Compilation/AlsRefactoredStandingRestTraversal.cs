@@ -18,7 +18,7 @@ public sealed class AlsRefactoredStandingRestTraversal
     {
         if(graph.CatalogDigest!=callbacks.CatalogDigest||graph.IdleCallbacks.ToArray().Any(c=>!callbacks.Nodes.Contains(c)))throw new ArgumentException("Foreign Standing rest traversal callbacks.");
         _rotate=callbacks.Nodes.ToArray().Single(c=>c.Function==AlsRefactoredStanceFunction.RefreshRotateInPlace);
-        if(_rotate.PropertyIndex!=203||_rotate.SourcePropertyIndex!=68||_rotate.OnBecomeRelevant)throw new ArgumentException("Standing root callback differs.");
+        if(_rotate.PropertyIndex!=(graph.Crouching?111:203)||_rotate.SourcePropertyIndex!=(graph.Crouching?2:68)||_rotate.OnBecomeRelevant)throw new ArgumentException("Stance root callback differs.");
         _graph=graph;_callbacks=new(callbacks);
     }
     public void Begin(in AlsPoseUpdateContext context, AlsRefactoredRestParentRuntime parent, bool initializeInstance=false)

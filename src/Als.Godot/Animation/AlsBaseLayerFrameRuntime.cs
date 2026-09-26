@@ -79,6 +79,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     public int RequestCount { get; private set; }
     internal int StopTransitionCount { get; private set; }
     internal int CommittedStopTransitionCount { get; private set; }
+    internal AlsRefactoredDemoStances? RefactoredStances => _grounded.RefactoredStances;
     internal float InertiaRequestSeconds => _request;
     public ReadOnlySpan<string> CurveNames => _movement.CurveNames;
     public ReadOnlySpan<AlsLocalPose> ReferencePose => _movement.ReferencePose;
@@ -326,6 +327,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         try
         {
         _identity=frame.Identity; SourceUpdated=false; RequestCount=0; _phase=Phase.GlobalUpdating;
+        RefactoredStances?.Begin(frame, result, movement);
         BeginMontageFrame(frame.Identity, frame.DeltaTime, _candidateMovementState == AlsMovementStateInput.Ragdoll);
         _candidateRolling = _committedRolling;
         _movementAction = _rollingGameplay ? frame.MovementAction : default;
@@ -356,7 +358,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             _candidateIdleControl = _idleControl.Evaluate(frame, result.ActualRotationMode, _candidateControlInput.State.Idle, feedback);
             _candidateTurn = _turnInPlace.Evaluate(_candidateIdleControl.Turn, frame.CharacterYaw, result.ActualStance,
                 _candidateIdleControl.State.RotationScale, _montages.Observations);
-            if (_candidateTurn.AttemptPlayback) _montages.Play(_candidateTurn.Command);
+            if (_candidateTurn.AttemptPlayback && RefactoredStances is null) _montages.Play(_candidateTurn.Command);
             _candidateIdleControl = _candidateIdleControl with
             { State = _candidateIdleControl.State with { RotationScale = _candidateTurn.RotationScale } };
             _candidateControlInput = _candidateControlInput with
@@ -439,6 +441,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             _turnNotifies.Complete(0);
             _movement.PrepareEvents(_turnNotifyBinding,_turnNotifies.Notifies,_turnNotifies.DirectNotifies,
                 _failureEpochs.AsSpan(0, _failureEpochCount));
+            RefactoredStances?.PostUpdate();
             _phase=Phase.Unvisited;
         }
         catch { _phase=Phase.Faulted; throw; }
@@ -502,8 +505,9 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
             for (var bone = 0; bone < _pose.Length; bone++)
             { _pose[bone] = _posePrecise[bone].ToSingle(); if (SourceUpdated) _raw[bone] = _rawPrecise[bone].ToSingle(); }
             _phase = Phase.Evaluated;
-            if (HasMontageFrame && SourceUpdated && _movement.GroundedReadCount > 0)
+            if (RefactoredStances is null && HasMontageFrame && SourceUpdated && _movement.GroundedReadCount > 0)
                 PlayStopTransitions();
+            RefactoredStances?.PostUpdate();
         }
         catch { _phase = Phase.Faulted; throw; }
     }
@@ -512,6 +516,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     {
         ValidateCommit(identity);
         _movement.Commit(identity);
+        RefactoredStances?.Commit(identity);
         if (_tailPrepared) _tail.Commit(identity);
         if (_mappedInputMode == true)
         {
@@ -534,6 +539,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
         if (identity != _identity) throw new ArgumentException("Foreign BaseLayer frame commit.");
         // Both child candidates must be ready before either bank is published.
         _movement.ValidateCommit(identity);
+        RefactoredStances?.ValidateCommit(identity);
         if (_tailPrepared) _tail.ValidateCommit(identity);
         if (HasMontageFrame) { _actions.ValidateCommit(identity); _turnNotifies.ValidateCommit(identity); }
     }
@@ -585,6 +591,7 @@ internal sealed class AlsBaseLayerFrameRuntime : IDisposable, IAlsGroundedFrameR
     {
         if (_phase == Phase.Disposed) throw new ObjectDisposedException(nameof(AlsBaseLayerFrameRuntime));
         _movement.Discard(); _tail.Discard(); _actions.Discard(); _turnNotifies.Discard(); StopTransitionCount = 0; _sink = null; _phase = Phase.Idle;
+        RefactoredStances?.Discard();
         _cancelForRuntimeFailure = false; _failureEpochCount = 0; _motionPreparation = default; _preparedRootMotion = default;
         _candidateRolling = _committedRolling;
     }

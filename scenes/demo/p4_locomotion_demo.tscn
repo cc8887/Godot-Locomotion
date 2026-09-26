@@ -119,6 +119,9 @@ size = Vector3(8, 112.90759, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ifow5"]
 
+[sub_resource type="BoxShape3D" id="Shape_climbable_2m"]
+size = Vector3(2, 2, 2)
+
 [node name="P4LocomotionDemo" type="Node3D" unique_id=1810879079]
 script = ExtResource("1_demo")
 
@@ -270,13 +273,14 @@ mesh = SubResource("BoxMesh_wvhbo")
 shape = SubResource("BoxShape3D_ifow5")
 
 [node name="Climbable2M" type="StaticBody3D" parent="World" unique_id=1641497858]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0.5, -21.574)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -21.574)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="World/Climbable2M" unique_id=1513462438]
+scale = Vector3(2, 2, 2)
 mesh = SubResource("BoxMesh_wvhbo")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="World/Climbable2M" unique_id=1992373696]
-shape = SubResource("BoxShape3D_ifow5")
+shape = SubResource("Shape_climbable_2m")
 
 [node name="SmokeStations" type="Node3D" parent="." unique_id=1381753419]
 

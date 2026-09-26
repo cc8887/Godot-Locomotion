@@ -12,6 +12,7 @@ public sealed class AlsRefactoredStandingIdleSlot
     private readonly AlsRefactoredStandingRestGraph _graph;
     private readonly AlsMontageSlotPose _mixer;
     private readonly IAlsMontagePoseSource _sampler;
+    private readonly AlsMontageSlot _slot;
     private readonly AlsPrecisePose[] _source, _pose;
     private readonly AlsInertialCurve[] _sourceCurves, _curves;
     private AlsMontageFrame? _frame;
@@ -32,8 +33,8 @@ public sealed class AlsRefactoredStandingIdleSlot
         if(graph.CatalogDigest!=catalog.IndexDigest || rest.Graph.CatalogDigest!=catalog.IndexDigest || montages.CatalogDigest!=catalog.IndexDigest ||
             !rest.BoneNames.SequenceEqual(montages.BoneNames) || !rest.Parents.SequenceEqual(montages.Parents) ||
             !rest.CurveNames.SequenceEqual(montages.CurveNames))throw new ArgumentException("Foreign Standing Idle Slot layout.");
-        _graph=graph;_rest=rest;_sampler=montages.CreateSampler();
-        var reference=catalog.CompileAbsolutePose(AlsRefactoredStandingRestGraph.IdleSequence);
+        _graph=graph;_rest=rest;_sampler=montages.CreateSampler(); _slot=graph.Crouching?AlsTurnSlot.Crouching:AlsTurnSlot.Standing;
+        var reference=catalog.CompileAbsolutePose(graph.IdleSource);
         _mixer=new(reference.ReferencePose,montages.Parents,montages.CurveNames.Length);
         _source=new AlsPrecisePose[rest.BoneNames.Length];_pose=new AlsPrecisePose[_source.Length];
         _sourceCurves=new AlsInertialCurve[rest.CurveNames.Length];_curves=new AlsInertialCurve[_sourceCurves.Length];
@@ -44,7 +45,7 @@ public sealed class AlsRefactoredStandingIdleSlot
         if(_frame is not null || frame.Identity!=context.Identity || !context.HasSharedContext || context.UpdateCounter is not {HasUpdated:true} ||
             _hasCommitted&&(context.Identity.CharacterId!=_committedIdentity.CharacterId || context.Identity.SlotGeneration!=_committedIdentity.SlotGeneration ||
                 context.Identity.FrameId<=_committedIdentity.FrameId))throw new ArgumentException("Foreign Standing Slot update.");
-        var weights=frame.SlotWeights(AlsTurnSlot.Standing);
+        var weights=frame.SlotWeights(_slot);
         var update=AlsSlotSourceUpdate.Resolve(initialize?0:_committedSource,weights,context,_graph.AlwaysUpdateSlotSource);
         _frame=frame;_identity=context.Identity;_weights=weights;_sourceUpdate=update;
         _evaluated=_faulted=SourceEvaluated=false;
@@ -56,14 +57,14 @@ public sealed class AlsRefactoredStandingIdleSlot
         {
             var hasSource=_weights.SourceWeight>AlsPoseBlender.WeightThreshold;
             if(hasSource){_rest.SampleIdleSource(_source,_sourceCurves);SourceEvaluated=true;}
-            _mixer.Evaluate(_frame!,_identity,AlsTurnSlot.Standing,hasSource?_source:[],hasSource?_sourceCurves:[],_pose,_curves,_sampler);
+            _mixer.Evaluate(_frame!,_identity,_slot,hasSource?_source:[],hasSource?_sourceCurves:[],_pose,_curves,_sampler);
             _evaluated=true;
         }
         catch{_faulted=true;throw;}
     }
     private void Check()
     {
-        if(_frame is null || _faulted || _frame.Identity!=_identity || _frame.SlotWeights(AlsTurnSlot.Standing)!=_weights)
+        if(_frame is null || _faulted || _frame.Identity!=_identity || _frame.SlotWeights(_slot)!=_weights)
             throw new InvalidOperationException("Standing Slot candidate missing, changed or faulted.");
     }
     private void RequireEvaluation(){Check();if(!_evaluated)throw new InvalidOperationException("Standing Slot pose has not been evaluated.");}

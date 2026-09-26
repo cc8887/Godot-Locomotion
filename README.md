@@ -10,6 +10,10 @@ pelvis correction，以及 Gather/Worker/Commit 多线程动画路径。
 仓库位置从本地环境配置中的 `GODOT_ALS_ROOT` 读取；后续在 `main` 分支继续开发。
 2026-09-20 已合入此前 P5A 工作目录的实现、数据和验证记录，并同步本地生成资产。
 普通入口默认启用完整分层、Aim、Refactored 脚部调度及最终接触策略，不再依赖一串诊断参数。
+2026-09-26 普通入口已默认使用新 Refactored Standing/Crouching 姿态宿主和共享 Transition Slot，
+接入原 Gather/Worker/Commit。Grounded 站蹲外层、空中/落地及上身暂沿用现有图作为桥接，
+尚非完整 Refactored 整图替换；范围、三频率与十角色验证见
+[新宿主接入记录](docs/verification/2026-09-26-demo-refactored-stances.md)。
 这仍是开发中的 Demo：地形全程接触、起停滑步、换髋和上下身观感、P5A 收尾及后续玩法尚未全部验收。
 历史 P4 证书不代表当前完整链路已验收；P7 十分钟性能认证也未完成。
 
