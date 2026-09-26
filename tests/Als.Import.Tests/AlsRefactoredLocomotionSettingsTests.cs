@@ -13,6 +13,8 @@ public sealed class AlsRefactoredLocomotionSettingsTests
         var settings = new AlsRefactoredLocomotionSettings(c, a);
         Assert.Equal(50, settings.MovingThreshold); Assert.Equal(150, settings.MovingSmoothThreshold);
         Assert.Equal(300, settings.TeleportDistance);
+        Assert.True(settings.IgnoreBaseRotation);
+        Assert.False(settings.InheritBaseYawInVelocityMode);
         var altered = JsonNode.Parse(c)!; altered["movingSpeedThreshold"] = 80;
         Assert.Equal(80, new AlsRefactoredLocomotionSettings(altered.ToJsonString(), a).MovingThreshold);
         altered["movingSpeedThreshold"] = -1;

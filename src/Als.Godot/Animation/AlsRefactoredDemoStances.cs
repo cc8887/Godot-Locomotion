@@ -14,6 +14,8 @@ internal sealed class AlsRefactoredDemoStances
     private readonly AlsRefactoredLocomotionSettings _settings;
     internal AlsRefactoredMotionObservation Observation { get; private set; }
     internal AlsRefactoredMotionObservation CommittedObservation { get; private set; }
+    internal AlsRefactoredLocomotionHistory CommittedMotionHistory { get; private set; }
+    private AlsRefactoredLocomotionHistory _nextMotionHistory;
     private AlsRefactoredLocomotionHost? _host;
     private AlsRefactoredCharacterActionRuntime? _runtime=>_host?.Actions;
     private ReadOnlySpan<string> NativeNames=>_locomotion.Pose.CurveNames;
@@ -122,9 +124,10 @@ internal sealed class AlsRefactoredDemoStances
         var nativeRotation = new AlsQuaternion(0, 0, Math.Sin(half), Math.Cos(half));
         Observation = AlsRefactoredMotionObservation.Capture(frame, _settings.MovingThreshold, _settings.MovingSmoothThreshold);
         var speed = Observation.Speed;
-        var velocityYaw = speed > .01f ? (float)(Math.Atan2(velocity.Y, velocity.X) * (180d / Math.PI)) : (float)yaw;
-        var direction = AlsFootIkCoordinates.ToNative(frame.InputDirection);
-        var inputYaw = Observation.HasInput ? Math.Atan2(direction.Y,direction.X)*(180d/Math.PI) : yaw;
+        _nextMotionHistory = AlsRefactoredLocomotionHistory.Advance(CommittedMotionHistory, frame, Observation,
+            _settings.IgnoreBaseRotation, pending, _settings.InheritBaseYawInVelocityMode && result.ActualRotationMode == AlsRotationMode.VelocityDirection);
+        var velocityYaw = _nextMotionHistory.VelocityYaw;
+        var inputYaw = _nextMotionHistory.InputYaw;
         var gait = Value("PoseGait"); var grounded = Value("PoseGrounded");
         var unweightedGait = grounded > 1e-8f ? gait / grounded : gait;
         var moving = Observation.Moving;
@@ -132,7 +135,7 @@ internal sealed class AlsRefactoredDemoStances
         var crouch = result.ActualStance == AlsStance.Crouching;
         var rotation = result.ActualRotationMode switch { AlsRotationMode.VelocityDirection => AlsRefactoredRestRotation.VelocityDirection,
             AlsRotationMode.Aiming => AlsRefactoredRestRotation.Aiming, _ => AlsRefactoredRestRotation.ViewDirection };
-        var nativeMovement = new AlsRefactoredMovementInput(velocity, AlsFootIkCoordinates.ToNative(frame.ActualAcceleration), nativeRotation,
+        var nativeMovement = new AlsRefactoredMovementInput(velocity, _nextMotionHistory.Acceleration, nativeRotation,
             speed, 1, velocityYaw, view, frame.MaxAcceleration * 100f, frame.MaxBrakingDeceleration * 100f,
             result.ActualGait switch { AlsGait.Walking => "Als.Gait.Walking", AlsGait.Sprinting => "Als.Gait.Sprinting", _ => "Als.Gait.Running" },
             rotation == AlsRefactoredRestRotation.VelocityDirection, pending, _delta,
@@ -203,6 +206,7 @@ internal sealed class AlsRefactoredDemoStances
     {
         ValidateCommit(id);
         CommittedObservation = Observation;
+        CommittedMotionHistory = _nextMotionHistory;
         var groundedState=_visited&&SourceUpdated?_runtime!.Grounded!.State:-1;
         if (_feetUpdated) { CommittedFootFeedbackFrames++; CommittedFeet = _nextFeet; }
         CommittedTransitionsAllowed = _input.Rest.TransitionsAllowed;

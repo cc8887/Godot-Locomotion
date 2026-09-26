@@ -20,6 +20,8 @@ value = {"schemaVersion": 1, "characterClass": character_class.get_path_name(),
          "source": settings.get_path_name(),
          "movingSpeedThreshold": settings.get_editor_property("moving_speed_threshold"),
          "teleportDistanceThreshold": character.get_editor_property("mesh").get_editor_property("teleport_distance_threshold"),
+         "ignoreBaseRotation": character.get_editor_property("character_movement").get_editor_property("ignore_base_rotation"),
+         "inheritBaseYawInVelocityMode": settings.get_editor_property("inherit_movement_base_rotation_in_velocity_direction_rotation_mode"),
          "animationSettingsSha256": hashlib.sha256((root / "assets/config/refactored_movement_settings.json").read_bytes()).hexdigest()}
 if value["movingSpeedThreshold"] < 0 or value["teleportDistanceThreshold"] < 0:
     raise RuntimeError("Invalid moving threshold")
