@@ -5,12 +5,11 @@ using GodotAls.Import.Compilation;
 
 namespace GodotAls.Physics;
 
-// Explicit diagnostic ownership: Core integrates; Godot bodies are frozen,
-// non-colliding pose proxies. Never attach Jolt joints or enable gameplay with
-// this host without full acceptance. Contacts use the same Core solver buffers.
+// Core integrates the island. Diagnostic callers can mirror its pose to frozen,
+// non-colliding Godot bodies; the production ragdoll uses its Skeleton3D.
 internal sealed class AlsCoreJointHost
 {
-    private readonly AlsPhysicsBodySet _proxies;
+    private readonly AlsPhysicsBodySet? _proxies;
     private readonly AlsPrecisePose[] _massLocal;
     private readonly bool _worldSpace;
     private readonly AlsIslandBodyState[] _speedCandidates;
@@ -26,6 +25,19 @@ internal sealed class AlsCoreJointHost
         _speedCandidates = new AlsIslandBodyState[proxies.BodyCount];
         _speedOverrides = new AlsIslandVelocityOverride[proxies.BodyCount];
         CheckOwnership(); Publish();
+    }
+
+    // Production ragdoll presents the Core island through its Skeleton3D.
+    // It has no need for frozen, non-colliding Godot rigid-body mirrors.
+    internal AlsCoreJointHost(AlsRagdollPhysicsDefinition definition, AlsJointIsland island)
+    {
+        Island = island;
+        _massLocal = [];
+        _speedCandidates = new AlsIslandBodyState[definition.Bodies.Length];
+        _speedOverrides = new AlsIslandVelocityOverride[definition.Bodies.Length];
+        if (island.BodyCount < definition.Bodies.Length)
+            throw new ArgumentException("Core island has fewer bodies than the ragdoll asset.");
+        CheckOwnership();
     }
 
     internal void Step(double dt)
@@ -91,6 +103,7 @@ internal sealed class AlsCoreJointHost
     private void CheckOwnership()
     {
         if (!GodotThread.IsMainThread()) throw new InvalidOperationException("Physics proxy access requires Main.");
+        if (_proxies is null) return;
         if (_proxies.Active) throw new InvalidOperationException("Core and Jolt cannot both own body integration.");
         for (var i = 0; i < _proxies.BodyCount; i++)
         {
@@ -110,6 +123,7 @@ internal sealed class AlsCoreJointHost
 
     private void Publish()
     {
+        if (_proxies is null) return;
         for (var i = 0; i < _proxies.BodyCount; i++)
         {
             var mass = AlsPrecisePose.Compose(_massLocal[i], Island.BodyAt(i).Actor);

@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Security.Cryptography;
 using System.Text.Json;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Physics;
@@ -12,7 +13,14 @@ public sealed class AlsNativeSleepTrajectoryTests(Xunit.Abstractions.ITestOutput
     [Fact]
     public void SleepCountersMetricsTrajectoriesAndImpulseWakeMatchNativeScene()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_sleep_reference.json")));
+        var reference = File.ReadAllBytes(AlsFootRigCompilerTests.PathInRepository(
+            "tests/Als.Import.Tests/Fixtures/Physics/v4_physics_sleep_reference.json"));
+        using var runtime = JsonDocument.Parse(File.ReadAllText(AlsFootRigCompilerTests.PathInRepository(
+            "assets/config/v4_physics_sleep_settings.json")));
+        Assert.False(runtime.RootElement.TryGetProperty("cases", out _));
+        Assert.Equal(Convert.ToHexString(SHA256.HashData(reference)),
+            runtime.RootElement.GetProperty("referenceSha256").GetString());
+        using var doc = JsonDocument.Parse(reference);
         var root = doc.RootElement; Assert.True(B(root, "sleepEnabled"));
         var cvars = root.GetProperty("sleepSettings");
         Assert.Equal(0, D(cvars, "p.Chaos.Solver.Sleep.PartialIslandSleep"));

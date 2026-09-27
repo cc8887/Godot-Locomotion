@@ -5,7 +5,7 @@ namespace GodotAls.Import.Tests;
 
 public sealed class AlsSleepSettingsCompilerTests
 {
-    private static string Reference => File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_sleep_reference.json"));
+    private static string Reference => File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_sleep_settings.json"));
     private static AlsRagdollPhysicsDefinition Definition(string name) => AlsPhysicsAssetCompiler.Compile(
         File.ReadAllText(AlsFootRigCompilerTests.PathInRepository("assets/config/v4_physics_asset_inputs.json")), AlsPhysicsAssetCompiler.MeshRoot + name + "." + name);
     [Theory]

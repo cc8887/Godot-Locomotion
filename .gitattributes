@@ -7,3 +7,5 @@ tests/Als.Core.Tests/Fixtures/P5A/*.json text eol=lf
 assets/config/*.json -text
 assets/config/raw_sequences/*.json -text
 assets/config/refactored_animation_sources/*.json -text
+# Native sleep trajectories are test fixtures; retain their original export bytes.
+tests/Als.Import.Tests/Fixtures/Physics/*.json -text

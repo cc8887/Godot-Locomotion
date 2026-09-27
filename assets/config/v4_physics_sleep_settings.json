@@ -1,0 +1,384 @@
+{
+  "schemaVersion": 2,
+  "sleepEnabled": true,
+  "sleepSettings": {
+    "p.Chaos.Solver.Sleep.PartialIslandSleep": 0,
+    "p.Chaos.SmoothedPositionLerpRate": 0.30000001192092896,
+    "p.Chaos.Solver.Sleep.AngularSleepThresholdSize": 0
+  },
+  "rigs": [
+    {
+      "mesh": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Mannequin.Mannequin",
+      "physicsAsset": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/Mannequin_PhysicsAsset.Mannequin_PhysicsAsset",
+      "bodies": [
+        {
+          "index": 0,
+          "bone": "pelvis",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 1,
+          "bone": "spine_01",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 2,
+          "bone": "spine_02",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 3,
+          "bone": "spine_03",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 4,
+          "bone": "neck_01",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 5,
+          "bone": "head",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 6,
+          "bone": "thigh_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 7,
+          "bone": "thigh_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 8,
+          "bone": "calf_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 9,
+          "bone": "calf_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 10,
+          "bone": "clavicle_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 11,
+          "bone": "clavicle_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 12,
+          "bone": "upperarm_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 13,
+          "bone": "upperarm_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 14,
+          "bone": "lowerarm_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 15,
+          "bone": "lowerarm_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 16,
+          "bone": "hand_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 17,
+          "bone": "hand_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 18,
+          "bone": "root",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        }
+      ]
+    },
+    {
+      "mesh": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/AnimMan.AnimMan",
+      "physicsAsset": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/AnimMan_PhysicsAsset.AnimMan_PhysicsAsset",
+      "bodies": [
+        {
+          "index": 0,
+          "bone": "pelvis",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 1,
+          "bone": "spine_01",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 2,
+          "bone": "spine_02",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 3,
+          "bone": "spine_03",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 4,
+          "bone": "neck_01",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 5,
+          "bone": "head",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 6,
+          "bone": "thigh_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 7,
+          "bone": "thigh_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 8,
+          "bone": "calf_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 9,
+          "bone": "calf_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 10,
+          "bone": "clavicle_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 11,
+          "bone": "clavicle_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 12,
+          "bone": "upperarm_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 13,
+          "bone": "upperarm_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 14,
+          "bone": "lowerarm_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 15,
+          "bone": "lowerarm_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 16,
+          "bone": "hand_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 17,
+          "bone": "hand_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 18,
+          "bone": "root",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 19,
+          "bone": "foot_l",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        },
+        {
+          "index": 20,
+          "bone": "foot_r",
+          "sleepLinearThreshold": 1,
+          "sleepAngularThreshold": 0.05000000074505806,
+          "sleepCounterThreshold": 4,
+          "sleepThresholdMultiplier": 1,
+          "sleepType": 0
+        }
+      ]
+    }
+  ],
+  "referenceSha256": "9D12170CAF8832890DCF31F91B9F42A3ABA6AF1177A392161F98D08E2ADFB46D"
+}

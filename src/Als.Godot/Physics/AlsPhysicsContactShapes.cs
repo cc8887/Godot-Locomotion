@@ -13,23 +13,11 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
     internal int Count => _resources.Count;
     internal void Bind(AlsRagdollPhysicsDefinition definition, AlsContactRegistry registry, AlsGodotContactQuery query)
     {
-        var cooked = AlsConvexTopologyCompiler.Compile(Godot.FileAccess.GetFileAsString(
-            "res://assets/config/v4_physics_convex_topology.json"), definition)
-            .ToDictionary(s => (s.Body, s.Shape), s => s.Topology);
-        var properties = AlsConvexPropertiesCompiler.Compile(Godot.FileAccess.GetFileAsString(
-            "res://assets/config/v4_physics_convex_properties.json"), definition, cooked);
-        var runtime = AlsRuntimeShapeCompiler.Compile(
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"),
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), definition.Mesh)
-            .ToDictionary(s => (s.Body, s.Shape));
-        var primitives = AlsPrimitiveGeometryCompiler.Compile(
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_primitive_geometry.json"),
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"), definition.Mesh)
-            .ToDictionary(s => (s.Body, s.Shape));
-        var filters = AlsSimulationFilterCompiler.Compile(
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_simulation_filters.json"),
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_runtime_shapes.json"),
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), definition.Mesh);
+        Bind(definition, registry, query, AlsRagdollShapeProfile.Compile(definition));
+    }
+    internal void Bind(AlsRagdollPhysicsDefinition definition, AlsContactRegistry registry,
+        AlsGodotContactQuery query, AlsRagdollShapeProfile profile)
+    {
         foreach (var body in definition.Bodies)
         {
             if (body.Defaults.GetProperty("collisionEnabled").GetString() != "QueryAndPhysics")
@@ -39,21 +27,21 @@ internal sealed class AlsPhysicsContactShapes : IDisposable
                 var source = body.Shapes[shapeIndex];
                 if (source.CollisionEnabled is not (0 or 3) || source.RestOffsetCm != 0)
                     throw new NotSupportedException("Asset contact mode/rest offset is not supported.");
-                cooked.TryGetValue((body.Index, shapeIndex), out var topology);
-                var observed = runtime[(body.Index, shapeIndex)];
-                var primitive = primitives.TryGetValue((body.Index, shapeIndex), out var value) ? (AlsPrimitiveGeometry?)value : null;
+                profile.Cooked.TryGetValue((body.Index, shapeIndex), out var topology);
+                var observed = profile.Runtime[(body.Index, shapeIndex)];
+                var primitive = profile.Primitives.TryGetValue((body.Index, shapeIndex), out var value) ? (AlsPrimitiveGeometry?)value : null;
                 // Cooked convex vertices already bake FKConvexElem's local
                 // transform. Only the actual runtime leaf wrapper is applied.
                 var shape = Create(source, topology, observed, primitive); _resources.Add(shape); shape.Margin = 0;
                 var local = AlsCachedJointSettingsCompiler.RigidConnector(observed.LeafLocal);
-                var filter = filters[(body.Index, shapeIndex)];
+                var filter = profile.Filters[(body.Index, shapeIndex)];
                 var handle = registry.Register(new(body.Index, local, 1, 1, source.Type is "sphere" or "capsule",
                     filter.Simulation, filter.Filter));
                 query.Bind(handle, shape,topology,source.Type=="box"?primitive!.Value.BoxHalf:null,
                     source.Type=="convex"?observed.Scale:null,source.Type is "box" or "convex"?observed.MarginCm:0,
                     nativeCapsule:primitive?.Capsule, proxyLocal:primitive?.ProxyLocal,
                     nativeSphereRadius:source.Type=="sphere"?primitive!.Value.Radius:null,
-                    convexProperties:source.Type=="convex"?properties[(body.Index,shapeIndex)]:null,
+                    convexProperties:source.Type=="convex"?profile.Properties[(body.Index,shapeIndex)]:null,
                     nativeBounds:new(observed.BoundsMinCm,observed.BoundsMaxCm));
             }
         }

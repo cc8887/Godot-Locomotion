@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
@@ -13,7 +12,6 @@ namespace GodotAls.Physics;
 // Capsule/movement activation is the caller's responsibility after Create succeeds.
 internal sealed class AlsCharacterRagdollSimulation : IDisposable
 {
-    private AlsPhysicsBodySet? _proxies;
     private AlsSceneContactSet? _scene;
     private AlsGodotContactQuery? _query;
     private AlsPhysicsContactShapes? _shapes;
@@ -54,20 +52,20 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
     private void Initialize(Node parent, Node environment, AlsP3Character character,
         AlsP3RuntimeContext context, bool limitInitialSpeed)
     {
+        if (!parent.IsInsideTree()) throw new ArgumentException("Ragdoll owner must be in the scene tree.", nameof(parent));
         _character = character;
         var history = character.BodyHistory ?? throw new InvalidOperationException("Character has no physical history.");
+        var profile = history.Profile;
         var skeleton = context.AnimationSet.Skeletons[context.Profile.SkeletonId];
         var mesh = context.AnimationSet.SkeletalMeshes[context.Profile.MannequinMeshId];
+        if (profile.Definition.Mesh != mesh.ObjectPath)
+            throw new InvalidOperationException("Ragdoll profile belongs to another mesh.");
         _snapshotName = context.MovementGraph?.RagdollPose.SnapshotName ??
             throw new InvalidOperationException("Ragdoll recovery requires the complete root graph.");
         _meshName = mesh.Name;
         _snapshotBones = skeleton.PhysicalBones.Select(b => b.Name).ToArray();
         _snapshotToLogical = skeleton.PhysicalToLogical.ToArray();
-        var authored = AlsPhysicsAssetCompiler.Compile(Read("v4_physics_asset_inputs.json"), mesh.ObjectPath);
-        var definition = AlsPhysicsJointFrameCompiler.Compile(Read("v4_physics_joint_frame_inputs.json"), authored);
-        var settings = AlsPhysicsJointCompiler.Compile(Read("v4_physics_joint_reference.json"), definition);
-        var conditioning = AlsBodyInertiaCompiler.Compile(Read("v4_physics_inertia_reference.json"), definition, settings);
-        var sleep = AlsSleepSettingsCompiler.Compile(Read("v4_physics_sleep_reference.json"), definition);
+        var definition = profile.Definition;
         var names = skeleton.LogicalBones.Select(b => b.Name).ToArray();
         var parents = skeleton.LogicalBones.Select(b => b.ParentLogicalId).ToArray();
         _entryPose = new AlsLocalPose[names.Length]; _flail = new AlsPrecisePose[names.Length];
@@ -87,25 +85,23 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
         _scene = new(environment, entryBodies.Length);
         var bodies = new AlsIslandBody[entryBodies.Length + _scene.BodyCount];
         var states = new AlsIslandBodyState[bodies.Length]; entryBodies.CopyTo(states, 0);
-        var sleepSettings = new AlsSleepBodySettings[bodies.Length]; sleep.Bodies.CopyTo(sleepSettings, 0);
+        var sleepSettings = new AlsSleepBodySettings[bodies.Length]; profile.Sleep.Bodies.CopyTo(sleepSettings, 0);
         foreach (var body in definition.Bodies)
             bodies[body.Index] = new(body.MassLocal, body.PhysicsType == 1 ? default :
-                new((float)(1 / body.MassKg), new AlsDoubleVector(conditioning[body.Index].ConditionedInverseInertia)),
+                new((float)(1 / body.MassKg), new AlsDoubleVector(profile.Conditioning[body.Index].ConditionedInverseInertia)),
                 body.Defaults.GetProperty("linearDamping").GetDouble(), body.Defaults.GetProperty("angularDamping").GetDouble(),
                 body.Defaults.GetProperty("bEnableGravity").GetBoolean());
         _scene.InitializeBodies(bodies, states);
-        using var reference = JsonDocument.Parse(Read("v4_physics_awake_solver_reference.json"));
-        var solver = reference.RootElement.GetProperty("cases")[0].GetProperty("solverSettings");
-        var joints = definition.Joints.Select(j => AlsCachedJointSettingsCompiler.IslandJoint(j.ParentBody, j.ChildBody,
-            j.ParentFrame, j.ChildFrame, settings[j.Index].NativeSettings, solver)).ToArray();
-        var island = new AlsJointIsland(bodies, joints, states, sleepSettings: sleepSettings, sleepSmoothing: sleep.Smoothing);
-        _animation = new(authored, settings, names, parents, island, 1.5f, 1.5f);
+        var island = new AlsJointIsland(bodies, profile.Joints, states, sleepSettings: sleepSettings,
+            sleepSmoothing: profile.Sleep.Smoothing);
+        _animation = new(profile.AuthoredDefinition, profile.Settings, names, parents, island, 1.5f, 1.5f);
         _animation.Prepare(_entryPose); // Reject incompatible motor bindings before publishing any owner.
 
         var registry = new AlsContactRegistry(bodies.Length, definition.Bodies.Sum(b => b.Shapes.Length) + _scene.ShapeCount);
-        _query = new(registry, AlsContactDetectorCompiler.Compile(Read("v4_physics_cull_reference.json")));
-        _shapes = new(); _shapes.Bind(definition, registry, _query);
-        foreach (var body in definition.Bodies) _query.BindBodyBounds(body.Index, conditioning[body.Index].NativeBoundsSize);
+        _query = new(registry, profile.Detector);
+        _shapes = new(); _shapes.Bind(definition, registry, _query, profile.Shapes);
+        foreach (var body in definition.Bodies)
+            _query.BindBodyBounds(body.Index, profile.Conditioning[body.Index].NativeBoundsSize);
         _scene.Bind(registry, _query);
         var material = definition.Bodies[0].Material;
         var friction = material.GetProperty("friction").GetSingle();
@@ -122,13 +118,12 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
                 body.Defaults.GetProperty("gravityGroupIndex").GetInt32() != 0 ||
                 body.Defaults.GetProperty("bGyroscopicTorqueEnabled").GetBoolean())
                 throw new NotSupportedException("Ragdoll requires the supported homogeneous material and gravity policy.");
-        var contactSettings = AlsContactRuntimeSettingsCompiler.Compile(Read("v4_physics_contact_settings.json"), definition);
+        var contactSettings = profile.Contact;
         var overlap = new float[bodies.Length]; contactSettings.BodyOverlapVelocities.CopyTo(overlap, 0);
         _contacts = new(registry, _query, new(staticFriction, friction, friction),
             new(1f / Engine.PhysicsTicksPerSecond, restitution, contactSettings.RestitutionThreshold, contactSettings.MaxPushOutVelocity),
             16, island, bodyOverlapVelocities: contactSettings.EnableInitialDepenetration ? overlap : []);
-        _proxies = new(parent, definition, names, parents, identity.CharacterId, identity.SlotGeneration, collisionLayer: 0, collisionMask: 0);
-        _host = new(_proxies, definition, island, worldSpace: true);
+        _host = new(definition, island);
         _speedLimit = Activation.SpeedLimit; AnimationIdentity = identity;
     }
 
@@ -217,7 +212,6 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
             _character.PublishedFrameId == _character.RuntimeCommittedFrameId;
     }
 
-    private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
     private static void Main()
     { if (!GodotThread.IsMainThread()) throw new InvalidOperationException("Character ragdoll simulation requires Main."); }
     private void Check() { Main(); ObjectDisposedException.ThrowIf(_disposed, this); }
@@ -226,7 +220,7 @@ internal sealed class AlsCharacterRagdollSimulation : IDisposable
         Main(); if (_disposed) return;
         // Scene binding rejects disposal under a locked solve. Do not poison
         // this owner before that guard succeeds: the same step must be retryable.
-        _scene?.Dispose(); _query?.Dispose(); _shapes?.Dispose(); _proxies?.Dispose();
+        _scene?.Dispose(); _query?.Dispose(); _shapes?.Dispose();
         _disposed = true;
     }
 }
