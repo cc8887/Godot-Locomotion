@@ -231,7 +231,7 @@ public partial class PhysicsCoreJointReplay : Node3D
                 var actor = states[spine].Actor;
                 states[spine] = states[spine] with { Actor = actor with { Rotation = (AlsQuaternion.FromAxisAngle(System.Numerics.Vector3.UnitY, .6f) * actor.Rotation).Normalized() } };
             }
-            var sleep = _sleep ? AlsSleepSettingsCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_sleep_reference.json"), definition) : null;
+            var sleep = _sleep ? AlsSleepSettingsCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_sleep_settings.json"), definition) : null;
             var sleepSettings = sleep is null ? [] : new AlsSleepBodySettings[bodies.Length];
             if (sleep is not null) sleep.Bodies.CopyTo(sleepSettings, 0);
             if (_setupDirectory is not null)

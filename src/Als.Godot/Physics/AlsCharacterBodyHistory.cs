@@ -26,6 +26,7 @@ public partial class AlsCharacterBodyHistory : Node
     internal AlsFrameIdentity SourceAnimationIdentity { get; private set; }
     internal AlsFrameIdentity PhysicsIdentity => _history?.CommittedIdentity ?? default;
     internal int BodyCount => _seed.Length;
+    internal AlsRagdollCompiledProfile Profile { get; private set; } = null!;
     internal string? Failure { get; private set; }
 
     internal void Configure(AlsP3Character owner, AlsP3RuntimeContext context)
@@ -35,8 +36,8 @@ public partial class AlsCharacterBodyHistory : Node
         ProcessThreadGroupOrder = AlsP3FrameStages.Lifecycle;
         var skeleton = context.AnimationSet.Skeletons[context.Profile.SkeletonId];
         var mesh = context.AnimationSet.SkeletalMeshes[context.Profile.MannequinMeshId];
-        var definition = AlsPhysicsAssetCompiler.Compile(
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), mesh.ObjectPath);
+        Profile = AlsRagdollCompiledProfile.Get(mesh.ObjectPath);
+        var definition = Profile.AuthoredDefinition;
         _names = skeleton.LogicalBones.Select(b => b.Name).ToArray();
         _bridge = new(definition, _names,
             skeleton.LogicalBones.Select(b => b.ParentLogicalId).ToArray(), owner.Handle.CharacterId, owner.Handle.Generation);

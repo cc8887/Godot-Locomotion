@@ -9,7 +9,10 @@ public static class AlsSleepSettingsCompiler
     public static AlsRigSleepSettings Compile(string json, AlsRagdollPhysicsDefinition definition)
     {
         using var document = JsonDocument.Parse(json); var root = document.RootElement;
-        Require(root.GetProperty("schemaVersion").GetInt32() == 1 && root.GetProperty("sleepEnabled").GetBoolean(), "Native sleep reference required.");
+        Require(root.GetProperty("schemaVersion").GetInt32() == 2 && root.GetProperty("sleepEnabled").GetBoolean() &&
+            root.EnumerateObject().Select(p => p.Name).ToHashSet(StringComparer.Ordinal).SetEquals(
+                ["schemaVersion", "sleepEnabled", "sleepSettings", "rigs", "referenceSha256"]) &&
+            root.GetProperty("referenceSha256").GetString() is { Length: 64 }, "Compact native sleep settings required.");
         var cvars = root.GetProperty("sleepSettings");
         Require(cvars.GetProperty("p.Chaos.Solver.Sleep.PartialIslandSleep").GetDouble() == 0 &&
             cvars.GetProperty("p.Chaos.Solver.Sleep.AngularSleepThresholdSize").GetDouble() == 0, "Partial/size-scaled sleeping is unsupported.");
