@@ -71,7 +71,7 @@ public sealed class ContractLayoutTests
     {
         AssertFieldOrder<AlsLocomotionCommand>(
             "MovementAxes", "ViewYaw", "ViewPitch", "AimYaw", "AimPitch", "RequestedGait",
-            "RequestedStance", "RequestedRotationMode", "JumpPressed", "RequestedOverlay");
+            "RequestedStance", "RequestedRotationMode", "JumpPressed", "RequestedOverlay", "CancelAction");
         AssertFieldOrder<AlsViewPoseState>(
             "RelativeYaw", "RelativePitch", "YawSpeed", "HeadWeight", "SpineWeight",
             "SpineResidualYaw", "LastWorldYaw");
@@ -141,7 +141,7 @@ public sealed class ContractLayoutTests
             "RotationMode", "RequestedAction", "CurrentDriveMode", "RagdollState",
             "AnimationQualityTier", "Command", "CharacterYaw", "MaxAcceleration",
             "MaxBrakingDeceleration", "JumpAccepted", "FootPlacementReleaseSignals",
-            "ActionRequest", "LandPrediction", "AimYawRateDegrees", "FirstPerson", "CharacterRotation", "FootIk", "MovementInput", "RefactoredGroundPrediction", "GameplayAction", "MeshHeightOffset", "ActionParameters", "MovementAction", "RagdollPhysics");
+            "ActionRequest", "LandPrediction", "AimYawRateDegrees", "FirstPerson", "CharacterRotation", "FootIk", "MovementInput", "RefactoredGroundPrediction", "GameplayAction", "MeshHeightOffset", "ActionParameters", "MovementAction", "RagdollPhysics", "Mantling");
         AssertStorageFieldOrder<AlsRuntimeState>(
             "LocomotionState", "SmoothedVelocity", "SmoothedAcceleration", "Lean",
             "LeftFootLocked", "RightFootLocked", "TurnInPlaceTime", "RotateInPlaceTime",

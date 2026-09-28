@@ -1,0 +1,13 @@
+# Clean clone validation (2026-09-28)
+
+- Source: `git clone --no-local --single-branch --branch main . ../GodotALS-clone-validation-20260928`, HEAD `991038d4db9d58f48dbbb10a954be4b7fc652332`. The configured GitHub remote could not be reached because `github.com` did not resolve; this is a clone of the local committed `main`, without its uncommitted or ignored files.
+- Runtime: Godot `4.7.2.stable.mono.official.ed1daf0bf`, .NET 8 SDK.
+- Before a C# build, the committed plugin failed to parse at `plugin.gd:13`: `Identifier "AlsImporterPlugin" not declared in the current scope` and `Cannot infer the type of "bridge" variable`. Godot's editor process nevertheless exited with code 0, so its output must be checked.
+- `dotnet build GodotALS.csproj -p:Optimize=true` passed with 0 warnings and 0 errors. The editor then loaded without the plugin parse error.
+- Running `als_demo.tscn` from Git files alone exited with code 1: `assets/generated/als_v4/compiled/als_animation_set.tres` is ignored and absent. The checkout is not a runnable asset delivery.
+- For runtime validation, copied the 288 local generated `als_v4` files (about 0.13 GiB) into the clone and let Godot import them. The compiled animation set SHA-256 matched at both ends: `11482F62AB48131B22AB1A869ECF40E4E266CBCA5FE9BFEF1F2ED2756C674D35`.
+- With these assets, `als_demo.tscn` ran headlessly for 180 frames with exit code 0. `p4_keyboard_mouse_smoke.tscn` passed 360 frames; `action_input_smoke.tscn -- --hz=60` passed 240 frames.
+- Applied the plugin fix to the clone, ran `dotnet clean GodotALS.csproj -c Debug`, confirmed the Debug `GodotALS.dll` was absent, and opened the editor without a parse error. After rebuilding with 0 warnings and 0 errors, the action input smoke passed again.
+- Core `ContractLayoutTests` exposed two stale field lists (`CancelAction`, `Mantling`): 18 passed and 2 failed before the test correction, 20 passed afterward in both the clone and main directory. Two zero-allocation tests failed during a broader parallel run and both passed in isolation. The broader Core run was stopped after several minutes.
+- Import manifest and compilation tests passed 230/230. The broader Import run was stopped after about five minutes; it had reported one intentional skip and no failure before cancellation. Neither broader suite is claimed as passed.
+- This was headless runtime verification, not a visual inspection or a new UE export. A Git-only clone still requires the documented generated asset delivery before Demo execution. Godot also generated nine untracked `.cs.uid` files in the clone during import.

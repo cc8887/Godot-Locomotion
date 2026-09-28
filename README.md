@@ -46,8 +46,9 @@ Worker 在 Release 策略下完成回滚后，现可沿用原帧输入重试；�
 `GODOT_EXECUTABLE`。该文件已加入 `.gitignore`；提交前不要使用 `git add -f`
 强制跟踪它。
 
-在 Godot 中导入仓库根目录的 `project.godot` 后运行主场景，或从 PowerShell
-直接启动 Demo：
+首次 clone 后先用 .NET 8 SDK 构建 `GodotALS.csproj`，再用 Godot 4.7.2 .NET
+打开仓库根目录的 `project.godot`。导入插件在构建前也可加载，但执行菜单命令需要
+已编译的 C# 程序集。完成资产准备后可运行主场景，或从 PowerShell 直接启动 Demo：
 
 ```powershell
 if (-not (Test-Path .env.local.ps1)) { Copy-Item .env.local.ps1.example .env.local.ps1 }
