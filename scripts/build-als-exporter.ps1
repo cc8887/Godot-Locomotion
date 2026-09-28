@@ -30,6 +30,7 @@ $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts\un
 $packagePath = [IO.Path]::GetFullPath((Join-Path $artifactsRoot 'AlsGodotExporter'))
 $projectRoot = Split-Path -Parent $unrealProjectPath
 $pluginsRoot = Join-Path $projectRoot 'Plugins'
+$dependencyPlugin = Resolve-RequiredPath (Join-Path $pluginsRoot 'ALS\ALS.uplugin') 'ALS plugin dependency'
 $targetPath = [IO.Path]::GetFullPath((Join-Path $pluginsRoot 'AlsGodotExporter'))
 $managedSentinel = Join-Path $targetPath '.godotals-managed'
 
@@ -42,7 +43,7 @@ if (Test-Path -LiteralPath $packagePath) {
 }
 New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
 
-& $runUat BuildPlugin "-Plugin=$pluginSource" "-Package=$packagePath" -TargetPlatforms=Win64
+& $runUat BuildPlugin "-Plugin=$pluginSource" "-Dependencies=$dependencyPlugin" "-Package=$packagePath" -TargetPlatforms=Win64
 if ($LASTEXITCODE -ne 0) {
     throw "RunUAT BuildPlugin failed with exit code $LASTEXITCODE."
 }

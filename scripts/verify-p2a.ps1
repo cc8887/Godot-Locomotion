@@ -102,6 +102,7 @@ if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
     throw "Build script does not exist: $buildScript"
 }
 
+Write-Host 'P2A: building the exporter and running its UE ready check...'
 $outputLines = & $buildScript -EngineRoot $EngineRoot -UnrealProject $UnrealProject 2>&1
 $outputLines | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
@@ -126,6 +127,7 @@ if (-not (Test-Path -LiteralPath $godotIgnorePath -PathType Leaf)) {
 $editorCommand = Join-Path ([IO.Path]::GetFullPath($EngineRoot)) 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $projectHashBefore = (Get-FileHash -LiteralPath $UnrealProject -Algorithm SHA256).Hash
 
+Write-Host 'P2A: checking the export plan and metadata...'
 $dryRunOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -DryRun "-Output=$outputPath" -unattended -nop4 -nosplash -nullrhi -nosound 2>&1
 $dryRunOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
@@ -257,6 +259,7 @@ if ($manifest.auditSummary.status -cne 'planned') {
 }
 Write-Host 'GODOT_ALS_P2A_METADATA_OK'
 
+Write-Host 'P2A: exporting assets and checking file hashes...'
 $exportOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export "-Output=$outputPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
 $exportOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
@@ -300,6 +303,7 @@ if (@($formalManifest.files).Count -ne $plan.summary.exportableCount) {
 }
 Write-Host "GODOT_ALS_P2A_FULL_EXPORT_OK files=$(@($formalManifest.files).Count)"
 
+Write-Host 'P2A: repeating the export to verify deterministic output...'
 $determinismOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export "-Output=$determinismPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
 $determinismOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {

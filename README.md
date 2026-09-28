@@ -38,7 +38,7 @@ dotnet build GodotALS.csproj -p:Optimize=true
 
 清单的 `files[]` 记录 141 个 FBX/PNG 的路径、大小和 SHA-256；仓库中的 `reference/als-v4-export.lock.json` 锁定该批清单。`.import` 与 `.godot/imported` 由 Godot 生成，不需要下载。若已合法持有与仓库锁定批次相同的本地导出文件，可放入上述目录，跳过 P2A，直接运行 P2B。
 
-自行准备包含 `AdvancedLocomotionSystemV.uproject` 和 `Content/AdvancedLocomotionV4` 的 UE 5.9 ALS V4 源工程；[ALS V4 的 Fab 页面](https://www.fab.com/listings/ef9651a4-fb55-4866-a2d9-1b38b028f9c7)可供确认内容来源。加载 `.env.local.ps1` 后，在仓库根目录运行：
+自行准备包含 `AdvancedLocomotionSystemV.uproject`、`Content/AdvancedLocomotionV4` 和 `Plugins/ALS/ALS.uplugin` 的 UE 5.9 ALS V4 源工程；[ALS V4 的 Fab 页面](https://www.fab.com/listings/ef9651a4-fb55-4866-a2d9-1b38b028f9c7)可供确认内容来源。加载 `.env.local.ps1` 后，在仓库根目录运行：
 
 ```powershell
 $lockedManifestSha = (Get-Content reference/als-v4-export.lock.json -Raw | ConvertFrom-Json).manifestSha256
