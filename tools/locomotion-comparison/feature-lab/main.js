@@ -53,9 +53,9 @@ const LESSONS = {
     problem: "从右横移突然改向左，当前循环可能正让一只脚越过另一只脚。若当帧切到相反方向的髋姿态，腿和脚会穿插或跳位。需要把输入方向与可换髋的动画窗口分开。",
     alsFlow: ["六方向状态", "Feet_Crossing = 0", "髋偏向/状态权重", "ChangeDirection"],
     als: "ALS V4 使用 F/B/LF/LB/RF/RB 六方向状态与四向 VelocityBlend。中性换髋要等 Feet_Crossing 恰为 0、源状态权重为 1、髋偏向绝对值小于 0.5，再沿 ChangeDirection 自定义曲线与腿部 BlendProfile 过渡。Feet_Crossing 不能替代停步用的 Feet_Position。",
-    lyraFlow: ["四向 Strafe", "请求移动角", "Orientation Warping", "下身朝向修正"],
-    lyra: "Epic 文档说明 Lyra 用四个基本方向的 Strafe 资产，并在覆盖不足的起步中用 Orientation Warping 程序化扭转下半身。公开说明未给出与 ALS Feet_Crossing 一一对应的交叉步门控；右侧仅展示方向适配原理。",
-    boundary: "左侧脚越过中线的动作被夸张放大；门控状态与阈值依据 ALS V4 图。右侧是四向样本加下身旋转的程序化示意，不代表 Lyra 实际资产里的逐帧交叉步。",
+    lyraFlow: ["四向 Strafe", "起步请求角", "Orientation Warping", "下身朝向修正"],
+    lyra: "Epic 文档说明 Lyra 用四个基本方向的 Strafe 资产，并在覆盖不足的起步中用 Orientation Warping 程序化适配方向。文档没有给出反向交叉步的换髋策略，也没有与 ALS Feet_Crossing 对应的门控；右侧仅借起步机制解释方向适配。",
+    boundary: "左侧脚越过中线的动作被夸张放大；门控状态与阈值依据 ALS V4 图。右侧是公开起步方向适配的程序化参照，不代表 Lyra 在反向交叉时实际运行 Orientation Warping。",
     phases: ["右横移", "反向输入", "脚交叉/等待", "换髋或适配"],
     sources: [["ALS 交错步原图审计", assetRoot + "2026-09-09-locomotion-port-gap-audit.md"], ["ALS 换髋许可验证", assetRoot + "2026-09-10-direction-completeness.md"], ["Lyra Orientation Warping", epicAnimation]],
   },
@@ -409,9 +409,9 @@ function sample(featureId, side, u) {
     const lowerYaw = root.yaw + (side === "als" ? alsProgress : lyraProgress) * sign * .52;
     return {
       frame: { root, lowerYaw, feet: crossFeet(u, sign) },
-      state: side === "als" ? requested ? allowed ? "ChangeDirection · 换髋" : crossing ? "等待 Feet_Crossing = 0" : "等待髋偏向回中" : "原方向循环" : requested ? "四向 Strafe + Orientation Warping" : "基本方向 Strafe",
+      state: side === "als" ? requested ? allowed ? "ChangeDirection · 换髋" : crossing ? "等待 Feet_Crossing = 0" : "等待髋偏向回中" : "原方向循环" : requested ? "起步方向适配参照" : "四向 Strafe 资产参照",
       value: side === "als" ? crossing ? "Feet_Crossing = 1" : `Feet_Crossing = 0 · Bias ${p.bias.toFixed(1)}` : `${(lyraProgress * 30).toFixed(0)}° 下身适配`,
-      overlay: side === "als" ? "交叉窗口内保持原髋姿态" : "方向适配展示下身旋转，不等同换髋门控",
+      overlay: side === "als" ? "交叉窗口内保持原髋姿态" : "逆向交叉的 Lyra 实际处理尚未核验",
       metrics: [["Feet_Crossing", String(crossing)], ["髋偏向", p.bias.toFixed(1)], ["ALS 换髋许可", allowed ? "开放" : "等待"]],
     };
   }
@@ -484,8 +484,8 @@ function selectFeature(next) {
   for (const phase of lesson.phases) { const span = document.createElement("span"); span.textContent = phase; elements.phases.append(span); }
   elements.alsHeading.textContent = feature === "foot-lock" && options["foot-lock"].surface === "moving" ? "本地扩展 / 三维示意" : "原图规则 / 三维示意";
   elements.alsBadge.textContent = feature === "foot-lock" && options["foot-lock"].surface === "moving" ? "本地扩展" : "已核对";
-  elements.lyraHeading.textContent = feature === "foot-lock" ? "通用未约束参照" : feature === "mantle" ? "已公开的跳跃路径" : "Epic 公开机制";
-  elements.lyraBadge.textContent = feature === "foot-lock" ? "通用反例" : feature === "mantle" ? "范围说明" : "官方文档";
+  elements.lyraHeading.textContent = feature === "foot-lock" ? "通用未约束参照" : feature === "mantle" ? "已公开的跳跃路径" : feature === "cross-step" ? "起步方向适配参照" : "Epic 公开机制";
+  elements.lyraBadge.textContent = feature === "foot-lock" ? "通用反例" : feature === "mantle" || feature === "cross-step" ? "范围说明" : "官方文档";
   renderControls(); render();
 }
 
