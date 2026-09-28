@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f8f7" />
+    <link rel="icon" href="data:," />
+    <title>ALS V4 / Lyra · 动画机制对照</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div><a class="back-link" href="../">← 交互演示</a><h1>ALS V4 / Lyra 动画机制对照</h1></div>
+        <span class="edition">五个可交互专题 · Three.js 教学模型</span>
+      </header>
+
+      <nav class="feature-nav" aria-label="动画机制专题">
+        <button type="button" data-feature="foot-lock" aria-current="page"><span>01</span> 锁脚</button>
+        <button type="button" data-feature="turn"><span>02</span> 原地转向</button>
+        <button type="button" data-feature="mantle"><span>03</span> 攀爬</button>
+        <button type="button" data-feature="cross-step"><span>04</span> 交叉步</button>
+        <button type="button" data-feature="equipment"><span>05</span> 道具动画</button>
+      </nav>
+
+      <section class="feature-intro" aria-labelledby="feature-title">
+        <div><p class="eyebrow" id="feature-number">01 / FOOT CONTACT</p><h2 id="feature-title">锁脚</h2></div>
+        <p id="feature-lead"></p>
+      </section>
+
+      <section class="workbench" aria-label="同步三维机制演示">
+        <div class="controls" id="feature-controls"></div>
+        <div class="scene-grid">
+          <section class="scene-pane als-pane" aria-labelledby="als-heading">
+            <div class="scene-heading"><div><span>ALS V4</span><h3 id="als-heading">原图规则 / 三维示意</h3></div><strong id="als-badge">已核对</strong></div>
+            <div class="viewport"><canvas id="als-canvas" aria-label="ALS 动画机制三维场景"></canvas><span class="viewport-label" id="als-overlay"></span></div>
+            <div class="scene-status"><span id="als-state"></span><strong id="als-value"></strong></div>
+          </section>
+          <section class="scene-pane lyra-pane" aria-labelledby="lyra-heading">
+            <div class="scene-heading"><div><span>LYRA</span><h3 id="lyra-heading">Epic 公开机制</h3></div><strong id="lyra-badge">官方文档</strong></div>
+            <div class="viewport"><canvas id="lyra-canvas" aria-label="Lyra 动画机制三维场景"></canvas><span class="viewport-label" id="lyra-overlay"></span></div>
+            <div class="scene-status"><span id="lyra-state"></span><strong id="lyra-value"></strong></div>
+          </section>
+        </div>
+        <div class="transport">
+          <button id="play-button" class="command" type="button">暂停</button>
+          <button id="reset-button" class="secondary-command" type="button">重置</button>
+          <label for="timeline"><span>时间</span><input id="timeline" type="range" min="0" max="1000" value="0" /><output id="time-value">0.00 s</output></label>
+        </div>
+        <div class="phase-track" id="phase-track" aria-label="本专题阶段"></div>
+        <div class="readout"><div><span id="metric-a-label"></span><strong id="metric-a"></strong></div><div><span id="metric-b-label"></span><strong id="metric-b"></strong></div><div><span id="metric-c-label"></span><strong id="metric-c"></strong></div></div>
+      </section>
+
+      <section class="analysis-section" aria-labelledby="problem-title">
+        <div class="section-heading"><span>问题</span><h2 id="problem-title">为什么需要这套机制</h2></div>
+        <p id="problem-copy"></p>
+      </section>
+      <section class="analysis-section" aria-labelledby="mechanism-title">
+        <div class="section-heading"><span>机制</span><h2 id="mechanism-title">两条处理链</h2></div>
+        <div class="mechanism-grid"><div><h3>ALS V4</h3><div class="flow" id="als-flow"></div><p id="als-explanation"></p></div><div><h3>Lyra / 对照边界</h3><div class="flow" id="lyra-flow"></div><p id="lyra-explanation"></p></div></div>
+      </section>
+      <section class="analysis-section sources-section" aria-labelledby="boundary-title">
+        <div class="section-heading"><span>证据</span><h2 id="boundary-title">可验证的范围</h2></div>
+        <p id="boundary-copy"></p>
+        <div id="source-links" class="source-links"></div>
+      </section>
+      <footer><a href="../locomotion-comparison/">停步与 Distance Matching</a><a href="../../blog/als-lyra-animation-features.html">阅读专题文章</a></footer>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
