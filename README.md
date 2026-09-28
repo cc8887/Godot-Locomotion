@@ -48,7 +48,8 @@ Worker 在 Release 策略下完成回滚后，现可沿用原帧输入重试；�
 
 首次 clone 后先用 .NET 8 SDK 构建 `GodotALS.csproj`，再用 Godot 4.7.2 .NET
 打开仓库根目录的 `project.godot`。导入插件在构建前也可加载，但执行菜单命令需要
-已编译的 C# 程序集。完成资产准备后可运行主场景，或从 PowerShell 直接启动 Demo：
+已编译的 C# 程序集。先按下文[首次 clone 的资产准备](#首次-clone-的资产准备)导出并导入资产，
+再运行主场景，或从 PowerShell 直接启动 Demo：
 
 ```powershell
 if (-not (Test-Path .env.local.ps1)) { Copy-Item .env.local.ps1.example .env.local.ps1 }
@@ -96,16 +97,60 @@ Mannequin、Overlay 与道具模型。最初 P2 批次的审计为 0 error / 0 w
 `5D942E8566C9C8DE0FBBF015E02C6235AC2DEEF51C8C54446A56302A1D35BFD0`。
 音频按既定范围未导出，也不阻塞当前动画示例。
 
-生成资产位于 ignored 的 `assets/generated/als_v4/**`，不应提交导入缓存、
-`.godot`、`bin` 或 `obj`。
+## 首次 clone 的资产准备
 
-因此 clean checkout 不能只靠 Git 内容直接运行 Demo。首次准备必须先按
-[P2A 全量导出](docs/architecture/p2a-full-ue-export.md)从 UE 5.9 源项目执行
-`scripts/verify-p2a.ps1`，再按
-[P2B 全量导入](docs/architecture/p2b-godot-import-closure.md)执行
-`scripts/verify-p2b.ps1 -CleanImport`。完成后必须存在
-`assets/generated/als_v4/compiled/als_animation_set.tres`；已有受审计的同批生成
-资产时可复用该交付物，不必把它提交到 Git。
+Git 忽略整个 `assets/generated/als_v4/`，所以单独 clone 后缺少以下运行所需文件：
+
+| 路径（均在 `assets/generated/als_v4/` 下） | 数量 | 生成阶段 |
+| --- | ---: | --- |
+| `als_manifest.json` | 1 | P2A 正式清单，记录 267 个资产及文件哈希 |
+| `animations/*.fbx` | 126 | P2A 动画序列 |
+| `meshes/skeletal/*.fbx` | 7 | P2A 角色和道具骨骼网格 |
+| `meshes/static/*.fbx` | 4 | P2A 静态网格 |
+| `textures/*.png` | 4 | P2A 纹理 |
+| `compiled/als_animation_set.tres` | 1 | P2B 编译后的 Godot 资源，Demo 启动时直接加载 |
+
+141 个 FBX/PNG 的具体文件名、大小和 SHA-256 以生成的 `als_manifest.json` 的
+`files[]` 为准；仓库跟踪的 `reference/als-v4-export.lock.json` 锁定正式清单的
+SHA-256。`.import`、`.godot/imported` 是 Godot 在导入时生成的缓存，
+`export_plan.json`、`audit/`、`partial/` 是导出审计材料，不需要另行下载来运行 Demo。
+缺少 `.tres` 时主场景无法启动；缺少或改动清单中的源文件会导致导入校验失败。
+
+准备一份自己有权使用、与本仓库锁定批次一致的 UE 5.9 ALS V4 源工程
+（包含 `AdvancedLocomotionSystemV.uproject` 和 `Content/AdvancedLocomotionV4`）；
+源工程和导出资产不随本仓库提供。ALS V4 的来源见
+[Fab 官方页面](https://www.fab.com/listings/ef9651a4-fb55-4866-a2d9-1b38b028f9c7)。
+在 Windows PowerShell 7 中，从本仓库根目录执行：
+
+```powershell
+if (-not (Test-Path .env.local.ps1)) { Copy-Item .env.local.ps1.example .env.local.ps1 }
+# 编辑 .env.local.ps1：ALS_UE_PROJECT_ROOT 指向源工程目录，
+# UE_ENGINE_ROOT 指向 UE 5.9 安装根目录，GODOT_EXECUTABLE 指向 Godot 4.7.2 .NET。
+. ./.env.local.ps1
+$lockedManifestSha = (Get-Content reference/als-v4-export.lock.json -Raw | ConvertFrom-Json).manifestSha256
+.\scripts\verify-p2a.ps1 -EngineRoot $env:UE_ENGINE_ROOT `
+  -UnrealProject $env:ALS_UE_PROJECT_FILE -UpdateAssetLock
+$exportedManifestSha = (Get-FileHash assets/generated/als_v4/als_manifest.json -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($exportedManifestSha -cne $lockedManifestSha) {
+  throw '导出批次与仓库锁不一致；请核对 UE 源工程/版本，不要继续导入或提交新锁。'
+}
+.\scripts\verify-p2b.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -CleanImport
+Test-Path assets/generated/als_v4/compiled/als_animation_set.tres
+```
+
+P2A 会构建并部署仓库内的 UE 导出插件，完成两次导出、审计和确定性比较；
+`-UpdateAssetLock` 才会发布候选输出，同时重写本地的锁文件。哈希检查用于确认
+这次导出与仓库锁定批次一致；不一致时不要将本地锁文件提交。P2B 会重新构建
+.NET 项目、执行 Godot 清洁导入并验证资产和真实 rig。详细门禁与限制见
+[P2A 全量导出](docs/architecture/p2a-full-ue-export.md)和
+[P2B 全量导入](docs/architecture/p2b-godot-import-closure.md)。若已有**同一锁定批次**
+的合法本地生成文件，可以放在上述目录后直接执行 P2B，无需重复 UE 导出。
+
+仓库只提供导出工具和代码，不公开分发这些源资产：ALS V4 包含 Epic/第三方内容；
+[Epic 内容许可](https://www.unrealengine.com/eula/content)限制向第三方分发源格式内容，
+[Fab 标准许可](https://www.fab.com/eula)允许在适用条款下与项目协作者私下共享，
+但不允许把资产作为独立资源公开再分发。仓库自己的
+[资产许可说明](ASSET_LICENSE.md)也不能替原权利人授予分发权。
 
 ## 验证
 
