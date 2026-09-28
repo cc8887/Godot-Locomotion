@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --test motion-model.test.js"
+    "build:features": "vite build feature-lab --base ./ --outDir dist",
+    "test": "node --test motion-model.test.js feature-lab/model.test.js"
   },
   "dependencies": {
     "three": "0.181.0"
