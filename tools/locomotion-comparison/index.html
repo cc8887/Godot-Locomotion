@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f9f8" />
+    <link rel="icon" href="data:," />
+    <title>ALS 与 Distance Matching | 停步机制对比</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="page-header">
+        <div>
+          <h1>ALS 与 Distance Matching</h1>
+          <p>同一制动轨迹，切换入口脚步相位，看谁决定停点、谁决定落哪只脚。</p>
+        </div>
+        <span class="model-note">机制示意 · 非 UE / Godot 逐帧回放</span>
+      </header>
+
+      <section class="workspace" aria-label="同步三维停步演示">
+        <div class="case-toolbar">
+          <div class="case-label"><strong>入口脚相位</strong><span><i class="foot-key left-key"></i>左脚 <i class="foot-key right-key"></i>右脚 · 浅环为入口脚印</span></div>
+          <div class="segmented" role="group" aria-label="选择停步入口相位">
+            <button type="button" data-stop-case="cross" aria-pressed="true">双脚交叉</button>
+            <button type="button" data-stop-case="left" aria-pressed="false">左脚支撑</button>
+            <button type="button" data-stop-case="right" aria-pressed="false">右脚支撑</button>
+          </div>
+        </div>
+        <div class="scene-grid">
+          <section class="scene-pane als-pane" aria-labelledby="als-title">
+            <div class="pane-heading">
+              <span class="lane-number">01</span>
+              <div>
+                <h2 id="als-title">ALS</h2>
+                <p>Feet_Position → Lock / Plant → 脚锁</p>
+              </div>
+            </div>
+            <div class="canvas-wrap"><canvas id="als-canvas" aria-label="ALS 三维停步动画"></canvas><span class="foot-callout" id="als-callout">左脚撑住 · 右脚跨步</span></div>
+            <div class="pane-footer">
+              <span class="status-dot als-dot"></span>
+              <span id="als-state">移动循环</span>
+              <strong id="als-foot">跟随当前脚步相位</strong>
+            </div>
+          </section>
+          <section class="scene-pane dm-pane" aria-labelledby="dm-title">
+            <div class="pane-heading">
+              <span class="lane-number">02</span>
+              <div>
+                <h2 id="dm-title">Lyra 使用的距离匹配</h2>
+                <p>剩余距离 → 曲线反查 → 片段时间</p>
+              </div>
+            </div>
+            <div class="canvas-wrap"><canvas id="dm-canvas" aria-label="Distance Matching 三维停步动画"></canvas><span class="foot-callout" id="dm-callout">固定片段 · 右脚接触</span></div>
+            <div class="pane-footer">
+              <span class="status-dot dm-dot"></span>
+              <span id="dm-state">距离曲线待进入</span>
+              <strong id="dm-foot">双脚接触</strong>
+            </div>
+          </section>
+        </div>
+
+        <div class="decision-strip">
+          <div><span>ALS · Feet_Position</span><strong id="feet-position-readout">+0.18</strong></div>
+          <div><span>ALS · 停步分支</span><strong id="als-branch-readout">Plant Right</strong></div>
+          <div><span>固定片段 · 入口脚位差</span><strong id="phase-jump-readout">0 cm</strong></div>
+        </div>
+        <p class="case-explanation" id="case-explanation">交叉时 p = +0.18：右脚侧尚未压实，ALS 走 Plant Right；固定距离片段会跳到自己的脚位。</p>
+        <div class="phase-toolbar">
+          <div class="segmented" role="group" aria-label="选择距离匹配的入口相位方案">
+            <button type="button" data-phase-mode="distance" aria-pressed="true">仅距离匹配</button>
+            <button type="button" data-phase-mode="adapted" aria-pressed="false">先适配相位</button>
+          </div>
+          <p id="phase-result">固定片段与入口相位冲突；距离相同仍会换脚</p>
+        </div>
+
+        <div class="transport">
+          <button id="play-button" class="primary-button" type="button" aria-label="暂停动画">暂停</button>
+          <button id="reset-button" class="plain-button" type="button">重置</button>
+          <label class="scrub-control" for="time-scrub">
+            <span>时间</span>
+            <input id="time-scrub" type="range" min="0" max="1000" value="0" />
+            <output id="time-output" for="time-scrub">0.00 s</output>
+          </label>
+        </div>
+
+        <div class="readout" aria-live="off">
+          <div><span>实际速度</span><strong id="speed-readout">5.00 m/s</strong></div>
+          <div><span>剩余距离</span><strong id="distance-readout">3.13 m</strong></div>
+          <div><span>ALS 停步时间</span><strong id="als-time-readout">未进入</strong></div>
+          <div><span>DM 片段时间</span><strong id="dm-time-readout">0.00 s</strong></div>
+        </div>
+      </section>
+
+      <section class="parameters" aria-labelledby="parameters-title">
+        <div class="section-intro">
+          <h2 id="parameters-title">调整运动条件</h2>
+          <p>两边始终共享角色位移；改变的是动画如何响应这段位移。</p>
+        </div>
+        <div class="parameter-grid">
+          <label for="initial-speed">
+            <span>初始速度 <output id="initial-speed-value" for="initial-speed">5.0 m/s</output></span>
+            <input id="initial-speed" type="range" min="3" max="6" step="0.1" value="5" />
+          </label>
+          <label for="braking">
+            <span>制动减速度 <output id="braking-value" for="braking">4.0 m/s²</output></span>
+            <input id="braking" type="range" min="3" max="7" step="0.1" value="4" />
+          </label>
+        </div>
+      </section>
+
+      <section class="explanation" aria-labelledby="logic-title">
+        <div class="section-intro">
+          <h2 id="logic-title">它们各自解决什么</h2>
+          <p>ALS 先决定落哪只脚；距离匹配先决定动画播到哪里。</p>
+        </div>
+        <div class="logic-grid">
+          <article class="logic-column">
+            <div class="logic-heading"><span class="logic-rule als-rule"></span><h3>ALS：按状态与相位停步</h3></div>
+            <p>角色运动先减速。Stop 图读取上一移动姿态的 <code>Feet_Position</code>：符号选左/右脚，绝对值是否达到 0.5 选 Lock/Plant。Lock 固定已着地的脚；Plant 先补脚，再转移支撑。</p>
+            <div class="formula">Moving <span>→</span> Stop <span>→</span> Not Moving</div>
+            <p class="logic-detail">本演示以 1.5 m/s 表示动画的 MovingSmooth 速度门槛；原 ALS 在“仍有输入且仍有速度”时也会继续判为移动。普通停止由状态与脚步相位触发，并不根据预测停止位置反查动画时间。</p>
+          </article>
+          <article class="logic-column">
+            <div class="logic-heading"><span class="logic-rule dm-rule"></span><h3>Distance Matching：按距离选帧</h3></div>
+            <p>先预测角色还会移动多远，再到动画根运动烘焙的距离曲线上二分查找对应时间。该时间决定片段内的骨骼姿态；单靠距离值无法知道上一段循环正由哪只脚支撑。</p>
+            <div class="formula">d = v² / 2a <span>→</span> C(t) = −d <span>→</span> t</div>
+            <p class="logic-detail">右侧固定片段按默认右脚支撑入口设定，让三种入口共用同一脚步相位，凸显节点的相位限制；“先适配相位”是假设已有对应片段的教学对照，不代表 Lyra 原始蓝图的资产选择。接触期脚掌仍固定，不用滑步制造差异。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="comparison" aria-labelledby="comparison-title">
+        <h2 id="comparison-title">差别落在哪里</h2>
+        <div class="comparison-table" role="table" aria-label="方案差异">
+          <div class="comparison-row comparison-head" role="row"><span role="columnheader">观察点</span><span role="columnheader">ALS</span><span role="columnheader">Distance Matching</span></div>
+          <div class="comparison-row" role="row"><span role="cell">主要依据</span><span role="cell">速度、输入、步态、脚步相位</span><span role="cell">目标距离与动画距离曲线</span></div>
+          <div class="comparison-row" role="row"><span role="cell">动画时间</span><span role="cell">播放器推进与状态过渡</span><span role="cell">按剩余距离反查显式时间</span></div>
+          <div class="comparison-row" role="row"><span role="cell">最擅长</span><span role="cell">保持支撑脚与方向姿态连续</span><span role="cell">让片段位移节奏贴合停止位置</span></div>
+          <div class="comparison-row" role="row"><span role="cell">需额外处理</span><span role="cell">制动距离与片段节奏不符时的滑步</span><span role="cell">相位跳变、脚接触与预测误差</span></div>
+        </div>
+        <p class="closing-note">此页面是教学模型。ALS 分支依据本地 ALS V4 状态图；Lyra 侧隔离展示 Epic 的 Distance Match to Target 核心规则，固定片段及相位适配对照均是程序化设定。没有导出 Lyra 原始 Stop 图，画面不代表其逐节点或逐骨骼求值。浅色环表示入口脚位，实色环表示当前着地脚。</p>
+      </section>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
