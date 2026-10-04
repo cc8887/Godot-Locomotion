@@ -5,9 +5,11 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE = ROOT / 'artifacts/lyra-analysis'
-PROJECT = Path('../GASP58')
+PROJECT = project_path()
 ASSETS = ROOT / 'assets/generated/lyra_als'
 TAG = 'cmc-motor-v2-final'
 OUTPUT = EVIDENCE / 'character-motor-v2-integrity.json'

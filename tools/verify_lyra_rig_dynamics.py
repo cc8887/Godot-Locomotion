@@ -5,6 +5,8 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -36,7 +38,7 @@ assert not native['fullRig'] and not native['production']
 for field in ('dependencies', 'previousFixtureSha256'):
     for p, digest in native[field].items(): assert sha(root / p) == digest, p
 for p, digest in native['assetSha256'].items():
-    assert sha(Path('../GASP58/Content') / (p.split('.')[0].removeprefix('/Game/')+'.uasset')) == digest, p
+    assert sha(project_path('Content') / (p.split('.')[0].removeprefix('/Game/')+'.uasset')) == digest, p
 for p, digest in native['probeSourceSha256'].items():
     assert sha(repo / 'tools/unreal/AlsV4AssetExporter/Source/AlsV4AssetExporter' / p) == digest
     for tree in ('source', 'package'):

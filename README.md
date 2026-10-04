@@ -12,7 +12,7 @@
 git clone --branch v0.2.0-lyra https://github.com/cc8887/Godot-Locomotion.git
 Set-Location Godot-Locomotion
 Copy-Item .env.local.ps1.example .env.local.ps1
-# 编辑 .env.local.ps1，将 GODOT_EXECUTABLE 设为本机 Godot 4.7.2 .NET console.exe 的绝对路径。
+# 编辑 .env.local.ps1，将 GODOT_EXECUTABLE 设为 Godot 4.7.2 .NET console.exe 的相对路径。
 # 使用 Release 资源时，UE_ENGINE_ROOT、ALS_UE_PROJECT_ROOT、ALS_REFERENCE_ROOT 可以留空。
 . ./.env.local.ps1
 ```
@@ -210,6 +210,8 @@ if (-not (Test-Path assets/generated/als_v4/compiled/als_animation_set.tres)) {
 P2A 构建并部署 UE 导出插件，完成两次导出和确定性校验；`-UpdateAssetLock` 会发布输出并更新本地锁文件。P2B 构建 .NET 项目，执行 Godot 清洁导入及资产验证。若导出哈希不同，不要提交更新后的锁文件。详细流程见 [P2A 导出](docs/architecture/p2a-full-ue-export.md)和 [P2B 导入](docs/architecture/p2b-godot-import-closure.md)。
 
 ### GASP58 的 ALS V4 资源
+
+Lyra 的导出与验证工具以仓库目录为相对路径基准，和调用时的工作目录无关。默认源工程为 `../GASP58/GASP58.uproject`，引擎为 `../UE_5.8`；安装位置不同时，在被忽略的 `.env.local.ps1` 中设置 `LYRA_UE_PROJECT_FILE`、`UE_ENGINE_ROOT`。Python 原生源码验证读取 `UNREAL_ENGINE_SOURCE_ROOT`（默认 `../UnrealEngine`）；独立 Rig 对照工程使用 `LYRA_RIG_REFERENCE_HOST`、`LYRA_RIG_SOLVER_HOST`。这些配置和脚本路径参数支持相对路径，仓库与发布文档不保存本机盘符路径。
 
 若源工程是 `GASP58.uproject`（UE 5.8，含 `Content/AdvancedLocomotionV4`），使用资产专用插件和独立的本地锁。先执行 P2A、P2B，再生成六组与本次清单绑定的原始动画源：
 

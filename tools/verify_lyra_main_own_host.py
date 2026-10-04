@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 artifacts = repo / 'artifacts/lyra-analysis'
@@ -14,7 +16,7 @@ assert len(baseline['fixtures']) == 643 and len(baseline['packages']) == 508
 for name, digest in baseline['fixtures'].items():
     assert sha((root / name).read_bytes()) == digest, name
 for name, digest in baseline['packages'].items():
-    path = Path('../GASP58/Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')
+    path = project_path('Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')
     assert sha(path.read_bytes()) == digest, name
 
 logs = {}

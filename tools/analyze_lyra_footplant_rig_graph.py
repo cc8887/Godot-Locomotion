@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 path = root / 'footplant_rig_graph_v1.json'
@@ -38,7 +40,7 @@ for graph in data['graphs']:
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 for name, digest in data['previousFixtureSha256'].items():
     assert sha(root / name) == digest, name
-content = Path('../GASP58/Content')
+content = project_path('Content')
 for name, digest in data['assetSha256'].items():
     asset = content / (name.split('.')[0].removeprefix('/Game/') + '.uasset')
     assert sha(asset) == digest, name

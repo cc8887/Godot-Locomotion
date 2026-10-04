@@ -6,10 +6,12 @@ import json
 import math
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE = ROOT / 'artifacts/lyra-analysis'
 ASSETS = ROOT / 'assets/generated/lyra_als'
-PROJECT = Path('../GASP58')
+PROJECT = project_path()
 COUNTS = {'single': 1, 'three-groups': 3, 'mixed': 4, 'per-call': 14}
 read = lambda p: json.loads(p.read_bytes())
 DIAGNOSTICS = {'Main_InertiaInput', 'Main_InertiaOutput', 'Main_Dynamic', 'Main_Lower',

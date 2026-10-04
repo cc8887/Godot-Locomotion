@@ -6,6 +6,8 @@ import struct
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -110,7 +112,7 @@ for group in ('dependencies', 'previousFixtureSha256'):
     for name, digest in contract[group].items():
         assert sha(root / name) == digest, name
 for path, digest in contract['assetSha256'].items():
-    assert sha(Path('../GASP58/Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, path
+    assert sha(project_path('Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, path
 result = dict(schemaVersion=1, source=gates['debug'], ownership=ownership, nativeQueueSha256=sha(root / 'source_notify_queue_v1_native.json'),
     releaseTests=62, roleFramesPerConfiguration=sum(roles['debug'][h]['roleFrames'] for h in (30, 60, 120)),
     ordinaryFramesPerConfiguration=4800, ordinaryCallbacks=roles['debug']['ten']['sourceNotifyCallbacks'],

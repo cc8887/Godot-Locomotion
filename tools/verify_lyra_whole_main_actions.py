@@ -4,10 +4,12 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 evidence = repo / 'artifacts/lyra-analysis'
 assets = repo / 'assets/generated/lyra_als'
-project = Path('../GASP58')
+project = project_path()
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 load = lambda p: json.loads(p.read_bytes())
 output = evidence / 'whole-main-actions-final-integrity.json'

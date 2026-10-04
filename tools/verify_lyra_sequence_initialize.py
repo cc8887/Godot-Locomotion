@@ -1,5 +1,7 @@
 """Audit actual Linked startup phases and the complete existing character matrix."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import hashlib
 import json
 import re
@@ -57,7 +59,7 @@ for case in native['cases']:
         for key in ('weight','previousDistance','nextDistance','deltaPrevious','delta','deltaValid'):
             assert after[key] == before[key], (row['node'], key)
 
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 ledger = read(out / f'{native_tag_base}-engine-sources.json')
 assert ledger == closure['engineSourceSha256'] and len(ledger) == 16
 for p, digest in ledger.items():
@@ -66,11 +68,11 @@ package = repo / 'artifacts/unreal/lyra-whole-main-oracle/package-source-initial
 for p, digest in closure['probeSourceSha256'].items():
     assert sha(repo / 'tools/unreal/LyraSequenceInitializeOracle' / p) == sha(package / p) == digest, p
 assert 'Result: Succeeded' in log(out / 'whole-main-build-package-source-initialize-v1.log')
-assert read(package / 'Binaries/Win64/UnrealEditor.modules')['BuildId'] == read(Path('../GASP58/Binaries/Win64/UnrealEditor.modules'))['BuildId']
+assert read(package / 'Binaries/Win64/UnrealEditor.modules')['BuildId'] == read(project_path('Binaries/Win64/UnrealEditor.modules'))['BuildId']
 assets = repo / 'assets/generated/lyra_als'
 assert {p.relative_to(assets).as_posix(): sha(p) for p in assets.rglob('*.json')} == closure['previousFixtureSha256']
 assert len(closure['previousFixtureSha256']) == 870
-project = Path('../GASP58')
+project = project_path()
 assert not (project / 'Plugins/LyraWholeMainOracle').exists()
 for p, digest in closure['protectedProject'].items():
     assert sha(project / p) == digest, p

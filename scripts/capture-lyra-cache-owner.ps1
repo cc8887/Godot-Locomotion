@@ -1,8 +1,12 @@
-param([string]$EngineRoot='../UE_5.8',
-      [string]$UnrealProject='../GASP58/GASP58.uproject',
+param([string]$EngineRoot=$env:UE_ENGINE_ROOT,
+      [string]$UnrealProject=$env:LYRA_UE_PROJECT_FILE,
       [ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$PackageName='package-cache-owner-v1',
       [ValidatePattern('^[a-zA-Z0-9-]+$')][string]$RunTag='cache-owner-v1')
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'common/LocomotionPaths.ps1')
+$EngineRoot = Resolve-LocomotionPath -Path $EngineRoot -EnvironmentVariable 'UE_ENGINE_ROOT' -Fallback '../UE_5.8'
+$UnrealProject = Resolve-LocomotionPath -Path $UnrealProject -EnvironmentVariable 'LYRA_UE_PROJECT_FILE' -Fallback '../GASP58/GASP58.uproject'
+
 $phaseRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $phaseLog=Join-Path $phaseRoot "artifacts/lyra-analysis/$RunTag-native.log"
 $phasePlugin=Join-Path $phaseRoot "artifacts/unreal/lyra-whole-main-oracle/$PackageName/LyraWholeMainOracle.uplugin"

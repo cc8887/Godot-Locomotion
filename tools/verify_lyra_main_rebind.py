@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 from PIL import Image, ImageStat
 
 repo = Path(__file__).resolve().parents[1]
@@ -181,7 +183,7 @@ for name, digest in protected.items():
     assert sha(assets / name) == digest, name
 assert len(reference['assetSha256']) == previous['protectedUasset'] == 669
 for name, digest in reference['assetSha256'].items():
-    assert sha(Path('../GASP58/Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, name
+    assert sha(project_path('Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, name
 
 report = {
     'liveRebindPassed': True,

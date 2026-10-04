@@ -7,10 +7,12 @@ import struct
 from collections import Counter
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
-content = Path('../GASP58/Content')
+content = project_path('Content')
 
 
 def sha(path):

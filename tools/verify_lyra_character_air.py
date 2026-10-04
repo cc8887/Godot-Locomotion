@@ -4,10 +4,12 @@ import json
 import math
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 ROOT=Path(__file__).resolve().parents[1]
 E=ROOT/'artifacts/lyra-analysis'
 ASSETS=ROOT/'assets/generated/lyra_als'
-PROJECT=Path('../GASP58')
+PROJECT=project_path()
 TAG='cmc-air-v2-final2'
 OUT=E/'character-air-v2-integrity.json'
 assert not OUT.exists(),'Preserve air audit'

@@ -3,12 +3,14 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from locomotion_paths import project_path
+
 import xml.etree.ElementTree as ET
 
 repo = Path(__file__).resolve().parents[1]
 root = repo/'assets/generated/lyra_als'
 artifacts = repo/'artifacts/lyra-analysis'
-content = Path('../GASP58/Content')
+content = project_path('Content')
 sha = lambda data: hashlib.sha256(data).hexdigest()
 read = lambda name: json.loads((root/name).read_bytes())
 native, requests, definitions = map(read, ('pivot_source_native.json', 'pivot_source_requests.json', 'pivot_source_definitions.json'))

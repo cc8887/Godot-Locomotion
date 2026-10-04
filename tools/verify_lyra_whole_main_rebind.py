@@ -5,10 +5,12 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 evidence = repo / 'artifacts/lyra-analysis'
 assets = repo / 'assets/generated/lyra_als'
-project = Path('../GASP58')
+project = project_path()
 
 
 def sha(path):

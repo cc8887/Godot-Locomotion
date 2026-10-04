@@ -1,5 +1,7 @@
 """Audit actual Linked startup phases and the complete existing character matrix."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import hashlib
 import json
 import re
@@ -58,7 +60,7 @@ for c in native['cases']:
     assert [(s['counter'], s['frame']) for s in c['cacheSteps']] == [(1,10),(1,10),(2,11),(2,11),(1,10),(1,10),(1,12),(32767,13),(-32768,14),(-32768,14)]
     assert [len(s['order']) for s in c['cacheSteps']] == [56,34,56,34,56,34,56,56,56,34]
 
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 ledger = read(out / f'{tag}-engine-sources.json')
 assert ledger == closure['engineSourceSha256'] and len(ledger) == 12
 for p, digest in ledger.items():
@@ -67,11 +69,11 @@ package = repo / 'artifacts/unreal/lyra-whole-main-oracle/package-graph-phases-v
 for p, digest in closure['probeSourceSha256'].items():
     assert sha(repo / 'tools/unreal/LyraGraphPhasesOracle' / p) == sha(package / p) == digest, p
 assert 'Result: Succeeded' in log(out / 'whole-main-build-package-graph-phases-v2.log')
-assert read(package / 'Binaries/Win64/UnrealEditor.modules')['BuildId'] == read(Path('../GASP58/Binaries/Win64/UnrealEditor.modules'))['BuildId']
+assert read(package / 'Binaries/Win64/UnrealEditor.modules')['BuildId'] == read(project_path('Binaries/Win64/UnrealEditor.modules'))['BuildId']
 assets = repo / 'assets/generated/lyra_als'
 assert {p.relative_to(assets).as_posix(): sha(p) for p in assets.rglob('*.json')} == closure['previousFixtureSha256']
 assert len(closure['previousFixtureSha256']) == 870
-project = Path('../GASP58')
+project = project_path()
 assert not (project / 'Plugins/LyraWholeMainOracle').exists()
 for p, digest in closure['protectedProject'].items():
     assert sha(project / p) == digest, p

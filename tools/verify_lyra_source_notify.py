@@ -5,6 +5,8 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -65,7 +67,7 @@ contract = json.loads((root / 'notify_contract_v1.json').read_bytes())
 for name, digest in contract['previousFixtureSha256'].items():
     assert sha(root / name) == digest, name
 for path, digest in contract['assetSha256'].items():
-    package = Path('../GASP58/Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')
+    package = project_path('Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')
     assert sha(package) == digest, path
 
 result = dict(schemaVersion=1, source=gates['debug'], releaseTests=tests,

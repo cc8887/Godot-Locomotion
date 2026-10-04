@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -29,7 +31,7 @@ assert sha(root / 'footplant_rig_ground_v2_native.json') == '3ddc3ba4b9851a3e6cb
 traversal = json.loads((root / 'rig_traversal_v1_native.json').read_bytes())
 for p, digest in traversal['previousFixtureSha256'].items(): assert sha(root / p) == digest, p
 for p, digest in traversal['assetSha256'].items():
-    path = Path('../GASP58/Content') / (p.split('.')[0].removeprefix('/Game/') + '.uasset')
+    path = project_path('Content') / (p.split('.')[0].removeprefix('/Game/') + '.uasset')
     assert sha(path) == digest, p
 source = repo / 'tools/unreal/AlsV4AssetExporter/Source/AlsV4AssetExporter'
 for p, digest in traversal['probeSourceSha256'].items():

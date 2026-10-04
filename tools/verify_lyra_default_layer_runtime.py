@@ -2,6 +2,8 @@
 import hashlib
 import json
 from pathlib import Path
+from locomotion_paths import project_path
+
 import re
 import xml.etree.ElementTree as ET
 
@@ -37,7 +39,7 @@ for hook, f in data['functions'].items():
     assert node['type'] == '/Script/Engine.AnimNode_Root' and not node['links']
     assert node['index'] == graph['root'] and node['settings']['name'] == hook
     assert all(v == 'None' for v in node['functions'].values())
-project = Path('../GASP58')
+project = project_path()
 for p, d in closure['protectedProject'].items(): assert sha(project/p) == d, p
 for p, d in closure['assetSha256'].items():
     path = p.split('.')[0]

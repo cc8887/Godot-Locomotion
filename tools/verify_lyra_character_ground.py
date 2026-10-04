@@ -5,10 +5,12 @@ import math
 import struct
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 ROOT = Path(__file__).resolve().parents[1]
 E = ROOT / 'artifacts/lyra-analysis'
 ASSETS = ROOT / 'assets/generated/lyra_als'
-PROJECT = Path('../GASP58')
+PROJECT = project_path()
 TAG = 'cmc-ground-v1-final3'
 OUTPUT = E / 'character-ground-v1-integrity.json'
 assert not OUTPUT.exists(), 'Preserve ground audit'

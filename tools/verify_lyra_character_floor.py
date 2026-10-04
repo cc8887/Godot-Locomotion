@@ -6,10 +6,12 @@ import re
 import struct
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 ROOT = Path(__file__).resolve().parents[1]
 E = ROOT / 'artifacts/lyra-analysis'
 ASSETS = ROOT / 'assets/generated/lyra_als'
-PROJECT = Path('../GASP58')
+PROJECT = project_path()
 TAG = 'cmc-floor-v1-final'
 OUTPUT = E / 'character-floor-v1-integrity.json'
 assert not OUTPUT.exists(), 'Preserve floor audit'

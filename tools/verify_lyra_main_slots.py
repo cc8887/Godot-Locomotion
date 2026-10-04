@@ -5,6 +5,8 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo=Path(__file__).resolve().parents[1]
 root=repo/'assets/generated/lyra_als'
 logs=repo/'artifacts/lyra-analysis'
@@ -16,7 +18,7 @@ assert data['requestSha256']==sha(root/'main_slots_v1_requests.json')
 for section in ('dependencies','previousFixtureSha256'):
     for p,d in data[section].items():assert sha(root/p)==d,p
 for p,d in data['assetSha256'].items():
-    assert sha(Path('../GASP58/Content')/(p.split('.')[0].removeprefix('/Game/')+'.uasset'))==d,p
+    assert sha(project_path('Content')/(p.split('.')[0].removeprefix('/Game/')+'.uasset'))==d,p
 source=repo/'tools/unreal/AlsV4AssetExporter/Source/AlsV4AssetExporter'
 for fixture in (data,load('slot_pose_v1_native.json'),load('montage_sampling_v1_native.json'),load('montage_blend_v1_native.json')):
     for p,d in fixture['probeSourceSha256'].items():

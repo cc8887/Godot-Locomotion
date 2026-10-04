@@ -6,9 +6,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$releaseRoot = [IO.Path]::GetFullPath($ProjectRoot)
+. (Join-Path $PSScriptRoot 'common/LocomotionPaths.ps1')
+$releaseRoot = Resolve-LocomotionPath -Path $ProjectRoot
 if ([string]::IsNullOrWhiteSpace($GodotExecutable)) { throw 'Set GODOT_EXECUTABLE or pass -GodotExecutable.' }
-$releaseGodot = (Resolve-Path -LiteralPath $GodotExecutable).Path
+$releaseGodot = (Resolve-Path -LiteralPath (Resolve-LocomotionPath -Path $GodotExecutable)).Path
 $releaseOut = Join-Path $releaseRoot ('artifacts/lyra-release/' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $releaseOut -Force | Out-Null
 $releaseCases = [Collections.Generic.List[object]]::new()

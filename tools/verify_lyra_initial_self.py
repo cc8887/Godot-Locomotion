@@ -1,5 +1,7 @@
 """Audit startup Main phases, real characters and the protected export baseline."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import hashlib
 import json
 import re
@@ -58,7 +60,7 @@ assert 'node:7' not in native['repeatedCacheBones'] and 'node:83' not in native[
 request = read(out / 'main-phases-v3-requests.json')
 assert len(request['nodes']) == 49 and request['mesh'].endswith('/SKM_Manny.SKM_Manny')
 
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 ledger = read(out / 'main-phases-v3-engine-sources.json')
 assert ledger == closure['engineSourceSha256'] and len(ledger) == 9
 for p, digest in ledger.items():
@@ -69,12 +71,12 @@ for p, digest in closure['probeSourceSha256'].items():
     assert sha(repo / 'artifacts/unreal/lyra-whole-main-oracle/package-main-phases-v2' / p) == digest, p
 package = repo / 'artifacts/unreal/lyra-whole-main-oracle/package-main-phases-v2'
 assert 'Result: Succeeded' in log(out / 'whole-main-build-package-main-phases-v2.log')
-assert read(package / 'Binaries/Win64/UnrealEditor.modules')['BuildId'] == read(Path('../GASP58/Binaries/Win64/UnrealEditor.modules'))['BuildId']
+assert read(package / 'Binaries/Win64/UnrealEditor.modules')['BuildId'] == read(project_path('Binaries/Win64/UnrealEditor.modules'))['BuildId']
 
 assets = repo / 'assets/generated/lyra_als'
 assert {p.relative_to(assets).as_posix(): sha(p) for p in assets.rglob('*.json')} == closure['previousFixtureSha256']
 assert len(closure['previousFixtureSha256']) == 870
-project = Path('../GASP58')
+project = project_path()
 assert not (project / 'Plugins/LyraWholeMainOracle').exists()
 for p, digest in closure['protectedProject'].items():
     assert sha(project / p) == digest, p

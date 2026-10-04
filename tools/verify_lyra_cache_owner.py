@@ -1,5 +1,7 @@
 """Audit the actual Main/Provider cache owners and bounded native evidence."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import hashlib
 import json
 import re
@@ -51,7 +53,7 @@ for case in native['cases']:
     for row in case['rows']:
         assert len(row['states']) == 3
         assert all(s['update'] == dict(counter=-1,frame=-1) for s in row['states'])
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 ledger = read(out / 'cache-owner-v1-engine-sources.json')
 assert ledger == closure['engineSourceSha256'] and len(ledger) == 31
 for p,digest in ledger.items():
@@ -61,7 +63,7 @@ assert len(closure['probeSourceSha256']) == 11
 for p,digest in closure['probeSourceSha256'].items():
     assert sha(repo / 'tools/unreal/LyraCacheOwnerOracle' / p) == sha(package / p) == digest,p
 assert 'Result: Succeeded' in log(out / 'whole-main-build-package-cache-owner-v5.log')
-project = Path('../GASP58')
+project = project_path()
 assert read(package / 'Binaries/Win64/UnrealEditor.modules')['BuildId'] == read(project / 'Binaries/Win64/UnrealEditor.modules')['BuildId']
 assert not (project / 'Plugins/LyraWholeMainOracle').exists()
 assets = repo / 'assets/generated/lyra_als'

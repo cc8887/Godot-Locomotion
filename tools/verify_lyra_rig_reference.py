@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import engine_path, project_path, rig_reference_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -35,7 +37,7 @@ assert len(fixture['previousFixtureSha256']) == 813 and len(fixture['assetSha256
 for path, digest in fixture['previousFixtureSha256'].items():
     assert sha(root / path) == digest, path
 for path, digest in fixture['assetSha256'].items():
-    assert sha(Path('../GASP58/Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, path
+    assert sha(project_path('Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, path
 for path, digest in policy['dependencies'].items():
     assert sha(root / path) == digest, path
 assert policy['mapping'] == fixture['profiles'][1]['mapping']
@@ -49,18 +51,18 @@ package_root = repo / 'artifacts/unreal/gasp58-lyra-rig-reference'
 for path, digest in fixture['probeSourceSha256'].items():
     for base in (source, package_root / 'source/AlsV4AssetExporter/Source/AlsV4AssetExporter',
                  package_root / 'package-ready/AlsV4AssetExporter/Source/AlsV4AssetExporter',
-                 Path('../GLRigRef/HostProject/Plugins/AlsV4AssetExporter/Source/AlsV4AssetExporter')):
+                 rig_reference_path('Plugins/AlsV4AssetExporter/Source/AlsV4AssetExporter')):
         assert sha(base / path) == digest, (base, path)
 traversal = json.loads((root / 'rig_traversal_v1_native.json').read_bytes())
 for path, digest in traversal['probeSourceSha256'].items():
     for base in (source, repo / 'artifacts/unreal/gasp58-lyra-masks/source/AlsV4AssetExporter/Source/AlsV4AssetExporter',
                  repo / 'artifacts/unreal/gasp58-lyra-masks/package/AlsV4AssetExporter/Source/AlsV4AssetExporter'):
         assert sha(base / path) == digest, (base, path)
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 modules = json.loads((package_root / 'package-ready/AlsV4AssetExporter/Binaries/Win64/UnrealEditor.modules').read_bytes())
 assert modules['BuildId'] == json.loads((engine / 'Binaries/Win64/UnrealEditor.modules').read_bytes())['BuildId']
 binary = 'Binaries/Win64/UnrealEditor-AlsV4AssetExporter.dll'
-assert sha(package_root / 'package-ready/AlsV4AssetExporter' / binary) == sha(Path('../GLRigRef/HostProject/Plugins/AlsV4AssetExporter') / binary)
+assert sha(package_root / 'package-ready/AlsV4AssetExporter' / binary) == sha(rig_reference_path('Plugins/AlsV4AssetExporter') / binary)
 assert 'Result: Succeeded' in read(logs / 'rig-reference-plugin-build-bridge.log')
 for filename in ('rig-reference-ue-fixed.log', 'rig-reference-ue-repeat.log'):
     text = read(logs / filename)

@@ -3,6 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -15,7 +17,7 @@ for name, digest in data['previousFixtureSha256'].items():
     assert sha(root / name) == digest, name
 assert len(data['previousFixtureSha256']) == 645
 for path, digest in data['assetSha256'].items():
-    p = Path('../GASP58/Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')
+    p = project_path('Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')
     assert sha(p) == digest, path
 assert len(data['assetSha256']) == 508
 for name, digest in data['probeSourceSha256'].items():

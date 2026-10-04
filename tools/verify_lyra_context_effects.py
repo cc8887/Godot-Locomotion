@@ -5,6 +5,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from locomotion_paths import unreal_source_path
+
 repo=Path(__file__).resolve().parents[1]
 root=repo/'assets/generated/lyra_als'
 logs=repo/'artifacts/lyra-analysis'
@@ -26,7 +28,7 @@ project=repo.parent/'GASP58'
 assert not (project/'Plugins/LyraContextEffectsOracle').exists(),'Temporary plugin must be archived outside the project'
 for name,digest in native['protectedProjectSha256'].items():assert sha(project/name)==digest,name
 for path,digest in policy['assetSha256'].items():assert sha(project/'Content'/(path.split('.')[0].removeprefix('/Game/')+'.uasset'))==digest,path
-original=subprocess.check_output(['git','-C','../UnrealEngine','show',policy['sourceConfig']['ref']+':'+policy['sourceConfig']['path']]).decode('utf-8')
+original=subprocess.check_output(['git','-C',str(unreal_source_path()),'show',policy['sourceConfig']['ref']+':'+policy['sourceConfig']['path']]).decode('utf-8')
 capture=logs/'lyra-original-context-DefaultGame.ini'
 assert sha(capture)==policy['sourceConfig']['sha256']
 assert original.splitlines()==capture.read_text(encoding='utf-8-sig').splitlines()

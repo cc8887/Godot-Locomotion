@@ -3,6 +3,8 @@ import argparse
 import gc
 import json
 from pathlib import Path
+from locomotion_paths import engine_path
+
 from verify_lyra_multi_layer_native import EVIDENCE, ROOT, read, sha
 
 
@@ -47,7 +49,7 @@ def main():
         del trace
         gc.collect()
     assert len(trajectories)==3
-    proxy=Path('../UE_5.8/Engine/Source/Runtime/Engine/Private/Animation/AnimInstanceProxy.cpp')
+    proxy=engine_path('Engine/Source/Runtime/Engine/Private/Animation/AnimInstanceProxy.cpp')
     linked=proxy.with_name('AnimNode_LinkedAnimGraph.cpp')
     assert 'if(FrameCounterForUpdate != GFrameCounter)' in proxy.read_text(encoding='utf-8-sig')
     assert 'Proxy.UpdateAnimation_WithRoot(NewContext, LinkedRoot, GetDynamicLinkFunctionName())' in linked.read_text(encoding='utf-8-sig')

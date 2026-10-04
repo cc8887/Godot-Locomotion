@@ -5,6 +5,8 @@ import json
 import math
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 sha = lambda data: hashlib.sha256(data).hexdigest()
 
 
@@ -83,7 +85,7 @@ def verify(root, content):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, default=Path('assets/generated/lyra_als'))
-    parser.add_argument('--content', type=Path, default=Path('../GASP58/Content'))
+    parser.add_argument('--content', type=Path, default=project_path('Content'))
     parser.add_argument('--output', type=Path, default=Path('artifacts/lyra-analysis/main-cycle-lean-resource-verification.json'))
     args = parser.parse_args()
     report = verify(args.root, args.content)

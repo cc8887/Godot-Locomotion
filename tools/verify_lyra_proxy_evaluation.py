@@ -1,5 +1,7 @@
 """Audit original full-graph counter evidence and production regressions."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import hashlib
 import json
 import re
@@ -34,7 +36,7 @@ if '--native-only' in sys.argv:
     assert scope['originalFullRoot'] and scope['originalProxyPhaseReads'] and scope['als81']
     assert scope['controlledExternalFrames'] and scope['mainUpdateCounterWrites'] == 0
     assert scope['requiredBonesCounterAdaptation'] and not scope['goalComplete']
-    project = Path('../GASP58')
+    project = project_path()
     for p, digest in closure['previousFixtureSha256'].items():
         assert sha(repo / 'assets/generated/lyra_als' / p) == digest, p
     for p, digest in closure['protectedProject'].items():
@@ -56,7 +58,7 @@ if '--native-only' in sys.argv:
         assert sha(probe / p) == sha(package / p) == digest, p
     engine_sources = read(out / 'proxy-phase-v1-closure.json')['engineSourceSha256']
     for p, digest in engine_sources.items():
-        assert sha(Path('../UE_5.8/Engine') / p) == digest, p
+        assert sha(engine_path('Engine') / p) == digest, p
     evidence = {}
     def evidence_file(p):
         evidence[p.relative_to(repo).as_posix()] = sha(p)

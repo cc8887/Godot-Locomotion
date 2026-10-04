@@ -5,13 +5,15 @@ import json
 import os
 from pathlib import Path
 
+__repository_root = Path(__file__).resolve().parents[2]
+
 import unreal
 
 
 SOURCE = os.environ.get("LYRA_RETARGET_ASSET",
                         "/Game/GodotLyraRetarget/Unarmed/LY_MM_Unarmed_Jog_Left")
 OUTPUT = Path(os.environ.get("LYRA_RETARGET_FBX",
-                          r".\assets\generated\lyra_als\animations\LY_MM_Unarmed_Jog_Left.fbx"))
+                          str(__repository_root / 'assets/generated/lyra_als/animations/LY_MM_Unarmed_Jog_Left.fbx')))
 EXPECTED_SKELETON = (
     "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/"
     "ALS_Mannequin_Skeleton.ALS_Mannequin_Skeleton"

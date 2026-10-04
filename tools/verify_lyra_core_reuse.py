@@ -1,5 +1,7 @@
 """Audit shared Core changes, protected assets and focused runtime evidence."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import argparse
 import hashlib
 import json
@@ -53,16 +55,16 @@ def native():
     assert scope['originalBlueprint'] and scope['explicitOriginalLinkedNodeCalls'] and scope['providerRecalcRequiredCurves']
     assert not scope['naturalSceneScheduler'] and not scope['als81BoneMapping']
     check_hashes(ROOT/'assets/generated/lyra_als', closure['previousFixtureSha256'])
-    check_hashes(Path('../GASP58'), closure['protectedProject'])
+    check_hashes(project_path(), closure['protectedProject'])
     check_hashes(ROOT/'tools/unreal/LyraRootBoneOracle', closure['probeSourceSha256'])
-    check_hashes(Path('../UE_5.8/Engine'), closure['engineSourceSha256'])
+    check_hashes(engine_path('Engine'), closure['engineSourceSha256'])
     for name, expected in closure['assetSha256'].items():
         package = name.split('.')[0]
         if package.startswith('/Game/'):
-            file = Path('../GASP58/Content')/(package[6:]+'.uasset')
+            file = project_path('Content')/(package[6:]+'.uasset')
         else:
             assert package.startswith('/ShooterCore/')
-            file = Path('../GASP58/Plugins/GameFeatures/ShooterCore/Content')/(package[13:]+'.uasset')
+            file = project_path('Plugins/GameFeatures/ShooterCore/Content')/(package[13:]+'.uasset')
         assert sha(file) == expected, name
     cases = read(OUT/'root-bones-native-v2-native.json')['cases']
     counts = dict(first=0, late=0, invalidated=0, direct=0, invalidatedDirect=0)

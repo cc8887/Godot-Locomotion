@@ -1,9 +1,13 @@
 [CmdletBinding()]
-param([string]$EngineRoot='../UE_5.8',
-      [string]$UnrealProject='../GASP58/GASP58.uproject',
+param([string]$EngineRoot=$env:UE_ENGINE_ROOT,
+      [string]$UnrealProject=$env:LYRA_UE_PROJECT_FILE,
       [ValidatePattern('^[a-zA-Z0-9_-]+\.log$')][string]$LogName='notify-termination-windows-v1-native.log',
       [ValidatePattern('^[a-zA-Z0-9-]+$')][string]$Capture='notify-termination-windows-v1')
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'common/LocomotionPaths.ps1')
+$EngineRoot = Resolve-LocomotionPath -Path $EngineRoot -EnvironmentVariable 'UE_ENGINE_ROOT' -Fallback '../UE_5.8'
+$UnrealProject = Resolve-LocomotionPath -Path $UnrealProject -EnvironmentVariable 'LYRA_UE_PROJECT_FILE' -Fallback '../GASP58/GASP58.uproject'
+
 Set-StrictMode -Version Latest
 $montageRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $montageEditor=Join-Path $EngineRoot 'Engine/Binaries/Win64/UnrealEditor-Cmd.exe'

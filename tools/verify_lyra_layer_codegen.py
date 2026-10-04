@@ -2,6 +2,8 @@
 import hashlib
 import json
 from pathlib import Path
+from locomotion_paths import project_path
+
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,7 +54,7 @@ assert capture['requestSha256'] == sha(EVIDENCE / 'layer-binding-matrix-v3-reque
 assert capture['nativeSha256'] == sha(EVIDENCE / 'layer-binding-matrix-v3-native.json')
 for suffix in ('request', 'native', 'closure'):
     assert (EVIDENCE / f'layer-binding-matrix-v3-{suffix}.json').read_bytes() == (EVIDENCE / f'layer-binding-matrix-v3-repeat-{suffix}.json').read_bytes()
-project = Path('../GASP58')
+project = project_path()
 for name, digest in capture['protectedJson'].items():
     assert sha(ROOT / 'assets/generated/lyra_als' / name) == digest, name
 for name, digest in capture['configuration'].items():

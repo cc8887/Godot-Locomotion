@@ -6,10 +6,12 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 artifacts = repo / 'artifacts/lyra-analysis'
-content = Path('../GASP58/Content')
+content = project_path('Content')
 sha = lambda data: hashlib.sha256(data).hexdigest()
 native = json.loads((root / 'main_pivot_native.json').read_bytes())
 requests = json.loads((root / 'main_pivot_requests.json').read_bytes())

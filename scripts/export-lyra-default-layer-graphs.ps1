@@ -1,7 +1,11 @@
-param([string]$EngineRoot='../UE_5.8',
-      [string]$UnrealProject='../GASP58/GASP58.uproject',
+param([string]$EngineRoot=$env:UE_ENGINE_ROOT,
+      [string]$UnrealProject=$env:LYRA_UE_PROJECT_FILE,
       [ValidatePattern('^[a-zA-Z0-9-]+$')][string]$RunTag='default-layer-runtime-v1')
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'common/LocomotionPaths.ps1')
+$EngineRoot = Resolve-LocomotionPath -Path $EngineRoot -EnvironmentVariable 'UE_ENGINE_ROOT' -Fallback '../UE_5.8'
+$UnrealProject = Resolve-LocomotionPath -Path $UnrealProject -EnvironmentVariable 'LYRA_UE_PROJECT_FILE' -Fallback '../GASP58/GASP58.uproject'
+
 $defaultRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $defaultLog=Join-Path $defaultRoot "artifacts/lyra-analysis/$RunTag-export.log"
 $defaultPlugin=Join-Path $defaultRoot 'artifacts/unreal/gasp58-lyra-masks/package/AlsV4AssetExporter/AlsV4AssetExporter.uplugin'

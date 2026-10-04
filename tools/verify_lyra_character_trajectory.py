@@ -5,9 +5,11 @@ import math
 import re
 from pathlib import Path
 
+from locomotion_paths import engine_path, project_path
+
 ROOT = Path(__file__).resolve().parents[1]
 E = ROOT / 'artifacts/lyra-analysis'
-PROJECT = Path('../GASP58')
+PROJECT = project_path()
 TAG = 'cmc-trajectory-v1-wall-contacts-final'
 OUTPUT = E / 'character-trajectory-v1-integrity.json'
 assert not OUTPUT.exists(), 'Preserve trajectory audit'
@@ -169,7 +171,7 @@ sources = [
     'tools/export_lyra_movement_trajectory.py',
     'tools/verify_lyra_character_trajectory.py',
 ]
-engine = Path('../UE_5.8/Engine/Source/Runtime/Engine/Private/Components')
+engine = engine_path('Engine/Source/Runtime/Engine/Private/Components')
 result = dict(auditPassed=True, wallTangentRegressionPassed=True, diagnosticsCompleted=True,
               comparisonPassed=False, nativeWorldTrajectoryParity=False, goalComplete=False,
               physicalReferenceFrames=1680, diagnosticMoves=3360, diagnosticRetries=3360,

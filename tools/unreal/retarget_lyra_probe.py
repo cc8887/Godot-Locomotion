@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 
+__repository_root = Path(__file__).resolve().parents[2]
+
 import unreal
 
 
@@ -13,7 +15,7 @@ SOURCE_MESH = "/Game/Characters/Heroes/Mannequin/Meshes/SKM_Manny"
 TARGET_MESH = "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Mannequin"
 RETARGETER = "/Game/Characters/Heroes/Mannequin_UE4/Meshes/RTG_UE5Manny_UE4Manny"
 DESTINATION = "/Game/GodotLyraRetarget/Unarmed"
-OUTPUT = Path(r".\artifacts\lyra-analysis") / (
+OUTPUT = (__repository_root / 'artifacts/lyra-analysis') / (
     "retarget-probe-" + SOURCE.rsplit("/", 1)[1] + ".json")
 
 

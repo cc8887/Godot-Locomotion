@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--ue-log', action='append', required=True)
 parser.add_argument('--godot-log', required=True)
@@ -20,7 +22,7 @@ for name, digest in native['dependencies'].items():
 for name, digest in native['previousFixtureSha256'].items():
     assert sha(root / name) == digest, name
 for name, digest in native['assetSha256'].items():
-    assert sha(Path('../GASP58/Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, name
+    assert sha(project_path('Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, name
 for name, digest in native['probeSourceSha256'].items():
     assert sha(repo / 'tools/unreal/AlsV4AssetExporter/Source/AlsV4AssetExporter' / name) == digest, name
     for tree in ('source', 'package'):

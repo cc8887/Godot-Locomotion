@@ -3,12 +3,14 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from locomotion_paths import project_path
+
 import xml.etree.ElementTree as ET
 
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
-content = Path('../GASP58/Content')
+content = project_path('Content')
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 read = lambda p: json.loads((root / p).read_bytes())
 catalog = read('montage_catalog_v2.json')

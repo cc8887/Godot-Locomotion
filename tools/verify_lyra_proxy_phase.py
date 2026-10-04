@@ -1,5 +1,7 @@
 """Audit phase-counter evidence, production regressions and protected inputs."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import hashlib
 import json
 import re
@@ -33,8 +35,8 @@ scope = closure['scope']
 assert scope['originalProxyEntryPoints'] and scope['originalLinkedNodes']
 assert scope['proxyCounterWrites'] == scope['assetsSaved'] == 0
 assert scope['controlledExternalFrames'] and not scope['naturalComponentCounters'] and not scope['fullLyraGraphs'] and not scope['goalComplete']
-engine = Path('../UE_5.8/Engine')
-project = Path('../GASP58')
+engine = engine_path('Engine')
+project = project_path()
 for p, digest in closure['engineSourceSha256'].items(): assert sha(engine/p) == digest, p
 for p, digest in closure['previousFixtureSha256'].items(): assert sha(repo/'assets/generated/lyra_als'/p) == digest, p
 for p, digest in closure['protectedProject'].items(): assert sha(project/p) == digest, p

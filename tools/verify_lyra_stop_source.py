@@ -3,6 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo=Path(__file__).resolve().parents[1]
 root=repo/'assets/generated/lyra_als'
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
@@ -14,7 +16,7 @@ assert native['schemaVersion']==definitions['schemaVersion']==requests['schemaVe
 assert native['requestSha256']==definitions['requestSha256']==expected
 for n,h in native['dependencies'].items(): assert sha(root/n)==h, n
 for p,h in native['assetSha256'].items():
-    package=Path('../GASP58/Content')/(p.split('.')[0].removeprefix('/Game/')+'.uasset')
+    package=project_path('Content')/(p.split('.')[0].removeprefix('/Game/')+'.uasset')
     assert sha(package)==h, p
 assert len(native['assetSha256'])==489 and len(definitions['assets'])==36
 assert len(native['traces'])==len(requests['traces'])==9

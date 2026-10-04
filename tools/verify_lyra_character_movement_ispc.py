@@ -6,10 +6,12 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import engine_path, project_path
+
 repo = Path(__file__).resolve().parents[1]
 evidence = repo / 'artifacts/lyra-analysis'
 assets = repo / 'assets/generated/lyra_als'
-project = Path('../GASP58')
+project = project_path()
 output = evidence / 'character-movement-ispc-integrity.json'
 assert not output.exists(), 'Preserve audit evidence'
 
@@ -148,7 +150,7 @@ sources = ['src/Als.Core/Locomotion/AlsPrecisePoseBlender.cs', 'src/Als.Core/Loc
            'src/Als.Godot/Animation/Lyra/LyraAimingLayerHost.cs',
            'src/Als.Godot/Animation/Lyra/LyraItemLayerGraphInstance.cs', str(diagnostic.relative_to(repo)),
            'tools/verify_lyra_character_movement_ispc.py']
-engine = Path('../UE_5.8/Engine/Source/Runtime')
+engine = engine_path('Engine/Source/Runtime')
 kernel_sources = ['Engine/Private/Animation/AnimationRuntime.cpp', 'Engine/Private/Animation/AnimationRuntime.ispc',
                   'Core/Public/Math/Vector.isph']
 result = dict(schemaVersion=1, auditPassed=True, comparisonPassed=True, completeAcceptance=False, goalComplete=False,

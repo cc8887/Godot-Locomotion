@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import engine_path, project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -79,7 +81,7 @@ assert len(traversal['previousFixtureSha256']) == 808 and len(traversal['assetSh
 for path, digest in traversal['previousFixtureSha256'].items():
     assert sha(root / path) == digest, path
 for path, digest in traversal['assetSha256'].items():
-    asset = Path('../GASP58/Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')
+    asset = project_path('Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')
     assert sha(asset) == digest, path
 source = repo / 'tools/unreal/AlsV4AssetExporter/Source/AlsV4AssetExporter'
 for path, digest in traversal['probeSourceSha256'].items():
@@ -87,7 +89,7 @@ for path, digest in traversal['probeSourceSha256'].items():
     for tree in ('source', 'package'):
         assert sha(repo / 'artifacts/unreal/gasp58-lyra-masks' / tree / 'AlsV4AssetExporter/Source/AlsV4AssetExporter' / path) == digest, path
 
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 sources = (
     ('Plugins/Animation/ControlRig/Source/ControlRig/Private/Units/Collision/RigUnit_WorldCollision.cpp', ('SweepSingleByChannel', 'InverseTransformVector(HitResult.ImpactNormal)', 'FCollisionShape::MakeSphere(Radius)')),
     ('Source/Runtime/Engine/Private/Collision/CollisionConversions.cpp', ('FindGeomOpposingNormal', 'FindGeometryOpposingNormal')),

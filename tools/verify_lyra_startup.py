@@ -1,5 +1,7 @@
 """Freeze implementation and audit original startup plus final runtime evidence."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import argparse
 import hashlib
 import json
@@ -38,16 +40,16 @@ def native_audit():
     assert scope['directCounterWrites'] == scope['globalFrameWrites'] == scope['assetsSaved'] == 0
     assert scope['originalBlueprint'] and scope['deferredComponentStartup'] and scope['originalManny164']
     check_hashes(ROOT/'assets/generated/lyra_als', closure['previousFixtureSha256'])
-    check_hashes(Path('../GASP58'), closure['protectedProject'])
+    check_hashes(project_path(), closure['protectedProject'])
     check_hashes(ROOT/'tools/unreal/LyraStartupOracle', closure['probeSourceSha256'])
-    check_hashes(Path('../UE_5.8/Engine'), closure['engineSourceSha256'])
+    check_hashes(engine_path('Engine'), closure['engineSourceSha256'])
     for name, h in closure['assetSha256'].items():
         package = name.split('.')[0]
         if package.startswith('/Game/'):
-            file = Path('../GASP58/Content')/(package[6:]+'.uasset')
+            file = project_path('Content')/(package[6:]+'.uasset')
         else:
             assert package.startswith('/ShooterCore/')
-            file = Path('../GASP58/Plugins/GameFeatures/ShooterCore/Content')/(package[13:]+'.uasset')
+            file = project_path('Plugins/GameFeatures/ShooterCore/Content')/(package[13:]+'.uasset')
         assert sha(file) == h, name
     native = read(OUT/'startup-phase-v2-native.json')
     assert len(native['cases']) == 36

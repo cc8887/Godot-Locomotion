@@ -4,6 +4,8 @@ import hashlib
 import json
 import struct
 from pathlib import Path
+from locomotion_paths import project_path
+
 from verify_lyra_main_lean import verify as verify_resources
 
 sha = lambda data: hashlib.sha256(data).hexdigest()
@@ -88,6 +90,6 @@ def verify(root, content):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, default=Path('assets/generated/lyra_als'))
-    parser.add_argument('--content', type=Path, default=Path('../GASP58/Content'))
+    parser.add_argument('--content', type=Path, default=project_path('Content'))
     args = parser.parse_args()
     print(json.dumps(verify(args.root, args.content), indent=2))

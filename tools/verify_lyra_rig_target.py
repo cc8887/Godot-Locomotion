@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import engine_path, project_path, rig_solver_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -45,7 +47,7 @@ assert len(fixture['previousFixtureSha256']) == 815 and len(fixture['assetSha256
 for path, digest in fixture['previousFixtureSha256'].items():
     assert sha(root / path) == digest, path
 for path, digest in fixture['assetSha256'].items():
-    assert sha(Path('../GASP58/Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, path
+    assert sha(project_path('Content') / (path.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, path
 for path, digest in fixture['dependencies'].items():
     assert sha(root / path) == digest, path
 assert len(fixture['traces']) == 6
@@ -59,7 +61,7 @@ package_root = repo / 'artifacts/unreal/gasp58-lyra-rig-target'
 for path, digest in fixture['probeSourceSha256'].items():
     for base in (source, package_root / 'source/AlsV4AssetExporter/Source/AlsV4AssetExporter',
                  package_root / 'package/Source/AlsV4AssetExporter',
-                 Path('../GLRigSolve/HostProject/Plugins/AlsV4AssetExporter/Source/AlsV4AssetExporter')):
+                 rig_solver_path('Plugins/AlsV4AssetExporter/Source/AlsV4AssetExporter')):
         assert sha(base / path) == digest, (base, path)
 for original, bases in (
     ('rig_reference_v1_native.json', (
@@ -72,11 +74,11 @@ for original, bases in (
     for path, digest in load(original)['probeSourceSha256'].items():
         for base in bases:
             assert sha(base / path) == digest, (base, path)
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 modules = json.loads((package_root / 'package/Binaries/Win64/UnrealEditor.modules').read_bytes())
 assert modules['BuildId'] == json.loads((engine / 'Binaries/Win64/UnrealEditor.modules').read_bytes())['BuildId']
 binary = 'Binaries/Win64/UnrealEditor-AlsV4AssetExporter.dll'
-assert sha(package_root / 'package' / binary) == sha(Path('../GLRigSolve/HostProject/Plugins/AlsV4AssetExporter') / binary)
+assert sha(package_root / 'package' / binary) == sha(rig_solver_path('Plugins/AlsV4AssetExporter') / binary)
 assert 'Result: Succeeded' in read(logs / 'rig-target-plugin-build.log')
 native_marker = ('LYRA_RIG_TARGET_NATIVE_OK frames=2520 poses=2154 solves=2001 visits=683343 sweeps=16008 '
                  'leftHits=2313 rightHits=2303 protectedPackages=669 protectedJson=815 assets_saved=0')

@@ -4,11 +4,13 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 directory = root / 'montage_actions'
 logs = repo / 'artifacts/lyra-analysis'
-content = Path('../GASP58/Content')
+content = project_path('Content')
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 load = lambda p: json.loads(p.read_bytes())
 catalog = load(directory / 'catalog.json')

@@ -2,6 +2,8 @@
 import hashlib
 import json
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import xml.etree.ElementTree as ET
 
 repo = Path(__file__).resolve().parents[1]
@@ -17,7 +19,7 @@ assert sha(out/f'{tag}-native.json') == closure['nativeSha256']
 for p, d in closure['probeSourceSha256'].items():
     assert sha(repo/'tools/unreal/LyraLayerFallbackOracle'/p) == d, p
     assert sha(repo/'artifacts/unreal/lyra-whole-main-oracle/package-layer-fallback-v4'/p) == d, p
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 for p, d in closure['engineSourceSha256'].items():
     assert sha(engine/p) == d, p
     assert sha(out/f'{tag}-engine-source'/Path(p).name) == d, p
@@ -25,7 +27,7 @@ assert read(out/f'{tag}-engine-source/sha256.json') == closure['engineSourceSha2
 assets = repo/'assets/generated/lyra_als'
 current = {p.relative_to(assets).as_posix(): sha(p) for p in assets.rglob('*.json')}
 assert current == closure['previousFixtureSha256']
-project = Path('../GASP58')
+project = project_path()
 for p, d in closure['protectedProject'].items(): assert sha(project/p) == d, p
 for p, d in closure['assetSha256'].items():
     path = p.split('.')[0]

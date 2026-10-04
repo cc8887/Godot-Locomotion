@@ -4,6 +4,8 @@ import json
 import struct
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo / 'assets/generated/lyra_als'
 logs = repo / 'artifacts/lyra-analysis'
@@ -25,7 +27,7 @@ for name, digest in native['previousFixtureSha256'].items():
     assert sha(root / name) == digest, name
 assert len(native['previousFixtureSha256']) == 685
 for name, digest in native['assetSha256'].items():
-    assert sha(Path('../GASP58/Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, name
+    assert sha(project_path('Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')) == digest, name
 assert len(native['assetSha256']) == 508
 for name, digest in native['probeSourceSha256'].items():
     for tree in (repo / 'tools/unreal/AlsV4AssetExporter',

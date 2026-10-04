@@ -1,20 +1,26 @@
 param([Parameter(Mandatory=$true)][ValidatePattern('^[a-zA-Z0-9-]+$')][string]$RunTag,
-      [Parameter(Mandatory=$true)][ValidatePattern('^[a-zA-Z0-9-]+$')][string]$PackageName)
+      [Parameter(Mandatory=$true)][ValidatePattern('^[a-zA-Z0-9-]+$')][string]$PackageName,
+      [string]$EngineRoot=$env:UE_ENGINE_ROOT,
+      [string]$UnrealProject=$env:LYRA_UE_PROJECT_FILE)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'common/LocomotionPaths.ps1')
+$EngineRoot = Resolve-LocomotionPath -Path $EngineRoot -EnvironmentVariable 'UE_ENGINE_ROOT' -Fallback '../UE_5.8'
+$UnrealProject = Resolve-LocomotionPath -Path $UnrealProject -EnvironmentVariable 'LYRA_UE_PROJECT_FILE' -Fallback '../GASP58/GASP58.uproject'
+
 Set-StrictMode -Version Latest
 $layerRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $layerPackage=Join-Path $layerRoot "artifacts/unreal/lyra-whole-main-oracle/$PackageName"
-$layerProject='../GASP58/GASP58.uproject'
+$layerProject=$UnrealProject
 $layerLog=Join-Path $layerRoot "artifacts/lyra-analysis/$RunTag-ue.log"
 if(Test-Path -LiteralPath $layerLog){throw 'Preserve previous capture log.'}
-$layerLive=@(Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'UnrealEditor*' -and $_.CommandLine -and $_.CommandLine.Replace('\','/').Contains('../GASP58')})
+$layerLive=@(Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'UnrealEditor*' -and $_.CommandLine -and $_.CommandLine.Replace('\','/').Contains($UnrealProject.Replace('\','/'))})
 if($layerLive.Count){throw 'Project Editor is already running.'}
 $layerOldTag=[Environment]::GetEnvironmentVariable('LYRA_LAYER_BINDING_TAG','Process')
 $layerOldPackage=[Environment]::GetEnvironmentVariable('LYRA_LAYER_BINDING_PACKAGE','Process')
 try{
     [Environment]::SetEnvironmentVariable('LYRA_LAYER_BINDING_TAG',$RunTag,'Process')
     [Environment]::SetEnvironmentVariable('LYRA_LAYER_BINDING_PACKAGE',$layerPackage,'Process')
-    & '../UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' $layerProject -run=pythonscript `
+    & (Join-Path $EngineRoot 'Engine/Binaries/Win64/UnrealEditor-Cmd.exe') $layerProject -run=pythonscript `
         "-Script=$(Join-Path $layerRoot 'tools/unreal/capture_lyra_layer_binding_matrix.py')" "-PLUGIN=$(Join-Path $layerPackage 'LyraWholeMainOracle.uplugin')" `
         '-DisablePlugins=ModelContextProtocol,Mocara' -ModelContextProtocolPort=58081 -unattended -nop4 -nosplash -nullrhi -stdout -FullStdOutLogOutput *> $layerLog
     $layerExit=$LASTEXITCODE

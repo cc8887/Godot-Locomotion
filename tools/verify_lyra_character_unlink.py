@@ -2,6 +2,8 @@
 import hashlib
 import json
 from pathlib import Path
+from locomotion_paths import project_path
+
 import re
 import xml.etree.ElementTree as ET
 
@@ -34,7 +36,7 @@ current = {p.relative_to(assets).as_posix(): sha(p) for p in assets.rglob('*.jso
 expected = dict(closure['previousFixtureSha256'])
 expected['default_layer_graphs_v1.json'] = closure['resourceSha256']
 assert current == expected and len(current) == 870
-project = Path('../GASP58')
+project = project_path()
 for p, digest in closure['protectedProject'].items():
     assert sha(project/p) == digest, p
 for p, digest in closure['assetSha256'].items():

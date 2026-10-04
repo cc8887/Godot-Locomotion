@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 from PIL import Image, ImageStat
 
 repo = Path(__file__).resolve().parents[1]
@@ -164,7 +166,7 @@ for name, digest in protected.items():
     assert sha(assets / name) == digest, name
 assert len(reference['assetSha256']) == 669
 for name, digest in reference['assetSha256'].items():
-    path = Path('../GASP58/Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')
+    path = project_path('Content') / (name.split('.')[0].removeprefix('/Game/') + '.uasset')
     assert sha(path) == digest, name
 
 report = dict(roleIsolationPassed=True, ordinaryTenRolesPassed=True, runs=runs, ordinary=ordinary,

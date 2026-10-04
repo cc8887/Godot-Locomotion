@@ -4,6 +4,8 @@ import hashlib
 import json
 import struct
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 from verify_lyra_main_lean_runtime import verify as verify_runtime
 
 
@@ -99,7 +101,7 @@ def verify(root, content, engine):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, default=Path('assets/generated/lyra_als'))
-    parser.add_argument('--content', type=Path, default=Path('../GASP58/Content'))
-    parser.add_argument('--engine', type=Path, default=Path('../UE_5.8'))
+    parser.add_argument('--content', type=Path, default=project_path('Content'))
+    parser.add_argument('--engine', type=Path, default=engine_path())
     args = parser.parse_args()
     print(json.dumps(verify(args.root, args.content, args.engine), indent=2))

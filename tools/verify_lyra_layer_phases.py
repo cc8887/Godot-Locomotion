@@ -1,5 +1,7 @@
 """Audit original traversal evidence, current sources, resources and runtime gates."""
 from pathlib import Path
+from locomotion_paths import engine_path, project_path
+
 import hashlib
 import json
 import re
@@ -28,7 +30,7 @@ closures = [read(out/f'{tag}-closure.json') for tag in ('layer-phases-v5','layer
 for kind in ('requests','native','closure'):
     assert (out/f'layer-phases-v5-{kind}.json').read_bytes() == (out/f'layer-phases-v5-repeat-{kind}.json').read_bytes(), kind
 closure = closures[0]
-engine = Path('../UE_5.8/Engine')
+engine = engine_path('Engine')
 ledger = read(out/'layer-phases-v5-engine-sources.json')
 assert ledger == closure['engineSourceSha256'] and len(ledger) == 7
 for p, digest in ledger.items():
@@ -61,7 +63,7 @@ assert stage_counts == dict(initial=14,linked=14,unlinked=14,relinked=14,unbound
 assets = repo/'assets/generated/lyra_als'
 assert {p.relative_to(assets).as_posix():sha(p) for p in assets.rglob('*.json')} == closure['previousFixtureSha256']
 assert len(closure['previousFixtureSha256']) == 870
-project = Path('../GASP58')
+project = project_path()
 for p, digest in closure['protectedProject'].items():
     assert sha(project/p) == digest, p
 for p, digest in closure['assetSha256'].items():

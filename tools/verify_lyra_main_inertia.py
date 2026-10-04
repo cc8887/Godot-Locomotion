@@ -9,6 +9,8 @@ import struct
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo=Path(__file__).resolve().parents[1]
 root=repo/'assets/generated/lyra_als'
 logs=repo/'artifacts/lyra-analysis'
@@ -37,7 +39,7 @@ for name in fixture_names[:4]:
     for section in ('dependencies','previousFixtureSha256'):
         for p,d in fixture[section].items():assert sha(root/p)==d,(name,p)
 for p,d in data['assetSha256'].items():
-    assert sha(Path('../GASP58/Content')/(p.split('.')[0].removeprefix('/Game/')+'.uasset'))==d,p
+    assert sha(project_path('Content')/(p.split('.')[0].removeprefix('/Game/')+'.uasset'))==d,p
 frames=poses=curves=attributes=roots=request_count=0
 pairs=set();assets=set();profile_assets=set()
 for trace,q in zip(data['traces'],requests['traces'],strict=True):

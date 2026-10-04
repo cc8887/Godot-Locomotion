@@ -3,9 +3,13 @@ param([Parameter(Mandatory=$true)][ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$
       [ValidateSet(30,60,120)][int]$Hz=60,
       [ValidateSet('movement','turn','actions','rebind','physics','multi-layer')][string]$Case='actions',
       [ValidateRange(0,100000)][int]$FrameLimit=0,
-      [string]$EngineRoot='../UE_5.8',
-      [string]$UnrealProject='../GASP58/GASP58.uproject')
+      [string]$EngineRoot=$env:UE_ENGINE_ROOT,
+      [string]$UnrealProject=$env:LYRA_UE_PROJECT_FILE)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'common/LocomotionPaths.ps1')
+$EngineRoot = Resolve-LocomotionPath -Path $EngineRoot -EnvironmentVariable 'UE_ENGINE_ROOT' -Fallback '../UE_5.8'
+$UnrealProject = Resolve-LocomotionPath -Path $UnrealProject -EnvironmentVariable 'LYRA_UE_PROJECT_FILE' -Fallback '../GASP58/GASP58.uproject'
+
 Set-StrictMode -Version Latest
 $captureRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $captureProject=[IO.Path]::GetFullPath($UnrealProject)

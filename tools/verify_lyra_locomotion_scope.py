@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo/'assets/generated/lyra_als'
 artifacts = repo/'artifacts/lyra-analysis'
@@ -26,7 +28,7 @@ native = json.loads((root/'idle_runtime_v2_native.json').read_bytes())
 packages = native['assetSha256']
 assert len(packages) == 508
 for name, digest in packages.items():
-    package = Path('../GASP58/Content')/(name.split('.')[0].removeprefix('/Game/')+'.uasset')
+    package = project_path('Content')/(name.split('.')[0].removeprefix('/Game/')+'.uasset')
     assert sha(package.read_bytes()) == digest, name
 del native
 

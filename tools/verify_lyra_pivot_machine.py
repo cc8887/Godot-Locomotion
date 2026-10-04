@@ -6,10 +6,12 @@ import re
 import struct
 from pathlib import Path
 
+from locomotion_paths import project_path
+
 repo = Path(__file__).resolve().parents[1]
 root = repo/'assets/generated/lyra_als'
 artifacts = repo/'artifacts/lyra-analysis'
-content = Path('../GASP58/Content')
+content = project_path('Content')
 sha = lambda data: hashlib.sha256(data).hexdigest()
 fixtures, matrices = {}, {}
 for prefix, previous_count in (('pivot_machine', 608), ('pivot_machine_reentry', 611)):
