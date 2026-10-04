@@ -1,5 +1,111 @@
 # Godot ALS
 
+## Lyra Release：资源配置与测试
+
+[Lyra Preview Release v0.2.0-lyra](https://github.com/cc8887/Godot-Locomotion/releases/tag/v0.2.0-lyra) 提供与 tag 对应的 ALS 和 Lyra 资源。下面是 Windows 上运行本版本的流程；源代码 zip 本身不含资源，需要同时下载两个资源附件。
+
+### 1. 准备工具与对应版本的代码
+
+安装 **Godot 4.7.2 .NET/Mono、.NET 8 SDK、PowerShell 7**。使用 Godot 的 `*_console.exe` 可以直接查看导入和测试日志。下载本 Release 的资源后，无需安装 UE 或重新导出动画。
+
+```powershell
+git clone --branch v0.2.0-lyra https://github.com/cc8887/Godot-Locomotion.git
+Set-Location Godot-Locomotion
+Copy-Item .env.local.ps1.example .env.local.ps1
+# 编辑 .env.local.ps1，将 GODOT_EXECUTABLE 设为本机 Godot 4.7.2 .NET console.exe 的绝对路径。
+# 使用 Release 资源时，UE_ENGINE_ROOT、ALS_UE_PROJECT_ROOT、ALS_REFERENCE_ROOT 可以留空。
+. ./.env.local.ps1
+```
+
+已有检出可以先 `git fetch origin --tags`，再切到 `v0.2.0-lyra`。不同 tag 的资源批次不要混用；JSON 中的依赖摘要按原始文件字节验证，不要格式化资源文件。
+
+### 2. 下载、校验并解压两个资源包
+
+从上述 Release 页面下载下列三个附件。也可以安装 GitHub CLI 后在仓库根目录运行：
+
+```powershell
+gh release download v0.2.0-lyra --repo cc8887/Godot-Locomotion `
+  --pattern 'godot-*-assets-v0.2.0-lyra.zip' --pattern 'SHA256SUMS.txt' --dir .
+
+foreach ($line in Get-Content SHA256SUMS.txt) {
+    if ($line -match '^([0-9a-f]{64})  (.+)$') {
+        $expected = $Matches[1]; $archive = $Matches[2]
+        if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) {
+            throw "资源包校验失败：$archive"
+        }
+    }
+}
+Expand-Archive ./godot-als-assets-v0.2.0-lyra.zip -DestinationPath . -Force
+Expand-Archive ./godot-lyra-assets-v0.2.0-lyra.zip -DestinationPath . -Force
+./scripts/verify-release-resources.ps1 -ExpectedTag v0.2.0-lyra
+```
+
+两个 zip 内已带 `assets/generated/` 路径，**解压目标是仓库根目录**，不要解压到 `assets/generated/` 后形成双层目录。校验脚本逐文件检查大小和 SHA-256，成功时输出两条 `GODOT_RELEASE_RESOURCES_OK`。
+
+| 解压后的目录 | 内容与用途 |
+| --- | --- |
+| `assets/generated/als_v4/` | ALS 模型、骨架、动画 FBX、纹理、导出清单及 `compiled/als_animation_set.tres`；ALS 和 Lyra 的人物渲染都使用它 |
+| `assets/generated/als_v4_raw/` | ALS 原始动画源 JSON，供 ALS 运行链及相关回归读取 |
+| `assets/generated/lyra_als/` | 已重定向到 ALS 骨架的 Unarmed/Pistol/Rifle 动画、武器模型与纹理、Main/Linked Layer/Rig 配置、曲线、属性、通知、Montage，以及当前本地导出的原生参考数据 |
+| `resource-bundles/` | 两包的版本与逐文件哈希清单；不参与动画运行 |
+
+资源包保留 FBX/PNG/JSON/TRES 的原始字节，排除 `.import` 和 `.godot` 缓存；Godot 会在首次导入时重新生成缓存。Lyra 包同时包含原生参考轨迹，解压后的资源需要约 **12 GB** 磁盘空间。`native_win64/LyraNativeMath.dll` 是可选 Win64 数值桥，已随包提供；运行 Main RootYaw 也支持托管回退，不需要为普通 Demo 安装 MSVC。
+
+### 3. 构建、首次导入并启动 Lyra
+
+在仓库根目录执行：
+
+```powershell
+dotnet build GodotALS.csproj -c Debug
+if ($LASTEXITCODE -ne 0) { throw 'C# 构建失败' }
+& $env:GODOT_EXECUTABLE --headless --editor --path $env:GODOT_ALS_ROOT --import
+if ($LASTEXITCODE -ne 0) { throw 'Godot 首次导入失败' }
+& $env:GODOT_EXECUTABLE --rendering-method gl_compatibility --path $env:GODOT_ALS_ROOT `
+  -- --locomotion=lyra --lyra-profile=rifle
+```
+
+启动参数放在 `--` 后。`--lyra-profile=unarmed`、`pistol`、`rifle` 选择初始装备，`--lyra-characters=10` 加入九个 NPC。省略 `--locomotion=lyra` 会运行默认 ALS Demo；Godot 编辑器直接 F5 也默认启动 ALS。Lyra 的完整场景为 `res://scenes/demo/lyra_locomotion_demo.tscn`，旧 `lyra_unarmed_demo.tscn` 只用于早期独立诊断。
+
+| Lyra 输入 | 行为 |
+| --- | --- |
+| `W/A/S/D`、鼠标 | 移动、转向视角 |
+| `Alt`、`Ctrl`、`Space` | 行走、切换蹲伏、跳跃 |
+| `Q` | 循环切换 Unarmed/Pistol/Rifle 的装备 Layer |
+| 鼠标右键、左键 | ADS 瞄准、开火 |
+| `R`、`E` | 换弹、Emote；移动可打断 Emote |
+| `Esc` | 切换鼠标捕获 |
+
+这里的 `R/Q/E` 是 Lyra 的操作，与下面 ALS 操作表中的翻滚/Overlay/道具不同。人工检查步枪方向时，先按住 W 前进，再松开 W 并按 D 右移；短起步切换和持续前进后的切换都应检查。再测试 ADS、蹲伏、换装，以及场景中的台阶、斜坡和落差。
+
+### 4. 自动测试 Lyra
+
+资源校验、构建和首次导入完成后，关闭交互式 Demo，再运行可重复的 Release 测试入口。它使用传入的 Godot 路径，每次创建新的日志/报告目录，不依赖开发机历史 `artifacts/lyra-analysis/` 文件。
+
+```powershell
+# 60Hz：三个装备及十角色换装/武器动作，共四个场景。
+./scripts/verify-lyra-release.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -Suite Smoke -Rates 60
+# 30/60/120Hz：步枪 W→D 短切换与稳定 Cycle 换向，检查模型朝向与残余扭转。
+./scripts/verify-lyra-release.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -Suite Direction -Rates 30,60,120
+# 台阶、斜坡、落差，以及两武器/站蹲/ADS/跳跃。
+./scripts/verify-lyra-release.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -Suite Terrain -Rates 60
+# 或一次运行全部三频测试，共 21 个场景。
+./scripts/verify-lyra-release.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -Suite All -Rates 30,60,120
+```
+
+每个 Main 场景实际运行 8 秒物理帧，包含取消重试和最终 Rig→ALS 蒙皮检查；地形场景使用自身完整轨迹。成功时输出 `LYRA_RELEASE_TESTS_OK`，日志和 JSON 位于 `artifacts/lyra-release/<本次运行ID>/`。非零进程退出、缺少成功标记、Godot `ERROR/WARNING` 或方向断言失败都会使脚本失败。该入口验证真实 Godot/Jolt 运行；人工键鼠观感仍需按上一节检查。
+
+可分别构建 `dotnet build GodotALS.csproj -c ExportRelease -p:Optimize=true` 与 Debug，再用各自程序集运行；上述测试入口默认使用 Godot 加载的 Debug 程序集，不会自动把 ExportRelease 替换为 Debug。历史严格 UE 对照测试在 `scenes/tests/lyra_*.tscn` 和 `scripts/verify-lyra-*.ps1` 中，有些还需要自行采集的 UE oracle 或开发期构建日志；它们不能替代这个新检出的入口。
+
+### 5. 资源缺失或自行导出
+
+遇到 `Compiled ALS asset set is missing`，检查 ALS 包是否解压到正确位置；遇到 Lyra JSON 缺失、`Stale/Changed ... dependency`，先运行资源校验，再确认代码 tag 和两包版本相同。首次 FBX 导入必须等待完成。修改模型或重导动画后，重新导入并重新验证依赖摘要，不能只替换单个 FBX/JSON。
+
+自行从 UE 准备 ALS 资源的流程见下方[资产准备](#资产准备)和[GASP58 的 ALS V4 资源](#gasp58-的-als-v4-资源)。Lyra 当前批次从 GASP58 的 Lyra 内容导出并重定向到 ALS；动画、曲线、Layer 图、Rig、通知和原生参考是多个导出阶段的产物，入口在 `scripts/export-lyra-*.ps1`、`tools/unreal/export_lyra_*.py`，对应阶段及依赖见 [ALS 人物与接口复核](docs/verification/2026-10-03-lyra-als-interface-review.md)。运行本 Release 优先使用同 tag 的整包，UE 5.8/5.9 差异不改变这里的安装步骤。
+
+资源及其转换文件适用 [ASSET_LICENSE.md](ASSET_LICENSE.md) 和[第三方声明](THIRD_PARTY_NOTICES.md)，不属于项目代码的 MIT 授权；资源包中也保留这些说明。
+
+---
+
 最新 Lyra 普通 NotifyState 实时派发已接角色：Begin 使用旧未匹配库存，切换数组后实时 Tick，普通通知和 Montage Ended 共用活动库存；已提交 Reload 通知内换装与后续装备查找修复。两次 UE 参考 13 类/47 回调字节同，Core607、Debug/实际Optimize最终46进程全部通过，三频新角色1260帧/retry及原消费者/窗口/Main/Rig回归；178源码、869 JSON/710原包/9配置和程序集恢复审计通过。见 [实时状态派发验证](docs/verification/2026-10-03-lyra-notify-live-dispatch.md)。ALS68/69/81和Interface/Layer路线保持；任意原状态BP、世界销毁、通用图、完整物理/近景及全部暂缓项仍开放，整个目标active。
 
 最新 Lyra Montage NotifyState 收尾：保留 ALS68/69/81 与现有 Interface/Layer 路线，已接普通角色的 Ended 前倒序状态回调/交换删除，按物理实例及 Montage 对象来源筛选。原生11类/31回调和三频适配取消重试通过；旧窗口失效经上一程序集复核，保留旧资源并新增15轨迹/33235帧/45资产/60轨道精确原生参考。最终Debug/实际Optimize共32进程、Core557、两构建零错误零警告，以及140源码/原资源/程序集恢复审计通过，见 [状态收尾验证](docs/verification/2026-10-03-lyra-montage-notify-termination.md)。完整Begin/Tick/Blueprint状态、世界销毁、通用图和完整物理/近景仍开放，字段仍34/47，整个目标active。下方NotifyState结束待办以本批指定收尾范围为准。
@@ -48,7 +154,7 @@ Lyra最新验证：继续复用ALS人物68根蒙皮骨和69 raw/81 logical，14�
 
 ## 运行
 
-需要 Windows、Godot 4.7.2 .NET、.NET 8 SDK 和 PowerShell 7。**首次 clone 后，必须先按[资产准备](#资产准备)从有权使用的 UE 源工程导出并导入资产；Git 仓库本身不能直接运行 Demo。**UE 5.9 ALS 源工程与 UE 5.8 GASP58 的 ALS V4 内容均有对应流程。
+需要 Windows、Godot 4.7.2 .NET、.NET 8 SDK 和 PowerShell 7。**首次 clone 后，需要安装对应 Release 的资源包，或按[资产准备](#资产准备)从有权使用的 UE 源工程导出并导入资产；Git 仓库本身不含完整运行资源。**UE 5.9 ALS 源工程与 UE 5.8 GASP58 的 ALS V4 内容均有对应流程。
 
 在仓库根目录创建本机配置，填写 `ALS_UE_PROJECT_ROOT`、`UE_ENGINE_ROOT` 和 `GODOT_EXECUTABLE`。`GODOT_ALS_ROOT` 与 `ALS_UE_PROJECT_FILE` 会由配置自动计算；`ALS_REFERENCE_ROOT` 仅用于相关原生对照验证。`.env.local.ps1` 已被 Git 忽略。
 
@@ -67,7 +173,7 @@ dotnet build GodotALS.csproj -p:Optimize=true
 
 也可以用 Godot 打开根目录的 `project.godot`，按 F5 运行。C# 程序集需先构建，导入插件菜单才能执行。`p4_locomotion_demo.tscn` 是旧诊断场景。
 
-Lyra 的 Win64 RootYaw 数学桥需先构建一次：运行 `./scripts/build-lyra-native-math.ps1 -EvidenceTag local-first`，再构建 C# 项目。它使用 MSVC x64 Build Tools，与 UE 向量版三角函数保持相同舍入；生成的 DLL 位于被忽略的 `assets/generated/lyra_als/native_win64/`。现有编辑器插件在 Windows x64 导出时把 DLL 放到程序旁边。其他平台使用标量计算，尚未通过本机 Win64 原生精度门禁。转向验证见 [完整 Main 转向](docs/verification/2026-10-02-lyra-whole-main-turning.md)。
+Lyra 的 Win64 RootYaw 数学桥是可选依赖，Release 资源包已包含该 DLL。自行构建时可运行 `./scripts/build-lyra-native-math.ps1 -EvidenceTag local-first`，再构建 C# 项目；它需要 MSVC x64 Build Tools。未加载 DLL 时使用托管计算，验证范围见 [姿态与惯性 Core](docs/verification/2026-10-04-lyra-pose-inertia-core.md)。
 
 ## 资产准备
 
@@ -219,7 +325,7 @@ dotnet test tests/Als.Core.Tests/Als.Core.Tests.csproj -c Release
 
 原创代码及相关文档采用 [MIT 许可](LICENSE.md)。ALS V4、Epic/Fab 等第三方资产及其导出或转换文件不属于 MIT 许可范围，适用各自的来源条款。
 
-[Epic 内容许可](https://www.unrealengine.com/eula/content)限制源格式内容的对外分发；[Fab 标准许可](https://www.fab.com/eula)允许按条款与项目协作者私下共享，但不允许单独公开再分发资产。因此本仓库提供导出工具，不上传这批源资产。具体边界见 [资产许可](ASSET_LICENSE.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。
+Release 资源附件包含 ALS 与 Lyra 的导出和转换资源，并保留来源许可说明。下载、使用及后续分发须遵守适用的来源条款，项目 MIT 许可不授予第三方资源使用权。具体边界见 [资产许可](ASSET_LICENSE.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ## 开发状态
 

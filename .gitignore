@@ -12,6 +12,7 @@ obj/
 __pycache__/
 *.py[cod]
 assets/generated/
+resource-bundles/
 artifacts/*
 !artifacts/.gdignore
 benchmark-results/*
