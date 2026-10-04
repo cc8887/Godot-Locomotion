@@ -83,6 +83,11 @@ public static class AlsMeshSpacePoseBlend
         Span<AlsQuaternion> scratch, Span<AlsPrecisePose> output)
         => BlendSelected(basis, layer, parents, default, boneWeights, scratch, output);
 
+    public static void Blend(ReadOnlySpan<AlsPrecisePose> basis, ReadOnlySpan<AlsPrecisePose> layer,
+        ReadOnlySpan<int> parents, ReadOnlySpan<float> boneWeights,
+        Span<AlsQuaternion> scratch, Span<AlsPrecisePose> output, bool singleRotationAlpha)
+        => BlendSelected(basis, layer, parents, default, boneWeights, scratch, output, singleRotationAlpha);
+
     // SourceIndex selects a local atom, not a separately accumulated component-space pose.
     public static void BlendLayers(ReadOnlySpan<AlsPrecisePose> basis, ReadOnlySpan<AlsPrecisePose> layers,
         ReadOnlySpan<int> parents, ReadOnlySpan<int> sourceIndices, ReadOnlySpan<float> boneWeights,
@@ -95,7 +100,7 @@ public static class AlsMeshSpacePoseBlend
 
     private static void BlendSelected(ReadOnlySpan<AlsPrecisePose> basis, ReadOnlySpan<AlsPrecisePose> layers,
         ReadOnlySpan<int> parents, ReadOnlySpan<int> sourceIndices, ReadOnlySpan<float> boneWeights,
-        Span<AlsQuaternion> scratch, Span<AlsPrecisePose> output)
+        Span<AlsQuaternion> scratch, Span<AlsPrecisePose> output, bool singleRotationAlpha = false)
     {
         var count = basis.Length;
         if (count == 0 || layers.Length == 0 || layers.Length % count != 0 ||
@@ -112,13 +117,14 @@ public static class AlsMeshSpacePoseBlend
         var sourceMesh = scratch[..count];
         var targetMesh = scratch.Slice(count, count);
         var blendedMesh = scratch.Slice(count * 2, count);
+        AlsQuaternion Multiply(AlsQuaternion a,AlsQuaternion b)=>singleRotationAlpha?AlsQuaternion.MultiplyIsPc(a,b):a*b;
         for (var bone = 0; bone < count; bone++)
         {
             var parent = parents[bone];
             var from = basis[bone];
             var to = layers[(sourceIndices.IsEmpty ? 0 : sourceIndices[bone] * count) + bone];
-            sourceMesh[bone] = parent < 0 ? from.Rotation : sourceMesh[parent] * from.Rotation;
-            targetMesh[bone] = parent < 0 ? to.Rotation : targetMesh[parent] * to.Rotation;
+            sourceMesh[bone] = parent < 0 ? from.Rotation : Multiply(sourceMesh[parent],from.Rotation);
+            targetMesh[bone] = parent < 0 ? to.Rotation : Multiply(targetMesh[parent],to.Rotation);
             var weight = System.Math.Clamp(boneWeights[bone], 0, 1);
             AlsPrecisePose pose;
             if (weight <= AlsPoseBlender.WeightThreshold)
@@ -133,22 +139,46 @@ public static class AlsMeshSpacePoseBlend
             }
             else
             {
-                pose = new(from.Position * (1d - weight) + to.Position * weight,
-                    FastLerp(from.Rotation, to.Rotation, weight), from.Scale * (1d - weight) + to.Scale * weight);
-                blendedMesh[bone] = FastLerp(sourceMesh[bone], targetMesh[bone], weight);
+                // ISPC BlendWith calls VectorLerp with float Alpha and double
+                // vectors: A + (B-A)*Alpha, contracted into multiply-add.
+                // The scalar FTransform path uses two weighted contributions.
+                pose = new(singleRotationAlpha ? LerpIsPc(from.Position, to.Position, weight) : from.Position * (1d - weight) + to.Position * weight,
+                    FastLerp(from.Rotation, to.Rotation, weight, singleRotationAlpha),
+                    singleRotationAlpha ? LerpIsPc(from.Scale, to.Scale, weight) : from.Scale * (1d - weight) + to.Scale * weight);
+                blendedMesh[bone] = FastLerp(sourceMesh[bone], targetMesh[bone], weight, singleRotationAlpha);
             }
 
             // Even a zero-weight child needs conversion through the blended parent, not its source parent.
             if (parent >= 0)
-                pose = pose with { Rotation = (blendedMesh[parent].Conjugate() * blendedMesh[bone]).Normalized() };
+                pose = pose with { Rotation = Multiply(blendedMesh[parent].Conjugate(),blendedMesh[bone]).Normalized() };
             output[bone] = pose;
         }
     }
 
-    private static AlsQuaternion FastLerp(AlsQuaternion from, AlsQuaternion to, float weight)
+    private static AlsDoubleVector LerpIsPc(AlsDoubleVector from, AlsDoubleVector to, float weight) =>
+        new(System.Math.FusedMultiplyAdd(to.X - from.X, weight, from.X), System.Math.FusedMultiplyAdd(to.Y - from.Y, weight, from.Y),
+            System.Math.FusedMultiplyAdd(to.Z - from.Z, weight, from.Z));
+
+    private static AlsQuaternion FastLerp(AlsQuaternion from, AlsQuaternion to, float weight, bool singleRotationAlpha)
     {
-        var bias = AlsQuaternion.Dot(from, to) >= 0 ? 1f : -1f;
-        return (from * (bias * (1d - weight)) + to * weight).Normalized();
+        // UE's ISPC QuatFastLerp infers float for DotResult, Bias and 1-Alpha
+        // even with double quaternion elements. Scalar FTransform math uses
+        // double scalar registers. Select the actual kernel explicitly.
+        var dot = AlsQuaternion.Dot(from, to);
+        var bias = (singleRotationAlpha ? (float)dot : dot) >= 0 ? 1f : -1f;
+        var complement = singleRotationAlpha ? (double)(1f - weight) : 1d - weight;
+        if (singleRotationAlpha)
+        {
+            // The shipped ISPC kernel rounds the source product before fusing
+            // the target product and sum. Preserve that order before normalize.
+            var sourceWeight = bias * complement;
+            return new AlsQuaternion(
+                System.Math.FusedMultiplyAdd(to.X, weight, from.X * sourceWeight),
+                System.Math.FusedMultiplyAdd(to.Y, weight, from.Y * sourceWeight),
+                System.Math.FusedMultiplyAdd(to.Z, weight, from.Z * sourceWeight),
+                System.Math.FusedMultiplyAdd(to.W, weight, from.W * sourceWeight)).Normalized();
+        }
+        return (from * (bias * complement) + to * weight).Normalized();
     }
 
 }

@@ -14,6 +14,14 @@ public partial class AlsDemoEntry : Node
     {
         try
         {
+            if (OS.GetCmdlineUserArgs().Contains("--locomotion=lyra"))
+            {
+                if (ConfigureBeforeReady is not null) throw new InvalidOperationException("ALS fixture configuration cannot target a Lyra character.");
+                var lyra = ResourceLoader.Load<PackedScene>("res://scenes/demo/lyra_locomotion_demo.tscn")
+                    ?? throw new InvalidOperationException("Lyra Main Demo scene is missing.");
+                AddChild(lyra.Instantiate<LyraLocomotionDemo>());
+                return;
+            }
             AlsAnimationRuntimeOptions.ConfigureDemo();
             var scene = ResourceLoader.Load<PackedScene>("res://scenes/demo/p4_locomotion_demo.tscn")
                 ?? throw new InvalidOperationException("ALS Demo scene is missing.");

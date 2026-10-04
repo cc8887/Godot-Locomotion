@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory)]
     [string]$GodotExecutable,
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+    [string]$AssetLockPath = '',
     [switch]$CleanImport
 )
 
@@ -21,7 +22,10 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Formal ALS manifest not found: $manifestPath"
 }
 
-$assetLockPath = Join-Path $projectRootPath 'reference\als-v4-export.lock.json'
+if ([string]::IsNullOrWhiteSpace($AssetLockPath)) {
+    $AssetLockPath = Join-Path $projectRootPath 'reference\als-v4-export.lock.json'
+}
+$assetLockPath = [IO.Path]::GetFullPath($AssetLockPath)
 Assert-AlsExportLock -ManifestPath $manifestPath -AssetRoot $assetRoot -LockPath $assetLockPath | Out-Null
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 if ($manifest.auditSummary.status -ne 'complete') {

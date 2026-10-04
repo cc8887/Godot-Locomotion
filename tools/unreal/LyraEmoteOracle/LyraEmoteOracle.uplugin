@@ -1,0 +1,1 @@
+{"FileVersion":3,"Version":1,"VersionName":"1","FriendlyName":"Lyra Emote Oracle","CanContainContent":false,"Installed":true,"Modules":[{"Name":"LyraEmoteOracle","Type":"Editor","LoadingPhase":"Default","PlatformAllowList":["Win64"]}]}

@@ -11,6 +11,33 @@ public readonly record struct AlsAssetNotifyOccurrence(int EventId, int Definiti
 
 public static partial class AlsTimelineRuntime
 {
+    /// <summary>Contiguous Montage HandleEvents endpoints. The native path tests
+    /// these positions directly; reconstructing current from a rounded delta can
+    /// change which events overlap a reverse traversal by one float ULP.</summary>
+    public static bool TryExtractAssetNotifiesFromPositions(ReadOnlySpan<AlsAssetNotifyDefinition> definitions,
+        float previous, float current, Span<AlsAssetNotifyOccurrence> output,
+        out int count, out AlsP5FailureCode failure)
+    {
+        count=0;failure=AlsP5FailureCode.NonFiniteInput;
+        if(!float.IsFinite(previous)||!float.IsFinite(current))return false;
+        failure=AlsP5FailureCode.InvalidBinding;
+        for(var i=0;i<definitions.Length;i++)
+        {
+            var d=definitions[i];
+            if(d.EventId<0||!float.IsFinite(d.TriggerTimeSeconds)||!float.IsFinite(d.EndTriggerTimeSeconds)||d.EndTriggerTimeSeconds<d.TriggerTimeSeconds)return false;
+            for(var j=0;j<i;j++)if(definitions[j].EventId==d.EventId)return false;
+        }
+        var backwards=current<previous;var needed=0;
+        foreach(var d in definitions)if(Overlaps(d,previous,current,backwards))needed++;
+        if(needed>output.Length){failure=AlsP5FailureCode.EventBufferOverflow;return false;}
+        for(var i=0;i<definitions.Length;i++)
+        {
+            var d=definitions[i];if(!Overlaps(d,previous,current,backwards))continue;
+            output[count++]=new(d.EventId,i,backwards?current<=MathF.Max(d.TriggerTimeSeconds,0):current>=d.EndTriggerTimeSeconds);
+        }
+        failure=AlsP5FailureCode.None;return true;
+    }
+
     /// <summary>UE non-looping asset extraction before queue filtering and state lifecycle dispatch.
     /// Start and delta must come from the current asset tick, not the last committed notify cursor.</summary>
     public static bool TryExtractNonLoopingAssetNotifies(ReadOnlySpan<AlsAssetNotifyDefinition> definitions,

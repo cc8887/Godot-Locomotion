@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "group": "aux",
+  "sourceDirectory": "/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Unarmed",
+  "clips": [
+    { "slot": "crouch_idle", "name": "MM_Unarmed_Crouch_Idle", "property": "Crouch_Idle" },
+    { "slot": "crouch_entry", "name": "MM_Unarmed_Crouch_Entry", "property": "Crouch_Idle_Entry" },
+    { "slot": "crouch_exit", "name": "MM_Unarmed_Crouch_Exit", "property": "Crouch_Idle_Exit" },
+    { "slot": "crouch_walk_fwd", "name": "MM_Unarmed_Crouch_Walk_Fwd", "cardinal": "Crouch_Walk_Cardinals", "direction": "forward" },
+    { "slot": "crouch_walk_left", "name": "MM_Unarmed_Crouch_Walk_Left", "cardinal": "Crouch_Walk_Cardinals", "direction": "left" },
+    { "slot": "crouch_walk_right", "name": "MM_Unarmed_Crouch_Walk_Right", "cardinal": "Crouch_Walk_Cardinals", "direction": "right" },
+    { "slot": "crouch_walk_bwd", "name": "MM_Unarmed_Crouch_Walk_Bwd", "cardinal": "Crouch_Walk_Cardinals", "direction": "backward" },
+    { "slot": "jump_start", "name": "MM_Unarmed_Jump_Start", "property": "Jump_Start" },
+    { "slot": "jump_start_loop", "name": "MM_Unarmed_Jump_Start_Loop", "property": "Jump_StartLoop" },
+    { "slot": "jump_apex", "name": "MM_Unarmed_Jump_Apex", "property": "Jump_Apex" },
+    { "slot": "jump_fall_loop", "name": "MM_Unarmed_Jump_Fall_Loop", "property": "Jump_FallLoop" },
+    { "slot": "jump_fall_land", "name": "MM_Unarmed_Jump_Fall_Land", "property": "Jump_FallLand" }
+  ]
+}

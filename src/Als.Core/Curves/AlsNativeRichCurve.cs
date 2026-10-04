@@ -1,13 +1,19 @@
 namespace GodotAls.Core.Curves;
 
+public enum AlsNativeBezierEvaluation { Reassociated, NestedLerp }
+
 /// <summary>Immutable, unweighted UE RichCurve with constant extrapolation.
 /// Retains the binary32 evaluation boundaries of the native animation source.</summary>
 public sealed class AlsNativeRichCurve
 {
     private readonly AlsCurveKey[] _keys;
+    private readonly AlsNativeBezierEvaluation _bezierEvaluation;
 
-    public AlsNativeRichCurve(ReadOnlySpan<AlsCurveKey> keys)
+    public AlsNativeRichCurve(ReadOnlySpan<AlsCurveKey> keys,
+        AlsNativeBezierEvaluation bezierEvaluation = AlsNativeBezierEvaluation.Reassociated)
     {
+        if (!Enum.IsDefined(bezierEvaluation)) throw new ArgumentOutOfRangeException(nameof(bezierEvaluation));
+        _bezierEvaluation = bezierEvaluation;
         if (keys.IsEmpty) throw new ArgumentException("A native curve requires at least one key.");
         for (var i = 0; i < keys.Length; i++)
         {
@@ -42,8 +48,20 @@ public sealed class AlsNativeRichCurve
         return float.IsFinite(value) ? value : throw new ArgumentException("Nonfinite native curve sample.");
     }
 
-    private static float Bezier(float p0, float p1, float p2, float p3, float alpha)
+    private float Bezier(float p0, float p1, float p2, float p3, float alpha)
     {
+        if (_bezierEvaluation == AlsNativeBezierEvaluation.NestedLerp)
+        {
+            // Source model extraction in the current Lyra native trace retains
+            // CurveEvaluation.h's six float Lerp boundaries. Select this path
+            // explicitly; the ALS reference trace verifies reassociation below.
+            var p01Nested = p0 + alpha * (p1 - p0);
+            var p12Nested = p1 + alpha * (p2 - p1);
+            var p23Nested = p2 + alpha * (p3 - p2);
+            var p012Nested = p01Nested + alpha * (p12Nested - p01Nested);
+            var p123Nested = p12Nested + alpha * (p23Nested - p12Nested);
+            return p012Nested + alpha * (p123Nested - p012Nested);
+        }
         // UE's optimized BezierInterp factors the nested Lerp additions. Keep
         // these float intermediates: six separately rounded Lerps and a double
         // Hermite polynomial both change stride/play-rate and accumulate clock drift.

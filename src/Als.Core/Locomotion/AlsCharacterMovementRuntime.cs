@@ -63,7 +63,7 @@ public sealed class AlsCharacterMovementRuntime
         if (input.LengthSquared > 1) input *= 1 / System.Math.Sqrt(input.LengthSquared);
         var values = history.Values;
         var acceleration = input * values.MaxAcceleration;
-        var amount = values.MaxAcceleration > 0 ? System.Math.Sqrt(acceleration.LengthSquared) / values.MaxAcceleration : 0;
+        var amount = AlsCharacterVelocity.InputAmount(acceleration, values.MaxAcceleration);
         var analog = (float)System.Math.Clamp(amount, 0, 1);
         var maxSpeed = grounded && stance == AlsStance.Crouching ? values.MaxCrouchedSpeed : values.MaxWalkSpeed;
         var appliedAcceleration = acceleration;

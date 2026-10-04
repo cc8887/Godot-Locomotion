@@ -8,10 +8,12 @@ public static partial class AlsSyncRuntime
     public const int MaxAssetSyncSamples = 512;
     public const int MaxAssetSyncPassedMarkers = 256;
 
-    /// <summary>Candidate-only mixed Sequence/BlendSpace CanBeLeader/AlwaysFollower group. Call on inactive
+    /// <summary>Candidate-only mixed Sequence/BlendSpace CanBeLeader/AlwaysFollower/AlwaysLeader group. Call on inactive
     /// frames too. Sample weights must be resolved by the source BlendSpace before this call.
-    /// Marker tracks currently require looping and the same complete symbol set within a group.
-    /// No evaluator, mirror, phase-matching, notify queue, or root-motion side effects.</summary>
+    /// Named groups synchronize on the intersection of their source marker names.
+    /// Nonlooping Sequence tracks preserve native start/end boundaries; marked BlendSpaces still require looping.
+    /// Sequence evaluators supply prepared clocks/rates and skip inertia rejoin resync.
+    /// No mirror, phase-matching, notify queue, or root-motion side effects.</summary>
     public static bool TryEvaluateAssetSyncGroup(int groupId, in AlsAssetSyncGroupHistory previousGroup,
         ReadOnlySpan<AlsAssetSyncPlayer> players, ReadOnlySpan<AlsAssetSyncSample> samples,
         ReadOnlySpan<AlsAssetSyncSequence> sequences, ReadOnlySpan<AlsAssetSyncMarker> markers,
@@ -47,13 +49,18 @@ public static partial class AlsSyncRuntime
             InitializeAssetTickHistory(player, samples, sequences, previousPlayers, previousSamples,
                 players.Length == 1 || validMask != 0, out stagedPlayers[i], stagedSamples);
             var record = stagedPlayers[i].Marker;
-            if (validMask == 0 || !previousGroup.HasLeader || validMask != previousGroup.ValidMarkerMask) record = AlsAssetMarkerRecord.Invalid;
+            // FAnimGroupInstance::Prepare compares persistent source occurrence
+            // storage first, then resets it when that occurrence changed asset
+            // or was absent from the previous physical group's player list.
+            if (validMask == 0 || !previousGroup.HasLeader || validMask != previousGroup.ValidMarkerMask ||
+                FindAssetHistory(previousPlayers, player) < 0) record = ResetAssetMarker(record);
             stagedPlayers[i] = stagedPlayers[i] with { Marker = record };
         }
         var context = new AssetMarkerContext { ValidMask = validMask, Ratio = previousGroup.HasLeader ? previousGroup.Ratio : 0 };
         context.PreviousRatio = context.Ratio;
         if (previousGroup.HasLeader && previousGroup.MarkerEnd.Valid &&
-            ContainsMarker(validMask, previousGroup.MarkerEnd.PreviousSymbol) && ContainsMarker(validMask, previousGroup.MarkerEnd.NextSymbol))
+            (previousGroup.MarkerEnd.PreviousSymbol == 0 || ContainsMarker(validMask, previousGroup.MarkerEnd.PreviousSymbol)) &&
+            (previousGroup.MarkerEnd.NextSymbol == 0 || ContainsMarker(validMask, previousGroup.MarkerEnd.NextSymbol)))
             context.Start = previousGroup.MarkerEnd;
         Span<PassedAssetMarker> passed = stackalloc PassedAssetMarker[MaxAssetSyncPassedMarkers];
         var leaderIndex = 0;
@@ -86,7 +93,7 @@ public static partial class AlsSyncRuntime
             var index = order[n]; var player = players[index];
             // UE compares the sorted leader index here, not the identity of the winning player.
             if (!previousGroup.HasLeader || previousGroup.SortedLeaderIndex != leaderIndex)
-                stagedPlayers[index] = stagedPlayers[index] with { Marker = AlsAssetMarkerRecord.Invalid };
+                stagedPlayers[index] = stagedPlayers[index] with { Marker = ResetAssetMarker(stagedPlayers[index].Marker) };
             if (!TickAssetSyncPlayer(player, samples, sequences, markers, frameDelta, false, false,
                     player.RequestedInertialization, ref stagedPlayers[index], stagedSamples, ref context, passed)) return false;
             stagedTickContexts[index] = new(player.PlayerId, n, false);
@@ -110,7 +117,8 @@ public static partial class AlsSyncRuntime
     // FAnimGroupInstance::TestTickRecordForLeadership: followers still compete by
     // weight when no leader is available, but sort behind every possible leader.
     private static float AssetLeaderScore(in AlsAssetSyncPlayer player) =>
-        player.Role == AlsAssetSyncRole.AlwaysFollower ? -2f + player.Weight : player.Weight;
+        player.Role switch { AlsAssetSyncRole.AlwaysFollower => -2f + player.Weight,
+            AlsAssetSyncRole.AlwaysLeader => 2f, _ => player.Weight };
 
     private static bool TickAssetSyncPlayer(in AlsAssetSyncPlayer player, ReadOnlySpan<AlsAssetSyncSample> allSamples,
         ReadOnlySpan<AlsAssetSyncSequence> sequences, ReadOnlySpan<AlsAssetSyncMarker> markers, float frameDelta,
@@ -125,7 +133,7 @@ public static partial class AlsSyncRuntime
             var sequence = sequences[samples[0].SequenceIndex];
             var track = markers.Slice(sequence.MarkerStart, sequence.MarkerCount);
             var rate = player.PlayRate * sequence.RateScale;
-            var time = resync ? context.Ratio * sequence.DurationSeconds : history.Time;
+            var time = resync && !player.IsEvaluator ? context.Ratio * sequence.DurationSeconds : history.Time;
             var previousTime = time; var delta = 0f; var record = history.Marker;
             if (leader)
             {
@@ -134,11 +142,11 @@ public static partial class AlsSyncRuntime
                 {
                     if (groupMarker)
                     {
-                        if (!TickMarkerLeader(track, sequence.DurationSeconds, delta, ref time, out previousTime, ref record, ref context, passed)) return false;
+                        if (!TickMarkerLeader(track, sequence.DurationSeconds, delta, ref time, out previousTime, ref record, ref context, passed, player.Looping)) return false;
                     }
                     else if (!AdvanceAssetTime(time, sequence.DurationSeconds, delta, player.Looping, out time)) return false;
                 }
-                else if (groupMarker && !record.Initialized) record = MarkersAtTime(track, sequence.DurationSeconds, time);
+                else if (groupMarker && !AssetMarkerValid(record, player.Looping)) record = MarkersAtTime(track, sequence.DurationSeconds, time, player.Looping,context.ValidMask);
                 context.Ratio = time / sequence.DurationSeconds;
             }
             else
@@ -147,7 +155,7 @@ public static partial class AlsSyncRuntime
                 {
                     if (context.Start.Valid)
                     {
-                        if (!TickMarkerFollower(track, sequence.DurationSeconds, context.LeaderDelta, ref time, out previousTime, ref record, context, passed)) return false;
+                        if (!TickMarkerFollower(track, sequence.DurationSeconds, context.LeaderDelta, ref time, out previousTime, ref record, context, passed, player.Looping)) return false;
                     }
                     else
                     {
@@ -203,7 +211,7 @@ public static partial class AlsSyncRuntime
                 }
                 else if (resetFollowers)
                 {
-                    record = MarkersAtTime(track, sequence.DurationSeconds, sampleTime);
+                    record = MarkersAtTime(track, sequence.DurationSeconds, sampleTime,validMask:context.ValidMask);
                     context.Start = context.End = PositionFromMarkers(track, sequence.DurationSeconds, sampleTime, record);
                 }
                 cache[selected] = entry with { Time = sampleTime, PreviousTime = samplePrevious, Marker = record };
@@ -293,7 +301,7 @@ public static partial class AlsSyncRuntime
     }
 
     private static bool FiniteAssetMarker(in AlsAssetMarkerRecord record) => !record.Initialized ||
-        record.PreviousIndex >= 0 && record.NextIndex >= 0 && float.IsFinite(record.PreviousDistance) && float.IsFinite(record.NextDistance);
+        record.PreviousIndex >= -1 && record.NextIndex >= -1 && float.IsFinite(record.PreviousDistance) && float.IsFinite(record.NextDistance);
 
     private static bool FiniteAssetPosition(in AlsAssetMarkerPosition position) =>
         position.PreviousSymbol is >= 0 and < 64 && position.NextSymbol is >= 0 and < 64 && float.IsFinite(position.Alpha);
@@ -312,9 +320,11 @@ public static partial class AlsSyncRuntime
             (previousGroup.GroupId != groupId || previousGroup.LeaderPlayerId < 0 || previousGroup.LeaderAssetId < 0 || previousGroup.LeaderEpoch <= 0 ||
              previousGroup.SortedLeaderIndex < 0 || previousGroup.SortedLeaderIndex >= previousPlayers.Length ||
              !float.IsFinite(previousGroup.LeaderScore) ||
-             previousGroup.LeaderScore is not (>= -2 and <= -1 or >= 0 and <= 1) ||
-             !float.IsFinite(previousGroup.PreviousRatio) || previousGroup.PreviousRatio is < 0 or > 1 ||
-             !float.IsFinite(previousGroup.Ratio) || previousGroup.Ratio is < 0 or > 1 ||
+             previousGroup.LeaderScore < -2 ||
+             !float.IsFinite(previousGroup.PreviousRatio) || previousGroup.PreviousRatio < 0 ||
+             !float.IsFinite(previousGroup.Ratio) || previousGroup.Ratio < 0 ||
+             (previousGroup.PreviousRatio > 1 || previousGroup.Ratio > 1) &&
+                 !RetainedEvaluatorGroupRatios(previousGroup,previousPlayers,previousSamples,sequences) ||
              !FiniteAssetPosition(previousGroup.MarkerStart) || !FiniteAssetPosition(previousGroup.MarkerEnd))) return false;
         foreach (var sequence in sequences)
         {
@@ -333,12 +343,15 @@ public static partial class AlsSyncRuntime
         for (var i = 0; i < players.Length; i++)
         {
             var p = players[i];
-            if (p.PlayerId < 0 || p.AssetId < 0 || p.Epoch <= 0 || p.Kind > AlsAssetSyncKind.BlendSpace || p.Role > AlsAssetSyncRole.AlwaysFollower ||
+            if (p.PlayerId < 0 || p.AssetId < 0 || p.Epoch <= 0 || p.Kind > AlsAssetSyncKind.BlendSpace || p.Role > AlsAssetSyncRole.AlwaysLeader ||
                 !float.IsFinite(p.Time) || p.Time < 0 || !float.IsFinite(p.PlayRate) || !float.IsFinite(p.PlayRate * frameDelta) ||
                 !float.IsFinite(p.Weight) || p.Weight < 0 ||
                 p.SampleStart < 0 || p.SampleCount < 1 || p.SampleCount > MaxBlendSpaceTimingSamples || p.SampleStart > samples.Length - p.SampleCount ||
-                p.MatchSyncPhases || p.AssetMarkerMask != 0 && !p.Looping && (!independent || p.Kind == AlsAssetSyncKind.BlendSpace) || (p.AssetMarkerMask & 1UL) != 0 ||
+                p.IsEvaluator && p.Kind != AlsAssetSyncKind.Sequence ||
+                p.MatchSyncPhases || p.AssetMarkerMask != 0 && !p.Looping && p.Kind == AlsAssetSyncKind.BlendSpace || (p.AssetMarkerMask & 1UL) != 0 ||
                 p.Kind == AlsAssetSyncKind.Sequence && p.SampleCount != 1 || p.Kind == AlsAssetSyncKind.BlendSpace && p.Time > 1) return false;
+            if (p.MarkerRecord is { } storage && (p.Kind != AlsAssetSyncKind.Sequence || !FiniteAssetMarker(storage) ||
+                !float.IsFinite(storage.PreviousDistance) || !float.IsFinite(storage.NextDistance))) return false;
             for (var j = 0; j < i; j++) if (players[j].PlayerId == p.PlayerId) return false;
             for (var j = p.SampleStart; j < p.SampleStart + p.SampleCount; j++)
             {
@@ -351,13 +364,22 @@ public static partial class AlsSyncRuntime
                     !float.IsFinite(p.PlayRate * frameDelta * sample.RateScale * sequence.RateScale)) return false;
                 var mask = AssetMarkerMask(markers.Slice(sequence.MarkerStart, sequence.MarkerCount));
                 if (mask != 0 && p.AssetMarkerMask != 0 && mask != p.AssetMarkerMask) return false;
-                if (p.Kind == AlsAssetSyncKind.Sequence && (p.Time > sequence.DurationSeconds || mask != p.AssetMarkerMask)) return false;
+                // A nonlooping evaluator can retain its previous accumulator
+                // after changing sequence, including across a zero-delta tick.
+                // Native preparation clamps ExplicitTime, not that accumulator.
+                if (p.Kind == AlsAssetSyncKind.Sequence && (p.Time > sequence.DurationSeconds &&
+                    !(p.IsEvaluator && !p.Looping && mask == 0) || mask != p.AssetMarkerMask)) return false;
+                // FAnimGroupInstance::Prepare discards named-group marker
+                // storage on a length-only tick or an occurrence rejoin.
+                // When an occurrence existed last frame, an asset change
+                // must still supply that exact prior record.
+                if (p.Kind == AlsAssetSyncKind.Sequence && p.MarkerRecord is { Initialized: true } supplied &&
+                    (supplied.PreviousIndex >= sequence.MarkerCount || supplied.NextIndex >= sequence.MarkerCount) &&
+                    (independent || p.AssetMarkerMask!=0 && HasAssetOccurrence(previousPlayers,p) &&
+                        !IsRetainedMarkerBeforeAssetChange(p, supplied, previousPlayers, previousSamples, sequences))) return false;
                 for (var k = p.SampleStart; k < j; k++)
                     if (samples[k].SampleId == sample.SampleId || samples[k].SequenceIndex == sample.SequenceIndex) return false;
             }
-            if (!independent && p.AssetMarkerMask != 0)
-                for (var j = 0; j < i; j++)
-                    if (players[j].AssetMarkerMask != 0 && players[j].AssetMarkerMask != p.AssetMarkerMask) return false;
         }
         foreach (var item in owned) if (!item) return false;
         for (var index = 0; index < previousPlayers.Length; index++)
@@ -374,8 +396,9 @@ public static partial class AlsSyncRuntime
                 if (p.Marker.Initialized && (p.Marker.PreviousIndex >= sequence.MarkerCount || p.Marker.NextIndex >= sequence.MarkerCount)) return false;
             }
         }
-        foreach (var s in previousSamples)
+        for (var sampleIndex=0; sampleIndex<previousSamples.Length; sampleIndex++)
         {
+            var s=previousSamples[sampleIndex];
             if (s.SampleId < 0 || !float.IsFinite(s.Time) || s.Time < 0 || !float.IsFinite(s.PreviousTime) || s.PreviousTime < 0 ||
                 !float.IsFinite(s.DeltaPrevious) || !float.IsFinite(s.Delta) || !FiniteAssetMarker(s.Marker)) return false;
             var found = false;
@@ -383,12 +406,68 @@ public static partial class AlsSyncRuntime
             {
                 if (s.AnimationId != sequence.AnimationId) continue;
                 found = true;
-                if (s.Time > sequence.DurationSeconds || s.PreviousTime > sequence.DurationSeconds || s.Marker.Initialized &&
+                if ((s.Time > sequence.DurationSeconds || s.PreviousTime > sequence.DurationSeconds) &&
+                    !RetainedEvaluatorInterval(sampleIndex,s,sequence,previousPlayers) || s.Marker.Initialized &&
                     (s.Marker.PreviousIndex >= sequence.MarkerCount || s.Marker.NextIndex >= sequence.MarkerCount)) return false;
                 break;
             }
             if (!found) return false;
         }
         return true;
+    }
+
+    private static bool RetainedEvaluatorInterval(int index, in AlsAssetSampleHistory sample,
+        in AlsAssetSyncSequence sequence, ReadOnlySpan<AlsAssetPlayerHistory> players)
+    {
+        if (sequence.MarkerCount!=0) return false;
+        foreach (var player in players)
+            if (player.IsNonLoopingEvaluator && player.SampleCount==1 && player.SampleStart==index &&
+                player.AssetId==sequence.AnimationId && player.Time==sample.Time &&
+                player.DeltaPrevious==sample.PreviousTime && player.DeltaPrevious==sample.DeltaPrevious && player.Delta==sample.Delta)
+                return true;
+        return false;
+    }
+    private static bool RetainedEvaluatorGroupRatios(in AlsAssetSyncGroupHistory group,
+        ReadOnlySpan<AlsAssetPlayerHistory> players,ReadOnlySpan<AlsAssetSampleHistory> samples,
+        ReadOnlySpan<AlsAssetSyncSequence> sequences)
+    {
+        if (group.ValidMarkerMask!=0) return false;
+        foreach (var player in players)
+        {
+            if (!player.IsNonLoopingEvaluator || player.PlayerId!=group.LeaderPlayerId || player.AssetId!=group.LeaderAssetId ||
+                player.Epoch!=group.LeaderEpoch || player.SampleCount!=1 || (uint)player.SampleStart>=samples.Length) continue;
+            var sample=samples[player.SampleStart];
+            foreach (var sequence in sequences)
+                if (sequence.AnimationId==sample.AnimationId && RetainedEvaluatorInterval(player.SampleStart,sample,sequence,players) &&
+                    group.PreviousRatio==player.DeltaPrevious/sequence.DurationSeconds && group.Ratio==player.Time/sequence.DurationSeconds)
+                    return true;
+        }
+        return false;
+    }
+
+    private static bool HasAssetOccurrence(ReadOnlySpan<AlsAssetPlayerHistory> previousPlayers,in AlsAssetSyncPlayer current)
+    {
+        foreach(var prior in previousPlayers)
+            if(prior.PlayerId==current.PlayerId && prior.Epoch==current.Epoch) return true;
+        return false;
+    }
+
+    // A marked group's Prepare clears an occurrence's previous asset indices
+    // before ticking its new sequence. Accept that storage only when it is the
+    // exact, valid prior occurrence record; an arbitrary bad index still fails.
+    private static bool IsRetainedMarkerBeforeAssetChange(in AlsAssetSyncPlayer current,
+        in AlsAssetMarkerRecord storage, ReadOnlySpan<AlsAssetPlayerHistory> previousPlayers,
+        ReadOnlySpan<AlsAssetSampleHistory> previousSamples, ReadOnlySpan<AlsAssetSyncSequence> sequences)
+    {
+        foreach (var prior in previousPlayers)
+        {
+            if (prior.PlayerId != current.PlayerId || prior.Epoch != current.Epoch || prior.AssetId == current.AssetId ||
+                prior.Marker != storage || prior.SampleCount != 1 || (uint)prior.SampleStart >= previousSamples.Length) continue;
+            var animation = previousSamples[prior.SampleStart].AnimationId;
+            foreach (var sequence in sequences)
+                if (sequence.AnimationId == animation && storage.PreviousIndex < sequence.MarkerCount &&
+                    storage.NextIndex < sequence.MarkerCount) return true;
+        }
+        return false;
     }
 }

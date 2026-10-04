@@ -5,6 +5,8 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="assets/generated/lyra_als/native_win64/LyraNativeMath.dll" Link="LyraNativeMath.dll"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('assets/generated/lyra_als/native_win64/LyraNativeMath.dll')" />
     <Compile Include="src/Als.Godot/**/*.cs" />
     <ProjectReference Include="src/Als.Core/Als.Core.csproj" />
     <ProjectReference Include="src/Als.Import/Als.Import.csproj" />

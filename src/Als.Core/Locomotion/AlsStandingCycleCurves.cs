@@ -30,6 +30,13 @@ public static class AlsStandingCycleCurves
         return new((value.Present ? value.Value : 0) + source.Value * weight);
     }
 
+    public static AlsInertialCurve BlendStateMachine(AlsInertialCurve basis, AlsInertialCurve layer, float alpha)
+    {
+        var previous = 1f - alpha;
+        if (basis.Present && MathF.Abs(previous - 1f) > 1e-8f) basis = Scale(basis, previous);
+        return alpha > AlsPoseBlender.WeightThreshold && layer.Present ? Accumulate(basis, layer, alpha) : basis;
+    }
+
     public static AlsInertialCurve Lerp(AlsInertialCurve first, AlsInertialCurve second, float alpha)
     {
         if (MathF.Abs(alpha) <= AlsPoseBlender.WeightThreshold) return first;

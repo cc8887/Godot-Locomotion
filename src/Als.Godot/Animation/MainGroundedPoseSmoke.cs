@@ -24,6 +24,7 @@ public partial class MainGroundedPoseSmoke : Node
             using var library = AlsAnimationLibraryBuilder.Build(set, locomotion); AddChild(library.Root);
             using var reference = new AlsDetailPoseSampler(library, set, detail);
             using var graph = new AlsMainGroundedPoseGraph(library, set, machine, states, dependencies, sources);
+            var poseSources = library.MovementSources(set, locomotion.SkeletonId);
             var rest = reference.ReferencePose.ToArray();
             var standing = new AlsLocalPose[rest.Length]; var crouching = new AlsLocalPose[rest.Length];
             var output = new AlsLocalPose[rest.Length]; var retry = new AlsLocalPose[rest.Length];
@@ -80,7 +81,7 @@ public partial class MainGroundedPoseSmoke : Node
                             var profile = machine.Edges[candidate.GetActiveEdge(edge)].BlendProfile;
                             for (var bone = 0; bone < expected.Length; bone++)
                             {
-                                var weights = profile == AlsGroundedBlendProfile.QuickFeet ? dependencies.QuickFeetWeights(bone, transition.Alpha) :
+                                var weights = profile == AlsGroundedBlendProfile.QuickFeet ? dependencies.QuickFeetLogicalWeights(bone, transition.Alpha) :
                                     new System.Numerics.Vector2(transition.Alpha, 1 - transition.Alpha);
                                 expected[bone] = AlsPoseBlender.Accumulate(AlsPoseBlender.Scale(expected[bone], weights.Y), target[bone], weights.X);
                             }
@@ -111,7 +112,9 @@ public partial class MainGroundedPoseSmoke : Node
                 graph.Compose(active, times, standing, crouching, rest, output);
                 _ = graph.Curve(active, times, "FootLock_L", .25f, .75f);
             }
-            AlsLocalPoseClip Clip(int id) => new(library.Library.GetAnimation(library.ClipNames[id]), library.Skeleton, ownsAnimation: false);
+            // Reference and composed poses include virtual bones. Borrow the
+            // existing logical source sampler instead of a physical skin clip.
+            AlsMovementAnimationSource Clip(int id) => poseSources.Create(id);
             void StatePose(int index, Span<AlsLocalPose> destination)
             {
                 if (index == 1) { standing.CopyTo(destination); return; }

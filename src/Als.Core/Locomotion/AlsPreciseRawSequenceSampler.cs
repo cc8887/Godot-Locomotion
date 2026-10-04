@@ -9,11 +9,16 @@ public sealed class AlsPreciseRawSequenceSampler
     private readonly AlsLogicalVirtualBone[] _virtualBones;
     private readonly AlsPrecisePose[] _reference, _first, _second, _components;
     private int _sampling;
+    private readonly AlsRawFrameTimeRounding _rounding;
 
     public AlsPreciseRawSequenceSampler(AlsRawAnimationPoseData data, ReadOnlySpan<int> parents,
-        ReadOnlySpan<AlsPrecisePose> reference, ReadOnlySpan<AlsLogicalVirtualBone> virtualBones)
+        ReadOnlySpan<AlsPrecisePose> reference, ReadOnlySpan<AlsLogicalVirtualBone> virtualBones,
+        AlsRawFrameTimeRounding rounding = AlsRawFrameTimeRounding.OptimizedCancellation)
     {
         ArgumentNullException.ThrowIfNull(data);
+        if (rounding is not (AlsRawFrameTimeRounding.OptimizedCancellation or AlsRawFrameTimeRounding.RoundSubframe))
+            throw new ArgumentOutOfRangeException(nameof(rounding));
+        _rounding = rounding;
         if (reference.Length != data.LogicalBoneCount || virtualBones.Length != data.VirtualBoneCount)
             throw new ArgumentException("Precise raw reference layout differs.");
         var single = new AlsLocalPose[reference.Length];
@@ -33,7 +38,7 @@ public sealed class AlsPreciseRawSequenceSampler
     public AlsRawPoseKeySelection Sample(double seconds, Span<AlsPrecisePose> output)
     {
         if (output.Length != _reference.Length) throw new ArgumentException("Precise raw output layout differs.");
-        var keys = AlsRawSequencePoseSampler.SelectKeys(_data, seconds);
+        var keys = AlsRawSequencePoseSampler.SelectKeys(_data, seconds, _rounding);
         if (Interlocked.CompareExchange(ref _sampling, 1, 0) != 0) throw new InvalidOperationException("Precise source scratch is already in use.");
         try
         {

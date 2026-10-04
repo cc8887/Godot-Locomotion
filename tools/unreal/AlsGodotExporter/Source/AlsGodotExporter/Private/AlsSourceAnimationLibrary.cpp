@@ -1,11 +1,17 @@
 #include "AlsSourceAnimationLibrary.h"
 
 #include "Animation/AnimSequence.h"
+#include "Animation/BlendProfile.h"
 #include "Animation/AnimData/IAnimationDataModel.h"
 #include "Animation/Skeleton.h"
 #include "AnimationRuntime.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
+
+void UAlsSourceAnimationLibrary::FinishSourceCompression(UAnimSequence* Animation)
+{
+    if (Animation) Animation->WaitOnExistingCompression();
+}
 
 namespace
 {
@@ -54,6 +60,42 @@ void SourceOptionalPath(const TSharedRef<FJsonObject>& Object, const TCHAR* Fiel
     if (Path.IsEmpty()) Object->SetField(Field, MakeShared<FJsonValueNull>());
     else Object->SetStringField(Field, Path);
 }
+}
+
+FString UAlsSourceAnimationLibrary::ReadBlendProfileMetadata(UBlendProfile* Profile)
+{
+    if (!Profile || !Profile->GetSkeleton()) return {};
+    const USkeleton* Skeleton = Profile->GetSkeleton();
+    const FReferenceSkeleton& Reference = Skeleton->GetReferenceSkeleton();
+    const auto Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("path"), Profile->GetPathName());
+    Result->SetStringField(TEXT("skeleton"), Skeleton->GetPathName());
+    Result->SetStringField(TEXT("mode"), SourceEnumName(Profile->GetMode()));
+    TArray<TSharedPtr<FJsonValue>> Entries;
+    for (int32 Index = 0; Index < Profile->GetNumBlendEntries(); ++Index)
+    {
+        const FBlendProfileBoneEntry& Entry = Profile->GetEntry(Index);
+        const auto Item = MakeShared<FJsonObject>();
+        Item->SetNumberField(TEXT("index"), Index);
+        Item->SetStringField(TEXT("bone"), Entry.BoneReference.BoneName.ToString());
+        Item->SetNumberField(TEXT("scale"), Entry.BlendScale);
+        Entries.Add(MakeShared<FJsonValueObject>(Item));
+    }
+    Result->SetArrayField(TEXT("entries"), Entries);
+    TArray<TSharedPtr<FJsonValue>> Bones;
+    for (int32 Index = 0; Index < Reference.GetNum(); ++Index)
+    {
+        const FName Name = Reference.GetBoneName(Index);
+        const auto Item = MakeShared<FJsonObject>();
+        Item->SetNumberField(TEXT("index"), Index);
+        Item->SetStringField(TEXT("bone"), Name.ToString());
+        Item->SetNumberField(TEXT("parent"), Reference.GetParentIndex(Index));
+        Item->SetNumberField(TEXT("entry"), Profile->GetEntryIndex(Name));
+        Item->SetNumberField(TEXT("scale"), Profile->GetBoneBlendScale(Name));
+        Bones.Add(MakeShared<FJsonValueObject>(Item));
+    }
+    Result->SetArrayField(TEXT("bones"), Bones);
+    return SourceJson(Result);
 }
 
 FString UAlsSourceAnimationLibrary::ReadSourceFloatCurves(UAnimSequenceBase* Animation)
@@ -150,6 +192,24 @@ FString UAlsSourceAnimationLibrary::ReadSourceAnimationMetadata(UAnimSequence* A
     return SourceJson(Result);
 }
 
+FString UAlsSourceAnimationLibrary::ReadSourceRootMotionRange(UAnimSequence* Animation,
+    double StartTime, double EndTime)
+{
+    if (!Animation || !Animation->GetSkeleton() || !FMath::IsFinite(StartTime) ||
+        !FMath::IsFinite(EndTime) || StartTime < 0 || EndTime <= StartTime ||
+        EndTime > Animation->GetPlayLength() + 1e-5) return {};
+    const FTransform Motion = Animation->ExtractRootMotionFromRange(StartTime, EndTime, FAnimExtractContext());
+    const FVector Translation = Motion.GetTranslation();
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("source"), Animation->GetPathName());
+    Result->SetNumberField(TEXT("playLength"), Animation->GetPlayLength());
+    Result->SetNumberField(TEXT("startTime"), StartTime);
+    Result->SetNumberField(TEXT("endTime"), EndTime);
+    Result->SetObjectField(TEXT("motion"), SourceTransform(Motion));
+    Result->SetNumberField(TEXT("planarDistanceCm"), Translation.Size2D());
+    return SourceJson(Result);
+}
+
 FString UAlsSourceAnimationLibrary::ReadSkeletonPoseMetadata(USkeleton* Skeleton)
 {
     if (!Skeleton) return {};
@@ -193,7 +253,8 @@ namespace
 {
 FString ReadSourcePose(UAnimSequence* Animation, const double TimeSeconds,
                       const bool ShouldRetarget, const bool ExtractRootMotion,
-                      const bool IgnoreRootLock, const bool EvaluateAdditive)
+                      const bool IgnoreRootLock, const bool EvaluateAdditive,
+                      const bool UseRawData = true)
 {
     if (!Animation || !Animation->GetSkeleton() || !FMath::IsFinite(TimeSeconds) ||
         !Animation->GetDataModelInterface()) return {};
@@ -203,7 +264,7 @@ FString ReadSourcePose(UAnimSequence* Animation, const double TimeSeconds,
     for (int32 Bone = 0; Bone < Reference.GetNum(); ++Bone) Required.Add(static_cast<FBoneIndexType>(Bone));
     const FMemMark Mark(FMemStack::Get());
     FBoneContainer Container(Required, UE::Anim::FCurveFilterSettings(), *Skeleton);
-    Container.SetUseRAWData(true);
+    Container.SetUseRAWData(UseRawData);
     Container.SetUseSourceData(false);
     Container.SetDisableRetargeting(!ShouldRetarget);
     FCompactPose Pose;
@@ -215,6 +276,9 @@ FString ReadSourcePose(UAnimSequence* Animation, const double TimeSeconds,
     FAnimExtractContext Context(TimeSeconds, ExtractRootMotion);
     Context.bIgnoreRootLock = IgnoreRootLock;
     Context.bExtractWithRootMotionProvider = false;
+#if WITH_EDITOR
+    Context.bEnforceCompressedDataSampling = !UseRawData;
+#endif
 
     // Both entry points use the same RAW container. The animation entry additionally
     // performs the real asset's base-pose selection and local/mesh additive conversion.
@@ -255,6 +319,13 @@ FString UAlsSourceAnimationLibrary::ReadRawAnimationPose(UAnimSequence* Animatio
                                                        const bool IgnoreRootLock)
 {
     return ReadSourcePose(Animation, TimeSeconds, ShouldRetarget, ExtractRootMotion, IgnoreRootLock, true);
+}
+
+FString UAlsSourceAnimationLibrary::ReadCompressedAnimationPose(UAnimSequence* Animation, const double TimeSeconds,
+                                                              const bool ShouldRetarget, const bool ExtractRootMotion,
+                                                              const bool IgnoreRootLock)
+{
+    return ReadSourcePose(Animation, TimeSeconds, ShouldRetarget, ExtractRootMotion, IgnoreRootLock, true, false);
 }
 
 FString UAlsSourceAnimationLibrary::ReadRawSamplingCases()

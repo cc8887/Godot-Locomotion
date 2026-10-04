@@ -6,10 +6,15 @@
 #include "AnimationRuntime.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
+#include "UObject/UObjectGlobals.h"
 
-static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const float Y, const float NormalizedTime, const bool Legacy, const FString& TimedJson = FString())
+static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const float Y,
+    const float NormalizedTime, const bool Legacy, const FString& TimedJson = FString(),
+    UAnimSequence* BaseAnimation = nullptr, const double BaseTime = 0)
 {
     if (!BlendSpace || !BlendSpace->GetSkeleton() || !FMath::IsFinite(Pitch) || !FMath::IsFinite(Y) || !FMath::IsFinite(NormalizedTime)) return {};
+    if (BaseAnimation && (BaseAnimation->GetSkeleton() != BlendSpace->GetSkeleton() ||
+        BaseAnimation->IsValidAdditive() || !FMath::IsFinite(BaseTime))) return {};
     USkeleton* Skeleton = BlendSpace->GetSkeleton();
     const FReferenceSkeleton& Reference = Skeleton->GetReferenceSkeleton();
     const FMemMark Mark(FMemStack::Get());
@@ -97,6 +102,39 @@ static FString ReadBlendPose(UBlendSpace* BlendSpace, const float Pitch, const f
     Result->SetArrayField(TEXT("names"), Names);
     Result->SetArrayField(TEXT("pose"), Poses);
     Result->SetObjectField(TEXT("curves"), Curves);
+    if (BaseAnimation)
+    {
+        FCompactPose BasePose; BasePose.SetBoneContainer(&Container);
+        FBlendedCurve BaseCurve; BaseCurve.InitFrom(Container);
+        UE::Anim::FStackAttributeContainer BaseAttributes;
+        FAnimationPoseData BaseData(BasePose, BaseCurve, BaseAttributes);
+        FAnimExtractContext BaseContext(BaseTime, false);
+        BaseContext.bIgnoreRootLock = false;
+        BaseContext.bExtractWithRootMotionProvider = false;
+        BaseAnimation->GetAnimationPose(BaseData, BaseContext);
+        auto PoseRows = [&](const FCompactPose& Atoms)
+        {
+            TArray<TSharedPtr<FJsonValue>> Rows;
+            for (const FCompactPoseBoneIndex Bone : Atoms.ForEachBoneIndex())
+            {
+                const FTransform& Transform = Atoms[Bone];
+                const FVector P = Transform.GetTranslation(), S = Transform.GetScale3D();
+                const FQuat Q = Transform.GetRotation();
+                const TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
+                Row->SetArrayField(TEXT("position"), Numbers({P.X, P.Y, P.Z}));
+                Row->SetArrayField(TEXT("rotation"), Numbers({Q.X, Q.Y, Q.Z, Q.W}));
+                Row->SetArrayField(TEXT("scale"), Numbers({S.X, S.Y, S.Z}));
+                Rows.Add(MakeShared<FJsonValueObject>(Row));
+            }
+            return Rows;
+        };
+        Result->SetStringField(TEXT("baseSource"), BaseAnimation->GetPathName());
+        Result->SetNumberField(TEXT("baseTime"), BaseTime);
+        Result->SetArrayField(TEXT("basePose"), PoseRows(BasePose));
+        FAnimationRuntime::AccumulateMeshSpaceRotationAdditiveToLocalPose(BaseData, PoseData, 1.0f);
+        BasePose.NormalizeRotations();
+        Result->SetArrayField(TEXT("appliedPose"), PoseRows(BasePose));
+    }
     FString Json;
     if (!FJsonSerializer::Serialize(Result, TJsonWriterFactory<>::Create(&Json))) return {};
     return Json;
@@ -110,6 +148,58 @@ FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose(UBlendSpace* BlendSpac
 FString UAlsSourceAnimationLibrary::ReadRawBlendSpacePose2D(UBlendSpace* BlendSpace, const float X, const float Y, const float NormalizedTime)
 {
     return ReadBlendPose(BlendSpace, X, Y, NormalizedTime, false);
+}
+
+FString UAlsSourceAnimationLibrary::ReadRawAimingPose2D(UBlendSpace* BlendSpace, UAnimSequence* BaseAnimation,
+    const double BaseTime, const float X, const float Y, const float NormalizedTime)
+{
+    if (!BaseAnimation) return {};
+    return ReadBlendPose(BlendSpace, X, Y, NormalizedTime, false, FString(), BaseAnimation, BaseTime);
+}
+
+static UBlendSpace* RetargetTransientBlendSpace(UBlendSpace* Source, USkeleton* TargetSkeleton,
+    const TArray<UAnimSequence*>& TargetSamples)
+{
+    if (!Source || !TargetSkeleton || Source->GetBlendSamples().Num() != TargetSamples.Num()) return nullptr;
+    for (const UAnimSequence* Sample : TargetSamples)
+    {
+        if (!Sample || Sample->GetSkeleton() != TargetSkeleton) return nullptr;
+    }
+
+    UBlendSpace* Temporary = DuplicateObject<UBlendSpace>(Source, GetTransientPackage());
+    if (!Temporary) return nullptr;
+    Temporary->SetFlags(RF_Transient);
+    for (int32 Index = 0; Index < TargetSamples.Num(); ++Index)
+    {
+        if (!Temporary->ReplaceSampleAnimation(Index, TargetSamples[Index])) return nullptr;
+    }
+    Temporary->SetSkeleton(TargetSkeleton);
+    Temporary->ValidateSampleData();
+    if (Temporary->GetBlendSamples().Num() != TargetSamples.Num()) return nullptr;
+    for (int32 Index = 0; Index < TargetSamples.Num(); ++Index)
+    {
+        if (Temporary->GetBlendSample(Index).Animation != TargetSamples[Index] ||
+            !Temporary->GetBlendSample(Index).bIsValid) return nullptr;
+    }
+    Temporary->ResampleData();
+    return Temporary;
+}
+
+FString UAlsSourceAnimationLibrary::ReadRetargetedBlendSpacePose2D(UBlendSpace* Source, USkeleton* TargetSkeleton,
+    const TArray<UAnimSequence*>& TargetSamples, const float X, const float Y, const float NormalizedTime)
+{
+    UBlendSpace* Temporary = RetargetTransientBlendSpace(Source, TargetSkeleton, TargetSamples);
+    if (!Temporary) return {};
+    return ReadRawBlendSpacePose2D(Temporary, X, Y, NormalizedTime);
+}
+
+FString UAlsSourceAnimationLibrary::ReadRetargetedAimingPose2D(UBlendSpace* Source, USkeleton* TargetSkeleton,
+    const TArray<UAnimSequence*>& TargetSamples, UAnimSequence* BaseAnimation, const double BaseTime,
+    const float X, const float Y, const float NormalizedTime)
+{
+    UBlendSpace* Temporary = RetargetTransientBlendSpace(Source, TargetSkeleton, TargetSamples);
+    if (!Temporary || !BaseAnimation) return {};
+    return ReadBlendPose(Temporary, X, Y, NormalizedTime, false, FString(), BaseAnimation, BaseTime);
 }
 
 FString UAlsSourceAnimationLibrary::ReadRawBlendSpaceTimedPose(UBlendSpace* BlendSpace, const FString& SamplesJson)

@@ -49,7 +49,7 @@ public static partial class AlsTimelineRuntime
                 if (!context.Leader && !policy.OnFollower || context.DedicatedServer && !policy.OnDedicatedServer ||
                     policy.WeightThreshold > context.Weight ||
                     policy.FilterType == AlsAssetNotifyFilterType.Lod && policy.FilterLod <= context.PredictedLod) continue;
-                if (policy.StateObjectId < 0 && NextAssetNotifyFraction(ref seed) >= policy.Chance) continue;
+                if (policy.StateObjectId < 0 && GodotAls.Core.Math.AlsRandomStream.NextFraction(ref seed) >= policy.Chance) continue;
                 if (policy.FilterViaRequest && reference.ScopeFiltered) continue;
             }
             var duplicate = false;
@@ -85,9 +85,4 @@ public static partial class AlsTimelineRuntime
         left.StateObjectId >= 0 && left.StateObjectId == right.StateObjectId ||
         left.NotifyObjectId < 0 && left.StateObjectId < 0 && left.NameId == right.NameId;
 
-    private static float NextAssetNotifyFraction(ref uint seed)
-    {
-        seed = unchecked(seed * 196314165u + 907633515u);
-        return BitConverter.UInt32BitsToSingle(0x3f800000u | (seed >> 9)) - 1f;
-    }
 }

@@ -1,6 +1,8 @@
 #include "AlsSourceAnimationLibrary.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/BlendSpace.h"
+#include "Animation/AnimNotifies/AnimNotify.h"
+#include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 
@@ -49,6 +51,42 @@ FString UAlsSourceAnimationLibrary::ReadSourceSyncMetadata(UAnimationAsset* Anim
         Result->SetArrayField(TEXT("samples"), Samples);
     }
     else return {};
+    FString Json;
+    return FJsonSerializer::Serialize(Result, TJsonWriterFactory<>::Create(&Json)) ? Json : FString();
+}
+
+FString UAlsSourceAnimationLibrary::ReadSourceNotifyMetadata(UAnimSequenceBase* Animation)
+{
+    if (!Animation) return {};
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("source"), Animation->GetPathName());
+    Result->SetNumberField(TEXT("length"), Animation->GetPlayLength());
+    TArray<TSharedPtr<FJsonValue>> Events;
+    for (const FAnimNotifyEvent& Event : Animation->Notifies)
+    {
+        const TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
+        Row->SetNumberField(TEXT("index"), Events.Num());
+        Row->SetStringField(TEXT("name"), Event.NotifyName.ToString());
+        Row->SetStringField(TEXT("notifyClass"), Event.Notify ? Event.Notify->GetClass()->GetPathName() : FString());
+        Row->SetStringField(TEXT("notifyStateClass"), Event.NotifyStateClass ? Event.NotifyStateClass->GetClass()->GetPathName() : FString());
+        Row->SetNumberField(TEXT("time"), Event.GetTime());
+        Row->SetNumberField(TEXT("duration"), Event.GetDuration());
+        Row->SetNumberField(TEXT("triggerTime"), Event.GetTriggerTime());
+        Row->SetNumberField(TEXT("endTriggerTime"), Event.GetEndTriggerTime());
+        Row->SetNumberField(TEXT("triggerTimeOffset"), Event.TriggerTimeOffset);
+        Row->SetNumberField(TEXT("endTriggerTimeOffset"), Event.EndTriggerTimeOffset);
+        Row->SetNumberField(TEXT("track"), Event.TrackIndex);
+        Row->SetNumberField(TEXT("triggerWeightThreshold"), Event.TriggerWeightThreshold);
+        Row->SetNumberField(TEXT("triggerChance"), Event.NotifyTriggerChance);
+        Row->SetNumberField(TEXT("filterType"), Event.NotifyFilterType.GetValue());
+        Row->SetNumberField(TEXT("filterLod"), Event.NotifyFilterLOD);
+        Row->SetBoolField(TEXT("canBeFilteredViaRequest"), Event.bCanBeFilteredViaRequest);
+        Row->SetBoolField(TEXT("triggerOnDedicatedServer"), Event.bTriggerOnDedicatedServer);
+        Row->SetBoolField(TEXT("triggerOnFollower"), Event.bTriggerOnFollower);
+        Row->SetBoolField(TEXT("branchingPoint"), Event.IsBranchingPoint());
+        Events.Add(MakeShared<FJsonValueObject>(Row));
+    }
+    Result->SetArrayField(TEXT("events"), Events);
     FString Json;
     return FJsonSerializer::Serialize(Result, TJsonWriterFactory<>::Create(&Json)) ? Json : FString();
 }

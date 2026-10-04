@@ -76,11 +76,7 @@ public static class AlsTwoBoneIk
         return (newJoint, newEnd);
     }
 
-    internal static AlsDoubleVector SafeNormal(AlsDoubleVector v)
-    {
-        var squared = v.LengthSquared;
-        return squared == 1 ? v : squared < (double)1e-8f ? default : v * (1 / M.Sqrt(squared));
-    }
+    internal static AlsDoubleVector SafeNormal(AlsDoubleVector v) => v.SafeNormal();
     internal static AlsQuaternion Between(AlsDoubleVector a, AlsDoubleVector b)
     {
         var w = 1 + AlsDoubleVector.Dot(a, b);

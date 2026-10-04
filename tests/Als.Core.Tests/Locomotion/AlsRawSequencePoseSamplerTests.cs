@@ -7,11 +7,13 @@ namespace GodotAls.Core.Tests.Locomotion;
 [Collection(AllocationTestCollection.Name)]
 public sealed class AlsRawSequencePoseSamplerTests
 {
-    [Fact]
-    public void TimeSelectionMatchesEveryNativeFrameRateInterpolationAndBoundaryCase()
+    [Theory]
+    [InlineData("v4_raw_sequence_sampling_native.json", AlsRawFrameTimeRounding.OptimizedCancellation)]
+    [InlineData("lyra_raw_sequence_sampling_native.json", AlsRawFrameTimeRounding.RoundSubframe)]
+    public void TimeSelectionMatchesEveryNativeFrameRateInterpolationAndBoundaryCase(string filename, AlsRawFrameTimeRounding rounding)
     {
         using var fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,
-            "Fixtures", "P3", "v4_raw_sequence_sampling_native.json")));
+            "Fixtures", "P3", filename)));
         Assert.Equal(1, fixture.RootElement.GetProperty("schemaVersion").GetInt32());
         var cases = fixture.RootElement.GetProperty("samplingCases");
         Assert.Equal(152, cases.GetArrayLength());
@@ -25,7 +27,7 @@ public sealed class AlsRawSequencePoseSamplerTests
                 (count - 1) * (double)denominator / numerator, interpolation,
                 [0], [], [true], Enumerable.Repeat(AlsLocalPose.Identity, count).ToArray(), []);
             var time = row.GetProperty("timeSeconds").GetDouble();
-            var actual = AlsRawSequencePoseSampler.SelectKeys(data, time);
+            var actual = AlsRawSequencePoseSampler.SelectKeys(data, time, rounding);
             var expected = new AlsRawPoseKeySelection(row.GetProperty("firstKey").GetInt32(),
                 row.GetProperty("secondKey").GetInt32(), row.GetProperty("alpha").GetSingle(),
                 row.GetProperty("interpolate").GetBoolean(), row.GetProperty("sampleTimeSeconds").GetDouble());

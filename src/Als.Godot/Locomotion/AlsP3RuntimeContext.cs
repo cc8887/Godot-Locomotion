@@ -425,8 +425,7 @@ public sealed class AlsP3RuntimeContext
             var config = ProjectSettings.GlobalizePath("res://assets/config");
             PropProfile = AlsOverlayPropCompiler.Compile(System.IO.File.ReadAllText(System.IO.Path.Combine(config, "v4_overlay_props_inputs.json")),
                 animationSet, animationSet.SkeletalMeshes[MovementGraph.MannequinMeshId].SkeletonId);
-            PropSources = AlsRawAnimationSourceCompiler.Compile(System.IO.File.ReadAllText(System.IO.Path.Combine(config, "v4_overlay_prop_source_inputs.json")),
-                animationSet, PropProfile.Digest, 1, 1, [PropProfile.BowAnimationId], file => System.IO.File.ReadAllBytes(System.IO.Path.Combine(config, file)));
+            PropSources = AlsRawAnimationSourceLoader.LoadProp(animationSet, PropProfile);
         }
         motorSettings.Validate();
         if (mainManagedThreadId <= 0)

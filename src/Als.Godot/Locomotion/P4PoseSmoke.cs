@@ -374,13 +374,39 @@ public partial class P4PoseSmoke : Node
         var offsetOutput = default(AlsPoseModifierOutput);
         Require(modifier.TryApply(in offsetInput, ref offsetOutput, out var offsetReason),
             $"animated foot offset failed: {offsetReason}");
-        foreach (var (bone, expected) in new[]
-                 { (profile.FootRig.Left.FootBoneId, leftWorld), (profile.FootRig.Right.FootBoneId, rightWorld) })
+        foreach (var (side, leg, expected, physicalPosition, physicalRotation) in new[]
+                 {
+                     ("left", profile.FootRig.Left, leftWorld,
+                         offsetOutput.LeftPhysicalTargetWorldPosition,
+                         offsetOutput.LeftPhysicalTargetWorldRotation),
+                     ("right", profile.FootRig.Right, rightWorld,
+                         offsetOutput.RightPhysicalTargetWorldPosition,
+                         offsetOutput.RightPhysicalTargetWorldRotation),
+                 })
         {
-            var actual = skeleton.GlobalTransform * BuildCurrentComponent(skeleton, bone);
-            Require(actual.Origin.DistanceTo(expected.Origin) < 1e-4f &&
-                    1f - MathF.Abs(actual.Basis.GetRotationQuaternion().Dot(expected.Basis.GetRotationQuaternion())) < 1e-5f,
-                "Flat unlocked IK changed the authored lifted-foot position or rotation.");
+            var actual = skeleton.GlobalTransform * BuildCurrentComponent(skeleton, leg.FootBoneId);
+            var positionError = actual.Origin.DistanceTo(expected.Origin);
+            var rotationError = 1f - MathF.Abs(actual.Basis.GetRotationQuaternion().Dot(
+                expected.Basis.GetRotationQuaternion()));
+            if (positionError >= 1e-4f || rotationError >= 1e-5f)
+            {
+                var hip = skeleton.GlobalTransform *
+                    BuildSnapshotComponent(before, skeleton, leg.ThighBoneId).Origin;
+                var knee = skeleton.GlobalTransform *
+                    BuildSnapshotComponent(before, skeleton, leg.KneeBoneId).Origin;
+                var targetPositionError = System.Numerics.Vector3.Distance(
+                    physicalPosition, ToNumerics(expected.Origin));
+                var targetRotationError = 1f - MathF.Abs(System.Numerics.Quaternion.Dot(
+                    physicalRotation, ToNumerics(expected.Basis.GetRotationQuaternion())));
+                throw new InvalidOperationException(
+                    $"Flat unlocked IK changed the authored lifted-foot position or rotation: " +
+                    $"side={side} positionError={positionError:R} rotationError={rotationError:R} " +
+                    $"physicalTargetPositionError={targetPositionError:R} " +
+                    $"physicalTargetRotationError={targetRotationError:R} " +
+                    $"hipKnee={hip.DistanceTo(knee):R} kneeFoot={knee.DistanceTo(expected.Origin):R} " +
+                    $"hipFoot={hip.DistanceTo(expected.Origin):R} " +
+                    $"before={expected.Origin} after={actual.Origin} physicalTarget={physicalPosition}");
+            }
         }
         basePose.Restore(skeleton, visualRoot);
         foreach (var invalid in new[]
@@ -973,25 +999,28 @@ public partial class P4PoseSmoke : Node
             Require(source.Length == bound.Length &&
                     source.GetTrackCount() == bound.GetTrackCount(),
                 $"Aim normalization changed clip identity: {definition.Name}");
-            var sourceGuardTracks = 0;
+            var sourceBoundaryTracks = 0;
             for (var trackIndex = 0; trackIndex < source.GetTrackCount(); trackIndex++)
             {
                 var sourceKeyCount = source.TrackGetKeyCount(trackIndex);
                 if (sourceKeyCount > 0 &&
-                    source.TrackGetKeyTime(trackIndex, sourceKeyCount - 1) > source.Length)
+                    (source.TrackGetKeyTime(trackIndex, sourceKeyCount - 1) > source.Length ||
+                     source.TrackGetKeyTime(trackIndex, sourceKeyCount - 1) < source.Length - 1e-8))
                 {
-                    sourceGuardTracks++;
+                    sourceBoundaryTracks++;
                 }
                 var boundKeyCount = bound.TrackGetKeyCount(trackIndex);
                 Require(boundKeyCount > 0 &&
+                        bound.TrackGetKeyTime(trackIndex, 0) <= 1e-8 &&
+                        bound.TrackGetKeyTime(trackIndex, boundKeyCount - 1) >= bound.Length - 1e-8 &&
                         bound.TrackGetKeyTime(trackIndex, boundKeyCount - 1) <= bound.Length,
-                    $"Aim normalized track exceeds the clip domain: " +
+                    $"Aim normalized track does not cover the clip domain: " +
                     $"clip={definition.Name} track={trackIndex}");
                 VerifyTrackSamplesNear(
                     source, bound, trackIndex, definition.Name, "Aim normalization");
             }
-            Require(sourceGuardTracks > 0,
-                $"Aim normalization fixture has no imported guard key: {definition.Name}");
+            Require(sourceBoundaryTracks > 0,
+                $"Aim normalization fixture has no imported boundary difference: {definition.Name}");
         });
     }
 
@@ -1006,7 +1035,6 @@ public partial class P4PoseSmoke : Node
             Require(source.Length == bound.Length &&
                     source.GetTrackCount() == bound.GetTrackCount(),
                 $"{label} changed clip identity");
-            var sourceGuardTracks = 0;
             for (var trackIndex = 0; trackIndex < source.GetTrackCount(); trackIndex++)
             {
                 Require(source.TrackGetType(trackIndex) == bound.TrackGetType(trackIndex) &&
@@ -1028,11 +1056,6 @@ public partial class P4PoseSmoke : Node
                             bound.TrackGetKeyTransition(trackIndex, keyIndex),
                         $"{label} changed key topology: track={trackIndex} key={keyIndex}");
                 }
-                if (sourceKeyCount > 0 &&
-                    source.TrackGetKeyTime(trackIndex, sourceKeyCount - 1) > source.Length)
-                {
-                    sourceGuardTracks++;
-                }
                 using var path = bound.TrackGetPath(trackIndex);
                 if (definition.ForceRootLock && !definition.RootMotionEnabled &&
                     definition.RootMotionRootLock == 0 && path.GetSubName(0) == "root")
@@ -1053,8 +1076,6 @@ public partial class P4PoseSmoke : Node
                 }
                 else VerifyTrackSamplesNear(source, bound, trackIndex, definition.Name, label);
             }
-            Require(sourceGuardTracks > 0,
-                $"{label} fixture has no imported guard key");
         });
     }
 

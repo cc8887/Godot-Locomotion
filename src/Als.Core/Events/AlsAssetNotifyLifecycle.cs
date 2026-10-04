@@ -128,18 +128,18 @@ public static partial class AlsTimelineRuntime
         failure = AlsP5FailureCode.None; return true;
     }
 
-    private static bool ValidLifecycleInput(ReadOnlySpan<AlsAssetNotifyPolicy> policies, in AlsAssetNotifyDispatchInput input) =>
+    internal static bool ValidLifecycleInput(ReadOnlySpan<AlsAssetNotifyPolicy> policies, in AlsAssetNotifyDispatchInput input) =>
         ValidQueueReference(policies, input.Reference) && float.IsFinite(input.Duration) && input.Duration >= 0 &&
         input.PlaybackEpoch >= 0 && float.IsFinite(input.EffectiveWeight) && input.EffectiveWeight >= 0 &&
         input.SourceKind <= AlsAssetNotifySourceKind.Montage &&
         (input.SourceKind != AlsAssetNotifySourceKind.None || input.SourceInstanceId == 0) &&
         (policies[input.Reference.PolicyIndex].NotifyObjectId >= 0 || policies[input.Reference.PolicyIndex].StateObjectId >= 0);
 
-    private static bool IncludedNotifySource(in AlsAssetNotifyDispatchInput input, AlsAssetNotifyDispatchMode mode) =>
+    internal static bool IncludedNotifySource(in AlsAssetNotifyDispatchInput input, AlsAssetNotifyDispatchMode mode) =>
         mode != AlsAssetNotifyDispatchMode.ForceAnimGraphOnly && mode != AlsAssetNotifyDispatchMode.ForceMontageOnly ||
         (input.SourceKind == AlsAssetNotifySourceKind.Montage) == (mode == AlsAssetNotifyDispatchMode.ForceMontageOnly);
 
-    private static int AllocateNotifyInstance(ref int next)
+    internal static int AllocateNotifyInstance(ref int next)
     {
         // Matches the native int32 boundary, including its repeated zero at wrap.
         if (next == int.MaxValue) { next = 0; return 0; }

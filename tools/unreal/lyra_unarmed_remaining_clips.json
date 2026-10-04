@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "group": "remaining",
+  "sourceDirectory": "/Game/Characters/Heroes/Mannequin/Animations/Locomotion",
+  "clips": [
+    {"slot": "hipfire_crouch", "name": "MM_Pistol_Crouch_Idle", "subdirectory": "Pistol", "property": "Aim_HipFirePose_Crouch"},
+    {"slot": "turn_left", "name": "MM_Unarmed_TurnLeft_90", "property": "TurnInPlace_Left"},
+    {"slot": "turn_right", "name": "MM_Unarmed_TurnRight_90", "property": "TurnInPlace_Right"},
+    {"slot": "crouch_turn_left", "name": "MM_Unarmed_Crouch_TurnLeft_90", "property": "Crouch_TurnInPlace_Left"},
+    {"slot": "crouch_turn_right", "name": "MM_Unarmed_Crouch_TurnRight_90", "property": "Crouch_TurnInPlace_Right"},
+    {"slot": "walk_fwd_start", "name": "MM_Unarmed_Walk_Fwd_Start", "cardinal": "ADS_Start_Cardinals", "direction": "forward"},
+    {"slot": "walk_left_start", "name": "MM_Unarmed_Walk_Left_Start", "cardinal": "ADS_Start_Cardinals", "direction": "left"},
+    {"slot": "walk_right_start", "name": "MM_Unarmed_Walk_Right_Start", "cardinal": "ADS_Start_Cardinals", "direction": "right"},
+    {"slot": "walk_bwd_start", "name": "MM_Unarmed_Walk_Bwd_Start", "cardinal": "ADS_Start_Cardinals", "direction": "backward"},
+    {"slot": "walk_fwd_stop", "name": "MM_Unarmed_Walk_Fwd_Stop", "cardinal": "ADS_Stop_Cardinals", "direction": "forward"},
+    {"slot": "walk_left_stop", "name": "MM_Unarmed_Walk_Left_Stop", "cardinal": "ADS_Stop_Cardinals", "direction": "left"},
+    {"slot": "walk_right_stop", "name": "MM_Unarmed_Walk_Right_Stop", "cardinal": "ADS_Stop_Cardinals", "direction": "right"},
+    {"slot": "walk_bwd_stop", "name": "MM_Unarmed_Walk_Bwd_Stop", "cardinal": "ADS_Stop_Cardinals", "direction": "backward"},
+    {"slot": "walk_fwd_pivot", "name": "MM_Unarmed_Walk_Fwd_Pivot", "cardinal": "ADS_Pivot_Cardinals", "direction": "forward"},
+    {"slot": "walk_left_pivot", "name": "MM_Unarmed_Walk_Left_Pivot", "cardinal": "ADS_Pivot_Cardinals", "direction": "left"},
+    {"slot": "walk_right_pivot", "name": "MM_Unarmed_Walk_Right_Pivot", "cardinal": "ADS_Pivot_Cardinals", "direction": "right"},
+    {"slot": "walk_bwd_pivot", "name": "MM_Unarmed_Walk_Bwd_Pivot", "cardinal": "ADS_Pivot_Cardinals", "direction": "backward"}
+  ]
+}

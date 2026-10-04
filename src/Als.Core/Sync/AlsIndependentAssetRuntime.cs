@@ -76,8 +76,11 @@ public static partial class AlsSyncRuntime
         out AlsAssetPlayerHistory history, Span<AlsAssetSampleHistory> sampleHistory)
     {
         var previousIndex = FindAssetHistory(previousPlayers, player);
-        var record = previousIndex >= 0 ? previousPlayers[previousIndex].Marker : AlsAssetMarkerRecord.Invalid;
-        history = new(player.PlayerId, player.AssetId, player.Epoch, player.Time, 0, 0, record, player.SampleStart, player.SampleCount);
+        // A real source occurrence retains its marker storage even while it
+        // is hidden or reinitialized. Native Reset clears indices only.
+        var record = player.MarkerRecord ?? (previousIndex >= 0 ? previousPlayers[previousIndex].Marker : AlsAssetMarkerRecord.Invalid);
+        history = new(player.PlayerId, player.AssetId, player.Epoch, player.Time, 0, 0, record, player.SampleStart, player.SampleCount,
+            player.IsEvaluator && !player.Looping);
         for (var n = player.SampleStart; n < player.SampleStart + player.SampleCount; n++)
         {
             var sample = samples[n]; var sequence = sequences[sample.SequenceIndex];

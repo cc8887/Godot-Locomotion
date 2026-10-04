@@ -18,9 +18,7 @@ public sealed class AlsRawRootMotionSampler
         _data = data; _reference = rootReference; _normalizeScale = normalizeScale;
         _absoluteKeyCount = absoluteKeyCount ?? data.SampledKeyCount;
         if (_absoluteKeyCount < 0 || _absoluteKeyCount > data.SampledKeyCount) throw new ArgumentOutOfRangeException(nameof(absoluteKeyCount));
-        var inverseRotation = rootReference.Rotation.Conjugate();
-        var inverseScale = new AlsDoubleVector(Reciprocal(rootReference.Scale.X), Reciprocal(rootReference.Scale.Y), Reciprocal(rootReference.Scale.Z));
-        _rootToComponent = new((rootReference.Position * -1 * inverseScale).Rotate(inverseRotation), inverseRotation, inverseScale);
+        _rootToComponent = AlsPrecisePose.Inverse(rootReference);
     }
     public AlsPrecisePose Extract(double start, double end)
     {
@@ -33,7 +31,12 @@ public sealed class AlsRawRootMotionSampler
     // Absolute source root transform for ALS mantle warping. Unlike Extract,
     // this preserves authored scale and does not remove the reference/start pose.
     public AlsPrecisePose SampleAbsolute(double seconds)
+        => SampleAbsolute(seconds, AlsRawFrameTimeRounding.OptimizedCancellation);
+
+    public AlsPrecisePose SampleAbsolute(double seconds, AlsRawFrameTimeRounding rounding)
     {
+        if (rounding is not (AlsRawFrameTimeRounding.OptimizedCancellation or AlsRawFrameTimeRounding.RoundSubframe))
+            throw new ArgumentOutOfRangeException(nameof(rounding));
         if (!double.IsFinite(seconds)) throw new ArgumentOutOfRangeException(nameof(seconds));
         if (!_data.LogicalTrackPresence[0]) return _reference;
         // GetBoneTransform -> UAnimDataModel::EvaluateBoneTrackTransform is not
@@ -42,14 +45,20 @@ public sealed class AlsRawRootMotionSampler
         var frame = (seconds * _data.FrameRateNumerator) / _data.FrameRateDenominator;
         if (!double.IsFinite(frame) || frame < int.MinValue || frame >= int.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(seconds));
-        var first = (int)System.Math.Floor(frame);
-        var alpha = (float)(frame - first);
-        var carry = (int)alpha; first += carry; alpha -= carry;
-        if (alpha > 0) alpha = MathF.Min(alpha, .9999999403953552f);
+        var (first, alpha) = AlsAnimationFrameTime.FromFramePosition(frame, rounding);
         if (_data.Interpolation == AlsRawAnimationInterpolation.Step) alpha = MathF.Floor(alpha + .5f);
         if (MathF.Abs(alpha - 1) <= 1e-8f) return AbsoluteKey(first + 1);
         if (MathF.Abs(alpha) <= 1e-8f) return AbsoluteKey(first);
         return AlsPrecisePose.BlendTransform(AbsoluteKey(first), AbsoluteKey(first + 1), alpha);
+    }
+    // Provider intervals use the direct track entry, with its own time rounding.
+    // Keep Extract's existing clamped interval API for validated ALS consumers.
+    public AlsPrecisePose ExtractAbsoluteRange(double start, double end, AlsRawFrameTimeRounding rounding)
+    {
+        var first = SampleAbsolute(start, rounding); var last = SampleAbsolute(end, rounding);
+        if (_normalizeScale) { first = first with { Scale = AlsDoubleVector.One }; last = last with { Scale = AlsDoubleVector.One }; }
+        first = AlsPrecisePose.Compose(_rootToComponent, first); last = AlsPrecisePose.Compose(_rootToComponent, last);
+        return AlsPrecisePose.Relative(last, first);
     }
     private AlsPrecisePose AbsoluteKey(int index) => (uint)index < (uint)_absoluteKeyCount
         ? new(_data.GetPhysicalKey(index)[0]) : AlsPrecisePose.Identity;
@@ -63,5 +72,4 @@ public sealed class AlsRawRootMotionSampler
         var first = new AlsPrecisePose(_data.GetPhysicalKey(keys.FirstKey)[0]);
         return keys.Interpolate ? AlsPrecisePose.BlendTransform(first, new(_data.GetPhysicalKey(keys.SecondKey)[0]), keys.Alpha) : first;
     }
-    private static double Reciprocal(double value) => System.Math.Abs(value) <= 1e-8f ? 0 : 1 / value;
 }

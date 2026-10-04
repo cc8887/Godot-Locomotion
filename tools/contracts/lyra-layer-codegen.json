@@ -1,0 +1,6 @@
+{
+  "interfaceClass": "/Game/Characters/Heroes/Mannequin/Animations/LinkedLayers/ALI_ItemAnimLayers.ALI_ItemAnimLayers_C",
+  "namespace": "GodotAls.Animation.Lyra",
+  "prefix": "Lyra",
+  "poseInputType": "LyraLayerPoseInput"
+}

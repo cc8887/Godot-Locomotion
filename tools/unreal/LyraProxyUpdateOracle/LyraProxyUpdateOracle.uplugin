@@ -1,0 +1,1 @@
+{"FileVersion":3,"Version":1,"VersionName":"1.0","FriendlyName":"Lyra Whole Main Oracle","Installed":true,"CanContainContent":false,"Modules":[{"Name":"LyraProxyUpdateOracle","Type":"Editor","LoadingPhase":"Default","PlatformAllowList":["Win64"]}]}

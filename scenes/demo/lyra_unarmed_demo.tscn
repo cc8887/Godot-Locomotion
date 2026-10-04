@@ -1,0 +1,75 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/Als.Godot/Locomotion/LyraUnarmedDemo.cs" id="1_demo"]
+[ext_resource type="Script" path="res://src/Als.Godot/Locomotion/AlsOrbitCamera.cs" id="2_camera"]
+
+[sub_resource type="BoxShape3D" id="1_floor_shape"]
+size = Vector3(24, 0.3, 24)
+
+[sub_resource type="BoxMesh" id="2_floor_mesh"]
+size = Vector3(24, 0.3, 24)
+
+[sub_resource type="StandardMaterial3D" id="3_floor_material"]
+albedo_color = Color(0.28, 0.34, 0.32, 1)
+roughness = 0.9
+
+[sub_resource type="CapsuleShape3D" id="4_capsule"]
+radius = 0.33
+height = 1.8
+
+[sub_resource type="CapsuleShape3D" id="6_stand_shape"]
+radius = 0.33
+height = 1.8
+
+[sub_resource type="Environment" id="5_environment"]
+background_mode = 1
+background_color = Color(0.45, 0.54, 0.6, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.73, 0.76, 1)
+ambient_light_energy = 0.3
+
+[node name="LyraUnarmedDemo" type="Node3D"]
+script = ExtResource("1_demo")
+
+[node name="Floor" type="StaticBody3D" parent="."]
+position = Vector3(0, -0.15, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("1_floor_shape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("2_floor_mesh")
+surface_material_override/0 = SubResource("3_floor_material")
+
+[node name="Character" type="CharacterBody3D" parent="."]
+position = Vector3(0, 0.9, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Character"]
+shape = SubResource("4_capsule")
+
+[node name="GroundProbe" type="RayCast3D" parent="Character"]
+position = Vector3(0, -0.9, 0)
+target_position = Vector3(0, -5, 0)
+
+[node name="StandClearance" type="ShapeCast3D" parent="Character"]
+position = Vector3(0, 0.002, 0)
+shape = SubResource("6_stand_shape")
+target_position = Vector3(0, 0, 0)
+
+[node name="OrbitCamera" type="Node3D" parent="."]
+script = ExtResource("2_camera")
+
+[node name="SpringArm3D" type="SpringArm3D" parent="OrbitCamera"]
+spring_length = 4.2
+
+[node name="Camera3D" type="Camera3D" parent="OrbitCamera/SpringArm3D"]
+current = true
+fov = 60.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.65, 0.5, 0)
+light_energy = 0.6
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("5_environment")

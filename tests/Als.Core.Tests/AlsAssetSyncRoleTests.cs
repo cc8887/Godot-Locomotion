@@ -30,7 +30,36 @@ public sealed class AlsAssetSyncRoleTests
         var f = new Fixture(false);
         f.Players[0] = f.Players[0] with { Weight = MathF.BitIncrement(1) };
         f.Players[1] = f.Players[1] with { Weight = 1.25f };
-        f.Tick(); Assert.Equal(1, f.Group.LeaderPlayerId); Assert.Equal(1.25f, f.Group.LeaderScore);
+        for (var frame = 0; frame < 5; frame++) f.Tick();
+        Assert.Equal(1, f.Group.LeaderPlayerId); Assert.Equal(1.25f, f.Group.LeaderScore);
+    }
+
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void AlwaysLeaderUsesFixedNativeScoreAndIgnoresWeightTies(bool marked)
+    {
+        var f = new Fixture(marked);
+        f.Players[0] = f.Players[0] with { Role = AlsAssetSyncRole.AlwaysLeader, Weight = .001f };
+        f.Players[1] = f.Players[1] with { Weight = 1.25f };
+        for (var frame = 0; frame < 20; frame++)
+        { f.Tick(); Assert.Equal(0, f.Group.LeaderPlayerId); Assert.Equal(2, f.Group.LeaderScore); }
+        f.Players[1] = f.Players[1] with { Role = AlsAssetSyncRole.AlwaysLeader };
+        // UE's score-only small-array sort reverses this pair on a tie.
+        // A larger raw weight must not change their equal forced-leader scores.
+        for (var frame = 0; frame < 20; frame++)
+        { f.Tick(); Assert.Equal(1, f.Group.LeaderPlayerId); Assert.Equal(2, f.Group.LeaderScore); }
+    }
+
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void EvaluatorDoesNotResyncItsExplicitClockWhenAnInertiaScopeRejoins(bool evaluator)
+    {
+        var f = new Fixture(false);
+        f.Players[0] = f.Players[0] with { Role = AlsAssetSyncRole.AlwaysLeader };
+        f.Tick(); var ratio = f.Group.Ratio;
+        f.Players[0] = f.Players[0] with { Epoch = 2, Time = .7f, PlayRate = 0,
+            RequestedInertialization = true, IsEvaluator = evaluator };
+        f.Tick(); Assert.Equal(evaluator ? .35f : ratio, f.Group.PreviousRatio);
     }
 
     [Fact]
@@ -75,7 +104,7 @@ public sealed class AlsAssetSyncRoleTests
     }
 
     [Theory]
-    [InlineData(2)]
+    [InlineData(3)]
     [InlineData(255)]
     public void UnsupportedRoleRejectsWholeBatchWithoutPublishingEarlierGroup(int role)
     {
@@ -96,7 +125,7 @@ public sealed class AlsAssetSyncRoleTests
     public void MixedRolesKeepHotTickAllocationFree()
     {
         var f = new Fixture(true);
-        f.Players[0] = f.Players[0] with { Role = AlsAssetSyncRole.AlwaysFollower };
+        f.Players[0] = f.Players[0] with { Role = AlsAssetSyncRole.AlwaysLeader, IsEvaluator = true };
         for (var i = 0; i < 100; i++) f.Tick();
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < 1000; i++) f.Tick();

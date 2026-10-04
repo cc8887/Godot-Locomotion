@@ -1,0 +1,1 @@
+{"FileVersion":3,"Version":1,"VersionName":"1.0","FriendlyName":"Lyra Layer Fallback Oracle","Installed":true,"CanContainContent":false,"Modules":[{"Name":"LyraWholeMainOracle","Type":"Editor","LoadingPhase":"Default","PlatformAllowList":["Win64"]}],"Plugins":[{"Name":"AnimationWarping","Enabled":true}]}

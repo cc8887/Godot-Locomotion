@@ -8,6 +8,14 @@ param(
 
     [string]$Output = '',
 
+    [string]$BuildScript = (Join-Path $PSScriptRoot 'build-als-exporter.ps1'),
+
+    [string]$ReadyMarker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0',
+
+    [string]$CommandletName = 'AlsGodotExport',
+
+    [string]$AssetLockPath = '',
+
     [switch]$UpdateAssetLock
 )
 
@@ -30,8 +38,11 @@ $outputPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoo
     -Path (Join-Path $publicationPath 'canonical-candidate') -Label 'CandidateRoot'
 $determinismPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path (Join-Path $artifactsPath 'p2a-determinism\als_v4') -Label 'DeterminismRoot'
+if ([string]::IsNullOrWhiteSpace($AssetLockPath)) {
+    $AssetLockPath = Join-Path $repositoryRoot 'reference\als-v4-export.lock.json'
+}
 $assetLockPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
-    -Path (Join-Path $repositoryRoot 'reference\als-v4-export.lock.json') -Label 'LockPath'
+    -Path ([IO.Path]::GetFullPath($AssetLockPath)) -Label 'LockPath'
 $lockCandidatePath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path (Join-Path $publicationPath 'als-v4-export.lock.candidate.json') -Label 'LockCandidatePath'
 $canonicalBackupPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
@@ -97,21 +108,20 @@ function Assert-P2AV2Manifest {
     }
 }
 
-$buildScript = Join-Path $PSScriptRoot 'build-als-exporter.ps1'
-if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
-    throw "Build script does not exist: $buildScript"
+$resolvedBuildScript = [IO.Path]::GetFullPath($BuildScript)
+if (-not (Test-Path -LiteralPath $resolvedBuildScript -PathType Leaf)) {
+    throw "Build script does not exist: $resolvedBuildScript"
 }
 
 Write-Host 'P2A: building the exporter and running its UE ready check...'
-$outputLines = & $buildScript -EngineRoot $EngineRoot -UnrealProject $UnrealProject 2>&1
+$outputLines = & $resolvedBuildScript -EngineRoot $EngineRoot -UnrealProject $UnrealProject 2>&1
 $outputLines | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A build gate failed with exit code $LASTEXITCODE."
 }
 
-$marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'
-if (-not (($outputLines | Out-String).Contains($marker, [StringComparison]::Ordinal))) {
-    throw "P2A ready marker was not found: $marker"
+if (-not (($outputLines | Out-String).Contains($ReadyMarker, [StringComparison]::Ordinal))) {
+    throw "P2A ready marker was not found: $ReadyMarker"
 }
 
 Write-Host 'GODOT_ALS_P2A_READY'
@@ -128,7 +138,7 @@ $editorCommand = Join-Path ([IO.Path]::GetFullPath($EngineRoot)) 'Engine\Binarie
 $projectHashBefore = (Get-FileHash -LiteralPath $UnrealProject -Algorithm SHA256).Hash
 
 Write-Host 'P2A: checking the export plan and metadata...'
-$dryRunOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -DryRun "-Output=$outputPath" -unattended -nop4 -nosplash -nullrhi -nosound 2>&1
+$dryRunOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -DryRun "-Output=$outputPath" -unattended -nop4 -nosplash -nullrhi -nosound 2>&1
 $dryRunOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A dry-run failed with exit code $LASTEXITCODE."
@@ -260,7 +270,7 @@ if ($manifest.auditSummary.status -cne 'planned') {
 Write-Host 'GODOT_ALS_P2A_METADATA_OK'
 
 Write-Host 'P2A: exporting assets and checking file hashes...'
-$exportOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export "-Output=$outputPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
+$exportOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -Export "-Output=$outputPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
 $exportOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A full export failed with exit code $LASTEXITCODE."
@@ -304,7 +314,7 @@ if (@($formalManifest.files).Count -ne $plan.summary.exportableCount) {
 Write-Host "GODOT_ALS_P2A_FULL_EXPORT_OK files=$(@($formalManifest.files).Count)"
 
 Write-Host 'P2A: repeating the export to verify deterministic output...'
-$determinismOutput = & $editorCommand $UnrealProject -run=AlsGodotExport -Export "-Output=$determinismPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
+$determinismOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -Export "-Output=$determinismPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
 $determinismOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A determinism export failed with exit code $LASTEXITCODE."

@@ -264,8 +264,8 @@ public sealed partial class AlsInertialization
             {
                 var old = older * input[bone].Conjugate();
                 var oldAngle = 2 * System.Math.Atan2(x * old.X + y * old.Y + z * old.Z, old.W);
-                while (oldAngle > System.Math.PI) oldAngle -= 2 * System.Math.PI;
-                while (oldAngle < -System.Math.PI) oldAngle += 2 * System.Math.PI;
+                while (oldAngle > MathF.PI) oldAngle -= (double)(2 * MathF.PI);
+                while (oldAngle < -MathF.PI) oldAngle += (double)(2 * MathF.PI);
                 speed = Unwind(angle - (float)oldAngle) / _historyDelta;
             }
             _bones[bone] = _bones[bone] with { Rotation = new(new((float)x, (float)y, (float)z), angle, speed) };

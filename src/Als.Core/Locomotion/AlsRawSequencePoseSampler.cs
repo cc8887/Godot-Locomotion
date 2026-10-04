@@ -7,13 +7,16 @@ namespace GodotAls.Core.Locomotion;
 public readonly record struct AlsRawPoseKeySelection(int FirstKey, int SecondKey, float Alpha,
     bool Interpolate, double SampleTimeSeconds);
 
+// Captured engine builds differ in whether the inline FFrameTime constructor's
+// (Subframe + .5f) - .5f cancellation is optimized away.
+public enum AlsRawFrameTimeRounding { OptimizedCancellation, RoundSubframe }
+
 /// <summary>Exclusive per-owner raw sequence sampler. Shared data is immutable; all scratch
 /// belongs to this instance. Time selects a pose only: looping and time advancement belong
 /// to the source player. Output is before retargeting, root lock and additive conversion.</summary>
 public sealed class AlsRawSequencePoseSampler
 {
     private const float KeySnapThreshold = 1e-4f;
-    private const float MaxSubframe = .999999940395355224609375f;
     private readonly AlsLogicalPoseExpansion _expansion;
     private readonly AlsLocalPose[] _physicalReference, _physicalKey, _first, _second, _components;
     private int _sampling;
@@ -74,18 +77,21 @@ public sealed class AlsRawSequencePoseSampler
     /// <summary>Matches GetBonePose's seconds entry, FEvaluationContext's frame-time
     /// round trip, then GetKeyIndicesFromTime and AnimDataModel's interpolation gates.
     /// Negative times select the first key; times past the end select the last without wrapping.</summary>
-    public static AlsRawPoseKeySelection SelectKeys(AlsRawAnimationPoseData data, double seconds)
+    public static AlsRawPoseKeySelection SelectKeys(AlsRawAnimationPoseData data, double seconds,
+        AlsRawFrameTimeRounding rounding = AlsRawFrameTimeRounding.OptimizedCancellation)
     {
         ArgumentNullException.ThrowIfNull(data);
         if (!double.IsFinite(seconds)) throw new ArgumentOutOfRangeException(nameof(seconds));
+        if (rounding is not (AlsRawFrameTimeRounding.OptimizedCancellation or AlsRawFrameTimeRounding.RoundSubframe))
+            throw new ArgumentOutOfRangeException(nameof(rounding));
         var numerator = data.FrameRateNumerator; var denominator = data.FrameRateDenominator;
         var framePosition = (seconds * numerator) / denominator;
         if (!double.IsFinite(framePosition))
             throw new ArgumentOutOfRangeException(nameof(seconds), "Raw sample time overflows the native frame-time conversion.");
-        var contextTime = AsFrameTime(framePosition);
+        var contextTime = AsFrameTime(framePosition, rounding);
         var sampleSeconds = ((long)contextTime.Frame * denominator + contextTime.Subframe * (double)denominator) / numerator;
         if (sampleSeconds <= 0 || data.SampledKeyCount == 1) return new(0, 0, 0, false, sampleSeconds);
-        var keyTime = AsFrameTime((sampleSeconds * numerator) / denominator);
+        var keyTime = AsFrameTime((sampleSeconds * numerator) / denominator, rounding);
         if (keyTime.Frame >= data.SampledKeyCount - 1)
             return new(data.SampledKeyCount - 1, 0, 0, false, sampleSeconds);
         var first = ScalarMath.Clamp(keyTime.Frame, 0, data.SampledKeyCount - 1);
@@ -96,21 +102,8 @@ public sealed class AlsRawSequencePoseSampler
         return new(first, second, alpha, true, sampleSeconds);
     }
 
-    private static (int Frame, float Subframe) AsFrameTime(double framePosition)
-    {
-        var floor = ScalarMath.Floor(framePosition);
-        var frame = (int)ScalarMath.Clamp(floor, int.MinValue, int.MaxValue);
-        var subframe = (float)(framePosition - floor);
-        var carry = (int)subframe;
-        subframe -= carry; frame = unchecked(frame + carry);
-        if (subframe > 0) subframe = MathF.Min(subframe, MaxSubframe);
-        // FFrameTime's header writes (Subframe + .5f) - .5f, but this native UE/MSVC
-        // build uses /fp:fast and folds that cancellation. The exported selector oracle
-        // preserves the original binary32 subframe; imposing C#'s two rounded adds here
-        // would introduce a second quantization that the running engine does not perform.
-        subframe = ScalarMath.Clamp(subframe, 0, MaxSubframe);
-        return (frame, subframe);
-    }
+    private static (int Frame, float Subframe) AsFrameTime(double framePosition, AlsRawFrameTimeRounding rounding)
+        => AlsAnimationFrameTime.FromFramePosition(framePosition, rounding);
 
     /// <summary>UE's vectorized FTransform::Blend for alpha in [0,1]. Linear translation
     /// and scale; shortest-path quaternion lerp followed by normalization. Negative dot

@@ -1,0 +1,1 @@
+{"FileVersion":3,"Version":1,"VersionName":"1.0.0","FriendlyName":"Lyra Gameplay Notify Oracle","CanContainContent":false,"Installed":true,"Plugins":[{"Name":"GameplayAbilities","Enabled":true}],"Modules":[{"Name":"LyraGameplayNotifyOracle","Type":"Editor","LoadingPhase":"Default","PlatformAllowList":["Win64"]}]}

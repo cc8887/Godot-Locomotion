@@ -1,0 +1,16 @@
+{
+  "FullBody_Aiming": 0,
+  "FullBody_CycleState": 1,
+  "FullBody_FallLandState": 2,
+  "FullBody_FallLoopState": 3,
+  "FullBody_IdleState": 4,
+  "FullBody_JumpApexState": 5,
+  "FullBody_JumpStartLoopState": 6,
+  "FullBody_JumpStartState": 7,
+  "FullBody_PivotState": 8,
+  "FullBody_SkeletalControls": 9,
+  "FullBody_StartState": 10,
+  "FullBody_StopState": 11,
+  "FullBodyAdditives": 12,
+  "LeftHandPose_OverrideState": 13
+}

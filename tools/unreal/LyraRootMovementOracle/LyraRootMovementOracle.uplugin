@@ -1,0 +1,1 @@
+{"FileVersion":3,"Version":1,"VersionName":"1","FriendlyName":"Lyra Root Movement Oracle","CanContainContent":false,"Installed":true,"Modules":[{"Name":"LyraRootMovementOracle","Type":"Editor","LoadingPhase":"Default","PlatformAllowList":["Win64"]}]}

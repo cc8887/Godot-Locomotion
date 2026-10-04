@@ -1,0 +1,24 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "ALS V4 Asset Exporter",
+  "Description": "Exports Blueprint ALS V4 assets and metadata for Godot.",
+  "Category": "Editor",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Installed": false,
+  "Plugins": [
+    { "Name": "IKRig", "Enabled": true },
+    { "Name": "AnimationWarping", "Enabled": true },
+    { "Name": "ControlRig", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "AlsV4AssetExporter",
+      "Type": "Editor",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": ["Win64"]
+    }
+  ]
+}

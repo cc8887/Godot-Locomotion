@@ -542,8 +542,13 @@ public static class AlsAnimationLibraryBuilder
         for (var trackIndex = 0; trackIndex < animation.GetTrackCount(); trackIndex++)
         {
             var keyCount = animation.TrackGetKeyCount(trackIndex);
-            if (keyCount == 0 ||
-                animation.TrackGetKeyTime(trackIndex, keyCount - 1) <= animation.Length)
+            if (keyCount == 0)
+            {
+                continue;
+            }
+            var lastKeyTime = animation.TrackGetKeyTime(trackIndex, keyCount - 1);
+            if (lastKeyTime <= animation.Length &&
+                lastKeyTime >= animation.Length - 1e-8)
             {
                 continue;
             }

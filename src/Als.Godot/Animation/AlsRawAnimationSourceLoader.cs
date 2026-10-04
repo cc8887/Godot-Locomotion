@@ -1,9 +1,13 @@
+using System.Text.Json;
 using GodotAls.Import.Compilation;
 
 namespace GodotAls.Animation;
 
 internal static class AlsRawAnimationSourceLoader
 {
+    private const string ConfigDirectory = "res://assets/config/";
+    private const string GeneratedDirectory = "res://assets/generated/als_v4_raw/";
+
     public static int[] CollectRoots(AlsAnimationSetDefinition set, AlsMovementGraphDefinition definition)
     {
         var graph = definition.Binding.CreateGraphBuildView();
@@ -21,28 +25,44 @@ internal static class AlsRawAnimationSourceLoader
     public static AlsRawAnimationSourceBank Load(AlsAnimationSetDefinition set, AlsMovementGraphDefinition definition)
     {
         var source = definition.Sources.CreateCoreView();
-        return AlsRawAnimationSourceCompiler.Compile(
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_recovery_movement_source_inputs.json"), set,
+        return Compile("v4_recovery_movement_source_inputs.json", set,
             definition.Binding.CreateCoreView().Digest.ToString("X16"), source.Players.Length, source.Samples.Length,
-            CollectRoots(set, definition), relative => Godot.FileAccess.GetFileAsBytes("res://assets/config/" + relative));
+            CollectRoots(set, definition));
     }
 
     public static AlsRawAnimationSourceBank LoadAim(AlsAnimationSetDefinition set, AlsAimSamplingProfile profile) =>
-        AlsRawAnimationSourceCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_aim_source_inputs.json"),
+        Compile("v4_aim_source_inputs.json",
             set, profile.BindingDigest, AlsAimSamplingProfile.PlayerCount, AlsAimSamplingProfile.SampleCount,
-            profile.AnimationIds, relative => Godot.FileAccess.GetFileAsBytes("res://assets/config/" + relative));
+            profile.AnimationIds);
 
     public static AlsRawAnimationSourceBank LoadRagdoll(AlsAnimationSetDefinition set, AlsRagdollPoseProfile profile) =>
-        AlsRawAnimationSourceCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_ragdoll_source_inputs.json"),
-            set, profile.BindingDigest, 1, 1, [profile.AnimationId], relative => Godot.FileAccess.GetFileAsBytes("res://assets/config/" + relative));
+        Compile("v4_ragdoll_source_inputs.json", set, profile.BindingDigest, 1, 1, [profile.AnimationId]);
 
     public static AlsRawAnimationSourceBank LoadOverlay(AlsAnimationSetDefinition set, AlsOverlaySourceProfile profile) =>
-        AlsRawAnimationSourceCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_overlay_source_inputs.json"),
+        Compile("v4_overlay_source_inputs.json",
             set, profile.BindingDigest, AlsOverlaySourceProfile.PlayerCount, AlsOverlaySourceProfile.PlayerCount,
-            profile.AnimationIds, relative => Godot.FileAccess.GetFileAsBytes("res://assets/config/" + relative));
+            profile.AnimationIds);
 
     public static AlsRawAnimationSourceBank LoadStop(AlsAnimationSetDefinition set, GodotAls.Core.Locomotion.AlsStopTransitionDefinition definition) =>
-        AlsRawAnimationSourceCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_stop_source_inputs.json"),
-            set, definition.BindingDigest, 2, 2, definition.Bindings.ToArray().Select(b => b.AnimationId).ToArray(),
-            relative => Godot.FileAccess.GetFileAsBytes("res://assets/config/" + relative));
+        Compile("v4_stop_source_inputs.json", set, definition.BindingDigest, 2, 2,
+            definition.Bindings.ToArray().Select(b => b.AnimationId).ToArray());
+
+    public static AlsRawAnimationSourceBank LoadProp(AlsAnimationSetDefinition set, AlsOverlayPropProfile profile) =>
+        Compile("v4_overlay_prop_source_inputs.json", set, profile.Digest, 1, 1, [profile.BowAnimationId]);
+
+    private static AlsRawAnimationSourceBank Compile(string indexName, AlsAnimationSetDefinition set,
+        string bindingDigest, int playerCount, int sampleCount, ReadOnlySpan<int> rootAnimationIds)
+    {
+        var directory = ConfigDirectory;
+        var generatedIndex = GeneratedDirectory + indexName;
+        if (Godot.FileAccess.FileExists(generatedIndex))
+        {
+            using var candidate = JsonDocument.Parse(Godot.FileAccess.GetFileAsString(generatedIndex));
+            if (candidate.RootElement.GetProperty("request").GetProperty("definitionDigest").GetString() == set.DefinitionDigest)
+                directory = GeneratedDirectory;
+        }
+        return AlsRawAnimationSourceCompiler.Compile(Godot.FileAccess.GetFileAsString(directory + indexName), set,
+            bindingDigest, playerCount, sampleCount, rootAnimationIds,
+            relative => Godot.FileAccess.GetFileAsBytes(directory + relative));
+    }
 }

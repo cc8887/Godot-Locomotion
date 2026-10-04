@@ -38,10 +38,16 @@ public partial class RawAnimationSourceSmoke : Node
             .Append("__not_authored__").Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToArray();
         var aimSampler = aim && EvaluateAdditive ? new AlsAimAnimationSourceSampler(definition.AimSampling, bank, set, names) : null;
         var aimPose = new AlsLocalPose[79]; var aimCurves = new AlsInertialCurve[names.Length]; var aimVerified = 0;
-        using var oracle = JsonDocument.Parse(Read(ragdoll ? "tests/Als.Import.Tests/Fixtures/Ragdoll/native_source_poses.json" : "tests/Als.Core.Tests/Fixtures/P3/" +
-            (overlay ? EvaluateAdditive ? "v4_overlay_additive_source_pose_native.json" : "v4_overlay_source_pose_native.json" :
-                aim ? EvaluateAdditive ? "v4_aim_additive_source_pose_native.json" : "v4_aim_source_pose_native.json" :
-                EvaluateAdditive ? "v4_additive_source_pose_native.json" : "v4_movement_source_pose_native.json")));
+        var oracleOverride = System.Environment.GetEnvironmentVariable("ALS_RAW_SOURCE_ORACLE_PATH");
+        if (oracleOverride is not null && !Path.IsPathFullyQualified(oracleOverride))
+            throw new ArgumentException("ALS_RAW_SOURCE_ORACLE_PATH must be absolute.");
+        var oracleJson = oracleOverride is null
+            ? Read(ragdoll ? "tests/Als.Import.Tests/Fixtures/Ragdoll/native_source_poses.json" : "tests/Als.Core.Tests/Fixtures/P3/" +
+                (overlay ? EvaluateAdditive ? "v4_overlay_additive_source_pose_native.json" : "v4_overlay_source_pose_native.json" :
+                    aim ? EvaluateAdditive ? "v4_aim_additive_source_pose_native.json" : "v4_aim_source_pose_native.json" :
+                    EvaluateAdditive ? "v4_additive_source_pose_native.json" : "v4_movement_source_pose_native.json"))
+            : File.ReadAllText(oracleOverride);
+        using var oracle = JsonDocument.Parse(oracleJson);
         if (EvaluateAdditive)
             Require(oracle.RootElement.GetProperty("sourceIndexSha256").GetString()!.Equals(
                 Convert.ToHexString(SHA256.HashData(Godot.FileAccess.GetFileAsBytes("res://assets/config/" +

@@ -24,10 +24,14 @@ public partial class RawSequenceSourceRequest : Node
             var core = definition.Binding.CreateCoreView();
             var ids = AlsRawAnimationSourceLoader.CollectRoots(set, definition);
             var source = definition.Sources.CreateCoreView();
-            var aim = OS.GetCmdlineUserArgs().Contains("--aim-source");
-            var overlay = OS.GetCmdlineUserArgs().Contains("--overlay-source");
-            var stop = OS.GetCmdlineUserArgs().Contains("--stop-source");
-            if ((aim ? 1 : 0) + (overlay ? 1 : 0) + (stop ? 1 : 0) > 1) throw new ArgumentException("Choose one source closure.");
+            var arguments = OS.GetCmdlineUserArgs();
+            var aim = arguments.Contains("--aim-source");
+            var overlay = arguments.Contains("--overlay-source");
+            var stop = arguments.Contains("--stop-source");
+            var ragdoll = arguments.Contains("--ragdoll-source");
+            var prop = arguments.Contains("--prop-source");
+            if ((aim ? 1 : 0) + (overlay ? 1 : 0) + (stop ? 1 : 0) + (ragdoll ? 1 : 0) + (prop ? 1 : 0) > 1)
+                throw new ArgumentException("Choose one source closure.");
             var stopProfile = stop ? AlsStopTransitionCompiler.Compile(
                 Godot.FileAccess.GetFileAsString("res://assets/config/v4_overlay_transition_inputs.json"), set,
                 AlsGroundedMachineCompiler.CompileGrounded(Godot.FileAccess.GetFileAsString("res://assets/config/v4_grounded_dependencies.json"))) : null;
@@ -36,15 +40,23 @@ public partial class RawSequenceSourceRequest : Node
                 Godot.FileAccess.GetFileAsString("res://assets/config/v4_overlay_inputs.json"), set) : null;
             var aimProfile = aim ? AlsAimSamplingCompiler.Compile(Godot.FileAccess.GetFileAsString(
                 "res://assets/config/v4_aim_sampling.json"), definition.AimPose, set) : null;
+            var propProfile = prop ? AlsOverlayPropCompiler.Compile(Godot.FileAccess.GetFileAsString(
+                "res://assets/config/v4_overlay_props_inputs.json"), set,
+                set.SkeletalMeshes[definition.MannequinMeshId].SkeletonId) : null;
             if (aimProfile is not null) ids = aimProfile.AnimationIds.ToArray();
             if (overlayProfile is not null) ids = overlayProfile.AnimationIds.ToArray();
             if (stopProfile is not null) ids = stopProfile.Bindings.ToArray().Select(b => b.AnimationId).ToArray();
-            var players = stop ? 2 : overlay ? AlsOverlaySourceProfile.PlayerCount : aim ? AlsAimSamplingProfile.PlayerCount : source.Players.Length;
-            var samples = stop ? 2 : overlay ? AlsOverlaySourceProfile.PlayerCount : aim ? AlsAimSamplingProfile.SampleCount : source.Samples.Length;
+            if (ragdoll) ids = [definition.RagdollPose.AnimationId];
+            if (propProfile is not null) ids = [propProfile.BowAnimationId];
+            var players = stop ? 2 : overlay ? AlsOverlaySourceProfile.PlayerCount : aim ? AlsAimSamplingProfile.PlayerCount :
+                ragdoll || prop ? 1 : source.Players.Length;
+            var samples = stop ? 2 : overlay ? AlsOverlaySourceProfile.PlayerCount : aim ? AlsAimSamplingProfile.SampleCount :
+                ragdoll || prop ? 1 : source.Samples.Length;
             var request = new
             {
                 definitionDigest = set.DefinitionDigest,
-                bindingDigest = stopProfile?.BindingDigest ?? overlayProfile?.BindingDigest ?? aimProfile?.BindingDigest ?? core.Digest.ToString("X16"),
+                bindingDigest = propProfile?.Digest ?? (ragdoll ? definition.RagdollPose.BindingDigest : null) ??
+                    stopProfile?.BindingDigest ?? overlayProfile?.BindingDigest ?? aimProfile?.BindingDigest ?? core.Digest.ToString("X16"),
                 players,
                 samples,
                 rootAssets = ids.Select(id => set.Animations[id]).OrderBy(a => a.StableId, StringComparer.Ordinal)
@@ -52,7 +64,7 @@ public partial class RawSequenceSourceRequest : Node
             };
             Directory.CreateDirectory(Path.GetDirectoryName(output)!);
             File.WriteAllText(output, JsonSerializer.Serialize(request, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            GD.Print($"RAW_SOURCE_REQUEST_OK aim={aim} overlay={overlay} stop={stop} roots={ids.Length} players={players} samples={samples} additive_dependencies=resolve_in_ue output={output}");
+            GD.Print($"RAW_SOURCE_REQUEST_OK aim={aim} overlay={overlay} stop={stop} ragdoll={ragdoll} prop={prop} roots={ids.Length} players={players} samples={samples} additive_dependencies=resolve_in_ue output={output}");
             GetTree().Quit();
         }
         catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }

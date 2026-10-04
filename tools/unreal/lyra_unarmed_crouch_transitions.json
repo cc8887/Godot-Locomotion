@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "group": "crouch_transitions",
+  "sourceDirectory": "/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Unarmed",
+  "clips": [
+    { "slot": "crouch_start_fwd", "name": "MM_Unarmed_Crouch_Walk_Fwd_Start", "cardinal": "Crouch_Start_Cardinals", "direction": "forward" },
+    { "slot": "crouch_start_left", "name": "MM_Unarmed_Crouch_Walk_Left_Start", "cardinal": "Crouch_Start_Cardinals", "direction": "left" },
+    { "slot": "crouch_start_right", "name": "MM_Unarmed_Crouch_Walk_Right_Start", "cardinal": "Crouch_Start_Cardinals", "direction": "right" },
+    { "slot": "crouch_start_bwd", "name": "MM_Unarmed_Crouch_Walk_Bwd_Start", "cardinal": "Crouch_Start_Cardinals", "direction": "backward" },
+    { "slot": "crouch_stop_fwd", "name": "MM_Unarmed_Crouch_Walk_Fwd_Stop", "cardinal": "Crouch_Stop_Cardinals", "direction": "forward" },
+    { "slot": "crouch_stop_left", "name": "MM_Unarmed_Crouch_Walk_Left_Stop", "cardinal": "Crouch_Stop_Cardinals", "direction": "left" },
+    { "slot": "crouch_stop_right", "name": "MM_Unarmed_Crouch_Walk_Right_Stop", "cardinal": "Crouch_Stop_Cardinals", "direction": "right" },
+    { "slot": "crouch_stop_bwd", "name": "MM_Unarmed_Crouch_Walk_Bwd_Stop", "cardinal": "Crouch_Stop_Cardinals", "direction": "backward" },
+    { "slot": "crouch_pivot_fwd", "name": "MM_Unarmed_Crouch_Walk_Fwd_Pivot", "cardinal": "Crouch_Pivot_Cardinals", "direction": "forward" },
+    { "slot": "crouch_pivot_left", "name": "MM_Unarmed_Crouch_Walk_Left_Pivot", "cardinal": "Crouch_Pivot_Cardinals", "direction": "left" },
+    { "slot": "crouch_pivot_right", "name": "MM_Unarmed_Crouch_Walk_Right_Pivot", "cardinal": "Crouch_Pivot_Cardinals", "direction": "right" },
+    { "slot": "crouch_pivot_bwd", "name": "MM_Unarmed_Crouch_Walk_Bwd_Pivot", "cardinal": "Crouch_Pivot_Cardinals", "direction": "backward" }
+  ]
+}

@@ -9,6 +9,19 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsAssetNotifyWindowTests
 {
     [Fact]
+    public void MontagePositionsPreserveTheProvidedReverseEndpoint()
+    {
+        var previous=.8f;var current=.1f;var time=MathF.BitIncrement(current);
+        var definitions=new[]{new AlsAssetNotifyDefinition(7,time,time)};
+        var output=new AlsAssetNotifyOccurrence[1];
+        Assert.True(previous+(current-previous)>time);
+        Assert.True(AlsTimelineRuntime.TryExtractAssetNotifiesFromPositions(definitions,previous,current,output,out var count,out var failure));
+        Assert.Equal(AlsP5FailureCode.None,failure);Assert.Equal(1,count);Assert.Equal(new(7,0,true),output[0]);
+        Assert.True(AlsTimelineRuntime.TryExtractAssetNotifies(definitions,1,previous,current-previous,false,output,out count,out failure));
+        Assert.Equal(0,count);
+    }
+
+    [Fact]
     public void WindowContractsAreSequentialUnmanagedValues()
     {
         Assert.Equal(System.Runtime.InteropServices.LayoutKind.Sequential, typeof(AlsAssetNotifyDefinition).StructLayoutAttribute!.Value);

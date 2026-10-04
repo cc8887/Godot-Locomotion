@@ -1444,19 +1444,20 @@ public sealed class AlsComponentPoseModifier : IDisposable
         var from = fromValue / fromLength;
         var to = toValue / toLength;
         var dot = Math.Clamp(from.Dot(to), -1f, 1f);
-        var angle = MathF.Min(MathF.Acos(dot), maximumAngle);
+        var axis = from.Cross(to);
+        var axisLength = axis.Length();
+        var angle = MathF.Min(MathF.Atan2(axisLength, dot), maximumAngle);
         if (angle <= 1e-6f)
         {
             return true;
         }
-        var axis = from.Cross(to);
-        if (axis.LengthSquared() <= 1e-10f)
+        if (axisLength <= 1e-5f && dot < 0f)
         {
             axis = DeterministicPerpendicular(from);
         }
         else
         {
-            axis = axis.Normalized();
+            axis /= axisLength;
         }
         swing = new Quaternion(axis, angle).Normalized();
         return IsFinite(swing);
@@ -2259,7 +2260,9 @@ public sealed class AlsComponentPoseModifier : IDisposable
         if (times[0] > 1e-8 || times[^1] < animation.Length - 1e-8)
         {
             throw new InvalidOperationException(
-                $"P4 Aim managed sampler track does not cover the clip domain: track={trackIndex}");
+                $"P4 Aim managed sampler track does not cover the clip domain: " +
+                $"animation={animation.ResourceName} track={trackIndex} keys={times.Length} " +
+                $"first={times[0]:R} last={times[^1]:R} length={animation.Length:R}");
         }
     }
 

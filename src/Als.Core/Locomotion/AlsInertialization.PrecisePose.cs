@@ -107,8 +107,10 @@ public sealed partial class AlsInertialization
             {
                 var old = older.Rotation * input[b].Rotation.Conjugate();
                 var oldAngle = 2 * ScalarMath.Atan2(axis.X * old.X + axis.Y * old.Y + axis.Z * old.Z, old.W);
-                while (oldAngle > ScalarMath.PI) oldAngle -= 2 * ScalarMath.PI;
-                while (oldAngle < -ScalarMath.PI) oldAngle += 2 * ScalarMath.PI;
+                // UE GetTwistAngle<double> calls UnwindRadians<double>, whose
+                // PI/TWO_PI macros are float constants promoted to double.
+                while (oldAngle > MathF.PI) oldAngle -= (double)(2 * MathF.PI);
+                while (oldAngle < -MathF.PI) oldAngle += (double)(2 * MathF.PI);
                 speed = Unwind(angle - (float)oldAngle) / _historyDelta;
             }
             _bones[b] = new(FullVectorDifference((latest.Position - input[b].Position) * (1d / _unitsPerCentimeter),

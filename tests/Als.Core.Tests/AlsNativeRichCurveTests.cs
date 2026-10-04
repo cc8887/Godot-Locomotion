@@ -5,6 +5,22 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsNativeRichCurveTests
 {
     [Fact]
+    public void LyraSourceModelRetainsItsNativeNestedLerpBoundary()
+    {
+        // RAW GetBonePose trace: jump_fall_land/DisableLegIK at 35/120 s.
+        // This one-ULP difference requires an explicit extraction profile;
+        // changing the existing ALS default would alter verified playback rates.
+        AlsCurveKey[] keys = [
+            new(.2666666805744171f, 1, 0, 0, AlsCurveInterpolationMode.Cubic),
+            new(.4000000059604645f, 0, 0, 0, AlsCurveInterpolationMode.Cubic)];
+        var curve = new AlsNativeRichCurve(keys, AlsNativeBezierEvaluation.NestedLerp);
+        Assert.Equal(BitConverter.SingleToInt32Bits(.907715f),
+            BitConverter.SingleToInt32Bits(curve.Sample((float)(35d / 120))));
+        Assert.Equal(.90771496f, new AlsNativeRichCurve(keys).Sample((float)(35d / 120)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new AlsNativeRichCurve(keys, (AlsNativeBezierEvaluation)99));
+    }
+
+    [Fact]
     public void RunningStrideRetainsNativeValueBeforeItBecomesAPlaybackRate()
     {
         // Original Run stride keys; the Standing native trace records this

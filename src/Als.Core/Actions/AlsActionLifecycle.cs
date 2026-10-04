@@ -135,7 +135,7 @@ internal static class AlsActionLifecycle
             (state.DesiredWeight - state.BeginWeight) * Shape(state.Alpha, option);
     }
 
-    private static float Shape(float alpha, AlsActionBlendOption option)
+    internal static float Shape(float alpha, AlsActionBlendOption option)
     {
         var alpha2 = alpha * alpha;
         var value = option switch

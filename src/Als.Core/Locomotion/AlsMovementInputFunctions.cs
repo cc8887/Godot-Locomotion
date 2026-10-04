@@ -38,16 +38,10 @@ public sealed class AlsMovementInputFunctions
     public static Vector2 InterpolateLean(Vector2 current, Vector2 target, float delta, float interpSpeed)
     {
         Finite(current.X); Finite(current.Y); Finite(target.X); Finite(target.Y); Finite(delta); Finite(interpSpeed);
-        return new(Interpolate(current.X, target.X, delta, interpSpeed), Interpolate(current.Y, target.Y, delta, interpSpeed));
+        return new((float)GodotAls.Core.Math.AlsMath.InterpolateTo(current.X, target.X, delta, interpSpeed),
+            (float)GodotAls.Core.Math.AlsMath.InterpolateTo(current.Y, target.Y, delta, interpSpeed));
     }
 
-    private static float Interpolate(double current, double target, double delta, double speed)
-    {
-        if (speed <= 0) return (float)target;
-        var distance = target - current;
-        if (distance * distance < 1e-8f) return (float)target;
-        return (float)(current + distance * System.Math.Clamp(delta * speed, 0, 1));
-    }
     private static double Divide(double numerator, double denominator) => denominator == 0 ? 0 : numerator / denominator;
     private static void Finite(float value)
     { if (!float.IsFinite(value)) throw new ArgumentOutOfRangeException(nameof(value)); }

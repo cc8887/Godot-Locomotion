@@ -15,6 +15,13 @@ public readonly record struct AlsDoubleVector(double X, double Y, double Z)
     public Vector3 ToSingle() => new((float)X, (float)Y, (float)Z);
     public bool NearlyZero(double tolerance) => ScalarMath.Abs(X) <= tolerance && ScalarMath.Abs(Y) <= tolerance && ScalarMath.Abs(Z) <= tolerance;
     public AlsDoubleVector RemoveScaling() => this * (LengthSquared >= 1e-8f ? 1 / ScalarMath.Sqrt(LengthSquared) : 1);
+    public AlsDoubleVector SafeNormal(double squaredTolerance = 1e-8f)
+    {
+        if (!double.IsFinite(squaredTolerance) || squaredTolerance <= 0)
+            throw new ArgumentOutOfRangeException(nameof(squaredTolerance));
+        var size = LengthSquared;
+        return size == 1 ? this : size < squaredTolerance ? default : this * (1 / ScalarMath.Sqrt(size));
+    }
     public static AlsDoubleVector operator +(AlsDoubleVector a, AlsDoubleVector b) => new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
     public static AlsDoubleVector operator -(AlsDoubleVector a, AlsDoubleVector b) => new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
     public static AlsDoubleVector operator *(AlsDoubleVector a, AlsDoubleVector b) => new(a.X * b.X, a.Y * b.Y, a.Z * b.Z);
@@ -54,6 +61,20 @@ public readonly record struct AlsPrecisePose(AlsDoubleVector Position, AlsQuater
             (a.Rotation * firstWeight + b.Rotation * alpha).Normalized(), a.Scale * (1.0 - alpha) + b.Scale * alpha);
     }
 
+    // Local LayeredBoneBlend / FTransform::BlendWith uses the difference form
+    // of vector lerp. BlendTransform above retains its weighted-sum ordering.
+    public static AlsPrecisePose BlendWith(in AlsPrecisePose basis, in AlsPrecisePose target, float alpha)
+    {
+        if (!float.IsFinite(alpha) || alpha is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(alpha));
+        basis.Validate(); target.Validate();
+        if (alpha <= AlsPoseBlender.WeightThreshold) return basis;
+        if (alpha >= 1f - AlsPoseBlender.WeightThreshold) return target;
+        var bias = AlsQuaternion.Dot(basis.Rotation, target.Rotation) >= 0 ? 1d : -1d;
+        return new(basis.Position + (target.Position - basis.Position) * alpha,
+            (basis.Rotation * (bias * (1d - alpha)) + target.Rotation * alpha).Normalized(),
+            basis.Scale + (target.Scale - basis.Scale) * alpha);
+    }
+
     public static AlsPrecisePose Compose(in AlsPrecisePose local, in AlsPrecisePose parent)
     {
         local.Validate(); parent.Validate(); var scale = local.Scale * parent.Scale;
@@ -73,6 +94,14 @@ public readonly record struct AlsPrecisePose(AlsDoubleVector Position, AlsQuater
         return new((target.Position - source.Position).Rotate(inverse) * reciprocal, inverse * target.Rotation, scale);
     }
     private static double Reciprocal(double value) => ScalarMath.Abs(value) <= 1e-8f ? 0 : 1 / value;
+
+    public static AlsPrecisePose Inverse(in AlsPrecisePose pose)
+    {
+        pose.Validate();
+        var scale = new AlsDoubleVector(Reciprocal(pose.Scale.X), Reciprocal(pose.Scale.Y), Reciprocal(pose.Scale.Z));
+        var rotation = pose.Rotation.Conjugate();
+        return new((scale * (pose.Position * -1)).Rotate(rotation), rotation, scale);
+    }
 
     // Native desired-scale matrix construction, including reflected and degenerate scales.
     // Do not orthogonalize/decompose shear or normalize rotations before constructing rows.

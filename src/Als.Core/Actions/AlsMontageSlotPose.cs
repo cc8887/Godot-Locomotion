@@ -10,6 +10,11 @@ public interface IAlsMontagePoseSource
     void Sample(in AlsMontageEvaluation entry, Span<AlsPrecisePose> pose, Span<AlsInertialCurve> curves);
 }
 
+// The optimized ALS reference and the current original Lyra weapon reference
+// produce different float rounding. Select the captured native arithmetic at
+// the owner boundary; do not silently change already verified ALS instances.
+public enum AlsMontageWeightNormalization { SharedReciprocal, IndividualDivision }
+
 // UE SlotEvaluatePose without blend profiles: mix non-additives, then apply
 // local/mesh additive deltas in montage evaluation order. Exclusive scratch owner.
 public sealed class AlsMontageSlotPose
@@ -18,15 +23,18 @@ public sealed class AlsMontageSlotPose
     private readonly AlsInertialCurve[] _sampleCurves, _resultCurves;
     private readonly int[] _parents;
     private readonly AlsQuaternion[] _rotations;
+    private readonly AlsMontageWeightNormalization _normalization;
     private bool _busy;
-    public AlsMontageSlotPose(ReadOnlySpan<AlsPrecisePose> reference, ReadOnlySpan<int> parents, int curveCount)
+    public AlsMontageSlotPose(ReadOnlySpan<AlsPrecisePose> reference, ReadOnlySpan<int> parents, int curveCount,
+        AlsMontageWeightNormalization normalization = AlsMontageWeightNormalization.SharedReciprocal)
     {
-        if (reference.IsEmpty || parents.Length != reference.Length || curveCount < 0) throw new ArgumentException("Invalid montage pose layout.");
+        if (reference.IsEmpty || parents.Length != reference.Length || curveCount < 0 || (uint)normalization > 1) throw new ArgumentException("Invalid montage pose layout.");
         for (var bone = 0; bone < parents.Length; bone++)
             if (parents[bone] < -1 || parents[bone] >= bone) throw new ArgumentException("Montage poses require parent-first bones.");
         foreach (var pose in reference) pose.Validate();
         _reference = reference.ToArray(); _parents = parents.ToArray(); _sample = new AlsPrecisePose[reference.Length]; _result = new AlsPrecisePose[reference.Length];
         _sampleCurves = new AlsInertialCurve[curveCount]; _resultCurves = new AlsInertialCurve[curveCount]; _rotations = new AlsQuaternion[reference.Length * 2];
+        _normalization = normalization;
     }
     public void Evaluate(AlsMontageFrame frame, in AlsFrameIdentity identity, AlsMontageSlot slot,
         ReadOnlySpan<AlsPrecisePose> source, ReadOnlySpan<AlsInertialCurve> sourceCurves,
@@ -49,14 +57,14 @@ public sealed class AlsMontageSlotPose
         {
             if (weights.SlotNodeWeight <= AlsPoseBlender.WeightThreshold) { source.CopyTo(output); sourceCurves.CopyTo(curves); return; }
             var denominator = weights.TotalNodeWeight > 1 + AlsPoseBlender.WeightThreshold ? weights.TotalNodeWeight : 1;
-            // Reuse one float factor, matching the native optimized pose loops.
             var weightScale = 1f / denominator;
+            float Weight(float value) => _normalization == AlsMontageWeightNormalization.IndividualDivision ? value / denominator : value * weightScale;
             var first = true; var nonAdditiveCount = 0; _resultCurves.AsSpan().Clear();
             foreach (var entry in frame.Evaluations)
             {
                 if (entry.Slot != slot || entry.AdditiveType != 0) continue;
                 nonAdditiveCount++;
-                Sample(entry); var weight = entry.Weight * weightScale;
+                Sample(entry); var weight = Weight(entry.Weight);
                 for (var bone = 0; bone < output.Length; bone++)
                     _result[bone] = first ? AlsPrecisePoseBlender.Scale(_sample[bone], weight) : AlsPrecisePoseBlender.Accumulate(_result[bone], _sample[bone], weight);
                 for (var c = 0; c < curves.Length; c++)
@@ -84,7 +92,7 @@ public sealed class AlsMontageSlotPose
             foreach (var entry in frame.Evaluations)
             {
                 if (entry.Slot != slot || entry.AdditiveType == 0) continue;
-                Sample(entry); var weight = entry.Weight * weightScale;
+                Sample(entry); var weight = Weight(entry.Weight);
                 if (entry.AdditiveType == 2) AlsPrecisePoseBlender.MeshApply(_result, _sample, _parents, _rotations, _result, weight);
                 else for (var bone = 0; bone < output.Length; bone++) _result[bone] = AlsPrecisePoseBlender.LocalApply(_result[bone], _sample[bone], weight);
                 AlsLayeringCurves.Apply(_resultCurves, _sampleCurves, weight, _resultCurves);

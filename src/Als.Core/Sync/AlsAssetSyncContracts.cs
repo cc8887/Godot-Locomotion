@@ -5,15 +5,17 @@ public readonly record struct AlsAssetSyncMarker(int Symbol, float TimeSeconds);
 public readonly record struct AlsAssetSyncSequence(int AnimationId, float DurationSeconds, float RateScale,
     int MarkerStart, int MarkerCount);
 public enum AlsAssetSyncKind : byte { Sequence, BlendSpace }
-public enum AlsAssetSyncRole : byte { CanBeLeader, AlwaysFollower }
+public enum AlsAssetSyncRole : byte { CanBeLeader, AlwaysFollower, AlwaysLeader }
 
-/// <summary>Non-mirrored, non-evaluator source player. Time is normalized for a
-/// BlendSpace, seconds for a Sequence. Samples are already filtered and in native cache order.</summary>
+/// <summary>Non-mirrored source tick. Evaluators supply their prepared clock/rate. Time is normalized for a
+/// BlendSpace, seconds for a Sequence. Samples are already filtered and in native cache order.
+/// MarkerRecord optionally supplies the occurrence's persistent marker storage, including hidden/reset frames.</summary>
 public readonly record struct AlsAssetSyncPlayer(int PlayerId, int AssetId, long Epoch, AlsAssetSyncKind Kind,
     float Time, float PlayRate, float Weight, int SampleStart, int SampleCount, ulong AssetMarkerMask,
     bool Looping = true, bool LegacyLength = true, bool MatchSyncPhases = false,
     bool RequestedInertialization = false, bool OverridePositionWhenJoining = false,
-    AlsAssetSyncRole Role = AlsAssetSyncRole.CanBeLeader);
+    AlsAssetSyncRole Role = AlsAssetSyncRole.CanBeLeader, bool IsEvaluator = false,
+    AlsAssetMarkerRecord? MarkerRecord = null);
 
 public readonly record struct AlsAssetSyncSample(int SampleId, int SequenceIndex, float Weight,
     float RateScale = 1, float CachedPlayRate = 1);
@@ -26,15 +28,19 @@ public readonly record struct AlsAssetMarkerRecord(int PreviousIndex, int NextIn
 
 public readonly record struct AlsAssetMarkerPosition(int PreviousSymbol, int NextSymbol, float Alpha)
 {
-    public bool Valid => PreviousSymbol != 0 || NextSymbol != 0;
+    // Native IsValid requires both names; a start/end boundary can encode a
+    // position but cannot win the group's marker-leader fallback search.
+    public bool Valid => PreviousSymbol != 0 && NextSymbol != 0;
 }
 
 public readonly record struct AlsAssetSampleHistory(int SampleId, int AnimationId, float Time,
     float PreviousTime, AlsAssetMarkerRecord Marker, float DeltaPrevious, float Delta);
 
+// Evaluator metadata preserves a valid accumulator/interval when a shorter
+// sequence replaces the asset. Historical sample bounds require this owner.
 public readonly record struct AlsAssetPlayerHistory(int PlayerId, int AssetId, long Epoch,
     float Time, float DeltaPrevious, float Delta, AlsAssetMarkerRecord Marker,
-    int SampleStart, int SampleCount);
+    int SampleStart, int SampleCount, bool IsNonLoopingEvaluator = false);
 
 // Indexed like playerOutput, while Order records actual native dispatch order. Every attempted
 // marker leader ticks with Leader=true, including an attempt before the final winning leader.

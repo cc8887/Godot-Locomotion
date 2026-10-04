@@ -5,8 +5,12 @@ namespace GodotAls.Core.Locomotion;
 internal static class AlsRefactoredSpring
 {
     public static void Evaluate(ref float value, ref float velocity, float target, float targetVelocity,
-        float delta, float frequency, float damping)
+        float delta, float frequency, float damping, bool expandedInvExp = false)
     {
+        // The installed Kismet float instantiation retains expanded powers;
+        // the existing Rig/ALS instantiation uses Horner evaluation.
+        float InvExp(float x) => expandedInvExp ?
+            1f / (1f + 1.00746054f * x + .45053901f * x * x + .25724632f * x * x * x) : AlsRefactoredRigMath.InvExp(x);
         var w = frequency * 6.28318530718f;
         if (w < 1e-8f) { value += velocity * delta; return; }
         if (damping < 1e-8f)
@@ -25,8 +29,8 @@ internal static class AlsRefactoredSpring
             var c2 = -(velocity + (w * damping - wd) * err) / (2f * wd);
             var c1 = err - c2;
             var a1 = wd - damping * w; var a2 = -(wd + damping * w);
-            var e1 = AlsRefactoredRigMath.InvExp(-a1 * delta);
-            var e2 = AlsRefactoredRigMath.InvExp(-a2 * delta);
+            var e1 = InvExp(-a1 * delta);
+            var e2 = InvExp(-a2 * delta);
             value = adjusted + e1 * c1 + e2 * c2;
             velocity = e1 * c1 * a1 + e2 * c2 * a2;
         }
@@ -35,7 +39,7 @@ internal static class AlsRefactoredSpring
             var wd = w * MathF.Sqrt(1f - damping * damping);
             var b = (velocity + err * (damping * w)) / wd;
             var (s, c) = AlsRefactoredRigMath.SinCos(wd * delta);
-            var e = AlsRefactoredRigMath.InvExp(damping * w * delta);
+            var e = InvExp(damping * w * delta);
             value = e * (err * c + b * s);
             velocity = -value * damping * w;
             velocity += e * (b * (wd * c) - err * (wd * s));
@@ -44,7 +48,7 @@ internal static class AlsRefactoredSpring
         else
         {
             var c2 = velocity + err * w;
-            var e = AlsRefactoredRigMath.InvExp(w * delta);
+            var e = InvExp(w * delta);
             value = adjusted + (err + c2 * delta) * e;
             velocity = (c2 - err * w - c2 * (w * delta)) * e;
         }

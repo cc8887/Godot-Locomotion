@@ -8,6 +8,7 @@ class UAnimSequenceBase;
 class USkeleton;
 class UBlendSpace;
 class UAnimationAsset;
+class UBlendProfile;
 
 /** Read-only source metadata and explicitly raw, non-additive pose evaluation. */
 UCLASS()
@@ -20,6 +21,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadSourceSyncMetadata(UAnimationAsset* Animation);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadSourceNotifyMetadata(UAnimSequenceBase* Animation);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadSourceFloatCurves(UAnimSequenceBase* Animation);
@@ -37,6 +41,21 @@ public:
     static FString ReadRawBlendSpacePose2D(UBlendSpace* BlendSpace, float X, float Y, float NormalizedTime);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadRawAimingPose2D(UBlendSpace* BlendSpace, UAnimSequence* BaseAnimation,
+                                      double BaseTime, float X, float Y, float NormalizedTime);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadRetargetedBlendSpacePose2D(UBlendSpace* Source, USkeleton* TargetSkeleton,
+                                                  const TArray<UAnimSequence*>& TargetSamples,
+                                                  float X, float Y, float NormalizedTime);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadRetargetedAimingPose2D(UBlendSpace* Source, USkeleton* TargetSkeleton,
+                                              const TArray<UAnimSequence*>& TargetSamples,
+                                              UAnimSequence* BaseAnimation, double BaseTime,
+                                              float X, float Y, float NormalizedTime);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadRawBlendSpaceTimedPose(UBlendSpace* BlendSpace, const FString& SamplesJson);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
@@ -46,7 +65,16 @@ public:
     static FString ReadSourceAnimationMetadata(UAnimSequence* Animation);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadSourceRootMotionRange(UAnimSequence* Animation, double StartTime, double EndTime);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static void FinishSourceCompression(UAnimSequence* Animation);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadSkeletonPoseMetadata(USkeleton* Skeleton);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadBlendProfileMetadata(UBlendProfile* Profile);
 
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadRawBonePose(UAnimSequence* Animation, double TimeSeconds,
@@ -55,4 +83,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="ALS Export")
     static FString ReadRawAnimationPose(UAnimSequence* Animation, double TimeSeconds,
                                        bool ShouldRetarget, bool ExtractRootMotion, bool IgnoreRootLock);
+
+    UFUNCTION(BlueprintCallable, Category="ALS Export")
+    static FString ReadCompressedAnimationPose(UAnimSequence* Animation, double TimeSeconds,
+                                              bool ShouldRetarget, bool ExtractRootMotion, bool IgnoreRootLock);
 };

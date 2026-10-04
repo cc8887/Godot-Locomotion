@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "sourceDirectory": "/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Unarmed",
+  "clips": [
+    { "slot": "idle", "name": "MM_Unarmed_Idle_Ready" },
+    { "slot": "jog_fwd_start", "name": "MM_Unarmed_Jog_Fwd_Start" },
+    { "slot": "jog_fwd_cycle", "name": "MM_Unarmed_Jog_Fwd" },
+    { "slot": "jog_fwd_stop", "name": "MM_Unarmed_Jog_Fwd_Stop" },
+    { "slot": "jog_fwd_pivot", "name": "MM_Unarmed_Jog_Fwd_Pivot" },
+    { "slot": "jog_left_start", "name": "MM_Unarmed_Jog_Left_Start" },
+    { "slot": "jog_left_cycle", "name": "MM_Unarmed_Jog_Left" },
+    { "slot": "jog_left_stop", "name": "MM_Unarmed_Jog_Left_Stop" },
+    { "slot": "jog_left_pivot", "name": "MM_Unarmed_Jog_Left_Pivot" },
+    { "slot": "jog_right_start", "name": "MM_Unarmed_Jog_Right_Start" },
+    { "slot": "jog_right_cycle", "name": "MM_Unarmed_Jog_Right" },
+    { "slot": "jog_right_stop", "name": "MM_Unarmed_Jog_Right_Stop" },
+    { "slot": "jog_right_pivot", "name": "MM_Unarmed_Jog_Pivot_Right" },
+    { "slot": "jog_bwd_start", "name": "MM_Unarmed_Jog_Bwd_Start" },
+    { "slot": "jog_bwd_cycle", "name": "MM_Unarmed_Jog_Bwd" },
+    { "slot": "jog_bwd_stop", "name": "MM_Unarmed_Jog_Bwd_Stop" },
+    { "slot": "jog_bwd_pivot", "name": "MM_Unarmed_Jog_Bwd_Pivot" },
+    { "slot": "walk_fwd_cycle", "name": "MM_Unarmed_Walk_Fwd" },
+    { "slot": "walk_left_cycle", "name": "MM_Unarmed_Walk_Left" },
+    { "slot": "walk_right_cycle", "name": "MM_Unarmed_Walk_Right" },
+    { "slot": "walk_bwd_cycle", "name": "MM_Unarmed_Walk_Bwd" }
+  ]
+}

@@ -1,4 +1,6 @@
 .gitattributes text eol=lf
+# The interface generator verifies exact source bytes across Windows checkouts.
+src/Als.Godot/Animation/Lyra/LyraGeneratedLayerContract.g.cs text eol=lf
 # Unified patch context preserves the upstream JSON tab after Git's context marker.
 reference/patches/*.patch text eol=lf whitespace=-space-before-tab
 tests/Als.Core.Tests/Fixtures/P5A/*.json text eol=lf
@@ -9,3 +11,5 @@ assets/config/raw_sequences/*.json -text
 assets/config/refactored_animation_sources/*.json -text
 # Native sleep trajectories are test fixtures; retain their original export bytes.
 tests/Als.Import.Tests/Fixtures/Physics/*.json -text
+# Preserve the native Lyra sampling fixture exactly as exported by UE.
+tests/Als.Core.Tests/Fixtures/P3/lyra_raw_sequence_sampling_native.json -text whitespace=-trailing-space,-space-before-tab

@@ -1,0 +1,1 @@
+{"FileVersion":3,"Version":1,"VersionName":"1","FriendlyName":"Lyra Motion Warping Oracle","CanContainContent":false,"Installed":true,"Modules":[{"Name":"LyraMotionWarpingOracle","Type":"Editor","LoadingPhase":"Default","PlatformAllowList":["Win64"]}]}

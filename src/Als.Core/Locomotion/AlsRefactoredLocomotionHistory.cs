@@ -39,7 +39,7 @@ public readonly record struct AlsRefactoredLocomotionHistory(AlsFrameIdentity Id
         if (baseId != 0 && !initial && baseId == previous.BaseIdentity)
         {
             var deltaRotation = AlsCameraMath.Rotator(rotation * previous.BaseRotation.Conjugate());
-            if (!ignoreBaseRotation) priorVelocity = Rotate(priorVelocity, deltaRotation);
+            if (!ignoreBaseRotation) priorVelocity = AlsCharacterRotationMath.RotateVector(priorVelocity, deltaRotation);
             // Character::RefreshLocomotionEarly has an independent opt-in for
             // idle VelocityDirection, even when CMC ignores base rotation.
             if (!previous.Moving && inheritVelocityYaw)
@@ -54,16 +54,4 @@ public readonly record struct AlsRefactoredLocomotionHistory(AlsFrameIdentity Id
 
     private static float Yaw(AlsDoubleVector value) => (float)(System.Math.Atan2(value.Y, value.X) * (180d / System.Math.PI));
 
-    private static AlsDoubleVector Rotate(AlsDoubleVector v, AlsAimingRotation r)
-    {
-        // FRotator::RotateVector uses FRotationMatrix, not quaternion rotation.
-        // The Win64 matrix uses the promoted float DEG_TO_RAD constant.
-        const double radians = System.MathF.PI / 180f;
-        var sp = System.Math.Sin(r.Pitch * radians); var cp = System.Math.Cos(r.Pitch * radians);
-        var sy = System.Math.Sin(r.Yaw * radians); var cy = System.Math.Cos(r.Yaw * radians);
-        var sr = System.Math.Sin(r.Roll * radians); var cr = System.Math.Cos(r.Roll * radians);
-        return new(v.X * (cp * cy) + v.Y * (sr * sp * cy - cr * sy) - v.Z * (cr * sp * cy + sr * sy),
-            v.X * (cp * sy) + v.Y * (sr * sp * sy + cr * cy) + v.Z * (cy * sr - cr * sp * sy),
-            v.X * sp - v.Y * (sr * cp) + v.Z * (cr * cp));
-    }
 }

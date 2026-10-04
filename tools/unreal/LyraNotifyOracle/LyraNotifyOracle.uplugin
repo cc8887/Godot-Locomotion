@@ -1,0 +1,9 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "Lyra Notify Oracle",
+  "CanContainContent": false,
+  "Installed": true,
+  "Modules": [{"Name": "LyraNotifyOracle", "Type": "Editor", "LoadingPhase": "Default", "PlatformAllowList": ["Win64"]}]
+}

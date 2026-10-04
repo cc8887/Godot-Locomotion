@@ -1,0 +1,1 @@
+{"FileVersion":3,"Version":1,"VersionName":"1.0","FriendlyName":"Lyra Startup Oracle","Installed":true,"CanContainContent":false,"Modules":[{"Name":"LyraStartupOracle","Type":"Editor","LoadingPhase":"Default","PlatformAllowList":["Win64"]}]}
