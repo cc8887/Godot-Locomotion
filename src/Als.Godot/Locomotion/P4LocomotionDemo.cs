@@ -21,7 +21,7 @@ public partial class P4LocomotionDemo : Node3D
     private const float TranslationRange = 0.45f;
     private const float RotationSpeed = 0.25f;
 
-    private readonly AlsPlayerInputAdapter _playerInput = new();
+    private AlsPlayerInputAdapter _playerInput = new();
     private IAlsLocomotionCommandSource? _smokeCommandSource;
     private Action<AlsP3RuntimeContext>? _configureSmokeContext;
     private (AlsHarnessMode Mode, bool HeadlessOrDebug)? _smokeRuntimePolicy;
@@ -50,8 +50,77 @@ public partial class P4LocomotionDemo : Node3D
     private bool _failed;
     private long _inputLifecycleRevision;
     private uint _inputLifecycleGeneration;
+    private AlsRotationMode _demoRotationMode = AlsRotationMode.LookingDirection;
 
     internal bool IsRuntimeReady => _runtimeConfigured && !_failed;
+    internal bool ExternalPlayerActive { get; private set; }
+
+    internal bool CanHandoffPlayer => IsRuntimeReady && ActiveCharacter.RuntimeCommittedFrameId > 0 &&
+        ActiveCharacter.WorkerInFlight == 0 && !ActiveCharacter.Diagnostics.PresentationPending &&
+        ActiveCharacter.PublishedFrameId == ActiveCharacter.RuntimeCommittedFrameId &&
+        !ActiveCharacter.PhysicsDriven && !ActiveCharacter.LatestMotorInput.Mantling.Active &&
+        ActiveCharacter.FullMovementDiagnostics.MovementNotifies.Action == AlsTimelineAction.None;
+
+    internal DemoPlayerHandoff CaptureDemoPlayer()
+    {
+        if (!CanHandoffPlayer) throw new InvalidOperationException("ALS player has no idle committed handoff boundary.");
+        var motor = (AlsCharacterMotor)ActiveCharacter.MovementAnchor;
+        var capsule = (CapsuleShape3D)motor.GetNode<CollisionShape3D>("AlsCapsuleCollision").Shape;
+        return new(motor.GlobalPosition - Vector3.Up * (capsule.Height * .5f), motor.GlobalRotation.Y,
+            motor.Velocity, ActiveCharacter.Diagnostics.Result.ActualStance == AlsStance.Crouching,
+            motor.CaptureCommittedLifecycleSnapshot(ActiveCharacter.RuntimeCommittedFrameId).WasGrounded);
+    }
+
+    internal void PauseDemoPlayer()
+    {
+        _demoRotationMode = _playerInput.DemoRotationMode;
+        ActiveCharacter.SetActive(false);
+        _slot.ProcessMode = ProcessModeEnum.Disabled;
+        SetExternalPlayer(true);
+    }
+
+    internal void ResumeDemoPlayer()
+    {
+        _slot.ProcessMode = ProcessModeEnum.Inherit;
+        ActiveCharacter.SetActive(true);
+        SetExternalPlayer(false);
+    }
+
+    private void SetExternalPlayer(bool external)
+    {
+        ExternalPlayerActive = external;
+        GetNode<CanvasLayer>("HudLayer").Visible = !external;
+        if (NativeCamera is not null) NativeCamera.ProcessMode = external ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
+        if (!external) { _orbitCamera.UseNativeOutput(); EnsureCameraTarget(ActiveCharacter); }
+    }
+
+    internal void ReplaceDemoPlayer(in DemoPlayerHandoff state)
+    {
+        if (!ExternalPlayerActive) throw new InvalidOperationException("Pause ALS before replacing its player.");
+        var context = _context.ForkDemoPlayer();
+        var input = new AlsPlayerInputAdapter(); input.ImportDemoStance(state.Crouching, _demoRotationMode);
+        if (context.MovementGraph is { } graph)
+        {
+            var preview = graph.ActionPolicies.Single(p => p.DefinitionId == graph.RollDefinitionId);
+            input.ConfigureActionPreview(preview.DefinitionId, preview.StartSectionId);
+            context.ActionOutcomeCommitted += input.ObserveActionOutcome;
+        }
+        var replacement = new AlsP3CharacterSlot { Name = "IncomingCharacterSlot" };
+        AddChild(replacement);
+        try
+        {
+            replacement.Configure(context, () => input, state.Feet + Vector3.Up * (context.MotorSettings.StandingHeight * .5f));
+            replacement.ActiveCharacter.SetSchedulingActive(false);
+            ((AlsCharacterMotor)replacement.ActiveCharacter.MovementAnchor).ImportDemoHandoff(state);
+        }
+        catch { replacement.DisposeRuntime(); replacement.Free(); throw; }
+        _context.ActionOutcomeCommitted -= _playerInput.ObserveActionOutcome;
+        _slot.DisposeRuntime(); _slot.Free();
+        _slot = replacement; _slot.Name = "CharacterSlot"; _context = context; _playerInput = input;
+        _inputLifecycleGeneration = 0; _inputLifecycleRevision = 0;
+        _slot.ActiveCharacter.SetSchedulingActive(true);
+        SetExternalPlayer(false);
+    }
 
     internal AlsP3Character ActiveCharacter => _slot.ActiveCharacter;
 
@@ -208,7 +277,7 @@ public partial class P4LocomotionDemo : Node3D
         try
         {
             UpdatePlatforms(delta);
-            if (!_runtimeConfigured || _smokeCommandSource is not null)
+            if (!_runtimeConfigured || ExternalPlayerActive || _smokeCommandSource is not null)
             {
                 return;
             }
@@ -233,6 +302,7 @@ public partial class P4LocomotionDemo : Node3D
 
     public override void _UnhandledInput(InputEvent input)
     {
+        if (ExternalPlayerActive) return;
         if (_runtimeConfigured && !_failed && _context.PropProfile is not null && _slot.ActiveCharacter.LifecycleDiagnostics.IsActive)
         {
             var next = input.IsActionPressed("overlay_next", allowEcho: false);
@@ -274,7 +344,7 @@ public partial class P4LocomotionDemo : Node3D
 
     public override void _Process(double delta)
     {
-        if (_failed || !_runtimeConfigured)
+        if (_failed || !_runtimeConfigured || ExternalPlayerActive)
         {
             return;
         }

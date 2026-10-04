@@ -36,6 +36,14 @@ public sealed class AlsPlayerInputAdapter : IAlsLocomotionCommandSource, IAlsAct
     public bool ActionPreviewEnabled => _previewDefinition >= 0;
     public AlsFrameIdentity CapturedActionIdentity => _actions.Identity;
 
+    internal AlsRotationMode DemoRotationMode => _rotationMode;
+    internal void ImportDemoStance(bool crouching, AlsRotationMode rotationMode)
+    {
+        if (_capturedFrameId != 0) throw new InvalidOperationException("Import input intent before capture.");
+        _stance = crouching ? AlsStance.Crouching : AlsStance.Standing;
+        _rotationMode = rotationMode;
+    }
+
     public void ConfigureActionPreview(int definition, int section)
     {
         if (definition < 0 || section < 0 || ActionPreviewEnabled || _capturedFrameId != 0)

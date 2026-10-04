@@ -28,6 +28,34 @@ internal sealed class LyraSceneMovementService:IDisposable
     private AlsDoubleVector _velocity;
     private Vector3 _publishedVelocity;
     private bool _haveVelocity,_initialized,_disposed;
+    internal void ImportDemoHandoff(in DemoPlayerHandoff state)
+    {
+        state.Validate();
+        if (_initialized || _haveVelocity) throw new InvalidOperationException("Import into a fresh Lyra motor.");
+        Crouching = state.Crouching; Grounded = state.Grounded;
+        _capsule.Height = 2 * (Crouching ? Settings.CrouchedHalfHeight : Settings.StandingHalfHeight);
+        _body.GlobalTransform = new(new Basis(Vector3.Up, state.Yaw), state.Feet + Vector3.Up * (_capsule.Height * .5f));
+        _body.Velocity = _publishedVelocity = state.Velocity;
+        _velocity = LyraGodotRigCollision.NativePosition(state.Velocity); _haveVelocity = true;
+        _animation.Binding.Model.Position = new(0, -_capsule.Height * .5f, 0);
+        _animation.SetMovementCrouched(Crouching);
+    }
+
+    internal DemoPlayerHandoff CaptureDemoPlayer() => new(
+        _body.GlobalPosition - Vector3.Up * (_capsule.Height * .5f), _body.GlobalRotation.Y, _body.Velocity, Crouching, Grounded);
+
+    internal LyraSceneObservation ObserveDemoHandoff(float pitch, bool ads)
+    {
+        var state = _animation.Observation;
+        var actual = LyraGodotRigCollision.NativePosition(_body.Velocity);
+        var observation = new LyraMainObservationInput(LyraGodotRigCollision.NativePosition(_body.GlobalPosition),
+            new(0, -Mathf.RadToDeg(_body.Rotation.Y), 0, state.First, state.Crouching, state.Ads),
+            actual, default, Grounded, Crouching, Grounded ? 1 : 3, ads, false, state.RootYaw);
+        var feet = CaptureDemoPlayer().Feet;
+        return new(new(observation, Mathf.RadToDeg(pitch), Settings.GravityZ, false, false, true, 0),
+            Settings.Snapshot(actual), Grounded ? 0 : GroundTraceDistance, Grounded,
+            LyraGodotRigCollision.NativePosition(feet), new(0, 0, 1));
+    }
     public LyraSceneMovementService(CharacterBody3D body,LyraCharacterAnimation animation,
         CollisionShape3D shape,RayCast3D floor,ShapeCast3D clearance,LyraCharacterMovementSettings? settings=null)
     {

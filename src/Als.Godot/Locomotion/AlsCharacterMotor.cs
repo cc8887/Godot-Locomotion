@@ -55,6 +55,23 @@ public partial class AlsCharacterMotor : CharacterBody3D
     internal bool GetUpInputBlocked { get; set; }
     internal AlsActionRequest RecoveryRequest { get; set; } = AlsActionRequest.None;
 
+    internal void ImportDemoHandoff(in DemoPlayerHandoff state)
+    {
+        EnsureMainThread(); state.Validate();
+        if (!_configured || _lastFrameId != -1 || CollisionLayer != 0 || CollisionMask != 0)
+            throw new InvalidOperationException("Handoff requires a fresh inactive motor.");
+        _actualStance = state.Crouching ? AlsStance.Crouching : AlsStance.Standing;
+        _capsuleShape!.Height = state.Crouching ? _settings.CrouchingHeight : _settings.StandingHeight;
+        GlobalTransform = new(new Basis(Vector3.Up, state.Yaw), state.Feet + Vector3.Up * (_capsuleShape.Height * .5f));
+        Velocity = state.Velocity; _previousActualVelocity = ToNumerics(Velocity);
+        _rotationHistory = AlsCharacterRotationModel.Initialize(-state.Yaw * (180d / System.Math.PI));
+        _previousGatherTransform = GlobalTransform; _hasPreviousGatherTransform = false;
+        _movementBase = default; WorldMovementVelocity = Velocity;
+        _restoredGroundedBeforeMove = state.Grounded; _hasRestoredGroundedState = true;
+        _committedLifecycleSnapshot = CaptureLifecycleSnapshot(state.Grounded);
+        _committedLifecycleFrameId = 0;
+    }
+
     internal void RestoreFromRagdoll(Transform3D actor, bool grounded, Vector3 fallingVelocity)
     {
         EnsureMainThread(); EnsureLiveInTree();

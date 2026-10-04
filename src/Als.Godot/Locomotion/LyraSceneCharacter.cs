@@ -24,6 +24,14 @@ internal sealed class LyraSceneCharacter:IDisposable
     private bool _disposed;
     public LyraCharacterMovementSettings MovementSettings=>_movement.Settings;
     public bool Grounded=>_movement.Grounded;
+    internal DemoPlayerHandoff CaptureDemoPlayer() => _movement.CaptureDemoPlayer();
+    internal void ImportDemoHandoff(in DemoPlayerHandoff state) => _movement.ImportDemoHandoff(state);
+    internal void PresentDemoHandoff(float delta, float pitch, bool ads)
+    {
+        var observation = _movement.ObserveDemoHandoff(pitch, ads);
+        var candidate = observation.Prepare(Animation, delta);
+        Animation.Commit(candidate);
+    }
     public LyraSceneCharacter(Node3D parent,LyraLocomotionResources resources,LyraMontageCatalog catalog,
         string name,Vector3 position,string profile,bool linkInitially=true)
     {

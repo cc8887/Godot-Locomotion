@@ -65,7 +65,22 @@ if ($LASTEXITCODE -ne 0) { throw 'Godot 首次导入失败' }
   -- --locomotion=lyra --lyra-profile=rifle
 ```
 
-启动参数放在 `--` 后。`--lyra-profile=unarmed`、`pistol`、`rifle` 选择初始装备，`--lyra-characters=10` 加入九个 NPC。省略 `--locomotion=lyra` 会运行默认 ALS Demo；Godot 编辑器直接 F5 也默认启动 ALS。Lyra 的完整场景为 `res://scenes/demo/lyra_locomotion_demo.tscn`，旧 `lyra_unarmed_demo.tscn` 只用于早期独立诊断。
+启动参数放在 `--` 后。`--lyra-profile=unarmed`、`pistol`、`rifle` 选择初始装备，`--lyra-characters=10` 加入九个 NPC。省略 `--locomotion=lyra` 会运行默认 ALS Demo；Godot 编辑器直接 F5 也默认启动 ALS。**main 分支的默认入口支持下方的运行时切换；已发布的 `v0.2.0-lyra` 使用启动时选模式。**`res://scenes/demo/lyra_locomotion_demo.tscn` 保留为独立 Lyra 场景及自动回归入口，旧 `lyra_unarmed_demo.tscn` 只用于早期独立诊断。
+
+### 在同一 Demo 中切换 ALS／Lyra（main）
+
+资源就绪后，F5 或运行 `scenes/demo/als_demo.tscn`，按 **F6** 在 ALS 与 Lyra 主控间切换；也可按 Esc 显示鼠标，再点击顶部的 ALS／Lyra 按钮。`--locomotion=lyra` 选择初始 Lyra，省略或传 `--locomotion=als` 则以 ALS 启动。
+
+切换共用原场景的地形、移动平台和相机输入，交接脚底位置、朝向、世界速度与蹲伏状态；行走、跑动和空中均可切换。两套动画各自初始化，上一主控的运行时停止更新和碰撞。ALS 的 Overlay、旋转／相机模式及 Lyra 的装备选择分别记忆；Q/E/R 按当前系统解释，HUD 显示当前模式。翻滚、攀爬、Ragdoll／起身和 Lyra Montage 期间先记录请求，动作结束后接管；Ragdoll 需要先用 G 恢复角色。目标资源缺失或初始化失败时保留当前主控，并显示失败原因。
+
+传 `--lyra-characters=10` 时，在首次进入 Lyra 后创建九个 NPC；切回 ALS 时这些 NPC 继续在同一个世界运行。仅使用 ALS 可以先安装 ALS 资源，首次切换 Lyra 时需要对应的 Lyra 资源。
+
+以下测试通过默认入口使用 F6 实际按键和切换请求，覆盖两个初始模式、移动／蹲伏／空中交接、装备记忆、动作延后和失败恢复，每次输出独立报告：
+
+```powershell
+./scripts/verify-demo-switch.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -Rates 30,60,120
+./scripts/verify-demo-switch.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -Rates 60 -WithCompanions
+```
 
 | Lyra 输入 | 行为 |
 | --- | --- |

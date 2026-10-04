@@ -442,6 +442,19 @@ public sealed class AlsP3RuntimeContext
 
     public AlsHarnessMode Mode { get; }
 
+    // Share definitions, not callbacks, retirement queues or dispatch counters.
+    internal AlsP3RuntimeContext ForkDemoPlayer() => new(this);
+    private AlsP3RuntimeContext(AlsP3RuntimeContext source)
+    {
+        Mode = source.Mode; Settings = source.Settings; MotorSettings = source.MotorSettings;
+        AnimationSet = source.AnimationSet; Profile = source.Profile;
+        PresentationTransform = source.PresentationTransform; FootGatherSettings = source.FootGatherSettings;
+        MovementGraph = source.MovementGraph; SourceBindings = source.SourceBindings;
+        PropProfile = source.PropProfile; PropSources = source.PropSources;
+        MainManagedThreadId = source.MainManagedThreadId; HeadlessOrDebug = source.HeadlessOrDebug;
+        AutomaticRagdollEnvironment = source.AutomaticRagdollEnvironment;
+    }
+
     public AlsLocomotionSettings Settings { get; }
 
     public AlsMotorSettings MotorSettings { get; }

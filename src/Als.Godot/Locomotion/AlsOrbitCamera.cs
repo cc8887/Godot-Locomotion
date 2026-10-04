@@ -37,6 +37,16 @@ public partial class AlsOrbitCamera : Node3D
         camera.KeepAspect = Camera3D.KeepAspectEnum.Width;
     }
 
+    internal void UseOrbitOutput(Node3D target)
+    {
+        Configure(target);
+        var camera = GetNode<Camera3D>("SpringArm3D/Camera3D");
+        camera.TopLevel = false; camera.Transform = Transform3D.Identity;
+        _springArm!.ProcessMode = ProcessModeEnum.Inherit;
+        GlobalPosition = target.GlobalPosition + FollowOffset;
+        ApplyOrbit();
+    }
+
     public override void _Ready()
     {
         _springArm = GetNodeOrNull<SpringArm3D>("SpringArm3D")
