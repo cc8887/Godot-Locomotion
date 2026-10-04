@@ -2,7 +2,7 @@
 
 ## Lyra Release：资源配置与测试
 
-[Lyra Preview Release v0.2.0-lyra](https://github.com/cc8887/Godot-Locomotion/releases/tag/v0.2.0-lyra) 提供与 tag 对应的 ALS 和 Lyra 资源。下面是 Windows 上运行本版本的流程；源代码 zip 本身不含资源，需要同时下载两个资源附件。
+[Lyra Preview Release v0.2.0-lyra](https://github.com/cc8887/Godot-Locomotion/releases/tag/v0.2.0-lyra) 提供与 tag 对应的 ALS 和 Lyra 资源。下面是 Windows 上运行本版本的流程；源代码 zip 本身不含资源，需要同时下载 ALS 资源包和全部 Lyra 分包。
 
 ### 1. 准备工具与对应版本的代码
 
@@ -19,13 +19,13 @@ Copy-Item .env.local.ps1.example .env.local.ps1
 
 已有检出可以先 `git fetch origin --tags`，再切到 `v0.2.0-lyra`。不同 tag 的资源批次不要混用；JSON 中的依赖摘要按原始文件字节验证，不要格式化资源文件。
 
-### 2. 下载、校验并解压两个资源包
+### 2. 下载、校验并解压资源包
 
-从上述 Release 页面下载下列三个附件。也可以安装 GitHub CLI 后在仓库根目录运行：
+从上述 Release 页面下载 ALS ZIP、全部 Lyra `partNN.zip` 分包及 `SHA256SUMS.txt`。也可以安装 GitHub CLI 后在仓库根目录运行：
 
 ```powershell
 gh release download v0.2.0-lyra --repo cc8887/Godot-Locomotion `
-  --pattern 'godot-*-assets-v0.2.0-lyra.zip' --pattern 'SHA256SUMS.txt' --dir .
+  --pattern 'godot-*-assets-v0.2.0-lyra*.zip' --pattern 'SHA256SUMS.txt' --dir .
 
 foreach ($line in Get-Content SHA256SUMS.txt) {
     if ($line -match '^([0-9a-f]{64})  (.+)$') {
@@ -35,12 +35,13 @@ foreach ($line in Get-Content SHA256SUMS.txt) {
         }
     }
 }
-Expand-Archive ./godot-als-assets-v0.2.0-lyra.zip -DestinationPath . -Force
-Expand-Archive ./godot-lyra-assets-v0.2.0-lyra.zip -DestinationPath . -Force
+Get-ChildItem 'godot-*-assets-v0.2.0-lyra*.zip' | Sort-Object Name | ForEach-Object {
+    Expand-Archive -LiteralPath $_.FullName -DestinationPath . -Force
+}
 ./scripts/verify-release-resources.ps1 -ExpectedTag v0.2.0-lyra
 ```
 
-两个 zip 内已带 `assets/generated/` 路径，**解压目标是仓库根目录**，不要解压到 `assets/generated/` 后形成双层目录。校验脚本逐文件检查大小和 SHA-256，成功时输出两条 `GODOT_RELEASE_RESOURCES_OK`。
+每个 zip 内已带 `assets/generated/` 路径，**解压目标是仓库根目录**，不要解压到 `assets/generated/` 后形成双层目录。Lyra 分包是独立 ZIP，应全部解压到同一位置，不需要先拼接文件。校验脚本逐文件检查整组资源的大小和 SHA-256；缺少任意分包中的文件会报错，成功时输出两条 `GODOT_RELEASE_RESOURCES_OK`。
 
 | 解压后的目录 | 内容与用途 |
 | --- | --- |
@@ -98,7 +99,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Godot 首次导入失败' }
 
 ### 5. 资源缺失或自行导出
 
-遇到 `Compiled ALS asset set is missing`，检查 ALS 包是否解压到正确位置；遇到 Lyra JSON 缺失、`Stale/Changed ... dependency`，先运行资源校验，再确认代码 tag 和两包版本相同。首次 FBX 导入必须等待完成。修改模型或重导动画后，重新导入并重新验证依赖摘要，不能只替换单个 FBX/JSON。
+遇到 `Compiled ALS asset set is missing`，检查 ALS 包是否解压到正确位置；遇到 Lyra JSON 缺失、`Stale/Changed ... dependency`，先运行资源校验，再确认代码 tag 和 ALS/Lyra 全部分包版本相同。首次 FBX 导入必须等待完成。修改模型或重导动画后，重新导入并重新验证依赖摘要，不能只替换单个 FBX/JSON。
 
 自行从 UE 准备 ALS 资源的流程见下方[资产准备](#资产准备)和[GASP58 的 ALS V4 资源](#gasp58-的-als-v4-资源)。Lyra 当前批次从 GASP58 的 Lyra 内容导出并重定向到 ALS；动画、曲线、Layer 图、Rig、通知和原生参考是多个导出阶段的产物，入口在 `scripts/export-lyra-*.ps1`、`tools/unreal/export_lyra_*.py`，对应阶段及依赖见 [ALS 人物与接口复核](docs/verification/2026-10-03-lyra-als-interface-review.md)。运行本 Release 优先使用同 tag 的整包，UE 5.8/5.9 差异不改变这里的安装步骤。
 
