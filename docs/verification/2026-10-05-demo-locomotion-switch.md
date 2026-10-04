@@ -19,7 +19,12 @@ Godot 4.7.2 .NET，目标 net8.0／C# 12，构建使用 SDK 10.0.300、Optimize=
 | 实际 OpenGL 渲染 | 60Hz 一项通过，九张截图；抽查 ALS、Rifle、Unarmed 及返回 ALS 的四张，HUD 与单角色展示可见 |
 | ALS 动作回归 | 240 帧通过；R/X 物理键、替换／取消／完成和主线程回调保持 |
 | 原相机故障恢复 | 52 帧、两次容量故障／10 次失败恢复通过；两条预期注入警告 |
+| 合入后的主目录构建 | Optimize=true，0 错误／0 警告 |
+| 合入后的主目录切换 | ALS／Lyra 初始模式各 30／60／120Hz，六项全部通过；使用用户当前修改后的 Demo 场景 |
+| 合入后的 Lyra 方向回归 | 60Hz short／steady 两项通过 |
 
 报告和截图保存于被忽略的 `artifacts/demo-switch/`，可通过 `scripts/verify-demo-switch.ps1` 重跑。早期编译成员名／命名空间错误、Montage 工作态查询误用的失败记录已保留；改用 committed 库存后全部切换测试通过。新切换运行及普通动作回归没有 Godot 错误或警告。
+
+实施提交为 `1762805d`，由 `codex/demo-locomotion-switch` fast-forward 合入 main。主目录构建及回归日志归档在 `artifacts/demo-switch/2026-10-05-runtime-switch/`；主目录切换报告在 `artifacts/demo-switch/ba37a5516ef84747bf8736b3219b4826/`，方向报告在 `artifacts/lyra-release/389a0009bf0e47cf819192219a211cb1/`。合入前后校验用户 12 个已修改文件的 SHA256 和原已暂存脚本重命名，均完整保留。
 
 本批没有修改、启动或导出 UE，没有打包／全量 .NET 回归／十分钟性能或完整人工玩法验收。切换只发布到 main 的合入提交，现有 `v0.2.0-lyra` 的 tag 与 Release 不包含此新功能。
