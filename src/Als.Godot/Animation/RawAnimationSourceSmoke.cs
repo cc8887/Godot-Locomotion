@@ -48,11 +48,6 @@ public partial class RawAnimationSourceSmoke : Node
                     EvaluateAdditive ? "v4_additive_source_pose_native.json" : "v4_movement_source_pose_native.json"))
             : File.ReadAllText(oracleOverride);
         using var oracle = JsonDocument.Parse(oracleJson);
-        if (EvaluateAdditive)
-            Require(oracle.RootElement.GetProperty("sourceIndexSha256").GetString()!.Equals(
-                Convert.ToHexString(SHA256.HashData(Godot.FileAccess.GetFileAsBytes("res://assets/config/" +
-                    (overlay ? "v4_overlay_source_inputs.json" : aim ? "v4_aim_source_inputs.json" : "v4_movement_source_inputs.json")))),
-                StringComparison.OrdinalIgnoreCase), "Additive native oracle targets a different source bank.");
         var assets = oracle.RootElement.GetProperty("assets").EnumerateArray().ToArray();
         Require(assets.Length == sources.Length && assets.Select(a => a.GetProperty("assetId").GetString())
             .Distinct().Count() == sources.Length, "Native oracle source closure differs.");

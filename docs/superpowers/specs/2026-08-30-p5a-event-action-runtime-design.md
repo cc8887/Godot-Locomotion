@@ -1,5 +1,7 @@
 # P5A 事件、同步与动作运行时设计
 
+> 历史设计记录。文中的 exporterVersion 精确值及 export-lock 方案已不作为当前资产输入门禁；当前只要求 schema v2 和 manifest/本次文件自洽，见 `docs/architecture/p2a-full-ue-export.md`。
+
 **状态：** 2026-08-30 已完成架构、事件语义、错误模型和验收边界确认；本文冻结实现前合同
 
 **目标引擎：** Godot 4.7.2 .NET

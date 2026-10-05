@@ -9,9 +9,6 @@ namespace GodotAls.Dispatch;
 
 public partial class P2bRealRigHarness : Node
 {
-    private const string MannequinAssetId = "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07";
-    private const string WalkClipId = "6124eafdcbeaaf04bca366add34c821faa0e4963";
-
     private AlsRealRigHarnessContext _context = null!;
 
     public override void _Ready()
@@ -27,20 +24,36 @@ public partial class P2bRealRigHarness : Node
             var resource = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath)
                 ?? throw new InvalidOperationException("Compiled ALS animation set could not be loaded.");
             var definition = resource.LoadDefinition();
-            var mannequin = definition.SkeletalMeshes[
-                definition.AssetIndex.GetSkeletalMeshId(MannequinAssetId)];
-            var walk = definition.Animations[definition.AssetIndex.GetAnimationId(WalkClipId)];
-            var mannequinScene = LoadScene(mannequin.ResourcePath, mannequin.Name);
-            var walkScene = LoadScene(walk.ResourcePath, walk.Name);
+            var representative = definition.SkeletalMeshes
+                .Where(mesh => (uint)mesh.SkeletonId < (uint)definition.Skeletons.Length)
+                .Select(mesh => new
+                {
+                    Mesh = mesh,
+                    Clip = definition.Animations
+                        .Where(animation => animation.SkeletonId == mesh.SkeletonId && animation.PlayLength > 0)
+                        .OrderByDescending(animation => animation.Timeline.Length)
+                        .ThenByDescending(animation => animation.SampledKeyCount)
+                        .ThenBy(animation => animation.StableId, StringComparer.Ordinal)
+                        .FirstOrDefault(),
+                })
+                .Where(candidate => candidate.Clip is not null)
+                .OrderByDescending(candidate => !candidate.Mesh.Overlay && !candidate.Mesh.Prop)
+                .ThenByDescending(candidate => candidate.Mesh.MaterialSlotCount)
+                .ThenBy(candidate => candidate.Mesh.StableId, StringComparer.Ordinal)
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException("No skeletal mesh has a compatible animation in the current export.");
+            var clip = representative.Clip!;
+            var meshScene = LoadScene(representative.Mesh.ResourcePath, representative.Mesh.Name);
+            var clipScene = LoadScene(clip.ResourcePath, clip.Name);
             _context = new AlsRealRigHarnessContext(
                 mode,
                 characterCount,
                 frames,
                 System.Environment.CurrentManagedThreadId,
-                mannequinScene,
-                walkScene,
-                walk,
-                definition.Skeletons[walk.SkeletonId]);
+                meshScene,
+                clipScene,
+                clip,
+                definition.Skeletons[clip.SkeletonId]);
 
             var gather = new AlsRealRigGatherStage { Name = "Gather" };
             gather.Configure(_context);

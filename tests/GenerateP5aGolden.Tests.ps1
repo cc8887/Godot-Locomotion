@@ -604,7 +604,9 @@ function New-TestP5aDeployment
 {
     param(
         [Parameter(Mandatory)][string]$Name,
-        [string]$RepositoryRoot
+        [string]$RepositoryRoot,
+        [int]$EngineMinorVersion = 9,
+        [int]$EnginePatchVersion = 0
     )
 
     $root = if ([string]::IsNullOrEmpty($RepositoryRoot)) {
@@ -643,7 +645,7 @@ public sealed class SyntheticGameEditorTarget : TargetRules
 '@
     $receipt = Join-Path $project 'Binaries\Win64\SyntheticGameEditor.target'
     Write-TestP5aText $receipt @"
-{"TargetName":"SyntheticGameEditor","Platform":"Win64","Configuration":"Development","Version":{"MajorVersion":5,"MinorVersion":9,"PatchVersion":0,"BuildId":"$buildId"}}
+{"TargetName":"SyntheticGameEditor","Platform":"Win64","Configuration":"Development","Version":{"MajorVersion":5,"MinorVersion":$EngineMinorVersion,"PatchVersion":$EnginePatchVersion,"BuildId":"$buildId"}}
 "@
     $alsManifest = Join-Path $project 'Plugins\ALS\Binaries\Win64\UnrealEditor.modules'
     $traceManifest = Join-Path $deployed 'Binaries\Win64\UnrealEditor.modules'
@@ -4990,6 +4992,21 @@ Start-Sleep -Seconds 30
         }
     }
 
+    It 'accepts a UE 5.8.1 Editor receipt when the module BuildIds match' {
+        Assert-TestP5aCommandCapability 'Open-P5aDeployedBuildEvidenceLease' generator
+        $fixture = New-TestP5aDeployment 'deployment-ue58' -EngineMinorVersion 8 -EnginePatchVersion 1
+        $lease = Open-P5aDeployedBuildEvidenceLease `
+            -RepositoryRoot $fixture.RepositoryRoot -UnrealProject $fixture.UProject
+        try
+        {
+            $lease.Evidence.targetReceiptSha256 | Should Match '^[0-9a-f]{64}$'
+        }
+        finally
+        {
+            $lease.Dispose()
+        }
+    }
+
     It 'accepts only one exact bare or UE-wrapped child marker and rejects every gate failure' {
         Assert-TestP5aCommandCapability 'Assert-P5aChildGateOutput' either
         $ready = "P5A_TRACE_READY_OK cases=8 commit=$script:P5aLockedCommit"
@@ -7570,6 +7587,10 @@ Start-Sleep -Seconds 30
                 $script:P5aVerifierPath
             }
             [IO.File]::Copy($sourceEntrypoint, $entrypoint, $true)
+            [IO.File]::Copy(
+                (Join-Path $script:P5aRepositoryRoot 'scripts\unreal-version-functions.ps1'),
+                (Join-Path $scriptRoot 'unreal-version-functions.ps1'),
+                $true)
             Remove-Item -LiteralPath $context.Oracle.AppHostPath -Force
             $powerShell = [Management.Automation.PowerShell]::Create()
             try

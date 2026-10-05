@@ -31,6 +31,14 @@ function Set-P3TraceDerivedAcceleration([object]$Trace)
 }
 
 Describe 'generate-p3-golden.ps1 semantic validation' {
+    It 'accepts supported UE minor versions and verifies receipt identity against the selected engine' {
+        $source = [System.IO.File]::ReadAllText($script:GeneratorScript)
+        $source | Should Match 'Get-AlsSupportedEngineVersion\s+-EngineRoot\s+\$engineRoot'
+        $source | Should Match 'Build-And-AuditEditorTarget\s+\$resolvedProject\s+\$projectDirectory\s+\$engineRoot\s+\$engineVersion'
+        $source | Should Match 'Assert-AlsSupportedEngineVersion'
+        $source | Should Not Match "Expected Unreal Engine 5\.9\.0"
+    }
+
     It 'locks approved reference patch bytes to LF on autocrlf hosts' {
         $attributes = [System.IO.File]::ReadAllText(
             (Join-Path $script:RepositoryRoot '.gitattributes'))

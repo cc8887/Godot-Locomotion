@@ -6,22 +6,29 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$UnrealProject,
 
+    [string]$ContentRoot = '/Game/AdvancedLocomotionV4',
+
     [string]$Output = '',
 
     [string]$BuildScript = (Join-Path $PSScriptRoot 'build-als-exporter.ps1'),
 
-    [string]$ReadyMarker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0',
-
-    [string]$CommandletName = 'AlsGodotExport',
-
-    [string]$AssetLockPath = '',
-
-    [switch]$UpdateAssetLock
+    [string]$CommandletName = 'AlsGodotExport'
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-. (Join-Path $PSScriptRoot 'asset-lock-functions.ps1')
+. (Join-Path $PSScriptRoot 'unreal-version-functions.ps1')
+. (Join-Path $PSScriptRoot 'p2a-publication-functions.ps1')
+
+$invalidContentRootSegment = @($ContentRoot.Substring([Math]::Min(6, $ContentRoot.Length)).Split('/') |
+    Where-Object { $_ -in @('', '.', '..') }).Count -gt 0
+if ($ContentRoot -cnotmatch '^/Game/[^/]+(?:/[^/]+)*$' -or
+    $ContentRoot.Contains('\') -or $invalidContentRootSegment) {
+    throw "ContentRoot must be a canonical Unreal content path below /Game/: $ContentRoot"
+}
+
+[void](Get-AlsSupportedEngineVersion -EngineRoot $EngineRoot)
+$readyMarker = 'GODOT_ALS_EXPORTER_READY'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
 $artifactsPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
@@ -38,35 +45,25 @@ $outputPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoo
     -Path (Join-Path $publicationPath 'canonical-candidate') -Label 'CandidateRoot'
 $determinismPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path (Join-Path $artifactsPath 'p2a-determinism\als_v4') -Label 'DeterminismRoot'
-if ([string]::IsNullOrWhiteSpace($AssetLockPath)) {
-    $AssetLockPath = Join-Path $repositoryRoot 'reference\als-v4-export.lock.json'
-}
-$assetLockPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
-    -Path ([IO.Path]::GetFullPath($AssetLockPath)) -Label 'LockPath'
-$lockCandidatePath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
-    -Path (Join-Path $publicationPath 'als-v4-export.lock.candidate.json') -Label 'LockCandidatePath'
 $canonicalBackupPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path (Join-Path $publicationPath 'als_v4.canonical.backup') -Label 'CanonicalBackupRoot'
-$lockBackupPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
-    -Path (Join-Path $publicationPath 'als-v4-export.lock.backup.json') -Label 'LockBackupPath'
 $journalPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot `
     -Path (Join-Path $publicationPath 'transaction.json') -Label 'JournalPath'
 
 $publicationPaths = @{
     CanonicalRoot = $canonicalPath; CandidateRoot = $outputPath; DeterminismRoot = $determinismPath
-    LockPath = $assetLockPath; LockCandidatePath = $lockCandidatePath
-    CanonicalBackupRoot = $canonicalBackupPath; LockBackupPath = $lockBackupPath; JournalPath = $journalPath
+    CanonicalBackupRoot = $canonicalBackupPath; JournalPath = $journalPath
 }
 Assert-AlsP2aPublicationPathTopology -Paths $publicationPaths
 Repair-AlsP2aPublication -RepositoryRoot $repositoryRoot -JournalPath $journalPath
 Invoke-AlsP2aStagingWorkflow -RepositoryRoot $repositoryRoot -CandidateRoot $outputPath `
-    -DeterminismRoot $determinismPath -LockCandidatePath $lockCandidatePath -Action {
-    foreach ($backup in @($canonicalBackupPath, $lockBackupPath)) {
+    -DeterminismRoot $determinismPath -Action {
+    foreach ($backup in @($canonicalBackupPath)) {
         if (Test-Path -LiteralPath $backup) {
             throw "P2A publication has orphaned backup residue without a recovery journal: $backup"
         }
     }
-    foreach ($staging in @($outputPath, $determinismPath, $lockCandidatePath)) {
+    foreach ($staging in @($outputPath, $determinismPath)) {
         Remove-AlsRepositoryDescendantPath -RepositoryRoot $repositoryRoot -Path $staging -Label 'stale P2A staging'
     }
 
@@ -82,8 +79,9 @@ function Assert-P2AV2Manifest {
     if ($null -eq $Manifest.PSObject.Properties['schemaVersion'] -or $Manifest.schemaVersion -ne 2) {
         throw "$Label manifest schemaVersion is not 2."
     }
-    if ($null -eq $Manifest.PSObject.Properties['exporterVersion'] -or $Manifest.exporterVersion -cne '2.0.0') {
-        throw "$Label manifest exporterVersion is not 2.0.0."
+    if ($null -eq $Manifest.PSObject.Properties['exporterVersion'] -or
+        [string]::IsNullOrWhiteSpace([string]$Manifest.exporterVersion)) {
+        throw "$Label manifest exporterVersion is missing."
     }
     if (@($Manifest.animations | Where-Object { @($_.metadata.timeline).Count -gt 0 }).Count -eq 0) {
         throw "$Label manifest contains no Sequence timeline entries."
@@ -120,8 +118,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "P2A build gate failed with exit code $LASTEXITCODE."
 }
 
-if (-not (($outputLines | Out-String).Contains($ReadyMarker, [StringComparison]::Ordinal))) {
-    throw "P2A ready marker was not found: $ReadyMarker"
+if (-not (($outputLines | Out-String).Contains($readyMarker, [StringComparison]::Ordinal))) {
+    throw "P2A ready marker was not found: $readyMarker"
 }
 
 Write-Host 'GODOT_ALS_P2A_READY'
@@ -138,7 +136,7 @@ $editorCommand = Join-Path ([IO.Path]::GetFullPath($EngineRoot)) 'Engine\Binarie
 $projectHashBefore = (Get-FileHash -LiteralPath $UnrealProject -Algorithm SHA256).Hash
 
 Write-Host 'P2A: checking the export plan and metadata...'
-$dryRunOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -DryRun "-Output=$outputPath" -unattended -nop4 -nosplash -nullrhi -nosound 2>&1
+$dryRunOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -DryRun "-Output=$outputPath" "-ContentRoot=$ContentRoot" -unattended -nop4 -nosplash -nullrhi -nosound 2>&1
 $dryRunOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A dry-run failed with exit code $LASTEXITCODE."
@@ -270,7 +268,7 @@ if ($manifest.auditSummary.status -cne 'planned') {
 Write-Host 'GODOT_ALS_P2A_METADATA_OK'
 
 Write-Host 'P2A: exporting assets and checking file hashes...'
-$exportOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -Export "-Output=$outputPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
+$exportOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -Export "-Output=$outputPath" "-ContentRoot=$ContentRoot" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
 $exportOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A full export failed with exit code $LASTEXITCODE."
@@ -289,19 +287,7 @@ Assert-P2AV2Manifest -Manifest $formalManifest -Label 'Formal'
 if ($formalManifest.auditSummary.status -cne 'complete' -or $formalManifest.auditSummary.errorCount -ne 0) {
     throw "Formal manifest audit is not complete: $($formalManifest.auditSummary.status)"
 }
-foreach ($file in $formalManifest.files) {
-    $filePath = Join-Path $outputPath $file.relativePath
-    if (-not (Test-Path -LiteralPath $filePath -PathType Leaf) -or (Get-Item -LiteralPath $filePath).Length -le 0) {
-        throw "Manifest output file is missing or empty: $($file.relativePath)"
-    }
-    if ($file.sha256 -cnotmatch '^[0-9a-f]{64}$') {
-        throw "Manifest output SHA-256 is invalid: $($file.relativePath)"
-    }
-    $actualHash = (Get-FileHash -LiteralPath $filePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualHash -cne $file.sha256) {
-        throw "Manifest output SHA-256 mismatch: $($file.relativePath)"
-    }
-}
+Assert-AlsP2aManifestFiles -Manifest $formalManifest -AssetRoot $outputPath -Label 'Formal'
 $fbxFiles = Get-ChildItem -LiteralPath $outputPath -Recurse -File -Filter '*.fbx'
 $externalTextureObjects = @($fbxFiles | Select-String -Pattern '^\s*(Texture|Video):\s+\d+,' -CaseSensitive)
 if ($externalTextureObjects.Count -ne 0) {
@@ -314,16 +300,16 @@ if (@($formalManifest.files).Count -ne $plan.summary.exportableCount) {
 Write-Host "GODOT_ALS_P2A_FULL_EXPORT_OK files=$(@($formalManifest.files).Count)"
 
 Write-Host 'P2A: repeating the export to verify deterministic output...'
-$determinismOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -Export "-Output=$determinismPath" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
+$determinismOutput = & $editorCommand $UnrealProject "-run=$CommandletName" -Export "-Output=$determinismPath" "-ContentRoot=$ContentRoot" -unattended -nop4 -nosplash -nosound -AllowCommandletRendering -RenderOffscreen 2>&1
 $determinismOutput | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) {
     throw "P2A determinism export failed with exit code $LASTEXITCODE."
 }
 }
 $compareScript = Join-Path $PSScriptRoot 'compare-p2a-exports.ps1'
-Invoke-AlsP2aJointPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
+Invoke-AlsP2aPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
     -RepositoryRoot $repositoryRoot -CanonicalRoot $canonicalPath -CandidateRoot $outputPath `
-    -DeterminismRoot $determinismPath -LockPath $assetLockPath -LockCandidatePath $lockCandidatePath `
-    -CanonicalBackupRoot $canonicalBackupPath -LockBackupPath $lockBackupPath -JournalPath $journalPath `
-    -ComparisonScriptPath $compareScript -UpdateAssetLock:$UpdateAssetLock
+    -DeterminismRoot $determinismPath `
+    -CanonicalBackupRoot $canonicalBackupPath -JournalPath $journalPath `
+    -ComparisonScriptPath $compareScript
 Write-Host 'P2A_VERIFICATION_OK'

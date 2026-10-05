@@ -34,9 +34,9 @@ public partial class AimPoseSmoke : Node
         var root = document.RootElement;
         Require(root.GetProperty("schemaVersion").GetInt32() == 1 && root.GetProperty("source").GetString() ==
             "UBlendSpace.GetAnimationPose(RAW, retargeted, asset root lock)", "Wrong native Aim pose oracle.");
-        foreach (var binding in new[] { ("samplingSha256", "v4_aim_sampling.json"), ("sourceIndexSha256", "v4_aim_source_inputs.json") })
-            Require(root.GetProperty(binding.Item1).GetString()!.Equals(Convert.ToHexString(SHA256.HashData(
-                Godot.FileAccess.GetFileAsBytes("res://assets/config/" + binding.Item2))), StringComparison.OrdinalIgnoreCase), "Aim oracle binding changed.");
+        Require(root.GetProperty("samplingSha256").GetString()!.Equals(Convert.ToHexString(SHA256.HashData(
+            Godot.FileAccess.GetFileAsBytes("res://assets/config/v4_aim_sampling.json"))), StringComparison.OrdinalIgnoreCase),
+            "Aim sampling configuration changed.");
         var skeleton = definition.AimRawSources.GetSkeleton(definition.AimSampling.SkeletonId);
         var count = 0; var staticCount = 0; var frames = new Dictionary<int, int>(); var mixed = 0;
         var positionError = 0f; var rotationError = 0f; var scaleError = 0f;

@@ -14,8 +14,6 @@ public sealed record AlsImportedResourceAuditReport(
 public static class AlsImportedResourceAuditor
 {
     private const double AnimationLengthTolerance = 1.0 / 30.0;
-    private const string MannequinAssetId = "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07";
-
     private static readonly System.Numerics.Matrix4x4 ImportedBoneToTarget = new(
         0f, 0f, -1f, 0f,
         -1f, 0f, 0f, 0f,
@@ -225,6 +223,34 @@ public static class AlsImportedResourceAuditor
 
     private static void AuditSkeletalMeshes(AlsAnimationSetDefinition definition, List<string> errors)
     {
+        var largestBoneCountBySkeleton = new Dictionary<int, int>();
+        foreach (var mesh in definition.SkeletalMeshes)
+        {
+            var resourcePath = ToResourcePath(mesh.ResourcePath);
+            var scene = ResourceLoader.Load<PackedScene>(resourcePath);
+            if (scene is null)
+            {
+                continue;
+            }
+
+            var root = scene.Instantiate();
+            try
+            {
+                var skeleton = FindFirst<Skeleton3D>(root);
+                if (skeleton is null)
+                {
+                    continue;
+                }
+
+                largestBoneCountBySkeleton[mesh.SkeletonId] = Math.Max(
+                    largestBoneCountBySkeleton.GetValueOrDefault(mesh.SkeletonId), skeleton.GetBoneCount());
+            }
+            finally
+            {
+                root.Free();
+            }
+        }
+
         foreach (var mesh in definition.SkeletalMeshes)
         {
             var resourcePath = ToResourcePath(mesh.ResourcePath);
@@ -241,7 +267,8 @@ public static class AlsImportedResourceAuditor
                         resourcePath,
                         skeleton,
                         definition.Skeletons[mesh.SkeletonId],
-                        string.Equals(mesh.StableId, MannequinAssetId, StringComparison.Ordinal),
+                        largestBoneCountBySkeleton.TryGetValue(mesh.SkeletonId, out var largestBoneCount) &&
+                        skeleton.GetBoneCount() == largestBoneCount,
                         errors);
                 }
 

@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schemaVersion": { "const": 2 },
-    "exporterVersion": { "const": "2.0.0" },
+    "exporterVersion": { "type": "string", "pattern": "\\S" },
     "sourceEngineVersion": { "type": "string", "minLength": 1 },
     "sourceProjectId": { "type": "string", "minLength": 1 },
     "sourceContentRoot": { "type": "string", "pattern": "^/Game/" },

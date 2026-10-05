@@ -17,21 +17,87 @@ namespace
             Kind == EAlsAssetKind::Material || Kind == EAlsAssetKind::MaterialInstance;
     }
 
-    FString MakeOutputPath(const EAlsAssetKind Kind, const FString& Id)
+    bool IsValidContentRoot(const FString& ContentRoot)
     {
+        if (!ContentRoot.StartsWith(TEXT("/Game/"), ESearchCase::CaseSensitive) ||
+            ContentRoot.EndsWith(TEXT("/"), ESearchCase::CaseSensitive) || ContentRoot.Contains(TEXT("\\")))
+        {
+            return false;
+        }
+
+        TArray<FString> Segments;
+        ContentRoot.Mid(1).ParseIntoArray(Segments, TEXT("/"), false);
+        for (const FString& Segment : Segments)
+        {
+            if (Segment.IsEmpty() || Segment == TEXT(".") || Segment == TEXT(".."))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool IsWithinContentRoot(const FString& PackagePath, const FString& ContentRoot)
+    {
+        return PackagePath == ContentRoot || PackagePath.StartsWith(ContentRoot + TEXT("/"), ESearchCase::CaseSensitive);
+    }
+
+    bool MakeOutputPath(const EAlsAssetKind Kind, const FAssetData& AssetData,
+        const FString& ContentRoot, FString& OutPath, FString& OutError)
+    {
+        FString KindDirectory;
+        const TCHAR* Extension = TEXT("fbx");
         switch (Kind)
         {
-        case EAlsAssetKind::SkeletalMesh:
-            return FString::Printf(TEXT("meshes/skeletal/%s.fbx"), *Id);
-        case EAlsAssetKind::StaticMesh:
-            return FString::Printf(TEXT("meshes/static/%s.fbx"), *Id);
-        case EAlsAssetKind::AnimationSequence:
-            return FString::Printf(TEXT("animations/%s.fbx"), *Id);
-        case EAlsAssetKind::Texture:
-            return FString::Printf(TEXT("textures/%s.png"), *Id);
+        case EAlsAssetKind::SkeletalMesh: KindDirectory = TEXT("meshes/skeletal"); break;
+        case EAlsAssetKind::StaticMesh: KindDirectory = TEXT("meshes/static"); break;
+        case EAlsAssetKind::AnimationSequence: KindDirectory = TEXT("animations"); break;
+        case EAlsAssetKind::Texture: KindDirectory = TEXT("textures"); Extension = TEXT("png"); break;
         default:
-            return FString();
+            OutPath.Reset();
+            return true;
         }
+
+        const FString AssetName = AssetData.AssetName.ToString();
+        const FString PackagePath = AssetData.PackageName.ToString();
+        if (AssetName.IsEmpty() || AssetName == TEXT(".") || AssetName == TEXT("..") ||
+            AssetName.Contains(TEXT("/")) || AssetName.Contains(TEXT("\\")) ||
+            !IsWithinContentRoot(PackagePath, ContentRoot))
+        {
+            OutError = FString::Printf(TEXT("Cannot preserve the original asset name in a safe export path: %s"),
+                *AssetData.GetObjectPathString());
+            return false;
+        }
+
+        FString RelativeDirectory;
+        if (PackagePath != ContentRoot)
+        {
+            FString RelativePackagePath = PackagePath.Mid(ContentRoot.Len() + 1);
+            const FString AssetSuffix = TEXT("/") + AssetName;
+            if (RelativePackagePath == AssetName)
+            {
+                RelativeDirectory.Reset();
+            }
+            else if (RelativePackagePath.EndsWith(AssetSuffix, ESearchCase::CaseSensitive))
+            {
+                RelativePackagePath.LeftChopInline(AssetSuffix.Len(), EAllowShrinking::No);
+                RelativeDirectory = MoveTemp(RelativePackagePath);
+            }
+            else
+            {
+                OutError = FString::Printf(TEXT("Asset package does not end with its original asset name: %s"),
+                    *AssetData.GetObjectPathString());
+                return false;
+            }
+        }
+
+        OutPath = KindDirectory;
+        if (!RelativeDirectory.IsEmpty())
+        {
+            OutPath += TEXT("/") + RelativeDirectory;
+        }
+        OutPath += TEXT("/") + AssetName + TEXT(".") + Extension;
+        return true;
     }
 }
 
@@ -63,21 +129,21 @@ bool AlsAssetKindIsExportable(const EAlsAssetKind Kind)
         Kind == EAlsAssetKind::AnimationSequence || Kind == EAlsAssetKind::Texture;
 }
 
-bool FAlsAssetDiscovery::Discover(TArray<FAlsExportAsset>& OutAssets, FString& OutError)
+bool FAlsAssetDiscovery::Discover(const FString& ContentRoot, TArray<FAlsExportAsset>& OutAssets, FString& OutError)
 {
+    OutError.Reset();
+    if (!IsValidContentRoot(ContentRoot))
+    {
+        OutError = FString::Printf(TEXT("ContentRoot must be a canonical Unreal content path below /Game/: %s"),
+            *ContentRoot);
+        return false;
+    }
+
     IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
     AssetRegistry.WaitForCompletion();
 
     FARFilter Filter;
-    Filter.PackagePaths = {
-        FName(TEXT("/Game/AdvancedLocomotionV4/CharacterAssets")),
-        FName(TEXT("/Game/AdvancedLocomotionV4/Props")),
-        FName(TEXT("/Game/AdvancedLocomotionV4/Data")),
-        FName(TEXT("/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers")),
-        FName(TEXT("/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys")),
-        FName(TEXT("/Game/AdvancedLocomotionV4/Blueprints/CameraSystem")),
-        FName(TEXT("/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic")),
-    };
+    Filter.PackagePaths.Add(FName(*ContentRoot));
     Filter.bRecursivePaths = true;
     Filter.bIncludeOnlyOnDiskAssets = true;
 
@@ -114,7 +180,7 @@ bool FAlsAssetDiscovery::Discover(TArray<FAlsExportAsset>& OutAssets, FString& O
         for (const FName DependencyPackage : DependencyPackages)
         {
             const FString DependencyPath = DependencyPackage.ToString();
-            if (!DependencyPath.StartsWith(TEXT("/Game/AdvancedLocomotionV4/")) || IsExcluded(DependencyPath + TEXT(".Asset")))
+            if (!IsWithinContentRoot(DependencyPath, ContentRoot) || IsExcluded(DependencyPath + TEXT(".Asset")))
             {
                 continue;
             }
@@ -143,7 +209,10 @@ bool FAlsAssetDiscovery::Discover(TArray<FAlsExportAsset>& OutAssets, FString& O
         Asset.Kind = Classify(AssetData);
         const FString ObjectPath = AssetData.GetObjectPathString();
         Asset.Id = FAlsStableAssetId::Create(ObjectPath);
-        Asset.OutputPath = MakeOutputPath(Asset.Kind, Asset.Id);
+        if (!MakeOutputPath(Asset.Kind, AssetData, ContentRoot, Asset.OutputPath, OutError))
+        {
+            return false;
+        }
 
         if (const FString* ExistingPath = ObjectPathById.Find(Asset.Id); ExistingPath && *ExistingPath != ObjectPath)
         {

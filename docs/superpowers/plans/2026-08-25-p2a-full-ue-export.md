@@ -1,5 +1,7 @@
 # P2A Full UE Asset Export Implementation Plan
 
+> 历史实施计划。示例 UE/plugin 版本与资产数量仅记录当时环境，不作为后续资产输入锁；当前门禁见 `docs/architecture/p2a-full-ue-export.md`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use completed checkboxes for tracking.
 
 **Goal:** 使用 UE 5.9 C++ Editor Commandlet 一次发现并导出全部目标 ALS 角色、动画、Overlay、道具及依赖，生成通过 schema、输出审计和双运行确定性门禁的正式 manifest。

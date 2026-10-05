@@ -27,7 +27,6 @@ public sealed record AlsManifest(
     [property: JsonRequired] AlsAuditSummary AuditSummary)
 {
     public const int CurrentSchemaVersion = 2;
-    public const string CurrentExporterVersion = "2.0.0";
 }
 
 public sealed record AlsCoordinateSystem(

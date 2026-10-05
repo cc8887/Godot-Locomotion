@@ -42,9 +42,7 @@ int32 UAlsV4AssetExportCommandlet::Main(const FString& Params)
             UE_LOG(LogAlsV4AssetExporter, Error, TEXT("Asset exporter self-test failed: %s"), *Error);
             return 3;
         }
-        UE_LOG(LogAlsV4AssetExporter, Display,
-            TEXT("GODOT_ALS_V4_EXPORTER_READY engine=%d.%d.%d plugin=1.0.0 curves=%d composites=%d"),
-            Version.GetMajor(), Version.GetMinor(), Version.GetPatch(), CurveCases, CompositeCases);
+        UE_LOG(LogAlsV4AssetExporter, Display, TEXT("GODOT_ALS_EXPORTER_READY"));
         return 0;
     }
 
@@ -65,9 +63,12 @@ int32 UAlsV4AssetExportCommandlet::Main(const FString& Params)
     }
     OutputDirectory = FPaths::ConvertRelativePathToFull(OutputDirectory);
 
+    FString ContentRoot = TEXT("/Game/AdvancedLocomotionV4");
+    FParse::Value(*Params, TEXT("ContentRoot="), ContentRoot);
+
     TArray<FAlsExportAsset> Assets;
     FString Error;
-    if (!FAlsAssetDiscovery::Discover(Assets, Error))
+    if (!FAlsAssetDiscovery::Discover(ContentRoot, Assets, Error))
     {
         UE_LOG(LogAlsV4AssetExporter, Error, TEXT("Asset discovery failed: %s"), *Error);
         return 3;
@@ -76,7 +77,7 @@ int32 UAlsV4AssetExportCommandlet::Main(const FString& Params)
     int32 ExportableCount = 0;
     int32 ConfigCount = 0;
     if (!FAlsExportPlanner::Write(OutputDirectory, Assets, ExportableCount, ConfigCount, Error) ||
-        !FAlsManifestWriter::WritePlanned(OutputDirectory, Assets, Error))
+        !FAlsManifestWriter::WritePlanned(OutputDirectory, ContentRoot, Assets, Error))
     {
         UE_LOG(LogAlsV4AssetExporter, Error, TEXT("Asset plan failed: %s"), *Error);
         return 4;
@@ -101,7 +102,7 @@ int32 UAlsV4AssetExportCommandlet::Main(const FString& Params)
 
     TArray<FAlsExportFile> Files;
     if (!FAlsOutputAuditor::Audit(OutputDirectory, Assets, NormalizedFbxKeys, Files, Error) ||
-        !FAlsManifestWriter::WriteComplete(OutputDirectory, Assets, Files, Error))
+        !FAlsManifestWriter::WriteComplete(OutputDirectory, ContentRoot, Assets, Files, Error))
     {
         UE_LOG(LogAlsV4AssetExporter, Error, TEXT("Output audit failed: %s"), *Error);
         return 6;

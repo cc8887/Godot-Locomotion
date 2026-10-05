@@ -134,9 +134,8 @@ P3A 运行时 gate 因此明确重建 `Debug -p:Optimize=true --no-incremental`�
 本机没有 Godot export templates，因此只验证了 `ExportRelease` 编译边界，没有执行 exported runtime；文档
 和 marker 均不把 editor-host 结果冒充 exported runtime 验证。
 
-为排除旧 P2A 批次 FBX 中遗留的 external texture object，本轮使用仓库现有 exporter 重新执行完整 P2A
-双导出。新正式 manifest SHA-256 为
-`369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327`，审计为 267 assets / 141 files、
+为排除当时导出 FBX 中遗留的 external texture object，本轮使用仓库现有 exporter 重新执行完整 P2A
+双导出。当次 manifest 哈希和 267 assets / 141 files 是历史观测值，不要求后续资产批次匹配；审计为
 0 error / 0 warning，第二遍确定性比较覆盖 146 files。137 个 FBX 中 `Texture`/`Video` external object 计数
 为 0，`export_report.json` 的 `normalizedFbxKeys` 包含 `ExternalTextureObject`。随后清空的仅是当前 worktree
 `.godot/imported` 与 ignored asset sidecar/compiled cache；`verify-p2b.ps1 -CleanImport` 首次导入无
@@ -153,8 +152,7 @@ pwsh -NoProfile -File scripts/verify-p3a.ps1 `
 ```
 
 入口先 restore/build Release，运行 Pester、自身 motor smoke、optimized Debug editor host 和 P3A 四矩阵；
-四矩阵通过后先校验正式 P2A manifest SHA-256
-`369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327`，再严格按以下顺序执行。P2B 默认
+四矩阵通过后先按当前 manifest 校验导出文件、类型和运行时所需元数据，再严格按以下顺序执行。P2B 默认
 强制 `-CleanImport`，只清理当前 worktree 的 Godot/ignored asset cache；任一步非零或 Godot 输出含
 `SCRIPT ERROR`/`ERROR:` 均立即失败，不会继续打印 P3A success：
 

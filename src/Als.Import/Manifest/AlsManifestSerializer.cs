@@ -26,9 +26,9 @@ public static class AlsManifestSerializer
         {
             throw new JsonException("ALS manifest schemaVersion must be 2.");
         }
-        if (!string.Equals(manifest.ExporterVersion, AlsManifest.CurrentExporterVersion, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(manifest.ExporterVersion))
         {
-            throw new JsonException("ALS manifest exporterVersion must be 2.0.0.");
+            throw new JsonException("ALS manifest exporterVersion must be a non-empty informational value.");
         }
         for (var index = 0; index < manifest.Animations.Length; index++)
         {

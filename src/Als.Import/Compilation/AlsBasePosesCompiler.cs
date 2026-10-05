@@ -124,12 +124,20 @@ public static class AlsBasePosesCompiler
     {
         Require(a.StableId == AssetIds[role] && a.Name == PoseNames[role] && a.SkeletonId == skeleton &&
             (uint)a.Id < (uint)set.Animations.Length && ReferenceEquals(set.Animations[a.Id], a) &&
-            a.ResourcePath == "animations/" + a.StableId + ".fbx" && a.PlayLength == .033333335f &&
+            IsOriginalBasePoseResourcePath(a.ResourcePath, PoseNames[role]) && a.PlayLength == .033333335f &&
             a.FrameRateNumerator == 30 && a.FrameRateDenominator == 1 && a.SampledKeyCount == 2 && !a.Loop && a.Interpolation == 0 &&
             !a.RootMotionEnabled && a.RootMotionRootLock == 0 && !a.ForceRootLock && a.UseNormalizedRootMotionScale &&
             a.AdditiveType == 0 && a.AdditiveBasePoseType == 0 && a.AdditiveBasePoseFrame == 0 && a.AdditiveBasePoseAnimationId == -1 &&
             a.Curves.Length == 0 && a.LegacyCurveNames.Length == 0 && a.Timeline.Length == 0 && a.SyncMarkers.Length == 0 &&
             !a.Overlay && !a.Prop, "BasePose manifest identity, sampling, curves or event policy changed: " + a.Name);
+    }
+
+    private static bool IsOriginalBasePoseResourcePath(string path, string assetName)
+    {
+        var segments = path.Split('/');
+        return segments.Length >= 2 && segments[0] == "animations" &&
+            segments.All(segment => segment.Length > 0 && segment is not "." and not "..") &&
+            segments[^1] == assetName + ".fbx";
     }
 
     private static void Pins(Node node, string[] inputs, string[] outputs) => Require(

@@ -2,6 +2,8 @@
 
 ## 阶段目标
 
+本文中的资产数量、示例对象路径及首次导出器版本为历史实测快照，不构成后续输入的固定资产批次或版本锁。当前导出由所选 `ContentRoot` 扫描，并以本次 manifest 的文件列表做自洽校验。
+
 P2A 建立 UE 5.9 到 Godot ALS 项目的可重复资产交付边界。本阶段一次发现并导出 ALS V4 角色、动画、Overlay、道具模型及其项目内依赖；音频、关卡、环境、UI、AI 和 GameMode 不在本阶段范围内。
 
 本阶段完成 UE 侧导出、元数据、审计和确定性门禁，不代表 Godot 已完成这些资产的导入、重定向或运行时功能映射。后续 P2B 将消费本阶段的正式 manifest。
@@ -29,7 +31,7 @@ P2A 建立 UE 5.9 到 Godot ALS 项目的可重复资产交付边界。本阶段
 
 ## 实测资产清单
 
-2026-08-25 对源项目实际扫描得到 267 个目标资产，`excluded=0`。这里的 `excluded=0` 表示纳入扫描的 ALS 角色、动画、Overlay 和 Props 范围内没有无法分类或被静默跳过的资产；它不表示音频等非目标目录被导出。
+2026-08-25 的一次源项目扫描得到 267 个目标资产，`excluded=0`。以下数量、名称和摘要是当时的测量记录，不是后续导出必须匹配的固定 inventory；P2A 按本次 `ContentRoot` 和 UE Asset Registry 重新发现资产。这里的 `excluded=0` 表示纳入扫描的 ALS 角色、动画、Overlay 和 Props 范围内没有无法分类或被静默跳过的资产；它不表示音频等非目标目录被导出。
 
 | 资产类型 | 计划数量 | 二进制导出 |
 |---|---:|---:|
@@ -69,16 +71,15 @@ P2A 建立 UE 5.9 到 Godot ALS 项目的可重复资产交付边界。本阶段
 
 正式入口为 `assets/generated/als_v4/als_manifest.json`。发布顺序是先写 partial manifest，导出全部文件，完成路径、长度、SHA-256、引用和数量审计，再原子替换 formal manifest。失败时不会把 incomplete manifest 发布为正式结果。
 
-本次 formal manifest：
+本次 formal manifest 的历史快照：
 
 - `auditSummary.status=complete`
 - `assetCount=267`
 - `fileCount=141`
 - `errorCount=0`
 - `warningCount=0`
-- 单次实测 manifest SHA-256：`f3f0e3e1d25e9d1bb31dfff9302d79af8572f62917dbb40a34fff5121f813cab`
 
-`files[]` 为每个 FBX/PNG 记录相对路径、长度和 SHA-256。审计拒绝空文件、缺失文件、重复路径、输出根逃逸、无效 hash、目标资产缺少输出以及内部引用缺失。本批对 skeleton、skeletal mesh、animation、additive base pose、Montage、BlendSpace、material parent 和 texture 的 241 个 metadata 引用检查结果为 0 缺失。SHA-256 通过 UE 所带 OpenSSL 计算；UE 5.9 当前的平台 SHA-256 API 在该 commandlet 路径会发生 native crash，因此没有使用它。
+`files[]` 为每个 FBX/PNG 记录相对路径、长度和 SHA-256，用来核对当前导出文件与当前 manifest；不会与历史 manifest 或资产哈希比较。导出文件以原始 UE `AssetName` 命名，并保留所选 `ContentRoot` 下的相对目录。审计拒绝空文件、缺失文件、重复路径、输出根逃逸、无效 hash、目标资产缺少输出以及内部引用缺失。本批对 skeleton、skeletal mesh、animation、additive base pose、Montage、BlendSpace、material parent 和 texture 的 241 个 metadata 引用检查结果为 0 缺失。SHA-256 通过 UE 所带 OpenSSL 计算；UE 5.9 当前的平台 SHA-256 API 在该 commandlet 路径会发生 native crash，因此没有使用它。
 
 ## 确定性处理
 
@@ -116,10 +117,10 @@ P2A_DETERMINISM_OK files=146
 P2B 应从 formal manifest 驱动 Godot 导入，不按文件名猜测关联关系，并至少建立以下门禁：
 
 1. 验证骨名、父索引、rest pose hash、单位比例和 UE Z-up 左手系到 Godot Y-up 右手系转换；
-2. 导入 7 个 SkeletalMesh、4 个 StaticMesh、126 个 AnimationSequence 和 4 个纹理，核对 Godot 侧文件/资源计数；
+2. 导入当前 manifest 声明的 SkeletalMesh、StaticMesh、AnimationSequence 和纹理，不要求匹配本页历史数量；
 3. 校验动画时长、采样率、Root Motion、曲线、notify、sync marker、Montage section 和 BlendSpace sample；
 4. 建立 Material/MaterialInstance 到 Godot 材质参数的显式映射；
-5. 先用 Mannequin 加一组 Base locomotion 与一个 M4A1/Pistol Overlay 做真实骨架 smoke，再扩到全部 Overlay 和 Props；
+5. 使用 profile 指定的骨架和代表性 locomotion/overlay 资源做真实骨架 smoke，再覆盖当前 manifest 中其它配置资源；
 6. 在 P1 Gather/Worker/Commit 架构中验证真实 Skeleton3D/AnimationMixer 的线程所有权、single/parallel 等价性和性能。
 
 P2B 完成后，才进入参考 `ALS-Refactored` C++ 行为的逐模块移植：基础 locomotion、stance/gait/rotation mode、Overlay、mantle、ragdoll、IK 和 camera，且每个模块都需要 UE/Godot golden trace 或等价回放对比。

@@ -21,9 +21,6 @@ public static class AlsGodotImportCoordinator
     public const string ManifestPath = AssetRoot + "/als_manifest.json";
     public const string CompiledResourcePath = AssetRoot + "/compiled/als_animation_set.tres";
 
-    private const string MannequinAssetId = "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07";
-    private const string M4a1AssetId = "2516ba17950769f5845f00f6c17c6d6ac913f475";
-
     public static AlsGodotImportReport Run()
     {
         var manifestAbsolutePath = ProjectSettings.GlobalizePath(ManifestPath);
@@ -101,22 +98,31 @@ public static class AlsGodotImportCoordinator
         }
 
         var restored = reloaded.LoadDefinition();
-        if (restored.Animations.Length == 0 ||
-            restored.Montages.Length == 0 ||
-            restored.BlendSpaces.Length == 0 ||
-            restored.Materials.Length == 0 ||
-            restored.PhysicsAssets.Length == 0)
+        if (restored.Skeletons.Length == 0 ||
+            restored.SkeletalMeshes.Length == 0 ||
+            restored.Animations.Length == 0)
         {
-            throw new InvalidOperationException("Generated ALS animation set reloaded without complete runtime tables.");
+            throw new InvalidOperationException("Generated ALS animation set is missing its core skeleton, mesh, or animation data.");
         }
     }
 
     private static void VerifyRepresentativeMaterials(AlsAnimationSetDefinition definition)
     {
         var builder = new AlsMaterialBuilder(definition);
-        foreach (var stableId in new[] { MannequinAssetId, M4a1AssetId })
+        var representativeMeshes = definition.SkeletalMeshes
+            .Where(mesh => mesh.MaterialIds.Length > 0)
+            .OrderByDescending(mesh => !mesh.Overlay && !mesh.Prop)
+            .ThenByDescending(mesh => mesh.MaterialSlotCount)
+            .ThenBy(mesh => mesh.StableId, StringComparer.Ordinal)
+            .Take(2)
+            .ToArray();
+        if (representativeMeshes.Length == 0)
         {
-            var mesh = definition.SkeletalMeshes[definition.AssetIndex.GetSkeletalMeshId(stableId)];
+            throw new InvalidOperationException("No skeletal mesh with material assignments is available for the material smoke.");
+        }
+
+        foreach (var mesh in representativeMeshes)
+        {
             var scene = ResourceLoader.Load<PackedScene>(AlsImportedResourceAuditor.ToResourcePath(mesh.ResourcePath));
             if (scene is null)
             {

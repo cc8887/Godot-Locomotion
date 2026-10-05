@@ -1,91 +1,3 @@
-function Read-AlsExportLock {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$LockPath)
-
-    if (-not (Test-Path -LiteralPath $LockPath -PathType Leaf)) { throw "ALS export lock does not exist: $LockPath" }
-    try { $document = [System.Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText($LockPath)) }
-    catch { throw "ALS export lock is not valid JSON: $($_.Exception.Message)" }
-    try {
-        if ($document.RootElement.ValueKind -ne [Text.Json.JsonValueKind]::Object) { throw 'ALS export lock must be a JSON object.' }
-        $required = @('schemaVersion', 'manifestSha256', 'assetCount', 'fileCount', 'animationCount', 'exporterVersion', 'sourceProjectId')
-        $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-        $values = @{}
-        foreach ($property in $document.RootElement.EnumerateObject()) {
-            if ($property.Name -cnotin $required) { throw "ALS export lock contains unknown property: $($property.Name)" }
-            if (-not $seen.Add($property.Name)) { throw "ALS export lock contains duplicate property: $($property.Name)" }
-            $values[$property.Name] = $property.Value.Clone()
-        }
-        foreach ($name in $required) { if (-not $seen.Contains($name)) { throw "ALS export lock is missing property: $name" } }
-        $schemaVersion = 0; $assetCount = 0; $fileCount = 0; $animationCount = 0
-        if (-not $values.schemaVersion.TryGetInt32([ref]$schemaVersion) -or $schemaVersion -ne 1) { throw 'ALS export lock schemaVersion must be exactly 1.' }
-        if (-not $values.assetCount.TryGetInt32([ref]$assetCount) -or $assetCount -ne 267) { throw 'ALS export lock assetCount must be exactly 267.' }
-        if (-not $values.fileCount.TryGetInt32([ref]$fileCount) -or $fileCount -ne 141) { throw 'ALS export lock fileCount must be exactly 141.' }
-        if (-not $values.animationCount.TryGetInt32([ref]$animationCount) -or $animationCount -ne 126) { throw 'ALS export lock animationCount must be exactly 126.' }
-        $manifestSha256 = $values.manifestSha256.GetString()
-        $exporterVersion = $values.exporterVersion.GetString()
-        $sourceProjectId = $values.sourceProjectId.GetString()
-        if ($manifestSha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'ALS export lock manifestSha256 must be lowercase SHA-256.' }
-        if ([string]::IsNullOrWhiteSpace($exporterVersion)) { throw 'ALS export lock exporterVersion must be non-empty.' }
-        if ([string]::IsNullOrWhiteSpace($sourceProjectId)) { throw 'ALS export lock sourceProjectId must be non-empty.' }
-        [pscustomobject]@{ SchemaVersion=$schemaVersion; ManifestSha256=$manifestSha256; AssetCount=$assetCount; FileCount=$fileCount; AnimationCount=$animationCount; ExporterVersion=$exporterVersion; SourceProjectId=$sourceProjectId }
-    }
-    finally { $document.Dispose() }
-}
-
-function Publish-AlsExportLock {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$ManifestPath,
-        [Parameter(Mandatory)][string]$LockPath,
-        [string]$RepositoryRoot = ''
-    )
-
-    $manifest = Read-AlsP2aManifestJson -ManifestPath $ManifestPath -Label 'Export lock candidate'
-    $assetCount = [int]$manifest.auditSummary.assetCount
-    $fileCount = @($manifest.files).Count
-    $animationCount = @($manifest.animations).Count
-    if ($manifest.auditSummary.status -cne 'complete' -or [int]$manifest.auditSummary.errorCount -ne 0 -or
-        $assetCount -ne 267 -or $fileCount -ne 141 -or $animationCount -ne 126) {
-        throw "Refusing to publish ALS export lock from incomplete or unexpected manifest counts: assets=$assetCount files=$fileCount animations=$animationCount"
-    }
-    $value = [ordered]@{
-        schemaVersion = 1
-        manifestSha256 = (Get-FileHash -LiteralPath $ManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-        assetCount = $assetCount
-        fileCount = $fileCount
-        animationCount = $animationCount
-        exporterVersion = [string]$manifest.exporterVersion
-        sourceProjectId = [string]$manifest.sourceProjectId
-    }
-    if ([string]::IsNullOrWhiteSpace($value.exporterVersion) -or [string]::IsNullOrWhiteSpace($value.sourceProjectId)) { throw 'Refusing to publish ALS export lock without producer identity.' }
-    $lockFullPath = if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
-        [IO.Path]::GetFullPath($LockPath)
-    }
-    else {
-        Resolve-AlsRepositoryDescendantPath -RepositoryRoot $RepositoryRoot -Path $LockPath -Label 'LockPath'
-    }
-    $directory = [IO.Path]::GetDirectoryName($lockFullPath)
-    [void][IO.Directory]::CreateDirectory($directory)
-    $bytes = [Text.UTF8Encoding]::new($false).GetBytes("$($value | ConvertTo-Json)$([Environment]::NewLine)")
-    $temporaryPath = Join-Path $directory ".$([IO.Path]::GetFileName($lockFullPath)).$([guid]::NewGuid().ToString('N')).tmp"
-    if (-not [string]::IsNullOrWhiteSpace($RepositoryRoot)) {
-        $temporaryPath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $RepositoryRoot -Path $temporaryPath -Label 'Lock temporary path'
-    }
-    try {
-        $stream = [System.IO.FileStream]::new($temporaryPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough)
-        try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
-        if ([System.IO.File]::Exists($lockFullPath)) { [System.IO.File]::Replace($temporaryPath, $lockFullPath, [Management.Automation.Language.NullString]::Value) }
-        else { [System.IO.File]::Move($temporaryPath, $lockFullPath) }
-    }
-    catch { throw "Failed to publish ALS export lock atomically: $($_.Exception.Message)" }
-    finally {
-        if ([IO.File]::Exists($temporaryPath)) {
-            if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) { [IO.File]::Delete($temporaryPath) }
-            else { Remove-AlsRepositoryDescendantPath -RepositoryRoot $RepositoryRoot -Path $temporaryPath -Label 'Lock temporary residue' }
-        }
-    }
-}
-
 function Get-AlsP2aSha1 {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Value)
@@ -141,6 +53,70 @@ function Read-AlsP2aManifestJson {
     }
     finally {
         if ($null -ne $document) { $document.Dispose() }
+    }
+}
+
+function Assert-AlsP2aManifestFiles {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$Manifest,
+        [Parameter(Mandatory)][string]$AssetRoot,
+        [string]$Label = 'Export'
+    )
+
+    $assetRootFullPath = [IO.Path]::GetFullPath($AssetRoot)
+    if (-not (Test-Path -LiteralPath $assetRootFullPath -PathType Container)) {
+        throw "$Label asset root does not exist: $assetRootFullPath"
+    }
+    $canonicalRoot = $assetRootFullPath.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) +
+        [IO.Path]::DirectorySeparatorChar
+    $declaredPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $files = @($Manifest.files)
+    for ($index = 0; $index -lt $files.Count; $index++) {
+        $file = $files[$index]
+        $relativePath = [string]$file.relativePath
+        $fieldPath = "$Label files[$index].relativePath"
+        if ([string]::IsNullOrWhiteSpace($relativePath) -or $relativePath.Contains('\') -or
+            [IO.Path]::IsPathRooted($relativePath)) {
+            throw "$fieldPath must be a canonical relative path: $relativePath"
+        }
+        $segments = @($relativePath -split '/')
+        if ($segments | Where-Object { $_ -in @('', '.', '..') }) {
+            throw "$fieldPath contains an empty, '.' or '..' path segment: $relativePath"
+        }
+        try { $path = [IO.Path]::GetFullPath([IO.Path]::Combine($assetRootFullPath, $relativePath)) }
+        catch { throw "$fieldPath is invalid: $($_.Exception.Message)" }
+        if (-not $path.StartsWith($canonicalRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "$fieldPath escapes outside the asset root: $relativePath"
+        }
+        if (-not $declaredPaths.Add($relativePath)) {
+            throw "$fieldPath duplicates a case-insensitive file path: $relativePath"
+        }
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "$fieldPath target does not exist as a file: $relativePath"
+        }
+        $info = Get-Item -LiteralPath $path
+        if ([long]$file.size -le 0 -or $info.Length -ne [long]$file.size) {
+            throw "$Label file size does not match the manifest: $relativePath"
+        }
+        if ([string]$file.sha256 -cnotmatch '^[0-9a-f]{64}$') {
+            throw "$Label files[$index].sha256 is not a lowercase SHA-256: $relativePath"
+        }
+        $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -cne [string]$file.sha256) {
+            throw "$Label file SHA-256 does not match the manifest: $relativePath"
+        }
+    }
+
+    foreach ($collection in @(
+        'skeletons', 'skeletalMeshes', 'staticMeshes', 'animations', 'montages', 'blendSpaces',
+        'aimOffsets', 'materials', 'textures', 'physicsAssets', 'curves', 'configAssets'
+    )) {
+        foreach ($asset in @($Manifest.$collection)) {
+            if ($null -ne $asset.outputPath -and -not $declaredPaths.Contains([string]$asset.outputPath)) {
+                throw "$Label $collection output is missing from files[]: $($asset.outputPath)"
+            }
+        }
     }
 }
 
@@ -288,8 +264,9 @@ function Assert-AlsP2aPublishManifest {
     if ($null -eq $Manifest.PSObject.Properties['schemaVersion'] -or [int]$Manifest.schemaVersion -ne 2) {
         throw "$Label manifest schemaVersion must be exactly 2."
     }
-    if ($null -eq $Manifest.PSObject.Properties['exporterVersion'] -or [string]$Manifest.exporterVersion -cne '2.0.0') {
-        throw "$Label manifest exporterVersion must be exactly 2.0.0."
+    if ($null -eq $Manifest.PSObject.Properties['exporterVersion'] -or
+        [string]::IsNullOrWhiteSpace([string]$Manifest.exporterVersion)) {
+        throw "$Label manifest exporterVersion must be present as informational metadata."
     }
     $assetCollections = @(
         'skeletons', 'skeletalMeshes', 'staticMeshes', 'animations', 'montages', 'blendSpaces',
@@ -306,9 +283,8 @@ function Assert-AlsP2aPublishManifest {
     $fileCount = @($Manifest.files).Count
     $animationCount = @($Manifest.animations).Count
     if ([string]$Manifest.auditSummary.status -cne 'complete' -or [int]$Manifest.auditSummary.errorCount -ne 0 -or
-        $assetCount -ne 267 -or $allAssets.Count -ne 267 -or $fileCount -ne 141 -or
-        [int]$Manifest.auditSummary.fileCount -ne 141 -or $animationCount -ne 126) {
-        throw "$Label manifest inventory is incomplete or unexpected: assets=$assetCount actualAssets=$($allAssets.Count) files=$fileCount animations=$animationCount."
+        $assetCount -ne $allAssets.Count -or $fileCount -ne [int]$Manifest.auditSummary.fileCount) {
+        throw "$Label manifest inventory summary does not match its contents: assets=$assetCount actualAssets=$($allAssets.Count) files=$fileCount summaryFiles=$($Manifest.auditSummary.fileCount)."
     }
 
     $audioAssets = @($allAssets | Where-Object {
@@ -483,7 +459,7 @@ function Assert-AlsP2aPublishManifest {
     }
 
     return [pscustomobject]@{
-        SchemaVersion = 2; ExporterVersion = '2.0.0'; AssetCount = $assetCount; FileCount = $fileCount
+        SchemaVersion = 2; ExporterVersion = [string]$Manifest.exporterVersion; AssetCount = $assetCount; FileCount = $fileCount
         AnimationCount = $animationCount; SequenceEventCount = $sequenceEventCount
         MontageEventCount = $montageEventCount; EventCount = $eventCount; QueuedCount = $queuedCount
         BranchingPointCount = $branchingPointCount; SyncMarkerCount = $syncMarkerCount
@@ -703,8 +679,7 @@ function Repair-AlsP2aPublication {
     }
     $paths = @{}
     foreach ($property in @(
-        'canonicalRoot', 'candidateRoot', 'determinismRoot', 'canonicalBackupRoot', 'lockPath',
-        'lockCandidatePath', 'lockBackupPath', 'journalPath'
+        'canonicalRoot', 'candidateRoot', 'determinismRoot', 'canonicalBackupRoot', 'journalPath'
     )) {
         $paths[$property] = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path ([string]$journal.$property) -Label "journal.$property"
     }
@@ -713,9 +688,8 @@ function Repair-AlsP2aPublication {
     Assert-AlsP2aPublicationPathTopology -Paths $paths
 
     if ([string]$journal.state -ceq 'committed') {
-        if (-not (Test-Path -LiteralPath $paths.canonicalRoot -PathType Container) -or
-            -not (Test-Path -LiteralPath $paths.lockPath -PathType Leaf)) {
-            throw 'Committed P2A publication is missing canonical or lock output.'
+        if (-not (Test-Path -LiteralPath $paths.canonicalRoot -PathType Container)) {
+            throw 'Committed P2A publication is missing the canonical export.'
         }
     }
     else {
@@ -731,27 +705,12 @@ function Repair-AlsP2aPublication {
         elseif (-not (Test-Path -LiteralPath $paths.candidateRoot) -and (Test-Path -LiteralPath $paths.canonicalRoot)) {
             Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $paths.canonicalRoot -Label 'rollback newly installed canonical'
         }
-
-        if ([bool]$journal.lockOriginalExisted) {
-            if (Test-Path -LiteralPath $paths.lockBackupPath -PathType Leaf) {
-                Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $paths.lockPath -Label 'rollback lock candidate'
-                Move-AlsRepositoryDescendantPath -RepositoryRoot $root -Source $paths.lockBackupPath -Destination $paths.lockPath -Label 'restore lock backup'
-            }
-            elseif (-not (Test-Path -LiteralPath $paths.lockPath -PathType Leaf)) {
-                throw 'Cannot recover the previous export lock because both lock and backup are absent.'
-            }
-        }
-        elseif (-not (Test-Path -LiteralPath $paths.lockCandidatePath) -and (Test-Path -LiteralPath $paths.lockPath)) {
-            Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $paths.lockPath -Label 'rollback newly installed lock'
-        }
     }
 
     foreach ($entry in @(
         @{ Path = $paths.candidateRoot; Label = 'candidate staging' },
         @{ Path = $paths.determinismRoot; Label = 'determinism staging' },
-        @{ Path = $paths.lockCandidatePath; Label = 'lock candidate' },
-        @{ Path = $paths.canonicalBackupRoot; Label = 'canonical backup residue' },
-        @{ Path = $paths.lockBackupPath; Label = 'lock backup residue' }
+        @{ Path = $paths.canonicalBackupRoot; Label = 'canonical backup residue' }
     )) {
         Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $entry.Path -Label $entry.Label
     }
@@ -765,7 +724,6 @@ function Invoke-AlsP2aStagingWorkflow {
         [Parameter(Mandatory)][string]$RepositoryRoot,
         [Parameter(Mandatory)][string]$CandidateRoot,
         [Parameter(Mandatory)][string]$DeterminismRoot,
-        [Parameter(Mandatory)][string]$LockCandidatePath,
         [Parameter(Mandatory)][scriptblock]$Action
     )
 
@@ -773,7 +731,6 @@ function Invoke-AlsP2aStagingWorkflow {
     $staging = @{
         CandidateRoot = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $CandidateRoot -Label 'CandidateRoot'
         DeterminismRoot = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $DeterminismRoot -Label 'DeterminismRoot'
-        LockCandidatePath = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $LockCandidatePath -Label 'LockCandidatePath'
     }
     Assert-AlsP2aPublicationPathTopology -Paths $staging
     try {
@@ -784,8 +741,7 @@ function Invoke-AlsP2aStagingWorkflow {
         try {
             foreach ($entry in @(
                 @{ Path = $staging.CandidateRoot; Label = 'failed workflow candidate staging' },
-                @{ Path = $staging.DeterminismRoot; Label = 'failed workflow determinism staging' },
-                @{ Path = $staging.LockCandidatePath; Label = 'failed workflow lock candidate' }
+                @{ Path = $staging.DeterminismRoot; Label = 'failed workflow determinism staging' }
             )) {
                 Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $entry.Path -Label $entry.Label
             }
@@ -797,7 +753,7 @@ function Invoke-AlsP2aStagingWorkflow {
     }
 }
 
-function Invoke-AlsP2aJointPublication {
+function Invoke-AlsP2aPublication {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$GateToken,
@@ -805,15 +761,11 @@ function Invoke-AlsP2aJointPublication {
         [Parameter(Mandatory)][string]$CanonicalRoot,
         [Parameter(Mandatory)][string]$CandidateRoot,
         [Parameter(Mandatory)][string]$DeterminismRoot,
-        [Parameter(Mandatory)][string]$LockPath,
-        [Parameter(Mandatory)][string]$LockCandidatePath,
         [Parameter(Mandatory)][string]$CanonicalBackupRoot,
-        [Parameter(Mandatory)][string]$LockBackupPath,
         [Parameter(Mandatory)][string]$JournalPath,
         [Parameter(Mandatory)][string]$ComparisonScriptPath,
-        [ValidateSet('', 'Comparison', 'CanonicalSwap', 'LockSwap')]
-        [string]$FaultInjectionPoint = '',
-        [switch]$UpdateAssetLock
+        [ValidateSet('', 'Comparison', 'CanonicalSwap')]
+        [string]$FaultInjectionPoint = ''
     )
 
     if ($GateToken -cne 'P2A_EXPORT_GATES_COMPLETE') {
@@ -823,9 +775,8 @@ function Invoke-AlsP2aJointPublication {
     $resolved = @{}
     foreach ($entry in @(
         @{ Name = 'CanonicalRoot'; Value = $CanonicalRoot }, @{ Name = 'CandidateRoot'; Value = $CandidateRoot },
-        @{ Name = 'DeterminismRoot'; Value = $DeterminismRoot }, @{ Name = 'LockPath'; Value = $LockPath },
-        @{ Name = 'LockCandidatePath'; Value = $LockCandidatePath }, @{ Name = 'CanonicalBackupRoot'; Value = $CanonicalBackupRoot },
-        @{ Name = 'LockBackupPath'; Value = $LockBackupPath }, @{ Name = 'JournalPath'; Value = $JournalPath }
+        @{ Name = 'DeterminismRoot'; Value = $DeterminismRoot },
+        @{ Name = 'CanonicalBackupRoot'; Value = $CanonicalBackupRoot }, @{ Name = 'JournalPath'; Value = $JournalPath }
     )) {
         $resolved[$entry.Name] = Resolve-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $entry.Value -Label $entry.Name
     }
@@ -845,23 +796,14 @@ function Invoke-AlsP2aJointPublication {
         $audit = Assert-AlsP2aPublishManifest -Manifest $manifest -Label 'Canonical candidate'
         Write-Host "P2A_MANIFEST_AUDIT_OK assets=$($audit.AssetCount) files=$($audit.FileCount) animations=$($audit.AnimationCount) sequence_events=$($audit.SequenceEventCount) montage_events=$($audit.MontageEventCount) events=$($audit.EventCount) queued=$($audit.QueuedCount) branching_points=$($audit.BranchingPointCount) sync_markers=$($audit.SyncMarkerCount) terminal_sections=$($audit.TerminalSectionCount) audio=$($audit.AudioAssetCount)"
 
-        if (-not $UpdateAssetLock) {
-            Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $resolved.CandidateRoot -Label 'unpublished candidate staging'
-            Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $resolved.DeterminismRoot -Label 'unpublished determinism staging'
-            return
-        }
-
-        Publish-AlsExportLock -ManifestPath $manifestPath -LockPath $resolved.LockCandidatePath -RepositoryRoot $root
         $journal = [ordered]@{
             schemaVersion = 1; state = 'prepared'; repositoryRoot = $root
             canonicalRoot = $resolved.CanonicalRoot; candidateRoot = $resolved.CandidateRoot
             determinismRoot = $resolved.DeterminismRoot; canonicalBackupRoot = $resolved.CanonicalBackupRoot
-            lockPath = $resolved.LockPath; lockCandidatePath = $resolved.LockCandidatePath
-            lockBackupPath = $resolved.LockBackupPath; journalPath = $resolved.JournalPath
+            journalPath = $resolved.JournalPath
             canonicalOriginalExisted = [bool](Test-Path -LiteralPath $resolved.CanonicalRoot -PathType Container)
-            lockOriginalExisted = [bool](Test-Path -LiteralPath $resolved.LockPath -PathType Leaf)
         }
-        foreach ($backup in @($resolved.CanonicalBackupRoot, $resolved.LockBackupPath)) {
+        foreach ($backup in @($resolved.CanonicalBackupRoot)) {
             if (Test-Path -LiteralPath $backup) { throw "P2A publication has orphaned backup residue without a journal: $backup" }
         }
         Write-AlsP2aPublicationJournal -RepositoryRoot $root -JournalPath $resolved.JournalPath -Value $journal
@@ -869,18 +811,13 @@ function Invoke-AlsP2aJointPublication {
         if ($journal.canonicalOriginalExisted) {
             Move-AlsRepositoryDescendantPath -RepositoryRoot $root -Source $resolved.CanonicalRoot -Destination $resolved.CanonicalBackupRoot -Label 'backup canonical'
         }
-        if ($journal.lockOriginalExisted) {
-            Move-AlsRepositoryDescendantPath -RepositoryRoot $root -Source $resolved.LockPath -Destination $resolved.LockBackupPath -Label 'backup lock'
-        }
         Move-AlsRepositoryDescendantPath -RepositoryRoot $root -Source $resolved.CandidateRoot -Destination $resolved.CanonicalRoot -Label 'install canonical candidate'
         if ($FaultInjectionPoint -ceq 'CanonicalSwap') { throw 'Injected P2A canonical swap failure.' }
-        Move-AlsRepositoryDescendantPath -RepositoryRoot $root -Source $resolved.LockCandidatePath -Destination $resolved.LockPath -Label 'install lock candidate'
-        if ($FaultInjectionPoint -ceq 'LockSwap') { throw 'Injected P2A lock swap failure.' }
 
         $journal.state = 'committed'
         Write-AlsP2aPublicationJournal -RepositoryRoot $root -JournalPath $resolved.JournalPath -Value $journal
         Repair-AlsP2aPublication -RepositoryRoot $root -JournalPath $resolved.JournalPath
-        Write-Host 'GODOT_ALS_P2A_JOINT_PUBLISH_OK'
+        Write-Host 'GODOT_ALS_P2A_PUBLICATION_OK'
     }
     catch {
         $failure = $_
@@ -891,8 +828,7 @@ function Invoke-AlsP2aJointPublication {
             else {
                 foreach ($entry in @(
                     @{ Path = $resolved.CandidateRoot; Label = 'failed candidate staging' },
-                    @{ Path = $resolved.DeterminismRoot; Label = 'failed determinism staging' },
-                    @{ Path = $resolved.LockCandidatePath; Label = 'failed lock candidate' }
+                    @{ Path = $resolved.DeterminismRoot; Label = 'failed determinism staging' }
                 )) {
                     Remove-AlsRepositoryDescendantPath -RepositoryRoot $root -Path $entry.Path -Label $entry.Label
                 }
@@ -903,48 +839,4 @@ function Invoke-AlsP2aJointPublication {
         }
         throw $failure
     }
-}
-
-function Assert-AlsExportLock {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$ManifestPath, [Parameter(Mandatory)][string]$AssetRoot, [Parameter(Mandatory)][string]$LockPath)
-
-    $lock = Read-AlsExportLock -LockPath $LockPath
-    $actualManifestHash = (Get-FileHash -LiteralPath $ManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualManifestHash -cne $lock.ManifestSha256) { throw "Formal ALS manifest SHA-256 mismatch: expected=$($lock.ManifestSha256) actual=$actualManifestHash" }
-    $manifest = Read-AlsP2aManifestJson -ManifestPath $ManifestPath -Label 'Formal ALS'
-    if ([int]$manifest.auditSummary.assetCount -ne $lock.AssetCount -or @($manifest.files).Count -ne $lock.FileCount -or
-        @($manifest.animations).Count -ne $lock.AnimationCount -or [string]$manifest.exporterVersion -cne $lock.ExporterVersion -or
-        [string]$manifest.sourceProjectId -cne $lock.SourceProjectId) { throw 'Formal ALS manifest counts or producer identity differ from tracked lock.' }
-    $assetRootFullPath = [IO.Path]::GetFullPath($AssetRoot)
-    if (-not (Test-Path -LiteralPath $assetRootFullPath -PathType Container)) { throw "ALS asset root does not exist: $assetRootFullPath" }
-    $canonicalRoot = $assetRootFullPath.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-    $canonicalRelativePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    $files = @($manifest.files)
-    for ($index = 0; $index -lt $files.Count; $index++) {
-        $file = $files[$index]
-        $relativePath = [string]$file.relativePath
-        $fieldPath = "files[$index].relativePath"
-        if ([string]::IsNullOrWhiteSpace($relativePath)) { throw "$fieldPath must be a non-empty relative file path." }
-        if ([IO.Path]::IsPathRooted($relativePath)) { throw "$fieldPath must be relative, not rooted or absolute: $relativePath" }
-        $segments = @($relativePath -split '[\\/]')
-        if ($segments | Where-Object { $_ -ceq '.' -or $_ -ceq '..' }) {
-            throw "$fieldPath contains a forbidden '.' or '..' path segment: $relativePath"
-        }
-        try { $path = [IO.Path]::GetFullPath([IO.Path]::Combine($assetRootFullPath, $relativePath)) }
-        catch { throw "$fieldPath is not a valid relative path '$relativePath': $($_.Exception.Message)" }
-        if (-not $path.StartsWith($canonicalRoot, [StringComparison]::OrdinalIgnoreCase)) {
-            throw "$fieldPath escapes outside the ALS asset root: $relativePath"
-        }
-        $canonicalRelativePath = ([IO.Path]::GetRelativePath($assetRootFullPath, $path)).Replace([IO.Path]::DirectorySeparatorChar, '/')
-        if (-not $canonicalRelativePaths.Add($canonicalRelativePath)) {
-            throw "$fieldPath duplicates a normalized manifest file path: $relativePath"
-        }
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "$fieldPath target must resolve to a file: $relativePath" }
-        $info = Get-Item -LiteralPath $path
-        if ($info.Length -ne [long]$file.size) { throw "Locked ALS export file size mismatch at ${fieldPath}: $relativePath" }
-        $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($hash -cne [string]$file.sha256) { throw "Locked ALS export file SHA-256 mismatch at ${fieldPath}: $relativePath" }
-    }
-    return $lock
 }

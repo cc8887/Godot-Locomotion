@@ -9,7 +9,7 @@ public sealed class AlsExportPlanValidatorTests
     public void ValidatorAcceptsCanonicalPlan()
     {
         var mesh = Asset("/Game/AdvancedLocomotionV4/Props/Meshes/Box.Box", AlsAssetKind.StaticMesh,
-            "meshes/static/7d3d3f1e0f341eb76b3233c535305c182eb91ed4.fbx");
+            "meshes/static/Props/Meshes/Box.fbx");
         var plan = new AlsExportPlan(1, [mesh], new AlsExportPlanSummary(1, 1));
 
         Assert.Empty(AlsExportPlanValidator.Validate(plan));
@@ -20,13 +20,43 @@ public sealed class AlsExportPlanValidatorTests
     {
         var audio = Asset("/Game/AdvancedLocomotionV4/Audio/Step.Step", AlsAssetKind.OtherConfig);
         var mesh = Asset("/Game/AdvancedLocomotionV4/Props/Meshes/Box.Box", AlsAssetKind.StaticMesh,
-            "meshes/static/7d3d3f1e0f341eb76b3233c535305c182eb91ed4.fbx");
+            "meshes/static/Props/Meshes/Box.fbx");
         var plan = new AlsExportPlan(1, [mesh, audio], new AlsExportPlanSummary(2, 1));
 
         var issues = AlsExportPlanValidator.Validate(plan);
 
         Assert.Contains(issues, issue => issue.Code == "ALSPLAN004");
         Assert.Contains(issues, issue => issue.Code == "ALSPLAN007");
+    }
+
+    [Fact]
+    public void ValidatorAcceptsNestedOriginalEngineNamesWithoutPinningAssetIds()
+    {
+        var path = "/Game/ReplacementPack/Characters/Prototype/Body.Body";
+        var mesh = Asset(path, AlsAssetKind.SkeletalMesh,
+            "meshes/skeletal/Characters/Prototype/Body.fbx");
+        var plan = new AlsExportPlan(1, [mesh], new AlsExportPlanSummary(1, 1));
+
+        Assert.Empty(AlsExportPlanValidator.Validate(plan));
+    }
+
+    [Fact]
+    public void ValidatorRejectsStableIdBasedNamesAndUnsafeNestedPaths()
+    {
+        var objectPath = "/Game/ReplacementPack/Characters/Body.Body";
+        var id = AlsStableAssetId.Create(objectPath);
+        foreach (var outputPath in new[]
+        {
+            $"meshes/skeletal/{id}.fbx",
+            "meshes/skeletal/../Body.fbx",
+            "meshes/skeletal/Characters\\Body.fbx",
+        })
+        {
+            var mesh = Asset(objectPath, AlsAssetKind.SkeletalMesh, outputPath);
+            var plan = new AlsExportPlan(1, [mesh], new AlsExportPlanSummary(1, 1));
+
+            Assert.Contains(AlsExportPlanValidator.Validate(plan), issue => issue.Code == "ALSPLAN009");
+        }
     }
 
     [Fact]

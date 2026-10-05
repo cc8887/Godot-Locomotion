@@ -55,6 +55,23 @@ public sealed class AlsBasePosesCompilerTests
         Assert.Equal(new[] { 1670, 1668 }, result.Evaluators.ToArray().Select(e => e.NodeIndex));
     }
 
+    [Fact]
+    public void AcceptsNestedExportPathWhilePreservingTheOriginalBasePoseName()
+    {
+        var original = AnimationSet.Value;
+        var animations = (AlsAnimationDefinition[])original.Animations.Clone();
+        var index = Array.FindIndex(animations, animation => animation.Name == "ALS_N_Pose");
+        animations[index] = animations[index] with
+        {
+            ResourcePath = "animations/ReplacementFolder/ALS_N_Pose.fbx",
+        };
+
+        var result = Compile(Read(), original with { Animations = animations });
+
+        Assert.Equal(animations[index].Id, result.Evaluators[0].AnimationId);
+        Assert.Equal("animations/ReplacementFolder/ALS_N_Pose.fbx", animations[result.Evaluators[0].AnimationId].ResourcePath);
+    }
+
     [Theory]
     [InlineData("schema")]
     [InlineData("missing-node")]
@@ -128,6 +145,7 @@ public sealed class AlsBasePosesCompilerTests
     [InlineData("curve")]
     [InlineData("events")]
     [InlineData("missing-asset")]
+    [InlineData("resource-name")]
     public void RejectsManifestChangesRatherThanSilentlySamplingAnotherAsset(string mutation)
     {
         var original = AnimationSet.Value;
@@ -145,6 +163,7 @@ public sealed class AlsBasePosesCompilerTests
             "curve" => asset with { Curves = original.Animations.First(a => a.Curves.Length > 0).Curves },
             "events" => asset with { Timeline = original.Animations.First(a => a.Timeline.Length > 0).Timeline },
             "missing-asset" => asset with { ObjectPath = asset.ObjectPath + "_Missing" },
+            "resource-name" => asset with { ResourcePath = "animations/" + asset.StableId + ".fbx" },
             _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
         };
         Assert.ThrowsAny<Exception>(() => Compile(Read(), set));

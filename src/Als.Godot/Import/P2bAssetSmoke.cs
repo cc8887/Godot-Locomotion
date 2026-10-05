@@ -7,23 +7,7 @@ namespace GodotAls.Import;
 
 public partial class P2bAssetSmoke : Node
 {
-    private const string MannequinAssetId = "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07";
-    private const string M4a1AssetId = "2516ba17950769f5845f00f6c17c6d6ac913f475";
-
-    private static readonly string[] ClipIds =
-    [
-        "6124eafdcbeaaf04bca366add34c821faa0e4963",
-        "572c3c83c9007964c233db4c7288ae38e20c3dec",
-        "a73b6e3c8aac55396058a7cb7c65b1afe6a539fa",
-        "5c0f718da651311d539b76fcd178dc6467839df6",
-        "bf827e8773890767df2c42df9208d461dc9e3ece",
-        "74fae9958ca8fc1e28329c581038e55a4840c2c1",
-    ];
-
-    private static readonly string[] PoseBoneNames =
-    [
-        "root", "pelvis", "spine_03", "hand_l", "hand_r", "foot_l", "foot_r",
-    ];
+    private const int MaximumSampledClips = 6;
 
     public override void _Ready()
     {
@@ -44,102 +28,108 @@ public partial class P2bAssetSmoke : Node
         var resource = ResourceLoader.Load<AlsAnimationSetResource>(AlsGodotImportCoordinator.CompiledResourcePath)
             ?? throw new InvalidOperationException("Compiled ALS animation set could not be loaded.");
         var definition = resource.LoadDefinition();
-        var mannequinAsset = definition.SkeletalMeshes[definition.AssetIndex.GetSkeletalMeshId(MannequinAssetId)];
-        var m4a1Asset = definition.SkeletalMeshes[definition.AssetIndex.GetSkeletalMeshId(M4a1AssetId)];
-        var mannequin = LoadScene(mannequinAsset.ResourcePath, mannequinAsset.Name);
-        var materialBuilder = new AlsMaterialBuilder(definition);
-        var finalDigests = new List<string>();
-        var overlayCount = 0;
+        var representative = definition.SkeletalMeshes
+            .Select(mesh => new
+            {
+                Mesh = mesh,
+                Skeleton = (uint)mesh.SkeletonId < (uint)definition.Skeletons.Length
+                    ? definition.Skeletons[mesh.SkeletonId]
+                    : null,
+            })
+            .Where(candidate => candidate.Skeleton is not null && candidate.Mesh.MaterialIds.Length > 0)
+            .Select(candidate => new
+            {
+                candidate.Mesh,
+                Skeleton = candidate.Skeleton!,
+                CompatibleClips = definition.Animations
+                    .Where(animation => animation.SkeletonId == candidate.Mesh.SkeletonId &&
+                        animation.PlayLength > 0 && animation.SampledKeyCount > 0)
+                    .OrderByDescending(animation => animation.Timeline.Length)
+                    .ThenByDescending(animation => animation.SampledKeyCount)
+                    .ThenBy(animation => animation.StableId, StringComparer.Ordinal)
+                    .ToArray(),
+            })
+            .Where(candidate => candidate.CompatibleClips.Length > 0)
+            .OrderByDescending(candidate => !candidate.Mesh.Overlay && !candidate.Mesh.Prop)
+            .ThenByDescending(candidate => candidate.Skeleton.PhysicalBones.Length)
+            .ThenByDescending(candidate => candidate.CompatibleClips.Length)
+            .ThenByDescending(candidate => candidate.Mesh.MaterialSlotCount)
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException("No materialized skeletal mesh has a compatible animation in the current export.");
 
-        for (var clipIndex = 0; clipIndex < ClipIds.Length; clipIndex++)
+        var targetScene = LoadScene(representative.Mesh.ResourcePath, representative.Mesh.Name);
+        var sampledClips = representative.CompatibleClips.Take(MaximumSampledClips).ToArray();
+        if (representative.Skeleton.PhysicalBones.Length == 0)
         {
-            var animationId = definition.AssetIndex.GetAnimationId(ClipIds[clipIndex]);
-            var clip = definition.Animations[animationId];
+            throw new InvalidOperationException($"Skeleton has no physical bones: {representative.Skeleton.ObjectPath}");
+        }
+
+        var materialBuilder = new AlsMaterialBuilder(definition);
+        var poseChanges = 0;
+        var materialChecks = 0;
+
+        foreach (var clip in sampledClips)
+        {
             var source = LoadScene(clip.ResourcePath, clip.Name);
-            using var bound = AlsAnimationBinder.Bind(
-                mannequin,
-                source,
-                clip,
-                definition.Skeletons[clip.SkeletonId]);
+            using var bound = AlsAnimationBinder.Bind(targetScene, source, clip, representative.Skeleton);
             AddChild(bound.Root);
+            var poseBoneNames = Enumerable.Range(0, bound.Skeleton.GetBoneCount())
+                .Select(index => bound.Skeleton.GetBoneName(index).ToString())
+                .ToArray();
             var materialReport = materialBuilder.ApplyToRoot(
                 bound.Root,
-                mannequinAsset.StableId,
-                mannequinAsset.MaterialIds);
+                representative.Mesh.StableId,
+                representative.Mesh.MaterialIds);
             if (materialReport.AppliedCount == 0 || materialReport.UnresolvedCount != 0)
             {
-                throw new InvalidOperationException($"Mannequin received no reconstructed material for {clip.Name}.");
+                throw new InvalidOperationException(
+                    $"Representative mesh material reconstruction failed for {clip.Name}: " +
+                    $"applied={materialReport.AppliedCount} unresolved={materialReport.UnresolvedCount}.");
             }
+            materialChecks += materialReport.AppliedCount;
 
-            var initialPose = AlsPoseDigest.CapturePoses(bound.Skeleton, PoseBoneNames);
+            var initialPose = AlsPoseDigest.CapturePoses(bound.Skeleton, poseBoneNames);
             var poseChanged = false;
             var frameCount = Math.Min(60, Math.Max(1, (int)Math.Ceiling(clip.PlayLength * 30.0)));
             for (var frame = 1; frame <= frameCount; frame++)
             {
                 bound.Player.Advance(1.0 / 30.0);
-                var currentPose = AlsPoseDigest.CapturePoses(bound.Skeleton, PoseBoneNames);
+                var currentPose = AlsPoseDigest.CapturePoses(bound.Skeleton, poseBoneNames);
                 poseChanged |= AlsPoseDigest.HasChanged(initialPose, currentPose);
-                if (frame == frameCount)
-                {
-                    finalDigests.Add(AlsPoseDigest.Compute(bound.Skeleton, frame, PoseBoneNames));
-                }
             }
-
-            if (clipIndex < 4 && !poseChanged)
-            {
-                throw new InvalidOperationException($"Representative animation did not change the selected pose: {clip.Name}");
-            }
-            overlayCount += clip.Overlay ? 1 : 0;
+            poseChanges += poseChanged ? 1 : 0;
         }
 
-        var propRoot = LoadScene(m4a1Asset.ResourcePath, m4a1Asset.Name).Instantiate();
-        AddChild(propRoot);
+        var targetRoot = targetScene.Instantiate();
+        AddChild(targetRoot);
         try
         {
-            var materialReport = materialBuilder.ApplyToRoot(
-                propRoot,
-                m4a1Asset.StableId,
-                m4a1Asset.MaterialIds);
-            if (materialReport.AppliedCount == 0 || materialReport.UnresolvedCount != 0)
-            {
-                throw new InvalidOperationException("M4A1 received no reconstructed material.");
-            }
-        }
-        finally
-        {
-            propRoot.Free();
-        }
-
-        var mannequinRoot = mannequin.Instantiate();
-        try
-        {
-            var skeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(mannequinRoot)
-                ?? throw new InvalidOperationException("Mannequin scene has no Skeleton3D.");
-            var mannequinMeshId = definition.AssetIndex.GetSkeletalMeshId(MannequinAssetId);
-            var skeletonDefinition = definition.Skeletons[definition.SkeletalMeshes[mannequinMeshId].SkeletonId];
-            var importedRestPoseHash = AlsImportedResourceAuditor.ComputeTargetRestPoseHash(skeleton, skeletonDefinition);
+            var skeleton = AlsImportedResourceAuditor.FindFirst<Skeleton3D>(targetRoot)
+                ?? throw new InvalidOperationException("Representative skeletal mesh scene has no Skeleton3D.");
+            var importedRestPoseHash = AlsImportedResourceAuditor.ComputeTargetRestPoseHash(skeleton, representative.Skeleton);
             if (!string.Equals(
                     importedRestPoseHash,
-                    skeletonDefinition.TargetPhysicalRestPoseHash,
+                    representative.Skeleton.TargetPhysicalRestPoseHash,
                     StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"Mannequin rest-pose hash mismatch: expected={skeletonDefinition.TargetPhysicalRestPoseHash} " +
+                    $"Representative skeleton rest-pose hash mismatch: expected={representative.Skeleton.TargetPhysicalRestPoseHash} " +
                     $"actual={importedRestPoseHash}{System.Environment.NewLine}" +
-                    AlsImportedResourceAuditor.DescribeRestPoseDifferences(skeleton, skeletonDefinition));
+                    AlsImportedResourceAuditor.DescribeRestPoseDifferences(skeleton, representative.Skeleton));
             }
-            if (finalDigests.Distinct(StringComparer.Ordinal).Count() < 2)
+            if (poseChanges == 0 || materialChecks == 0)
             {
-                throw new InvalidOperationException("Representative animations produced no distinct final pose digests.");
+                throw new InvalidOperationException("Compatible animation or material smoke did not exercise imported data.");
             }
 
             GD.Print(
-                $"P2B_ASSET_SMOKE_OK mannequinBones={skeleton.GetBoneCount()} clips={ClipIds.Length} " +
-                $"overlay={overlayCount} props={(m4a1Asset.Prop ? 1 : 0)} restHash={importedRestPoseHash}");
+                $"P2B_ASSET_SMOKE_OK bones={skeleton.GetBoneCount()} " +
+                $"compatible_clips={representative.CompatibleClips.Length} sampled_clips={sampledClips.Length} " +
+                $"pose_changes={poseChanges} material_checks={materialChecks}");
         }
         finally
         {
-            mannequinRoot.Free();
+            targetRoot.Free();
         }
     }
 

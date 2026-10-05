@@ -287,8 +287,22 @@ public sealed class AlsTimelineExporterSourceContractTests
         Assert.Contains("contains no sync markers", VerifyP2A, StringComparison.Ordinal);
         Assert.Contains("contains no typed timeline events or actions", VerifyP2A, StringComparison.Ordinal);
         Assert.Contains("schemaVersion -ne 2", VerifyP2A, StringComparison.Ordinal);
-        Assert.Contains("exporterVersion -cne '2.0.0'", VerifyP2A, StringComparison.Ordinal);
+        Assert.DoesNotContain("exporterVersion -cne '2.0.0'", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("exporterVersion is missing.", VerifyP2A, StringComparison.Ordinal);
         Assert.DoesNotContain("curves or timeline entries", VerifyP2A, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportPreservesOriginalUnrealAssetNamesAndContentRootFolders()
+    {
+        var discovery = ReadPrivateSource("AlsAssetDiscovery.cpp");
+
+        Assert.Contains("const FString AssetName = AssetData.AssetName.ToString();", discovery, StringComparison.Ordinal);
+        Assert.Contains("PackagePath.Mid(ContentRoot.Len() + 1)", discovery, StringComparison.Ordinal);
+        Assert.Contains("AssetName + TEXT(\".\") + Extension", discovery, StringComparison.Ordinal);
+        Assert.Contains("FParse::Value(*Params, TEXT(\"ContentRoot=\"), ContentRoot)", CommandletSource, StringComparison.Ordinal);
+        Assert.Contains("Discover(ContentRoot, Assets, Error)", CommandletSource, StringComparison.Ordinal);
+        Assert.Contains("WriteComplete(OutputDirectory, ContentRoot", CommandletSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -313,16 +327,14 @@ public sealed class AlsTimelineExporterSourceContractTests
     }
 
     [Fact]
-    public void ReadyMarkerDeclaresExporterVersionTwo()
+    public void ReadyMarkerDoesNotPinExporterVersion()
     {
-        const string marker = "GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0";
-
-        Assert.Contains("plugin=2.0.0", CommandletSource, StringComparison.Ordinal);
-        Assert.Contains(marker, BuildScript, StringComparison.Ordinal);
-        Assert.Contains(marker, VerifyP2A, StringComparison.Ordinal);
-        Assert.DoesNotContain("plugin=1.0.0", CommandletSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("plugin=1.0.0", BuildScript, StringComparison.Ordinal);
-        Assert.DoesNotContain("plugin=1.0.0", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("GODOT_ALS_EXPORTER_READY", CommandletSource, StringComparison.Ordinal);
+        Assert.Contains("GODOT_ALS_EXPORTER_READY", BuildScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("engine=$engineVersion plugin=2.0.0", BuildScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("plugin=2.0.0", VerifyP2A, StringComparison.Ordinal);
+        Assert.Contains("Get-AlsSupportedEngineVersion", BuildScript, StringComparison.Ordinal);
+        Assert.Contains("Get-AlsSupportedEngineVersion", VerifyP2A, StringComparison.Ordinal);
     }
 
     private static string ReadPrivateSource(string fileName)

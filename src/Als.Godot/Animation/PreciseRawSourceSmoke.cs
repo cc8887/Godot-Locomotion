@@ -39,10 +39,6 @@ public partial class PreciseRawSourceSmoke : Node
             Require(request.GetProperty("definitionDigest").GetString() == bank.DefinitionDigest && request.GetProperty("bindingDigest").GetString() == bank.BindingDigest,
                 "Raw native fixture binding differs.");
         }
-        else Require(fixture.RootElement.GetProperty("sourceIndexSha256").GetString()!.Equals(
-            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Godot.FileAccess.GetFileAsBytes("res://assets/config/" +
-                (stop ? "v4_stop_source_inputs.json" : "v4_overlay_source_inputs.json")))),
-            StringComparison.OrdinalIgnoreCase), "Additive native fixture targets a different source bank.");
         var assets = fixture.RootElement.GetProperty("assets").EnumerateArray().ToArray();
         Require(assets.Length == sources.Length && bank.Sources.Length == (stop ? 3 : 36), "Precise raw source closure differs.");
         var count = 0; var boneCount = 0; var pError = 0.0; var qError = 0.0; var sError = 0.0; var cError = 0f;

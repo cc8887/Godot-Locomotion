@@ -12,6 +12,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'unreal-version-functions.ps1')
 
 $lockedCommit = 'b754d6f0f2bb03741d301f8fb88077ebfe561e17'
 $lockedPatchHash = '3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f'
@@ -366,7 +367,11 @@ function Sync-OwnedPlugin(
     }
 }
 
-function Build-And-AuditEditorTarget([string]$ProjectPath, [string]$ProjectDirectory, [string]$EngineRoot)
+function Build-And-AuditEditorTarget(
+    [string]$ProjectPath,
+    [string]$ProjectDirectory,
+    [string]$EngineRoot,
+    [string]$ExpectedEngineVersion)
 {
     $targetFiles = @(Get-ChildItem -LiteralPath (Join-Path $ProjectDirectory 'Source') `
         -Filter '*Editor.Target.cs' -File -Recurse)
@@ -405,9 +410,14 @@ function Build-And-AuditEditorTarget([string]$ProjectPath, [string]$ProjectDirec
     $receiptPath = Join-Path $ProjectDirectory "Binaries\Win64\$targetName.target"
     if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { throw "Missing Editor target receipt: $receiptPath" }
     $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-    if ($receipt.Version.MajorVersion -ne 5 -or $receipt.Version.MinorVersion -ne 9 -or $receipt.Version.PatchVersion -ne 0)
+    $receiptEngineVersion = Assert-AlsSupportedEngineVersion `
+        -MajorVersion ([int]$receipt.Version.MajorVersion) `
+        -MinorVersion ([int]$receipt.Version.MinorVersion) `
+        -PatchVersion ([int]$receipt.Version.PatchVersion) `
+        -Context 'P3 Editor receipt'
+    if ($receiptEngineVersion -cne $ExpectedEngineVersion)
     {
-        throw "Editor receipt engine identity is not 5.9.0: $receiptPath"
+        throw "Editor receipt engine identity does not match ${ExpectedEngineVersion}: $receiptPath"
     }
     $targetBuildId = [string]$receipt.Version.BuildId
     if ([string]::IsNullOrWhiteSpace($targetBuildId)) { throw "Editor receipt has no BuildId: $receiptPath" }
@@ -1267,6 +1277,9 @@ try
     }
     Recover-P3OutputTransactions $resolvedProjectRoot
 
+    $engineRoot = Get-FullPath (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $resolvedEditor))))
+    $engineVersion = Get-AlsSupportedEngineVersion -EngineRoot $engineRoot
+
     $referenceOutput = @(& (Join-Path $resolvedProjectRoot 'scripts\prepare-p3-reference.ps1') `
         -ReferenceRoot $resolvedReferenceRoot -ProjectRoot $resolvedProjectRoot)
     $expectedReferenceMarker = "P3_REFERENCE_OK commit=$lockedCommit patches=1"
@@ -1275,17 +1288,11 @@ try
         throw "P3 reference preparation did not return exact marker '$expectedReferenceMarker': $($referenceOutput -join [Environment]::NewLine)"
     }
 
-    $engineRoot = Get-FullPath (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $resolvedEditor))))
-    $buildVersionPath = Join-Path $engineRoot 'Engine\Build\Build.version'
-    $buildVersion = Get-Content -LiteralPath $buildVersionPath -Raw | ConvertFrom-Json
-    $engineVersion = "$($buildVersion.MajorVersion).$($buildVersion.MinorVersion).$($buildVersion.PatchVersion)"
-    if ($engineVersion -cne '5.9.0') { throw "Expected Unreal Engine 5.9.0, got $engineVersion at $engineRoot." }
-
     $projectDirectory = Get-FullPath (Split-Path -Parent $resolvedProject)
     Ensure-AlsJunction $projectDirectory $resolvedReferenceRoot
     Sync-OwnedPlugin (Join-Path $resolvedProjectRoot 'tools\unreal\AlsLocomotionTrace') $projectDirectory
 
-    Build-And-AuditEditorTarget $resolvedProject $projectDirectory $engineRoot
+    Build-And-AuditEditorTarget $resolvedProject $projectDirectory $engineRoot $engineVersion
 
     $temporaryOutput = Join-Path ([System.IO.Path]::GetTempPath()) "godot-als-p3-$([guid]::NewGuid().ToString('N'))"
     New-Item -ItemType Directory -Path $temporaryOutput | Out-Null

@@ -1,5 +1,7 @@
 # P5A Event, Sync and Action Runtime Implementation Plan
 
+> 历史实施计划。固定 exporterVersion、导出批次 SHA 和 lock 发布流程均已由当前 manifest 自洽校验取代；保留本文仅作实现历史。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在现有 P4 生产链上一次完成 Manifest v2、全量 ALS 动画时间线重导出、通用 Curve/Event/Sync/Dynamic Transition/ActionPlayer、真实 Transition 与原地 Roll、跨引擎证据、1/10 角色并行矩阵和可操作 Demo，同时保持 P0-P4 行为与零分配门禁。

@@ -24,8 +24,8 @@ Mantle、Ragdoll、Camera 行为或最终性能预算。这些功能从 P3 开�
 
 `Als.Import` 在 Godot API 之外完成以下检查与编译：
 
-1. 严格 camelCase JSON、未知字段拒绝、schema/audit/count/order/stable-ID 校验；
-2. 141 个声明文件的路径边界、大小、SHA-256、缺失/多余文件审计；
+1. 严格 camelCase JSON、未知字段拒绝、schema/audit/count/order/stable-ID 校验；资产数量由当前 manifest 自洽计算，不与历史批次锁定；
+2. 当前 manifest 声明文件的路径边界、大小、SHA-256、缺失/多余文件审计；SHA-256 仅核对本次 manifest 与导出文件，不比较历史导出摘要；
 3. 坐标合同固定为 UE 左手 Z-up 厘米到目标右手 Y-up 米，`unitScale` 必须为 `0.01`；
 4. Skeleton 编译为逻辑骨、物理骨、Virtual Bone、Socket 和双向整数表；
 5. 类人骨架只要声明 pelvis/foot 骨，即必须完整包含 `root`、`pelvis`、`foot_l`、`foot_r`；
@@ -33,7 +33,7 @@ Mantle、Ragdoll、Camera 行为或最终性能预算。这些功能从 P3 开�
    编译为稳定整数表；PhysicsAsset 的 body/constraint 骨名必须解析到依赖 mesh 的物理骨架；
 7. 非空引用不允许猜测默认值，内容错误提供稳定错误码、资产 ID 和 JSON 字段路径。
 
-完整定义会序列化进
+上表数量和时间为一次已完成导入的历史测量值，不是资产门禁常量。完整定义会序列化进
 `assets/generated/als_v4/compiled/als_animation_set.tres` 的 `DefinitionJson`，并保存 payload SHA-256。
 Resource 重新加载时先校验 payload SHA-256，再恢复全部 runtime 表并核对 definition digest。资产 smoke 和真实 rig
 harness 只读取这个 `.tres`，不再重新读取或编译 manifest，因此门禁覆盖了 P3 将使用的实际交付物。

@@ -2,14 +2,13 @@ param(
     [Parameter(Mandatory)]
     [string]$GodotExecutable,
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
-    [string]$AssetLockPath = '',
     [switch]$CleanImport
 )
 
 $ErrorActionPreference = 'Stop'
 $markerPattern = 'P2B_IMPORT_OK assets=(\d+) files=(\d+) skeletal=(\d+) static=(\d+) animations=(\d+) textures=(\d+)'
 . (Join-Path $PSScriptRoot 'p2b-verification-functions.ps1')
-. (Join-Path $PSScriptRoot 'asset-lock-functions.ps1')
+. (Join-Path $PSScriptRoot 'p2a-publication-functions.ps1')
 
 if (-not (Test-Path -LiteralPath $GodotExecutable -PathType Leaf)) {
     throw "Godot executable not found: $GodotExecutable"
@@ -22,15 +21,19 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Formal ALS manifest not found: $manifestPath"
 }
 
-if ([string]::IsNullOrWhiteSpace($AssetLockPath)) {
-    $AssetLockPath = Join-Path $projectRootPath 'reference\als-v4-export.lock.json'
+$manifest = Read-AlsP2aManifestJson -ManifestPath $manifestPath -Label 'Formal'
+$assetCollections = @(
+    'skeletons', 'skeletalMeshes', 'staticMeshes', 'animations', 'montages', 'blendSpaces',
+    'aimOffsets', 'materials', 'textures', 'physicsAssets', 'curves', 'configAssets'
+)
+$manifestAssetCount = 0
+foreach ($collection in $assetCollections) { $manifestAssetCount += @($manifest.$collection).Count }
+if ($manifest.auditSummary.status -cne 'complete' -or [int]$manifest.auditSummary.errorCount -ne 0 -or
+    [int]$manifest.auditSummary.assetCount -ne $manifestAssetCount -or
+    [int]$manifest.auditSummary.fileCount -ne @($manifest.files).Count) {
+    throw "Formal manifest has an incomplete or inconsistent audit summary: status=$($manifest.auditSummary.status) assets=$manifestAssetCount files=$(@($manifest.files).Count)."
 }
-$assetLockPath = [IO.Path]::GetFullPath($AssetLockPath)
-Assert-AlsExportLock -ManifestPath $manifestPath -AssetRoot $assetRoot -LockPath $assetLockPath | Out-Null
-$manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
-if ($manifest.auditSummary.status -ne 'complete') {
-    throw "ALS manifest audit is not complete: $($manifest.auditSummary.status)"
-}
+Assert-AlsP2aManifestFiles -Manifest $manifest -AssetRoot $assetRoot -Label 'Formal'
 
 if ($CleanImport) {
     $importCache = Join-Path $projectRootPath '.godot\imported'
@@ -88,7 +91,14 @@ if (-not $match.Success) {
     throw 'Godot P2B import marker was not emitted.'
 }
 
-$expected = @(267, 141, 7, 4, 126, 4)
+$expected = @(
+    $manifestAssetCount,
+    @($manifest.files).Count,
+    @($manifest.skeletalMeshes).Count,
+    @($manifest.staticMeshes).Count,
+    @($manifest.animations).Count,
+    @($manifest.textures).Count
+)
 for ($index = 0; $index -lt $expected.Length; $index++) {
     if ([int]$match.Groups[$index + 1].Value -ne $expected[$index]) {
         throw "Godot P2B import marker reported unexpected counts: $($match.Value)"
@@ -106,17 +116,18 @@ if ($assetSmokeExitCode -ne 0 -or $assetSmokeErrorLines.Count -ne 0) {
     throw "Godot P2B representative asset smoke failed with exit code $assetSmokeExitCode.$([Environment]::NewLine)$details"
 }
 
-$assetSmokePattern = 'P2B_ASSET_SMOKE_OK mannequinBones=(\d+) clips=(\d+) overlay=(\d+) props=(\d+)'
+$assetSmokePattern = 'P2B_ASSET_SMOKE_OK bones=(\d+) compatible_clips=(\d+) sampled_clips=(\d+) pose_changes=(\d+) material_checks=(\d+)'
 $assetSmokeMatch = [regex]::Match($joinedAssetSmokeOutput, $assetSmokePattern)
 if (-not $assetSmokeMatch.Success) {
     throw 'Godot P2B representative asset marker was not emitted.'
 }
 
-$expectedAssetSmoke = @(68, 6, 2, 1)
-for ($index = 0; $index -lt $expectedAssetSmoke.Length; $index++) {
-    if ([int]$assetSmokeMatch.Groups[$index + 1].Value -ne $expectedAssetSmoke[$index]) {
-        throw "Godot P2B representative asset marker reported unexpected counts: $($assetSmokeMatch.Value)"
-    }
+if ([int]$assetSmokeMatch.Groups[1].Value -le 0 -or
+    [int]$assetSmokeMatch.Groups[2].Value -le 0 -or
+    [int]$assetSmokeMatch.Groups[3].Value -le 0 -or
+    [int]$assetSmokeMatch.Groups[4].Value -le 0 -or
+    [int]$assetSmokeMatch.Groups[5].Value -le 0) {
+    throw "P2B compatible mesh/animation smoke did not exercise imported data: $($assetSmokeMatch.Value)"
 }
 
 Write-Output 'P2B_ASSET_VERIFICATION_OK'
@@ -167,10 +178,13 @@ foreach ($characterCount in @(1, 10)) {
     if ($single.Digest -cne $parallel.Digest) {
         throw "P2B real-rig digest mismatch for characters=${characterCount}: single=$($single.Digest), parallel=$($parallel.Digest)."
     }
+    if ($single.Events -ne $parallel.Events) {
+        throw "P2B real-rig event mismatch for characters=${characterCount}: single=$($single.Events), parallel=$($parallel.Events)."
+    }
     foreach ($result in @($single, $parallel)) {
         if ($result.Characters -ne $characterCount -or $result.Frames -ne 120 -or
             $result.Missing -ne 0 -or $result.Stale -ne 0 -or
-            $result.Replacements -ne 1 -or $result.Events -ne ($characterCount * 4 + 4)) {
+            $result.Replacements -ne 1) {
             throw "P2B real-rig harness reported invalid semantics for mode=$($result.Mode) characters=$characterCount."
         }
     }

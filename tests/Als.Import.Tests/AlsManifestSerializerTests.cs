@@ -455,18 +455,21 @@ public sealed class AlsManifestSerializerTests
     }
 
     [Fact]
-    public void RejectsManifestV1AndAnyExporterVersionOtherThanTwo()
+    public void RequiresSchemaV2ButTreatsExporterVersionAsInformationalMetadata()
     {
         var v1 = MutateTypedFixture(root => root["schemaVersion"] = 1);
         var oldExporter = MutateTypedFixture(root => root["exporterVersion"] = "1.0.0");
-        var futureExporter = MutateTypedFixture(root => root["exporterVersion"] = "2.1.0");
+        var replacementExporter = MutateTypedFixture(root => root["exporterVersion"] = "9.4-preview");
+        var emptyExporter = MutateTypedFixture(root => root["exporterVersion"] = " ");
 
         Assert.False(IsSchemaValid(v1));
-        Assert.False(IsSchemaValid(oldExporter));
-        Assert.False(IsSchemaValid(futureExporter));
+        Assert.True(IsSchemaValid(oldExporter));
+        Assert.True(IsSchemaValid(replacementExporter));
+        Assert.False(IsSchemaValid(emptyExporter));
         Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(v1));
-        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(oldExporter));
-        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(futureExporter));
+        Assert.Equal("1.0.0", AlsManifestSerializer.Deserialize(oldExporter).ExporterVersion);
+        Assert.Equal("9.4-preview", AlsManifestSerializer.Deserialize(replacementExporter).ExporterVersion);
+        Assert.Throws<JsonException>(() => AlsManifestSerializer.Deserialize(emptyExporter));
     }
 
     [Theory]

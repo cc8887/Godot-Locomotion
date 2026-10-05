@@ -14,16 +14,15 @@ P3 已把 P3A 的确定性 motor/model 接到 Godot 4.7.2 的真实 Mannequin �
 
 P3 不包含 AimOffset、上半身分层、Turn/Rotate in Place、Foot IK、Overlay gameplay、动作系统、Root Motion、Ragdoll 或完整 ALS Camera。这些功能没有取消，边界见第 10 节。
 
-## 2. 锁定输入与资产闭包
+## 2. 参考输入与资产闭包
 
-| 合同 | 锁定值 |
+| 记录项 | 当时的验证值 |
 | --- | --- |
 | `ALS-Refactored` | `b754d6f0f2bb03741d301f8fb88077ebfe561e17` |
 | P3A repository closure base | `e69f18bb3410d77ef50df38b073535b5e9f20635` |
-| formal manifest SHA-256 | `369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327` |
 | Godot | `4.7.2.stable.mono.official.ed1daf0bf` |
 
-Formal manifest 状态为 `complete`，统计为 267 assets / 141 files / 7 skeletal meshes / 4 static meshes / 126 animations / 4 textures，`errorCount=0`、`warningCount=0`。代表资源 smoke 进一步确认 Mannequin 68 bones、6 clips、2 Overlay 资源和 1 个道具资源。`assets/generated/als_v4/**` 仍是可复现的 ignored 生成物，不进入 Git。
+Formal manifest 在该次验证中状态为 `complete`，统计为 267 assets / 141 files / 7 skeletal meshes / 4 static meshes / 126 animations / 4 textures，`errorCount=0`、`warningCount=0`。这些数量和当时的 manifest SHA 不作为当前导出门禁；P2A/P2B 使用本次 manifest 声明的路径、数量和文件摘要自检。代表资源 smoke 进一步确认 Mannequin 68 bones、6 clips、2 Overlay 资源和 1 个道具资源。导出文件保留 UE 原始资产名；`assets/generated/als_v4/**` 仍是 ignored 生成物，不进入 Git。
 
 ## 3. Stable-ID locomotion profile
 

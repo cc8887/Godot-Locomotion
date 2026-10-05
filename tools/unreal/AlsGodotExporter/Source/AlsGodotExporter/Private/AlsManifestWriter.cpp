@@ -211,7 +211,7 @@ namespace
 
 namespace
 {
-bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets,
+bool WriteManifest(const FString& OutputDirectory, const FString& SourceContentRoot, const TArray<FAlsExportAsset>& Assets,
     const TArray<FAlsExportFile>& Files, const TCHAR* Status, const bool bPublishFormal, FString& OutError)
 {
     TSet<FString> AssetIds;
@@ -250,7 +250,7 @@ bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>
     Writer->WriteValue(TEXT("exporterVersion"), TEXT("2.0.0"));
     Writer->WriteValue(TEXT("sourceEngineVersion"), FEngineVersion::Current().ToString());
     Writer->WriteValue(TEXT("sourceProjectId"), FApp::GetProjectName());
-    Writer->WriteValue(TEXT("sourceContentRoot"), TEXT("/Game/AdvancedLocomotionV4"));
+    Writer->WriteValue(TEXT("sourceContentRoot"), SourceContentRoot);
     Writer->WriteObjectStart(TEXT("coordinateSystem"));
     Writer->WriteValue(TEXT("sourceHandedness"), TEXT("left"));
     Writer->WriteValue(TEXT("sourceUpAxis"), TEXT("Z"));
@@ -329,13 +329,15 @@ bool WriteManifest(const FString& OutputDirectory, const TArray<FAlsExportAsset>
 }
 }
 
-bool FAlsManifestWriter::WritePlanned(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets, FString& OutError)
+bool FAlsManifestWriter::WritePlanned(const FString& OutputDirectory, const FString& SourceContentRoot,
+    const TArray<FAlsExportAsset>& Assets, FString& OutError)
 {
-    return WriteManifest(OutputDirectory, Assets, {}, TEXT("planned"), false, OutError);
+    return WriteManifest(OutputDirectory, SourceContentRoot, Assets, {}, TEXT("planned"), false, OutError);
 }
 
-bool FAlsManifestWriter::WriteComplete(const FString& OutputDirectory, const TArray<FAlsExportAsset>& Assets,
+bool FAlsManifestWriter::WriteComplete(const FString& OutputDirectory, const FString& SourceContentRoot,
+    const TArray<FAlsExportAsset>& Assets,
     const TArray<FAlsExportFile>& Files, FString& OutError)
 {
-    return WriteManifest(OutputDirectory, Assets, Files, TEXT("complete"), true, OutError);
+    return WriteManifest(OutputDirectory, SourceContentRoot, Assets, Files, TEXT("complete"), true, OutError);
 }

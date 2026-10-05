@@ -2,14 +2,14 @@
 
 ## Lyra Release：资源配置与测试
 
-[Lyra Preview Release v0.2.0-lyra](https://github.com/cc8887/Godot-Locomotion/releases/tag/v0.2.0-lyra) 提供与 tag 对应的 ALS 和 Lyra 资源。下面是 Windows 上运行本版本的流程；源代码 zip 本身不含资源，需要同时下载 ALS 资源包和全部 Lyra 分包。
+[Lyra Release v0.2.1-lyra](https://github.com/cc8887/Godot-Locomotion/releases/tag/v0.2.1-lyra) 提供与 tag 对应的 ALS 和 Lyra 资源。下面是 Windows 上运行本版本的流程；源代码 zip 本身不含资源，需要同时下载 ALS 资源包和全部 Lyra 分包。
 
 ### 1. 准备工具与对应版本的代码
 
 安装 **Godot 4.7.2 .NET/Mono、.NET 8 SDK、PowerShell 7**。使用 Godot 的 `*_console.exe` 可以直接查看导入和测试日志。下载本 Release 的资源后，无需安装 UE 或重新导出动画。
 
 ```powershell
-git clone --branch v0.2.0-lyra https://github.com/cc8887/Godot-Locomotion.git
+git clone --branch v0.2.1-lyra https://github.com/cc8887/Godot-Locomotion.git
 Set-Location Godot-Locomotion
 Copy-Item .env.local.ps1.example .env.local.ps1
 # 编辑 .env.local.ps1，将 GODOT_EXECUTABLE 设为 Godot 4.7.2 .NET console.exe 的相对路径。
@@ -17,15 +17,15 @@ Copy-Item .env.local.ps1.example .env.local.ps1
 . ./.env.local.ps1
 ```
 
-已有检出可以先 `git fetch origin --tags`，再切到 `v0.2.0-lyra`。不同 tag 的资源批次不要混用；JSON 中的依赖摘要按原始文件字节验证，不要格式化资源文件。
+已有检出可以先 `git fetch origin --tags`，再切到 `v0.2.1-lyra`。导出清单随当前资源生成，不锁定某个历史资产批次；校验器检查清单与本次导出文件一致，保留引擎导出的原始资源名称。JSON 资源应保持原始字节，避免手工格式化造成清单不一致。
 
 ### 2. 下载、校验并解压资源包
 
 从上述 Release 页面下载 ALS ZIP、全部 Lyra `partNN.zip` 分包及 `SHA256SUMS.txt`。也可以安装 GitHub CLI 后在仓库根目录运行：
 
 ```powershell
-gh release download v0.2.0-lyra --repo cc8887/Godot-Locomotion `
-  --pattern 'godot-*-assets-v0.2.0-lyra*.zip' --pattern 'SHA256SUMS.txt' --dir .
+gh release download v0.2.1-lyra --repo cc8887/Godot-Locomotion `
+  --pattern 'godot-*-assets-v0.2.1-lyra*.zip' --pattern 'SHA256SUMS.txt' --dir .
 
 foreach ($line in Get-Content SHA256SUMS.txt) {
     if ($line -match '^([0-9a-f]{64})  (.+)$') {
@@ -35,10 +35,10 @@ foreach ($line in Get-Content SHA256SUMS.txt) {
         }
     }
 }
-Get-ChildItem 'godot-*-assets-v0.2.0-lyra*.zip' | Sort-Object Name | ForEach-Object {
+Get-ChildItem 'godot-*-assets-v0.2.1-lyra*.zip' | Sort-Object Name | ForEach-Object {
     Expand-Archive -LiteralPath $_.FullName -DestinationPath . -Force
 }
-./scripts/verify-release-resources.ps1 -ExpectedTag v0.2.0-lyra
+./scripts/verify-release-resources.ps1 -ExpectedTag v0.2.1-lyra
 ```
 
 每个 zip 内已带 `assets/generated/` 路径，**解压目标是仓库根目录**，不要解压到 `assets/generated/` 后形成双层目录。Lyra 分包是独立 ZIP，应全部解压到同一位置，不需要先拼接文件。校验脚本逐文件检查整组资源的大小和 SHA-256；缺少任意分包中的文件会报错，成功时输出两条 `GODOT_RELEASE_RESOURCES_OK`。
@@ -65,7 +65,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Godot 首次导入失败' }
   -- --locomotion=lyra --lyra-profile=rifle
 ```
 
-启动参数放在 `--` 后。`--lyra-profile=unarmed`、`pistol`、`rifle` 选择初始装备，`--lyra-characters=10` 加入九个 NPC。省略 `--locomotion=lyra` 会运行默认 ALS Demo；Godot 编辑器直接 F5 也默认启动 ALS。**main 分支的默认入口支持下方的运行时切换；已发布的 `v0.2.0-lyra` 使用启动时选模式。**`res://scenes/demo/lyra_locomotion_demo.tscn` 保留为独立 Lyra 场景及自动回归入口，旧 `lyra_unarmed_demo.tscn` 只用于早期独立诊断。
+启动参数放在 `--` 后。`--lyra-profile=unarmed`、`pistol`、`rifle` 选择初始装备，`--lyra-characters=10` 加入九个 NPC。省略 `--locomotion=lyra` 会运行默认 ALS Demo；Godot 编辑器直接 F5 也默认启动 ALS。**v0.2.1-lyra 的默认入口支持下方的运行时切换。**`res://scenes/demo/lyra_locomotion_demo.tscn` 保留为独立 Lyra 场景及自动回归入口，旧 `lyra_unarmed_demo.tscn` 只用于早期独立诊断。
 
 ### 在同一 Demo 中切换 ALS／Lyra（main）
 
@@ -114,7 +114,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Godot 首次导入失败' }
 
 ### 5. 资源缺失或自行导出
 
-遇到 `Compiled ALS asset set is missing`，检查 ALS 包是否解压到正确位置；遇到 Lyra JSON 缺失、`Stale/Changed ... dependency`，先运行资源校验，再确认代码 tag 和 ALS/Lyra 全部分包版本相同。首次 FBX 导入必须等待完成。修改模型或重导动画后，重新导入并重新验证依赖摘要，不能只替换单个 FBX/JSON。
+遇到 `Compiled ALS asset set is missing`，检查 ALS 包是否解压到正确位置；遇到 Lyra JSON 缺失或 `Stale/Changed ... dependency`，先确认文件与当前导出清单一致。清单随每次导出更新，不要求匹配某个历史资产哈希；替换相似资产后重新导出/导入并更新相应清单与依赖数据即可。Release ZIP 的 `SHA256SUMS.txt` 只用于检查下载完整性。首次 FBX 导入必须等待完成，不要只替换单个 FBX/JSON 而保留旧清单。
 
 自行从 UE 准备 ALS 资源的流程见下方[资产准备](#资产准备)和[GASP58 的 ALS V4 资源](#gasp58-的-als-v4-资源)。Lyra 当前批次从 GASP58 的 Lyra 内容导出并重定向到 ALS；动画、曲线、Layer 图、Rig、通知和原生参考是多个导出阶段的产物，入口在 `scripts/export-lyra-*.ps1`、`tools/unreal/export_lyra_*.py`，对应阶段及依赖见 [ALS 人物与接口复核](docs/verification/2026-10-03-lyra-als-interface-review.md)。运行本 Release 优先使用同 tag 的整包，UE 5.8/5.9 差异不改变这里的安装步骤。
 
@@ -198,52 +198,47 @@ Lyra 的 Win64 RootYaw 数学桥是可选依赖，Release 资源包已包含该 
 | 文件 | 数量 | 来源 |
 | --- | ---: | --- |
 | `als_manifest.json` | 1 | P2A 导出清单 |
-| `animations/*.fbx` | 126 | P2A 动画 |
-| `meshes/skeletal/*.fbx` | 7 | P2A 骨骼网格 |
-| `meshes/static/*.fbx` | 4 | P2A 静态网格 |
-| `textures/*.png` | 4 | P2A 纹理 |
+| `animations/**/*.fbx` | 由当前 manifest 声明 | P2A 动画 |
+| `meshes/skeletal/**/*.fbx` | 由当前 manifest 声明 | P2A 骨骼网格 |
+| `meshes/static/**/*.fbx` | 由当前 manifest 声明 | P2A 静态网格 |
+| `textures/**/*.png` | 由当前 manifest 声明 | P2A 纹理 |
 | `compiled/als_animation_set.tres` | 1 | P2B 编译资源，Demo 启动时加载 |
 
-清单的 `files[]` 记录 141 个 FBX/PNG 的路径、大小和 SHA-256；仓库中的 `reference/als-v4-export.lock.json` 锁定该批清单。`.import` 与 `.godot/imported` 由 Godot 生成，不需要下载。若已合法持有与仓库锁定批次相同的本地导出文件，可放入上述目录，跳过 P2A，直接运行 P2B。
+清单的 `files[]` 按当前导出记录文件路径、大小和 SHA-256，用于检查文件与该清单是否一致，不与历史批次摘要或固定资产数量比较。导出文件保留 UE 资产原名，并保留选定 `ContentRoot` 下的目录层级。`.import` 与 `.godot/imported` 由 Godot 生成，不需要下载。
 
 自行准备包含 `AdvancedLocomotionSystemV.uproject`、`Content/AdvancedLocomotionV4` 和 `Plugins/ALS/ALS.uplugin` 的 UE 5.9 ALS V4 源工程；[ALS V4 的 Fab 页面](https://www.fab.com/listings/ef9651a4-fb55-4866-a2d9-1b38b028f9c7)可供确认内容来源。加载 `.env.local.ps1` 后，在仓库根目录运行：
 
 ```powershell
-$lockedManifestSha = (Get-Content reference/als-v4-export.lock.json -Raw | ConvertFrom-Json).manifestSha256
 .\scripts\verify-p2a.ps1 -EngineRoot $env:UE_ENGINE_ROOT `
-  -UnrealProject $env:ALS_UE_PROJECT_FILE -UpdateAssetLock
-$exportedManifestSha = (Get-FileHash assets/generated/als_v4/als_manifest.json -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($exportedManifestSha -cne $lockedManifestSha) {
-  throw '导出批次与仓库锁不一致；请核对 UE 源工程/版本，不要继续导入或提交新锁。'
-}
+  -UnrealProject $env:ALS_UE_PROJECT_FILE
 .\scripts\verify-p2b.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -CleanImport
 if (-not (Test-Path assets/generated/als_v4/compiled/als_animation_set.tres)) {
   throw 'P2B 未生成 Demo 所需的动画资源。'
 }
 ```
 
-P2A 构建并部署 UE 导出插件，完成两次导出和确定性校验；`-UpdateAssetLock` 会发布输出并更新本地锁文件。P2B 构建 .NET 项目，执行 Godot 清洁导入及资产验证。若导出哈希不同，不要提交更新后的锁文件。详细流程见 [P2A 导出](docs/architecture/p2a-full-ue-export.md)和 [P2B 导入](docs/architecture/p2b-godot-import-closure.md)。
+P2A 构建并部署 UE 导出插件，完成两次导出和确定性比较；文件哈希只用于核对每个文件是否匹配本次 manifest，不要求与固定资产批次相同。P2B 构建 .NET 项目，执行 Godot 清洁导入及资产验证。schema v2 和资产/动画语义检查仍作为数据格式与运行时合同。详细流程见 [P2A 导出](docs/architecture/p2a-full-ue-export.md)和 [P2B 导入](docs/architecture/p2b-godot-import-closure.md)。
+
+替换相似 ALS 内容时，可用 `verify-p2a.ps1 -ContentRoot '/Game/<内容根>'` 指定导出源内容根；导出器保留 UE 资产原名及该根下的相对目录，不要求匹配固定批次的数量或哈希。若替换资产沿用原语义对象路径，可复用现有 profile；若对象路径或角色/动画命名变化，下游 P3/P4/P5A 的语义映射需要相应调整。P5A 的内容根从 manifest 的 `sourceContentRoot` 解析。
 
 ### GASP58 的 ALS V4 资源
 
 Lyra 的导出与验证工具以仓库目录为相对路径基准，和调用时的工作目录无关。默认源工程为 `../GASP58/GASP58.uproject`，引擎为 `../UE_5.8`；安装位置不同时，在被忽略的 `.env.local.ps1` 中设置 `LYRA_UE_PROJECT_FILE`、`UE_ENGINE_ROOT`。Python 原生源码验证读取 `UNREAL_ENGINE_SOURCE_ROOT`（默认 `../UnrealEngine`）；独立 Rig 对照工程使用 `LYRA_RIG_REFERENCE_HOST`、`LYRA_RIG_SOLVER_HOST`。这些配置和脚本路径参数支持相对路径，仓库与发布文档不保存本机盘符路径。
 
-若源工程是 `GASP58.uproject`（UE 5.8，含 `Content/AdvancedLocomotionV4`），使用资产专用插件和独立的本地锁。先执行 P2A、P2B，再生成六组与本次清单绑定的原始动画源：
+若源工程是 `GASP58.uproject`（UE 5.8，含 `Content/AdvancedLocomotionV4`），使用资产专用插件导出当前资产；不再与固定导出批次或 manifest hash 比较。先执行 P2A、P2B，再生成六组与本次编译资源定义绑定的原始动画源：
 
 ```powershell
 $gaspProject = '..\GASP58\GASP58.uproject'
 $ue58 = '../UE_5.8'
-$gaspLock = Join-Path (Get-Location) 'artifacts\gasp58\als-v4-export.lock.json'
 .\scripts\verify-p2a.ps1 -EngineRoot $ue58 -UnrealProject $gaspProject `
   -BuildScript (Join-Path (Get-Location) 'scripts\build-gasp58-exporter.ps1') `
-  -ReadyMarker 'GODOT_ALS_V4_EXPORTER_READY engine=5.8.1 plugin=1.0.0' `
-  -CommandletName AlsV4AssetExport -AssetLockPath $gaspLock -UpdateAssetLock
-.\scripts\verify-p2b.ps1 -GodotExecutable $env:GODOT_EXECUTABLE -AssetLockPath $gaspLock
+  -CommandletName AlsV4AssetExport
+.\scripts\verify-p2b.ps1 -GodotExecutable $env:GODOT_EXECUTABLE
 .\scripts\export-gasp58-raw-sources.ps1 -EngineRoot $ue58 `
   -UnrealProject $gaspProject -GodotExecutable $env:GODOT_EXECUTABLE
 ```
 
-原始源写入被忽略的 `assets/generated/als_v4_raw/`，运行时只在定义摘要匹配时读取；仓库锁与旧原生对照夹具保持原样。GASP58 的内容不包含另一路 `/ALS` Refactored 资产，[本次验证记录](docs/verification/2026-09-29-gasp58-export.md)列出资源来源、校验结果和适用边界。
+原始源写入被忽略的 `assets/generated/als_v4_raw/`，运行时只在定义摘要匹配时读取；该摘要校验用于保证原始源对应当前编译定义，不是导出资产批次锁。GASP58 的内容不包含另一路 `/ALS` Refactored 资产，[本次验证记录](docs/verification/2026-09-29-gasp58-export.md)列出资源来源、校验结果和适用边界。
 
 ### Lyra 玩家与 NPC 示例
 

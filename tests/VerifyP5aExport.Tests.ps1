@@ -1,9 +1,9 @@
 $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$script:AssetLockFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\asset-lock-functions.ps1'
+$script:P2aPublicationFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p2a-publication-functions.ps1'
 $script:CompareExportsPath = Join-Path $script:RepositoryRoot 'scripts\compare-p2a-exports.ps1'
 
-if (Test-Path -LiteralPath $script:AssetLockFunctionsPath -PathType Leaf) {
-    . $script:AssetLockFunctionsPath
+if (Test-Path -LiteralPath $script:P2aPublicationFunctionsPath -PathType Leaf) {
+    . $script:P2aPublicationFunctionsPath
 }
 
 function Get-TestStableId([int]$Value) {
@@ -13,6 +13,17 @@ function Get-TestStableId([int]$Value) {
 function Get-TestSha1([string]$Value) {
     $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
     return [Convert]::ToHexString([Security.Cryptography.SHA1]::HashData($bytes)).ToLowerInvariant()
+}
+
+function Get-TestManifestAssetCount([object]$Manifest) {
+    $count = 0
+    foreach ($collection in @(
+        'skeletons', 'skeletalMeshes', 'staticMeshes', 'animations', 'montages', 'blendSpaces',
+        'aimOffsets', 'materials', 'textures', 'physicsAssets', 'curves', 'configAssets'
+    )) {
+        $count += @($Manifest.$collection).Count
+    }
+    return $count
 }
 
 function New-TestAsset([int]$Index, [string]$Kind) {
@@ -105,7 +116,7 @@ function New-TestP5aManifest {
         }
     }
 
-    return [pscustomobject][ordered]@{
+    $manifest = [pscustomobject][ordered]@{
         schemaVersion = 2
         exporterVersion = '2.0.0'
         sourceEngineVersion = '5.9.0'
@@ -125,9 +136,11 @@ function New-TestP5aManifest {
         configAssets = @(& $newAssets 49 'Blueprint')
         files = $files
         auditSummary = [pscustomobject][ordered]@{
-            status = 'complete'; assetCount = 267; fileCount = 141; errorCount = 0; warningCount = 0
+            status = 'complete'; assetCount = 0; fileCount = $files.Count; errorCount = 0; warningCount = 0
         }
     }
+    $manifest.auditSummary.assetCount = Get-TestManifestAssetCount $manifest
+    return $manifest
 }
 
 function Copy-TestManifest([object]$Manifest) {
@@ -173,23 +186,18 @@ function New-PublicationFixture([string]$Name) {
     $canonical = Join-Path $repo 'assets\generated\als_v4'
     $candidate = Join-Path $repo 'artifacts\p2a-publication\canonical-candidate'
     $determinism = Join-Path $repo 'artifacts\p2a-determinism\als_v4'
-    $lock = Join-Path $repo 'reference\als-v4-export.lock.json'
-    $lockCandidate = Join-Path $repo 'artifacts\p2a-publication\als-v4-export.lock.candidate.json'
     $canonicalBackup = Join-Path $repo 'artifacts\p2a-publication\als_v4.canonical.backup'
-    $lockBackup = Join-Path $repo 'artifacts\p2a-publication\als-v4-export.lock.backup.json'
     $journal = Join-Path $repo 'artifacts\p2a-publication\transaction.json'
     [void][IO.Directory]::CreateDirectory($canonical)
-    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($lock))
     [IO.File]::WriteAllText((Join-Path $canonical 'old.bin'), 'old-canonical', [Text.UTF8Encoding]::new($false))
-    [IO.File]::WriteAllText($lock, "old-lock`r`n", [Text.UTF8Encoding]::new($false))
     $manifest = New-TestP5aManifest
     Write-TestExportRoot -Root $candidate -Manifest $manifest
     [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($determinism))
     Copy-Item -LiteralPath $candidate -Destination $determinism -Recurse
     return [pscustomobject]@{
         RepositoryRoot = $repo; CanonicalRoot = $canonical; CandidateRoot = $candidate
-        DeterminismRoot = $determinism; LockPath = $lock; LockCandidatePath = $lockCandidate
-        CanonicalBackupRoot = $canonicalBackup; LockBackupPath = $lockBackup; JournalPath = $journal
+        DeterminismRoot = $determinism; CanonicalBackupRoot = $canonicalBackup; JournalPath = $journal
+        LegacyLockPath = Join-Path $repo 'reference\als-v4-export.lock.json'
     }
 }
 
@@ -206,33 +214,30 @@ function Get-FileByteSnapshot([string]$Path) {
     return [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
 }
 
-function Invoke-TestPublication([object]$Fixture, [string]$FaultInjectionPoint = '', [switch]$UpdateAssetLock) {
-    Invoke-AlsP2aJointPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
+function Invoke-TestPublication([object]$Fixture, [string]$FaultInjectionPoint = '') {
+    Invoke-AlsP2aPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
         -RepositoryRoot $Fixture.RepositoryRoot -CanonicalRoot $Fixture.CanonicalRoot `
         -CandidateRoot $Fixture.CandidateRoot -DeterminismRoot $Fixture.DeterminismRoot `
-        -LockPath $Fixture.LockPath -LockCandidatePath $Fixture.LockCandidatePath `
-        -CanonicalBackupRoot $Fixture.CanonicalBackupRoot -LockBackupPath $Fixture.LockBackupPath `
+        -CanonicalBackupRoot $Fixture.CanonicalBackupRoot `
         -JournalPath $Fixture.JournalPath -ComparisonScriptPath $script:CompareExportsPath `
-        -FaultInjectionPoint $FaultInjectionPoint -UpdateAssetLock:$UpdateAssetLock
+        -FaultInjectionPoint $FaultInjectionPoint
 }
 
 function Assert-NoPublicationResidue([object]$Fixture) {
     foreach ($path in @(
-        $Fixture.CandidateRoot, $Fixture.DeterminismRoot, $Fixture.LockCandidatePath,
-        $Fixture.CanonicalBackupRoot, $Fixture.LockBackupPath, $Fixture.JournalPath
+        $Fixture.CandidateRoot, $Fixture.DeterminismRoot,
+        $Fixture.CanonicalBackupRoot, $Fixture.JournalPath
     )) {
         (Test-Path -LiteralPath $path) | Should Be $false
     }
 }
 
-function Write-TestPublicationJournal([object]$Fixture, [string]$State, [bool]$CanonicalOriginalExisted, [bool]$LockOriginalExisted) {
+function Write-TestPublicationJournal([object]$Fixture, [string]$State, [bool]$CanonicalOriginalExisted) {
     $journal = [ordered]@{
         schemaVersion = 1; state = $State; repositoryRoot = $Fixture.RepositoryRoot
         canonicalRoot = $Fixture.CanonicalRoot; candidateRoot = $Fixture.CandidateRoot
         determinismRoot = $Fixture.DeterminismRoot; canonicalBackupRoot = $Fixture.CanonicalBackupRoot
-        lockPath = $Fixture.LockPath; lockCandidatePath = $Fixture.LockCandidatePath
-        lockBackupPath = $Fixture.LockBackupPath; journalPath = $Fixture.JournalPath
-        canonicalOriginalExisted = $CanonicalOriginalExisted; lockOriginalExisted = $LockOriginalExisted
+        journalPath = $Fixture.JournalPath; canonicalOriginalExisted = $CanonicalOriginalExisted
     }
     [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Fixture.JournalPath))
     [IO.File]::WriteAllText($Fixture.JournalPath, ($journal | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
@@ -295,7 +300,7 @@ function New-TestTopLevelManifest([string]$AuditStatus) {
     return $manifest
 }
 
-function New-TestTopLevelPlan {
+function New-TestTopLevelPlan([int]$ExportableCount) {
     $kinds = @(
         'Skeleton', 'SkeletalMesh', 'StaticMesh', 'AnimationSequence', 'AnimMontage',
         'BlendSpace', 'MaterialInstance', 'PhysicsAsset', 'Texture', 'Blueprint'
@@ -310,7 +315,7 @@ function New-TestTopLevelPlan {
     }
     return [pscustomobject][ordered]@{
         assets = $assets
-        summary = [pscustomobject]@{ assetCount = 267; exportableCount = 141 }
+        summary = [pscustomobject]@{ assetCount = $assets.Count; exportableCount = $ExportableCount }
     }
 }
 
@@ -319,19 +324,22 @@ function New-TestTopLevelVerifierFixture([string]$Name, [string]$Stage, [string]
     $scripts = Join-Path $repo 'scripts'
     $template = Join-Path $repo 'fixture-data\export-template'
     $canonical = Join-Path $repo 'assets\generated\als_v4'
-    $lock = Join-Path $repo 'reference\als-v4-export.lock.json'
     $engineRoot = Join-Path $repo 'engine'
     $editor = Join-Path $engineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
     [void][IO.Directory]::CreateDirectory($scripts)
     [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($editor))
     [void][IO.Directory]::CreateDirectory($canonical)
-    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($lock))
-    Copy-Item $script:AssetLockFunctionsPath (Join-Path $scripts 'asset-lock-functions.ps1')
+    $buildVersionPath = Join-Path $engineRoot 'Engine\Build\Build.version'
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($buildVersionPath))
+    [IO.File]::WriteAllText($buildVersionPath, '{"MajorVersion":5,"MinorVersion":9,"PatchVersion":0}')
+    Copy-Item $script:P2aPublicationFunctionsPath (Join-Path $scripts 'p2a-publication-functions.ps1')
     Copy-Item $script:CompareExportsPath (Join-Path $scripts 'compare-p2a-exports.ps1')
+    Copy-Item (Join-Path $script:RepositoryRoot 'scripts\unreal-version-functions.ps1') `
+        (Join-Path $scripts 'unreal-version-functions.ps1')
     Copy-Item (Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1') (Join-Path $scripts 'verify-p2a.ps1')
     [IO.File]::WriteAllText(
         (Join-Path $scripts 'build-als-exporter.ps1'),
-        "Write-Output 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'; `$global:LASTEXITCODE = 0",
+        "Write-Output 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=9.4-preview'; `$global:LASTEXITCODE = 0",
         [Text.UTF8Encoding]::new($false))
     $editorSource = Join-Path $repo 'fixture-editor.cs'
     [IO.File]::WriteAllText($editorSource, @'
@@ -371,13 +379,13 @@ internal static class FixtureEditor
             File.Copy(Path.Combine(template, "export_plan.json"), Path.Combine(output, "export_plan.json"), true);
             File.Copy(Path.Combine(template, "partial", "als_manifest.partial.json"),
                 Path.Combine(output, "partial", "als_manifest.partial.json"), true);
-            Console.WriteLine("GODOT_ALS_P2A_PLAN_OK assets=267 exportable=141 config=126 excluded=0");
+            Console.WriteLine("GODOT_ALS_P2A_PLAN_OK assets=10 exportable=1 config=1 excluded=0");
             return 0;
         }
         if (export)
         {
             CopyTree(template, output);
-            Console.WriteLine("GODOT_ALS_P2A_EXPORT_OK assets=267 files=141 fbx=137 textures=4 warnings=0");
+            Console.WriteLine("GODOT_ALS_P2A_EXPORT_OK assets=10 files=1 fbx=1 textures=0 warnings=0");
             return 0;
         }
         return 12;
@@ -392,7 +400,7 @@ internal static class FixtureEditor
     Write-TestExportRoot -Root $template -Manifest $formal
     [IO.File]::WriteAllText(
         (Join-Path $template 'export_plan.json'),
-        (New-TestTopLevelPlan | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+        (New-TestTopLevelPlan $formal.files.Count | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText(
         (Join-Path $template 'partial\als_manifest.partial.json'),
         (New-TestTopLevelManifest 'planned' | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
@@ -415,31 +423,31 @@ internal static class FixtureEditor
     $project = Join-Path $repo 'fixture.uproject'
     [IO.File]::WriteAllText($project, '{}', [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $canonical 'old.bin'), 'old-canonical', [Text.UTF8Encoding]::new($false))
-    [IO.File]::WriteAllText($lock, "old-lock`r`n", [Text.UTF8Encoding]::new($false))
-
     return [pscustomobject]@{
         RepositoryRoot = $repo; Scripts = $scripts; EngineRoot = $engineRoot; UnrealProject = $project
-        CanonicalRoot = $canonical; LockPath = $lock
+        CanonicalRoot = $canonical
         CandidateRoot = Join-Path $repo 'artifacts\p2a-publication\canonical-candidate'
         DeterminismRoot = Join-Path $repo 'artifacts\p2a-determinism\als_v4'
-        LockCandidatePath = Join-Path $repo 'artifacts\p2a-publication\als-v4-export.lock.candidate.json'
         CanonicalBackupRoot = Join-Path $repo 'artifacts\p2a-publication\als_v4.canonical.backup'
-        LockBackupPath = Join-Path $repo 'artifacts\p2a-publication\als-v4-export.lock.backup.json'
         JournalPath = Join-Path $repo 'artifacts\p2a-publication\transaction.json'
     }
 }
 
 Describe 'P5A complete ALS v2 export audit' {
-    It 'accepts exact inventory and audits Sequence Montage IDs tick totals terminal links and audio absence' {
+    It 'accepts a self-consistent inventory and audits Sequence Montage IDs tick totals terminal links and audio absence' {
         (Get-Command Assert-AlsP2aPublishManifest -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
         if (-not (Get-Command Assert-AlsP2aPublishManifest -ErrorAction SilentlyContinue)) { return }
-        $result = Assert-AlsP2aPublishManifest -Manifest (New-TestP5aManifest) -Label 'Fixture'
+        $manifest = New-TestP5aManifest
+        $manifest.animations = @($manifest.animations | Select-Object -First 2)
+        $manifest.auditSummary.assetCount = Get-TestManifestAssetCount $manifest
+        $manifest.exporterVersion = '9.4-preview'
+        $result = Assert-AlsP2aPublishManifest -Manifest $manifest -Label 'Fixture'
 
         $result.SchemaVersion | Should Be 2
-        $result.ExporterVersion | Should Be '2.0.0'
-        $result.AssetCount | Should Be 267
-        $result.FileCount | Should Be 141
-        $result.AnimationCount | Should Be 126
+        $result.ExporterVersion | Should Be '9.4-preview'
+        $result.AssetCount | Should Be $manifest.auditSummary.assetCount
+        $result.FileCount | Should Be $manifest.files.Count
+        $result.AnimationCount | Should Be $manifest.animations.Count
         $result.SequenceEventCount | Should Be 2
         $result.MontageEventCount | Should Be 1
         $result.EventCount | Should Be 3
@@ -506,7 +514,7 @@ Describe 'P5A complete ALS v2 export audit' {
 
         $animationCount = New-TestP5aManifest
         $animationCount.animations = @($animationCount.animations | Select-Object -First 125)
-        (Get-ManifestAuditError $animationCount) | Should Match 'animations=125'
+        (Get-ManifestAuditError $animationCount) | Should Match 'inventory summary does not match its contents.*actualAssets='
     }
 
     It 'accepts the exact six timeline kinds and their frozen payload domains' {
@@ -780,44 +788,23 @@ Describe 'P5A two-root comparison' {
     }
 }
 
-Describe 'P5A joint canonical and lock publication' {
-    It 'publishes canonical and lock together only after comparison while keeping lock schemaVersion one' {
-        (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        if (-not (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue)) { return }
+Describe 'P5A canonical publication without asset locks' {
+    It 'publishes the deterministic candidate without writing a historical asset lock' {
+        (Get-Command Invoke-AlsP2aPublication -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
+        if (-not (Get-Command Invoke-AlsP2aPublication -ErrorAction SilentlyContinue)) { return }
         $fixture = New-PublicationFixture 'success'
         $candidateBefore = Get-TreeByteSnapshot $fixture.CandidateRoot
 
-        Invoke-TestPublication -Fixture $fixture -UpdateAssetLock
-
-        (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $candidateBefore
-        $lock = Get-Content -Raw $fixture.LockPath | ConvertFrom-Json
-        $lock.schemaVersion | Should Be 1
-        $lock.exporterVersion | Should Be '2.0.0'
-        $lock.assetCount | Should Be 267
-        $lock.fileCount | Should Be 141
-        $lock.animationCount | Should Be 126
-        $lock.manifestSha256 | Should Be (Get-FileHash (Join-Path $fixture.CanonicalRoot 'als_manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant()
-        Assert-NoPublicationResidue $fixture
-    }
-
-    It 'never publishes either resource when UpdateAssetLock is absent' {
-        (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        if (-not (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue)) { return }
-        $fixture = New-PublicationFixture 'no-update'
-        $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-        $lockBefore = Get-FileByteSnapshot $fixture.LockPath
-
         Invoke-TestPublication -Fixture $fixture
 
-        (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
+        (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $candidateBefore
+        (Test-Path -LiteralPath $fixture.LegacyLockPath) | Should Be $false
         Assert-NoPublicationResidue $fixture
     }
 
-    It 'rejects recursively duplicated raw manifest properties before journal or publication mutation' {
+    It 'rejects recursively duplicated raw manifest properties before publication' {
         $fixture = New-PublicationFixture 'duplicate-raw-property'
         $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-        $lockBefore = Get-FileByteSnapshot $fixture.LockPath
         $candidateManifest = Join-Path $fixture.CandidateRoot 'als_manifest.json'
         $determinismManifest = Join-Path $fixture.DeterminismRoot 'als_manifest.json'
         $raw = [IO.File]::ReadAllText($candidateManifest)
@@ -828,152 +815,102 @@ Describe 'P5A joint canonical and lock publication' {
         [IO.File]::WriteAllText($candidateManifest, $duplicate, $encoding)
         [IO.File]::WriteAllText($determinismManifest, $duplicate, $encoding)
 
-        $errorMessage = ''
-        try { Invoke-TestPublication -Fixture $fixture -UpdateAssetLock }
-        catch { $errorMessage = $_.Exception.Message }
+        $message = ''
+        try { Invoke-TestPublication -Fixture $fixture }
+        catch { $message = $_.Exception.Message }
 
-        $errorMessage | Should Match 'duplicate.*kind|kind.*duplicate'
+        $message | Should Match 'duplicate.*kind|kind.*duplicate'
         (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
         Assert-NoPublicationResidue $fixture
     }
 
-    It 'rejects invalid raw manifest JSON with stable cleanup before publication mutation' {
+    It 'rejects invalid manifest JSON and cleans both export stages' {
         $fixture = New-PublicationFixture 'invalid-raw-json'
         $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-        $lockBefore = Get-FileByteSnapshot $fixture.LockPath
         $invalid = '{"schemaVersion":2,'
         $encoding = [Text.UTF8Encoding]::new($false)
         [IO.File]::WriteAllText((Join-Path $fixture.CandidateRoot 'als_manifest.json'), $invalid, $encoding)
         [IO.File]::WriteAllText((Join-Path $fixture.DeterminismRoot 'als_manifest.json'), $invalid, $encoding)
 
-        $errorMessage = ''
-        try { Invoke-TestPublication -Fixture $fixture -UpdateAssetLock }
-        catch { $errorMessage = $_.Exception.Message }
+        $message = ''
+        try { Invoke-TestPublication -Fixture $fixture }
+        catch { $message = $_.Exception.Message }
 
-        $errorMessage | Should Match 'manifest is not valid JSON'
+        $message | Should Match 'manifest is not valid JSON'
         (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
         Assert-NoPublicationResidue $fixture
     }
 
-    foreach ($fault in @('Comparison', 'CanonicalSwap', 'LockSwap')) {
-        It "restores old canonical and lock bytes and clears all residue after $fault fault injection" {
-            (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-            if (-not (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue)) { return }
+    foreach ($fault in @('Comparison', 'CanonicalSwap')) {
+        It "restores the previous canonical directory after $fault failure" {
             $fixture = New-PublicationFixture "fault-$fault"
             $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
             $rejected = $false
 
-            try { Invoke-TestPublication -Fixture $fixture -FaultInjectionPoint $fault -UpdateAssetLock }
+            try { Invoke-TestPublication -Fixture $fixture -FaultInjectionPoint $fault }
             catch { $rejected = $true }
 
             $rejected | Should Be $true
             (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-            (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
             Assert-NoPublicationResidue $fixture
         }
     }
 
-    It 'recovers an incomplete journal before starting a new publication' {
-        (Get-Command Repair-AlsP2aPublication -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        if (-not (Get-Command Repair-AlsP2aPublication -ErrorAction SilentlyContinue)) { return }
+    It 'recovers an interrupted canonical swap from its transaction journal' {
         $fixture = New-PublicationFixture 'startup-recovery'
         $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-        $lockBefore = Get-FileByteSnapshot $fixture.LockPath
         [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($fixture.CanonicalBackupRoot))
         Move-Item -LiteralPath $fixture.CanonicalRoot -Destination $fixture.CanonicalBackupRoot
         Move-Item -LiteralPath $fixture.CandidateRoot -Destination $fixture.CanonicalRoot
-        Move-Item -LiteralPath $fixture.LockPath -Destination $fixture.LockBackupPath
-        [IO.File]::WriteAllText($fixture.LockPath, 'new-lock', [Text.UTF8Encoding]::new($false))
-        $journal = [ordered]@{
-            schemaVersion = 1; state = 'prepared'; repositoryRoot = $fixture.RepositoryRoot
-            canonicalRoot = $fixture.CanonicalRoot; candidateRoot = $fixture.CandidateRoot
-            determinismRoot = $fixture.DeterminismRoot; canonicalBackupRoot = $fixture.CanonicalBackupRoot
-            lockPath = $fixture.LockPath; lockCandidatePath = $fixture.LockCandidatePath
-            lockBackupPath = $fixture.LockBackupPath; journalPath = $fixture.JournalPath
-            canonicalOriginalExisted = $true; lockOriginalExisted = $true
-        }
-        [IO.File]::WriteAllText($fixture.JournalPath, ($journal | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+        Write-TestPublicationJournal $fixture 'prepared' $true
 
         Repair-AlsP2aPublication -RepositoryRoot $fixture.RepositoryRoot -JournalPath $fixture.JournalPath
 
         (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
         Assert-NoPublicationResidue $fixture
     }
 
-    It 'rejects every move or delete path outside the repository before comparison or mutation' {
-        (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        if (-not (Get-Command Invoke-AlsP2aJointPublication -ErrorAction SilentlyContinue)) { return }
-        foreach ($property in @(
-            'CanonicalRoot', 'CandidateRoot', 'DeterminismRoot', 'LockPath', 'LockCandidatePath',
-            'CanonicalBackupRoot', 'LockBackupPath', 'JournalPath'
-        )) {
+    It 'rejects publication paths outside the repository before comparison or mutation' {
+        foreach ($property in @('CanonicalRoot', 'CandidateRoot', 'DeterminismRoot', 'CanonicalBackupRoot', 'JournalPath')) {
             $fixture = New-PublicationFixture "escape-$property"
-            $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
+            $canonicalRoot = Join-Path $fixture.RepositoryRoot 'assets\generated\als_v4'
+            $canonicalBefore = Get-TreeByteSnapshot $canonicalRoot
             $outside = Join-Path $TestDrive "outside-$property"
             $fixture.$property = $outside
             $rejected = $false
 
-            try { Invoke-TestPublication -Fixture $fixture -UpdateAssetLock }
+            try { Invoke-TestPublication -Fixture $fixture }
             catch { $rejected = $true }
 
             $rejected | Should Be $true
-            (Get-TreeByteSnapshot (Join-Path $fixture.RepositoryRoot 'assets\generated\als_v4')) | Should Be $canonicalBefore
-            (Get-FileByteSnapshot (Join-Path $fixture.RepositoryRoot 'reference\als-v4-export.lock.json')) | Should Be $lockBefore
+            (Get-TreeByteSnapshot $canonicalRoot) | Should Be $canonicalBefore
             (Test-Path -LiteralPath $outside) | Should Be $false
         }
     }
 
-    It 'rejects any ancestor or descendant transaction path before repair comparison or mutation' {
+    It 'rejects ancestor and descendant transaction paths before running comparison' {
         foreach ($case in @(
-            @{ Name = 'canonical-ancestor'; Mutate = { param($f) $f.CandidateRoot = Join-Path $f.CanonicalRoot 'candidate' } },
-            @{ Name = 'candidate-ancestor'; Mutate = { param($f) $f.LockCandidatePath = Join-Path $f.CandidateRoot 'lock.json' } },
-            @{ Name = 'journal-ancestor'; Mutate = { param($f) $f.JournalPath = [IO.Path]::GetDirectoryName($f.LockCandidatePath) } }
+            @{ Name = 'candidate-under-canonical'; Mutate = { param($fixture) $fixture.CandidateRoot = Join-Path $fixture.CanonicalRoot 'candidate' } },
+            @{ Name = 'journal-parent'; Mutate = { param($fixture) $fixture.JournalPath = [IO.Path]::GetDirectoryName($fixture.CanonicalBackupRoot) } }
         )) {
-            $repo = Join-Path $TestDrive "topology-$($case.Name)"
-            $fixture = [pscustomobject]@{
-                RepositoryRoot = $repo
-                CanonicalRoot = Join-Path $repo 'assets\generated\als_v4'
-                CandidateRoot = Join-Path $repo 'artifacts\p2a-publication\candidate'
-                DeterminismRoot = Join-Path $repo 'artifacts\p2a-determinism\als_v4'
-                LockPath = Join-Path $repo 'reference\als-v4-export.lock.json'
-                LockCandidatePath = Join-Path $repo 'artifacts\p2a-publication\lock.candidate.json'
-                CanonicalBackupRoot = Join-Path $repo 'artifacts\p2a-publication\canonical.backup'
-                LockBackupPath = Join-Path $repo 'artifacts\p2a-publication\lock.backup.json'
-                JournalPath = Join-Path $repo 'artifacts\p2a-publication\transaction.json'
-            }
-            [void][IO.Directory]::CreateDirectory((Join-Path $repo 'assets\config'))
-            $sentinel = Join-Path $repo 'assets\config\sentinel.txt'
-            [IO.File]::WriteAllText($sentinel, 'keep', [Text.UTF8Encoding]::new($false))
-            & $case.Mutate $fixture
-            $probe = Join-Path $repo 'comparison-probe.ps1'
-            $probeMarker = Join-Path $repo 'comparison-called.txt'
+            $fixture = New-PublicationFixture "topology-$($case.Name)"
+            $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
+            $probe = Join-Path $fixture.RepositoryRoot 'comparison-probe.ps1'
+            $probeMarker = Join-Path $fixture.RepositoryRoot 'comparison-called.txt'
             [IO.File]::WriteAllText($probe, "[IO.File]::WriteAllText('$($probeMarker.Replace("'", "''"))', 'called')", [Text.UTF8Encoding]::new($false))
+            & $case.Mutate $fixture
 
-            $errorMessage = ''
-            try {
-                Invoke-AlsP2aJointPublication -GateToken 'P2A_EXPORT_GATES_COMPLETE' `
-                    -RepositoryRoot $fixture.RepositoryRoot -CanonicalRoot $fixture.CanonicalRoot `
-                    -CandidateRoot $fixture.CandidateRoot -DeterminismRoot $fixture.DeterminismRoot `
-                    -LockPath $fixture.LockPath -LockCandidatePath $fixture.LockCandidatePath `
-                    -CanonicalBackupRoot $fixture.CanonicalBackupRoot -LockBackupPath $fixture.LockBackupPath `
-                    -JournalPath $fixture.JournalPath -ComparisonScriptPath $probe
-            }
-            catch { $errorMessage = $_.Exception.Message }
+            $message = ''
+            try { Invoke-TestPublication -Fixture $fixture }
+            catch { $message = $_.Exception.Message }
 
-            $errorMessage | Should Match 'ancestor|descendant|overlap'
+            $message | Should Match 'ancestor|descendant|overlap'
             (Test-Path -LiteralPath $probeMarker) | Should Be $false
-            [IO.File]::ReadAllText($sentinel) | Should Be 'keep'
-            (Test-Path -LiteralPath $fixture.CanonicalBackupRoot) | Should Be $false
-            (Test-Path -LiteralPath $fixture.LockBackupPath) | Should Be $false
+            (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
         }
     }
 
-    It 'rejects a junction input before comparison or deletion and preserves the external sentinel' {
+    It 'rejects a junction candidate before comparison and preserves the external sentinel' {
         if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return }
         $fixture = New-PublicationFixture 'junction'
         $external = Join-Path $TestDrive 'junction-external'
@@ -986,117 +923,51 @@ Describe 'P5A joint canonical and lock publication' {
         $probeMarker = Join-Path $fixture.RepositoryRoot 'comparison-called.txt'
         [IO.File]::WriteAllText($probe, "[IO.File]::WriteAllText('$($probeMarker.Replace("'", "''"))', 'called')", [Text.UTF8Encoding]::new($false))
 
-        $errorMessage = ''
-        try {
-            Invoke-TestPublication -Fixture $fixture
-        }
-        catch { $errorMessage = $_.Exception.Message }
+        $message = ''
+        try { Invoke-TestPublication -Fixture $fixture }
+        catch { $message = $_.Exception.Message }
 
-        $errorMessage | Should Match 'reparse'
+        $message | Should Match 'reparse'
         [IO.File]::ReadAllText($externalSentinel) | Should Be 'outside'
         (Test-Path -LiteralPath $probeMarker) | Should Be $false
     }
 
-    foreach ($combination in @(
-        @{ Name = 'canonical-only'; Canonical = $true; Lock = $false },
-        @{ Name = 'lock-only'; Canonical = $false; Lock = $true },
-        @{ Name = 'neither'; Canonical = $false; Lock = $false }
-    )) {
-        It "recovers a prepared transaction with $($combination.Name) original resource ownership" {
-            $fixture = New-PublicationFixture "recovery-$($combination.Name)"
-            $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
-            if ($combination.Canonical) {
-                Move-Item $fixture.CanonicalRoot $fixture.CanonicalBackupRoot
-                Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot
-            }
-            else {
-                Remove-Item $fixture.CanonicalRoot -Recurse
-                Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot
-                $canonicalBefore = '<absent>'
-            }
-            if ($combination.Lock) {
-                Move-Item $fixture.LockPath $fixture.LockBackupPath
-                [IO.File]::WriteAllText($fixture.LockCandidatePath, 'new-lock')
-                Move-Item $fixture.LockCandidatePath $fixture.LockPath
-            }
-            else {
-                Remove-Item $fixture.LockPath
-                [IO.File]::WriteAllText($fixture.LockCandidatePath, 'new-lock')
-                Move-Item $fixture.LockCandidatePath $fixture.LockPath
-                $lockBefore = '<absent>'
-            }
-            Write-TestPublicationJournal $fixture 'prepared' $combination.Canonical $combination.Lock
-
-            Repair-AlsP2aPublication -RepositoryRoot $fixture.RepositoryRoot -JournalPath $fixture.JournalPath
-
-            (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-            (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
-            Assert-NoPublicationResidue $fixture
-        }
-    }
-
-    foreach ($window in @('AfterCanonicalBackup', 'AfterBothBackups', 'AfterCanonicalInstall')) {
-        It "recovers the prepared crash window $window" {
-            $fixture = New-PublicationFixture "window-$window"
-            $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
-            Move-Item $fixture.CanonicalRoot $fixture.CanonicalBackupRoot
-            if ($window -ne 'AfterCanonicalBackup') { Move-Item $fixture.LockPath $fixture.LockBackupPath }
-            if ($window -eq 'AfterCanonicalInstall') { Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot }
-            Write-TestPublicationJournal $fixture 'prepared' $true $true
-
-            Repair-AlsP2aPublication -RepositoryRoot $fixture.RepositoryRoot -JournalPath $fixture.JournalPath
-
-            (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-            (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
-            Assert-NoPublicationResidue $fixture
-        }
-    }
-
-    It 'finishes cleanup for a committed transaction after partial residue removal' {
+    It 'finishes cleanup after a committed transaction with partial residue' {
         $fixture = New-PublicationFixture 'committed-cleanup'
-        Move-Item $fixture.CanonicalRoot $fixture.CanonicalBackupRoot
-        Move-Item $fixture.LockPath $fixture.LockBackupPath
-        Move-Item $fixture.CandidateRoot $fixture.CanonicalRoot
-        [IO.File]::WriteAllText($fixture.LockCandidatePath, 'committed-lock')
-        Move-Item $fixture.LockCandidatePath $fixture.LockPath
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($fixture.CanonicalBackupRoot))
+        Move-Item -LiteralPath $fixture.CanonicalRoot -Destination $fixture.CanonicalBackupRoot
+        Move-Item -LiteralPath $fixture.CandidateRoot -Destination $fixture.CanonicalRoot
         $canonicalCommitted = Get-TreeByteSnapshot $fixture.CanonicalRoot
-        $lockCommitted = Get-FileByteSnapshot $fixture.LockPath
-        Remove-Item $fixture.CanonicalBackupRoot -Recurse
-        Write-TestPublicationJournal $fixture 'committed' $true $true
+        Remove-Item -LiteralPath $fixture.CanonicalBackupRoot -Recurse
+        Write-TestPublicationJournal $fixture 'committed' $true
 
         Repair-AlsP2aPublication -RepositoryRoot $fixture.RepositoryRoot -JournalPath $fixture.JournalPath
 
         (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalCommitted
-        (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockCommitted
         Assert-NoPublicationResidue $fixture
     }
 }
-
-Describe 'P5A workflow staging cleanup' {
+Describe 'P2A workflow staging cleanup' {
     foreach ($phase in @('DryRun', 'FullExport', 'DeterminismExport')) {
-        It "cleans all staging without touching canonical or lock when $phase fails" {
+        It "cleans all staging without touching canonical output when $phase fails" {
             (Get-Command Invoke-AlsP2aStagingWorkflow -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
             if (-not (Get-Command Invoke-AlsP2aStagingWorkflow -ErrorAction SilentlyContinue)) { return }
             $fixture = New-PublicationFixture "workflow-$phase"
             Remove-Item $fixture.CandidateRoot -Recurse
             Remove-Item $fixture.DeterminismRoot -Recurse
             $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-            $lockBefore = Get-FileByteSnapshot $fixture.LockPath
 
             $rejected = $false
             try {
                 Invoke-AlsP2aStagingWorkflow -RepositoryRoot $fixture.RepositoryRoot `
                     -CandidateRoot $fixture.CandidateRoot -DeterminismRoot $fixture.DeterminismRoot `
-                    -LockCandidatePath $fixture.LockCandidatePath -Action {
+                    -Action {
                         [void][IO.Directory]::CreateDirectory($fixture.CandidateRoot)
                         [IO.File]::WriteAllText((Join-Path $fixture.CandidateRoot 'candidate.bin'), 'candidate')
                         if ($phase -eq 'DryRun') { throw 'injected dry-run failure' }
                         [void][IO.Directory]::CreateDirectory($fixture.DeterminismRoot)
                         [IO.File]::WriteAllText((Join-Path $fixture.DeterminismRoot 'determinism.bin'), 'determinism')
                         if ($phase -eq 'FullExport') { throw 'injected full-export failure' }
-                        [IO.File]::WriteAllText($fixture.LockCandidatePath, 'lock-candidate')
                         throw 'injected determinism failure'
                     }
             }
@@ -1104,7 +975,6 @@ Describe 'P5A workflow staging cleanup' {
 
             $rejected | Should Be $true
             (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-            (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
             Assert-NoPublicationResidue $fixture
         }
     }
@@ -1115,8 +985,14 @@ Describe 'P5A verify exact canonical boundary' {
         $repo = Join-Path $TestDrive 'verify-boundary'
         $scripts = Join-Path $repo 'scripts'
         [void][IO.Directory]::CreateDirectory($scripts)
-        Copy-Item $script:AssetLockFunctionsPath (Join-Path $scripts 'asset-lock-functions.ps1')
+        Copy-Item $script:P2aPublicationFunctionsPath (Join-Path $scripts 'p2a-publication-functions.ps1')
+        Copy-Item (Join-Path $script:RepositoryRoot 'scripts\unreal-version-functions.ps1') `
+            (Join-Path $scripts 'unreal-version-functions.ps1')
         Copy-Item (Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1') (Join-Path $scripts 'verify-p2a.ps1')
+        $engineRoot = Join-Path $repo 'engine'
+        $buildVersion = Join-Path $engineRoot 'Engine\Build\Build.version'
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($buildVersion))
+        [IO.File]::WriteAllText($buildVersion, '{"MajorVersion":5,"MinorVersion":9,"PatchVersion":0}')
         [IO.File]::WriteAllText((Join-Path $scripts 'build-als-exporter.ps1'), "throw 'build must not run'", [Text.UTF8Encoding]::new($false))
         $config = Join-Path $repo 'assets\config'
         $candidate = Join-Path $repo 'artifacts\p2a-publication\canonical-candidate'
@@ -1130,7 +1006,7 @@ Describe 'P5A verify exact canonical boundary' {
         [IO.File]::WriteAllText($project, '{}')
 
         $errorMessage = ''
-        try { & (Join-Path $scripts 'verify-p2a.ps1') -EngineRoot (Join-Path $repo 'engine') -UnrealProject $project -Output (Join-Path $repo 'assets') }
+        try { & (Join-Path $scripts 'verify-p2a.ps1') -EngineRoot $engineRoot -UnrealProject $project -Output (Join-Path $repo 'assets') }
         catch { $errorMessage = $_.Exception.Message }
 
         $errorMessage | Should Match 'assets.generated.als_v4|canonical publication root'
@@ -1148,14 +1024,13 @@ Describe 'P5A top-level raw manifest gates' {
                 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return }
                 $fixture = New-TestTopLevelVerifierFixture "$stage-$corruption" $stage $corruption
                 $canonicalBefore = Get-TreeByteSnapshot $fixture.CanonicalRoot
-                $lockBefore = Get-FileByteSnapshot $fixture.LockPath
                 $output = @()
                 $errorMessage = ''
 
                 try {
                     & (Join-Path $fixture.Scripts 'verify-p2a.ps1') `
-                        -EngineRoot $fixture.EngineRoot -UnrealProject $fixture.UnrealProject `
-                        -UpdateAssetLock *>&1 | ForEach-Object { $output += $_ }
+                        -EngineRoot $fixture.EngineRoot -UnrealProject $fixture.UnrealProject *>&1 |
+                        ForEach-Object { $output += $_ }
                 }
                 catch {
                     $errorMessage = $_.Exception.Message
@@ -1172,9 +1047,8 @@ Describe 'P5A top-level raw manifest gates' {
                 else {
                     $text | Should Match 'GODOT_ALS_P2A_METADATA_OK'
                 }
-                $text | Should Not Match 'GODOT_ALS_P2A_FULL_EXPORT_OK|GODOT_ALS_P2A_JOINT_PUBLISH_OK'
+                $text | Should Not Match 'GODOT_ALS_P2A_FULL_EXPORT_OK|GODOT_ALS_P2A_PUBLICATION_OK'
                 (Get-TreeByteSnapshot $fixture.CanonicalRoot) | Should Be $canonicalBefore
-                (Get-FileByteSnapshot $fixture.LockPath) | Should Be $lockBefore
                 Assert-NoPublicationResidue $fixture
             }
         }

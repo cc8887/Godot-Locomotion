@@ -31,7 +31,9 @@ internal sealed class LyraContextEffectsConsumer(Node3D actor,LyraNotifyCatalog 
     private ImmutableArray<LyraContextReceiverSnapshot> Receivers()
     {
         if(!Live(actor))return [];
-        IEnumerable<Node> nodes=(actor is ILyraContextEffectsReceiver?[actor]:Array.Empty<Node>()).Concat(actor.GetChildren());
+        IEnumerable<Node> nodes = (actor is ILyraContextEffectsReceiver
+            ? new Node[] { actor }
+            : Array.Empty<Node>()).Concat(actor.GetChildren());
         return nodes.Where(n=>Live(n)&&n is ILyraContextEffectsReceiver).Select(n=>n is LyraContextEffectComponent c?
             new LyraContextReceiverSnapshot(n,c.ConvertPhysicalSurfaceToContext,c.CurrentContexts):new(n,false,[])).ToImmutableArray();
     }

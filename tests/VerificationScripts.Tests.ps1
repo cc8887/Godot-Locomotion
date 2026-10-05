@@ -4,222 +4,100 @@ $script:P2bFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p2b-verific
 $script:P1VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p1.ps1'
 $script:P0VerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p0.ps1'
 $script:GodotOutputFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\godot-output-functions.ps1'
-$script:AssetLockFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\asset-lock-functions.ps1'
+$script:P2aPublicationFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p2a-publication-functions.ps1'
 $script:P2aVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p2a.ps1'
-$script:TrackedAssetLockPath = Join-Path $script:RepositoryRoot 'reference\als-v4-export.lock.json'
+$script:CompareExportsPath = Join-Path $script:RepositoryRoot 'scripts\compare-p2a-exports.ps1'
 $script:P4VerificationFunctionsPath = Join-Path $script:RepositoryRoot 'scripts\p4-verification-functions.ps1'
 $script:P4MatrixVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p4-matrix.ps1'
 $script:P4DemoVerifierPath = Join-Path $script:RepositoryRoot 'scripts\verify-p4-demo.ps1'
 $script:P4DemoControllerPath = Join-Path $script:RepositoryRoot 'src\Als.Godot\Locomotion\P4LocomotionDemo.cs'
 
-if (Test-Path -LiteralPath $script:P2bFunctionsPath) {
-    . $script:P2bFunctionsPath
-}
-if (Test-Path -LiteralPath $script:GodotOutputFunctionsPath) {
-    . $script:GodotOutputFunctionsPath
-}
-if (Test-Path -LiteralPath $script:AssetLockFunctionsPath) {
-    . $script:AssetLockFunctionsPath
-}
-if (Test-Path -LiteralPath $script:P4VerificationFunctionsPath) {
-    . $script:P4VerificationFunctionsPath
-}
+if (Test-Path -LiteralPath $script:P2bFunctionsPath) { . $script:P2bFunctionsPath }
+if (Test-Path -LiteralPath $script:GodotOutputFunctionsPath) { . $script:GodotOutputFunctionsPath }
+if (Test-Path -LiteralPath $script:P2aPublicationFunctionsPath) { . $script:P2aPublicationFunctionsPath }
+if (Test-Path -LiteralPath $script:P4VerificationFunctionsPath) { . $script:P4VerificationFunctionsPath }
 
-function Write-SynchronizedManifestAndLock([object]$Manifest, [string]$ManifestPath, [string]$LockPath) {
-    [IO.File]::WriteAllText($ManifestPath, ($Manifest | ConvertTo-Json -Depth 100), [Text.UTF8Encoding]::new($false))
-    $lock = Get-Content -Raw $script:TrackedAssetLockPath | ConvertFrom-Json
-    $lock.manifestSha256 = (Get-FileHash -LiteralPath $ManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    [IO.File]::WriteAllText($LockPath, ($lock | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
-}
-
-function Get-ExportLockValidationError([string]$ManifestPath, [string]$AssetRoot, [string]$LockPath) {
-    try {
-        Assert-AlsExportLock -ManifestPath $ManifestPath -AssetRoot $AssetRoot -LockPath $LockPath | Out-Null
-        return $null
+function New-TestP2aManifestFileFixture([string]$Root) {
+    $relativePath = 'animations/ReplacementSet/Walk_C.fbx'
+    $assetPath = Join-Path $Root $relativePath
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($assetPath))
+    [IO.File]::WriteAllBytes($assetPath, [byte[]]@(0x41, 0x42, 0x43))
+    return [pscustomobject]@{
+        files = @([pscustomobject]@{
+            relativePath = $relativePath
+            size = 3
+            sha256 = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        })
+        animations = @([pscustomobject]@{ outputPath = $relativePath })
     }
-    catch { return $_.Exception.Message }
 }
 
-Describe 'P2B formal manifest lock' {
-    It 'reads the tracked asset lock and validates it before parsing manifest JSON' {
-        $source = [System.IO.File]::ReadAllText($script:P2bVerifierPath)
-        $lockIndex = $source.IndexOf('Assert-AlsExportLock')
-        $jsonIndex = $source.IndexOf('ConvertFrom-Json')
+Describe 'P2B manifest-declared file integrity' {
+    It 'accepts original-style nested names and hashes declared by the current manifest' {
+        $root = Join-Path $TestDrive 'manifest-declared-assets'
+        $manifest = New-TestP2aManifestFileFixture $root
 
-        $source | Should Match 'reference\\als-v4-export\.lock\.json'
-        $source | Should Not Match '369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327'
-        $lockIndex | Should BeGreaterThan -1
-        $jsonIndex | Should BeGreaterThan $lockIndex
+        { Assert-AlsP2aManifestFiles -Manifest $manifest -AssetRoot $root } | Should Not Throw
     }
 
-    It 'rejects a tampered lock and manifest without changing either file' {
-        (Get-Command Assert-AlsExportLock -ErrorAction SilentlyContinue) |
-            Should Not BeNullOrEmpty
-        if (-not (Get-Command Assert-AlsExportLock -ErrorAction SilentlyContinue)) {
-            return
-        }
-        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
-        $manifest = Join-Path $assetRoot 'als_manifest.json'
-        $tamperedLock = Join-Path $TestDrive 'tampered-lock.json'
-        $lock = Get-Content -Raw $script:TrackedAssetLockPath | ConvertFrom-Json
-        $lock.manifestSha256 = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-        [IO.File]::WriteAllText($tamperedLock, ($lock | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
-        $lockHash = (Get-FileHash $tamperedLock -Algorithm SHA256).Hash
-        $rejected = $false
-        try { Assert-AlsExportLock -ManifestPath $manifest -AssetRoot $assetRoot -LockPath $tamperedLock | Out-Null }
-        catch { $rejected = $true }
-        $rejected | Should Be $true
-        (Get-FileHash $tamperedLock -Algorithm SHA256).Hash | Should Be $lockHash
+    It 'accepts replacement bytes when the current manifest describes them and rejects stale metadata' {
+        $root = Join-Path $TestDrive 'replacement-payload-assets'
+        $manifest = New-TestP2aManifestFileFixture $root
+        $assetPath = Join-Path $root $manifest.files[0].relativePath
+        [IO.File]::WriteAllBytes($assetPath, [byte[]]@(0x58, 0x59))
 
-        $tamperedManifest = Join-Path $TestDrive 'tampered-manifest.json'
-        [IO.File]::WriteAllBytes($tamperedManifest, [IO.File]::ReadAllBytes($manifest))
-        [IO.File]::AppendAllText($tamperedManifest, ' ')
-        $manifestHash = (Get-FileHash $tamperedManifest -Algorithm SHA256).Hash
-        $rejected = $false
-        try { Assert-AlsExportLock -ManifestPath $tamperedManifest -AssetRoot $assetRoot -LockPath $script:TrackedAssetLockPath | Out-Null }
-        catch { $rejected = $true }
-        $rejected | Should Be $true
-        (Get-FileHash $tamperedManifest -Algorithm SHA256).Hash | Should Be $manifestHash
+        $message = ''
+        try { Assert-AlsP2aManifestFiles -Manifest $manifest -AssetRoot $root }
+        catch { $message = $_.Exception.Message }
+        $message | Should Match 'size does not match'
+
+        $manifest.files[0].size = 2
+        $manifest.files[0].sha256 = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        { Assert-AlsP2aManifestFiles -Manifest $manifest -AssetRoot $root } | Should Not Throw
     }
 
-    It 'rejects a synchronized manifest traversal before reading outside the asset root' {
-        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
-        $manifest = Get-Content -Raw (Join-Path $assetRoot 'als_manifest.json') | ConvertFrom-Json
-        $outside = Get-Item -LiteralPath (Join-Path $script:RepositoryRoot 'assets\config\p4_pose_profile.json')
-        $manifest.files[0].relativePath = '..\..\config\p4_pose_profile.json'
-        $manifest.files[0].size = $outside.Length
-        $manifest.files[0].sha256 = (Get-FileHash -LiteralPath $outside.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        $manifestPath = Join-Path $TestDrive 'traversal-manifest.json'
-        $lockPath = Join-Path $TestDrive 'traversal-lock.json'
-        Write-SynchronizedManifestAndLock $manifest $manifestPath $lockPath
+    It 'rejects traversal paths independently of any historical asset hash' {
+        $root = Join-Path $TestDrive 'manifest-path-boundary'
+        $manifest = New-TestP2aManifestFileFixture $root
+        $manifest.files[0].relativePath = '../outside.fbx'
 
-        $errorMessage = Get-ExportLockValidationError $manifestPath $assetRoot $lockPath
-
-        $errorMessage | Should Match 'files\[0\]\.relativePath'
-        $errorMessage | Should Match 'outside|escape|segment'
+        $message = ''
+        try { Assert-AlsP2aManifestFiles -Manifest $manifest -AssetRoot $root }
+        catch { $message = $_.Exception.Message }
+        $message | Should Match 'canonical relative path|path segment|escapes'
     }
+}
 
-    It 'rejects an absolute manifest file path with an indexed diagnostic' {
-        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
-        $manifest = Get-Content -Raw (Join-Path $assetRoot 'als_manifest.json') | ConvertFrom-Json
-        $file = Get-Item -LiteralPath (Join-Path $assetRoot $manifest.files[0].relativePath)
-        $manifest.files[0].relativePath = $file.FullName
-        $manifestPath = Join-Path $TestDrive 'absolute-manifest.json'
-        $lockPath = Join-Path $TestDrive 'absolute-lock.json'
-        Write-SynchronizedManifestAndLock $manifest $manifestPath $lockPath
-
-        $errorMessage = Get-ExportLockValidationError $manifestPath $assetRoot $lockPath
-
-        $errorMessage | Should Match 'files\[0\]\.relativePath'
-        $errorMessage | Should Match 'relative|rooted|absolute'
-    }
-
-    It 'rejects a dot path segment even when it resolves to a locked file' {
-        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
-        $manifest = Get-Content -Raw (Join-Path $assetRoot 'als_manifest.json') | ConvertFrom-Json
-        $manifest.files[0].relativePath = '.\' + ([string]$manifest.files[0].relativePath).Replace('/', '\')
-        $manifestPath = Join-Path $TestDrive 'dot-manifest.json'
-        $lockPath = Join-Path $TestDrive 'dot-lock.json'
-        Write-SynchronizedManifestAndLock $manifest $manifestPath $lockPath
-
-        $errorMessage = Get-ExportLockValidationError $manifestPath $assetRoot $lockPath
-
-        $errorMessage | Should Match 'files\[0\]\.relativePath'
-        $errorMessage | Should Match 'segment'
-    }
-
-    It 'rejects a dot-dot segment even when normalization remains inside the asset root' {
-        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
-        $manifest = Get-Content -Raw (Join-Path $assetRoot 'als_manifest.json') | ConvertFrom-Json
-        $fileName = [IO.Path]::GetFileName([string]$manifest.files[0].relativePath)
-        $manifest.files[0].relativePath = "animations\ignored\..\$fileName"
-        $manifestPath = Join-Path $TestDrive 'dot-dot-manifest.json'
-        $lockPath = Join-Path $TestDrive 'dot-dot-lock.json'
-        Write-SynchronizedManifestAndLock $manifest $manifestPath $lockPath
-
-        $errorMessage = Get-ExportLockValidationError $manifestPath $assetRoot $lockPath
-
-        $errorMessage | Should Match 'files\[0\]\.relativePath'
-        $errorMessage | Should Match 'segment'
-    }
-
-    It 'rejects duplicate canonical relative paths across separator and case variants' {
-        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
-        $manifest = Get-Content -Raw (Join-Path $assetRoot 'als_manifest.json') | ConvertFrom-Json
-        $manifest.files[1].relativePath = ([string]$manifest.files[0].relativePath).ToUpperInvariant().Replace('/', '\')
-        $manifest.files[1].size = $manifest.files[0].size
-        $manifest.files[1].sha256 = $manifest.files[0].sha256
-        $manifestPath = Join-Path $TestDrive 'duplicate-path-manifest.json'
-        $lockPath = Join-Path $TestDrive 'duplicate-path-lock.json'
-        Write-SynchronizedManifestAndLock $manifest $manifestPath $lockPath
-
-        $errorMessage = Get-ExportLockValidationError $manifestPath $assetRoot $lockPath
-
-        $errorMessage | Should Match 'files\[1\]\.relativePath'
-        $errorMessage | Should Match 'duplicate'
-    }
-
-    It 'rejects a manifest target that resolves to a directory' {
-        $assetRoot = Join-Path $script:RepositoryRoot 'assets\generated\als_v4'
-        $manifest = Get-Content -Raw (Join-Path $assetRoot 'als_manifest.json') | ConvertFrom-Json
-        $manifest.files[0].relativePath = 'animations'
-        $manifestPath = Join-Path $TestDrive 'directory-manifest.json'
-        $lockPath = Join-Path $TestDrive 'directory-lock.json'
-        Write-SynchronizedManifestAndLock $manifest $manifestPath $lockPath
-
-        $errorMessage = Get-ExportLockValidationError $manifestPath $assetRoot $lockPath
-
-        $errorMessage | Should Match 'files\[0\]\.relativePath'
-        $errorMessage | Should Match 'file'
-    }
-
-    It 'publishes exact lock fields durably and preserves old bytes on replacement failure' {
-        (Get-Command Publish-AlsExportLock -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
-        if (-not (Get-Command Publish-AlsExportLock -ErrorAction SilentlyContinue)) { return }
-        $manifest = Join-Path $script:RepositoryRoot 'assets\generated\als_v4\als_manifest.json'
-        $output = Join-Path $TestDrive 'asset.lock.json'
-        Publish-AlsExportLock -ManifestPath $manifest -LockPath $output
-        $value = Get-Content -Raw $output | ConvertFrom-Json
-        (@($value.PSObject.Properties.Name) -join ',') | Should Be 'schemaVersion,manifestSha256,assetCount,fileCount,animationCount,exporterVersion,sourceProjectId'
-        $value.schemaVersion | Should Be 1
-        $value.assetCount | Should Be 267
-        $value.fileCount | Should Be 141
-        $value.animationCount | Should Be 126
-        $value.manifestSha256 | Should Match '^[0-9a-f]{64}$'
-
-        $beforeHash = (Get-FileHash $output -Algorithm SHA256).Hash
-        $handle = [IO.FileStream]::new($output, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
-        $rejected = $false
-        try { Publish-AlsExportLock -ManifestPath $manifest -LockPath $output }
-        catch { $rejected = $true }
-        finally { $handle.Dispose() }
-        $rejected | Should Be $true
-        (Get-FileHash $output -Algorithm SHA256).Hash | Should Be $beforeHash
-        @(Get-ChildItem $TestDrive -Filter '.asset.lock.json.*.tmp').Count | Should Be 0
-    }
-
-    It 'routes verify-p2a through the one tested joint publication after existing export gates' {
+Describe 'P2A export publication without a fixed asset batch' {
+    It 'compares two current exports and publishes the candidate without a tracked hash lock' {
         $source = [IO.File]::ReadAllText($script:P2aVerifierPath)
-        $cleanupBoundary = $source.IndexOf('Invoke-AlsP2aStagingWorkflow')
+        $cleanup = $source.IndexOf('Invoke-AlsP2aStagingWorkflow')
         $dryRun = $source.IndexOf('$dryRunOutput = & $editorCommand')
-        $fullExportGate = $source.LastIndexOf('GODOT_ALS_P2A_FULL_EXPORT_OK')
+        $fullExport = $source.IndexOf('GODOT_ALS_P2A_FULL_EXPORT_OK')
         $determinism = $source.IndexOf('$determinismOutput = & $editorCommand')
-        $orchestration = $source.LastIndexOf('Invoke-AlsP2aJointPublication')
-        $comparisonArgument = $source.LastIndexOf('-ComparisonScriptPath $compareScript')
-        $source | Should Match '\[switch\]\$UpdateAssetLock'
-        $cleanupBoundary | Should BeGreaterThan -1
-        $dryRun | Should BeGreaterThan $cleanupBoundary
-        $orchestration | Should BeGreaterThan $fullExportGate
-        $determinism | Should BeGreaterThan $fullExportGate
-        $orchestration | Should BeGreaterThan $determinism
-        $comparisonArgument | Should BeGreaterThan $orchestration
-        $source | Should Match 'Assert-AlsP2aCanonicalPublicationRoot'
-        $source | Should Match '(?s)Invoke-AlsP2aStagingWorkflow.+?-Action\s*\{.+?\$determinismOutput.+?\r?\n\}\r?\n\$compareScript.+?\r?\nInvoke-AlsP2aJointPublication'
-        $source | Should Not Match 'Invoke-AlsP2aCompareAndPublish'
-        $source | Should Not Match 'Publish-AlsExportLock -ManifestPath \$formalManifestPath -LockPath \$assetLockPath'
+        $publication = $source.LastIndexOf('Invoke-AlsP2aPublication')
+        $compare = $source.LastIndexOf('-ComparisonScriptPath $compareScript')
+
+        $cleanup | Should BeGreaterThan -1
+        $dryRun | Should BeGreaterThan $cleanup
+        $fullExport | Should BeGreaterThan $dryRun
+        $determinism | Should BeGreaterThan $fullExport
+        $publication | Should BeGreaterThan $determinism
+        $compare | Should BeGreaterThan $publication
+        $source | Should Match 'Assert-AlsP2aManifestFiles'
+        $source | Should Not Match 'als-v4-export\.lock|UpdateAssetLock|AssetLockPath|JointPublication'
+    }
+
+    It 'keeps P2B inventory dynamic and validates bytes against its own manifest' {
+        $source = [IO.File]::ReadAllText($script:P2bVerifierPath)
+
+        $source | Should Match '\$manifestAssetCount'
+        $source | Should Match 'Assert-AlsP2aManifestFiles -Manifest \$manifest -AssetRoot \$assetRoot'
+        $source | Should Match '\$single\.Events -ne \$parallel\.Events'
+        $source | Should Not Match '\$characterCount \* 4 \+ 4'
+        $source | Should Not Match 'als-v4-export\.lock|Assert-AlsExportLock|369AF84ABA028AFBDF6EEA7F1A4F1161DFD4B5E9BEA736E9460BFE368CE14327'
     }
 }
-
 Describe 'Godot verifier error-line handling' {
     It 'rejects SCRIPT ERROR and ERROR lines even with exit zero and a success marker' {
         (Get-Command Assert-GodotInvocationSucceeded -ErrorAction SilentlyContinue) |

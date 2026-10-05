@@ -143,7 +143,7 @@ if ($LASTEXITCODE -ne 0) {
 if ($projectHashBefore -ne (Get-FileHash -LiteralPath $unrealProjectPath -Algorithm SHA256).Hash) {
     throw 'The ready check modified the Unreal project descriptor.'
 }
-$marker = "GODOT_ALS_V4_EXPORTER_READY engine=$($buildVersion.MajorVersion).$($buildVersion.MinorVersion).$($buildVersion.PatchVersion) plugin=1.0.0"
+$marker = 'GODOT_ALS_EXPORTER_READY'
 if (-not (($readyOutput | Out-String).Contains($marker, [StringComparison]::Ordinal))) {
     throw "Ready marker was not found: $marker"
 }

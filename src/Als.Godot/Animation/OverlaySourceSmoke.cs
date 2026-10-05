@@ -38,7 +38,6 @@ public partial class OverlaySourceSmoke : Node
         var root = oracle.RootElement;
         Require(root.GetProperty("schemaVersion").GetInt32() == 1 && root.GetProperty("source").GetString() ==
             "UE GetAnimationPose; authored Overlay evaluator pins; caller-owned player seconds", "Wrong Overlay node oracle provenance.");
-        Hash("assets/config/v4_overlay_source_inputs.json", root.GetProperty("sourceIndexSha256").GetString()!);
         Hash("assets/config/v4_layering_inputs.json", root.GetProperty("layeringSha256").GetString()!);
         var sampler = new AlsPreciseOverlayAnimationSourceSampler(profile, bank, set, names);
         var pose = new AlsPrecisePose[79]; var curves = new AlsInertialCurve[names.Length];

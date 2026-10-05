@@ -10,7 +10,6 @@
 #include "AlsPhysicsAssetExport.h"
 #include "AlsTextureExporter.h"
 #include "Misc/App.h"
-#include "Misc/EngineVersion.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 
@@ -409,9 +408,7 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         }
         UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_COMPOSITE_EXPORT_SELF_TEST_OK cases=%d"),
             CompositeSelfTestCaseCount);
-        const FEngineVersion EngineVersion = FEngineVersion::Current();
-        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_EXPORTER_READY engine=%d.%d.%d plugin=2.0.0"),
-            EngineVersion.GetMajor(), EngineVersion.GetMinor(), EngineVersion.GetPatch());
+        UE_LOG(LogAlsGodotExporter, Display, TEXT("GODOT_ALS_EXPORTER_READY"));
         return 0;
     }
 
@@ -431,9 +428,12 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
     }
     OutputDirectory = FPaths::ConvertRelativePathToFull(OutputDirectory);
 
+    FString ContentRoot = TEXT("/Game/AdvancedLocomotionV4");
+    FParse::Value(*Params, TEXT("ContentRoot="), ContentRoot);
+
     TArray<FAlsExportAsset> Assets;
     FString Error;
-    if (!FAlsAssetDiscovery::Discover(Assets, Error))
+    if (!FAlsAssetDiscovery::Discover(ContentRoot, Assets, Error))
     {
         UE_LOG(LogAlsGodotExporter, Error, TEXT("Asset discovery failed: %s"), *Error);
         return 3;
@@ -447,7 +447,7 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         return 3;
     }
 
-    if (!FAlsManifestWriter::WritePlanned(OutputDirectory, Assets, Error))
+    if (!FAlsManifestWriter::WritePlanned(OutputDirectory, ContentRoot, Assets, Error))
     {
         UE_LOG(LogAlsGodotExporter, Error, TEXT("Metadata extraction failed: %s"), *Error);
         return 5;
@@ -476,7 +476,7 @@ int32 UAlsGodotExportCommandlet::Main(const FString& Params)
         UE_LOG(LogAlsGodotExporter, Error, TEXT("Output audit failed: %s"), *Error);
         return 6;
     }
-    if (!FAlsManifestWriter::WriteComplete(OutputDirectory, Assets, Files, Error))
+    if (!FAlsManifestWriter::WriteComplete(OutputDirectory, ContentRoot, Assets, Files, Error))
     {
         UE_LOG(LogAlsGodotExporter, Error, TEXT("Formal manifest publication failed: %s"), *Error);
         return 6;

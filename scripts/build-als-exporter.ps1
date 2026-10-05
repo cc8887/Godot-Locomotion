@@ -9,6 +9,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'unreal-version-functions.ps1')
 
 function Resolve-RequiredPath([string]$Path, [string]$Label) {
     if (-not [IO.Path]::IsPathFullyQualified($Path)) {
@@ -22,6 +23,7 @@ function Resolve-RequiredPath([string]$Path, [string]$Label) {
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
 $engineRootPath = Resolve-RequiredPath $EngineRoot 'EngineRoot'
+[void](Get-AlsSupportedEngineVersion -EngineRoot $engineRootPath)
 $unrealProjectPath = Resolve-RequiredPath $UnrealProject 'UnrealProject'
 $runUat = Resolve-RequiredPath (Join-Path $engineRootPath 'Engine\Build\BatchFiles\RunUAT.bat') 'RunUAT'
 $editorCommand = Resolve-RequiredPath (Join-Path $engineRootPath 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe') 'UnrealEditor-Cmd'
@@ -85,7 +87,7 @@ if (-not (($readyOutput | Out-String).Contains($compositeSelfTestMarker, [String
     throw "Native composite export self-test marker was not found: $compositeSelfTestMarker"
 }
 
-$marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'
+$marker = 'GODOT_ALS_EXPORTER_READY'
 if (-not (($readyOutput | Out-String).Contains($marker, [StringComparison]::Ordinal))) {
     throw "Ready marker was not found: $marker"
 }

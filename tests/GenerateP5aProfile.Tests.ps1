@@ -18,6 +18,40 @@ function Write-P5aRawJsonFixture([string]$Value, [string]$Path) {
     [IO.File]::WriteAllText($Path, $Value, [Text.UTF8Encoding]::new($false))
 }
 
+function Get-P5aTestAssetId([string]$ObjectPath) {
+    $sha1 = [Security.Cryptography.SHA1]::Create()
+    try {
+        return [Convert]::ToHexString($sha1.ComputeHash([Text.Encoding]::UTF8.GetBytes($ObjectPath))).ToLowerInvariant()
+    }
+    finally { $sha1.Dispose() }
+}
+
+function Set-P5aTestSourceContentRoot([object]$Manifest, [string]$ReplacementRoot) {
+    $oldRoot = [string]$Manifest.sourceContentRoot
+    $idByPath = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    foreach ($asset in @($Manifest.animations) + @($Manifest.montages)) {
+        $oldPath = [string]$asset.objectPath
+        if ($oldPath.StartsWith("$oldRoot/", [StringComparison]::Ordinal)) {
+            $asset.objectPath = $ReplacementRoot + $oldPath.Substring($oldRoot.Length)
+            $asset.id = Get-P5aTestAssetId ([string]$asset.objectPath)
+            $idByPath.Add([string]$asset.objectPath, [string]$asset.id)
+        }
+    }
+    foreach ($montage in @($Manifest.montages)) {
+        foreach ($slot in @($montage.metadata.slots)) {
+            foreach ($segment in @($slot.segments)) {
+                $path = [string]$segment.animationObjectPath
+                $replacementPath = $ReplacementRoot + $path.Substring($oldRoot.Length)
+                if ($idByPath.ContainsKey($replacementPath)) {
+                    $segment.animationObjectPath = $replacementPath
+                    $segment.animationId = $idByPath[$replacementPath]
+                }
+            }
+        }
+    }
+    $Manifest.sourceContentRoot = $ReplacementRoot
+}
+
 Describe 'generate-p5a-profile strict mapping and publication' {
     It 'generates the exact deterministic runtime profile from canonical object paths' {
         $first = Join-Path $TestDrive 'first.json'
@@ -57,6 +91,38 @@ Describe 'generate-p5a-profile strict mapping and publication' {
             Should Be 'Roll|2d9341182885d90ad666fff32c025937438b1827|BaseLayer|Default'
         "$($profile.demoCases.transitionStance)|$($profile.demoCases.transitionFoot)|$($profile.demoCases.rollAction)" |
             Should Be 'Standing|Left|Roll'
+    }
+
+    It 'resolves semantic source roles relative to the manifest ContentRoot' {
+        $manifest = Get-Content -Raw $script:Manifest | ConvertFrom-Json
+        $replacementRoot = '/Game/ReplacementLocomotionPack'
+        Set-P5aTestSourceContentRoot $manifest $replacementRoot
+        $fixture = Join-Path $TestDrive 'replacement-content-root.json'
+        $output = Join-Path $TestDrive 'replacement-content-root-profile.json'
+        Write-P5aJsonFixture $manifest $fixture
+
+        $result = Invoke-P5aGenerator $fixture $output
+
+        $result.ExitCode | Should Be 0
+        $profile = Get-Content -Raw $output | ConvertFrom-Json
+        @($profile.syncGroups[0].members).Count | Should Be 17
+        $profile.actions[0].montage | Should Be (Get-P5aTestAssetId `
+            "$replacementRoot/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_Default.ALS_N_LandRoll_F_Montage_Default")
+        $originalProfile = Get-Content -Raw $script:TrackedProfile | ConvertFrom-Json
+        @($profile.syncGroups[0].members.animation | Where-Object { $_ -in $originalProfile.syncGroups[0].members.animation }).Count |
+            Should Be 0
+    }
+
+    It 'rejects a malformed sourceContentRoot instead of resolving outside the selected package' {
+        $manifest = Get-Content -Raw $script:Manifest | ConvertFrom-Json
+        $manifest.sourceContentRoot = '/Game/../ReplacementPack'
+        $fixture = Join-Path $TestDrive 'invalid-content-root.json'
+        Write-P5aJsonFixture $manifest $fixture
+
+        $result = Invoke-P5aGenerator $fixture (Join-Path $TestDrive 'invalid-content-root-profile.json')
+
+        $result.ExitCode | Should Not Be 0
+        $result.Output | Should Match 'sourceContentRoot.*canonical Unreal content path'
     }
 
     It 'rejects zero and multiple exact ordinal object path matches without basename fallback' {
@@ -152,7 +218,7 @@ Describe 'generate-p5a-profile strict mapping and publication' {
         $result.Output | Should Match 'segment.*object path.*Roll Sequence'
     }
 
-    It 'rejects incompatible manifest versions and noncanonical selected asset IDs' {
+    It 'rejects incompatible schema and noncanonical selected asset IDs but accepts exporter metadata changes' {
         $manifest = Get-Content -Raw $script:Manifest | ConvertFrom-Json
         $manifest.schemaVersion = 1
         $fixture = Join-Path $TestDrive 'schema-one.json'
@@ -162,12 +228,18 @@ Describe 'generate-p5a-profile strict mapping and publication' {
         $result.Output | Should Match 'schemaVersion.*2'
 
         $manifest = Get-Content -Raw $script:Manifest | ConvertFrom-Json
-        $manifest.exporterVersion = '2.0.1'
-        $fixture = Join-Path $TestDrive 'wrong-exporter.json'
+        $manifest.exporterVersion = '9.4-preview'
+        $fixture = Join-Path $TestDrive 'replacement-exporter.json'
         Write-P5aJsonFixture $manifest $fixture
-        $result = Invoke-P5aGenerator $fixture (Join-Path $TestDrive 'wrong-exporter-output.json')
+        $result = Invoke-P5aGenerator $fixture (Join-Path $TestDrive 'replacement-exporter-output.json')
+        $result.ExitCode | Should Be 0
+
+        $manifest.exporterVersion = ' '
+        $fixture = Join-Path $TestDrive 'empty-exporter.json'
+        Write-P5aJsonFixture $manifest $fixture
+        $result = Invoke-P5aGenerator $fixture (Join-Path $TestDrive 'empty-exporter-output.json')
         $result.ExitCode | Should Not Be 0
-        $result.Output | Should Match 'exporterVersion.*2\.0\.0'
+        $result.Output | Should Match 'exporterVersion.*missing'
 
         $transitionPath = '/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L'
         $manifest = Get-Content -Raw $script:Manifest | ConvertFrom-Json

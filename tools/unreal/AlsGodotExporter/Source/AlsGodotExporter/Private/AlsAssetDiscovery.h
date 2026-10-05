@@ -5,7 +5,7 @@
 class FAlsAssetDiscovery
 {
 public:
-    static bool Discover(TArray<FAlsExportAsset>& OutAssets, FString& OutError);
+    static bool Discover(const FString& ContentRoot, TArray<FAlsExportAsset>& OutAssets, FString& OutError);
 
 private:
     static EAlsAssetKind Classify(const FAssetData& AssetData);

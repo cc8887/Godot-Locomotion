@@ -1,5 +1,7 @@
 # P4 Aim, Layering, Turn/Rotate and Foot Placement Implementation Plan
 
+> 历史实施计划。本文中的 P2A 导出 manifest hash/count lock 已不再是当前门禁；资产完整性按本次 manifest 与本次文件核对。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在一个隔离功能分支内完成 P4 的曲线与 profile 资产合同、AimOffset 与上半身分层、Turn/Rotate In Place、Foot IK/Foot Lock/pelvis、动态平台、可操作 Demo 和 1/10 角色性能门禁。

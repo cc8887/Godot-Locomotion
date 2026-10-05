@@ -13,6 +13,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'unreal-version-functions.ps1')
 
 function Invoke-P5aGeneratorDefaultProcess
 {
@@ -2322,12 +2323,14 @@ function Get-P5aDeployedBuildEvidence
     $receiptPath = Join-Path $projectRoot "Binaries\Win64\$targetName.target"
     try { $receipt = [IO.File]::ReadAllText($receiptPath) | ConvertFrom-Json -Depth 30 }
     catch { throw "P5A Editor target receipt is missing or malformed: $receiptPath" }
-    if ([int]$receipt.Version.MajorVersion -ne 5 -or
-        [int]$receipt.Version.MinorVersion -ne 9 -or
-        [int]$receipt.Version.PatchVersion -ne 0 -or
-        [string]::IsNullOrEmpty([string]$receipt.Version.BuildId))
+    [void](Assert-AlsSupportedEngineVersion `
+        -MajorVersion ([int]$receipt.Version.MajorVersion) `
+        -MinorVersion ([int]$receipt.Version.MinorVersion) `
+        -PatchVersion ([int]$receipt.Version.PatchVersion) `
+        -Context 'P5A Editor receipt')
+    if ([string]::IsNullOrEmpty([string]$receipt.Version.BuildId))
     {
-        throw 'P5A Editor receipt must identify engine 5.9.0 and a BuildId.'
+        throw 'P5A Editor receipt must identify a supported UE 5.8.x/5.9.x engine and a BuildId.'
     }
     $buildId = [string]$receipt.Version.BuildId
     $alsManifestPath = Join-Path $projectRoot 'Plugins\ALS\Binaries\Win64\UnrealEditor.modules'

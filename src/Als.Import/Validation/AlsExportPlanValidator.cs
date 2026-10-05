@@ -92,7 +92,8 @@ public static partial class AlsExportPlanValidator
 
         if (!IsValidOutputPath(asset))
         {
-            Add(issues, "ALSPLAN009", asset.Id, $"{path}.outputPath", "Output path does not match asset kind and stable ID.", null, asset.OutputPath);
+            Add(issues, "ALSPLAN009", asset.Id, $"{path}.outputPath",
+                "Output path must match the asset kind and preserve the original engine asset name.", null, asset.OutputPath);
         }
     }
 
@@ -108,15 +109,36 @@ public static partial class AlsExportPlanValidator
             return false;
         }
 
-        var expected = asset.Kind switch
+        var expectedPrefix = asset.Kind switch
         {
-            AlsAssetKind.SkeletalMesh => $"meshes/skeletal/{asset.Id}.fbx",
-            AlsAssetKind.StaticMesh => $"meshes/static/{asset.Id}.fbx",
-            AlsAssetKind.AnimationSequence => $"animations/{asset.Id}.fbx",
-            AlsAssetKind.Texture => $"textures/{asset.Id}.png",
+            AlsAssetKind.SkeletalMesh => "meshes/skeletal/",
+            AlsAssetKind.StaticMesh => "meshes/static/",
+            AlsAssetKind.AnimationSequence => "animations/",
+            AlsAssetKind.Texture => "textures/",
             _ => null,
         };
-        return string.Equals(asset.OutputPath, expected, StringComparison.Ordinal);
+        var extension = asset.Kind == AlsAssetKind.Texture ? ".png" : ".fbx";
+        if (expectedPrefix is null || !asset.OutputPath.StartsWith(expectedPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var segments = asset.OutputPath.Split('/');
+        if (segments.Any(segment => string.IsNullOrEmpty(segment) || segment is "." or ".."))
+        {
+            return false;
+        }
+
+        var separator = asset.OutputPath.LastIndexOf('/');
+        var fileName = asset.OutputPath[(separator + 1)..];
+        var objectNameSeparator = asset.ObjectPath.LastIndexOf('.');
+        if (objectNameSeparator < 0 || objectNameSeparator == asset.ObjectPath.Length - 1)
+        {
+            return false;
+        }
+
+        var originalAssetName = asset.ObjectPath[(objectNameSeparator + 1)..];
+        return string.Equals(fileName, originalAssetName + extension, StringComparison.Ordinal);
     }
 
     private static void Add(List<AlsValidationIssue> issues, string code, string? assetId, string fieldPath,

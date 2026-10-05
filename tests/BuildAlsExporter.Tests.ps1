@@ -7,17 +7,14 @@ $manifestWriterPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\S
 $manifestWriterSource = [System.IO.File]::ReadAllText($manifestWriterPath)
 $commandletPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\Source\AlsGodotExporter\Private\AlsGodotExportCommandlet.cpp'
 $commandletSource = [System.IO.File]::ReadAllText($commandletPath)
+$gaspCommandletPath = Join-Path $repositoryRoot 'tools\unreal\AlsV4AssetExporter\Source\AlsV4AssetExporter\Private\AlsV4AssetExportCommandlet.cpp'
+$gaspCommandletSource = [System.IO.File]::ReadAllText($gaspCommandletPath)
 $registryPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\Source\AlsGodotExporter\Private\AlsNotifyClassRegistry.cpp'
 $registrySource = [System.IO.File]::ReadAllText($registryPath)
 $animationReaderPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\Source\AlsGodotExporter\Private\AlsAnimationMetadataReader.cpp'
 $animationReaderSource = [System.IO.File]::ReadAllText($animationReaderPath)
 $descriptorPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\AlsGodotExporter.uplugin'
 $descriptor = Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json
-$assetLockPath = Join-Path $repositoryRoot 'reference\als-v4-export.lock.json'
-$assetLock = Get-Content -LiteralPath $assetLockPath -Raw | ConvertFrom-Json
-$canonicalManifestPath = Join-Path $repositoryRoot 'assets\generated\als_v4\als_manifest.json'
-$canonicalManifest = Get-Content -LiteralPath $canonicalManifestPath -Raw | ConvertFrom-Json
-
 Describe 'ALS exporter build readiness gating' {
     It 'requires the native curve export self-test marker before the ready marker' {
         $selfTestMarkerIndex = $buildScriptSource.IndexOf('GODOT_ALS_CURVE_EXPORT_SELF_TEST_OK cases=16')
@@ -31,10 +28,10 @@ Describe 'ALS exporter build readiness gating' {
         $readyCheckIndex | Should BeGreaterThan $readyMarkerIndex
     }
 
-    It 'requires the native timeline export self-test marker before the v2 ready marker' {
+    It 'requires the native timeline export self-test marker before the generic ready marker' {
         $selfTestMarkerIndex = $buildScriptSource.IndexOf('GODOT_ALS_TIMELINE_EXPORT_SELF_TEST_OK cases=26')
         $selfTestCheckIndex = $buildScriptSource.IndexOf('Contains($timelineSelfTestMarker')
-        $readyMarkerIndex = $buildScriptSource.IndexOf('GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0')
+        $readyMarkerIndex = $buildScriptSource.IndexOf("`$marker = 'GODOT_ALS_EXPORTER_READY'")
         $readyCheckIndex = $buildScriptSource.IndexOf('Contains($marker')
 
         $selfTestMarkerIndex | Should BeGreaterThan -1
@@ -43,10 +40,10 @@ Describe 'ALS exporter build readiness gating' {
         $readyCheckIndex | Should BeGreaterThan $readyMarkerIndex
     }
 
-    It 'requires the native composite production-entry self-test marker before the v2 ready marker' {
+    It 'requires the native composite production-entry self-test marker before the generic ready marker' {
         $selfTestMarkerIndex = $buildScriptSource.IndexOf('GODOT_ALS_COMPOSITE_EXPORT_SELF_TEST_OK cases=1')
         $selfTestCheckIndex = $buildScriptSource.IndexOf('Contains($compositeSelfTestMarker')
-        $readyMarkerIndex = $buildScriptSource.IndexOf('GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0')
+        $readyMarkerIndex = $buildScriptSource.IndexOf("`$marker = 'GODOT_ALS_EXPORTER_READY'")
         $readyCheckIndex = $buildScriptSource.IndexOf('Contains($marker')
 
         $selfTestMarkerIndex | Should BeGreaterThan -1
@@ -55,18 +52,26 @@ Describe 'ALS exporter build readiness gating' {
         $readyCheckIndex | Should BeGreaterThan $readyMarkerIndex
     }
 
-    It 'keeps every v2 producer and consumer version declaration consistent' {
-        $marker = 'GODOT_ALS_EXPORTER_READY engine=5.9.0 plugin=2.0.0'
+    It 'does not gate exporter readiness on a plugin version string' {
+        $buildScriptSource | Should Match ([regex]::Escape("`$marker = 'GODOT_ALS_EXPORTER_READY'"))
+        $verifyScriptSource | Should Match ([regex]::Escape("`$readyMarker = 'GODOT_ALS_EXPORTER_READY'"))
+        $buildScriptSource | Should Not Match 'GODOT_ALS_EXPORTER_READY.*plugin='
+        $verifyScriptSource | Should Not Match '\[string\]\$ReadyMarker|plugin=2\.0\.0|engine=\$engineVersion plugin='
+    }
+
+    It 'keeps producer metadata informational and readiness independent of the exporter version' {
 
         $descriptor.Version | Should Be 2
         $descriptor.VersionName | Should Be '2.0.0'
         $manifestWriterSource | Should Match ([regex]::Escape('WriteValue(TEXT("exporterVersion"), TEXT("2.0.0"))'))
-        $commandletSource | Should Match ([regex]::Escape('plugin=2.0.0'))
-        $buildScriptSource | Should Match ([regex]::Escape($marker))
-        $verifyScriptSource | Should Match ([regex]::Escape($marker))
-        $verifyScriptSource | Should Not Match ([regex]::Escape('plugin=1.0.0'))
-        $assetLock.schemaVersion | Should Be 1
-        $assetLock.exporterVersion | Should Be $canonicalManifest.exporterVersion
+        $buildScriptSource | Should Match ([regex]::Escape("`$marker = 'GODOT_ALS_EXPORTER_READY'"))
+        $verifyScriptSource | Should Match ([regex]::Escape("`$readyMarker = 'GODOT_ALS_EXPORTER_READY'"))
+        $buildScriptSource | Should Not Match 'GODOT_ALS_EXPORTER_READY.*plugin='
+        $verifyScriptSource | Should Not Match '\[string\]\$ReadyMarker|plugin=2\.0\.0|engine=\$engineVersion plugin='
+        $buildScriptSource | Should Match 'Get-AlsSupportedEngineVersion'
+        $verifyScriptSource | Should Match 'Get-AlsSupportedEngineVersion'
+        $verifyScriptSource | Should Match ([regex]::Escape("exporterVersion is missing."))
+        $verifyScriptSource | Should Not Match ([regex]::Escape("exporterVersion -cne '2.0.0'"))
     }
 
     It 'audits animation semantics through the v2 timeline field' {
@@ -126,7 +131,24 @@ Describe 'ALS exporter build readiness gating' {
         $verifyScriptSource | Should Match ([regex]::Escape('foreach ($animationAsset in @($Manifest.animations) + @($Manifest.montages))'))
         $verifyScriptSource | Should Match ([regex]::Escape('foreach ($animationAsset in @($Manifest.animations))'))
         $verifyScriptSource | Should Match ([regex]::Escape("schemaVersion -ne 2"))
-        $verifyScriptSource | Should Match ([regex]::Escape("exporterVersion -cne '2.0.0'"))
+        $verifyScriptSource | Should Match ([regex]::Escape('exporterVersion is missing.'))
+        $verifyScriptSource | Should Not Match ([regex]::Escape("exporterVersion -cne '2.0.0'"))
         $verifyScriptSource | Should Not Match ([regex]::Escape('curves or timeline entries'))
+    }
+
+    It 'preserves the original Unreal asset names and folders in exported file paths' {
+        $discoveryPath = Join-Path $repositoryRoot 'tools\unreal\AlsGodotExporter\Source\AlsGodotExporter\Private\AlsAssetDiscovery.cpp'
+        $discoverySource = [System.IO.File]::ReadAllText($discoveryPath)
+
+        $discoverySource | Should Match ([regex]::Escape('const FString AssetName = AssetData.AssetName.ToString();'))
+        $discoverySource | Should Match ([regex]::Escape('PackagePath.Mid(ContentRoot.Len() + 1)'))
+        $discoverySource | Should Match ([regex]::Escape('AssetName + TEXT(".") + Extension'))
+        $commandletSource | Should Match ([regex]::Escape('FParse::Value(*Params, TEXT("ContentRoot="), ContentRoot)'))
+        $commandletSource | Should Match ([regex]::Escape('Discover(ContentRoot, Assets, Error)'))
+        $gaspCommandletSource | Should Match ([regex]::Escape('FString ContentRoot = TEXT("/Game/AdvancedLocomotionV4");'))
+        $gaspCommandletSource | Should Match ([regex]::Escape('FParse::Value(*Params, TEXT("ContentRoot="), ContentRoot)'))
+        $gaspCommandletSource | Should Match ([regex]::Escape('Discover(ContentRoot, Assets, Error)'))
+        $gaspCommandletSource | Should Match ([regex]::Escape('WritePlanned(OutputDirectory, ContentRoot, Assets, Error)'))
+        $gaspCommandletSource | Should Match ([regex]::Escape('WriteComplete(OutputDirectory, ContentRoot, Assets, Files, Error)'))
     }
 }

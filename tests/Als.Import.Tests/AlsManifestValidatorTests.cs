@@ -24,7 +24,7 @@ public sealed class AlsManifestValidatorTests
     }
 
     [Fact]
-    public void RejectsUnsupportedSchemaAndExporterVersionsAtStablePaths()
+    public void RejectsUnsupportedSchemaButAcceptsAnyNonEmptyExporterVersion()
     {
         var manifest = AlsManifestSerializer.Load(AlsManifestSerializerTests.TypedTimelineFixturePath());
 
@@ -32,7 +32,9 @@ public sealed class AlsManifestValidatorTests
         Assert.Equal("ALSMANIFEST001", schemaIssue.Code);
         Assert.Equal("$.schemaVersion", schemaIssue.FieldPath);
 
-        var exporterIssue = Assert.Single(AlsManifestValidator.Validate(manifest with { ExporterVersion = "1.0.0" }));
+        Assert.Empty(AlsManifestValidator.Validate(manifest with { ExporterVersion = "9.4-preview" }));
+
+        var exporterIssue = Assert.Single(AlsManifestValidator.Validate(manifest with { ExporterVersion = " " }));
         Assert.Equal("ALSMANIFEST013", exporterIssue.Code);
         Assert.Equal("$.exporterVersion", exporterIssue.FieldPath);
     }

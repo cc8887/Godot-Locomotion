@@ -58,8 +58,15 @@ $manifest = Read-P5aManifestJson $manifestFullPath
 if ($manifest.schemaVersion -isnot [long] -or $manifest.schemaVersion -ne 2) {
     throw 'Canonical manifest schemaVersion must be integer 2.'
 }
-if ($manifest.exporterVersion -isnot [string] -or $manifest.exporterVersion -cne '2.0.0') {
-    throw 'Canonical manifest exporterVersion must be exactly 2.0.0.'
+if ($manifest.exporterVersion -isnot [string] -or [string]::IsNullOrWhiteSpace($manifest.exporterVersion)) {
+    throw 'Canonical manifest exporterVersion metadata is missing.'
+}
+$sourceContentRoot = [string]$manifest.sourceContentRoot
+$invalidContentRootSegment = @($sourceContentRoot.Substring([Math]::Min(6, $sourceContentRoot.Length)).Split('/') |
+    Where-Object { $_ -in @('', '.', '..') }).Count -gt 0
+if ($sourceContentRoot -cnotmatch '^/Game/[^/]+(?:/[^/]+)*$' -or
+    $sourceContentRoot.Contains('\') -or $invalidContentRootSegment) {
+    throw "Canonical manifest sourceContentRoot must be a canonical Unreal content path: $sourceContentRoot"
 }
 
 function Resolve-ExactManifestAsset([object]$Manifest, [string]$Collection, [string]$ObjectPath) {
@@ -86,7 +93,7 @@ function Resolve-Id([string]$Collection, [string]$ObjectPath) {
     return [string](Resolve-ExactManifestAsset $manifest $Collection $ObjectPath).id
 }
 
-$locomotionRoot = '/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion'
+$locomotionRoot = "$sourceContentRoot/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion"
 $memberNames = @(
     'ALS_CLF_Walk_L', 'ALS_N_Run_RB', 'ALS_N_Walk_B', 'ALS_N_Walk_LF', 'ALS_N_Run_F',
     'ALS_N_Walk_F', 'ALS_N_Run_B', 'ALS_N_Run_LF', 'ALS_N_Sprint_F', 'ALS_CLF_Walk_F',
@@ -101,10 +108,10 @@ $members = @($memberNames | ForEach-Object {
     }
 })
 
-$transitionRoot = '/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions'
+$transitionRoot = "$sourceContentRoot/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions"
 $leftTransition = Resolve-Id 'animations' "$transitionRoot/ALS_N_Transition_L.ALS_N_Transition_L"
 $rightTransition = Resolve-Id 'animations' "$transitionRoot/ALS_N_Transition_R.ALS_N_Transition_R"
-$actionRoot = '/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions'
+$actionRoot = "$sourceContentRoot/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions"
 $rollMontageAsset = Resolve-ExactManifestAsset $manifest 'montages' `
     "$actionRoot/ALS_N_LandRoll_F_Montage_Default.ALS_N_LandRoll_F_Montage_Default"
 $rollSequenceAsset = Resolve-ExactManifestAsset $manifest 'animations' `

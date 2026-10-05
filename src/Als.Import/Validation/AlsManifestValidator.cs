@@ -23,10 +23,10 @@ public static partial class AlsManifestValidator
                 options.SupportedSchemaVersion.ToString(), manifest.SchemaVersion.ToString());
         }
 
-        if (!string.Equals(manifest.ExporterVersion, options.SupportedExporterVersion, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(manifest.ExporterVersion))
         {
-            Add(issues, "ALSMANIFEST013", null, "$.exporterVersion", "Unsupported manifest exporter version.",
-                options.SupportedExporterVersion, manifest.ExporterVersion);
+            Add(issues, "ALSMANIFEST013", null, "$.exporterVersion", "Exporter version metadata cannot be empty.",
+                "non-empty", manifest.ExporterVersion);
         }
 
         if (manifest.AuditSummary is null)

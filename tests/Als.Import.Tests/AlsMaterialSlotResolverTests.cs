@@ -24,4 +24,26 @@ public sealed class AlsMaterialSlotResolverTests
     {
         Assert.Equal(-1, AlsMaterialSlotResolver.Resolve(["Shared", "Shared"], [0, 1], "Shared"));
     }
+
+    [Theory]
+    [InlineData("M_AnimMan_Default_0")]
+    [InlineData("M_AnimMan_Default_14")]
+    public void ResolvesGodotNumberedDuplicateNamesToTheUniqueExportedMaterial(string importedName)
+    {
+        Assert.Equal(
+            0,
+            AlsMaterialSlotResolver.Resolve(["M_AnimMan_Default", "M_AnimMan_Eyes"], [0, 1], importedName));
+    }
+
+    [Fact]
+    public void PrefersAnExactExportedNameBeforeInterpretingANumericSuffix()
+    {
+        Assert.Equal(1, AlsMaterialSlotResolver.Resolve(["Default", "Default_1"], [0, 1], "Default_1"));
+    }
+
+    [Fact]
+    public void RejectsAnAmbiguousGodotDuplicateName()
+    {
+        Assert.Equal(-1, AlsMaterialSlotResolver.Resolve(["Shared", "Shared"], [0, 1], "Shared_2"));
+    }
 }

@@ -22,22 +22,18 @@ Task 17 计划要求根目录 README，但此前仓库没有该文件。本轮�
 
 ## 2. 来源、资产和 Profile
 
-### 2.1 固定来源
+### 2.1 验证来源快照
 
-| 项目 | 固定值 |
+| 项目 | 当时的记录值 |
 | --- | --- |
 | 参考仓库 | `https://github.com/Sixze/ALS-Refactored.git` |
 | ALS-Refactored commit | `b754d6f0f2bb03741d301f8fb88077ebfe561e17` |
 | 目标 UE | `5.9.0` |
 | 兼容补丁 | `reference/patches/als-refactored-ue-5.9-engine-version.patch` |
 | 补丁 SHA-256 | `3dc561f194045d3dc01bd65c7f7c3bd4acd0a30c0fab31ea0cd16d676d312e5f` |
-| 资产 lock schema | `1` |
-| 正式 manifest SHA-256 | `F12C56C705F05C7C55E77955BD14A3729A2E96D5FAA669FDBD759702B0EA846E` |
 | 资产审计 | 267 assets / 141 files / 126 animations / 0 error / 0 warning |
 
-`reference/als-refactored.lock.json` 锁定参考 commit、引擎和唯一兼容补丁；
-`reference/als-v4-export.lock.json` 锁定正式资产摘要及数量。Overlay 和道具模型
-已经包含在全量资产边界内，音频明确不在该批范围内。
+表中目标引擎和资产数量是该次参考验证的记录，不是导出资产的版本门禁。当前导出以 manifest 声明的资产、原始对象名和语义数据为准，并在导出时比较两份结果的确定性；不会要求 manifest 或二进制文件匹配历史批次哈希。Overlay 和道具模型已经包含在当次资产边界内，音频明确不在范围内。
 
 ### 2.2 P4 Profile
 
