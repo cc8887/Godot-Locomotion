@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kimodo Pipeline · Motion Viewer</title>
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <div class="brand">Kimodo Pipeline · Motion Viewer</div>
+  <select id="stageSelect" title="管线阶段"></select>
+  <button id="modeBtn" class="btn" type="button">A/B 对比</button>
+  <label id="syncWrap" class="chk" hidden><input type="checkbox" id="syncAB" checked> A/B 同步</label>
+  <span class="muted small" id="serverInfo">assets/generated · 只读</span>
+</header>
+<div id="errBar" hidden></div>
+<div id="layout">
+  <aside id="sidebar">
+    <input id="fileSearch" type="text" placeholder="过滤文件名…">
+    <div id="stageMeta" class="muted small"></div>
+    <ul id="fileList"></ul>
+  </aside>
+  <main id="main">
+    <div id="viewports">
+      <div class="vp active" id="vpA" data-slot="A">
+        <canvas id="canvasA"></canvas>
+        <div class="vp-label">A</div>
+        <div class="vp-badge" id="badgeA">（未加载）</div>
+      </div>
+      <div class="vp" id="vpB" data-slot="B" hidden>
+        <canvas id="canvasB"></canvas>
+        <div class="vp-label">B</div>
+        <div class="vp-badge" id="badgeB">（未加载）</div>
+      </div>
+    </div>
+    <div id="legend">
+      <span><i class="dot" style="background:#ff7a1a"></i>根骨骼 root/Root</span>
+      <span><i class="dot" style="background:#ff3d81"></i>骨盆 pelvis/Hips</span>
+      <span><i class="dot" style="background:#b44cff"></i>IK/虚拟骨 ik_*/VB_*</span>
+      <span><i class="dot" style="background:#35d96b"></i>脚 *foot*/ankle*</span>
+      <span><i class="dot" style="background:#ffd23d"></i>手 *hand*/wrist*</span>
+      <span><i class="dot" style="background:#38a9ff"></i>头 head</span>
+      <span><i class="line"></i>根/骨盆运动轨迹</span>
+    </div>
+    <div id="transport">
+      <button id="playBtn" class="btn primary" type="button">暂停</button>
+      <input type="range" id="timeSlider" min="0" max="1" step="0.001" value="0">
+      <span id="timeText" class="mono">0.00 / 0.00 s</span>
+      <label class="chk">速度
+        <select id="speedSelect">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.5">1.5×</option>
+          <option value="2">2×</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="loopChk" checked> 循环</label>
+      <label class="chk">Up 轴
+        <select id="upSelect" title="仅作用于当前激活视图">
+          <option value="y" selected>Y-up</option>
+          <option value="z">Z-up 修正</option>
+        </select>
+      </label>
+      <button id="resetCamBtn" class="btn" type="button">重置视角</button>
+      <select id="clipSelect" hidden title="多 Take 时选择"></select>
+    </div>
+    <div id="infoPanel">
+      <div id="infoTabs">
+        <button class="tabBtn active" data-tab="summary" type="button">概要</button>
+        <button class="tabBtn" data-tab="disp" type="button">位移轨道</button>
+        <button class="tabBtn" data-tab="bones" type="button">关键骨骼</button>
+        <button class="tabBtn" data-tab="sidecar" type="button">溯源 JSON</button>
+      </div>
+      <div class="tabScroll">
+        <div class="tab" id="tab-summary"><div class="muted">尚未加载文件</div></div>
+        <div class="tab" id="tab-disp" hidden></div>
+        <div class="tab" id="tab-bones" hidden></div>
+        <div class="tab" id="tab-sidecar" hidden></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>
