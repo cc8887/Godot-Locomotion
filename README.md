@@ -69,7 +69,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Godot 首次导入失败' }
 
 ### 在同一 Demo 中切换 ALS／Lyra（main）
 
-资源就绪后，F5 或运行 `scenes/demo/als_demo.tscn`，按 **F6** 在 ALS 与 Lyra 主控间切换；也可按 Esc 显示鼠标，再点击顶部的 ALS／Lyra 按钮。`--locomotion=lyra` 选择初始 Lyra，省略或传 `--locomotion=als` 则以 ALS 启动。
+资源就绪后，F5 或运行 `scenes/demo/als_demo.tscn`，按 **F6** 在 ALS 与 Lyra 主控间切换；也可直接点击顶部的 ALS／Lyra 按钮。默认鼠标可见且自由移动，按 Esc 主动捕获后可转动视角，再按 Esc 或切到其他窗口即可释放；返回窗口不会自动捕获。`--locomotion=lyra` 选择初始 Lyra，省略或传 `--locomotion=als` 则以 ALS 启动。
 
 切换共用原场景的地形、移动平台和相机输入，交接脚底位置、朝向、世界速度与蹲伏状态；行走、跑动和空中均可切换。两套动画各自初始化，上一主控的运行时停止更新和碰撞。ALS 的 Overlay、旋转／相机模式及 Lyra 的装备选择分别记忆；Q/E/R 按当前系统解释，HUD 显示当前模式。翻滚、攀爬、Ragdoll／起身和 Lyra Montage 期间先记录请求，动作结束后接管；Ragdoll 需要先用 G 恢复角色。目标资源缺失或初始化失败时保留当前主控，并显示失败原因。
 

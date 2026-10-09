@@ -251,8 +251,8 @@ public partial class DemoLocomotionSwitcher : Node
         _status.Text = _issue is not null ? "  切换失败，保留当前主控：" + _issue :
             _waitingForAls ? "  正在接管 ALS…" : _requested.HasValue && _requested.Value != UsingLyra ?
             "  等待当前动作完成后切换…" : UsingLyra ?
-            "  F6 切换 · Lyra / " + _profile + " · Q 换装备 · R 装填 · E Emote · Esc 显示鼠标" :
-            "  F6 切换 · ALS · Q/E Overlay · R 翻滚 · Esc 显示鼠标";
+            "  F6 切换 · Lyra / " + _profile + " · Q 换装备 · R 装填 · E Emote · Esc 捕获/释放鼠标" :
+            "  F6 切换 · ALS · Q/E Overlay · R 翻滚 · Esc 捕获/释放鼠标";
     }
 
     public override void _ExitTree()
