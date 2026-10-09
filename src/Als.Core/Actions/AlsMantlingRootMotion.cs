@@ -77,7 +77,9 @@ public static class AlsMantlingRootMotion
         var rotation=(start.Rotation*(bias*(1.0-rotationWeight))+target.Rotation*rotationWeight).Normalized();
         var projection=gravityUp*AlsDoubleVector.Dot(gravityUp,new(rotation.X,rotation.Y,rotation.Z));
         rotation=new AlsQuaternion(projection.X,projection.Y,projection.Z,rotation.W).Normalized();
-        var root=useRootMotion ? Reverse(mesh,UnitScale(rootSampler.Sample(montageTime))) : AlsPrecisePose.Identity;
+        // Anchors are in the mesh basis even when authored root sampling is
+        // disabled. Always cancel that basis before emitting an actor pose.
+        var root=Reverse(mesh,useRootMotion ? UnitScale(rootSampler.Sample(montageTime)) : AlsPrecisePose.Identity);
         var targetActor=AlsPrecisePose.Compose(root,new(position,rotation,AlsDoubleVector.One));
         var velocity=(targetActor.Position-actor.Position)*(1.0/delta);
         var rotationDelta=targetActor.Rotation*actor.Rotation.Conjugate();

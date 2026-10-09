@@ -207,6 +207,20 @@ Sprint/Weapon Start 的非循环起步片段也服务原地 motor。DAG 的 `in_
 
 矩阵保存 `directional-quality.json` 及全部输入 trace 哈希；运行场景全部通过但足部质量失败时，runner 仍返回失败。`publish activate` 必须取得完整 71 项矩阵、三帧率并行一致性和针对同一包的质量证据，并重新计算四方向门禁；局部 `_OK` 标记不能代替质量验收。当前 v11 的身体偏移已修复，但足底对照仍不合格，保留为未激活候选，见 [实测与截图](../../docs/verification/2026-10-07-als-nonprop-directional-e2e.md)。
 
+## Low Mantle 可复用真实场景诊断
+
+Low Mantle 的局部真实场景诊断可直接执行 `scripts/verify-kimodo-mantle-scene.py`：
+
+```powershell
+& G:/Github/kimodo/.venv/Scripts/python.exe scripts/verify-kimodo-mantle-scene.py `
+  --pack res://assets/generated/als_nonprop_<version>/resource-pack.json `
+  --output artifacts/tests/<fresh-run>/mantle-scene
+```
+
+先完成项目构建和 Godot 资源导入；脚本复用 `mantling_demo_smoke.tscn` 的完整 Demo、真实物理、Montage 与最终骨架写入，覆盖 Low 三种物理 Hz、根运动开关、单线程和候选／原版 GPU 截图，不依赖 computer-use。各进程显式选择包，证据目录不得复用，保存命令／日志／胶囊方向／截图摘要，并核对整批载荷、活动指针和动画设置未变。
+
+场景通过 `--mantle-output=<path>` 输出逐帧 actor 位置／yaw、已发布物理骨骼、committed/presented 身份和完整蒙皮顶点与已知平台箱体的交叠深度。脚本分别保存 `runtimePassed`、`quality.orientationPassed` 和 `quality.skinPassed`；静态平台 actor yaw 偏差上限 1°，蒙皮箱体交叠深度上限 2 cm。后一项是新增夹具几何门禁，不是放宽既有原生接触对照。任何失败均返回非零，原版对照也照实保留失败，不能因为原版也穿模而将候选判为通过。它不替代 High、完整矩阵、全部身份、支撑力／手掌朝向或人工验收；当前仍失败的结果见[复核记录](../../docs/verification/2026-10-09-mantle-runtime-orientation-penetration.md)。
+
 ## 根运动曲线作为产出的一部分
 
 `publish stage` 自动从最终目标 raw 烘焙：包含 root 平移/旋转，或原合同声明根运动的每个资产，分别写到 `motion_curves/<edition>/<OriginalAssetName>.root-motion.json`。导出不受运行根运动开关影响，包含位移、相对旋转、累计/剩余平面距离、到终点的负剩余路程和三维距离；保留原时长、键数及 interpolation。文件登记到包索引和 SHA256 payload 清单，激活检查其完整性。

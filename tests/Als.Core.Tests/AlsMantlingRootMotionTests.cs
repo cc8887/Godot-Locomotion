@@ -39,6 +39,28 @@ public sealed class AlsMantlingRootMotionTests
     }
 
     [Theory]
+    [InlineData(0, false)][InlineData(.4, false)]
+    [InlineData(0, true)][InlineData(.4, true)]
+    public void DisabledRootSamplingStillCancelsMeshBasisAtBothAnchors(double yaw, bool relative)
+    {
+        var mesh=Yaw(-System.Math.PI/2);
+        var actor=Pose(10,20,30,Yaw(yaw));
+        var target=Pose(90,80,130,Yaw(yaw));
+        var targetBase=Pose(25,-40,0,Yaw(.3));
+        var destination=relative ? AlsPrecisePose.Relative(target,targetBase) : target;
+        var anchors=AlsMantlingRootMotion.CreateAnchors(actor,destination,mesh,Identity,Identity,relative,targetBase);
+        // A null sampler proves this correction does not re-enable authored root sampling.
+        var first=AlsMantlingRootMotion.Prepare(0,0,.01f,Settings,anchors,actor,mesh,Up,true,relative,targetBase,null!,false);
+        Near(actor,first.TargetActor);
+        Near(AlsDoubleVector.Zero,first.Velocity);
+        var end=AlsMantlingRootMotion.Prepare(.75f,.25f,.1f,Settings,anchors,actor,mesh,Up,true,relative,targetBase,null!,false);
+        Near(target,end.TargetActor);
+        var mid=AlsMantlingRootMotion.Prepare(0,.5f,.1f,Settings,anchors,actor,mesh,Up,true,relative,targetBase,null!,false);
+        Near(actor.Rotation,mid.TargetActor.Rotation);
+        Near((actor.Position+target.Position)*.5,mid.TargetActor.Position);
+    }
+
+    [Theory]
     [InlineData(0,1,true)][InlineData(1,0,true)][InlineData(1,1,false)]
     public void ClearedSourceStillAdvancesTimeWithoutSampling(float duration,float delta,bool alive)
     {

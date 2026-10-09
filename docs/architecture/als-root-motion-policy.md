@@ -16,6 +16,8 @@
 
 普通 Demo 的完整链在两种根策略下均启用 `--rolling-gameplay`，开启根策略时额外启用 `--montage-root-motion`；显式 `--action-preview` 仍表达动画预览意图。配置不是运行中热切换，不另建角色时钟、独立求值或最终写骨掩盖路径。
 
+翻越锚点始终包含原生 mesh 相对 actor 的 −90° 基底。关闭作者 Root 采样只将 Root 变换替换为 identity；`Prepare` 仍必须通过 `Reverse(mesh, identity)` 抵消锚点基底，不能将整个 mesh→actor 变换删去，否则输出角色额外偏转 90°。此抵消不读取动画 Root。关闭策略下的程序化目标插值不保证恢复资产的接触轨迹，完整落台不能替代最终蒙皮与障碍交叠检查；当前失败证据见[朝向与穿模复核](../verification/2026-10-09-mantle-runtime-orientation-penetration.md)。
+
 ## 生产契约
 
 生产图按依赖完成 master、镜像/反向/参数派生、原资产身份打包，然后原生重定向到目标 rig。`publish stage` 在最终 root/IK 分解及采样接口确定后，必须调用 `root_curves.export`，再登记文件并写版本包。曲线读取尚未受运行策略或 root lock 影响的最终目标 raw；运行关闭根运动仍完整导出。SOMA BVH 外层静态 Root 不作为目标轨迹来源。

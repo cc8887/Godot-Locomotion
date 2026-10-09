@@ -16,6 +16,7 @@ internal sealed class AlsSoleGeometryObserver
     private readonly Point[] _points;
     private readonly Point[] _supportPoints;
     private readonly Dictionary<Skeleton3D, Transform3D[]> _poses = [];
+    private readonly List<Surface> _surfaces = [];
     public int LeftCount { get; }
     public int RightCount { get; }
     public float BindErrorMeters { get; }
@@ -87,6 +88,7 @@ internal sealed class AlsSoleGeometryObserver
                 var stride = indices.Length / vertices.Length;
                 if (stride is not (4 or 8)) throw new InvalidOperationException("Unsupported skin weight count.");
                 var surface = new Surface(skeleton, binds, bones, vertices, indices, weights, stride);
+                _surfaces.Add(surface);
                 for (var v = 0; v < vertices.Length; v++)
                 {
                     float left = 0, right = 0, total = 0;
@@ -208,6 +210,40 @@ internal sealed class AlsSoleGeometryObserver
     {
         if (OS.GetThreadCallerId() != OS.GetMainThreadId())
             throw new InvalidOperationException("Imported mesh access requires the main thread.");
+    }
+
+    internal readonly record struct VolumePenetration(int Vertices, int Inside, float MaximumDepthMeters,
+        Vector3 DeepestWorld, string DominantBone);
+
+    // Observe the complete published skin against a known fixture volume;
+    // reuse the same verified bind mapping and skinning as sole observation.
+    internal VolumePenetration CaptureVolumePenetration(Transform3D volumeToWorld, Aabb volume)
+    {
+        RequireMainThread();
+        foreach (var (skeleton, poses) in _poses)
+            for (var bone=0;bone<poses.Length;bone++) poses[bone]=skeleton.GetBoneGlobalPose(bone);
+        var inverse=volumeToWorld.AffineInverse();
+        int vertices=0,inside=0;float depth=0;var deepest=Vector3.Zero;var dominant="";
+        foreach (var surface in _surfaces)
+        for (var vertex=0;vertex<surface.Vertices.Length;vertex++)
+        {
+            vertices++;
+            var world=surface.Skeleton.GlobalTransform*Skin(surface,vertex,_poses[surface.Skeleton]);
+            var local=inverse*world;
+            if (!volume.HasPoint(local)) continue;
+            inside++;
+            var min=local-volume.Position;var max=volume.End-local;
+            var distance=MathF.Min(MathF.Min(min.X,max.X),MathF.Min(MathF.Min(min.Y,max.Y),MathF.Min(min.Z,max.Z)));
+            if (distance<=depth) continue;
+            depth=distance;deepest=world;float weight=0;
+            for (var w=0;w<surface.Stride;w++)
+            {
+                var i=vertex*surface.Stride+w;
+                if (surface.Weights[i]<=weight) continue;
+                weight=surface.Weights[i];dominant=surface.Skeleton.GetBoneName(surface.Bones[surface.Indices[i]]).ToString();
+            }
+        }
+        return new(vertices,inside,depth,deepest,dominant);
     }
 
     private static Vector3 Skin(Surface surface, int vertex, Transform3D[] poses)

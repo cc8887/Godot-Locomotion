@@ -21,6 +21,9 @@ public partial class MantlingDemoSmoke : Node
     private bool _ragdollSeen, _interrupted;
     private Vector3 _last;
     private readonly List<int> _captures = [];
+    private string? _output;
+    private AlsSoleGeometryObserver? _geometry;
+    private readonly List<object> _frames = [];
     public override void _Ready()
     {
         try
@@ -29,12 +32,14 @@ public partial class MantlingDemoSmoke : Node
 _case = args.FirstOrDefault(a => a.StartsWith("--mantle-case="))?[14..] ?? "low";
             _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--mantle-hz="))?[12..] ?? "60");
 _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
+            _output = args.FirstOrDefault(a => a.StartsWith("--mantle-output="))?[16..];
             if (_capture is not null) { Directory.CreateDirectory(_capture); RenderingServer.FramePostDraw += Capture; }
             Engine.PhysicsTicksPerSecond = _hz;
             _entry = new() { ConfigureBeforeReady = demo => demo.ConfigureRuntimePolicyForSmoke(
                 args.Contains("--mantle-single") ? AlsHarnessMode.Single : AlsHarnessMode.Parallel, true) };
             AddChild(_entry);
             if (!_entry.Demo.IsRuntimeReady) throw new Exception("Demo failed to initialize.");
+            if (_output is not null) _geometry=new(_entry.Demo.ActiveCharacter.PhysicalDisplaySkeleton.GetParent());
             var world = _entry.Demo.GetNode<Node3D>("World");
             foreach (var child in world.GetChildren()) if (child.Name != "StartFloor") Disable(child);
             var floor = world.GetNode<StaticBody3D>("StartFloor");
@@ -90,6 +95,22 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
                 if (_active > 1 && motor.GlobalPosition.DistanceTo(_last) > .5f) throw new Exception("Discontinuous mantle root motion.");
             }
             _last = motor.GlobalPosition;
+            if (_output is not null)
+            {
+                var skeleton=character.PhysicalDisplaySkeleton;
+                var bones=new Dictionary<string,object>();
+                foreach (var name in new[]{"root","pelvis","spine_03","hand_l","hand_r","foot_l","foot_r"})
+                {
+                    var bone=skeleton.FindBone(name);var pose=skeleton.GetBoneGlobalPose(bone);
+                    bones[name]=new {world=V(skeleton.GlobalTransform*pose.Origin),rotation=Q((skeleton.GlobalBasis*pose.Basis).GetRotationQuaternion())};
+                }
+                var penetration=GodotObject.IsInstanceValid(_obstacle) ? _geometry!.CaptureVolumePenetration(
+                    _obstacle.GlobalTransform,new Aabb(new Vector3(-2,-_height/2,-1.5f),new Vector3(4,_height,3))) : default;
+                _frames.Add(new {tick=_tick,time=mantle.Time,active=mantle.Active,actor=V(motor.GlobalPosition),
+                    actorYaw= motor.GlobalBasis.GetEuler().Y,committed=character.RuntimeCommittedFrameId,
+                    presented=character.PublishedFrameId,bones,penetration=new {penetration.Vertices,penetration.Inside,
+                        penetration.MaximumDepthMeters,deepestWorld=V(penetration.DeepestWorld),penetration.DominantBone}});
+            }
             if (_tick % Math.Max(1, _hz / 10) == 0 && _capture is not null) _captures.Add(_tick);
             if (_tick % _hz == 0) GD.Print($"MANTLE_FRAME tick={_tick} active={mantle.Active} time={mantle.Time:R} p={motor.GlobalPosition} probe={motor.MantleProbeRejection}");
             if (_tick >= _hz * 6)
@@ -107,6 +128,7 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
                     if (MathF.Abs(motor.GlobalPosition.Y - capsule.Height * .5f - _height) > .08f || !motor.IsOnFloor())
                         throw new Exception($"Mantle did not land on top: {motor.GlobalPosition}.");
                 }
+                SaveReport();
                 GD.Print($"MANTLE_DEMO_OK case={_case} hz={_hz} active={_active} starts={_starts} footsteps={_footsteps} interrupted={_interrupted} ragdoll={_ragdollSeen}"); _done = true; GetTree().Quit();
             }
         }
@@ -128,6 +150,16 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
         using var image = GetViewport().GetTexture().GetImage();
         foreach (var tick in _captures) image.SavePng(Path.Combine(_capture!, $"mantle-{tick}.png")); _captures.Clear();
     }
-    private void Fail(Exception e) { _done = true; GD.PushError(e.ToString()); GetTree().Quit(1); }
+    private static float[] V(Vector3 v)=>[v.X,v.Y,v.Z];
+    private static float[] Q(Quaternion q)=>[q.X,q.Y,q.Z,q.W];
+    private void SaveReport()
+    {
+        if (_output is null) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_output))!);
+        File.WriteAllText(_output,System.Text.Json.JsonSerializer.Serialize(new {schemaVersion=1,scenario=_case,hz=_hz,
+            rootMotion=GodotAls.Animation.AlsAnimationRuntimeOptions.SampleRootMotion,
+            scope="Published physical bones and full skin vertices against the fixture box",frames=_frames}));
+    }
+    private void Fail(Exception e) { _done = true; SaveReport(); GD.PushError(e.ToString()); GetTree().Quit(1); }
     public override void _ExitTree() { Input.ActionRelease("jump"); if (_capture is not null) RenderingServer.FramePostDraw -= Capture; }
 }
